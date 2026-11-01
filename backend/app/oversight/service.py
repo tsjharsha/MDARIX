@@ -8,7 +8,9 @@
   not started; the reportability decision tasks;
 - **Report obligations:** each obligation not yet met, with the deadline it was given;
 - **Communications:** each open request's reply due date (its owner's task);
-- **Guide approvals:** a guide version waiting for its second person, due at the end of the next working day;
+- **Approvals:** a report snapshot or guide version waiting for its second person: the approver's task (workflow/
+  approvals.py), due at the end of the next working day (a report's sooner deadline first); a guide version asked
+  before 0.10.64, without a task, from the version itself;
 - **CAPA:** the effectiveness check tasks, and the CAPAs imported from the QMS with a due date (on the view only:
   the QMS owns them, so they raise no alert);
 - every other open My Work task with a due date.
@@ -214,13 +216,14 @@ def _task_items(db: Session, tenant_id) -> list[dict]:
         complaint_id = details.get("complaint_id") or (
             task.source_entity_id if task.source_entity_type == "Complaint" else None
         )
-        opens = {"section": "My Work"}
+        # An approval task (workflow/approvals.py) names its own category and the screen it opens.
+        opens = details.get("opens") or {"section": "My Work"}
         if task.task_type == REPLY_TASK and complaint_id:
             opens = {"section": "Complaints", "tab": f"Communications?complaint={complaint_id}"}
         found.append(
             _item(
                 f"task:{task.id}",
-                TASK_CATEGORIES.get(task.task_type, "TASK"),
+                details.get("category") or TASK_CATEGORIES.get(task.task_type, "TASK"),
                 task.title,
                 task.due_at,
                 ref=details.get("complaint_business_id") or details.get("reference") or task.business_id,
@@ -327,8 +330,19 @@ def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
 
 
 def _guide_items(db: Session, tenant_id, calendar: rules.Calendar) -> list[dict]:
+    """A guide version waiting for approval with no approver's task (one asked before 0.10.64): the task stands for
+    it otherwise, so it shows once."""
     from backend.app.db.models.guides_communications import DecisionGuideVersion
+    from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
 
+    asked = {
+        row.source_entity_id
+        for row in db.query(WorkflowTask.source_entity_id).filter(
+            WorkflowTask.tenant_id == tenant_id,
+            WorkflowTask.source_entity_type == "DecisionGuideVersion",
+            WorkflowTask.status.in_(list(OPEN_TASK_STATUSES)),
+        )
+    }
     return [
         _item(
             f"guide:{row.id}",
@@ -342,6 +356,7 @@ def _guide_items(db: Session, tenant_id, calendar: rules.Calendar) -> list[dict]
         for row in db.query(DecisionGuideVersion).filter(
             DecisionGuideVersion.tenant_id == tenant_id, DecisionGuideVersion.state == "AWAITING_APPROVAL"
         )
+        if row.id not in asked
     ]
 
 

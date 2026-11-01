@@ -50,6 +50,8 @@ from backend.app.evidence_workflow.people import current_person, require_any_per
 from backend.app.reportability import assessments, deadlines, markets
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.standards import STARTER_MARK, chips
+from backend.app.workflow import approvals
+from backend.app.workflow.tasks import run_hook
 
 logger = logging.getLogger("mdarix.authority_reports")
 router = APIRouter(prefix="/api/v1/reports", tags=["Authority reports"])
@@ -170,6 +172,22 @@ def _preparers(obligation: ReportObligation, extra: str | None = None) -> set[st
     return {ref for ref in found if ref}
 
 
+def standing(control_db, ctx, tenant_id, preparers: set[str], signer: str | None, trial: bool) -> dict:
+    """Whether this person may approve the snapshot, told before any password (J13, workflow/approvals.py): never the
+    preparer, the conclusion's signer or an administrator, except that working alone in a trial one may approve one's
+    own practice report ("same person", T-B8); the colleagues who may approve, by name."""
+    me = str(ctx.user_id)
+    person = current_person(control_db, ctx)
+    role = person.role_for(REGULATORY_APPROVE if person.holds(REGULATORY_APPROVE) else REGULATORY_REVIEW)
+    if person.holds_any(*approvals.PERMISSIONS):
+        problem = rules.approver_problem(me, role, preparers, signer)
+        separation = problem is not None and (role or "").upper() not in rules.ADMINISTRATOR_ROLES
+    else:
+        problem, separation = approvals.NO_RIGHTS, False
+    others = [name for _, name in approvals.approvers(control_db, tenant_id, {*preparers, signer, me})]
+    return {**approvals.standing(problem, separation, others, trial, role, "report"), "role": role}
+
+
 def _deadline(obligation: ReportObligation, context: dict, today, org_zone: str | None = None) -> dict:
     """The obligation's deadline: the one it was given (a rejection never moves it); while it is provisional, the
     market assessment's current one."""
@@ -243,6 +261,10 @@ def _snapshot_view(row: ReportSnapshot, names: dict) -> dict:
         "approved_at": _iso(row.approved_at),
         "signed_record_id": str(row.signed_record_id) if row.signed_record_id else None,
         "preparers": [names.get(ref) or "A colleague" for ref in row.preparers or []],
+        "same_person": bool(row.approved_by)
+        and (
+            row.approved_by in (row.preparers or []) or row.approved_by == (row.fields or {}).get("conclusion_signer")
+        ),
         "sample": row.source_system is not None,
     }
 
@@ -378,6 +400,19 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "snapshots": [_snapshot_view(row, names) for row in reversed(snapshots)],
         "pending_snapshot": _snapshot_view(pending, names) if pending else None,
         "cannot_approve": sorted({names.get(ref) or "A colleague" for ref in (*_preparers(obligation), signer) if ref}),
+        # Who approves, before anyone types a password: for the waiting snapshot, else for the one this person asks.
+        "approval": standing(
+            control_db,
+            ctx,
+            tenant_id,
+            set(pending.preparers or []) | _preparers(obligation)
+            if pending
+            else _preparers(obligation, str(ctx.user_id)),
+            ((pending.fields or {}).get("conclusion_signer") if pending else None) or signer,
+            trial,
+        )
+        if obligation.state in rules.EDITABLE
+        else None,
         "submissions": [
             _submission_view(row, evidence.get(row.id, []), names, due, obligation.market, deadline_zone)
             for row in reversed(submissions)
@@ -722,6 +757,7 @@ def ask_for_approval(
     obligation = _obligation(db, _tenant(ctx), obligation_id, lock=True)
     if obligation.state not in rules.EDITABLE:
         raise _error(409, "NOT_A_DRAFT", "Only a draft is frozen for approval")
+    replaced = [row.id for row in _snapshots(db, obligation) if row.state == "PENDING"]
     snapshot = request_snapshot(db, control_db, obligation, str(ctx.user_id), _now())
     _audit(
         db,
@@ -732,7 +768,51 @@ def ask_for_approval(
         fingerprint=snapshot.content_fingerprint,
     )
     db.commit()
+    run_hook(db, "report snapshot approval task", _approval_tasks, control_db, ctx, obligation, snapshot, replaced)
     return detail(db, control_db, ctx, obligation)
+
+
+def _approval_tasks(db, control_db, ctx, obligation: ReportObligation, snapshot: ReportSnapshot, replaced) -> None:
+    """The approver's task in My Work (J13): for each colleague who may approve the snapshot, due at the end of the
+    next working day or at the report's deadline when sooner; a replaced snapshot's tasks are cancelled."""
+    from backend.app.oversight.service import calendar_of
+
+    actor = str(ctx.user_id)
+    for old in replaced:
+        approvals.finish(
+            db,
+            obligation.tenant_id,
+            source_type=OBJECT_TYPE,
+            source_id=old,
+            outcome="Replaced",
+            actor=actor,
+            approved=False,
+        )
+    calendar = calendar_of(db, obligation.tenant_id)
+    due = calendar.working_day_end(snapshot.requested_at, 1)
+    if obligation.due_on:
+        due = min(due, rules.deadline_end(obligation.due_on, obligation.market, calendar.zone))
+    ref = (snapshot.fields or {}).get("complaint") or str(obligation.complaint_id)
+    approvals.ask(
+        db,
+        control_db,
+        obligation.tenant_id,
+        source_type=OBJECT_TYPE,
+        source_id=snapshot.id,
+        title=f"Approve snapshot {snapshot.version} of the {_form(obligation).title} for {ref}",
+        due_at=due,
+        excluded={*(snapshot.preparers or []), (snapshot.fields or {}).get("conclusion_signer")},
+        requester=actor,
+        trial=_trial(control_db, obligation.tenant_id),
+        details={
+            "complaint_id": str(obligation.complaint_id),
+            "complaint_business_id": ref,
+            "obligation_id": str(obligation.id),
+            "market": obligation.market,
+            "category": "OBLIGATION",
+            "opens": {"section": "Complaints", "tab": f"Reports?complaint={obligation.complaint_id}"},
+        },
+    )
 
 
 class ApproveRequest(BaseModel):
@@ -768,15 +848,17 @@ def approve_snapshot(
     if snapshot.state != "PENDING" or obligation.state not in rules.EDITABLE:
         raise _error(409, "SNAPSHOT_NOT_PENDING", "This snapshot is not waiting for approval")
     me = str(ctx.user_id)
-    person = current_person(control_db, ctx)
-    role = person.role_for(REGULATORY_APPROVE if person.holds(REGULATORY_APPROVE) else REGULATORY_REVIEW)
-    problem = rules.approver_problem(
-        me,
-        role,
+    allowed = standing(
+        control_db,
+        ctx,
+        tenant_id,
         set(snapshot.preparers or []) | _preparers(obligation),
         (snapshot.fields or {}).get("conclusion_signer"),
+        _trial(control_db, tenant_id),
     )
-    if problem:
+    role, same_person = allowed["role"], allowed["same_person"]
+    if not allowed["may_approve"]:
+        problem = allowed["message"]
         _audit(db, ctx, "REPORT_SNAPSHOT_APPROVAL_REFUSED", obligation, version=snapshot.version, reason=problem)
         db.commit()
         raise _error(403, "SECOND_PERSON_REQUIRED", problem)
@@ -813,7 +895,8 @@ def approve_snapshot(
         object_version=str(snapshot.version),
         decision_type=DECISION_TYPE,
         decision="APPROVED",
-        remarks=f"{obligation.form_version}, snapshot {snapshot.version}",
+        remarks=f"{obligation.form_version}, snapshot {snapshot.version}"
+        + (", same person (trial practice: prepared and approved by one person)" if same_person else ""),
         signer_user_id=me,
         signer_role=role or "UNKNOWN",
         signature_meaning=meaning,
@@ -837,6 +920,7 @@ def approve_snapshot(
                 "version": snapshot.version,
                 "signature_id": str(record.id),
                 "fingerprint": snapshot.content_fingerprint,
+                "same_person": same_person,
             },
             created_at=now,
         )
@@ -853,6 +937,17 @@ def approve_snapshot(
         except Exception:
             logger.exception("Signature %s was saved but its snapshot %s was not", record.id, snapshot.id)
             raise
+    run_hook(
+        db,
+        "report snapshot approval task",
+        approvals.finish,
+        tenant_id,
+        source_type=OBJECT_TYPE,
+        source_id=snapshot.id,
+        outcome="Approved",
+        actor=me,
+        approved=True,
+    )
     return detail(db, control_db, ctx, obligation)
 
 
