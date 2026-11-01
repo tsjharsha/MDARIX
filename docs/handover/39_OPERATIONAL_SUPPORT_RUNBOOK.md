@@ -72,6 +72,29 @@ It runs with the owner credentials, clears that platform administrator's MFA enr
 next sign-in, records an audit event under the `MDARIX_PLATFORM` organization and prints the result. Confirm the
 person's identity out of band (call them on a known number) before running it, and put the ticket in `--reason`.
 
+## Judges and evaluators at an event
+
+Set their trials up before the event, with the platform administrator's existing tools (0.10.62; nothing here is a
+new feature). Each judge gets their own free trial, with the sample data, and is its owner.
+
+1. **The request.** Each judge requests a trial on the sign-up page with their own work email, ideally a week before.
+   A staff member may fill in the form for a judge who agreed to it, with the judge's own email: the activation email
+   goes to that address, never to MDARIX.
+2. **The approval.** Requests within the day's caps are approved at once. Any other request waits in Platform Admin >
+   Customers & Tenants > Trials (the trial requests queue): approve it there.
+3. **The activation.** The judge activates from the email and sets up an authenticator app at the first sign-in (ask
+   them to bring a phone with one). If the email does not arrive, use "Resend invitation" in the queue, or issue a
+   fresh activation link from the person's account (your own session must have passed MFA) and hand it over yourself.
+4. **A panel that shares one workspace.** A trial owner invites up to two colleagues (3 users per trial) in Getting
+   started > Team. Each colleague activates and sets up MFA in the same way.
+5. **On the day.** Sign-ups from one network address are limited to `MDARIX_SIGNUP_PER_ADDRESS_PER_HOUR` per hour
+   (30 by default); the day's automatic approvals to `MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX` (company emails) and
+   `MDARIX_TRIAL_AUTO_APPROVE_PERSONAL_DAILY_MAX` (personal emails). Raise them in `.env.production` before the event
+   if more people will sign up, run `dc up -d --no-build --wait` (DEPLOYMENT.md), and set them back afterwards.
+6. **A trial that ends during judging.** Give it a later end date in Plans & Licensing > Subscriptions (or the
+   customer's Subscription tab). From 0.10.62 an ended trial is never suspended, and a renewed one opens again at
+   once.
+
 ## Common customer questions
 
 - **"AI answers say they come from rules."** The organization's AI processing is off (the default for new

@@ -34,11 +34,26 @@ class Limit:
     window_seconds: int
 
 
+def _count_from_env(name: str, default: int) -> int:
+    """A limit an operator may set (read when the API starts); a missing, invalid or non-positive value keeps the
+    default."""
+    try:
+        value = int(os.getenv(name) or default)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+# Sign-up requests per network address per hour. 30 by default (0.10.62, J12): at a venue (a hackathon, an
+# incubator's demo day) many people sign up from one Wi-Fi address; the per-email limit and the daily caps of
+# automatic approval (trial/auto_approval.py) still bound what one person or a burst can do.
+SIGNUP_PER_ADDRESS_PER_HOUR = _count_from_env("MDARIX_SIGNUP_PER_ADDRESS_PER_HOUR", 30)
+
 # Attempts allowed per window. Account-level lockout (login_throttles) and MFA lockout still apply on top.
 LIMITS: dict[str, Limit] = {
     "signin:ip": Limit(30, 300),
     "signin:account": Limit(10, 900),
-    "signup:ip": Limit(5, 3600),
+    "signup:ip": Limit(SIGNUP_PER_ADDRESS_PER_HOUR, 3600),
     "signup:email": Limit(3, 86400),
     "forgot:ip": Limit(10, 3600),
     "forgot:email": Limit(3, 3600),
@@ -116,12 +131,23 @@ def _key_hash(scope: str, key: str) -> str:
     return hashlib.sha256(f"{salt}:{scope}:{key.strip().lower()}".encode()).hexdigest()
 
 
+def wait_words(seconds: int) -> str:
+    """How long until the window ends, as people say it: "a minute", "12 minutes", "an hour", "3 hours"."""
+    minutes = max(1, -(-seconds // 60))
+    if minutes == 1:
+        return "a minute"
+    if minutes < 60:
+        return f"{minutes} minutes"
+    hours = -(-minutes // 60)
+    return "an hour" if hours == 1 else f"{hours} hours"
+
+
 def _too_many(retry_after: int, message: str | None = None) -> HTTPException:
     return HTTPException(
         429,
         detail={
             "code": "RATE_LIMITED",
-            "message": message or "Too many attempts. Please wait a few minutes and try again.",
+            "message": message or f"Too many attempts. Please try again in {wait_words(retry_after)}.",
             "retry_after_seconds": max(1, retry_after),
         },
         headers={"Retry-After": str(max(1, retry_after))},

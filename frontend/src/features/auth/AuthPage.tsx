@@ -49,7 +49,6 @@ export const lostAuthenticatorHelp = (support: string) =>
   `Lost your phone and your recovery codes? In a free trial, ask the person who invited you: they can reset it in Getting started › Team. If you started the trial, write to ${support}. In a pilot, ask your administrator.`;
 
 const MESSAGES: Record<string, string> = {
-  RATE_LIMITED: "Too many attempts. Please wait a few minutes and try again.",
   ACCOUNT_TEMPORARILY_LOCKED:
     "Too many failed sign-in attempts. Wait 15 minutes, then try again or reset your password.",
   INVALID_CREDENTIALS: "That email and password do not match an active account.",
