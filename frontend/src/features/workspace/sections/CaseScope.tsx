@@ -132,7 +132,8 @@ function SaveOutcome({ result }: { result: ScopeSaveResult }) {
 
 /** The scope as it stands: each part with its items, and why it last changed. */
 function ScopeView({ scope }: { scope: ScopeVersion }) {
-  const parts = scopeParts(scope);
+  // Lots left out exist only where a lot impact list left one out (a free trial): no empty line elsewhere.
+  const parts = scopeParts(scope).filter((part) => part.key !== "lots_left_out" || part.items.length > 0);
   return (
     <>
       <dl className="ca-facts uw-scope-facts">

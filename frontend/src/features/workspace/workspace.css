@@ -4850,6 +4850,37 @@ div.uw-task-count:hover {
   margin: 14px 0 6px;
   font-size: 0.95rem;
 }
+.uw-li-lots {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-li-lot {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.uw-li-lot-head {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+/* Two facts a row on a phone, four on a wide screen. */
+.uw-li-lot .ca-facts {
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+}
+.uw-li-lot .ac-badge {
+  white-space: normal;
+}
+.uw-li-evidence {
+  margin: 0;
+  color: var(--ac-muted);
+  font-size: 0.85rem;
+}
 .uw-li-shipments summary {
   cursor: pointer;
 }
@@ -4861,7 +4892,6 @@ div.uw-task-count:hover {
 .uw-li-exclude {
   display: grid;
   gap: 4px;
-  min-width: 180px;
 }
 .uw-li-exclude textarea {
   width: 100%;

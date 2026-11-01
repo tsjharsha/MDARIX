@@ -638,6 +638,7 @@ def serialize(data: dict, refs: dict, names: dict[str, str]) -> dict:
         "excluded_lots": [
             {
                 "id": item["lot_id"],
+                "business_id": lots[item["lot_id"]].business_id if item["lot_id"] in lots else None,
                 "lot_identifier": lots[item["lot_id"]].lot_identifier if item["lot_id"] in lots else None,
                 "reason": item.get("reason"),
             }

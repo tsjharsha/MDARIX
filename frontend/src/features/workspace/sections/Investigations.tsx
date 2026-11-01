@@ -357,14 +357,14 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
           (work.investigationId ? (
             <>
               <CaseScopePanel
-                key={`${work.investigationId}:${scopeRound}`}
+                key={`scope:${work.investigationId}:${scopeRound}`}
                 investigationId={work.investigationId}
                 caseQuestion={selected?.investigation_question ?? undefined}
                 onChanged={() => setLotRound((value) => value + 1)}
               />
               {isTrial && (
                 <LotImpactPanel
-                  key={`${work.investigationId}:${lotRound}`}
+                  key={`lot:${work.investigationId}:${lotRound}`}
                   investigationId={work.investigationId}
                   caseLabel={selected ? displayId(selected, "investigation_identifier") : "this case"}
                   focus={lotFocus}

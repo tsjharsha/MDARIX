@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Boxes, Download, Factory, PackageCheck, Save, ShieldCheck, Truck } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
-import { Table, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
+import { errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
 import { useCan, useWorkspace } from "../workspaceContext";
 import { InlineError } from "./boardParts";
@@ -279,14 +279,14 @@ function ImpactBody({
         <strong>Units shipped by country:</strong> {countriesText(totals.by_country, "no distribution imported")}
       </p>
       {list.truncated && <p className="ac-note">Only the first 2,000 lots are listed.</p>}
-      <LotTable
+      <LotGroup
         title="Lots with complaints"
         lots={groups.withComplaints}
         view={view}
         excluded={excluded}
         onExclude={onExclude}
       />
-      <LotTable
+      <LotGroup
         title="Lots without complaints yet"
         lots={groups.withoutComplaints}
         view={view}
@@ -294,7 +294,7 @@ function ImpactBody({
         onExclude={onExclude}
       />
       {groups.excluded.length > 0 && (
-        <LotTable
+        <LotGroup
           title="Left out of the list"
           lots={groups.excluded}
           view={view}
@@ -306,7 +306,7 @@ function ImpactBody({
   );
 }
 
-function LotTable({
+function LotGroup({
   title,
   lots,
   view,
@@ -328,49 +328,53 @@ function LotTable({
     onExclude(next);
   };
   return (
-    <section className="ca-drawer-section uw-li-group">
+    <section className="ca-drawer-section uw-li-group" aria-label={title}>
       <h3>
         {title} · {lots.length}
       </h3>
-      <Table
-        caption={title}
-        rows={lots}
-        rowKey={(lot) => lot.id}
-        empty={{ title: "No lots", detail: "" }}
-        columns={[
-          {
-            key: "lot_identifier",
-            label: "Lot",
-            render: (lot) => (
-              <span>
+      <ul className="uw-li-lots">
+        {lots.map((lot) => {
+          const leaving = lot.id in excluded;
+          return (
+            <li key={lot.id} className="uw-li-lot">
+              <p className="uw-li-lot-head">
                 <strong>{lot.lot_identifier}</strong>
-                <small className="ac-muted"> {lot.version ?? ""}</small>
-              </span>
-            ),
-          },
-          {
-            key: "complaints",
-            label: "Complaints",
-            render: (lot) =>
-              lot.complaints ? (
-                <span>
-                  {lot.complaints}
-                  {lot.per_1000 !== null && <small className="ac-muted"> · {lot.per_1000} per 1,000 units</small>}
-                </span>
-              ) : (
-                <span className="ac-muted">None yet</span>
-              ),
-          },
-          { key: "released", label: "Released", render: (lot) => unitsText(lot.released) },
-          {
-            key: "shipped",
-            label: "Shipped by country",
-            render: (lot) =>
-              lot.distribution_imported ? (
+                {lot.version && <small className="ac-muted"> {lot.version}</small>}
+              </p>
+              <dl className="ca-facts">
+                <div>
+                  <dt>Complaints</dt>
+                  <dd>
+                    {lot.complaints
+                      ? `${lot.complaints}${lot.per_1000 !== null ? ` · ${lot.per_1000} per 1,000 units` : ""}`
+                      : "None yet"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Released</dt>
+                  <dd>{unitsText(lot.released)}</dd>
+                </div>
+                <div>
+                  <dt>Shipped</dt>
+                  <dd>
+                    {lot.distribution_imported ? (
+                      `${unitsText(lot.shipped)}: ${countriesText(lot.by_country)}`
+                    ) : (
+                      <ToneBadge tone="warning" label={view.not_imported} />
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>In stock</dt>
+                  <dd>
+                    {lot.distribution_imported ? unitsText(lot.in_stock) : "Not known"}
+                    {lot.over_shipped && <small className="tone-bad"> more shipped than released</small>}
+                  </dd>
+                </div>
+              </dl>
+              {lot.shipments.length > 0 && (
                 <details className="uw-li-shipments">
-                  <summary>
-                    {unitsText(lot.shipped)}: {countriesText(lot.by_country)}
-                  </summary>
+                  <summary>Consignees ({lot.shipments.length})</summary>
                   <ul>
                     {lot.shipments.map((item) => (
                       <li key={`${item.consignee}|${item.country}|${item.ship_date}`}>
@@ -380,39 +384,12 @@ function LotTable({
                     ))}
                   </ul>
                 </details>
-              ) : (
-                <ToneBadge tone="warning" label={view.not_imported} />
-              ),
-          },
-          {
-            key: "in_stock",
-            label: "In stock",
-            render: (lot) =>
-              lot.distribution_imported ? (
-                <span>
-                  {unitsText(lot.in_stock)}
-                  {lot.over_shipped && <small className="tone-bad"> more shipped than released</small>}
-                </span>
-              ) : (
-                <span className="ac-muted">Not known</span>
-              ),
-          },
-          {
-            key: "evidence",
-            label: "Why it is listed",
-            render: (lot) => <small>{lot.evidence.join("; ")}</small>,
-          },
-          {
-            key: "exclude",
-            label: "Leave out",
-            render: (lot) => {
-              const leaving = lot.id in excluded;
-              if (!onExclude)
-                return lot.excluded ? <small>{lot.exclusion_reason}</small> : <span className="ac-muted">—</span>;
-              return (
+              )}
+              <p className="uw-li-evidence">{lot.evidence.join("; ")}</p>
+              {onExclude ? (
                 <div className="uw-li-exclude">
                   <label>
-                    <input type="checkbox" checked={leaving} onChange={() => toggle(lot)} /> Leave out
+                    <input type="checkbox" checked={leaving} onChange={() => toggle(lot)} /> Leave out of the list
                   </label>
                   {leaving && (
                     <textarea
@@ -424,11 +401,13 @@ function LotTable({
                     />
                   )}
                 </div>
-              );
-            },
-          },
-        ]}
-      />
+              ) : (
+                lot.excluded && <p className="uw-li-evidence">Left out: {lot.exclusion_reason}</p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }

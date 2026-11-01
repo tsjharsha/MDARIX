@@ -34,7 +34,7 @@ PRACTICE = "Practice record"
 
 def group(row: dict) -> str:
     if row["excluded"]:
-        return "Excluded"
+        return "Left out"
     return "With complaints" if row["complaints"] else "Without complaints yet"
 
 
@@ -84,7 +84,7 @@ def header_lines(view: dict, organization: str | None) -> list[str]:
     lines = [
         f"Organization: {organization or '-'}",
         f"Case: {view['investigation']['business_id'] or view['investigation']['id']}",
-        f"Suspect factor: {factor['kind_label'].lower()} {factor['label']}",
+        f"Suspect factor ({factor['kind_label'].lower()}): {factor['label']}",
         f"List: {view['which_label']}",
     ]
     if view.get("practice_label"):
@@ -93,14 +93,12 @@ def header_lines(view: dict, organization: str | None) -> list[str]:
 
 
 def _lot_lines(row: dict) -> list[tuple[str, str]]:
-    rate = f", {row['per_1000']} per 1,000 units released" if row["per_1000"] is not None else ""
-    out = [
-        (
-            f"{row['lot_identifier']}  {row['product'] or '-'} {row['version'] or ''}: "
-            f"{row['complaints']} complaint{'' if row['complaints'] == 1 else 's'}{rate}",
-            "body",
-        )
-    ]
+    if not row["complaints"]:
+        complaints = "no complaints yet"
+    else:
+        rate = f", {row['per_1000']} per 1,000 units released" if row["per_1000"] is not None else ""
+        complaints = f"{row['complaints']} complaint{'' if row['complaints'] == 1 else 's'}{rate}"
+    out = [(f"{row['lot_identifier']}  {row['product'] or '-'} {row['version'] or ''}: {complaints}", "body")]
     if row["distribution_imported"]:
         stock = f", {_number(row['in_stock'])} in stock" if row["in_stock"] is not None else ""
         countries = ", ".join(f"{item['country']} {item['units']:,}" for item in row["by_country"])
@@ -126,7 +124,7 @@ def _lot_lines(row: dict) -> list[tuple[str, str]]:
     for line in row["evidence"]:
         out.append((f"    {line}", "muted"))
     if row["excluded"]:
-        out.append((f"    Excluded: {row['exclusion_reason']}", "muted"))
+        out.append((f"    Left out: {row['exclusion_reason']}", "muted"))
     return out
 
 
@@ -153,7 +151,7 @@ def lines(view: dict) -> list[tuple[str, str]]:
     out += [
         (
             f"{totals['lots']} lots: {totals['with_complaints']} with complaints ({totals['complaints']} complaints), "
-            f"{totals['without_complaints']} without complaints yet; {totals['excluded']} excluded.",
+            f"{totals['without_complaints']} without complaints yet; {totals['excluded']} left out.",
             "body",
         ),
         (
@@ -171,7 +169,7 @@ def lines(view: dict) -> list[tuple[str, str]]:
             "Lots without complaints yet",
             [row for row in listed["lots"] if not row["excluded"] and not row["complaints"]],
         ),
-        ("Excluded lots", [row for row in listed["lots"] if row["excluded"]]),
+        ("Lots left out", [row for row in listed["lots"] if row["excluded"]]),
     ):
         if not rows:
             continue

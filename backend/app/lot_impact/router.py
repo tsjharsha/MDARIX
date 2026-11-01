@@ -263,7 +263,7 @@ def save_lot_impact(
         return view(db, control_db, ctx, case)
     now = _now()
     role = acting_role(control_db, tenant_id, ctx.user_id, INVESTIGATION_WORK)
-    reason = f"Lot impact: {factor['label']} ({factor['kind_label'].lower()}); {len(kept)} lots kept" + (
+    reason = f"Lot impact on {factor['label']}: {len(kept)} lots kept" + (
         f", {len(excluded)} left out with a reason" if excluded else ""
     )
     current.update(

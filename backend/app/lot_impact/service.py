@@ -142,9 +142,7 @@ def matching(db: Session, tenant_id, factor: dict) -> dict[str, list[str]]:
             LotComponent.component_lot_identifier == factor["lot"],
         )
         for lot_id, component_lot, component in rows:
-            found[str(lot_id)].append(
-                f"Genealogy: {component.name} ({component.component_identifier}) lot {component_lot}"
-            )
+            found[str(lot_id)].append(f"Lot genealogy: built with {component.name} lot {component_lot}")
         return dict(found)
     supplier = db.query(Supplier.name).filter(Supplier.tenant_id == tenant_id, Supplier.id == key).scalar()
     rows = query.join(
@@ -153,10 +151,8 @@ def matching(db: Session, tenant_id, factor: dict) -> dict[str, list[str]]:
         & (ComponentSupplier.tenant_id == LotComponent.tenant_id),
     ).filter(LotComponent.tenant_id == tenant_id, ComponentSupplier.supplier_id == key)
     for lot_id, component_lot, component in rows:
-        part = f"{component.name} ({component.component_identifier})" + (
-            f" lot {component_lot}" if component_lot else ""
-        )
-        found[str(lot_id)].append(f"Genealogy: {part}; {supplier} is a recorded supplier of this component")
+        part = component.name + (f" lot {component_lot}" if component_lot else "")
+        found[str(lot_id)].append(f"Lot genealogy: built with {part}; {supplier} is a recorded supplier of it")
     return dict(found)
 
 

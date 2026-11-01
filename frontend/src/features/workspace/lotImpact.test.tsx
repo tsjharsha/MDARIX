@@ -66,7 +66,7 @@ const lot = (over: Partial<ImpactLot>): ImpactLot => ({
       ship_date: "2026-08-23",
     },
   ],
-  evidence: ["Genealogy: Pressure Sensor (Sample) (SAMPLE-ORBIT-300-C1) lot NS-SL-2417 (Sample)"],
+  evidence: ["Lot genealogy: built with Pressure Sensor (Sample) lot NS-SL-2417 (Sample)"],
   excluded: false,
   exclusion_reason: null,
   ...over,

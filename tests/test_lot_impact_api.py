@@ -163,7 +163,7 @@ def test_the_case_suggests_the_sensor_lot_and_lists_the_lots_that_share_it(trial
     assert lots[ORBIT_LOT.format(4)]["in_stock"] == 30
     eight = lots[ORBIT_LOT.format(8)]
     assert eight["distribution_imported"] is False and eight["shipped"] is None and eight["in_stock"] is None
-    assert lots[ORBIT_LOT.format(6)]["evidence"][0].startswith("Genealogy: Pressure Sensor (Sample)")
+    assert lots[ORBIT_LOT.format(6)]["evidence"][0].startswith("Lot genealogy: built with Pressure Sensor (Sample)")
     totals = listed["totals"]
     assert (totals["with_complaints"], totals["without_complaints"], totals["not_imported"]) == (2, 3, 1)
     assert {item["country"] for item in totals["by_country"]} == {"US", "IN", "DE", "FR"}
@@ -192,8 +192,11 @@ def test_an_exclusion_needs_a_reason_and_is_kept_with_the_case_scope(trial):
     again = _ok(user.put(base, json={"factor": factor, "excluded": [{"lot_id": lot_8, "reason": reason}]}))
     assert again["saved"]["scope_version"] == saved["saved"]["scope_version"]
     scope = _ok(user.get(base.replace("/lot-impact", "/scope")))
-    assert scope["current"]["excluded_lots"] == [{"id": lot_8, "lot_identifier": ORBIT_LOT.format(8), "reason": reason}]
-    assert len(scope["current"]["lots"]) == 4 and scope["current"]["change_reason"].startswith("Lot impact: ")
+    left_out = scope["current"]["excluded_lots"]
+    assert [(item["id"], item["lot_identifier"], item["reason"]) for item in left_out] == [
+        (lot_8, ORBIT_LOT.format(8), reason)
+    ]
+    assert len(scope["current"]["lots"]) == 4 and scope["current"]["change_reason"].startswith("Lot impact on ")
 
 
 def test_the_person_signs_the_list_and_a_later_import_shows_changed_since_signed(trial):
