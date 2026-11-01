@@ -1,6 +1,6 @@
 """Import of the business records beyond products, lots and complaints: components, suppliers, sites, bills of
-materials, approved suppliers, lot genealogy, changes, requirements, risks, failure modes, controls, investigations,
-evidence and CAPAs.
+materials, approved suppliers, lot genealogy, distribution, changes, requirements, risks, failure modes, controls,
+investigations, evidence and CAPAs.
 
 These templates plug into backend/app/trial/imports.py, which keeps the rules for every import: the whole batch is
 checked first, references must resolve inside the tenant, personal data is refused, and a batch with any problem
@@ -10,7 +10,7 @@ writes nothing. A record that refers to another (a BOM line to its component) ne
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
@@ -74,6 +74,18 @@ TEMPLATES: dict[str, dict] = {
         "optional": ["component_lot_id"],
         "identity": ["lot_id", "component_id", "component_lot_id"],
         "example": [["L24-0815", "PS-110", "KS-5521"]],
+    },
+    # Where each lot's units went (T-G5): consignees are organizations, never people; a free trial only for now
+    # (imports.TRIAL_ONLY). A shipment is one lot, consignee, country and ship date: a re-upload updates it.
+    "distribution": {
+        "title": "Distribution",
+        "required": ["lot_id", "consignee", "country", "quantity", "ship_date"],
+        "optional": ["consignee_type", "consignee_reference"],
+        "identity": ["lot_id", "consignee", "country", "ship_date"],
+        "example": [
+            ["L24-0815", "Galway University Hospital", "IE", "120", "2026-07-28", "Hospital", "C-1182"],
+            ["L24-0815", "Medisupply Distribution GmbH", "DE", "80", "2026-08-02", "Distributor", "C-2207"],
+        ],
     },
     "changes": {
         "title": "Engineering changes",
@@ -345,7 +357,96 @@ def check(entity: str, rows, lookup, report) -> int:
             if not need(lot, "lot_id", "Lot") or not need(component, "component_id", "Component"):
                 continue
             new += _genealogy(lookup.db, lookup.tenant_id, lot.id, component.id, row.get("component_lot_id")) is None
+        elif entity == "distribution":
+            problem = distribution_problem(row)
+            if problem:
+                report.add(line, problem[0], problem[1])
+                continue
+            lot = lookup.lot(row["lot_id"])
+            if not need(lot, "lot_id", "Lot"):
+                continue
+            new += _shipment(lookup.db, lookup.tenant_id, lot.id, row) is None
     return new
+
+
+# ISO 3166-1 alpha-2: the officially assigned codes.
+COUNTRY_CODES = frozenset(
+    """
+    AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA
+    CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA
+    GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP
+    KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS
+    MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS
+    RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW
+    TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW
+    """.split()
+)
+
+
+def distribution_problem(row: dict) -> tuple[str, str] | None:
+    """A shipment row's own problem, before its lot is looked up: the country code and the units."""
+    if (row.get("country") or "").strip().upper() not in COUNTRY_CODES:
+        return "country", "Use the two-letter ISO country code, for example IN, US or DE (GB for the United Kingdom)."
+    if not units(row.get("quantity")):
+        return "quantity", "A shipment has at least one unit."
+    return None
+
+
+def units(value) -> int:
+    """A whole number as the import's checks accept it ("1,250", "1 250"), 0 when there is none."""
+    digits = "".join(character for character in str(value or "") if character.isdigit())
+    return int(digits) if digits else 0
+
+
+def _shipment(db: Session, tenant_id, lot_id, row: dict):
+    from backend.app.db.models.lot_impact import LotDistribution
+
+    return (
+        db.query(LotDistribution)
+        .filter(
+            LotDistribution.tenant_id == tenant_id,
+            LotDistribution.lot_batch_id == lot_id,
+            LotDistribution.consignee == row["consignee"],
+            LotDistribution.country == row["country"].strip().upper(),
+            LotDistribution.ship_date == date.fromisoformat(row["ship_date"]),
+        )
+        .first()
+    )
+
+
+def distribution_flags(db: Session, tenant_id, lot_identifiers) -> list[dict]:
+    """Lots this import shipped from whose units shipped (every shipment held, not only this file's) now exceed the
+    units they released: the data-quality report flags them; nothing is refused."""
+    from sqlalchemy import func
+
+    from backend.app.db.models.foundation import LotBatch
+    from backend.app.db.models.lot_impact import LotDistribution
+
+    wanted = sorted(set(lot_identifiers))
+    if not wanted:
+        return []
+    rows = (
+        db.query(LotBatch.lot_identifier, LotBatch.quantity, func.sum(LotDistribution.quantity))
+        .join(
+            LotDistribution,
+            (LotDistribution.lot_batch_id == LotBatch.id) & (LotDistribution.tenant_id == LotBatch.tenant_id),
+        )
+        .filter(LotBatch.tenant_id == tenant_id, LotBatch.lot_identifier.in_(wanted), LotBatch.quantity.isnot(None))
+        .group_by(LotBatch.lot_identifier, LotBatch.quantity)
+        .order_by(LotBatch.lot_identifier)
+        .all()
+    )
+    return [
+        {
+            "lot_id": lot,
+            "released": int(released),
+            "shipped": int(shipped),
+            "message": f"Lot {lot}: {int(shipped):,} units shipped, {int(released):,} released. Check the distribution "
+            "or the lot's quantity.",
+        }
+        for lot, released, shipped in rows
+        if shipped is not None and int(shipped) > int(released)
+    ]
 
 
 def _genealogy(db: Session, tenant_id, lot_id, component_id, component_lot: str | None):
@@ -501,6 +602,37 @@ def write(
                 )
                 created += 1
             else:
+                updated += 1
+        elif entity == "distribution":
+            from backend.app.db.models.lot_impact import LotDistribution
+
+            lot = lookup.lot(row["lot_id"])
+            shipment = _shipment(db, tenant_id, lot.id, row)
+            values = {
+                "quantity": units(row["quantity"]),
+                "consignee_type": row.get("consignee_type") or None,
+                "consignee_reference": row.get("consignee_reference") or None,
+            }
+            if shipment is None:
+                db.add(
+                    LotDistribution(
+                        id=uuid.uuid4(),
+                        tenant_id=tenant_id,
+                        lot_batch_id=lot.id,
+                        consignee=row["consignee"],
+                        country=row["country"].strip().upper(),
+                        ship_date=parse_date(row["ship_date"]).date(),
+                        source_system=source,
+                        created_at=now,
+                        updated_at=now,
+                        **values,
+                    )
+                )
+                created += 1
+            else:
+                for name, value in values.items():
+                    setattr(shipment, name, value)
+                shipment.updated_at = now
                 updated += 1
         db.flush()
     upsert_record_evidences(db, tenant_id, evidence)

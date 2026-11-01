@@ -109,7 +109,27 @@ COLUMN_HELP: dict[str, dict[str, str]] = {
         "user_type": "Who used it (healthcare professional, lay user, patient, service engineer): proposed for a person "
         "to confirm. Any other value stays Unknown, shown as you gave it.",
     },
+    "lot_genealogy": {
+        "component_lot_id": "The component's own lot that went into this lot (a sensor lot, for example). A case's lot "
+        "impact lists every lot built with the same component lot.",
+    },
+    "distribution": {
+        "lot_id": "The lot shipped. A row for a lot not loaded yet is set aside with its reason.",
+        "consignee": "The organization the units went to: a hospital, a distributor or a clinic. Never a patient or "
+        "another person: names of people are refused.",
+        "country": "The two-letter ISO country code of the consignee (IN, US, DE...).",
+        "quantity": "Units shipped, a whole number. Units shipped beyond the lot's units released are flagged in the "
+        "data-quality report.",
+        "ship_date": "The day the units left (YYYY-MM-DD).",
+    },
 }
+# Templates a free trial offers and a pilot does not yet (owner decision, 1 Nov 2026: lot impact, T-G5, stays hidden
+# on a pilot until the MVP plan schedules G5).
+TRIAL_ONLY = frozenset({"distribution"})
+
+
+def offered(entity: str, policy: "ImportPolicy") -> bool:
+    return entity not in TRIAL_ONLY or policy.source == UPLOAD_SOURCE
 
 
 def column_help(entity: str) -> dict[str, str]:
@@ -541,7 +561,7 @@ class _Report:
 def _parse(
     entity: str, raw: bytes, report: _Report, policy: ImportPolicy = TRIAL_POLICY, date_format: str = "ISO"
 ) -> list[tuple[int, dict]]:
-    if entity not in TEMPLATES:
+    if entity not in TEMPLATES or not offered(entity, policy):
         raise HTTPException(404, detail={"code": "TEMPLATE_NOT_FOUND", "message": "Unknown template"})
     if len(raw) > policy.file_limit_bytes:
         raise HTTPException(413, detail={"code": "FILE_TOO_LARGE", "message": policy.file_too_large})
@@ -993,6 +1013,8 @@ def check_file(
 
 
 def check_records(db: Session, tenant_id, entity: str, records: list[dict], policy: ImportPolicy) -> dict:
+    if not offered(entity, policy):
+        raise HTTPException(404, detail={"code": "TEMPLATE_NOT_FOUND", "message": "Unknown template"})
     report = _Report()
     rows = rows_from_records(entity, records, report)
     return _check_rows(db, tenant_id, entity, rows, report, policy)[0]
@@ -1158,6 +1180,11 @@ def import_file(
             quarantined_rows=len(set_aside),
             quality_report=quality_report(checked.data_lines, len(rows), len(set_aside), report["updated_records"]),
         )
+        if entity == "distribution":
+            # Units shipped beyond the units a lot released are flagged, never refused (T-G5).
+            result["quality_report"]["flags"] = business_imports.distribution_flags(
+                db, tenant_id, [row["lot_id"] for _, row in rows]
+            )
     result.update(
         rejected_rows=report["rejected_rows"],
         masked_values=report["masked_values"],

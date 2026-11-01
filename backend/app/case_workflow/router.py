@@ -432,6 +432,10 @@ def save_scope(
     if previous_row is not None and not data.get("change_reason"):
         raise _error(422, "CHANGE_REASON_REQUIRED", "Say in at least 10 characters why the scope changes")
     previous = scope.as_data(previous_row) if previous_row is not None else scope.derived_scope(db, case)
+    # The lot impact list (tr08) stays with every later version: its factor, its signed snapshot and the lots left out
+    # (a lot put back in the scope here is no longer left out).
+    data["excluded_lots"] = [item for item in previous["excluded_lots"] if item["lot_id"] not in data["lot_ids"]]
+    data["lot_impact"] = previous["lot_impact"]
     included = scope.check_references(db, case, data)
     warnings = scope.scope_warnings(included, data["product_version_ids"], data["date_from"], data["date_to"])
     diff = scope.scope_diff(previous, data)

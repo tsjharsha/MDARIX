@@ -24,6 +24,8 @@ export type ScopeVersion = {
   included_complaints?: ScopeComplaint[] | null;
   excluded_complaints?: ScopeComplaint[] | null;
   lots?: ScopeLot[] | null;
+  /** Lots a person left out of the case, with the reason (the lot impact list, a free trial). */
+  excluded_lots?: (ScopeLot & { reason?: string | null })[] | null;
   markets?: string[] | null;
   failure_modes?: ScopeFailureMode[] | null;
   date_from?: string | null;
@@ -377,6 +379,14 @@ export function scopeParts(
       }),
     },
     { key: "lots", label: "Lots", items: list(scope?.lots, (row) => lotLabel(row as Row)) },
+    {
+      key: "lots_left_out",
+      label: "Lots left out",
+      items: list(scope?.excluded_lots, (row) => {
+        const reason = safeText(row.reason);
+        return reason ? `${lotLabel(row as Row)} (${reason})` : lotLabel(row as Row);
+      }),
+    },
     { key: "markets", label: "Markets", items: list(scope?.markets, (row) => String(row).trim()) },
     {
       key: "failure_modes",
@@ -403,20 +413,22 @@ export function compareScopes(
 ): ScopeCompareRow[] {
   const before = scopeParts(left);
   const after = scopeParts(right);
-  return before.map((part, index) => {
-    const next = after[index]?.items ?? [];
-    const added = next.filter((item) => !part.items.includes(item));
-    const removed = part.items.filter((item) => !next.includes(item));
-    return {
-      key: part.key,
-      label: part.label,
-      left: part.items,
-      right: next,
-      added,
-      removed,
-      same: !added.length && !removed.length,
-    };
-  });
+  return before
+    .map((part, index) => {
+      const next = after[index]?.items ?? [];
+      const added = next.filter((item) => !part.items.includes(item));
+      const removed = part.items.filter((item) => !next.includes(item));
+      return {
+        key: part.key,
+        label: part.label,
+        left: part.items,
+        right: next,
+        added,
+        removed,
+        same: !added.length && !removed.length,
+      };
+    })
+    .filter((row) => row.key !== "lots_left_out" || row.left.length > 0 || row.right.length > 0);
 }
 
 /** The options a long picker shows: those matching the search (ID or detail), at most `limit`, chosen ones always kept. */

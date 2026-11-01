@@ -206,15 +206,19 @@ describe("what changed", () => {
         { id: "c-4", business_id: "CMP000004" },
       ],
       lots: [],
+      excluded_lots: [{ id: "l-1", business_id: "LOT000001", reason: "On quality hold in our warehouse" }],
       markets: ["DE", "FR"],
       date_to: null,
     };
+    // Lots left out show only where a version has one (the lot impact list, a free trial).
+    expect(compareScopes(v1, v1).map((item) => item.key)).not.toContain("lots_left_out");
     const rows = compareScopes(v1, v2);
     const row = (key: string) => rows.find((item) => item.key === key);
     expect(row("question")?.same).toBe(true);
     expect(row("included")).toMatchObject({ added: ["CMP000004"], removed: ["CMP000002"], same: false });
     expect(row("excluded")?.left).toEqual(["CMP000003 (User error confirmed)"]);
     expect(row("lots")).toMatchObject({ left: ["LOT000001"], right: [], removed: ["LOT000001"] });
+    expect(row("lots_left_out")?.added).toEqual(["LOT000001 (On quality hold in our warehouse)"]);
     expect(row("markets")?.added).toEqual(["FR"]);
     expect(row("failure_modes")?.left).toEqual(["FM000001 Occlusion"]);
     expect(row("period")).toMatchObject({ left: ["2026-01-01 to 2026-06-30"], right: ["2026-01-01 to open"] });
@@ -224,6 +228,7 @@ describe("what changed", () => {
       "Complaints in scope",
       "Complaints kept out",
       "Lots",
+      "Lots left out",
       "Markets",
       "Failure modes",
       "Period",

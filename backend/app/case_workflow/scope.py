@@ -52,6 +52,17 @@ def excluded_list(items) -> list[dict]:
     return result
 
 
+def excluded_lots(items) -> list[dict]:
+    """``[{lot_id, reason}]`` with one entry per lot (the first wins) and the reason trimmed (tr08)."""
+    result: list[dict] = []
+    for item in items or ():
+        data = item if isinstance(item, dict) else {}
+        key = as_uuid(data.get("lot_id"))
+        if key is not None and str(key) not in {entry["lot_id"] for entry in result}:
+            result.append({"lot_id": str(key), "reason": " ".join(str(data.get("reason") or "").split())})
+    return result
+
+
 def text_list(values, *, limit: int = 120) -> list[str]:
     """Distinct non-empty strings (compared without case), trimmed, in their first order."""
     result: list[str] = []
@@ -182,6 +193,8 @@ def as_data(row: InvestigationScopeVersion) -> dict:
         "included_complaint_ids": id_list(row.included_complaint_ids),
         "excluded_complaints": excluded_list(row.excluded_complaints),
         "lot_ids": id_list(row.lot_ids),
+        "excluded_lots": excluded_lots(row.excluded_lots),
+        "lot_impact": row.lot_impact,
         "markets": text_list(row.markets),
         "failure_mode_ids": id_list(row.failure_mode_ids),
         "date_from": row.date_from,
@@ -239,6 +252,8 @@ def derived_scope(db: Session, case) -> dict:
         "included_complaint_ids": included,
         "excluded_complaints": [],
         "lot_ids": [],
+        "excluded_lots": [],
+        "lot_impact": None,
         "markets": [],
         "failure_mode_ids": [],
         "date_from": None,
@@ -280,6 +295,8 @@ def write_version(
         included_complaint_ids=id_list(data.get("included_complaint_ids")),
         excluded_complaints=excluded_list(data.get("excluded_complaints")),
         lot_ids=id_list(data.get("lot_ids")),
+        excluded_lots=excluded_lots(data.get("excluded_lots")),
+        lot_impact=data.get("lot_impact"),
         markets=text_list(data.get("markets")),
         failure_mode_ids=id_list(data.get("failure_mode_ids")),
         date_from=data.get("date_from"),
@@ -536,7 +553,12 @@ def references(db: Session, tenant_id, data_list: list[dict]) -> dict:
         if version_ids
         else {}
     )
-    lot_ids = wanted_ids(item for data in data_list for item in data.get("lot_ids") or ())
+    lot_ids = wanted_ids(
+        [
+            *(item for data in data_list for item in data.get("lot_ids") or ()),
+            *(item["lot_id"] for data in data_list for item in data.get("excluded_lots") or ()),
+        ]
+    )
     lots = (
         {
             str(row.id): row
@@ -611,6 +633,16 @@ def serialize(data: dict, refs: dict, names: dict[str, str]) -> dict:
                 "lot_identifier": lots[str(item)].lot_identifier if str(item) in lots else None,
             }
             for item in data.get("lot_ids") or ()
+        ],
+        # Lots a person left out, with the reason (the lot impact list, tr08).
+        "excluded_lots": [
+            {
+                "id": item["lot_id"],
+                "business_id": lots[item["lot_id"]].business_id if item["lot_id"] in lots else None,
+                "lot_identifier": lots[item["lot_id"]].lot_identifier if item["lot_id"] in lots else None,
+                "reason": item.get("reason"),
+            }
+            for item in data.get("excluded_lots") or ()
         ],
         "markets": list(data.get("markets") or ()),
         "failure_modes": [
