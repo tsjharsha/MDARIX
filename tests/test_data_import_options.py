@@ -208,12 +208,13 @@ def test_refusing_flags_every_row_that_masking_would_change(investigator, produc
     assert not check["ready"] and check["rows_to_import"] == 0
     messages = {issue["row"]: issue["message"] for issue in check["issues"]}
     assert set(messages) == {5, 18, 34}, check["issues"]
+    # Each refusal quotes the words it found (0.10.62, J8).
     assert messages[5] == (
-        "This looks like it contains a person's name and a phone number. "
+        "This looks like it contains a person's name and a phone number (“Kavya Rao, +91 98450 12345”). "
         "Remove personal data and retry, or choose to mask it."
     )
-    assert messages[18].startswith("This looks like it contains a person's name and an email address.")
-    assert messages[34].startswith("This looks like it contains a person's name and a phone number.")
+    assert messages[18].startswith("This looks like it contains a person's name and an email address (“")
+    assert messages[34].startswith("This looks like it contains a person's name and a phone number (“")
     assert investigator.post(IMPORT, content=body).status_code == 422
     assert _stored(ids) == {}
 

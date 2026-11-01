@@ -30,7 +30,7 @@ from backend.app.db.models.foundation import Complaint, Product
 from backend.app.db.models.ingestion import ImportLineage
 from backend.app.db.models.regulatory_reference import ImdrfCodeMapping
 from backend.app.enterprise_audit import make_audit_event
-from backend.app.trial.imports import TEMPLATES, _check_values, _mask, _personal_data, _Report, quality_report
+from backend.app.trial.imports import TEMPLATES, _check_values, _Report, quality_report, stored_value
 from backend.app.trial.sample_data import SAMPLE_SOURCE, STORY_WINDOWS_BY
 
 SAMPLE_FILE = "Sample complaints export.xlsx"
@@ -112,7 +112,7 @@ def stage_sample_import(db: Session, tenant_id, now: datetime) -> dict:
         db, tenant_id, import_ref, "complaints", TEMPLATES["complaints"]["required"], rows, version, SAMPLE_SOURCE
     )
     set_aside = _set_aside(len(rows) + 2)
-    import_quarantine.store(db, tenant_id, import_ref, "complaints", SAMPLE_SOURCE, set_aside, _personal_data, _mask)
+    import_quarantine.store(db, tenant_id, import_ref, "complaints", SAMPLE_SOURCE, set_aside, stored_value)
     for item in db.query(Product).filter(Product.tenant_id == tenant_id, Product.source_system == SAMPLE_SOURCE):
         if item.product_identifier in SAMPLE_IDENTITY:
             item.udi_di, item.gmdn_code, item.gmdn_term = SAMPLE_IDENTITY[item.product_identifier]

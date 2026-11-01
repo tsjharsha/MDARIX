@@ -37,8 +37,13 @@ def test_the_sample_shows_an_import_run_its_set_aside_rows_lineage_and_reference
     assert run["sample"] and run["file_name"] == "Sample complaints export.xlsx" and run["entity"] == "complaints"
     report = run["report"]
     total = _ok(user.get("/api/v1/complaints", params={"source_system": "MDARIX_SAMPLE"}))["total"]
-    assert report["rows_read"] == total + 2 and report["rows_accepted"] == total
+    # Every sample complaint came in with the export except SAMPLE-RV-10, the India hospital's report that arrives
+    # weeks later (sample_reports.py, 0.10.58, staged after the import run so its counts stay): it has no import.
+    assert report["rows_read"] == total - 1 + 2 and report["rows_accepted"] == total - 1
     assert report["rows_quarantined"] == 2 and report["balanced"] is True
+    india = _complaint(user, q="SAMPLE-RV-10")
+    assert india["complaint_identifier"] == "SAMPLE-RV-10"
+    assert _ok(user.get(f"/api/v1/data/import/origin/complaints/{india['id']}"))["imports"] == []
 
     detail = _ok(user.get(f"{RUNS}/{run['import_ref']}"))
     assert detail["quarantine_now"] == {"open": 2, "reprocessed": 0} and detail["imported_by"] == "MDARIX sample author"

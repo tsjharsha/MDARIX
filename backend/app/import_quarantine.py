@@ -1,13 +1,15 @@
 """Stored quarantine (R14): the rows a workspace import sets aside are kept, with their reasons, until a person
 corrects them and they are imported again.
 
-A free trial never stores them (its uploader gets the rejects file back instead). Personal data in a stored row is
-masked, never kept as sent; a corrected row goes through the same checked import as any other row. A row whose text
+A free trial stores them too (0.10.56) and deletes them with the trial. Every free-text value of a stored row is masked
+(trial/imports.py stored_value), never kept as sent, and a reason never quotes the words a check found; a corrected row
+goes through the same checked import as any other row. A row whose text
 suggests harm carries its harm words, so it reaches triage while still quarantined (A2).
 """
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -34,10 +36,18 @@ def harm_words(row: dict) -> list[str]:
     return found + intake_rules.harm_words(text)
 
 
-def stored_values(row: dict, personal_data, mask) -> dict:
-    """The row as it may be stored: each value that holds personal data is masked (``personal_data`` and ``mask`` are
-    the import's own checks, trial/imports.py)."""
-    return {column: mask(value) if value and personal_data(value) else value for column, value in row.items()}
+# The words a check quotes in its reason (trial/imports.py _quoted): left out of a stored reason, which is kept.
+_QUOTED = re.compile(r" \(“[^”]*”\)")
+
+
+def stored_values(row: dict, stored_value) -> dict:
+    """The row as it may be stored: ``stored_value(column, value)`` is the import's own masking (trial/imports.py)."""
+    return {column: stored_value(column, value) for column, value in row.items()}
+
+
+def stored_problems(problems: list[str]) -> list[str]:
+    """The reasons as they may be stored: without the words a check quoted (they may be personal data)."""
+    return [_QUOTED.sub("", problem) for problem in problems]
 
 
 def store(
@@ -47,13 +57,12 @@ def store(
     entity: str,
     source: str,
     set_aside: list[tuple[int, dict, list[str]]],
-    personal_data,
-    mask,
+    stored_value,
 ) -> None:
     """Keep the set-aside rows of one import, in its transaction."""
     now = datetime.now(timezone.utc)
     for line, row, problems in set_aside:
-        values = stored_values(row, personal_data, mask)
+        values = stored_values(row, stored_value)
         db.add(
             ImportQuarantineRow(
                 tenant_id=tenant_id,
@@ -62,7 +71,7 @@ def store(
                 source=source,
                 line=line,
                 row=values,
-                problems=problems,
+                problems=stored_problems(problems),
                 harm_words=harm_words(values),
                 status=OPEN,
                 created_at=now,
