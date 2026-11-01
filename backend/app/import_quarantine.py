@@ -15,33 +15,15 @@ from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.app.complaint_review.rules import matched_words
+from backend.app.intake import rules as intake_rules
 from backend.app.db.models.ingestion import ImportQuarantineRow
 
 OPEN = "OPEN"
 REPROCESSED = "REPROCESSED"
 
-# Words that suggest harm to a person (a subset of complaint_review.rules.DEFAULT_WORDS: failures alone are not harm).
-HARM_WORDS = (
-    "injury",
-    "injured",
-    "burn",
-    "burned",
-    "choke",
-    "choking",
-    "shortness of breath",
-    "short of breath",
-    "death",
-    "died",
-    "hospital",
-    "emergency",
-    "bleeding",
-    "infection",
-    "overdose",
-    "underdose",
-    "wrong dose",
-    "shock",
-)
+# Words that suggest harm to a person: the one starter harm-word list of triage (intake/rules.py, G19), a directly
+# negated mention ("no harm") left out. Failures alone are not harm.
+HARM_WORDS = intake_rules.HARM_WORDS
 _YES = frozenset({"yes", "y", "true", "1"})
 
 
@@ -49,7 +31,7 @@ def harm_words(row: dict) -> list[str]:
     """Why a row suggests harm: a death or serious-injury column marked yes, then the harm words in its text."""
     found = [column for column in ("death", "serious_injury") if str(row.get(column, "")).strip().lower() in _YES]
     text = " ".join(str(row.get(column, "")) for column in ("description", "complaint_type", "problem_code"))
-    return found + matched_words(text, HARM_WORDS)
+    return found + intake_rules.harm_words(text)
 
 
 def stored_values(row: dict, personal_data, mask) -> dict:

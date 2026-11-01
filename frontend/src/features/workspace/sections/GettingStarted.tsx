@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Signpost,
   Star,
+  PhoneCall,
   Telescope,
   Upload,
   Users,
@@ -259,6 +260,28 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
             </>
           )}
         </p>
+        {allowed("Complaints") && (
+          <div id="trial-first-contact" className="uw-story-partner uw-anchor">
+            <div>
+              <strong>
+                <PhoneCall size={16} aria-hidden="true" /> Before a complaint: the first call and triage
+              </strong>
+              <p>
+                Log a call from a hospital and see it become a complaint, a service job, both, or pending. Urgent
+                intakes and calls that mention harm go to the triage list at once, with their clocks running from
+                awareness.
+              </p>
+            </div>
+            <div className="uw-story-partner-actions">
+              <button type="button" className="ac-secondary" onClick={() => open("Complaints", "First contact")}>
+                Log a call
+              </button>
+              <button type="button" className="ac-secondary" onClick={() => open("Complaints", "Triage")}>
+                Triage list
+              </button>
+            </div>
+          </div>
+        )}
         <ol className="uw-trial-steps uw-story-steps">
           {chapters.map((chapter) => (
             <ChapterRow

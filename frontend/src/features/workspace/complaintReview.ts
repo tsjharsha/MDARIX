@@ -6,6 +6,10 @@ import type { Slice, Tone } from "../admin/console/dashboardModel";
 import type { TrustSummary } from "./trust";
 
 export const COMPLAINTS_TABS = [
+  // Before every other queue: the events flagged or escalated for triage, then the calls and urgent intakes with their
+  // first-contact check (intake.ts, T-G19, T-G32).
+  "Triage",
+  "First contact",
   // How each complaint is resolved: routine first (disposition.ts, T-G36).
   "Dispositions",
   "Second look",

@@ -4292,3 +4292,87 @@ div.uw-task-count:hover {
 .uw-preview-list li span {
   color: var(--ac-ink-2);
 }
+
+/* First contact, urgent intake and triage (0.10.57) */
+.uw-clock {
+  font-weight: 600;
+}
+.uw-clock.tone-warning {
+  color: #8a5a00;
+}
+.uw-clock.tone-critical {
+  color: var(--ac-critical);
+}
+.uw-tr-scroll {
+  overflow-x: auto;
+}
+.uw-tr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.uw-tr-table th,
+.uw-tr-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--ac-line);
+  text-align: left;
+  vertical-align: top;
+}
+.uw-escalate {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.uw-escalate input {
+  min-width: 0;
+  flex: 1 1 200px;
+}
+.uw-fc-questions {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-fc-question {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+}
+.uw-fc-question.is-flag {
+  border-color: var(--ac-serious);
+}
+.uw-fc-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.uw-fc-answers label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+.uw-fc-outcome {
+  padding: 10px 12px;
+  border-radius: var(--ac-radius);
+  background: #eef5fb;
+}
+.uw-fc-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.uw-fc-pair > div {
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+}
+.uw-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

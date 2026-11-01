@@ -72,6 +72,12 @@ TRIAL_DATA_TABLES = (
     "signer_training_records",
     # Complaint dispositions (tr02): on the complaints listed below.
     "complaint_dispositions",
+    # First contacts, urgent intakes and triage, duplicate links and re-upload field changes (tr04).
+    "first_contact_checks",
+    "triage_records",
+    "record_links",
+    "record_field_changes",
+    "intake_events",
     # The case AI run (md42): about the cases listed below.
     "case_ai_runs",
     # Case scope versions and evidence review history (md29): about the cases and evidence listed below.
