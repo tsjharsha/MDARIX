@@ -4819,6 +4819,15 @@ div.uw-task-count:hover {
 .uw-li-entry {
   margin: 8px 0 0;
 }
+/* The case summary's way in: the label wraps on a phone instead of widening the panel. */
+.uw-li-entry button {
+  max-width: 100%;
+  height: auto;
+  min-height: 36px;
+  padding-block: 6px;
+  white-space: normal;
+  text-align: left;
+}
 .uw-li-never {
   display: flex;
   gap: 8px;
