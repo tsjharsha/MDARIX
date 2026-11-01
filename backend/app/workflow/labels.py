@@ -46,6 +46,12 @@ TASK_TYPES: dict[str, TaskType] = {
     "REPORTABILITY_DECISION": TaskType("Reportability decision", REGULATORY_REVIEW_PERMISSION, "REGULATORY_REVIEWER"),
     # A CAPA's effectiveness check is near or past its day (md41); finished by the signed result.
     "EFFECTIVENESS_CHECK": TaskType("Effectiveness check", QUALITY_REVIEW_PERMISSION, "REVIEWER"),
+    # A first contact (tr04, G32): a follow-up with the reporter on what is unknown or not stated (a dated task until
+    # the communications log, G30); the QMS complaint to create or link for a complaint, "both" or an urgent intake
+    # (G20); the QA review of a "service only" decision (G32). Each is finished by the action it asks for.
+    "FIRST_CONTACT_FOLLOW_UP": TaskType("First-contact follow-up", SIGNAL_TRIAGE_PERMISSION, "TRIAGE_LEAD"),
+    "QMS_COMPLAINT": TaskType("Create or link the QMS complaint", SIGNAL_TRIAGE_PERMISSION, "TRIAGE_LEAD"),
+    "SERVICE_ONLY_REVIEW": TaskType("QA review of a service-only call", QUALITY_REVIEW_PERMISSION, "REVIEWER"),
 }
 
 # Task types a person finishes by hand (POST /api/v1/tasks/{id}/complete); every other type is finished by the
@@ -72,6 +78,8 @@ SOURCE_LABELS: dict[str, str] = {
     "Complaint": "Complaint",
     # A CAPA whose effectiveness check is due (md41): the quality reviewers' reminder.
     "Capa": "CAPA",
+    # A logged contact or an urgent intake (tr04): its follow-ups, QMS-complaint task and QA review.
+    "IntakeEvent": "Contact or urgent intake",
 }
 
 # Used only when backend/app/role_codes.py does not carry ROLE_LABELS (an older build).

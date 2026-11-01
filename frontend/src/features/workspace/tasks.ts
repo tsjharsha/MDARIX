@@ -147,6 +147,8 @@ export function taskSignal(task: Partial<Pick<Task, "source">>): string | null {
 
 /** Task types whose source can be an evidence request (Phase 3): asked to provide evidence, waiting, or reviewing it. */
 const EVIDENCE_REQUEST_TASKS = ["EVIDENCE_RESPONSE", "EVIDENCE_REQUEST", "EVIDENCE_REVIEW"];
+/** The first-contact tasks (tr04): a follow-up with the caller, the QMS complaint to create or link, the QA review. */
+export const FIRST_CONTACT_TASKS = ["FIRST_CONTACT_FOLLOW_UP", "QMS_COMPLAINT", "SERVICE_ONLY_REVIEW"];
 // A request reference as it may travel in a tab name; anything else is ignored.
 const REQUEST_REF = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
@@ -244,6 +246,8 @@ export function taskDestination(
   }
   // A reporting clock due soon or overdue opens the reportability watch; a CAPA's effectiveness check opens that CAPA.
   if (type === "REPORTABILITY_DECISION") return { section: "Complaints", tab: "Reportability" };
+  // A call's follow-up, its QMS-complaint task and the QA review of a "service only" open the first contact (0.10.57).
+  if (FIRST_CONTACT_TASKS.includes(type)) return { section: "Complaints", tab: "First contact" };
   if (type === "EFFECTIVENESS_CHECK") {
     const capa = typeof task.details?.capa_id === "string" ? task.details.capa_id : null;
     return { section: "Records", tab: recordsTab(capa) };

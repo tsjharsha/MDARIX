@@ -5,6 +5,7 @@ import { errorText, send, useResource } from "../../customer-admin/shared";
 import { formatDateTime, formatDay } from "../../../app/dates";
 import { useCan } from "../workspaceContext";
 import { countOf, formatCount } from "./common";
+import { EscalateButton } from "./Triage";
 
 /*
  * What an Excel or CSV import did (0.10.56, the MVP's R14, R16 and R17 on the trial's import path): each run's
@@ -214,6 +215,52 @@ export function ImportRunReport({ run }: { run: ImportRun }) {
         ))}
       </ul>
       {report.rows_quarantined > 0 && <SetAsideRows source={aside} />}
+      {!!report.rows_changed && <FieldChanges importRef={run.import_ref} />}
+    </div>
+  );
+}
+
+type FieldChange = { record_key: string; field: string; before: string | null; after: string | null };
+
+/** The fields this run changed on records already there: a re-upload keeps their history (T-G20). */
+function FieldChanges({ importRef }: { importRef: string }) {
+  const changes = useResource<{ items: FieldChange[] }>(
+    `/api/v1/intake/changes?${new URLSearchParams({ import_ref: importRef })}`,
+  );
+  const items = changes.data?.items ?? [];
+  if (!changes.data) return null;
+  return (
+    <div className="uw-import-aside">
+      <h3 className="uw-trial-subhead">
+        <ListChecks size={15} aria-hidden="true" /> Field changes ({formatCount(items.length)})
+      </h3>
+      {items.length ? (
+        <div className="ac-table-wrap">
+          <table className="ac-table">
+            <caption className="ca-sr-only">Fields this import changed</caption>
+            <thead>
+              <tr>
+                <th scope="col">Record</th>
+                <th scope="col">Field</th>
+                <th scope="col">Before</th>
+                <th scope="col">After</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, index) => (
+                <tr key={`${item.record_key}-${item.field}-${index}`}>
+                  <td>{item.record_key}</td>
+                  <td>{item.field.replace(/_/g, " ")}</td>
+                  <td>{item.before ?? "—"}</td>
+                  <td>{item.after ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="ac-muted">The updated rows changed no field.</p>
+      )}
     </div>
   );
 }
@@ -257,10 +304,12 @@ function SetAsideRows({ source }: { source: ReturnType<typeof useResource<Quaran
               <tr key={row.id}>
                 <td>
                   {row.line}
-                  {row.suggests_harm && (
+                  {row.suggests_harm ? (
                     <small className="uw-flag-critical" title={`Suggests harm: ${row.harm_words.join(", ")}`}>
-                      Suggests harm
+                      Suggests harm: on the triage list
                     </small>
+                  ) : (
+                    <EscalateButton kind="QUARANTINE" id={row.id} label="Triage" />
                   )}
                 </td>
                 <td>

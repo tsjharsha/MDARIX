@@ -1139,12 +1139,13 @@ def import_file(
         )
     # The checked rows themselves: masked where asked, without the rows set aside.
     result = _write_rows(db, tenant_id, entity, rows, policy)
+    import_ref = uuid.uuid4()
+    _after_complaints(db, tenant_id, entity, rows, result, import_ref if policy.quarantine else None, policy.source)
     if policy.quarantine:
         # A governed import: each written row keeps its lineage (R16), each set-aside row is stored for correction
         # (R14), under one import reference that the import's audit event (DATA_IMPORTED, TRIAL_DATA_IMPORTED) carries.
         from backend.app import import_lineage, import_quarantine
 
-        import_ref = uuid.uuid4()
         version = import_lineage.mapping_version(entity, report["columns"], date_format)
         import_lineage.write(
             db, tenant_id, import_ref, entity, TEMPLATES[entity]["required"], rows, version, policy.source
@@ -1188,7 +1189,10 @@ def import_records(db: Session, tenant_id, entity: str, records: list[dict], pol
         raise HTTPException(
             422, detail={"code": "IMPORT_CHECK_FAILED", "message": "Fix the listed problems first", "report": report}
         )
-    return _write_rows(db, tenant_id, entity, rows_from_records(entity, records, _Report()), policy)
+    rows = rows_from_records(entity, records, _Report())
+    result = _write_rows(db, tenant_id, entity, rows, policy)
+    _after_complaints(db, tenant_id, entity, rows, result, None, policy.source)
+    return result
 
 
 def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy) -> dict:
@@ -1203,6 +1207,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
     new_complaints: dict[str, dict] = {}
     evidence: list = []
     proposed: dict = {}  # complaint id -> (use environment, user type) as the file gives them
+    changes: list[dict] = []  # each field a re-upload changes on a complaint already there (G20)
     if entity in business_imports.TEMPLATES:
         created, updated = business_imports.write(
             entity, rows, db, tenant_id, lookup, lambda when: _stamp(now, when, source), _date, now, source
@@ -1324,6 +1329,8 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             new_complaints[row["complaint_id"]] = fields
             created += 1
         else:
+            if row["complaint_id"] not in new_complaints:
+                changes.extend(_field_changes(complaint, values, row["complaint_id"]))
             for name, value in values.items():
                 setattr(complaint, name, value)
             complaint.updated_at = now
@@ -1341,10 +1348,57 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
         insert_rows(db, Complaint, list(new_complaints.values()))
         upsert_record_evidences(db, tenant_id, evidence)
         _propose_classifications(db, tenant_id, complaints, proposed, now)
-    result = {"entity": entity, "created": created, "updated": updated, "rows": len(rows)}
+    result = {"entity": entity, "created": created, "updated": updated, "rows": len(rows), "_changes": changes}
     if also_created:
         result["also_created"] = also_created
     return result
+
+
+def _shown(value) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date().isoformat() if value.time() == datetime.min.time() else value.isoformat()
+    return str(value)
+
+
+def _field_changes(complaint: Complaint, values: dict, identifier: str) -> list[dict]:
+    """The fields a re-upload changes on a complaint, with the value before and after (the history of field changes,
+    G20); an unchanged field is not listed."""
+    found = []
+    for name, value in values.items():
+        before = getattr(complaint, name)
+        if isinstance(before, datetime) and isinstance(value, datetime):
+            same = before.replace(tzinfo=None) == value.replace(tzinfo=None)
+        else:
+            same = before == value
+        if not same:
+            found.append(
+                {
+                    "entity": "complaints",
+                    "record_id": complaint.id,
+                    "record_key": identifier,
+                    "field": name,
+                    "before": _shown(before),
+                    "after": _shown(value),
+                }
+            )
+    return found
+
+
+def _after_complaints(db: Session, tenant_id, entity: str, rows, result: dict, import_ref, source: str) -> None:
+    """A complaints file: its field changes are stored with the run, and each QMS-complaint task whose complaint ID
+    the file brings is closed (T-G20)."""
+    changes = result.pop("_changes", [])
+    if entity != "complaints":
+        return
+    from backend.app.intake import service as intake
+
+    now = datetime.now(timezone.utc)
+    result["field_changes"] = intake.record_changes(db, tenant_id, changes, import_ref, source, now)
+    result["qms_tasks_closed"] = intake.confirm_by_import(
+        db, tenant_id, [row.get("complaint_id") for _, row in rows], "system:import", now
+    )
 
 
 def _add_named_references(

@@ -168,6 +168,13 @@ STEPS = (
         ("complaint_dispositions",),
         ("tenants", "complaints", "decisions"),
     ),
+    Step(
+        "tr04",
+        "tr04_trial_intake_triage.py",
+        "create_intake_tables",
+        ("intake_events", "first_contact_checks", "triage_records", "record_links", "record_field_changes"),
+        ("tenants", "products"),
+    ),
 )
 
 

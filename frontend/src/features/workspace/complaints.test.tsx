@@ -54,9 +54,11 @@ const item = (overrides: Partial<SecondLookItem> = {}): SecondLookItem => ({
 });
 
 describe("the Complaints section", () => {
-  it("offers the dispositions first, the second look, the backlog, the watch and the settings, opening the tab a link names", () => {
+  it("offers triage first, the first contact, the dispositions, the second look, the backlog, the watch and the settings, opening the tab a link names", () => {
     const tabs = (markup: string) => [...markup.matchAll(/role="tab"[^>]*>([^<]+)</g)].map((match) => match[1]);
     expect(tabs(render(<ComplaintsSection />))).toEqual([
+      "Triage",
+      "First contact",
       "Dispositions",
       "Second look",
       "Backlog",
@@ -65,11 +67,13 @@ describe("the Complaints section", () => {
       "Review settings",
       "Reporting windows",
     ]);
-    // Routine first: the complaints waiting for a disposition (T-G36).
-    expect(render(<ComplaintsSection />)).toContain("Complaints waiting, newest first");
+    // Triage before every other queue (T-G19); then routine first: the complaints waiting for a disposition (T-G36).
+    expect(render(<ComplaintsSection />)).toContain("Reading the triage list");
+    expect(render(<ComplaintsSection tab="First contact" />)).toContain("Reading the calls");
+    expect(render(<ComplaintsSection tab="Dispositions" />)).toContain("Complaints waiting, newest first");
     expect(render(<ComplaintsSection tab="Second look" />)).toContain("Checking your records");
     expect(render(<ComplaintsSection tab="Backlog" />)).toContain("Reading your open complaints");
-    expect(render(<ComplaintsSection tab="Unknown" />)).toContain("Complaints waiting, newest first");
+    expect(render(<ComplaintsSection tab="Unknown" />)).toContain("Reading the triage list");
   });
 
   it("has its own address and menu entry", () => {
