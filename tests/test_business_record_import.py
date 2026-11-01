@@ -98,7 +98,8 @@ def test_a_whole_product_story_imports_and_links_across_systems():
     _import(client, "component_suppliers", _csv("component_id,supplier_id", f"PS-{TAG},SUP-{TAG}"))
     genealogy = _csv("lot_id,component_id,component_lot_id", f"L-{TAG},PS-{TAG},KS-{TAG}")
     assert _import(client, "lot_genealogy", genealogy)["created"] == 1
-    assert _import(client, "lot_genealogy", genealogy)["updated"] == 1  # same row again: no duplicate
+    # The same row again: no duplicate, and nothing changed, so nothing counts as updated (0.10.62, J9).
+    assert _import(client, "lot_genealogy", genealogy)["updated"] == 0
 
     complaints = _import(
         client,

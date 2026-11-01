@@ -22,9 +22,11 @@ export type QualityReport = {
   rows_read: number;
   rows_accepted: number;
   rows_quarantined: number;
-  /** Rows that updated a record already there; null for a products file. */
+  /** Rows that changed a field of a record already there; null for a products file. */
   rows_changed: number | null;
   rows_new: number | null;
+  /** Rows of records already there, as the file has them (0.10.62; absent from older runs). */
+  rows_unchanged?: number | null;
   balanced: boolean;
   /** A distribution file: the lots whose units shipped now exceed the units they released (flagged, not refused). */
   flags?: { lot_id: string; released: number; shipped: number; message: string }[];
@@ -64,13 +66,17 @@ export const fileTitle = (run: Pick<ImportRun, "file_name" | "entity">) =>
 
 export type Check = { label: string; ok: boolean; detail: string };
 
+/** "2 new, 1 updated, 7 unchanged": updated counts only rows that changed a field; null for a products file. */
+export function writtenSplit(report: QualityReport): string | null {
+  if (report.rows_new === null || report.rows_changed === null) return null;
+  const unchanged = report.rows_unchanged ? `, ${formatCount(report.rows_unchanged)} unchanged` : "";
+  return `${formatCount(report.rows_new)} new, ${formatCount(report.rows_changed)} updated${unchanged}`;
+}
+
 /** The checks a run's report answers, in plain words (exported for its test). */
 export function runChecks(run: Pick<ImportRun, "report" | "masked_values">): Check[] {
   const { report } = run;
-  const written =
-    report.rows_new === null || report.rows_changed === null
-      ? countOf(report.rows_accepted, "row")
-      : `${formatCount(report.rows_new)} new, ${formatCount(report.rows_changed)} updated`;
+  const written = writtenSplit(report) ?? countOf(report.rows_accepted, "row");
   return [
     {
       label: "Every row accounted for",
@@ -203,11 +209,7 @@ export function ImportRunReport({ run }: { run: ImportRun }) {
         <StatTile
           label="Written"
           value={formatCount(report.rows_accepted)}
-          detail={
-            report.rows_new === null || report.rows_changed === null
-              ? "Rows saved"
-              : `${formatCount(report.rows_new)} new, ${formatCount(report.rows_changed)} updated`
-          }
+          detail={writtenSplit(report) ?? "Rows saved"}
           icon={<CheckCircle2 size={18} />}
           tone="good"
         />

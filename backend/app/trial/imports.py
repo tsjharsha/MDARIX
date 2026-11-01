@@ -75,8 +75,6 @@ TRIAL_POLICY = ImportPolicy(
     quarantine=True,
 )
 WORKSPACE_POLICY = ImportPolicy(source=WORKSPACE_UPLOAD_SOURCE, quarantine=True)
-# A complaint's status as its quality system names it (complaints.status holds 40 characters).
-COMPLAINT_STATUS_MAX = 40
 
 # What a column is for, in plain words, for the columns whose meaning changes what MDARIX finds (shown beside each
 # template in the import panel; templates_for() keeps only the template's own columns).
@@ -350,6 +348,31 @@ def _personal_data(value: str, labels: bool = True, names: bool = True) -> str |
     """What personal data the text seems to hold ("a phone number"), or None."""
     found = _personal_match(value, labels, names)
     return found[0] if found else None
+
+
+# Template columns stored under another name (the rest are stored under their own name).
+_STORED_AS = {
+    "product_name": "name",
+    "component_name": "name",
+    "supplier_name": "name",
+    "site_name": "name",
+    "failure_mode_name": "name",
+    "question": "investigation_question",
+    "owner": "owner_ref",
+}
+
+
+def column_limit(entity: str, column: str) -> int:
+    """How many characters the column's value may have: what its database column holds (complaints.status 40,
+    complaints.country 80...), so a file the check calls ready never fails at writing (J10); text columns keep
+    LONG_TEXT or 255. The quality system's own status words are kept (Cancelled, Void, Closed - no action...)."""
+    from backend.app.db.models.lot_impact import LotDistribution
+
+    models = {"products": Product, "lots": LotBatch, "complaints": Complaint, "distribution": LotDistribution}
+    model = models.get(entity) or business_imports.KEYED.get(entity, (None,))[0]
+    stored = getattr(getattr(model, "__table__", None), "c", {}).get(_STORED_AS.get(column, column))
+    length = getattr(getattr(stored, "type", None), "length", None)
+    return length or LONG_TEXT.get(column, 255)
 
 
 def _free_text(column: str) -> bool:
@@ -739,9 +762,10 @@ def _check_values(
                 else:
                     label = _masking_found(value, masked)
                     found = (label, _masked_words(value, masked)) if label else _personal_match(value, names=names)
-                limit = LONG_TEXT.get(column, 255)
-                if len(value) > limit:
-                    report.add(line, column, f"Keep this under {limit} characters.")
+                limit = column_limit(entity, column)
+                # A shipment's country has its own check, which names the two-letter code.
+                if len(value) > limit and (entity, column) != ("distribution", "country"):
+                    report.add(line, column, f"Keep this to {limit} characters or fewer.")
                 if found:
                     advice = (
                         "Masking could not remove it; remove it from the file."
@@ -754,10 +778,6 @@ def _check_values(
                     report.add(
                         line, column, "Text cannot start with =, +, - or @: spreadsheets would run it as a formula."
                     )
-        # The quality system's own status is kept (Cancelled, Void, Closed - no action, Inquiry...): the second look
-        # reads those words to find complaints that were closed off (backend/app/complaint_review/rules.py).
-        if entity == "complaints" and len(row.get("status") or "") > COMPLAINT_STATUS_MAX:
-            report.add(line, "status", f"Keep the status under {COMPLAINT_STATUS_MAX} characters.")
         if identity_columns:
             identity = tuple(row.get(column) for column in identity_columns)
         else:
@@ -1257,7 +1277,13 @@ def import_file(
             import_ref=str(import_ref),
             mapping_version=version,
             quarantined_rows=len(set_aside),
-            quality_report=quality_report(checked.data_lines, len(rows), len(set_aside), report["updated_records"]),
+            quality_report=quality_report(
+                checked.data_lines,
+                len(rows),
+                len(set_aside),
+                None if entity == "products" else result["updated"],
+                new=report["new_rows"],
+            ),
         )
         if entity == "distribution":
             # Units shipped beyond the units a lot released are flagged, never refused (T-G5).
@@ -1275,16 +1301,30 @@ def import_file(
     return result
 
 
-def quality_report(read: int, accepted: int, quarantined: int, changed: int | None) -> dict:
+def quality_report(read: int, accepted: int, quarantined: int, changed: int | None, new: int | None = None) -> dict:
     """The data-quality report of one governed import run (R17): ``read`` is the file's non-blank data lines, each of
-    which must end accepted or quarantined; ``balanced`` says the counts agree with the file. ``rows_changed`` (rows that updated a record already there)
-    is None for a products file, whose rows may add versions to an existing product."""
+    which must end accepted or quarantined; ``balanced`` says the counts agree with the file. Accepted rows are new
+    (``new``, by default every row that changed nothing), changed (they changed a field of a record already there) or
+    unchanged (a record already there, as the file has it: J9). The three are None for a products file, whose rows may
+    add versions to an existing product."""
+    if changed is None:
+        return {
+            "rows_read": read,
+            "rows_accepted": accepted,
+            "rows_quarantined": quarantined,
+            "rows_changed": None,
+            "rows_new": None,
+            "rows_unchanged": None,
+            "balanced": read == accepted + quarantined,
+        }
+    new = accepted - changed if new is None else new
     return {
         "rows_read": read,
         "rows_accepted": accepted,
         "rows_quarantined": quarantined,
         "rows_changed": changed,
-        "rows_new": accepted - changed if changed is not None else None,
+        "rows_new": new,
+        "rows_unchanged": max(accepted - new - changed, 0),
         "balanced": read == accepted + quarantined,
     }
 
@@ -1396,14 +1436,18 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                 lookup.lots[row["lot_id"]] = lot
                 created += 1
             else:
-                lot.product_version_id = version.id if version else lot.product_version_id
-                lot.manufacturing_site_id = site.id if site else lot.manufacturing_site_id
-                if built:
-                    lot.effective_timestamp = built
-                if quantity is not None:
-                    lot.quantity = quantity
-                lot.updated_at = now
-                updated += 1
+                changed = business_imports.apply_values(
+                    lot,
+                    {
+                        "product_version_id": version.id if version else lot.product_version_id,
+                        "manufacturing_site_id": site.id if site else lot.manufacturing_site_id,
+                        "effective_timestamp": built or lot.effective_timestamp,
+                        "quantity": quantity if quantity is not None else lot.quantity,
+                    },
+                )
+                if changed:
+                    lot.updated_at = now
+                    updated += 1
             db.flush()
             continue
         lot = lookup.lot(row["lot_id"]) if row.get("lot_id") else None
@@ -1420,6 +1464,10 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             "status": (row.get("status") or "open").lower(),
             **_complaint_details(row),
         }
+        if complaint is not None and row["complaint_id"] not in new_complaints:
+            # A re-upload sets only what its file holds: a column it leaves out (or a blank status) keeps the stored
+            # value, so a file without a status column never reopens a closed complaint (J9).
+            values = {name: value for name, value in values.items() if _from_file(name, row)}
         if complaint is None:
             fields = {
                 "id": uuid.uuid4(),
@@ -1434,15 +1482,18 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             complaints[row["complaint_id"]] = complaint
             new_complaints[row["complaint_id"]] = fields
             created += 1
-        else:
-            if row["complaint_id"] not in new_complaints:
-                changes.extend(_field_changes(complaint, values, row["complaint_id"]))
+        elif row["complaint_id"] in new_complaints:  # named twice in the file: the later row wins, as before
             for name, value in values.items():
                 setattr(complaint, name, value)
-            complaint.updated_at = now
-            if row["complaint_id"] in new_complaints:  # named twice in the file: the later row wins, as before
-                new_complaints[row["complaint_id"]].update(values, updated_at=now)
-            updated += 1
+            new_complaints[row["complaint_id"]].update(values, updated_at=now)
+        else:
+            found = _field_changes(complaint, values, row["complaint_id"])
+            changes.extend(found)
+            for name, value in values.items():
+                setattr(complaint, name, value)
+            if found:  # "updated" counts the rows that changed a field, not every row seen again
+                complaint.updated_at = now
+                updated += 1
         evidence.append(_complaint_evidence(complaint, row, product, version, lot, source))
         if row.get("use_environment") or row.get("user_type"):
             proposed[row["complaint_id"]] = (row.get("use_environment"), row.get("user_type"))
@@ -1458,6 +1509,24 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
     if also_created:
         result["also_created"] = also_created
     return result
+
+
+# The complaint fields a re-upload sets, and the file columns each comes from (the other fields come from
+# _complaint_details, which reads only the columns a file has).
+_COMPLAINT_FIELD_COLUMNS = {
+    "product_version_id": ("version", "lot_id"),
+    "lot_batch_id": ("lot_id",),
+    "event_timestamp": ("event_date",),
+    "complaint_timestamp": ("received_date",),
+}
+
+
+def _from_file(field: str, row: dict) -> bool:
+    """Whether the row's file gives this complaint field (a blank status gives none: it keeps the stored one)."""
+    if field == "status":
+        return bool(row.get("status"))
+    columns = _COMPLAINT_FIELD_COLUMNS.get(field)
+    return columns is None or any(column in row for column in columns)
 
 
 def _shown(value) -> str | None:

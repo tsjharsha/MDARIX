@@ -206,7 +206,7 @@ def test_a_complaints_import_and_reimport_leave_the_same_records_as_one_row_at_a
     }
     assert second["result"] == {
         "created": 2 + 1 + 1,  # two complaints, version Rev C, lot 9
-        "updated": 30,
+        "updated": 5,  # the rows that changed a field (0.10.62, J9); the other 25 are as the file had them
         "rows": 32,
         "also_created": {"versions": 1, "lots": 1},
     }
@@ -240,7 +240,7 @@ def test_a_business_import_writes_the_same_evidence_as_one_record_at_a_time(monk
 
     assert _without_ids(now) == _without_ids(before)
     assert len(now[1]["evidence"]) == 6
-    assert now[1]["result"]["created"] == 1 and now[1]["result"]["updated"] == 5
+    assert now[1]["result"]["created"] == 1 and now[1]["result"]["updated"] == 1  # only K-2 changed (J9)
     kept, changed = f"RECORD:CAPA:K{marker}-1", f"RECORD:CAPA:K{marker}-2"
     assert now[0]["chunk_ids"][kept] == now[1]["chunk_ids"][kept]
     assert now[0]["chunk_ids"][changed] != now[1]["chunk_ids"][changed]

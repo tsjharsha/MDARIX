@@ -82,7 +82,7 @@ def test_the_quality_systems_own_status_is_kept_for_the_second_look():
     too_long = imports._Report()
     rows = imports._parse("complaints", header + b"C-3,P-1,Alarm," + b"x" * 41 + b"\n", too_long, imports.TRIAL_POLICY)
     imports._check_values("complaints", rows, too_long)
-    assert "under 40 characters" in too_long.issues[0]["message"]
+    assert "to 40 characters or fewer" in too_long.issues[0]["message"]
 
 
 # ------------------------------------------------------------------------------------------- Excel workbooks

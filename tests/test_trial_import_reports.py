@@ -102,6 +102,7 @@ def test_a_trial_import_is_governed_and_its_report_names_the_file():
         "rows_quarantined": 1,
         "rows_changed": 0,
         "rows_new": 2,
+        "rows_unchanged": 0,
         "balanced": True,
     }
     newest = _ok(user.get(RUNS))["runs"][0]
