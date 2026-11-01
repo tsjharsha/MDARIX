@@ -14,7 +14,8 @@ import {
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Tabs, errorText, send, useResource, whenNoLongerPending } from "../../customer-admin/shared";
 import { sectionAllowed, useWorkspace, type WorkspaceSection } from "../workspaceContext";
-import { ImportPanel, templateSummary, type ImportResult, type ImportTemplate } from "./ImportData";
+import { ImportPanel, templateSummary, useReportChoice, type ImportResult, type ImportTemplate } from "./ImportData";
+import { IMPORT_REPORTS_ID, ImportReportsPanel } from "./ImportReports";
 import { formatDay } from "../../../app/dates";
 import { countOf } from "./common";
 import { QualityLoop } from "./QualityLoop";
@@ -144,6 +145,7 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
     sectionAllowed(section as WorkspaceSection, session?.allowed_menu, session?.business_permissions);
   const focusTab = trialTabFor(focus);
   const [tab, setTab] = useState<TrialTab>(focusTab ?? "Your data");
+  const reports = useReportChoice(focus);
   // A tab below the story, opened and brought into view.
   const showTab = (name: TrialTab) => {
     setTab(name);
@@ -345,13 +347,25 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
                   </button>
                 </p>
               )}
+              <p className="uw-cited-line">
+                Each import has a data-quality report: rows read, written and set aside, and why.{" "}
+                <button
+                  type="button"
+                  className="ac-link"
+                  onClick={() => document.getElementById(IMPORT_REPORTS_ID)?.scrollIntoView({ behavior: "smooth" })}
+                >
+                  See the data-quality reports
+                </button>
+              </p>
               <ImportPanel
                 id="trial-import"
                 complaintsAlone
                 templates={trial?.templates ?? []}
                 basePath="/api/v1/trial/imports"
                 fileLimitBytes={trial?.limits?.file_bytes}
+                onReport={reports.show}
                 onImported={(result, entity) => {
+                  reports.imported(result.import_ref);
                   if (newComplaints(entity, result) > 0) setOwnImported(true);
                   status.reload();
                   insights.reload();
@@ -360,6 +374,11 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
                   else story.reload();
                   work.refreshProducts();
                 }}
+              />
+              <ImportReportsPanel
+                selected={reports.selected}
+                onSelect={reports.setSelected}
+                refreshKey={reports.refreshKey}
               />
               <InsightsPanel insights={insights.data} source={insights} reading={readingImported} />
             </>

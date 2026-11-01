@@ -141,3 +141,52 @@ class DataQualityIssue(Base):
     __table_args__ = (
         CheckConstraint("severity in ('INFO','WARNING','ERROR')", name="data_quality_issue_severity_allowed"),
     )
+
+
+class ImportQuarantineRow(Base):
+    """A row an import set aside (R14): stored with its reasons, personal data masked, until it is corrected and
+    re-processed (backend/app/import_quarantine.py)."""
+
+    __tablename__ = "import_quarantine_rows"
+
+    id = uuid_pk()
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    import_ref: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    entity: Mapped[str] = mapped_column(String(30), nullable=False)
+    source: Mapped[str] = mapped_column(String(40), nullable=False)
+    line: Mapped[int] = mapped_column(nullable=False)
+    row: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    problems: Mapped[list] = mapped_column(JSONB, nullable=False)
+    harm_words: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="OPEN")
+    created_at = tz(False)
+    resolved_at = tz()
+    resolved_by: Mapped[str | None] = mapped_column(String(120))
+
+    __table_args__ = (
+        CheckConstraint("status in ('OPEN','REPROCESSED')", name="import_quarantine_status_allowed"),
+        Index("ix_import_quarantine_tenant_status", "tenant_id", "status"),
+        Index("ix_import_quarantine_import", "import_ref"),
+    )
+
+
+class ImportLineage(Base):
+    """Which import brought a record in, and under which mapping (R16): one row per imported row
+    (backend/app/import_lineage.py)."""
+
+    __tablename__ = "import_lineage"
+
+    id = uuid_pk()
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    import_ref: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    entity: Mapped[str] = mapped_column(String(30), nullable=False)
+    record_key: Mapped[str] = mapped_column(String(400), nullable=False)
+    line: Mapped[int] = mapped_column(nullable=False)
+    mapping_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    source: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at = tz(False)
+
+    __table_args__ = (
+        Index("ix_import_lineage_record", "tenant_id", "entity", "record_key"),
+        Index("ix_import_lineage_import", "import_ref"),
+    )

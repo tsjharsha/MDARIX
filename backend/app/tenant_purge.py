@@ -210,7 +210,13 @@ def erase_person(
             )
         )
     }
-    for table in (*PERSONAL_ACCOUNT_TABLES, "role_assignments", "user_additional_roles", "persona_assignments"):
+    for table in (
+        *PERSONAL_ACCOUNT_TABLES,
+        "role_assignments",
+        "user_additional_roles",
+        "persona_assignments",
+        "signing_grants",
+    ):
         if table in present:
             count = db.execute(text(f'DELETE FROM "{table}" WHERE user_id = :user'), {"user": user.id}).rowcount
             if count:

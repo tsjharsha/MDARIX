@@ -952,6 +952,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Choose a file (Excel or CSV) and choose Check file. Nothing is saved yet.",
               "Read how your columns were read and the preview. Fix any problems, or download the rows to fix.",
               "Choose Import N rows.",
+              "Choose See its data-quality report: rows read, written and set aside, and the reason for each row set aside. Fix those rows in your file and import it again.",
             ],
             result:
               "Imported, with how many records are new and updated. Importing the file again updates the same records.",
