@@ -716,13 +716,13 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Trend check and detection rules",
         where: "Signals › Trend check and Signals › Detection rules",
         purpose:
-          "The trend check compares each version's last 30 days with its own history, counted per unit in the field where lot quantities exist. It is a check, never a verdict.",
+          "The trend check compares each version's last 30 days with its own history and, for a version that replaced another, with that version too (the stronger comparison is shown), counted per unit in the field where lot quantities exist (by calendar days for single-use products). An event linked from several records counts once. It is a check, never a verdict.",
         tasks: [
           {
             title: "Read the trend check",
             steps: [
               "Group By version, By problem code or By complaint type.",
-              "Each row's Result is Significant rise (chance under 1% if nothing changed), Higher than usual (under 5%), In line with history, Too few to assess or History too short.",
+              "Each row's Result is Significant rise (chance under 1% if nothing changed, allowing for the groups checked at once), Higher than usual (under 5%), In line with history, Too few to assess or History too short. Chance shows the adjusted value, with the group's own value beside it.",
               "On a rising row with no open signal, choose Raise a signal (PMS / Signal Triage Lead and Leader).",
             ],
             note: "The line under the table names the basis: ISO 13485 8.4 (analysis of data) and EU MDR Art. 88 (trend reporting).",

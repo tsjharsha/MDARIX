@@ -52,7 +52,7 @@ describe("the Signal inbox's counts", () => {
 
   it("group thousands in the trend check's counts", () => {
     expect(trendCountText({ recent: 2290, expected: 1204.46, ratio: 1.9, result: "SIGNIFICANT" })).toBe(
-      "2,290 against 1,204.5 expected (1.9×)",
+      "2,290 against 1,204.5 expected (1.9× expected)",
     );
     expect(trendCountText({ recent: 2290, expected: 0, ratio: null, result: "SHORT_HISTORY" })).toBe(
       "2,290 in 30 days",

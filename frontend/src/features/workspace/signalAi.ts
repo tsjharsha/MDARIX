@@ -20,6 +20,9 @@ export type TrendItem = {
   history_days: number;
   expected: number;
   p_value: number | null;
+  /** The chance adjusted for every group tested on the board at once (Benjamini-Hochberg); the result follows it. */
+  p_adjusted?: number | null;
+  groups_tested?: number;
   ratio: number | null;
   result: TrendResult;
   label: string;
@@ -31,6 +34,12 @@ export type TrendItem = {
   basis?: "UNITS" | "TIME";
   baseline?: "OWN_HISTORY" | "PREVIOUS_VERSION";
   baseline_name?: string | null;
+  /** Why the expected number follows the calendar although its lots have quantities (a single-use product). */
+  basis_note?: string | null;
+  /** The other baseline also compared (own history, or the version it replaced); the stronger one is shown. */
+  also_compared?: string | null;
+  /** Recent records linked to an earlier record of the same event: listed, not counted again. */
+  linked_records?: number;
 };
 
 export type TrendBoard = {
@@ -46,11 +55,14 @@ export type TrendBoard = {
     steady: number;
     too_few: number;
     short_history: number;
+    /** The groups assessed across the whole board, which the adjusted chances allow for. */
+    groups_tested?: number;
+    linked_records?: number;
   };
   truncated: boolean;
   note: string;
   // How many groups were counted per unit in the field, and how many by calendar days.
-  basis?: { units: number; time: number };
+  basis?: { units: number; time: number; single_use?: number };
   items: TrendItem[];
 };
 
@@ -82,23 +94,34 @@ export const TREND_RESULT: Record<TrendResult, { label: string; tone: Tone }> = 
 export function perUnitHint(board: Pick<TrendBoard, "basis"> | null | undefined): string | null {
   const time = board?.basis?.time ?? 0;
   const units = board?.basis?.units ?? 0;
+  const singleUse = board?.basis?.single_use ?? 0;
   if (!time) return null;
-  const counted = units
-    ? `${time} of ${time + units} groups are counted per calendar day`
-    : `Every group is counted per calendar day`;
+  const counted =
+    units || singleUse
+      ? `${time} of ${time + units + singleUse} groups are counted per calendar day`
+      : `Every group is counted per calendar day`;
   return `${counted} because their lots have no quantity, so a version shipped in growing numbers can look like a rising trend. Add each lot's quantity and manufacture date in the lot import to count per unit in the field.`;
 }
 
 /** What a group was compared with: its own history, or the version it replaced (a version too young for its own). */
-export function trendBaselineText(item: Pick<TrendItem, "baseline" | "baseline_name" | "history" | "history_days">) {
-  if (item.baseline === "PREVIOUS_VERSION")
-    return `${item.baseline_name ?? "The previous version"}: ${item.history} in the ${item.history_days} days before this version's release`;
-  return `Own history: ${item.history} in ${item.history_days} days`;
+export function trendBaselineText(
+  item: Pick<TrendItem, "baseline" | "baseline_name" | "history" | "history_days" | "also_compared">,
+) {
+  const text =
+    item.baseline === "PREVIOUS_VERSION"
+      ? `${item.baseline_name ?? "The previous version"}: ${item.history} in the ${item.history_days} days before this version's release`
+      : `Own history: ${item.history} in ${item.history_days} days`;
+  // Compared with both baselines: the stronger comparison is shown, and the other named.
+  return item.also_compared ? `${text} (stronger than ${item.also_compared})` : text;
 }
 
 /** What the expected number follows: units in the field (lot quantities) or calendar days. */
-export const trendBasisText = (item: Pick<TrendItem, "basis">) =>
-  item.basis === "UNITS" ? "Per unit in the field" : "Per calendar day";
+export const trendBasisText = (item: Pick<TrendItem, "basis" | "basis_note">) =>
+  item.basis === "UNITS"
+    ? "Per unit in the field"
+    : item.basis_note
+      ? "Per calendar day (single-use)"
+      : "Per calendar day";
 
 /** The result's label, saying "the previous version" when that is what the group was compared with. */
 export function trendResultLabel(item: Pick<TrendItem, "result" | "baseline">): string {
@@ -116,21 +139,34 @@ export function pValueText(value: number | null | undefined): string {
   return `p ${value.toFixed(3)}`;
 }
 
-/** "6 against 1.0 expected (6.0×)". */
+/** The chance the result follows: adjusted for the groups tested at once, with the raw chance beside it when they
+ * differ ("p 0.015 adjusted, p 0.004 alone"); "p 0.004" for a group tested alone, "—" when not assessed. */
+export function chanceText(item: Pick<TrendItem, "p_value" | "p_adjusted" | "groups_tested">): string {
+  const adjusted = item.p_adjusted ?? item.p_value;
+  if ((item.groups_tested ?? 1) <= 1 || adjusted === item.p_value) return pValueText(item.p_value);
+  return `${pValueText(adjusted)} adjusted, ${pValueText(item.p_value)} alone`;
+}
+
+/** "6 against 1.0 expected (6.0× expected)": the multiple is always of the expected number, never of an average. */
 // Counts grouped the en-US way, whatever the browser's language: "2,290 against 1,204.5 expected" (DEV-025).
 const grouped = (value: number, decimals = 0) =>
   value.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
-export function trendCountText(item: Pick<TrendItem, "recent" | "expected" | "ratio" | "result">): string {
-  if (item.result === "SHORT_HISTORY") return `${grouped(item.recent)} in 30 days`;
-  const ratio = typeof item.ratio === "number" ? ` (${item.ratio.toFixed(1)}×)` : "";
+export function trendCountText(
+  item: Pick<TrendItem, "recent" | "expected" | "ratio" | "result"> & { recent_days?: number },
+): string {
+  if (item.result === "SHORT_HISTORY") return `${grouped(item.recent)} in ${item.recent_days ?? 30} days`;
+  const ratio = typeof item.ratio === "number" ? ` (${item.ratio.toFixed(1)}× expected)` : "";
   return `${grouped(item.recent)} against ${grouped(item.expected, 1)} expected${ratio}`;
 }
 
 export function trendHeadline(board: TrendBoard | null | undefined): { title: string; detail: string; tone: Tone } {
   if (!board) return { title: "Checking every version against its own history…", detail: "", tone: "neutral" };
-  const { significant, elevated, groups, complaints_counted } = board.summary;
-  const counted = `${grouped(complaints_counted)} complaints counted across ${grouped(groups)} groups, whatever their status.`;
+  const { significant, elevated, groups, complaints_counted, groups_tested, linked_records } = board.summary;
+  const counted =
+    `${grouped(complaints_counted)} complaints counted across ${grouped(groups)} groups, whatever their status.` +
+    (groups_tested && groups_tested > 1 ? ` Results allow for the ${grouped(groups_tested)} groups checked.` : "") +
+    (linked_records ? " An event linked from several records counts once." : "");
   if (significant)
     return {
       title: `${significant} ${significant === 1 ? "group" : "groups"} rising significantly against their own history`,
@@ -160,7 +196,7 @@ export function signalFromTrend(item: TrendItem) {
     product_id: item.product.id,
     ...(item.product_version ? { product_version_id: item.product_version.id } : {}),
     complaint_ids: item.recent_complaints.map((complaint) => complaint.id),
-    reason: `Raised from the trend check: ${item.label.toLowerCase()} (${pValueText(item.p_value)})`,
+    reason: `Raised from the trend check: ${item.label.toLowerCase()} (${chanceText(item)})`,
   };
 }
 

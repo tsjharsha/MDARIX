@@ -201,13 +201,11 @@ describe("Automatic insights: the panel", () => {
     // The hero trend: the recent rate, the band over the last three months, the earlier average and the peak.
     expect(html).toContain('<h3 class="uw-ins-hero-eyebrow"');
     expect(html).toContain("2.3</span></span></strong> <span>a month now</span>");
-    expect(html).toContain("up from 0.8 before · 3.1×");
+    expect(html).toContain("up from 0.8 a month before · 3.1× the earlier average");
     expect(html).toContain('role="img" aria-label="10 complaints from Apr 2026 to Oct 2026');
     expect(html).toContain("Rise since Aug &#x27;26");
     expect(html).toContain("Average before: 0.8 a month");
-    expect(html).toContain(
-      '<tspan class="uw-ins-hero-peak-value">Sep &#x27;26: 3 complaints</tspan><tspan> · 4× the earlier average</tspan>',
-    );
+    expect(html).toContain('<tspan class="uw-ins-hero-peak-value">Sep &#x27;26: 3 complaints</tspan></text>');
     expect(html.match(/class="uw-ins-hero-dot is-recent/g)).toHaveLength(3);
     expect(html.match(/class="uw-ins-hero-dot"/g)).toHaveLength(4);
     // One keyboard stop for the months (the latest), each month a column named with its numbers.

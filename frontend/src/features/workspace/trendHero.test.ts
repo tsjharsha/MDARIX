@@ -41,7 +41,7 @@ describe("Hero trend: the headline", () => {
     const headline = heroHeadline(SAMPLE);
     expect(headline).toMatchObject({ decimals: 1, unit: "a month now", direction: "up", since: "2026-08" });
     expect(headline.value).toBeCloseTo(25 / 3);
-    expect(headline.detail).toBe("up from 3.0 before · 2.8×");
+    expect(headline.detail).toBe("up from 3.0 a month before · 2.8× the earlier average");
   });
 
   it("says none before for a series that starts in the recent months, and how much lower for a fall", () => {
@@ -142,23 +142,23 @@ describe("Hero trend: the chart", () => {
     expect(heroGeometry(SAMPLE, 326).average).toMatchObject({ label: "Avg before: 3.0", anchor: "end" });
   });
 
-  it("calls out the peak with its multiple of the earlier average, only when there was one", () => {
+  it("calls out the peak with its count only: the headline holds the card's one multiple (J19)", () => {
     const g = heroGeometry(SAMPLE, 760);
-    expect(g.peak).toMatchObject({ index: 5, text: "Sep '26: 12 complaints · 4× the earlier average" });
+    expect(g.peak).toMatchObject({ index: 5, text: "Sep '26: 12 complaints" });
     // The callout sits above the plot, its leader down to the point.
     expect(g.peak!.box.y + g.peak!.box.height).toBeLessThanOrEqual(g.plot.top);
     expect(g.peak!.leader.x).toBeCloseTo(g.points[5].x);
     expect(g.peak!.box.x).toBeGreaterThanOrEqual(0);
     expect(g.peak!.box.x + g.peak!.box.width).toBeLessThanOrEqual(760);
     expect(heroGeometry(REV_B, 760).peak?.text).toBe("Sep '26: 9 complaints");
-    expect(peakText("2026-09", 1, null, false)).toBe("Sep '26: 1 complaint");
+    expect(peakText("2026-09", 1, false)).toBe("Sep '26: 1 complaint");
     expect(heroGeometry(trendOf([], SERIES), 760).peak).toBeNull();
   });
 
   it("shortens the callout and thins the month ticks on a phone, keeping the latest month", () => {
     const g = heroGeometry(SAMPLE, 326);
     expect(g.compact).toBe(true);
-    expect(g.peak?.text).toBe("Sep '26: 12 · 4×");
+    expect(g.peak?.text).toBe("Sep '26: 12");
     expect(g.peak!.box.x + g.peak!.box.width).toBeLessThanOrEqual(326);
     expect(g.xTicks.map((tick) => tick.label)).toEqual(["Apr '26", "Jun '26", "Aug '26", "Oct '26"]);
     // Neighbouring ticks never closer than a label's width.

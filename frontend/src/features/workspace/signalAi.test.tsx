@@ -3,13 +3,17 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   aiSummaryNote,
   canRaiseFromTrend,
+  chanceText,
   isRunning,
   oneClickQuestion,
+  perUnitHint,
   pValueText,
   runAuthor,
   runHeadline,
   runProgress,
   signalFromTrend,
+  trendBaselineText,
+  trendBasisText,
   trendCountText,
   trendHeadline,
   trendPath,
@@ -69,8 +73,32 @@ describe("the trend check", () => {
     expect(pValueText(0.0004)).toBe("p < 0.001");
     expect(pValueText(0.0166)).toBe("p 0.017");
     expect(pValueText(null)).toBe("—");
-    expect(trendCountText(item())).toBe("6 against 1.0 expected (6.0×)");
+    expect(trendCountText(item())).toBe("6 against 1.0 expected (6.0× expected)");
     expect(trendCountText(item({ result: "SHORT_HISTORY" }))).toBe("6 in 30 days");
+  });
+
+  it("shows the adjusted chance, the stronger of two baselines and why a group counts by the calendar (0.10.63)", () => {
+    expect(chanceText(item())).toBe("p < 0.001");
+    expect(chanceText(item({ p_value: 0.004, p_adjusted: 0.004, groups_tested: 1 }))).toBe("p 0.004");
+    expect(chanceText(item({ p_value: 0.004, p_adjusted: 0.015, groups_tested: 4 }))).toBe(
+      "p 0.015 adjusted, p 0.004 alone",
+    );
+    expect(chanceText(item({ p_value: null, p_adjusted: null, groups_tested: 4 }))).toBe("—");
+    expect(
+      trendBaselineText(
+        item({ baseline: "PREVIOUS_VERSION", baseline_name: "FlowSure 200 Rev A", also_compared: "its own history" }),
+      ),
+    ).toBe("FlowSure 200 Rev A: 6 in the 180 days before this version's release (stronger than its own history)");
+    expect(trendBaselineText(item())).toBe("Own history: 6 in 180 days");
+    expect(trendBasisText(item({ basis: "TIME", basis_note: "Single-use or consumable product: ..." }))).toBe(
+      "Per calendar day (single-use)",
+    );
+    expect(trendBasisText(item({ basis: "TIME" }))).toBe("Per calendar day");
+    expect(perUnitHint({ basis: { units: 2, time: 1, single_use: 1 } })).toContain("1 of 4 groups are counted");
+    expect(perUnitHint({ basis: { units: 2, time: 0, single_use: 1 } })).toBeNull();
+    expect(signalFromTrend(item({ p_value: 0.004, p_adjusted: 0.015, groups_tested: 4 })).reason).toBe(
+      "Raised from the trend check: rate significantly higher than its history (p 0.015 adjusted, p 0.004 alone)",
+    );
   });
 
   it("leads with significant rises, then elevated ones", () => {
@@ -94,6 +122,10 @@ describe("the trend check", () => {
     expect(trendHeadline(board({ elevated: 2 })).tone).toBe("warning");
     expect(trendHeadline(board({})).title).toBe("No version is rising against its own history");
     expect(trendHeadline(board({})).detail).toContain("120 complaints counted across 4 groups, whatever their status.");
+    expect(trendHeadline(board({ groups_tested: 3, linked_records: 2 })).detail).toContain(
+      "Results allow for the 3 groups checked. An event linked from several records counts once.",
+    );
+    expect(trendHeadline(board({ groups_tested: 1 })).detail).not.toContain("allow for");
   });
 
   it("raises a signal only from a notable group without one, with its recent complaints", () => {
@@ -119,8 +151,18 @@ describe("the trend check", () => {
   it("shows a signal's own check", () => {
     const markup = renderToStaticMarkup(<TrendLine trend={item()} />);
     expect(markup).toContain("Significant rise");
-    expect(markup).toContain("6 against 1.0 expected (6.0×)");
+    expect(markup).toContain("6 against 1.0 expected (6.0× expected)");
+    expect(markup).toContain("in the last 30 days");
     expect(markup).toContain("p &lt; 0.001");
+    // S3, S4: a young version says its own days; the chance shown is the adjusted one, the raw one beside it.
+    const young = renderToStaticMarkup(
+      <TrendLine
+        trend={item({ recent_days: 11, p_value: 0.004, p_adjusted: 0.015, groups_tested: 4, basis: "UNITS" })}
+      />,
+    );
+    expect(young).toContain("in the 11 days since its release");
+    expect(young).toContain("Per unit in the field");
+    expect(young).toContain("p 0.015 adjusted, p 0.004 alone");
     expect(renderToStaticMarkup(<TrendLine trend={null} />)).toContain("it names no product");
   });
 });

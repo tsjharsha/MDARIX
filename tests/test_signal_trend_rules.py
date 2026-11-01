@@ -115,3 +115,104 @@ def test_a_new_version_is_compared_with_the_one_it_replaced():
     own = trend.check(recent=6, history=6, days_of_history=180)
     assert own.as_dict()["label"] == "Rate significantly higher than its history"
     assert own.as_dict()["baseline"] == "OWN_HISTORY" and own.as_dict()["baseline_name"] is None
+
+
+# ------------------------------------------------------------------------------------- 0.10.63: trend statistics
+
+
+@pytest.mark.parametrize(
+    "observed,expected,probability,rel",
+    [
+        (5, 0.7, 0.000785535, 1e-6),
+        (3, 0.5, 0.0143877, 1e-5),
+        (12, 4.0, 0.000915229, 1e-6),
+        (60, 40.0, 0.00187963, 1e-5),
+        (900, 800.0, 0.000275913, 1e-5),
+        (1000, 760.0, 5.746e-17, 1e-3),
+        (800, 746.0, 0.0260645, 1e-5),
+    ],
+)
+def test_the_poisson_tail_keeps_exact_values_and_never_underflows(observed, expected, probability, rel):
+    """S1: from exp(-expected) the tail was 1.0 for any count once the expected number passed ~745."""
+    assert trend.poisson_tail(observed, expected) == pytest.approx(probability, rel=rel)
+
+
+def test_a_large_rise_is_significant_however_many_complaints_are_expected():
+    # 2,000 in 30 days against 800 expected (4,800 in 180 days) read "In line" before 0.10.63.
+    found = trend.check(2000, 4800, 180)
+    assert found.expected == pytest.approx(800.0)
+    assert found.result == trend.SIGNIFICANT and found.p_value < 1e-100
+
+
+def test_a_version_younger_than_the_window_is_expected_only_its_own_days():
+    """S3: a version released 11 days ago (release day included) is expected 11 days of complaints, not 30."""
+    young = trend.check(4, 18, 180, baseline=trend.PREVIOUS_VERSION, baseline_name="Pump Rev A", recent_days=11)
+    assert young.expected == pytest.approx(18 * 11 / 180)
+    assert young.result == trend.ELEVATED  # p 0.026; against 30 days (3.0 expected) it read "In line" (p 0.35)
+    assert young.as_dict()["recent_days"] == 11
+    assert "4 complaints in the 11 days since its release against 1.1 expected" in trend.sentence("Pump Rev B", young)
+    assert trend.check(4, 18, 180, recent_days=99).recent_days == 30
+
+
+def test_the_adjusted_value_allows_for_every_group_tested_at_once():
+    """S4: Benjamini-Hochberg over the groups tested on one board; the label follows the adjusted value."""
+    checks = [
+        trend.check(5, 6, 180),  # p 0.0037: significant on its own
+        trend.check(3, 6, 180),  # p 0.080
+        trend.check(3, 6, 180),
+        trend.check(3, 6, 180),
+        trend.check(2, 6, 180),  # too few: not tested
+    ]
+    assert checks[0].result == trend.SIGNIFICANT
+    adjusted = trend.adjust(checks)
+    first = adjusted[0]
+    assert first.groups_tested == 4 and first.p_value == checks[0].p_value
+    assert first.p_adjusted == pytest.approx(checks[0].p_value * 4)
+    assert first.result == trend.ELEVATED  # 0.0146: not significant once four groups are allowed for
+    assert adjusted[1].p_adjusted == pytest.approx(min(1.0, checks[1].p_value * 4 / 4))
+    assert adjusted[4] is checks[4] and adjusted[4].p_adjusted is None
+    shown = first.as_dict()
+    assert shown["p_value"] == round(checks[0].p_value, 4) and shown["p_adjusted"] == round(first.p_adjusted, 4)
+    assert "allowing for the 4 groups checked" in trend.sentence("Pump Rev B", first)
+    # The textbook example: 0.01, 0.04, 0.03, 0.005 adjust to 0.02, 0.04, 0.04, 0.02.
+    raw = [trend.Check(9, 1, 180, 1.0, p, 9.0, trend.STEADY) for p in (0.01, 0.04, 0.03, 0.005)]
+    assert [item.p_adjusted for item in trend.adjust(raw)] == pytest.approx([0.02, 0.04, 0.04, 0.02])
+    # One group alone: the adjusted value is the raw one.
+    alone = trend.adjust([checks[0]])[0]
+    assert alone.p_adjusted == alone.p_value and alone.result == trend.SIGNIFICANT
+    assert "allowing for" not in trend.sentence("X", alone)
+
+
+def test_a_lasting_rise_since_the_change_stays_visible_against_the_version_it_replaced():
+    """J26: once a new version has its own history, its rise since release is in that history too; compared with both
+    baselines, the stronger comparison is reported, saying which."""
+    own = trend.check(6, 34, 170)  # 6 against 6.0 expected from its own (already high) history
+    previous = trend.check(6, 6, 180, baseline=trend.PREVIOUS_VERSION, baseline_name="Pump Rev A")
+    assert own.result == trend.STEADY and previous.result == trend.SIGNIFICANT
+    found = trend.stronger(own, previous)
+    assert found.baseline == trend.PREVIOUS_VERSION and found.result == trend.SIGNIFICANT
+    assert found.also_compared == "its own history"
+    assert "Also compared with its own history; the stronger comparison is shown." in trend.sentence("Rev B", found)
+    # The other way round: own history is stronger and names the previous version.
+    reverse = trend.stronger(
+        trend.check(6, 6, 180), trend.check(6, 34, 170, baseline=trend.PREVIOUS_VERSION, baseline_name="Pump Rev A")
+    )
+    assert reverse.baseline == trend.OWN_HISTORY and reverse.also_compared == "Pump Rev A"
+    # A version too young for its own history: the previous version, with nothing else to name.
+    young = trend.stronger(trend.check(6, 2, 40), previous)
+    assert young.baseline == trend.PREVIOUS_VERSION and young.also_compared is None
+    assert trend.stronger(own, None) is own
+
+
+def test_single_use_products_are_named_by_their_words():
+    """J27: a single-use or consumable product's units are used up; the board counts it by calendar days."""
+    assert trend.single_use("Infusion set, single-use")
+    assert trend.single_use("GlucoCheck", "Diabetes care", "Blood glucose test strip, IVD")
+    assert trend.single_use(None, "Disposable syringes")
+    assert not trend.single_use(
+        "OrbitCare 300 Infusion Pump (Sample)", "Infusion therapy", "General-purpose infusion pump"
+    )
+    assert not trend.single_use("PulseWatch 410 Patient Monitor (Sample)", "Patient monitoring", None)
+    by_time = trend.check(6, 12, 180, basis_note=trend.SINGLE_USE_NOTE)
+    assert by_time.basis == trend.TIME and by_time.as_dict()["basis_note"] == trend.SINGLE_USE_NOTE
+    assert trend.sentence("Set Rev A", by_time).endswith(trend.SINGLE_USE_NOTE)

@@ -6,7 +6,7 @@ import { sectionAllowed, useCan, useWorkspace } from "../workspaceContext";
 import {
   TREND_GROUPS,
   canRaiseFromTrend,
-  pValueText,
+  chanceText,
   signalFromTrend,
   trendCountText,
   trendHeadline,
@@ -81,7 +81,7 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
         <StatTile
           label="Significant rise"
           value={summary ? summary.significant : null}
-          detail="Chance under 1% if nothing changed"
+          detail="Chance under 1% if nothing changed, allowing for the groups checked"
           icon={<AlertTriangle size={18} />}
           tone={summary?.significant ? "critical" : undefined}
         />
@@ -95,13 +95,21 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
         <StatTile
           label="Groups checked"
           value={summary ? summary.groups : null}
-          detail={summary ? `${summary.too_few + summary.short_history} not assessed (too few or too new)` : ""}
+          detail={
+            summary
+              ? `${summary.groups_tested ?? summary.groups - summary.too_few - summary.short_history} assessed; ${summary.too_few + summary.short_history} too few or too new`
+              : ""
+          }
           icon={<Activity size={18} />}
         />
         <StatTile
           label="Complaints counted"
           value={summary ? summary.complaints_counted : null}
-          detail="Every status; dismissed records left out"
+          detail={
+            summary?.linked_records
+              ? "Every status; dismissed records left out; an event linked from several records counts once"
+              : "Every status; dismissed records left out"
+          }
           icon={<Activity size={18} />}
         />
       </div>
@@ -130,7 +138,8 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
               key: "recent",
               label: "Last 30 days",
               numeric: true,
-              render: (row: TrendItem) => trendCountText(row),
+              render: (row: TrendItem) =>
+                row.recent_days < 30 ? `${trendCountText(row)} in ${row.recent_days} days` : trendCountText(row),
             },
             {
               key: "history",
@@ -142,7 +151,7 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
               label: "Counted",
               render: (row: TrendItem) => trendBasisText(row),
             },
-            { key: "p_value", label: "Chance", render: (row: TrendItem) => pValueText(row.p_value) },
+            { key: "p_value", label: "Chance", render: (row: TrendItem) => chanceText(row) },
             {
               key: "signals",
               label: "",

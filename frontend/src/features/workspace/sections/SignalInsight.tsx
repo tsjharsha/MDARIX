@@ -6,8 +6,9 @@ import { useCanRunAi, useWorkspace } from "../workspaceContext";
 import {
   aiSummaryNote,
   insightPath,
-  pValueText,
+  chanceText,
   summaryPath,
+  trendBasisText,
   trendCountText,
   trendResultOf,
   type SignalInsight,
@@ -112,8 +113,11 @@ export function TrendLine({ trend }: { trend: TrendItem | null }) {
         <TrendingUp size={16} aria-hidden="true" /> Trend check
       </h3>
       <p>
-        <ToneBadge tone={result.tone} label={result.label} /> <strong>{trendCountText(trend)}</strong> in the last{" "}
-        {trend.recent_days} days · {pValueText(trend.p_value)}
+        <ToneBadge tone={result.tone} label={result.label} /> <strong>{trendCountText(trend)}</strong>{" "}
+        {trend.recent_days < 30
+          ? `in the ${trend.recent_days} days since its release`
+          : `in the last ${trend.recent_days} days`}{" "}
+        · {trendBasisText(trend)} · {chanceText(trend)}
       </p>
       <p className="ac-muted">{trend.sentence}</p>
     </section>
