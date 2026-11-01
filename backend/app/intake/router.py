@@ -265,7 +265,9 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
         "outcome_row": rules.outcome_row(answers) if latest else None,
         "draft": bool(latest and latest.signed_at is None),
         "signed": _check_view(signed, name) if signed else None,
-        "check_due_at": service._iso(service.working_day_end(rules.utc(event.created_at)))
+        "check_due_at": service._iso(
+            service.working_day_end(rules.utc(event.created_at), 0, service.calendar(db, event.tenant_id))
+        )
         if latest and signed is None
         else None,
         "tasks": [service.task_view(task, now) for task in tasks],

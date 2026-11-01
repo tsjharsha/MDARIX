@@ -1,0 +1,556 @@
+"""Reminders and escalation (T-G25) and the oversight view's items (T-G9), read from the records that carry a date.
+
+``due_items`` reads every dated item of the organization from its own record, never a copy:
+
+- **Triage:** each open triage item's target (24 clock hours from availability in MDARIX, or the reopening), with
+  its triage owner and backup; for an urgent intake not yet a complaint, its earliest provisional reporting deadline;
+- **Reporting deadlines:** a market assessment that says reportable or pending, with its deadline, whose report is
+  not started; the reportability decision tasks;
+- **Report obligations:** each obligation not yet met, with the deadline it was given;
+- **Communications:** each open request's reply due date (its owner's task);
+- **Guide approvals:** a guide version waiting for its second person, due at the end of the next working day;
+- **CAPA:** the effectiveness check tasks, and the CAPAs imported from the QMS with a due date (on the view only:
+  the QMS owns them, so they raise no alert);
+- every other open My Work task with a due date.
+
+``sweep`` turns the items that are due soon or overdue into alerts for the people their chain names (rules.py): new
+ones are raised, ones whose item is done or no longer due are resolved, read state is kept. Escalations are audited.
+The scheduler sweeps every organization every 15 minutes, and a person opening their reminders or the oversight view
+sweeps their organization when the last sweep is older than five minutes. Nothing here changes the item itself.
+"""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from datetime import date, datetime, timedelta, timezone
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from backend.app.db.models.oversight import DueAlert, OversightSettings, UserAbsence
+from backend.app.oversight import rules
+
+logger = logging.getLogger("mdarix.oversight")
+ACTOR = "system:reminders"
+SWEEP_EVERY = timedelta(minutes=5)
+READ_LIMIT = 2000
+TASK_CATEGORIES = {
+    "EXTERNAL_REPLY_DUE": "COMMUNICATION",
+    "EFFECTIVENESS_CHECK": "CAPA",
+    "REPORTABILITY_DECISION": "REPORTING",
+    "FIRST_CONTACT_FOLLOW_UP": "TRIAGE",
+    "QMS_COMPLAINT": "TRIAGE",
+    "SERVICE_ONLY_REVIEW": "TRIAGE",
+    "SIGNAL_TRIAGE": "TRIAGE",
+}
+CLOSED_CAPA = ("closed", "cancelled", "canceled", "completed", "done", "verified")
+
+
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _iso(value) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+# --------------------------------------------------------------------------------------------- settings and absences
+
+
+def settings_row(db: Session, tenant_id) -> OversightSettings | None:
+    return db.query(OversightSettings).filter(OversightSettings.tenant_id == tenant_id).one_or_none()
+
+
+def settings_view(row: OversightSettings | None) -> dict:
+    if row is None:
+        return {
+            "time_zone": rules.DEFAULT_ZONE,
+            "work_days": list(rules.DEFAULT_DAYS),
+            "holidays": [],
+            "reminder_hours": rules.DEFAULT_HOURS,
+            "escalation_role": rules.DEFAULT_ROLE,
+            "updated_at": None,
+        }
+    return {
+        "time_zone": row.time_zone,
+        "work_days": list(row.work_days or []),
+        "holidays": list(row.holidays or []),
+        "reminder_hours": row.reminder_hours,
+        "escalation_role": row.escalation_role,
+        "updated_at": _iso(row.updated_at) if row.updated_by else None,
+    }
+
+
+def calendar_from(view: dict) -> rules.Calendar:
+    holidays = set()
+    for item in view["holidays"]:
+        try:
+            holidays.add(date.fromisoformat(item["date"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return rules.Calendar(view["time_zone"], tuple(view["work_days"]) or rules.DEFAULT_DAYS, frozenset(holidays))
+
+
+def calendar_of(db: Session, tenant_id) -> rules.Calendar:
+    """The organization's working calendar; the default one when it cannot be read (an older database)."""
+    try:
+        with db.begin_nested():
+            row = settings_row(db, tenant_id)
+    except Exception:
+        logger.warning("The working calendar of %s could not be read; the default applies", tenant_id, exc_info=True)
+        return rules.Calendar()
+    return calendar_from(settings_view(row))
+
+
+def absences(db: Session, tenant_id, today: date | None = None) -> list[dict]:
+    """Absences not cancelled that have not ended (``today`` given), soonest first."""
+    query = db.query(UserAbsence).filter(UserAbsence.tenant_id == tenant_id, UserAbsence.cancelled_at.is_(None))
+    if today is not None:
+        query = query.filter(UserAbsence.ends_on >= today)
+    return [
+        {
+            "id": str(row.id),
+            "user_id": row.user_id,
+            "backup_id": row.backup_id,
+            "starts_on": row.starts_on,
+            "ends_on": row.ends_on,
+            "note": row.note,
+            "sample": row.source_system is not None,
+        }
+        for row in query.order_by(UserAbsence.starts_on).limit(READ_LIMIT)
+    ]
+
+
+def people(control_db: Session | None, tenant_id) -> list[dict]:
+    """The organization's people who can sign in (never an administrator account or MDARIX staff), with their
+    roles: the owners, backups and escalation recipients alerts may go to."""
+    from backend.app.db.models.foundation import AuthUser
+    from backend.app.role_codes import is_administrator_role, role_code
+    from backend.app.workflow.people import display_name, roles_of
+
+    if control_db is None:
+        return []
+    found = []
+    for user in (
+        control_db.query(AuthUser)
+        .filter(AuthUser.tenant_id == tenant_id, AuthUser.status == "ACTIVE")
+        .order_by(AuthUser.display_name)
+        .limit(500)
+    ):
+        if is_administrator_role(user.role):
+            continue
+        found.append(
+            {
+                "id": str(user.id),
+                "name": display_name(user),
+                "roles": [role_code(role) for role in roles_of(control_db, user)],
+            }
+        )
+    return found
+
+
+# --------------------------------------------------------------------------------------------- the dated items
+
+
+def _item(
+    key,
+    category,
+    title,
+    due_at,
+    *,
+    ref=None,
+    complaint_id=None,
+    owner_id=None,
+    backup_id=None,
+    queue=None,
+    market=None,
+    product=None,
+    opens=None,
+    alerts=True,
+) -> dict:
+    return {
+        "key": key,
+        "category": category,
+        "title": title[:400],
+        "ref": ref,
+        "complaint_id": str(complaint_id) if complaint_id else None,
+        "owner_id": str(owner_id) if owner_id else None,
+        "backup_id": str(backup_id) if backup_id else None,
+        "queue": queue,
+        "market": market,
+        "product": product,
+        "due_at": due_at,
+        "opens": opens or {"section": "My Work"},
+        "alerts": alerts,
+    }
+
+
+def _day_end_utc(day: date) -> datetime:
+    """The end of a legal deadline's day, as the report worksheets count it (authority_reports/rules.py)."""
+    from backend.app.authority_reports.rules import deadline_end
+
+    return deadline_end(day)
+
+
+def _task_items(db: Session, tenant_id) -> list[dict]:
+    from backend.app.communications.service import TASK_TYPE as REPLY_TASK
+    from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
+    from backend.app.workflow.labels import role_label
+
+    found = []
+    for task in (
+        db.query(WorkflowTask)
+        .filter(
+            WorkflowTask.tenant_id == tenant_id,
+            WorkflowTask.status.in_(list(OPEN_TASK_STATUSES)),
+            WorkflowTask.due_at.isnot(None),
+        )
+        .order_by(WorkflowTask.due_at)
+        .limit(READ_LIMIT)
+    ):
+        details = task.details or {}
+        complaint_id = details.get("complaint_id") or (
+            task.source_entity_id if task.source_entity_type == "Complaint" else None
+        )
+        opens = {"section": "My Work"}
+        if task.task_type == REPLY_TASK and complaint_id:
+            opens = {"section": "Complaints", "tab": f"Communications?complaint={complaint_id}"}
+        found.append(
+            _item(
+                f"task:{task.id}",
+                TASK_CATEGORIES.get(task.task_type, "TASK"),
+                task.title,
+                task.due_at,
+                ref=details.get("complaint_business_id") or details.get("reference") or task.business_id,
+                complaint_id=complaint_id,
+                owner_id=task.assigned_user_id,
+                queue=None if task.assigned_user_id else role_label(task.assigned_role),
+                opens=opens,
+            )
+        )
+    return found
+
+
+def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dict]:
+    from backend.app.intake import service as intake
+
+    found = []
+    for item in intake.triage(db, control_db, tenant_id, "open", now)["items"]:
+        record = item.get("record") or {}
+        owner = record.get("triage_owner") or record.get("event_owner")
+        complaint_id = item["id"] if item["kind"] == intake.COMPLAINT else None
+        common = {
+            "ref": item["ref"],
+            "complaint_id": complaint_id,
+            "owner_id": owner,
+            "backup_id": record.get("backup_owner"),
+            "queue": None if owner else "Triage",
+            "product": item.get("product_name"),
+            "opens": {"section": "Complaints", "tab": "Triage"},
+        }
+        found.append(
+            _item(
+                f"triage:{item['key']}",
+                "TRIAGE",
+                f"Triage {item['ref']}: {item['tier_label'].lower()}",
+                datetime.fromisoformat(item["triage_clock"]["due_at"]),
+                **common,
+            )
+        )
+        # An urgent intake is not a complaint yet: its provisional deadline is on no other list.
+        if item["kind"] == intake.INTAKE and item["deadlines"]:
+            first = item["deadlines"][0]
+            found.append(
+                _item(
+                    f"provisional:{item['key']}:{first['market']}",
+                    "REPORTING",
+                    f"Provisional {first['label']} deadline for {item['ref']} ({first['basis']})",
+                    _day_end_utc(date.fromisoformat(first["due_date"])),
+                    market=first["market"],
+                    **common,
+                )
+            )
+    return found
+
+
+def _report_items(db: Session, tenant_id) -> list[dict]:
+    from backend.app.authority_reports import forms
+    from backend.app.authority_reports import rules as report_rules
+    from backend.app.authority_reports.router import _candidates
+    from backend.app.db.models.authority_reports import ReportObligation
+    from backend.app.reportability import markets
+
+    found = []
+    obligations = db.query(ReportObligation).filter(ReportObligation.tenant_id == tenant_id).limit(READ_LIMIT).all()
+    started = {(row.complaint_id, row.market) for row in obligations if row.kind == "INITIAL"}
+    for row in obligations:
+        if row.due_on is None or row.state in report_rules.MET:
+            continue
+        form = forms.FORMS.get(row.form_code)
+        found.append(
+            _item(
+                f"obligation:{row.id}",
+                "OBLIGATION",
+                f"{form.title if form else 'Report'}: {report_rules.STATE_LABELS.get(row.state, row.state).lower()}",
+                _day_end_utc(row.due_on),
+                complaint_id=row.complaint_id,
+                owner_id=row.created_by,
+                market=row.market,
+                opens={"section": "Complaints", "tab": f"Reports?complaint={row.complaint_id}"},
+            )
+        )
+    for row in _candidates(db, tenant_id):
+        if row.due_on is None or row.filed_on or (row.complaint_id, row.market) in started:
+            continue
+        label = markets.MARKET_LABELS.get(row.market, row.market)
+        pending = row.conclusion is None
+        found.append(
+            _item(
+                f"assessment:{row.complaint_id}:{row.market}",
+                "REPORTING",
+                f"{label}: market assessment not signed, provisional deadline"
+                if pending
+                else f"{label}: reportable, the report is not started",
+                _day_end_utc(row.due_on),
+                complaint_id=row.complaint_id,
+                owner_id=row.signed_by or row.created_by,
+                market=row.market,
+                opens={
+                    "section": "Complaints",
+                    "tab": "Reportability" if pending else f"Reports?complaint={row.complaint_id}",
+                },
+            )
+        )
+    return found
+
+
+def _guide_items(db: Session, tenant_id, calendar: rules.Calendar) -> list[dict]:
+    from backend.app.db.models.guides_communications import DecisionGuideVersion
+
+    return [
+        _item(
+            f"guide:{row.id}",
+            "GUIDE",
+            f"Approve decision guide version {row.code}: a second person approves it",
+            calendar.working_day_end(row.requested_at or row.updated_at, 1),
+            ref=row.code,
+            queue="Approvers",
+            opens={"section": "Complaints", "tab": "Decision guides"},
+        )
+        for row in db.query(DecisionGuideVersion).filter(
+            DecisionGuideVersion.tenant_id == tenant_id, DecisionGuideVersion.state == "AWAITING_APPROVAL"
+        )
+    ]
+
+
+def _capa_items(db: Session, tenant_id) -> list[dict]:
+    from backend.app.db.models.foundation import Capa, Product
+
+    names = {row.id: row.name for row in db.query(Product.id, Product.name).filter(Product.tenant_id == tenant_id)}
+    return [
+        _item(
+            f"capa:{row.id}",
+            "CAPA",
+            f"CAPA {row.business_id or row.capa_identifier}: {row.title} (in your QMS)",
+            row.due_at,
+            ref=row.business_id or row.capa_identifier,
+            queue="Your QMS",
+            product=names.get(row.product_id),
+            opens={"section": "Records", "tab": "Effectiveness checks"},
+            alerts=False,
+        )
+        for row in db.query(Capa).filter(Capa.tenant_id == tenant_id, Capa.due_at.isnot(None)).limit(READ_LIMIT)
+        if str(row.status or "").lower() not in CLOSED_CAPA
+    ]
+
+
+def _with_complaints(db: Session, tenant_id, items: list[dict]) -> None:
+    """Each item about a complaint gets its reference, product and (where it has none) its market."""
+    from backend.app.db.models.foundation import Complaint, Product
+    from backend.app.reportability import markets
+
+    ids = {uuid.UUID(item["complaint_id"]) for item in items if item["complaint_id"]}
+    if not ids:
+        return
+    complaints = {
+        str(row.id): row
+        for row in db.query(
+            Complaint.id, Complaint.business_id, Complaint.complaint_identifier, Complaint.product_id, Complaint.country
+        ).filter(Complaint.tenant_id == tenant_id, Complaint.id.in_(list(ids)))
+    }
+    names = {row.id: row.name for row in db.query(Product.id, Product.name).filter(Product.tenant_id == tenant_id)}
+    for item in items:
+        row = complaints.get(item["complaint_id"] or "")
+        if row is None:
+            continue
+        item["ref"] = row.complaint_identifier
+        item["product"] = item["product"] or names.get(row.product_id)
+        item["market"] = item["market"] or markets.market_of(row.country)
+
+
+def due_items(db: Session, control_db: Session | None, tenant_id, now: datetime | None = None) -> list[dict]:
+    """Every dated item of the organization (see the module docstring), soonest first. A source that cannot be read
+    (an older database) is left out and logged; the others still show."""
+    now = now or now_utc()
+    calendar = calendar_of(db, tenant_id)
+    sources = (
+        ("tasks", lambda: _task_items(db, tenant_id)),
+        ("triage", lambda: _triage_items(db, control_db, tenant_id, now)),
+        ("reports", lambda: _report_items(db, tenant_id)),
+        ("guides", lambda: _guide_items(db, tenant_id, calendar)),
+        ("capas", lambda: _capa_items(db, tenant_id)),
+    )
+    items: list[dict] = []
+    for name, read in sources:
+        try:
+            with db.begin_nested():
+                items += read()
+        except Exception:
+            logger.exception("The %s of %s could not be read for the oversight view", name, tenant_id)
+    for item in items:
+        if item["due_at"].tzinfo is None:
+            item["due_at"] = item["due_at"].replace(tzinfo=timezone.utc)
+    _with_complaints(db, tenant_id, items)
+    items.sort(key=lambda item: (item["due_at"], item["key"]))
+    return items
+
+
+# --------------------------------------------------------------------------------------------- the sweep
+
+
+def escalation_people(everyone: list[dict], role: str) -> list[str]:
+    from backend.app.role_codes import role_code
+
+    wanted = role_code(role)
+    return [person["id"] for person in everyone if wanted in person["roles"]]
+
+
+def sweep(db: Session, control_db: Session | None, tenant_id, now: datetime | None = None) -> dict:
+    """Raise and resolve the organization's alerts (see the module docstring). Flushes; the caller commits."""
+    from backend.app.enterprise_audit import make_audit_event
+
+    now = now or now_utc()
+    row = settings_row(db, tenant_id)
+    view = settings_view(row)
+    calendar = calendar_from(view)
+    today = calendar.local_day(now)
+    everyone = people(control_db, tenant_id)
+    active = {person["id"] for person in everyone}
+    escalating = escalation_people(everyone, view["escalation_role"])
+    away = absences(db, tenant_id, today)
+    wanted: dict[tuple, tuple[dict, str]] = {}
+    for item in due_items(db, control_db, tenant_id, now):
+        if not item["alerts"]:
+            continue
+        state = rules.state_of(item["due_at"], now, view["reminder_hours"])
+        for tier, person, reason in rules.recipients(item, state, active, away, escalating, today):
+            wanted[(item["key"], tier, person)] = (item, reason)
+    existing = {
+        (alert.item_key, alert.tier, alert.recipient_id): alert
+        for alert in db.query(DueAlert).filter(DueAlert.tenant_id == tenant_id).limit(10 * READ_LIMIT)
+    }
+    raised = resolved = 0
+    for key, (item, reason) in wanted.items():
+        alert = existing.get(key)
+        fields = {
+            "reason": reason,
+            "category": item["category"],
+            "title": item["title"],
+            "ref": (item["ref"] or "")[:120] or None,
+            "complaint_id": uuid.UUID(item["complaint_id"]) if item["complaint_id"] else None,
+            "owner_id": item["owner_id"],
+            "due_at": item["due_at"],
+            "opens": item["opens"],
+        }
+        if alert is None:
+            alert = DueAlert(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                item_key=key[0],
+                tier=key[1],
+                recipient_id=key[2],
+                raised_at=now,
+                **fields,
+            )
+            try:
+                with db.begin_nested():
+                    db.add(alert)
+                    db.flush()
+            except IntegrityError:  # a sweep running at the same moment raised it
+                continue
+        elif alert.resolved_at is not None:
+            for name, value in fields.items():
+                setattr(alert, name, value)
+            alert.raised_at, alert.resolved_at, alert.read_at = now, None, None
+        else:
+            for name, value in fields.items():
+                setattr(alert, name, value)
+            continue
+        raised += 1
+        if alert.tier == rules.ESCALATION:
+            db.add(
+                make_audit_event(
+                    tenant_id=tenant_id,
+                    actor_ref=ACTOR,
+                    action="DUE_ITEM_ESCALATED",
+                    entity_type="DueAlert",
+                    entity_id=alert.id,
+                    details={"item": key[0], "recipient": key[2], "reason": reason, "due_at": _iso(item["due_at"])},
+                    created_at=now,
+                )
+            )
+    for key, alert in existing.items():
+        if key not in wanted and alert.resolved_at is None:
+            alert.resolved_at = now
+            resolved += 1
+    if row is None:
+        row = OversightSettings(id=uuid.uuid4(), tenant_id=tenant_id, updated_at=now)
+        db.add(row)
+    row.swept_at = now
+    db.flush()
+    return {"raised": raised, "resolved": resolved}
+
+
+def sweep_if_stale(db: Session, control_db: Session | None, tenant_id, now: datetime | None = None) -> None:
+    """Sweep when the last sweep is older than ``SWEEP_EVERY`` (opening a list brings it up to date); commits. A
+    failing sweep is logged and the list shows the alerts as they were."""
+    now = now or now_utc()
+    row = settings_row(db, tenant_id)
+    if row is not None and row.swept_at is not None and now - row.swept_at < SWEEP_EVERY:
+        return
+    try:
+        sweep(db, control_db, tenant_id, now)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("The reminders of %s could not be brought up to date", tenant_id)
+
+
+def run_for_all_tenants(control_db: Session) -> dict:
+    """The scheduler job: the sweep for every active organization, on the shared plane or its own database, each
+    committed on its own; a failing organization is logged and the job then fails so the scheduler alerts."""
+    from backend.app.reportability.reminders import active_tenant_ids
+    from backend.app.db.data_plane import open_tenant_data_session
+
+    totals = {"tenants": 0, "raised": 0, "resolved": 0}
+    failed = []
+    for tenant_id in active_tenant_ids(control_db):
+        try:
+            with open_tenant_data_session(tenant_id) as data:
+                try:
+                    done = sweep(data, control_db, tenant_id)
+                    data.commit()
+                except Exception:
+                    data.rollback()
+                    raise
+        except Exception as exc:
+            logger.exception("The reminders failed for organization %s", tenant_id)
+            failed.append({"tenant_id": str(tenant_id), "error": type(exc).__name__})
+            continue
+        totals["tenants"] += 1
+        totals["raised"] += done["raised"]
+        totals["resolved"] += done["resolved"]
+    if failed:
+        raise RuntimeError(f"Reminders failed for {len(failed)} organization(s): {failed}")
+    return {**totals, "failed": failed}

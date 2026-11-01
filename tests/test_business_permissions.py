@@ -64,6 +64,11 @@ EXEMPT = {
         "GET",
         "/api/v1/reports/{obligation_id}/submissions/{submission_id}/evidence/{evidence_id}/file",
     ): "the authority's own receipt or reply kept with a submission, read like any evidence content",
+    # Reminders and escalation (0.10.60): a person reads their own alerts and records or ends their own absence;
+    # nobody acts for another, so every signed-in member may, checked in the route.
+    ("POST", "/api/v1/oversight/alerts/read"): "the person's own alerts only, checked in the route",
+    ("POST", "/api/v1/oversight/absences"): "the person's own absence only, with a colleague of the organization",
+    ("POST", "/api/v1/oversight/absences/{absence_id}/cancel"): "the person's own absence only, checked in the route",
     ("POST", "/api/v1/ask/"): "AI permission checked in the route (Ask resolves its own session)",
     ("GET", "/api/v1/stage3/reports/jobs/{job_id}"): "read-only job status; the download is guarded",
     ("GET", "/api/v1/trial/templates/{entity}.csv"): "blank CSV template, no customer data",

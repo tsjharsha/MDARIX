@@ -43,6 +43,8 @@ GENERIC_REFERENCES = (
     ("record_links", "left_id"),
     ("record_links", "right_id"),
     ("record_field_changes", "record_id"),
+    # A reminder or escalation names the complaint its item is about (tr07).
+    ("due_alerts", "complaint_id"),
     # A communications log request raised by a first contact points at its intake event (tr06).
     ("communication_entries", "intake_event_id"),
 )

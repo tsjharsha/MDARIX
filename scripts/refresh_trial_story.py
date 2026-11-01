@@ -20,7 +20,8 @@ triage record (backend/app/trial/sample_intake.py) unless they are there, and th
 finished US example, an India complaint with a rejected attempt, and India in the sample's own reporting windows,
 backend/app/trial/sample_reports.py) unless they are there, and the sample's own US guide version, a draft whose test
 fails, and the communications log's examples (backend/app/trial/sample_guides.py; the open request is owned by the
-trial's first user) unless they are there. Each trial is committed on its own, with an audit event.
+trial's first user) unless they are there, and the sample author's absence with the trial's first user as backup and
+the two events that user owns (backend/app/trial/sample_oversight.py) unless they are there. Each trial is committed on its own, with an audit event.
 """
 
 from __future__ import annotations
@@ -82,6 +83,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.trial.sample_imports import has_sample_import, stage_sample_import
     from backend.app.trial.sample_intake import has_sample_intake, stage_sample_intake
     from backend.app.trial.sample_guides import has_sample_guides, stage_sample_guides
+    from backend.app.trial.sample_oversight import has_sample_oversight, stage_sample_oversight
     from backend.app.trial.sample_reports import has_sample_reports, stage_sample_reports
 
     results = []
@@ -108,6 +110,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             intake_missing = not has_sample_intake(session, tenant_id)
             reports_missing = not has_sample_reports(session, tenant_id)
             guides_missing = not has_sample_guides(session, tenant_id)
+            oversight_missing = not has_sample_oversight(session, tenant_id)
             if not (
                 story_missing
                 or lots_missing
@@ -118,6 +121,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or intake_missing
                 or reports_missing
                 or guides_missing
+                or oversight_missing
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -132,6 +136,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *(["the sample first contacts and urgent intake"] if intake_missing else []),
                     *(["the sample report worksheets"] if reports_missing else []),
                     *(["the sample guide versions and communications log"] if guides_missing else []),
+                    *(["the sample absence and event owners"] if oversight_missing else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -153,6 +158,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["reports"] = stage_sample_reports(session, tenant_id, now)
             if guides_missing:
                 added["guides"] = stage_sample_guides(session, tenant_id, now)
+            if oversight_missing:
+                added["oversight"] = stage_sample_oversight(session, tenant_id, now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,
