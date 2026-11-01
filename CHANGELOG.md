@@ -10,6 +10,55 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.56] - 2026-11-01
+
+On the trial maintenance line (`release/0.10`): the MVP's governed import (R14 stored quarantine, R16 row lineage, R17
+data-quality report) and its regulatory reference data (G2a: UDI-DI and GMDN on products, IMDRF codes) come to the
+free trial's Excel/CSV import path, with the screens a trial user sees. Ported from `mvp-1.0` (6072cdd, e753040,
+da4a71a, 8ace582, 4549323, c01c277); the trial and the MVP now behave the same once the data is in. The pilot feature
+set (R08) is not part of it.
+
+**Migrations, expand-only:** `md49signinggrants` (table `signing_grants`), `md50importquarantine`
+(`import_quarantine_rows`), `md51importlineage` (`import_lineage`), `md52regulatoryreference` (`products.udi_di`,
+`gmdn_code`, `gmdn_term`; `product_registrations`, `market_responsible_parties`, `imdrf_codes`,
+`imdrf_code_mappings`), identical to `mvp-1.0`'s, and the empty merge `tr03amergemvpimports`, which joins them with
+`tr02complaintdispositions` into one head. New tables and nullable columns only: nothing is rewritten or dropped, and
+0.10.55 runs on the migrated schema. The API and web images change.
+
+### Added
+
+- **A data-quality report for every import** (R17), under Getting started › Your data and under Import data: the
+  file's name, when and by whom; rows read, written (new and updated) and set aside; and the checks: every row
+  accounted for, rows that passed every check, personal details replaced. After an import, "See its data-quality
+  report" opens it; Your data opens with a link to the reports. `GET /api/v1/data/import/runs` lists the latest runs;
+  `GET /api/v1/data/import/runs/{import_ref}` now also reads a free trial's runs (`TRIAL_DATA_IMPORTED`) and names the
+  file (`?file_name=` on an import, last part of the path, personal data masked, recorded on its audit event).
+- **The rows set aside, with their reasons** (R14), in the report: rows that suggest harm first, each with its row
+  number, reasons and values, personal details stored only as placeholders such as [PERSON]. The person fixes the file
+  and imports it again. A free trial now stores its set-aside rows too (`TRIAL_POLICY.quarantine`), masked as the
+  workspace import stores them; the rows-to-fix download stays.
+- **Where this record came from** (R16) in a complaint's disposition: the file, the row and the import, with a link
+  to that import's report; on products in Import data too. `GET /api/v1/data/import/origin/{entity}/{id}` for
+  products, lots and complaints, by their MDARIX id.
+- **Regulatory reference data** (G2a): a complaint's disposition shows its problem code's IMDRF codes (approved links
+  only; `GET /api/v1/regulatory-reference/imdrf/links`), and the complaint list's problem-code filter names them.
+  Import data › Products: UDI-DI and GMDN shows each product's UDI-DI, GMDN code and term, set there by people who may
+  change records (G2a's check: a GMDN code is five digits). IMDRF terms are read from the release loaded with
+  `scripts/load_imdrf_annex.py`; none is typed into MDARIX.
+- **The sample shows each of them** (`backend/app/trial/sample_imports.py`): the import run "Sample complaints
+  export.xlsx", whose rows are the sample complaints (lineage), with two rows set aside (SAMPLE-RJ-01 no description;
+  SAMPLE-RJ-02 a caller's name and phone number, stored as placeholders, a date that does not exist, and harm, so it
+  lists first) and a balanced report; UDI-DI and GMDN on the three sample products; the sample's alarm and flow
+  problem codes linked to IMDRF Annex A (A14, A16). Its audit record carries no created or updated counts, and no
+  complaint, product or lot is added: every count quoted elsewhere stays, and OrbitCare stays the only rising trend.
+  `scripts/refresh_trial_story.py` adds it, once, to running trials; removing the sample removes it.
+- The in-app user guide and the trial guide say where the report is.
+
+### Changed
+
+- The R11 schema (`signing_grants`, its erasure with a person's personal data) comes with the migration chain, but the
+  trial line does not enforce R11: a trial has one administrator, and its owner gives colleagues the trial's role.
+
 ## [0.10.55] - 2026-10-31
 
 On the trial maintenance line (`release/0.10`): a read-only preview of the distributor and EU authorised-representative
