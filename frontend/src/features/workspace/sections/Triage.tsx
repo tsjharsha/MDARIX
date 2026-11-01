@@ -21,6 +21,7 @@ import {
   type TriageItem,
   type TriageList,
 } from "../intake";
+import { reportsTab } from "../authorityReports";
 
 /** The second look's rule: triage, opening cases or quality review may write. */
 export function useCanTriage() {
@@ -40,7 +41,7 @@ const SHOWS = [
  * intakes, flagged calls, flagged imported complaints and set-aside rows that suggest harm), with both clocks: the
  * triage target from when it reached MDARIX, and each market's provisional deadline from awareness (T-G19).
  */
-export function Triage({ onOpenTab }: { onOpenTab?: (tab: "First contact") => void }) {
+export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const [show, setShow] = useState<"open" | "done">("open");
   const [open, setOpen] = useState<TriageItem | null>(null);
   const list = useResource<TriageList>(`${TRIAGE}?show=${show}`);
@@ -111,7 +112,7 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: "First contact") => vo
         {items.length ? (
           <ul className="uw-cr-list">
             {items.map((item) => (
-              <TriageCard key={item.key} item={item} onOpen={() => setOpen(item)} />
+              <TriageCard key={item.key} item={item} onOpen={() => setOpen(item)} onOpenTab={onOpenTab} />
             ))}
           </ul>
         ) : (
@@ -142,7 +143,15 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: "First contact") => vo
   );
 }
 
-function TriageCard({ item, onOpen }: { item: TriageItem; onOpen: () => void }) {
+function TriageCard({
+  item,
+  onOpen,
+  onOpenTab,
+}: {
+  item: TriageItem;
+  onOpen: () => void;
+  onOpenTab?: (tab: string) => void;
+}) {
   const first = item.deadlines[0];
   return (
     <li className="uw-cr-card">
@@ -192,6 +201,16 @@ function TriageCard({ item, onOpen }: { item: TriageItem; onOpen: () => void }) 
           <button type="button" className="ac-secondary" onClick={onOpen}>
             {item.record?.completed_at ? "See the triage record" : "Triage"}
           </button>
+          {onOpenTab && item.kind === "COMPLAINT" && (
+            <>
+              <button type="button" className="ac-link" onClick={() => onOpenTab("Reportability")}>
+                Next: assess per market
+              </button>
+              <button type="button" className="ac-link" onClick={() => onOpenTab(reportsTab(item.id))}>
+                Its reports
+              </button>
+            </>
+          )}
         </div>
       </div>
     </li>

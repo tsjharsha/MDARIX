@@ -3,6 +3,7 @@ import { EscalateButton } from "./Triage";
 import {
   AlarmClock,
   CheckCircle2,
+  ClipboardList,
   FileSearch,
   HelpCircle,
   Hourglass,
@@ -14,7 +15,8 @@ import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console
 import { formatDate, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
 import { investigationRequestFor, useCan, useOpenInvestigation } from "../workspaceContext";
-import { recordId, type ComplaintsTab } from "../complaintReview";
+import { recordId } from "../complaintReview";
+import { owesWorksheet, reportsTab } from "../authorityReports";
 import {
   AWARE_SOURCE,
   TRIGGER_LABELS,
@@ -46,7 +48,7 @@ function useCanDecide() {
  * whose outcome is unknown), with its reporting clocks against the organization's own windows, most urgent first. A
  * person records the decision; MDARIX keeps the clock and never submits a report.
  */
-export function ReportabilityWatch({ onOpenTab }: { onOpenTab: (tab: ComplaintsTab) => void }) {
+export function ReportabilityWatch({ onOpenTab }: { onOpenTab: (tab: string) => void }) {
   const canEditWindows = useCan("regulatory.approve");
   const [show, setShow] = useState<WatchShow>("open");
   const [product, setProduct] = useState("");
@@ -165,7 +167,12 @@ export function ReportabilityWatch({ onOpenTab }: { onOpenTab: (tab: ComplaintsT
         {items.length ? (
           <ul className="uw-cr-list">
             {items.map((item) => (
-              <WatchCard key={item.id} item={item} onDecide={() => setDeciding(item)} />
+              <WatchCard
+                key={item.id}
+                item={item}
+                onDecide={() => setDeciding(item)}
+                onReports={() => onOpenTab(reportsTab(item.id))}
+              />
             ))}
           </ul>
         ) : (
@@ -190,7 +197,15 @@ export function ReportabilityWatch({ onOpenTab }: { onOpenTab: (tab: ComplaintsT
 }
 
 /** One complaint on the watch (exported for its unit test). */
-export function WatchCard({ item, onDecide }: { item: WatchItem; onDecide: () => void }) {
+export function WatchCard({
+  item,
+  onDecide,
+  onReports,
+}: {
+  item: WatchItem;
+  onDecide: () => void;
+  onReports?: () => void;
+}) {
   const canDecide = useCanDecide();
   const openInvestigation = useOpenInvestigation();
   const state = watchStateOf(item.state);
@@ -311,6 +326,11 @@ export function WatchCard({ item, onDecide }: { item: WatchItem; onDecide: () =>
           >
             <Scale size={15} aria-hidden="true" />{" "}
             {item.state === "DECIDED" ? "Open the assessment" : "Assess per market"}
+          </button>
+        )}
+        {onReports && owesWorksheet(item.markets) && (
+          <button type="button" className="ac-secondary" onClick={onReports} aria-label={`${name}: report worksheets`}>
+            <ClipboardList size={15} aria-hidden="true" /> Report worksheet
           </button>
         )}
         {openInvestigation && request && !item.case && (

@@ -1,9 +1,10 @@
-import { useEffect, useId, useState } from "react";
+import { useContext, useEffect, useId, useState } from "react";
 import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { WorkspaceContext, useCan, useWorkspace } from "../workspaceContext";
+import { WORKSHEET_MARKETS, reportsTab } from "../authorityReports";
 import { recordName } from "../complaintReview";
 import { clockText } from "../reportability";
 import {
@@ -629,6 +630,7 @@ export function SignedVersion({
   onSaved: () => void;
 }) {
   const canDecide = useCanAssess();
+  const workspace = useContext(WorkspaceContext);
   const [reference, setReference] = useState("");
   const [filedOn, setFiledOn] = useState("");
   const [error, setError] = useState("");
@@ -675,7 +677,24 @@ export function SignedVersion({
           </span>
         )}
       </div>
-      {conclusion === "REPORTABLE" && !version.filed_on && canDecide && (
+      {conclusion === "REPORTABLE" && WORKSHEET_MARKETS.includes(version.market) && (
+        <div className="ca-action-row">
+          <button
+            type="button"
+            className="ac-primary"
+            onClick={() => workspace?.open("Complaints", reportsTab(complaintId))}
+            disabled={!workspace}
+          >
+            <PenLine size={15} aria-hidden="true" />{" "}
+            {version.filed_on ? "Open the report record" : "Open the report worksheet"}
+          </button>
+          <p className="ac-muted">
+            The worksheet is drafted from this conclusion in the authority's field order. A second person approves it;
+            you submit it in the authority's route and record it there. MDARIX submits nothing.
+          </p>
+        </div>
+      )}
+      {conclusion === "REPORTABLE" && !WORKSHEET_MARKETS.includes(version.market) && !version.filed_on && canDecide && (
         <form className="ca-form-grid" onSubmit={record} aria-label="Filing reference and date">
           <label className="ca-field">
             Filing reference

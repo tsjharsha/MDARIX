@@ -562,6 +562,11 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         from backend.app.trial.sample_intake import stage_sample_intake
 
         sample["intake"] = stage_sample_intake(db, tenant.id, now)
+        # The report worksheets: a finished US example, an India example with a rejected attempt, and India in the
+        # sample's reporting windows (backend/app/trial/sample_reports.py). After the import run: its counts stay.
+        from backend.app.trial.sample_reports import stage_sample_reports
+
+        sample["reports"] = stage_sample_reports(db, tenant.id, now)
         user = AuthUser(
             id=uuid.uuid4(),
             tenant_id=tenant.id,

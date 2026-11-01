@@ -66,6 +66,11 @@ TRIAL_DATA_TABLES = (
     "complaint_reportability",
     "reportability_settings",
     "capa_effectiveness_checks",
+    # Report evidence, submissions, snapshots and obligations (tr05): on the complaints and assessments listed below.
+    "report_evidence",
+    "report_submissions",
+    "report_snapshots",
+    "report_obligations",
     # Per-market assessments, classifications (both on complaints listed below) and signer training records (tr01).
     "complaint_market_assessments",
     "complaint_classifications",
