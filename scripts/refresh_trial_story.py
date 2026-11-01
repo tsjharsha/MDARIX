@@ -25,8 +25,9 @@ starter worked complaints, and its matrix is run again), and the sample author's
 the two events that user owns (backend/app/trial/sample_oversight.py) unless they are there, and the lot genealogy, the
 three OrbitCare lots without complaints and the distribution with its import run for a case's Lot impact
 (backend/app/trial/sample_lot_impact.py; lot 005 then releases 60 units and the new lots 30 each, made the same day, so
-the trend's units in the field stay the same) unless they are there. Each trial is committed on its own, with an audit
-event.
+the trend's units in the field stay the same) unless they are there, and the sample products' device categories and
+the sample lots' expiry dates (``SAMPLE_PRODUCT_FACTS``, 0.10.64) where they are not set. Each trial is committed on its
+own, with an audit event.
 """
 
 from __future__ import annotations
@@ -73,13 +74,15 @@ def trials(db: Session) -> list[tuple]:
 def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.db.tenant_scope import bind_tenant
     from backend.app.enterprise_audit import make_audit_event
-    from backend.app.db.models.foundation import LotBatch
+    from backend.app.db.models.foundation import LotBatch, Product, ProductVersion
     from backend.app.signals.hooks import seed_demo_signals
     from backend.app.trial.sample_data import (
+        SAMPLE_PRODUCT_FACTS,
         SAMPLE_SOURCE,
         has_sample_data,
         has_story_examples,
         seed_lot_quantities,
+        seed_product_facts,
         seed_story_examples,
     )
     from backend.app.trial.sample_assessments import has_sample_assessments, stage_sample_assessments
@@ -119,6 +122,28 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             guides_unlocked = relock_sample_drafts(session, tenant_id, apply=False)
             oversight_missing = not has_sample_oversight(session, tenant_id)
             lot_impact_missing = not has_sample_lot_impact(session, tenant_id)
+            facts_missing = (
+                session.query(Product.id)
+                .filter(
+                    Product.tenant_id == tenant_id,
+                    Product.source_system == SAMPLE_SOURCE,
+                    Product.product_identifier.in_(list(SAMPLE_PRODUCT_FACTS)),
+                    Product.device_category.is_(None),
+                )
+                .count()
+                + session.query(LotBatch.id)
+                .join(ProductVersion, ProductVersion.id == LotBatch.product_version_id)
+                .join(Product, Product.id == ProductVersion.product_id)
+                .filter(
+                    LotBatch.tenant_id == tenant_id,
+                    LotBatch.source_system == SAMPLE_SOURCE,
+                    LotBatch.expiry_date.is_(None),
+                    Product.product_identifier.in_(
+                        [code for code, facts in SAMPLE_PRODUCT_FACTS.items() if facts.get("shelf_life_days")]
+                    ),
+                )
+                .count()
+            )
             if not (
                 story_missing
                 or lots_missing
@@ -132,6 +157,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or guides_unlocked
                 or oversight_missing
                 or lot_impact_missing
+                or facts_missing
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -149,6 +175,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *(["the locked wording and starter matrix in the sample guide draft"] if guides_unlocked else []),
                     *(["the sample absence and event owners"] if oversight_missing else []),
                     *(["the sample lot genealogy and distribution"] if lot_impact_missing else []),
+                    *(["the sample products' device categories and lot expiry dates"] if facts_missing else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -177,6 +204,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             if lot_impact_missing:
                 # After the quantities: lot 005's units are shared with the three new lots.
                 added["lot_impact"] = stage_sample_lot_impact(session, tenant_id, now)
+            # Last: every sample lot exists by now.
+            added["product_facts"] = seed_product_facts(session, tenant_id)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,

@@ -175,6 +175,29 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+.ug-coverage {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+.ug-coverage > div {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 12px;
+}
+.ug-coverage dt {
+  color: #0f766e;
+  font-weight: 600;
+}
+.ug-coverage dd {
+  margin: 0;
+}
+@media (max-width: 560px) {
+  .ug-coverage > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
 @media (max-width: 860px) {
   .ug-layout {
     grid-template-columns: minmax(0, 1fr);

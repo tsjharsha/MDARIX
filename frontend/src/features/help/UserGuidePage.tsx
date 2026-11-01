@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { BESIDE_YOUR_QMS, PMS_FRAMING } from "./besideYourQms";
 import { TRIAL_GUIDE_PATH } from "./trialGuide";
-import { GUIDE_PARTS, GUIDE_SECTIONS, ROLE_SUMMARY } from "./userGuide";
+import { COVERAGE, COVERAGE_MARKETS, COVERAGE_NOTE, GUIDE_PARTS, GUIDE_SECTIONS, ROLE_SUMMARY } from "./userGuide";
 import "./trialGuide.css";
 import "./userGuide.css";
 
@@ -83,6 +83,11 @@ export function UserGuidePage() {
               <li>
                 <a href="#roles" className="ug-contents-part">
                   {GUIDE_PARTS.length + 1}. Who can do what
+                </a>
+              </li>
+              <li>
+                <a href="#coverage" className="ug-contents-part">
+                  {GUIDE_PARTS.length + 2}. What MDARIX covers
                 </a>
               </li>
             </ol>
@@ -182,6 +187,42 @@ export function UserGuidePage() {
                 {GUIDE_SECTIONS.length} topics. Names in this guide are the ones on the screen; the records you see are
                 your organization's own.
               </p>
+            </section>
+
+            <section id="coverage" className="ug-part" aria-labelledby="coverage-title">
+              <header className="ug-part-head">
+                <p className="ug-part-number">Part {GUIDE_PARTS.length + 2}</p>
+                <h2 id="coverage-title">What MDARIX covers</h2>
+                <p>
+                  By device category, in {COVERAGE_MARKETS}: which reporting clocks, report worksheets and checks apply,
+                  and what is not covered yet. Set a product&apos;s category in the products file (column
+                  device_category). Starter text, for your regulatory consultant to confirm.
+                </p>
+              </header>
+              {COVERAGE.map((row) => (
+                <article key={row.category} className="ug-section" aria-label={row.category}>
+                  <h3>{row.category}</h3>
+                  <dl className="ug-coverage">
+                    <div>
+                      <dt>Reporting clocks</dt>
+                      <dd>{row.clocks}</dd>
+                    </div>
+                    <div>
+                      <dt>Report worksheets</dt>
+                      <dd>{row.worksheets}</dd>
+                    </div>
+                    <div>
+                      <dt>Checks</dt>
+                      <dd>{row.checks}</dd>
+                    </div>
+                    <div>
+                      <dt>Not covered yet</dt>
+                      <dd>{row.notYet}</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+              <p className="tg-small">{COVERAGE_NOTE}</p>
             </section>
           </div>
         </div>

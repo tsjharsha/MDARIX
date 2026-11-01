@@ -91,6 +91,7 @@ def item_of(capa: Capa, product_name, case_business_id, check: CapaEffectiveness
             "id": str(capa.id),
             "business_id": capa.business_id,
             "capa_identifier": capa.capa_identifier,
+            "qms_reference": capa.qms_reference,
             "title": capa.title,
             "status": capa.status,
             "action_type": capa.action_type,

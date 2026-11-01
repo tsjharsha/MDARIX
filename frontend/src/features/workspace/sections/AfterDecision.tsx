@@ -27,7 +27,9 @@ import {
   followUpListPath,
   followUpOverdue,
   followUpPath,
+  followUpQmsReferencePath,
   followUpStatusView,
+  QMS_REFERENCE_MAX,
   followUpTypeLabel,
   impactBody,
   impactCanComplete,
@@ -208,13 +210,14 @@ export function FollowUpDrawer({
   const [mode, setMode] = useState<FollowUpActionKey | null>(null);
   const [text, setText] = useState("");
   const [dueDay, setDueDay] = useState("");
+  const [qmsReference, setQmsReference] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const name = safeText(followUp.business_id) ?? "Follow-up";
   const allowed = followUpActions(followUp);
   const run = async (key: FollowUpActionKey) => {
     if (busy) return;
-    const problem = followUpActionProblem(key, { text, dueDay });
+    const problem = followUpActionProblem(key, { text, dueDay, qmsReference });
     if (problem) {
       setError(problem);
       return;
@@ -222,7 +225,7 @@ export function FollowUpDrawer({
     setBusy(true);
     setError("");
     try {
-      await send(followUpPath(followUp.id, key), "POST", followUpActionBody(key, { text, dueDay }));
+      await send(followUpPath(followUp.id, key), "POST", followUpActionBody(key, { text, dueDay, qmsReference }));
       const label = FOLLOW_UP_ACTIONS_SHOWN.find((item) => item.key === key)?.label ?? "Update";
       notify(`${name}: ${label.toLowerCase()} recorded.`);
       onDone();
@@ -263,9 +266,12 @@ export function FollowUpDrawer({
         </div>
         <div>
           <dt>CAPA</dt>
-          <dd>{capa ?? "None raised"}</dd>
+          <dd>{capa ?? "None recorded"}</dd>
         </div>
       </dl>
+      {followUp.capa && followUp.actions?.can_set_qms_reference && !copy && (
+        <QmsReferenceForm followUp={followUp} onDone={onDone} />
+      )}
       {safeText(followUp.title) && <p className="uw-intel-statement">{followUp.title}</p>}
       {safeText(followUp.completion_note) && (
         <section className="ca-drawer-section">
@@ -293,6 +299,7 @@ export function FollowUpDrawer({
                     setError("");
                     setText("");
                     setDueDay("");
+                    setQmsReference("");
                     if (item?.needsInput) setMode(key);
                     else void run(key);
                   }}
@@ -339,6 +346,15 @@ export function FollowUpDrawer({
                 CAPA due date (optional)
                 <input type="date" value={dueDay} onChange={(event) => setDueDay(event.target.value)} />
               </label>
+              <label className="ca-field">
+                QMS reference (optional)
+                <input
+                  maxLength={QMS_REFERENCE_MAX}
+                  value={qmsReference}
+                  placeholder="The number your QMS gave the CAPA"
+                  onChange={(event) => setQmsReference(event.target.value)}
+                />
+              </label>
               <p className="ac-muted">
                 MDARIX records the CAPA to raise and links it to this follow-up. You raise and run the CAPA in your QMS.
               </p>
@@ -365,6 +381,56 @@ export function FollowUpDrawer({
         </p>
       )}
     </Drawer>
+  );
+}
+
+/** The number your QMS gave the CAPA (J22): added once the CAPA is raised there, changed or cleared later. */
+function QmsReferenceForm({ followUp, onDone }: { followUp: FollowUp; onDone: () => void }) {
+  const { notify } = useWorkspace();
+  const saved = followUp.capa?.qms_reference ?? "";
+  const [value, setValue] = useState(saved);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const save = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await send(followUpQmsReferencePath(followUp.id), "POST", { qms_reference: value.trim() || null });
+      notify(value.trim() ? `QMS reference ${value.trim()} recorded.` : "QMS reference cleared.");
+      onDone();
+    } catch (failure) {
+      setError(errorText(failure, "The QMS reference was not saved."));
+      setBusy(false);
+    }
+  };
+  return (
+    <form
+      className="ca-form ca-drawer-section"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void save();
+      }}
+    >
+      <label className="ca-field">
+        QMS reference
+        <input
+          maxLength={QMS_REFERENCE_MAX}
+          value={value}
+          placeholder="The number your QMS gave the CAPA"
+          onChange={(event) => setValue(event.target.value)}
+        />
+      </label>
+      <div className="ca-action-row">
+        <button type="submit" className="ac-secondary" disabled={busy || value.trim() === saved}>
+          {busy ? "Saving…" : "Save QMS reference"}
+        </button>
+      </div>
+      {error && (
+        <p className="ac-message tone-critical" role="alert">
+          {error}
+        </p>
+      )}
+    </form>
   );
 }
 

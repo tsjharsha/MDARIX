@@ -603,10 +603,8 @@ def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datet
             )
             signed.setdefault(key, {})[market] = clock
     products = {
-        row.id: (row.name, row.product_family, row.gmdn_term, row.description)
-        for row in db.query(Product.id, Product.name, Product.product_family, Product.gmdn_term, Product.description)
-        .filter(Product.tenant_id == tenant_id)
-        .limit(READ_LIMIT)
+        row.id: markets.product_is_ivd(row)
+        for row in db.query(Product).filter(Product.tenant_id == tenant_id).limit(READ_LIMIT)
     }
     return {"org_zone": zone, "signed": signed, "products": products}
 
@@ -665,7 +663,7 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
         own=own,
         signed=signed,
         org_zone=context["org_zone"],
-        ivd=markets.is_ivd(*context["products"].get(primary.get("product_id"), ())),
+        ivd=context["products"].get(primary.get("product_id"), False),
     )
     record = member_records.get(primary_key)
     opened = rules.utc(record.opened_at) if record is not None else primary["available_at"]

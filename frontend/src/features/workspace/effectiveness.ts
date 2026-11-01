@@ -49,6 +49,7 @@ export type CapaItem = {
     status: string | null;
     action_type: string | null;
     source_system: string | null;
+    qms_reference?: string | null;
     opened_on: string | null;
     due_on: string | null;
     closed: boolean;
@@ -139,6 +140,16 @@ export const stateOf = (state: string | null | undefined) =>
 const plural = (count: number, noun: string) => `${count.toLocaleString()} ${count === 1 ? noun : `${noun}s`}`;
 
 export const capaRef = (item: Pick<CapaItem, "capa">) => item.capa.business_id || item.capa.capa_identifier || "CAPA";
+
+/**
+ * Where a CAPA stands in your QMS (J22), wherever the CAPA shows: "QMS reference CAPA-0450" once known, "To raise in
+ * your QMS" for one MDARIX recorded without it yet, or null for a CAPA that came from your QMS (its ID is the QMS's).
+ */
+export function capaQmsText(capa: { qms_reference?: string | null; source_system?: string | null }): string | null {
+  const ref = capa.qms_reference?.trim();
+  if (ref) return `QMS reference ${ref}`;
+  return capa.source_system === "MDARIX" ? "To raise in your QMS" : null;
+}
 
 /**
  * "10 days left", "Due today", "3 days overdue" (app/dates.ts timeLeft), or what the state says. Counted from today where the person is, from

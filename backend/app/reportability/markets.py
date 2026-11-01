@@ -683,6 +683,14 @@ def is_ivd(*texts) -> bool:
     return any(IVD_WORDS.search(str(text or "")) for text in texts)
 
 
+def product_is_ivd(product) -> bool:
+    """Whether a product (a Product row, or None) is an in-vitro diagnostic, read the same way on the watch and in
+    triage: the words of its name, family, GMDN term or description."""
+    if product is None:
+        return False
+    return is_ivd(product.name, product.product_family, product.gmdn_term, product.description)
+
+
 def window_markets(window: dict) -> set[str]:
     """The markets a reporting window covers (a window without markets covers every market)."""
     if not window.get("markets"):

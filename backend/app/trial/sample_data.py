@@ -550,6 +550,8 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
             )
             counts["evidence"] += 1
     db.flush()
+    # The products' device categories and the lots' expiry dates, before any worksheet is drafted from them.
+    seed_product_facts(db, tenant_id)
     return {"created": True, **counts}
 
 
@@ -570,6 +572,48 @@ def seed_lot_quantities(db: Session, tenant_id) -> int:
         if quantity is not None:
             lot.quantity = quantity
             updated += 1
+    db.flush()
+    return updated
+
+
+# The sample products' facts (J32, 0.10.64), by product identifier: the device category the report worksheets and
+# Help › What MDARIX covers read, and the shelf life that dates each lot's expiry (made + days; None: no expiry). One
+# line per sample product: a product added to the sample adds its line here.
+SAMPLE_PRODUCT_FACTS: dict[str, dict] = {
+    "SAMPLE-ORBIT-300": {"device_category": "REUSABLE", "shelf_life_days": 1826},
+    "SAMPLE-PULSE-410": {"device_category": "REUSABLE", "shelf_life_days": 1826},
+    "SAMPLE-VENTRA-250": {"device_category": "REUSABLE", "shelf_life_days": 1826},
+}
+
+
+def seed_product_facts(db: Session, tenant_id) -> dict:
+    """Give the sample products their facts and the sample lots their expiry where none is set (trials approved
+    before 0.10.64 included; run after every sample lot exists). Idempotent; never touches a record the organization
+    imported. Flushes but never commits. Returns the products and lots updated."""
+    updated = {"products": 0, "lots": 0}
+    shelf_life = {}
+    for product in db.query(Product).filter(Product.tenant_id == tenant_id, Product.source_system == SAMPLE_SOURCE):
+        facts = SAMPLE_PRODUCT_FACTS.get(product.product_identifier) or {}
+        shelf_life[product.id] = facts.get("shelf_life_days")
+        changed = False
+        for field in ("device_category",):
+            if getattr(product, field) is None and facts.get(field) is not None:
+                setattr(product, field, facts[field])
+                changed = True
+        updated["products"] += changed
+    for lot, product_id in (
+        db.query(LotBatch, ProductVersion.product_id)
+        .join(ProductVersion, ProductVersion.id == LotBatch.product_version_id)
+        .filter(
+            LotBatch.tenant_id == tenant_id,
+            LotBatch.source_system == SAMPLE_SOURCE,
+            LotBatch.expiry_date.is_(None),
+        )
+    ):
+        days = shelf_life.get(product_id)
+        if days and lot.effective_timestamp:
+            lot.expiry_date = (lot.effective_timestamp + timedelta(days=days)).date()
+            updated["lots"] += 1
     db.flush()
     return updated
 

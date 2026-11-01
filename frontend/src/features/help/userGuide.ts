@@ -44,6 +44,82 @@ export const ROLE_SUMMARY: readonly [string, string][] = [
   ["Customer Administrator", "Manages people and settings for the organization; never reviews or signs."],
 ];
 
+/** One device category of Help › What MDARIX covers (J32): what applies to it in the trial's markets. */
+export type CoverageRow = {
+  category: string;
+  clocks: string;
+  worksheets: string;
+  checks: string;
+  notYet: string;
+};
+
+/** The markets the coverage table speaks of: the trial's reporting markets. */
+export const COVERAGE_MARKETS =
+  "the United States (FDA), the EU and Northern Ireland (EU MDR), Great Britain (MHRA) and India (CDSCO)";
+
+/**
+ * What MDARIX covers, by device category, in the trial's markets: which reporting clocks, report worksheets and checks
+ * apply, and what is not covered yet. Starter text for your regulatory consultant to confirm, kept to what the trial
+ * does today (the device category is a product's field, from the products file).
+ */
+export const COVERAGE: readonly CoverageRow[] = [
+  {
+    category: "Implant",
+    clocks:
+      "Every market's clock, as for any device: US 30 calendar days or 5 work days; EU, NI and GB 2, 10 or 15 days; India 15 days.",
+    worksheets:
+      "US Form FDA 3500A and India MDAE. India's device category reads Implantable from the product. Implant and explant dates (US D6, India B3) are entered by hand.",
+    checks: "Trend per unit in the field when every lot has a quantity: an implanted unit counts as in use.",
+    notYet: "Implant and explant dates from your records; implant cards and registries.",
+  },
+  {
+    category: "Single-use",
+    clocks: "Every market's clock, as for any device.",
+    worksheets:
+      "US 3500A and India MDAE. India reads Single use from the product; the expiration date comes from the lot's expiry date. Reprocessing (US D7) is entered by hand.",
+    checks:
+      "Trend by calendar day when the product's name, family, GMDN term or description says single-use or consumable: used-up units are not in the field.",
+    notYet: "Reprocessed single-use devices; sterility and shelf-life checks beyond the lot's expiry date.",
+  },
+  {
+    category: "Reusable or capital equipment",
+    clocks: "Every market's clock, as for any device.",
+    worksheets:
+      "US 3500A and India MDAE. India reads Reusable from the product; serial number and lot come from the complaint. Installation, maintenance and calibration dates (India A12, A14, A15) are entered by hand.",
+    checks: "Trend per unit in the field when every lot has a quantity, else per calendar day.",
+    notYet: "An installed base by serial number; service, maintenance and calibration records.",
+  },
+  {
+    category: "Software",
+    clocks: "Every market's clock, as for any device.",
+    worksheets: "US 3500A and India MDAE. India's software version (A8) comes from the product version.",
+    checks: "Trend per version, each new version compared with the one it replaced.",
+    notYet:
+      "Cybersecurity reporting; the users of each version (without lot quantities the trend counts calendar days).",
+  },
+  {
+    category: "IVD (in-vitro diagnostic)",
+    clocks:
+      "US and India as for any device. The EU and NI clocks cite EU IVDR Art. 82 (starter) when the product's name, family, GMDN term or description says IVD.",
+    worksheets: "US 3500A and India MDAE; India's IVD category field is not used yet.",
+    checks: "Trend by calendar day: an IVD's words mark it consumable.",
+    notYet:
+      "The EU questions quote the MDR's definitions, not the IVDR's; IVDR trend reporting and performance follow-up; an EU worksheet.",
+  },
+  {
+    category: "Kit",
+    clocks: "Every market's clock, for the kit as one device.",
+    worksheets:
+      "US 3500A and India MDAE. A complaint may name each of the kit's lots on a row of its own in the file; the lot field lists them all.",
+    checks: "Trend by calendar day when the product's words say kit.",
+    notYet: "Each component's own reportability; lot impact reads the complaint's first lot only.",
+  },
+];
+
+/** Said once under the table: what no category has yet. */
+export const COVERAGE_NOTE =
+  "No category has an EU, NI or GB report worksheet yet: prepare those reports in the authority's own form. MDARIX never submits a report, and a person decides and signs every conclusion.";
+
 export const GUIDE_PARTS: readonly GuidePart[] = [
   {
     id: "basics",
@@ -1006,10 +1082,12 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Open the CAPA and carry out the follow-ups",
             steps: [
               "Under After the decision, Follow-ups lists each follow-up. Choose Act.",
-              "For CAPA required, choose Record the CAPA to raise in your QMS, give the CAPA title (and optionally a due date) and choose Record the CAPA. You raise and run the CAPA in your QMS.",
+              "For CAPA required, choose Record the CAPA to raise in your QMS, give the CAPA title (and optionally a due date and the QMS reference) and choose Record the CAPA. You raise and run the CAPA in your QMS.",
+              "Once your QMS has given the CAPA its number, open the follow-up again, enter it in QMS reference and choose Save QMS reference. The CAPA then reads QMS reference and that number wherever it shows.",
               "For the others, choose Start and later Complete with what was done.",
             ],
-            result: "The CAPA is raised and linked to the signed decision; it is listed on the CAPAs tab.",
+            result:
+              "The CAPA to raise is recorded and linked to the signed decision; it is listed on the CAPAs tab, marked To raise in your QMS until its QMS reference is saved.",
           },
           {
             title: "Not ready to decide",

@@ -362,13 +362,14 @@ def _guide_items(db: Session, tenant_id, calendar: rules.Calendar) -> list[dict]
 
 def _capa_items(db: Session, tenant_id) -> list[dict]:
     from backend.app.db.models.foundation import Capa, Product
+    from backend.app.decision_followups.rules import capa_qms_words
 
     names = {row.id: row.name for row in db.query(Product.id, Product.name).filter(Product.tenant_id == tenant_id)}
     return [
         _item(
             f"capa:{row.id}",
             "CAPA",
-            f"CAPA {row.business_id or row.capa_identifier}: {row.title} (in your QMS)",
+            f"CAPA {row.business_id or row.capa_identifier}: {row.title} ({capa_qms_words(row) or 'in your QMS'})",
             row.due_at,
             ref=row.business_id or row.capa_identifier,
             queue="Your QMS",

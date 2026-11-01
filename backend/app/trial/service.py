@@ -38,6 +38,7 @@ from backend.app.trial.request_profile import describe as describe_profile
 from backend.app.trial.sample_data import (
     SAMPLE_SOURCE,
     seed_lot_quantities,
+    seed_product_facts,
     seed_sample_workspace,
     seed_story_examples,
 )
@@ -611,6 +612,8 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         from backend.app.trial.sample_lot_impact import stage_sample_lot_impact
 
         sample["lot_impact"] = stage_sample_lot_impact(db, tenant.id, now)
+        # The sample products' device categories and the lots' expiry dates (J32), after every sample lot exists.
+        sample["product_facts"] = seed_product_facts(db, tenant.id)
         db.add(
             TenantMembership(
                 id=uuid.uuid4(),

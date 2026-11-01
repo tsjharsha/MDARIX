@@ -186,12 +186,14 @@ def assess(
     today: datetime | date,
     linked: datetime | None = None,
     org_zone: str | None = None,
+    ivd: bool | None = None,
 ) -> dict:
     """What the watch shows for one complaint (without the person's decision). ``today``: now (a day in older
-    callers); ``org_zone``: the organization's time zone (deadlines.py)."""
+    callers); ``org_zone``: the organization's time zone (deadlines.py); ``ivd``: the product is an in-vitro diagnostic
+    (``markets.product_is_ivd``; None: read from the product name alone)."""
     aware, source = awareness(complaint, linked)
     clock_list = rules.clocks(record, windows, aware, today, org_zone)
-    if markets.is_ivd(record.get("product_name")):
+    if markets.is_ivd(record.get("product_name")) if ivd is None else ivd:
         # An in-vitro diagnostic's EU clocks cite the IVDR (starter), not the MDR.
         clock_list = [
             replace(clock, basis=tuple("IVDR_82" if item == "MDR_87" else item for item in clock.basis))
@@ -217,7 +219,7 @@ def assess(
 
 def _rows(db: Session, tenant_id: uuid.UUID, since: date, product_id: uuid.UUID | None):
     query = (
-        db.query(Complaint, Product.name, ProductVersion.version_identifier, ComplaintSecondLook.decision)
+        db.query(Complaint, Product, ProductVersion.version_identifier, ComplaintSecondLook.decision)
         .outerjoin(Product, (Product.tenant_id == Complaint.tenant_id) & (Product.id == Complaint.product_id))
         .outerjoin(
             ProductVersion,
@@ -283,8 +285,10 @@ def watch(
     candidates = []
     held_on_second_look = 0
     linked = _linked(db, tenant_id, [row[0].id for row in rows[:READ_LIMIT]])
-    for complaint, product_name, version, second_look in rows[:READ_LIMIT]:
-        record = _record(complaint, product_name, version)
+    ivd: dict = {}
+    for complaint, product, version, second_look in rows[:READ_LIMIT]:
+        record = _record(complaint, product.name if product else None, version)
+        ivd[complaint.id] = markets.product_is_ivd(product)
         if not rules.watched(record):
             continue
         aware, _ = awareness(complaint, linked.get(complaint.id))
@@ -311,7 +315,16 @@ def watch(
     assessed = assessments.rows_by_complaint(db, tenant_id, ids)
     items = []
     for complaint, record in candidates:
-        seen = assess(complaint, record, windows, cases.get(complaint.id), today, linked.get(complaint.id), org_zone)
+        seen = assess(
+            complaint,
+            record,
+            windows,
+            cases.get(complaint.id),
+            today,
+            linked.get(complaint.id),
+            org_zone,
+            ivd=ivd[complaint.id],
+        )
         decided = decisions.get(complaint.id)
         aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
         seen["markets"] = assessments.markets_summary(
@@ -385,7 +398,7 @@ def one(db: Session, tenant_id: uuid.UUID, complaint_id: uuid.UUID, today: datet
     """``(complaint, record, assessment, second-look decision)`` for one complaint, or None when it does not exist."""
     today = deadlines.as_moment(today)
     row = (
-        db.query(Complaint, Product.name, ProductVersion.version_identifier, ComplaintSecondLook.decision)
+        db.query(Complaint, Product, ProductVersion.version_identifier, ComplaintSecondLook.decision)
         .outerjoin(Product, (Product.tenant_id == Complaint.tenant_id) & (Product.id == Complaint.product_id))
         .outerjoin(
             ProductVersion,
@@ -400,13 +413,20 @@ def one(db: Session, tenant_id: uuid.UUID, complaint_id: uuid.UUID, today: datet
     )
     if row is None:
         return None
-    complaint, product_name, version, second_look = row
-    record = _record(complaint, product_name, version)
+    complaint, product, version, second_look = row
+    record = _record(complaint, product.name if product else None, version)
     windows = settings_of(db, tenant_id)["windows"]
     case = _case_reviews(db, tenant_id, [complaint.id]).get(complaint.id)
     org_zone = deadlines.org_zone(db, tenant_id)
     seen = assess(
-        complaint, record, windows, case, today, _linked(db, tenant_id, [complaint.id]).get(complaint.id), org_zone
+        complaint,
+        record,
+        windows,
+        case,
+        today,
+        _linked(db, tenant_id, [complaint.id]).get(complaint.id),
+        org_zone,
+        ivd=markets.product_is_ivd(product),
     )
     seen["org_zone"] = org_zone
     return complaint, record, seen, second_look
@@ -433,11 +453,18 @@ def clocks_for(
     }
     found = []
     linked = _linked(db, tenant_id, ids)
+    product_ids = {row.product_id for row in complaints if row.product_id}
+    products = (
+        {row.id: row for row in db.query(Product).filter(Product.tenant_id == tenant_id, Product.id.in_(product_ids))}
+        if product_ids
+        else {}
+    )
     for complaint in complaints:
         record = _record(complaint, None, None)
         if not rules.watched(record):
             continue
-        seen = assess(complaint, record, windows, None, today, linked.get(complaint.id), org_zone)
+        ivd = markets.product_is_ivd(products.get(complaint.product_id))
+        seen = assess(complaint, record, windows, None, today, linked.get(complaint.id), org_zone, ivd=ivd)
         aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
         assessed = assessments.rows_by_complaint(db, tenant_id, [complaint.id]).get(complaint.id, {})
         binding = binding_of(

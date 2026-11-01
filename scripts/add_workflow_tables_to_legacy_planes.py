@@ -1,7 +1,8 @@
 """Give legacy dedicated organization databases the workflow changes of migrations md27 (roles, tasks), md28
 (signals), md29 (case scope and evidence review), md30 (intelligence judgements), md31 (intelligence values), md32 (reviews and the Decision Brief), md33 (the human decision), md40 (complaint review), md41 (reporting and CAPA), md42 (the case AI run), md43 (units per lot), md44 (email preferences, trial demo requests), tr01 (per-market assessments,
 complaint classifications, signer training), tr02 (complaint dispositions, the decision's root-cause attribution)
-and tr04 to tr08 (the trial line's intake, reports, guides, oversight and lot impact tables).
+tr04 to tr08 (the trial line's intake, reports, guides, oversight and lot impact tables) and tr09 (a CAPA's QMS
+reference, a lot's expiry date, a product's device category and a complaint's other lots).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -203,6 +204,17 @@ STEPS = (
         "create_lot_impact_tables",
         ("lot_distributions",),
         ("tenants", "lot_batches", "investigation_scope_versions"),
+    ),
+    Step(
+        "tr09",
+        "tr09_trial_record_facts.py",
+        "add_record_facts",
+        (),
+        ("capas", "lot_batches", "products", "complaints"),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'capas' AND column_name = 'qms_reference')"
+        ),
     ),
 )
 
