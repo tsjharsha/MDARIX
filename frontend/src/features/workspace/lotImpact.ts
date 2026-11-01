@@ -1,7 +1,8 @@
 // Lot impact on a case (T-G5; backend/app/lot_impact): types, paths and the pure rules the panel uses. MDARIX lists
 // every lot that shares the suspect factor the person chooses; the person decides any field action in the QMS.
 
-export const LOT_IMPACT_TAB = "Lot impact";
+/** The Lot impact section's anchor on the case's Scope step (it is versioned with the case scope). */
+export const LOT_IMPACT_ANCHOR = "lot-impact";
 export const SIGNERS = ["decision.sign", "quality.review", "regulatory.approve"] as const;
 
 export type FactorKind = "COMPONENT_LOT" | "SUPPLIER" | "PRODUCT_VERSION";

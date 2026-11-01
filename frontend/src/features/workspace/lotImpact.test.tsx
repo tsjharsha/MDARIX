@@ -33,6 +33,7 @@ vi.mock("../customer-admin/shared", async (importOriginal) => {
 });
 
 const { LotImpactPanel } = await import("./sections/LotImpact");
+const { CaseHeader } = await import("./sections/CaseHeader");
 
 const CASE = "case-1";
 const BASE = `/api/v1/investigations/${CASE}/lot-impact`;
@@ -202,9 +203,29 @@ describe("the lot impact helpers", () => {
 });
 
 describe("the case's Lot impact", () => {
+  it("is one click from the case summary in a trial, and absent where it is not offered", () => {
+    const header = (onLotImpact?: () => void) =>
+      renderToStaticMarkup(
+        <WorkspaceContext.Provider value={workspace(["investigation.work"])}>
+          <CaseHeader
+            investigationId={CASE}
+            row={{ id: CASE }}
+            onStep={vi.fn()}
+            onChanged={vi.fn()}
+            onLotImpact={onLotImpact}
+          />
+        </WorkspaceContext.Provider>,
+      );
+    expect(header(vi.fn())).toContain("Lot impact: which other lots share the suspect part");
+    expect(header()).not.toContain("Lot impact");
+  });
+
   it("shows the suggestion, the lots with and without complaints and 'distribution not imported'", () => {
     resources.data = { [BASE]: view() };
     const html = render(["investigation.work", "decision.sign", "data.export"]);
+    // A section of the Scope step, with its own heading and anchor (no tab of its own).
+    expect(html).toContain('id="lot-impact"');
+    expect(html).toContain("Lot impact: what else is out there for INV-0001");
     expect(html).toContain("Suggested from the case&#x27;s lots");
     expect(html).toContain("It recommends no recall");
     expect(html).toContain("Lots with complaints · 1");

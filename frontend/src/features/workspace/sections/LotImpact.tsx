@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Boxes, Download, Factory, PackageCheck, Save, ShieldCheck, Truck } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Table, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
@@ -8,6 +8,7 @@ import { InlineError } from "./boardParts";
 import { countOf } from "./common";
 import {
   KIND_GROUPS,
+  LOT_IMPACT_ANCHOR,
   countriesText,
   exclusionBody,
   exclusionProblem,
@@ -26,12 +27,24 @@ import {
 } from "../lotImpact";
 
 /**
- * A case's Lot impact (free trial, T-G5): the person picks the suspect factor (a component lot, a supplier or a
+ * A case's Lot impact (free trial, T-G5), a section of the case's Scope step: the person picks the suspect factor (a component lot, a supplier or a
  * product version; MDARIX suggests the one the case's lots share) and MDARIX lists every lot that shares it, with and
  * without complaints, its units released, shipped by country and consignee, and still in stock. Lots left out need a
  * reason; the list is kept with the case scope and signed. MDARIX lists; the person decides any field action in the QMS.
  */
-export function LotImpactPanel({ investigationId, caseLabel }: { investigationId: string; caseLabel: string }) {
+export function LotImpactPanel({
+  investigationId,
+  caseLabel,
+  focus = false,
+  onChanged,
+}: {
+  investigationId: string;
+  caseLabel: string;
+  /** Scroll to the section once it is read (the case summary's Lot impact button). */
+  focus?: boolean;
+  /** Told when the list is kept or signed: each writes a new version of the case scope. */
+  onChanged?: () => void;
+}) {
   const { open, notify } = useWorkspace();
   const [preview, setPreview] = useState<Factor | null>(null);
   const screen = useResource<LotImpactView>(lotImpactPath(investigationId, preview));
@@ -46,6 +59,15 @@ export function LotImpactPanel({ investigationId, caseLabel }: { investigationId
   useEffect(() => {
     setExcluded(view?.source === "saved" ? exclusionsOf(list) : {});
   }, [fingerprint, view?.source]);
+  const anchor = useRef<HTMLDivElement>(null);
+  const loaded = !!view;
+  useEffect(() => {
+    if (!focus || !loaded) return;
+    anchor.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Once more after the scope above has been read too, so the section stays at the top.
+    const timer = window.setTimeout(() => anchor.current?.scrollIntoView({ block: "start" }), 700);
+    return () => window.clearTimeout(timer);
+  }, [focus, loaded]);
   const keep = async () => {
     if (!list) return;
     setBusy(true);
@@ -57,6 +79,7 @@ export function LotImpactPanel({ investigationId, caseLabel }: { investigationId
       });
       setPreview(null);
       screen.reload();
+      onChanged?.();
       notify("Kept with the case scope.");
     } catch (reason) {
       setError(errorText(reason, "The list was not kept."));
@@ -64,11 +87,14 @@ export function LotImpactPanel({ investigationId, caseLabel }: { investigationId
       setBusy(false);
     }
   };
+  const title = `Lot impact: what else is out there for ${caseLabel}`;
   if (!view)
     return (
-      <Panel eyebrow="Lot impact" title={`What else is out there: ${caseLabel}`} source={screen}>
-        {null}
-      </Panel>
+      <div id={LOT_IMPACT_ANCHOR} className="uw-anchor" ref={anchor}>
+        <Panel eyebrow="Case scope" title={title} source={screen}>
+          {null}
+        </Panel>
+      </div>
     );
   const closed = view.investigation.closed;
   const savedKey = factorKey(view.saved?.factor);
@@ -78,8 +104,8 @@ export function LotImpactPanel({ investigationId, caseLabel }: { investigationId
     JSON.stringify(exclusionBody(excluded)) !== JSON.stringify(exclusionBody(exclusionsOf(list)));
   const problem = list ? exclusionProblem(excluded, list.lots, view.reason_min) : "";
   return (
-    <>
-      <Panel eyebrow="Lot impact" title={`What else is out there: ${caseLabel}`} source={screen}>
+    <div id={LOT_IMPACT_ANCHOR} className="uw-anchor uw-li" ref={anchor}>
+      <Panel eyebrow="Case scope" title={title} source={screen}>
         <p className="uw-li-never">
           <ShieldCheck size={16} aria-hidden="true" /> {view.never_decides}
         </p>
@@ -163,6 +189,7 @@ export function LotImpactPanel({ investigationId, caseLabel }: { investigationId
             again={!!view.signed}
             onSigned={() => {
               screen.reload();
+              onChanged?.();
               notify("The lot impact list is signed.");
             }}
           />
@@ -170,7 +197,7 @@ export function LotImpactPanel({ investigationId, caseLabel }: { investigationId
       {(view.saved || view.signed) && (
         <Downloads investigationId={investigationId} label={view.investigation.business_id} signed={!!view.signed} />
       )}
-    </>
+    </div>
   );
 }
 

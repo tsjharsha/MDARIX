@@ -910,14 +910,14 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
       {
         id: "lot-impact",
         title: "Lot impact: which other lots share the suspect part (free trial)",
-        where: "Investigations › Lot impact (also Lot impact on the case header)",
+        where: "Investigations › Scope › Lot impact (one click from the case: Lot impact on its summary)",
         purpose:
           "Once a signal is confirmed, see what else is out there: every lot that shares the suspect component lot, supplier or product version, where its units went and how many are still in stock. MDARIX lists; you decide any field action in your QMS. MDARIX recommends no recall.",
         tasks: [
           {
             title: "Choose the suspect factor",
             steps: [
-              "Open the case and choose Lot impact.",
+              "Open the case and choose Lot impact on its summary: Scope opens at its Lot impact section.",
               "Read the suggestion: the component lot, supplier or version most of the case's lots share. Keep it, or pick another in Suspect factor.",
               "Read the list: lots with complaints (with complaints per 1,000 units released), lots without complaints yet, units released, shipped by country and consignee, and still in stock. Open a lot's shipments to see each consignee.",
             ],

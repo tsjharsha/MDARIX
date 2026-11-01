@@ -36,7 +36,16 @@ import {
  * The Scope tab of a case: what the investigation covers now, the form for its next version, what a save changed,
  * and every earlier version with a side-by-side comparison of any two. Editing needs investigation.work.
  */
-export function CaseScopePanel({ investigationId, caseQuestion }: { investigationId: string; caseQuestion?: string }) {
+export function CaseScopePanel({
+  investigationId,
+  caseQuestion,
+  onChanged,
+}: {
+  investigationId: string;
+  caseQuestion?: string;
+  /** Told when a new scope version is saved here (the Lot impact section below reads the scope's lots). */
+  onChanged?: () => void;
+}) {
   const canEdit = useCan("investigation.work");
   const scope = useResource<CaseScope>(scopePath(investigationId));
   const [editing, setEditing] = useState(false);
@@ -88,6 +97,7 @@ export function CaseScopePanel({ investigationId, caseQuestion }: { investigatio
             setEditing(false);
             setSaved(result);
             scope.reload();
+            onChanged?.();
           }}
         />
       )}
