@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from backend.app import mfa
 from backend.app.db.models.complaint_disposition import ComplaintDisposition
 from backend.app.db.models.foundation import AuditEvent, Complaint, Investigation, SignedApprovalRecord
 from backend.app.db.models.market_assessment import ComplaintClassification, ComplaintMarketAssessment
@@ -126,6 +127,7 @@ def test_the_routine_complaint_closes_at_service_level_on_one_screen_with_one_si
         and screen["coding_criteria"]["version"] == "coding-starter-1"
     )
     assert screen["practice_label"].startswith("Practice record") and screen["training_required"] is True
+    assert screen["code_required"] is mfa.signatures_require_mfa()
     assert rt01 in _backlog_ids(user)
 
     # The practice training on the disposition rules and the coding criteria comes first (a trial's rule).

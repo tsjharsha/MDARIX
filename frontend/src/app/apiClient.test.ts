@@ -206,21 +206,73 @@ describe("second-factor refusals", () => {
     expect(mfaRedirectFor("/api/v1/admin/identity/users", 403, "MFA_ENROLLMENT_REQUIRED")).toBe("/mfa?setup=1");
   });
 
-  it("leaves a signature or operator action to show its own message", () => {
+  it("leaves an operator action to show its own message", () => {
     for (const path of [
-      "/api/v1/regulatory/documents/abc/status",
       "/api/v1/platform-admin/tenants/abc/legal-hold",
       "/api/v1/platform-admin/users/abc/activation-link",
-      "/api/v1/governance/decisions/abc/sign",
-      "/api/v1/investigations/abc/decision/sign",
     ]) {
       expect(mfaRedirectFor(path, 403, "MFA_REQUIRED")).toBeNull();
       expect(mfaRedirectFor(path, 403, "MFA_ENROLLMENT_REQUIRED")).toBeNull();
     }
   });
 
+  it("sends an unfinished sign-in to the MFA page from a signing address too", () => {
+    expect(mfaRedirectFor("/api/v1/governance/decisions/abc/sign", 403, "MFA_REQUIRED")).toBe("/mfa");
+    expect(mfaRedirectFor("/api/v1/regulatory/documents/abc/status", 403, "MFA_REQUIRED")).toBe("/mfa");
+  });
+
   it("ignores other refusals", () => {
     expect(mfaRedirectFor("/api/v1/investigations", 403, "PERMISSION_DENIED")).toBeNull();
     expect(mfaRedirectFor("/api/v1/investigations", 401, "MFA_REQUIRED")).toBeNull();
+  });
+});
+
+// Every signing route of the server (tests/test_signing_code_refusals.py SIGNING_ROUTES), as the screens call them.
+const SIGNING_CALLS = [
+  "/api/v1/capas/c1/effectiveness/result",
+  "/api/v1/complaints/c1/disposition/sign",
+  "/api/v1/complaints/c1/market-assessments/US/sign",
+  "/api/v1/decision-guides/US/versions/2/approve",
+  "/api/v1/documents/v1/sign",
+  "/api/v1/governance/decisions/d1/sign",
+  "/api/v1/intake/e1/check/review",
+  "/api/v1/intake/e1/check/sign",
+  "/api/v1/investigations/i1/decision/sign",
+  "/api/v1/investigations/i1/lot-impact/sign",
+  "/api/v1/oversight/events/c1/ready",
+  "/api/v1/regulatory/documents/r1/status",
+  "/api/v1/reports/o1/snapshots/s1/approve",
+];
+
+describe("signing refusals", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("stay on the signing form with the server's words: no redirect, nothing typed is lost", async () => {
+    const refusals: [number, string, string][] = [
+      [403, "SIGNATURE_CODE_INVALID", "That code didn't match. Enter the current code from your authenticator app."],
+      [403, "SIGNATURE_MFA_NOT_SET_UP", "Set up an authenticator app (My Account > Security) before signing decisions"],
+      [403, "INVALID_REAUTHENTICATION", "Current password was not verified"],
+      [429, "SIGNATURE_TEMPORARILY_LOCKED", "Too many failed attempts. Try again in 15 minutes."],
+    ];
+    const replace = vi.fn();
+    vi.stubGlobal("window", {
+      setTimeout,
+      clearTimeout,
+      location: { pathname: "/app/complaints", search: "", replace },
+    });
+    for (const path of SIGNING_CALLS) {
+      for (const [status, code, message] of refusals) {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: { code, message } }), { status })),
+        );
+        await expect(requestJson(path, { method: "POST", body: "{}" })).rejects.toMatchObject({
+          status,
+          code,
+          message,
+        });
+      }
+    }
+    expect(replace).not.toHaveBeenCalled();
   });
 });

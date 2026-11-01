@@ -354,7 +354,7 @@ def test_signing_needs_the_authenticator_code_when_signatures_require_it(org, mo
     item = _save(regulatory, complaint, "US", _answers(**{**US_NONE, "US4": "YES", "US5": "YES"}), harm_level="MINOR")
     monkeypatch.setattr(mfa, "signatures_require_mfa", lambda: True)
     refused = _sign(regulatory, complaint, "US", item, "REPORTABLE")
-    assert refused.status_code == 403 and refused.json()["detail"]["code"] == "MFA_ENROLLMENT_REQUIRED"
+    assert refused.status_code == 403 and refused.json()["detail"]["code"] == "SIGNATURE_MFA_NOT_SET_UP"
 
 
 def test_only_watched_complaints_and_enabled_markets_and_the_single_decision_stays(org):

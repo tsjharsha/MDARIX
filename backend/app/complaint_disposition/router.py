@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from backend.app import mfa
 from backend.app.access.permissions import INVESTIGATION_CREATE, QUALITY_REVIEW, SIGNAL_TRIAGE
 from backend.app.complaint_classification import rules as coding
 from backend.app.complaint_disposition import rules, service, triggers
@@ -182,6 +183,8 @@ def screen(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
         "training": training.status(db, tenant_id, ctx.user_id, needed),
         # The practice training before signing is a free trial's rule (T-G40P).
         "training_required": trial,
+        # The signature needs an authenticator code (verify_signing_credentials): the form asks for it before sending.
+        "code_required": mfa.signatures_require_mfa(),
         "trained_colleagues": [names.get(ref) or "A colleague" for ref in holders],
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,

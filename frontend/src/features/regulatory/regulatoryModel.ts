@@ -169,8 +169,9 @@ const APPROVAL_REFUSALS: Record<string, string> = {
   REAUTHENTICATION_REQUIRED: "Enter your password to approve this document.",
   INVALID_REAUTHENTICATION:
     "Your password was not accepted. Check it and try again; after five failed attempts approving is locked for 15 minutes.",
-  MFA_REQUIRED: "Enter the current six-digit code from your authenticator app (the code was missing or not accepted).",
-  MFA_ENROLLMENT_REQUIRED:
+  SIGNATURE_CODE_INVALID:
+    "Enter the current six-digit code from your authenticator app (the code was missing or not accepted).",
+  SIGNATURE_MFA_NOT_SET_UP:
     "Approving needs an authenticator app. Set one up under My Account, Security, then approve again.",
   ADMINISTRATOR_CANNOT_SIGN:
     "Administrators do not approve controlled documents; an approver of your organization must do this.",

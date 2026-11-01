@@ -189,6 +189,11 @@ describe("the disposition rules on screen", () => {
     const ready = filled(base);
     expect(signProblem(base, ready, false)).toMatch(/practice training/);
     expect(signProblem(base, ready, true)).toBeNull();
+    // When the server needs the authenticator code, the form asks for it before sending (no refusal after signing).
+    const coded = { ...base, code_required: true };
+    expect(signProblem(coded, ready, true)).toBe("Enter the 6-digit code from your authenticator app.");
+    expect(signProblem(coded, { ...ready, code: "12345" }, true)).toMatch(/6-digit code/);
+    expect(signProblem(coded, { ...ready, code: " 123456 " }, true)).toBeNull();
     expect(signProblem(base, { ...ready, attribution: "" }, true)).toMatch(/attribution/);
     expect(signProblem(base, { ...ready, attribution: "UNDETERMINED" }, true)).toMatch(/Undetermined/);
     expect(signProblem(base, { ...ready, useEnvironment: "OTHER" }, true)).toMatch(/other/);
