@@ -195,7 +195,8 @@ def test_a_serious_us_complaint_is_assessed_trained_signed_versioned_and_filed(o
         bind_tenant(db, org["tenant_id"])
         record = db.get(SignedApprovalRecord, uuid.UUID(current["signed_record_id"]))
         assert record.object_type == "ComplaintMarketAssessment" and record.decision == "REPORTABLE"
-        assert "US-starter-1" in record.signature_meaning and "scale-starter-1" in record.signature_meaning
+        assert "with its questions, MDARIX starter, version 1" in record.signature_meaning
+        assert "harm-severity scale, MDARIX starter, version 1" in record.signature_meaning
 
     # Reportable but not yet filed: still on the watch; the filing settles it.
     watched = next(item for item in regulatory.get(f"{WATCH}?show=all").json()["items"] if item["id"] == complaint)

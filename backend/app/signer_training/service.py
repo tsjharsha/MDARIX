@@ -63,7 +63,9 @@ def documents(db: Session | None = None, tenant_id=None) -> dict[str, Document]:
     for market, question_set in markets.QUESTION_SETS.items():
         code = codes[market]
         title = f"{question_set.title}: " + (
-            "starter questions" if code == question_set.version else f"your guide, {version_words(code)}"
+            "starter questions"
+            if code == question_set.version
+            else f"your guide, {version_words(code).removeprefix('your ')}"
         )
         found[question_set_code(market)] = Document(
             question_set_code(market), title, code, f"the questions of {question_set.title}"

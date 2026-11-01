@@ -140,7 +140,7 @@ def test_assessments_started_after_publication_use_it_and_ones_in_progress_keep_
     assert us["question_set"]["version"] == "US-v2" and any(q["extra"] for q in us["question_set"]["questions"])
     # What a US signature relies on now is the organization's version.
     training = _ok(user.get("/api/v1/signer-training?documents=QUESTION_SET_US"))["documents"][0]
-    assert training["version"] == "US-v2" and "your guide version US-v2" in training["title"]
+    assert training["version"] == "US-v2" and "your guide, version 2" in training["title"]
 
 
 def test_a_draft_is_edited_tested_and_approved_by_a_second_person(trial):
