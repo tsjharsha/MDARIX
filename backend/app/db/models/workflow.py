@@ -89,6 +89,30 @@ class UserAdditionalRole(Base):
     )
 
 
+class SigningGrant(Base):
+    """An administrator gave a person a role that signs (R11): until a second administrator confirms it, the person
+    does not sign under that role (backend/app/access/signing_grants.py). One row per person and role; a new grant
+    of the same role after it was taken away opens the row again."""
+
+    __tablename__ = "signing_grants"
+    id = _pk()
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("auth_users.id"), nullable=False)
+    role_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="PENDING")
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    requested_at = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("now()"))
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    decided_at = mapped_column(DateTime(timezone=True))
+    decision_reason: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "user_id", "role_code", name="uq_signing_grants_user_role"),
+        CheckConstraint("status IN ('PENDING', 'CONFIRMED', 'REFUSED')", name="status_known"),
+        Index("ix_signing_grants_tenant_status", "tenant_id", "status"),
+    )
+
+
 class WorkflowTask(Base):
     """One piece of work: for a person (``assigned_user_id``) or a role queue (``assigned_role`` only)."""
 
