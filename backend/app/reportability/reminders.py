@@ -96,20 +96,15 @@ def sweep_reportability(db: Session, tenant_id: uuid.UUID, today: date | None = 
     return {"created": created, "settled": settled}
 
 
-def run_for_all_tenants(control_db: Session) -> dict:
-    """The scheduler job: both sweeps for every active organization, on the shared plane or its own database, each
-    committed on its own. A failing organization is logged and reported and the others still run; the job then fails
-    so the scheduler alerts after repeated failures."""
-    from backend.app.capa_effectiveness.router import sweep_tenant as sweep_effectiveness
+def active_tenant_ids(control_db: Session) -> list:
+    """Every active organization this deployment serves, on the shared plane or its own database (also the reminders
+    sweep's list, backend/app/oversight/service.py)."""
     from backend.app.customer_lifecycle import customer_allows_access_clause
-    from backend.app.db.data_plane import open_tenant_data_session
     from backend.app.db.models.customer_lifecycle import TenantDataPlane
     from backend.app.db.models.foundation import Tenant
     from backend.app.deployment_role import served_tenants_clause
 
-    totals = {"tenants": 0, "reportability_created": 0, "reportability_settled": 0, "effectiveness_created": 0}
-    failed = []
-    tenant_ids = [
+    return [
         row.id
         for row in control_db.query(Tenant.id)
         .join(TenantDataPlane, TenantDataPlane.tenant_id == Tenant.id)
@@ -122,7 +117,18 @@ def run_for_all_tenants(control_db: Session) -> dict:
         .order_by(Tenant.id)
         .all()
     ]
-    for tenant_id in tenant_ids:
+
+
+def run_for_all_tenants(control_db: Session) -> dict:
+    """The scheduler job: both sweeps for every active organization, on the shared plane or its own database, each
+    committed on its own. A failing organization is logged and reported and the others still run; the job then fails
+    so the scheduler alerts after repeated failures."""
+    from backend.app.capa_effectiveness.router import sweep_tenant as sweep_effectiveness
+    from backend.app.db.data_plane import open_tenant_data_session
+
+    totals = {"tenants": 0, "reportability_created": 0, "reportability_settled": 0, "effectiveness_created": 0}
+    failed = []
+    for tenant_id in active_tenant_ids(control_db):
         try:
             with open_tenant_data_session(tenant_id) as data:
                 try:

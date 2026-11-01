@@ -7,7 +7,7 @@ MDARIX never sends anything to an external contact: people send from their own m
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime
 
 REPORTER, DISTRIBUTOR, HOSPITAL, SERVICE_PARTNER = "REPORTER", "DISTRIBUTOR", "HOSPITAL", "SERVICE_PARTNER"
 PARTY_LABELS = {
@@ -81,25 +81,19 @@ def overdue(status: str, reply_due_on: date | None, today: date) -> bool:
     return status == OPEN and reply_due_on is not None and reply_due_on < today
 
 
-def working_hour_after(moment: datetime) -> datetime:
-    """One working hour after ``moment``. shortcut: working time is Monday to Friday, all day, in UTC; the
-    organization's own calendar and hours come with G25's reminders."""
-    moment = moment.astimezone(timezone.utc)
-    if moment.weekday() >= 5:
-        moment = datetime.combine(
-            moment.date() + timedelta(days=7 - moment.weekday()), datetime.min.time(), tzinfo=timezone.utc
-        )
-    end = moment + timedelta(hours=1)
-    if end.weekday() >= 5:
-        end += timedelta(days=7 - end.weekday())
-    return end
+def working_hour_after(moment: datetime, calendar=None) -> datetime:
+    """One working hour after ``moment`` on the organization's working calendar (its weekdays, holidays and time zone,
+    backend/app/oversight/rules.py); the default calendar is Monday to Friday in UTC."""
+    from backend.app.oversight.rules import Calendar
+
+    return (calendar or Calendar()).working_hour_after(moment)
 
 
-def in_mdarix(occurred_at: datetime | None, logged_at: datetime | None) -> bool | None:
+def in_mdarix(occurred_at: datetime | None, logged_at: datetime | None, calendar=None) -> bool | None:
     """S4: done in MDARIX when logged before the message was sent or received, or within one working hour of it."""
     if occurred_at is None or logged_at is None:
         return None
-    return logged_at <= working_hour_after(occurred_at)
+    return logged_at <= working_hour_after(occurred_at, calendar)
 
 
 def entry_problem(direction: str, purpose: str, channel: str, subject: str, owner: str | None, due: date | None):

@@ -43,6 +43,7 @@ from backend.app.db.models.guides_communications import CommunicationEntry, Comm
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import require_any_permission
+from backend.app.oversight.service import calendar_of
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
 router = APIRouter(prefix="/api/v1/communications", tags=["Communications log"])
@@ -123,7 +124,9 @@ def party_view(party: ExternalParty) -> dict:
     }
 
 
-def _attempt_view(index: int, attempt: dict, attempts: list[dict], party: ExternalParty | None, names: dict) -> dict:
+def _attempt_view(
+    index: int, attempt: dict, attempts: list[dict], party: ExternalParty | None, names: dict, calendar=None
+) -> dict:
     contact = party_view(party)["primary" if attempt.get("contact") == rules.PRIMARY else "second"] if party else None
     latest = index == len(attempts) - 1
     at, logged = datetime.fromisoformat(attempt["at"]), datetime.fromisoformat(attempt["logged_at"])
@@ -141,12 +144,18 @@ def _attempt_view(index: int, attempt: dict, attempts: list[dict], party: Extern
         "note": attempt.get("note"),
         "logged_at": attempt["logged_at"],
         "logged_by": names.get(attempt.get("logged_by")) or "A colleague",
-        "in_mdarix": rules.in_mdarix(at, logged),
+        "in_mdarix": rules.in_mdarix(at, logged, calendar),
     }
 
 
 def entry_view(
-    entry: CommunicationEntry, party: ExternalParty | None, refs: dict, names: dict, today: date, limit: int
+    entry: CommunicationEntry,
+    party: ExternalParty | None,
+    refs: dict,
+    names: dict,
+    today: date,
+    limit: int,
+    calendar=None,
 ) -> dict:
     attempts = entry.attempts or []
     contact = party_view(party)["primary" if entry.current_contact == rules.PRIMARY else "second"] if party else None
@@ -168,7 +177,7 @@ def entry_view(
         "occurred_at": _iso(entry.occurred_at),
         "logged_at": _iso(entry.logged_at),
         "logged_by": names.get(entry.logged_by) or "A colleague",
-        "in_mdarix": rules.in_mdarix(entry.occurred_at, entry.logged_at)
+        "in_mdarix": rules.in_mdarix(entry.occurred_at, entry.logged_at, calendar)
         if attempts or entry.purpose != rules.REQUEST
         else None,
         "owner_id": entry.owner_id,
@@ -181,7 +190,9 @@ def entry_view(
         "not_sent_yet": entry.status == rules.OPEN and not attempts,
         "current_contact": entry.current_contact,
         "contact_now": contact,
-        "attempts": [_attempt_view(index, item, attempts, party, names) for index, item in enumerate(attempts)],
+        "attempts": [
+            _attempt_view(index, item, attempts, party, names, calendar) for index, item in enumerate(attempts)
+        ],
         "unanswered": rules.unanswered(attempts, entry.current_contact),
         "attempts_limit": limit,
         "evidence": entry.evidence or [],
@@ -224,7 +235,9 @@ def _views(db, control_db, tenant_id, rows: list[CommunicationEntry], today: dat
     who |= {attempt.get("logged_by") for row in rows for attempt in row.attempts or []}
     names = {**SAMPLE_NAMES, **people(control_db, tenant_id, [ref for ref in who if ref])}
     limit = service.attempts_limit(db, tenant_id)
-    return [entry_view(row, parties.get(row.party_id), refs, names, today, limit) for row in rows]
+    # S4 counts working time on the organization's own calendar (T-G25).
+    calendar = calendar_of(db, tenant_id)
+    return [entry_view(row, parties.get(row.party_id), refs, names, today, limit, calendar) for row in rows]
 
 
 def _today() -> date:
