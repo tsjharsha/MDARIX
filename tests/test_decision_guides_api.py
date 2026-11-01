@@ -111,7 +111,7 @@ def test_the_sample_publishes_us_v2_and_holds_a_v3_draft_whose_test_fails(trial)
     vmsr = next(q for q in v2["question_set"]["questions"] if q["extra"])
     assert vmsr["clause"] == "21 CFR 803.19 (VMSR program)" and vmsr["basis"] == ["CFR803_19"]
     assert next(q for q in v2["question_set"]["questions"] if q["id"] == "US2A")["starter"] is False
-    assert v2["signature"]["meaning"].startswith("I approve US-v2")
+    assert v2["signature"]["meaning"].startswith("I approve your version 2 of the")
     assert v2["test_results"]["failed"] == 0 and v2["test_results"]["current"]
     # Every question of every version shows its clause.
     for market in markets.MARKETS:
@@ -140,7 +140,7 @@ def test_assessments_started_after_publication_use_it_and_ones_in_progress_keep_
     assert us["question_set"]["version"] == "US-v2" and any(q["extra"] for q in us["question_set"]["questions"])
     # What a US signature relies on now is the organization's version.
     training = _ok(user.get("/api/v1/signer-training?documents=QUESTION_SET_US"))["documents"][0]
-    assert training["version"] == "US-v2" and "your guide version US-v2" in training["title"]
+    assert training["version"] == "US-v2" and "your guide, version 2" in training["title"]
 
 
 def test_a_draft_is_edited_tested_and_approved_by_a_second_person(trial):

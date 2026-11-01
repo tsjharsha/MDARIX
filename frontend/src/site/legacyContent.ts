@@ -274,7 +274,7 @@ export const pages: Record<string, { eyebrow: string; title: string; copy: strin
   "/integrations": {
     eyebrow: "Integrations",
     title: "Work beside the systems you already trust.",
-    copy: "QMS, PLM, ERP, MES, supplier, document, and evidence platforms remain authoritative systems of record.",
+    copy: "MDARIX works beside your QMS or complaint software. Your QMS keeps the complaint record, CAPA and change control.",
   },
   "/security": {
     eyebrow: "Security & access",
@@ -471,7 +471,7 @@ export const capabilityStatus: {
         icon: "clock",
         title: "Reporting clocks",
         detail:
-          "FDA, EU, UK and Canada reporting windows counted from the day you became aware, with each reportability decision and its reason kept.",
+          "Reporting windows for the US, EU/NI, GB and India (MvPI worksheet), counted from the day you became aware, with each reportability decision and its reason kept.",
       },
       {
         icon: "signal",
@@ -504,10 +504,45 @@ export const capabilityStatus: {
           "CSV or Excel with your own column names, guided by templates. Personal details are refused or replaced before anything is stored.",
       },
       {
-        icon: "roles",
-        title: "Roles, administration and MFA",
+        icon: "signature",
+        title: "Routine close and logged calls",
         detail:
-          "Workflow roles with separation of duties, customer administration, and authenticator-app MFA on every account.",
+          "A routine complaint closed with one signed disposition, and a call logged as it comes in, with a check of what it still needs.",
+      },
+      {
+        icon: "clock",
+        title: "US and India report worksheets",
+        detail:
+          "The FDA 3500A and India MvPI worksheets filled from your records, with what is missing marked. A person submits; MDARIX never does.",
+      },
+      {
+        icon: "second-look",
+        title: "Decision guides",
+        detail:
+          "Your reportability guide for each market, versioned and approved, so every assessment names the guide it used.",
+      },
+      {
+        icon: "connection",
+        title: "Communications log",
+        detail: "Each request to and reply from a reporter, distributor or authority, with what is due and when.",
+      },
+      {
+        icon: "signal",
+        title: "Reminders and oversight",
+        detail:
+          "Who owns each event and what is due, with reminders before a deadline and a backup when someone is away.",
+      },
+      {
+        icon: "product",
+        title: "Lot impact (in the free trial)",
+        detail:
+          "Once a signal is confirmed, every lot that shares the suspect part, with units released, shipped and in stock. MDARIX lists; a person decides any field action.",
+      },
+      {
+        icon: "roles",
+        title: "Authenticator-app MFA",
+        detail:
+          "MFA on every account, and every action in the audit trail. In the free trial everyone has the same role.",
       },
     ],
   },
@@ -536,10 +571,10 @@ export const capabilityStatus: {
           "Your fields and reference data mapped with governed templates, reviewed with your team before anything goes live.",
       },
       {
-        icon: "ai",
-        title: "AI assistance that cites its evidence",
+        icon: "roles",
+        title: "Workflow roles and administration",
         detail:
-          "Answers that name the records they rely on, switched on only once it is validated with your team. People still make every decision.",
+          "Workflow roles with separation of duties, so the person who writes is never the one who signs, and your own administrator for users and access.",
       },
     ],
   },
@@ -549,6 +584,12 @@ export const capabilityStatus: {
     text: "Not available yet.",
     promise: "On our roadmap. Design partners help decide what comes first.",
     items: [
+      {
+        icon: "ai",
+        title: "AI assistance that cites its evidence",
+        detail:
+          "Planned, after evaluation: answers that name the records they rely on, switched on only once AI is evaluated with your team. AI is off in the free trial. People still make every decision.",
+      },
       {
         icon: "sso",
         title: "Single sign-on",
@@ -568,7 +609,7 @@ export const trialIncludes: string[] = [
   "30 days, free, with no credit card",
   "Up to 3 users and 5,000 uploaded rows",
   "Sample data that tells the quality story in nine chapters",
-  "Your own CSV exports, checked for problems and personal data before import",
+  "Your own Excel or CSV exports, checked for problems and personal data before import",
   "Fourteen step-by-step videos",
   "AI is off during the trial: every step works by hand",
 ];
@@ -826,7 +867,7 @@ export const solutionOverrides: Record<string, { eyebrow: string; title: string;
   "cross-system": {
     eyebrow: "Solution - Cross-system investigation",
     title: "Bring the investigation together across systems of record.",
-    copy: "Use governed mappings to connect QMS, PLM, ERP, supplier, and manufacturing context while each source remains authoritative and provenance stays visible.",
+    copy: "Use governed mappings to connect QMS, PLM, ERP, supplier, and manufacturing context. Your QMS keeps the complaint record, CAPA and change control, and provenance stays visible.",
   },
 };
 

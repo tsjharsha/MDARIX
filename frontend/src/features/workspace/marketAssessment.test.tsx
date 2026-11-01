@@ -139,7 +139,8 @@ const item = (overrides: Partial<MarketItem> = {}): MarketItem => ({
       code: "QUESTION_SET_US",
       title: "US medical device reporting: starter questions",
       version: "US-starter-1",
-      statement: "I have read version US-starter-1",
+      statement:
+        "I have read the questions of US medical device reporting (21 CFR Part 803), MDARIX starter, version 1",
       state: "MISSING",
       held_version: null,
       trained_at: null,
@@ -309,7 +310,9 @@ describe("the assessment screen", () => {
 
   it("names the document and version to acknowledge", () => {
     const html = render(<TrainingPanel documents={item().training} colleagues={[]} required onDone={vi.fn()} />);
-    expect(html).toContain("I have read version US-starter-1");
+    expect(html).toContain(
+      "I have read the questions of US medical device reporting (21 CFR Part 803), MDARIX starter, version 1",
+    );
     expect(html).toContain("No colleague holds a current acknowledgement yet.");
     expect(html).toContain("ISO 13485 clause 6.2");
   });

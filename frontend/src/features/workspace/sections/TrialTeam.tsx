@@ -13,6 +13,8 @@ export type TeamMember = {
   status: string;
   is_owner: boolean;
   is_you: boolean;
+  /** An invitation whose link no longer works: shown as Expired, with Resend invitation. */
+  invitation_expired?: boolean;
 };
 export type Team = {
   can_invite: boolean;
@@ -34,6 +36,10 @@ export function memberActions(member: TeamMember, team: Pick<Team, "can_invite" 
   return [...actions, "remove"];
 }
 
+/** How a person's place on the team reads: Active, Invited, or Expired (an invitation link that no longer works). */
+export const memberStatus = (member: TeamMember) =>
+  member.status === "ACTIVE" ? "Active" : member.invitation_expired ? "Invitation expired" : "Invited";
+
 /** The confirmation for taking a colleague off the trial, or withdrawing an invitation not yet accepted. */
 export function removeConfirmation(member: TeamMember, onDone: () => void): Confirmation {
   const name = member.display_name || member.email;
@@ -42,7 +48,7 @@ export function removeConfirmation(member: TeamMember, onDone: () => void): Conf
     title: invited ? `Withdraw the invitation to ${name}?` : `Remove ${name} from your trial?`,
     body: invited
       ? "The invitation link stops working at once, and the seat is free for someone else."
-      : "They are signed out at once and can no longer sign in. Everything they did stays in MDARIX under their name, and their seat is free for someone else.",
+      : "This ends their access to your trial now: they are signed out at once and can no longer sign in. Everything they did stays in MDARIX under their name, and their seat is free for someone else. You can invite them again later.",
     confirmLabel: "Remove from trial",
     danger: true,
     done: invited ? `The invitation to ${name} is withdrawn.` : `${name} is removed from your trial.`,
@@ -185,7 +191,7 @@ export function TeamView({
                   <small>{member.email}</small>
                 </div>
                 <span className={`uw-team-status ${member.status === "ACTIVE" ? "is-active" : ""}`}>
-                  {member.status === "ACTIVE" ? "Active" : "Invited"}
+                  {memberStatus(member)}
                 </span>
                 {memberActions(member, data).map((action) =>
                   action === "resend" ? (

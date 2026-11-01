@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { safeReturnTo, signInNotice } from "./AuthPage";
+import { MFA_TIMED_OUT, lostAuthenticatorHelp, safeReturnTo, signInNotice } from "./AuthPage";
 
 const ORIGIN = "https://app.mdarix.example";
 
@@ -38,5 +38,19 @@ describe("sign-in notice", () => {
     expect(signInNotice(new URLSearchParams("expired=1"))).toMatch(/without activity/);
     expect(signInNotice(new URLSearchParams("reason=expired&returnTo=%2Fapp"))).toMatch(/session has ended/);
     expect(signInNotice(new URLSearchParams(""))).toBe("");
+  });
+});
+
+describe("who helps with a lost authenticator, and a setup that timed out (J38)", () => {
+  it("names the person who invited you in a trial, MDARIX support for the trial owner, the administrator in a pilot", () => {
+    const help = lostAuthenticatorHelp("support@mdarix.example");
+    expect(help).toContain("In a free trial, ask the person who invited you");
+    expect(help).toContain("If you started the trial, write to support@mdarix.example.");
+    expect(help).toContain("In a pilot, ask your administrator.");
+  });
+
+  it("says the sign-in timed out and how to start the setup again", () => {
+    expect(MFA_TIMED_OUT).toContain("timed out");
+    expect(MFA_TIMED_OUT).toContain("sign in again; a setup starts again from the beginning");
   });
 });

@@ -738,13 +738,13 @@ export function signErrorView(error: unknown): { text: string; reload: boolean; 
     ADMINISTRATOR_CANNOT_SIGN: "Administrators never sign decisions. An authorized decision maker must sign.",
     APPROVAL_AUTHORITY_DENIED: "Your role has no authority to sign this decision. Ask an authorized decision maker.",
     DENIED_NOT_ENTITLED: "Controlled signatures are not enabled for your organization.",
-    MFA_ENROLLMENT_REQUIRED: "Signing needs an authenticator app. Set it up under My Account first.",
+    SIGNATURE_MFA_NOT_SET_UP: "Signing needs an authenticator app. Set it up under My Account first.",
     SIGNATURE_TEMPORARILY_LOCKED: "Too many failed attempts. Signing is locked for your account for a while.",
   };
   if (known && reloads[known]) return { text: reloads[known], reload: true, credentials: false };
   if (known && refusals[known]) return { text: refusals[known], reload: false, credentials: false };
   // A wrong password or code (401, or 403 about the second factor): the server's own words.
-  const credentials = status === 401 || known === "MFA_REQUIRED" || known === "INVALID_REAUTHENTICATION";
+  const credentials = status === 401 || known === "SIGNATURE_CODE_INVALID" || known === "INVALID_REAUTHENTICATION";
   return { text: describeError(error, "The decision was not signed."), reload: false, credentials };
 }
 

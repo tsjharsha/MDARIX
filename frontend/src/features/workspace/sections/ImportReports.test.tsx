@@ -38,6 +38,11 @@ describe("an import's data-quality report", () => {
     expect(checks[2].detail).toContain("2 rows set aside with their reasons");
   });
 
+  it("counts as updated only the rows that changed a field (a re-upload of the same file)", () => {
+    const again = { ...run.report, rows_new: 0, rows_changed: 1, rows_unchanged: 37 };
+    expect(runChecks({ ...run, report: again })[1].detail).toBe("0 new, 1 updated, 37 unchanged.");
+  });
+
   it("flags a run that does not balance and names replaced personal details", () => {
     const checks = runChecks({
       masked_values: 3,

@@ -447,6 +447,10 @@ def verify_signing_credentials(
     "sign" throttle (5 lock signing for 15 minutes); sign-in has its own lock, so signing cannot be used to guess
     passwords around it. Each refusal calls ``record_refusal(action)`` (the caller's audit event), is committed, and
     raises 403. Returns the signer (None for a legacy in-process session that has no account).
+
+    The codes are about this signature only (SIGNATURE_CODE_INVALID, SIGNATURE_MFA_NOT_SET_UP), never MFA_REQUIRED:
+    that one means the sign-in still owes its second factor, and the browser leaves the page for it, losing what the
+    person typed into the signing form.
     """
     from backend.app import mfa
 
@@ -471,7 +475,7 @@ def verify_signing_credentials(
             raise HTTPException(
                 403,
                 detail={
-                    "code": "MFA_ENROLLMENT_REQUIRED",
+                    "code": "SIGNATURE_MFA_NOT_SET_UP",
                     "message": "Set up an authenticator app (My Account > Security) before signing decisions",
                 },
             )
@@ -481,7 +485,14 @@ def verify_signing_credentials(
             db.commit()
             raise HTTPException(
                 403,
-                detail={"code": "MFA_REQUIRED", "message": "Enter the current code from your authenticator app"},
+                detail={
+                    "code": "SIGNATURE_CODE_INVALID",
+                    "message": (
+                        "That code didn't match. Enter the current code from your authenticator app."
+                        if mfa_code
+                        else "Enter the current code from your authenticator app."
+                    ),
+                },
             )
     if signer is not None:
         mfa.record_success(db, signer, scope="sign")

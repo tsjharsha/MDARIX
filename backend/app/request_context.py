@@ -58,8 +58,9 @@ def _ensure_trial_open(db: Session, tenant_id) -> None:
             detail={
                 "code": "TRIAL_ENDED",
                 "message": (
-                    "Your MDARIX free trial has ended. Contact us to continue with your data intact"
-                    + (f"; otherwise it is deleted, at the earliest, on {deleted_on}." if deleted_on else ".")
+                    "Your MDARIX free trial has ended."
+                    + (f" Its data is deleted, at the earliest, on {deleted_on}." if deleted_on else "")
+                    + " To continue, talk to us about a pilot: it works on your real data."
                 ),
                 "ended_on": ended_on,
                 "data_deleted_on": deleted_on,
@@ -70,6 +71,10 @@ def _ensure_trial_open(db: Session, tenant_id) -> None:
 def ensure_tenant_access(db: Session, user) -> None:
     """Refuse access when the user's organization or their membership in it has been suspended or revoked."""
     tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+    # A free trial past its end reads as ended (the trial-ended page), even when an older release's hourly job
+    # suspended its organization at the end (J25).
+    if tenant is not None:
+        _ensure_trial_open(db, tenant.id)
     if tenant is None or str(tenant.status or "").upper() in BLOCKED_TENANT_STATUSES:
         raise HTTPException(
             403, detail={"code": "TENANT_ACCESS_SUSPENDED", "message": "Access to this organization is suspended"}
@@ -91,7 +96,6 @@ def ensure_tenant_access(db: Session, user) -> None:
     memberships = db.query(TenantMembership).filter(
         TenantMembership.user_id == user.id, TenantMembership.tenant_id == user.tenant_id
     )
-    _ensure_trial_open(db, tenant.id)
     if memberships.filter(TenantMembership.status == "ACTIVE").first() is not None:
         return
     if memberships.filter(TenantMembership.status.in_(sorted(BLOCKED_MEMBERSHIP_STATUSES))).first() is not None:

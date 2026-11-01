@@ -397,7 +397,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Under question 3, Resolved at service level is chosen: fill in the troubleshooting, the correction, what was done, the result, the service ticket and why no investigation is needed (ISO 13485:2016 clause 8.2.2).",
               "Choose the Root-cause attribution: device-related, use-related, environment-related or undetermined (with a reason). Show definitions explains each.",
               "Check the classification for trends: Use environment and User type, proposed from your records. A value not on the list stays Unknown, with the source value shown; nothing is guessed. Show the coding criteria explains how to code.",
-              "The first time, record the practice training on the disposition rules and the coding criteria (I have read version ...).",
+              "The first time, record the practice training on the disposition rules and the coding criteria (I have read the complaint disposition rules, MDARIX starter, version 1).",
               "Enter Your password and the Authenticator code and choose Sign the disposition.",
             ],
             result:
@@ -492,7 +492,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             who: "Regulatory Reviewer, Authorized Decision Maker, Leader.",
             steps: [
               "On Complaints › Reportability, filter Needs a decision, Overdue, Due soon or Missing answers, and choose Assess per market on a card. The market of the event's country is shown first; open any other enabled market from its tab.",
-              "In a free trial, before your first signature, read the market's questions and the harm-severity scale and confirm I have read version … for each (a practice training acknowledgement). The screen names colleagues who already hold one.",
+              "In a free trial, before your first signature, read the market's questions and the harm-severity scale and confirm I have read …, MDARIX starter, version 1 for each (a practice training acknowledgement). The screen names colleagues who already hold one.",
               "Check the harm level: the complaint's severity from your quality system is mapped on the scale, with the market's serious threshold. Choose another level only with a reason.",
               "Answer each question Yes, No, Unknown or Not applicable, with a rationale and the evidence relied on. Each shows its clause and the Starter text mark; Show definition opens its full definition.",
               "Choose Save answers to see the suggestion: Reportable (with its report type), Pending information (an Unknown could make it reportable) or Not reportable.",
@@ -1006,7 +1006,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Open the CAPA and carry out the follow-ups",
             steps: [
               "Under After the decision, Follow-ups lists each follow-up. Choose Act.",
-              "For CAPA required, choose Create CAPA, give the CAPA title (and optionally a due date) and choose Create CAPA.",
+              "For CAPA required, choose Record the CAPA to raise in your QMS, give the CAPA title (and optionally a due date) and choose Record the CAPA. You raise and run the CAPA in your QMS.",
               "For the others, choose Start and later Complete with what was done.",
             ],
             result: "The CAPA is raised and linked to the signed decision; it is listed on the CAPAs tab.",
@@ -1180,7 +1180,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
       {
         id: "import",
         title: "Import your data",
-        where: "Import data · Bring in CSV files (in a trial also Getting started › Your data)",
+        where: "Import data · Bring in Excel or CSV files (in a trial also Getting started › Your data)",
         purpose:
           "Bring in exports from your quality, product and supplier systems as they are. Every file is checked for problems and personal data before anything is saved.",
         tasks: [

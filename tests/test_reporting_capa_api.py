@@ -539,7 +539,7 @@ def test_a_check_is_planned_reminded_signed_and_repeated_after_a_failure(org, mo
     monkeypatch.setenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "true")
     body = {"result": "EFFECTIVE", "summary": "No occlusion complaints since round two", "plan_version": 1}
     no_code = org["approver"].post(f"{url}/result", json={**body, "password": PASSWORD})
-    assert no_code.status_code == 403 and no_code.json()["detail"]["code"] == "MFA_ENROLLMENT_REQUIRED"
+    assert no_code.status_code == 403 and no_code.json()["detail"]["code"] == "SIGNATURE_MFA_NOT_SET_UP"
     secret = org["approver"].post("/api/v1/auth/mfa/enroll").json()["secret"]
     enrolled = org["approver"].post("/api/v1/auth/mfa/verify-enrollment", json={"code": totp.current_code(secret)})
     assert enrolled.status_code == 200, enrolled.text

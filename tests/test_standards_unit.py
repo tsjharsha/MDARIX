@@ -219,9 +219,9 @@ def test_the_summary_ends_with_the_standards_it_references():
         assert rows.count(short) == 1
     assert "Corrective action" in rows and "Canada" in rows
     assert "EU MDR Art. 88" not in rows and "QMSR" not in rows
-    # The PDF writes the dash in the fonts' encoding, not as a question mark.
+    # The PDF prints the dash as written, not as a question mark.
     rendered = summary.render_pdf(data, "Example Medical", "2026-10-17 10:00 UTC")
-    assert b"SOR/98-282 ss. 59\\22661" in rendered
+    assert "SOR/98-282 ss. 59–61" in pdf.text_of(rendered)
 
 
 def test_long_titles_wrap_inside_their_column():
@@ -313,5 +313,28 @@ def test_citation_themes_cite_the_catalog_where_it_has_the_entry():
 
 
 def test_the_pdf_writer_keeps_typographic_dashes_and_quotes():
-    assert pdf.escape("59–61 — ‘a’ “b”") == "59\\22661 \\227 \\221a\\222 \\223b\\224"
-    assert pdf.escape("→") == "?"
+    rendered = pdf.render("t", [], [("59–61 — ‘a’ “b” → ≥ μ", "body")], watermark="", footer="")
+    assert "59–61 — ‘a’ “b” → ≥ μ" in pdf.text_of(rendered)
+
+
+def test_signed_statements_and_meanings_name_documents_never_codes():
+    """J18: "I have read version disposition-starter-1" and "under coding-starter-1 ... for US, EU_NI" were signed."""
+    import re
+
+    from backend.app.complaint_disposition.rules import signature_meaning as disposition_meaning
+    from backend.app.decision_guides.rules import signature_meaning as guide_meaning
+    from backend.app.reportability.markets import signature_meaning as market_meaning
+    from backend.app.signer_training import service
+
+    assert standards.version_words("disposition-starter-1") == "MDARIX starter, version 1"
+    assert standards.version_words("US-v2") == "your version 2"
+    statements = [document.as_dict()["statement"] for document in service.documents().values()]
+    assert "I have read the complaint disposition rules, MDARIX starter, version 1" in statements
+    signed = [
+        *statements,
+        disposition_meaning("CMP000001", "SERVICE_LEVEL", ["US", "EU_NI"], True),
+        market_meaning("CMP000001", "IN", "IN-starter-1", "NOT_REPORTABLE"),
+        guide_meaning("US-v2", "US guide"),
+    ]
+    code = re.compile(r"\b[A-Za-z]+-(starter-)?v?\d\b|\bEU_NI\b|\bscale-starter")
+    assert [text for text in signed if code.search(text)] == []

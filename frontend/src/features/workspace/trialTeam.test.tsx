@@ -77,6 +77,14 @@ describe("the trial owner looks after the team", () => {
     expect(asColleague).toContain("The person who started this trial can invite colleagues.");
   });
 
+  it("shows an expired invitation as expired, with Resend invitation (J37)", () => {
+    const expired = member({ id: "u3", status: "INVITED", invitation_expired: true });
+    const shown = render(team(true, [{ ...owner, is_you: true }, expired]));
+    expect(shown).toContain("Invitation expired");
+    expect(shown).toContain("Resend invitation");
+    expect(render(team(true, [member({ status: "INVITED" })]))).toContain(">Invited<");
+  });
+
   it("confirms a removal naming the person, then asks the server to remove them", async () => {
     const call = stubApi();
     const done = vi.fn();
@@ -85,6 +93,8 @@ describe("the trial owner looks after the team", () => {
     expect(request.confirmLabel).toBe("Remove from trial");
     expect(request.danger).toBe(true);
     expect(request.body).toContain("Everything they did stays in MDARIX under their name");
+    expect(request.body).toMatch(/^This ends their access to your trial now/);
+    expect(request.body).toContain("You can invite them again later.");
     await request.run("", "", false, "");
     expect(call()).toEqual({ path: "/api/v1/trial/team/u2/remove", method: "POST", body: undefined });
     expect(done).toHaveBeenCalledOnce();

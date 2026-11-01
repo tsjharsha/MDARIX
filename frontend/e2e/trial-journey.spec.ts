@@ -366,7 +366,7 @@ test.describe("free trial journey", () => {
     await expect(drawer.getByText("Routine path: one screen, one signature")).toBeVisible({ timeout: 20_000 });
 
     // Free trials: a practice acknowledgement of the disposition rules and the coding criteria, before anything else.
-    const training = drawer.getByRole("button", { name: /^I have read version / });
+    const training = drawer.getByRole("button", { name: /^I have read / });
     for (let left = await training.count(); left > 0; left--) {
       await training.first().click();
       await expect(training).toHaveCount(left - 1, { timeout: 20_000 });

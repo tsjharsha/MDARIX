@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import hashlib
 import io
-import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
@@ -23,6 +22,7 @@ from backend.app.db.models.reviews import CaseReview
 from backend.app.db.session import RuntimeSessionLocal, SessionLocal, runtime_role_active
 from backend.app.db.tenant_scope import bind_tenant
 from backend.app.readiness_home.summary import PMS_FRAMING
+from reports.pdf import text_of
 from tests.test_free_trial import PASSWORD, _approved_trial_client
 
 pytestmark = pytest.mark.db
@@ -50,9 +50,7 @@ def trial():
 
 def pdf_text(content: bytes) -> str:
     """The text a PDF written by reports/pdf.py shows, its lines joined (wrapped lines read as one)."""
-    shown = re.findall(rb"\(((?:\\.|[^\\)])*)\) Tj", content)
-    text = " ".join(re.sub(r"\\(.)", r"\1", item.decode("latin-1")) for item in shown)
-    return re.sub(r"\s+", " ", text)
+    return " ".join(text_of(content).split())
 
 
 def _section(view: dict, key: str) -> dict:
@@ -374,6 +372,10 @@ def test_the_change_impact_input_names_the_affected_products_lots_and_assessment
         "SAMPLE-ORBIT-300-LOT-003",
         "SAMPLE-ORBIT-300-LOT-004",
         "SAMPLE-ORBIT-300-LOT-005",
+        # Rev B lots without complaints, added to the sample by 0.10.61 (lot impact): built after the change too.
+        "SAMPLE-ORBIT-300-LOT-006",
+        "SAMPLE-ORBIT-300-LOT-007",
+        "SAMPLE-ORBIT-300-LOT-008",
     ]
     assert all(row["sources"][0]["type"] == "Lot" for row in _section(view, "LOTS")["rows"])
     # The complaints whose market assessments may need review: RV-08 (US pending) and RV-06 (harm, not assessed yet).
@@ -426,3 +428,31 @@ def test_another_organization_reads_no_document_and_sample_removal_takes_them(tr
             .count()
         )
     assert left == 0
+
+
+def test_a_document_signed_before_the_unicode_pdf_writer_still_verifies(trial, monkeypatch):
+    """0.10.62 changed the PDF writer (embedded fonts). A version signed earlier keeps the PDF that was signed: the
+    download is the stored file, its SHA-256 is still the signed one, and the signature hash still recomputes."""
+    from backend.app.human_decision.rules import signature_hash
+    from reports import pdf as writer
+
+    user = trial["user"]
+    view = _write_all(user, _generate(user, "MANAGEMENT_REVIEW", period_days=90).json())
+    legacy = b"%PDF-1.4\n% a file written by the writer before 0.10.62\n%%EOF\n"
+    monkeypatch.setattr(writer, "render", lambda *args, **kwargs: legacy)
+    signed = user.post(f"{DOCS}/{view['id']}/sign", json={"password": PASSWORD})
+    assert signed.status_code == 200, signed.text
+    monkeypatch.undo()  # today's writer from here on
+    body = signed.json()
+    signature = body["signature"]
+    assert signature["pdf_sha256"] == hashlib.sha256(legacy).hexdigest()
+    download = user.get(f"{DOCS}/{body['id']}/pdf")
+    assert download.status_code == 200 and download.content == legacy
+    with SessionLocal() as db:
+        record = (
+            db.query(SignedApprovalRecord).filter(SignedApprovalRecord.id == uuid.UUID(signature["record_id"])).one()
+        )
+    assert record.content_fingerprint == hashlib.sha256(download.content).hexdigest()
+    assert record.signature_hash == signature_hash(
+        record.content_fingerprint, record.signer_user_id, record.object_version
+    )

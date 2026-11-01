@@ -483,8 +483,9 @@ def test_csv_import_checks_everything_before_saving():
     assert imported.json()["created"] == 2 and imported.json()["signals"] == "FINDING"
     assert "insights" not in imported.json()
     assert user.get("/api/v1/trial/insights").json()["scope"] == "your data"
-    # Re-uploading updates instead of duplicating.
-    assert user.post("/api/v1/trial/imports/complaints", content=good).json()["updated"] == 2
+    # Re-uploading updates instead of duplicating; the same rows again change nothing, so none counts as updated (J9).
+    again = user.post("/api/v1/trial/imports/complaints", content=good).json()
+    assert again["created"] == 0 and again["updated"] == 0
     status = user.get("/api/v1/trial/status").json()
     assert status["own_data"] == {"products": 1, "lots": 1, "complaints": 2}
     # One row in a file is one row: 2 product rows, 1 lot row and 2 complaint rows (re-uploading added none).
@@ -558,6 +559,49 @@ def test_trial_closes_on_its_end_date():
         assert db.query(Tenant).filter(Tenant.id == uuid.UUID(approval["tenant_id"])).one().status == "ACTIVE"
     finally:
         db.close()
+
+
+def test_an_ended_trial_shows_as_ended_not_suspended_and_an_extension_reopens_it():
+    """J25: the hourly job suspended an ended trial's organization, so the person read "Access to this organization is
+    suspended" instead of the trial-ended page, and extending the trial left it suspended."""
+    from backend.app.access.platform_subscriptions import run_subscription_lifecycle_job
+    from backend.app.db.models.foundation import PlanDefinition
+    from backend.app.db.tenant_scope import bind_system
+
+    user, approval, _ = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    with SessionLocal() as db:
+        bind_system(db, "test: end the trial")
+        row = db.query(SubscriptionLifecycle).filter(SubscriptionLifecycle.tenant_id == tenant_id).one()
+        row.expires_at, row.grace_ends_at = datetime.now(timezone.utc) - timedelta(minutes=1), None
+        db.commit()
+        run_subscription_lifecycle_job(db, "test:lifecycle")
+        db.commit()
+        assert db.get(Tenant, tenant_id).status == "ACTIVE"
+        plan_id = str(db.query(PlanDefinition.id).filter(PlanDefinition.code == "FREE_TRIAL").scalar())
+    ended = user.get("/api/v1/auth/session")
+    assert ended.status_code == 403 and ended.json()["detail"]["code"] == "TRIAL_ENDED"
+    # An organization an earlier release suspended at the trial's end reads as ended too.
+    with SessionLocal() as db:
+        bind_system(db, "test: suspended by 0.10.61's job")
+        db.get(Tenant, tenant_id).status = "SUSPENDED"
+        db.commit()
+    assert user.get("/api/v1/session/context").json()["detail"]["code"] == "TRIAL_ENDED"
+    now = datetime.now(timezone.utc)
+    extended = authenticated_client().post(
+        f"/api/v1/platform/customers/{tenant_id}/subscription",
+        json={
+            "plan_id": plan_id,
+            "starts_at": (now - timedelta(days=30)).isoformat(),
+            "expires_at": (now + timedelta(days=7)).isoformat(),
+            "reason": "Trial extended by a week for the evaluation",
+        },
+    )
+    assert extended.status_code == 200, extended.text
+    assert user.get("/api/v1/trial/status").status_code == 200
+    with SessionLocal() as db:
+        bind_system(db, "test: read the tenant")
+        assert db.get(Tenant, tenant_id).status == "ACTIVE"
 
 
 def test_ask_mdarix_is_grounded_in_the_trial_sample_investigation():
@@ -831,7 +875,7 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     assert chapters["INVESTIGATE_WITH_AI"]["finding"]["value"] == 1  # the guided investigation
     # Trials start without AI: the chapter promises what the case page does without it.
     assert chapters["INVESTIGATE_WITH_AI"]["title"] == "Investigate with evidence you can trace"
-    assert "AI assistance joins when it is switched on" in chapters["INVESTIGATE_WITH_AI"]["promise"]
+    assert "AI is off in the free trial" in chapters["INVESTIGATE_WITH_AI"]["promise"]
     assert chapters["RISK_FILE"]["finding"]["state"] == "CRITICAL"
     # The decision chapter opens the guided investigation's waiting brief.
     assert chapters["DECIDE_AND_SIGN"]["opens"] == {"section": "Investigations", "tab": "Decision Brief"}

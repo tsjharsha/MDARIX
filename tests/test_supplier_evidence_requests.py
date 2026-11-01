@@ -75,3 +75,31 @@ def test_the_workspace_lists_its_own_suppliers_and_capas():
     listed = user.get("/api/v1/data-plane/suppliers").json()["records"]
     assert supplier in {str(row["id"]) for row in listed}
     assert user.get("/api/v1/data-plane/capas").status_code == 200
+
+
+def test_a_free_trial_saves_a_supplier_request_and_never_emails_it(monkeypatch):
+    """J33: a trial e-mailed any address although the guides say MDARIX sends nothing from a trial."""
+    import auth.emailer
+    from tests.test_free_trial import _approved_trial_client
+
+    def must_not_send(*_args, **_kwargs):
+        raise AssertionError("a free trial must not email a supplier")
+
+    monkeypatch.setattr(auth.emailer, "send_supplier_evidence_request", must_not_send)
+    user, _, _ = _approved_trial_client()
+    identifier = f"SUP-TR-{uuid.uuid4().hex[:8].upper()}"
+    loaded = user.post(
+        "/api/v1/trial/imports/suppliers",
+        content=f"supplier_id,supplier_name\n{identifier},Trial Supplier Co\n",
+        headers={"Content-Type": "text/csv"},
+    )
+    assert loaded.status_code == 200, loaded.text
+    with engine.connect() as connection:
+        supplier = str(
+            connection.execute(
+                text("SELECT id FROM suppliers WHERE supplier_identifier = :id"), {"id": identifier}
+            ).scalar()
+        )
+    made = user.post(PATH, json=_body(supplier))
+    assert made.status_code == 200, made.text
+    assert made.json()["status"] == "SAVED" and made.json()["email_delivery"] == "NOT_SENT_IN_TRIAL"

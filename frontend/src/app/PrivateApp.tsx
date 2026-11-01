@@ -20,6 +20,7 @@ import { signOut } from "../features/shared/session";
 import { api } from "./api";
 import { PlatformProductConfiguration } from "../features/stage2/PlatformProductConfiguration";
 import { ConsentBanner } from "../features/shared/ConsentBanner";
+import { REAL_DATA_NOTICE } from "../features/help/trialNextSteps";
 import { CustomerAdminControlPlane } from "../features/customer-admin/CustomerAdminControlPlane";
 import { RegulatoryCopilot } from "../features/regulatory/RegulatoryCopilot";
 import { RiskTraceabilityWorkspace } from "../features/risk/RiskTraceabilityWorkspace";
@@ -93,14 +94,16 @@ export function PrivateApplicationGate() {
         })
         .catch((error) => {
           if (!active) return;
+          const next = afterSessionRefusal(error);
           // A server that is down or restarting is not a sign-out: say so and keep trying.
-          if (isOutage(error)) {
+          if (next === "RETRY") {
             setState("UNREACHABLE");
             timer = window.setTimeout(check, retryDelay(attempt++));
             return;
           }
-          const idle = error instanceof ApiError && error.code === "SESSION_IDLE_TIMEOUT";
-          window.location.replace(signInPath(idle ? "idle" : undefined, window.location));
+          // An ended trial is still signed in: the workspace shows the trial-ended page (J25).
+          if (next === "TRIAL_ENDED") setState("AUTHORIZED");
+          else window.location.replace(signInPath(next === "IDLE" ? "idle" : undefined, window.location));
         });
     void check();
     return () => {
@@ -343,6 +346,14 @@ export function PrivateApplication() {
   );
 }
 
+/** Where the session check sends the person when the server refuses it. */
+export function afterSessionRefusal(error: unknown): "RETRY" | "TRIAL_ENDED" | "IDLE" | "SIGN_IN" {
+  if (isOutage(error)) return "RETRY";
+  const code = error instanceof ApiError ? error.code : undefined;
+  if (code === "TRIAL_ENDED") return "TRIAL_ENDED";
+  return code === "SESSION_IDLE_TIMEOUT" ? "IDLE" : "SIGN_IN";
+}
+
 /** A free trial past its end date: what happens to the data, and how to continue. */
 function TrialEnded({ message }: { message: string }) {
   return (
@@ -350,19 +361,18 @@ function TrialEnded({ message }: { message: string }) {
       <div className="auth-card">
         <span className="eyebrow">Free trial</span>
         <h1>Your free trial has ended</h1>
-        <p>{message || "Your MDARIX free trial has ended. Contact us to continue with your data intact."}</p>
+        <p>{message || "Your MDARIX free trial has ended."}</p>
         <p>
-          Nothing is lost yet: your workspace and data are kept until the deletion date, and continuing keeps them as
-          they are.
+          <strong>{REAL_DATA_NOTICE.title}.</strong> {REAL_DATA_NOTICE.text}
         </p>
         <a className="primary-action" href="/contact">
-          Contact us to continue
+          Talk to us about a pilot
         </a>
         <p className="auth-links">
           <button type="button" className="link-button" onClick={() => void signOut()}>
             Sign out
-          </button>
-          <a href="/trial-agreement">Free trial agreement</a>
+          </button>{" "}
+          · <a href="/trial-agreement">Free trial agreement</a>
         </p>
       </div>
     </main>

@@ -864,8 +864,8 @@ function FollowUp({ item, dueAt, onDone }: { item: IntakeItem; dueAt: string | n
         <Hourglass size={15} aria-hidden="true" /> Follow-up with the caller
       </h4>
       <p>
-        Due {formatDate(dueAt)}. Ask about every Unknown and Not stated answer. Until the communications log arrives,
-        this is a dated task on the check.
+        Due {formatDate(dueAt)}. Ask about every Unknown and Not stated answer. The follow-up is a dated task on the
+        check.
       </p>
       <label className="ca-field">
         What the caller said, or what you tried

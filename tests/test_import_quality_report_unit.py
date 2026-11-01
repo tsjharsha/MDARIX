@@ -16,8 +16,14 @@ def test_counts_agree_with_the_file():
         "rows_quarantined": 3,
         "rows_changed": 2,
         "rows_new": 5,
+        "rows_unchanged": 0,
         "balanced": True,
     }
+
+
+def test_rows_seen_again_without_a_change_are_unchanged_not_updated():
+    report = quality_report(10, 10, 0, 1, new=2)
+    assert (report["rows_new"], report["rows_changed"], report["rows_unchanged"]) == (2, 1, 7)
 
 
 def test_a_lost_row_is_not_balanced():
@@ -26,7 +32,8 @@ def test_a_lost_row_is_not_balanced():
 
 def test_products_have_no_changed_count():
     report = quality_report(4, 4, 0, None)
-    assert report["rows_changed"] is None and report["rows_new"] is None and report["balanced"]
+    assert report["rows_changed"] is None and report["rows_new"] is None and report["rows_unchanged"] is None
+    assert report["balanced"]
 
 
 def test_a_row_with_extra_values_is_kept_with_its_problem_and_counted():

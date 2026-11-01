@@ -116,6 +116,8 @@ export type DispositionScreen = {
   version: number;
   training: TrainingDocument[];
   training_required: boolean;
+  /** The server needs the authenticator code with the signature (MDARIX_REQUIRE_MFA_FOR_SIGNATURES). */
+  code_required?: boolean;
   trained_colleagues: string[];
   starter_mark: string;
   practice_label: string | null;
@@ -233,6 +235,8 @@ export function signProblem(screen: DispositionScreen, form: DispositionForm, tr
   if (screen.current && short(form.changeReason, reasonMin)) return "Say why the disposition changes.";
   if (!trained) return "Record the practice training first.";
   if (!form.password) return "Enter your password to sign.";
+  if (screen.code_required && !/^\d{6}$/.test(form.code.trim()))
+    return "Enter the 6-digit code from your authenticator app.";
   return null;
 }
 

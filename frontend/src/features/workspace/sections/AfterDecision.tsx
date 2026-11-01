@@ -59,7 +59,7 @@ function FollowUpStatus({ item }: { item: FollowUp }) {
 
 /**
  * The follow-up actions a signed decision required on this case: who holds each, its due date and status, and what the
- * person may do with it (start, complete with a note, cancel with a reason, raise a CAPA in the quality system).
+ * person may do with it (start, complete with a note, cancel with a reason, record the CAPA to raise in the QMS).
  */
 export function FollowUpsPanel({
   investigationId,
@@ -191,7 +191,7 @@ export function FollowUpsPanel({
 const FOLLOW_UP_COPY: Record<Exclude<FollowUpActionKey, "start">, { title: string; field: string; submit: string }> = {
   complete: { title: "Complete this follow-up", field: "What was done (kept in the audit trail)", submit: "Complete" },
   cancel: { title: "Cancel this follow-up", field: "Why is it cancelled?", submit: "Cancel follow-up" },
-  capa: { title: "Create a CAPA for this follow-up", field: "CAPA title", submit: "Create CAPA" },
+  capa: { title: "Record the CAPA to raise in your QMS", field: "CAPA title", submit: "Record the CAPA" },
 };
 
 /** One follow-up: its facts, and the form for the action chosen (start at once; the others need a few words). */
@@ -340,7 +340,7 @@ export function FollowUpDrawer({
                 <input type="date" value={dueDay} onChange={(event) => setDueDay(event.target.value)} />
               </label>
               <p className="ac-muted">
-                The CAPA is raised in your quality system's register and linked to this follow-up.
+                MDARIX records the CAPA to raise and links it to this follow-up. You raise and run the CAPA in your QMS.
               </p>
             </>
           )}

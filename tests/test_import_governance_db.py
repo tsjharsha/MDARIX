@@ -106,9 +106,7 @@ def test_harm_rows_list_first(orgs):
             (2, {"complaint_id": "GOV-C1", "description": "display flicker"}, ["product_id: not found"]),
             (3, {"complaint_id": "GOV-C2", "description": "patient taken to hospital"}, ["product_id: not found"]),
         ]
-        import_quarantine.store(
-            db, tenant_id, ref, "complaints", "CSV_IMPORT", set_aside, imports._personal_data, imports._mask
-        )
+        import_quarantine.store(db, tenant_id, ref, "complaints", "CSV_IMPORT", set_aside, imports.stored_value)
         db.commit()
         items = import_quarantine.listing(db, tenant_id, import_ref=ref)["items"]
         assert [item["line"] for item in items] == [3, 2]

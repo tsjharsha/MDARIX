@@ -228,10 +228,10 @@ def test_signing_needs_an_enrolled_authenticator_and_a_fresh_code(monkeypatch, d
     email = _make_user(role="APPROVER")
     client, _ = _sign_in(email)
     not_enrolled = _sign(client, decision)
-    assert not_enrolled.status_code == 403 and not_enrolled.json()["detail"]["code"] == "MFA_ENROLLMENT_REQUIRED"
+    assert not_enrolled.status_code == 403 and not_enrolled.json()["detail"]["code"] == "SIGNATURE_MFA_NOT_SET_UP"
     secret, _ = _enroll(client)
     no_code = _sign(client, decision)
-    assert no_code.status_code == 403 and no_code.json()["detail"]["code"] == "MFA_REQUIRED"
+    assert no_code.status_code == 403 and no_code.json()["detail"]["code"] == "SIGNATURE_CODE_INVALID"
     signed = _sign(client, decision, code=_next_code(secret))
     assert signed.status_code == 200, signed.text
 
