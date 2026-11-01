@@ -320,7 +320,8 @@ MVPI_MDAE = Form(
                 Field("B1", "1", "Date of event / near miss incident", "event_date", INITIAL),
                 Field("B2", "2", "Type of event (adverse event, product problem)", "event_type", MUST),
                 Field(
-                    "B3", "3", "For implantable medical devices only: implanted and explanted dates", missing=NOT_USED
+                    "B3", "3", "For implantable medical devices only: implanted and explanted dates",
+                    note="Leave blank for a device that is not implanted.",
                 ),
                 Field("B4", "4", "Location of event", "in_location", INITIAL),
                 Field("B5", "5", "Device operator", "in_operator", INITIAL),
