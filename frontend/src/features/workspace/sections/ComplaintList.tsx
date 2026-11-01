@@ -169,6 +169,13 @@ export function ComplaintFilterBar({
   const [lotText, setLotText] = useState(filters.lot);
   const versions = versionChoices(listOf(data?.versions) as ComplaintVersionChoice[], filters.productId);
   const sources = sourceChoices(listOf(data?.sources), filters.source);
+  // The IMDRF codes the problem codes map to (G2a, approved links only), shown in the problem-code choice.
+  const problemCodes = listOf(data?.problem_codes) as string[];
+  const imdrf = useResource<{ links: Record<string, { code: string }[]> }>(
+    problemCodes.length
+      ? `/api/v1/regulatory-reference/imdrf/links?${new URLSearchParams(problemCodes.map((code) => ["code", code]))}`
+      : null,
+  );
   const applyLot = () => {
     if (lotText.trim() !== filters.lot) onChange({ lot: lotText.trim() });
   };
@@ -222,7 +229,8 @@ export function ComplaintFilterBar({
         label="Problem code"
         all="All problem codes"
         value={filters.problemCode}
-        values={listOf(data?.problem_codes)}
+        values={problemCodes}
+        labels={imdrfLabels(problemCodes, imdrf.data?.links)}
         onChange={(value) => onChange({ problemCode: value })}
       />
       <FacetSelect
@@ -260,17 +268,32 @@ export function ComplaintFilterBar({
 }
 
 /** A filter over the values the complaints record; a value from a link that the list does not offer stays chosen. */
+/** A problem code with the IMDRF codes it maps to: "PRESSURE_ALARM · IMDRF A16" (exported for its test). */
+export function imdrfLabels(
+  codes: string[],
+  links: Record<string, { code: string }[]> | undefined,
+): Record<string, string> {
+  return Object.fromEntries(
+    codes
+      .filter((code) => links?.[code]?.length)
+      .map((code) => [code, `${code} · IMDRF ${(links?.[code] ?? []).map((link) => link.code).join(", ")}`]),
+  );
+}
+
 function FacetSelect({
   label,
   all,
   value,
   values,
+  labels,
   onChange,
 }: {
   label: string;
   all: string;
   value: string;
   values: string[];
+  /** What an option reads, where it is more than the value. */
+  labels?: Record<string, string>;
   onChange: (value: string) => void;
 }) {
   const known = values.includes(value);
@@ -280,7 +303,7 @@ function FacetSelect({
       {value && !known && <option value={value}>{value}</option>}
       {values.map((item) => (
         <option key={item} value={item}>
-          {item}
+          {labels?.[item] ?? item}
         </option>
       ))}
     </select>

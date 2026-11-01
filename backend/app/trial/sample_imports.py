@@ -21,7 +21,7 @@ elsewhere stays. Idempotent; flushes but never commits (the caller owns the tran
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
@@ -103,7 +103,7 @@ def stage_sample_import(db: Session, tenant_id, now: datetime) -> dict:
     )
     if not complaints:
         return {"created": False}
-    imported_at = now - timedelta(days=1)
+    imported_at = now  # the lineage rows carry the same moment
     import_ref = uuid.uuid4()
     version = import_lineage.mapping_version("complaints", SAMPLE_COLUMNS, "ISO")
     rows = [(line, {"complaint_id": c, "product_id": p}) for line, (c, p) in enumerate(complaints, 2)]

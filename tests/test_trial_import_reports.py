@@ -115,9 +115,9 @@ def test_a_trial_import_is_governed_and_its_report_names_the_file():
     other, _, _ = _approved_trial_client()
     assert other.get(f"{RUNS}/{result['import_ref']}").status_code == 404
     assert other.get(f"/api/v1/data/import/origin/complaints/{own['id']}").status_code == 404
-    assert other.get("/api/v1/data/import/quarantine", params={"import_ref": result["import_ref"]}).json()[
-        "items"
-    ] == []
+    assert (
+        other.get("/api/v1/data/import/quarantine", params={"import_ref": result["import_ref"]}).json()["items"] == []
+    )
     assert result["import_ref"] not in {run["import_ref"] for run in _ok(other.get(RUNS))["runs"]}
 
 
