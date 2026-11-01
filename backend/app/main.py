@@ -60,6 +60,7 @@ from backend.app.ai_settings import router as ai_settings_router
 from backend.app.audit_chain_api import router as audit_chain_router
 from backend.app.tenant_export_api import router as tenant_export_router
 from backend.app.data_import_router import router as data_import_router
+from backend.app.regulatory_reference_router import router as regulatory_reference_router
 from backend.app.investigation_open_router import assignees_router as investigation_assignees_router
 from backend.app.investigation_open_router import router as investigation_open_router
 from backend.app.case_workflow.router import router as case_workflow_router
@@ -441,6 +442,7 @@ app.include_router(ai_settings_router)
 app.include_router(audit_chain_router)
 app.include_router(tenant_export_router)
 app.include_router(data_import_router)
+app.include_router(regulatory_reference_router)
 app.include_router(investigation_open_router)
 app.include_router(investigation_assignees_router)
 app.include_router(complaints_router)

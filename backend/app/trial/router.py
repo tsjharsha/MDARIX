@@ -237,9 +237,10 @@ def _trial_import_and_audit(
     raw: bytes,
     date_format: str = "ISO",
     options: tuple[bool, bool] = (False, False),
+    file_name: str | None = None,
 ) -> dict:
     """The trial import (all or nothing, unless problem rows are set aside) with its audit record (runs in the thread
-    pool). ``options`` is (skip_problem_rows, mask_personal_data)."""
+    pool). ``options`` is (skip_problem_rows, mask_personal_data); ``file_name`` is recorded for the run report."""
     try:
         result = imports.import_file(data, tenant_id, entity, raw, imports.TRIAL_POLICY, date_format, *options)
         db.add(
@@ -250,7 +251,10 @@ def _trial_import_and_audit(
                 action="TRIAL_DATA_IMPORTED",
                 entity_type="TrialImport",
                 # Counts only: the rejects file holds the uploader's own rows, personal data included.
-                details={k: v for k, v in result.items() if k != "rejects_csv"},
+                details={
+                    **{k: v for k, v in result.items() if k != "rejects_csv"},
+                    "file_name": imports.file_label(file_name),
+                },
                 created_at=datetime.now(timezone.utc),
             )
         )
@@ -296,6 +300,7 @@ async def run_trial_import(
     date_format: str = Query(default="ISO", max_length=8),
     on_problems: str = Query(default="refuse", max_length=8),
     personal_data: str = Query(default="refuse", max_length=8),
+    file_name: str | None = Query(default=None, max_length=255),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
@@ -305,7 +310,9 @@ async def run_trial_import(
     await run_in_threadpool(_require_trial, db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     raw = await _body(request)
-    result = await run_in_threadpool(_trial_import_and_audit, db, data, ctx, tenant_id, entity, raw, order, options)
+    result = await run_in_threadpool(
+        _trial_import_and_audit, db, data, ctx, tenant_id, entity, raw, order, options, file_name
+    )
     return imports.after_import(background, tenant_id, result, source="trial import")
 
 

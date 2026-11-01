@@ -14,16 +14,19 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
+from backend.app import import_lineage, import_quarantine
 from backend.app.access.permissions import RECORDS_WRITE, require_permission
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import AuditEvent
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.business_ids import as_uuid
+from backend.app.signals.hooks import IMPORT_AUDIT_ACTIONS
 from backend.app.trial import imports
 from backend.app.trial.service import trial_subscription
 
@@ -82,9 +85,11 @@ def _import_and_audit(
     policy: imports.ImportPolicy,
     date_format: str = "ISO",
     options: tuple[bool, bool] = (False, False),
+    file_name: str | None = None,
 ) -> dict:
     """The import (all or nothing, unless the uploader chose to set problem rows aside), then its audit record (runs
-    in the thread pool). ``options`` is (skip_problem_rows, mask_personal_data)."""
+    in the thread pool). ``options`` is (skip_problem_rows, mask_personal_data); ``file_name`` is the uploaded file's
+    name, recorded for its run report (``imports.file_label``)."""
     try:
         result = imports.import_file(data, tenant_id, entity, raw, policy, date_format, *options)
         data.commit()
@@ -104,7 +109,11 @@ def _import_and_audit(
             action="DATA_IMPORTED",
             entity_type="DataImport",
             # Counts only: the rejects file holds the uploader's own rows, personal data included.
-            details={**{k: v for k, v in result.items() if k != "rejects_csv"}, "source": policy.source},
+            details={
+                **{k: v for k, v in result.items() if k != "rejects_csv"},
+                "source": policy.source,
+                "file_name": imports.file_label(file_name),
+            },
             created_at=datetime.now(timezone.utc),
         )
     )
@@ -141,6 +150,7 @@ async def run_import(
     date_format: str = Query(default="ISO", max_length=8),
     on_problems: str = Query(default="refuse", max_length=8),
     personal_data: str = Query(default="refuse", max_length=8),
+    file_name: str | None = Query(default=None, max_length=255),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
@@ -150,5 +160,185 @@ async def run_import(
     policy = await run_in_threadpool(_policy, db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     raw = await _body(request, policy)
-    result = await run_in_threadpool(_import_and_audit, db, data, ctx, tenant_id, entity, raw, policy, order, options)
+    result = await run_in_threadpool(
+        _import_and_audit, db, data, ctx, tenant_id, entity, raw, policy, order, options, file_name
+    )
     return imports.after_import(background, tenant_id, result, source="CSV import")
+
+
+@router.get("/quarantine", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+def quarantine_list(
+    status: str = Query(default=import_quarantine.OPEN, pattern="^(OPEN|REPROCESSED)$"),
+    import_ref: uuid.UUID | None = None,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    data: Session = Depends(get_data_plane_db),
+):
+    """Rows imports set aside (R14), those suggesting harm first, with the counts for the reconciliation."""
+    return import_quarantine.listing(data, uuid.UUID(str(ctx.tenant_id)), status, import_ref)
+
+
+@router.post("/quarantine/{row_id}/reprocess", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+def quarantine_reprocess(
+    row_id: uuid.UUID,
+    corrected: dict[str, str] = Body(..., embed=True, alias="row"),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """Import a corrected quarantined row through the usual checks; the row closes only if it passes."""
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    policy = _policy(db, ctx)
+    try:
+        result = import_quarantine.reprocess(
+            data, tenant_id, row_id, corrected, imports.import_records, policy, str(ctx.user_id)
+        )
+        data.commit()
+    except HTTPException:
+        data.rollback()
+        raise
+    db.add(
+        AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            actor_ref=str(ctx.user_id),
+            action="QUARANTINE_ROW_REPROCESSED",
+            entity_type="DataImport",
+            # The row's reference only: its values are the organization's records.
+            details={"quarantine_row": str(row_id), "entity": result["quarantine_row"]["entity"]},
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+    return result
+
+
+@router.get("/lineage/{entity}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+def record_lineage(
+    entity: str,
+    key: str = Query(..., max_length=400),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The imports that brought a record in, with their mapping versions (R16). ``key`` is the record's identifier
+    columns joined with ':' (for a lot: lot_id:product_id:version)."""
+    if entity not in imports.TEMPLATES:
+        raise HTTPException(404, detail={"code": "TEMPLATE_NOT_FOUND", "message": "Unknown template"})
+    return {
+        "entity": entity,
+        "key": key,
+        "imports": import_lineage.of_record(data, uuid.UUID(str(ctx.tenant_id)), entity, key),
+    }
+
+
+def _run_view(event: AuditEvent, names: dict[str, str]) -> dict:
+    details = event.details or {}
+    return {
+        "import_ref": details.get("import_ref"),
+        "entity": details.get("entity"),
+        "file_name": details.get("file_name"),
+        "imported_at": event.created_at.isoformat(),
+        "imported_by": names.get(event.actor_ref) or event.actor_ref,
+        "mapping_version": details.get("mapping_version"),
+        "masked_values": details.get("masked_values") or 0,
+        "sample": bool(details.get("sample")),
+        "report": details["quality_report"],
+    }
+
+
+def _actor_names(db: Session, tenant_id: uuid.UUID, events: list[AuditEvent]) -> dict[str, str]:
+    """The names people read for the uploaders (an actor_ref is an account id), and the sample's own author."""
+    from backend.app.case_workflow.states import SAMPLE_OWNER_NAME
+    from backend.app.db.models.foundation import AuthUser
+
+    ids = {as_uuid(event.actor_ref) for event in events} - {None}
+    rows = (
+        db.query(AuthUser.id, AuthUser.display_name, AuthUser.username)
+        .filter(AuthUser.tenant_id == tenant_id, AuthUser.id.in_(ids))
+        .all()
+        if ids
+        else []
+    )
+    return {"system:trial-sample": SAMPLE_OWNER_NAME, **{str(i): (name or user) for i, name, user in rows}}
+
+
+def _runs_query(db: Session, tenant_id: uuid.UUID):
+    """The governed import runs (R17): a workspace's or a free trial's imports whose audit record carries a
+    data-quality report."""
+    return db.query(AuditEvent).filter(
+        AuditEvent.tenant_id == tenant_id,
+        AuditEvent.action.in_(IMPORT_AUDIT_ACTIONS),
+        AuditEvent.details.has_key("quality_report"),
+    )
+
+
+@router.get("/runs", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+def import_runs(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The latest import runs, newest first, each with its data-quality report (R17). The sample's run is left out
+    once the sample data, and its rows, are removed."""
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    events = _runs_query(db, tenant_id).order_by(AuditEvent.created_at.desc()).limit(20).all()
+    samples = [event.details["import_ref"] for event in events if event.details.get("sample")]
+    kept = import_lineage.present(data, tenant_id, samples)
+    events = [event for event in events if not event.details.get("sample") or event.details["import_ref"] in kept]
+    names = _actor_names(db, tenant_id, events)
+    return {"runs": [_run_view(event, names) for event in events]}
+
+
+@router.get("/runs/{import_ref}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+def import_run_report(
+    import_ref: uuid.UUID,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The data-quality report of one import run (R17), as recorded when it ran, with its quarantined rows' state now."""
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    event = (
+        _runs_query(db, tenant_id)
+        .filter(AuditEvent.details["import_ref"].astext == str(import_ref))
+        .order_by(AuditEvent.created_at)
+        .first()
+    )
+    if event is None:
+        raise HTTPException(404, detail={"code": "IMPORT_RUN_NOT_FOUND", "message": "No such import run"})
+    return {
+        **_run_view(event, _actor_names(db, tenant_id, [event])),
+        "quarantine_now": import_quarantine.counts(data, tenant_id, import_ref),
+    }
+
+
+@router.get("/origin/{entity}/{record_id}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+def record_origin(
+    entity: str,
+    record_id: uuid.UUID,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """Where a product, lot or complaint came from (R16), by its MDARIX id: the imports behind it, each with its file,
+    who imported it and the row it was read from."""
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    key, source = import_lineage.key_of(data, tenant_id, entity, record_id)
+    imported = import_lineage.of_record(data, tenant_id, entity, key)
+    refs = sorted({item["import_ref"] for item in imported})
+    events = _runs_query(db, tenant_id).filter(AuditEvent.details["import_ref"].astext.in_(refs)).all() if refs else []
+    names = _actor_names(db, tenant_id, events)
+    runs = {event.details["import_ref"]: _run_view(event, names) for event in events}
+    return {
+        "entity": entity,
+        "key": key,
+        "source_system": source,
+        "imports": [
+            {
+                **item,
+                "file_name": runs.get(item["import_ref"], {}).get("file_name"),
+                "imported_by": runs.get(item["import_ref"], {}).get("imported_by"),
+                "has_report": item["import_ref"] in runs,
+            }
+            for item in imported
+        ],
+    }

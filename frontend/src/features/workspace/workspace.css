@@ -332,6 +332,101 @@
   padding-left: 20px;
   font-size: 14px;
 }
+/* An import's data-quality report, its rows set aside, and a record's origin (0.10.56, ImportReports.tsx). */
+.uw-import-run-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.uw-import-runs {
+  margin-bottom: 12px;
+}
+/* Narrow screens: the report stays inside the panel and its table scrolls on its own. */
+.uw-import-run,
+.uw-import-run > *,
+.uw-import-aside {
+  min-width: 0;
+}
+.uw-import-run {
+  display: grid;
+  gap: 12px;
+}
+.uw-import-aside h3 {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.uw-import-aside td:nth-child(2) {
+  min-width: 220px;
+}
+.uw-import-checks {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+.uw-import-checks li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.uw-import-checks li svg {
+  flex: none;
+  margin-top: 2px;
+}
+.uw-import-checks .is-ok svg {
+  color: var(--ac-teal);
+}
+.uw-import-checks .is-bad svg {
+  color: #8b1d1d;
+}
+.uw-import-aside td small {
+  display: block;
+}
+.uw-origin,
+.uw-imdrf {
+  margin: 8px 0 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.uw-origin ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+.uw-identity-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-identity-list > li {
+  padding: 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  overflow-wrap: anywhere;
+}
+.uw-identity-head {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.uw-identity-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+.uw-identity-form .ca-action-row,
+.uw-identity-form .uw-trial-message {
+  grid-column: 1 / -1;
+}
 .uw-trial-findings {
   margin: 0;
   padding: 12px 14px 12px 32px;

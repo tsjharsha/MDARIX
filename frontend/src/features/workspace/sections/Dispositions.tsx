@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CheckCircle2, FileWarning, GitBranch, Inbox, Link2, ShieldAlert, Timer, Wrench } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
+import { ImdrfCodes, RecordOrigin } from "./ImportReports";
 import { formatDay } from "../../../app/dates";
 import { useCan, useWorkspace } from "../workspaceContext";
 import { countOf } from "./common";
@@ -261,7 +262,7 @@ export function DispositionPanel({
   onTrained: () => void;
 }) {
   const canSign = useCanDispose();
-  const { notify } = useWorkspace();
+  const { notify, open } = useWorkspace();
   const [form, setForm] = useState<DispositionForm>(() => formOf(screen));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -303,6 +304,12 @@ export function DispositionPanel({
         </p>
         {complaint.description && <q className="uw-cr-text">{complaint.description}</q>}
         {screen.practice_label && <p className="uw-ma-practice">{screen.practice_label}</p>}
+        <ImdrfCodes problemCode={complaint.problem_code} />
+        <RecordOrigin
+          entity="complaints"
+          recordId={complaint.id}
+          onOpenReport={(importRef) => open("Import data", `report=${importRef}`)}
+        />
       </section>
 
       {screen.current && <SignedDisposition version={screen.current} />}
