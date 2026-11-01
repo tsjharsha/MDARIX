@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EscalateButton } from "./Triage";
 import {
   AlarmClock,
   CheckCircle2,
@@ -317,6 +318,7 @@ export function WatchCard({ item, onDecide }: { item: WatchItem; onDecide: () =>
             <FileSearch size={15} aria-hidden="true" /> Open investigation
           </button>
         )}
+        <EscalateButton kind="COMPLAINT" id={item.id} />
       </div>
     </li>
   );

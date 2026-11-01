@@ -415,7 +415,7 @@ test.describe("free trial journey", () => {
     });
     const problems = watchErrors(page);
     await openSection(page, "Complaints");
-    // Complaints opens on Dispositions (routine first); the second look is its own tab.
+    // Complaints opens on Triage (before every queue, 0.10.57); the second look is its own tab.
     await page
       .getByRole("tablist", { name: "Complaint sections" })
       .getByRole("tab", { name: /^Second look/ })

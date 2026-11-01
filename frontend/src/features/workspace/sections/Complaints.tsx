@@ -22,6 +22,8 @@ import { Hero, InlineError, Pager, ProductFilter } from "./boardParts";
 import { TrustBadge } from "./TrustBadge";
 import { ReportabilityWatch } from "./ReportabilityWatch";
 import { Dispositions } from "./Dispositions";
+import { FirstContact } from "./FirstContact";
+import { EscalateButton, Triage } from "./Triage";
 import { ReportingWindows } from "./ReportingWindows";
 import { Starters } from "./Starters";
 import { ComplaintList } from "./ComplaintList";
@@ -68,7 +70,8 @@ import {
 } from "../complaintReview";
 
 /**
- * Complaints: the second look (records cancelled or logged as inquiries that carry signs of a complaint, and recurring
+ * Complaints: the triage list first (urgent intakes, flagged calls and records that suggest harm), the first contact
+ * (calls and urgent intakes with their check), the dispositions, the second look (records cancelled or logged as inquiries that carry signs of a complaint, and recurring
  * No Fault Found codes, for a person to decide on), the backlog board (open complaints in no signal and no case,
  * against the organization's target) and the reportability watch (reporting clocks against the organization's own
  * windows), and the complaint list with its filters (a link may carry them: complaintListTab in ../complaintList.ts).
@@ -77,10 +80,12 @@ import {
 export function ComplaintsSection({ tab }: { tab?: string }) {
   const [target] = useState(() => parseComplaintListTab(tab));
   const [active, setActive] = useState<ComplaintsTab>(() =>
-    target.isList ? COMPLAINT_LIST_TAB : offeredTab(tab, COMPLAINTS_TABS, "Dispositions"),
+    target.isList ? COMPLAINT_LIST_TAB : offeredTab(tab, COMPLAINTS_TABS, "Triage"),
   );
   return (
     <Tabs tabs={COMPLAINTS_TABS} active={active} onChange={setActive} label="Complaint sections">
+      {active === "Triage" && <Triage onOpenTab={setActive} />}
+      {active === "First contact" && <FirstContact onOpenTab={setActive} />}
       {active === "Dispositions" && <Dispositions />}
       {active === "Second look" && <SecondLook />}
       {active === "Backlog" && <Backlog />}
@@ -98,6 +103,36 @@ function useCanDecide() {
   const create = useCan("investigation.create");
   const quality = useCan("quality.review");
   return triage || create || quality;
+}
+
+/**
+ * The same first-contact check for an imported service record or inquiry (T-G32): it opens a check with the record's
+ * words and times, linked to it, in Complaints › First contact. Its signed outcome is the second-look decision.
+ */
+function FirstContactCheckButton({ complaintId }: { complaintId: string }) {
+  const [opened, setOpened] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  if (opened) return <span className="uw-cr-meta">Check {opened} opened under First contact</span>;
+  return (
+    <>
+      <button
+        type="button"
+        className="ac-link"
+        onClick={async () => {
+          setError("");
+          try {
+            const event = await send<{ reference: string }>(`/api/v1/intake/from-complaint/${complaintId}`, "POST");
+            setOpened(event.reference);
+          } catch (reason) {
+            setError(errorText(reason, "The check was not opened"));
+          }
+        }}
+      >
+        <ClipboardCheck size={15} aria-hidden="true" /> First-contact check
+      </button>
+      <InlineError text={error} />
+    </>
+  );
 }
 
 // The second look ----------------------------------------------------------------------------------------------------
@@ -335,6 +370,10 @@ export function SecondLookCard({
             <FileSearch size={15} aria-hidden="true" /> Open investigation
           </button>
         )}
+        {canDecide && !item.decision && item.reasons.some((reason) => reason.code === "INQUIRY") && (
+          <FirstContactCheckButton complaintId={item.id} />
+        )}
+        <EscalateButton kind="COMPLAINT" id={item.id} />
       </div>
     </li>
   );
@@ -748,6 +787,11 @@ function Backlog() {
                     },
                   ]
                 : []),
+              {
+                key: "escalate",
+                label: "",
+                render: (row: BacklogItem) => <EscalateButton kind="COMPLAINT" id={row.id} label="Triage" />,
+              },
             ]}
           />
           <Pager page={page} pages={list.data?.pages ?? 1} onPage={setPage} />

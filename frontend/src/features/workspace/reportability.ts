@@ -95,7 +95,7 @@ export type WatchItem = {
   death: boolean | null;
   malfunction: boolean | null;
   aware_date: string | null;
-  aware_source: "AWARENESS_DATE" | "RECEIVED_DATE" | "RECORDED_DATE" | null;
+  aware_source: "AWARENESS_DATE" | "RECEIVED_DATE" | "RECORDED_DATE" | "LINKED_SOURCE" | null;
   days_since_aware: number | null;
   triggers: Trigger[];
   clocks: Clock[];
@@ -191,6 +191,7 @@ export const AWARE_SOURCE: Record<string, string> = {
   AWARENESS_DATE: "awareness date",
   RECEIVED_DATE: "received date (no awareness date recorded)",
   RECORDED_DATE: "recorded date (no awareness or received date)",
+  LINKED_SOURCE: "earlier linked source (a logged call or intake about the same event)",
 };
 
 export function watchHeadline(summary: WatchSummary | null | undefined): { title: string; detail: string; tone: Tone } {

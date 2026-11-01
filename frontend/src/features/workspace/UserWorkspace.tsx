@@ -119,9 +119,9 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   },
   Complaints: {
     icon: ClipboardList,
-    description: "Second look and backlog",
+    description: "Triage, first contact, backlog",
     guide:
-      "Find complaints hidden as cancellations, inquiries or No Fault Found, and see which open complaints wait in no signal and no case past your target. A person decides; MDARIX never changes your records.",
+      "Triage urgent events first, check each call for a hidden complaint, close routine complaints, and find complaints hidden as cancellations, inquiries or No Fault Found. A person decides; MDARIX never changes your records.",
     context: false,
   },
   Signals: {

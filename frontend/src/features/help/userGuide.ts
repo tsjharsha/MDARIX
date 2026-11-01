@@ -341,6 +341,46 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
       "Close routine complaints at service level with a documented reason, find the complaints that hide, keep every reporting clock, and turn a rising trend into a case.",
     sections: [
       {
+        id: "first-contact",
+        title: "First contact and triage: a call, an urgent intake, a duplicate",
+        where: "Complaints › Triage and Complaints › First contact; Getting started, Before a complaint",
+        purpose:
+          "A service call can hide a complaint. Log the caller's words and answer the ten starter questions: the fixed table gives complaint, service only, both or pending. Urgent intakes, harm answers and harm words reach the triage list at once, before every other queue, with each market's provisional deadline counted from awareness.",
+        tasks: [
+          {
+            title: "Log a call and sign the check",
+            who: "Leader, and anyone who triages signals, opens cases or reviews quality.",
+            steps: [
+              "Open Complaints › First contact and choose Log a call. Write the caller's words as they said them, the product, lot or serial number, what was asked for and the time of the call (that is the awareness time; it never moves).",
+              "Answer questions 1 to 9: Yes, No, Unknown or Not applicable (with a reason); questions 4 to 6 may be Not stated. No means not alleged. Unknown and Not stated are never No.",
+              "Choose Save the call. The table's outcome shows at once; a Yes or Unknown on question 4, 5 or 6, or a harm word, puts the call on the triage list before anyone signs.",
+              "Open the call, check the classification (or choose another, with your reason), enter Your password and the Authenticator code and choose Sign the check.",
+            ],
+            result:
+              "Complaint or both: a task to create or link the QMS complaint, then the complaint's disposition. Service only: a written reason and a QA review task (every service-only call in the trial). Pending: a dated follow-up with the caller.",
+            note: "Service only is offered only when question 7 is Yes and nothing else is alleged, unknown or not stated. A QA reviewer who disagrees reclassifies the call as a complaint; its awareness stays the time of the call.",
+          },
+          {
+            title: "Triage an urgent intake or a flagged record",
+            steps: [
+              "Choose Urgent intake for a serious event: it is a complaint by definition and goes to triage at once. Leave awareness empty if nobody confirmed it: the clock runs from first knowledge or receipt, marked Awareness unresolved: deadline provisional.",
+              "Open Complaints › Triage. Each item shows why it is flagged, the triage target (24 hours from when it reached MDARIX) and each market's provisional deadline from awareness.",
+              "Choose Triage: the severity, the event owner and the triage owner (a backup if you have a second person), the immediate action or why none is needed, and the awareness time confirmed.",
+              "From any queue (Second look, Backlog, Dispositions, Reportability, rows set aside at import, First contact) choose Escalate to triage, with a reason, to send a record there by hand.",
+            ],
+          },
+          {
+            title: "Link a possible duplicate",
+            steps: [
+              "Under Complaints › First contact, Possible duplicates lists records from different sources with the same product and lot or serial number, events within 2 days and the same site or country.",
+              "Write why and choose Link into one event, or Not the same: dismiss.",
+              "A link uses the earliest awareness of its sources: the triage list shows Awareness conflict and every deadline counted from awareness is recomputed, the reportability watch's included. Undo a link with a reason; its history stays.",
+            ],
+            note: "Uploading a complaints file again updates its records and keeps each field's change, shown in that import's data-quality report. An upload that brings a QMS complaint ID entered on a call closes its QMS-complaint task.",
+          },
+        ],
+      },
+      {
         id: "dispositions",
         title: "Dispositions: close a routine complaint in minutes",
         where: "Complaints › Dispositions, and Signals › By resolution",

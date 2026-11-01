@@ -8,6 +8,7 @@ import { useCan, useWorkspace } from "../workspaceContext";
 import { countOf } from "./common";
 import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
 import { TrainingPanel } from "./MarketAssessment";
+import { EscalateButton } from "./Triage";
 import {
   BRANCH_LABELS,
   BRANCH_TONES,
@@ -208,6 +209,7 @@ export function DispositionCard({ item, onOpen }: { item: BoardItem; onOpen: () 
                   ? "Close on the routine path"
                   : "Decide the disposition"}
           </button>
+          {!signed && <EscalateButton kind="COMPLAINT" id={item.id} />}
         </div>
       </div>
     </li>
