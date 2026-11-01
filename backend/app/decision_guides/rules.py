@@ -107,7 +107,8 @@ def wording_problems(market: str, questions: list[dict]) -> list[str]:
     """Core questions of a version being prepared whose locked wording is not MDARIX's (a draft from before 0.10.64)."""
     core = {question.id: question for question in starter(market).questions}
     return [
-        f"Question {item['id']} keeps the regulation's wording: save the draft to restore it"
+        f"Question {item['id']} was reworded before the wording was locked: save the draft to restore the regulation's"
+        " wording"
         for item in questions
         if item["id"] in core and not _is_starter_wording(item, core[item["id"]])
     ]

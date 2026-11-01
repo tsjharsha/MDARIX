@@ -447,7 +447,11 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
                         </label>
                       </td>
                       <td>{question.clause}</td>
-                      <td>{question.basis.join(", ")}</td>
+                      <td>
+                        {question.basis
+                          .map((id) => view.catalog.find((item) => item.id === id)?.short ?? id)
+                          .join(", ")}
+                      </td>
                     </>
                   )}
                   <td>

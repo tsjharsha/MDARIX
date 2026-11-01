@@ -383,7 +383,10 @@ def test_a_sample_draft_seeded_before_the_lock_is_brought_up_to_date_once(trial)
         ]
         db.commit()
     stale = _market(_ok(trial["user"].get(GUIDES)), "US")["open"]["problems"]
-    assert "Question US2A keeps the regulation's wording: save the draft to restore it" in stale
+    assert (
+        "Question US2A was reworded before the wording was locked: save the draft to restore the regulation's wording"
+        in stale
+    )
     with SessionLocal() as db:
         bind_tenant(db, tenant_id)
         assert relock_sample_drafts(db, tenant_id, apply=False) == 1
