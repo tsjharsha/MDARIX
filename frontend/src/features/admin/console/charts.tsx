@@ -99,7 +99,7 @@ export function Panel({
           <div className="ac-empty">
             <Lock size={20} aria-hidden="true" />
             <strong>Your free trial has ended</strong>
-            <span>{shown.error || "Contact us to continue with your data intact."}</span>
+            <span>{shown.error || "Contact us about a pilot on your real data."}</span>
           </div>
         ) : shown.code === CUSTOMER_APPROVAL_REQUIRED ? (
           // A Platform Administrator reading a customer's data without the customer's approval: what is needed, not

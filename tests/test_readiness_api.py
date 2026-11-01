@@ -322,3 +322,14 @@ def test_another_organization_sees_none_of_this(org, seeded):
     assert checks["REPORTING_CLOCKS"]["state"] == "NOT_SET"
     assert checks["REPORTING_CLOCKS"]["opens"] == {"section": "Complaints", "tab": "Reporting windows"}
     assert org["other"].get("/api/v1/readiness/summary").json()["complaints"]["received"] == 0
+
+
+def test_an_empty_workspace_is_never_ready(org):
+    """J24: with no records every check read CLEAR, and the page said "Ready: every inspection check is clear"."""
+    body = org["other"].get("/api/v1/readiness").json()
+    assert body["summary"]["clear"] == 0 and body["summary"]["not_set"] == body["summary"]["checks"]
+    unread = [check for check in body["checks"] if check["code"] != "REPORTING_CLOCKS"]
+    assert unread and all(
+        (check["state"], check["value"], check["detail"]) == ("NOT_SET", None, "Not set: no records yet")
+        for check in unread
+    )

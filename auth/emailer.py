@@ -399,8 +399,9 @@ def send_trial_reminder(recipient: str, organization: str, *, days_left: int, en
             heading=f"Your MDARIX trial for {organization} ends {left}",
             details=(("Trial ends", ends_on), (DELETED_ON, delete_on)),
             paragraphs=(
-                "To keep your workspace and its data, reply to this email and we will set up a design-partner or "
-                "paid plan with you.",
+                "To continue, reply to this email and we will talk about a pilot with you. The pilot works only with "
+                "your real data: if you uploaded your own data and removed the sample data, we can move it into your "
+                "pilot on request.",
                 "If you do nothing, the workspace closes when the trial ends and its data is deleted 30 days later, "
                 "on the date above at the earliest.",
                 f"What a pilot on your real data involves is in Next steps, in your workspace: "
@@ -420,7 +421,9 @@ def send_trial_ended(recipient: str, organization: str, *, delete_on: str) -> st
             heading=f"The MDARIX trial for {organization} has ended",
             paragraphs=(
                 "Your workspace is closed. Your data is kept at least until the date below, then deleted for good.",
-                "To continue with your data intact, reply to this email before then.",
+                "To continue, reply to this email before then and we will talk about a pilot with you. The pilot works "
+                "only with your real data: if you uploaded your own data and removed the sample data, we can move it "
+                "into your pilot on request.",
             ),
             details=((DELETED_ON, delete_on),),
             reason="You are receiving this email because you started a free MDARIX trial.",

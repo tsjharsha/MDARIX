@@ -371,7 +371,14 @@ def set_platform_subscription(
         .order_by(SubscriptionLifecycle.created_at.desc())
         .first()
     )
+    reactivated = False
     if current:
+        # A subscription that had expired is renewed: the organization the expiry suspended is active again (a trial
+        # extended after its end, a plan renewed late). A tenant suspended for another reason was not EXPIRED.
+        if current.status == "EXPIRED" and expires > now and str(tenant.status or "").upper() == "SUSPENDED":
+            tenant.status = "ACTIVE"
+            tenant.updated_at = now
+            reactivated = True
         current.plan_id = plan.id
         current.plan_version = plan.version
         current.starts_at = starts
@@ -414,6 +421,7 @@ def set_platform_subscription(
                 "plan_version": plan.version,
                 "plan_code": plan.code,
                 "previous_plan_code": previous_plan,
+                "tenant_reactivated": reactivated,
             },
             created_at=now,
         )
@@ -536,6 +544,11 @@ def run_subscription_lifecycle_job(db: Session, actor_ref: str, now: datetime | 
     transitioned = 0
     rows = db.query(SubscriptionLifecycle).all()
     schedules = reminder_schedules(db)
+    from backend.app.trial.service import FREE_TRIAL_PLAN
+
+    # A free trial is not suspended when it ends: the trial-ended rule closes it (request_context._ensure_trial_open)
+    # and the person sees the trial-ended page, with what happens to the data, instead of "suspended" (J25).
+    free_trial = {plan_id for (plan_id,) in db.query(PlanDefinition.id).filter(PlanDefinition.code == FREE_TRIAL_PLAN)}
     for row in rows:
         previous = row.status
         if row.expires_at <= now and row.grace_ends_at and row.grace_ends_at > now and row.status != "GRACE":
@@ -544,7 +557,8 @@ def run_subscription_lifecycle_job(db: Session, actor_ref: str, now: datetime | 
         if row.expires_at <= now and (not row.grace_ends_at or row.grace_ends_at <= now) and row.status != "EXPIRED":
             row.status = "EXPIRED"
             transitioned += 1
-            db.query(Tenant).filter(Tenant.id == row.tenant_id).update({"status": "SUSPENDED"})
+            if row.plan_id not in free_trial:
+                db.query(Tenant).filter(Tenant.id == row.tenant_id).update({"status": "SUSPENDED"})
         if row.status != previous:
             db.add(
                 AuditEvent(
@@ -554,7 +568,11 @@ def run_subscription_lifecycle_job(db: Session, actor_ref: str, now: datetime | 
                     action="SUBSCRIPTION_STATUS_CHANGED",
                     entity_type="SubscriptionLifecycle",
                     entity_id=row.id,
-                    details={"from": previous, "to": row.status, "tenant_suspended": row.status == "EXPIRED"},
+                    details={
+                        "from": previous,
+                        "to": row.status,
+                        "tenant_suspended": row.status == "EXPIRED" and row.plan_id not in free_trial,
+                    },
                     created_at=now,
                 )
             )

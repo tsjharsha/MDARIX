@@ -5,6 +5,7 @@ import { SignupPage } from "./SignupPage";
 import { QrCodeSvg } from "../../app/QrCodeSvg";
 import { MfaAlreadyOn } from "./MfaAlreadyOn";
 import { useRecoveryCodeSaving } from "../shared/recoveryCodeSaving";
+import { PUBLISHED_CONTACT, useSiteInfo } from "../../site/legal";
 
 export { AuthFrame };
 
@@ -39,6 +40,14 @@ export function signInNotice(query: URLSearchParams): string {
   return "";
 }
 
+export const MFA_TIMED_OUT =
+  "This sign-in timed out: the authenticator step waits 10 minutes. Return to sign in and sign in again to start the setup again.";
+
+/** Who resets a lost authenticator: in a free trial the person who invited you, or MDARIX support for the person who
+ * started it; in a pilot, the administrator. */
+export const lostAuthenticatorHelp = (support: string) =>
+  `Lost your phone and your recovery codes? In a free trial, ask the person who invited you: they can reset it in Getting started › Team. If you started the trial, write to ${support}. In a pilot, ask your administrator.`;
+
 const MESSAGES: Record<string, string> = {
   RATE_LIMITED: "Too many attempts. Please wait a few minutes and try again.",
   ACCOUNT_TEMPORARILY_LOCKED:
@@ -47,7 +56,10 @@ const MESSAGES: Record<string, string> = {
   INVALID_RESET: "This reset link has expired or was already used. Request a new one below.",
   // Anyone with an invitation (a trial owner too) can get a fresh link themselves: "Forgot password?" sends one.
   INVALID_ACTIVATION:
-    'This invitation link has expired or was already used. Request a new link from the sign-in page with "Forgot password?", or ask your administrator to send a new invitation.',
+    'This invitation link has expired or was already used. Request a new link from the sign-in page with "Forgot password?", or ask the person who invited you to send a new invitation.',
+  // The authenticator step waits 10 minutes (auth/cookies.py PENDING_MFA_SECONDS); after that the server no longer
+  // knows the sign-in.
+  UNAUTHENTICATED: MFA_TIMED_OUT,
   VALID_EMAIL_REQUIRED: "Enter a valid work email.",
   REAUTHENTICATION_REQUIRED: "Enter your current password and a code from your current app, or a recovery code.",
   REAUTHENTICATION_FAILED: "The password or the code is wrong. Check both and try again.",
@@ -112,6 +124,7 @@ export function AuthPage({ mode }: { mode: string }) {
   }, []);
   const isMfa = mode === "mfa";
   const [mfaCode, setMfaCode] = useState("");
+  const support = useSiteInfo()?.support_email || PUBLISHED_CONTACT.support;
   const [mfaSecret, setMfaSecret] = useState("");
   const [mfaUri, setMfaUri] = useState("");
   const [useRecovery, setUseRecovery] = useState(false);
@@ -457,9 +470,7 @@ export function AuthPage({ mode }: { mode: string }) {
             )}
             <a href="/signin">Return to sign in</a>
           </p>
-          <p className="auth-links">
-            Lost your phone and your recovery codes? Ask your administrator to reset your multi-factor authentication.
-          </p>
+          <p className="auth-links">{lostAuthenticatorHelp(support)}</p>
         </form>
       </AuthFrame>
     );
