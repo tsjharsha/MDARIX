@@ -292,8 +292,9 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
               </strong>
               <p>
                 A reportable US or India conclusion drafts its Form FDA 3500A or MvPI worksheet in the authority's field
-                order. A colleague approves it; you enter it in the authority's route and record the submission and the
-                receipt. MDARIX never submits. The sample has a finished US report and an India report to correct.
+                order. A colleague approves it, told by a task in My Work; working alone in the trial, you approve your
+                own practice report. You enter it in the authority's route and record the submission and the receipt.
+                MDARIX never submits. The sample has a finished US report and an India report to correct.
               </p>
             </div>
             <div className="uw-story-partner-actions">

@@ -248,11 +248,20 @@ describe("the decision guide screens", () => {
       state_label: "Waiting for approval",
       problems: [],
       you_edited: true,
+      you_asked: true,
       requested_by: "Asha",
+      approval: {
+        may_approve: false,
+        same_person: false,
+        approvers: ["Rahul"],
+        message: "You edited this version. A colleague with regulatory approval rights approves this: Rahul.",
+      },
     });
-    expect(render(<GuideDrawer market="US" version={4} onClose={vi.fn()} />)).toContain(
-      "You edited it: a colleague approves it.",
-    );
+    // Who approves is said in place of the form, before any password (J13); its author may withdraw it.
+    const waiting = render(<GuideDrawer market="US" version={4} onClose={vi.fn()} />);
+    expect(waiting).toContain("A colleague with regulatory approval rights approves this: Rahul.");
+    expect(waiting).not.toContain("Your password");
+    expect(waiting).toContain("Withdraw it: back to draft");
     resources.data["/api/v1/decision-guides/US/versions/2"] = version({
       version: 2,
       code: "US-v2",

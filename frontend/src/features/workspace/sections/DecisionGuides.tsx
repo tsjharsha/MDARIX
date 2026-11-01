@@ -679,7 +679,27 @@ function Publish({
           </div>
         </>
       )}
-      {canEdit && view.state === "AWAITING_APPROVAL" && (
+      {view.state === "AWAITING_APPROVAL" && view.approval && !view.approval.may_approve && (
+        <div className="uw-rp-approval" role="note" aria-label="Who approves the version">
+          <p>
+            <strong>{view.code}</strong> sent for approval by {view.requested_by} {formatDate(view.requested_at)}.
+          </p>
+          <p>{view.approval.message}</p>
+        </div>
+      )}
+      {canEdit && view.you_asked && (
+        <div className="ca-action-row">
+          <button
+            type="button"
+            className="ac-secondary"
+            disabled={action.busy}
+            onClick={() => void action.run(`${base}/withdraw`, "POST")}
+          >
+            Withdraw it: back to draft
+          </button>
+        </div>
+      )}
+      {canEdit && view.state === "AWAITING_APPROVAL" && view.approval?.may_approve !== false && (
         <form
           className="uw-rp-approval"
           aria-label="Approve the version"
@@ -691,8 +711,8 @@ function Publish({
           <p>
             <strong>{view.code}</strong> sent for approval by {view.requested_by} {formatDate(view.requested_at)}. Not
             allowed to approve: {view.editors.join(", ")} (who edited it) and administrators.
-            {view.you_edited ? " You edited it: a colleague approves it." : ""}
           </p>
+          {view.approval?.same_person && <p className="ac-message tone-warning">{view.approval.message}</p>}
           <div className="ca-form-grid">
             <label className="ca-field">
               Your password

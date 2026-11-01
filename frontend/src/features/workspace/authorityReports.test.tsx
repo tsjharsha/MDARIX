@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import {
+  askNote,
   deadlineText,
   fieldTone,
   owesWorksheet,
@@ -276,6 +277,45 @@ describe("the reports screens", () => {
     expect(html).toContain("Not allowed to approve: Priya");
     expect(html).toContain("MDARIX never submits");
     expect(html).toContain("PDF (working draft)");
+  });
+
+  it("tells who approves before any password: the names in place of the form, or the trial's practice note", () => {
+    const pending = {
+      id: "s1",
+      version: 1,
+      state: "PENDING" as const,
+      form_version: "x",
+      content_fingerprint: "abcdef0123456789",
+      requested_by: "Priya",
+      requested_at: "2026-11-01T10:00:00Z",
+      approved_by: null,
+      approved_at: null,
+      preparers: ["Priya"],
+      sample: false,
+    };
+    const colleague = "You prepared this worksheet. A colleague with regulatory approval rights approves this: Rahul.";
+    resources.data["/api/v1/reports/r1"] = detail("DRAFT", {
+      pending_snapshot: pending,
+      approval: { may_approve: false, same_person: false, approvers: ["Rahul"], message: colleague },
+    });
+    let html = render(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />);
+    expect(html).toContain(colleague);
+    expect(html).not.toContain("Your password");
+    const practice =
+      "In a pilot a colleague approves this; in the trial you may approve your own practice report as Leader.";
+    resources.data["/api/v1/reports/r1"] = detail("DRAFT", {
+      pending_snapshot: pending,
+      approval: { may_approve: true, same_person: true, approvers: [], message: practice },
+    });
+    html = render(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />);
+    expect(html).toContain(practice);
+    expect(html).toContain("Your password");
+    expect(askNote({ may_approve: false, same_person: false, approvers: ["Rahul"], message: "x" })).toBe(
+      "When ready, ask for approval: Rahul gets a task in My Work.",
+    );
+    expect(askNote({ may_approve: true, same_person: true, approvers: [], message: "x" })).toContain(
+      "working alone in the trial, you approve your own practice report",
+    );
   });
 
   it("offers to mark an approved snapshot as submitted", () => {

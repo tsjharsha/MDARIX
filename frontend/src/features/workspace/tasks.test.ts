@@ -97,6 +97,22 @@ describe("where a task opens", () => {
     expect(at("RISK_REVIEW")).toEqual({ section: "Intelligence", tab: "Risk & traceability" });
     expect(at("REGULATORY_REVIEW")).toEqual({ section: "Intelligence", tab: "Regulatory copilot" });
     expect(taskDestination({ task_type: "SIGNAL_TRIAGE", investigation: null })).toEqual({ section: "Signals" });
+    // An approval waiting for the approver (J13) opens the complaint's reports, or the decision guides.
+    expect(
+      taskDestination({
+        task_type: "REGULATORY_REVIEW",
+        investigation: null,
+        source: { type: "ReportSnapshot", id: "s1" },
+        details: { complaint_id: "c1" },
+      }),
+    ).toEqual({ section: "Complaints", tab: "Reports?complaint=c1" });
+    expect(
+      taskDestination({
+        task_type: "REGULATORY_REVIEW",
+        investigation: null,
+        source: { type: "DecisionGuideVersion", id: "g1" },
+      }),
+    ).toEqual({ section: "Complaints", tab: "Decision guides" });
     // A call's follow-up, QMS-complaint task and QA review open the first contact (0.10.57).
     for (const type of ["FIRST_CONTACT_FOLLOW_UP", "QMS_COMPLAINT", "SERVICE_ONLY_REVIEW"])
       expect(taskDestination({ task_type: type, investigation: null })).toEqual({

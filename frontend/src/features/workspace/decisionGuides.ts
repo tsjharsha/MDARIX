@@ -3,6 +3,7 @@
 // the test cases and decides whether a version can be published; these only shape what the person sees and sends.
 import type { Tone } from "../admin/console/dashboardModel";
 import type { Market, Question, QuestionSet } from "./marketAssessment";
+import type { ApprovalStanding } from "./authorityReports";
 
 export const GUIDES = "/api/v1/decision-guides";
 export const GUIDES_TAB = "Decision guides";
@@ -89,6 +90,10 @@ export type GuideVersion = VersionSummary & {
   change_reason: string | null;
   editors: string[];
   you_edited?: boolean;
+  /** This person sent it for approval: they may withdraw it (J13). */
+  you_asked?: boolean;
+  /** Who approves it, while it waits (J13); the form is shown only when ``may_approve``. */
+  approval?: ApprovalStanding | null;
   requested_by: string | null;
   requested_at: string | null;
   approved_at: string | null;

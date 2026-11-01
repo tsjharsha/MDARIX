@@ -11,6 +11,8 @@ import { signalsTab } from "./signals";
 import { reviewsTab } from "./reviews";
 import { decisionTab } from "./decisionTabs";
 import { recordsTab } from "./effectiveness";
+import { reportsTab } from "./authorityReports";
+import { GUIDES_TAB } from "./decisionGuides";
 
 export type TaskView = "assigned" | "queue" | "waiting" | "returned" | "due_soon" | "overdue" | "completed" | "created";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -259,6 +261,12 @@ export function taskDestination(
     const capa = typeof task.details?.capa_id === "string" ? task.details.capa_id : null;
     return { section: "Records", tab: recordsTab(capa) };
   }
+  // A report snapshot or guide version waiting for approval opens its screen, where the approver approves (J13).
+  if (sourceKind(task) === "REPORTSNAPSHOT") {
+    const complaint = typeof task.details?.complaint_id === "string" ? task.details.complaint_id : undefined;
+    return { section: "Complaints", tab: reportsTab(complaint) };
+  }
+  if (sourceKind(task) === "DECISIONGUIDEVERSION") return { section: "Complaints", tab: GUIDES_TAB };
   switch (type) {
     case "SIGNAL_TRIAGE": {
       const signal = taskSignal(task);

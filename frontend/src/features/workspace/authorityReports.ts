@@ -75,6 +75,30 @@ export type WorksheetField = {
 
 export type WorksheetSection = { code: string; title: string; note: string | null; fields: WorksheetField[] };
 
+/**
+ * Who approves a waiting snapshot or guide version, from the server before anyone types a password (J13): the form is
+ * shown only when ``may_approve``; ``same_person`` is the trial's practice approval of one's own work (working alone);
+ * ``message`` says why not and names the colleagues who may (``approvers``).
+ */
+export type ApprovalStanding = {
+  may_approve: boolean;
+  same_person: boolean;
+  approvers: string[];
+  message: string | null;
+  role?: string | null;
+};
+
+/** What the draft says before approval is asked: who gets the approval task in My Work. */
+export function askNote(standing: ApprovalStanding | null | undefined): string {
+  if (!standing) return "When ready, ask a colleague to approve the snapshot.";
+  const names = standing.approvers;
+  if (names.length)
+    return `When ready, ask for approval: ${names.join(", ")} ${names.length === 1 ? "gets" : "get"} a task in My Work.`;
+  if (standing.same_person)
+    return "When ready, ask for approval. In a pilot a colleague approves it; working alone in the trial, you approve your own practice report.";
+  return "When ready, ask for approval. Nobody else in your organization may approve it yet: an administrator gives a colleague the Regulatory Reviewer, Authorized Decision Maker or Leader role.";
+}
+
 export type Snapshot = {
   id: string;
   version: number;
@@ -86,6 +110,8 @@ export type Snapshot = {
   approved_by: string | null;
   approved_at: string | null;
   preparers: string[];
+  /** Approved by its preparer or the conclusion's signer: the trial's practice approval (T-B8). */
+  same_person?: boolean;
   sample: boolean;
 };
 
@@ -173,6 +199,7 @@ export type ReportDetail = {
   snapshots: Snapshot[];
   pending_snapshot: Snapshot | null;
   cannot_approve: string[];
+  approval?: ApprovalStanding | null;
   submissions: Submission[];
   request: { text: string; received_on: string } | null;
   parent_id: string | null;
