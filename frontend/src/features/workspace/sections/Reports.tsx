@@ -359,11 +359,17 @@ function Approval({ detail, onChanged }: { detail: ReportDetail; onChanged: (det
         });
       }}
     >
-      <p>
-        {waiting} Not allowed to approve: {detail.cannot_approve.join(", ")} (the preparer and the signer of the market
-        conclusion).
-      </p>
-      {standing?.same_person && <p className="ac-message tone-warning">{standing.message}</p>}
+      {standing?.same_person ? (
+        <>
+          <p>{waiting}</p>
+          <p className="ac-message tone-warning">{standing.message}</p>
+        </>
+      ) : (
+        <p>
+          {waiting} Not allowed to approve: {detail.cannot_approve.join(", ")} (the preparer and the signer of the
+          market conclusion).
+        </p>
+      )}
       <div className="ca-form-grid">
         <label className="ca-field">
           Your password
