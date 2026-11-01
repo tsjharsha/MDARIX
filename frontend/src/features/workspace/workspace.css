@@ -4814,3 +4814,63 @@ div.uw-task-count:hover {
 .uw-ov-left {
   display: block;
 }
+
+/* Lot impact on a case (T-G5, free trial): the factor picker, the lots that share it, the signed list. */
+.uw-li-entry {
+  margin: 8px 0 0;
+}
+.uw-li-never {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink-2);
+}
+.uw-li-never svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--ac-teal);
+}
+.uw-li-factor select {
+  width: 100%;
+  max-width: 720px;
+}
+.uw-li-suggestion {
+  margin: 4px 0 10px;
+  color: var(--ac-ink-2);
+}
+.uw-li-countries {
+  margin: 10px 0;
+}
+.uw-li-group h3 {
+  margin: 14px 0 6px;
+  font-size: 0.95rem;
+}
+.uw-li-shipments summary {
+  cursor: pointer;
+}
+.uw-li-shipments ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+}
+.uw-li-exclude {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+}
+.uw-li-exclude textarea {
+  width: 100%;
+}
+.uw-li-changed {
+  border-left: 3px solid var(--ac-warning);
+  padding-left: 10px;
+}
+.uw-li-changed ul {
+  margin: 6px 0;
+  padding-left: 18px;
+}

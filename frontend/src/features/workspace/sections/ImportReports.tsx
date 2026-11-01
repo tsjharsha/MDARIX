@@ -26,6 +26,8 @@ export type QualityReport = {
   rows_changed: number | null;
   rows_new: number | null;
   balanced: boolean;
+  /** A distribution file: the lots whose units shipped now exceed the units they released (flagged, not refused). */
+  flags?: { lot_id: string; released: number; shipped: number; message: string }[];
 };
 export type ImportRun = {
   import_ref: string;
@@ -83,6 +85,17 @@ export function runChecks(run: Pick<ImportRun, "report" | "masked_values">): Che
         ? `${countOf(report.rows_quarantined, "row")} set aside with ${report.rows_quarantined === 1 ? "its reason" : "their reasons"}: fix them in your file and import it again.`
         : "No row was set aside.",
     },
+    ...(report.flags
+      ? [
+          {
+            label: "Units shipped within units released",
+            ok: report.flags.length === 0,
+            detail: report.flags.length
+              ? `${countOf(report.flags.length, "lot")} shipped more units than released: ${report.flags.map((flag) => flag.message).join(" ")}`
+              : "No lot shipped more units than it released.",
+          },
+        ]
+      : []),
     ...(run.masked_values
       ? [
           {

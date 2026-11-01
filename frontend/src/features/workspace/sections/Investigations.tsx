@@ -29,6 +29,8 @@ import { Embedded, StatusBadge } from "./common";
 import { localDay } from "../workspaceModel";
 import { CaseDue, CaseHeader, CasePriority, CaseStateBadge } from "./CaseHeader";
 import { CaseScopePanel } from "./CaseScope";
+import { LotImpactPanel } from "./LotImpact";
+import { LOT_IMPACT_TAB } from "../lotImpact";
 import { CaseIntelligencePanel } from "./CaseIntelligence";
 import { CaseReviewsPanel, ReviewDrawer } from "./CaseReviews";
 import { CaseDecisionBriefPanel } from "./CaseDecisionBrief";
@@ -74,6 +76,8 @@ const CASE_PAGE_TABS = [
   "Intelligence",
   "Ask MDARIX",
   "Scope",
+  // A free trial only (T-G5): hidden on a pilot until the MVP plan schedules G5.
+  LOT_IMPACT_TAB,
   "Reviews",
   "Decision Brief",
   "Decision",
@@ -83,11 +87,14 @@ const CASE_PAGE_TABS = [
 type Tab = (typeof TABS)[number] | (typeof CASE_PAGE_TABS)[number];
 
 export function InvestigationsSection({ tab: requested }: { tab?: string }) {
-  const { work, open, reportStep } = useWorkspace();
+  const { work, open, reportStep, isTrial } = useWorkspace();
   // Under the MVP feature set the case story is parked and the decision is taken on this case's Decision tab
   // (featureSet.ts).
   const featureSet = useFeatureSet();
-  const tabs: readonly Tab[] = featureSet === "mvp" ? CASE_PAGE_TABS : tabsFor("Investigations", TABS, featureSet);
+  const tabs: readonly Tab[] =
+    featureSet === "mvp"
+      ? CASE_PAGE_TABS.filter((item) => isTrial || item !== LOT_IMPACT_TAB)
+      : tabsFor("Investigations", TABS, featureSet);
   // "Intelligence?view=Unknowns" opens the Intelligence tab on that view (see intelligenceTab).
   const { tab, view: requestedView } = parseInvestigationsTab(requested);
   const [intelView, setIntelView] = useState<IntelligenceView>(requestedView ?? "Hypotheses");
@@ -281,6 +288,7 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
                 investigationId={work.investigationId}
                 row={selected}
                 onManage={canOpen && selected ? () => setManaging(selected) : undefined}
+                onLotImpact={tabs.includes(LOT_IMPACT_TAB) ? () => setActive(LOT_IMPACT_TAB) : undefined}
                 onStep={goToStep}
                 onChanged={() => {
                   all.reload();
@@ -350,6 +358,16 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
                 detail="The scope belongs to one investigation. Pick one in the context bar above, or open one from the list."
               />
             </Panel>
+          ))}
+        {active === LOT_IMPACT_TAB &&
+          (work.investigationId ? (
+            <LotImpactPanel
+              key={work.investigationId}
+              investigationId={work.investigationId}
+              caseLabel={selected ? displayId(selected, "investigation_identifier") : "this case"}
+            />
+          ) : (
+            <NoCase detail="Lot impact belongs to one investigation. Pick one in the context bar above, or open one from the list." />
           ))}
         {active === "Reviews" &&
           (work.investigationId || requestedReview ? (

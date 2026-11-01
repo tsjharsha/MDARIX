@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarClock, ChevronRight, Pause, Play, XCircle } from "lucide-react";
+import { Boxes, CalendarClock, ChevronRight, Pause, Play, XCircle } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { displayId, safeText } from "../../../app/displayId";
@@ -65,6 +65,7 @@ export function CaseHeader({
   investigationId,
   row,
   onManage,
+  onLotImpact,
   onStep,
   onChanged,
 }: {
@@ -72,6 +73,8 @@ export function CaseHeader({
   row: Record<string, any> | null | undefined;
   /** Opens the manage drawer (priority, due date, owner); absent for a role that may not change the case. */
   onManage?: () => void;
+  /** Opens the case's Lot impact (a free trial, T-G5); absent where it is not offered. */
+  onLotImpact?: () => void;
   onStep: (destination: StepDestination) => void;
   onChanged: () => void;
 }) {
@@ -109,6 +112,13 @@ export function CaseHeader({
             <dd>{ownerText(current)}</dd>
           </div>
         </dl>
+        {onLotImpact && (
+          <p className="uw-li-entry">
+            <button type="button" className="ac-secondary" onClick={onLotImpact}>
+              <Boxes size={15} aria-hidden="true" /> Lot impact: which other lots share the suspect part
+            </button>
+          </p>
+        )}
         {(transitions.length > 0 || onManage) && (
           <div className="ca-action-row">
             {transitions.map((item) => (

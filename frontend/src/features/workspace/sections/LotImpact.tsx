@@ -1,0 +1,573 @@
+import { useEffect, useState } from "react";
+import { AlertTriangle, Boxes, Download, Factory, PackageCheck, Save, ShieldCheck, Truck } from "lucide-react";
+import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
+import { Table, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
+import { downloadFile } from "../../reports/download";
+import { useCan, useWorkspace } from "../workspaceContext";
+import { InlineError } from "./boardParts";
+import { countOf } from "./common";
+import {
+  KIND_GROUPS,
+  countriesText,
+  exclusionBody,
+  exclusionProblem,
+  exclusionsOf,
+  factorKey,
+  factorOf,
+  groupLots,
+  lotImpactBase,
+  lotImpactPath,
+  optionText,
+  unitsText,
+  type Factor,
+  type ImpactList,
+  type ImpactLot,
+  type LotImpactView,
+} from "../lotImpact";
+
+/**
+ * A case's Lot impact (free trial, T-G5): the person picks the suspect factor (a component lot, a supplier or a
+ * product version; MDARIX suggests the one the case's lots share) and MDARIX lists every lot that shares it, with and
+ * without complaints, its units released, shipped by country and consignee, and still in stock. Lots left out need a
+ * reason; the list is kept with the case scope and signed. MDARIX lists; the person decides any field action in the QMS.
+ */
+export function LotImpactPanel({ investigationId, caseLabel }: { investigationId: string; caseLabel: string }) {
+  const { open, notify } = useWorkspace();
+  const [preview, setPreview] = useState<Factor | null>(null);
+  const screen = useResource<LotImpactView>(lotImpactPath(investigationId, preview));
+  const view = screen.data;
+  const canWork = useCan("investigation.work");
+  const signer = [useCan("decision.sign"), useCan("quality.review"), useCan("regulatory.approve")].some(Boolean);
+  const [excluded, setExcluded] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const list = view?.list ?? null;
+  const fingerprint = list?.fingerprint;
+  useEffect(() => {
+    setExcluded(view?.source === "saved" ? exclusionsOf(list) : {});
+  }, [fingerprint, view?.source]);
+  const keep = async () => {
+    if (!list) return;
+    setBusy(true);
+    setError("");
+    try {
+      await send(lotImpactBase(investigationId), "PUT", {
+        factor: { kind: list.factor.kind, id: list.factor.id, lot: list.factor.lot },
+        excluded: exclusionBody(excluded),
+      });
+      setPreview(null);
+      screen.reload();
+      notify("Kept with the case scope.");
+    } catch (reason) {
+      setError(errorText(reason, "The list was not kept."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (!view)
+    return (
+      <Panel eyebrow="Lot impact" title={`What else is out there: ${caseLabel}`} source={screen}>
+        {null}
+      </Panel>
+    );
+  const closed = view.investigation.closed;
+  const savedKey = factorKey(view.saved?.factor);
+  const shownKey = factorKey(list?.factor);
+  const editsPending =
+    view.source !== "saved" ||
+    JSON.stringify(exclusionBody(excluded)) !== JSON.stringify(exclusionBody(exclusionsOf(list)));
+  const problem = list ? exclusionProblem(excluded, list.lots, view.reason_min) : "";
+  return (
+    <>
+      <Panel eyebrow="Lot impact" title={`What else is out there: ${caseLabel}`} source={screen}>
+        <p className="uw-li-never">
+          <ShieldCheck size={16} aria-hidden="true" /> {view.never_decides}
+        </p>
+        {view.practice_label && <p className="ac-note">{view.practice_label}</p>}
+        <label className="ca-field uw-li-factor">
+          Suspect factor
+          <select
+            value={shownKey}
+            onChange={(event) =>
+              setPreview(event.target.value === savedKey ? null : factorOf(event.target.value, view.options))
+            }
+          >
+            {!shownKey && <option value="">Choose a component lot, a supplier or a product version</option>}
+            {KIND_GROUPS.map(([kind, label]) => {
+              const items = view.options.filter((item) => item.kind === kind);
+              return items.length ? (
+                <optgroup key={kind} label={label}>
+                  {items.map((item) => (
+                    <option key={factorKey(item)} value={factorKey(item)}>
+                      {optionText(item)}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null;
+            })}
+          </select>
+        </label>
+        <FactorNote view={view} />
+        {!view.genealogy && (
+          <p className="ac-note">
+            No lot genealogy yet: import it (Import data, Lot genealogy) to compare lots by component lot or supplier.{" "}
+            <button type="button" className="ac-link" onClick={() => open("Import data")}>
+              Open Import data
+            </button>
+          </p>
+        )}
+        {list ? (
+          <ImpactBody
+            view={view}
+            list={list}
+            excluded={excluded}
+            onExclude={canWork && !closed ? setExcluded : undefined}
+          />
+        ) : (
+          <Empty title="Choose the suspect factor" detail="MDARIX then lists every lot that shares it." />
+        )}
+        {list && canWork && !closed && (
+          <>
+            {editsPending && (
+              <p className="ac-muted">
+                {view.source === "saved"
+                  ? "Keep the list again to update its totals and the case scope."
+                  : "Nothing is kept yet: keep this factor with the case to use it and sign the list."}
+              </p>
+            )}
+            <div className="ca-action-row">
+              <button
+                type="button"
+                className="ac-primary"
+                disabled={busy || !!problem || !editsPending}
+                onClick={() => void keep()}
+              >
+                <Save size={15} aria-hidden="true" /> {busy ? "Keeping…" : "Keep this list with the case"}
+              </button>
+            </div>
+            <InlineError text={problem || error} />
+          </>
+        )}
+      </Panel>
+      {view.signed && <SignedList view={view} />}
+      {view.saved &&
+        list &&
+        view.source === "saved" &&
+        !editsPending &&
+        !closed &&
+        (!view.signed || view.signed.changed) && (
+          <SignForm
+            investigationId={investigationId}
+            list={list}
+            allowed={signer}
+            again={!!view.signed}
+            onSigned={() => {
+              screen.reload();
+              notify("The lot impact list is signed.");
+            }}
+          />
+        )}
+      {(view.saved || view.signed) && (
+        <Downloads investigationId={investigationId} label={view.investigation.business_id} signed={!!view.signed} />
+      )}
+    </>
+  );
+}
+
+function FactorNote({ view }: { view: LotImpactView }) {
+  if (view.source === "saved" && view.saved)
+    return (
+      <p className="ac-muted">
+        Kept with the case scope{view.saved.scope_version ? ` (version ${view.saved.scope_version})` : ""}
+        {view.saved.saved_by_name ? ` by ${view.saved.saved_by_name}` : ""}
+        {view.saved.saved_at ? `, ${formatDate(view.saved.saved_at)}` : ""}.
+      </p>
+    );
+  if (view.source === "suggested" && view.suggestion)
+    return (
+      <p className="uw-li-suggestion">
+        Suggested from the case's lots: <strong>{view.suggestion.label}</strong> ({view.suggestion.why}). You choose:
+        pick another factor above if the evidence points elsewhere.
+      </p>
+    );
+  if (view.source === "preview")
+    return <p className="ac-muted">A preview: nothing is kept until you keep it with the case.</p>;
+  return null;
+}
+
+function ImpactBody({
+  view,
+  list,
+  excluded,
+  onExclude,
+}: {
+  view: LotImpactView;
+  list: ImpactList;
+  excluded: Record<string, string>;
+  onExclude?: (next: Record<string, string>) => void;
+}) {
+  const { totals } = list;
+  const groups = groupLots(list.lots);
+  return (
+    <>
+      <div className="uw-trial-stats">
+        <StatTile
+          label="Lots that share it"
+          value={totals.lots}
+          detail={totals.excluded ? `${countOf(totals.excluded, "lot")} left out` : "None left out"}
+          icon={<Boxes size={18} />}
+        />
+        <StatTile
+          label="With complaints"
+          value={totals.with_complaints}
+          detail={countOf(totals.complaints, "complaint")}
+          icon={<AlertTriangle size={18} />}
+          tone={totals.with_complaints ? "warning" : "good"}
+        />
+        <StatTile
+          label="Without complaints yet"
+          value={totals.without_complaints}
+          detail="Built with the same factor"
+          icon={<Factory size={18} />}
+        />
+        <StatTile
+          label="Units released"
+          value={unitsText(totals.released)}
+          detail={`${unitsText(totals.shipped)} shipped`}
+          icon={<Truck size={18} />}
+        />
+        <StatTile
+          label="Still in stock"
+          value={unitsText(totals.in_stock)}
+          detail={
+            totals.not_imported
+              ? `${countOf(totals.not_imported, "lot")}: ${view.not_imported.toLowerCase()}`
+              : "Released minus shipped"
+          }
+          icon={<PackageCheck size={18} />}
+          tone={totals.not_imported ? "warning" : undefined}
+        />
+      </div>
+      <p className="uw-li-countries">
+        <strong>Units shipped by country:</strong> {countriesText(totals.by_country, "no distribution imported")}
+      </p>
+      {list.truncated && <p className="ac-note">Only the first 2,000 lots are listed.</p>}
+      <LotTable
+        title="Lots with complaints"
+        lots={groups.withComplaints}
+        view={view}
+        excluded={excluded}
+        onExclude={onExclude}
+      />
+      <LotTable
+        title="Lots without complaints yet"
+        lots={groups.withoutComplaints}
+        view={view}
+        excluded={excluded}
+        onExclude={onExclude}
+      />
+      {groups.excluded.length > 0 && (
+        <LotTable
+          title="Left out of the list"
+          lots={groups.excluded}
+          view={view}
+          excluded={excluded}
+          onExclude={onExclude}
+        />
+      )}
+    </>
+  );
+}
+
+function LotTable({
+  title,
+  lots,
+  view,
+  excluded,
+  onExclude,
+}: {
+  title: string;
+  lots: ImpactLot[];
+  view: LotImpactView;
+  excluded: Record<string, string>;
+  onExclude?: (next: Record<string, string>) => void;
+}) {
+  if (!lots.length) return null;
+  const toggle = (lot: ImpactLot) => {
+    if (!onExclude) return;
+    const next = { ...excluded };
+    if (lot.id in next) delete next[lot.id];
+    else next[lot.id] = lot.exclusion_reason ?? "";
+    onExclude(next);
+  };
+  return (
+    <section className="ca-drawer-section uw-li-group">
+      <h3>
+        {title} · {lots.length}
+      </h3>
+      <Table
+        caption={title}
+        rows={lots}
+        rowKey={(lot) => lot.id}
+        empty={{ title: "No lots", detail: "" }}
+        columns={[
+          {
+            key: "lot_identifier",
+            label: "Lot",
+            render: (lot) => (
+              <span>
+                <strong>{lot.lot_identifier}</strong>
+                <small className="ac-muted"> {lot.version ?? ""}</small>
+              </span>
+            ),
+          },
+          {
+            key: "complaints",
+            label: "Complaints",
+            render: (lot) =>
+              lot.complaints ? (
+                <span>
+                  {lot.complaints}
+                  {lot.per_1000 !== null && <small className="ac-muted"> · {lot.per_1000} per 1,000 units</small>}
+                </span>
+              ) : (
+                <span className="ac-muted">None yet</span>
+              ),
+          },
+          { key: "released", label: "Released", render: (lot) => unitsText(lot.released) },
+          {
+            key: "shipped",
+            label: "Shipped by country",
+            render: (lot) =>
+              lot.distribution_imported ? (
+                <details className="uw-li-shipments">
+                  <summary>
+                    {unitsText(lot.shipped)}: {countriesText(lot.by_country)}
+                  </summary>
+                  <ul>
+                    {lot.shipments.map((item) => (
+                      <li key={`${item.consignee}|${item.country}|${item.ship_date}`}>
+                        {item.ship_date} · {item.country} · {item.consignee}
+                        {item.consignee_type ? ` (${item.consignee_type})` : ""}: {unitsText(item.units)}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : (
+                <ToneBadge tone="warning" label={view.not_imported} />
+              ),
+          },
+          {
+            key: "in_stock",
+            label: "In stock",
+            render: (lot) =>
+              lot.distribution_imported ? (
+                <span>
+                  {unitsText(lot.in_stock)}
+                  {lot.over_shipped && <small className="tone-bad"> more shipped than released</small>}
+                </span>
+              ) : (
+                <span className="ac-muted">Not known</span>
+              ),
+          },
+          {
+            key: "evidence",
+            label: "Why it is listed",
+            render: (lot) => <small>{lot.evidence.join("; ")}</small>,
+          },
+          {
+            key: "exclude",
+            label: "Leave out",
+            render: (lot) => {
+              const leaving = lot.id in excluded;
+              if (!onExclude)
+                return lot.excluded ? <small>{lot.exclusion_reason}</small> : <span className="ac-muted">—</span>;
+              return (
+                <div className="uw-li-exclude">
+                  <label>
+                    <input type="checkbox" checked={leaving} onChange={() => toggle(lot)} /> Leave out
+                  </label>
+                  {leaving && (
+                    <textarea
+                      rows={2}
+                      aria-label={`Why ${lot.lot_identifier} is left out`}
+                      placeholder={`Why (at least ${view.reason_min} characters)`}
+                      value={excluded[lot.id]}
+                      onChange={(event) => onExclude({ ...excluded, [lot.id]: event.target.value })}
+                    />
+                  )}
+                </div>
+              );
+            },
+          },
+        ]}
+      />
+    </section>
+  );
+}
+
+function SignedList({ view }: { view: LotImpactView }) {
+  const signed = view.signed!;
+  const { signature } = signed;
+  return (
+    <Panel
+      eyebrow="Signed list"
+      title={`${countOf(signed.list.totals.lots, "lot")} sharing ${signed.list.factor.label}`}
+      action={
+        <ToneBadge
+          tone={signed.changed ? "warning" : "good"}
+          label={signed.changed ? "Changed since signed" : "Matches the records"}
+        />
+      }
+    >
+      <p>
+        Signed by <strong>{signature.signer_name}</strong>
+        {signature.signer_role ? ` (${signature.signer_role})` : ""} on {formatDate(signature.signed_at)}
+        {signature.scope_version ? `, kept as case scope version ${signature.scope_version}` : ""}.
+      </p>
+      <p className="ac-muted">Meaning: {signature.meaning}</p>
+      <p className="ac-muted">
+        Signature record {signature.record_business_id ?? signature.record_id} · checksum{" "}
+        {signature.content_fingerprint.slice(0, 12)}…
+      </p>
+      {signed.changed && (
+        <section className="ca-drawer-section uw-li-changed" aria-label="Changed since signed">
+          <h3>Changed since signed</h3>
+          <ul>
+            {signed.changes.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          <p className="ac-muted">
+            The signed list stays as it was signed. Read the list above and sign it again if it is the one to keep.
+          </p>
+        </section>
+      )}
+    </Panel>
+  );
+}
+
+function SignForm({
+  investigationId,
+  list,
+  allowed,
+  again,
+  onSigned,
+}: {
+  investigationId: string;
+  list: ImpactList;
+  allowed: boolean;
+  again: boolean;
+  onSigned: () => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  if (!allowed)
+    return (
+      <Panel eyebrow="Signature" title="Sign the list">
+        <p className="ac-note">
+          A colleague who signs decisions signs the list. Your role can prepare it and keep it with the case.
+        </p>
+      </Panel>
+    );
+  const sign = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await send(`${lotImpactBase(investigationId)}/sign`, "POST", {
+        password,
+        mfa_code: code || null,
+        fingerprint: list.fingerprint,
+      });
+      setPassword("");
+      setCode("");
+      onSigned();
+    } catch (reason) {
+      setError(errorText(reason, "The list was not signed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Panel eyebrow="Signature" title={again ? "Sign the list again" : "Sign the list"}>
+      <form
+        className="uw-rp-approval"
+        aria-label="Sign the lot impact list"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void sign();
+        }}
+      >
+        <p>
+          You sign the list of {countOf(list.totals.lots, "lot")} sharing <strong>{list.factor.label}</strong> as the
+          records show it now. Your signature is not a field action: decide any field action in your QMS.
+        </p>
+        <div className="ca-form-grid">
+          <label className="ca-field">
+            Your password
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+          <label className="ca-field">
+            Authenticator code
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+            />
+          </label>
+        </div>
+        <div className="ca-action-row">
+          <button type="submit" className="ac-primary" disabled={busy || !password}>
+            <ShieldCheck size={15} aria-hidden="true" /> {busy ? "Signing…" : "Sign the list"}
+          </button>
+        </div>
+        <InlineError text={error} />
+      </form>
+    </Panel>
+  );
+}
+
+function Downloads({
+  investigationId,
+  label,
+  signed,
+}: {
+  investigationId: string;
+  label: string | null;
+  signed: boolean;
+}) {
+  const canExport = useCan("data.export");
+  const [error, setError] = useState("");
+  if (!canExport) return null;
+  const get = async (kind: "csv" | "pdf") => {
+    setError("");
+    try {
+      await downloadFile(`${lotImpactBase(investigationId)}/list.${kind}`, {
+        fallbackName: `mdarix-lot-impact-${label ?? "case"}.${kind}`,
+      });
+    } catch (reason) {
+      setError(errorText(reason, "The file could not be downloaded."));
+    }
+  };
+  return (
+    <Panel eyebrow="Export" title={signed ? "The signed list" : "The list kept with the case"}>
+      <div className="ca-action-row uw-doc-downloads">
+        <button type="button" className="ac-secondary" onClick={() => void get("pdf")}>
+          <Download size={15} aria-hidden="true" /> PDF
+        </button>
+        <button type="button" className="ac-secondary" onClick={() => void get("csv")}>
+          <Download size={15} aria-hidden="true" /> CSV
+        </button>
+      </div>
+      <InlineError text={error} />
+    </Panel>
+  );
+}

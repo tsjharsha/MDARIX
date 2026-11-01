@@ -115,6 +115,8 @@ export function adminAreasFor<T extends readonly [string, string, unknown, reado
 export const MVP_IMPORT_ENTITIES: readonly string[] = [
   "products",
   "lots",
+  // Where each lot's units went, for a case's Lot impact: a free trial only (the server offers it to no pilot).
+  "distribution",
   "complaints",
   "investigations",
   "capas",
