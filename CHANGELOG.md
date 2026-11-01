@@ -10,6 +10,63 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.59] - 2026-11-01
+
+On the trial maintenance line (`release/0.10`): the organization's own decision guides (T-G15, MVP G15) and the
+external communications log (T-G30, MVP G30), built once on the trial line for the trial and the pilot alike (D-T14).
+A guide points to a conclusion; a person confirms or overrides it and signs. MDARIX never decides, never submits and
+never sends anything to an external contact. Customer-defined conclusion logic, "not reportable on current evidence"
+with its re-confirmation and end state (set 5), the first-contact guide on the same engine (G32), the customer's own
+harm-severity scale and the oversight view (G9, 0.10.60) stay for later.
+
+**Migration, expand-only:** `tr06guidescomms`, chained from `tr05authorityreports`: four new tables
+(`decision_guide_versions`, `external_parties`, `communication_entries`, `communication_settings`), each with tenant
+row-level security, in the trial's retention list, sample removal, purge and export, and the legacy-plane step.
+Nothing existing changes; the downgrade drops only these tables. On `mvp-1.0` the forward merge adds a merge revision
+joining its head and `tr06guidescomms`. The API and web images change.
+
+### Added
+
+- **Complaints › Decision guides**: each market's guide (US, EU/NI, GB, India) with the version in use and its
+  history. Version 1 is MDARIX's starter, read-only. "Start a new version" copies the version in use into a draft:
+  reword any question, its definition, its help text and its clause; give it its basis from the standards list; add
+  extra questions (recorded and printed with the answers, never required, never part of the conclusion) and reorder
+  them. The questions that drive the conclusion cannot be removed, and their conclusion logic stays fixed.
+- **The publish gate**: every question needs its regulation clause and its basis; every version has test cases (a set
+  of answers and the outcome it must point to: reportable, with its report type when given; not reportable; pending
+  information; a blank answer is Unknown, never No). The starter versions ship with their tests. A version is sent for
+  approval only when its tests pass on its current content; the results are kept with it.
+- **Approval**: a colleague who did not edit the version (never an administrator) approves it with password and
+  authenticator code; that publishes it. Assessments started afterwards use it; ones in progress keep theirs; each
+  signed conclusion names its guide version. What a signer must have read (practice training) is the version in use.
+- **Export for an audit**: a version as PDF and DOCX, with every question, its clause and basis, the test cases and
+  their results, and the approval manifestation.
+- **Complaints › Communications**: every message sent to or received from a reporter, distributor, hospital or service
+  partner: direction, party, time, purpose (information request, update, response), owner, reply due date, every
+  attempt (when, how, which contact, what happened, when it was logged), status (open, answered, unresolved after
+  attempts, closed), evidence references and the QMS record ID of a formal response or field safety notice. Each party
+  has a primary and a second contact; after the organization's number of unanswered attempts (default 3, a setting) a
+  request moves to the second contact, then shows "unresolved after attempts". The reply is recorded as its own
+  entry. Each message counts as recorded in MDARIX when logged before sending or within one working hour (S4).
+- **Unknown answers raise a request**: a market assessment saved with an Unknown on a question that drives the
+  conclusion raises one request to the reporter per market; a first-contact follow-up (0.10.57) is now also a request,
+  linked to its dated task, which the request finishes with the same outcome. Follow-ups recorded earlier keep working.
+- **Where open requests show**: the owner's My Work (a "Reply due from an external contact" task, overdue when the
+  reply is late), the new Readiness check "Requests to external contacts", and the case's Decision Brief. Links from a
+  complaint's market assessment and report open its log.
+- **Sample data** (all marked Sample, covered by sample removal; added once to earlier trials by
+  `scripts/refresh_trial_story.py`): US-v2, the sample organization's own US guide (its help text on the three
+  serious-injury parts and a VMSR question, 21 CFR 803.19), approved by the sample approver and in use; a draft US-v3
+  whose own test fails ("outcome unknown: expected not reportable"); a request to SAMPLE-RV-08's reporter for the
+  patient's outcome with two unanswered attempts, overdue and owned by the trial user; an answered distributor question
+  on SAMPLE-RV-03; a hospital request on SAMPLE-RV-01 unresolved after three attempts to each contact. No complaint is
+  added: the sample's counts and the OrbitCare trend are unchanged.
+
+### Changed
+
+- The standards catalog adds 21 CFR 803.19 (starter text). Readiness has 11 checks (was 10).
+- The tests carry the reviewed exemptions for the report worksheet reads of 0.10.58 (as on `mvp-1.0`).
+
 ## [0.10.58] - 2026-11-01
 
 On the trial maintenance line (`release/0.10`): the report worksheets for the US (Form FDA 3500A, 09/2025 edition,

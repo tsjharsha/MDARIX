@@ -182,6 +182,13 @@ STEPS = (
         ("report_obligations", "report_snapshots", "report_submissions", "report_evidence"),
         ("tenants", "complaints", "complaint_market_assessments"),
     ),
+    Step(
+        "tr06",
+        "tr06_trial_guides_communications.py",
+        "create_guide_communication_tables",
+        ("decision_guide_versions", "external_parties", "communication_entries", "communication_settings"),
+        ("tenants", "complaints"),
+    ),
 )
 
 

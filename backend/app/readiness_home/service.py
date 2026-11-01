@@ -64,6 +64,8 @@ WHY = {
     "is documented; a complaint left without a decision is a backlog finding.",
     "RECURRING_SERVICE_LEVEL": "A recurring problem fixed in the field each time is a trend: closed service tickets must "
     "still reach the analysis of data.",
+    "EXTERNAL_REQUESTS": "A question to a reporter, distributor, hospital or service partner needs an owner, a due "
+    "date and a record of every attempt; an unanswered one is a gap in the complaint file.",
     "RISK_FILE_INPUT": "Under the QMSR, FDA inspections follow the risk file and name post-market data not used as "
     "input to risk management a significant deficiency; ISO 14971:2019 "
     "clause 10 asks for post-production information to reach risk management.",
@@ -93,6 +95,8 @@ BASIS = {
     "DISPOSITIONS_DUE": ("ISO13485_8_2_2",),
     # Service-level matters that recur: analysis of data (clause 8.4).
     "RECURRING_SERVICE_LEVEL": ("ISO13485_8_4", "ISO13485_8_2_2"),
+    # Requests to external contacts left open or unanswered (tr06, G30): complaint handling (clause 8.2.2).
+    "EXTERNAL_REQUESTS": ("ISO13485_8_2_2",),
     # Post-market data not in the risk file: production and post-production information feeds risk management.
     "RISK_FILE_INPUT": ("ISO14971_10",),
 }
@@ -505,6 +509,32 @@ def recurring_service_level(db: Session, tenant_id: uuid.UUID, today: date) -> d
     )
 
 
+def external_requests(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
+    """Requests to external contacts that are open, overdue, or ended unresolved after attempts (tr06, G30)."""
+    from backend.app.communications.service import summary
+
+    found = summary(db, tenant_id, today)
+    return _check(
+        "EXTERNAL_REQUESTS",
+        "Requests to external contacts",
+        found["open"],
+        ATTENTION if found["overdue"] else CLEAR,
+        f"{_n(found['open'], 'open request')}, {found['overdue']:,} past the reply due date; "
+        f"{_n(found['unresolved'], 'request')} unresolved after attempts",
+        {"section": "Complaints", "tab": "Communications"},
+        [
+            {
+                "id": item["complaint_id"] or item["id"],
+                "ref": item["ref"],
+                "label": ("Overdue: " if item["overdue"] else "Open: ")
+                + f"{item['party']}, reply due {item['reply_due_on'] or 'not set'}, {item['attempts']} attempts",
+            }
+            for item in found["items"]
+        ],
+        {"overdue": found["overdue"], "unresolved": found["unresolved"]},
+    )
+
+
 HOME = ("COMPLAINTS_TO_RECHECK", "COMPLAINTS_PAST_TARGET", "REPORTING_CLOCKS", "TRENDS_WITHOUT_ACTION")
 CHECKS = (
     complaints_to_recheck,
@@ -517,6 +547,7 @@ CHECKS = (
     triage_overdue,
     dispositions_due,
     recurring_service_level,
+    external_requests,
 )
 
 

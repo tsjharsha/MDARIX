@@ -1,6 +1,7 @@
 """The documents a signature relies on, and who holds a training record on their current versions.
 
-The documents are MDARIX's starter documents: each market's question set (``US-starter-1``...) and the harm-severity
+The documents are MDARIX's starter documents: each market's question set (``US-starter-1``..., or the organization's own
+published guide version, ``US-v2``..., T-G15) and the harm-severity
 scale (``scale-starter-1``), read from backend/app/reportability/markets.py, and the disposition rules
 (``disposition-starter-1``, backend/app/complaint_disposition/rules.py) and classification coding criteria
 (``coding-starter-1``, backend/app/complaint_classification/rules.py), so a new version there makes every record of the
@@ -47,14 +48,19 @@ def question_set_code(market: str) -> str:
     return f"QUESTION_SET_{market}"
 
 
-def documents() -> dict[str, Document]:
-    """Every starter document, at its current version (read now, so a changed version takes effect at once)."""
-    found = {
-        question_set_code(market): Document(
-            question_set_code(market), f"{question_set.title}: starter questions", question_set.version
+def documents(db: Session | None = None, tenant_id=None) -> dict[str, Document]:
+    """Every document, at its current version (read now, so a changed version takes effect at once). With the
+    organization's data plane, a market's question set is its published guide version when it has one (T-G15)."""
+    from backend.app.decision_guides.service import current_codes
+
+    codes = current_codes(db, tenant_id)
+    found = {}
+    for market, question_set in markets.QUESTION_SETS.items():
+        code = codes[market]
+        title = f"{question_set.title}: " + (
+            "starter questions" if code == question_set.version else f"your guide version {code}"
         )
-        for market, question_set in markets.QUESTION_SETS.items()
-    }
+        found[question_set_code(market)] = Document(question_set_code(market), title, code)
     found[HARM_SCALE] = Document(HARM_SCALE, "Harm-severity scale (starter)", markets.SCALE_VERSION)
     found[DISPOSITION_RULES] = Document(
         DISPOSITION_RULES, "Complaint disposition rules (starter)", disposition.RULES_VERSION
@@ -65,9 +71,10 @@ def documents() -> dict[str, Document]:
     return found
 
 
-def for_market(market: str) -> list[Document]:
-    """What a market conclusion relies on: the market's question set and the harm-severity scale."""
-    every = documents()
+def for_market(market: str, db: Session | None = None, tenant_id=None) -> list[Document]:
+    """What a market conclusion relies on: the market's question set (its current version) and the harm-severity
+    scale."""
+    every = documents(db, tenant_id)
     return [every[question_set_code(market)], every[HARM_SCALE]]
 
 
@@ -78,7 +85,7 @@ def for_disposition() -> list[Document]:
     return [every[DISPOSITION_RULES], every[CODING_CRITERIA]]
 
 
-def content(code: str) -> dict | None:
+def content(code: str, db: Session | None = None, tenant_id=None) -> dict | None:
     """What the person reads before acknowledging."""
     if code == HARM_SCALE:
         return {"scale": markets.scale()}
@@ -88,7 +95,9 @@ def content(code: str) -> dict | None:
         return {"rules": list(coding.CODING_CRITERIA)}
     for market in markets.MARKETS:
         if code == question_set_code(market):
-            return {"question_set": markets.QUESTION_SETS[market].as_dict()}
+            from backend.app.decision_guides.service import current
+
+            return {"question_set": current(db, tenant_id, market).as_dict()}
     return None
 
 

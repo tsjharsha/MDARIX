@@ -90,6 +90,13 @@
       "jurisdiction": "United States"
     },
     {
+      "id": "CFR803_19",
+      "short": "21 CFR 803.19",
+      "title": "Exemptions, variances and alternative reporting (FDA's VMSR program)",
+      "jurisdiction": "United States",
+      "starter": true
+    },
+    {
       "id": "CFR803_50",
       "short": "21 CFR 803.50",
       "title": "30-day reports by manufacturers",

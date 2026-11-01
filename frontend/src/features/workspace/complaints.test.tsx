@@ -64,9 +64,11 @@ describe("the Complaints section", () => {
       "Backlog",
       "Reportability",
       "Reports",
+      "Communications",
       "Complaint list",
       "Review settings",
       "Reporting windows",
+      "Decision guides",
     ]);
     // Triage before every other queue (T-G19); then routine first: the complaints waiting for a disposition (T-G36).
     expect(render(<ComplaintsSection />)).toContain("Reading the triage list");
@@ -77,6 +79,9 @@ describe("the Complaints section", () => {
     expect(render(<ComplaintsSection tab="Unknown" />)).toContain("Reading the triage list");
     // A link may open one complaint's reports (T-G2b).
     expect(render(<ComplaintsSection tab="Reports?complaint=c1" />)).toContain("Reading the reports");
+    // ... or one complaint's communications log, and the decision guides (T-G30, T-G15).
+    expect(render(<ComplaintsSection tab="Communications?complaint=c1" />)).toContain("Reading the log");
+    expect(render(<ComplaintsSection tab="Decision guides" />)).toContain("Reading the guides");
   });
 
   it("has its own address and menu entry", () => {

@@ -44,6 +44,8 @@ CONTRACT = {
     "FIRST_CONTACT_FOLLOW_UP": ("signal.triage", "TRIAGE_LEAD"),
     "QMS_COMPLAINT": ("signal.triage", "TRIAGE_LEAD"),
     "SERVICE_ONLY_REVIEW": ("quality.review", "REVIEWER"),
+    # The communications log (tr06): a request's owner until its reply arrives or it ends.
+    "EXTERNAL_REPLY_DUE": ("signal.triage", "TRIAGE_LEAD"),
 }
 
 
