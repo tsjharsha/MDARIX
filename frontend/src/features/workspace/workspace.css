@@ -4481,3 +4481,82 @@ div.uw-task-count:hover {
   width: auto;
   flex: none;
 }
+
+/* Decision guides (0.10.59, T-G15) and the communications log (T-G30). */
+.uw-dg-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.uw-dg-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.uw-dg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.uw-dg-table th,
+.uw-dg-table td {
+  border-bottom: 1px solid var(--ac-line);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.uw-dg-table thead th {
+  color: var(--ac-ink-2);
+  font-weight: 600;
+}
+.uw-dg-table td:nth-child(3) {
+  min-width: 140px;
+}
+.uw-dg-edit td:nth-child(2) {
+  min-width: 260px;
+}
+.uw-dg-edit textarea,
+.uw-dg-edit input,
+.uw-dg-edit select {
+  width: 100%;
+}
+.uw-dg-extra {
+  background: var(--ac-surface-2, rgba(127, 127, 127, 0.06));
+}
+.uw-dg-tests,
+.uw-dg-problems,
+.uw-cm-parties {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-dg-tests li,
+.uw-cm-parties li {
+  display: grid;
+  gap: 2px;
+}
+.uw-dg-failed {
+  border-left: 3px solid var(--ac-critical, #b42318);
+  padding-left: 6px;
+}
+.uw-dg-order {
+  display: flex;
+  gap: 4px;
+}
+.uw-dg-basis {
+  display: grid;
+  gap: 4px;
+}
+.uw-dg-test-editor {
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+  padding: 8px;
+}
+.uw-cm-unanswered td {
+  color: var(--ac-ink-2);
+}

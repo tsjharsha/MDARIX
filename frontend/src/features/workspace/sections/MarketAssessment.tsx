@@ -5,6 +5,7 @@ import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../cu
 import { formatDay } from "../../../app/dates";
 import { WorkspaceContext, useCan, useWorkspace } from "../workspaceContext";
 import { WORKSHEET_MARKETS, reportsTab } from "../authorityReports";
+import { communicationsTab } from "../communications";
 import { recordName } from "../complaintReview";
 import { clockText } from "../reportability";
 import {
@@ -120,9 +121,25 @@ function AssessmentIntro({ detail }: { detail: AssessmentDetail }) {
         </div>
       )}
       <p className="ac-muted">
-        Add any enabled market where your procedure says this event must be assessed. MDARIX does not submit reports.
+        Add any enabled market where your procedure says this event must be assessed. MDARIX does not submit reports. An
+        Unknown answer raises a request to the reporter in the complaint's communications log.
       </p>
+      <CommunicationsLink complaintId={detail.complaint.id} />
     </section>
+  );
+}
+
+function CommunicationsLink({ complaintId }: { complaintId: string }) {
+  const workspace = useContext(WorkspaceContext);
+  if (!workspace) return null;
+  return (
+    <button
+      type="button"
+      className="ac-link"
+      onClick={() => workspace.open("Complaints", communicationsTab(complaintId))}
+    >
+      Open the communications log
+    </button>
   );
 }
 
@@ -206,8 +223,9 @@ export function MarketPanel({
       <header className="uw-ma-head">
         <h3>{item.question_set.title}</h3>
         <span className="uw-cr-meta">
-          Question set {item.question_set.version} · scale {detail.scale.version}
+          Guide {item.question_set.version} · scale {detail.scale.version}
           {item.preselected ? " · the event's market" : ""}
+          {item.question_set_current === false ? " · started before your current guide version: it keeps this one" : ""}
         </span>
         {item.clock && (
           <span
@@ -390,7 +408,13 @@ function QuestionRow({
         </legend>
         <p className="uw-ma-clause">
           <span className="uw-basis-chip">{question.clause}</span> <BasisChips ids={question.basis} label="Basis" />
-          <span className="uw-ma-starter-chip">Starter text</span>
+          {question.extra ? (
+            <span className="uw-ma-starter-chip">Your extra question: optional, never changes the suggestion</span>
+          ) : question.starter ? (
+            <span className="uw-ma-starter-chip">Starter text</span>
+          ) : (
+            <span className="uw-ma-starter-chip">Your wording</span>
+          )}
           <button
             type="button"
             className="ac-link uw-ma-definition-toggle"

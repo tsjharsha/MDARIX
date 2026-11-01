@@ -100,6 +100,20 @@ export type BriefState = {
   versions?: BriefVersionRow[] | null;
   gate?: { can_submit?: boolean | null; blocking?: BriefBlocking[] | null } | null;
   actions?: BriefActions | null;
+  /** Live, not part of a version: open and overdue requests to external contacts on the case's complaints (T-G30). */
+  communications?: {
+    open: number;
+    overdue: number;
+    unresolved: number;
+    items: Array<{
+      id: string;
+      ref: string | null;
+      party: string | null;
+      subject: string;
+      reply_due_on: string | null;
+      overdue: boolean;
+    }>;
+  } | null;
 };
 
 const code = (value: unknown) =>

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { CheckCircle2, ClipboardList, Download, FileText, Send, ShieldCheck, Undo2 } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
-import { useCan } from "../workspaceContext";
+import { WorkspaceContext, useCan } from "../workspaceContext";
+import { communicationsTab } from "../communications";
 import { countOf } from "./common";
 import { Hero, InlineError } from "./boardParts";
 import {
@@ -233,6 +234,7 @@ export function ReportDrawer({
             {detail.assessment?.report_type_label ? ` · ${detail.assessment.report_type_label}` : ""}
             {detail.case ? ` · ${detail.case}` : ""}
           </p>
+          <CommunicationsLink complaintId={detail.complaint.id} />
         </section>
         <Downloads detail={detail} />
         <Worksheet detail={detail} onChanged={changed} canWrite={canWrite} />
@@ -950,5 +952,20 @@ function SubmissionRecord({ detail }: { detail: ReportDetail }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+/** The complaint's communications log: the questions to the reporter or others behind the report (T-G30). */
+function CommunicationsLink({ complaintId }: { complaintId: string }) {
+  const workspace = useContext(WorkspaceContext);
+  return (
+    <button
+      type="button"
+      className="ac-link"
+      disabled={!workspace}
+      onClick={() => workspace?.open("Complaints", communicationsTab(complaintId))}
+    >
+      Open the complaint's communications log
+    </button>
   );
 }

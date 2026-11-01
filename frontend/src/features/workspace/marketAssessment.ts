@@ -36,6 +36,8 @@ export type Question = {
   serious: boolean;
   note: string | null;
   starter: boolean;
+  /** The organization's own extra question (T-G15): recorded and printed, never required, never in the conclusion. */
+  extra?: boolean;
 };
 
 export type QuestionSet = {
@@ -107,6 +109,8 @@ export type MarketItem = {
   preselected: boolean;
   required: boolean;
   question_set: QuestionSet;
+  /** False when a draft keeps a guide version older than the one in use now (T-G15). */
+  question_set_current?: boolean;
   threshold: { level: string; label: string };
   current: Version | null;
   draft: Version | null;
@@ -238,6 +242,7 @@ export function draftBody(form: AssessmentForm) {
 /** The first question without an answer or without its rationale, for signing (the server's rule). */
 export function answersProblem(questions: Question[], form: AssessmentForm): string | null {
   for (const question of questions) {
+    if (question.extra) continue;
     const entry = form.answers[question.id];
     if (!entry?.answer) return `Answer question ${question.id}`;
     if (collapsed(entry.rationale).length < ASSESSMENT_LIMITS.reasonMin)
