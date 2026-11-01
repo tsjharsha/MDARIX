@@ -94,6 +94,12 @@ describe("where a task opens", () => {
     expect(at("RISK_REVIEW")).toEqual({ section: "Intelligence", tab: "Risk & traceability" });
     expect(at("REGULATORY_REVIEW")).toEqual({ section: "Intelligence", tab: "Regulatory copilot" });
     expect(taskDestination({ task_type: "SIGNAL_TRIAGE", investigation: null })).toEqual({ section: "Signals" });
+    // A call's follow-up, QMS-complaint task and QA review open the first contact (0.10.57).
+    for (const type of ["FIRST_CONTACT_FOLLOW_UP", "QMS_COMPLAINT", "SERVICE_ONLY_REVIEW"])
+      expect(taskDestination({ task_type: type, investigation: null })).toEqual({
+        section: "Complaints",
+        tab: "First contact",
+      });
   });
 
   it("opens a signal triage task on its signal, else on the signal inbox", () => {

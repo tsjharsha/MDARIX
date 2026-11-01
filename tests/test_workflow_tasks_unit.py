@@ -40,6 +40,10 @@ CONTRACT = {
     # Reporting and CAPA (md41): a reporting clock due without a decision; a CAPA's effectiveness check due.
     "REPORTABILITY_DECISION": ("regulatory.review", "REGULATORY_REVIEWER"),
     "EFFECTIVENESS_CHECK": ("quality.review", "REVIEWER"),
+    # First contact (tr04): the follow-up with the reporter, the QMS-complaint task, the QA review of "service only".
+    "FIRST_CONTACT_FOLLOW_UP": ("signal.triage", "TRIAGE_LEAD"),
+    "QMS_COMPLAINT": ("signal.triage", "TRIAGE_LEAD"),
+    "SERVICE_ONLY_REVIEW": ("quality.review", "REVIEWER"),
 }
 
 

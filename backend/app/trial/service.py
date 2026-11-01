@@ -558,6 +558,10 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         from backend.app.trial.sample_imports import stage_sample_import
 
         sample["imports"] = stage_sample_import(db, tenant.id, now)
+        # The first contacts, the urgent intake and a finished triage record (backend/app/trial/sample_intake.py).
+        from backend.app.trial.sample_intake import stage_sample_intake
+
+        sample["intake"] = stage_sample_intake(db, tenant.id, now)
         user = AuthUser(
             id=uuid.uuid4(),
             tenant_id=tenant.id,

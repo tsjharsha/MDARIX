@@ -37,4 +37,5 @@ from backend.app.db.models.reportability import *
 from backend.app.db.models.capa_effectiveness import *
 from backend.app.db.models.market_assessment import *
 from backend.app.db.models.complaint_disposition import *
+from backend.app.db.models.intake import *
 from backend.app.db.models.case_ai import *

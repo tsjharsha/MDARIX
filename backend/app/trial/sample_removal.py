@@ -37,6 +37,12 @@ GENERIC_REFERENCES = (
     ("reality_relationships", "source_entity_id"),
     ("reality_relationships", "target_entity_id"),
     ("signed_approval_records", "object_id"),
+    # Triage records, duplicate links and re-upload field changes point at an intake, a complaint or a set-aside row
+    # (tr04).
+    ("triage_records", "subject_id"),
+    ("record_links", "left_id"),
+    ("record_links", "right_id"),
+    ("record_field_changes", "record_id"),
 )
 # Sample rows of tables without ``source_system``: the sample's import lineage and set-aside rows (``source``) and
 # its IMDRF links (their proposer), backend/app/trial/sample_imports.py.

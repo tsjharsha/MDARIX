@@ -15,7 +15,9 @@ US draft and the harm complaints' severities, backend/app/trial/sample_assessmen
 the routine complaints with their proposed classifications and a signed service-level example
 (backend/app/trial/sample_dispositions.py) unless they are there, and the sample's import run with its
 data-quality report, set-aside rows, the products' UDI-DI and GMDN and the IMDRF links of its problem codes
-(backend/app/trial/sample_imports.py) unless it is there. Each trial is committed on its own, with an audit event.
+(backend/app/trial/sample_imports.py) unless it is there, and the sample's first contacts, urgent intake and finished
+triage record (backend/app/trial/sample_intake.py) unless they are there. Each trial is committed on its own, with an
+audit event.
 """
 
 from __future__ import annotations
@@ -75,6 +77,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.trial.sample_decision import has_sample_decision, stage_sample_decision
     from backend.app.trial.sample_dispositions import has_routine_examples, seed_routine_examples
     from backend.app.trial.sample_imports import has_sample_import, stage_sample_import
+    from backend.app.trial.sample_intake import has_sample_intake, stage_sample_intake
 
     results = []
     for tenant_id, tenant_key, name in trials(db):
@@ -97,6 +100,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             assessments_missing = not has_sample_assessments(session, tenant_id)
             routine_missing = not has_routine_examples(session, tenant_id)
             import_missing = not has_sample_import(session, tenant_id)
+            intake_missing = not has_sample_intake(session, tenant_id)
             if not (
                 story_missing
                 or lots_missing
@@ -104,6 +108,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or assessments_missing
                 or routine_missing
                 or import_missing
+                or intake_missing
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -115,6 +120,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *(["the sample market assessments"] if assessments_missing else []),
                     *(["the routine sample complaints"] if routine_missing else []),
                     *(["the sample import run"] if import_missing else []),
+                    *(["the sample first contacts and urgent intake"] if intake_missing else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -130,6 +136,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             if import_missing:
                 # Last: the run's lineage covers every sample complaint, the routine ones included.
                 added["imports"] = stage_sample_import(session, tenant_id, now)
+            if intake_missing:
+                added["intake"] = stage_sample_intake(session, tenant_id, now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,
