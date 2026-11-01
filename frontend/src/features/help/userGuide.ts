@@ -594,6 +594,81 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         ],
       },
       {
+        id: "reminders",
+        title: "Reminders, escalation and absences",
+        where: "My Work (the panel at the top); the bell in the header",
+        purpose:
+          "A deadline never passes silently. Every item with a date (a triage target, a provisional or report deadline, a report obligation, a reply due, a guide approval, a task) reminds its owner before it is due and escalates when it is overdue. An alert tells people in MDARIX (no e-mail is sent); it never closes or changes the item.",
+        tasks: [
+          {
+            title: "Work your reminders",
+            steps: [
+              "The bell shows how many reminders and escalations you have not read. Choose it to open My Work.",
+              "Escalations and overdue items are listed one by one; items only due soon are grouped by kind. Choose Open to go where the item is done.",
+              "Choose Mark read when you have seen one. It stays in the list until its item is done; then it disappears by itself.",
+            ],
+            result:
+              "Reminders go to the owner before the due time (24 hours by default). At the due time the item escalates to its backup and to the people holding your escalation role (the Leader by default). When nobody else can be reached, you are told so: invite a colleague or name a backup.",
+          },
+          {
+            title: "Record an absence",
+            steps: [
+              "Choose I will be away, give the first and last day and the colleague who covers for you, then Record my absence.",
+              "Choose I am back to end it early.",
+            ],
+            result:
+              "While you are away your backup receives your reminders and escalations. Your items stay yours, and your backup gains no right to sign for you.",
+          },
+        ],
+      },
+      {
+        id: "oversight",
+        title: "Oversight: everything at risk in one place",
+        where: "Readiness › Oversight",
+        purpose:
+          "For the head of QA/RA: every dated item overdue or due soon, with its owner, its due time and who it escalated to; every event and whether it is ready to close; who is away; and your working calendar. IDs, owners, dates and states only, never patient or reporter data.",
+        tasks: [
+          {
+            title: "Review and export",
+            steps: [
+              "Open Readiness › Oversight. The tiles count what is overdue, due soon, not ready to close, not filed, and closed in your QMS before it was ready.",
+              "Filter by product, market and kind; choose Every dated item to see later ones too. Choose Open on a row to go where it is done.",
+              "Choose CSV for the monthly product review.",
+            ],
+          },
+          {
+            title: "Set the working calendar",
+            who: "Quality reviewers and regulatory approvers.",
+            steps: [
+              "Under Working calendar and escalation, choose your time zone and working days, add your holidays, and set how many hours before a due time reminders go and the role overdue items escalate to. Choose Save the calendar.",
+            ],
+            result:
+              "Your own due times (a follow-up at the end of the next working day, the one-working-hour rule of the communications log) count on this calendar. An authority's legal deadline keeps its own counting rule.",
+          },
+        ],
+      },
+      {
+        id: "event-closure",
+        title: "Events: owner, stage, closure checklist and the decision record",
+        where: "Readiness › Oversight › Ready to close in the QMS? (Checklist)",
+        purpose:
+          "Each complaint MDARIX works on is an event with an owner. Its checklist shows what still blocks closure, read from your records. MDARIX never closes the complaint: your QMS does.",
+        tasks: [
+          {
+            title: "Sign ready to close and file the record",
+            who: "The event owner.",
+            steps: [
+              "Choose Checklist on the event. Name the event owner if none is named.",
+              "Each open item says why and has Resolve, which opens where it is done: triage, market assessments, report obligations, the disposition or investigation decision, information requests, open tasks. Open CAPAs are listed and do not block.",
+              "When the checklist is clear, enter your password and authenticator code and choose Sign ready to close. With items still open you may sign only with a written reason.",
+              "Choose Decision record (PDF): every signed decision on the event, each with the signer's name, date and time and meaning, and a SHA-256 checksum. File it in your QMS complaint record, then enter the QMS reference and choose Record the filing.",
+            ],
+            result:
+              "Until the filing is recorded, the event shows Decision record not filed on the oversight view. A complaint closed in your QMS before it was ready is flagged there.",
+          },
+        ],
+      },
+      {
         id: "signals",
         title: "Signals: triage a pattern of complaints",
         where: "Signals › Signal inbox",

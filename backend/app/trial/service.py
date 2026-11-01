@@ -587,6 +587,11 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         from backend.app.trial.sample_guides import stage_sample_guides
 
         sample["guides"] = stage_sample_guides(db, tenant.id, now, owner_id=str(user.id))
+        # The sample author away with the trial user as backup, and two events the trial user owns (RV-08 not ready
+        # to close, RT-03 clear), backend/app/trial/sample_oversight.py.
+        from backend.app.trial.sample_oversight import stage_sample_oversight
+
+        sample["oversight"] = stage_sample_oversight(db, tenant.id, now, owner_id=str(user.id))
         db.add(
             TenantMembership(
                 id=uuid.uuid4(),

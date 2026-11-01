@@ -66,6 +66,12 @@ TRIAL_DATA_TABLES = (
     "complaint_reportability",
     "reportability_settings",
     "capa_effectiveness_checks",
+    # Reminders and escalations, absences, the working calendar and the events' closure (tr07): on the complaints
+    # listed below.
+    "due_alerts",
+    "user_absences",
+    "event_closures",
+    "oversight_settings",
     # Communications log entries, their parties and settings, and the customer's guide versions (tr06): entries on
     # the complaints listed below, before their parties.
     "communication_entries",

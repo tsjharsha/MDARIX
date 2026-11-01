@@ -73,10 +73,11 @@ def reporter_party(db: Session, tenant_id, complaint: Complaint, actor: str, now
 
 
 def _task(db, tenant_id, entry: CommunicationEntry, party: ExternalParty, actor: str, ref: str | None):
-    from backend.app.intake.service import _user_or_none, working_day_end
+    from backend.app.intake.service import _user_or_none, calendar, working_day_end
     from backend.app.workflow.tasks import create_task
 
-    due = datetime.combine(entry.reply_due_on, datetime.max.time(), tzinfo=timezone.utc) if entry.reply_due_on else None
+    days = calendar(db, tenant_id)
+    due = days.day_end(entry.reply_due_on) if entry.reply_due_on else None
     task = create_task(
         db,
         tenant_id,
@@ -85,7 +86,7 @@ def _task(db, tenant_id, entry: CommunicationEntry, party: ExternalParty, actor:
         source_type=SOURCE_TYPE,
         source_id=entry.id,
         assigned_user_id=_user_or_none(entry.owner_id),
-        due_at=due or working_day_end(entry.logged_at, 1),
+        due_at=due or working_day_end(entry.logged_at, 1, days),
         created_by=actor,
         details={"complaint_id": str(entry.complaint_id) if entry.complaint_id else None, "reference": ref},
     )
@@ -325,10 +326,11 @@ def ensure_assessment_request(
     """One open request to the reporter per complaint and market while its assessment has Unknown answers on questions
     that drive the conclusion: raised to be sent, owned by the person who saved, due at the end of the next working
     day; the questions it asks follow the latest save."""
-    from backend.app.intake.service import working_day_end
+    from backend.app.intake.service import calendar
 
     if not unknown:
         return None
+    days = calendar(db, tenant_id)
     subject = f"Ask the reporter: {', '.join(labels.get(q, q) for q in unknown)} ({market} assessment, Unknown)"
     subject = subject[: rules.SUBJECT_MAX]
     found = _open_from(db, tenant_id, ASSESSMENT, "market", market, complaint.id)
@@ -352,7 +354,7 @@ def ensure_assessment_request(
         actor=actor,
         now=now,
         owner_id=actor,
-        reply_due_on=working_day_end(now, 1).date(),
+        reply_due_on=days.add_working_days(days.local_day(now), 1),
         origin={"type": ASSESSMENT, "market": market, "questions": unknown},
         sent=False,
     )
