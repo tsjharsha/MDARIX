@@ -10,6 +10,76 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.57] - 2026-11-20
+
+On the trial maintenance line (`release/0.10`): the first-contact check (T-G32, MVP G32), urgent intake with the
+awareness rule and the triage flag (T-G19, G19), and duplicates with import history (T-G20, G20), built once on the
+trial line for the trial and the pilot alike (T-B11). They behave as the MVP items; the trial's differences are its
+data source (an Excel/CSV upload or the sample), its three seats (T-B8), practice records (T-B5) and starter text
+(T-B6). Undoing a link after signed work (G20 set 5), reminders (G25) and the communications log (G30) are not in it:
+until T-G30, a follow-up with the reporter is a dated task.
+
+**Migration, expand-only:** `tr04intaketriage`, chained from `tr03amergemvpimports`: five new tables
+(`intake_events`, `first_contact_checks`, `triage_records`, `record_links`, `record_field_changes`), each with tenant
+row-level security, in the trial's retention list, sample removal, purge and export. Nothing existing changes; the
+downgrade drops only these tables. On `mvp-1.0` the forward merge adds a merge revision joining its head and
+`tr04intaketriage`. The API and web images change.
+
+### Added
+
+- **Complaints › First contact**: Log a call (the caller's words verbatim, product, lot or serial number, what was
+  asked for, the times with their time zone) and the starter first-contact guide's ten questions
+  (`first-contact-starter-1`, starter text). G32's outcomes table, fixed in code, gives complaint, service only, both,
+  pending, or pending: confirm no deficiency. Unknown and Not stated are never No; "service only" is offered only by
+  the table's row 2 and no override reaches it. The coordinator signs the classification (password and authenticator
+  code): complaint or both raise the QMS-complaint task; service only needs a written reason and goes to the QA review
+  (every service-only call in the trial; due in 5 working days, 1 when a fault or harm word matches); pending raises a
+  dated follow-up with the caller. A reviewer who disagrees reclassifies it as a complaint, with the call's awareness
+  time; the record shows "same person" when the reviewer signed it too. An imported inquiry or service record gets
+  the same check from the second look (First-contact check), and its signed outcome is the second-look decision.
+- **Urgent intake**: a complaint by definition, on the triage list at once, its QMS-complaint task raised. The times
+  are kept apart (event, first knowledge by a distributor or service agent, receipt, awareness, arrival in MDARIX).
+  Without an awareness time the clock runs from the earliest of first knowledge and receipt, shown as "Awareness
+  unresolved: deadline provisional".
+- **Complaints › Triage**, before every other queue (and the tab Complaints now opens on): urgent intakes, flagged
+  calls, flagged imported complaints not yet taken up, and set-aside import rows that suggest harm (TA-R14.2). The
+  flag reads death, serious injury, a malfunction, a patient involved with the outcome unknown, a serious severity,
+  first-contact questions 4 to 6 and MDARIX's starter harm words (`harm-words-starter-1`, with "pt" and "ICU"; a
+  directly negated mention such as "no harm" does not count). Both clocks: the 24-hour triage target from arrival in
+  MDARIX, and each enabled market's provisional deadline from awareness in the shortest plausible category (MVP 5.1b,
+  `provisional-starter-1`, shown as conservative). The triage record: severity, event owner, triage owner, a backup
+  where there is a second person, the immediate action or why none is needed, and the confirmed awareness time.
+  **Escalate to triage**, with a reason, from the second look, the backlog, dispositions, the reportability watch,
+  rows set aside at import and first contact.
+- **Possible duplicates** across uploads, the sample, calls and urgent intakes (same product and lot or serial number,
+  events within 2 days, same site or country): link into one event or dismiss, with a reason; undo a link with a
+  reason, its history kept. A link uses the earliest awareness of its sources: "Awareness conflict" on the triage list
+  until a person confirms the time, and the reportability watch and market clocks recount from it ("an earlier linked
+  source"). A link to an imported complaint closes the call's QMS-complaint task.
+- **Import history**: re-uploading a complaints file keeps each field's change (before, after, the import), shown in
+  that run's data-quality report (`GET /api/v1/intake/changes`). A QMS complaint ID entered by hand on a call shows
+  "Awaiting import confirmation" until an upload brings it; then the call is linked and the task closed.
+- **Getting started**: "Before a complaint: the first call and triage", with Log a call and Triage list. Not a
+  chapter: the chapter count stays ten.
+- **My Work**: the follow-ups, QMS-complaint tasks and QA reviews (`FIRST_CONTACT_FOLLOW_UP`, `QMS_COMPLAINT`,
+  `SERVICE_ONLY_REVIEW`) open Complaints › First contact.
+- **The sample** (`backend/app/trial/sample_intake.py`): SAMPLE-CALL-01 (an IFU request: service only, signed, QA
+  review due), SAMPLE-CALL-02 (a battery shutdown during a patient transfer with a repair: both, signed nine days
+  ago, its QMS complaint never linked, triaged), SAMPLE-CALL-03 (a loan monitor, harm unknown, "pt": pending and
+  flagged), SAMPLE-CALL-04 (nothing wrong said, nothing asked: pending, confirm no deficiency) and SAMPLE-URG-01 (free
+  flow at set-up, "pt" moved to "ICU", no awareness time). SAMPLE-CALL-02 and SAMPLE-RT-05 are the likely duplicate
+  pair: linking them moves RT-05's awareness eight days earlier. No complaint, product or lot is added: every count
+  quoted elsewhere stays, and OrbitCare stays the only rising trend. `scripts/refresh_trial_story.py` adds it, once,
+  to running trials; removing the sample removes it.
+- API: `/api/v1/intake` (guide, list, log, detail, check, sign, review, follow-up, QMS, from-complaint, duplicates,
+  links, changes) and `/api/v1/triage` (list, escalate, record). Not part of `mvp-1.0`'s `_PILOT_API` gate.
+- The in-app user guide and the trial guide describe the first call, urgent intake, triage and duplicates.
+
+### Changed
+
+- The set-aside rows' harm words are the one starter list of triage (`import_quarantine.HARM_WORDS` reads it).
+- Complaints opens on Triage; the routine path stays chapter 1 and Dispositions stays one click away.
+
 ## [0.10.56] - 2026-11-01
 
 On the trial maintenance line (`release/0.10`): the MVP's governed import (R14 stored quarantine, R16 row lineage, R17
