@@ -64,6 +64,7 @@ SAMPLE_LABELS = {
     "products": "products",
     "product_versions": "product versions",
     "lot_batches": "lots",
+    "lot_distributions": "shipments",
     "complaints": "complaints",
     "investigations": "investigations",
     "evidence": "pieces of evidence",

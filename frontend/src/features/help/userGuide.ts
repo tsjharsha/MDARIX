@@ -908,6 +908,44 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         ],
       },
       {
+        id: "lot-impact",
+        title: "Lot impact: which other lots share the suspect part (free trial)",
+        where: "Investigations › Scope › Lot impact (one click from the case: Lot impact on its summary)",
+        purpose:
+          "Once a signal is confirmed, see what else is out there: every lot that shares the suspect component lot, supplier or product version, where its units went and how many are still in stock. MDARIX lists; you decide any field action in your QMS. MDARIX recommends no recall.",
+        tasks: [
+          {
+            title: "Choose the suspect factor",
+            steps: [
+              "Open the case and choose Lot impact on its summary: Scope opens at its Lot impact section.",
+              "Read the suggestion: the component lot, supplier or version most of the case's lots share. Keep it, or pick another in Suspect factor.",
+              "Read the list: lots with complaints (with complaints per 1,000 units released), lots without complaints yet, units released, shipped by country and consignee, and still in stock. Open a lot's shipments to see each consignee.",
+            ],
+            result:
+              "A lot with no distribution imported says Distribution not imported: its units are not known, never zero.",
+            note: "Distribution comes from Import data › Distribution (lot, consignee, country, units, ship date); lot genealogy from Import data › Lot genealogy. Consignees are organizations; names of people are refused.",
+          },
+          {
+            title: "Leave a lot out and keep the list with the case",
+            who: "Quality Investigator and Leader.",
+            steps: [
+              "Tick Leave out on a lot and say why (at least 10 characters).",
+              "Choose Keep this list with the case: the case scope gets a new version, with the lots kept and the lots left out and their reasons.",
+            ],
+          },
+          {
+            title: "Sign the list",
+            who: "Anyone who signs decisions, reviews quality or approves regulatory content.",
+            steps: [
+              "Read the list kept with the case, enter Your password and Authenticator code, and choose Sign the list.",
+              "Download the PDF or CSV for your field action file (Practice record in a free trial).",
+            ],
+            result:
+              "The signed list is kept as it was signed. When the records change afterwards (a new complaint, distribution imported), the panel says Changed since signed and what changed; sign again if that is the list to keep.",
+          },
+        ],
+      },
+      {
         id: "brief",
         title: "The Decision Brief",
         where: "Investigations › Decision Brief",
@@ -1156,6 +1194,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Read how your columns were read and the preview. Fix any problems, or download the rows to fix.",
               "Choose Import N rows.",
               "Choose See its data-quality report: rows read, written and set aside, and the reason for each row set aside. Fix those rows in your file and import it again.",
+              "A distribution file (free trial) also reports any lot whose units shipped exceed its units released: check the file or the lot's quantity.",
             ],
             result:
               "Imported, with how many records are new and updated. Importing the file again updates the same records.",

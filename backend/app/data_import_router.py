@@ -60,13 +60,16 @@ def import_templates(ctx: AuthenticatedRequestContext = Depends(get_request_cont
                 "download": f"/api/v1/data/import/templates/{entity}.csv",
             }
             for entity, spec in imports.TEMPLATES.items()
+            if imports.offered(entity, policy)
         ],
     }
 
 
 @router.get("/templates/{entity}.csv")
-def import_template(entity: str, ctx: AuthenticatedRequestContext = Depends(get_request_context)):
-    if entity not in imports.TEMPLATES:
+def import_template(
+    entity: str, ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)
+):
+    if entity not in imports.TEMPLATES or not imports.offered(entity, _policy(db, ctx)):
         raise HTTPException(404, detail={"code": "TEMPLATE_NOT_FOUND", "message": "Unknown template"})
     return Response(
         imports.template_csv(entity),

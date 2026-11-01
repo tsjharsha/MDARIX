@@ -199,6 +199,15 @@ _SYNONYMS: dict[str, dict[str, tuple[str, ...]]] = {
             "units released",
         ),
     },
+    "distribution": {
+        "lot_id": _COMPLAINT_SYNONYMS["lot_id"],
+        "consignee": ("consignee name", "customer", "customer name", "ship to", "ship to name", "sold to name"),
+        "country": ("ship to country", "destination country", "country code", "customer country"),
+        "quantity": ("qty", "quantity shipped", "shipped quantity", "units shipped", "units", "shipped qty"),
+        "ship_date": ("shipping date", "shipped date", "date shipped", "dispatch date", "delivery date", "ship dt"),
+        "consignee_type": ("consignee type", "customer type", "account type", "channel"),
+        "consignee_reference": ("customer number", "customer id", "account number", "ship to number", "sold to"),
+    },
     "investigations": {
         "investigation_id": (
             "investigation id",

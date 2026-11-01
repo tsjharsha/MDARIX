@@ -72,6 +72,7 @@ from backend.app.authority_reports.router import router as authority_reports_rou
 from backend.app.communications.router import router as communications_router
 from backend.app.decision_guides.router import router as decision_guides_router
 from backend.app.oversight.router import router as oversight_router
+from backend.app.lot_impact.router import router as lot_impact_router
 from backend.app.qms_documents.router import router as qms_documents_router
 from backend.app.party_views.router import router as party_views_router
 from backend.app.reportability.assessment_router import router as market_assessment_router
@@ -460,6 +461,7 @@ app.include_router(communications_router)  # The external communications log (tr
 app.include_router(oversight_router)  # Reminders and escalation, the oversight view, the event closure (tr07)
 app.include_router(qms_documents_router)  # Ready-to-use documents, signed PDF and DOCX (T-G35)
 app.include_router(party_views_router)  # Distributor and authorised-representative preview, trial only (T-G37P)
+app.include_router(lot_impact_router)  # Lot impact on a case, trial only (T-G5, tr08)
 app.include_router(reportability_router)  # Reportability watch and reporting windows (md41)
 app.include_router(market_assessment_router)  # Seriousness and causation per market, signed conclusions (tr01)
 app.include_router(signer_training_router)  # Training on the current version of what a signature relies on (tr01)
