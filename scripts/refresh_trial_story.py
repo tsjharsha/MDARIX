@@ -16,8 +16,9 @@ the routine complaints with their proposed classifications and a signed service-
 (backend/app/trial/sample_dispositions.py) unless they are there, and the sample's import run with its
 data-quality report, set-aside rows, the products' UDI-DI and GMDN and the IMDRF links of its problem codes
 (backend/app/trial/sample_imports.py) unless it is there, and the sample's first contacts, urgent intake and finished
-triage record (backend/app/trial/sample_intake.py) unless they are there. Each trial is committed on its own, with an
-audit event.
+triage record (backend/app/trial/sample_intake.py) unless they are there, and the sample's report worksheets (a
+finished US example, an India complaint with a rejected attempt, and India in the sample's own reporting windows,
+backend/app/trial/sample_reports.py) unless they are there. Each trial is committed on its own, with an audit event.
 """
 
 from __future__ import annotations
@@ -78,6 +79,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.trial.sample_dispositions import has_routine_examples, seed_routine_examples
     from backend.app.trial.sample_imports import has_sample_import, stage_sample_import
     from backend.app.trial.sample_intake import has_sample_intake, stage_sample_intake
+    from backend.app.trial.sample_reports import has_sample_reports, stage_sample_reports
 
     results = []
     for tenant_id, tenant_key, name in trials(db):
@@ -101,6 +103,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             routine_missing = not has_routine_examples(session, tenant_id)
             import_missing = not has_sample_import(session, tenant_id)
             intake_missing = not has_sample_intake(session, tenant_id)
+            reports_missing = not has_sample_reports(session, tenant_id)
             if not (
                 story_missing
                 or lots_missing
@@ -109,6 +112,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or routine_missing
                 or import_missing
                 or intake_missing
+                or reports_missing
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -121,6 +125,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *(["the routine sample complaints"] if routine_missing else []),
                     *(["the sample import run"] if import_missing else []),
                     *(["the sample first contacts and urgent intake"] if intake_missing else []),
+                    *(["the sample report worksheets"] if reports_missing else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -138,6 +143,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["imports"] = stage_sample_import(session, tenant_id, now)
             if intake_missing:
                 added["intake"] = stage_sample_intake(session, tenant_id, now)
+            if reports_missing:
+                added["reports"] = stage_sample_reports(session, tenant_id, now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,
