@@ -542,28 +542,28 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Decision guides: make each market's questions your own",
         where: "Complaints › Decision guides",
         purpose:
-          "Every market assessment asks its market's guide. Version 1 is MDARIX's starter. Your organization makes its own version: reword the questions, add your own, run the test cases, and have a colleague approve it. The guide points to a conclusion; a person decides and signs.",
+          "Every market assessment asks its market's guide. Version 1 is MDARIX's starter. Your organization makes its own version: the regulation's wording stays locked, and you add your explanation and examples beside it, your own questions and your worked complaints; then run the test matrix and have a colleague approve it. The guide points to a conclusion; a person decides and signs.",
         tasks: [
           {
             title: "Prepare a new version",
             who: "Anyone with regulatory review or approval rights.",
             steps: [
               "Open Complaints › Decision guides and choose Start a new version on the market. It is a copy of the version in use.",
-              "Reword any question, its definition, its help text and its clause. The questions that drive the conclusion cannot be removed, and their conclusion logic stays fixed.",
+              "The questions that drive the conclusion keep the regulation's wording: the question, its definition and its clause are locked. Write your explanation and examples beside each. These questions cannot be removed, and their conclusion logic stays fixed. A version approved before the lock stays as it was signed.",
               "Choose Add an extra question for what your procedure also asks (for example VMSR participation). It is recorded and printed with the answers; it never changes the conclusion and is never required.",
-              "Give every question its clause and choose its basis from the standards list. A version with a question missing either cannot be published.",
-              "Add test cases: a set of answers and the outcome the guide must point to. A question left blank is Unknown, never No. Choose Save the draft, then Run the test cases.",
+              "Give every extra question its clause and choose its basis from the standards list. A version with a question missing either cannot be published.",
+              "The test matrix holds worked complaints: the answers for a complaint and what the guide must point to in this market. MDARIX's starter worked complaints are in every version; choose Add a worked complaint for your own. A question left blank is Unknown, never No. Choose Save the draft, then Run the test matrix.",
             ],
             result:
-              "Before it is used lists what still blocks it: a missing clause or basis, tests not run on the current content, or a failing test.",
+              "Before it is used lists what still blocks it: a missing clause or basis, a matrix not run on the current content, or a worked complaint that fails. Only a version whose matrix passes can be sent for approval.",
           },
           {
             title: "Approve and publish it",
             who: "A colleague who did not edit the version; never an administrator.",
             steps: [
               "Write What changed and why, and choose Ask a colleague to approve it.",
-              "The colleague opens the version, reads it, enters their password and authenticator code and chooses Approve and publish.",
-              "Download the PDF or DOCX for an audit: every question with its clause, the test cases and their results, and the approval.",
+              "The colleague opens the version and reads it with Test matrix, run again now. If a worked complaint gives a different answer now, the version cannot be approved: its author changes it and sends it again. Otherwise the colleague enters their password and authenticator code and chooses Approve and publish.",
+              "Download the PDF or DOCX for an audit: every question with its clause, your explanation and examples, the test matrix and its results, and the approval.",
             ],
             result:
               "Assessments started from then on use the new version; ones in progress keep theirs. Each signed conclusion names the guide version, and what a signer must have read is the version in use.",

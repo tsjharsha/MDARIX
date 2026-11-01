@@ -42,12 +42,15 @@ export type GuideList = {
   practice_label: string | null;
 };
 
+/** A worked complaint of the test matrix. */
 export type TestCase = {
   id: string;
   name: string;
   answers: Record<string, string>;
   expected: Expected;
   expected_report_type: string | null;
+  /** MDARIX's starter row: in every version's matrix, never removed. */
+  starter?: boolean;
 };
 
 export type TestResult = {
@@ -87,6 +90,8 @@ export type GuideVersion = VersionSummary & {
     run_by: string;
   } | null;
   problems: string[];
+  /** The matrix run again for the approver: the worked complaints whose answer changed. Any blocks the approval. */
+  matrix_changed?: string[];
   change_reason: string | null;
   editors: string[];
   you_edited?: boolean;
@@ -104,6 +109,7 @@ export type GuideVersion = VersionSummary & {
   expected_labels: Record<Expected, string>;
   report_types: Array<{ code: string; label: string }>;
   core_rule: string;
+  matrix_rule?: string;
   never_decides: string;
   scale_note: string;
   starter_mark: string;
@@ -119,6 +125,9 @@ export type QuestionForm = {
   clause: string;
   basis: string[];
   extra: boolean;
+  /** The organization's own text beside a core question's locked wording. */
+  explanation: string;
+  examples: string;
 };
 
 export const questionForm = (question: Question): QuestionForm => ({
@@ -129,6 +138,8 @@ export const questionForm = (question: Question): QuestionForm => ({
   clause: question.clause ?? "",
   basis: [...(question.basis ?? [])],
   extra: !!question.extra,
+  explanation: question.explanation ?? "",
+  examples: question.examples ?? "",
 });
 
 export const NEW_EXTRA: QuestionForm = {
@@ -139,6 +150,8 @@ export const NEW_EXTRA: QuestionForm = {
   clause: "",
   basis: [],
   extra: true,
+  explanation: "",
+  examples: "",
 };
 
 export function stateTone(state: GuideState): Tone {
@@ -196,17 +209,13 @@ export function outcomeText(
   return `${labels[expected] ?? expected}${type ? ` (${type})` : ""}`;
 }
 
-/** The body of PUT /api/v1/decision-guides/{market}/versions/{n}. */
+/** The body of PUT /api/v1/decision-guides/{market}/versions/{n}. A core question sends only the organization's own
+ * text: its wording is locked, and the server refuses a change to it. */
 export function saveBody(questions: QuestionForm[], tests: TestCase[]) {
   return {
-    questions: questions.map(({ id, text, definition, note, clause, basis }) => ({
-      id,
-      text,
-      definition,
-      note,
-      clause,
-      basis,
-    })),
+    questions: questions.map(({ id, text, definition, note, clause, basis, extra, explanation, examples }) =>
+      extra ? { id, text, definition, note, clause, basis } : { id, explanation, examples },
+    ),
     test_cases: tests.map(({ name, answers, expected, expected_report_type }) => ({
       name,
       answers,
