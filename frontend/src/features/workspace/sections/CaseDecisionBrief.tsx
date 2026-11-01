@@ -183,6 +183,17 @@ export function CaseDecisionBriefPanel({
           onOpenDecision={onOpenDecision}
         />
       )}
+      {state?.communications && (state.communications.open > 0 || state.communications.unresolved > 0) && (
+        <p className={`uw-hint tone-${state.communications.overdue ? "critical" : "warning"}`} role="note">
+          Requests to external contacts on this case's complaints: {state.communications.open} open,{" "}
+          {state.communications.overdue} overdue, {state.communications.unresolved} unresolved after attempts.{" "}
+          {state.communications.items
+            .slice(0, 3)
+            .map((item) => `${item.ref ?? ""} ${item.party ?? ""}: ${item.subject}${item.overdue ? " (overdue)" : ""}`)
+            .join("; ")}
+          . See Complaints › Communications.
+        </p>
+      )}
       <Panel
         eyebrow={caseLabel}
         title={current ? `Decision Brief · version ${current.version}` : "Decision Brief"}

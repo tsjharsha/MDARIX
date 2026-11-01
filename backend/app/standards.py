@@ -71,6 +71,14 @@ CATALOG: tuple[Standard, ...] = (
         True,
     ),
     Standard("CFR803_17", "21 CFR 803.17", "Written MDR procedures", UNITED_STATES),
+    # Cited by a customer's own guide question on VMSR participation (T-G15, 0.10.59): starter text.
+    Standard(
+        "CFR803_19",
+        "21 CFR 803.19",
+        "Exemptions, variances and alternative reporting (FDA's VMSR program)",
+        UNITED_STATES,
+        True,
+    ),
     Standard("CFR803_50", "21 CFR 803.50", "30-day reports by manufacturers", UNITED_STATES),
     Standard("CFR803_53", "21 CFR 803.53", "5-day reports", UNITED_STATES),
     Standard("CFR11_10E", "21 CFR 11.10(e)", "Audit trails", UNITED_STATES),

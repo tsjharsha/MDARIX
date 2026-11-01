@@ -39,4 +39,5 @@ from backend.app.db.models.market_assessment import *
 from backend.app.db.models.complaint_disposition import *
 from backend.app.db.models.intake import *
 from backend.app.db.models.authority_reports import *
+from backend.app.db.models.guides_communications import *
 from backend.app.db.models.case_ai import *

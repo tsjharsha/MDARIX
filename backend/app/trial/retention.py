@@ -66,6 +66,12 @@ TRIAL_DATA_TABLES = (
     "complaint_reportability",
     "reportability_settings",
     "capa_effectiveness_checks",
+    # Communications log entries, their parties and settings, and the customer's guide versions (tr06): entries on
+    # the complaints listed below, before their parties.
+    "communication_entries",
+    "external_parties",
+    "communication_settings",
+    "decision_guide_versions",
     # Report evidence, submissions, snapshots and obligations (tr05): on the complaints and assessments listed below.
     "report_evidence",
     "report_submissions",

@@ -97,6 +97,10 @@ class Question:
     # The answer says whether the harm reaches the market's "serious" threshold (checked against the scale).
     serious: bool = False
     note: str = ""
+    # False once a customer's guide version rewords it (T-G15); an extra question is the customer's own: recorded and
+    # printed with the answer, never part of the conclusion and never required.
+    starter: bool = True
+    extra: bool = False
 
     def as_dict(self) -> dict:
         return {
@@ -107,7 +111,8 @@ class Question:
             "basis": list(self.basis),
             "serious": self.serious,
             "note": self.note or None,
-            "starter": True,
+            "starter": self.starter,
+            "extra": self.extra,
         }
 
 
@@ -488,6 +493,12 @@ def answers_problem(question_set: QuestionSet, answers: dict, *, complete: bool)
     """Why the answers cannot be saved (``complete=False``) or signed (``complete=True``), or None."""
     for question in question_set.questions:
         item = answers.get(question.id)
+        if question.extra:
+            if item is not None and item["answer"] is not None and item["answer"] not in ANSWERS:
+                return f"Question {question.id}: answer Yes, No, Unknown or Not applicable"
+            if item is not None and len(item["rationale"]) > RATIONALE_MAX:
+                return f"Question {question.id}: keep the rationale under {RATIONALE_MAX} characters"
+            continue
         if item is None:
             if complete:
                 return f"Answer question {question.id}: {question.text}"

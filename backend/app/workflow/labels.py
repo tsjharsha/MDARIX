@@ -52,6 +52,9 @@ TASK_TYPES: dict[str, TaskType] = {
     "FIRST_CONTACT_FOLLOW_UP": TaskType("First-contact follow-up", SIGNAL_TRIAGE_PERMISSION, "TRIAGE_LEAD"),
     "QMS_COMPLAINT": TaskType("Create or link the QMS complaint", SIGNAL_TRIAGE_PERMISSION, "TRIAGE_LEAD"),
     "SERVICE_ONLY_REVIEW": TaskType("QA review of a service-only call", QUALITY_REVIEW_PERMISSION, "REVIEWER"),
+    # An information request to a reporter, distributor, hospital or service partner (tr06, G30): its owner's task
+    # until it is answered, closed or unresolved after attempts.
+    "EXTERNAL_REPLY_DUE": TaskType("Reply due from an external contact", SIGNAL_TRIAGE_PERMISSION, "TRIAGE_LEAD"),
 }
 
 # Task types a person finishes by hand (POST /api/v1/tasks/{id}/complete); every other type is finished by the
@@ -80,6 +83,8 @@ SOURCE_LABELS: dict[str, str] = {
     "Capa": "CAPA",
     # A logged contact or an urgent intake (tr04): its follow-ups, QMS-complaint task and QA review.
     "IntakeEvent": "Contact or urgent intake",
+    # A request in the communications log (tr06): its owner's reply-due task.
+    "CommunicationEntry": "Communication",
 }
 
 # Used only when backend/app/role_codes.py does not carry ROLE_LABELS (an older build).

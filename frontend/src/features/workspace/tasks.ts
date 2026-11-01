@@ -1,6 +1,7 @@
 // Pure rules for the task inbox (My Work) and the dashboard's "My work": which tabs exist, where a task opens, how
 // its due date and assignment read, and what each action sends. The server owns every task and decides every action;
 // these only shape what the person sees.
+import { communicationsTab } from "./communications";
 import { titleCase, type Tone } from "../admin/console/dashboardModel";
 import { roleLabel } from "../../app/roles";
 import { safeText } from "../../app/displayId";
@@ -248,6 +249,11 @@ export function taskDestination(
   if (type === "REPORTABILITY_DECISION") return { section: "Complaints", tab: "Reportability" };
   // A call's follow-up, its QMS-complaint task and the QA review of a "service only" open the first contact (0.10.57).
   if (FIRST_CONTACT_TASKS.includes(type)) return { section: "Complaints", tab: "First contact" };
+  // A reply due from an external contact opens the complaint's communications log (0.10.59).
+  if (type === "EXTERNAL_REPLY_DUE") {
+    const complaint = typeof task.details?.complaint_id === "string" ? task.details.complaint_id : null;
+    return { section: "Complaints", tab: communicationsTab(complaint) };
+  }
   if (type === "EFFECTIVENESS_CHECK") {
     const capa = typeof task.details?.capa_id === "string" ? task.details.capa_id : null;
     return { section: "Records", tab: recordsTab(capa) };
