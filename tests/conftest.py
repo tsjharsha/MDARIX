@@ -92,6 +92,7 @@ DB_MODULES = {
     "test_mfa_mvp",
     "test_decision_governance_hardening",
     "test_free_trial",
+    "test_trial_import_reports",
     # The Platform Admin trial overview and request queue with hundreds of trials (statements, pages, filters).
     "test_trial_overview_scale",
     # Getting started › Automatic insights: headline numbers, trend, records and the questions answered in place.

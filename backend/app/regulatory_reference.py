@@ -437,3 +437,36 @@ def approved_imdrf_codes(db: Session, tenant_id, customer_system: str, customer_
         .all()
     )
     return [tuple(row) for row in rows]
+
+
+def approved_links(db: Session, control: Session, tenant_id, customer_system: str, codes: list[str]) -> dict:
+    """``{customer code: [{release, annex, code, term}]}``: the approved IMDRF links of these codes, with each IMDRF
+    term as loaded (the mapping's own release first, else the newest release that has the code; None when no release
+    holds it yet). What a complaint shows beside its problem code."""
+    codes = [code for code in dict.fromkeys(codes) if code][:200]
+    if not codes:
+        return {}
+    rows = (
+        db.query(ImdrfCodeMapping)
+        .filter(
+            ImdrfCodeMapping.tenant_id == tenant_id,
+            ImdrfCodeMapping.customer_system == customer_system,
+            ImdrfCodeMapping.customer_code.in_(codes),
+            ImdrfCodeMapping.status == "APPROVED",
+        )
+        .order_by(ImdrfCodeMapping.customer_code, ImdrfCodeMapping.annex, ImdrfCodeMapping.imdrf_code)
+        .all()
+    )
+    wanted = {(item.annex, item.imdrf_code) for item in rows}
+    terms: dict[tuple, dict[str, str]] = {}
+    if wanted:
+        for item in control.query(ImdrfCode).filter(ImdrfCode.code.in_({code for _, code in wanted})).all():
+            terms.setdefault((item.annex, item.code), {})[item.release] = item.term
+    out: dict[str, list[dict]] = {}
+    for item in rows:
+        by_release = terms.get((item.annex, item.imdrf_code), {})
+        term = by_release.get(item.release) or (by_release[max(by_release)] if by_release else None)
+        out.setdefault(item.customer_code, []).append(
+            {"release": item.release, "annex": item.annex, "code": item.imdrf_code, "term": term}
+        )
+    return out

@@ -58,8 +58,9 @@ class ImportPolicy:
     # A complaints file may name products, versions and lots not loaded yet: with this they are added from it (a free
     # trial starts from one complaints export); without it each must be loaded first (an organization's master data).
     create_references: bool = False
-    # A governed import: rows set aside are stored for correction (R14) and every written row keeps its lineage
-    # (R16); a free trial never stores either.
+    # A governed import: rows set aside are stored for correction (R14), personal data masked, every written row keeps
+    # its lineage (R16) and the run its data-quality report (R17). A free trial is governed too (0.10.56): the trial
+    # and the MVP behave the same once the data is in.
     quarantine: bool = False
 
 
@@ -71,6 +72,7 @@ TRIAL_POLICY = ImportPolicy(
     limit_label="your trial",
     xlsx_max_bytes=20 * 1024 * 1024,
     create_references=True,
+    quarantine=True,
 )
 WORKSPACE_POLICY = ImportPolicy(source=WORKSPACE_UPLOAD_SOURCE, quarantine=True)
 # A complaint's status as its quality system names it (complaints.status holds 40 characters).
@@ -302,6 +304,15 @@ def _personal_data(value: str, labels: bool = True) -> str | None:
         if pattern.search(value):
             return label
     return None
+
+
+def file_label(name: str | None) -> str | None:
+    """The uploaded file's name as a run report shows it: the last part of the path, at most 120 characters, personal
+    data masked (a name such as "complaints from jane.doe@example.com.csv"). None when none was sent."""
+    name = (name or "").replace("\\", "/").rsplit("/", 1)[-1].strip()[:120]
+    if not name:
+        return None
+    return _mask(name) if _personal_data(name) else name
 
 
 def _mask(value: str) -> str:
@@ -1129,8 +1140,8 @@ def import_file(
     # The checked rows themselves: masked where asked, without the rows set aside.
     result = _write_rows(db, tenant_id, entity, rows, policy)
     if policy.quarantine:
-        # A workspace import is governed: each written row keeps its lineage (R16), each set-aside row is stored
-        # for correction (R14), under one import reference that the DATA_IMPORTED audit event also carries.
+        # A governed import: each written row keeps its lineage (R16), each set-aside row is stored for correction
+        # (R14), under one import reference that the import's audit event (DATA_IMPORTED, TRIAL_DATA_IMPORTED) carries.
         from backend.app import import_lineage, import_quarantine
 
         import_ref = uuid.uuid4()

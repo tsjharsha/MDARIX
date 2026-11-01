@@ -13,8 +13,9 @@ sample Decision Brief, written by the sample author and waiting for quality revi
 unless the case already has a brief, and the per-market assessment's sample answers (a signed EU/NI example, a pending
 US draft and the harm complaints' severities, backend/app/trial/sample_assessments.py) unless they are there, and
 the routine complaints with their proposed classifications and a signed service-level example
-(backend/app/trial/sample_dispositions.py) unless they are there. Each trial is committed on its own, with an audit
-event.
+(backend/app/trial/sample_dispositions.py) unless they are there, and the sample's import run with its
+data-quality report, set-aside rows, the products' UDI-DI and GMDN and the IMDRF links of its problem codes
+(backend/app/trial/sample_imports.py) unless it is there. Each trial is committed on its own, with an audit event.
 """
 
 from __future__ import annotations
@@ -73,6 +74,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.trial.sample_assessments import has_sample_assessments, stage_sample_assessments
     from backend.app.trial.sample_decision import has_sample_decision, stage_sample_decision
     from backend.app.trial.sample_dispositions import has_routine_examples, seed_routine_examples
+    from backend.app.trial.sample_imports import has_sample_import, stage_sample_import
 
     results = []
     for tenant_id, tenant_key, name in trials(db):
@@ -94,7 +96,15 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             decision_missing = not has_sample_decision(session, tenant_id)
             assessments_missing = not has_sample_assessments(session, tenant_id)
             routine_missing = not has_routine_examples(session, tenant_id)
-            if not (story_missing or lots_missing or decision_missing or assessments_missing or routine_missing):
+            import_missing = not has_sample_import(session, tenant_id)
+            if not (
+                story_missing
+                or lots_missing
+                or decision_missing
+                or assessments_missing
+                or routine_missing
+                or import_missing
+            ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
             if not apply:
@@ -104,6 +114,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *(["the sample decision brief"] if decision_missing else []),
                     *(["the sample market assessments"] if assessments_missing else []),
                     *(["the routine sample complaints"] if routine_missing else []),
+                    *(["the sample import run"] if import_missing else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -116,6 +127,9 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["assessments"] = stage_sample_assessments(session, tenant_id, now)
             if routine_missing:
                 added["routine"] = seed_routine_examples(session, tenant_id, now)
+            if import_missing:
+                # Last: the run's lineage covers every sample complaint, the routine ones included.
+                added["imports"] = stage_sample_import(session, tenant_id, now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,

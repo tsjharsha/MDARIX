@@ -553,6 +553,11 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         from backend.app.trial.sample_dispositions import seed_routine_examples
 
         sample["routine"] = seed_routine_examples(db, tenant.id, now)
+        # The sample's import run with its data-quality report and set-aside rows, the products' UDI-DI and GMDN, and
+        # the IMDRF links of its problem codes (backend/app/trial/sample_imports.py). Last: it reads every complaint.
+        from backend.app.trial.sample_imports import stage_sample_import
+
+        sample["imports"] = stage_sample_import(db, tenant.id, now)
         user = AuthUser(
             id=uuid.uuid4(),
             tenant_id=tenant.id,

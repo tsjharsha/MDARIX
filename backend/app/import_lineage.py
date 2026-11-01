@@ -66,3 +66,61 @@ def of_record(db: Session, tenant_id, entity: str, key: str) -> list[dict]:
         }
         for item in items
     ]
+
+
+def present(db: Session, tenant_id, refs: list[str]) -> set[str]:
+    """Which of these imports still have lineage rows (a sample run's go with the sample data)."""
+    if not refs:
+        return set()
+    rows = (
+        db.query(ImportLineage.import_ref)
+        .filter(ImportLineage.tenant_id == tenant_id, ImportLineage.import_ref.in_([uuid.UUID(ref) for ref in refs]))
+        .distinct()
+        .all()
+    )
+    return {str(ref) for (ref,) in rows}
+
+
+def key_of(db: Session, tenant_id, entity: str, record_id: uuid.UUID) -> tuple[str, str | None]:
+    """A product's, lot's or complaint's lineage key (``record_key``, from its own identifiers) and the system it came
+    from; 404 when the organization has no such record."""
+    from fastapi import HTTPException
+
+    from backend.app.db.models.foundation import Complaint, LotBatch, Product, ProductVersion
+
+    product = (Product.id == Complaint.product_id) & (Product.tenant_id == Complaint.tenant_id)
+    if entity == "complaints":
+        row = (
+            db.query(Complaint.complaint_identifier, Product.product_identifier, Complaint.source_system)
+            .join(Product, product)
+            .filter(Complaint.tenant_id == tenant_id, Complaint.id == record_id)
+            .first()
+        )
+    elif entity == "lots":
+        row = (
+            db.query(
+                LotBatch.lot_identifier,
+                Product.product_identifier,
+                ProductVersion.version_identifier,
+                LotBatch.source_system,
+            )
+            .join(
+                ProductVersion,
+                (ProductVersion.id == LotBatch.product_version_id) & (ProductVersion.tenant_id == LotBatch.tenant_id),
+            )
+            .join(Product, (Product.id == ProductVersion.product_id) & (Product.tenant_id == LotBatch.tenant_id))
+            .filter(LotBatch.tenant_id == tenant_id, LotBatch.id == record_id)
+            .first()
+        )
+    elif entity == "products":
+        row = (
+            db.query(Product.product_identifier, Product.source_system)
+            .filter(Product.tenant_id == tenant_id, Product.id == record_id)
+            .first()
+        )
+    else:
+        raise HTTPException(404, detail={"code": "TEMPLATE_NOT_FOUND", "message": "Unknown template"})
+    if row is None:
+        raise HTTPException(404, detail={"code": "RECORD_NOT_FOUND", "message": "No such record"})
+    *identifiers, source = row
+    return ":".join(str(value or "") for value in identifiers)[:400], source

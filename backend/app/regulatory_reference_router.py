@@ -18,6 +18,8 @@ from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
 router = APIRouter(prefix="/api/v1/regulatory-reference", tags=["Regulatory reference"])
+# The code system of a complaint's own problem code (complaints.problem_code), as its IMDRF mappings name it.
+PROBLEM_CODES = "problem_code"
 
 
 def _tenant(ctx: AuthenticatedRequestContext) -> uuid.UUID:
@@ -162,6 +164,19 @@ def imdrf_codes(
     db: Session = Depends(get_db),
 ):
     return {"codes": reference.search_codes(db, release, annex, q)}
+
+
+@router.get("/imdrf/links")
+def imdrf_links(
+    code: list[str] = Query(default=[]),
+    customer_system: str = Query(default=PROBLEM_CODES, max_length=80),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The approved IMDRF codes, with their terms, of the organization's own codes (by default its complaints'
+    problem codes): ``?code=PRESSURE_ALARM&code=NFF``."""
+    return {"links": reference.approved_links(data, db, _tenant(ctx), customer_system, [c[:120] for c in code])}
 
 
 @router.get("/imdrf/mappings")

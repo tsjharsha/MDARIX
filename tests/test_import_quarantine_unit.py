@@ -32,9 +32,17 @@ def test_personal_data_is_masked_before_storing():
     assert imports._personal_data(stored["description"], labels=False) is None
 
 
-def test_only_workspace_imports_store_rows():
+def test_workspace_and_trial_imports_store_rows():
+    # The trial and the MVP behave the same once the data is in (0.10.56).
     assert imports.WORKSPACE_POLICY.quarantine is True
-    assert imports.TRIAL_POLICY.quarantine is False
+    assert imports.TRIAL_POLICY.quarantine is True
+
+
+def test_a_file_name_keeps_its_last_part_without_personal_data():
+    assert imports.file_label("C:\\exports\\complaints-2026.xlsx") == "complaints-2026.xlsx"
+    assert imports.file_label("/tmp/a/b.csv") == "b.csv"
+    assert imports.file_label("  ") is None and imports.file_label(None) is None
+    assert "jane.doe@example.com" not in imports.file_label("from jane.doe@example.com.csv")
 
 
 class _Session:
