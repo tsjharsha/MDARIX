@@ -30,9 +30,10 @@ def header_lines(view: dict, organization: str | None) -> list[str]:
     )
     lines = [
         f"Organization: {organization or '-'}",
-        f"Form version: {view['form']['version']}. {view['form']['authority']}",
-        f"Complaint {complaint['ref']} ({complaint['product_name'] or '-'} {complaint['version'] or ''}), "
-        f"{view['market_label']}; {state}",
+        f"Form version: {view['form']['version']}",
+        f"Authority: {view['form']['authority']}",
+        f"Complaint {complaint['ref']}: {complaint['product_name'] or '-'} {complaint['version'] or ''}",
+        f"Market: {view['market_label']}; {state}",
         f"Deadline: {view['deadline']['due_on'] or 'not set'}"
         + (" (provisional)" if view["deadline"]["provisional"] else ""),
         DRAFT_LINE,
@@ -51,7 +52,7 @@ def _status(item: dict) -> str:
     source = item.get("source") or {}
     where = source.get("label") or ""
     ref = f" ({source['ref']})" if source.get("ref") else ""
-    by = f" by {item['by']}" if item.get("by") else ""
+    by = f": {item['by']}" if item.get("by") else ""
     return f"[{item['status_label']}{by}]" + (f" {where}{ref}" if where else "")
 
 
@@ -80,7 +81,7 @@ def manifestation(view: dict) -> list[str]:
 
 
 def lines(view: dict) -> list[tuple[str, str]]:
-    clauses = "; ".join(f"{chip['short']} {chip['title']}" for chip in view["form"]["clauses"])
+    clauses = "; ".join(f"{chip['short']}: {chip['title']}" for chip in view["form"]["clauses"])
     out: list[tuple[str, str]] = [
         (f"Field order: {view['form']['source_document']}.", "muted"),
         (f"Clauses: {clauses} (pending approval)" if clauses else "", "muted"),
@@ -109,7 +110,7 @@ def render_pdf(view: dict, organization: str | None) -> bytes:
     watermark = (
         "PRACTICE RECORD - NOT YOUR REGULATORY RECORD" if view.get("practice_label") else "DRAFT - MDARIX NEVER SUBMITS"
     )
-    footer = f"{organization or ''} - {view['form']['version']} - {view['complaint']['ref']} - draft, never submitted by MDARIX"
+    footer = f"{view['complaint']['ref']} - {view['form']['version']} - MDARIX never submits"
     return pdf.render(
         f"MDARIX {_title(view)}", header_lines(view, organization), lines(view), watermark=watermark, footer=footer
     )

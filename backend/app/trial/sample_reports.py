@@ -76,6 +76,7 @@ US_ENTRIES = {
     "D2A": "SMP (sample: your FDA product code)",
     "D3": "Orbit Medical Devices (Sample), Springfield, US",
     "G1": "Orbit Medical Devices (Sample), 1 Sample Way, Springfield, US; vigilance office (sample)",
+    "G2": "Health professional",
     "G4": "SAMPLE-510K-0001 (sample)",
     "G8": "SAMPLE-0000000-2026-00001 (sample)",
     "H6_CONCLUSIONS": "Entered in eSubmitter from the IMDRF Annex D release (sample)",

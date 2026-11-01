@@ -207,7 +207,7 @@ FDA_3500A = Form(
                 Field("H10", "H10", "Related report number"),
                 Field("H11", "H11", "Additional manufacturer narrative", "case", LATER),
             ),
-            "H6 codes come from your approved IMDRF mappings of the complaint's problem code (Records › Reference data).",
+            "H6 codes come from your approved IMDRF mappings of the complaint's problem code (Records > Reference data).",
         ),
     ),
     (

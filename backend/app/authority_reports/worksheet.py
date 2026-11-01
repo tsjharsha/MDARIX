@@ -18,11 +18,13 @@ from backend.app.authority_reports import forms
 from backend.app.reportability import markets
 
 FROM_RECORD, ENTERED, CONFIRMED, OUTSIDE = "FROM_RECORD", "ENTERED", "CONFIRMED", "OUTSIDE"
+FICTIONAL_STATUS = "FICTIONAL"
 STATUS_LABELS = {
     FROM_RECORD: "From record",
     ENTERED: "Entered by a person",
     CONFIRMED: "Confirmed",
     OUTSIDE: "Enter in the authority's route",
+    FICTIONAL_STATUS: "Fictional (sample only)",
     **forms.MISSING_LABELS,
 }
 VALUE_MAX = 4000
@@ -473,7 +475,7 @@ def build(
             elif item.source:
                 found = SOURCES[item.source](context)
             value, source = found if found and found[0] else (None, None)
-            status = FROM_RECORD if value else None
+            status = (FICTIONAL_STATUS if item.personal else FROM_RECORD) if value else None
             if not item.personal and entry.get("value"):
                 value, status, source = entry["value"], ENTERED, None
             elif value and entry.get("confirmed"):

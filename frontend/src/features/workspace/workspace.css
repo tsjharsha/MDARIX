@@ -4474,3 +4474,10 @@ div.uw-task-count:hover {
 .uw-rp-reopen {
   margin-top: 10px;
 }
+.uw-rp .ca-check {
+  justify-content: flex-start;
+}
+.uw-rp .ca-check input {
+  width: auto;
+  flex: none;
+}

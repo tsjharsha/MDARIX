@@ -235,8 +235,15 @@ export function stepIndex(state: ObligationState): number {
   return -1;
 }
 
-export function deadlineText(item: { due_on: string | null; days_left: number | null; provisional: boolean }): string {
+/** The states in which the obligation's deadline is met (the server's rules.MET). */
+export const MET_STATES: readonly ObligationState[] = ["ACCEPTED", "SUBMITTED_NO_ACK", "FOLLOW_UP_DUE", "COMPLETE"];
+
+export function deadlineText(
+  item: { due_on: string | null; days_left: number | null; provisional: boolean },
+  state?: ObligationState,
+): string {
   if (!item.due_on) return "No deadline yet";
+  if (state && MET_STATES.includes(state)) return `Deadline ${item.due_on}: met by the submission`;
   const left =
     item.days_left === null
       ? ""
@@ -257,6 +264,7 @@ export function summaryLine(counts: Record<string, number>): string {
   const later = n("MAY_BE_UNKNOWN") + n("FOLLOW_UP");
   if (later) parts.push(`${later} may wait`);
   if (n("OUTSIDE")) parts.push(`${n("OUTSIDE")} entered in the authority's route`);
+  if (n("FICTIONAL")) parts.push(`${n("FICTIONAL")} fictional (sample only)`);
   return parts.join(" · ");
 }
 

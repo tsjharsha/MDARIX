@@ -115,7 +115,7 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
                   <q className="uw-cr-text uw-cr-clip">{item.description}</q>
                   <p className="uw-cr-meta">
                     <span className={`uw-clock tone-${item.overdue ? "critical" : "neutral"}`}>
-                      {deadlineText(item)}
+                      {deadlineText(item, item.state)}
                     </span>
                     {item.assessment ? ` · Assessment: ${item.assessment}` : ""} · Next: {item.next_step}
                   </p>
@@ -186,7 +186,7 @@ export function ReportDrawer({
       <div className="uw-dp uw-rp">
         <div className="uw-cr-decision">
           <ToneBadge tone={stateTone(detail.state, detail.deadline.overdue)} label={detail.state_label} />
-          <span className="uw-cr-meta">{deadlineText(detail.deadline)}</span>
+          <span className="uw-cr-meta">{deadlineText(detail.deadline, detail.state)}</span>
           <span className="uw-cr-meta">
             {detail.form.version} · {detail.market_label}
             {detail.complaint.sample ? " · sample" : ""}
@@ -786,12 +786,8 @@ function Worksheet({
     <section className="ca-drawer-section" aria-label="The worksheet">
       <h4>The worksheet, in the authority's field order</h4>
       <p className="uw-cr-meta">{summaryLine(detail.counts)}</p>
-      {detail.sections.map((section, index) => (
-        <details
-          key={section.code}
-          className="uw-rp-section"
-          open={index < 3 || section.fields.some((item) => item.status === "MUST_HAVE")}
-        >
+      {detail.sections.map((section) => (
+        <details key={section.code} className="uw-rp-section" open={section.fields.length > 0}>
           <summary>
             {section.title}
             {section.fields.length ? ` (${section.fields.length})` : ""}

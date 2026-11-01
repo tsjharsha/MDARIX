@@ -718,7 +718,7 @@ class ApproveRequest(BaseModel):
 
 def signature_meaning(form_title: str, version: int, ref: str) -> str:
     return (
-        f"I approve snapshot {version} of the {form_title.lower()} for {ref} as the content to submit. MDARIX does not "
+        f"I approve snapshot {version} of the {form_title} for {ref} as the content to submit. MDARIX does not "
         "submit it."
     )
 
@@ -1308,7 +1308,7 @@ def export(
                     "signer_name": _names(control_db, tenant_id, [record.signer_user_id]).get(record.signer_user_id)
                     or "A colleague",
                     "signer_role": (record.signer_role or "").replace("_", " ").title(),
-                    "signed_at": _iso(record.signed_at),
+                    "signed_at": record.signed_at.isoformat(timespec="seconds") if record.signed_at else None,
                     "meaning": record.signature_meaning,
                     "record_business_id": record.business_id,
                     "record_id": str(record.id),

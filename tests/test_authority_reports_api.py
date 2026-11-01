@@ -123,9 +123,7 @@ def test_rv06_drafts_a_3500a_worksheet_in_field_order_with_a_status_on_every_fie
     assert fields["G6"]["value"] == "30-day; Initial" and fields["G6"]["source"]["type"] == "MarketAssessment"
     assert fields["MFR_REPORT"]["status"] == "MUST_HAVE"
     # The sample's patient fields keep their place, filled with fictional values.
-    assert (
-        fields["A1"]["value"] == "PT-0006 (fictional)" and fields["A1"]["source"]["label"] == "Fictional sample value"
-    )
+    assert fields["A1"]["value"] == "PT-0006 (fictional)" and fields["A1"]["status"] == "FICTIONAL"
     assert detail["practice_label"] and detail["starter_mark"] and "never submits" in detail["never_submits"]
 
 
