@@ -1,12 +1,13 @@
 """The sample's own decision guide versions and communications log (T-G15, T-G30; T-SAM for 0.10.59).
 
 - **A customer version of the US guide:** US-v2 (fictional, clearly sample), prepared by the sample author from the
-  starter: the three serious-injury parts carry the organization's own help text, and an extra question asks whether
-  the organization takes part in FDA's VMSR program (21 CFR 803.19), both with their clause and basis. Its test cases
+  starter: the three serious-injury parts keep MDARIX's locked wording and carry the organization's own explanation
+  beside it (part (c) also its examples), and an extra question asks whether the organization takes part in FDA's VMSR
+  program (21 CFR 803.19), with its clause and basis. Its test cases
   (the starter's) pass; the sample approver (the second sample account of 0.10.58) approved it, so it is the US guide
   in use. Assessments started from then on use it; the RV-08 draft, started before, keeps US-starter-1.
-- **A draft US-v3** with one test case of the organization's own that fails ("outcome unknown: expected not
-  reportable", while Unknown is never No): the publish gate shows it.
+- **A draft US-v3** whose test matrix has one worked complaint of the organization's own that fails ("outcome
+  unknown: expected not reportable", while Unknown is never No): it cannot be sent for approval.
 - **The communications log:** on SAMPLE-RV-08 (outcome not known) a request to the reporter for the patient's outcome,
   raised by its Unknown answers, with two unanswered attempts and its reply overdue; on SAMPLE-RV-03 a distributor's
   question answered (the reply recorded, its QMS record linked by ID); on SAMPLE-RV-01 a request to the hospital's
@@ -44,6 +45,10 @@ VMSR_QUESTION = {
     "clause": "21 CFR 803.19 (VMSR program)",
     "basis": ["CFR803_19"],
 }
+INJURY_EXAMPLES = (
+    "Sample examples: a cut closed with sutures to prevent permanent scarring is part (c); a bruise that healed without "
+    "treatment is not."
+)
 V2_REASON = (
     "Sample: our own help text on the three serious-injury parts (procedure QP-08), and the VMSR question our "
     "reporting procedure asks."
@@ -101,7 +106,10 @@ def _guides(db, tenant_id, author: str, approver: str, now: datetime) -> dict:
     made = now - timedelta(days=5)
     v2 = router.start_draft(db, tenant_id, us, author, made, SAMPLE_SOURCE)
     questions = [
-        {**item, "note": INJURY_HELP} if item["id"] in ("US2A", "US2B", "US2C") else item for item in v2.questions
+        {**item, "explanation": INJURY_HELP, "examples": INJURY_EXAMPLES if item["id"] == "US2C" else ""}
+        if item["id"] in ("US2A", "US2B", "US2C")
+        else item
+        for item in v2.questions
     ]
     questions, problem = rules.clean_questions(us, [*questions, VMSR_QUESTION])
     assert problem is None, problem
@@ -138,6 +146,30 @@ def _guides(db, tenant_id, author: str, approver: str, now: datetime) -> dict:
     router.save(db, v3, v3.questions, tests, author, started + timedelta(hours=1))
     results = router.run_tests(db, v3, author, started + timedelta(hours=2))
     return {"published": v2.code, "draft": v3.code, "draft_failing": results["failed"]}
+
+
+def relock_sample_drafts(db: Session, tenant_id, apply: bool) -> int:
+    """0.10.64: a sample guide version being prepared, seeded before the core wording was locked, takes MDARIX's wording
+    back (its help text becomes its explanation) and MDARIX's starter worked complaints, and its matrix is run again,
+    so it fails only on its own worked complaint as in a new trial. Returns how many changed (or would); idempotent."""
+    from backend.app.db.models.guides_communications import DecisionGuideVersion
+    from backend.app.decision_guides import router, rules
+
+    changed = 0
+    for row in db.query(DecisionGuideVersion).filter(
+        DecisionGuideVersion.tenant_id == tenant_id,
+        DecisionGuideVersion.source_system == SAMPLE_SOURCE,
+        DecisionGuideVersion.state.in_(rules.OPEN_STATES),
+    ):
+        questions = rules.relocked(row.market, row.questions or [])
+        tests, problem = rules.clean_tests(row.market, row.test_cases or [])
+        if problem or (questions == row.questions and tests == row.test_cases):
+            continue
+        changed += 1
+        if apply:
+            router.save(db, row, questions, tests, row.updated_by or "system:trial-sample", row.updated_at)
+            router.run_tests(db, row, row.updated_by or "system:trial-sample", row.updated_at)
+    return changed
 
 
 def _party(

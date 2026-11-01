@@ -62,8 +62,15 @@ NEVER_DECIDES = (
     "and never submits."
 )
 CORE_RULE = (
-    "The questions that drive the conclusion can be reworded and clarified, not removed, and their conclusion logic "
-    "stays fixed. Extra questions are recorded and printed with the answers; they never change the conclusion."
+    "The questions that drive the conclusion keep the regulation's wording: the question, its definition and its clause "
+    "are locked, and you add your own explanation and examples beside them. They cannot be removed, and their "
+    "conclusion logic stays fixed. Extra questions are recorded and printed with the answers; they never change the "
+    "conclusion."
+)
+MATRIX_RULE = (
+    "The test matrix: worked complaints with the answer this market's guide must point to. MDARIX's starter rows are in "
+    "every version; add your own. A version is sent for approval only when every row passes, and its approval runs the "
+    "matrix again: a changed answer blocks it."
 )
 SCALE_NOTE = "The harm-severity scale stays MDARIX's fixed starter scale in the trial (scale-starter-1)."
 
@@ -186,7 +193,7 @@ def _starter_view(market: str, superseded: bool) -> dict:
         "starter": True,
         "based_on": None,
         "question_set": question_set.as_dict(),
-        "test_cases": tests,
+        "test_cases": [{**test, "starter": True} for test in tests],
         "test_results": {
             "fingerprint": fingerprint,
             "results": results,
@@ -197,6 +204,7 @@ def _starter_view(market: str, superseded: bool) -> dict:
             "run_by": "MDARIX",
         },
         "problems": [],
+        "matrix_changed": [],
         "change_reason": "MDARIX's starter guide, written from the regulation's definitions.",
         "editors": [],
         "requested_by": None,
@@ -227,7 +235,7 @@ def version_view(control_db, row: DecisionGuideVersion, names: dict, signature: 
         "starter": False,
         "based_on": row.based_on,
         "question_set": question_set.as_dict(),
-        "test_cases": row.test_cases or [],
+        "test_cases": [{**test, "starter": rules.is_starter_row(row.market, test)} for test in row.test_cases or []],
         "test_results": (
             {
                 **results,
@@ -237,8 +245,12 @@ def version_view(control_db, row: DecisionGuideVersion, names: dict, signature: 
             if results
             else None
         ),
-        "problems": rules.publish_problems(row.questions or [], row.test_cases or [], results, fingerprint)
+        "problems": rules.publish_problems(row.market, row.questions or [], row.test_cases or [], results, fingerprint)
         if row.state in rules.OPEN_STATES
+        else [],
+        # The matrix run again now, for the approver: any row listed blocks the approval.
+        "matrix_changed": [item["name"] for item in rules.changed_rows(row.market, row.test_cases or [])]
+        if row.state == rules.AWAITING
         else [],
         "change_reason": row.change_reason,
         "editors": [names.get(ref) or "A colleague" for ref in row.editors or []],
@@ -312,6 +324,7 @@ def detail(db, control_db, ctx, market: str, version: int) -> dict:
             if code.startswith(rules.PREFIX[market] + "_")
         ],
         "core_rule": CORE_RULE,
+        "matrix_rule": MATRIX_RULE,
         "never_decides": NEVER_DECIDES,
         "scale_note": SCALE_NOTE,
         "starter_mark": STARTER_MARK,
@@ -396,7 +409,10 @@ def start_draft(db, tenant_id, market: str, actor: str, now: datetime, source_sy
         raise _error(409, "DRAFT_EXISTS", "A version of this guide is already being prepared: open it")
     published = next((row for row in rows if row.state == rules.PUBLISHED), None)
     if published is not None:
-        questions, tests, based_on = published.questions, published.test_cases, published.code
+        # A version signed before 0.10.64 may have reworded a core question: the copy takes MDARIX's wording back.
+        questions, based_on = rules.relocked(market, published.questions or []), published.code
+        tests, problem = rules.clean_tests(market, published.test_cases or [])
+        assert problem is None, problem
     else:
         base = rules.starter(market)
         questions = [rules.question_dict(question) for question in base.questions]
@@ -443,12 +459,15 @@ def create_draft(
 
 
 class QuestionIn(BaseModel):
+    # A core question's locked fields are left out (or sent unchanged); an extra question gives them all.
     id: str = Field(default="", max_length=10)
-    text: str = Field(max_length=rules.TEXT_MAX * 2)
-    definition: str | None = Field(default="", max_length=rules.DEFINITION_MAX * 2)
-    note: str | None = Field(default="", max_length=rules.NOTE_MAX * 2)
-    clause: str | None = Field(default="", max_length=rules.CLAUSE_MAX * 2)
-    basis: list[str] = Field(default_factory=list, max_length=10)
+    text: str | None = Field(default=None, max_length=rules.TEXT_MAX * 2)
+    definition: str | None = Field(default=None, max_length=rules.DEFINITION_MAX * 2)
+    note: str | None = Field(default=None, max_length=rules.NOTE_MAX * 2)
+    clause: str | None = Field(default=None, max_length=rules.CLAUSE_MAX * 2)
+    basis: list[str] | None = Field(default=None, max_length=10)
+    explanation: str | None = Field(default=None, max_length=rules.OWN_MAX * 2)
+    examples: str | None = Field(default=None, max_length=rules.OWN_MAX * 2)
 
 
 class TestIn(BaseModel):
@@ -541,7 +560,7 @@ def run_version_tests(
     if row.state not in rules.OPEN_STATES:
         raise _error(409, "NOT_A_DRAFT", "The tests of a published version were run before its approval")
     if not row.test_cases:
-        raise _error(422, "NO_TESTS", "Add at least one test case")
+        raise _error(422, "NO_TESTS", "Add at least one worked complaint to the test matrix")
     results = run_tests(db, row, str(ctx.user_id), _now())
     _audit(db, ctx, "DECISION_GUIDE_TESTS_RUN", row, market, passed=results["passed"], failed=results["failed"])
     db.commit()
@@ -555,7 +574,9 @@ class ApprovalRequest(BaseModel):
 def request_approval(db, row: DecisionGuideVersion, reason: str, actor: str, now: datetime) -> None:
     """Ask a second person to approve (shared with the sample). Refused while anything blocks publication."""
     fingerprint = _fingerprint(row.market, row.code, row.questions or [], row.test_cases or [])
-    problems = rules.publish_problems(row.questions or [], row.test_cases or [], row.test_results, fingerprint)
+    problems = rules.publish_problems(
+        row.market, row.questions or [], row.test_cases or [], row.test_results, fingerprint
+    )
     if problems:
         raise _error(409, "NOT_READY_TO_PUBLISH", problems[0], problems=problems)
     if len(reason) < rules.REASON_MIN:
@@ -676,6 +697,18 @@ def approve(
         _audit(db, ctx, "DECISION_GUIDE_APPROVAL_REFUSED", row, market, reason=problem)
         db.commit()
         raise _error(403, "SECOND_PERSON_REQUIRED", problem)
+    changed = rules.changed_rows(market, row.test_cases or [])
+    if changed:
+        names = [item["name"] for item in changed]
+        _audit(db, ctx, "DECISION_GUIDE_APPROVAL_REFUSED", row, market, reason="MATRIX_CHANGED", rows=names)
+        db.commit()
+        raise _error(
+            409,
+            "MATRIX_CHANGED",
+            f"The test matrix gives a different answer now for: {'; '.join(names)}. Its author changes the version and "
+            "sends it again",
+            rows=names,
+        )
 
     def refused(action: str) -> None:
         control_db.add(

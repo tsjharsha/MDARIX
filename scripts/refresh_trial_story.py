@@ -20,7 +20,8 @@ triage record (backend/app/trial/sample_intake.py) unless they are there, and th
 finished US example, an India complaint with a rejected attempt, and India in the sample's own reporting windows,
 backend/app/trial/sample_reports.py) unless they are there, and the sample's own US guide version, a draft whose test
 fails, and the communications log's examples (backend/app/trial/sample_guides.py; the open request is owned by the
-trial's first user) unless they are there, and the sample author's absence with the trial's first user as backup and
+trial's first user) unless they are there (a sample draft seeded before 0.10.64 takes the locked wording and MDARIX's
+starter worked complaints, and its matrix is run again), and the sample author's absence with the trial's first user as backup and
 the two events that user owns (backend/app/trial/sample_oversight.py) unless they are there, and the lot genealogy, the
 three OrbitCare lots without complaints and the distribution with its import run for a case's Lot impact
 (backend/app/trial/sample_lot_impact.py; lot 005 then releases 60 units and the new lots 30 each, made the same day, so
@@ -86,7 +87,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.trial.sample_dispositions import has_routine_examples, seed_routine_examples
     from backend.app.trial.sample_imports import has_sample_import, stage_sample_import
     from backend.app.trial.sample_intake import has_sample_intake, stage_sample_intake
-    from backend.app.trial.sample_guides import has_sample_guides, stage_sample_guides
+    from backend.app.trial.sample_guides import has_sample_guides, relock_sample_drafts, stage_sample_guides
     from backend.app.trial.sample_oversight import has_sample_oversight, stage_sample_oversight
     from backend.app.trial.sample_lot_impact import has_sample_lot_impact, stage_sample_lot_impact
     from backend.app.trial.sample_reports import has_sample_reports, stage_sample_reports
@@ -115,6 +116,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             intake_missing = not has_sample_intake(session, tenant_id)
             reports_missing = not has_sample_reports(session, tenant_id)
             guides_missing = not has_sample_guides(session, tenant_id)
+            guides_unlocked = relock_sample_drafts(session, tenant_id, apply=False)
             oversight_missing = not has_sample_oversight(session, tenant_id)
             lot_impact_missing = not has_sample_lot_impact(session, tenant_id)
             if not (
@@ -127,6 +129,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or intake_missing
                 or reports_missing
                 or guides_missing
+                or guides_unlocked
                 or oversight_missing
                 or lot_impact_missing
             ):
@@ -143,6 +146,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *(["the sample first contacts and urgent intake"] if intake_missing else []),
                     *(["the sample report worksheets"] if reports_missing else []),
                     *(["the sample guide versions and communications log"] if guides_missing else []),
+                    *(["the locked wording and starter matrix in the sample guide draft"] if guides_unlocked else []),
                     *(["the sample absence and event owners"] if oversight_missing else []),
                     *(["the sample lot genealogy and distribution"] if lot_impact_missing else []),
                 ]
@@ -166,6 +170,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["reports"] = stage_sample_reports(session, tenant_id, now)
             if guides_missing:
                 added["guides"] = stage_sample_guides(session, tenant_id, now)
+            if guides_unlocked:
+                added["guide_drafts_relocked"] = relock_sample_drafts(session, tenant_id, apply=True)
             if oversight_missing:
                 added["oversight"] = stage_sample_oversight(session, tenant_id, now)
             if lot_impact_missing:

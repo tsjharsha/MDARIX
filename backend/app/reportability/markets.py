@@ -97,10 +97,14 @@ class Question:
     # The answer says whether the harm reaches the market's "serious" threshold (checked against the scale).
     serious: bool = False
     note: str = ""
-    # False once a customer's guide version rewords it (T-G15); an extra question is the customer's own: recorded and
-    # printed with the answer, never part of the conclusion and never required.
+    # False when a customer's guide version of 0.10.59-0.10.63 reworded it (T-G15; locked from 0.10.64); an extra
+    # question is the customer's own: recorded and printed with the answer, never part of the conclusion and never
+    # required.
     starter: bool = True
     extra: bool = False
+    # The organization's own explanation and examples beside the locked wording (0.10.64).
+    explanation: str = ""
+    examples: str = ""
 
     def as_dict(self) -> dict:
         return {
@@ -113,6 +117,8 @@ class Question:
             "note": self.note or None,
             "starter": self.starter,
             "extra": self.extra,
+            "explanation": self.explanation or None,
+            "examples": self.examples or None,
         }
 
 
