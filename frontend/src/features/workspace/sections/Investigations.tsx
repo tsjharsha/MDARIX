@@ -29,6 +29,7 @@ import { Embedded, StatusBadge } from "./common";
 import { localDay } from "../workspaceModel";
 import { CaseDue, CaseHeader, CasePriority, CaseStateBadge } from "./CaseHeader";
 import { CaseScopePanel } from "./CaseScope";
+import { LotImpactPanel } from "./LotImpact";
 import { CaseIntelligencePanel } from "./CaseIntelligence";
 import { CaseReviewsPanel, ReviewDrawer } from "./CaseReviews";
 import { CaseDecisionBriefPanel } from "./CaseDecisionBrief";
@@ -83,7 +84,7 @@ const CASE_PAGE_TABS = [
 type Tab = (typeof TABS)[number] | (typeof CASE_PAGE_TABS)[number];
 
 export function InvestigationsSection({ tab: requested }: { tab?: string }) {
-  const { work, open, reportStep } = useWorkspace();
+  const { work, open, reportStep, isTrial } = useWorkspace();
   // Under the MVP feature set the case story is parked and the decision is taken on this case's Decision tab
   // (featureSet.ts).
   const featureSet = useFeatureSet();
@@ -113,6 +114,14 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
         : "All investigations",
   );
   const [starting, setStarting] = useState(() => prefill !== null);
+  // Lot impact (a free trial, T-G5) is a section of the Scope step, versioned with the case scope: the case summary's
+  // Lot impact button opens Scope there. Each part is read again when the other saves a new scope version.
+  const [lotFocus, setLotFocus] = useState(false);
+  const [scopeRound, setScopeRound] = useState(0);
+  const [lotRound, setLotRound] = useState(0);
+  useEffect(() => {
+    if (active !== "Scope") setLotFocus(false);
+  }, [active]);
   // The Decision tab's "Review the brief first" opens the Decision Brief tab on its quality review.
   const [reviewFocus, setReviewFocus] = useState(false);
   useEffect(() => {
@@ -281,6 +290,14 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
                 investigationId={work.investigationId}
                 row={selected}
                 onManage={canOpen && selected ? () => setManaging(selected) : undefined}
+                onLotImpact={
+                  isTrial
+                    ? () => {
+                        setLotFocus(true);
+                        setActive("Scope");
+                      }
+                    : undefined
+                }
                 onStep={goToStep}
                 onChanged={() => {
                   all.reload();
@@ -338,11 +355,23 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
           ))}
         {active === "Scope" &&
           (work.investigationId ? (
-            <CaseScopePanel
-              key={work.investigationId}
-              investigationId={work.investigationId}
-              caseQuestion={selected?.investigation_question ?? undefined}
-            />
+            <>
+              <CaseScopePanel
+                key={`scope:${work.investigationId}:${scopeRound}`}
+                investigationId={work.investigationId}
+                caseQuestion={selected?.investigation_question ?? undefined}
+                onChanged={() => setLotRound((value) => value + 1)}
+              />
+              {isTrial && (
+                <LotImpactPanel
+                  key={`lot:${work.investigationId}:${lotRound}`}
+                  investigationId={work.investigationId}
+                  caseLabel={selected ? displayId(selected, "investigation_identifier") : "this case"}
+                  focus={lotFocus}
+                  onChanged={() => setScopeRound((value) => value + 1)}
+                />
+              )}
+            </>
           ) : (
             <Panel title="No investigation selected">
               <Empty

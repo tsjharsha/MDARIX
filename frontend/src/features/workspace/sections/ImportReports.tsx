@@ -26,6 +26,8 @@ export type QualityReport = {
   rows_changed: number | null;
   rows_new: number | null;
   balanced: boolean;
+  /** A distribution file: the lots whose units shipped now exceed the units they released (flagged, not refused). */
+  flags?: { lot_id: string; released: number; shipped: number; message: string }[];
 };
 export type ImportRun = {
   import_ref: string;
@@ -40,6 +42,8 @@ export type ImportRun = {
 };
 export type SetAsideRow = {
   id: string;
+  /** The file's template: only a complaints row can be a complaint to triage. */
+  entity?: string;
   line: number;
   row: Record<string, string>;
   problems: string[];
@@ -83,6 +87,17 @@ export function runChecks(run: Pick<ImportRun, "report" | "masked_values">): Che
         ? `${countOf(report.rows_quarantined, "row")} set aside with ${report.rows_quarantined === 1 ? "its reason" : "their reasons"}: fix them in your file and import it again.`
         : "No row was set aside.",
     },
+    ...(report.flags
+      ? [
+          {
+            label: "Units shipped within units released",
+            ok: report.flags.length === 0,
+            detail: report.flags.length
+              ? `${countOf(report.flags.length, "lot")} shipped more units than released: ${report.flags.map((flag) => flag.message).join(" ")}`
+              : "No lot shipped more units than it released.",
+          },
+        ]
+      : []),
     ...(run.masked_values
       ? [
           {
@@ -308,9 +323,9 @@ function SetAsideRows({ source }: { source: ReturnType<typeof useResource<Quaran
                     <small className="uw-flag-critical" title={`Suggests harm: ${row.harm_words.join(", ")}`}>
                       Suggests harm: on the triage list
                     </small>
-                  ) : (
+                  ) : !row.entity || row.entity === "complaints" ? (
                     <EscalateButton kind="QUARANTINE" id={row.id} label="Triage" />
-                  )}
+                  ) : null}
                 </td>
                 <td>
                   <ul className="uw-trial-issues">

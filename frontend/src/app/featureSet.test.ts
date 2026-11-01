@@ -158,14 +158,26 @@ describe("feature set", () => {
     expect(operations?.[3]).toEqual(["System health", "Queues & jobs", "Email & notifications", "Problem reports"]);
   });
 
-  it("offers the six data types the MVP reads first, in loading order, and the rest on request", () => {
-    const entities = ["products", "lots", "complaints", "components", "suppliers", "risks", "investigations", "capas"];
+  it("offers the data types the MVP reads first, in loading order, and the rest on request", () => {
+    // A free trial's list also holds distribution (the server offers it to no pilot): it follows the lots.
+    const entities = [
+      "products",
+      "lots",
+      "complaints",
+      "components",
+      "suppliers",
+      "risks",
+      "investigations",
+      "capas",
+      "distribution",
+    ];
     const templates = entities.map((entity) => ({ entity }));
     expect(importTemplatesFor(templates, "full")).toEqual({ core: templates, more: [] });
     const { core, more } = importTemplatesFor(templates, "mvp");
     expect(core.map((item) => item.entity)).toEqual([
       "products",
       "lots",
+      "distribution",
       "complaints",
       "investigations",
       "capas",

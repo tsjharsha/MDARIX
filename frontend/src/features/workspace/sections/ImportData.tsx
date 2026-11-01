@@ -235,7 +235,8 @@ export function ImportPanel({
   useEffect(() => {
     if (complaintsAlone && offersComplaints && !chosen.current) setEntity("complaints");
   }, [complaintsAlone, offersComplaints]);
-  // Under the MVP feature set the six data types its screens read come first; the others are offered on request.
+  // Under the MVP feature set the data types its screens read come first (in a trial, distribution too); the others are
+  // offered on request.
   const { core, more } = importTemplatesFor(templates, useFeatureSet());
   const [showMore, setShowMore] = useState(false);
   const shown = showMore ? [...core, ...more] : core;
@@ -361,7 +362,7 @@ export function ImportPanel({
           }}
         >
           {showMore
-            ? "Show only the six data types the checks read"
+            ? `Show only the first ${core.length} data types`
             : `Show ${more.length} more data types for deeper investigations (components, suppliers, changes…)`}
         </button>
       )}

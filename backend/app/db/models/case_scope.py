@@ -1,4 +1,4 @@
-"""Investigation scope and evidence review history (migration md29).
+"""Investigation scope and evidence review history (migration md29; excluded lots and the lot impact list, tr08).
 
 - ``investigation_scope_versions``: every version of a case's scope (question, versions, included and excluded
   complaints with reasons, lots, markets, dates, failure modes, objectives). The latest version is the current scope;
@@ -80,6 +80,10 @@ class InvestigationScopeVersion(Base):
     failure_mode_ids: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     date_from = mapped_column(Date)
     date_to = mapped_column(Date)
+    # tr08 (lot impact, T-G5): [{lot_id, reason}] lots a person left out of the case, and the lot impact list's
+    # suspect factor and its last signed snapshot (backend/app/lot_impact/service.py); null before a factor is chosen.
+    excluded_lots: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    lot_impact = mapped_column(JSONB)
     objectives: Mapped[str | None] = mapped_column(Text)
     change_reason: Mapped[str | None] = mapped_column(Text)
     reviews_must_restart: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))

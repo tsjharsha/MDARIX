@@ -10,6 +10,69 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.61] - 2026-11-01
+
+On the trial maintenance line (`release/0.10`): lot impact on a case (T-G5, MVP G5, with G26's lot genealogy in
+cases), in the free trial only: a pilot does not see it until the MVP plan schedules G5 (owner decision, 1 Nov 2026).
+Once a signal is confirmed, the case answers "what else is out there?": every lot that shares the suspect part, how
+many units it released, where they went and how many are still in stock. MDARIX lists; it recommends no recall and no
+other field action, and the person decides any field action in the QMS. Still to come (MVP 1.1): the field action
+itself (G13), field safety notices, consignee acknowledgements, Part 806 and FSCA drafts, and date ranges as a factor.
+
+**Migration, expand-only:** `tr08lotimpact`, chained from `tr07oversight`: one new table (`lot_distributions`) with
+tenant row-level security, and two new columns with defaults on `investigation_scope_versions` (`excluded_lots`,
+`lot_impact`). The table is in the trial's retention list, sample removal, purge and export, and the legacy-plane
+step. No existing row changes; the downgrade drops only what it added. On `mvp-1.0` the forward merge adds a merge
+revision joining its head and `tr08lotimpact`. The API and web images change.
+
+### Added
+
+- **Distribution import** (Import data › Distribution): lot, consignee, country, units and ship date, with the
+  consignee type and reference if the export has them. A consignee is an organization (a hospital, a distributor, a
+  clinic); names of people are refused, as personal data is in every import. Countries are two-letter ISO codes;
+  units are whole numbers of at least one. A row for a lot not loaded is set aside with its reason (0.10.56's
+  set-aside rows, lineage and data-quality report); a lot whose units shipped exceed its units released is flagged in
+  the data-quality report, never refused. A re-upload of the same shipment (lot, consignee, country, ship date)
+  updates it. A pilot's import screen does not offer it.
+- **Lot impact on a case** (Investigations › Scope, its own "Lot impact" section; one click from the case summary):
+  the person chooses the suspect factor: a component lot (from the lot genealogy import), a supplier (a recorded
+  supplier of a part the genealogy names) or a product version. MDARIX suggests the one most of the case's lots share
+  and says why; the person chooses. MDARIX lists every lot that shares it, lots with complaints first (with their
+  complaints and complaints per 1,000 units released), then lots without complaints yet, each with its units
+  released, shipped by country and consignee, still in stock, and the genealogy row behind it. A lot with no
+  distribution imported says "Distribution not imported", never zero units. Totals: lots, complaints, units released,
+  shipped and in stock, and units shipped by country.
+- **Leaving a lot out** needs a reason (at least 10 characters). "Keep this list with the case" writes a new version
+  of the case scope: its lots become the lots kept, with the lots left out and their reasons; the scope view and its
+  version comparison show them.
+- **The signed list**: a person who signs decisions, reviews quality or approves regulatory content signs the kept
+  list with password and authenticator code (the list read must be the list signed). The snapshot is kept, frozen,
+  with a new version of the case scope and its signature manifestation and SHA-256 checksum. When the records change
+  afterwards (a complaint, a shipment, a lot's units), the list shows "Changed since signed" and what changed; the
+  person signs again if that is the list to keep.
+- **Export** (data.export): the signed list, or the kept list as the records show it now, as a PDF and a CSV (one row
+  per shipment), marked "Practice record" in a trial.
+- **Trial insights**: "What do lots 003 and 004 have in common?" now reads the lot genealogy: both were built with
+  the same sensor lot.
+- **Sample data** (marked Sample, covered by sample removal; added once to earlier trials by
+  `scripts/refresh_trial_story.py`): OrbitCare 300 Rev B's pressure sensor (NovaSense Components) comes from sensor lot
+  NS-SL-2417 (Sample) in lots 003 and 004, the two lots with most pressure-alarm complaints, and in three new lots
+  without complaints (006, 007, 008); lot 005 used NS-SL-2533 (Sample). Each lot also names its control board lot.
+  Shipments go to fictional hospitals and distributors in India, the US, Germany, France and the Netherlands, with
+  units still in stock; lot 008 has no distribution imported. The sample's distribution import run sets one row aside
+  (a lot not loaded) and flags a PulseWatch lot that shipped 410 of its 400 units.
+
+### Changed
+
+- **Sample counts**: the sample has 18 lots (was 15); OrbitCare lot 005 releases 60 units (was 150) and lots 006 to
+  008 30 each, all made the same day as lot 005, so Rev B still releases 450 units on the same days: the trend check's
+  units in the field, the OrbitCare rise and its signal are unchanged (a fresh trial on 0.10.60 and on 0.10.61 gives
+  the same trend board and signal), as are the 43 complaints. Lot 005's complaints per 1,000 units in Trial insights
+  read 33.3 (was 13.3).
+- A row set aside from a file other than complaints no longer offers "Triage": only a complaint can be one.
+- Import data offers Distribution after Lots in a trial and says "Show only the first N data types".
+- The tests carry the case scope's two new columns and the trial's new cleanup tables.
+
 ## [0.10.60] - 2026-11-01
 
 On the trial maintenance line (`release/0.10`): reminders and escalation (T-G25, MVP G25), the Quality and Regulatory
