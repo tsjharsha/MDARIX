@@ -156,7 +156,7 @@ const list: AlertList = {
     },
   ],
   people: [{ id: "p2", name: "Priya Backup" }],
-  never: "An alert tells people; it never closes or changes the item.",
+  never: "An alert tells people in MDARIX; it never closes or changes the item. MDARIX sends no e-mail about it.",
 };
 
 describe("the reminders in My Work and the bell", () => {
@@ -219,7 +219,7 @@ const oversight: Oversight = {
       owner_name: "Taylor Quality",
       stage: "Market assessment",
       blocked: 3,
-      next: "Every relevant market is assessed and signed",
+      next: "Sign the United States (FDA) market assessment",
       state: "NOT_READY",
       state_label: "Not ready to close",
       sample: true,
@@ -237,7 +237,7 @@ const oversight: Oversight = {
     updated_at: null,
   },
   staffing: "Only one person can receive alerts: invite a colleague, so an overdue item reaches someone else.",
-  never: "An alert tells people; it never closes or changes the item.",
+  never: "An alert tells people in MDARIX; it never closes or changes the item. MDARIX sends no e-mail about it.",
 };
 
 describe("the oversight view", () => {
@@ -249,7 +249,7 @@ describe("the oversight view", () => {
     expect(html).toContain("Reply due from Reporter of SAMPLE-RV-08");
     expect(html).toContain("overdue 2 days");
     expect(html).toContain("Not ready to close");
-    expect(html).toContain("3: Every relevant market is assessed and signed");
+    expect(html).toContain("3 open. Next: Sign the United States (FDA) market assessment");
     expect(html).toContain("invite a colleague");
     expect(html).toContain("is away until");
     expect(html).toContain("CSV");

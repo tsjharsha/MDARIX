@@ -130,6 +130,8 @@ export type CheckItem = {
   result_label: string;
   detail: string;
   opens: Opens;
+  /** What to do next, for an open item ("Sign the United States (FDA) market assessment"). */
+  action?: string | null;
 };
 
 export type RecordEntry = {

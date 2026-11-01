@@ -271,7 +271,7 @@ function EventsPanel({ events, onOpen }: { events: EventRow[]; onOpen: (id: stri
     {
       key: "next",
       label: "Open items",
-      render: (row) => (row.blocked ? `${row.blocked}: ${row.next}` : "None"),
+      render: (row) => (row.blocked ? `${row.blocked} open. Next: ${row.next}` : "None"),
       sortValue: (row) => row.blocked,
     },
     {
@@ -361,7 +361,7 @@ export function EventDrawer({
           <dd>
             {summary.next_action ? (
               <button type="button" className="ac-link" onClick={() => go(summary.next_action!.opens)}>
-                {summary.next_action.label}: {summary.next_action.detail}
+                {summary.next_action.label}
               </button>
             ) : (
               "None: the checklist is clear"

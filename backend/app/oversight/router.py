@@ -77,8 +77,8 @@ CSV_FIELDS = (
     "escalated_to",
 )
 NEVER = (
-    "An alert tells people; it never closes or changes the item. MDARIX e-mails nobody outside your organization and "
-    "never decides: a person does, and signs."
+    "An alert tells people in MDARIX; it never closes or changes the item. MDARIX sends no e-mail about it and never "
+    "decides: a person does, and signs."
 )
 
 
@@ -287,7 +287,7 @@ def _event_summary(complaint, facts: dict, row: EventClosure | None, products: d
         "owner_id": closure.owner_of(row, facts["record"]),
         "stage": current["label"] if current else "Closed in the QMS",
         "blocked": len(blocked),
-        "next": blocked[0]["label"] if blocked else None,
+        "next": blocked[0]["action"] if blocked else None,
         "state": state,
         "state_label": EVENT_STATES[state],
         "sample": complaint.source_system is not None,
@@ -748,7 +748,7 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
             if nearest
             else None,
             "open_requests": len(found["requests"]),
-            "next_action": {"label": blocked[0]["label"], "detail": blocked[0]["detail"], "opens": blocked[0]["opens"]}
+            "next_action": {"label": blocked[0]["action"], "detail": blocked[0]["detail"], "opens": blocked[0]["opens"]}
             if blocked
             else None,
         },

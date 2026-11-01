@@ -598,7 +598,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Reminders, escalation and absences",
         where: "My Work (the panel at the top); the bell in the header",
         purpose:
-          "A deadline never passes silently. Every item with a date (a triage target, a provisional or report deadline, a report obligation, a reply due, a guide approval, a task) reminds its owner before it is due and escalates when it is overdue. An alert tells people; it never closes or changes the item.",
+          "A deadline never passes silently. Every item with a date (a triage target, a provisional or report deadline, a report obligation, a reply due, a guide approval, a task) reminds its owner before it is due and escalates when it is overdue. An alert tells people in MDARIX (no e-mail is sent); it never closes or changes the item.",
         tasks: [
           {
             title: "Work your reminders",

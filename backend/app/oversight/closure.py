@@ -247,6 +247,13 @@ def checklist(found: dict) -> list[dict]:
     complaint = found["complaint"]
     reports = {"section": "Complaints", "tab": f"Reports?complaint={complaint.id}"}
     items = []
+    # What to do next, one imperative per open item (the event summary's next action and the events list).
+    actions: dict[str, str] = {
+        "TRIAGE": "Complete the triage record (on the triage list)",
+        "FIRST_CONTACT": "Sign the first-contact check",
+        "DECISION": "Sign the disposition",
+        "TASKS": "Finish the open task in My Work",
+    }
     record = found["record"]
     if found["on_triage"] or (record is not None and record.completed_at is None):
         items.append(
@@ -288,10 +295,13 @@ def checklist(found: dict) -> list[dict]:
         label = markets.MARKET_LABELS.get(market, market)
         if current is None and draft is None:
             open_markets.append(f"{label} not assessed")
+            actions.setdefault("MARKETS", f"Assess the {label} market")
         elif current is None:
             open_markets.append(f"{label} not signed")
+            actions.setdefault("MARKETS", f"Sign the {label} market assessment")
         elif draft is not None:
             open_markets.append(f"{label} reassessment open")
+            actions.setdefault("MARKETS", f"Sign the {label} reassessment")
     items.append(
         _check(
             "MARKETS",
@@ -304,11 +314,13 @@ def checklist(found: dict) -> list[dict]:
         )
     )
     started = {row.market for row in found["obligations"] if row.kind == "INITIAL"}
-    unmet = [
-        f"{markets.MARKET_LABELS.get(row.market, row.market)}: {report_rules.STATE_LABELS[row.state].lower()}"
-        for row in found["obligations"]
-        if row.state not in report_rules.MET
-    ]
+    unmet = []
+    for row in found["obligations"]:
+        if row.state in report_rules.MET:
+            continue
+        label, state = markets.MARKET_LABELS.get(row.market, row.market), report_rules.STATE_LABELS[row.state].lower()
+        unmet.append(f"{label}: {state}")
+        actions.setdefault("OBLIGATIONS", f"Complete the {label} report ({state})")
     for market in wanted:
         current, _ = current_and_draft(by_market.get(market, []))
         if (
@@ -318,6 +330,7 @@ def checklist(found: dict) -> list[dict]:
             and not current.filed_on
         ):
             unmet.append(f"{markets.MARKET_LABELS.get(market, market)}: reportable, the report is not started")
+            actions.setdefault("OBLIGATIONS", f"Start the {markets.MARKET_LABELS.get(market, market)} report")
     items.append(
         _check(
             "OBLIGATIONS",
@@ -338,6 +351,8 @@ def checklist(found: dict) -> list[dict]:
         branch = "service-level resolution" if disposition.branch == "SERVICE_LEVEL" else "known issue"
         items.append(_check("DECISION", "The decision is signed", PASS, f"The disposition is signed as a {branch}"))
     else:
+        if escalated:
+            actions["DECISION"] = "Sign the investigation decision on the case"
         items.append(
             _check(
                 "DECISION",
@@ -350,6 +365,11 @@ def checklist(found: dict) -> list[dict]:
             )
         )
     requests = found["requests"]
+    actions["REQUESTS"] = (
+        "Answer or close the open information request"
+        if len(requests) == 1
+        else f"Answer or close the {len(requests)} open information requests"
+    )
     items.append(
         _check(
             "REQUESTS",
@@ -360,6 +380,8 @@ def checklist(found: dict) -> list[dict]:
         )
     )
     tasks = [task for task in found["tasks"] if task.task_type != REPLY_TASK]
+    if len(tasks) > 1:
+        actions["TASKS"] = f"Finish the {len(tasks)} open tasks in My Work"
     items.append(
         _check(
             "TASKS",
@@ -383,6 +405,8 @@ def checklist(found: dict) -> list[dict]:
                 {"section": "Records", "tab": "Effectiveness checks"},
             )
         )
+    for item in items:
+        item["action"] = actions.get(item["code"]) if item["result"] == BLOCKED else None
     return items
 
 

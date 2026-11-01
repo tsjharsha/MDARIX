@@ -15,8 +15,8 @@ operator knows a release migrates the database.
 On the trial maintenance line (`release/0.10`): reminders and escalation (T-G25, MVP G25), the Quality and Regulatory
 Oversight view (T-G9, MVP G9), and the event owner, stage, closure readiness and event decision record (T-G28, MVP
 G28), built once on the trial line for the trial and the pilot alike (D-T14). A deadline never passes silently: an
-alert tells people and never closes or changes the item. MDARIX never closes a complaint, never decides and never
-e-mails anyone outside the organization. Still to come: e-mails for alerts (in-app only in this release), the full
+alert tells people in MDARIX and never closes or changes the item; no e-mail is sent about it in this release.
+MDARIX never closes a complaint and never decides. Still to come: e-mails for alerts, the full
 6.0 tiers (T1's half and three-quarter points, repeats every 4 hours or daily, T2's out-of-hours route), the head of
 QA's deputy and named third contact, the weekly oversight sign-off (T22), decision record versions after a reopening,
 and the QMS import of the closure.

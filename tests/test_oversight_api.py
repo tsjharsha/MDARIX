@@ -228,8 +228,13 @@ def test_the_event_owner_signs_ready_to_close_and_files_the_decision_record(tria
     assert blocked["you_are_owner"] and blocked["blocked"] >= 2
     codes = {item["code"]: item for item in blocked["checklist"]}
     assert codes["MARKETS"]["result"] == "BLOCKED" and codes["REQUESTS"]["result"] == "BLOCKED"
+    assert codes["MARKETS"]["action"].startswith("Sign the United States")
+    assert codes["REQUESTS"]["action"] == "Answer or close the open information request"
+    assert events["SAMPLE-RV-08"]["next"] == "Complete the triage record (on the triage list)"
     assert codes["REQUESTS"]["opens"]["tab"].startswith("Communications?complaint=")
-    assert [stage["code"] for stage in blocked["stages"]][-1] == "CLOSED" and blocked["summary"]["next_action"]
+    assert [stage["code"] for stage in blocked["stages"]][-1] == "CLOSED" and blocked["summary"]["next_action"][
+        "label"
+    ] == "Complete the triage record (on the triage list)"
     refused = user.post(f"{VIEW}/events/{blocked['event']['complaint_id']}/ready", json={"password": PASSWORD})
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "REASON_REQUIRED"
 
