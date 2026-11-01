@@ -30,6 +30,7 @@ from backend.app.db.models.foundation import SignedApprovalRecord
 from backend.app.db.models.market_assessment import ComplaintMarketAssessment
 from backend.app.db.models.reportability import ComplaintReportability
 from backend.app.db.session import get_db
+from backend.app.decision_guides import service as guides
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import current_person, require_any_permission
 from backend.app.reportability import assessments, markets, rules, service
@@ -149,8 +150,11 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
     if legacy is not None:
         refs.add(legacy.decided_by)
     wanted_holders: dict[str, list[str]] = {}
+    codes = guides.current_codes(db, tenant_id)
     for market in shown:
-        wanted_holders[market] = training.holders(db, tenant_id, training.for_market(market), exclude=str(ctx.user_id))
+        wanted_holders[market] = training.holders(
+            db, tenant_id, training.for_market(market, db, tenant_id), exclude=str(ctx.user_id)
+        )
         refs |= set(wanted_holders[market])
     names = people(control_db, tenant_id, [ref for ref in refs if ref])
     trial = is_trial(control_db, tenant_id)
@@ -159,6 +163,8 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
         versions = by_market.get(market, [])
         current, draft = assessments.current_and_draft(versions)
         evaluation = markets.evaluate(market, draft.answers or {}) if draft is not None else None
+        # A draft keeps the guide version it was started with; a new assessment uses the one published now (T-G15).
+        question_set = guides.by_code(db, tenant_id, market, draft.question_set if draft is not None else None)
         items.append(
             {
                 "market": market,
@@ -166,17 +172,20 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
                 "enabled": market in enabled,
                 "preselected": market == markets.market_of(record.get("country")),
                 "required": market in summary,
-                "question_set": markets.QUESTION_SETS[market].as_dict(),
+                "question_set": question_set.as_dict(),
+                "question_set_current": question_set.version == codes[market],
                 "threshold": {"level": markets.THRESHOLDS[market], "label": markets.THRESHOLD_LABELS[market]},
-                "current": assessments.row_view(current, names),
-                "draft": assessments.row_view(draft, names),
+                "current": assessments.row_view(current, names, codes[market]),
+                "draft": assessments.row_view(draft, names, codes[market]),
                 "evaluation": evaluation,
                 "disagreement": markets.disagreement(market, draft.answers or {}, draft.harm_level) if draft else None,
                 "history": [
-                    assessments.row_view(row, names) for row in reversed(versions) if row not in (current, draft)
+                    assessments.row_view(row, names, codes[market])
+                    for row in reversed(versions)
+                    if row not in (current, draft)
                 ],
                 "clock": (summary.get(market) or {}).get("clock"),
-                "training": training.status(db, tenant_id, ctx.user_id, training.for_market(market)),
+                "training": training.status(db, tenant_id, ctx.user_id, training.for_market(market, db, tenant_id)),
                 "trained_colleagues": [names.get(ref) or "A colleague" for ref in wanted_holders[market]],
             }
         )
@@ -209,8 +218,7 @@ def market_assessments(
     return detail(db, control_db, ctx, complaint_id)
 
 
-def _clean_draft(market: str, payload: DraftRequest) -> dict:
-    question_set = markets.QUESTION_SETS[market]
+def _clean_draft(question_set: markets.QuestionSet, payload: DraftRequest) -> dict:
     answers = markets.clean_answers(question_set, {key: value.model_dump() for key, value in payload.answers.items()})
     return {
         "answers": answers,
@@ -250,8 +258,9 @@ def save_draft(
             "MARKET_NOT_ENABLED",
             f"{markets.MARKET_LABELS[market]} is not enabled: enter its reporting window in Reporting windows first",
         )
-    clean = _clean_draft(market, payload)
-    question_set = markets.QUESTION_SETS[market]
+    draft = next((row for row in versions if row.conclusion is None), None)
+    question_set = guides.by_code(db, tenant_id, market, draft.question_set if draft is not None else None)
+    clean = _clean_draft(question_set, payload)
     problem = markets.answers_problem(question_set, clean["answers"], complete=False) or markets.harm_problem(
         clean["harm_level"],
         clean["harm_code"],
@@ -265,7 +274,6 @@ def save_draft(
     aware = date.fromisoformat(seen["aware_date"]) if seen["aware_date"] else None
     clock = markets.market_clock(market, evaluation["suggested"], evaluation["report_type"], windows, aware, today)
     now = datetime.now(timezone.utc)
-    draft = next((row for row in versions if row.conclusion is None), None)
     action = "COMPLAINT_MARKET_ASSESSMENT_SAVED"
     if draft is None:
         draft = ComplaintMarketAssessment(
@@ -286,6 +294,15 @@ def save_draft(
     draft.due_on = date.fromisoformat(clock["due_date"]) if clock else None
     draft.updated_at = now
     db.flush()
+    # Each Unknown on a question that drives the conclusion raises a request to the reporter (T-G30).
+    from backend.app.communications.service import ensure_assessment_request
+
+    unknown = [
+        question.id
+        for question in question_set.questions
+        if not question.extra and (clean["answers"].get(question.id) or {}).get("answer") == markets.UNKNOWN
+    ]
+    ensure_assessment_request(db, tenant_id, complaint, market, unknown, {}, str(ctx.user_id), now)
     db.add(
         make_audit_event(
             tenant_id=tenant_id,
@@ -338,9 +355,10 @@ def sign_conclusion(
         raise _error(409, "NO_DRAFT", "Save the answers before signing the conclusion")
     if draft.version != payload.version or not _same_moment(draft.updated_at, payload.saved_at):
         raise _error(409, "DRAFT_CHANGED", "The answers changed since you opened them; reload and read them again")
-    question_set = markets.QUESTION_SETS[market]
-    if draft.question_set != question_set.version or draft.scale_version != markets.SCALE_VERSION:
-        raise _error(409, "QUESTIONS_CHANGED", "The questions or the scale have a new version: save the answers again")
+    # The draft keeps the guide version it was started with (T-G15); the scale is fixed in the trial.
+    question_set = guides.by_code(db, tenant_id, market, draft.question_set)
+    if draft.scale_version != markets.SCALE_VERSION:
+        raise _error(409, "QUESTIONS_CHANGED", "The harm-severity scale has a new version: save the answers again")
     answers = draft.answers or {}
     evaluation = markets.evaluate(market, answers)
     conclusion = str(payload.conclusion or "").strip().upper()
@@ -364,7 +382,7 @@ def sign_conclusion(
     role = person.role_for(REGULATORY_APPROVE if person.holds(REGULATORY_APPROVE) else REGULATORY_REVIEW)
     if (role or "").upper() in ADMINISTRATOR_ROLES:
         raise _error(403, "ADMINISTRATOR_CANNOT_SIGN", "Administrators cannot sign market conclusions")
-    needed = training.for_market(market)
+    needed = training.for_market(market, db, tenant_id)
     untrained = training.missing(db, tenant_id, ctx.user_id, needed)
     trial = is_trial(control_db, tenant_id)
     # Decision 6 (31 Oct 2026): the practice-training rule binds trial organisations only; pilots get G40 later.
@@ -418,7 +436,8 @@ def sign_conclusion(
         "version": draft.version,
         "question_set": draft.question_set,
         "questions": {
-            question.id: {"text": question.text, "clause": question.clause} for question in question_set.questions
+            question.id: {"text": question.text, "clause": question.clause, **({"extra": True} if question.extra else {})}
+            for question in question_set.questions
         },
         "answers": answers,
         "harm_level": draft.harm_level,

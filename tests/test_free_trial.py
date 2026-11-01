@@ -33,6 +33,10 @@ _TRIAL_BUSINESS_TABLES = (
     # The rest of the sample story (backend/app/trial/sample_data.py seed_story_examples) and what people do with it.
     "complaint_second_looks",
     "complaint_reportability",
+    "communication_entries",
+    "external_parties",
+    "communication_settings",
+    "decision_guide_versions",
     "report_evidence",
     "report_submissions",
     "report_snapshots",
@@ -1026,7 +1030,7 @@ def test_the_inspection_pack_holds_every_record_behind_every_check():
     assert names[:3] == ["00-README.txt", "01-readiness-summary.pdf", "02-inspection-checks.csv"]
     assert names[-1] == "manifest.json" and len(names) == 12
     manifest = json.loads(archive.read("manifest.json"))
-    assert manifest["unreadable"] == [] and manifest["checks"]["checks"] == 10
+    assert manifest["unreadable"] == [] and manifest["checks"]["checks"] == 11
     for entry in manifest["files"]:
         assert hashlib.sha256(archive.read(entry["name"])).hexdigest() == entry["sha256"], entry["name"]
     assert archive.read("01-readiness-summary.pdf").startswith(b"%PDF")
@@ -1042,7 +1046,7 @@ def test_the_inspection_pack_holds_every_record_behind_every_check():
     assert len(rows("10-risk-file-input.csv")) == 4  # the header and the three sample products
     assert any("SAMPLE-CAPA-01" in line for line in rows("09-capas-without-verified-effect.csv"))
     checks = rows("02-inspection-checks.csv")
-    assert len(checks) == 11 and any("03-hidden-complaints.csv" in line for line in checks)
+    assert len(checks) == 12 and any("03-hidden-complaints.csv" in line for line in checks)
     readme = archive.read("00-README.txt").decode("utf-8")
     assert "SHA-256" in readme and "verify against the source records" in readme
     assert "03-hidden-complaints.csv; basis: ISO 13485 8.2.2; 21 CFR 820.35" in readme
@@ -1080,7 +1084,7 @@ def test_the_weekly_readiness_email_reaches_the_quality_leads_once_a_week(monkey
         payload = event.payload
         assert payload["week"] == "2026-W43" and "@" not in str(payload)  # no address in the queue
         content = payload["content"]
-        assert content["first"] is True and content["total"] == 10 and content["weakest"]["state"] == "CRITICAL"
+        assert content["first"] is True and content["total"] == 11 and content["weakest"]["state"] == "CRITICAL"
 
         sent = []
         from auth import emailer
@@ -1090,7 +1094,7 @@ def test_the_weekly_readiness_email_reaches_the_quality_leads_once_a_week(monkey
         )
         assert notifications.handle_event(db, digest.EVENT, payload) is True
         assert [recipient for recipient, _ in sent] == [email]  # the trial's Leader
-        assert sent[0][1]["week"] == "2026-W43" and sent[0][1]["content"]["total"] == 10
+        assert sent[0][1]["week"] == "2026-W43" and sent[0][1]["content"]["total"] == 11
 
         # The next week says what changed (compared with this week's snapshot).
         with open_tenant_data_session(tenant_id) as data:

@@ -279,6 +279,21 @@ def version_view(db: Session, control_db: Session, row: DecisionBriefVersion) ->
 # -------------------------------------------------------------------------------------------------- reading
 
 
+def _communications(db: Session, case: Investigation) -> dict:
+    from datetime import datetime, timezone
+
+    from backend.app.communications.service import summary
+    from backend.app.db.models.foundation import InvestigationComplaint
+
+    complaints = [
+        row.complaint_id
+        for row in db.query(InvestigationComplaint.complaint_id).filter(
+            InvestigationComplaint.tenant_id == case.tenant_id, InvestigationComplaint.investigation_id == case.id
+        )
+    ]
+    return summary(db, case.tenant_id, datetime.now(timezone.utc).date(), complaints)
+
+
 def _brief_payload(db: Session, control_db: Session, person: Person, case: Investigation) -> dict:
     rows = _versions(db, case)
     current = rows[0] if rows else None
@@ -291,6 +306,9 @@ def _brief_payload(db: Session, control_db: Session, person: Person, case: Inves
         gate["can_submit"] = False
     return {
         "investigation": composer.investigation_section(case),
+        # Live, not part of a version: the open and overdue requests to external contacts on the case's complaints
+        # (the communications log, tr06, G30).
+        "communications": _communications(db, case),
         "current": version_view(db, control_db, current) if current is not None else None,
         "versions": [version_summary(row, names) for row in rows],
         "gate": gate,

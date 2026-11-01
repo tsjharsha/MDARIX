@@ -582,6 +582,11 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         )
         db.add(user)
         db.flush()
+        # The organization's own US guide version (published) and a draft whose test fails, and the communications
+        # log's examples, with the open request owned by the trial user (backend/app/trial/sample_guides.py).
+        from backend.app.trial.sample_guides import stage_sample_guides
+
+        sample["guides"] = stage_sample_guides(db, tenant.id, now, owner_id=str(user.id))
         db.add(
             TenantMembership(
                 id=uuid.uuid4(),

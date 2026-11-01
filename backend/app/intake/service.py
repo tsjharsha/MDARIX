@@ -10,7 +10,8 @@ changes an imported complaint.
 - **The triage list** (``triage``) shows, before every other queue, each event that is flagged or escalated by hand and
   not yet triaged: urgent intakes, flagged contacts, flagged imported complaints and set-aside rows that suggest harm
   (T-R14), and any event whose new link raised an "awareness conflict".
-- **Tasks** are ``workflow_tasks`` of the intake event: the follow-up with the reporter (until T-G30), the QMS-complaint
+- **Tasks** are ``workflow_tasks`` of the intake event: the follow-up with the reporter (since T-G30 also a request in
+  the communications log, linked to the task), the QMS-complaint
   task and the QA review of a "service only".
 """
 
@@ -190,7 +191,8 @@ def make_reference(db: Session, tenant_id: uuid.UUID, kind: str) -> str:
 
 
 def ensure_follow_up(db, tenant_id, event: IntakeEvent, answers: dict, suggestion: str, actor, now) -> None:
-    """Every Unknown and Not stated raises a follow-up with the reporter (a dated task until T-G30): one open task per
+    """Every Unknown and Not stated raises a follow-up with the reporter (a dated task, and its request in the
+    communications log since T-G30): one open task per
     event, due at the end of the next working day (T9), naming the questions it asks."""
     from backend.app.workflow.tasks import create_task
 
@@ -217,6 +219,10 @@ def ensure_follow_up(db, tenant_id, event: IntakeEvent, answers: dict, suggestio
         details={"questions": asks, "reference": event.reference},
     )
     task.details = {**(task.details or {}), "questions": asks, "reference": event.reference}
+    # The communications log (T-G30, 0.10.59): the follow-up is also a request to the reporter, linked to this task.
+    from backend.app.communications.service import ensure_intake_request
+
+    ensure_intake_request(db, tenant_id, event, task, asks, str(actor), now)
 
 
 def ensure_qms_task(db, tenant_id, event: IntakeEvent, actor, now) -> None:

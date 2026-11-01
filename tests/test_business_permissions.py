@@ -56,6 +56,14 @@ EXEMPT = {
     # "report" in "reportability": reads open to every member, like the complaint list; no export, no file.
     ("GET", "/api/v1/complaints/reportability"): "read-only reportability watch of the organization's complaints",
     ("GET", "/api/v1/complaints/reportability-settings"): "read-only reporting windows of the organization",
+    # The report worksheets (0.10.58): reads open to every member, like the complaint they come from; the worksheet
+    # export (PDF/DOCX) needs DATA_EXPORT, every write needs a decider.
+    ("GET", "/api/v1/reports"): "read-only list of the organization's report obligations",
+    ("GET", "/api/v1/reports/{obligation_id}"): "read-only worksheet and history of one report obligation",
+    (
+        "GET",
+        "/api/v1/reports/{obligation_id}/submissions/{submission_id}/evidence/{evidence_id}/file",
+    ): "the authority's own receipt or reply kept with a submission, read like any evidence content",
     ("POST", "/api/v1/ask/"): "AI permission checked in the route (Ask resolves its own session)",
     ("GET", "/api/v1/stage3/reports/jobs/{job_id}"): "read-only job status; the download is guarded",
     ("GET", "/api/v1/trial/templates/{entity}.csv"): "blank CSV template, no customer data",

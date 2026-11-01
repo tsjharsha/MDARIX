@@ -45,10 +45,11 @@ def training(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     """The starter documents (all, or the codes asked for), each with its content and the person's record of it."""
-    every = service.documents()
+    tenant_id = uuid.UUID(ctx.tenant_id)
+    every = service.documents(db, tenant_id)
     wanted = [every[code] for code in (documents.split(",") if documents else every) if code in every]
-    states = service.status(db, uuid.UUID(ctx.tenant_id), ctx.user_id, wanted)
-    return {"documents": [{**item, **(service.content(item["code"]) or {})} for item in states]}
+    states = service.status(db, tenant_id, ctx.user_id, wanted)
+    return {"documents": [{**item, **(service.content(item["code"], db, tenant_id) or {})} for item in states]}
 
 
 @router.post("/{document_code}/acknowledge")
@@ -61,7 +62,7 @@ def acknowledge(
 ):
     """Record that the person read the document's current version ("I have read version ...")."""
     tenant_id = uuid.UUID(ctx.tenant_id)
-    document = service.documents().get(document_code)
+    document = service.documents(db, tenant_id).get(document_code)
     if document is None:
         raise _error(404, "DOCUMENT_NOT_FOUND", "No such document")
     if payload.version != document.version:

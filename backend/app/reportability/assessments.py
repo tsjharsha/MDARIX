@@ -49,17 +49,17 @@ def _iso(value) -> str | None:
     return value.isoformat() if value is not None else None
 
 
-def row_view(row: ComplaintMarketAssessment | None, names: dict[str, str]) -> dict | None:
+def row_view(row: ComplaintMarketAssessment | None, names: dict[str, str], current_code: str | None = None) -> dict | None:
+    """``current_code``: the code of the market's guide version in use now (the starter's when not given)."""
     if row is None:
         return None
     kind = markets.REPORT_TYPES.get(row.report_type or "")
-    question_set = markets.QUESTION_SETS[row.market]
     return {
         "id": str(row.id),
         "market": row.market,
         "version": row.version,
         "question_set": row.question_set,
-        "question_set_current": row.question_set == question_set.version,
+        "question_set_current": row.question_set == (current_code or markets.QUESTION_SETS[row.market].version),
         "answers": row.answers or {},
         "harm_level": row.harm_level,
         "harm_code": row.harm_code,
