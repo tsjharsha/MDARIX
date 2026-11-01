@@ -25,7 +25,6 @@ def header_lines(view: dict, organization: str | None) -> list[str]:
         f"Market: {view['market_label']}",
         f"Version: {view['code']} (version {view['version']}); {view['state_label'].lower()}",
         f"Based on: {view['based_on'] or 'written by MDARIX'}",
-        view["never_decides"],
     ]
     if view.get("practice_label"):
         lines.append(view["practice_label"])
@@ -38,9 +37,12 @@ def _mark(question: dict) -> str:
     return "Starter text." if question.get("starter") else "Your wording of a question that drives the conclusion."
 
 
-def _answers(test: dict, labels: dict) -> str:
-    given = test.get("answers") or {}
-    return ", ".join(f"{key} {labels.get(value, value)}" for key, value in given.items()) or "none (all Unknown)"
+def _answers(test: dict, labels: dict, order: list[str]) -> str:
+    """The test's answers in the guide's question order (stored answers come back in no particular order)."""
+    given = sorted(
+        (test.get("answers") or {}).items(), key=lambda item: order.index(item[0]) if item[0] in order else 99
+    )
+    return ", ".join(f"{key} {labels.get(value, value)}" for key, value in given) or "none (all Unknown)"
 
 
 def manifestation(view: dict) -> list[str]:
@@ -61,6 +63,7 @@ def lines(view: dict) -> list[tuple[str, str]]:
     labels = view.get("answer_labels") or markets.ANSWER_LABELS
     question_set = view["question_set"]
     out: list[tuple[str, str]] = [
+        (view["never_decides"], "body"),
         (view["core_rule"], "muted"),
         (view["scale_note"], "muted"),
         (view["starter_mark"], "muted"),
@@ -93,7 +96,7 @@ def lines(view: dict) -> list[tuple[str, str]]:
     for test in view.get("test_cases") or []:
         result = results.get(test["id"])
         out.append((f"{test['id']}  {test['name']}", "body"))
-        out.append((f"    Answers: {_answers(test, labels)}", "muted"))
+        out.append((f"    Answers: {_answers(test, labels, [q['id'] for q in question_set['questions']])}", "muted"))
         out.append((f"    Expected: {_label(test['expected'])}{_kind(test.get('expected_report_type'))}", "muted"))
         if result:
             verdict = "passed" if result["passed"] else "FAILED"

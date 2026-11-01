@@ -59,7 +59,9 @@ export function Communications({ complaintId }: { complaintId?: string | null })
           counts
             ? counts.open
               ? `${countOf(counts.open, "open request")}, ${counts.overdue} overdue`
-              : "No request waits for a reply"
+              : counts.unresolved
+                ? `${countOf(counts.unresolved, "request")} unresolved after attempts`
+                : "No request waits for a reply"
             : "Reading the log…"
         }
         detail="Every question to a reporter, distributor, hospital or service partner, with its owner, reply due date and every attempt. Send from your own mail or phone, then record it here."
@@ -77,8 +79,8 @@ export function Communications({ complaintId }: { complaintId?: string | null })
         {data?.complaint && <q className="uw-cr-text">{data.complaint.description}</q>}
         {data && (
           <p className="ac-muted">
-            {s4Text(data.s4)} Counts: {counts?.unresolved ?? 0} unresolved after attempts. Unanswered attempts before a
-            request moves on: {data.attempts_limit}.
+            {s4Text(data.s4)} {counts?.unresolved ?? 0} unresolved after attempts. A request moves on after{" "}
+            {data.attempts_limit} unanswered attempts.
           </p>
         )}
         {data?.items.length ? (
@@ -201,7 +203,7 @@ function RecordEntry({
   return (
     <Panel eyebrow="Record" title="Record a message sent or received">
       <form
-        className="ca-form-grid"
+        className="ca-form-grid uw-cm-form"
         aria-label="Record a message"
         onSubmit={async (event) => {
           event.preventDefault();
@@ -534,7 +536,7 @@ export function EntryDrawer({ id, labels, onClose }: { id: string; labels?: Labe
                     <th scope="col">When</th>
                     <th scope="col">How</th>
                     <th scope="col">Contact</th>
-                    <th scope="col">What happened</th>
+                    <th scope="col">Result</th>
                     <th scope="col">Logged</th>
                   </tr>
                 </thead>
@@ -553,8 +555,7 @@ export function EntryDrawer({ id, labels, onClose }: { id: string; labels?: Labe
                       </td>
                       <td>{attempt.contact_name}</td>
                       <td>
-                        {attempt.outcome_label}
-                        {attempt.unanswered && attempt.outcome === "SENT" ? " (no reply)" : ""}
+                        {attempt.unanswered && attempt.outcome === "SENT" ? "Sent, no reply" : attempt.outcome_label}
                         {attempt.note ? `: ${attempt.note}` : ""}
                       </td>
                       <td>

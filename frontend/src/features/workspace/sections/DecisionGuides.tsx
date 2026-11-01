@@ -201,7 +201,7 @@ export function GuideDrawer({ market, version, onClose }: { market: string; vers
       </Drawer>
     );
   }
-  const editing = view.editable && canEdit;
+  const editing = view.state === "DRAFT" && canEdit;
   return (
     <Drawer title={`${view.market_label}: ${view.code}`} onClose={onClose}>
       <div className="uw-dp uw-dg">
@@ -294,16 +294,24 @@ function TestTable({ view, tests }: { view: GuideVersion; tests: TestCase[] }) {
           const result = results[test.id];
           return (
             <li key={test.id} className={result && !result.passed ? "uw-dg-failed" : ""}>
-              {result ? (
-                result.passed ? (
-                  <CheckCircle2 size={15} className="tone-good" aria-label="Passed" />
-                ) : (
-                  <XCircle size={15} className="tone-critical" aria-label="Failed" />
-                )
-              ) : null}{" "}
-              <strong>{test.name}</strong>
+              <strong>
+                {result ? (
+                  result.passed ? (
+                    <CheckCircle2 size={14} className="tone-good" aria-label="Passed" />
+                  ) : (
+                    <XCircle size={14} className="tone-critical" aria-label="Failed" />
+                  )
+                ) : null}{" "}
+                {test.name}
+              </strong>
               <span className="uw-cr-meta">
-                Answers: {answersText(test, view.answer_labels)} · expected{" "}
+                Answers:{" "}
+                {answersText(
+                  test,
+                  view.answer_labels,
+                  view.question_set.questions.map((question) => question.id),
+                )}{" "}
+                · expected{" "}
                 {outcomeText(test.expected, test.expected_report_type, view.expected_labels, view.report_types)}
                 {result && !result.passed
                   ? ` · the guide points to ${outcomeText(result.actual, result.actual_report_type, view.expected_labels, view.report_types)}`
@@ -342,7 +350,7 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
             <thead>
               <tr>
                 <th scope="col">ID</th>
-                <th scope="col">Question, definition and help</th>
+                <th scope="col">Wording</th>
                 <th scope="col">Clause</th>
                 <th scope="col">Basis</th>
                 <th scope="col">
@@ -355,7 +363,7 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
                 <tr key={`${question.id}-${index}`} className={question.extra ? "uw-dg-extra" : ""}>
                   <th scope="row">
                     {question.id || "New"}
-                    <span className="uw-ma-starter-chip">{question.extra ? "Extra" : "Drives the conclusion"}</span>
+                    <span className="uw-cr-meta uw-dg-kind">{question.extra ? "extra" : "core"}</span>
                   </th>
                   <td>
                     <label className="ca-field">
@@ -376,13 +384,21 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
                     </label>
                     <label className="ca-field">
                       Help text
-                      <input value={question.note} onChange={(event) => set(index, { note: event.target.value })} />
+                      <textarea
+                        rows={2}
+                        value={question.note}
+                        onChange={(event) => set(index, { note: event.target.value })}
+                      />
                     </label>
                   </td>
                   <td>
                     <label className="ca-field">
                       Clause
-                      <input value={question.clause} onChange={(event) => set(index, { clause: event.target.value })} />
+                      <textarea
+                        rows={2}
+                        value={question.clause}
+                        onChange={(event) => set(index, { clause: event.target.value })}
+                      />
                     </label>
                     {!question.clause.trim() && <span className="tone-critical">No clause yet</span>}
                   </td>

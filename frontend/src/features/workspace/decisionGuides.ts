@@ -168,8 +168,14 @@ export function editProblem(questions: QuestionForm[]): string | null {
 }
 
 /** "US1 Yes, US3 Yes" for a test's answers; a missing answer is Unknown, never No. */
-export function answersText(test: Pick<TestCase, "answers">, labels: Record<string, string>): string {
-  const given = Object.entries(test.answers);
+export function answersText(
+  test: Pick<TestCase, "answers">,
+  labels: Record<string, string>,
+  order: string[] = [],
+): string {
+  // In the guide's question order (the stored answers come back in no particular order).
+  const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
+  const given = Object.entries(test.answers).sort(([a], [b]) => rank(a) - rank(b));
   return given.length
     ? given.map(([id, answer]) => `${id} ${labels[answer] ?? answer}`).join(", ")
     : "none (all Unknown)";

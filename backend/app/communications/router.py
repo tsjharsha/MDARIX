@@ -24,6 +24,7 @@ from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import false
 from sqlalchemy.orm import Session
 
 from backend.app.access.permissions import (
@@ -284,7 +285,9 @@ def communications(
         db.query(ExternalParty)
         .filter(
             ExternalParty.tenant_id == tenant_id,
-            (ExternalParty.complaint_id.is_(None)) | (ExternalParty.complaint_id == complaint_id),
+            # A reporter is chosen only on their own complaint; the others on any.
+            ((ExternalParty.complaint_id.is_(None)) & (ExternalParty.party_type != rules.REPORTER))
+            | ((ExternalParty.complaint_id == complaint_id) if complaint_id is not None else false()),
         )
         .order_by(ExternalParty.party_type, ExternalParty.name)
         .all()

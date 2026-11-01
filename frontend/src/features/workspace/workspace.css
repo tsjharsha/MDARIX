@@ -4535,10 +4535,19 @@ div.uw-task-count:hover {
   padding: 0;
   list-style: none;
 }
-.uw-dg-tests li,
+.uw-dg-tests li {
+  display: block;
+}
+.uw-dg-tests li .uw-cr-meta {
+  display: block;
+}
 .uw-cm-parties li {
   display: grid;
   gap: 2px;
+}
+.uw-dg-kind {
+  display: block;
+  font-weight: 400;
 }
 .uw-dg-failed {
   border-left: 3px solid var(--ac-critical, #b42318);
@@ -4559,4 +4568,19 @@ div.uw-task-count:hover {
 }
 .uw-cm-unanswered td {
   color: var(--ac-ink-2);
+}
+.uw-dg-tests svg {
+  vertical-align: -2px;
+}
+.uw-dg-problems li {
+  color: var(--ac-critical);
+}
+.uw-dg-tests strong svg {
+  display: inline-block;
+}
+.uw-cm-form select,
+.uw-dg-basis select,
+.uw-dg-test-editor select {
+  width: 100%;
+  max-width: 100%;
 }

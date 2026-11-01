@@ -396,7 +396,7 @@ def _intake_party(db, tenant_id, event, actor: str, now):
         id=uuid.uuid4(),
         tenant_id=tenant_id,
         party_type=rules.REPORTER,
-        name=f"Reporter of {event.reference}" + (f" ({event.reporter_site})" if event.reporter_site else ""),
+        name=f"Reporter of {event.reference}" + (f", {event.reporter_site}" if event.reporter_site else ""),
         source_system=event.source_system,
         created_by=actor,
         created_at=now,
