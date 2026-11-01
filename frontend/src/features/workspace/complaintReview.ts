@@ -15,6 +15,8 @@ export const COMPLAINTS_TABS = [
   "Second look",
   "Backlog",
   "Reportability",
+  // The report worksheets, the second person's approval and the submission record (authorityReports.ts, T-G2c, T-G2b).
+  "Reports",
   // Every complaint, filtered by product, version, lot, problem code, country or status (complaintList.ts).
   "Complaint list",
   "Review settings",

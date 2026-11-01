@@ -10,7 +10,70 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
-## [0.10.57] - 2026-11-20
+## [0.10.58] - 2026-11-01
+
+On the trial maintenance line (`release/0.10`): the report worksheets for the US (Form FDA 3500A, 09/2025 edition,
+for eMDR) and India (the MvPI Medical Device Adverse Event Reporting Form, Version 1.2) (T-G2c, MVP G2c), and the
+obligation lifecycle with its approved snapshot and complete submission record (T-G2b, MVP G2b), built once on the
+trial line for the trial and the pilot alike (T-B11). MDARIX never submits: a person enters the report in the
+authority's route and records what was done. India's Rule 26 licensing-authority notice comes later (D-T18); the
+EU/NI and GB worksheets come with MVP set 5. Retention under D-10, G33's routing, the emergency route and the
+QMS-ready package stay on `mvp-1.0`.
+
+**Migration, expand-only:** `tr05authorityreports`, chained from `tr04intaketriage`: four new tables
+(`report_obligations`, `report_snapshots`, `report_submissions`, `report_evidence`), each with tenant row-level
+security, in the trial's retention list, sample removal, purge and export, and the legacy-plane step. Nothing
+existing changes; the downgrade drops only these tables. On `mvp-1.0` the forward merge adds a merge revision joining
+its head and `tr05authorityreports`. The API and web images change.
+
+### Added
+
+- **Complaints › Reports**: every report a market assessment says is owed (reportable, or pending information with
+  its provisional deadline), nearest deadline first, with its state and next step. The path reads Triage, market
+  assessment, worksheet, second-person approval, marked submitted.
+- **The worksheets**, in each authority's section and field order as printed on the official forms: Form FDA 3500A
+  (sections A to H; C and F are not filled by a device manufacturer) and the MDAE form Version 1.2 (primary
+  information, reporter details, device category, sections A to F). Every field shows its value, where it came from
+  (complaint, product, lot, market assessment, classification, case, CAPAs, triage record, registration, responsible
+  party, IMDRF mapping) and its status: from record, entered by a person, confirmed, or missing (must have before
+  submission, may be unknown in an initial report, follow up later). H6's device problem codes are the approved IMDRF
+  mappings of the complaint's problem code (T-G2a). Patient and reporter fields keep their place: the sample shows
+  fictional values; for any other data they read "Enter in the authority's route" and cannot be entered (T-B9).
+  MDARIX never fills a judgement (the association, the root cause). Field order and mappings are starter text.
+- **The lifecycle (G2b)**: draft; approved snapshot; submitted, acceptance pending; accepted (or submitted, no
+  acknowledgement expected); follow-up due; complete. "Ask for approval" freezes the worksheet as a snapshot; a
+  second person approves it with password and authenticator code, never the preparer, never the signer of the market
+  conclusion and never an administrator (D-T19: enforced in the trial as in G2b). The submission is recorded at once:
+  route, time, the submitted content (a file or a note) and the difference review (a material difference needs the
+  draft reopened and approved again). Evidence follows as it arrives: FDA's Ack1 to Ack4, the MvPI e-mail, a reference,
+  an acceptance, a rejection or a bounce. A receipt is not acceptance; an accepted initial report records the filing
+  on the signed conclusion and settles the market on the reportability watch. A rejection returns the obligation to
+  draft, "correction required", with its original deadline. A request for information after acceptance creates a
+  separate response obligation with its own deadline. The follow-up after a submission follows G2b's decision table
+  rows 1 to 4 (shown, no reminders until G25).
+- **Exports**: the worksheet as PDF and DOCX, a working draft or an approved snapshot exactly as frozen, with the form
+  version, "DRAFT - MDARIX NEVER SUBMITS", the starter-text mark, the practice-record label in a trial, every field's
+  status and source, and the approval manifestation (21 CFR 11.50).
+- **Entry points**: "Open the report worksheet" on a signed US or India conclusion; "Report worksheet" on the
+  reportability watch; "Next: assess per market" and "Its reports" on a triage item; Getting started's "After a
+  conclusion" card (not a chapter); the trial guide and the in-app user guide.
+- **Sample data** (all marked Sample, covered by sample removal; added once to earlier trials by
+  `scripts/refresh_trial_story.py`): SAMPLE-RV-09 gets a signed US conclusion and a finished 3500A report, approved by
+  the sample approver, submitted by eMDR on day 27 and accepted (four sample acknowledgement files); a new complaint,
+  SAMPLE-RV-10 (PulseWatch 410 Rev A, India, a probe burn reported four weeks after the event), gets a signed India
+  conclusion and an MDAE report whose e-mail bounced: "correction required". India is enabled in the sample's own
+  reporting windows. SAMPLE-RV-06 still waits for the trial user; its 3500A worksheet opens once its US conclusion is
+  signed.
+
+### Changed
+
+- On a US or India market with a worksheet, the filing is recorded by the submission record: the direct "Record the
+  filing" is refused there (EU/NI and GB keep it).
+- The sample has 43 complaints (was 42) and four reporting windows (was three); the routine path signs "not
+  reportable" for India too. OrbitCare 300 stays the only rising trend (RV-10's event is older than 30 days).
+- `## [0.10.57]` is dated 2026-11-01, the day it was released.
+
+## [0.10.57] - 2026-11-01
 
 On the trial maintenance line (`release/0.10`): the first-contact check (T-G32, MVP G32), urgent intake with the
 awareness rule and the triage flag (T-G19, G19), and duplicates with import history (T-G20, G20), built once on the

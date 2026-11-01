@@ -497,11 +497,43 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Answer each question Yes, No, Unknown or Not applicable, with a rationale and the evidence relied on. Each shows its clause and the Starter text mark; Show definition opens its full definition.",
               "Choose Save answers to see the suggestion: Reportable (with its report type), Pending information (an Unknown could make it reportable) or Not reportable.",
               "Under Sign the conclusion, confirm the suggestion or override it with a reason, enter your password and authenticator code, and choose Save and sign.",
-              "When your organization has reported, enter the Filing reference and Filed on date on the signed conclusion and choose Record the filing.",
+              "For the EU/NI and GB markets, when your organization has reported, enter the Filing reference and Filed on date on the signed conclusion and choose Record the filing. A US or India conclusion opens its report worksheet instead (Complaints › Reports).",
             ],
             result:
               "The card shows each market's state (for example US: reportable · filed). A change later is a new version; the earlier one stays visible.",
             note: "Unknown is never No: Not reportable cannot be signed while an Unknown could make the event reportable. Questions and thresholds are starter text, awaiting regulatory confirmation: check them against your own procedure. A decision recorded before per-market assessment stays, marked Single decision.",
+          },
+        ],
+      },
+      {
+        id: "reports",
+        title: "Reports: from a conclusion to a report ready to file",
+        where:
+          "Complaints › Reports; a signed US or India conclusion's Open the report worksheet; Getting started, After a conclusion",
+        purpose:
+          "A market assessed reportable, or pending information, owes a report with its deadline. MDARIX drafts the US Form FDA 3500A (09/2025) or the India MvPI MDAE form (Version 1.2) worksheet in the authority's field order, each field with its source and status. A second person approves the snapshot; you enter it in the authority's route and record the submission and the receipt. MDARIX never submits.",
+        tasks: [
+          {
+            title: "Prepare the worksheet and have it approved",
+            who: "Anyone with regulatory review or approval rights. The approver is never the preparer, never the signer of the market conclusion and never an administrator.",
+            steps: [
+              "Open Complaints › Reports and choose Start the worksheet on the complaint and market (or Open the report worksheet on the signed conclusion).",
+              "Read each section in the form's order. Each field shows From record (with its record), Entered by a person, Confirmed, or what is missing: must have before submission, may be unknown in an initial report, or follow up later. Patient and reporter details say Enter in the authority's route: MDARIX never stores them (the sample shows fictional ones).",
+              "Choose Enter a value for what the records do not hold, or Confirm against the source. Missing fields never block a timely initial report.",
+              "Choose Ask for approval: the worksheet is frozen as a snapshot. A colleague opens it, enters their password and authenticator code and chooses Approve the snapshot.",
+              "Download the PDF or DOCX: a working draft, or the approved snapshot exactly as frozen.",
+            ],
+            result: "The report shows Approved snapshot, with the approver and the checksum of what was approved.",
+          },
+          {
+            title: "Record the submission and the receipt",
+            steps: [
+              "Enter the approved snapshot in the authority's route yourself (eSubmitter for FDA eMDR; MvPI by e-mail or online).",
+              "Choose the route, the time you submitted, and attach the portal's copy (or describe it). Say whether it matches the approved snapshot; a material difference needs the draft reopened and approved again. Choose Mark as submitted.",
+              "As evidence arrives, record it: Ack1 and Ack2 are receipts, not acceptance; Ack3 passed (or the authority's acceptance) makes the report Accepted, and settles the market on the reportability watch. A failed Ack3, a rejection or a bounce returns the report to Draft: correction required, with its original deadline.",
+              "After acceptance, Complete the obligation, or record that a follow-up is due, or that the authority asked for more information: that creates a separate response obligation with its own deadline.",
+            ],
+            note: "In a free trial every snapshot and submission is a practice record. The worksheets' field order and mappings are starter text until the regulatory consultant confirms them.",
           },
         ],
       },
