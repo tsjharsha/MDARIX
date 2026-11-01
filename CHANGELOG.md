@@ -10,6 +10,139 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.63] - 2026-11-02
+
+On the trial maintenance line (`release/0.10`): stage 2 of the quality plan, "Clocks and numbers you can trust". A legal
+deadline is now counted one way and reads the same on every screen, with its time zone; an organization and a call have
+their own time zone; the trend check's statistics hold at any size; and screens, guides and the website quote the same
+counts.
+
+**No migration.** The API, worker and web images change. **Operators:** no new setting. The counting rules are starter
+rules, marked so, for the regulatory consultant to confirm per market; until then the conservative reading applies.
+
+### Changed: how a legal deadline is counted (every screen)
+
+One computation (`backend/app/reportability/deadlines.py`) now counts every market clock: the reportability watch, a
+market assessment, triage's provisional deadlines, a report obligation, the reportability reminders, the oversight view
+and its alerts, worksheets and exports.
+
+- **Awareness is taken in a time zone before its day is counted.** Before, the UTC date of awareness was day 0: an
+  awareness at 21:00 in New York counted from the next day. The authority's time zones are: US FDA America/New_York,
+  EU and Northern Ireland Europe/Brussels, Great Britain Europe/London, India Asia/Kolkata.
+- **Great Britain and India count the awareness day as day 1** (the MVP's conservative rule). Their deadlines are one
+  day earlier than before (India 15 days: awareness + 14). The US and the EU still count from the day after awareness.
+- **A deadline ends at 23:59 in the authority's time zone or the organization's, whichever comes first**, on the earlier
+  of the two days counted. Before, every deadline ended at midnight UTC (05:30 the next morning in India).
+- **Every legal deadline shows its time zone**: "Sat 7 Nov 2026, 23:59 IST". The API adds `due_at`, `due_zone` and
+  `due_label` beside `due_date` / `due_on` (watch clocks, market clocks, triage deadlines, report lists and details,
+  oversight items and alerts, the oversight CSV's `due_label` column, the inspection pack's "Deadline ends" column).
+- No weekend or holiday extension is applied (EU Regulation 1182/71 is left out); public holidays still count as work
+  days for the US 5-work-day report. A market without an authority zone here (Canada, or another country) counts in
+  the organization's time zone from the day after awareness.
+- An in-vitro diagnostic (recognised from its product name, family, GMDN term or description) cites **EU IVDR
+  Art. 82** (starter) where an EU clock cited MDR Art. 87, on the watch and in triage. New catalog entry `IVDR_82`.
+
+### Fixed
+
+- **Triage shows the event's own market first (J3).** It showed the earliest provisional deadline across every enabled
+  market, so a US event read "EU MDR … 14 days overdue". Now the event's market comes first, the other enabled markets
+  are marked "if also reportable", and a market with a signed conclusion shows that conclusion's deadline (or
+  "Concluded not reportable") instead of its provisional one. Without a country, or when the event's own market has
+  no reporting window, every enabled market shows and the screen says why. The reportability watch shows the
+  awareness day where the reader is, as triage does.
+- **The watch honours a signed shorter category (J14).** The binding clock is always the earliest of the window's
+  clock and every market's own clock, so an EU 2-day serious public health threat binds while a 15-day window runs;
+  Readiness's reporting check counts it overdue. **Signing a reportable conclusion gives every open initial report of
+  that market its category's deadline** (a report started while the market was pending kept the provisional date).
+- **One "time left" text everywhere (J40).** "3 days left", "1 day left", "5 h left", "Due today", "2 days overdue",
+  "3 h overdue": one helper (`frontend/src/app/dates.ts` `timeLeft`) on the watch, market assessments, triage, Reports,
+  the oversight view, reminders, case reviews and CAPA checks. Overdue comes from the server's state, so "1 h left"
+  never stands beside "Overdue"; whole days count to the deadline's own day in its time zone. ("Due in 10 days" now
+  reads "10 days left".)
+- **The organization's time zone (J16).** A new trial's working calendar starts in the sign-up country's time zone
+  before the sample is seeded (India Asia/Kolkata, United States America/New_York, United Kingdom Europe/London, and the
+  other common countries; otherwise UTC). Existing organizations keep theirs. The time-zone list holds current names
+  only ("Asia/Kolkata", never "Asia/Calcutta" or "US/Eastern" beside it); an old name sent by a browser is stored under
+  its current one.
+- **One end of day for MDARIX's own due times.** A reply due, a CAPA effectiveness reminder and a risk-file follow-up
+  end at 23:59 on the organization's calendar (they ended at 23:59 UTC); a first-contact follow-up's reply day is its
+  task's day on that calendar (it was the UTC date of the task's end: a day late west of Greenwich, "overdue since
+  29 Oct" beside "Due 30 Oct"); a reply is overdue once its day ends there.
+- **A call's time zone is chosen from a list and its times converted in it (J28).** Chicago 09:00 entered from India
+  is 15:00 UTC in November (it was stored as 03:30 UTC, the browser's 09:00). The first-contact form offers the list
+  and starts with the browser's zone; the server takes wall-clock times in the chosen zone and refuses an unknown zone
+  (422 `TIME_ZONE_UNKNOWN`). `GET /api/v1/intake/guide` adds `zones` and `zone_aliases`.
+- **One number per thing (J19).** The website and the user guide say eleven inspection checks (they said eight;
+  Readiness has eleven) and the website's quality loop draws all eleven ("3 of 11 inspection checks clear",
+  illustrative); Getting started says 10 chapters while the story loads (it said 9) and the website says ten (it said
+  nine); the Readiness check that counts complaints past the disposition target is named "Dispositions past the 30-day
+  target or to review" (it was "Complaints waiting for a disposition", beside a board whose "waiting" counts every
+  complaint without one); My Work's reminder panel says "12 reminders for you, 12 unread", as the bell counts them;
+  a legal deadline reads the same day on Reports and the oversight view (RV-08's read 28 Nov on one and 29 Nov,
+  midnight UTC seen from India, on the other).
+
+### Fixed: trend statistics
+
+- **The chance no longer breaks on large numbers (S1).** With more than about 745 complaints expected in 30 days every
+  group read "In line" whatever its count (2,000 against 800 expected was "in line"). The Poisson chance is now
+  computed in log space, exact at any size.
+- **An event reported from several records counts once (S2).** Complaints a person linked as one event (record links
+  LINKED, complaint to complaint) count once, at the earliest record's event date, in the trend check and in the count
+  rule; every record is still listed and linked to the signal as evidence. The board says "an event linked from
+  several records counts once".
+- **A version younger than 30 days is expected only the days it has existed (S3)** ("in the 11 days since its
+  release"); it was expected a full 30 days of complaints, which hid an early rise.
+- **Many groups at once (S4).** Results use the Benjamini–Hochberg adjusted chance across every group assessed on the
+  board (one organization, one grouping), at the same 1% and 5% thresholds; the Chance column shows the adjusted value
+  with the group's own beside it ("allowing for the N groups checked"). A signal's trend line, the product filter and
+  Readiness's trend and risk-file checks read the same adjusted result.
+- **Complaints dated in the future are not counted (S5)** in the trend check or the count rule until their day comes.
+- **A rise since a version change stays visible (J26).** A version that replaced another is compared with its own
+  history and with the version it replaced; the stronger comparison is shown and names the other. Before, once the
+  version had 60 days of its own history, a rise lasting since its release became its "history" and read "in line".
+- **Single-use and consumable products are counted by calendar days (J27).** Their units are used up, so counting
+  every unit ever released as still in the field hid rises. Such products are recognised from words in the name,
+  family, GMDN term or description (a word list until products carry a single-use field), and the row says "Per
+  calendar day (single-use)".
+- A chance below 0.0005 reads "under 0.001" in a signal's trend sentence (it read "0.000" beside "p < 0.001").
+- **One multiple per screen (J19).** The trend check says "(9.3× expected)"; the Getting started trend card says
+  "3.3× the earlier average" in its headline only (its peak callout no longer shows a second multiple). The two measure
+  different things (one version's 30 days against the version it replaced; all complaints per month against the
+  earlier average), and each is now labelled.
+
+### Sample numbers that change
+
+Measured on fresh trials seeded at 21:55 UTC on 1 Nov 2026 (03:25 on 2 Nov in India); the sample is dated from the
+trial's start, so a trial seeded at another hour can differ by a day. No sample data changed.
+
+- **A trial signed up from the United States** (calendar America/New_York, was UTC): every deadline now names its time
+  zone ("Sat 28 Nov 2026, 23:59 EST"). SAMPLE-RV-10 (India): 8 Nov, 7 days left, running -> **Sat 7 Nov 23:59 IST,
+  5 days left, due soon**. Triage's first deadline: RV-06 "EU 18 Oct, 14 days overdue" -> "US Sat 7 Nov, 6 days left";
+  RV-07 "EU 30 Oct, 2 days overdue" -> "EU signed, Wed 4 Nov 23:59 CET, 3 days left"; RV-10 "EU 3 Nov" -> "India
+  signed, Sat 7 Nov 23:59 IST"; RV-08 "EU 8 Nov" -> "US Sat 28 Nov 23:59 EST, 27 days left"; SAMPLE-URG-01 "EU 10 Nov"
+  -> "US Mon 30 Nov"; SAMPLE-CALL-03 (GB, no GB window) now says no window for its own market. India report (RV-10):
+  8 Nov, 7 days left -> Sat 7 Nov 23:59 IST, 5 days left. Readiness "Reporting clocks" and chapter 2: 2 (1 due soon)
+  -> 3 (2 due soon). The overdue reply on RV-08: due 29 Oct 23:59 UTC -> 29 Oct 23:59 EDT.
+- **A trial signed up from India** (calendar Asia/Kolkata, was UTC): every deadline ends at 23:59 IST, the earlier
+  end. RV-07 (EU) 3 -> 2 days left; RV-06 (US) 6 -> 5 days left, now due soon; RV-08 (US) 27 -> 26 days left; RV-10
+  (India) 8 Nov stays 8 Nov (awareness at 03:25 IST on 25 Oct is day 1), 7 -> 6 days left; the decided RV-09 -10 ->
+  -11 days. Readiness "Reporting clocks" 2 -> 3. Due times of MDARIX's own work end at 23:59 IST (they read 05:29 IST
+  the next day).
+- **Labels:** the Readiness check "Complaints waiting for a disposition" (3) is "Dispositions past the 30-day target or
+  to review" (3); "N days left" replaces "Due in N days"; triage's deadline column reads "Deadline" with each market's
+  role; My Work's panel "12 items need you" reads "12 reminders for you".
+- **Trend check:** OrbitCare Rev B 9 against 0.96 expected, ×9.3, significant; the pressure-alarm group 6 against 0.64,
+  significant; 1 signal; boards 6 and 17 groups with 1 significant each: unchanged (one group tested, so the adjusted
+  chance is the raw one). Getting started's trend card: "up from 3.3 before · 3.3×" -> "up from 3.3 a month before ·
+  3.3× the earlier average"; its peak callout "Oct '26: 19 complaints · 5.7× the earlier average" -> "Oct '26: 19
+  complaints".
+
+### Tests
+
+- A test that read the developer machine's date for an absence failed every night in India before 05:30; it now
+  reads the organization's day. The reporting tests' complaints are aware at noon UTC, so a day count no longer
+  depends on the hour the suite runs.
+
 ## [0.10.62] - 2026-11-01
 
 On the trial maintenance line (`release/0.10`): stage 1 of the quality plan, "Safety and honesty". It removes the

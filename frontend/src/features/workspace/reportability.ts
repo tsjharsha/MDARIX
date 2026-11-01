@@ -101,6 +101,8 @@ export type WatchItem = {
   death: boolean | null;
   malfunction: boolean | null;
   aware_date: string | null;
+  /** When the organization became aware (the day shown is the reader's, as on triage). */
+  aware_at?: string | null;
   aware_source: "AWARENESS_DATE" | "RECEIVED_DATE" | "RECORDED_DATE" | "LINKED_SOURCE" | null;
   days_since_aware: number | null;
   triggers: Trigger[];

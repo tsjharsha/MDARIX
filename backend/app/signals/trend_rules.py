@@ -281,10 +281,15 @@ def adjust(checks: list[Check]) -> list[Check]:
     ]
 
 
+def _p(value: float) -> str:
+    """A chance in three decimals; "under 0.001" where three decimals would read 0.000."""
+    return "under 0.001" if value < 0.0005 else f"{value:.3f}"
+
+
 def _chance(item: Check) -> str:
-    text = f"chance of at least this many if nothing changed: {item.p_value:.3f}"
+    text = f"chance of at least this many if nothing changed: {_p(item.p_value)}"
     if item.groups_tested > 1 and item.p_adjusted is not None:
-        text += f" ({item.p_adjusted:.3f} allowing for the {item.groups_tested} groups checked)"
+        text += f" ({_p(item.p_adjusted)} allowing for the {item.groups_tested} groups checked)"
     return text
 
 

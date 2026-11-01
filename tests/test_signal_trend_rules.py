@@ -216,3 +216,9 @@ def test_single_use_products_are_named_by_their_words():
     by_time = trend.check(6, 12, 180, basis_note=trend.SINGLE_USE_NOTE)
     assert by_time.basis == trend.TIME and by_time.as_dict()["basis_note"] == trend.SINGLE_USE_NOTE
     assert trend.sentence("Set Rev A", by_time).endswith(trend.SINGLE_USE_NOTE)
+
+
+def test_a_tiny_chance_reads_under_0_001_not_0_000():
+    # 0.10.63 review: the signal's trend line said "chance ... if nothing changed: 0.000" beside "p < 0.001".
+    item = trend.check(9, 6, 180, scale=0.16)
+    assert "if nothing changed: under 0.001" in trend.sentence("Rev B", item)

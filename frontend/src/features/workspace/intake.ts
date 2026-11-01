@@ -138,7 +138,7 @@ export type Deadline = {
   market: string;
   label: string;
   /** The event's own market first; the others only "if also reportable"; a signed conclusion replaces its market's. */
-  role: "OWN" | "IF_ALSO" | "SIGNED" | "NO_COUNTRY";
+  role: "OWN" | "IF_ALSO" | "SIGNED" | "NO_COUNTRY" | "OWN_NO_WINDOW";
   role_label: string;
   own: boolean;
   not_reportable: boolean;

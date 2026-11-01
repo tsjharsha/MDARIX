@@ -177,6 +177,9 @@ def test_triage_shows_the_events_own_market_first_and_a_signed_conclusion_instea
     # No country: every enabled market, none of them "if also".
     unknown = rules.provisional_deadlines(NOW, ["US", "EU_NI"], rules.FLAGGED, today)
     assert {d["role"] for d in unknown} == {"NO_COUNTRY"}
+    # A Great Britain event where only the US and the EU have windows: not "if also", its own market has none.
+    british = rules.provisional_deadlines(NOW, ["US", "EU_NI"], rules.FLAGGED, today, own="GB")
+    assert {d["role"] for d in british} == {"OWN_NO_WINDOW"}
     # An in-vitro diagnostic's EU deadline cites the IVDR (starter), not the MDR.
     ivd = rules.provisional_deadlines(NOW, ["EU_NI"], rules.FLAGGED, today, own="EU_NI", ivd=True)
     assert ivd[0]["basis"] == "10 days (EU IVDR Art. 82, starter)"

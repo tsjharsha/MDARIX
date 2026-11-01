@@ -240,8 +240,8 @@ export function WatchCard({
             )}
             {item.aware_date && (
               <span>
-                Aware {formatDay(item.aware_date)} by the {AWARE_SOURCE[item.aware_source ?? ""] ?? "records"} ·{" "}
-                {countOf(item.days_since_aware ?? 0, "day")} ago
+                Aware {formatDay(item.aware_at ?? item.aware_date)} by the{" "}
+                {AWARE_SOURCE[item.aware_source ?? ""] ?? "records"} · {countOf(item.days_since_aware ?? 0, "day")} ago
               </span>
             )}
           </div>

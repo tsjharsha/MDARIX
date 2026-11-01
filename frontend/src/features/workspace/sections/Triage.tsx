@@ -192,6 +192,8 @@ function TriageCard({
           <p className="uw-cr-meta">
             {first.role === "SIGNED" ? "Deadline" : "Provisional deadline"}: {first.label}, {deadlineText(first)}
             {item.deadlines.length > 1 && first.own ? " · other markets only if also reportable" : ""}
+            {first.role === "OWN_NO_WINDOW" ? " · no reporting window for the event's own market" : ""}
+            {first.role === "NO_COUNTRY" ? " · no country recorded" : ""}
           </p>
         )}
         {item.linked.length > 0 && (
@@ -347,7 +349,11 @@ function TriageDrawer({
                       <small className="ac-muted uw-tr-role">{deadline.role_label}</small>
                     </td>
                     <td>
-                      {deadline.tier_label}: {deadline.basis}
+                      {deadline.not_reportable
+                        ? deadline.basis
+                        : deadline.role === "SIGNED"
+                          ? `${deadline.basis}, signed`
+                          : `${deadline.tier_label}: ${deadline.basis}`}
                     </td>
                     <td>
                       <span className={`uw-clock tone-${clockTone(deadline.state ?? "")}`}>

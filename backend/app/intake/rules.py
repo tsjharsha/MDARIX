@@ -467,12 +467,13 @@ def tier(flagged: bool, threat: bool) -> str:
     return THREAT if threat else FLAGGED if flagged else UNFLAGGED
 
 
-OWN, ALSO, SIGNED, NO_COUNTRY = "OWN", "IF_ALSO", "SIGNED", "NO_COUNTRY"
+OWN, ALSO, SIGNED, NO_COUNTRY, NO_WINDOW = "OWN", "IF_ALSO", "SIGNED", "NO_COUNTRY", "OWN_NO_WINDOW"
 ROLE_LABELS = {
     OWN: "The event's market",
     ALSO: "If also reportable",
     SIGNED: "Signed market conclusion",
     NO_COUNTRY: "No country recorded: each enabled market",
+    NO_WINDOW: "No reporting window for the event's own market: each enabled market",
 }
 
 
@@ -495,8 +496,19 @@ def provisional_deadlines(
     whose EU clocks cite the IVDR (starter). ``today``: now (a day in older callers)."""
     found = []
     signed = signed or {}
-    for market in enabled or list(markets.MARKETS):
-        role = SIGNED if market in signed else OWN if market == own else ALSO if own else NO_COUNTRY
+    listed = enabled or list(markets.MARKETS)
+    for market in listed:
+        role = (
+            SIGNED
+            if market in signed
+            else OWN
+            if market == own
+            else ALSO
+            if own in listed
+            else NO_WINDOW
+            if own
+            else NO_COUNTRY
+        )
         if market in signed:
             clock = signed[market]
             found.append(

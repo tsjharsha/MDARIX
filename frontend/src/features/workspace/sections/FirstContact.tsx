@@ -226,6 +226,8 @@ type LogForm = {
   party: string;
   awareness: string;
   zone: string;
+  /** Whether the person typed the call's time: until then it follows "now" in the zone chosen. */
+  receivedTyped: boolean;
   answers: Answers;
   unknowns: string;
 };
@@ -259,6 +261,7 @@ function LogDrawer({
     party: "",
     awareness: "",
     zone: startingZone(guide, ZONE),
+    receivedTyped: false,
     answers: blankAnswers(guide.questions),
     unknowns: "",
   });
@@ -397,7 +400,7 @@ function LogDrawer({
               <input
                 type="datetime-local"
                 value={form.received}
-                onChange={(event) => set({ received: event.target.value })}
+                onChange={(event) => set({ received: event.target.value, receivedTyped: true })}
               />
             </label>
             <label className="ca-field">
@@ -439,7 +442,16 @@ function LogDrawer({
             )}
             <label className="ca-field">
               Time zone of the call
-              <select value={form.zone} onChange={(event) => set({ zone: event.target.value })}>
+              <select
+                value={form.zone}
+                onChange={(event) =>
+                  set({
+                    zone: event.target.value,
+                    // A time the person typed stays as typed (09:00 in Chicago); "now" follows the zone.
+                    ...(form.receivedTyped ? {} : { received: zonedInput(new Date(), event.target.value) }),
+                  })
+                }
+              >
                 {(guide.zones ?? [form.zone]).map((zone) => (
                   <option key={zone} value={zone}>
                     {zone.replace(/_/g, " ")}
