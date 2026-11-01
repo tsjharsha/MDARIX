@@ -189,6 +189,13 @@ STEPS = (
         ("decision_guide_versions", "external_parties", "communication_entries", "communication_settings"),
         ("tenants", "complaints"),
     ),
+    Step(
+        "tr07",
+        "tr07_trial_oversight.py",
+        "create_oversight_tables",
+        ("oversight_settings", "user_absences", "due_alerts", "event_closures"),
+        ("tenants", "complaints"),
+    ),
 )
 
 

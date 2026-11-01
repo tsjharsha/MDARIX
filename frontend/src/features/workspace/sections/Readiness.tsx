@@ -34,6 +34,9 @@ import { QualityLoop } from "./QualityLoop";
 import { loopFromReadiness } from "../qualityLoop";
 import { documentLink } from "../documents";
 import { FINDING_SIGNALS_NOW, WHILE_FINDING_SIGNALS } from "../signals";
+import { Tabs } from "../../customer-admin/shared";
+import { READINESS_TABS, parseReadinessTab, type ReadinessTab } from "../oversight";
+import { OversightView } from "./Oversight";
 
 const HOME_ICONS: Record<string, typeof ScanSearch> = {
   COMPLAINTS_TO_RECHECK: ScanSearch,
@@ -51,7 +54,18 @@ const TRENDS_CHECK = "TRENDS_WITHOUT_ACTION";
  * why it matters, with the disclaimer once at the foot. The summary for management review downloads as a PDF. Right
  * after an import the trend check says that its signals are being found, and the checks are read again once they are.
  */
-export function ReadinessSection() {
+export function ReadinessSection({ tab }: { tab?: string }) {
+  // Readiness holds the inspection checks and, beside them, the oversight view (T-G9): one place for the head of QA.
+  const [target] = useState(() => parseReadinessTab(tab));
+  const [active, setActive] = useState<ReadinessTab>(target.tab);
+  return (
+    <Tabs tabs={READINESS_TABS} active={active} onChange={setActive} label="Readiness sections">
+      {active === "Inspection checks" ? <InspectionChecks /> : <OversightView initialEvent={target.event} />}
+    </Tabs>
+  );
+}
+
+function InspectionChecks() {
   const { open } = useWorkspace();
   const data = useResource<Readiness>(READINESS_PATH, WHILE_FINDING_SIGNALS);
   const finding = !!data.data?.detection_pending;

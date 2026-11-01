@@ -139,6 +139,7 @@ briefly unavailable) is logged and tried again on the next one.
 | `export-expiry` | 1 h | Delete data exports after their download period |
 | `connector-sync` | 15 min | Sync connections that have a sync schedule |
 | `audit-chain-verification` | 24 h | Verify every organization's tamper-evident audit trail |
+| `due-alerts` | 15 min | Raise reminders for items due soon and escalations for overdue ones (owner, backup, the escalation role), and resolve those whose item is done; in-app only, nothing is e-mailed (`DUE_ITEM_ESCALATED` in the audit trail) |
 | `readiness-digest` | 6 h | Once per ISO week (from Monday 06:00 UTC): queue each organization's weekly readiness email (`READINESS_DIGEST`) to its quality leads |
 
 Every run is recorded in `scheduler_runs` (status, result, error type, consecutive failures). Jobs run in system

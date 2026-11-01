@@ -277,6 +277,15 @@ def reporting_reminders(db: Session, _state: dict) -> dict:
     return run_for_all_tenants(db)
 
 
+def due_alerts(db: Session, _state: dict) -> dict:
+    """Reminders and escalations of every dated item (triage, reporting deadlines, report obligations, replies due,
+    guide approvals, tasks), raised and resolved for every active organization (backend/app/oversight/service.py).
+    Idempotent; each organization is committed on its own."""
+    from backend.app.oversight.service import run_for_all_tenants
+
+    return run_for_all_tenants(db)
+
+
 def readiness_digest(db: Session, _state: dict) -> dict:
     """The weekly readiness email for every active organization: queued once per ISO week, from Monday 06:00 UTC
     (backend/app/readiness_home/digest.py); the outbox worker sends it to the quality leads."""
@@ -377,6 +386,13 @@ JOBS: tuple[Job, ...] = (
         timedelta(hours=6),
         reporting_reminders,
         "Remind reviewers of reporting clocks and CAPA effectiveness checks that are due",
+        CELL_JOBS,
+    ),
+    Job(
+        "due-alerts",
+        timedelta(minutes=15),
+        due_alerts,
+        "Remind owners of items due soon and escalate overdue ones to their backup and the escalation role",
         CELL_JOBS,
     ),
     Job(

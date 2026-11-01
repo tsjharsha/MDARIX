@@ -18,7 +18,7 @@ changes an imported complaint.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -32,7 +32,6 @@ from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordF
 from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
 from backend.app.intake import rules
 from backend.app.reportability import markets
-from backend.app.reportability import rules as reporting
 
 SOURCE_TYPE = "IntakeEvent"
 FOLLOW_UP, QMS, REVIEW = "FIRST_CONTACT_FOLLOW_UP", "QMS_COMPLAINT", "SERVICE_ONLY_REVIEW"
@@ -46,15 +45,19 @@ def now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def working_day_end(moment: datetime, days: int = 0) -> datetime:
-    """The end of the working day ``days`` working days after ``moment`` (UTC; Monday to Friday). Day 0 is the same
-    day, or the next working day when ``moment`` falls on a weekend."""
-    day = moment.astimezone(timezone.utc).date()
-    while day.weekday() >= 5:
-        day += timedelta(days=1)
-    if days:
-        day = reporting.add_work_days(day, days)
-    return datetime.combine(day, time(23, 59, 59), tzinfo=timezone.utc)
+def working_day_end(moment: datetime, days: int = 0, calendar=None) -> datetime:
+    """The end of the working day ``days`` working days after ``moment``, on the organization's working calendar
+    (``calendar``, backend/app/oversight/rules.py; the default is Monday to Friday in UTC). Day 0 is the same day, or
+    the next working day when ``moment`` falls on a day off."""
+    from backend.app.oversight.rules import Calendar
+
+    return (calendar or Calendar()).working_day_end(moment, days)
+
+
+def calendar(db: Session, tenant_id):
+    from backend.app.oversight.service import calendar_of
+
+    return calendar_of(db, tenant_id)
 
 
 def _iso(value) -> str | None:
@@ -214,7 +217,7 @@ def ensure_follow_up(db, tenant_id, event: IntakeEvent, answers: dict, suggestio
         source_type=SOURCE_TYPE,
         source_id=event.id,
         assigned_user_id=_user_or_none(actor),
-        due_at=working_day_end(now, 1),
+        due_at=working_day_end(now, 1, calendar(db, tenant_id)),
         created_by=actor,
         details={"questions": asks, "reference": event.reference},
     )
@@ -238,7 +241,7 @@ def ensure_qms_task(db, tenant_id, event: IntakeEvent, actor, now) -> None:
         source_type=SOURCE_TYPE,
         source_id=event.id,
         assigned_user_id=_user_or_none(actor),
-        due_at=working_day_end(now, 1),
+        due_at=working_day_end(now, 1, calendar(db, tenant_id)),
         created_by=actor,
         details={"reference": event.reference},
     )
@@ -250,7 +253,8 @@ def ensure_review_task(db, tenant_id, event: IntakeEvent, check: FirstContactChe
     from backend.app.workflow.tasks import create_task
 
     matched = rules.fault_words(event.reporter_words) + rules.harm_words(event.reporter_words)
-    due = min(working_day_end(now, 1), now + timedelta(hours=24)) if matched else working_day_end(now, 5)
+    days = calendar(db, tenant_id)
+    due = min(working_day_end(now, 1, days), now + timedelta(hours=24)) if matched else working_day_end(now, 5, days)
     create_task(
         db,
         tenant_id,

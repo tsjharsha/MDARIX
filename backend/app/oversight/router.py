@@ -1,0 +1,1037 @@
+"""Reminders and escalation, the oversight view and the event's closure (T-G25, T-G9, T-G28; MVP G25, G9, G28).
+
+- ``GET /api/v1/oversight``: one place for the head of QA/RA: every dated item overdue or due soon (or all), with its
+  owner, due time, hours left and who it escalated to, by category; filters by product, market and category; the
+  events (ready to close, not ready, decision record not filed, closed in the QMS before readiness); who is away;
+  the staffing warning. IDs, owners, dates and states only, never patient or reporter data;
+- ``GET /api/v1/oversight/export.csv``: the same list for the monthly product review (data.export);
+- ``GET``/``PUT /api/v1/oversight/settings``: the working calendar (time zone, working weekdays, holidays) and the
+  simple escalation rule (reminder hours, escalation role); changing them needs quality review or regulatory
+  approval;
+- ``GET /api/v1/oversight/alerts`` and ``POST .../alerts/read``: the signed-in person's own reminders and
+  escalations, with read state (brought up to date first);
+- ``GET``/``POST /api/v1/oversight/absences`` and ``POST .../absences/{id}/cancel``: a person records their own
+  absence with the colleague who covers it;
+- ``GET /api/v1/oversight/events/{complaint_id}``: the event: owner, stage line, checklist, decision record;
+  ``PUT .../owner``; ``POST .../ready`` (the event owner signs "ready to close in the QMS" with their password, with a
+  reason when items are open); ``PUT .../filing`` (the QMS filing reference); ``GET .../decision-record.pdf``.
+
+An alert never closes or changes an item; MDARIX never closes a complaint, never decides and never sends anything
+to an external contact. These routes serve a free trial and a pilot alike (T-B1).
+"""
+
+from __future__ import annotations
+
+import io
+import logging
+import uuid
+from datetime import date, datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from backend.app.access.permissions import (
+    DATA_EXPORT,
+    EVIDENCE_REQUEST,
+    INVESTIGATION_WORK,
+    QUALITY_REVIEW,
+    REGULATORY_APPROVE,
+    REGULATORY_REVIEW,
+    SIGNAL_TRIAGE,
+    require_permission,
+)
+from backend.app.complaint_review.service import people as names_of
+from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.models.foundation import Complaint, SignedApprovalRecord
+from backend.app.db.models.oversight import DueAlert, EventClosure, OversightSettings, UserAbsence
+from backend.app.db.session import get_db
+from backend.app.enterprise_audit import make_audit_event
+from backend.app.evidence_workflow.people import require_any_permission
+from backend.app.oversight import closure, rules, service
+from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+
+logger = logging.getLogger("mdarix.oversight")
+router = APIRouter(prefix="/api/v1/oversight", tags=["Oversight, reminders and escalation"])
+
+WRITERS = Depends(
+    require_any_permission(
+        SIGNAL_TRIAGE, INVESTIGATION_WORK, EVIDENCE_REQUEST, QUALITY_REVIEW, REGULATORY_REVIEW, REGULATORY_APPROVE
+    )
+)
+SETTERS = Depends(require_any_permission(QUALITY_REVIEW, REGULATORY_APPROVE))
+SAMPLE_NAMES = {"system:trial-sample": "MDARIX sample data"}
+EVENTS_MAX = 200
+ESCALATION_ROLES = ("LEADER", "REVIEWER", "APPROVER", "REGULATORY_REVIEWER")
+CSV_FIELDS = (
+    "category",
+    "title",
+    "ref",
+    "product",
+    "market",
+    "owner",
+    "queue",
+    "due_at",
+    "state",
+    "hours_left",
+    "escalated_to",
+)
+NEVER = (
+    "An alert tells people in MDARIX; it never closes or changes the item. MDARIX sends no e-mail about it and never "
+    "decides: a person does, and signs."
+)
+
+
+def _error(status: int, code: str, message: str, **extra) -> HTTPException:
+    return HTTPException(status, detail={"code": code, "message": message, **extra})
+
+
+def _tenant(ctx) -> uuid.UUID:
+    return uuid.UUID(str(ctx.tenant_id))
+
+
+def _iso(value) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+def _audit(db, ctx, action: str, entity_type: str, entity_id, **details) -> None:
+    db.add(
+        make_audit_event(
+            tenant_id=_tenant(ctx),
+            actor_ref=ctx.user_id,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            correlation_id=ctx.correlation_id,
+            details=details,
+        )
+    )
+
+
+def _names(control_db, tenant_id, refs) -> dict[str, str]:
+    return {**SAMPLE_NAMES, **names_of(control_db, tenant_id, [ref for ref in refs if ref])}
+
+
+def _trial(control_db, tenant_id) -> bool:
+    from backend.app.signer_training.router import is_trial
+
+    try:
+        return is_trial(control_db, tenant_id)
+    except Exception:
+        return False
+
+
+def _absence_view(item: dict, names: dict) -> dict:
+    return {
+        "id": item["id"],
+        "user_id": item["user_id"],
+        "user_name": names.get(item["user_id"]) or "A colleague",
+        "backup_id": item["backup_id"],
+        "backup_name": names.get(item["backup_id"]) or "A colleague",
+        "starts_on": item["starts_on"].isoformat(),
+        "ends_on": item["ends_on"].isoformat(),
+        "note": item["note"],
+        "sample": item["sample"],
+    }
+
+
+# --------------------------------------------------------------------------------------------- the oversight view
+
+
+def _escalations(db, tenant_id) -> dict[str, list[str]]:
+    found: dict[str, list[str]] = {}
+    for alert in db.query(DueAlert).filter(
+        DueAlert.tenant_id == tenant_id, DueAlert.tier == rules.ESCALATION, DueAlert.resolved_at.is_(None)
+    ):
+        found.setdefault(alert.item_key, []).append(alert.recipient_id)
+    return found
+
+
+def _item_views(db, control_db, tenant_id, now: datetime) -> tuple[list[dict], dict]:
+    view = service.settings_view(service.settings_row(db, tenant_id))
+    calendar = service.calendar_from(view)
+    today = calendar.local_day(now)
+    away = service.absences(db, tenant_id, today)
+    items = service.due_items(db, control_db, tenant_id, now)
+    escalated = _escalations(db, tenant_id)
+    refs = {ref for item in items for ref in (item["owner_id"], item["backup_id"])}
+    refs |= {ref for found in escalated.values() for ref in found} | {a["backup_id"] for a in away}
+    names = _names(control_db, tenant_id, refs)
+    views = []
+    for item in items:
+        state = rules.state_of(item["due_at"], now, view["reminder_hours"])
+        covering = rules.away_backup(away, item["owner_id"], today)
+        views.append(
+            {
+                **{key: item[key] for key in ("key", "category", "title", "ref", "complaint_id", "market", "product")},
+                "category_label": rules.CATEGORIES[item["category"]],
+                "owner_id": item["owner_id"],
+                "owner": names.get(item["owner_id"] or "") if item["owner_id"] else None,
+                "queue": item["queue"],
+                "away": {"backup": names.get(covering) or "A colleague"} if covering else None,
+                "due_at": item["due_at"].isoformat(),
+                "state": state,
+                "state_label": rules.STATE_LABELS[state],
+                "hours_left": rules.hours_left(item["due_at"], now),
+                "escalated_to": [names.get(ref) or "A colleague" for ref in escalated.get(item["key"], [])],
+                "alerts": item["alerts"],
+                "opens": item["opens"],
+            }
+        )
+    return views, {"settings": view, "away": away, "names": names, "calendar": calendar}
+
+
+def _filtered(items, product, market, category, show) -> list[dict]:
+    return [
+        item
+        for item in items
+        if (not product or item["product"] == product)
+        and (not market or item["market"] == market)
+        and (not category or item["category"] == category)
+        and (show == "all" or item["state"] != rules.LATER)
+    ]
+
+
+def _events(db, control_db, tenant_id) -> list[dict]:
+    """The events MDARIX has worked on (a triage record, an assessment, an obligation, a communication, a disposition
+    or a named owner), with their readiness to close."""
+    from backend.app.db.models.authority_reports import ReportObligation
+    from backend.app.db.models.complaint_disposition import ComplaintDisposition
+    from backend.app.db.models.guides_communications import CommunicationEntry
+    from backend.app.db.models.intake import TriageRecord
+    from backend.app.db.models.market_assessment import ComplaintMarketAssessment
+
+    ids: set = set()
+    for model, column in (
+        (EventClosure, EventClosure.complaint_id),
+        (ComplaintMarketAssessment, ComplaintMarketAssessment.complaint_id),
+        (ReportObligation, ReportObligation.complaint_id),
+        (CommunicationEntry, CommunicationEntry.complaint_id),
+        (ComplaintDisposition, ComplaintDisposition.complaint_id),
+    ):
+        ids |= {row[0] for row in db.query(column).filter(model.tenant_id == tenant_id, column.isnot(None)).distinct()}
+    ids |= {
+        row[0]
+        for row in db.query(TriageRecord.subject_id).filter(
+            TriageRecord.tenant_id == tenant_id, TriageRecord.subject_kind == "COMPLAINT"
+        )
+    }
+    if not ids:
+        return []
+    # shortcut: each event's checklist is read one by one (a few queries each), capped at EVENTS_MAX; batch the reads
+    # when an organization works on more events at once.
+    complaints = (
+        db.query(Complaint)
+        .filter(Complaint.tenant_id == tenant_id, Complaint.id.in_(list(ids)))
+        .order_by(Complaint.complaint_identifier)
+        .limit(EVENTS_MAX)
+        .all()
+    )
+    tasks = closure.open_tasks_by_complaint(db, tenant_id)
+    triage = closure.open_on_triage(db, tenant_id)
+    rows = {row.complaint_id: row for row in db.query(EventClosure).filter(EventClosure.tenant_id == tenant_id)}
+    products = _products(db, tenant_id)
+    found = []
+    for complaint in complaints:
+        facts = closure.facts(db, tenant_id, complaint, tasks, triage)
+        found.append(_event_summary(complaint, facts, rows.get(complaint.id), products))
+    refs = {item["owner_id"] for item in found}
+    names = _names(control_db, tenant_id, refs)
+    for item in found:
+        item["owner_name"] = names.get(item["owner_id"] or "") if item["owner_id"] else None
+    order = {"CLOSED_BEFORE_READY": 0, "NOT_FILED": 1, "READY_TO_SIGN": 2, "NOT_READY": 3, "FILED": 4, "CLOSED": 5}
+    found.sort(key=lambda item: (order[item["state"]], item["ref"]))
+    return found
+
+
+EVENT_STATES = {
+    "NOT_READY": "Not ready to close",
+    "READY_TO_SIGN": "Checklist clear: the owner signs ready to close",
+    "NOT_FILED": "Ready to close; decision record not filed in the QMS",
+    "FILED": "Ready to close; decision record filed",
+    "CLOSED_BEFORE_READY": "Closed in the QMS before it was ready",
+    "CLOSED": "Closed in the QMS",
+}
+
+
+def _products(db, tenant_id) -> dict:
+    from backend.app.db.models.foundation import Product
+
+    return {row.id: row.name for row in db.query(Product.id, Product.name).filter(Product.tenant_id == tenant_id)}
+
+
+def _event_state(complaint, items: list[dict], row: EventClosure | None) -> str:
+    blocked = [item for item in items if item["result"] == closure.BLOCKED]
+    closed = str(complaint.status or "").lower() in closure.CLOSED_STATUSES
+    ready = row is not None and row.ready_state is not None
+    if closed:
+        return "CLOSED" if ready else "CLOSED_BEFORE_READY"
+    if ready:
+        return "FILED" if row.qms_filing_ref else "NOT_FILED"
+    return "NOT_READY" if blocked else "READY_TO_SIGN"
+
+
+def _event_summary(complaint, facts: dict, row: EventClosure | None, products: dict) -> dict:
+    from backend.app.reportability import markets
+
+    items = closure.checklist(facts)
+    blocked = [item for item in items if item["result"] == closure.BLOCKED]
+    state = _event_state(complaint, items, row)
+    stages = closure.stage_line(facts, items, row)
+    current = next((stage for stage in stages if stage["state"] == "CURRENT"), None)
+    return {
+        "complaint_id": str(complaint.id),
+        "ref": complaint.complaint_identifier,
+        "product": products.get(complaint.product_id),
+        "market": markets.market_of(complaint.country),
+        "owner_id": closure.owner_of(row, facts["record"]),
+        "stage": current["label"] if current else "Closed in the QMS",
+        "blocked": len(blocked),
+        "next": blocked[0]["action"] if blocked else None,
+        "state": state,
+        "state_label": EVENT_STATES[state],
+        "sample": complaint.source_system is not None,
+    }
+
+
+def _staffing(everyone: list[dict], role: str) -> str | None:
+    holders = service.escalation_people(everyone, role)
+    if len(everyone) < 2:
+        return "Only one person can receive alerts: invite a colleague, so an overdue item reaches someone else."
+    if not holders:
+        return "Nobody holds the escalation role: choose another role or give it to someone."
+    return None
+
+
+@router.get("")
+def oversight(
+    product: str | None = Query(default=None, max_length=200),
+    market: str | None = Query(default=None, max_length=10),
+    category: str | None = Query(default=None, max_length=30),
+    show: str = Query(default="attention", pattern="^(attention|all)$"),
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    tenant_id = _tenant(ctx)
+    now = service.now_utc()
+    service.sweep_if_stale(db, control_db, tenant_id, now)
+    items, context = _item_views(db, control_db, tenant_id, now)
+    shown = _filtered(items, product, market, category, show)
+    counts = {
+        code: {
+            "label": label,
+            "overdue": sum(1 for item in items if item["category"] == code and item["state"] == rules.OVERDUE),
+            "due_soon": sum(1 for item in items if item["category"] == code and item["state"] == rules.DUE_SOON),
+        }
+        for code, label in rules.CATEGORIES.items()
+    }
+    events = _events(db, control_db, tenant_id)
+    everyone = service.people(control_db, tenant_id)
+    names = {**context["names"], **{person["id"]: person["name"] for person in everyone}}
+    return {
+        "as_of": now.isoformat(),
+        "items": shown,
+        "total": len(items),
+        "counts": counts,
+        "overdue": sum(1 for item in items if item["state"] == rules.OVERDUE),
+        "due_soon": sum(1 for item in items if item["state"] == rules.DUE_SOON),
+        "filters": {
+            "products": sorted({item["product"] for item in items if item["product"]}),
+            "markets": sorted({item["market"] for item in items if item["market"]}),
+            "categories": [{"code": code, "label": label} for code, label in rules.CATEGORIES.items()],
+        },
+        "events": events,
+        "event_counts": {state: sum(1 for item in events if item["state"] == state) for state in EVENT_STATES},
+        "away": [_absence_view(item, names) for item in context["away"]],
+        "settings": {
+            **context["settings"],
+            "escalation_role_label": _role_label(context["settings"]["escalation_role"]),
+        },
+        "staffing": _staffing(everyone, context["settings"]["escalation_role"]),
+        "never": NEVER,
+    }
+
+
+def _role_label(code: str) -> str:
+    from backend.app.workflow.labels import role_label
+
+    return role_label(code) or code
+
+
+@router.get("/export.csv", dependencies=[Depends(require_permission(DATA_EXPORT))])
+def export(
+    product: str | None = Query(default=None, max_length=200),
+    market: str | None = Query(default=None, max_length=10),
+    category: str | None = Query(default=None, max_length=30),
+    show: str = Query(default="attention", pattern="^(attention|all)$"),
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The oversight list as CSV: IDs, owners, dates and states only (no patient or reporter data)."""
+    from backend.app import csv_safe
+
+    tenant_id = _tenant(ctx)
+    items, _ = _item_views(db, control_db, tenant_id, service.now_utc())
+    stream = io.StringIO()
+    writer = csv_safe.writer(stream, fieldnames=list(CSV_FIELDS))
+    writer.writeheader()
+    for item in _filtered(items, product, market, category, show):
+        writer.writerow(
+            {
+                "category": item["category_label"],
+                "title": item["title"],
+                "ref": item["ref"] or "",
+                "product": item["product"] or "",
+                "market": item["market"] or "",
+                "owner": item["owner"] or "",
+                "queue": item["queue"] or "",
+                "due_at": item["due_at"],
+                "state": item["state_label"],
+                "hours_left": item["hours_left"],
+                "escalated_to": "; ".join(item["escalated_to"]),
+            }
+        )
+    _audit(db, ctx, "OVERSIGHT_EXPORTED", "OversightView", None, product=product, market=market, category=category)
+    db.commit()
+    return Response(
+        content=stream.getvalue().encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="mdarix-oversight.csv"'},
+    )
+
+
+# --------------------------------------------------------------------------------------------- settings
+
+
+class HolidayIn(BaseModel):
+    date: date
+    name: str = Field(default="", max_length=rules.HOLIDAY_NAME_MAX * 2)
+
+
+class SettingsIn(BaseModel):
+    time_zone: str = Field(max_length=60)
+    work_days: list[int] = Field(max_length=7)
+    holidays: list[HolidayIn] = Field(default_factory=list, max_length=rules.HOLIDAYS_MAX * 2)
+    reminder_hours: int = Field(ge=rules.HOURS_MIN, le=rules.HOURS_MAX)
+    escalation_role: str = Field(max_length=60)
+
+
+def _settings_body(db, tenant_id) -> dict:
+    view = service.settings_view(service.settings_row(db, tenant_id))
+    return {
+        **view,
+        "escalation_role_label": _role_label(view["escalation_role"]),
+        "roles": [{"code": code, "label": _role_label(code)} for code in ESCALATION_ROLES],
+        "weekdays": list(rules.WEEKDAYS),
+        "zones": list(rules.zone_names()),
+        "range": [rules.HOURS_MIN, rules.HOURS_MAX],
+    }
+
+
+@router.get("/settings")
+def settings(
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    return _settings_body(db, _tenant(ctx))
+
+
+@router.put("/settings", dependencies=[SETTERS])
+def save_settings(
+    payload: SettingsIn,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    tenant_id = _tenant(ctx)
+    holidays = [{"date": item.date, "name": " ".join(item.name.split())} for item in payload.holidays]
+    problem = rules.calendar_problem(payload.time_zone, payload.work_days, holidays)
+    if problem is None and payload.escalation_role not in ESCALATION_ROLES:
+        problem = "Choose the escalation role from the list"
+    if problem:
+        raise _error(422, "SETTINGS_INVALID", problem)
+    now = service.now_utc()
+    row = service.settings_row(db, tenant_id)
+    old = service.settings_view(row)
+    if row is None:
+        row = OversightSettings(id=uuid.uuid4(), tenant_id=tenant_id)
+        db.add(row)
+    row.time_zone, row.work_days = payload.time_zone, sorted(payload.work_days)
+    row.holidays = [
+        {"date": item["date"].isoformat(), "name": item["name"]} for item in sorted(holidays, key=lambda h: h["date"])
+    ]
+    row.reminder_hours, row.escalation_role = payload.reminder_hours, payload.escalation_role
+    row.updated_by, row.updated_at, row.swept_at = str(ctx.user_id), now, None
+    db.flush()
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=ctx.user_id,
+            action="OVERSIGHT_SETTINGS_CHANGED",
+            entity_type="OversightSettings",
+            entity_id=row.id,
+            correlation_id=ctx.correlation_id,
+            old_values={
+                key: old[key] for key in ("time_zone", "work_days", "holidays", "reminder_hours", "escalation_role")
+            },
+            new_values={
+                key: service.settings_view(row)[key]
+                for key in ("time_zone", "work_days", "holidays", "reminder_hours", "escalation_role")
+            },
+        )
+    )
+    db.commit()
+    return _settings_body(db, tenant_id)
+
+
+# --------------------------------------------------------------------------------------------- my alerts
+
+
+def _alert_view(alert: DueAlert, now: datetime, hours: int, names: dict) -> dict:
+    due = alert.due_at
+    state = rules.state_of(due, now, hours)
+    return {
+        "id": str(alert.id),
+        "tier": alert.tier,
+        "tier_label": rules.TIER_LABELS[alert.tier],
+        "reason": alert.reason,
+        "reason_label": rules.REASON_LABELS.get(alert.reason, alert.reason),
+        "category": alert.category,
+        "category_label": rules.CATEGORIES.get(alert.category, alert.category),
+        "title": alert.title,
+        "ref": alert.ref,
+        "owner": names.get(alert.owner_id or "") if alert.owner_id else None,
+        "due_at": due.isoformat(),
+        "state": state,
+        "state_label": rules.STATE_LABELS[state],
+        "hours_left": rules.hours_left(due, now),
+        "raised_at": alert.raised_at.isoformat(),
+        "read": alert.read_at is not None,
+        "opens": alert.opens,
+    }
+
+
+@router.get("/alerts")
+def my_alerts(
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The signed-in person's open reminders and escalations, escalations and overdue ones first."""
+    tenant_id = _tenant(ctx)
+    now = service.now_utc()
+    service.sweep_if_stale(db, control_db, tenant_id, now)
+    me = str(ctx.user_id)
+    rows = (
+        db.query(DueAlert)
+        .filter(DueAlert.tenant_id == tenant_id, DueAlert.recipient_id == me, DueAlert.resolved_at.is_(None))
+        .order_by(DueAlert.due_at)
+        .limit(500)
+        .all()
+    )
+    hours = service.settings_view(service.settings_row(db, tenant_id))["reminder_hours"]
+    names = _names(control_db, tenant_id, {row.owner_id for row in rows})
+    # One line per item: its escalation stands for its reminder too (both are marked read together).
+    by_item: dict[str, dict] = {}
+    for row in rows:
+        view = _alert_view(row, now, hours, names)
+        kept = by_item.get(row.item_key)
+        if kept is None:
+            by_item[row.item_key] = {**view, "ids": [view["id"]]}
+            continue
+        ids = [*kept["ids"], view["id"]]
+        if view["tier"] == rules.ESCALATION:
+            kept = {**view, "read": view["read"] and kept["read"]}
+        by_item[row.item_key] = {**kept, "ids": ids, "read": kept["read"] and view["read"]}
+    items = list(by_item.values())
+    items.sort(key=lambda item: (item["tier"] != rules.ESCALATION, item["state"] != rules.OVERDUE, item["due_at"]))
+    today = service.calendar_of(db, tenant_id).local_day(now)
+    away = [item for item in service.absences(db, tenant_id, today) if me in (item["user_id"], item["backup_id"])]
+    people_names = _names(control_db, tenant_id, {ref for item in away for ref in (item["user_id"], item["backup_id"])})
+    return {
+        "items": items,
+        "unread": sum(1 for item in items if not item["read"]),
+        "escalations": sum(1 for item in items if item["tier"] == rules.ESCALATION),
+        "absences": [_absence_view(item, people_names) for item in away],
+        "people": [{"id": p["id"], "name": p["name"]} for p in service.people(control_db, tenant_id) if p["id"] != me],
+        "never": NEVER,
+    }
+
+
+class ReadIn(BaseModel):
+    ids: list[uuid.UUID] = Field(default_factory=list, max_length=500)
+    all: bool = False
+
+
+@router.post("/alerts/read")
+def mark_read(
+    payload: ReadIn,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Mark the person's own alerts read (``all``: every open one). Reading never resolves an alert."""
+    tenant_id = _tenant(ctx)
+    query = db.query(DueAlert).filter(
+        DueAlert.tenant_id == tenant_id,
+        DueAlert.recipient_id == str(ctx.user_id),
+        DueAlert.resolved_at.is_(None),
+        DueAlert.read_at.is_(None),
+    )
+    if not payload.all:
+        if not payload.ids:
+            return {"read": 0}
+        query = query.filter(DueAlert.id.in_(payload.ids))
+    now = service.now_utc()
+    count = 0
+    for alert in query.all():
+        alert.read_at = now
+        count += 1
+    db.commit()
+    return {"read": count}
+
+
+# --------------------------------------------------------------------------------------------- absences
+
+
+class AbsenceIn(BaseModel):
+    starts_on: date
+    ends_on: date
+    backup_id: str = Field(max_length=64)
+    note: str = Field(default="", max_length=rules.NOTE_MAX * 2)
+
+
+@router.get("/absences")
+def absence_list(
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    tenant_id = _tenant(ctx)
+    today = service.calendar_of(db, tenant_id).local_day(service.now_utc())
+    found = service.absences(db, tenant_id, today)
+    names = _names(control_db, tenant_id, {ref for item in found for ref in (item["user_id"], item["backup_id"])})
+    return {"items": [_absence_view(item, names) for item in found]}
+
+
+@router.post("/absences")
+def record_absence(
+    payload: AbsenceIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The signed-in person's own absence, with the colleague who covers it. The backup receives the reminders and
+    escalations; ownership stays, and the backup gains no signing right."""
+    tenant_id = _tenant(ctx)
+    me = str(ctx.user_id)
+    now = service.now_utc()
+    today = service.calendar_of(db, tenant_id).local_day(now)
+    note = " ".join(payload.note.split())
+    problem = rules.absence_problem(me, payload.backup_id, payload.starts_on, payload.ends_on, today)
+    if problem is None and payload.backup_id not in {p["id"] for p in service.people(control_db, tenant_id)}:
+        problem = "Choose your backup among your organization's people"
+    if problem is None and len(note) > rules.NOTE_MAX:
+        problem = f"Keep the note to {rules.NOTE_MAX} characters"
+    if problem:
+        raise _error(422, "ABSENCE_INVALID", problem)
+    row = UserAbsence(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        user_id=me,
+        starts_on=payload.starts_on,
+        ends_on=payload.ends_on,
+        backup_id=payload.backup_id,
+        note=note or None,
+        created_by=me,
+        created_at=now,
+    )
+    db.add(row)
+    db.flush()
+    _audit(
+        db,
+        ctx,
+        "ABSENCE_RECORDED",
+        "UserAbsence",
+        row.id,
+        starts_on=payload.starts_on.isoformat(),
+        ends_on=payload.ends_on.isoformat(),
+        backup=payload.backup_id,
+    )
+    service.sweep(db, control_db, tenant_id, now)
+    db.commit()
+    return absence_list(db, control_db, ctx)
+
+
+@router.post("/absences/{absence_id}/cancel")
+def cancel_absence(
+    absence_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """End the person's own absence early (the record stays)."""
+    tenant_id = _tenant(ctx)
+    row = (
+        db.query(UserAbsence)
+        .filter(UserAbsence.tenant_id == tenant_id, UserAbsence.id == absence_id, UserAbsence.cancelled_at.is_(None))
+        .one_or_none()
+    )
+    if row is None or row.user_id != str(ctx.user_id):
+        raise _error(404, "ABSENCE_NOT_FOUND", "No such absence of yours")
+    now = service.now_utc()
+    row.cancelled_by, row.cancelled_at = str(ctx.user_id), now
+    db.flush()  # the sweep below reads the absences again
+    _audit(db, ctx, "ABSENCE_CANCELLED", "UserAbsence", row.id)
+    service.sweep(db, control_db, tenant_id, now)
+    db.commit()
+    return absence_list(db, control_db, ctx)
+
+
+# --------------------------------------------------------------------------------------------- the event
+
+
+def _complaint(db, tenant_id, complaint_id) -> Complaint:
+    complaint = db.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.id == complaint_id).one_or_none()
+    if complaint is None:
+        raise _error(404, "COMPLAINT_NOT_FOUND", "No such complaint in your organization")
+    return complaint
+
+
+def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict:
+    from backend.app.reportability import markets
+
+    found = closure.facts(db, tenant_id, complaint)
+    row = closure.closure_row(db, tenant_id, complaint.id)
+    items = closure.checklist(found)
+    blocked = [item for item in items if item["result"] == closure.BLOCKED]
+    owner = closure.owner_of(row, found["record"])
+    now = service.now_utc()
+    due = [
+        item for item in service.due_items(db, control_db, tenant_id, now) if item["complaint_id"] == str(complaint.id)
+    ]
+    refs = {owner, row.signed_by if row else None, row.filed_by if row else None}
+    refs |= {e.signed_by for e in found["first_contact"]} | {d.signed_by for d in found["dispositions"]}
+    refs |= {v.signed_by for versions in found["assessments"].values() for v in versions}
+    refs |= {s.approved_by for s in found["snapshots"]} | {str(d.decided_by_user_id) for d in found["decisions"]}
+    refs |= {d.authorized_by_ref for d in found["decisions"]}
+    if found["record"] is not None:
+        refs |= {found["record"].completed_by, found["record"].triage_owner}
+    names = _names(control_db, tenant_id, refs)
+    record = closure.decision_record(control_db, found, row, names)
+    signed_print = row.content_fingerprint if row is not None else None
+    changed = bool(row and row.ready_state and signed_print != closure.fingerprint(complaint.id, items))
+    nearest = due[0] if due else None
+    state = _event_state(complaint, items, row)
+    product = _products(db, tenant_id).get(complaint.product_id)
+    return {
+        "event": {
+            "complaint_id": str(complaint.id),
+            "ref": complaint.complaint_identifier,
+            "business_id": complaint.business_id,
+            "product": product,
+            "lot_batch_id": str(complaint.lot_batch_id) if complaint.lot_batch_id else None,
+            "market": markets.market_of(complaint.country),
+            "awareness_at": _iso(complaint.awareness_timestamp),
+            "status_in_qms": complaint.status,
+            "owner_id": owner,
+            "owner_name": names.get(owner or "") if owner else None,
+            "owner_named": bool(row and row.owner_id),
+            "sample": complaint.source_system is not None,
+        },
+        "summary": {
+            "nearest_deadline": {
+                "title": nearest["title"],
+                "due_at": nearest["due_at"].isoformat(),
+                "opens": nearest["opens"],
+            }
+            if nearest
+            else None,
+            "open_requests": len(found["requests"]),
+            "next_action": {"label": blocked[0]["action"], "detail": blocked[0]["detail"], "opens": blocked[0]["opens"]}
+            if blocked
+            else None,
+        },
+        "stages": closure.stage_line(found, items, row),
+        "checklist": items,
+        "blocked": len(blocked),
+        "state": state,
+        "state_label": EVENT_STATES[state],
+        "changed_since_signed": changed,
+        "ready": {
+            "state": row.ready_state,
+            "reason": row.ready_reason,
+            "version": row.version,
+            "signed_by": names.get(row.signed_by or "") or "A colleague",
+            "signed_at": _iso(row.signed_at),
+        }
+        if row is not None and row.ready_state
+        else None,
+        "decision_record": record,
+        "you_are_owner": owner == me,
+        "people": [{"id": p["id"], "name": p["name"]} for p in service.people(control_db, tenant_id)],
+        "reason_min": closure.REASON_MIN,
+        "never_closes": closure.NEVER_CLOSES,
+        "practice_label": _practice(control_db, tenant_id),
+    }
+
+
+def _practice(control_db, tenant_id) -> str | None:
+    from backend.app.reportability import markets
+
+    return markets.PRACTICE_LABEL if _trial(control_db, tenant_id) else None
+
+
+@router.get("/events/{complaint_id}")
+def event(
+    complaint_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    tenant_id = _tenant(ctx)
+    return event_view(db, control_db, tenant_id, _complaint(db, tenant_id, complaint_id), str(ctx.user_id))
+
+
+def _closure_for_update(db, tenant_id, complaint_id) -> EventClosure:
+    row = (
+        db.query(EventClosure)
+        .filter(EventClosure.tenant_id == tenant_id, EventClosure.complaint_id == complaint_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if row is None:
+        row = EventClosure(
+            id=uuid.uuid4(), tenant_id=tenant_id, complaint_id=complaint_id, version=0, updated_at=service.now_utc()
+        )
+        db.add(row)
+        db.flush()
+    return row
+
+
+class OwnerIn(BaseModel):
+    owner_id: str = Field(max_length=64)
+
+
+@router.put("/events/{complaint_id}/owner", dependencies=[WRITERS])
+def set_owner(
+    complaint_id: uuid.UUID,
+    payload: OwnerIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    tenant_id = _tenant(ctx)
+    complaint = _complaint(db, tenant_id, complaint_id)
+    if payload.owner_id not in {p["id"] for p in service.people(control_db, tenant_id)}:
+        raise _error(422, "OWNER_UNKNOWN", "Choose the event owner among your organization's people")
+    row = _closure_for_update(db, tenant_id, complaint.id)
+    old = row.owner_id
+    now = service.now_utc()
+    row.owner_id, row.owner_set_by, row.owner_set_at, row.updated_at = payload.owner_id, str(ctx.user_id), now, now
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=ctx.user_id,
+            action="EVENT_OWNER_SET",
+            entity_type="EventClosure",
+            entity_id=row.id,
+            correlation_id=ctx.correlation_id,
+            old_values={"owner": old},
+            new_values={"owner": payload.owner_id},
+            details={"complaint": complaint.complaint_identifier},
+        )
+    )
+    db.commit()
+    return event_view(db, control_db, tenant_id, complaint, str(ctx.user_id))
+
+
+class ReadyIn(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+    mfa_code: str | None = Field(default=None, max_length=12)
+    reason: str = Field(default="", max_length=closure.REASON_MAX * 2)
+
+
+@router.post("/events/{complaint_id}/ready", dependencies=[WRITERS])
+def sign_ready(
+    complaint_id: uuid.UUID,
+    payload: ReadyIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The event owner signs "ready to close in the QMS": the checklist clear, or with a reason when items are open.
+    MDARIX never closes the complaint."""
+    from backend.app.evidence_workflow.people import current_person
+    from backend.app.governance_router import verify_signing_credentials
+    from backend.app.human_decision.rules import signature_hash
+    from backend.app.role_codes import is_administrator_role
+
+    tenant_id = _tenant(ctx)
+    complaint = _complaint(db, tenant_id, complaint_id)
+    me = str(ctx.user_id)
+    found = closure.facts(db, tenant_id, complaint)
+    row = closure.closure_row(db, tenant_id, complaint.id)
+    owner = closure.owner_of(row, found["record"])
+    if owner != me:
+        raise _error(
+            403, "EVENT_OWNER_SIGNS", "Only the event owner signs ready to close: name yourself the owner first"
+        )
+    person = current_person(control_db, ctx)
+    if is_administrator_role(person.account_role or ""):
+        raise _error(403, "ADMINISTRATOR_NEVER_SIGNS", "An administrator account never signs")
+    items = closure.checklist(found)
+    blocked = [item for item in items if item["result"] == closure.BLOCKED]
+    reason = " ".join(payload.reason.split())
+    if blocked and len(reason) < closure.REASON_MIN:
+        raise _error(
+            422,
+            "REASON_REQUIRED",
+            f"{len(blocked)} items are still open: give the reason to sign anyway, in at least {closure.REASON_MIN} "
+            "characters, or resolve them first",
+            blocked=[item["label"] for item in blocked],
+        )
+    if len(reason) > closure.REASON_MAX:
+        raise _error(422, "REASON_TOO_LONG", f"Keep the reason to {closure.REASON_MAX} characters")
+
+    def refused(action: str) -> None:
+        control_db.add(
+            make_audit_event(
+                tenant_id=tenant_id,
+                actor_ref=ctx.user_id,
+                action=action,
+                entity_type=closure.OBJECT_TYPE,
+                entity_id=row.id if row else None,
+                correlation_id=ctx.correlation_id,
+                details={"attempt": "EVENT_READY_TO_CLOSE", "complaint": complaint.complaint_identifier},
+            )
+        )
+
+    verify_signing_credentials(
+        control_db, ctx, password=payload.password, mfa_code=payload.mfa_code, record_refusal=refused
+    )
+    row = _closure_for_update(db, tenant_id, complaint.id)
+    now = service.now_utc()
+    version = row.version + 1
+    print_ = closure.fingerprint(complaint.id, items)
+    meaning = closure.signature_meaning(complaint.complaint_identifier, version, len(blocked))
+    record = SignedApprovalRecord(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        object_type=closure.OBJECT_TYPE,
+        object_id=row.id,
+        object_version=f"v{version}",
+        decision_type=closure.DECISION_TYPE,
+        decision="APPROVED",
+        remarks=(reason or "Checklist clear")[:500],
+        signer_user_id=me,
+        signer_role=person.role_for(QUALITY_REVIEW) or person.account_role or "UNKNOWN",
+        signature_meaning=meaning,
+        content_fingerprint=print_,
+        signature_hash=signature_hash(print_, me, f"v{version}"),
+        status="SIGNED",
+        signed_at=now,
+        created_at=now,
+    )
+    control_db.add(record)
+    control_db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=ctx.user_id,
+            action="EVENT_READY_TO_CLOSE_SIGNED",
+            entity_type=closure.OBJECT_TYPE,
+            entity_id=row.id,
+            correlation_id=ctx.correlation_id,
+            details={
+                "complaint": complaint.complaint_identifier,
+                "version": version,
+                "open_items": len(blocked),
+                "signature_id": str(record.id),
+                "fingerprint": print_,
+            },
+            created_at=now,
+        )
+    )
+    row.version, row.ready_state = version, "READY_WITH_REASON" if blocked else "READY"
+    row.ready_reason, row.checklist, row.content_fingerprint = reason or None, items, print_
+    row.signed_record_id, row.signed_by, row.signed_at, row.updated_at = record.id, me, now, now
+    row.qms_filing_ref = row.filed_by = row.filed_at = None  # a new version is filed again
+    if db is control_db:
+        control_db.commit()
+    else:
+        control_db.commit()
+        try:
+            db.commit()
+        except Exception:
+            logger.exception("Signature %s was saved but event %s was not marked ready", record.id, complaint.id)
+            raise
+    return event_view(db, control_db, tenant_id, complaint, me)
+
+
+class FilingIn(BaseModel):
+    reference: str = Field(max_length=closure.FILING_MAX * 2)
+
+
+@router.put("/events/{complaint_id}/filing", dependencies=[WRITERS])
+def record_filing(
+    complaint_id: uuid.UUID,
+    payload: FilingIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The QMS reference under which the event decision record was filed (before the QMS closure)."""
+    tenant_id = _tenant(ctx)
+    complaint = _complaint(db, tenant_id, complaint_id)
+    reference = " ".join(payload.reference.split())
+    if not 3 <= len(reference) <= closure.FILING_MAX:
+        raise _error(422, "REFERENCE_INVALID", f"Give the QMS reference, 3 to {closure.FILING_MAX} characters")
+    row = _closure_for_update(db, tenant_id, complaint.id)
+    if row.ready_state is None:
+        raise _error(409, "NOT_READY", "Sign ready to close first: the record you file is the signed one")
+    now = service.now_utc()
+    row.qms_filing_ref, row.filed_by, row.filed_at, row.updated_at = reference, str(ctx.user_id), now, now
+    _audit(
+        db,
+        ctx,
+        "EVENT_DECISION_RECORD_FILED",
+        closure.OBJECT_TYPE,
+        row.id,
+        complaint=complaint.complaint_identifier,
+        reference=reference,
+        version=row.version,
+    )
+    db.commit()
+    return event_view(db, control_db, tenant_id, complaint, str(ctx.user_id))
+
+
+@router.get("/events/{complaint_id}/decision-record.pdf", dependencies=[Depends(require_permission(DATA_EXPORT))])
+def decision_record_pdf(
+    complaint_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    from backend.app.stage3_workflow_router import _organization_name
+
+    tenant_id = _tenant(ctx)
+    complaint = _complaint(db, tenant_id, complaint_id)
+    view = event_view(db, control_db, tenant_id, complaint, str(ctx.user_id))
+    body = closure.render_pdf(view, _organization_name(control_db, tenant_id))
+    _audit(
+        db,
+        ctx,
+        "EVENT_DECISION_RECORD_DOWNLOADED",
+        closure.OBJECT_TYPE,
+        None,
+        complaint=complaint.complaint_identifier,
+        sha256=view["decision_record"]["sha256"],
+    )
+    db.commit()
+    return Response(
+        content=body,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="mdarix-event-record-{complaint.complaint_identifier}.pdf"'
+        },
+    )
