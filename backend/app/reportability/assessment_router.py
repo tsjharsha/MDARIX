@@ -550,6 +550,25 @@ def record_filing(
     current, _ = assessments.current_and_draft(_versions(db, tenant_id, complaint_id, market, lock=True))
     if current is None or current.conclusion != markets.REPORTABLE:
         raise _error(409, "NOT_REPORTABLE_CONCLUSION", "Record a filing on a signed reportable conclusion")
+    from backend.app.db.models.authority_reports import ReportObligation
+
+    if (
+        db.query(ReportObligation.id)
+        .filter(
+            ReportObligation.tenant_id == tenant_id,
+            ReportObligation.complaint_id == complaint_id,
+            ReportObligation.market == market,
+            ReportObligation.kind == "INITIAL",
+        )
+        .first()
+        is not None
+    ):
+        # G2b: a report with a worksheet is met only by its submission record (a receipt is not acceptance).
+        raise _error(
+            409,
+            "REPORT_OBLIGATION_OPEN",
+            "This market's report has a worksheet: record the submission on it in Reports",
+        )
     old = {
         "filing_reference": current.filing_reference,
         "filed_on": current.filed_on.isoformat() if current.filed_on else None,

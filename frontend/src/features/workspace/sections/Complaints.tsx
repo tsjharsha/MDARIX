@@ -24,6 +24,8 @@ import { ReportabilityWatch } from "./ReportabilityWatch";
 import { Dispositions } from "./Dispositions";
 import { FirstContact } from "./FirstContact";
 import { EscalateButton, Triage } from "./Triage";
+import { Reports } from "./Reports";
+import { parseReportsTab } from "../authorityReports";
 import { ReportingWindows } from "./ReportingWindows";
 import { Starters } from "./Starters";
 import { ComplaintList } from "./ComplaintList";
@@ -79,17 +81,25 @@ import {
  */
 export function ComplaintsSection({ tab }: { tab?: string }) {
   const [target] = useState(() => parseComplaintListTab(tab));
+  // A link may name one complaint's reports ("Reports?complaint=<id>", authorityReports.ts).
+  const [reports, setReports] = useState(() => parseReportsTab(tab));
   const [active, setActive] = useState<ComplaintsTab>(() =>
-    target.isList ? COMPLAINT_LIST_TAB : offeredTab(tab, COMPLAINTS_TABS, "Triage"),
+    target.isList ? COMPLAINT_LIST_TAB : reports.isReports ? "Reports" : offeredTab(tab, COMPLAINTS_TABS, "Triage"),
   );
+  const openTab = (next: string) => {
+    const parsed = parseReportsTab(next);
+    setReports(parsed);
+    setActive(parsed.isReports ? "Reports" : offeredTab(next, COMPLAINTS_TABS, "Triage"));
+  };
   return (
-    <Tabs tabs={COMPLAINTS_TABS} active={active} onChange={setActive} label="Complaint sections">
-      {active === "Triage" && <Triage onOpenTab={setActive} />}
+    <Tabs tabs={COMPLAINTS_TABS} active={active} onChange={openTab} label="Complaint sections">
+      {active === "Triage" && <Triage onOpenTab={openTab} />}
       {active === "First contact" && <FirstContact onOpenTab={setActive} />}
       {active === "Dispositions" && <Dispositions />}
       {active === "Second look" && <SecondLook />}
       {active === "Backlog" && <Backlog />}
-      {active === "Reportability" && <ReportabilityWatch onOpenTab={setActive} />}
+      {active === "Reportability" && <ReportabilityWatch onOpenTab={openTab} />}
+      {active === "Reports" && <Reports complaintId={reports.complaintId} />}
       {active === COMPLAINT_LIST_TAB && <ComplaintList eyebrow="Complaints" initialFilters={target.filters} />}
       {active === "Review settings" && <ReviewSettingsPanel />}
       {active === "Reporting windows" && <ReportingWindows />}

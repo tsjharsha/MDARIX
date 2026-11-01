@@ -33,6 +33,10 @@ _TRIAL_BUSINESS_TABLES = (
     # The rest of the sample story (backend/app/trial/sample_data.py seed_story_examples) and what people do with it.
     "complaint_second_looks",
     "complaint_reportability",
+    "report_evidence",
+    "report_submissions",
+    "report_snapshots",
+    "report_obligations",
     "complaint_market_assessments",
     "complaint_classifications",
     "signer_training_records",
@@ -185,9 +189,9 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
         plane = db.query(TenantDataPlane).filter(TenantDataPlane.tenant_id == tenant_id).one()
         assert plane.status == "ACTIVE"
         assert db.query(Product).filter(Product.tenant_id == tenant_id).count() == 3
-        # 28 sample complaints, the 9 of the rest of the story (hidden complaints, reporting clocks) and the 5 routine
-        # complaints (backend/app/trial/sample_dispositions.py).
-        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 42
+        # 28 sample complaints, the 9 of the rest of the story (hidden complaints, reporting clocks), the 5 routine
+        # complaints (backend/app/trial/sample_dispositions.py) and the India report example (sample_reports.py).
+        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 43
     finally:
         db.close()
 
@@ -198,11 +202,11 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
     assert deleted - ends == timedelta(days=30)
     # The workspace dashboard reads the trial's own data, not another tenant's.
     counts = user.get("/api/v1/analytics/command-center").json()["counts"]
-    assert counts["products"] == 3 and counts["complaints"] == 42
+    assert counts["products"] == 3 and counts["complaints"] == 43
     insights = user.get("/api/v1/trial/insights").json()
     assert insights["scope"] == "sample data" and insights["findings"]
     # One request carries the whole panel: headline numbers, the complaints to filter and the questions answered.
-    assert insights["headline"]["total"] == 42 and len(insights["records"]) == 42
+    assert insights["headline"]["total"] == 43 and len(insights["records"]) == 43
     assert insights["questions"] and all(item["answer"]["summary"] for item in insights["questions"])
 
 
@@ -220,7 +224,7 @@ def test_every_sample_complaint_is_on_a_lot_of_its_version_made_before_the_event
             .filter(Complaint.tenant_id == uuid.UUID(approval["tenant_id"]))
             .all()
         )
-        assert len(rows) == 42
+        assert len(rows) == 43
         wrong = [
             (complaint.complaint_identifier, lot.lot_identifier)
             for complaint, lot in rows
@@ -239,7 +243,7 @@ def test_a_trial_shows_the_mvp_and_counts_the_sample_data_it_explains(monkeypatc
     user, _approval, _email = _approved_trial_client()
     assert user.get("/api/v1/session/context").json()["feature_set"] == "mvp"
     sample = user.get("/api/v1/trial/status").json()["sample"]
-    assert sample == {"products": 3, "lots": 15, "complaints": 42, "investigations": 1, "capas": 2, "risks": 3}
+    assert sample == {"products": 3, "lots": 15, "complaints": 43, "investigations": 1, "capas": 2, "risks": 3}
     assert authenticated_client().get("/api/v1/session/context").json()["feature_set"] == "full"
 
 
@@ -374,7 +378,7 @@ def test_the_owner_removes_the_sample_data_and_keeps_their_own_and_their_progres
 
     preview = user.get("/api/v1/trial/sample-data/removal").json()
     assert preview["is_owner"] and preview["has_sample"]
-    assert preview["sample"]["products"] == 3 and preview["sample"]["complaints"] == 42
+    assert preview["sample"]["products"] == 3 and preview["sample"]["complaints"] == 43
     assert preview["work_on_sample"] >= 2 and preview["own_records_affected"] == 0
     assert user.post("/api/v1/trial/sample-data/removal", json={}).status_code == 422
     removed = user.post("/api/v1/trial/sample-data/removal", json={"confirm": True})
@@ -938,8 +942,9 @@ def test_the_story_is_added_once_and_the_refresh_leaves_a_trial_with_it_alone():
         bind_tenant(db, tenant_id)
         assert seed_story_examples(db, tenant_id) == {"created": False}
         windows = db.query(ReportabilitySettings).filter(ReportabilitySettings.tenant_id == tenant_id).one()
-        assert windows.updated_by == STORY_WINDOWS_BY and len(windows.windows) == 3
-        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 42
+        # The FDA and EU windows, and India's (enabled by the sample's report examples, sample_reports.py).
+        assert windows.updated_by == STORY_WINDOWS_BY and len(windows.windows) == 4
+        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 43
     finally:
         db.close()
 

@@ -175,6 +175,13 @@ STEPS = (
         ("intake_events", "first_contact_checks", "triage_records", "record_links", "record_field_changes"),
         ("tenants", "products"),
     ),
+    Step(
+        "tr05",
+        "tr05_trial_authority_reports.py",
+        "create_report_tables",
+        ("report_obligations", "report_snapshots", "report_submissions", "report_evidence"),
+        ("tenants", "complaints", "complaint_market_assessments"),
+    ),
 )
 
 
