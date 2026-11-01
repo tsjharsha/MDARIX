@@ -155,6 +155,8 @@ TRIAL_DATA_TABLES = (
     "canonical_relationships",
     "source_canonical_links",
     "complaints",
+    # Shipments of the lots below (tr08).
+    "lot_distributions",
     "lot_components",
     "lot_batches",
     "product_components",

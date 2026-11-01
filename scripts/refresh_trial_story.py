@@ -21,7 +21,11 @@ finished US example, an India complaint with a rejected attempt, and India in th
 backend/app/trial/sample_reports.py) unless they are there, and the sample's own US guide version, a draft whose test
 fails, and the communications log's examples (backend/app/trial/sample_guides.py; the open request is owned by the
 trial's first user) unless they are there, and the sample author's absence with the trial's first user as backup and
-the two events that user owns (backend/app/trial/sample_oversight.py) unless they are there. Each trial is committed on its own, with an audit event.
+the two events that user owns (backend/app/trial/sample_oversight.py) unless they are there, and the lot genealogy, the
+three OrbitCare lots without complaints and the distribution with its import run for a case's Lot impact
+(backend/app/trial/sample_lot_impact.py; lot 005 then releases 60 units and the new lots 30 each, made the same day, so
+the trend's units in the field stay the same) unless they are there. Each trial is committed on its own, with an audit
+event.
 """
 
 from __future__ import annotations
@@ -84,6 +88,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.trial.sample_intake import has_sample_intake, stage_sample_intake
     from backend.app.trial.sample_guides import has_sample_guides, stage_sample_guides
     from backend.app.trial.sample_oversight import has_sample_oversight, stage_sample_oversight
+    from backend.app.trial.sample_lot_impact import has_sample_lot_impact, stage_sample_lot_impact
     from backend.app.trial.sample_reports import has_sample_reports, stage_sample_reports
 
     results = []
@@ -111,6 +116,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             reports_missing = not has_sample_reports(session, tenant_id)
             guides_missing = not has_sample_guides(session, tenant_id)
             oversight_missing = not has_sample_oversight(session, tenant_id)
+            lot_impact_missing = not has_sample_lot_impact(session, tenant_id)
             if not (
                 story_missing
                 or lots_missing
@@ -122,6 +128,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or reports_missing
                 or guides_missing
                 or oversight_missing
+                or lot_impact_missing
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -137,6 +144,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *(["the sample report worksheets"] if reports_missing else []),
                     *(["the sample guide versions and communications log"] if guides_missing else []),
                     *(["the sample absence and event owners"] if oversight_missing else []),
+                    *(["the sample lot genealogy and distribution"] if lot_impact_missing else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -160,6 +168,9 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["guides"] = stage_sample_guides(session, tenant_id, now)
             if oversight_missing:
                 added["oversight"] = stage_sample_oversight(session, tenant_id, now)
+            if lot_impact_missing:
+                # After the quantities: lot 005's units are shared with the three new lots.
+                added["lot_impact"] = stage_sample_lot_impact(session, tenant_id, now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,

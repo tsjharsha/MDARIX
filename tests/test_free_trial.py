@@ -67,6 +67,8 @@ _TRIAL_BUSINESS_TABLES = (
     "evidence",
     "investigations",
     "complaints",
+    "lot_distributions",
+    "lot_components",
     "lot_batches",
     "product_components",
     "component_suppliers",
@@ -251,7 +253,8 @@ def test_a_trial_shows_the_mvp_and_counts_the_sample_data_it_explains(monkeypatc
     user, _approval, _email = _approved_trial_client()
     assert user.get("/api/v1/session/context").json()["feature_set"] == "mvp"
     sample = user.get("/api/v1/trial/status").json()["sample"]
-    assert sample == {"products": 3, "lots": 15, "complaints": 43, "investigations": 1, "capas": 2, "risks": 3}
+    # 18 lots: OrbitCare's three lots without complaints for Lot impact (backend/app/trial/sample_lot_impact.py).
+    assert sample == {"products": 3, "lots": 18, "complaints": 43, "investigations": 1, "capas": 2, "risks": 3}
     assert authenticated_client().get("/api/v1/session/context").json()["feature_set"] == "full"
 
 

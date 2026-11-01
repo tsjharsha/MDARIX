@@ -31,8 +31,9 @@ def _complaint(user, **filters) -> dict:
 def test_the_sample_shows_an_import_run_its_set_aside_rows_lineage_and_reference_data():
     user, _approval, _email = _approved_trial_client()
     runs = _ok(user.get(RUNS))["runs"]
-    assert len(runs) == 1
-    run = runs[0]
+    # The complaints export, and the distribution export behind a case's Lot impact (sample_lot_impact.py).
+    assert sorted(run["entity"] for run in runs) == ["complaints", "distribution"]
+    run = next(run for run in runs if run["entity"] == "complaints")
     assert run["sample"] and run["file_name"] == "Sample complaints export.xlsx" and run["entity"] == "complaints"
     report = run["report"]
     total = _ok(user.get("/api/v1/complaints", params={"source_system": "MDARIX_SAMPLE"}))["total"]

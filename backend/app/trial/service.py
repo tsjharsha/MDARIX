@@ -592,6 +592,11 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         from backend.app.trial.sample_oversight import stage_sample_oversight
 
         sample["oversight"] = stage_sample_oversight(db, tenant.id, now, owner_id=str(user.id))
+        # Lot genealogy, three OrbitCare lots without complaints and the distribution, with its import run, for a case's
+        # Lot impact (backend/app/trial/sample_lot_impact.py). The trend's units in the field stay the same.
+        from backend.app.trial.sample_lot_impact import stage_sample_lot_impact
+
+        sample["lot_impact"] = stage_sample_lot_impact(db, tenant.id, now)
         db.add(
             TenantMembership(
                 id=uuid.uuid4(),

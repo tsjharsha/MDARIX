@@ -532,10 +532,18 @@ def _lots_question(records: _Records) -> dict | None:
         )
     else:
         missing.append("No components are recorded for the versions of these lots.")
-    missing.append(
-        "The records do not link a lot to the component lots or supplier deliveries that went into it, so which "
-        "parts each lot used is not known."
-    )
+    shared = _shared_component_lots(records, lots)
+    if shared:
+        # Lot genealogy (lot_components): the component lots both lots were built with (T-G5).
+        facts.append(
+            f"Lots {' and '.join(names)} were both built with " + "; ".join(shared) + " (lot genealogy). A case's Lot "
+            "impact lists every lot built with the same component lot."
+        )
+    else:
+        missing.append(
+            "The records do not link a lot to the component lots or supplier deliveries that went into it, so which "
+            "parts each lot used is not known."
+        )
     for lot in lots:
         if lot.product_version_id is None:
             missing.append(f"Lot {lot.lot_identifier} has no product version recorded.")
@@ -560,6 +568,26 @@ def _lots_question(records: _Records) -> dict | None:
             missing=missing,
         ),
     }
+
+
+def _shared_component_lots(records: _Records, lots: list) -> list[str]:
+    """The component lots every one of ``lots`` was built with ("Pressure Sensor (Sample) lot NS-SL-2417")."""
+    from backend.app.db.models.foundation import LotComponent
+
+    if len(lots) < 2:
+        return []
+    rows = (
+        records.db.query(LotComponent.lot_batch_id, Component.name, LotComponent.component_lot_identifier)
+        .join(Component, (Component.id == LotComponent.component_id) & (Component.tenant_id == LotComponent.tenant_id))
+        .filter(
+            LotComponent.tenant_id == records.tenant_id,
+            LotComponent.lot_batch_id.in_([lot.id for lot in lots]),
+            LotComponent.component_lot_identifier.isnot(None),
+        )
+        .all()
+    )
+    sets = [{(name, part) for lot_id, name, part in rows if lot_id == lot.id} for lot in lots]
+    return [f"{name} lot {part}" for name, part in sorted(set.intersection(*sets))]
 
 
 def _rise_question(records: _Records) -> dict | None:
