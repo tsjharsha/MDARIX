@@ -43,3 +43,20 @@ def category_code(value) -> str | None:
 
 def category_label(code) -> str | None:
     return CATEGORY_LABELS.get(str(code or ""))
+
+
+# Categories whose units are used up unless the product says otherwise (its single_use field): the cautious basis.
+CONSUMABLE_CATEGORIES = frozenset({SINGLE_USE, KIT, IVD})
+USE_PERIOD_MAX = 36500
+
+
+def single_use(product) -> bool | None:
+    """Whether the product is single-use from its own fields: its single-use field, else its category (single-use,
+    kit and IVD count as used up); None when neither is set (the caller falls back to the product's words)."""
+    if product is None:
+        return None
+    flag = getattr(product, "single_use", None)
+    if flag is not None:
+        return bool(flag)
+    category = getattr(product, "device_category", None)
+    return category in CONSUMABLE_CATEGORIES if category else None

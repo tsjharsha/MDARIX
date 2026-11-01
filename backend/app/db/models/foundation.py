@@ -152,6 +152,9 @@ class Product(TenantOwned, Base):
     gmdn_term: Mapped[str | None] = mapped_column(String(300))
     # tr09: IMPLANT, SINGLE_USE, REUSABLE, SOFTWARE, IVD or KIT (backend/app/product_facts.py); null when not known.
     device_category: Mapped[str | None] = mapped_column(String(40))
+    # tr09: a single-use product, and the days a unit stays in use after its lot's release (signals/trend_rules.py).
+    single_use: Mapped[bool | None] = mapped_column(Boolean)
+    use_period_days: Mapped[int | None] = mapped_column(Integer)
     __table_args__ = (
         UniqueConstraint("tenant_id", "product_identifier", name="uq_products_tenant_product_identifier"),
         UniqueConstraint("tenant_id", "id", name="uq_products_tenant_id_id"),

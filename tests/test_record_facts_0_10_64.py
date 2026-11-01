@@ -224,7 +224,7 @@ def test_the_watch_cites_the_ivdr_for_an_ivd_family(trial):
     EU window's clock runs on the watch."""
     tenant_id = trial["tenant_id"]
 
-    def change(family, injury):
+    def change(family, injury, category):
         with _session(tenant_id) as db:
             product = (
                 db.query(Product)
@@ -236,12 +236,14 @@ def test_the_watch_cites_the_ivdr_for_an_ivd_family(trial):
                 .filter(Complaint.tenant_id == tenant_id, Complaint.complaint_identifier == "SAMPLE-RV-07")
                 .one()
             )
-            before = (product.product_family, complaint.serious_injury)
+            before = (product.product_family, complaint.serious_injury, product.device_category)
             product.product_family, complaint.serious_injury = family, injury
+            # The words are the fallback for a product without a category (the sample's have one).
+            product.device_category = category
             db.commit()
             return before
 
-    before = change("In-vitro diagnostics", True)
+    before = change("In-vitro diagnostics", True, None)
     try:
         watch = trial["user"].get("/api/v1/complaints/reportability", params={"show": "all", "page_size": 100})
         rv07 = next(item for item in watch.json()["items"] if item["complaint_identifier"] == "SAMPLE-RV-07")
@@ -249,3 +251,69 @@ def test_the_watch_cites_the_ivdr_for_an_ivd_family(trial):
         assert "IVDR_82" in bases and "MDR_87" not in bases
     finally:
         change(*before)
+
+
+# ------------------------------------------------------- the single-use field and its use period (owner to approve)
+
+
+def _product(**fields):
+    base = dict(name="Pump", product_family="", gmdn_term="", description="", device_category=None)
+    base.update(single_use=None, use_period_days=None)
+    return SimpleNamespace(**{**base, **fields})
+
+
+def test_the_product_fields_decide_before_the_words():
+    from backend.app.signals import trend_rules
+
+    # The words remain the fallback for a product without a category or a single-use field.
+    assert trend_rules.product_basis(_product(name="Sterile catheter")) == (True, None)
+    # A category or the field overrides them: a "catheter" marked reusable is counted by units in the field.
+    assert trend_rules.product_basis(_product(name="Sterile catheter", device_category="REUSABLE")) == (False, None)
+    assert trend_rules.product_basis(_product(name="Sterile catheter", single_use=False)) == (False, None)
+    assert trend_rules.product_basis(_product(device_category="KIT")) == (True, None)
+    assert trend_rules.product_basis(_product(single_use=True, use_period_days=90)) == (True, 90)
+    assert trend_rules.product_basis(_product(single_use=False, use_period_days=90)) == (False, None)
+    # The IVDR: the category when set, else the words.
+    assert markets.product_is_ivd(_product(device_category="IVD"))
+    assert not markets.product_is_ivd(_product(name="Reagent analyser", device_category="REUSABLE"))
+    assert markets.product_is_ivd(_product(name="Reagent analyser"))
+
+
+def test_a_use_period_counts_each_lot_only_while_its_units_are_in_use():
+    from backend.app.signals import trend_rules
+
+    lots = [(date(2026, 1, 1), 100)]
+    # 1 Jan to 30 Jan: 30 days in use in full without a period, 10 with a 10-day one.
+    assert trend_rules.unit_days(lots, date(2026, 1, 1), date(2026, 1, 30)) == 3000
+    assert trend_rules.unit_days(lots, date(2026, 1, 1), date(2026, 1, 30), use_days=10) == 1000
+    # A lot whose period ended before the window adds nothing.
+    assert trend_rules.unit_days(lots, date(2026, 3, 1), date(2026, 3, 30), use_days=10) is None
+
+
+def test_h5_reads_the_single_use_field():
+    assert _values(forms.FDA_3500A, _context())["H5"] is None
+    context = _context()
+    context["product"].single_use = True
+    assert _values(forms.FDA_3500A, context)["H5"] == "Yes"
+
+
+@pytest.mark.db
+def test_the_products_file_brings_the_single_use_field_and_use_period(trial):
+    user = trial["user"]
+    tag = uuid.uuid4().hex[:6].upper()
+
+    def upload(text):
+        return user.post("/api/v1/trial/imports/products", content=text, headers={"Content-Type": "text/csv"})
+
+    head = "product_id,product_name,single_use,use_period_days\n"
+    assert upload(head + f"SU-{tag},Wound dressing,maybe,30\n").status_code == 422
+    assert upload(head + f"SU-{tag},Wound dressing,Y,0\n").status_code == 422
+    made = upload(head + f"SU-{tag},Wound dressing,Y,30\n")
+    assert made.status_code == 200, made.text
+    with SessionLocal() as db:
+        bind_system(db, "test: read the product")
+        product = db.query(Product).filter(Product.product_identifier == f"SU-{tag}").one()
+        assert product.single_use is True and product.use_period_days == 30
+    with _session(trial["tenant_id"]) as db:
+        sample = db.query(Product).filter(Product.tenant_id == trial["tenant_id"]).all()
+        assert {row.single_use for row in sample if row.source_system == "MDARIX_SAMPLE"} == {False}

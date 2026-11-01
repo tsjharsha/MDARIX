@@ -186,7 +186,7 @@ FDA_3500A = Form(
                 Field("H2", "H2", "If follow-up, what type?", "follow_up_type", NOT_USED),
                 Field("H3", "H3", "Device evaluated by manufacturer?", "case", LATER),
                 Field("H4", "H4", "Device manufacture date", None, INITIAL),
-                Field("H5", "H5", "Labeled for single use?", None, INITIAL),
+                Field("H5", "H5", "Labeled for single use?", "single_use", INITIAL),
                 Field("H6_PROBLEM", "H6", "Medical device problem code", "imdrf_A", MUST),
                 Field("H6_CLINICAL", "H6", "Health effect - clinical code", "imdrf_E", INITIAL),
                 Field("H6_IMPACT", "H6", "Health effect - impact code", "imdrf_F", INITIAL),

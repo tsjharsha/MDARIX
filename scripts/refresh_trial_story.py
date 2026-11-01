@@ -26,8 +26,8 @@ the two events that user owns (backend/app/trial/sample_oversight.py) unless the
 three OrbitCare lots without complaints and the distribution with its import run for a case's Lot impact
 (backend/app/trial/sample_lot_impact.py; lot 005 then releases 60 units and the new lots 30 each, made the same day, so
 the trend's units in the field stay the same) unless they are there, and the sample products' device categories and
-the sample lots' expiry dates (``SAMPLE_PRODUCT_FACTS``, 0.10.64) where they are not set. Each trial is committed on its
-own, with an audit event.
+single-use fields and the sample lots' expiry dates (``SAMPLE_PRODUCT_FACTS``, 0.10.64) where they are not set. Each
+trial is committed on its own, with an audit event.
 """
 
 from __future__ import annotations
@@ -75,6 +75,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.db.tenant_scope import bind_tenant
     from backend.app.enterprise_audit import make_audit_event
     from backend.app.db.models.foundation import LotBatch, Product, ProductVersion
+    from sqlalchemy import or_
     from backend.app.signals.hooks import seed_demo_signals
     from backend.app.trial.sample_data import (
         SAMPLE_PRODUCT_FACTS,
@@ -128,7 +129,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     Product.tenant_id == tenant_id,
                     Product.source_system == SAMPLE_SOURCE,
                     Product.product_identifier.in_(list(SAMPLE_PRODUCT_FACTS)),
-                    Product.device_category.is_(None),
+                    or_(Product.device_category.is_(None), Product.single_use.is_(None)),
                 )
                 .count()
                 + session.query(LotBatch.id)

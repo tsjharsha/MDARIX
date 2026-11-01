@@ -10,7 +10,9 @@ added.
 - ``lot_batches.expiry_date``: the lot's expiry (use-by) date, when it has one;
 - ``products.device_category``: IMPLANT, SINGLE_USE, REUSABLE (reusable or capital equipment), SOFTWARE, IVD or KIT
   (backend/app/product_facts.py checks the values);
-- ``complaints.other_lots``: the lot identifiers beyond the first of a complaint that names several (a kit's lots).
+- ``complaints.other_lots``: the lot identifiers beyond the first of a complaint that names several (a kit's lots);
+- ``products.single_use`` and ``products.use_period_days``: a single-use product, and how many days a unit stays in use
+  after its lot's release (the trend check's units in the field; null: counted by calendar day).
 
 Legacy dedicated organization databases get the same from scripts/add_workflow_tables_to_legacy_planes.py, which runs
 ``add_record_facts``.
@@ -30,6 +32,8 @@ COLUMNS = (
     ("lot_batches", "expiry_date", sa.Date),
     ("products", "device_category", lambda: sa.String(40)),
     ("complaints", "other_lots", postgresql.JSONB),
+    ("products", "single_use", sa.Boolean),
+    ("products", "use_period_days", sa.Integer),
 )
 
 

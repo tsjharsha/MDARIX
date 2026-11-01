@@ -416,6 +416,13 @@ _IMPLANTABLE = {code: "Non-implantable device" for code in product_facts.CATEGOR
 _USE = {product_facts.SINGLE_USE: "Single use", product_facts.REUSABLE: "Reusable"}
 
 
+def _single_use(context):
+    """US H5 "Labeled for single use?" from the product's single-use field."""
+    product = context["product"]
+    flag = getattr(product, "single_use", None) if product else None
+    return _product(context, None if flag is None else ("Yes" if flag else "No"), "The product's single-use field")
+
+
 def _immediate_action(context):
     triage = context["triage"]
     text = triage.immediate_action if triage else None
@@ -457,6 +464,7 @@ SOURCES = {
     "software_version": _software_version,
     "implantable": _category(_IMPLANTABLE, "The product's device category"),
     "use": _category(_USE, "The product's device category"),
+    "single_use": _single_use,
     "serial": lambda c: (
         (c["complaint"].serial_number, _complaint(c, "The complaint's serial number"))
         if c["complaint"].serial_number

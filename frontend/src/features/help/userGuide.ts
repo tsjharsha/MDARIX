@@ -76,9 +76,9 @@ export const COVERAGE: readonly CoverageRow[] = [
     category: "Single-use",
     clocks: "Every market's clock, as for any device.",
     worksheets:
-      "US 3500A and India MDAE. India reads Single use from the product; the expiration date comes from the lot's expiry date. Reprocessing (US D7) is entered by hand.",
+      "US 3500A and India MDAE. India reads Single use and US H5 Labeled for single use from the product; the expiration date comes from the lot's expiry date. Reprocessing (US D7) is entered by hand.",
     checks:
-      "Trend by calendar day when the product's name, family, GMDN term or description says single-use or consumable: used-up units are not in the field.",
+      "Trend by calendar day: used-up units are not in the field. With a use period (products file, use_period_days), by the units released within it.",
     notYet: "Reprocessed single-use devices; sterility and shelf-life checks beyond the lot's expiry date.",
   },
   {
@@ -100,9 +100,9 @@ export const COVERAGE: readonly CoverageRow[] = [
   {
     category: "IVD (in-vitro diagnostic)",
     clocks:
-      "US and India as for any device. The EU and NI clocks cite EU IVDR Art. 82 (starter) when the product's name, family, GMDN term or description says IVD.",
+      "US and India as for any device. The EU and NI clocks cite EU IVDR Art. 82 (starter) for a product of this category (without a category, when its name, family, GMDN term or description says IVD).",
     worksheets: "US 3500A and India MDAE; India's IVD category field is not used yet.",
-    checks: "Trend by calendar day: an IVD's words mark it consumable.",
+    checks: "Trend by calendar day, as a consumable, unless the product is marked not single-use.",
     notYet:
       "The EU questions quote the MDR's definitions, not the IVDR's; IVDR trend reporting and performance follow-up; an EU worksheet.",
   },
@@ -111,7 +111,7 @@ export const COVERAGE: readonly CoverageRow[] = [
     clocks: "Every market's clock, for the kit as one device.",
     worksheets:
       "US 3500A and India MDAE. A complaint may name each of the kit's lots on a row of its own in the file; the lot field lists them all.",
-    checks: "Trend by calendar day when the product's words say kit.",
+    checks: "Trend by calendar day, as a consumable, unless the product is marked not single-use.",
     notYet: "Each component's own reportability; lot impact reads the complaint's first lot only.",
   },
 ];

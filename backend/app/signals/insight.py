@@ -246,6 +246,9 @@ def _names(db: Session, tenant_id: uuid.UUID, product_ids, version_ids) -> tuple
             Product.product_family,
             Product.gmdn_term,
             Product.description,
+            Product.device_category,
+            Product.single_use,
+            Product.use_period_days,
         )
         .filter(
             Product.tenant_id == tenant_id, Product.id.in_([item for item in product_ids if item] or [uuid.uuid4()])
@@ -360,11 +363,14 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
         product = products.get(product_ref)
         version = versions.get(version_ref)
         # J27: a single-use product's units are used up, so the units ever released are not the units in the field.
-        disposable = product is not None and trend_rules.single_use(
-            product.name, product.product_family, product.gmdn_term, product.description
+        disposable, use_days = trend_rules.product_basis(product)
+        # With a use period, a single-use product's units in the field are those still within it after release.
+        by_units = not disposable or use_days is not None
+        recent_units = trend_rules.unit_days(lots.get(version_ref), recent_start, today, use_days) if by_units else None
+        counted_by_use = disposable and use_days is not None and recent_units is not None
+        note = (
+            (trend_rules.use_note(use_days) if counted_by_use else trend_rules.SINGLE_USE_NOTE) if disposable else None
         )
-        note = trend_rules.SINGLE_USE_NOTE if disposable else None
-        recent_units = None if disposable else trend_rules.unit_days(lots.get(version_ref), recent_start, today)
         against_previous = None
         prior = previous.get(version_ref)
         if prior:
@@ -384,7 +390,7 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
                     len(bucket["recent"]),
                     len(baseline),
                     window,
-                    scale=_scale(recent_units, trend_rules.unit_days(lots.get(prior["id"]), start, end)),
+                    scale=_scale(recent_units, trend_rules.unit_days(lots.get(prior["id"]), start, end, use_days)),
                     baseline=trend_rules.PREVIOUS_VERSION,
                     baseline_name=f"{product.name if product else 'Product'} {prior['name']}",
                     recent_days=recent_days,
@@ -398,8 +404,9 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
                 lots.get(version_ref),
                 recent_start - timedelta(days=days_of_history),
                 recent_start - timedelta(days=1),
+                use_days,
             )
-            if days_of_history and not disposable
+            if days_of_history and by_units
             else None
         )
         own = trend_rules.check(

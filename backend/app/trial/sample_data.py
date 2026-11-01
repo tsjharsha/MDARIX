@@ -580,9 +580,9 @@ def seed_lot_quantities(db: Session, tenant_id) -> int:
 # Help › What MDARIX covers read, and the shelf life that dates each lot's expiry (made + days; None: no expiry). One
 # line per sample product: a product added to the sample adds its line here.
 SAMPLE_PRODUCT_FACTS: dict[str, dict] = {
-    "SAMPLE-ORBIT-300": {"device_category": "REUSABLE", "shelf_life_days": 1826},
-    "SAMPLE-PULSE-410": {"device_category": "REUSABLE", "shelf_life_days": 1826},
-    "SAMPLE-VENTRA-250": {"device_category": "REUSABLE", "shelf_life_days": 1826},
+    "SAMPLE-ORBIT-300": {"device_category": "REUSABLE", "single_use": False, "shelf_life_days": 1826},
+    "SAMPLE-PULSE-410": {"device_category": "REUSABLE", "single_use": False, "shelf_life_days": 1826},
+    "SAMPLE-VENTRA-250": {"device_category": "REUSABLE", "single_use": False, "shelf_life_days": 1826},
 }
 
 
@@ -596,7 +596,7 @@ def seed_product_facts(db: Session, tenant_id) -> dict:
         facts = SAMPLE_PRODUCT_FACTS.get(product.product_identifier) or {}
         shelf_life[product.id] = facts.get("shelf_life_days")
         changed = False
-        for field in ("device_category",):
+        for field in ("device_category", "single_use", "use_period_days"):
             if getattr(product, field) is None and facts.get(field) is not None:
                 setattr(product, field, facts[field])
                 changed = True

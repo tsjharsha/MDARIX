@@ -86,6 +86,10 @@ COLUMN_HELP: dict[str, dict[str, str]] = {
         "device_category": "Implant, single-use, reusable (or capital equipment), software, IVD or kit. It decides "
         "which report fields MDARIX fills (an implant, the software version) and is shown in Help › What MDARIX "
         "covers.",
+        "single_use": "Y or N: labelled for single use. A single-use product's trend is counted by calendar day, or "
+        "with a use period by the units still in use.",
+        "use_period_days": "For a single-use product, how many days a unit stays in use after its lot's release (a "
+        "whole number). The trend check then counts each lot's units as in use only for those days.",
     },
     "lots": {
         "version": "The product version the lot builds. Its complaints are counted against this version's lots.",
@@ -149,10 +153,17 @@ TEMPLATES: dict[str, dict] = {
         "title": "Products and versions",
         "required": ["product_id", "product_name"],
         # A version is optional so sources that only list products (e.g. a PLM product list) can load them.
-        "optional": ["version", "product_family", "version_release_date", "device_category"],
+        "optional": [
+            "version",
+            "product_family",
+            "version_release_date",
+            "device_category",
+            "single_use",
+            "use_period_days",
+        ],
         "example": [
-            ["PUMP-200", "AquaFlow 200 Infusion Pump", "Rev C", "Infusion therapy", "2026-03-15", "Reusable"],
-            ["PUMP-200", "AquaFlow 200 Infusion Pump", "Rev D", "Infusion therapy", "2026-07-01", "Reusable"],
+            ["PUMP-200", "AquaFlow 200 Infusion Pump", "Rev C", "Infusion therapy", "2026-03-15", "Reusable", "N", ""],
+            ["PUMP-200", "AquaFlow 200 Infusion Pump", "Rev D", "Infusion therapy", "2026-07-01", "Reusable", "N", ""],
         ],
     },
     "lots": {
@@ -389,7 +400,7 @@ def _free_text(column: str) -> bool:
         or column in FLAG_COLUMNS
         or column in COUNT_COLUMNS
         or column in DEVICE_IDS
-        or column == "device_category"
+        or column in ("device_category", "single_use", "use_period_days")
     )
 
 
@@ -754,6 +765,12 @@ def _check_values(
             elif column == "device_category":
                 if product_facts.category_code(value) is None:
                     report.add(line, column, product_facts.CATEGORY_HINT)
+            elif column == "use_period_days":
+                if not value.isdigit() or not 1 <= int(value) <= product_facts.USE_PERIOD_MAX:
+                    report.add(line, column, "Use a whole number of days from 1 to 36,500.")
+            elif column == "single_use":
+                if value.lower() not in FLAG_VALUES:
+                    report.add(line, column, "Use Y or N.")
             elif column in DEVICE_IDS:
                 if not DEVICE_IDS[column].match(value):
                     extra = " ( ) $ % * +" if column == "udi" else ""
@@ -1391,6 +1408,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                     name=row["product_name"],
                     product_family=row.get("product_family") or None,
                     device_category=product_facts.category_code(row.get("device_category")),
+                    **_single_use_values(row, None),
                     lifecycle_status="active",
                     source_identifier=row["product_id"],
                     **_stamp(now, None, source),
@@ -1405,6 +1423,8 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                 product.device_category = (
                     product_facts.category_code(row.get("device_category")) or product.device_category
                 )
+                for name, value in _single_use_values(row, product).items():
+                    setattr(product, name, value)
                 product.updated_at = now
             if not row.get("version"):
                 db.flush()
@@ -1713,6 +1733,16 @@ def _propose_classifications(db: Session, tenant_id, complaints: dict, proposed:
             )
         )
     db.flush()
+
+
+def _single_use_values(row: dict, product) -> dict:
+    """A products row's single-use flag and use period; a blank or absent column keeps the stored value."""
+    flag = FLAG_VALUES.get((row.get("single_use") or "").lower())
+    period = int(row["use_period_days"]) if row.get("use_period_days") else None
+    return {
+        "single_use": flag if flag is not None else getattr(product, "single_use", None),
+        "use_period_days": period if period is not None else getattr(product, "use_period_days", None),
+    }
 
 
 def _complaint_details(row: dict) -> dict:

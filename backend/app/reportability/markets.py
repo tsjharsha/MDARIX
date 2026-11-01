@@ -685,9 +685,11 @@ def is_ivd(*texts) -> bool:
 
 def product_is_ivd(product) -> bool:
     """Whether a product (a Product row, or None) is an in-vitro diagnostic, read the same way on the watch and in
-    triage: the words of its name, family, GMDN term or description."""
+    triage: its device category when set (IVD or not), else the words of its name, family, GMDN term or description."""
     if product is None:
         return False
+    if getattr(product, "device_category", None):
+        return product.device_category == "IVD"
     return is_ivd(product.name, product.product_family, product.gmdn_term, product.description)
 
 
