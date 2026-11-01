@@ -41,7 +41,7 @@ export function signInNotice(query: URLSearchParams): string {
 }
 
 export const MFA_TIMED_OUT =
-  "This sign-in timed out: the authenticator step waits 10 minutes. Return to sign in and sign in again to start the setup again.";
+  "This sign-in timed out: MDARIX waits 10 minutes for the authenticator step. Return to sign in and sign in again; a setup starts again from the beginning.";
 
 /** Who resets a lost authenticator: in a free trial the person who invited you, or MDARIX support for the person who
  * started it; in a pilot, the administrator. */

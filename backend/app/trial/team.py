@@ -137,7 +137,7 @@ def _invitable(db: Session, tenant_id, email: str) -> AuthUser | None:
         raise _error(
             409,
             "INVITATION_PENDING",
-            "You have already invited this person. Their invitation is in the list below: use Resend invitation.",
+            "You have already invited this person. Their invitation is in your team list: use Resend invitation there.",
         )
     if existing.status != REMOVED_STATUS:
         raise _error(409, "ALREADY_ON_THE_TEAM", "This person is already on your trial team.")

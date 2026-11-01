@@ -371,8 +371,8 @@ function TrialEnded({ message }: { message: string }) {
         <p className="auth-links">
           <button type="button" className="link-button" onClick={() => void signOut()}>
             Sign out
-          </button>
-          <a href="/trial-agreement">Free trial agreement</a>
+          </button>{" "}
+          · <a href="/trial-agreement">Free trial agreement</a>
         </p>
       </div>
     </main>

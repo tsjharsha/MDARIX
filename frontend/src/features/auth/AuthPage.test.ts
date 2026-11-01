@@ -51,6 +51,6 @@ describe("who helps with a lost authenticator, and a setup that timed out (J38)"
 
   it("says the sign-in timed out and how to start the setup again", () => {
     expect(MFA_TIMED_OUT).toContain("timed out");
-    expect(MFA_TIMED_OUT).toContain("sign in again to start the setup again");
+    expect(MFA_TIMED_OUT).toContain("sign in again; a setup starts again from the beginning");
   });
 });
