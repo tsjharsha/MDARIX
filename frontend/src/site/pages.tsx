@@ -484,7 +484,8 @@ export function HomePage() {
         </div>
         <Reveal className="ms-trust-links">
           <a className="ms-link" href="/trust/regulations">
-            Covers FDA, EU MDR, UK and Canada reporting <ArrowRight size={14} aria-hidden="true" />
+            Covers reporting for the US, EU/NI, GB and India (MvPI worksheet){" "}
+            <ArrowRight size={14} aria-hidden="true" />
           </a>
           <a className="ms-link" href="/trust">
             How MDARIX earns trust <ArrowRight size={14} aria-hidden="true" />
@@ -694,7 +695,10 @@ export function PlatformGroupPage({ path }: { path: PlatformPath }) {
           <div className="ms-grid-2">
             <Reveal className="ms-card ms-card-flat">
               <strong>Regulations</strong>
-              <p>FDA, EU MDR, UK and Canada reporting, and the standards whose evidence MDARIX organizes.</p>
+              <p>
+                Reporting for the US, EU/NI, GB and India (MvPI worksheet), and the standards whose evidence MDARIX
+                organizes.
+              </p>
               <a className="ms-link" href="/trust/regulations">
                 See the regulations <ArrowRight size={14} aria-hidden="true" />
               </a>
@@ -1077,8 +1081,8 @@ export function TrustPage() {
           <span className="ms-eyebrow">Regulations</span>
           <strong id="regulations-link">Built around the evidence regulators ask for.</strong>
           <p>
-            FDA, EU MDR, UK and Canada reporting windows, and the standards whose evidence MDARIX organizes. MDARIX does
-            not certify compliance: your quality system and its validation stay yours.
+            Reporting windows for the US, EU/NI, GB and India (MvPI worksheet), and the standards whose evidence MDARIX
+            organizes. MDARIX does not certify compliance: your quality system and its validation stay yours.
           </p>
           <a className="ms-link" href="/trust/regulations">
             See the regulations <ArrowRight size={14} aria-hidden="true" />
@@ -1368,7 +1372,7 @@ export function CompanyPage() {
           {[
             [
               "Where MDARIX fits",
-              "MDARIX connects product context, complaints, changes, suppliers, lots, evidence, uncertainty, and human decisions. QMS, PLM, ERP, and supplier systems remain authoritative.",
+              "MDARIX connects product context, complaints, changes, suppliers, lots, evidence, uncertainty, and human decisions. Your QMS keeps the complaint record, CAPA and change control.",
             ],
             [
               "What makes MDARIX different",
