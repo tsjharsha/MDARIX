@@ -29,7 +29,7 @@ from backend.app.db.models.foundation import Component, LotBatch, LotComponent
 from backend.app.db.models.lot_impact import LotDistribution
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.trial import business_imports
-from backend.app.trial.imports import TEMPLATES, _check_references, _Lookup, _mask, _personal_data, _Report
+from backend.app.trial.imports import TEMPLATES, _check_references, _Lookup, _Report, stored_value
 from backend.app.trial.imports import quality_report
 from backend.app.trial.sample_data import SAMPLE_SOURCE, STORY_WINDOWS_BY
 
@@ -189,7 +189,7 @@ def stage_sample_lot_impact(db: Session, tenant_id, now: datetime) -> dict:
     aside = [(aside_line, dict(SET_ASIDE, ship_date=str(now.date())))]
     _check_references("distribution", aside, _Lookup(db, tenant_id), report)
     set_aside = [(line, row, report.row_problems.get(line, [])) for line, row in aside]
-    import_quarantine.store(db, tenant_id, import_ref, "distribution", SAMPLE_SOURCE, set_aside, _personal_data, _mask)
+    import_quarantine.store(db, tenant_id, import_ref, "distribution", SAMPLE_SOURCE, set_aside, stored_value)
     quality = quality_report(len(rows) + 1, len(rows), 1, 0)
     quality["flags"] = business_imports.distribution_flags(db, tenant_id, SHIPMENTS)
     db.add(

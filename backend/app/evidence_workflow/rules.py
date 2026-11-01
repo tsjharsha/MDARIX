@@ -169,7 +169,8 @@ PRIORITIES = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 # colleague or a role move OPEN -> ACKNOWLEDGED -> RECEIVED (or CANNOT_PROVIDE). Either kind ends REVIEWED or
 # CANCELLED.
 INTERNAL_STATUSES = ("OPEN", "ACKNOWLEDGED", "RECEIVED", "REVIEWED", "CANNOT_PROVIDE", "CANCELLED")
-SUPPLIER_STATUSES = ("PENDING_DELIVERY", "SENT", "REPLIED", "REVIEWED", "CANCELLED")
+# SAVED: a free trial's request, kept and never emailed (a trial sends nothing to suppliers, J33).
+SUPPLIER_STATUSES = ("SAVED", "PENDING_DELIVERY", "SENT", "REPLIED", "REVIEWED", "CANCELLED")
 STATUS_LABELS: dict[str, str] = {
     "OPEN": "Open",
     "ACKNOWLEDGED": "Acknowledged",
@@ -177,12 +178,13 @@ STATUS_LABELS: dict[str, str] = {
     "REVIEWED": "Reviewed",
     "CANNOT_PROVIDE": "Cannot provide",
     "CANCELLED": "Cancelled",
+    "SAVED": "Saved, not sent",
     "PENDING_DELIVERY": "Sent",
     "SENT": "Sent",
     "REPLIED": "Answered",
 }
 # Still waiting for the answer (these can be cancelled and become overdue).
-WAITING_STATUSES = frozenset({"OPEN", "ACKNOWLEDGED", "PENDING_DELIVERY", "SENT"})
+WAITING_STATUSES = frozenset({"OPEN", "ACKNOWLEDGED", "SAVED", "PENDING_DELIVERY", "SENT"})
 # Answered and waiting for the requester's review.
 ANSWERED_STATUSES = frozenset({"RECEIVED", "REPLIED"})
 # Nothing more happens to these.

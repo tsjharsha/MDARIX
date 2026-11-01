@@ -83,7 +83,7 @@ export function Photo({
 }
 
 // The complex scenes, which also open full-screen (Enlarge): the product reality graph and the cross-functional
-// investigation. "Your systems stay the record" (visuals.tsx SourceFlow) has the same button.
+// investigation. "Your QMS keeps the complaint record" (visuals.tsx SourceFlow) has the same button.
 const ENLARGEABLE = ["medtech-product-reality-graph-hero", "medtech-investigation-team"];
 
 /** Steps joined by animated connectors; a light pulse travels along the chain. */

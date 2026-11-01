@@ -60,15 +60,15 @@ def acknowledge(
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """Record that the person read the document's current version ("I have read version ...")."""
+    """Record that the person read the document's current version ("I have read ..., MDARIX starter, version 1")."""
     tenant_id = uuid.UUID(ctx.tenant_id)
     document = service.documents(db, tenant_id).get(document_code)
     if document is None:
         raise _error(404, "DOCUMENT_NOT_FOUND", "No such document")
     if payload.version != document.version:
         raise _error(409, "VERSION_CHANGED", f"The current version is {document.version}: read it and acknowledge it")
-    if " ".join(payload.statement.split()) != service.statement(document.version):
-        raise _error(422, "STATEMENT_REQUIRED", f'Confirm "{service.statement(document.version)}"')
+    if " ".join(payload.statement.split()) != service.statement(document):
+        raise _error(422, "STATEMENT_REQUIRED", f'Confirm "{service.statement(document)}"')
     now = datetime.now(timezone.utc)
     trial = is_trial(control_db, tenant_id)
     row, created = service.acknowledge(db, tenant_id, ctx.user_id, document, now, trial=trial)

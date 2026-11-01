@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from backend.app.reportability import rules
-from backend.app.standards import STARTER_MARK
+from backend.app.standards import STARTER_MARK, version_words
 
 # The label every signed record and document made in a free trial carries (T-B5).
 PRACTICE_LABEL = "Practice record: made in a free trial with sample or de-identified data. Not your regulatory record."
@@ -719,6 +719,6 @@ def market_clock(
 
 def signature_meaning(ref: str, market: str, version: str, conclusion: str) -> str:
     return (
-        f"I have assessed {ref} for {MARKET_LABELS[market]} with question set {version} and the harm-severity scale "
-        f"{SCALE_VERSION}, and conclude: {CONCLUSION_LABELS[conclusion].lower()}."
+        f"I have assessed {ref} for {MARKET_LABELS[market]} with its questions, {version_words(version)}, and the "
+        f"harm-severity scale, {version_words(SCALE_VERSION)}, and conclude: {CONCLUSION_LABELS[conclusion].lower()}."
     )

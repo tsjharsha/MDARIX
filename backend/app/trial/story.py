@@ -81,11 +81,11 @@ CHAPTERS = (
     ),
     (
         "DECIDE_AND_SIGN",
-        "Decide, sign and open the CAPA",
+        "Decide, sign and record the CAPA to raise",
         "The sample case's Decision Brief is written and waiting for you: review it as the quality reviewer, accept "
         "it, then sign the decision with your password and authenticator code and its root-cause attribution "
-        "(device-, use- or environment-related, or undetermined with a reason); the CAPA opens from the signed "
-        "decision. The person who writes a brief never reviews or signs it, on every case.",
+        "(device-, use- or environment-related, or undetermined with a reason); then record the CAPA to raise in your "
+        "QMS from the signed decision. The person who writes a brief never reviews or signs it, on every case.",
         "Trends that never become a CAPA are among the findings FDA cites most often.",
         {"section": "Investigations", "tab": "Decision Brief"},
         None,
@@ -152,8 +152,7 @@ WITHOUT_AI = {
     "INVESTIGATE_WITH_AI": (
         "Investigate with evidence you can trace",
         "The case page brings the complaints, lots, changes and evidence together; ask MDARIX a question and the answer "
-        "cites the records it comes from; the investigator weighs each explanation. AI assistance joins when it is "
-        "switched on for your organization.",
+        "cites the records it comes from; the investigator weighs each explanation. AI is off in the free trial.",
         "Small teams with large backlogs; conclusions that cannot show their sources are not trusted.",
     )
 }

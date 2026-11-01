@@ -274,9 +274,20 @@ def _luhn(digits: str) -> bool:
     return total % 10 == 0
 
 
+def _gtin14(digits: str) -> bool:
+    """A GTIN-14 (a device's trade item number, the UDI-DI) with a valid GS1 check digit."""
+    if len(digits) != 14:
+        return False
+    total = sum(int(char) * (3 if index % 2 == 0 else 1) for index, char in enumerate(reversed(digits[:-1])))
+    return (10 - total % 10) % 10 == int(digits[-1])
+
+
 def _card(match: re.Match) -> str:
+    """A card number passes the Luhn check; a valid GTIN-14 is a device identifier, even when it passes Luhn too
+    (about one in ten do)."""
     digits = re.sub(r"\D", "", match.group(0))
-    return "[CARD_NUMBER]" if 13 <= len(digits) <= 19 and _luhn(digits) else match.group(0)
+    card = 13 <= len(digits) <= 19 and _luhn(digits) and not _gtin14(digits)
+    return "[CARD_NUMBER]" if card else match.group(0)
 
 
 def _placeholder(label: str) -> str:
@@ -401,8 +412,10 @@ def _serials_near_people(text: str) -> str:
     return "".join(out)
 
 
-def mask_text(text: str) -> str:
-    """The text with personal information replaced by typed placeholders."""
+def mask_text(text: str, names: bool = True) -> str:
+    """The text with personal information replaced by typed placeholders. ``names=False`` is for the name of a thing
+    (a product, a part, a supplier): a title or a given name there is a brand ("Dr Trust BP monitor", "Dr. Morepen"),
+    so names are not looked for; everything else is."""
     if not text:
         return text
     masked = EMAIL.sub("[EMAIL]", text)
@@ -410,13 +423,15 @@ def mask_text(text: str) -> str:
     masked = LABELLED.sub(lambda m: f"{m.group(1)}{m.group(2)}{_placeholder(m.group(1))}", masked)
     masked = BIRTH_DATE.sub(lambda m: f"{m.group(1)}{m.group(2)}[DATE_OF_BIRTH]", masked)
     masked = RECORD_NUMBER.sub(lambda m: f"{m.group(1)}{m.group(2)}[ID_NUMBER]", masked)
-    masked = REPORTED_BY.sub(_reported_by, masked)
-    masked = TITLE.sub("[PERSON]", masked)
-    masked = ROLE_NAME.sub(_role_name, masked)
-    masked = CONTACT_NAME.sub(_contact_name, masked)
+    if names:
+        masked = REPORTED_BY.sub(_reported_by, masked)
+        masked = TITLE.sub("[PERSON]", masked)
+        masked = ROLE_NAME.sub(_role_name, masked)
+        masked = CONTACT_NAME.sub(_contact_name, masked)
     masked = FACILITY.sub(_facility, masked)
-    masked = GIVEN_NAME.sub(_given_name, masked)
-    masked = INITIALS_NAME.sub(_initials, masked)
+    if names:
+        masked = GIVEN_NAME.sub(_given_name, masked)
+        masked = INITIALS_NAME.sub(_initials, masked)
     masked = AGE_SEX.sub("[AGE_SEX]", masked)
     masked = SSN.sub("[ID_NUMBER]", masked)
     # Phone layouts before card numbers: "0091 98450 12345" has a card's digit count but is a phone number.

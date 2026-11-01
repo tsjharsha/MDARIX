@@ -572,7 +572,7 @@ export function ScalePanel({
   );
 }
 
-/** The training on what a signature relies on: read each document, then "I have read version …". Required to sign in a
+/** The training on what a signature relies on: read each document, then "I have read …, MDARIX starter, version 1". Required to sign in a
  * free trial only (owner decision 6); elsewhere the record can be made but signing does not wait for it. */
 export function TrainingPanel({
   documents,

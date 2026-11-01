@@ -89,7 +89,7 @@ const screen = (overrides: Partial<DispositionScreen> = {}): DispositionScreen =
       code: "DISPOSITION_RULES",
       title: "Complaint disposition rules (starter)",
       version: "disposition-starter-1",
-      statement: "I have read version disposition-starter-1",
+      statement: "I have read the complaint disposition rules, MDARIX starter, version 1",
       state: "MISSING",
       held_version: null,
       trained_at: null,
@@ -189,6 +189,11 @@ describe("the disposition rules on screen", () => {
     const ready = filled(base);
     expect(signProblem(base, ready, false)).toMatch(/practice training/);
     expect(signProblem(base, ready, true)).toBeNull();
+    // When the server needs the authenticator code, the form asks for it before sending (no refusal after signing).
+    const coded = { ...base, code_required: true };
+    expect(signProblem(coded, ready, true)).toBe("Enter the 6-digit code from your authenticator app.");
+    expect(signProblem(coded, { ...ready, code: "12345" }, true)).toMatch(/6-digit code/);
+    expect(signProblem(coded, { ...ready, code: " 123456 " }, true)).toBeNull();
     expect(signProblem(base, { ...ready, attribution: "" }, true)).toMatch(/attribution/);
     expect(signProblem(base, { ...ready, attribution: "UNDETERMINED" }, true)).toMatch(/Undetermined/);
     expect(signProblem(base, { ...ready, useEnvironment: "OTHER" }, true)).toMatch(/other/);
@@ -239,7 +244,7 @@ describe("the disposition screens", () => {
       expect(html).toContain(text);
     expect(html).toContain("Source value: “Step-down unit” (not on the list)");
     expect(html).toContain("Show the coding criteria");
-    expect(html).toContain("I have read version disposition-starter-1");
+    expect(html).toContain("I have read the complaint disposition rules, MDARIX starter, version 1");
     expect(html).toContain("Practice record");
   });
 
@@ -270,7 +275,7 @@ describe("the disposition screens", () => {
     expect(html).toContain("BATTERY_SHUTDOWN not recorded before");
     expect(html).toContain("Refused: a trigger is met");
     expect(html).toContain("its market assessment is still due under Complaints › Reportability");
-    expect(html).not.toContain("I have read version");
+    expect(html).not.toContain("I have read the");
   });
 
   it("shows a signed disposition as signed, with a new version only on request", () => {

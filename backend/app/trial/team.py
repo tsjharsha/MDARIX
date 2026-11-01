@@ -65,6 +65,7 @@ def team(db: Session, tenant_id, viewer: AuthUser) -> dict:
         .all()
     )
     owner = is_trial_owner(db, tenant_id, viewer)
+    expired = _expired_invitations(db, tenant_id, users)
     return {
         "can_invite": owner,
         # Remove colleagues, reset their MFA, decide on support access: the trial owner only.
@@ -80,10 +81,67 @@ def team(db: Session, tenant_id, viewer: AuthUser) -> dict:
                 "status": user.status,
                 "is_owner": user.username.strip().lower() == owner_email,
                 "is_you": user.id == viewer.id,
+                # An invitation whose link no longer works: shown as Expired, with Resend (J37).
+                "invitation_expired": user.id in expired,
             }
             for user in users
         ],
     }
+
+
+def _expired_invitations(db: Session, tenant_id, users) -> set:
+    """The invited people whose newest invitation link has expired (or who hold none that still works)."""
+    from sqlalchemy import func
+
+    invited = [user.id for user in users if user.status == "INVITED"]
+    if not invited:
+        return set()
+    open_until = dict(
+        db.query(UserInvitation.user_id, func.max(UserInvitation.expires_at))
+        .filter(
+            UserInvitation.tenant_id == tenant_id,
+            UserInvitation.user_id.in_(invited),
+            UserInvitation.used_at.is_(None),
+        )
+        .group_by(UserInvitation.user_id)
+        .all()
+    )
+    now = datetime.now(timezone.utc)
+    return {user_id for user_id in invited if open_until.get(user_id) is None or open_until[user_id] <= now}
+
+
+def _invitable(db: Session, tenant_id, email: str) -> AuthUser | None:
+    """Who already has this email: nobody (None), or a colleague removed from this trial, who may be invited again.
+    Every other case is refused with what it is (J37): an invitation waiting, a colleague on the team, an account in
+    another organization."""
+    existing = db.query(AuthUser).filter(AuthUser.username == email).first()
+    if existing is None:
+        # The organization's own session reads only its own accounts: an account elsewhere is looked up apart, and
+        # only whether it exists is read.
+        from backend.app.db.session import SessionLocal
+        from backend.app.db.tenant_scope import bind_system
+
+        with SessionLocal() as lookup:
+            bind_system(lookup, "trial invitation: is this email an account in another organization")
+            elsewhere = lookup.query(AuthUser.id).filter(AuthUser.username == email).first() is not None
+        if not elsewhere:
+            return None
+    if existing is None or existing.tenant_id != tenant_id:
+        raise _error(
+            409,
+            "ACCOUNT_IN_ANOTHER_ORGANIZATION",
+            "This email already has an MDARIX account in another organization. Invite them with another work email, "
+            "or ask them to write to MDARIX support.",
+        )
+    if existing.status == "INVITED":
+        raise _error(
+            409,
+            "INVITATION_PENDING",
+            "You have already invited this person. Their invitation is in your team list: use Resend invitation there.",
+        )
+    if existing.status != REMOVED_STATUS:
+        raise _error(409, "ALREADY_ON_THE_TEAM", "This person is already on your trial team.")
+    return existing
 
 
 def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, display_name: str) -> dict:
@@ -99,8 +157,7 @@ def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, disp
     # The name goes into the invitation email to the colleague: never a link (SEC-04).
     if looks_like_link(name):
         raise _error(422, "NAME_HAS_LINK", "Write the colleague's name without a web or email address")
-    if db.query(AuthUser.id).filter(AuthUser.username == email).first() is not None:
-        raise _error(409, "ACCOUNT_EXISTS", "This person already has an MDARIX account")
+    returning = _invitable(db, tenant_id, email)
     # Lock the trial's request row so two simultaneous invites cannot both take the last seat.
     db.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).with_for_update().first()
     seated = db.query(AuthUser.id).filter(AuthUser.tenant_id == tenant_id, AuthUser.status.in_(SEATED_STATUSES)).count()
@@ -110,32 +167,45 @@ def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, disp
         )
     _limit_invitations(tenant_id, inviter, "invite")
     now = datetime.now(timezone.utc)
-    user = AuthUser(
-        id=uuid.uuid4(),
-        tenant_id=tenant_id,
-        username=email,
-        display_name=name,
-        company=inviter.company,
-        password_hash=_hash(secrets.token_urlsafe(24)),
-        role=TRIAL_USER_ROLE,
-        status="INVITED",
-        email_verified=False,
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(user)
-    db.flush()
-    db.add(
-        TenantMembership(
+    if returning is not None:
+        # A removed colleague invited again: the same account (their earlier work stays theirs), a new password set
+        # through the new invitation, and their membership active again.
+        from backend.app import mfa
+
+        user = returning
+        user.display_name, user.status, user.updated_at = name, "INVITED", now
+        user.password_hash = _hash(secrets.token_urlsafe(24))
+        mfa.reset(db, user, now)  # they set up their authenticator again, as a new colleague does
+        db.query(TenantMembership).filter(
+            TenantMembership.tenant_id == tenant_id, TenantMembership.user_id == user.id
+        ).update({"status": "ACTIVE", "updated_at": now}, synchronize_session=False)
+    else:
+        user = AuthUser(
             id=uuid.uuid4(),
             tenant_id=tenant_id,
-            user_id=user.id,
-            status="ACTIVE",
-            is_default=True,
+            username=email,
+            display_name=name,
+            company=inviter.company,
+            password_hash=_hash(secrets.token_urlsafe(24)),
+            role=TRIAL_USER_ROLE,
+            status="INVITED",
+            email_verified=False,
             created_at=now,
             updated_at=now,
         )
-    )
+        db.add(user)
+        db.flush()
+        db.add(
+            TenantMembership(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                user_id=user.id,
+                status="ACTIVE",
+                is_default=True,
+                created_at=now,
+                updated_at=now,
+            )
+        )
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -144,7 +214,7 @@ def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, disp
             action="TRIAL_COLLEAGUE_INVITED",
             entity_type="AuthUser",
             entity_id=user.id,
-            details={"invited_user_id": str(user.id)},
+            details={"invited_user_id": str(user.id), "invited_again": returning is not None},
             created_at=now,
         )
     )

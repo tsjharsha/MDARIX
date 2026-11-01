@@ -122,7 +122,7 @@ const QUESTION_LIST = [
     mdarix: {
       title: "What MDARIX does",
       points: [
-        "Counts each complaint's reporting windows from the day you became aware, using the windows your procedure sets. Templates for FDA, EU MDR, UK and Canada reporting keep their basis (21 CFR 803.50 and 803.53, EU MDR Article 87, UK MDR 2002, SOR/98-282).",
+        "Counts each complaint's reporting windows from the day you became aware, using the windows your procedure sets. Templates for the US, EU/NI, GB and India keep their basis (21 CFR 803.50 and 803.53, EU MDR Article 87, UK MDR 2002, India's Medical Devices Rules 2017 with the MvPI worksheet).",
         "Shows which clocks are due, overdue or missing answers, and keeps each reportability decision with the named person who made it and their reason: reported, with the report reference and filing date, or not reportable.",
         "Brings complaints closed as inquiries or no fault found back for a second look, so a reportable event is not lost in the wrong category, and flags a death or serious injury closed without an investigation.",
         "MDARIX never decides reportability and never submits anything to a regulator: you record what was filed in the authority's own system.",
@@ -130,7 +130,7 @@ const QUESTION_LIST = [
     },
     note: NOT_ADVICE,
     links: [
-      ["FDA, EU MDR, UK and Canada reporting windows", "/trust/regulations"],
+      ["Reporting windows for the US, EU/NI, GB and India (MvPI worksheet)", "/trust/regulations"],
       ["How do I trend medical device complaints?", "/questions/how-to-trend-medical-device-complaints"],
     ],
   },
@@ -162,7 +162,7 @@ const QUESTION_LIST = [
         "Links complaints and failure modes to the risks and controls they touch, so field signals reach the risk file. Risks come in with the CSV templates, like products, lots and complaints.",
         "Readiness checks name the post-market data not yet in the risk file, and the trends with no CAPA or risk review, each opening the records behind it.",
         "Lets you plan and sign the CAPA effectiveness check, send input to the risk file, and download the inspector summary as one pack.",
-        "MDARIX does not replace your risk management file: a person decides what the risk file must say, and your systems stay the record.",
+        "MDARIX does not replace your risk management file: a person decides what the risk file must say, and the risk file stays in your QMS.",
       ],
     },
     note: NOT_ADVICE,

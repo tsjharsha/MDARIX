@@ -523,10 +523,12 @@ def write(
                 records.remember(model, row[key], record)
                 created += 1
             else:
-                for name, value in values.items():
-                    setattr(record, name, value)
-                record.updated_at = now
-                updated += 1
+                # A re-upload sets only what its file holds: an optional column it leaves out keeps the stored value
+                # (a CAPA's or an investigation's status is not reset to open), and "updated" counts real changes (J9).
+                kept = {name: value for name, value in values.items() if _given(name, row, key)}
+                if apply_values(record, kept):
+                    record.updated_at = now
+                    updated += 1
             db.flush()
             _links(entity, row, record, db, tenant_id, lookup, records, now)
             item = _index(entity, row, record, product, version, db, tenant_id, source)
@@ -558,8 +560,7 @@ def write(
                     )
                 )
                 created += 1
-            else:
-                link.effective_timestamp = when or link.effective_timestamp
+            elif apply_values(link, {"effective_timestamp": when or link.effective_timestamp}):
                 updated += 1
         elif entity == "component_suppliers":
             component, supplier = records.component(row["component_id"]), records.supplier(row["supplier_id"])
@@ -584,8 +585,7 @@ def write(
                     )
                 )
                 created += 1
-            else:
-                link.effective_timestamp = when or link.effective_timestamp
+            elif apply_values(link, {"effective_timestamp": when or link.effective_timestamp}):
                 updated += 1
         elif entity == "lot_genealogy":
             lot, component = lookup.lot(row["lot_id"]), records.component(row["component_id"])
@@ -601,8 +601,6 @@ def write(
                     )
                 )
                 created += 1
-            else:
-                updated += 1
         elif entity == "distribution":
             from backend.app.db.models.lot_impact import LotDistribution
 
@@ -629,14 +627,54 @@ def write(
                     )
                 )
                 created += 1
-            else:
-                for name, value in values.items():
-                    setattr(shipment, name, value)
+            elif apply_values(shipment, values):
                 shipment.updated_at = now
                 updated += 1
         db.flush()
     upsert_record_evidences(db, tenant_id, evidence)
     return created, updated
+
+
+# The optional column each record field comes from (a required column is always in the row).
+OPTIONAL_COLUMN = {
+    "revision": "revision",
+    "description": "description",
+    "status": "status",
+    "location": "location",
+    "event_timestamp": "effective_date",
+    "product_version_id": "version",
+    "requirement_type": "requirement_type",
+    "control_type": "control_type",
+    "opened_at": "opened_date",
+    "owner_ref": "owner",
+    "content": "content",
+    "document_ref": "document_ref",
+    "reliability_status": "review_status",
+    "action_type": "action_type",
+    "source_type": "source_type",
+    "source_reference": "source_reference",
+    "product_id": "product_id",
+    "investigation_id": "investigation_id",
+    "due_at": "due_date",
+    "effectiveness_check_at": "effectiveness_check_date",
+}
+
+
+def _given(field: str, row: dict, key: str) -> bool:
+    """Whether the row's file gives this field: its column is there (for a status, with a value: a blank status keeps
+    the stored one)."""
+    column = OPTIONAL_COLUMN.get(field, key)
+    return bool(row.get(column)) if field == "status" else column in row
+
+
+def apply_values(record, values: dict) -> bool:
+    """Set the values on the record; True when one of them changed."""
+    changed = False
+    for name, value in values.items():
+        if getattr(record, name) != value:
+            setattr(record, name, value)
+            changed = True
+    return changed
 
 
 def _values(entity: str, row: dict, product, version, records: Records, parse_date) -> dict:

@@ -69,6 +69,7 @@ not list.
 | `MDARIX_PASSWORD_SCRYPT_LOG2_N` | no | Password hash cost (default 17; production refuses less). Tests use 14. |
 | `MDARIX_PASSWORD_HASH_CONCURRENCY` | no | Maximum password hashes allowed concurrently in one process (default 3), limiting CPU and memory pressure during sign-in bursts. |
 | `MDARIX_RATE_LIMITS_ENABLED` | no | `false` only in automated tests; refused in production. |
+| `MDARIX_SIGNUP_PER_ADDRESS_PER_HOUR` | no | Free-trial sign-up requests per network address per hour (default 30, since 0.10.62; 5 before). A venue's Wi-Fi is one address for everyone in the room. A missing, invalid or non-positive value keeps 30. Read when the API starts. |
 | `MDARIX_CONNECTOR_SECRET_<TENANT ID>_<NAME>` | no | Server secrets a connector may reference by name (prefer the per-connector API key). In staging and production a connector may only name secrets that start with its tenant's identifier, for example `MDARIX_CONNECTOR_SECRET_TEN0351_TRACKWISE`. |
 | `MDARIX_CONNECTOR_MAX_BYTES` | no | Most a connector sync may read from a provider across all pages (50,000,000 bytes; each page at most 5 MB). |
 | `MDARIX_CONNECTOR_ENCRYPTION_KEY_ID` | no | ID of the current connector encryption key (`k1`). Change it whenever the key changes. |

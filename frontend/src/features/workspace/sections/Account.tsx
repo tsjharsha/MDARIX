@@ -133,7 +133,7 @@ export function EmailChoices() {
 }
 
 function Security() {
-  const { session, notify } = useWorkspace();
+  const { session, notify, isTrial } = useWorkspace();
   const [busy, setBusy] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -245,7 +245,11 @@ function Security() {
         <ul className="ca-check-list">
           <li>You are signed out after 30 minutes without activity.</li>
           <li>No session lasts longer than 12 hours, even when active.</li>
-          <li>If your administrator suspends your account, you are signed out everywhere immediately.</li>
+          <li>
+            {isTrial
+              ? "If the person who started this trial removes you from it, you are signed out everywhere immediately."
+              : "If your administrator suspends your account, you are signed out everywhere immediately."}
+          </li>
         </ul>
         <div className="ca-action-row">
           <button type="button" className="ca-danger-outline" onClick={() => void signOut()}>
@@ -265,7 +269,7 @@ function Security() {
 }
 
 function Access() {
-  const { session } = useWorkspace();
+  const { session, isTrial } = useWorkspace();
   const me = useResource<any>("/api/v1/me/context");
   const permissions = me.data?.permissions;
   const actions: string[] = Array.isArray(permissions?.actions)
@@ -321,7 +325,10 @@ function Access() {
           </details>
         )}
         <p className="ac-muted">
-          Your access is checked each time you open or change a record. To change it, ask your administrator.
+          Your access is checked each time you open or change a record.{" "}
+          {isTrial
+            ? "In a free trial everyone has the same role, so there is nothing to change."
+            : "To change it, ask your administrator."}
         </p>
       </Panel>
     </div>

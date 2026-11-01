@@ -68,6 +68,9 @@ describe("My Work tabs", () => {
       "My AI conversations",
     ]);
     expect(myWorkTabs(null, "Role queues")).toContain("Role queues");
+    // AI off (always in a free trial): no "My AI conversations" tab (J34).
+    expect(myWorkTabs(summary, undefined, true)).not.toContain("My AI conversations");
+    expect(myWorkTabs(summary, "My AI conversations", true)).toContain("My AI conversations");
     expect(hasRoleQueues({ counts: { queue: 1 } })).toBe(true);
   });
 

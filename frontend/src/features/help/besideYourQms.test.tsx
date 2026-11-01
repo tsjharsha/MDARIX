@@ -2,7 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import walkthrough from "../../../../docs/user-guide/QUALITY_MANAGER_WORKFLOW_WALKTHROUGH.md?raw";
 import { afterTheTrial } from "../../site/content";
-import { renderPage } from "../../site/prerender";
+import { anchorPages, capabilityCopy, pages as pageContent, solutionOverrides } from "../../site/legacyContent";
+import { INDEXED_PATHS, renderPage } from "../../site/prerender";
 import { questionAt } from "../../site/questions";
 import { BESIDE_YOUR_QMS, PMS_FRAMING } from "./besideYourQms";
 import pilotGuide from "./PILOT_GUIDE.md?raw";
@@ -69,14 +70,25 @@ describe("MDARIX works beside your QMS", () => {
       expect(said).toContain(record);
   });
 
-  it("replaces the older 'systems of record stay' wording", () => {
+  it("replaces the older 'systems of record stay' wording on every page", () => {
     const places = [
-      ...["/", "/trust", "/company"].map((path) => text(renderPage(path as "/"))),
-      JSON.stringify({ CONNECTION, QUESTIONS, afterTheTrial }),
+      ...INDEXED_PATHS.map((path) => text(renderPage(path))),
+      JSON.stringify({
+        CONNECTION,
+        QUESTIONS,
+        afterTheTrial,
+        pageContent,
+        capabilityCopy,
+        anchorPages,
+        solutionOverrides,
+      }),
       pilotGuide,
     ];
     for (const place of places) {
-      expect(place).not.toMatch(/stay (the|your) systems of record|systems of record stay|stay where they are/i);
+      // Every older variant (0.10.62): "stay the record", "remain authoritative (systems of record)".
+      expect(place).not.toMatch(
+        /stays? (the|your) (systems? of )?record|systems of record stay|stay where they are|(source|systems?|platforms?) remains? authoritative|authoritative systems? of record/i,
+      );
       expect(place).not.toContain("Works above QMS");
     }
   });

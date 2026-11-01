@@ -146,6 +146,11 @@ export function useWorkspace(): WorkspaceApi {
   return value;
 }
 
+/** Whether the workspace is a free trial (false outside the workspace). */
+export function useIsTrial(): boolean {
+  return !!useContext(WorkspaceContext)?.isTrial;
+}
+
 /** The server's feature set (session context `feature_set`); `full` outside the workspace or from older servers. */
 export function useFeatureSet(): FeatureSet {
   const value = useContext(WorkspaceContext);

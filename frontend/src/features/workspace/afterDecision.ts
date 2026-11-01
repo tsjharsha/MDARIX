@@ -118,7 +118,7 @@ export const FOLLOW_UP_ACTIONS_SHOWN: ReadonlyArray<{
 }> = [
   { key: "start", flag: "can_start", label: "Start", needsInput: false },
   { key: "complete", flag: "can_complete", label: "Complete", needsInput: true },
-  { key: "capa", flag: "can_create_capa", label: "Create CAPA", needsInput: true },
+  { key: "capa", flag: "can_create_capa", label: "Record the CAPA to raise in your QMS", needsInput: true },
   { key: "cancel", flag: "can_cancel", label: "Cancel", needsInput: true },
 ];
 

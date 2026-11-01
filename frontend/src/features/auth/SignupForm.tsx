@@ -44,7 +44,6 @@ export const STEP_ONE_CODES = new Set([
 ]);
 
 const MESSAGES: Record<string, string> = {
-  RATE_LIMITED: "Too many attempts. Please wait a few minutes and try again.",
   VALID_EMAIL_REQUIRED: "Enter a valid work email.",
   NAME_REQUIRED: "Enter your full name.",
   ORGANIZATION_REQUIRED: "Enter your company's name.",

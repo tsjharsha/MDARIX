@@ -116,12 +116,13 @@ export function hasRoleQueues(summary: TaskSummary | null | undefined): boolean 
 }
 
 /** My Work's tabs: Role queues only for someone who works a queue (or who was sent to it), then the other tabs. */
-export function myWorkTabs(summary: TaskSummary | null | undefined, active?: string): MyWorkTab[] {
+export function myWorkTabs(summary: TaskSummary | null | undefined, active?: string, aiOff = false): MyWorkTab[] {
   return [
     ...TASK_TABS.filter((item) => item.view !== "queue" || hasRoleQueues(summary) || active === item.tab).map(
       (item) => item.tab,
     ),
-    ...OTHER_MY_WORK_TABS,
+    // No AI conversations to list while AI is off (always in a free trial), unless a link opened that tab.
+    ...OTHER_MY_WORK_TABS.filter((tab) => tab !== "My AI conversations" || !aiOff || active === tab),
   ];
 }
 

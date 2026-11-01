@@ -408,7 +408,7 @@ describe("booking a one-to-one demo from the trial", () => {
     expect(sampleFacts({ products: 3, capas: 0 })).toEqual(["3 devices"]);
     expect(sampleFacts(null)).toEqual([]);
     // Every pain opens a screen the MVP keeps, and names its requirement.
-    const kept = ["Readiness", "Complaints", "Signals", "Investigations", "Records"];
+    const kept = ["Readiness", "Complaints", "Signals", "Investigations", "Records", "Import data"];
     for (const pain of SAMPLE_PAINS) {
       expect(kept).toContain(pain.opens.section);
       expect(pain.requirement.length).toBeGreaterThan(20);

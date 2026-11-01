@@ -75,8 +75,6 @@ TRIAL_POLICY = ImportPolicy(
     quarantine=True,
 )
 WORKSPACE_POLICY = ImportPolicy(source=WORKSPACE_UPLOAD_SOURCE, quarantine=True)
-# A complaint's status as its quality system names it (complaints.status holds 40 characters).
-COMPLAINT_STATUS_MAX = 40
 
 # What a column is for, in plain words, for the columns whose meaning changes what MDARIX finds (shown beside each
 # template in the import panel; templates_for() keeps only the template's own columns).
@@ -253,6 +251,7 @@ FLAG_VALUES = {"y": True, "yes": True, "true": True, "1": True, "n": False, "no"
 LONG_TEXT = {"description": 4000, "text": 4000, "question": 4000, "content": 20000}
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._/#:-]{0,119}$")
+PERSONS_NAME = "a person's name"
 # Personal data is found by masking (genai/pii.py), so refusing catches everything masking would replace. These
 # patterns are a second net for what masking leaves in place: labels ("MRN", "date of birth", "Aadhaar") and a few
 # looser layouts. (pattern, what it found, whether it matches only a label rather than the value).
@@ -269,8 +268,25 @@ _PERSONAL_DATA = [
         "a patient or record identifier",
         True,
     ),
-    (re.compile(r"\b(mr|mrs|ms|miss|dr)\.?\s+[A-Z][a-z]+"), "a person's name", False),
+    # The title in any case ("mr. smith"), the name capitalised or not.
+    (re.compile(r"\b(?i:mr|mrs|ms|miss|dr)\.?\s+[A-Za-z][a-z]+"), PERSONS_NAME, False),
 ]
+# What each second-net finding becomes in a stored value (label-only findings keep their label: the value after it
+# is masked).
+_SECOND_NET_PLACEHOLDER = {
+    "an email address": "[EMAIL]",
+    "a phone number": "[PHONE]",
+    "a national ID number": "[ID_NUMBER]",
+    PERSONS_NAME: "[PERSON]",
+}
+# Device identifiers are checked as identifiers, not as text: a ten-digit serial is not a phone number and a GTIN-14
+# not a card number (J8). A UDI is written as GS1 element strings ("(01)00884838000292(17)261120(10)L24-0815") or
+# HIBC, which starts with "+" ("+H123PUMP2001/$$3261120L24-0815"); exports escape a leading "+" (csv_safe).
+_UDI = re.compile(r"^[+A-Za-z0-9(][A-Za-z0-9 ._/#:()$%*+-]{0,119}$")
+DEVICE_IDS = {"serial_number": _ID, "udi": _UDI}
+# Columns that hold the name of a thing (a product, a part, a supplier, a site): a title or a given name there is a
+# brand ("Dr Trust BP monitor", "Dr. Morepen"), never a person, so names are not looked for in them.
+THING_NAMES = frozenset({"product_name", "product_family", "component_name", "supplier_name", "site_name"})
 # What masking puts in place of personal data (genai/pii.py), e.g. [PERSON], [PHONE], [DATE_OF_BIRTH].
 _MASK_PLACEHOLDER = re.compile(r"\[[A-Z_]+\]")
 # Each placeholder in the words of the check report. A lot or serial is masked only beside a patient's details, so
@@ -313,17 +329,94 @@ def _spreadsheet_formula(value: str) -> bool:
     return value.startswith(FORMULA_TRIGGERS) and not _SIGNED_NUMBER.match(value)
 
 
-def _personal_data(value: str, labels: bool = True) -> str | None:
-    """What personal data the text seems to hold. ``labels=False`` (after masking) ignores a label such as "MRN" or
-    "date of birth" left in front of a placeholder; the values themselves are still looked for."""
+def _personal_match(value: str, labels: bool = True, names: bool = True) -> tuple[str, str] | None:
+    """What personal data the text seems to hold and the words that hold it. ``labels=False`` (after masking) ignores
+    a label such as "MRN" or "date of birth" left in front of a placeholder; the values themselves are still looked
+    for. ``names=False`` is for the name of a thing (THING_NAMES)."""
     if not labels:
         value = _MASK_PLACEHOLDER.sub(" ", value)
     for pattern, label, label_only in _PERSONAL_DATA:
-        if label_only and not labels:
+        if (label_only and not labels) or (label == PERSONS_NAME and not names):
             continue
-        if pattern.search(value):
-            return label
+        found = pattern.search(value)
+        if found:
+            return label, found.group(0)
     return None
+
+
+def _personal_data(value: str, labels: bool = True, names: bool = True) -> str | None:
+    """What personal data the text seems to hold ("a phone number"), or None."""
+    found = _personal_match(value, labels, names)
+    return found[0] if found else None
+
+
+# Template columns stored under another name (the rest are stored under their own name).
+_STORED_AS = {
+    "product_name": "name",
+    "component_name": "name",
+    "supplier_name": "name",
+    "site_name": "name",
+    "failure_mode_name": "name",
+    "question": "investigation_question",
+    "owner": "owner_ref",
+}
+
+
+def column_limit(entity: str, column: str) -> int:
+    """How many characters the column's value may have: what its database column holds (complaints.status 40,
+    complaints.country 80...), so a file the check calls ready never fails at writing (J10); text columns keep
+    LONG_TEXT or 255. The quality system's own status words are kept (Cancelled, Void, Closed - no action...)."""
+    from backend.app.db.models.lot_impact import LotDistribution
+
+    models = {"products": Product, "lots": LotBatch, "complaints": Complaint, "distribution": LotDistribution}
+    model = models.get(entity) or business_imports.KEYED.get(entity, (None,))[0]
+    stored = getattr(getattr(model, "__table__", None), "c", {}).get(_STORED_AS.get(column, column))
+    length = getattr(getattr(stored, "type", None), "length", None)
+    return length or LONG_TEXT.get(column, 255)
+
+
+def _free_text(column: str) -> bool:
+    """A column of free text, checked (and stored) for personal data; identifiers, codes, dates and counts are not."""
+    return not (
+        column.endswith(("_id", "_ids", "_date"))
+        or column == "version"
+        or column in FLAG_COLUMNS
+        or column in COUNT_COLUMNS
+        or column in DEVICE_IDS
+    )
+
+
+def stored_value(column: str, value):
+    """A set-aside value as it may be stored (R14): free text with every personal detail masking finds replaced by a
+    placeholder, and what only the second net finds ("mr smith") too, so the set-aside view's "kept only as
+    placeholders" holds (J7). Identifiers are kept: a person needs them to find and fix the row."""
+    if not value or not isinstance(value, str) or not _free_text(column):
+        return value
+    names = column not in THING_NAMES
+    masked = _mask(value, names=names)
+    for pattern, label, label_only in _PERSONAL_DATA:
+        if not label_only and (names or label != PERSONS_NAME):
+            masked = pattern.sub(_SECOND_NET_PLACEHOLDER[label], masked)
+    return masked
+
+
+def _quoted(words: str) -> str:
+    """The words a check found, quoted in its message (each message quotes them in the same form, so a stored copy can
+    leave them out: import_quarantine.store)."""
+    return f" (“{' '.join(words.split())[:80]}”)"
+
+
+def _masked_words(value: str, masked: str) -> str:
+    """The words of the value that masking replaced, as the person wrote them ("Mr. John Smith, 98450 12345")."""
+    import difflib
+
+    before, after = re.findall(r"\S+|\s+", value), re.findall(r"\S+|\s+", masked)
+    spans = [
+        "".join(before[i1:i2]).strip(" ,.;:")
+        for tag, i1, i2, _, _ in difflib.SequenceMatcher(None, before, after, autojunk=False).get_opcodes()
+        if tag in ("replace", "delete")
+    ]
+    return ", ".join(span for span in spans if span)
 
 
 def file_label(name: str | None) -> str | None:
@@ -335,11 +428,11 @@ def file_label(name: str | None) -> str | None:
     return _mask(name) if _personal_data(name) else name
 
 
-def _mask(value: str) -> str:
+def _mask(value: str, names: bool = True) -> str:
     """Personal data replaced by typed placeholders, the masking every AI request gets (genai/pii.py)."""
     from genai.pii import mask_text
 
-    return mask_text(value)
+    return mask_text(value, names=names)
 
 
 def _masking_found(value: str, masked: str) -> str | None:
@@ -650,35 +743,41 @@ def _check_values(
                 if iso_date(value) is None:
                     expected = "YYYY-MM-DD" + (f" or {DATE_FORMATS[date_format]}" if date_format != "ISO" else "")
                     report.add(line, column, f"'{value}' is not a date in {expected} format.")
+            elif column in DEVICE_IDS:
+                if not DEVICE_IDS[column].match(value):
+                    extra = " ( ) $ % * +" if column == "udi" else ""
+                    report.add(
+                        line, column, f"Use up to 120 letters, numbers, spaces or . _ / # : -{extra} characters."
+                    )
             else:
                 # The same detection both ways: refusing flags whatever masking would replace.
-                masked = _mask(value)
+                names = column not in THING_NAMES
+                masked = _mask(value, names=names)
                 if mask_personal_data:
                     if masked != value:
                         report.masked_values += 1
                         report.originals[(line, column)] = value
                         row[column] = value = masked
-                    found = _personal_data(value, labels=False)
+                    found = _personal_match(value, labels=False, names=names)
                 else:
-                    found = _masking_found(value, masked) or _personal_data(value)
-                limit = LONG_TEXT.get(column, 255)
-                if len(value) > limit:
-                    report.add(line, column, f"Keep this under {limit} characters.")
+                    label = _masking_found(value, masked)
+                    found = (label, _masked_words(value, masked)) if label else _personal_match(value, names=names)
+                limit = column_limit(entity, column)
+                # A shipment's country has its own check, which names the two-letter code.
+                if len(value) > limit and (entity, column) != ("distribution", "country"):
+                    report.add(line, column, f"Keep this to {limit} characters or fewer.")
                 if found:
                     advice = (
                         "Masking could not remove it; remove it from the file."
                         if mask_personal_data
                         else "Remove personal data and retry, or choose to mask it."
                     )
-                    report.add(line, column, f"This looks like it contains {found}. {advice}")
+                    words = _quoted(found[1]) if found[1] else ""
+                    report.add(line, column, f"This looks like it contains {found[0]}{words}. {advice}")
                 if _spreadsheet_formula(value):
                     report.add(
                         line, column, "Text cannot start with =, +, - or @: spreadsheets would run it as a formula."
                     )
-        # The quality system's own status is kept (Cancelled, Void, Closed - no action, Inquiry...): the second look
-        # reads those words to find complaints that were closed off (backend/app/complaint_review/rules.py).
-        if entity == "complaints" and len(row.get("status") or "") > COMPLAINT_STATUS_MAX:
-            report.add(line, "status", f"Keep the status under {COMPLAINT_STATUS_MAX} characters.")
         if identity_columns:
             identity = tuple(row.get(column) for column in identity_columns)
         else:
@@ -1173,12 +1272,18 @@ def import_file(
             db, tenant_id, import_ref, entity, TEMPLATES[entity]["required"], rows, version, policy.source
         )
         set_aside = [(line, row, checked.row_problems[line]) for line, row in parsed if line in checked.row_problems]
-        import_quarantine.store(db, tenant_id, import_ref, entity, policy.source, set_aside, _personal_data, _mask)
+        import_quarantine.store(db, tenant_id, import_ref, entity, policy.source, set_aside, stored_value)
         result.update(
             import_ref=str(import_ref),
             mapping_version=version,
             quarantined_rows=len(set_aside),
-            quality_report=quality_report(checked.data_lines, len(rows), len(set_aside), report["updated_records"]),
+            quality_report=quality_report(
+                checked.data_lines,
+                len(rows),
+                len(set_aside),
+                None if entity == "products" else result["updated"],
+                new=report["new_rows"],
+            ),
         )
         if entity == "distribution":
             # Units shipped beyond the units a lot released are flagged, never refused (T-G5).
@@ -1196,16 +1301,30 @@ def import_file(
     return result
 
 
-def quality_report(read: int, accepted: int, quarantined: int, changed: int | None) -> dict:
+def quality_report(read: int, accepted: int, quarantined: int, changed: int | None, new: int | None = None) -> dict:
     """The data-quality report of one governed import run (R17): ``read`` is the file's non-blank data lines, each of
-    which must end accepted or quarantined; ``balanced`` says the counts agree with the file. ``rows_changed`` (rows that updated a record already there)
-    is None for a products file, whose rows may add versions to an existing product."""
+    which must end accepted or quarantined; ``balanced`` says the counts agree with the file. Accepted rows are new
+    (``new``, by default every row that changed nothing), changed (they changed a field of a record already there) or
+    unchanged (a record already there, as the file has it: J9). The three are None for a products file, whose rows may
+    add versions to an existing product."""
+    if changed is None:
+        return {
+            "rows_read": read,
+            "rows_accepted": accepted,
+            "rows_quarantined": quarantined,
+            "rows_changed": None,
+            "rows_new": None,
+            "rows_unchanged": None,
+            "balanced": read == accepted + quarantined,
+        }
+    new = accepted - changed if new is None else new
     return {
         "rows_read": read,
         "rows_accepted": accepted,
         "rows_quarantined": quarantined,
         "rows_changed": changed,
-        "rows_new": accepted - changed if changed is not None else None,
+        "rows_new": new,
+        "rows_unchanged": max(accepted - new - changed, 0),
         "balanced": read == accepted + quarantined,
     }
 
@@ -1317,14 +1436,18 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                 lookup.lots[row["lot_id"]] = lot
                 created += 1
             else:
-                lot.product_version_id = version.id if version else lot.product_version_id
-                lot.manufacturing_site_id = site.id if site else lot.manufacturing_site_id
-                if built:
-                    lot.effective_timestamp = built
-                if quantity is not None:
-                    lot.quantity = quantity
-                lot.updated_at = now
-                updated += 1
+                changed = business_imports.apply_values(
+                    lot,
+                    {
+                        "product_version_id": version.id if version else lot.product_version_id,
+                        "manufacturing_site_id": site.id if site else lot.manufacturing_site_id,
+                        "effective_timestamp": built or lot.effective_timestamp,
+                        "quantity": quantity if quantity is not None else lot.quantity,
+                    },
+                )
+                if changed:
+                    lot.updated_at = now
+                    updated += 1
             db.flush()
             continue
         lot = lookup.lot(row["lot_id"]) if row.get("lot_id") else None
@@ -1341,6 +1464,10 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             "status": (row.get("status") or "open").lower(),
             **_complaint_details(row),
         }
+        if complaint is not None and row["complaint_id"] not in new_complaints:
+            # A re-upload sets only what its file holds: a column it leaves out (or a blank status) keeps the stored
+            # value, so a file without a status column never reopens a closed complaint (J9).
+            values = {name: value for name, value in values.items() if _from_file(name, row)}
         if complaint is None:
             fields = {
                 "id": uuid.uuid4(),
@@ -1355,15 +1482,18 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             complaints[row["complaint_id"]] = complaint
             new_complaints[row["complaint_id"]] = fields
             created += 1
-        else:
-            if row["complaint_id"] not in new_complaints:
-                changes.extend(_field_changes(complaint, values, row["complaint_id"]))
+        elif row["complaint_id"] in new_complaints:  # named twice in the file: the later row wins, as before
             for name, value in values.items():
                 setattr(complaint, name, value)
-            complaint.updated_at = now
-            if row["complaint_id"] in new_complaints:  # named twice in the file: the later row wins, as before
-                new_complaints[row["complaint_id"]].update(values, updated_at=now)
-            updated += 1
+            new_complaints[row["complaint_id"]].update(values, updated_at=now)
+        else:
+            found = _field_changes(complaint, values, row["complaint_id"])
+            changes.extend(found)
+            for name, value in values.items():
+                setattr(complaint, name, value)
+            if found:  # "updated" counts the rows that changed a field, not every row seen again
+                complaint.updated_at = now
+                updated += 1
         evidence.append(_complaint_evidence(complaint, row, product, version, lot, source))
         if row.get("use_environment") or row.get("user_type"):
             proposed[row["complaint_id"]] = (row.get("use_environment"), row.get("user_type"))
@@ -1379,6 +1509,24 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
     if also_created:
         result["also_created"] = also_created
     return result
+
+
+# The complaint fields a re-upload sets, and the file columns each comes from (the other fields come from
+# _complaint_details, which reads only the columns a file has).
+_COMPLAINT_FIELD_COLUMNS = {
+    "product_version_id": ("version", "lot_id"),
+    "lot_batch_id": ("lot_id",),
+    "event_timestamp": ("event_date",),
+    "complaint_timestamp": ("received_date",),
+}
+
+
+def _from_file(field: str, row: dict) -> bool:
+    """Whether the row's file gives this complaint field (a blank status gives none: it keeps the stored one)."""
+    if field == "status":
+        return bool(row.get("status"))
+    columns = _COMPLAINT_FIELD_COLUMNS.get(field)
+    return columns is None or any(column in row for column in columns)
 
 
 def _shown(value) -> str | None:

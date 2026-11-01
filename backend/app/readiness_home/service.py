@@ -536,6 +536,22 @@ def external_requests(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
 
 
 HOME = ("COMPLAINTS_TO_RECHECK", "COMPLAINTS_PAST_TARGET", "REPORTING_CLOCKS", "TRENDS_WITHOUT_ACTION")
+# The records each check reads: with none of them, the check has nothing to read, so it is not set, never clear
+# (an empty workspace is not "Ready", J24). Every other check reads complaints.
+NOT_SET_YET = "Not set: no records yet"
+CHECK_RECORDS = {"CAPA_EFFECTIVENESS": Capa, "RISK_FILE_INPUT": Product}
+
+
+def _no_records_yet(db: Session, tenant_id: uuid.UUID, check: dict, counts: dict) -> dict:
+    """The check as it reads when its records are missing: not set, no number."""
+    model = CHECK_RECORDS.get(check["code"], Complaint)
+    if model not in counts:
+        counts[model] = db.query(func.count(model.id)).filter(model.tenant_id == tenant_id).scalar() or 0
+    if counts[model] or check["state"] != CLEAR:
+        return check
+    return {**check, "state": NOT_SET, "value": None, "detail": NOT_SET_YET, "items": []}
+
+
 CHECKS = (
     complaints_to_recheck,
     complaints_past_target,
@@ -580,6 +596,8 @@ def readiness(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> d
                 "items": [],
             }
         checks.append(found)
+    counts: dict = {}
+    checks = [_no_records_yet(db, tenant_id, check, counts) for check in checks]
     states = [check["state"] for check in checks]
     return {
         "as_of": today.isoformat(),

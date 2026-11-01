@@ -10,6 +10,86 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.62] - 2026-11-01
+
+On the trial maintenance line (`release/0.10`): stage 1 of the quality plan, "Safety and honesty". It removes the
+defects that would lose a person's work, print the wrong characters, keep personal data, change records nobody asked
+to change, or say what MDARIX does not do. It deploys together with 0.10.61.
+
+**No migration.** The API, worker and web images change. **Operators:** a new signing error code (below), a new
+environment setting (`MDARIX_SIGNUP_PER_ADDRESS_PER_HOUR`), and a script to run once at deploy with the owner's
+approval (`scripts/mask_set_aside_rows.py`).
+
+### Fixed
+
+- **A wrong signing code no longer loses the form.** A wrong, blank or reused authenticator code at any signature
+  (disposition, market assessment, first-contact check and QA review, report approval, guide approval, CAPA
+  effectiveness, management review document, ready to close, lot impact, case decision, governed decision, regulatory
+  document) answered 403 `MFA_REQUIRED`, the code for a sign-in that still owes its second factor, and the browser left
+  for /mfa with everything typed lost. It now answers **403 `SIGNATURE_CODE_INVALID`** ("That code didn't match. Enter
+  the current code from your authenticator app."); a signer without an authenticator gets **403
+  `SIGNATURE_MFA_NOT_SET_UP`**. Each signing form shows the message in place and keeps what was typed; five wrong
+  codes still lock signing for 15 minutes (429 `SIGNATURE_TEMPORARILY_LOCKED`), shown in place too. `MFA_REQUIRED`
+  now means only an unfinished sign-in. The disposition form asks for the code before sending when the server needs
+  it. Monitoring that counted `MFA_REQUIRED` on signing routes should count the two new codes.
+- **PDFs print every character.** Signed documents, worksheets, the decision record, guide, lot-impact and readiness
+  exports printed "?" for ≤ ≥ μ ™ € ₹ • … and Devanagari. The PDF writer now embeds Inter and Noto Sans Devanagari
+  (SIL Open Font License, licence files in `reports/fonts`), so text prints and copies as written; hashes stay in a
+  fixed-width font; every page has a short MDARIX brand line; long header and footer lines wrap instead of being cut.
+  A document signed earlier keeps the PDF that was signed, and its hash still verifies. Known limit: Devanagari
+  conjuncts show a visible virama (no shaping engine).
+- **Set-aside import rows keep personal details only as placeholders.** A stored set-aside row was masked only where
+  the second check flagged it ("Mr. John Smith", phone numbers, "67-year-old male at Riverside Hospital" were kept as
+  sent). Every free-text value is now masked before it is stored, and a stored reason leaves out the words a check
+  quoted. **`scripts/mask_set_aside_rows.py`** masks the rows stored since 0.10.56: a dry run by default (counts per
+  organization), `--apply` to write, safe to run twice, one audit event `SET_ASIDE_ROWS_MASKED` per organization
+  (counts only). Run it once per database that holds tenant data, at deploy, with the owner's approval.
+- **Identifiers are read as identifiers.** `serial_number` and `udi` are checked as identifiers (a ten-digit serial is
+  not a phone number); a UDI may start with "+" (HIBC) or "(" (GS1); a valid GTIN-14 is never a card number; product,
+  family, component, supplier and site names are never read as a person's name ("Dr Trust BP monitor"). Every
+  personal-data refusal quotes the words it found.
+- **A re-upload changes only what its file holds.** A file without the lot, version, date or status column blanked
+  those fields and reopened closed complaints (and reset CAPAs and investigations to open). Now a column the file
+  leaves out, or a blank status, keeps the stored value, and "updated" counts only rows that changed a field; the
+  data-quality report says new, updated and unchanged.
+- **A value too long for its column is refused by the check** ("Keep this to 40 characters or fewer.") instead of a
+  "ready" file failing with a server error.
+- **An ended trial shows the trial-ended page**, not "Access to this organization is suspended": the hourly job no
+  longer suspends free trials, an organization an earlier release suspended reads as ended, and renewing an expired
+  subscription (a trial extended after its end) reactivates the organization its expiry suspended.
+- **An empty workspace is not "Ready".** A Readiness check with no records to read says "Not set: no records yet".
+
+### Changed
+
+- **Team** (trial owner): an invite refusal says which case it is (`INVITATION_PENDING`, `ALREADY_ON_THE_TEAM`,
+  `ACCOUNT_IN_ANOTHER_ORGANIZATION`); a removed colleague can be invited again (the same account; they set up their
+  authenticator again); removing says it ends their access; an expired invitation reads "Invitation expired", with
+  Resend.
+- **Who helps**: a timed-out authenticator setup says so and how to start again; /mfa, My account and the empty
+  Dashboard name who helps in a trial (the person who invited you; MDARIX support for the trial owner). Pilot wording
+  stays.
+- **Sign-up at a venue**: up to 30 sign-up requests per network address per hour (was 5), set by
+  `MDARIX_SIGNUP_PER_ADDRESS_PER_HOUR`; a rate-limit refusal says the real wait ("Please try again in 12 minutes").
+  The runbook says how staff set up judges' and evaluators' trials before an event.
+- **Signed text names documents, never codes**: "I have read the complaint disposition rules, MDARIX starter, version
+  1" (was "I have read version disposition-starter-1"); dispositions, market assessments and guide approvals name the
+  rules, markets and versions in words. Only new signatures change; stored text is never rewritten.
+- **Honest words**: "Record the CAPA to raise in your QMS" wherever the trial said MDARIX opens the CAPA; a free
+  trial's supplier evidence request is saved, not e-mailed (status "Saved, not sent"; pilots unchanged); AI is off in
+  the trial, so My Work hides "My AI conversations" while AI is off and the case page and chapter 5 say so; no more
+  "continue with your data intact" (the trial-ended page and e-mails reuse the pilot's real-data notice), "Open the
+  guided investigation", "Until the communications log arrives" or "Bring in CSV files"; the pilot guide points to
+  today's screens; About the sample data lists what the sample holds now; a trial's import panel and set-aside view
+  say that set-aside rows are kept with personal details masked and deleted with the trial.
+- **Website**: supported markets read "US, EU/NI, GB and India (MvPI worksheet)" (Canada only as a reporting-window
+  template); "Available today" no longer claims workflow roles and customer administration for the free trial (they
+  are "In a pilot") and adds what shipped (routine close and logged calls, the US and India report worksheets,
+  decision guides, the communications log, reminders and oversight, lot impact in the free trial); AI items read
+  "Planned, after evaluation"; the older "your systems stay the record" wording is gone.
+- Tests found stale and corrected: the sample import run's 44 rows (SAMPLE-RV-10 is added after it, so the code was
+  right), the change-impact lot list (lots 006 to 008 since 0.10.61), the standards catalog count (CFR803_19 since
+  0.10.59), the PDF dash test.
+
 ## [0.10.61] - 2026-11-01
 
 On the trial maintenance line (`release/0.10`): lot impact on a case (T-G5, MVP G5, with G26's lot genealogy in
