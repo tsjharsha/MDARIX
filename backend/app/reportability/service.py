@@ -58,13 +58,16 @@ def settings_of(db: Session, tenant_id: uuid.UUID, control_db: Session | None = 
     }
 
 
-def awareness(complaint: Complaint) -> tuple[date | None, str | None]:
+def awareness(complaint: Complaint, linked: datetime | None = None) -> tuple[date | None, str | None]:
     """The day the organization became aware: the earliest of the awareness, received and recorded days (as the case's
-    regulatory review reads it; the earliest only ever makes a due date earlier), and which of them it is."""
+    regulatory review reads it; the earliest only ever makes a due date earlier), and which of them it is. ``linked``:
+    the earliest awareness among the sources a person linked to this complaint (G20, intake/service.py), which then
+    counts too."""
     days = [
         (_day(complaint.awareness_timestamp), "AWARENESS_DATE"),
         (_day(complaint.complaint_timestamp), "RECEIVED_DATE"),
         (_day(complaint.recorded_timestamp), "RECORDED_DATE"),
+        (_day(linked), "LINKED_SOURCE"),
     ]
     known = [(day, source) for day, source in days if day is not None]
     if not known:
@@ -167,9 +170,16 @@ def decision_view(row: ComplaintReportability | None, names: dict[str, str]) -> 
     }
 
 
-def assess(complaint: Complaint, record: dict, windows: list[dict], case: dict | None, today: date) -> dict:
+def assess(
+    complaint: Complaint,
+    record: dict,
+    windows: list[dict],
+    case: dict | None,
+    today: date,
+    linked: datetime | None = None,
+) -> dict:
     """What the watch shows for one complaint (without the person's decision)."""
-    aware, source = awareness(complaint)
+    aware, source = awareness(complaint, linked)
     clock_list = rules.clocks(record, windows, aware, today)
     review = (case or {}).get("review")
     settled = bool(review and review["status"] == "COMPLETED" and review["outcome"] in rules.SETTLING_OUTCOMES)
@@ -216,6 +226,12 @@ def _rows(db: Session, tenant_id: uuid.UUID, since: date, product_id: uuid.UUID 
     return query.order_by(AWARE_AT.asc(), Complaint.id).limit(READ_LIMIT + 1).all()
 
 
+def _linked(db: Session, tenant_id: uuid.UUID, complaint_ids) -> dict:
+    from backend.app.intake.service import linked_awareness
+
+    return linked_awareness(db, tenant_id, complaint_ids)
+
+
 def counts_as_complaint(status, complaint_type, second_look: str | None) -> bool:
     """A record the watch follows: not dismissed on the second look, and not a cancelled record or inquiry unless a
     person confirmed it is a complaint (until then it waits on the second look). A closed complaint is followed: closing
@@ -247,11 +263,12 @@ def watch(
     truncated = len(rows) > READ_LIMIT
     candidates = []
     held_on_second_look = 0
+    linked = _linked(db, tenant_id, [row[0].id for row in rows[:READ_LIMIT]])
     for complaint, product_name, version, second_look in rows[:READ_LIMIT]:
         record = _record(complaint, product_name, version)
         if not rules.watched(record):
             continue
-        aware, _ = awareness(complaint)
+        aware, _ = awareness(complaint, linked.get(complaint.id))
         if aware is not None and aware < since:
             continue
         if not counts_as_complaint(complaint.status, complaint.complaint_type, second_look):
@@ -275,7 +292,7 @@ def watch(
     assessed = assessments.rows_by_complaint(db, tenant_id, ids)
     items = []
     for complaint, record in candidates:
-        seen = assess(complaint, record, windows, cases.get(complaint.id), today)
+        seen = assess(complaint, record, windows, cases.get(complaint.id), today, linked.get(complaint.id))
         decided = decisions.get(complaint.id)
         aware = date.fromisoformat(seen["aware_date"]) if seen["aware_date"] else None
         seen["markets"] = assessments.markets_summary(record, windows, assessed.get(complaint.id, {}), aware, today)
@@ -371,7 +388,8 @@ def one(db: Session, tenant_id: uuid.UUID, complaint_id: uuid.UUID, today: date 
     complaint, product_name, version, second_look = row
     record = _record(complaint, product_name, version)
     windows = settings_of(db, tenant_id)["windows"]
-    seen = assess(complaint, record, windows, _case_reviews(db, tenant_id, [complaint.id]).get(complaint.id), today)
+    case = _case_reviews(db, tenant_id, [complaint.id]).get(complaint.id)
+    seen = assess(complaint, record, windows, case, today, _linked(db, tenant_id, [complaint.id]).get(complaint.id))
     return complaint, record, seen, second_look
 
 
@@ -392,11 +410,12 @@ def clocks_for(db: Session, tenant_id: uuid.UUID, complaints: list[Complaint], t
         )
     }
     found = []
+    linked = _linked(db, tenant_id, ids)
     for complaint in complaints:
         record = _record(complaint, None, None)
         if not rules.watched(record):
             continue
-        seen = assess(complaint, record, windows, None, today)
+        seen = assess(complaint, record, windows, None, today, linked.get(complaint.id))
         decided = decisions.get(complaint.id)
         binding = seen["binding"]
         found.append(
