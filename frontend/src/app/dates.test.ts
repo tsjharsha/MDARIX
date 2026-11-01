@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { daysUntil, formatDateTime, formatDay, formatUtc, isDateOnly, localDay } from "./dates";
+import {
+  daysUntil,
+  deadlineLabel,
+  formatDateTime,
+  formatDay,
+  formatUtc,
+  isDateOnly,
+  localDay,
+  timeLeft,
+} from "./dates";
 
 describe("dates", () => {
   it("names the month so day and month cannot be confused", () => {
@@ -37,5 +46,35 @@ describe("dates", () => {
     expect(daysUntil("2026-04-05", new Date(2026, 2, 25, 9))).toBe(11);
     expect(daysUntil("2026-10-20T10:00:00Z", justAfterMidnight)).toBeNull();
     expect(daysUntil(null, justAfterMidnight)).toBeNull();
+  });
+});
+
+describe("timeLeft: one way to say the time left (J40)", () => {
+  const now = new Date("2026-11-01T12:00:00Z");
+  const due = (iso: string, state?: string) => ({ due_at: iso, state });
+
+  it("counts whole days to the deadline's own day, then hours on the last day", () => {
+    expect(timeLeft(due("2026-11-07T18:29:59Z", "RUNNING"), now)).toBe("6 days left");
+    expect(timeLeft(due("2026-11-02T18:29:59Z", "DUE_SOON"), now)).toBe("1 day left");
+    expect(timeLeft(due("2026-11-01T18:29:59Z", "DUE_SOON"), now)).toBe("6 h left");
+    expect(timeLeft(due("2026-10-30T18:29:59Z", "OVERDUE"), now)).toBe("1 day overdue");
+    expect(timeLeft(due("2026-11-01T09:00:00Z", "OVERDUE"), now)).toBe("3 h overdue");
+  });
+
+  it("never says '1 days' and never puts time left beside an overdue state", () => {
+    expect(timeLeft({ days_left: 1 }, now)).toBe("1 day left");
+    expect(timeLeft(due("2026-11-01T12:40:00Z", "OVERDUE"), now)).toBe("Overdue");
+    expect(timeLeft(due("2026-11-01T11:00:00Z", "RUNNING"), now)).toBe("Due now");
+    expect(timeLeft({ days_left: 0 }, now)).toBe("Due today");
+    expect(timeLeft({ days_left: -3 }, now)).toBe("3 days overdue");
+  });
+
+  it("gives the same text for the same deadline whichever screen asks", () => {
+    const deadline = { due_at: "2026-11-04T22:59:59Z", due_date: "2026-11-04", days_left: 3, state: "DUE_SOON" };
+    // 0.10.62: the watch counted to the day where the person is ("2 days left"), Reports from the UTC date (3).
+    expect(timeLeft(deadline, now)).toBe(timeLeft({ ...deadline, days_left: 2 }, now));
+    expect(deadlineLabel({ due_label: "Wed 4 Nov 2026, 23:59 CET", due_date: "2026-11-04" })).toBe(
+      "Wed 4 Nov 2026, 23:59 CET",
+    );
   });
 });

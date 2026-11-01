@@ -1,3 +1,4 @@
+import { formatDay } from "../../app/dates";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -172,9 +173,22 @@ describe("the report helpers", () => {
   });
 
   it("writes the deadline and the worksheet summary plainly", () => {
-    expect(deadlineText({ due_on: "2026-11-07", days_left: -2, provisional: true })).toBe(
-      "Provisional deadline 2026-11-07, 2 days overdue",
+    const ninth = new Date(2026, 10, 9, 10, 0);
+    expect(
+      deadlineText({ due_on: "2026-11-07", days_left: -2, provisional: true, overdue: true }, undefined, ninth),
+    ).toBe(`Provisional deadline ${formatDay("2026-11-07")} · 2 days overdue`);
+    const india = {
+      due_on: "2026-11-07",
+      days_left: 6,
+      provisional: false,
+      overdue: false,
+      due_at: "2026-11-07T18:29:59+00:00",
+      due_label: "Sat 7 Nov 2026, 23:59 IST",
+    };
+    expect(deadlineText(india, undefined, new Date("2026-11-01T12:00:00Z"))).toBe(
+      "Deadline Sat 7 Nov 2026, 23:59 IST · 6 days left",
     );
+    expect(deadlineText(india, "ACCEPTED")).toBe("Deadline Sat 7 Nov 2026, 23:59 IST: met by the submission");
     expect(summaryLine({ FROM_RECORD: 3, ENTERED: 1, MUST_HAVE: 2, OUTSIDE: 4 })).toBe(
       "4 filled · 2 must have before submission · 4 entered in the authority's route",
     );
@@ -235,7 +249,7 @@ describe("the reports screens", () => {
     const html = render(<Reports />);
     expect(html).toContain("Second-person approval");
     expect(html).toContain("Start the worksheet");
-    expect(html).toContain("Deadline 2026-11-07, 6 days left");
+    expect(html).toMatch(/Deadline [^<]*2026 · \d+ days? (left|overdue)/);
     expect(render(<Reports />, [])).not.toContain("Start the worksheet</button>");
   });
 

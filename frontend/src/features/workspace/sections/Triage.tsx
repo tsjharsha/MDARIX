@@ -2,7 +2,6 @@ import { useState } from "react";
 import { AlertOctagon, CheckCircle2, Clock, FileWarning, Flag, Link2, Siren } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { formatDay } from "../../../app/dates";
 import { useCan } from "../workspaceContext";
 import { countOf } from "./common";
 import { ChipFilter, Hero, InlineError } from "./boardParts";
@@ -12,7 +11,7 @@ import {
   TRIAGE,
   clockTone,
   daysEarlier,
-  daysText,
+  deadlineText,
   fromLocalInput,
   hoursText,
   tierTone,
@@ -183,7 +182,7 @@ function TriageCard({
         </ul>
         <p className="uw-cr-meta">
           <span className={`uw-clock tone-${clockTone(item.triage_clock.state)}`}>
-            Triage target {hoursText(item.triage_clock.hours_left)}
+            Triage target {hoursText(item.triage_clock)}
           </span>
           {" · "}
           Aware {formatDate(item.awareness.at)} ({item.awareness.source_label}
@@ -191,7 +190,8 @@ function TriageCard({
         </p>
         {first && (
           <p className="uw-cr-meta">
-            Earliest provisional deadline: {first.label}, {formatDay(first.due_date)} ({daysText(first.days_left)})
+            {first.role === "SIGNED" ? "Deadline" : "Provisional deadline"}: {first.label}, {deadlineText(first)}
+            {item.deadlines.length > 1 && first.own ? " · other markets only if also reportable" : ""}
           </p>
         )}
         {item.linked.length > 0 && (
@@ -315,7 +315,7 @@ function TriageDrawer({
           <p>
             <strong>Triage target:</strong> {item.triage_clock.target_hours} hours from{" "}
             {formatDate(item.triage_clock.from)} (when it reached MDARIX or was reopened): due{" "}
-            {formatDate(item.triage_clock.due_at)}, {hoursText(item.triage_clock.hours_left)}.
+            {formatDate(item.triage_clock.due_at)}, {hoursText(item.triage_clock)}.
           </p>
           <p>
             <strong>Regulatory clocks</strong> count from awareness: {formatDate(item.awareness.at)} (
@@ -336,19 +336,22 @@ function TriageDrawer({
                 <tr>
                   <th scope="col">Market</th>
                   <th scope="col">Category</th>
-                  <th scope="col">Provisional deadline</th>
+                  <th scope="col">Deadline</th>
                 </tr>
               </thead>
               <tbody>
                 {item.deadlines.map((deadline) => (
                   <tr key={deadline.market}>
-                    <td>{deadline.label}</td>
+                    <td>
+                      {deadline.label}
+                      <small className="ac-muted uw-tr-role">{deadline.role_label}</small>
+                    </td>
                     <td>
                       {deadline.tier_label}: {deadline.basis}
                     </td>
                     <td>
-                      <span className={`uw-clock tone-${clockTone(deadline.state)}`}>
-                        {formatDay(deadline.due_date)} ({daysText(deadline.days_left)})
+                      <span className={`uw-clock tone-${clockTone(deadline.state ?? "")}`}>
+                        {deadlineText(deadline)}
                       </span>
                     </td>
                   </tr>

@@ -66,6 +66,9 @@ const ILLUSTRATIVE_LOOP: Record<string, { value: number; tone: LoopStation["tone
   TRENDS_WITHOUT_ACTION: { value: 1, tone: "warning", state: "Needs attention" },
   CAPA_EFFECTIVENESS: { value: 1, tone: "critical", state: "Critical" },
   RISK_FILE_INPUT: { value: 3, tone: "critical", state: "Critical" },
+  DISPOSITIONS_DUE: { value: 3, tone: "warning", state: "Needs attention" },
+  RECURRING_SERVICE_LEVEL: { value: 0, tone: "good", state: "Clear" },
+  EXTERNAL_REQUESTS: { value: 1, tone: "warning", state: "Needs attention" },
 };
 
 export const SITE_LOOP: LoopStation[] = LOOP_ORDER.map((step, index) => ({
@@ -386,13 +389,13 @@ export function HomePage() {
         <SectionHead
           eyebrow="Inspection readiness"
           title="See your quality loop the way an inspector will."
-          copy="Eight checks shaped by what FDA inspections cite and by the EU, UK and Canadian vigilance rules, read from your own records every day. Each one opens the records behind it, and the weakest link is named."
+          copy="Eleven checks shaped by what FDA inspections cite and by the EU, UK and Canadian vigilance rules, read from your own records every day. Each one opens the records behind it, and the weakest link is named."
         />
         <Reveal>
           <QualityLoop
             stations={SITE_LOOP}
             eyebrow="Illustrative · synthetic data"
-            title="2 of 8 inspection checks clear"
+            title="3 of 11 inspection checks clear"
             detail="Hidden complaints, a harm complaint closed without an investigation, a CAPA without an effectiveness check, and field data that never reached the risk file: what an inspector would find first. Your free trial starts with sample data that tells this story."
             doneLabel="clear"
           >

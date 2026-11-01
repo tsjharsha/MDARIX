@@ -2,6 +2,7 @@
 // the plain helpers the screens use (backend/app/intake/router.py decides; nothing here decides an outcome).
 
 import type { Tone } from "../admin/console/dashboardModel";
+import { deadlineLabel, timeLeft, type DueLike } from "../../app/dates";
 
 export const INTAKE = "/api/v1/intake";
 export const TRIAGE = "/api/v1/triage";
@@ -25,6 +26,9 @@ export type Guide = {
   harm_words: { version: string; words: string[] };
   fault_words: { version: string; words: string[] };
   levels: { code: string; label: string }[];
+  /** The time zones a call's times are entered in (current names), and old names with their current one. */
+  zones?: string[];
+  zone_aliases?: Record<string, string>;
   starter_mark: string;
 };
 
@@ -133,14 +137,23 @@ export type IntakeList = {
 export type Deadline = {
   market: string;
   label: string;
+  /** The event's own market first; the others only "if also reportable"; a signed conclusion replaces its market's. */
+  role: "OWN" | "IF_ALSO" | "SIGNED" | "NO_COUNTRY";
+  role_label: string;
+  own: boolean;
+  not_reportable: boolean;
   tier: string;
   tier_label: string;
-  days: number;
-  day_basis: "CALENDAR" | "WORK";
+  days: number | null;
+  day_basis: "CALENDAR" | "WORK" | null;
   basis: string;
-  due_date: string;
-  days_left: number;
-  state: "OVERDUE" | "DUE_SOON" | "RUNNING";
+  due_date: string | null;
+  due_at: string | null;
+  due_zone: string | null;
+  /** "Mon 30 Nov 2026, 23:59 IST": the end of the deadline in the time zone that binds. */
+  due_label: string | null;
+  days_left: number | null;
+  state: "OVERDUE" | "DUE_SOON" | "RUNNING" | null;
 };
 export type TriageRecordView = {
   severity: string | null;
@@ -259,19 +272,12 @@ export function signProblem(
   return null;
 }
 
-/** "in 4 h", "6 h overdue". */
-export function hoursText(hours: number): string {
-  const whole = Math.round(Math.abs(hours));
-  if (hours < 0) return whole >= 48 ? `${Math.round(whole / 24)} days overdue` : `${whole} h overdue`;
-  return whole >= 48 ? `in ${Math.round(whole / 24)} days` : `in ${whole} h`;
-}
+/** "4 h left", "6 h overdue", "3 days left": the app's one helper (app/dates.ts timeLeft), overdue from the state. */
+export const hoursText = (clock: Pick<DueLike, "state" | "due_at" | "hours_left">) => timeLeft(clock);
 
-/** "due in 3 days", "due today", "2 days overdue". */
-export function daysText(days: number): string {
-  if (days < 0) return `${-days} day${days === -1 ? "" : "s"} overdue`;
-  if (days === 0) return "due today";
-  return `due in ${days} day${days === 1 ? "" : "s"}`;
-}
+/** A legal deadline with its time zone and the time left: "Sat 7 Nov 2026, 23:59 IST (6 days left)". */
+export const deadlineText = (deadline: Deadline) =>
+  deadline.not_reportable ? "Concluded not reportable" : `${deadlineLabel(deadline)} (${timeLeft(deadline)})`;
 
 export const clockTone = (state: string): Tone =>
   state === "OVERDUE" ? "critical" : state === "DUE_SOON" ? "warning" : "neutral";
@@ -305,3 +311,24 @@ export const toLocalInput = (iso: string | null) => {
   )}`;
 };
 export const fromLocalInput = (value: string) => (value ? new Date(value).toISOString() : null);
+
+/** "2026-11-02T09:00": the wall clock in ``zone`` at ``now``, for a datetime-local input (J28). */
+export function zonedInput(now: Date, zone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: zone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "00";
+  return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
+}
+
+/** The call's time zone to start with: the browser's, by its current name when the guide lists it, else UTC. */
+export function startingZone(guide: Pick<Guide, "zones" | "zone_aliases">, browser: string): string {
+  const zone = guide.zone_aliases?.[browser] ?? browser;
+  return !guide.zones || guide.zones.includes(zone) ? zone : "UTC";
+}

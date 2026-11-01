@@ -34,7 +34,7 @@ def header_lines(view: dict, organization: str | None) -> list[str]:
         f"Authority: {view['form']['authority']}",
         f"Complaint {complaint['ref']}: {complaint['product_name'] or '-'} {complaint['version'] or ''}",
         f"Market: {view['market_label']}; {state}",
-        f"Deadline: {view['deadline']['due_on'] or 'not set'}"
+        f"Deadline: {view['deadline'].get('due_label') or view['deadline']['due_on'] or 'not set'}"
         + (" (provisional)" if view["deadline"]["provisional"] else ""),
         DRAFT_LINE,
     ]

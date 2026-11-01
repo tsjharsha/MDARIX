@@ -28,7 +28,7 @@ import { CitedFor } from "./CitedFor";
 import { RemoveSamplePanel } from "./RemoveSample";
 import { TeamPanel } from "./TrialTeam";
 import { BESIDE_YOUR_QMS } from "../../help/besideYourQms";
-import { journeyProgress, type JourneyKey } from "../../help/trialGuide";
+import { STORY_CHAPTERS, journeyProgress, type JourneyKey } from "../../help/trialGuide";
 import { NEXT_STEPS_LINK, NEXT_STEPS_SECTION, NEXT_STEPS_SUMMARY } from "../../help/trialNextSteps";
 import { LOOK_AHEAD_SECTION, LOOK_AHEAD_SUMMARY, LOOK_AHEAD_TABS } from "../partyPreview";
 import { SampleDataPanel } from "./SampleData";
@@ -174,7 +174,8 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   };
   const chapters = story.data?.chapters ?? [];
   const acted = story.data?.acted ?? 0;
-  const total = story.data?.total ?? 9;
+  // While the story loads, the same count it will show (0.10.62 said 9 of a 10-chapter story).
+  const total = story.data?.total ?? STORY_CHAPTERS;
   const headline = storyHeadline(story.data, storyFailed);
   const next = chapters.find((chapter) => chapter.code === story.data?.next) ?? null;
   const talk = () => window.open("/contact", "_blank", "noopener");

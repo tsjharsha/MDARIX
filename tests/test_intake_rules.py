@@ -147,3 +147,36 @@ def test_possible_duplicates():
     assert rules.duplicate_reasons(a, {**b, "lot_id": "L3"}) == []
     assert rules.duplicate_reasons(a, {**b, "country": "France"}) == []
     assert rules.duplicate_reasons(a, {**b, "product_id": 2}) == []
+
+
+def test_triage_shows_the_events_own_market_first_and_a_signed_conclusion_instead_of_its_provisional_deadline():
+    # J3 (0.10.63): a US event showed "EU MDR ... 14 days overdue" first, the earliest across every enabled market, and
+    # an EU event concluded reportable kept its 10-day provisional date beside the signed 15-day one.
+    today = date(2026, 11, 20)
+    us_event = rules.provisional_deadlines(NOW, ["US", "EU_NI", "IN"], rules.FLAGGED, today, own="US")
+    assert [(d["market"], d["role"]) for d in us_event] == [("US", "OWN"), ("EU_NI", "IF_ALSO"), ("IN", "IF_ALSO")]
+    assert us_event[1]["role_label"] == "If also reportable"
+    signed_clock = {
+        "window": "EU MDR: serious incident (15 days)",
+        "days": 15,
+        "day_basis": "CALENDAR",
+        "due_date": "2026-12-05",
+        "due_at": "2026-12-05T22:59:59+00:00",
+        "due_zone": "Europe/Brussels",
+        "due_label": "Sat 5 Dec 2026, 23:59 CET",
+        "days_left": 15,
+        "state": "RUNNING",
+    }
+    eu_event = rules.provisional_deadlines(
+        NOW, ["US", "EU_NI"], rules.FLAGGED, today, own="EU_NI", signed={"EU_NI": signed_clock}
+    )
+    assert eu_event[0]["market"] == "EU_NI" and eu_event[0]["role"] == "SIGNED" and eu_event[0]["days"] == 15
+    assert eu_event[0]["due_label"] == "Sat 5 Dec 2026, 23:59 CET" and eu_event[1]["role"] == "IF_ALSO"
+    concluded = rules.provisional_deadlines(NOW, ["US", "EU_NI"], rules.FLAGGED, today, own="US", signed={"US": None})
+    assert concluded[0]["market"] == "US" and concluded[0]["not_reportable"] and concluded[0]["due_at"] is None
+    # No country: every enabled market, none of them "if also".
+    unknown = rules.provisional_deadlines(NOW, ["US", "EU_NI"], rules.FLAGGED, today)
+    assert {d["role"] for d in unknown} == {"NO_COUNTRY"}
+    # An in-vitro diagnostic's EU deadline cites the IVDR (starter), not the MDR.
+    ivd = rules.provisional_deadlines(NOW, ["EU_NI"], rules.FLAGGED, today, own="EU_NI", ivd=True)
+    assert ivd[0]["basis"] == "10 days (EU IVDR Art. 82, starter)"

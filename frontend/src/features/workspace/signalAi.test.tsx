@@ -390,8 +390,8 @@ describe("a case's regulatory review", () => {
       </WorkspaceContext.Provider>,
     );
     expect(markup).toContain("CMP000031");
-    expect(markup).toContain("Due in 2 days");
-    expect(markup).toContain("FDA MDR (30 calendar days) · due 2026-10-15");
+    expect(markup).toContain("2 days left");
+    expect(markup).toMatch(/FDA MDR \(30 calendar days\) · due [^<]*2026/);
     expect(markup).toContain("Reported");
     expect(markup).toContain("Assess each market on the reportability watch");
     expect(

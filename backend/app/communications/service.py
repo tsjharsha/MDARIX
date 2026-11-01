@@ -363,6 +363,8 @@ def ensure_assessment_request(
 def ensure_intake_request(db: Session, tenant_id, event, task, questions: list[str], actor: str, now) -> None:
     """The first-contact follow-up (0.10.57) as a request to the reporter, linked to its dated task: answering or
     giving up on the request finishes the task with the same outcome."""
+    from backend.app.intake.service import calendar
+
     if task is None or _open_from(db, tenant_id, INTAKE, "event", str(event.id)) is not None:
         return
     party = _intake_party(db, tenant_id, event, actor, now)
@@ -384,7 +386,8 @@ def ensure_intake_request(db: Session, tenant_id, event, task, questions: list[s
         actor=actor,
         now=now,
         owner_id=str(task.assigned_user_id) if task.assigned_user_id else actor,
-        reply_due_on=task.due_at.date() if task.due_at else None,
+        # The due day on the organization's calendar: the UTC date of its end was a day later west of Greenwich.
+        reply_due_on=calendar(db, tenant_id).local_day(task.due_at) if task.due_at else None,
         origin={"type": INTAKE, "event": str(event.id), "reference": event.reference, "questions": questions},
         intake_event_id=event.id,
         sent=False,

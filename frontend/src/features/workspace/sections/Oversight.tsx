@@ -158,8 +158,8 @@ function itemColumns(go: (opens: Opens) => void): Column<OversightItem>[] {
       label: "Due",
       render: (row) => (
         <span>
-          {formatDate(row.due_at)}
-          <small className="ac-muted uw-ov-left">{hoursText(row.hours_left)}</small>
+          {row.due_label ?? formatDate(row.due_at)}
+          <small className="ac-muted uw-ov-left">{hoursText(row)}</small>
         </span>
       ),
     },

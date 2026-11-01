@@ -10,7 +10,6 @@ recorded. Earlier single decisions (complaint_reportability) stay as they are an
 from __future__ import annotations
 
 import uuid
-from datetime import date
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -49,7 +48,9 @@ def _iso(value) -> str | None:
     return value.isoformat() if value is not None else None
 
 
-def row_view(row: ComplaintMarketAssessment | None, names: dict[str, str], current_code: str | None = None) -> dict | None:
+def row_view(
+    row: ComplaintMarketAssessment | None, names: dict[str, str], current_code: str | None = None
+) -> dict | None:
     """``current_code``: the code of the market's guide version in use now (the starter's when not given)."""
     if row is None:
         return None
@@ -115,7 +116,7 @@ def required_markets(country: object, enabled: list[str], assessed) -> list[str]
 
 
 def markets_summary(
-    record: dict, windows: list[dict], versions_by_market: dict, aware: date | None, today: date
+    record: dict, windows: list[dict], versions_by_market: dict, aware, today, org_zone: str | None = None
 ) -> list[dict]:
     """Each market the complaint must be assessed for, with its state and its clock (for the watch)."""
     enabled = markets.enabled_markets(windows)
@@ -128,7 +129,9 @@ def markets_summary(
         kind = markets.REPORT_TYPES.get(report_type or "")
         # A market not assessed yet runs no clock of its own: the complaint's windows (by what it reports) bind it.
         started = seen["state"] != NOT_STARTED and not seen["filed"]
-        clock = markets.market_clock(market, clock_state, report_type, windows, aware, today) if started else None
+        clock = (
+            markets.market_clock(market, clock_state, report_type, windows, aware, today, org_zone) if started else None
+        )
         found.append(
             {
                 "market": market,

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { formatDate, useResource } from "../../customer-admin/shared";
-import { formatDay } from "../../../app/dates";
+import { deadlineLabel, formatDay } from "../../../app/dates";
 import { investigationRequestFor, useCan, useOpenInvestigation } from "../workspaceContext";
 import { recordId } from "../complaintReview";
 import { owesWorksheet, reportsTab } from "../authorityReports";
@@ -234,7 +234,7 @@ export function WatchCard({
             <strong>{item.binding ? clockText(item.binding) : state.label}</strong>
             {item.binding && (
               <span>
-                Due by {formatDay(item.binding.due_date)} · {item.binding.window}{" "}
+                Due by {deadlineLabel(item.binding)} · {item.binding.window}{" "}
                 <BasisChips ids={item.binding.basis} label="Basis of the window" />
               </span>
             )}

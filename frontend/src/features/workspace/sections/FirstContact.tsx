@@ -26,10 +26,10 @@ import {
   answerChoices,
   blankAnswers,
   daysEarlier,
-  fromLocalInput,
+  startingZone,
   linkBody,
   signProblem,
-  toLocalInput,
+  zonedInput,
   unanswered,
   type Answers,
   type Duplicate,
@@ -253,12 +253,12 @@ function LogDrawer({
     requested: "NONE",
     environment: "UNKNOWN",
     userType: "UNKNOWN",
-    received: toLocalInput(new Date().toISOString()),
+    received: zonedInput(new Date(), startingZone(guide, ZONE)),
     event: "",
     firstKnowledge: "",
     party: "",
     awareness: "",
-    zone: ZONE,
+    zone: startingZone(guide, ZONE),
     answers: blankAnswers(guide.questions),
     unknowns: "",
   });
@@ -282,14 +282,15 @@ function LogDrawer({
         requested: form.requested,
         use_environment: form.environment,
         user_type: form.userType,
-        received_at: fromLocalInput(form.received),
+        // Wall-clock times in the call's time zone: the server converts them in it (J28: Chicago 09:00 is 15:00 UTC).
+        received_at: form.received || null,
         received_zone: form.zone,
-        event_at: fromLocalInput(form.event),
+        event_at: form.event || null,
         event_zone: form.event ? form.zone : "",
-        first_knowledge_at: fromLocalInput(form.firstKnowledge),
+        first_knowledge_at: form.firstKnowledge || null,
         first_knowledge_zone: form.firstKnowledge ? form.zone : "",
         first_knowledge_party: form.party,
-        awareness_at: kind === "URGENT" ? fromLocalInput(form.awareness) : null,
+        awareness_at: kind === "URGENT" ? form.awareness || null : null,
         awareness_zone: form.zone,
         answers: kind === "CONTACT" ? form.answers : {},
         unknowns: form.unknowns,
@@ -437,8 +438,14 @@ function LogDrawer({
               </>
             )}
             <label className="ca-field">
-              Time zone
-              <input value={form.zone} onChange={(event) => set({ zone: event.target.value })} />
+              Time zone of the call
+              <select value={form.zone} onChange={(event) => set({ zone: event.target.value })}>
+                {(guide.zones ?? [form.zone]).map((zone) => (
+                  <option key={zone} value={zone}>
+                    {zone.replace(/_/g, " ")}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
         </section>

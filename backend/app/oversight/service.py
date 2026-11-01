@@ -73,7 +73,7 @@ def settings_view(row: OversightSettings | None) -> dict:
             "updated_at": None,
         }
     return {
-        "time_zone": row.time_zone,
+        "time_zone": rules.canonical_zone(row.time_zone),
         "work_days": list(row.work_days or []),
         "holidays": list(row.holidays or []),
         "reminder_hours": row.reminder_hours,
@@ -186,11 +186,12 @@ def _item(
     }
 
 
-def _day_end_utc(day: date) -> datetime:
-    """The end of a legal deadline's day, as the report worksheets count it (authority_reports/rules.py)."""
-    from backend.app.authority_reports.rules import deadline_end
+def _legal_end(day: date, market: str | None, zone: str) -> datetime:
+    """The end of a legal deadline's day by its market's counting rule (reportability/deadlines.py), as every other
+    screen shows it."""
+    from backend.app.reportability.deadlines import end_of
 
-    return deadline_end(day)
+    return end_of(day, market, zone).at
 
 
 def _task_items(db: Session, tenant_id) -> list[dict]:
@@ -259,14 +260,14 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
             )
         )
         # An urgent intake is not a complaint yet: its provisional deadline is on no other list.
-        if item["kind"] == intake.INTAKE and item["deadlines"]:
+        if item["kind"] == intake.INTAKE and item["deadlines"] and item["deadlines"][0]["due_at"]:
             first = item["deadlines"][0]
             found.append(
                 _item(
                     f"provisional:{item['key']}:{first['market']}",
                     "REPORTING",
                     f"Provisional {first['label']} deadline for {item['ref']} ({first['basis']})",
-                    _day_end_utc(date.fromisoformat(first["due_date"])),
+                    datetime.fromisoformat(first["due_at"]),
                     market=first["market"],
                     **common,
                 )
@@ -274,7 +275,7 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
     return found
 
 
-def _report_items(db: Session, tenant_id) -> list[dict]:
+def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
     from backend.app.authority_reports import forms
     from backend.app.authority_reports import rules as report_rules
     from backend.app.authority_reports.router import _candidates
@@ -293,7 +294,7 @@ def _report_items(db: Session, tenant_id) -> list[dict]:
                 f"obligation:{row.id}",
                 "OBLIGATION",
                 f"{form.title if form else 'Report'}: {report_rules.STATE_LABELS.get(row.state, row.state).lower()}",
-                _day_end_utc(row.due_on),
+                _legal_end(row.due_on, row.market, zone),
                 complaint_id=row.complaint_id,
                 owner_id=row.created_by,
                 market=row.market,
@@ -312,7 +313,7 @@ def _report_items(db: Session, tenant_id) -> list[dict]:
                 f"{label}: market assessment not signed, provisional deadline"
                 if pending
                 else f"{label}: reportable, the report is not started",
-                _day_end_utc(row.due_on),
+                _legal_end(row.due_on, row.market, zone),
                 complaint_id=row.complaint_id,
                 owner_id=row.signed_by or row.created_by,
                 market=row.market,
@@ -397,7 +398,7 @@ def due_items(db: Session, control_db: Session | None, tenant_id, now: datetime 
     sources = (
         ("tasks", lambda: _task_items(db, tenant_id)),
         ("triage", lambda: _triage_items(db, control_db, tenant_id, now)),
-        ("reports", lambda: _report_items(db, tenant_id)),
+        ("reports", lambda: _report_items(db, tenant_id, calendar.zone)),
         ("guides", lambda: _guide_items(db, tenant_id, calendar)),
         ("capas", lambda: _capa_items(db, tenant_id)),
     )

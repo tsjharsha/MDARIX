@@ -7,6 +7,7 @@ changes a complaint and never submits anything.
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, or_
@@ -18,7 +19,7 @@ from backend.app.db.models.complaint_review import ComplaintSecondLook
 from backend.app.db.models.foundation import Complaint, Investigation, InvestigationComplaint, Product, ProductVersion
 from backend.app.db.models.reportability import ComplaintReportability, ReportabilitySettings
 from backend.app.db.models.reviews import CaseReview
-from backend.app.reportability import assessments, rules
+from backend.app.reportability import assessments, deadlines, markets, rules
 
 # When the organization became aware, for the database's first filter (rules then take the earliest of the three).
 AWARE_AT = func.coalesce(Complaint.awareness_timestamp, Complaint.complaint_timestamp, Complaint.recorded_timestamp)
@@ -58,22 +59,29 @@ def settings_of(db: Session, tenant_id: uuid.UUID, control_db: Session | None = 
     }
 
 
-def awareness(complaint: Complaint, linked: datetime | None = None) -> tuple[date | None, str | None]:
-    """The day the organization became aware: the earliest of the awareness, received and recorded days (as the case's
+def _moment(value) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    return datetime.combine(value, datetime.min.time(), tzinfo=timezone.utc)
+
+
+def awareness(complaint: Complaint, linked: datetime | None = None) -> tuple[datetime | None, str | None]:
+    """When the organization became aware: the earliest of the awareness, received and recorded times (as the case's
     regulatory review reads it; the earliest only ever makes a due date earlier), and which of them it is. ``linked``:
     the earliest awareness among the sources a person linked to this complaint (G20, intake/service.py), which then
-    counts too."""
-    days = [
-        (_day(complaint.awareness_timestamp), "AWARENESS_DATE"),
-        (_day(complaint.complaint_timestamp), "RECEIVED_DATE"),
-        (_day(complaint.recorded_timestamp), "RECORDED_DATE"),
-        (_day(linked), "LINKED_SOURCE"),
+    counts too. The market's counting rule takes its day in each time zone (deadlines.py)."""
+    moments = [
+        (_moment(complaint.awareness_timestamp), "AWARENESS_DATE"),
+        (_moment(complaint.complaint_timestamp), "RECEIVED_DATE"),
+        (_moment(complaint.recorded_timestamp), "RECORDED_DATE"),
+        (_moment(linked), "LINKED_SOURCE"),
     ]
-    known = [(day, source) for day, source in days if day is not None]
+    known = [(moment, source) for moment, source in moments if moment is not None]
     if not known:
         return None, None
-    earliest = min(day for day, _ in known)
-    return earliest, next(source for day, source in known if day == earliest)
+    return min(known, key=lambda item: item[0])
 
 
 def _record(complaint: Complaint, product_name, version) -> dict:
@@ -175,19 +183,28 @@ def assess(
     record: dict,
     windows: list[dict],
     case: dict | None,
-    today: date,
+    today: datetime | date,
     linked: datetime | None = None,
+    org_zone: str | None = None,
 ) -> dict:
-    """What the watch shows for one complaint (without the person's decision)."""
+    """What the watch shows for one complaint (without the person's decision). ``today``: now (a day in older
+    callers); ``org_zone``: the organization's time zone (deadlines.py)."""
     aware, source = awareness(complaint, linked)
-    clock_list = rules.clocks(record, windows, aware, today)
+    clock_list = rules.clocks(record, windows, aware, today, org_zone)
+    if markets.is_ivd(record.get("product_name")):
+        # An in-vitro diagnostic's EU clocks cite the IVDR (starter), not the MDR.
+        clock_list = [
+            replace(clock, basis=tuple("IVDR_82" if item == "MDR_87" else item for item in clock.basis))
+            for clock in clock_list
+        ]
     review = (case or {}).get("review")
     settled = bool(review and review["status"] == "COMPLETED" and review["outcome"] in rules.SETTLING_OUTCOMES)
     in_review = bool(review and review["status"] in ("REQUESTED", "IN_PROGRESS"))
     return {
-        "aware_date": aware.isoformat() if aware else None,
+        "aware_date": aware.date().isoformat() if aware else None,
+        "aware_at": aware.isoformat() if aware else None,
         "aware_source": source,
-        "days_since_aware": (today - aware).days if aware else None,
+        "days_since_aware": (deadlines.day_of(today) - aware.date()).days if aware else None,
         "triggers": rules.triggers_of(record),
         "clocks": [clock.as_dict() for clock in clock_list],
         "binding": clock_list[0].as_dict() if clock_list else None,
@@ -252,13 +269,15 @@ def watch(
     product_id: uuid.UUID | None = None,
     page: int = 1,
     page_size: int = 25,
-    today: date | None = None,
+    today: datetime | date | None = None,
 ) -> dict:
-    """The complaints whose reportability needs a person's decision, most urgent first, with a summary."""
-    today = today or today_utc()
+    """The complaints whose reportability needs a person's decision, most urgent first, with a summary. ``today``:
+    now (a day in older callers)."""
+    today = deadlines.as_moment(today)
+    org_zone = deadlines.org_zone(db, tenant_id)
     settings = settings_of(db, tenant_id)
     windows = settings["windows"]
-    since = today - timedelta(days=settings["lookback_days"])
+    since = deadlines.day_of(today) - timedelta(days=settings["lookback_days"])
     rows = _rows(db, tenant_id, since, product_id)
     truncated = len(rows) > READ_LIMIT
     candidates = []
@@ -269,7 +288,7 @@ def watch(
         if not rules.watched(record):
             continue
         aware, _ = awareness(complaint, linked.get(complaint.id))
-        if aware is not None and aware < since:
+        if aware is not None and aware.date() < since:
             continue
         if not counts_as_complaint(complaint.status, complaint.complaint_type, second_look):
             if second_look is None and rules.triggers_of(record):
@@ -292,17 +311,13 @@ def watch(
     assessed = assessments.rows_by_complaint(db, tenant_id, ids)
     items = []
     for complaint, record in candidates:
-        seen = assess(complaint, record, windows, cases.get(complaint.id), today, linked.get(complaint.id))
+        seen = assess(complaint, record, windows, cases.get(complaint.id), today, linked.get(complaint.id), org_zone)
         decided = decisions.get(complaint.id)
-        aware = date.fromisoformat(seen["aware_date"]) if seen["aware_date"] else None
-        seen["markets"] = assessments.markets_summary(record, windows, assessed.get(complaint.id, {}), aware, today)
-        if seen["binding"] is None:
-            # No window starts a clock from the complaint's fields, but a market's assessment does (for example a
-            # malfunction concluded reportable in the EU): that market's clock binds.
-            market_clocks = [item["clock"] for item in seen["markets"] if item["clock"]]
-            if market_clocks:
-                earliest = min(market_clocks, key=lambda clock: clock["due_date"])
-                seen["binding"] = {**earliest, "triggers": [], "basis": []}
+        aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
+        seen["markets"] = assessments.markets_summary(
+            record, windows, assessed.get(complaint.id, {}), aware, today, org_zone
+        )
+        seen["binding"] = binding_of(seen["binding"], seen["markets"])
         # Settled by an earlier single decision, by its case's completed regulatory review, or by every market's
         # signed conclusion (reportable ones with their filing recorded).
         is_decided = decided is not None or seen["settled_by_case"] or assessments.settled(seen["markets"])
@@ -318,7 +333,7 @@ def watch(
         binding = item["binding"]
         return (
             rules.STATE_ORDER.get(item["state"], 9),
-            binding["due_date"] if binding else "9999-12-31",
+            binding["due_at"] if binding else "9999-12-31",
             item["aware_date"] or "9999-12-31",
             item["business_id"] or "",
         )
@@ -366,9 +381,9 @@ def watch(
     }
 
 
-def one(db: Session, tenant_id: uuid.UUID, complaint_id: uuid.UUID, today: date | None = None):
+def one(db: Session, tenant_id: uuid.UUID, complaint_id: uuid.UUID, today: datetime | date | None = None):
     """``(complaint, record, assessment, second-look decision)`` for one complaint, or None when it does not exist."""
-    today = today or today_utc()
+    today = deadlines.as_moment(today)
     row = (
         db.query(Complaint, Product.name, ProductVersion.version_identifier, ComplaintSecondLook.decision)
         .outerjoin(Product, (Product.tenant_id == Complaint.tenant_id) & (Product.id == Complaint.product_id))
@@ -389,14 +404,21 @@ def one(db: Session, tenant_id: uuid.UUID, complaint_id: uuid.UUID, today: date 
     record = _record(complaint, product_name, version)
     windows = settings_of(db, tenant_id)["windows"]
     case = _case_reviews(db, tenant_id, [complaint.id]).get(complaint.id)
-    seen = assess(complaint, record, windows, case, today, _linked(db, tenant_id, [complaint.id]).get(complaint.id))
+    org_zone = deadlines.org_zone(db, tenant_id)
+    seen = assess(
+        complaint, record, windows, case, today, _linked(db, tenant_id, [complaint.id]).get(complaint.id), org_zone
+    )
+    seen["org_zone"] = org_zone
     return complaint, record, seen, second_look
 
 
-def clocks_for(db: Session, tenant_id: uuid.UUID, complaints: list[Complaint], today: date | None = None) -> list[dict]:
+def clocks_for(
+    db: Session, tenant_id: uuid.UUID, complaints: list[Complaint], today: datetime | date | None = None
+) -> list[dict]:
     """The reporting clock of each complaint (for a case's regulatory review): its binding window and due date, its
     state, and the person's decision if any. Only complaints the watch follows are listed."""
-    today = today or today_utc()
+    today = deadlines.as_moment(today)
+    org_zone = deadlines.org_zone(db, tenant_id)
     windows = settings_of(db, tenant_id)["windows"]
     ids = [row.id for row in complaints]
     decisions = {
@@ -415,9 +437,13 @@ def clocks_for(db: Session, tenant_id: uuid.UUID, complaints: list[Complaint], t
         record = _record(complaint, None, None)
         if not rules.watched(record):
             continue
-        seen = assess(complaint, record, windows, None, today, linked.get(complaint.id))
+        seen = assess(complaint, record, windows, None, today, linked.get(complaint.id), org_zone)
+        aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
+        assessed = assessments.rows_by_complaint(db, tenant_id, [complaint.id]).get(complaint.id, {})
+        binding = binding_of(
+            seen["binding"], assessments.markets_summary(record, windows, assessed, aware, today, org_zone)
+        )
         decided = decisions.get(complaint.id)
-        binding = seen["binding"]
         found.append(
             {
                 "complaint": {"id": str(complaint.id), "business_id": complaint.business_id},
@@ -431,4 +457,16 @@ def clocks_for(db: Session, tenant_id: uuid.UUID, complaints: list[Complaint], t
             }
         )
     order = {state: index for state, index in rules.STATE_ORDER.items()}
-    return sorted(found, key=lambda item: (order.get(item["state"], 9), (item["binding"] or {}).get("due_date") or ""))
+    return sorted(found, key=lambda item: (order.get(item["state"], 9), (item["binding"] or {}).get("due_at") or ""))
+
+
+def binding_of(window_clock: dict | None, market_items: list[dict]) -> dict | None:
+    """The binding clock: always the earliest of the windows' clock and every market's own clock (J14: a signed shorter
+    category, such as an EU 2-day serious public health threat, binds even while a 15-day window runs)."""
+    found = [window_clock] if window_clock else []
+    found += [
+        {**item["clock"], "triggers": [], "basis": [], "market": item["market"]}
+        for item in market_items
+        if item.get("clock")
+    ]
+    return min(found, key=lambda clock: clock["due_at"]) if found else None
