@@ -38,6 +38,13 @@ GENERIC_REFERENCES = (
     ("reality_relationships", "target_entity_id"),
     ("signed_approval_records", "object_id"),
 )
+# Sample rows of tables without ``source_system``: the sample's import lineage and set-aside rows (``source``) and
+# its IMDRF links (their proposer), backend/app/trial/sample_imports.py.
+SAMPLE_MARKED = {
+    "import_lineage": ("source", SAMPLE_SOURCE),
+    "import_quarantine_rows": ("source", SAMPLE_SOURCE),
+    "imdrf_code_mappings": ("proposed_by", "system:trial-sample"),
+}
 # History that stays: what happened is never rewritten.
 KEPT = frozenset({"audit_events", "event_outbox", "erasure_log", "tenants"})
 # The records an organization uploads itself (backend/app/trial/imports.py UPLOAD_SOURCE).
@@ -115,6 +122,13 @@ def plan(db: Session, tenant_id: uuid.UUID) -> dict:
                 f"SELECT id FROM {table} WHERE tenant_id = :tenant AND source_system = :sample",
                 {"tenant": tenant_id, "sample": SAMPLE_SOURCE},
             )
+    for table, (column, marker) in SAMPLE_MARKED.items():
+        if table in tables:
+            doomed[table] |= _ids(
+                db,
+                f"SELECT id FROM {table} WHERE tenant_id = :tenant AND {column} = :sample",
+                {"tenant": tenant_id, "sample": marker},
+            )
     keys = [(child, column, parent) for child, column, parent in _foreign_keys(db) if child in tables]
     generic = [(table, column) for table, column in GENERIC_REFERENCES if table in tables and column in columns[table]]
     changed = True
@@ -179,6 +193,8 @@ def preview(db: Session, tenant_id: uuid.UUID) -> dict:
     own = 0
     work = 0
     for table, ids in planned["rows"].items():
+        if table in SAMPLE_MARKED:
+            continue  # the sample's own rows, not work done on it
         if "source_system" in columns[table]:
             counts = dict(
                 db.execute(

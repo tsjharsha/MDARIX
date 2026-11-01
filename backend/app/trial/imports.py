@@ -58,6 +58,10 @@ class ImportPolicy:
     # A complaints file may name products, versions and lots not loaded yet: with this they are added from it (a free
     # trial starts from one complaints export); without it each must be loaded first (an organization's master data).
     create_references: bool = False
+    # A governed import: rows set aside are stored for correction (R14), personal data masked, every written row keeps
+    # its lineage (R16) and the run its data-quality report (R17). A free trial is governed too (0.10.56): the trial
+    # and the MVP behave the same once the data is in.
+    quarantine: bool = False
 
 
 TRIAL_POLICY = ImportPolicy(
@@ -68,8 +72,9 @@ TRIAL_POLICY = ImportPolicy(
     limit_label="your trial",
     xlsx_max_bytes=20 * 1024 * 1024,
     create_references=True,
+    quarantine=True,
 )
-WORKSPACE_POLICY = ImportPolicy(source=WORKSPACE_UPLOAD_SOURCE)
+WORKSPACE_POLICY = ImportPolicy(source=WORKSPACE_UPLOAD_SOURCE, quarantine=True)
 # A complaint's status as its quality system names it (complaints.status holds 40 characters).
 COMPLAINT_STATUS_MAX = 40
 
@@ -301,6 +306,15 @@ def _personal_data(value: str, labels: bool = True) -> str | None:
     return None
 
 
+def file_label(name: str | None) -> str | None:
+    """The uploaded file's name as a run report shows it: the last part of the path, at most 120 characters, personal
+    data masked (a name such as "complaints from jane.doe@example.com.csv"). None when none was sent."""
+    name = (name or "").replace("\\", "/").rsplit("/", 1)[-1].strip()[:120]
+    if not name:
+        return None
+    return _mask(name) if _personal_data(name) else name
+
+
 def _mask(value: str) -> str:
     """Personal data replaced by typed placeholders, the masking every AI request gets (genai/pii.py)."""
     from genai.pii import mask_text
@@ -511,6 +525,8 @@ class _Report:
         self.new_rows = 0
         # The file holds no data row at all: nothing in it, or a header alone (DEV-018).
         self.no_rows = False
+        # Non-blank data lines in the file, counted as read: what the run report balances against (R17).
+        self.data_lines = 0
 
     def add(self, row: int | None, column: str | None, message: str) -> None:
         self.error_count += 1
@@ -558,9 +574,10 @@ def _parse(
     for line_number, cells in enumerate(reader, 2):
         if not any(cell.strip() for cell in cells):
             continue
+        report.data_lines += 1
         if any(cell.strip() for cell in cells[len(fields) :]):
+            # Kept with its problem, so it is set aside (and quarantined, counted) rather than lost.
             report.add(line_number, None, "This row has more values than the header has columns.")
-            continue
         row = {
             column: (cells[i].strip() if i < len(cells) else "")
             for i, column in enumerate(fields)
@@ -975,22 +992,6 @@ def check_file(
     return result
 
 
-def _checked_file(
-    db: Session,
-    tenant_id,
-    entity: str,
-    raw: bytes,
-    policy: ImportPolicy,
-    date_format: str,
-    skip_problem_rows: bool,
-    mask_personal_data: bool,
-) -> tuple[dict, list]:
-    """The check report and the rows that would be imported (masked when asked; without the set-aside rows)."""
-    report = _Report()
-    rows = _parse(entity, raw, report, policy, date_format)
-    return _check_rows(db, tenant_id, entity, rows, report, policy, date_format, skip_problem_rows, mask_personal_data)
-
-
 def check_records(db: Session, tenant_id, entity: str, records: list[dict], policy: ImportPolicy) -> dict:
     report = _Report()
     rows = rows_from_records(entity, records, report)
@@ -1127,13 +1128,35 @@ def import_file(
     skip_problem_rows: bool = False,
     mask_personal_data: bool = False,
 ) -> dict:
-    report, rows = _checked_file(db, tenant_id, entity, raw, policy, date_format, skip_problem_rows, mask_personal_data)
+    checked = _Report()
+    parsed = _parse(entity, raw, checked, policy, date_format)
+    report, rows = _check_rows(
+        db, tenant_id, entity, parsed, checked, policy, date_format, skip_problem_rows, mask_personal_data
+    )
     if not report["ready"]:
         raise HTTPException(
             422, detail={"code": "IMPORT_CHECK_FAILED", "message": "Fix the listed problems first", "report": report}
         )
     # The checked rows themselves: masked where asked, without the rows set aside.
     result = _write_rows(db, tenant_id, entity, rows, policy)
+    if policy.quarantine:
+        # A governed import: each written row keeps its lineage (R16), each set-aside row is stored for correction
+        # (R14), under one import reference that the import's audit event (DATA_IMPORTED, TRIAL_DATA_IMPORTED) carries.
+        from backend.app import import_lineage, import_quarantine
+
+        import_ref = uuid.uuid4()
+        version = import_lineage.mapping_version(entity, report["columns"], date_format)
+        import_lineage.write(
+            db, tenant_id, import_ref, entity, TEMPLATES[entity]["required"], rows, version, policy.source
+        )
+        set_aside = [(line, row, checked.row_problems[line]) for line, row in parsed if line in checked.row_problems]
+        import_quarantine.store(db, tenant_id, import_ref, entity, policy.source, set_aside, _personal_data, _mask)
+        result.update(
+            import_ref=str(import_ref),
+            mapping_version=version,
+            quarantined_rows=len(set_aside),
+            quality_report=quality_report(checked.data_lines, len(rows), len(set_aside), report["updated_records"]),
+        )
     result.update(
         rejected_rows=report["rejected_rows"],
         masked_values=report["masked_values"],
@@ -1143,6 +1166,20 @@ def import_file(
     if report.get("rejects_csv"):
         result["rejects_csv"] = report["rejects_csv"]
     return result
+
+
+def quality_report(read: int, accepted: int, quarantined: int, changed: int | None) -> dict:
+    """The data-quality report of one governed import run (R17): ``read`` is the file's non-blank data lines, each of
+    which must end accepted or quarantined; ``balanced`` says the counts agree with the file. ``rows_changed`` (rows that updated a record already there)
+    is None for a products file, whose rows may add versions to an existing product."""
+    return {
+        "rows_read": read,
+        "rows_accepted": accepted,
+        "rows_quarantined": quarantined,
+        "rows_changed": changed,
+        "rows_new": accepted - changed if changed is not None else None,
+        "balanced": read == accepted + quarantined,
+    }
 
 
 def import_records(db: Session, tenant_id, entity: str, records: list[dict], policy: ImportPolicy) -> dict:

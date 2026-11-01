@@ -145,6 +145,10 @@ class Product(TenantOwned, Base):
     lifecycle_status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="active")
     product_family: Mapped[str | None] = mapped_column(String(120))
     manufacturer_context: Mapped[str | None] = mapped_column(String(255))
+    # Regulatory identity (G2a): the device identifier and the GMDN term, the same in every market.
+    udi_di: Mapped[str | None] = mapped_column(String(80))
+    gmdn_code: Mapped[str | None] = mapped_column(String(10))
+    gmdn_term: Mapped[str | None] = mapped_column(String(300))
     __table_args__ = (
         UniqueConstraint("tenant_id", "product_identifier", name="uq_products_tenant_product_identifier"),
         UniqueConstraint("tenant_id", "id", name="uq_products_tenant_id_id"),

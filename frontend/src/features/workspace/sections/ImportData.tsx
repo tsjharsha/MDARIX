@@ -7,6 +7,7 @@ import { Panel } from "../../admin/console/charts";
 import { useCan, useFeatureSet, useWorkspace } from "../workspaceContext";
 import { importTemplatesFor } from "../../../app/featureSet";
 import { countOf, formatCount } from "./common";
+import { IMPORT_REPORTS_ID, ImportReportsPanel, ProductIdentityPanel } from "./ImportReports";
 
 /*
  * CSV import into the organization's own records. The same validated import serves free trials (their own routes
@@ -120,6 +121,8 @@ export type ImportResult = {
   masked_values?: number;
   /** "FINDING": signals from these complaints are being found after the answer (they show within seconds). */
   signals?: string;
+  /** The import run, whose data-quality report (rows read, written, set aside) the reports below show. */
+  import_ref?: string;
 };
 
 /** What the import result adds while its signals are being found. */
@@ -162,12 +165,15 @@ export function importUrl(
   mode: "check" | "import",
   dateFormat: DateFormat,
   options: ImportOptions = NO_OPTIONS,
+  fileName?: string,
 ) {
   const path = `${base}/${encodeURIComponent(entity)}${mode === "check" ? "/check" : ""}`;
   const query = new URLSearchParams();
   if (dateFormat !== "ISO") query.set("date_format", dateFormat);
   if (options.skipProblems) query.set("on_problems", "skip");
   if (options.maskPersonal) query.set("personal_data", "mask");
+  // The file's name, for the import's data-quality report (only with the import itself).
+  if (mode === "import" && fileName) query.set("file_name", fileName.slice(0, 255));
   const search = query.toString();
   return search ? `${path}?${search}` : path;
 }
@@ -206,6 +212,7 @@ export function ImportPanel({
   id = "data-import",
   eyebrow = "Bring your own data",
   complaintsAlone = false,
+  onReport,
 }: {
   templates: ImportTemplate[];
   /** /api/v1/data/import for every organization; /api/v1/trial/imports for the free trial's own limits. */
@@ -217,6 +224,8 @@ export function ImportPanel({
   eyebrow?: string;
   /** A complaints export alone is enough (a free trial): the products, versions and lots it names are added. */
   complaintsAlone?: boolean;
+  /** Opens the data-quality report of the import just done (shown below the panel). */
+  onReport?: (importRef: string) => void;
 }) {
   // Where a complaints export alone is enough, the panel opens on it (once the templates are there), until the person
   // chooses another.
@@ -235,6 +244,8 @@ export function ImportPanel({
   const [options, setOptions] = useState<ImportOptions>(NO_OPTIONS);
   // The rows set aside by the last import, kept to download after the report is cleared.
   const [rejects, setRejects] = useState<{ csv: string; rows: number } | null>(null);
+  // The last import's run, whose data-quality report is one click away.
+  const [lastRun, setLastRun] = useState<string | null>(null);
   const canImport = useCan("records.write");
   const [report, setReport] = useState<CheckReport | null>(null);
   const [busy, setBusy] = useState(false);
@@ -247,6 +258,7 @@ export function ImportPanel({
     setReport(null);
     setMessage(null);
     setRejects(null);
+    setLastRun(null);
   }, [entity, dateFormat]);
   // A new choice needs a new check of the same file.
   useEffect(() => {
@@ -264,7 +276,7 @@ export function ImportPanel({
       return null;
     }
     // The file goes as it is (bytes): the server reads an Excel workbook, or text in its encoding and separator.
-    return requestJson<any>(importUrl(basePath, template.entity, mode, dateFormat, options), {
+    return requestJson<any>(importUrl(basePath, template.entity, mode, dateFormat, options, file.name), {
       method: "POST",
       body: file,
       headers: { "Content-Type": isWorkbook(file) ? XLSX_TYPE : "text/csv" },
@@ -289,6 +301,7 @@ export function ImportPanel({
       if (result) {
         setMessage({ tone: "good", text: importedText(template?.title ?? "data", result) });
         setRejects(result.rejects_csv ? { csv: result.rejects_csv, rows: result.rejected_rows ?? 0 } : null);
+        setLastRun(result.import_ref ?? null);
         setReport(null);
         setFile(null);
         onImported(result, template.entity);
@@ -430,10 +443,23 @@ export function ImportPanel({
           {message.text}
         </p>
       )}
-      {rejects && !report && (
-        <button type="button" className="ac-secondary" onClick={() => downloadRejects(rejects.csv, template.entity)}>
-          <Download size={15} aria-hidden="true" /> Download the {countOf(rejects.rows, "row")} to fix
-        </button>
+      {(rejects || (lastRun && onReport)) && !report && (
+        <div className="ca-action-row">
+          {lastRun && onReport && (
+            <button type="button" className="ac-primary" onClick={() => onReport(lastRun)}>
+              <CheckCircle2 size={15} aria-hidden="true" /> See its data-quality report
+            </button>
+          )}
+          {rejects && (
+            <button
+              type="button"
+              className="ac-secondary"
+              onClick={() => downloadRejects(rejects.csv, template.entity)}
+            >
+              <Download size={15} aria-hidden="true" /> Download the {countOf(rejects.rows, "row")} to fix
+            </button>
+          )}
+        </div>
       )}
       {report && (
         <div className="uw-trial-report" role="status">
@@ -540,10 +566,37 @@ type Templates = {
   templates: ImportTemplate[];
 };
 
+/** The import run a link names (``report=<import_ref>``, from a record's origin), if any. */
+export const reportFocus = (focus?: string) => (focus?.startsWith("report=") ? focus.slice("report=".length) : null);
+
+/** Shows one import's data-quality report: chosen and scrolled to (Getting started › Your data, Import data). */
+export function useReportChoice(focus?: string) {
+  const [selected, setSelected] = useState<string | null>(() => reportFocus(focus));
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    const named = reportFocus(focus);
+    if (named) {
+      setSelected(named);
+      // After the reports are drawn.
+      window.setTimeout(() => document.getElementById(IMPORT_REPORTS_ID)?.scrollIntoView({ behavior: "smooth" }), 300);
+    }
+  }, [focus]);
+  const show = (importRef: string) => {
+    setSelected(importRef);
+    document.getElementById(IMPORT_REPORTS_ID)?.scrollIntoView({ behavior: "smooth" });
+  };
+  const imported = (importRef?: string) => {
+    if (importRef) setSelected(importRef);
+    setRefreshKey((key) => key + 1);
+  };
+  return { selected, setSelected, show, imported, refreshKey };
+}
+
 /** "Import data": the organization's CSV import, for everyone whose role may change records. */
-export function ImportDataSection() {
+export function ImportDataSection({ focus }: { focus?: string } = {}) {
   const { work } = useWorkspace();
   const templates = useResource<Templates>("/api/v1/data/import/templates");
+  const reports = useReportChoice(focus);
   return (
     <>
       {templates.state !== "ready" || !templates.data ? (
@@ -562,12 +615,18 @@ export function ImportDataSection() {
             templates={templates.data.templates}
             basePath="/api/v1/data/import"
             fileLimitBytes={templates.data.file_limit_bytes}
-            onImported={work.refreshProducts}
+            onImported={(result) => {
+              work.refreshProducts();
+              reports.imported(result.import_ref);
+            }}
+            onReport={reports.show}
             eyebrow="Import data"
             complaintsAlone={!!templates.data.creates_references}
           />
         </>
       )}
+      <ImportReportsPanel selected={reports.selected} onSelect={reports.setSelected} refreshKey={reports.refreshKey} />
+      <ProductIdentityPanel products={work.products} onOpenReport={reports.show} />
     </>
   );
 }

@@ -579,7 +579,7 @@ export function UserWorkspace({
                       {section === "Intelligence" && <IntelligenceSection tab={tab} />}
                       {section === "Trust & Audit" && <TrustSection tab={tab} />}
                       {section === "My Account" && <AccountSection tab={tab} />}
-                      {section === "Import data" && <ImportDataSection />}
+                      {section === "Import data" && <ImportDataSection focus={tab} />}
                       {section === "Share feedback" && <FeedbackSection isTrial={!!trial?.is_trial} />}
                       {section === "Look ahead" && trial?.is_trial && <LookAheadSection focus={tab} />}
                       {section === "Next steps" && trial?.is_trial && <TrialNextStepsSection />}

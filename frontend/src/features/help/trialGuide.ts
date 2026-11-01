@@ -105,6 +105,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
       "Choose your complaints export as it comes from your quality system, an Excel workbook or a CSV file. MDARIX reads its column names (Complaint Number, Product Code, Lot # and the like) and leaves out the columns it does not need, without storing them.",
       "Pick the date format of a CSV file (Excel dates are read as they are), then choose Check file: you see how each column was read, and the products and lots the file adds, before anything is saved.",
       "Then add your lots with their quantities, so trends are counted per unit in the field, and your investigations, CAPAs and risks, so every inspection check reads your own records. Download gives a template for any of them.",
+      "After each import choose See its data-quality report: rows read, written and set aside, each row set aside with its reason. A complaint's disposition shows where it came from (file and row) and its IMDRF codes.",
     ],
     result:
       "Your records sit beside the sample, and Readiness, Complaints, Signals and Records show findings from your own data. The chapter See it on your own data is ticked.",
