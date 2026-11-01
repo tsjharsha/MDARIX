@@ -10,6 +10,76 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.60] - 2026-11-01
+
+On the trial maintenance line (`release/0.10`): reminders and escalation (T-G25, MVP G25), the Quality and Regulatory
+Oversight view (T-G9, MVP G9), and the event owner, stage, closure readiness and event decision record (T-G28, MVP
+G28), built once on the trial line for the trial and the pilot alike (D-T14). A deadline never passes silently: an
+alert tells people and never closes or changes the item. MDARIX never closes a complaint, never decides and never
+e-mails anyone outside the organization. Still to come: e-mails for alerts (in-app only in this release), the full
+6.0 tiers (T1's half and three-quarter points, repeats every 4 hours or daily, T2's out-of-hours route), the head of
+QA's deputy and named third contact, the weekly oversight sign-off (T22), decision record versions after a reopening,
+and the QMS import of the closure.
+
+**Migration, expand-only:** `tr07oversight`, chained from `tr06guidescomms`: four new tables (`oversight_settings`,
+`user_absences`, `due_alerts`, `event_closures`), each with tenant row-level security, in the trial's retention list,
+sample removal, purge and export, and the legacy-plane step. Nothing existing changes; the downgrade drops only these
+tables. On `mvp-1.0` the forward merge adds a merge revision joining its head and `tr07oversight`. The API, worker and
+web images change; the scheduler runs a new job, `due-alerts`, every 15 minutes.
+
+### Added
+
+- **Reminders and escalation**: every item with a date is read from its own record: the triage target (24 clock
+  hours), an urgent intake's provisional reporting deadline, a market assessment's deadline whose report is not
+  started, each report obligation not yet met, each reply due on the communications log, a guide version waiting for
+  its second person (end of the next working day), and every My Work task with a due date. Before the due time (24
+  hours by default) its owner is reminded; while the owner is away, their backup is. At the due time it escalates to
+  the backup (the absent owner's, or the triage record's own) and to the people holding the organization's escalation
+  role (Leader by default); a person already told is skipped; when nobody else can be reached, the owner is told so.
+  An item with no owner, or whose owner can no longer sign in, goes to the escalation role at once. Alerts resolve
+  themselves when their item is done; each escalation is in the audit trail (`DUE_ITEM_ESCALATED`).
+- **My Work and the bell**: a panel above My Work's tabs lists escalations and overdue items one by one and groups the
+  items due soon by kind, each opening where it is done, with read state ("Mark read", "Mark all read"). The bell in
+  the header counts the unread ones.
+- **Absences**: a person records their own absence (first and last day, the colleague who covers it, a note) and ends
+  it with "I am back". The backup receives the reminders and escalations; ownership stays, and the backup gains no
+  signing right.
+- **The working calendar** (time zone, working weekdays, holidays) with the reminder hours and the escalation role,
+  set by quality review or regulatory approval. MDARIX's own due times count on it: a first-contact follow-up, the
+  QMS-complaint task and the QA review (0.10.57), a request's reply due date and the one-working-hour rule of S4
+  (0.10.59). This replaces the UTC stopgap of 0.10.59. An authority's legal deadline keeps its own counting rule.
+- **Readiness › Oversight**: one place for the head of QA/RA: tiles for overdue, due soon, events not ready to close,
+  decision records not filed and complaints closed in the QMS before they were ready; every dated item with its kind,
+  product, market, owner (and who covers while they are away), due time and hours left, and who it escalated to;
+  filters by product, market and kind; CSV export (data.export) for the monthly product review; who is away; a
+  staffing warning when only one person can receive alerts. IDs, owners, dates and states only, never patient or
+  reporter data. CAPAs from the QMS with a due date are listed and raise no alert.
+- **The event**: each complaint MDARIX has worked on has an event owner (named here, else the triage record's), a stage
+  line read from the records (triage, market assessment, investigation, decision, ready to close, closed in the QMS; a
+  summary, never a gate), a summary (product, market, awareness, nearest deadline, unresolved questions, next action)
+  and a closure checklist: triage complete; the first-contact check signed; every relevant market assessed and signed,
+  no reassessment open; every report obligation met; the disposition or the investigation decision signed; every
+  information request answered or closed; no task on the event open. Open CAPAs are listed and do not block. Each open
+  item says why and opens where it is resolved.
+- **Ready to close in the QMS**: signed by the event owner with password and authenticator code (never an
+  administrator): with the checklist clear, or with a written reason when items are still open. The checklist is kept
+  as signed; a change afterwards shows "sign again".
+- **The event decision record**: every signed decision on the event (first-contact check, triage, each market
+  conclusion with its versions, the disposition, the investigation decision, report approvals, ready to close), each
+  with the printed name, the date and time and the meaning, and a SHA-256 checksum; as a PDF to file in the QMS
+  complaint record; then the QMS filing reference is recorded. Until then the event shows "decision record not filed".
+- **Sample data** (marked Sample, covered by sample removal; added once to earlier trials by
+  `scripts/refresh_trial_story.py`): the MDARIX sample author away for a week with the trial user as backup; SAMPLE-RV-08
+  (not ready to close: its US assessment unsigned, the reporter's reply overdue and escalated, no decision) and
+  SAMPLE-RT-03 (a service-level close whose checklist is clear) owned by the trial user. No complaint is added: the
+  sample's counts (43 complaints) and the OrbitCare trend are unchanged.
+
+### Changed
+
+- Readiness has two tabs: Inspection checks (as before) and Oversight. The menu line reads "Inspection checks,
+  oversight". The number of inspection checks is unchanged (11).
+- The tests carry reviewed exemptions for a person's own alerts and absences.
+
 ## [0.10.59] - 2026-11-01
 
 On the trial maintenance line (`release/0.10`): the organization's own decision guides (T-G15, MVP G15) and the

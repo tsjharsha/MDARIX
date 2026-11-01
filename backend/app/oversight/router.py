@@ -228,11 +228,12 @@ def _events(db, control_db, tenant_id) -> list[dict]:
         .all()
     )
     tasks = closure.open_tasks_by_complaint(db, tenant_id)
+    triage = closure.open_on_triage(db, tenant_id)
     rows = {row.complaint_id: row for row in db.query(EventClosure).filter(EventClosure.tenant_id == tenant_id)}
     products = _products(db, tenant_id)
     found = []
     for complaint in complaints:
-        facts = closure.facts(db, tenant_id, complaint, tasks)
+        facts = closure.facts(db, tenant_id, complaint, tasks, triage)
         found.append(_event_summary(complaint, facts, rows.get(complaint.id), products))
     refs = {item["owner_id"] for item in found}
     names = _names(control_db, tenant_id, refs)

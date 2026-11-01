@@ -46,6 +46,7 @@ import { useWorkContext } from "./useWorkContext";
 import { ContextBar } from "./ContextBar";
 import { DashboardSection } from "./sections/Dashboard";
 import { ReadinessSection } from "./sections/Readiness";
+import { AlertsBell } from "./sections/Reminders";
 import { ColumnScopeProvider } from "../tables/ColumnChooser";
 import { MyWorkSection } from "./sections/MyWork";
 import { ProductsSection } from "./sections/Products";
@@ -94,9 +95,9 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   },
   Readiness: {
     icon: ShieldAlert,
-    description: "What an inspector would find",
+    description: "Inspection checks, oversight",
     guide:
-      "What an FDA investigator or a notified-body auditor would find in your complaints, reports, trends and CAPAs today, read from your own records. Every number opens the records behind it.",
+      "What an FDA investigator or a notified-body auditor would find in your complaints, reports, trends and CAPAs today, read from your own records; and, under Oversight, everything overdue or due soon with its owner, and each event's readiness to close. Every number opens the records behind it.",
     context: false,
   },
   Dashboard: {
@@ -486,6 +487,7 @@ export function UserWorkspace({
               </button>
             )}
             <SwitchOrganization />
+            <AlertsBell onOpen={() => open("My Work")} />
             <HelpMenu onGettingStarted={trial?.is_trial ? () => open("Getting started", "Your data") : undefined} />
             <button
               type="button"
@@ -566,7 +568,7 @@ export function UserWorkspace({
                   <SectionErrorBoundary name={section} resetKey={location.key}>
                     <div className="ca-section">
                       {section === "Getting started" && <GettingStartedSection focus={tab} />}
-                      {section === "Readiness" && <ReadinessSection />}
+                      {section === "Readiness" && <ReadinessSection tab={tab} />}
                       {section === "Dashboard" && <DashboardSection />}
                       {section === "My Work" && <MyWorkSection tab={tab} />}
                       {section === "Products" && <ProductsSection tab={tab} />}

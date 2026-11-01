@@ -63,6 +63,7 @@ import {
 import { StatusBadge } from "./common";
 import { parseRequestTab } from "../evidenceWorkflow";
 import { EvidenceRequestsPanel } from "./EvidenceRequests";
+import { RemindersPanel } from "./Reminders";
 
 const PAGE_SIZE = 50;
 
@@ -125,6 +126,7 @@ export function MyWorkSection({ tab }: { tab?: string }) {
   };
   return (
     <>
+      <RemindersPanel />
       <Tabs tabs={tabs} active={active} onChange={setActive} label="My work sections" counts={counts}>
         {view && <TaskInbox key={view} view={view} summary={summary} />}
         {active === MY_WORK_APPROVALS_TAB && <ApprovalsPanel onOpen={openApproval} />}

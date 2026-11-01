@@ -144,7 +144,19 @@ def open_tasks_by_complaint(db: Session, tenant_id) -> dict[str, list]:
     return found
 
 
-def facts(db: Session, tenant_id, complaint, tasks: dict[str, list] | None = None) -> dict:
+def open_on_triage(db: Session, tenant_id) -> set[str]:
+    """The complaints open on the triage list (flagged or escalated, triage not complete), read once for a list."""
+    from backend.app.intake import service as intake
+
+    found: set[str] = set()
+    for item in intake.triage(db, None, tenant_id, "open")["items"]:
+        found |= {member.split(":", 1)[1] for member in item["members"] if member.startswith(f"{intake.COMPLAINT}:")}
+    return found
+
+
+def facts(
+    db: Session, tenant_id, complaint, tasks: dict[str, list] | None = None, triage: set[str] | None = None
+) -> dict:
     """Everything the checklist, the stage line and the decision record read, in one place (``tasks``: the open
     tasks by complaint, when already read)."""
     from backend.app.communications.service import open_requests
@@ -199,6 +211,7 @@ def facts(db: Session, tenant_id, complaint, tasks: dict[str, list] | None = Non
     return {
         "complaint": complaint,
         "record": triage_record(db, tenant_id, complaint.id),
+        "on_triage": str(complaint.id) in (triage if triage is not None else open_on_triage(db, tenant_id)),
         "intakes": intakes,
         "first_contact": checks,
         "assessments": rows_by_complaint(db, tenant_id, [complaint.id]).get(complaint.id, {}),
@@ -235,18 +248,18 @@ def checklist(found: dict) -> list[dict]:
     reports = {"section": "Complaints", "tab": f"Reports?complaint={complaint.id}"}
     items = []
     record = found["record"]
-    if record is None:
-        items.append(_check("TRIAGE", "Triage is complete", NOT_REQUIRED, "Not flagged for triage"))
-    elif record.completed_at is None:
+    if found["on_triage"] or (record is not None and record.completed_at is None):
         items.append(
             _check(
                 "TRIAGE",
                 "Triage is complete",
                 BLOCKED,
-                "The triage record is not complete",
+                "On the triage list: its triage record is not complete",
                 {"section": "Complaints", "tab": "Triage"},
             )
         )
+    elif record is None:
+        items.append(_check("TRIAGE", "Triage is complete", NOT_REQUIRED, "Not flagged for triage"))
     else:
         items.append(_check("TRIAGE", "Triage is complete", PASS, f"Completed {record.completed_at:%d %b %Y}"))
     if not found["intakes"]:

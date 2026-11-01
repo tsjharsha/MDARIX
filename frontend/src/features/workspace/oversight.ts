@@ -1,0 +1,275 @@
+// Reminders and escalation (T-G25), the oversight view (T-G9) and the event's closure (T-G28): types, paths and the
+// pure rules the screens use. The server (/api/v1/oversight, backend/app/oversight) reads every dated item from its
+// own record; an alert never closes or changes the item.
+import type { Tone } from "../admin/console/dashboardModel";
+
+export const OVERSIGHT = "/api/v1/oversight";
+export const ALERTS = `${OVERSIGHT}/alerts`;
+export const OVERSIGHT_TAB = "Oversight";
+export const READINESS_TABS = ["Inspection checks", OVERSIGHT_TAB] as const;
+export type ReadinessTab = (typeof READINESS_TABS)[number];
+
+export type ItemState = "OVERDUE" | "DUE_SOON" | "LATER";
+export type Opens = { section: string; tab?: string } | null;
+
+export type Alert = {
+  id: string;
+  ids: string[];
+  tier: "REMINDER" | "ESCALATION";
+  tier_label: string;
+  reason: string;
+  reason_label: string;
+  category: string;
+  category_label: string;
+  title: string;
+  ref: string | null;
+  owner: string | null;
+  due_at: string;
+  state: ItemState;
+  state_label: string;
+  hours_left: number;
+  read: boolean;
+  opens: Opens;
+};
+
+export type Absence = {
+  id: string;
+  user_id: string;
+  user_name: string;
+  backup_id: string;
+  backup_name: string;
+  starts_on: string;
+  ends_on: string;
+  note: string | null;
+  sample: boolean;
+};
+
+export type Person = { id: string; name: string };
+
+export type AlertList = {
+  items: Alert[];
+  unread: number;
+  escalations: number;
+  absences: Absence[];
+  people: Person[];
+  never: string;
+};
+
+export type OversightItem = {
+  key: string;
+  category: string;
+  category_label: string;
+  title: string;
+  ref: string | null;
+  complaint_id: string | null;
+  market: string | null;
+  product: string | null;
+  owner: string | null;
+  queue: string | null;
+  away: { backup: string } | null;
+  due_at: string;
+  state: ItemState;
+  state_label: string;
+  hours_left: number;
+  escalated_to: string[];
+  alerts: boolean;
+  opens: Opens;
+};
+
+export type EventState = "NOT_READY" | "READY_TO_SIGN" | "NOT_FILED" | "FILED" | "CLOSED_BEFORE_READY" | "CLOSED";
+
+export type EventRow = {
+  complaint_id: string;
+  ref: string;
+  product: string | null;
+  market: string | null;
+  owner_id: string | null;
+  owner_name: string | null;
+  stage: string;
+  blocked: number;
+  next: string | null;
+  state: EventState;
+  state_label: string;
+  sample: boolean;
+};
+
+export type OversightSettings = {
+  time_zone: string;
+  work_days: number[];
+  holidays: Array<{ date: string; name: string }>;
+  reminder_hours: number;
+  escalation_role: string;
+  escalation_role_label: string;
+  updated_at: string | null;
+  roles?: Array<{ code: string; label: string }>;
+  weekdays?: string[];
+  zones?: string[];
+  range?: [number, number];
+};
+
+export type Oversight = {
+  as_of: string;
+  items: OversightItem[];
+  total: number;
+  counts: Record<string, { label: string; overdue: number; due_soon: number }>;
+  overdue: number;
+  due_soon: number;
+  filters: { products: string[]; markets: string[]; categories: Array<{ code: string; label: string }> };
+  events: EventRow[];
+  event_counts: Record<EventState, number>;
+  away: Absence[];
+  settings: OversightSettings;
+  staffing: string | null;
+  never: string;
+};
+
+export type CheckItem = {
+  code: string;
+  label: string;
+  result: "PASS" | "BLOCKED" | "NOT_REQUIRED" | "INFO";
+  result_label: string;
+  detail: string;
+  opens: Opens;
+};
+
+export type RecordEntry = {
+  kind: string;
+  summary: string;
+  reason: string | null;
+  signer: string;
+  signed_at: string | null;
+  meaning: string | null;
+  record_id: string | null;
+  record_ref: string | null;
+};
+
+export type EventView = {
+  event: {
+    complaint_id: string;
+    ref: string;
+    business_id: string | null;
+    product: string | null;
+    market: string | null;
+    awareness_at: string | null;
+    status_in_qms: string;
+    owner_id: string | null;
+    owner_name: string | null;
+    owner_named: boolean;
+    sample: boolean;
+  };
+  summary: {
+    nearest_deadline: { title: string; due_at: string; opens: Opens } | null;
+    open_requests: number;
+    next_action: { label: string; detail: string; opens: Opens } | null;
+  };
+  stages: Array<{ code: string; label: string; state: "DONE" | "CURRENT" | "OPEN" | "LATER" }>;
+  checklist: CheckItem[];
+  blocked: number;
+  state: EventState;
+  state_label: string;
+  changed_since_signed: boolean;
+  ready: { state: string; reason: string | null; version: number; signed_by: string; signed_at: string | null } | null;
+  decision_record: {
+    entries: RecordEntry[];
+    sha256: string;
+    version: number;
+    filed: { reference: string; by: string; at: string | null } | null;
+  };
+  you_are_owner: boolean;
+  people: Person[];
+  reason_min: number;
+  never_closes: string;
+  practice_label: string | null;
+};
+
+export type Filters = { product: string; market: string; category: string; show: "attention" | "all" };
+export const NO_FILTERS: Filters = { product: "", market: "", category: "", show: "attention" };
+
+/** The query string of the oversight list (and its CSV), only the filters that are set. */
+export function filterQuery(filters: Filters): string {
+  const params = new URLSearchParams();
+  if (filters.product) params.set("product", filters.product);
+  if (filters.market) params.set("market", filters.market);
+  if (filters.category) params.set("category", filters.category);
+  if (filters.show === "all") params.set("show", "all");
+  const text = params.toString();
+  return text ? `?${text}` : "";
+}
+
+export const oversightPath = (filters: Filters) => `${OVERSIGHT}${filterQuery(filters)}`;
+export const exportPath = (filters: Filters) => `${OVERSIGHT}/export.csv${filterQuery(filters)}`;
+export const eventPath = (complaintId: string) => `${OVERSIGHT}/events/${encodeURIComponent(complaintId)}`;
+
+/** A link to one event's closure in the oversight view ("Oversight?event=<id>"). */
+export const eventTab = (complaintId: string) => `${OVERSIGHT_TAB}?event=${encodeURIComponent(complaintId)}`;
+
+export function parseReadinessTab(tab: string | null | undefined): { tab: ReadinessTab; event: string | null } {
+  if (tab && (tab === OVERSIGHT_TAB || tab.startsWith(`${OVERSIGHT_TAB}?`)))
+    return { tab: OVERSIGHT_TAB, event: new URLSearchParams(tab.slice(OVERSIGHT_TAB.length + 1)).get("event") };
+  return { tab: "Inspection checks", event: null };
+}
+
+export const stateTone = (state: ItemState): Tone =>
+  state === "OVERDUE" ? "critical" : state === "DUE_SOON" ? "warning" : "neutral";
+
+export const alertTone = (alert: Pick<Alert, "tier" | "state">): Tone =>
+  alert.tier === "ESCALATION" ? "critical" : stateTone(alert.state);
+
+/** "3 h left", "2 days left", "overdue 5 h", "overdue 3 days". */
+export function hoursText(hours: number): string {
+  const size = Math.abs(hours);
+  const amount = size < 48 ? `${Math.max(1, Math.round(size))} h` : `${Math.round(size / 24)} days`;
+  return hours < 0 ? `overdue ${amount}` : `${amount} left`;
+}
+
+/** Escalations and overdue items one by one; the items only due soon grouped by category, so a long triage list
+ * reads as one line. */
+export function groupAlerts(items: Alert[]): {
+  urgent: Alert[];
+  soon: Array<{ category: string; label: string; items: Alert[] }>;
+} {
+  const urgent = items.filter((item) => item.tier === "ESCALATION" || item.state === "OVERDUE");
+  const soon: Array<{ category: string; label: string; items: Alert[] }> = [];
+  for (const item of items) {
+    if (urgent.includes(item)) continue;
+    const group = soon.find((entry) => entry.category === item.category);
+    if (group) group.items.push(item);
+    else soon.push({ category: item.category, label: item.category_label, items: [item] });
+  }
+  return { urgent, soon };
+}
+
+export const EVENT_TONES: Record<EventState, Tone> = {
+  NOT_READY: "warning",
+  READY_TO_SIGN: "good",
+  NOT_FILED: "warning",
+  FILED: "good",
+  CLOSED_BEFORE_READY: "critical",
+  CLOSED: "neutral",
+};
+
+export const CHECK_TONES: Record<CheckItem["result"], Tone> = {
+  PASS: "good",
+  BLOCKED: "critical",
+  NOT_REQUIRED: "neutral",
+  INFO: "warning",
+};
+
+/** Why "ready to close" cannot be signed yet, or null. A blocked checklist needs a written reason. */
+export function readyProblem(view: Pick<EventView, "you_are_owner" | "blocked" | "reason_min">, reason: string) {
+  if (!view.you_are_owner) return "Only the event owner signs: name yourself the owner first.";
+  if (view.blocked && reason.trim().length < view.reason_min)
+    return `${view.blocked} ${view.blocked === 1 ? "item is" : "items are"} still open: resolve them, or give the reason to sign anyway (at least ${view.reason_min} characters).`;
+  return null;
+}
+
+/** Why an absence cannot be recorded, or null. */
+export function absenceProblem(form: { starts_on: string; ends_on: string; backup_id: string }, today: string) {
+  if (!form.backup_id) return "Choose the colleague who covers for you.";
+  if (!form.starts_on || !form.ends_on) return "Give the first and the last day.";
+  if (form.ends_on < form.starts_on) return "The last day is before the first.";
+  if (form.ends_on < today) return "The absence is over already.";
+  return null;
+}
+
+export const WEEKDAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];

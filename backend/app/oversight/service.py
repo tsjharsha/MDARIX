@@ -253,7 +253,7 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
             _item(
                 f"triage:{item['key']}",
                 "TRIAGE",
-                f"Triage {item['ref']}: {item['tier_label'].lower()}",
+                f"Triage: {item['tier_label'].lower()}, not yet complete",
                 datetime.fromisoformat(item["triage_clock"]["due_at"]),
                 **common,
             )
