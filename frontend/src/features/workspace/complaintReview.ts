@@ -17,10 +17,15 @@ export const COMPLAINTS_TABS = [
   "Reportability",
   // The report worksheets, the second person's approval and the submission record (authorityReports.ts, T-G2c, T-G2b).
   "Reports",
+  // Every question to a reporter, distributor, hospital or service partner, with its attempts (communications.ts,
+  // T-G30).
+  "Communications",
   // Every complaint, filtered by product, version, lot, problem code, country or status (complaintList.ts).
   "Complaint list",
   "Review settings",
   "Reporting windows",
+  // The organization's own versions of each market's guide (decisionGuides.ts, T-G15).
+  "Decision guides",
 ] as const;
 export type ComplaintsTab = (typeof COMPLAINTS_TABS)[number];
 

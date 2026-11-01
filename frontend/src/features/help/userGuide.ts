@@ -538,6 +538,62 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         ],
       },
       {
+        id: "decision-guides",
+        title: "Decision guides: make each market's questions your own",
+        where: "Complaints › Decision guides",
+        purpose:
+          "Every market assessment asks its market's guide. Version 1 is MDARIX's starter. Your organization makes its own version: reword the questions, add your own, run the test cases, and have a colleague approve it. The guide points to a conclusion; a person decides and signs.",
+        tasks: [
+          {
+            title: "Prepare a new version",
+            who: "Anyone with regulatory review or approval rights.",
+            steps: [
+              "Open Complaints › Decision guides and choose Start a new version on the market. It is a copy of the version in use.",
+              "Reword any question, its definition, its help text and its clause. The questions that drive the conclusion cannot be removed, and their conclusion logic stays fixed.",
+              "Choose Add an extra question for what your procedure also asks (for example VMSR participation). It is recorded and printed with the answers; it never changes the conclusion and is never required.",
+              "Give every question its clause and choose its basis from the standards list. A version with a question missing either cannot be published.",
+              "Add test cases: a set of answers and the outcome the guide must point to. A question left blank is Unknown, never No. Choose Save the draft, then Run the test cases.",
+            ],
+            result:
+              "Before it is used lists what still blocks it: a missing clause or basis, tests not run on the current content, or a failing test.",
+          },
+          {
+            title: "Approve and publish it",
+            who: "A colleague who did not edit the version; never an administrator.",
+            steps: [
+              "Write What changed and why, and choose Ask a colleague to approve it.",
+              "The colleague opens the version, reads it, enters their password and authenticator code and chooses Approve and publish.",
+              "Download the PDF or DOCX for an audit: every question with its clause, the test cases and their results, and the approval.",
+            ],
+            result:
+              "Assessments started from then on use the new version; ones in progress keep theirs. Each signed conclusion names the guide version, and what a signer must have read is the version in use.",
+            note: "The harm-severity scale stays MDARIX's fixed starter scale in the trial. The questions and clauses are starter text until the regulatory consultant confirms them.",
+          },
+        ],
+      },
+      {
+        id: "communications",
+        title: "Communications: every question to an outside contact",
+        where:
+          "Complaints › Communications; a complaint's market assessment or report: Open the communications log; My Work for a reply due",
+        purpose:
+          "Each question to a reporter, distributor, hospital or service partner has an owner, a reply due date and a record of every attempt. MDARIX sends nothing: you send from your own mail or phone and record it here.",
+        tasks: [
+          {
+            title: "Record a request and its attempts",
+            steps: [
+              "Open the complaint's log, choose the party (or Add a party, with a primary and a second contact), then Information request, how you sent it, when, the owner and the reply due date. Choose Record it.",
+              "Each further try is Record another attempt: when, how and what happened (no answer, message left, bounced, or sent and waiting).",
+              "After your set number of unanswered attempts (3 unless you change it), the request moves to the party's second contact; after as many again, or when there is no second contact, it shows Unresolved after attempts.",
+              "When the answer comes, choose Record the reply with what they said, the evidence and the QMS record ID. The request is Answered.",
+            ],
+            result:
+              "Open and overdue requests show in My Work (the owner's), in Readiness and on the case's Decision Brief. Each message counts as recorded in MDARIX when it is logged before sending or within one working hour.",
+            note: "An Unknown answer in a market assessment, or in a first-contact check, raises a request to the reporter here. Formal responses to the complainant and field safety notices stay records of your QMS: link them by their ID.",
+          },
+        ],
+      },
+      {
         id: "signals",
         title: "Signals: triage a pattern of complaints",
         where: "Signals › Signal inbox",

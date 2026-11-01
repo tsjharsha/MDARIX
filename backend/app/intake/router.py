@@ -1091,6 +1091,9 @@ def close_follow_up(
     )
     if not done:
         raise _error(409, "NO_OPEN_FOLLOW_UP", "This contact has no open follow-up")
+    from backend.app.communications.service import close_for_intake
+
+    close_for_intake(db, tenant_id, event.id, outcome, note, str(ctx.user_id), service.now_utc())
     db.add(
         make_audit_event(
             tenant_id=tenant_id,

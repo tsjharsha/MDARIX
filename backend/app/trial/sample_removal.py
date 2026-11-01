@@ -43,6 +43,8 @@ GENERIC_REFERENCES = (
     ("record_links", "left_id"),
     ("record_links", "right_id"),
     ("record_field_changes", "record_id"),
+    # A communications log request raised by a first contact points at its intake event (tr06).
+    ("communication_entries", "intake_event_id"),
 )
 # Sample rows of tables without ``source_system``: the sample's import lineage and set-aside rows (``source``) and
 # its IMDRF links (their proposer), backend/app/trial/sample_imports.py.
