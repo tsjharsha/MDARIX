@@ -4376,3 +4376,101 @@ div.uw-task-count:hover {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* Report worksheets, the obligation lifecycle and the submission record (0.10.58) */
+.uw-rp-path,
+.uw-rp-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ac-ink-2);
+}
+.uw-rp-path li span,
+.uw-rp-steps li span {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--ac-line);
+  font-size: 12px;
+}
+.uw-rp-steps li.done {
+  color: var(--ac-ink);
+}
+.uw-rp-steps li.current {
+  color: var(--ac-ink);
+  font-weight: 600;
+}
+.uw-rp-section {
+  border-top: 1px solid var(--ac-line);
+  padding: 8px 0;
+}
+.uw-rp-section summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.uw-rp-fields {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-rp-field {
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+.uw-rp-field-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.uw-rp-number {
+  font-weight: 700;
+  min-width: 2.5em;
+}
+.uw-rp-label {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.uw-rp-value {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+.uw-rp-value.empty {
+  color: var(--ac-ink-2);
+}
+.uw-rp-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.uw-rp-edit input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.uw-rp-record {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+.uw-rp-approval,
+.uw-rp-after {
+  display: grid;
+  gap: 8px;
+}
+.uw-rp-reopen {
+  margin-top: 10px;
+}

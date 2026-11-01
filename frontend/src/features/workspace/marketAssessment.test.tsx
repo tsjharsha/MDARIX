@@ -290,11 +290,15 @@ describe("the assessment screen", () => {
     expect(html).toContain("Reportable · version 1");
     expect(html).toContain("30-calendar-day report (21 CFR 803.50)");
     expect(html).toContain("Overrides the suggestion (pending information): Report when unsure, QP-08");
-    expect(html).toContain("Record the filing");
+    // A US conclusion opens its report worksheet (0.10.58); EU/NI and GB keep the filing reference and date.
+    expect(html).toContain("Open the report worksheet");
+    expect(html).not.toContain("Record the filing");
     expect(html).toContain("MDARIX submits nothing");
+    const eu = render(<SignedVersion version={{ ...signed, market: "EU_NI" }} complaintId="c1" onSaved={vi.fn()} />);
+    expect(eu).toContain("Record the filing");
     const filed = render(
       <SignedVersion
-        version={{ ...signed, filed_on: "2026-10-31", filing_reference: "MDR-1" }}
+        version={{ ...signed, market: "EU_NI", filed_on: "2026-10-31", filing_reference: "MDR-1" }}
         complaintId="c1"
         onSaved={vi.fn()}
       />,

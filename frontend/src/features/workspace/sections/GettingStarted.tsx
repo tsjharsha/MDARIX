@@ -8,6 +8,7 @@ import {
   Signpost,
   Star,
   PhoneCall,
+  ClipboardList,
   Telescope,
   Upload,
   Users,
@@ -278,6 +279,25 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
               </button>
               <button type="button" className="ac-secondary" onClick={() => open("Complaints", "Triage")}>
                 Triage list
+              </button>
+            </div>
+          </div>
+        )}
+        {allowed("Complaints") && (
+          <div id="trial-reports" className="uw-story-partner uw-anchor">
+            <div>
+              <strong>
+                <ClipboardList size={16} aria-hidden="true" /> After a conclusion: the report, ready to file
+              </strong>
+              <p>
+                A reportable US or India conclusion drafts its Form FDA 3500A or MvPI worksheet in the authority's field
+                order. A colleague approves it; you enter it in the authority's route and record the submission and the
+                receipt. MDARIX never submits. The sample has a finished US report and an India report to correct.
+              </p>
+            </div>
+            <div className="uw-story-partner-actions">
+              <button type="button" className="ac-secondary" onClick={() => open("Complaints", "Reports")}>
+                Open Reports
               </button>
             </div>
           </div>

@@ -54,7 +54,7 @@ const item = (overrides: Partial<SecondLookItem> = {}): SecondLookItem => ({
 });
 
 describe("the Complaints section", () => {
-  it("offers triage first, the first contact, the dispositions, the second look, the backlog, the watch and the settings, opening the tab a link names", () => {
+  it("offers triage first, the first contact, the dispositions, the second look, the backlog, the watch, the reports and the settings, opening the tab a link names", () => {
     const tabs = (markup: string) => [...markup.matchAll(/role="tab"[^>]*>([^<]+)</g)].map((match) => match[1]);
     expect(tabs(render(<ComplaintsSection />))).toEqual([
       "Triage",
@@ -63,6 +63,7 @@ describe("the Complaints section", () => {
       "Second look",
       "Backlog",
       "Reportability",
+      "Reports",
       "Complaint list",
       "Review settings",
       "Reporting windows",
@@ -74,6 +75,8 @@ describe("the Complaints section", () => {
     expect(render(<ComplaintsSection tab="Second look" />)).toContain("Checking your records");
     expect(render(<ComplaintsSection tab="Backlog" />)).toContain("Reading your open complaints");
     expect(render(<ComplaintsSection tab="Unknown" />)).toContain("Reading the triage list");
+    // A link may open one complaint's reports (T-G2b).
+    expect(render(<ComplaintsSection tab="Reports?complaint=c1" />)).toContain("Reading the reports");
   });
 
   it("has its own address and menu entry", () => {
