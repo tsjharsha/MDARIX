@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import text
 
 from backend.app.db.session import engine
+from reports.pdf import text_of
 from tests.reports_seed import cleanup, role_client, seed_case
 
 PATH = "/api/v1/stage3/investigations/{}/record"
@@ -60,7 +61,8 @@ def test_csv_and_pdf_formats(seeded):
     assert "'=HYPERLINK" in csv_response.text and ",=HYPERLINK" not in csv_response.text
     pdf = client.get(PATH.format(seeded["investigation_id"]), params={"format": "pdf"})
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
-    assert f"INV-{tag}".encode() in pdf.content and seeded["signature_id"].encode() in pdf.content
+    shown = text_of(pdf.content)
+    assert f"INV-{tag}" in shown and seeded["signature_id"] in shown
     assert client.get(PATH.format(seeded["investigation_id"]), params={"format": "xml"}).status_code == 422
 
 
@@ -79,8 +81,8 @@ def test_the_compliance_pdf_lists_the_audit_events_and_signatures(seeded):
     from reports.pdf import page_count
 
     assert page_count(response.content) > 1
-    assert seeded["audit_event_id"].encode() in response.content
-    assert seeded["signature_id"].encode() in response.content
+    shown = text_of(response.content)
+    assert seeded["audit_event_id"] in shown and seeded["signature_id"] in shown
     as_json = admin.get("/api/v1/stage3/compliance-report", params={"output_format": "JSON"}).json()
     assert seeded["audit_event_id"] in {event["id"] for event in as_json["context"]["audit_events"]}
 

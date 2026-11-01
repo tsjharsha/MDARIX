@@ -12,6 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 from backend.app.qms_documents import render, service, templates
+from reports.pdf import text_of
 from backend.app.standards import STARTER_MARK
 
 pytestmark = pytest.mark.unit
@@ -120,14 +121,14 @@ def test_the_pdf_and_the_docx_carry_the_version_clauses_labels_records_and_signa
 
     pdf = render.render_pdf(_view(signed=True))
     assert pdf.startswith(b"%PDF")
-    text = pdf.decode("latin-1")
+    text = " ".join(text_of(pdf).split())
     for expected in (
         "Template version: mrr-starter-1",
-        "ISO 13485 5.6.2 Management review input \\(pending approval\\)",
+        "ISO 13485 5.6.2 Management review input (pending approval)",
         PRACTICE,
         "Records: CMP000000 v1, CMP000001 v1, CMP000002 v1",
         "[Written by the manufacturer]",
-        "Signed by Priya \\(Leader\\)",
+        "Signed by Priya (Leader)",
         "a" * 64,
         "Dispositions: CMP000000 v1",
     ):
@@ -142,14 +143,15 @@ def test_the_pdf_and_the_docx_carry_the_version_clauses_labels_records_and_signa
     draft = render.render_docx(_view(signed=False))
     paragraphs = "\n".join(paragraph.text for paragraph in Document(io.BytesIO(draft)).paragraphs)
     assert "Exported from draft version 2, not signed" in paragraphs and "Not signed: this is a draft." in paragraphs
-    assert b"PRACTICE RECORD - NOT YOUR REGULATORY RECORD" in render.render_pdf(_view(signed=False))
+    assert "PRACTICE RECORD - NOT YOUR REGULATORY RECORD" in text_of(render.render_pdf(_view(signed=False)))
     no_trial = {**_view(signed=False), "practice_label": None}
-    assert b"DRAFT - NOT SIGNED" in render.render_pdf(no_trial)
+    assert "DRAFT - NOT SIGNED" in text_of(render.render_pdf(no_trial))
 
 
 def test_the_pms_loop_arrows_print_in_the_pdf():
-    from reports.pdf import escape
+    from reports.pdf import render as write
 
     from backend.app.readiness_home.summary import PMS_FRAMING
 
-    assert "PMS -> risk management -> clinical evaluation -> PSUR -> back to the PMS plan" in escape(PMS_FRAMING)
+    shown = " ".join(text_of(write("PMS", [], [(PMS_FRAMING, "body")], watermark="", footer="")).split())
+    assert "PMS → risk management → clinical evaluation → PSUR → back to the PMS plan" in shown

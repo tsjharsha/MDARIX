@@ -299,11 +299,12 @@ def test_the_summary_for_management_review(org, seeded):
     assert pdf.headers["content-type"] == "application/pdf"
     assert pdf.headers["content-disposition"].startswith('attachment; filename="mdarix-readiness-summary-')
     assert pdf.content.startswith(b"%PDF")
-    from reports.pdf import page_count
+    from reports.pdf import page_count, text_of
 
     assert page_count(pdf.content) >= 1
-    assert b"Readiness today" in pdf.content and b"Reporting to regulatory authorities" in pdf.content
-    assert b"8. Standards referenced" in pdf.content and b"it does not certify compliance" in pdf.content
+    shown = " ".join(text_of(pdf.content).split())
+    assert "Readiness today" in shown and "Reporting to regulatory authorities" in shown
+    assert "8. Standards referenced" in shown and "it does not certify compliance" in shown
     with SessionLocal() as db:
         bind_system(db, "test: read the audit trail")
         assert (

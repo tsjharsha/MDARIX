@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from reports.pdf import page_count
+from reports.pdf import page_count, text_of
 from reports.service import REPORT_VERSION, REPORTS
 from tests.reports_seed import cleanup, role_client, seed_case
 
@@ -116,8 +116,9 @@ def test_csv_is_formula_safe_and_pdf_lists_the_records(seeded, investigator):
     assert f"C-{tag}" in text and "human_review_required" in text
     assert "'=HYPERLINK" in text and ",=HYPERLINK" not in text
     pdf = _report(investigator, "INVESTIGATION", "PDF").content
-    assert pdf.startswith(b"%PDF") and f"INV-{tag}".encode() in pdf and page_count(pdf) >= 1
-    assert b"Human review required" in pdf
+    shown = text_of(pdf)
+    assert pdf.startswith(b"%PDF") and f"INV-{tag}" in shown and page_count(pdf) >= 1
+    assert "Human review required" in shown
 
 
 def test_report_jobs_render_the_same_content(seeded, investigator):

@@ -219,9 +219,9 @@ def test_the_summary_ends_with_the_standards_it_references():
         assert rows.count(short) == 1
     assert "Corrective action" in rows and "Canada" in rows
     assert "EU MDR Art. 88" not in rows and "QMSR" not in rows
-    # The PDF writes the dash in the fonts' encoding, not as a question mark.
+    # The PDF prints the dash as written, not as a question mark.
     rendered = summary.render_pdf(data, "Example Medical", "2026-10-17 10:00 UTC")
-    assert b"SOR/98-282 ss. 59\\22661" in rendered
+    assert "SOR/98-282 ss. 59–61" in pdf.text_of(rendered)
 
 
 def test_long_titles_wrap_inside_their_column():
@@ -313,5 +313,5 @@ def test_citation_themes_cite_the_catalog_where_it_has_the_entry():
 
 
 def test_the_pdf_writer_keeps_typographic_dashes_and_quotes():
-    assert pdf.escape("59–61 — ‘a’ “b”") == "59\\22661 \\227 \\221a\\222 \\223b\\224"
-    assert pdf.escape("→") == "?"
+    rendered = pdf.render("t", [], [("59–61 — ‘a’ “b” → ≥ μ", "body")], watermark="", footer="")
+    assert "59–61 — ‘a’ “b” → ≥ μ" in pdf.text_of(rendered)
