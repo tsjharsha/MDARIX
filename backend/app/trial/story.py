@@ -14,6 +14,7 @@ ready-to-use document, imported their own complaints). Nothing here is inferred 
 
 from __future__ import annotations
 
+from backend.app import links
 import logging
 import uuid
 from datetime import date, datetime, timezone
@@ -35,7 +36,7 @@ CHAPTERS = (
         "opens a case, with the trigger's facts.",
         "ISO 13485 clause 8.2.2 lets a complaint close without an investigation only with a documented reason; treating "
         "every complaint as a worst case makes daily handling too slow.",
-        {"section": "Complaints", "tab": "Dispositions"},
+        links.target("Complaints", "Dispositions"),
         None,
     ),
     (
@@ -49,7 +50,7 @@ CHAPTERS = (
         "India?",
         "Reports filed months late, or never evaluated, are a repeat finding in FDA inspections; seriousness judged "
         "without stated criteria is hard to defend.",
-        {"section": "Complaints", "tab": "Reportability"},
+        links.target("Complaints", "Reportability"),
         "REPORTING_CLOCKS",
     ),
     (
@@ -59,7 +60,7 @@ CHAPTERS = (
         "complaint; a person confirms or dismisses each, with a reason.",
         "Recent FDA inspection findings include complaints cancelled or logged as inquiries although they met the firm's "
         "own complaint definition.",
-        {"section": "Complaints", "tab": "Second look"},
+        links.target("Complaints", "Second look"),
         "COMPLAINTS_TO_RECHECK",
     ),
     (
@@ -68,7 +69,7 @@ CHAPTERS = (
         "Signals count every complaint per product version, a statistical check compares each version with its own "
         "history, and Open case starts the investigation with every complaint attached.",
         "Trends counted on a subset of complaints, or by root-cause code, hide real rises until they are cited.",
-        {"section": "Signals", "tab": "Signal inbox"},
+        links.target("Signals", "Signal inbox"),
         None,
     ),
     (
@@ -78,7 +79,7 @@ CHAPTERS = (
         "and passes the automatic trust check, and the investigator judges each one.",
         "Small teams with large backlogs; AI that cannot show its sources is not trusted.",
         # Inside the guided investigation, on its case page (Getting started opens the chapter's case).
-        {"section": "Investigations", "tab": "Workspace"},
+        links.target("Investigations", "Workspace"),
         None,
     ),
     (
@@ -89,7 +90,7 @@ CHAPTERS = (
         "(device-, use- or environment-related, or undetermined with a reason); then record the CAPA to raise in your "
         "QMS from the signed decision. The person who writes a brief never reviews or signs it, on every case.",
         "Trends that never become a CAPA are among the findings FDA cites most often.",
-        {"section": "Investigations", "tab": "Decision Brief"},
+        links.target("Investigations", "Decision Brief"),
         None,
     ),
     (
@@ -98,7 +99,7 @@ CHAPTERS = (
         "Every CAPA gets an effectiveness check with a plan, a day, the complaint recurrence before and since, and a "
         "signed result.",
         "CAPAs closed without a verified effect are among the most cited quality-system findings.",
-        {"section": "Records", "tab": "Effectiveness checks"},
+        links.target("Records", "Effectiveness checks"),
         "CAPA_EFFECTIVENESS",
     ),
     (
@@ -109,7 +110,7 @@ CHAPTERS = (
         "new failure mode needs a risk file update with an owner and a date.",
         "Since February 2026 FDA inspects under QMSR and names post-market data not used in risk management a "
         "significant deficiency (ISO 14971 clause 10).",
-        {"section": "Records", "tab": "Risk file input"},
+        links.target("Records", "Risk file input"),
         "RISK_FILE_INPUT",
     ),
     (
@@ -121,7 +122,7 @@ CHAPTERS = (
         "downloads as PDF and DOCX.",
         "Management review records are now inspectable under QMSR, and copying figures from screens into documents "
         "by hand costs hours and invites errors.",
-        {"section": "Records", "tab": "Reports"},
+        links.target("Records", "Reports"),
         None,
     ),
     (
@@ -131,7 +132,7 @@ CHAPTERS = (
         "names, adds the products and lots it names, and checks every file for problems and personal data before "
         "anything is saved; every chapter above then reads it.",
         "Data spread across systems; teams spend hours a month on manual compilation.",
-        {"section": "Getting started", "tab": None},
+        links.target("Getting started", None),
         None,
     ),
 )

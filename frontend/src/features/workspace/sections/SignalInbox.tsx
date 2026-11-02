@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChevronRight, Plus, X } from "lucide-react";
 import { Empty, Panel } from "../../admin/console/charts";
 import {
@@ -12,7 +12,7 @@ import {
   type Column,
 } from "../../customer-admin/shared";
 import { displayId, safeText } from "../../../app/displayId";
-import { sectionAllowed, useCan, useWorkspace } from "../workspaceContext";
+import { WorkspaceContext, sectionAllowed, useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import { pageText } from "../tasks";
 import { sourceChoices, sourceText } from "../complaintList";
 import {
@@ -89,13 +89,18 @@ export function SignalInbox({
   const [filters, setFilters] = useState<SignalFilters>(initialFilters);
   const [query, setQuery] = useState(initialFilters.q);
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<string | null>(initialSignal);
+  // The signal shown is part of the address (Signal inbox?signal=SIG000023): Back returns to the list.
+  const [selected, setSelected] = useTabParam("signal", "push", initialSignal);
+  // The filters are too (Signal inbox?priority=HIGH): a change replaces the address, so refresh keeps them.
+  const report = useContext(WorkspaceContext)?.reportTab;
+  const keepFilters = (next: SignalFilters) => report?.(signalsTab({ filters: next }), "replace");
   const [creating, setCreating] = useState(false);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const next = query.trim();
       if (next === filters.q) return;
       setFilters((current) => ({ ...current, q: next }));
+      keepFilters({ ...filters, q: next });
       setPage(1);
     }, 300);
     return () => window.clearTimeout(timer);
@@ -108,6 +113,7 @@ export function SignalInbox({
   const finding = !!list.data?.detection_pending;
   const change = (next: Partial<SignalFilters>) => {
     setFilters((current) => ({ ...current, ...next }));
+    keepFilters({ ...filters, ...next });
     setPage(1);
   };
   // The server filters (overdue signals included) and sorts every page; the rows are one page, already in order.

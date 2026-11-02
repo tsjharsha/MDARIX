@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CheckCircle2, Clock, FileWarning, Flag, Link2, Siren } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { useCan } from "../workspaceContext";
+import { useCan, useTabParam } from "../workspaceContext";
 import { DeadlineChip, HarmChip, StateChip, type Harm } from "../../../app/chips";
 import { deadlineLabel } from "../../../app/dates";
 import { AlsoKnownAs, countOf } from "./common";
@@ -44,10 +44,13 @@ const SHOWS = [
  */
 export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const [show, setShow] = useState<"open" | "done">("open");
-  const [open, setOpen] = useState<TriageItem | null>(null);
+  // The item whose panel is open is part of the address (Triage?item=<key>): Back closes it, refresh keeps it.
+  const [openKey, setOpenKey] = useTabParam("item");
   const list = useResource<TriageList>(`${TRIAGE}?show=${show}`);
   const summary = list.data?.summary;
   const items = list.data?.items ?? [];
+  const open = openKey ? (items.find((item) => item.key === openKey) ?? null) : null;
+  const setOpen = (item: TriageItem | null) => setOpenKey(item ? item.key : null);
   const overdue = items.filter((item) => item.triage_clock.state === "OVERDUE").length;
   return (
     <div className="ac-overview">

@@ -72,13 +72,16 @@ import { NEXT_STEPS_SUBTITLE, NEXT_STEPS_SUMMARY } from "../help/trialNextSteps"
 import { requestJson } from "../../app/apiClient";
 import { rolesSummary } from "../../app/roles";
 import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
-import { searchWithoutSignal, signalFromSearch, signalLinkStart } from "./signals";
+import { signalFromSearch, signalLinkStart } from "./signals";
 import { zoneName } from "../../app/dates";
 import { PARKED_SECTIONS, featureSetOf, routeFor } from "../../app/featureSet";
+import { OLD_VIEWS, placeOf } from "../../app/linkTable";
+import { carryOverColumnChoices, columnScopeFor } from "../tables/columnViews";
 import {
   addressFor,
   isWorkspaceHistoryState,
   locationFromAddress,
+  restoreKind,
   type WorkspaceHistoryState,
 } from "./workspaceAddress";
 
@@ -226,28 +229,9 @@ const MVP_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
 /** A section's menu line and purpose under this feature set. */
 const navText = (section: WorkspaceSection, mvp: boolean) => (mvp && MVP_NAV[section]) || NAV[section];
 
-/** Legacy URL views map onto the new sections, so existing links and bookmarks keep working. */
-export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
-  home: ["Dashboard"],
-  readiness: ["Readiness"],
-  "my-work": ["My Work"],
-  products: ["Products"],
-  complaints: ["Complaints"],
-  signals: ["Signals"],
-  story: ["Investigations", "Story"],
-  persona: ["Dashboard"],
-  ask: ["Intelligence", "Ask MDARIX"],
-  investigations: ["Investigations"],
-  evidence: ["Evidence"],
-  decision: ["Decisions"],
-  records: ["Records"],
-  assurance: ["Trust & Audit", "AI assurance"],
-  audit: ["Trust & Audit", "Audit trail"],
-  "regulatory-copilot": ["Intelligence", "Regulatory copilot"],
-  "risk-traceability": ["Intelligence", "Risk & traceability"],
-  "signature-verification": ["Decisions", "Verify a signature"],
-  "next-steps": ["Next steps"],
-};
+/** Former and current addresses (/app/<view>) map onto sections, so existing links and bookmarks keep working (the
+ * old -> new link table, app/linkTable.json). */
+export const VIEW_TO_SECTION = OLD_VIEWS as Record<string, [WorkspaceSection, string?]>;
 
 export function UserWorkspace({
   session,
@@ -288,8 +272,19 @@ export function UserWorkspace({
     tab: start[1],
     key: 0,
   });
-  // The step the case page shows (it reports each change), for its address.
-  const [step, setStep] = useState<string | undefined>(undefined);
+  // The tab the section shows now, with the record, panel and filters it carries (each section reports a change; the
+  // case page its step), for the screen's address; undefined until the section reports one.
+  const [shown, setShown] = useState<string | undefined>(undefined);
+  // Whether the next address replaces the current history entry (a filter changed) instead of adding one.
+  const replaceNext = useRef(false);
+  // Lists' column choices were kept under the section's name until 0.10.67: carried to the screen's view id once.
+  useState(() => {
+    try {
+      return carryOverColumnChoices(window.localStorage);
+    } catch {
+      return 0; // No storage in this browser: nothing to carry over.
+    }
+  });
   const [menuOpen, setMenuOpen] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
   const [trial, setTrial] = useState<TrialStatus | null>(null);
@@ -326,7 +321,7 @@ export function UserWorkspace({
         tab: routed.tab,
         key: current.key + 1,
       }));
-      setStep(undefined);
+      setShown(undefined);
       setMenuOpen(false);
       setMessage(null);
       window.scrollTo({ top: 0 });
@@ -344,9 +339,12 @@ export function UserWorkspace({
     )
       return open("Getting started");
     if (chapter.case) work.setInvestigationId(chapter.case.id, chapter.case.product_id);
-    open(section, chapter.opens.tab ?? undefined);
+    open(section, placeOf(chapter.opens).tab);
   };
-  const reportStep = useCallback((tab: string) => setStep(tab), []);
+  const reportTab = useCallback((tab: string, how: "push" | "replace" = "push") => {
+    replaceNext.current = how === "replace";
+    setShown(tab);
+  }, []);
 
   // Once the case link is resolved it leaves the address (a reload then starts from the saved context), and a case
   // that could not be opened is said so.
@@ -361,16 +359,8 @@ export function UserWorkspace({
     if (caseLinkState === "not-found")
       notify(`${caseLink} was not found in your organization, or your role cannot open it.`, "critical");
     else if (caseLinkState === "failed")
-      notify(`${caseLink} could not be opened right now. Choose it in the context bar above.`, "critical");
+      notify(`${caseLink} could not be opened right now. Open it from Investigations.`, "critical");
   }, [caseLinkState]);
-
-  // The signal link has been taken into the start screen: it leaves the address, so a reload starts on the inbox.
-  // Signals itself says when the signal cannot be found.
-  useEffect(() => {
-    if (!signalLink) return;
-    const { pathname, search, hash } = window.location;
-    window.history.replaceState(window.history.state, "", `${pathname}${searchWithoutSignal(search)}${hash}`);
-  }, [signalLink]);
 
   // A free-trial user starts on Getting started, unless they followed a link to a specific screen.
   useEffect(() => {
@@ -385,39 +375,58 @@ export function UserWorkspace({
   const caseRef = selectedCase ? (selectedCase.business_id ?? selectedCase.investigation_identifier ?? null) : null;
   const addressSynced = useRef(false);
   const restoring = useRef(false);
+  // The screen (location.key) whose history entry the address is now.
+  const entryKey = useRef(-1);
   const caseResolving = work.caseLink?.state === "resolving";
   useEffect(() => {
     if (featureSet !== "mvp" || caseResolving) return;
     const onCasePage = location.section === "Investigations";
-    const tab = onCasePage ? (step ?? location.tab) : location.tab;
+    const tab = shown ?? location.tab;
     const next = addressFor({ section: location.section, tab, caseRef: onCasePage ? caseRef : null });
     const { pathname, search, hash } = window.location;
-    if (next !== `${pathname}${search}`) {
-      const state: WorkspaceHistoryState = {
-        mdarixWorkspace: true,
-        section: location.section,
-        tab,
-        caseId: work.investigationId || null,
-        productId: work.productId || null,
-      };
-      if (addressSynced.current && !restoring.current) window.history.pushState(state, "", `${next}${hash}`);
-      else window.history.replaceState(state, "", `${next}${hash}`);
+    const state: WorkspaceHistoryState = {
+      mdarixWorkspace: true,
+      section: location.section,
+      tab,
+      caseId: work.investigationId || null,
+      productId: work.productId || null,
+    };
+    // An address opened as it is (a link, a refresh) already reads right, but its entry must still hold the screen,
+    // or Back to it would restore nothing (a panel opened after it stayed open).
+    if (next === `${pathname}${search}`) window.history.replaceState(state, "", `${next}${hash}`);
+    else {
+      // A filter (or a tab said when a section opens) replaces this screen's own entry; the first address of a
+      // newly opened screen is always a new entry, so Back returns to the screen before it.
+      const replace =
+        !addressSynced.current || restoring.current || (replaceNext.current && entryKey.current === location.key);
+      if (replace) window.history.replaceState(state, "", `${next}${hash}`);
+      else window.history.pushState(state, "", `${next}${hash}`);
     }
+    if (entryKey.current === location.key) replaceNext.current = false;
+    entryKey.current = location.key;
     addressSynced.current = true;
     restoring.current = false;
-  }, [featureSet, caseResolving, location.key, location.section, location.tab, step, caseRef]);
+  }, [featureSet, caseResolving, location.key, location.section, location.tab, shown, caseRef]);
 
   // Back and Forward restore the screen and its case from what the history entry kept.
   const workRef = useRef(work);
   workRef.current = work;
+  const shownRef = useRef({ section: location.section as string, tab: shown ?? location.tab });
+  shownRef.current = { section: location.section, tab: shown ?? location.tab };
   useEffect(() => {
     if (featureSet !== "mvp") return;
     const onPopState = (event: PopStateEvent) => {
       if (!isWorkspaceHistoryState(event.state)) return;
       const state = event.state;
-      restoring.current = true;
-      setLocation((current) => ({ section: state.section, tab: state.tab, key: current.key + 1 }));
-      setStep(state.tab);
+      // The same tab with another panel or filter: only what it carries changes (a panel closes or opens again);
+      // another tab or screen is opened afresh. The address is already the entry's, so nothing is pushed for it.
+      const kind = restoreKind(shownRef.current, state);
+      if (kind !== "nothing") restoring.current = true;
+      if (kind === "carried") setShown(state.tab);
+      else if (kind === "screen") {
+        setLocation((current) => ({ section: state.section, tab: state.tab, key: current.key + 1 }));
+        setShown(state.tab);
+      }
       const current = workRef.current;
       if (state.caseId && state.caseId !== current.investigationId)
         current.setInvestigationId(state.caseId, state.productId ?? undefined);
@@ -434,7 +443,16 @@ export function UserWorkspace({
   }, [visibleSections, location.section, trialChecked]);
 
   const tenantName = session?.current_tenant?.tenant_name ?? "Your organization";
-  const api: WorkspaceApi = { session, work, open, notify, reportStep, isTrial: !!trial?.is_trial };
+  const api: WorkspaceApi = {
+    session,
+    work,
+    open,
+    notify,
+    reportStep: reportTab,
+    reportTab,
+    shownTab: shown ?? location.tab,
+    isTrial: !!trial?.is_trial,
+  };
   const { section, tab } = location;
 
   return (
@@ -572,7 +590,7 @@ export function UserWorkspace({
                   </div>
                 )}
                 {/* Every list on a page offers the field chooser; each page remembers its own choice of columns. */}
-                <ColumnScopeProvider key={location.key} scope={`workspace:${section}`}>
+                <ColumnScopeProvider key={location.key} scope={columnScopeFor(section)}>
                   <SectionErrorBoundary name={section} resetKey={location.key}>
                     <div className="ca-section">
                       {section === "Getting started" && <GettingStartedSection focus={tab} />}

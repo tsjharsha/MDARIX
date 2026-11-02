@@ -18,6 +18,11 @@ export type AppView =
   | "risk-traceability"
   | "signature-verification"
   | "next-steps"
+  | "getting-started"
+  | "import-data"
+  | "account"
+  | "feedback"
+  | "look-ahead"
   | "customer-admin"
   | "admin"
   | "admin-stage2"
@@ -80,6 +85,12 @@ export const APP_ROUTES: Record<AppView, string> = {
   "risk-traceability": "/app/risk-traceability",
   "signature-verification": "/app/signature-verification",
   "next-steps": "/app/next-steps",
+  // Sections that were named by ?section= until 0.10.67 (linkTable.json keeps the old addresses working).
+  "getting-started": "/app/getting-started",
+  "import-data": "/app/import-data",
+  account: "/app/account",
+  feedback: "/app/feedback",
+  "look-ahead": "/app/look-ahead",
   "customer-admin": "/app/customer-admin",
   admin: "/app/admin",
   "admin-stage2": "/app/admin/stage2",

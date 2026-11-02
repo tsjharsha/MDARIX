@@ -3,6 +3,7 @@ import { BellRing, CalendarOff, ChevronRight } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { placeOf } from "../../../app/linkTable";
 import {
   ALERTS,
   OVERSIGHT,
@@ -19,7 +20,11 @@ import { InlineError } from "./boardParts";
 /** Opens where an alert's work is done (its own section and tab). */
 function useOpen() {
   const { open } = useWorkspace();
-  return (opens: Opens) => opens && open(opens.section as WorkspaceSection, opens.tab);
+  return (opens: Opens) => {
+    if (!opens) return;
+    const place = placeOf(opens);
+    open(place.section as WorkspaceSection, place.tab);
+  };
 }
 
 /**

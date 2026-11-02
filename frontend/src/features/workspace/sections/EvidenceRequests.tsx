@@ -16,7 +16,7 @@ import {
 import { displayId, safeText } from "../../../app/displayId";
 import { useServerSort } from "../../../app/tableSort";
 import { WORKFLOW_ROLE_CODES, roleLabel } from "../../../app/roles";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import { localDay } from "../workspaceModel";
 import { unknownSetFrom } from "../../investigator/savedResults";
 import { CASE_PRIORITIES, casePriorityLabel } from "../caseWorkflow";
@@ -93,7 +93,8 @@ export function EvidenceRequestsPanel({
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const { sort, onSort } = useServerSort(() => setPage(1));
-  const [detail, setDetail] = useState<string | null>(initialRequest);
+  // The request shown is part of the address (Evidence requests?request=<id>).
+  const [detail, setDetail] = useTabParam("request", "push", initialRequest);
   const [creating, setCreating] = useState(false);
   useEffect(() => {
     const timer = window.setTimeout(() => {

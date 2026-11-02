@@ -1,3 +1,4 @@
+import { createContext } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { SignalInbox } from "./sections/SignalInbox";
@@ -39,6 +40,9 @@ vi.mock("./workspaceContext", () => ({
   useWorkspace: () => ({ work: { products: [] } }),
   useCan: () => false,
   sectionAllowed: () => true,
+  // The shown signal is part of the screen's address in the workspace; here none is shown.
+  useTabParam: () => [null, () => undefined],
+  WorkspaceContext: createContext(null),
 }));
 
 describe("the Signal inbox's counts", () => {

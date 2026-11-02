@@ -23,6 +23,7 @@ sweeps their organization when the last sweep is older than five minutes. Nothin
 
 from __future__ import annotations
 
+from backend.app import links
 import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -184,7 +185,7 @@ def _item(
         "market": market,
         "product": product,
         "due_at": due_at,
-        "opens": opens or {"section": "My Work"},
+        "opens": opens or links.target("My Work"),
         "alerts": alerts,
     }
 
@@ -218,9 +219,9 @@ def _task_items(db: Session, tenant_id) -> list[dict]:
             task.source_entity_id if task.source_entity_type == "Complaint" else None
         )
         # An approval task (workflow/approvals.py) names its own category and the screen it opens.
-        opens = details.get("opens") or {"section": "My Work"}
+        opens = details.get("opens") or links.target("My Work")
         if task.task_type == REPLY_TASK and complaint_id:
-            opens = {"section": "Complaints", "tab": f"Communications?complaint={complaint_id}"}
+            opens = links.target("Complaints", "Communications", record=("complaint", complaint_id))
         found.append(
             _item(
                 f"task:{task.id}",
@@ -252,7 +253,7 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
             "backup_id": record.get("backup_owner"),
             "queue": None if owner else "Triage",
             "product": item.get("product_name"),
-            "opens": {"section": "Complaints", "tab": "Triage"},
+            "opens": links.target("Complaints", "Triage"),
         }
         found.append(
             _item(
@@ -302,7 +303,7 @@ def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
                 complaint_id=row.complaint_id,
                 owner_id=row.created_by,
                 market=row.market,
-                opens={"section": "Complaints", "tab": f"Reports?complaint={row.complaint_id}"},
+                opens=links.target("Complaints", "Reports", record=("complaint", row.complaint_id)),
             )
         )
     for row in _candidates(db, tenant_id):
@@ -321,10 +322,9 @@ def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
                 complaint_id=row.complaint_id,
                 owner_id=row.signed_by or row.created_by,
                 market=row.market,
-                opens={
-                    "section": "Complaints",
-                    "tab": "Reportability" if pending else f"Reports?complaint={row.complaint_id}",
-                },
+                opens=links.target("Complaints", "Reportability")
+                if pending
+                else links.target("Complaints", "Reports", record=("complaint", row.complaint_id)),
             )
         )
     return found
@@ -352,7 +352,7 @@ def _guide_items(db: Session, tenant_id, calendar: rules.Calendar) -> list[dict]
             calendar.working_day_end(row.requested_at or row.updated_at, 1),
             ref=row.code,
             queue="Approvers",
-            opens={"section": "Complaints", "tab": "Decision guides"},
+            opens=links.target("Complaints", "Decision guides"),
         )
         for row in db.query(DecisionGuideVersion).filter(
             DecisionGuideVersion.tenant_id == tenant_id, DecisionGuideVersion.state == "AWAITING_APPROVAL"
@@ -375,7 +375,7 @@ def _capa_items(db: Session, tenant_id) -> list[dict]:
             ref=row.business_id or row.capa_identifier,
             queue="Your QMS",
             product=names.get(row.product_id),
-            opens={"section": "Records", "tab": "Effectiveness checks"},
+            opens=links.target("Records", "Effectiveness checks"),
             alerts=False,
         )
         for row in db.query(Capa).filter(Capa.tenant_id == tenant_id, Capa.due_at.isnot(None)).limit(READ_LIMIT)

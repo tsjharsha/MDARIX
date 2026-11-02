@@ -75,6 +75,12 @@ export const WORKSPACE_VIEWS: readonly AppView[] = [
   "signature-verification",
   // From trial to pilot: the workspace shows it in free-trial workspaces only (UserWorkspace).
   "next-steps",
+  // Every section has an address of its own (linkTable.json); the workspace decides which it shows.
+  "getting-started",
+  "import-data",
+  "account",
+  "feedback",
+  "look-ahead",
 ];
 
 /** A customer administrator manages their organization and, in the same account, may switch into the workspace

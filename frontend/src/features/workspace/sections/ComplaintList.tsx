@@ -5,10 +5,11 @@ import { SearchBox, Table, idColumn, listOf, sourceIdColumn, useResource } from 
 import { formatDay } from "../../../app/dates";
 import { sortParams, useServerSort } from "../../../app/tableSort";
 import { displayId } from "../../../app/displayId";
-import { investigationRequestFor, useOpenInvestigation, useWorkspace } from "../workspaceContext";
+import { investigationRequestFor, useOpenInvestigation, useTabFilters, useWorkspace } from "../workspaceContext";
 import { StatusBadge, listTitle } from "./common";
 import {
   EMPTY_COMPLAINT_FILTERS,
+  complaintFilterValues,
   complaintListPath,
   hasComplaintFilters,
   sourceChoices,
@@ -49,8 +50,12 @@ export function ComplaintList({
   const { sort, onSort } = useServerSort(() => setPage(1));
   const list = useResource<any>(complaintListPath(filters, page, sortParams(sort)));
   const pages = list.data?.pages ?? 1;
+  // The filters are part of the address (Complaint list?country=US): a change replaces it, so refresh keeps them.
+  const keepFilters = useTabFilters();
   const set = (change: Partial<ComplaintListFilters>) => {
-    setFilters((current) => ({ ...current, ...change }));
+    const next = { ...filters, ...change };
+    setFilters(next);
+    keepFilters(complaintFilterValues(next));
     setPage(1);
   };
   return (

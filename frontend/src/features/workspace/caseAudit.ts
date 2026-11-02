@@ -11,6 +11,7 @@ import { decisionTab } from "./decisionTabs";
 import { intelligenceTab } from "./intelligence";
 import { reviewsTab } from "./reviews";
 import { signalsTab } from "./signals";
+import { recordPlace, type RecordKind } from "../../app/linkTable";
 import { hashState, verificationChecks, type HistoryRow, type VerificationCheck } from "./humanDecision";
 
 const code = (value: unknown) =>
@@ -328,6 +329,11 @@ export function objectTypeLabel(value: unknown): string {
   return OBJECT_TYPES[type] ?? (type ? titleCase(type) : "Record");
 }
 
+const recordTarget = (kind: RecordKind, id: string): ObjectTarget => {
+  const place = recordPlace(kind, id);
+  return { kind: "section", section: place.section as WorkspaceSection, tab: place.tab };
+};
+
 /** Where a record named by an event opens, or null when no screen shows it. */
 export function objectTarget(object: TimelineObject | undefined): ObjectTarget | null {
   const row = record(object);
@@ -383,6 +389,28 @@ export function objectTarget(object: TimelineObject | undefined): ObjectTarget |
     case "CASE":
     case "INVESTIGATION":
       return { kind: "section", section: "Investigations", tab: "Workspace" };
+    // A complaint, its reports, communications, CAPAs and disposition open where each is worked (linkTable.json).
+    case "COMPLAINT":
+      return id ? recordTarget("complaint", id) : null;
+    case "REPORT":
+    case "REPORTOBLIGATION":
+    case "REPORT_OBLIGATION":
+      return id ? recordTarget("report", id) : null;
+    case "COMMUNICATION":
+    case "COMMUNICATIONENTRY":
+    case "COMMUNICATION_ENTRY":
+      return id ? recordTarget("communication", id) : null;
+    case "CAPA":
+      return id ? recordTarget("capa", id) : null;
+    case "DISPOSITION":
+    case "COMPLAINTDISPOSITION":
+    case "COMPLAINT_DISPOSITION": {
+      // A disposition opens by its complaint (the server's /complaints/{id}/disposition).
+      const complaint = idText(row.complaint_id);
+      return complaint
+        ? recordTarget("disposition", complaint)
+        : { kind: "section", section: "Complaints", tab: "Dispositions" };
+    }
     default:
       return null;
   }

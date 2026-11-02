@@ -221,7 +221,7 @@ def test_every_check_reads_the_records_behind_it(org, seeded):
     checks = {check["code"]: check for check in body["checks"]}
     assert (checks["COMPLAINTS_TO_RECHECK"]["value"], checks["COMPLAINTS_TO_RECHECK"]["state"]) == (1, "CRITICAL")
     assert checks["COMPLAINTS_TO_RECHECK"]["items"][0]["id"] == seeded["hidden"]
-    assert checks["COMPLAINTS_TO_RECHECK"]["opens"] == {"section": "Complaints", "tab": "Second look"}
+    assert checks["COMPLAINTS_TO_RECHECK"]["opens"].items() >= {"section": "Complaints", "tab": "Second look"}.items()
     assert (checks["COMPLAINTS_PAST_TARGET"]["value"], checks["COMPLAINTS_PAST_TARGET"]["state"]) == (1, "CRITICAL")
     assert checks["COMPLAINTS_PAST_TARGET"]["items"][0]["id"] == seeded["past_target"]
     clocks = checks["REPORTING_CLOCKS"]
@@ -320,7 +320,7 @@ def test_another_organization_sees_none_of_this(org, seeded):
     assert all(check["value"] in (0, None) for check in checks.values())
     # Without reporting windows the clocks are "not set up", the finding itself.
     assert checks["REPORTING_CLOCKS"]["state"] == "NOT_SET"
-    assert checks["REPORTING_CLOCKS"]["opens"] == {"section": "Complaints", "tab": "Reporting windows"}
+    assert checks["REPORTING_CLOCKS"]["opens"].items() >= {"section": "Complaints", "tab": "Reporting windows"}.items()
     assert org["other"].get("/api/v1/readiness/summary").json()["complaints"]["received"] == 0
 
 

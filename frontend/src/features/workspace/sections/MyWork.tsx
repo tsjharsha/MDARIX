@@ -22,7 +22,15 @@ import { displayId, safeText } from "../../../app/displayId";
 import { useServerSort } from "../../../app/tableSort";
 import { WORKFLOW_ROLE_CODES, roleLabel } from "../../../app/roles";
 import { conversationSummary } from "../../ask/structuredModel";
-import { sectionAllowed, useCan, useFeatureSet, useWorkspace } from "../workspaceContext";
+import {
+  chooseCase,
+  sectionAllowed,
+  useCan,
+  useFeatureSet,
+  useReportedTab,
+  useTabParam,
+  useWorkspace,
+} from "../workspaceContext";
 import { MY_WORK_APPROVALS_TAB } from "../../../app/featureSet";
 import type { QueueRow } from "../humanDecision";
 import { ApprovalsPanel } from "./DecisionApprovals";
@@ -103,7 +111,7 @@ export function MyWorkSection({ tab }: { tab?: string }) {
   // people who may sign, and each opens on its case's Decision step (app/featureSet.ts).
   const canSign = useCan("decision.sign");
   const approvals = useFeatureSet() === "mvp" && canSign;
-  const [active, setActive] = useState<MyWorkView>(() =>
+  const [active, setActive] = useReportedTab<MyWorkView>(() =>
     approvals && (tab ?? "").split("?")[0] === MY_WORK_APPROVALS_TAB ? MY_WORK_APPROVALS_TAB : initialMyWorkTab(tab),
   );
   // A task or link may name an evidence request to open ("Evidence requests?request=…", see taskDestination).
@@ -116,13 +124,14 @@ export function MyWorkSection({ tab }: { tab?: string }) {
   const tabs: MyWorkView[] = approvals ? [taskTabs[0], MY_WORK_APPROVALS_TAB, ...taskTabs.slice(1)] : taskTabs;
   const counts = Object.fromEntries(tabs.map((item) => [item, tabCount(item, summary.data)]));
   const view = taskViewForTab(active);
-  const openApproval = (row: QueueRow) => {
+  const openApproval = async (row: QueueRow) => {
     if (!row.investigationId) return;
     if (row.productId) work.setInvestigationId(row.investigationId, row.productId);
     else if (work.investigations.some((item) => String(item.id) === row.investigationId))
       work.setInvestigationId(row.investigationId);
-    else {
-      notify(`Choose ${row.caseId} in the context bar above, then open its Decision step.`, "critical");
+    // A case of another product: its product is looked up (My Work has no context bar to choose it in).
+    else if (!(row.caseId && (await chooseCase(work, row.caseId)))) {
+      notify(`${row.caseId ?? "This case"} could not be opened right now. Open it from Investigations.`, "critical");
       return;
     }
     open("Investigations", "Decision");
@@ -201,7 +210,6 @@ function TaskInbox({ view, summary }: { view: TaskView; summary: Resource<TaskSu
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const { sort, onSort } = useServerSort(() => setPage(1));
-  const [drawer, setDrawer] = useState<DrawerState | null>(null);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setSearch(query.trim());
@@ -217,6 +225,15 @@ function TaskInbox({ view, summary }: { view: TaskView; summary: Resource<TaskSu
   const action = useTaskAction(reload);
   const openTask = useOpenTask();
   const rows = listOf(list.data?.items) as Task[];
+  // The task whose panel is open is part of the address (Assigned to me?task=<id>); a refresh opens its details.
+  const [taskId, setTaskId] = useTabParam("task");
+  const [mode, setMode] = useState<DrawerState["mode"]>("details");
+  const listed = taskId ? rows.find((row) => String(row.id) === taskId) : undefined;
+  const drawer: DrawerState | null = listed ? { task: listed, mode } : null;
+  const setDrawer = (next: DrawerState | null) => {
+    if (next) setMode(next.mode);
+    setTaskId(next ? String(next.task.id) : null);
+  };
   const total = list.data?.total ?? rows.length;
   const pages = Math.max(1, Math.ceil(total / (list.data?.page_size || PAGE_SIZE)));
   const choose = (task: Task, key: TaskActionKey) => {

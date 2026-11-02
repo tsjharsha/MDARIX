@@ -8,7 +8,7 @@ import { safeText } from "../../../app/displayId";
 import { downloadFile } from "../../reports/download";
 import { StatementKind } from "../../shared/StatementKind";
 import "../../shared/statement-kind.css";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { chooseCase, useCan, useWorkspace } from "../workspaceContext";
 import {
   caseDecisionPath,
   decisionHistory,
@@ -168,7 +168,7 @@ export function CaseTimeline({
   caseLabel: string;
   onOpenDecision: (decisionId: string) => void;
 }) {
-  const { open } = useWorkspace();
+  const { open, work } = useWorkspace();
   const [filters, setFilters] = useState<TimelineFilters>(EMPTY_TIMELINE_FILTERS);
   const [page, setPage] = useState(1);
   const [actors, setActors] = useState<string[]>([]);
@@ -195,9 +195,15 @@ export function CaseTimeline({
     setFilters((current) => ({ ...current, ...patch }));
     if (!("search" in patch)) setPage(1);
   };
-  const go = (target: ObjectTarget) => {
-    if (target.kind === "decision") onOpenDecision(target.id);
-    else open(target.section, target.tab);
+  // A record of this case opens with this case as the context (the timeline may show another case than the one open).
+  const go = async (target: ObjectTarget) => {
+    if (target.kind === "decision") return onOpenDecision(target.id);
+    if (investigationId !== work.investigationId) {
+      if (work.investigations.some((item) => String(item.id) === investigationId))
+        work.setInvestigationId(investigationId);
+      else await chooseCase(work, caseLabel);
+    }
+    open(target.section, target.tab);
   };
   const filtered =
     filters.categories.length > 0 || !!filters.actor || !!filters.since || !!filters.until || !!filters.search.trim();
@@ -302,7 +308,11 @@ export function CaseTimeline({
                         {" · "}
                         {object.typeLabel}{" "}
                         {object.target ? (
-                          <button type="button" className="ac-link" onClick={() => go(object.target as ObjectTarget)}>
+                          <button
+                            type="button"
+                            className="ac-link"
+                            onClick={() => void go(object.target as ObjectTarget)}
+                          >
                             {object.label}
                           </button>
                         ) : (

@@ -1,3 +1,4 @@
+import type { Target } from "../../app/linkTable";
 // The free trial's story (/api/v1/trial/story, backend/app/trial/story.py): the quality loop chapter by chapter, each
 // with what the trial's records show and whether the organization acted on it (a record it created, never a page
 // view). Getting started reads it; the Platform Admin trial overview reads the same progress.
@@ -12,7 +13,7 @@ export type StoryChapter = {
   title: string;
   promise: string;
   pain: string;
-  opens: { section: string; tab?: string | null };
+  opens: { section: string; tab?: string | null; target?: Target | null };
   finding: { value: number | null; text: string | null; state: string };
   acted: { done: boolean; count: number };
   /** The case the chapter is about (the guided investigation), opened with it; null when there is none. */

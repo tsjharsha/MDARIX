@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -16,7 +16,16 @@ import { BarList, Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admi
 import { Drawer, Table, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
 import { offeredTab } from "../../../app/featureSet";
-import { investigationRequestFor, useCan, useCanRunAi, useOpenInvestigation, useWorkspace } from "../workspaceContext";
+import { tabParts } from "../../../app/linkTable";
+import {
+  WorkspaceContext,
+  investigationRequestFor,
+  renamed,
+  useCan,
+  useCanRunAi,
+  useOpenInvestigation,
+  useWorkspace,
+} from "../workspaceContext";
 import { StatusBadge, countOf } from "./common";
 import { Hero, InlineError, Pager, ProductFilter } from "./boardParts";
 import { TrustBadge } from "./TrustBadge";
@@ -97,7 +106,15 @@ export function ComplaintsSection({ tab }: { tab?: string }) {
           ? "Communications"
           : offeredTab(tab, COMPLAINTS_TABS, "Triage"),
   );
+  const workspace = useContext(WorkspaceContext);
+  const report = workspace?.reportTab;
+  // The tab it opens on is in the address from the start (a link that named another tab or none is replaced).
+  useEffect(() => {
+    if (report && tabParts(workspace?.shownTab).name !== active)
+      report(renamed(workspace?.shownTab, active), "replace");
+  }, []);
   const openTab = (next: string) => {
+    report?.(next);
     const parsed = parseReportsTab(next);
     const thread = parseCommunicationsTab(next);
     setReports(parsed);
@@ -109,7 +126,7 @@ export function ComplaintsSection({ tab }: { tab?: string }) {
   return (
     <Tabs tabs={COMPLAINTS_TABS} active={active} onChange={openTab} label="Complaint sections">
       {active === "Triage" && <Triage onOpenTab={openTab} />}
-      {active === "First contact" && <FirstContact onOpenTab={setActive} />}
+      {active === "First contact" && <FirstContact onOpenTab={openTab} />}
       {active === "Dispositions" && <Dispositions />}
       {active === "Second look" && <SecondLook />}
       {active === "Backlog" && <Backlog />}

@@ -247,7 +247,7 @@ def test_a_signed_version_is_never_edited_and_a_new_generation_is_version_two(tr
     chapters = {item["code"]: item for item in user.get("/api/v1/trial/story").json()["chapters"]}
     chapter = chapters["SHOW_THE_INSPECTOR"]
     assert chapter["title"] == "File ready-to-use documents" and chapter["acted"]["count"] >= 2
-    assert chapter["opens"] == {"section": "Records", "tab": "Reports"}
+    assert chapter["opens"].items() >= {"section": "Records", "tab": "Reports"}.items()
 
 
 def test_the_capa_log_lists_every_imported_capa_with_its_source_and_effectiveness(trial):

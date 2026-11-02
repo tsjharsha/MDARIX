@@ -146,10 +146,12 @@ def test_every_new_email_has_text_and_html_and_escapes_names(company, outbox):
     assert "support@example.com" in outbox[9]["text"]
 
 
-def test_the_approval_email_opens_the_decisions_screen(company, outbox):
+def test_the_approval_email_opens_the_approvals_queue(company, outbox):
+    # Without a case it opens My Work's approvals (0.10.67): the Decisions screen it named is parked under the MVP.
     emailer.send_review_pending_notice("a@x.test", organization="Acme", reference="DEC000003", submitted_by="Ann")
-    assert "https://app.example.com/app/decision" in outbox[0]["text"]
-    assert "/app/my-work" not in outbox[0]["text"]
+    assert "https://app.example.com/app/my-work?tab=Approvals" in outbox[0]["text"]
+    assert "Open the decision" in outbox[0]["text"] and "Open Decisions" not in outbox[0]["text"]
+    assert "/app/decision" not in outbox[0]["text"]
 
 
 def test_a_saved_reminder_template_changes_the_words_but_not_the_layout(company, outbox):
