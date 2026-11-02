@@ -172,6 +172,8 @@ export type AssessmentDetail = {
   scale: Scale;
   severity: string | null;
   severity_level: string | null;
+  /** Where the starting harm level came from: "Your QMS severity" or "The triage record" (stage 8). */
+  severity_source?: string | null;
   starter_mark: string;
   practice_label: string | null;
   /** The practice-training rule binds free-trial organizations only (owner decision 6, 31 Oct 2026). */

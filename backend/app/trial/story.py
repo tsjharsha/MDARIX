@@ -32,8 +32,8 @@ CHAPTERS = (
         "Close a routine complaint in minutes",
         "Most complaints are resolved at service level. On one screen you see why the complaint is not on the "
         "reportability watch, confirm where and by whom the device was used, record the fix and why no investigation "
-        "is needed, and sign once. A known issue joins its open case; a complaint that meets an escalation trigger "
-        "opens a case, with the trigger's facts.",
+        "is needed, and sign once. A known issue joins its open investigation; a complaint that meets an escalation "
+        "trigger opens an investigation, with the trigger's facts and the complaint's own record as its first evidence.",
         "ISO 13485 clause 8.2.2 lets a complaint close without an investigation only with a documented reason; treating "
         "every complaint as a worst case makes daily handling too slow.",
         links.target("Complaints", "Dispositions"),
@@ -65,9 +65,9 @@ CHAPTERS = (
     ),
     (
         "TRENDS_TO_CASES",
-        "Turn a rising trend into a case in one click",
-        "Signals count every complaint per product version, a statistical check compares each version with its own "
-        "history, and Open case starts the investigation with every complaint attached.",
+        "Turn a rising trend into an investigation in one click",
+        "Trends count every complaint per unit of each product version, a statistical check compares each version "
+        "with its earlier average, and Open an investigation starts it with every complaint attached.",
         "Trends counted on a subset of complaints, or by root-cause code, hide real rises until they are cited.",
         links.target("Signals", "Signal inbox"),
         None,
@@ -85,10 +85,10 @@ CHAPTERS = (
     (
         "DECIDE_AND_SIGN",
         "Decide, sign and record the CAPA to raise",
-        "The sample case's Decision Brief is written and waiting for you: review it as the quality reviewer, accept "
+        "The sample investigation's Decision Brief is written and waiting for you: review it as the quality reviewer, accept "
         "it, then sign the decision with your password and authenticator code and its root-cause attribution "
         "(device-, use- or environment-related, or undetermined with a reason); then record the CAPA to raise in your "
-        "QMS from the signed decision. The person who writes a brief never reviews or signs it, on every case.",
+        "QMS from the signed decision. The person who writes a brief never reviews or signs it, on every investigation.",
         "Trends that never become a CAPA are among the findings FDA cites most often.",
         links.target("Investigations", "Decision Brief"),
         None,
@@ -154,7 +154,7 @@ def _count(db: Session, query) -> int:
 WITHOUT_AI = {
     "INVESTIGATE_WITH_AI": (
         "Investigate with evidence you can trace",
-        "The case page brings the complaints, lots, changes and evidence together; ask MDARIX a question and the answer "
+        "The investigation brings the complaints, lots, changes and evidence together; ask MDARIX a question and the answer "
         "cites the records it comes from; the investigator weighs each explanation. AI is off in the free trial.",
         "Small teams with large backlogs; conclusions that cannot show their sources are not trusted.",
     )
@@ -337,7 +337,7 @@ def _trends_finding(db: Session, tenant_id: uuid.UUID, trends: dict | None) -> d
     """Signals waiting for a decision or a case, and trends with no CAPA or risk review (the readiness check)."""
     waiting = _signals_waiting(db, tenant_id)
     without_action = int((trends or {}).get("value") or 0)
-    parts = [f"{_plural(waiting, 'signal')} waiting for a decision or a case"]
+    parts = [f"{_plural(waiting, 'trend')} waiting for a decision or an investigation"]
     if without_action:
         parts.append(f"{_plural(without_action, 'trend')} with no CAPA or risk review")
     state = (trends or {}).get("state")
@@ -349,7 +349,7 @@ def _trends_finding(db: Session, tenant_id: uuid.UUID, trends: dict | None) -> d
 
 
 # The trend chapter's finding while an import's signals are being found (they appear within seconds).
-FINDING_SIGNALS = "Finding signals in the complaints you just imported…"
+FINDING_SIGNALS = "Finding trends in the complaints you just imported…"
 
 
 def _plural(count: int, noun: str) -> str:
@@ -415,8 +415,8 @@ def story(
     waiting = _dispositions_waiting(db, tenant_id) if with_findings else 0
     findings = {
         "ROUTINE_COMPLAINTS": (waiting, f"{_plural(waiting, 'complaint')} waiting for a disposition"),
-        "INVESTIGATE_WITH_AI": (open_cases, f"{_plural(open_cases, 'open case')} to investigate"),
-        "DECIDE_AND_SIGN": (awaiting, f"{_plural(awaiting, 'case')} without a signed decision"),
+        "INVESTIGATE_WITH_AI": (open_cases, f"{_plural(open_cases, 'open investigation')} to work"),
+        "DECIDE_AND_SIGN": (awaiting, f"{_plural(awaiting, 'investigation')} without a signed decision"),
         "YOUR_DATA": (
             counts["YOUR_DATA"],
             f"{_plural(counts['YOUR_DATA'], 'complaint')} of your own imported"

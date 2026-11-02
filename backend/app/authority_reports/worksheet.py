@@ -535,6 +535,10 @@ def build(
             if item.personal:
                 value = personal.get(item.id)
                 found = (value, _source("Sample", None, FICTIONAL)) if value else None
+            elif item.source == "front_page":
+                # The front page's number, entered once (stage 8: nothing typed twice).
+                front = (entries.get("MFR_REPORT") or {}).get("value")
+                found = (front, _source("Worksheet", None, "This worksheet's front page")) if front else None
             elif item.source == "request":
                 found = (
                     (request, _source("Obligation", None, "The authority's request, as recorded")) if request else None

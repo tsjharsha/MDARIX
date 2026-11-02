@@ -6,7 +6,7 @@ import { titleCase } from "../../../admin/console/dashboardModel";
 import { Drawer, errorText, listOf, send, useResource } from "../../../customer-admin/shared";
 import { safeText } from "../../../../app/displayId";
 import { AiInterpretationNote, StatementKind } from "../../../shared/StatementKind";
-import { useCan, useWorkspace } from "../../workspaceContext";
+import { useCan, usePanelFlag, usePanelState, useWorkspace } from "../../workspaceContext";
 import {
   LINK_LEGEND,
   LINK_STATE,
@@ -142,12 +142,23 @@ export function FailureChainView({
 }) {
   const canWork = useCan("investigation.work") && !readOnly;
   const chains = useResource<FailureChains>(intelligencePath(investigationId, "failure-chains"));
-  const [building, setBuilding] = useState(false);
-  const [changing, setChanging] = useState<{ chainId: string; segment: ChainSegment } | null>(null);
   const [adopting, setAdopting] = useState<string | null>(null);
   const [adoptError, setAdoptError] = useState("");
   const { notify } = useWorkspace();
   const stored = listOf(chains.data?.stored);
+  // Each drawer has its own address (panel=<kind>:<id>), so Back closes it and a refresh reopens it.
+  const [building, setBuilding] = usePanelFlag("build-chain");
+  const [changing, setChanging] = usePanelState<{ chainId: string; segment: ChainSegment }>(
+    "chain-link",
+    ({ chainId, segment }) => `${chainId}.${segment.linkId}`,
+    (key) => {
+      const [chainId, linkId] = key.split(".");
+      const chain = stored.find((item) => String(item.id) === chainId);
+      const layout = chain ? chainLayout(chain) : null;
+      const segment = [...(layout?.segments ?? []), ...(layout?.other ?? [])].find((item) => item.linkId === linkId);
+      return segment ? { chainId, segment } : null;
+    },
+  );
   const aiLatest = chains.data?.ai_latest ?? null;
   const aiChains = listOf(aiLatest?.chains);
   const done = () => {

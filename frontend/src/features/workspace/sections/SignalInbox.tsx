@@ -54,16 +54,16 @@ import { SignalDetailView, SignalDue, SignalPriorityCell, SignalStatusBadge } fr
 
 /** The inbox's line while an import's signals are being found. */
 export const FINDING_SIGNALS =
-  "Finding signals in the complaints you just imported… The list updates by itself when they are ready.";
+  "Finding trends in the complaints you just imported… The list updates by itself when they are ready.";
 
 /** What the inbox says when it lists no signal: they are still being found, none match, or there are none. */
 export function inboxEmpty(filters: SignalFilters, finding: boolean): { title: string; detail: string } {
-  if (finding) return { title: "Finding signals…", detail: "The signals from your import appear here in a moment." };
+  if (finding) return { title: "Finding trends…", detail: "The trends from your import appear here in a moment." };
   if (filters.q || filters.priorities.length || filters.productId || filters.origin || filters.owner || filters.source)
-    return { title: "No matching signals", detail: "Change the filters or the search to see more." };
+    return { title: "No matching trends", detail: "Change the filters or the search to see more." };
   return {
     title: `No ${filters.status === "ALL" ? "" : `${statusFilterLabel(filters.status).toLowerCase()} `}signals`,
-    detail: "Signals appear when the detection rule finds a pattern, or when someone creates one.",
+    detail: "Trends appear when the detection rule finds a pattern, or when someone creates one.",
   };
 }
 
@@ -155,7 +155,7 @@ export function SignalInbox({
           ) : undefined
         }
       >
-        <div className="ca-chips uw-signal-chips" role="radiogroup" aria-label="Signal status">
+        <div className="ca-chips uw-signal-chips" role="radiogroup" aria-label="Trend status">
           {chips.map((chip) => (
             <button
               type="button"
@@ -171,7 +171,7 @@ export function SignalInbox({
           ))}
         </div>
         <div className="ca-toolbar uw-signal-toolbar">
-          <SearchBox value={query} onChange={setQuery} label="Search signal ID, title or problem" />
+          <SearchBox value={query} onChange={setQuery} label="Search trend ID, title or problem" />
           <select
             aria-label="Priority"
             value={filters.priorities.join(",")}
@@ -270,7 +270,7 @@ export function SignalInbox({
                 <button
                   type="button"
                   className="ac-link"
-                  aria-label="Show signals that are not overdue as well"
+                  aria-label="Show trends that are not overdue as well"
                   onClick={() => change({ overdue: false })}
                 >
                   <X size={13} aria-hidden="true" />
@@ -283,7 +283,7 @@ export function SignalInbox({
                 <button
                   type="button"
                   className="ac-link"
-                  aria-label="Show every monitored signal"
+                  aria-label="Show every monitored trend"
                   onClick={() => change({ reviewDue: false })}
                 >
                   <X size={13} aria-hidden="true" />
@@ -351,7 +351,7 @@ function signalColumns(onOpen: (reference: string) => void): Column<SignalSummar
   return [
     {
       key: "business_id",
-      label: "Signal ID",
+      label: "Trend ID",
       fields: ["business_id"],
       sortValue: (row) => safeText(row.business_id),
       render: (row) => (
@@ -366,7 +366,7 @@ function signalColumns(onOpen: (reference: string) => void): Column<SignalSummar
       fields: ["title", "origin", "origin_label", "rule_code"],
       render: (row) => (
         <span className="ca-person">
-          <strong>{safeText(row.title) ?? "Untitled signal"}</strong>
+          <strong>{safeText(row.title) ?? "Untitled trend"}</strong>
           <small>{signalOriginLabel(row.origin, row.origin_label)}</small>
         </span>
       ),
@@ -515,12 +515,12 @@ function NewSignalDrawer({ onClose, onCreated }: { onClose: () => void; onCreate
       notify(`${safeText(created?.business_id) ?? "The signal"} was created.`);
       onCreated(created);
     } catch (reason) {
-      setError(errorText(reason, "The signal was not created."));
+      setError(errorText(reason, "The trend was not created."));
       setBusy(false);
     }
   };
   return (
-    <Drawer title="New signal" onClose={onClose}>
+    <Drawer title="New trend" onClose={onClose}>
       <form className="ca-form" onSubmit={submit}>
         <p className="ac-muted">
           Group complaints that point to the same problem. Triage then decides what to do about it.
@@ -645,13 +645,13 @@ function NewSignalDrawer({ onClose, onCreated }: { onClose: () => void; onCreate
             <AlertTriangle size={15} aria-hidden="true" /> {error}
           </p>
         )}
-        <p className="ac-muted">Recorded in the signal's history and the audit trail.</p>
+        <p className="ac-muted">Recorded in the trend's history and the audit trail.</p>
         <div className="ca-action-row">
           <button type="button" className="ac-secondary" onClick={onClose} disabled={busy}>
             Cancel
           </button>
           <button type="submit" className="ac-primary" disabled={busy || !!problem}>
-            {busy ? "Creating…" : "Create signal"}
+            {busy ? "Creating…" : "Create trend"}
           </button>
         </div>
       </form>
@@ -689,7 +689,7 @@ export function SignalTriageSummary({ onOpen }: { onOpen: (tab: string) => void 
   return (
     <Panel
       eyebrow="Signals"
-      title="Signal triage"
+      title="Trend triage"
       source={summary}
       action={
         <button type="button" className="ac-link" onClick={() => onOpen("Signal inbox")}>
@@ -697,7 +697,7 @@ export function SignalTriageSummary({ onOpen }: { onOpen: (tab: string) => void 
         </button>
       }
     >
-      <div className="uw-task-counts" role="group" aria-label="Signals by triage state">
+      <div className="uw-task-counts" role="group" aria-label="Trends by triage state">
         {tiles.map((tile) => (
           <button
             type="button"
@@ -716,7 +716,7 @@ export function SignalTriageSummary({ onOpen }: { onOpen: (tab: string) => void 
         </p>
       )}
       {top.state === "ready" && signals.length > 0 && (
-        <ul className="uw-list" aria-label="Open signals to look at first">
+        <ul className="uw-list" aria-label="Open trends to look at first">
           {signals.map((signal) => {
             const reference = safeText(signal.business_id) ?? String(signal.id);
             return (
@@ -724,7 +724,7 @@ export function SignalTriageSummary({ onOpen }: { onOpen: (tab: string) => void 
                 <span>
                   <strong>{safeText(signal.business_id) ?? "Signal"}</strong>
                   <small>
-                    {safeText(signal.title) ?? "Untitled signal"} · {signalProductText(signal)}
+                    {safeText(signal.title) ?? "Untitled trend"} · {signalProductText(signal)}
                   </small>
                 </span>
                 <SignalPriorityCell signal={signal} />
@@ -746,10 +746,10 @@ export function SignalTriageSummary({ onOpen }: { onOpen: (tab: string) => void 
         <Empty
           {...(finding
             ? inboxEmpty({} as SignalFilters, true)
-            : { title: "No open signals", detail: "Signals waiting for triage appear here." })}
+            : { title: "No open trends", detail: "Trends waiting for triage appear here." })}
         />
       )}
-      {top.state === "error" && <p className="ac-muted">{top.error ?? "Open signals could not be loaded."}</p>}
+      {top.state === "error" && <p className="ac-muted">{top.error ?? "Open trends could not be loaded."}</p>}
     </Panel>
   );
 }

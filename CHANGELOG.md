@@ -10,6 +10,119 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.69] - 2026-11-02
+
+On the trial maintenance line (`release/0.10`): stage 8 of the quality plan, "The investigation in 4 sections, the
+five-minute entrance and the wow screens". It applies to organizations on the new navigation (`tenants.navigation =
+new`); classic organizations keep today's screens, except the words and fixes said below.
+
+No migration. The API and web images change. The sample data does not change, so `scripts/refresh_trial_story.py`
+has nothing new to do; the story's chapter texts are code and change with the image.
+
+### Changed: one investigation in four sections (8.1)
+
+- On the new navigation an investigation is **Summary** (question, scope, lot impact, state), **Evidence** (its
+  evidence and reviews, hypotheses, open unknowns, failure chain, the analysis workspace), **Decisions & actions**
+  (risk and regulatory reviews, the Decision Brief, the decision, the CAPA recorded for your QMS, what follows the
+  decision) and **History** (the record to download, the timeline, signatures and brief fingerprints), under **one
+  progress line** with the next step as the main button. It had eleven tabs and a nine-step stepper.
+- Every former tab's address opens its section and part (`linkTable.json`): links in e-mails, tasks and bookmarks
+  keep working. Classic keeps its tabs.
+- **24 investigation drawers have their own address** (`panel=<kind>:<id>`): Back closes one; refresh, a new tab or a
+  link reopens it.
+- **Words:** inside the investigation "case" reads "investigation", and in the trend inbox "signal" reads "trend".
+  "Gaps" and "Unknowns" are one word, **Unknowns** (the readiness step, the check, the analysis tile). Tab names and
+  signed or stored text are unchanged.
+- **Path f** (from a trend to a signed decision): 10 steps (11 + 1 before).
+
+### Added: "Why am I asked?" and the summary before signing (8.2, 8.3)
+
+- One line under each question and step with its reason and clause: the complaint page's steps and ready to close,
+  the investigation's steps, the first-contact questions, the triage record, the disposition's four questions. A
+  market's question gives its decision guide's own note and locked clause.
+- Before each signature: **what you sign**, then **what it rests on** (answers and guide version, harm level and
+  clock; the worksheet's fields from your records and the snapshot's fingerprint; the brief and its fingerprint; the
+  checklist, markets and the decision record's fingerprint), then "You decide and sign. MDARIX prepared this from your
+  records; it never decides or submits." once.
+
+### Added: the five-minute entrance (8.4)
+
+- A trial on the new navigation opens on four tiles, each about five minutes: **"A complaint just arrived: what
+  now?"**, **"Is a problem rising?"** (OrbitCare 300 Rev B), **"Is this reportable, and by when, in the US and India?"**
+  (SAMPLE-RV-11) and **"Try it on your own export"** (optional). A tile opens its story on its record; a **story bar**
+  shows the step and the way back. The four inspection-readiness numbers and "Restart the sample story" are on the
+  entrance; the ten chapters are under "Explore all capabilities", your own data outside the count.
+- A returning person (the entrance seen in this browser) starts on My work, with "The five-minute stories" one click
+  away.
+
+### Added: the eight wow screens (8.5)
+
+In the design system's tokens; numbers in words beside every bar and marker, never colour alone; a table view beside
+each chart. (1) The hidden complaint revealed (Second look). (2) Legal clocks, one lane per market, on the complaint
+page. (3) The trend per unit against the earlier average (Trends › Trend check). (4) Lot impact as bars by lot and
+by country. (5) The report worksheet's sticky "N of M fields filled from your records" meter, "Show only missing",
+and "From <source>" under each value. (6) The decision record as a receipt. (7) The readiness ring: a state mark on
+every station; "Signals triaged" reads "Trends triaged" (the weekly digest too). (8) The entrance tiles.
+
+### Changed: nothing typed twice (8.6)
+
+- The market assessment's harm level starts from the **triage record's severity** when the QMS severity maps to none
+  ("From the triage record"); it was asked again for each market.
+- Form FDA 3500A **G8** is the front page's manufacturer report number; it was typed twice.
+- The disposition proposes the **user type** from the worksheet's report source (G2), with its source.
+- An escalated complaint's investigation question carries the complaint's words and the trigger in words (it carried
+  codes such as `NEW_FAILURE_MODE`), the **complaint's own record is linked as the investigation's first evidence**,
+  and the Decision Brief's problem statement starts as the question with AI off too (it started empty).
+
+### Changed: the next step, always (8.7)
+
+- The market assessment, the report worksheet, the disposition and an investigation opened from one complaint end
+  with that complaint's next action as the main button and its page one click away. A triaged complaint opens its
+  page. In the flagship story, "Assess India (CDSCO) too" follows the signed US conclusion.
+- **Fixed:** an escalated complaint's "Sign the investigation decision on the case" opened the list of
+  investigations; it now opens that investigation's decision.
+- **Fixed:** "Assess the United States (FDA) market" (and any market assessment link) opened Complaints › Reporting on
+  the complaint's reports, with no assessment in sight; it now opens the complaint's assessment.
+- The investigation's next step never names the analysis (it only warns in the brief's gate; with AI off it stays
+  "not started"); none is named once the decision is signed.
+
+### Changed (separate commit, for the owner to approve): Oversight lists an unassessed market's provisional clock
+
+- Oversight lists the reportability watch's provisional deadline of a market not assessed yet (SAMPLE-RV-06 and
+  SAMPLE-RV-11: FDA), so it says what Reporting and the complaint page say; once an assessment or a report dates the
+  market, that line stands in for it. On a fresh trial: Oversight's items 14 -> 16 (overdue 1 -> 1, due soon 2 -> 2);
+  the bell 3 -> 3, unchanged. Test: `tests/test_oversight_provisional.py`.
+
+### Changed: texts (8.8)
+
+The trial story's chapters (chapter 4: "Turn a rising trend into an investigation in one click"), About the sample
+data, the user guide (the entrance; the four sections) and the website's step strips match the new screens.
+
+### Sample numbers and labels that change
+
+No deadline, trend figure, count or record changes.
+
+| Where | Before | After |
+|---|---|---|
+| Story chapter 4 title | Turn a rising trend into a case in one click | Turn a rising trend into an investigation in one click |
+| Story findings | "N open cases to investigate"; "N cases without a signed decision"; "N signals waiting for a decision or a case" | "N open investigations to work"; "N investigations without a signed decision"; "N trends waiting for a decision or an investigation" |
+| Readiness ring, digest | Signals triaged | Trends triaged |
+| Investigation step | Gaps and open questions; check "Open questions are answered" | Unknowns; "Unknowns are answered" |
+| Analysis tile | Gaps | Unknowns |
+| Case record download | Download case record | Download investigation record |
+| Evidence source of sample records | MDARIX_SAMPLE | Sample data |
+| About the sample data, lot impact button | Open the case scope | Open the lot impact |
+
+### Tests
+
+- pytest: `tests/test_flagship_walkthrough.py` (new): the flagship from its tile to ready to close by each screen's
+  main button, with the field sources. Updated: `test_decision_brief.py` (the prefilled problem statement),
+  `test_free_trial.py`, `test_import_signals_after_response.py`, `test_case_workflow_unit.py`,
+  `test_case_intelligence_unit.py`, `test_readiness_digest_unit.py` (the words).
+- vitest: `entrance.test.tsx`, `whyAsked.test.tsx`, `wowScreens.test.tsx`, `nextAfter.test.ts`,
+  `flagshipWalk.test.ts` (new); `app/linkTable.test.ts` (every former investigation tab), `app/clickPaths.test.ts`
+  (path f), `caseWorkflow.test.ts` (the progress line), and the tests whose words changed.
+
 ## [0.10.68] - 2026-11-02
 
 On the trial maintenance line (`release/0.10`): stage 7 of the quality plan, "New navigation and the complaint page".

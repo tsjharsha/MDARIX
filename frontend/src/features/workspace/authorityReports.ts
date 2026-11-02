@@ -388,3 +388,18 @@ export function nowLocal(now: Date = new Date()): string {
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
 }
+
+/** A field still to enter before submission. */
+export const isMissing = (field: Pick<WorksheetField, "status">) => field.status === "MUST_HAVE";
+
+/** The worksheet's meter (wow screen 5): fields filled from the records, entered by a person, missing, and in all. */
+export function worksheetMeter(sections: readonly WorksheetSection[]) {
+  const fields = sections.flatMap((section) => section.fields);
+  const count = (statuses: string[]) => fields.filter((field) => statuses.includes(field.status)).length;
+  return {
+    total: fields.length,
+    fromRecords: count(["FROM_RECORD", "CONFIRMED"]),
+    entered: count(["ENTERED"]),
+    missing: fields.filter(isMissing).length,
+  };
+}

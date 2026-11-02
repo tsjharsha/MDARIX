@@ -137,7 +137,7 @@ export function SignalDetailView({
       <Panel eyebrow="Signal" title={reference} action={back}>
         <Empty
           title={`${reference} was not found`}
-          detail="It is not a signal of your organization, or your role cannot open it."
+          detail="It is not a trend of your organization, or your role cannot open it."
         />
       </Panel>
     );
@@ -173,7 +173,7 @@ function SignalBody({
   const [created, setCreated] = useState<CreatedCase | null>(null);
   const [opening, setOpening] = useState(false);
   const actions = signal.actions ?? {};
-  const name = safeText(signal.business_id) ?? "The signal";
+  const name = safeText(signal.business_id) ?? "The trend";
   const reference = (item: SignalRef) => safeText(item.business_id) ?? String(item.id);
 
   const openCase = (kase: CreatedCase) => {
@@ -216,7 +216,7 @@ function SignalBody({
         reload();
       }
     } catch (reason) {
-      notify(errorText(reason, "The case could not be opened."), "critical");
+      notify(errorText(reason, "The investigation could not be opened."), "critical");
     } finally {
       setOpening(false);
     }
@@ -367,13 +367,13 @@ function SignalBody({
               {actions.can_open_case ? "Open an investigation with options…" : "Create investigation"}
             </button>
           )}
-          {!anyAction && <p className="ac-muted">Nothing for you to do on this signal right now.</p>}
+          {!anyAction && <p className="ac-muted">Nothing for you to do on this trend right now.</p>}
         </div>
       </section>
 
       {(signal.canonical || listOf(signal.merged_from).length > 0 || listOf(signal.investigations).length > 0) && (
-        <section className="ca-drawer-section" aria-label="Lineage and cases">
-          <h3>Lineage and cases</h3>
+        <section className="ca-drawer-section" aria-label="Lineage and investigations">
+          <h3>Lineage and investigations</h3>
           {signal.canonical && (
             <p>
               Duplicate of{" "}
@@ -397,7 +397,7 @@ function SignalBody({
             </p>
           )}
           {listOf(signal.investigations).length > 0 && (
-            <ul className="uw-list" aria-label="Investigations opened for this signal">
+            <ul className="uw-list" aria-label="Investigations opened for this trend">
               {(listOf(signal.investigations) as Array<SignalRef & { status?: string | null }>).map((kase) => (
                 <li key={kase.id}>
                   <span>
@@ -416,13 +416,13 @@ function SignalBody({
         </section>
       )}
 
-      <section className="ca-drawer-section" aria-label="Complaints in this signal">
+      <section className="ca-drawer-section" aria-label="Complaints in this trend">
         <h3>Complaints · {complaints.length}</h3>
         <Table
-          caption="Complaints in this signal"
+          caption="Complaints in this trend"
           rows={complaints}
           rowKey={(row) => String(row.id)}
-          empty={{ title: "No complaints", detail: "Complaints grouped into this signal appear here." }}
+          empty={{ title: "No complaints", detail: "Complaints grouped into this trend appear here." }}
           columns={[
             {
               key: "business_id",
@@ -504,7 +504,7 @@ function SignalBody({
           <RelatedList title="Changes" rows={listOf(signal.related?.changes)} empty="No related changes." />
           <RelatedList title="Open CAPAs" rows={listOf(signal.related?.open_capas)} empty="No open CAPAs." />
           <RelatedList
-            title="Open cases"
+            title="Open investigations"
             rows={listOf(signal.related?.open_investigations)}
             empty="No open investigations for this product."
           />
@@ -545,11 +545,7 @@ function SignalBody({
         />
       )}
       {mode === "merge" && (
-        <MergeDrawer
-          signal={signal}
-          onClose={() => setMode(null)}
-          onDone={() => done(`Signals merged into ${name}.`)}
-        />
+        <MergeDrawer signal={signal} onClose={() => setMode(null)} onDone={() => done(`Trends merged into ${name}.`)} />
       )}
       {mode === "complaints" && (
         <AddComplaintsDrawer
@@ -648,7 +644,7 @@ function FormButtons({
 }) {
   return (
     <>
-      <p className="ac-muted">Recorded in the signal's history and the audit trail.</p>
+      <p className="ac-muted">Recorded in the trend's history and the audit trail.</p>
       <div className="ca-action-row">
         <button type="button" className="ac-secondary" onClick={onClose} disabled={busy}>
           Cancel
@@ -823,7 +819,7 @@ function DispositionDrawer({
               onChange={(event) => setForm({ ...form, canonicalSignalId: event.target.value })}
             >
               <option value="">
-                {siblings.list.state === "loading" ? "Loading…" : "Choose the signal that covers this problem"}
+                {siblings.list.state === "loading" ? "Loading…" : "Choose the trend that covers this problem"}
               </option>
               {siblings.rows.map((row) => (
                 <option key={row.id} value={row.id}>
@@ -832,7 +828,7 @@ function DispositionDrawer({
               ))}
             </select>
             {siblings.list.state === "ready" && !siblings.rows.length && (
-              <small className="ac-muted">No other open signal of this product.</small>
+              <small className="ac-muted">No other open trend of this product.</small>
             )}
           </label>
         )}
@@ -902,7 +898,7 @@ function MergeDrawer({ signal, onClose, onDone }: { signal: SignalDetail; onClos
   const siblings = useSiblingSignals(signal);
   const problem = mergeProblem(sources, reason);
   return (
-    <Drawer title={title(signal, "Merge signals")} onClose={onClose}>
+    <Drawer title={title(signal, "Merge trends")} onClose={onClose}>
       <form
         className="ca-form"
         onSubmit={async (event) => {
@@ -911,26 +907,26 @@ function MergeDrawer({ signal, onClose, onDone }: { signal: SignalDetail; onClos
           const result = await submit.run(
             signalPath(signal.id, "merge"),
             { source_signal_ids: sources, reason: reason.trim() },
-            "The signals were not merged.",
+            "The trends were not merged.",
           );
           if (result !== null) onDone();
         }}
       >
         <p className="ac-muted">
-          The chosen signals and their complaints are merged into {safeText(signal.business_id) ?? "this signal"}. They
+          The chosen signals and their complaints are merged into {safeText(signal.business_id) ?? "this trend"}. They
           keep their records and point here.
         </p>
         {siblings.list.state === "loading" && !siblings.list.data ? (
-          <p className="ac-muted">Loading signals…</p>
+          <p className="ac-muted">Loading trends…</p>
         ) : siblings.rows.length ? (
           <SignalChecklist
             rows={siblings.rows}
             chosen={sources}
             onToggle={(id) => setSources((current) => toggled(current, id))}
-            label="Signals to merge"
+            label="Trends to merge"
           />
         ) : (
-          <p className="ac-muted">No other open signal of this product.</p>
+          <p className="ac-muted">No other open trend of this product.</p>
         )}
         <label className="ca-field">
           Reason
@@ -945,7 +941,7 @@ function MergeDrawer({ signal, onClose, onDone }: { signal: SignalDetail; onClos
         </label>
         {problem && reason.trim() && <p className="uw-hint">{problem}</p>}
         <FormError error={submit.error} />
-        <FormButtons busy={submit.busy} disabled={!!problem} label="Merge into this signal" onClose={onClose} />
+        <FormButtons busy={submit.busy} disabled={!!problem} label="Merge into this trend" onClose={onClose} />
       </form>
     </Drawer>
   );
@@ -1105,7 +1101,7 @@ function InvestigationDrawer({
           <legend>
             Complaints for the case · {form.complaintIds.length} of {complaints.length}
           </legend>
-          <ul className="uw-pick-list" aria-label="Complaints for the case">
+          <ul className="uw-pick-list" aria-label="Complaints for the investigation">
             {complaints.map((row) => (
               <li key={row.id}>
                 <label className="ca-check">
@@ -1126,7 +1122,7 @@ function InvestigationDrawer({
             ))}
           </ul>
         </fieldset>
-        <div className="ca-chips" role="radiogroup" aria-label="Who works the case">
+        <div className="ca-chips" role="radiogroup" aria-label="Who works the investigation">
           {(["queue", "person"] as const).map((option) => (
             <button
               type="button"
@@ -1160,12 +1156,12 @@ function InvestigationDrawer({
         )}
         {siblings.rows.length > 0 && (
           <fieldset className="ca-fieldset uw-pick-fieldset">
-            <legend>Also covers these signals of the same product (optional)</legend>
+            <legend>Also covers these trends of the same product (optional)</legend>
             <SignalChecklist
               rows={siblings.rows}
               chosen={form.alsoSignalIds}
               onToggle={(id) => setForm({ ...form, alsoSignalIds: toggled(form.alsoSignalIds, id) })}
-              label="Other signals for the case"
+              label="Other trends for the investigation"
             />
           </fieldset>
         )}
@@ -1174,7 +1170,7 @@ function InvestigationDrawer({
           <input
             maxLength={64}
             value={form.identifier}
-            placeholder="The case number in your quality system, if it has one"
+            placeholder="The investigation number in your quality system, if it has one"
             onChange={(event) => setForm({ ...form, identifier: event.target.value })}
           />
         </label>

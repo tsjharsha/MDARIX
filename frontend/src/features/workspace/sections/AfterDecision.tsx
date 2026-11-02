@@ -4,7 +4,7 @@ import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
 import { safeText } from "../../../app/displayId";
 import { roleLabel } from "../../../app/roles";
-import { sectionAllowed, useCan, useWorkspace } from "../workspaceContext";
+import { sectionAllowed, useCan, usePanelState, useWorkspace } from "../workspaceContext";
 import {
   CLOSURE_RESULT,
   FOLLOW_UP_ACTIONS_SHOWN,
@@ -75,9 +75,14 @@ export function FollowUpsPanel({
   reloadKey?: number;
 }) {
   const list = useResource<{ items?: FollowUp[] }>(caseFollowUpsPath(investigationId));
-  const [chosen, setChosen] = useState<FollowUp | null>(null);
-  const [opened, setOpened] = useState(false);
   const rows = listOf(list.data?.items ?? list.data) as FollowUp[];
+  // The open follow-up has its own address (panel=follow-up:<id>), so Back closes it and a refresh reopens it.
+  const [chosen, setChosen] = usePanelState<FollowUp>(
+    "follow-up",
+    (row) => String(row.id),
+    (id) => rows.find((row) => String(row.id) === id) ?? null,
+  );
+  const [opened, setOpened] = useState(false);
   useEffect(() => {
     if (reloadKey) list.reload();
   }, [reloadKey]);
@@ -103,7 +108,7 @@ export function FollowUpsPanel({
     >
       {initialFollowUp && opened && !findByRef(rows, initialFollowUp) && (
         <p className="ac-muted" role="status">
-          The follow-up from your task is not part of this case's list. It may belong to another case.
+          The follow-up from your task is not part of this investigation's list. It may belong to another investigation.
         </p>
       )}
       <Table
@@ -450,9 +455,14 @@ export function ImpactAssessmentsPanel({
   onReopened?: () => void;
 }) {
   const list = useResource<{ items?: ImpactAssessment[] }>(caseImpactAssessmentsPath(investigationId));
-  const [chosen, setChosen] = useState<ImpactAssessment | null>(null);
-  const [opened, setOpened] = useState(false);
   const rows = listOf(list.data?.items ?? list.data) as ImpactAssessment[];
+  // The open assessment has its own address (panel=impact:<id>), so Back closes it and a refresh reopens it.
+  const [chosen, setChosen] = usePanelState<ImpactAssessment>(
+    "impact",
+    (row) => String(row.id),
+    (id) => rows.find((row) => String(row.id) === id) ?? null,
+  );
+  const [opened, setOpened] = useState(false);
   useEffect(() => {
     if (opened || !initialAssessment || list.state !== "ready") return;
     const found = findByRef(rows, initialAssessment);
@@ -469,7 +479,8 @@ export function ImpactAssessmentsPanel({
     >
       {initialAssessment && opened && !findByRef(rows, initialAssessment) && (
         <p className="ac-muted" role="status">
-          The assessment from your task is not part of this case's list. It may belong to another case.
+          The assessment from your task is not part of this investigation's list. It may belong to another
+          investigation.
         </p>
       )}
       <Table
@@ -478,7 +489,8 @@ export function ImpactAssessmentsPanel({
         rowKey={(row) => String(row.id)}
         empty={{
           title: "No impact assessments",
-          detail: "Evidence that reaches the case after its decision was signed is listed here to be assessed.",
+          detail:
+            "Evidence that reaches the investigation after its decision was signed is listed here to be assessed.",
         }}
         columns={[
           {
@@ -540,8 +552,8 @@ export function ImpactAssessmentsPanel({
         ]}
       />
       <p className="ac-note">
-        An assessment records whether new evidence changes the decision. A material impact reopens the case for a new
-        decision; the signed decision stays as it was signed.
+        An assessment records whether new evidence changes the decision. A material impact reopens the investigation for
+        a new decision; the signed decision stays as it was signed.
       </p>
       {chosen && (
         <ImpactDrawer
@@ -586,7 +598,7 @@ export function ImpactDrawer({
       const material = conclusion === "MATERIAL_IMPACT";
       notify(
         material
-          ? `${name}: material impact recorded. The case reopens for a new decision; the signed decision is unchanged.`
+          ? `${name}: material impact recorded. The investigation reopens for a new decision; the signed decision is unchanged.`
           : `${name}: no impact recorded. The signed decision stands.`,
       );
       onDone(material);
@@ -642,8 +654,8 @@ export function ImpactDrawer({
         <form className="ca-form ca-drawer-section" onSubmit={submit}>
           <h3>Your assessment</h3>
           <p className="ac-muted">
-            The signed decision is never changed. A material impact reopens the case so that a new decision, signed by
-            an authorized decision maker, can supersede it.
+            The signed decision is never changed. A material impact reopens the investigation so that a new decision,
+            signed by an authorized decision maker, can supersede it.
           </p>
           <fieldset className="ca-fieldset uw-pick-fieldset">
             <legend>Does this evidence change the decision?</legend>
@@ -694,7 +706,7 @@ export function ImpactDrawer({
           </div>
         </form>
       ) : (
-        !done && <p className="ac-muted">Someone who works this case records the assessment.</p>
+        !done && <p className="ac-muted">Someone who works this investigation records the assessment.</p>
       )}
       {error && (
         <p className="ac-message tone-critical" role="alert">
@@ -711,7 +723,7 @@ export function ClosureCriteria({ check, state }: { check: ClosureCheck | null; 
   if (!check)
     return (
       <p className="ac-muted">
-        The closure criteria could not be checked here. MDARIX checks them again when you close the case.
+        The closure criteria could not be checked here. MDARIX checks them again when you close the investigation.
       </p>
     );
   if (check.applies === false) return null;

@@ -95,12 +95,12 @@ export function EvidenceSelect({
       <select value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="">
           {inventory.state === "loading" && !inventory.data
-            ? "Loading the case's evidence…"
+            ? "Loading the investigation's evidence…"
             : items.length
               ? optional
                 ? "No evidence"
-                : "Choose evidence from this case"
-              : "No evidence in this case yet"}
+                : "Choose evidence from this investigation"
+              : "No evidence in this investigation yet"}
         </option>
         {items
           .filter((item) => item.evidence?.id)
@@ -111,7 +111,9 @@ export function EvidenceSelect({
           ))}
       </select>
       {inventory.state !== "loading" && inventory.state !== "ready" && (
-        <small className="ca-inline-error">{inventory.error ?? "The case's evidence could not be read."}</small>
+        <small className="ca-inline-error">
+          {inventory.error ?? "The investigation's evidence could not be read."}
+        </small>
       )}
     </label>
   );

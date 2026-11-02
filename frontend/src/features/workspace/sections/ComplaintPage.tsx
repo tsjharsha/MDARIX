@@ -4,9 +4,9 @@ import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { DeadlineChip, HarmChip } from "../../../app/chips";
 import { marketLabel } from "../../../app/labels";
-import { NEW_PLACES, placeOf } from "../../../app/linkTable";
+import { NEW_PLACES } from "../../../app/linkTable";
 import { offeredTab } from "../../../app/featureSet";
-import { renamed, useCan, useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { renamed, useCan, useOpenTarget, useWorkspace } from "../workspaceContext";
 import { tabParam, withTabParam } from "../workspaceAddress";
 import { CHECK_TONES, EVENT_TONES, eventPath, type CheckItem, type EventView, type Opens } from "../oversight";
 import { communicationsTab } from "../communications";
@@ -14,6 +14,9 @@ import { reportsTab } from "../authorityReports";
 import { DecisionRecord, OwnerPicker, ReadyForm } from "./Oversight";
 import { ProblemCode, useImdrfLinks } from "./ProblemCode";
 import { InlineError } from "./boardParts";
+import { ChartOrTable, ClockLanes, type Lane } from "./WowCharts";
+import { WhyAsked } from "../../shared/Basis";
+import { COMPLAINT_STEP_WHY } from "../whyAsked";
 
 export const COMPLAINT_SECTIONS = NEW_PLACES.Complaint.tabs;
 type ComplaintSection = (typeof COMPLAINT_SECTIONS)[number];
@@ -79,11 +82,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   useEffect(() => {
     if (readable && readable !== ref) reportTab?.(withTabParam(shownTab ?? tab, "ref", readable), "replace");
   }, [readable]);
-  const go = (opens: Opens | null) => {
-    if (!opens) return;
-    const place = placeOf(opens);
-    open(place.section as WorkspaceSection, place.tab);
-  };
+  const go = useOpenTarget();
   const choose = (next: ComplaintSection) => {
     setActive(next);
     reportTab?.(renamed(shownTab ?? tab, next));
@@ -196,6 +195,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                 )}
               </dl>
             </Panel>
+            <LegalClocks view={view} />
             <Panel eyebrow="Summary" title="Stage">
               <ol className="uw-ov-stages">
                 {view.stages.map((stage) => (
@@ -267,6 +267,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
               <OwnerPicker view={view} onChanged={changed} />
             </Panel>
             <Panel eyebrow="Decisions & actions" title="Ready to close">
+              <WhyAsked why={COMPLAINT_STEP_WHY.READY} />
               <WhoSigns view={view} code="READY" />
               <ReadyForm view={view} onChanged={changed} />
               {view.changed_since_signed && (
@@ -311,6 +312,7 @@ function CheckRow({
       <ToneBadge tone={CHECK_TONES[item.result]} label={item.result_label} />
       <span>
         <strong>{item.label}.</strong> {item.detail}
+        {open && <WhyAsked why={COMPLAINT_STEP_WHY[item.code]} />}
         {open && <WhoSigns view={view} code={item.code} />}
       </span>
       <span className="uw-cp-step-actions">
@@ -396,5 +398,73 @@ function SendTo({ view, code, onSent }: { view: EventView; code: string; onSent:
       </small>
       <InlineError text={error} />
     </span>
+  );
+}
+
+/**
+ * Legal clocks as one lane per market (wow screen 2): from the awareness day to each market's legal deadline (stage
+ * 2's one deadline per market), today marked; the markets assessed without a clock are named below.
+ */
+export function legalLanes(view: Pick<EventView, "event" | "work">): Lane[] {
+  return deadlineChips(view.work?.due ?? [])
+    .filter((item) => LEGAL.includes(item.category) && item.market)
+    .map((item) => ({
+      key: item.key,
+      market: marketLabel(item.market!),
+      from: view.event.awareness_at ?? item.due_at,
+      to: item.due_at,
+      note: item.title,
+      dueText: `Due ${item.due_label ?? formatDate(item.due_at)}`,
+      stateText:
+        item.state === "OVERDUE"
+          ? "Overdue"
+          : item.hours_left < 48
+            ? `${Math.max(0, Math.round(item.hours_left))} hours left`
+            : `${Math.floor(item.hours_left / 24)} days left`,
+      overdue: item.state === "OVERDUE",
+    }));
+}
+
+function LegalClocks({ view }: { view: EventView }) {
+  const lanes = legalLanes(view);
+  const clocked = new Set(
+    (view.work?.due ?? []).filter((item) => LEGAL.includes(item.category)).map((item) => item.market),
+  );
+  const without = (view.work?.markets ?? []).filter((market) => !clocked.has(market)).map(marketLabel);
+  if (!lanes.length && !without.length) return null;
+  return (
+    <Panel eyebrow="Summary" title="Legal clocks, market by market">
+      {lanes.length > 0 && (
+        <ChartOrTable
+          title={`From the day you became aware (${formatDate(view.event.awareness_at)}) to each deadline`}
+          chart={<ClockLanes lanes={lanes} />}
+          table={
+            <table className="uw-wow-table">
+              <caption className="sr-only">Legal clocks, market by market</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Market</th>
+                  <th scope="col">Clock</th>
+                  <th scope="col">Deadline</th>
+                  <th scope="col">Time left</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lanes.map((lane) => (
+                  <tr key={lane.key}>
+                    <th scope="row">{lane.market}</th>
+                    <td>{lane.note}</td>
+                    <td>{lane.dueText}</td>
+                    <td>{lane.stateText}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          }
+          note="Each clock counts from the day you became aware; starter rules, for your consultant to confirm."
+        />
+      )}
+      {without.length > 0 && <p className="ac-muted">No legal clock running: {without.join(", ")}.</p>}
+    </Panel>
   );
 }

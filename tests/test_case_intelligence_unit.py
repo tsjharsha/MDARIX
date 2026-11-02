@@ -345,7 +345,7 @@ def test_unknowns_in_progress_are_open_and_accepted_limitations_are_answered():
     assert not readiness.unknown_is_open("superseded")
     pending = readiness.evaluate(_facts(unknowns={"total": 3, "open": 2}))
     assert _check(pending, "unknowns")["result"] == "PENDING"
-    assert _check(pending, "unknowns")["rationale"] == "2 open questions still to answer"
+    assert _check(pending, "unknowns")["rationale"] == "2 open unknowns still to answer"
     assert _check(readiness.evaluate(_facts(unknowns={"total": 3, "open": 0})), "unknowns")["result"] == "PASS"
 
 

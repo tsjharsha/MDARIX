@@ -23,6 +23,7 @@ import {
 } from "../signalAi";
 import { ChipFilter, Hero, InlineError, ProductFilter } from "./boardParts";
 import { BasisLine } from "../../shared/Basis";
+import { Bars, BarsTable, ChartOrTable, type BarRow } from "./WowCharts";
 
 /**
  * Signals › Trend check: every product version (or version and problem, or complaint type) against its own history,
@@ -52,7 +53,7 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
       board.reload();
       if (made?.business_id || made?.id) onOpenSignal(String(made.business_id ?? made.id));
     } catch (failure) {
-      setError(errorText(failure, "The signal was not raised."));
+      setError(errorText(failure, "The trend was not raised."));
     } finally {
       setBusy(null);
     }
@@ -113,12 +114,13 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
           icon={<Activity size={18} />}
         />
       </div>
-      <Panel eyebrow="Signals" title="Trend check" source={board}>
+      <Panel eyebrow="Trends" title="Trend check" source={board}>
         <div className="uw-cr-toolbar">
           <ChipFilter label="Group complaints" options={TREND_GROUPS} value={group} onChange={setGroup} />
           <ProductFilter value={product} onChange={setProduct} />
         </div>
         <InlineError text={error} />
+        <TrendPerUnit items={board.data?.items ?? []} />
         <Table
           caption="Trend check"
           rows={board.data?.items ?? []}
@@ -162,7 +164,7 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
                     className="ac-link"
                     onClick={() => onOpenSignal(String(row.open_signals[0].business_id ?? row.open_signals[0].id))}
                   >
-                    {row.open_signals[0].business_id ?? "Open signal"}
+                    {row.open_signals[0].business_id ?? "Open trend"}
                   </button>
                 ) : canTriage && canRaiseFromTrend(row) ? (
                   <button
@@ -171,7 +173,7 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
                     disabled={busy === row.key}
                     onClick={() => void raise(row)}
                   >
-                    <Plus size={14} aria-hidden="true" /> {busy === row.key ? "Raising…" : "Raise a signal"}
+                    <Plus size={14} aria-hidden="true" /> {busy === row.key ? "Raising…" : "Raise a trend"}
                   </button>
                 ) : null,
             },
@@ -181,5 +183,41 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
         <BasisLine ids={TREND_BASIS} />
       </Panel>
     </div>
+  );
+}
+
+/**
+ * The trend per unit (wow screen 3): each assessed group's complaints in the last 30 days beside what the earlier
+ * average predicts for the units in the field (or the days, for a product counted by calendar). The groups that rose
+ * come first and say so in words; at most eight, the table lists them all.
+ */
+export function TrendPerUnit({ items }: { items: TrendItem[] }) {
+  const rank = (item: TrendItem) => (item.result === "SIGNIFICANT" ? 0 : item.result === "ELEVATED" ? 1 : 2);
+  const assessed = items
+    .filter((item) => item.expected > 0 && item.p_value !== null)
+    .sort((a, b) => rank(a) - rank(b) || (b.ratio ?? 0) - (a.ratio ?? 0));
+  const row = (item: TrendItem): BarRow => ({
+    key: item.key,
+    label: item.name,
+    value: item.recent,
+    valueText: `${item.recent} in the last ${item.recent_days} days`,
+    reference: item.expected,
+    referenceText: `the earlier average predicts ${item.expected.toLocaleString("en-US", { maximumFractionDigits: 2 })}${item.basis === "UNITS" ? " for its units in the field" : ""}`,
+    flag: rank(item) < 2 ? trendResultLabel(item) : null,
+  });
+  if (!assessed.length) return null;
+  return (
+    <ChartOrTable
+      title="Complaints against the earlier average"
+      chart={<Bars rows={assessed.slice(0, 8).map(row)} label="Complaints against the earlier average" />}
+      table={
+        <BarsTable
+          rows={assessed.map(row)}
+          caption="Complaints against the earlier average"
+          columns={["Group", "Last 30 days", "The earlier average predicts"]}
+        />
+      }
+      note="The bar is what arrived; the marker is what the group's earlier average predicts. A rise counts only when it is unlikely to be chance."
+    />
   );
 }

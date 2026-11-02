@@ -251,14 +251,14 @@ export const IMPACT_CONCLUSIONS = [
   {
     value: "NO_IMPACT",
     label: "No impact on the decision",
-    description: "The new evidence does not change the signed decision. The case stays as decided.",
+    description: "The new evidence does not change the signed decision. The investigation stays as decided.",
     tone: "good" as Tone,
   },
   {
     value: "MATERIAL_IMPACT",
     label: "Material impact",
     description:
-      "The new evidence could change the decision. The case reopens so that a new decision can supersede the signed one. The signed decision itself is never changed.",
+      "The new evidence could change the decision. The investigation reopens so that a new decision can supersede the signed one. The signed decision itself is never changed.",
     tone: "critical" as Tone,
   },
 ] as const;

@@ -127,6 +127,88 @@ def _routine_markets(facts: dict) -> list[str]:
     return [market for market in markets.MARKETS if market in facts["enabled"]]
 
 
+# The worksheet's report source (Form FDA 3500A G2) and the classification's user type it maps to.
+_REPORT_SOURCE = {"health professional": "HEALTHCARE_PROFESSIONAL"}
+
+
+def _from_report(db: Session, tenant_id, complaint_id, view: dict) -> dict:
+    """With no classification yet, the user type a report worksheet already recorded (its report source, G2) is
+    proposed, with where it came from (stage 8: a fact the record holds is not asked again). A person confirms it."""
+    from backend.app.db.models.authority_reports import ReportObligation
+
+    if view["id"] is not None or view["user_type"] != coding.UNKNOWN:
+        return view
+    for row in db.query(ReportObligation.entries).filter(
+        ReportObligation.tenant_id == tenant_id, ReportObligation.complaint_id == complaint_id
+    ):
+        said = str(((row.entries or {}).get("G2") or {}).get("value") or "").strip()
+        code = _REPORT_SOURCE.get(said.lower())
+        if code:
+            return {
+                **view,
+                "user_type": code,
+                "source_values": {**view["source_values"], "user_type": f"{said} (report worksheet G2)"},
+            }
+    return view
+
+
+def _complaint_as_evidence(db: Session, control_db: Session, ctx, case, complaint, ref: str, now: datetime) -> None:
+    """The escalated complaint's own record is the investigation's first evidence, linked for a person to review
+    (stage 8: the facts flow from the complaint into the investigation, not typed again)."""
+    from backend.app.db.models.foundation import Evidence, InvestigationEvidence
+    from backend.app.evidence_workflow.inventory import review_event
+    from backend.app.evidence_workflow.rules import UNREVIEWED
+    from backend.app.access.permissions import EVIDENCE_REVIEW
+
+    person = current_person(control_db, ctx)
+    evidence = Evidence(
+        id=uuid.uuid4(),
+        tenant_id=case.tenant_id,
+        evidence_identifier=f"{case.business_id or case.investigation_identifier}-{ref}"[:120],
+        investigation_id=case.id,
+        evidence_type="COMPLAINT_RECORD",
+        title=f"Complaint {ref}: {' '.join((complaint.description or '').split())}"[:255],
+        source_system="MDARIX",
+        source_identifier=ref,
+        source_reference=f"Complaint {ref}",
+        source_timestamp=complaint.awareness_timestamp,
+        effective_timestamp=complaint.awareness_timestamp,
+        recorded_timestamp=now,
+        ingestion_timestamp=now,
+        content=complaint.description,
+        fact_type="source_fact",
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(evidence)
+    db.flush()
+    db.add(
+        InvestigationEvidence(
+            id=uuid.uuid4(),
+            tenant_id=case.tenant_id,
+            investigation_id=case.id,
+            evidence_id=evidence.id,
+            relevance="The escalated complaint's own record",
+            created_at=now,
+            review_status=UNREVIEWED,
+            linked_by=person.user_id,
+        )
+    )
+    db.flush()
+    review_event(
+        db,
+        tenant_id=case.tenant_id,
+        case_id=case.id,
+        evidence_id=evidence.id,
+        event_type="LINKED",
+        actor=person,
+        permission=EVIDENCE_REVIEW,
+        to_status=UNREVIEWED,
+        reason="The escalated complaint's own record",
+        now=now,
+    )
+
+
 def screen(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today: date | None = None) -> dict:
     tenant_id = uuid.UUID(ctx.tenant_id)
     today = today or service.today_utc()
@@ -173,7 +255,7 @@ def screen(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
         ],
         "no_investigation_clause": rules.NO_INVESTIGATION_CLAUSE,
         "basis": chips(rules.CLAUSE_IDS),
-        "classification": service.classification_view(latest, names),
+        "classification": _from_report(db, tenant_id, complaint_id, service.classification_view(latest, names)),
         "classification_history": [service.classification_view(row, names) for row in reversed(classifications[:-1])],
         "use_environments": coding.USE_ENVIRONMENT_LABELS,
         "user_types": coding.USER_TYPE_LABELS,
@@ -403,11 +485,14 @@ def sign_disposition(
     opened = False
     if branch in rules.ESCALATED:
         user = control_db.query(AuthUser.username).filter(AuthUser.id == uuid.UUID(str(ctx.user_id))).first()
+        # The question carries what the complaint said and why it escalated, in words (stage 8: no codes, nothing
+        # typed twice); the person's reason follows.
         question = (
-            f"Escalated from complaint {ref} ({rules.BRANCH_LABELS[branch].lower()}"
-            + (f": {', '.join(triggers.codes(met))}" if met else "")
+            f"{(complaint.description or '').strip()} Escalated from complaint {ref} "
+            f"({rules.BRANCH_LABELS[branch].lower()}"
+            + (f": {'; '.join(item['label'].lower() for item in met)}" if met else "")
             + f"). {rationale}"
-        )[:2000]
+        ).strip()[:2000]
         case, _, _ = open_case(
             db,
             tenant_id,
@@ -418,6 +503,7 @@ def sign_disposition(
             owner_ref=user[0] if user else None,
             actor_role=acting_role(control_db, tenant_id, ctx.user_id, INVESTIGATION_CREATE),
         )
+        _complaint_as_evidence(db, control_db, ctx, case, complaint, ref, now)
         opened = True
     elif branch == rules.KNOWN_ISSUE:
         case = (

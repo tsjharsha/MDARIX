@@ -170,7 +170,7 @@ export function trendHeadline(board: TrendBoard | null | undefined): { title: st
   if (significant)
     return {
       title: `${significant} ${significant === 1 ? "group" : "groups"} rising significantly against their own history`,
-      detail: `${counted} Each needs a person's look: open its signal or raise one.`,
+      detail: `${counted} Each needs a person's look: open its trend or raise one.`,
       tone: "critical",
     };
   if (elevated)
@@ -227,7 +227,7 @@ export const summaryPath = (signalId: string) => `/api/v1/triage/signals/${encod
 
 const AI_REASONS: Record<string, string> = {
   PROVIDER_NOT_CONFIGURED: "No AI provider is set up yet, so the summary comes from the records.",
-  NOT_RUN: "The signal has no complaints to summarize.",
+  NOT_RUN: "The trend has no complaints to summarize.",
   NOTHING_KEPT: "AI wrote nothing that passed the checks, so the summary comes from the records.",
   UNREADABLE: "AI's reply could not be read, so the summary comes from the records.",
 };

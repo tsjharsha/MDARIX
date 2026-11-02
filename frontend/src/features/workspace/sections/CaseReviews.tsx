@@ -1,12 +1,12 @@
 import { deadlineLabel } from "../../../app/dates";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ClipboardCheck, Play, UserMinus, XCircle } from "lucide-react";
 import { ApiError } from "../../../app/apiClient";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
 import { safeText } from "../../../app/displayId";
 import { StatementKind } from "../../shared/StatementKind";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { useCan, usePanelState, useWorkspace } from "../workspaceContext";
 import { CaseDocumentLinks } from "./Documents";
 import { localDay } from "../workspaceModel";
 import { dueAtFromDay } from "../caseWorkflow";
@@ -95,8 +95,20 @@ export function CaseReviewsPanel({
 }) {
   const canRequest = useCan("investigation.work");
   const reviews = useResource<CaseReviews>(caseReviewsPath(investigationId));
-  const [opened, setOpened] = useState<string | null>(initialReview);
-  const [requesting, setRequesting] = useState<ReviewType | null>(null);
+  // Each drawer has its own address (panel=<kind>:<id>), so Back closes it and a refresh reopens it.
+  const [opened, setOpened] = usePanelState<string>(
+    "review",
+    (id) => id,
+    (id) => id,
+  );
+  useEffect(() => {
+    if (initialReview) setOpened(initialReview);
+  }, []);
+  const [requesting, setRequesting] = usePanelState<ReviewType>(
+    "request-review",
+    (type) => type,
+    (key) => (key === "RISK" || key === "REGULATORY" ? key : null),
+  );
   const items = sortReviews(listOf(reviews.data?.items) as Review[]);
   const policy = policyRows(reviews.data?.policy);
   return (
@@ -106,7 +118,7 @@ export function CaseReviewsPanel({
         judgement, with their rationale.
       </p>
       <CaseDocumentLinks investigationId={investigationId} />
-      <Panel eyebrow={caseLabel} title="Which reviews this case needs" source={reviews}>
+      <Panel eyebrow={caseLabel} title="Which reviews this investigation needs" source={reviews}>
         <div className="uw-review-policy">
           {policy.map((row) => {
             const open = openReviewOf(items, row.type);
@@ -152,14 +164,14 @@ export function CaseReviewsPanel({
           })}
         </div>
       </Panel>
-      <Panel eyebrow={caseLabel} title="Reviews of this case" source={reviews}>
+      <Panel eyebrow={caseLabel} title="Reviews of this investigation" source={reviews}>
         <Table
-          caption="Reviews of this case"
+          caption="Reviews of this investigation"
           rows={items}
           rowKey={(row) => String(row.id)}
           empty={{
             title: "No reviews yet",
-            detail: "Risk and regulatory reviews requested for this case appear here with their outcomes.",
+            detail: "Risk and regulatory reviews requested for this investigation appear here with their outcomes.",
           }}
           columns={[
             {
@@ -259,7 +271,7 @@ function RequestReviewDrawer({
     } catch (failure) {
       setError(
         failure instanceof ApiError && failure.code === "REVIEW_ALREADY_OPEN"
-          ? `A ${label.toLowerCase()} is already open for this case. Open it from the list instead.`
+          ? `A ${label.toLowerCase()} is already open for this investigation. Open it from the list instead.`
           : errorText(failure, "The review was not requested."),
       );
       setBusy(false);
@@ -946,7 +958,7 @@ function RegulatoryContextView({ context }: { context: unknown }) {
           </table>
         </div>
       ) : (
-        <Empty title="No complaints in scope" detail="The case's scope lists no complaints yet." />
+        <Empty title="No complaints in scope" detail="The investigation's scope lists no complaints yet." />
       )}
     </section>
   );
