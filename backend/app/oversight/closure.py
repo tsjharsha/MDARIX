@@ -322,7 +322,7 @@ def checklist(found: dict) -> list[dict]:
     started = {row.market for row in found["obligations"] if row.kind == "INITIAL"}
     unmet = []
     for row in found["obligations"]:
-        if row.state in report_rules.MET:
+        if row.state in report_rules.CLOSED:
             continue
         label, state = markets.MARKET_LABELS.get(row.market, row.market), report_rules.STATE_LABELS[row.state].lower()
         unmet.append(f"{label}: {state}")

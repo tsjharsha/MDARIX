@@ -97,8 +97,13 @@ def related(db, found: dict, complaint, names: dict[str, str], service: dict | N
             assessments.append(f"{label.get(market, market)}: started, not signed")
         else:
             assessments.append(f"{label.get(market, market)}: not assessed yet")
+    from backend.app.authority_reports import forms as report_forms
+    from backend.app.authority_reports import rules as report_rules
+
+    # The form's name and the report's state in words, not their codes (0.10.75: it read "FDA_3500A · draft").
     reports = [
-        f"{label.get(row.market, row.market)} · {row.form_code} · {row.state.replace('_', ' ').lower()}"
+        f"{label.get(row.market, row.market)} · {report_forms.FORMS[row.form_code].title} · "
+        + report_rules.STATE_LABELS.get(row.state, row.state).lower()
         for row in found["obligations"]
     ]
     decisions = [
@@ -154,6 +159,7 @@ def related(db, found: dict, complaint, names: dict[str, str], service: dict | N
             "label": "Authority reports",
             "count": len(reports),
             "lines": reports or ["None started"],
+            "items": [{"id": str(row.id), "ref": row.market} for row in found["obligations"] if row.kind == "INITIAL"],
         },
         {
             "key": "decisions",

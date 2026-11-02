@@ -568,6 +568,15 @@ def sign_conclusion(
     draft.signed_record_id, draft.content_fingerprint = record_row.id, content_fingerprint
     draft.signed_by, draft.signed_at, draft.updated_at = str(ctx.user_id), now, now
     _settle_provisional_reports(db, tenant_id, complaint_id, market, draft, now)
+    # 0.10.75 (C3), the new navigation: the signed conclusion creates the market's report, or cancels an unsubmitted
+    # one when it says not reportable, in this same transaction. Never on a draft (saving answers never comes here).
+    from backend.app.authority_reports import router as reports
+
+    ended = (
+        reports.follow_conclusion(db, ctx, tenant_id, complaint_id, market, draft, now)
+        if reports.new_navigation(control_db, tenant_id)
+        else []
+    )
     try:
         if db is control_db:
             control_db.commit()  # the shared plane: everything in one transaction
@@ -583,6 +592,7 @@ def sign_conclusion(
         db.rollback()
         control_db.rollback()
         raise _error(409, "SIGNED_MEANWHILE", "This market was signed a moment ago; reload to see it") from exc
+    reports.end_cancelled_approvals(db, ctx, tenant_id, ended)
     if assessments.settled(
         assessments.markets_summary(
             record,

@@ -1,14 +1,15 @@
 """A worksheet as a PDF (reports/pdf.py, as the ready-to-use documents) and a DOCX (python-docx), from the screen's
 view: the title block with the form version, the "draft: MDARIX never submits" line, the practice-record label in a
 trial and the starter-text mark; every section in the form's order, each field with its value, status and source;
-the approval manifestation of an approved snapshot (21 CFR 11.50: the printed name, the date and time, the meaning);
-and the list of source records."""
+the list of source records; and last the approval manifestation of an approved snapshot (21 CFR 11.50: the printed
+name, the date and time, the meaning), on its own last page."""
 
 from __future__ import annotations
 
 import io
 
 from backend.app.qms_documents.render import SOURCE_LABELS
+from reports.pdf import PAGE_BREAK
 
 DRAFT_LINE = "DRAFT - MDARIX NEVER SUBMITS. Enter this report in the authority's route yourself."
 LABELS = {**SOURCE_LABELS, "Classification": "Classifications", "ImdrfMapping": "IMDRF mappings", "Triage": "Triage"}
@@ -97,10 +98,12 @@ def lines(view: dict) -> list[tuple[str, str]]:
         for item in section["fields"]:
             out.append((_value(item), "body"))
             out.append((f"    {_status(item)}", "muted"))
-    out += [("", "body"), ("Approval", "heading"), *((line, "body") for line in manifestation(view))]
     out += [("", "body"), ("Source records", "heading")]
     for kind, refs in _sources(view).items():
         out.append((f"{LABELS.get(kind, kind)}: {', '.join(refs)}", "body"))
+    # The approval last; an approved report's on its own last page (0.10.75, C3).
+    out += [("", PAGE_BREAK if view.get("signature") else "body"), ("Approval", "heading")]
+    out += [(line, "body") for line in manifestation(view)]
     return out
 
 
@@ -127,6 +130,9 @@ def render_docx(view: dict, organization: str | None) -> bytes:
         paragraph = document.add_paragraph()
         paragraph.add_run(line).bold = line == DRAFT_LINE
     for text, style in lines(view):
+        if style == PAGE_BREAK:
+            document.add_page_break()
+            continue
         if not text:
             continue
         if style == "heading":

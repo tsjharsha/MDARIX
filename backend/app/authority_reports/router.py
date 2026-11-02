@@ -97,6 +97,16 @@ def _trial(control_db, tenant_id) -> bool:
     return is_trial(control_db, tenant_id)
 
 
+def new_navigation(control_db, tenant_id) -> bool:
+    """Whether the organization is on the new navigation (Release C's switch, ``tenants.navigation``): there a report
+    is created when its conclusion is signed, Send for approval waits for every mandatory field, and the PDF comes
+    after approval (0.10.75, C3). The classic navigation keeps its rules."""
+    from backend.app.db.models.foundation import Tenant
+
+    tenant = control_db.get(Tenant, tenant_id)
+    return tenant is not None and tenant.navigation == "new"
+
+
 def _names(control_db, tenant_id, refs) -> dict[str, str]:
     found = people(control_db, tenant_id, [ref for ref in refs if ref])
     return {**SAMPLE_NAMES, **found}
@@ -200,7 +210,7 @@ def _deadline(obligation: ReportObligation, context: dict, today, org_zone: str 
         if row is not None and row.due_on is not None:
             due = row.due_on
             provisional = row.conclusion is None
-    return due_fields(due, obligation.market, org_zone, today, provisional, obligation.state in rules.MET)
+    return due_fields(due, obligation.market, org_zone, today, provisional, obligation.state in rules.CLOSED)
 
 
 def due_fields(due: date | None, market: str, org_zone: str | None, now, provisional: bool, met: bool) -> dict:
@@ -341,6 +351,8 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
     deadline = _deadline(obligation, context, today, deadline_zone)
     due = date.fromisoformat(deadline["due_on"]) if deadline["due_on"] else None
     pending = next((row for row in snapshots if row.state == "PENDING"), None)
+    approved = next((row for row in reversed(snapshots) if row.state == "APPROVED"), None)
+    mandatory = worksheet.mandatory(sections)
     children = (
         db.query(ReportObligation)
         .filter(ReportObligation.tenant_id == tenant_id, ReportObligation.parent_id == obligation.id)
@@ -392,6 +404,12 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "state_label": rules.STATE_LABELS[obligation.state],
         "next_step": rules.next_step(obligation.state, pending is not None),
         "steps": [{"state": step, "label": rules.STATE_LABELS[step]} for step in rules.STEPS],
+        # The status path and the mandatory-fields meter (0.10.75, C3).
+        **rules.stage_view(obligation.state, len(mandatory["missing"]), pending is not None),
+        "mandatory": mandatory,
+        "approved_snapshot": _snapshot_view(approved, names) if approved else None,
+        "preparers": sorted({names.get(ref) or "A colleague" for ref in _preparers(obligation)}),
+        "cancelled_reason": obligation.note if obligation.state == rules.CANCELLED else None,
         "deadline": deadline,
         "report_type": obligation.report_type,
         "assessment": _assessment_view(context, names),
@@ -498,6 +516,7 @@ def report_list(
         )
     }
     items = []
+    paths = _list_paths(db, control_db, ctx, tenant_id, [row for row in obligations if row.complaint_id in complaints])
 
     def base(complaint, market):
         return {
@@ -531,6 +550,8 @@ def report_list(
                 **due_fields(row.due_on, row.market, org_zone, today, row.conclusion is None, bool(row.filed_on)),
                 "assessment": markets.CONCLUSION_LABELS.get(row.conclusion or row.suggested_conclusion),
                 "can_start": bool(form) and not row.filed_on,
+                "stage": None,
+                "views": [],
             }
         )
     for row in obligations:
@@ -548,12 +569,13 @@ def report_list(
                 "state": row.state,
                 "state_label": rules.STATE_LABELS[row.state],
                 "next_step": rules.next_step(row.state),
-                **due_fields(due, row.market, org_zone, today, row.due_provisional, row.state in rules.MET),
+                **due_fields(due, row.market, org_zone, today, row.due_provisional, row.state in rules.CLOSED),
                 "assessment": None,
                 "can_start": False,
+                **paths[row.id],
             }
         )
-    items.sort(key=lambda item: (item["state"] in rules.MET, item["due_at"] or "9999", item["complaint_ref"] or ""))
+    items.sort(key=lambda item: (item["state"] in rules.CLOSED, item["due_at"] or "9999", item["complaint_ref"] or ""))
     return {
         "items": items,
         "forms": [
@@ -565,19 +587,96 @@ def report_list(
     }
 
 
+# The Reports tab's list views (0.10.75, C3), each a filter of the one list: still owed, waiting for this person's
+# approval (in a trial one's own too, as practice; as Complaints' "Waiting for my approval"), submitted this month.
+REPORT_VIEWS = ("open", "my-approval", "submitted-month")
+
+
+def _list_paths(db, control_db, ctx, tenant_id, obligations: list[ReportObligation]) -> dict:
+    """Each started report's place on the status path, its mandatory-fields meter, its latest submission and the list
+    views it belongs to. shortcut: reads each report's worksheet (a few queries a report), fine for a trial's or a
+    pilot's tens of reports; batch the reads if an organization keeps hundreds open."""
+    from zoneinfo import ZoneInfo
+
+    if not obligations:
+        return {}
+    ids = [row.id for row in obligations]
+    pending = {
+        row.obligation_id: row
+        for row in db.query(ReportSnapshot).filter(
+            ReportSnapshot.tenant_id == tenant_id,
+            ReportSnapshot.obligation_id.in_(ids),
+            ReportSnapshot.state == "PENDING",
+        )
+    }
+    latest: dict = {}
+    for row in db.query(ReportSubmission).filter(
+        ReportSubmission.tenant_id == tenant_id, ReportSubmission.obligation_id.in_(ids)
+    ):
+        if row.obligation_id not in latest or row.submitted_at > latest[row.obligation_id]:
+            latest[row.obligation_id] = row.submitted_at
+    try:
+        zone = ZoneInfo(deadlines.org_zone(db, tenant_id) or "UTC")
+    except Exception:  # an unknown zone name: count the month in UTC
+        zone = timezone.utc
+    month = _now().astimezone(zone).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    practice, me = _trial(control_db, tenant_id), str(ctx.user_id)
+    out = {}
+    for row in obligations:
+        try:
+            context = _context(db, control_db, row)
+        except HTTPException:
+            context = None
+        meter = (
+            worksheet.mandatory(worksheet.build(_form(row), context, row.entries or {}, {}, row.request_text))
+            if context is not None
+            else {"total": 0, "filled": 0, "missing": []}
+        )
+        waiting = pending.get(row.id)
+        path = rules.stage_view(row.state, len(meter["missing"]), waiting is not None)
+        views = [
+            name
+            for name, holds in (
+                ("open", row.state not in rules.CLOSED),
+                ("my-approval", waiting is not None and (practice or waiting.requested_by != me)),
+                ("submitted-month", row.id in latest and latest[row.id] >= month),
+            )
+            if holds
+        ]
+        out[row.id] = {
+            "stage": path["stage"],
+            "stage_label": path["stage_label"],
+            "mandatory": {"total": meter["total"], "filled": meter["filled"]},
+            "submitted_at": _iso(latest.get(row.id)),
+            "views": views,
+        }
+    return out
+
+
 class StartRequest(BaseModel):
     complaint_id: uuid.UUID
     market: str = Field(max_length=10)
 
 
-def start(db, tenant_id, complaint_id, market: str, actor: str, now: datetime, source_system: str | None = None):
-    """A new initial obligation for the complaint and market, from its market assessment (shared with the sample)."""
+def start(
+    db,
+    tenant_id,
+    complaint_id,
+    market: str,
+    actor: str,
+    now: datetime,
+    source_system: str | None = None,
+    candidate: ComplaintMarketAssessment | None = None,
+):
+    """A new initial obligation for the complaint and market, from its market assessment (shared with the sample and
+    with the signing of a reportable conclusion, which passes its signed version as ``candidate``)."""
     form = forms.BY_MARKET.get(market)
     if form is None:
         raise _error(
             409, "NO_WORKSHEET", "This market's worksheet comes later: record the filing on its signed conclusion"
         )
-    candidate = next((row for row in _candidates(db, tenant_id, complaint_id) if row.market == market), None)
+    if candidate is None:
+        candidate = next((row for row in _candidates(db, tenant_id, complaint_id) if row.market == market), None)
     if candidate is None:
         raise _error(
             409,
@@ -630,6 +729,71 @@ def start_report(
         db.rollback()
         raise _error(409, "REPORT_EXISTS", "This market's report is already started: open it from the list") from exc
     return detail(db, control_db, ctx, obligation)
+
+
+def follow_conclusion(db, ctx, tenant_id, complaint_id, market: str, signed, now: datetime) -> list:
+    """What a signed market conclusion does to the market's report on the new navigation (0.10.75, C3), in the
+    signing's own transaction. Reportable: the report is created from the signed version (one per market per complaint;
+    a cancelled one is reopened). Not reportable: a report not yet submitted is cancelled, its reason kept and audited
+    (a submitted one stays as recorded). A draft conclusion never comes here. Returns the pending snapshots whose
+    approval tasks end once the signing is saved."""
+    if market not in forms.BY_MARKET:
+        return []
+    existing = (
+        db.query(ReportObligation)
+        .filter(
+            ReportObligation.tenant_id == tenant_id,
+            ReportObligation.complaint_id == complaint_id,
+            ReportObligation.market == market,
+            ReportObligation.kind == "INITIAL",
+        )
+        .with_for_update()
+        .one_or_none()
+    )
+    label = markets.MARKET_LABELS.get(market, market)
+    if signed.conclusion == markets.REPORTABLE:
+        if existing is None:
+            obligation = start(db, tenant_id, complaint_id, market, str(ctx.user_id), now, candidate=signed)
+            _audit(
+                db, ctx, "REPORT_CREATED_FROM_CONCLUSION", obligation, form=obligation.form_code, version=signed.version
+            )
+        elif existing.state == rules.CANCELLED:
+            existing.state, existing.assessment_id, existing.report_type = rules.DRAFT, signed.id, signed.report_type
+            existing.due_on, existing.due_provisional, existing.updated_at = signed.due_on, False, now
+            _audit(db, ctx, "REPORT_REOPENED_BY_CONCLUSION", existing, version=signed.version)
+        return []
+    if signed.conclusion != markets.NOT_REPORTABLE or existing is None or existing.state not in rules.CANCELLABLE:
+        return []
+    reason = (
+        f"The {label} conclusion signed on {now.date().isoformat()} (version {signed.version}) says not reportable"
+        + (f": {signed.override_reason}" if signed.override_reason else ".")
+    )
+    pending = []
+    for row in _snapshots(db, existing):
+        if row.state in ("PENDING", "APPROVED"):
+            if row.state == "PENDING":
+                pending.append(row.id)
+            row.state = "SUPERSEDED"
+    before = existing.state
+    existing.state, existing.note, existing.updated_at = rules.CANCELLED, reason, now
+    _audit(db, ctx, "REPORT_CANCELLED", existing, reason=reason, state_before=before, version=signed.version)
+    return pending
+
+
+def end_cancelled_approvals(db, ctx, tenant_id, pending: list) -> None:
+    """The approval tasks of the snapshots a cancelled report no longer needs, after the signing is saved."""
+    for snapshot_id in pending:
+        run_hook(
+            db,
+            "report snapshot approval task",
+            approvals.finish,
+            tenant_id,
+            source_type=OBJECT_TYPE,
+            source_id=snapshot_id,
+            outcome="Cancelled: not reportable",
+            actor=str(ctx.user_id),
+            approved=False,
+        )
 
 
 @router.get("/{obligation_id}")
@@ -760,6 +924,27 @@ def ask_for_approval(
     obligation = _obligation(db, _tenant(ctx), obligation_id, lock=True)
     if obligation.state not in rules.EDITABLE:
         raise _error(409, "NOT_A_DRAFT", "Only a draft is frozen for approval")
+    if new_navigation(control_db, obligation.tenant_id):
+        sections = worksheet.build(
+            _form(obligation),
+            _context(db, control_db, obligation),
+            obligation.entries or {},
+            {},
+            obligation.request_text,
+        )
+        missing = worksheet.mandatory(sections)["missing"]
+        if missing:
+            labels = {
+                item["id"]: f"{item['number']} {item['label']}".strip() for part in sections for item in part["fields"]
+            }
+            raise _error(
+                422,
+                "MANDATORY_FIELDS_MISSING",
+                f"Fill every mandatory field before sending for approval: {len(missing)} still empty ("
+                + "; ".join(labels[field] for field in missing)
+                + ")",
+                missing=missing,
+            )
     replaced = [row.id for row in _snapshots(db, obligation) if row.state == "PENDING"]
     snapshot = request_snapshot(db, control_db, obligation, str(ctx.user_id), _now())
     _audit(
@@ -1426,6 +1611,10 @@ def export(
         frozen = next((row for row in _snapshots(db, obligation) if row.id == snapshot), None)
         if frozen is None:
             raise _error(404, "SNAPSHOT_NOT_FOUND", "No such snapshot of this report")
+    if new_navigation(control_db, tenant_id) and (frozen is None or not frozen.signed_record_id):
+        # 0.10.75 (C3): the PDF is the approved report, in the form's field order with its approval on the last page.
+        raise _error(409, "APPROVE_FIRST", "The PDF is generated once the report is approved")
+    if frozen is not None:
         signature = None
         if frozen.signed_record_id:
             record = control_db.get(SignedApprovalRecord, frozen.signed_record_id)

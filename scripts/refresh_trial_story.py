@@ -35,7 +35,9 @@ as it stood, the day after its US report was accepted (0.10.70: it was signed ov
 title listed every question), and SAMPLE-RV-11's linked service work, in progress under its sample service ticket
 (0.10.71, ``seed_flagship_service``) where it has none, and 0.10.72's corrections (backend/app/trial/sample_0_10_72.py:
 SPO2_READING_HIGH's IMDRF Annex A term; the sample guide's example text, its approval re-recorded), and 0.10.73's
-Free Trial plan, whose "up to 3 users" and licensed-user limit read the trial's safety cap (``refresh_plan``). The sample's dates themselves are brought to today by the
+Free Trial plan, whose "up to 3 users" and licensed-user limit read the trial's safety cap (``refresh_plan``), and
+0.10.75's reports: on the new navigation, the report of each US or India conclusion signed reportable before the
+upgrade that has none (backend/app/trial/reports_0_10_75.py; the sample's own reports fit the status path as they are). The sample's dates themselves are brought to today by the
 hourly "trial-sample-clock" job (backend/app/trial/sample_clock.py) while nobody has worked on the sample. Each trial
 is committed on its own, with an audit event.
 """
@@ -87,7 +89,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.db.models.foundation import LotBatch, Product, ProductVersion
     from sqlalchemy import or_
     from backend.app.signals.hooks import seed_demo_signals
-    from backend.app.trial import sample_0_10_72
+    from backend.app.trial import reports_0_10_75, sample_0_10_72
     from backend.app.trial.sample_calm import has_calm_story, rerecord_rv09, stage_calm_story
     from backend.app.trial.sample_clock import _absence_to_trial_end
     from backend.app.trial.sample_data import (
@@ -177,6 +179,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             service_missing = not flagship_missing and seed_flagship_service(session, tenant_id, apply=False)
             # 0.10.72: SPO2_READING_HIGH's IMDRF term and the sample guide's example text.
             corrections = sample_0_10_72.refresh(session, tenant_id, apply=False)
+            # 0.10.75: on the new navigation, the report of a reportable conclusion signed before the upgrade.
+            reports_owed = reports_0_10_75.refresh(session, tenant_id, apply=False)
             if not (
                 story_missing
                 or flagship_missing
@@ -197,6 +201,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or rv09_unrecorded
                 or service_missing
                 or corrections
+                or reports_owed
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -227,6 +232,11 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *(
                         [f"{corrections} sample corrections (0.10.72: an IMDRF term, the guide's example text)"]
                         if corrections
+                        else []
+                    ),
+                    *(
+                        [f"{reports_owed} authority reports of conclusions signed reportable (0.10.75)"]
+                        if reports_owed
                         else []
                     ),
                 ]
@@ -273,6 +283,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["flagship_service"] = seed_flagship_service(session, tenant_id, apply=True)
             if corrections:
                 added["corrections_0_10_72"] = sample_0_10_72.refresh(session, tenant_id, apply=True, now=now)
+            if reports_owed:
+                added["reports_0_10_75"] = reports_0_10_75.refresh(session, tenant_id, apply=True, now=now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,

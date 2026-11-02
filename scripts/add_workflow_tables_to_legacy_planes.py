@@ -4,7 +4,7 @@ complaint classifications, signer training), tr02 (complaint dispositions, the d
 tr04 to tr08 (the trial line's intake, reports, guides, oversight and lot impact tables) and tr09 (a CAPA's QMS
 reference, a lot's expiry date, a product's device category and a complaint's other lots), tr10 (a set-aside import
 row dismissed with a reason), tr11 (each organization's navigation, classic or new) and tr12 (a sample-only trial,
-a complaint's linked service work) and tr13 (each person's workspace persona).
+a complaint's linked service work) tr13 (each person's workspace persona) and tr14 (a cancelled authority report).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -260,6 +260,17 @@ STEPS = (
         done_sql=(
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
             "AND table_name = 'auth_users' AND column_name = 'view_persona')"
+        ),
+    ),
+    Step(
+        "tr14",
+        "tr14_trial_report_cancelled.py",
+        "allow_cancelled_reports",
+        (),
+        ("report_obligations",),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_report_obligations_state_known' "
+            "AND pg_get_constraintdef(oid) LIKE '%CANCELLED%')"
         ),
     ),
 )

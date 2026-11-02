@@ -36,8 +36,14 @@ def _ok(response):
 def trial():
     from backend.app.trial.retention import purge_trial
 
+    from tests.test_release_c3_0_10_75 import _classic
+
     user, approval, _ = _approved_trial_client()
     tenant_id = uuid.UUID(approval["tenant_id"])
+    # The lifecycle as built in 0.10.58, which the classic navigation keeps (every pilot today). The new navigation's
+    # rules (0.10.75: a report made on signing, approval after every mandatory field, the PDF after approval) are
+    # tested in test_release_c3_0_10_75.py.
+    _classic(tenant_id)
     colleague = _client(tenant_id, "LEADER", "Rahul Colleague")
     try:
         yield {"user": user, "colleague": colleague, "tenant_id": tenant_id}

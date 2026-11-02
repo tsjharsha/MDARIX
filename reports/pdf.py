@@ -38,7 +38,7 @@ BRAND = "MDARIX"
 BRAND_LINE = "complaint handling and post-market vigilance"
 TEAL = (0.031, 0.482, 0.471)  # #087b78, the site's and the app's teal
 
-Line = tuple[str, str]  # (text, style) where style is "body", "heading" or "muted"
+Line = tuple[str, str]  # (text, style) where style is "body", "heading", "muted" or PAGE_BREAK
 
 # Font resource names: the sans regular and semibold, the Devanagari fallback, and Courier for hashes.
 SANS, SANS_BOLD, DEVANAGARI, MONO = "F1", "F2", "F3", "F4"
@@ -205,6 +205,7 @@ def _scalar(value) -> str:
     return str(value)
 
 
+PAGE_BREAK = "pagebreak"  # a body line's style that starts a new page
 STYLES = {"heading": (SANS_BOLD, 10.5, 0), "muted": (SANS, BODY_FONT_SIZE, 0.45), "body": (SANS, BODY_FONT_SIZE, 0)}
 
 
@@ -225,6 +226,9 @@ def render(title: str, header_lines: Iterable[str], body: Iterable[Line], *, wat
     """The PDF: a title block, then the body paginated; every page carries the watermark and its number."""
     wrapped: list[Line] = []
     for text, style in body:
+        if style == PAGE_BREAK:
+            wrapped.append(("", PAGE_BREAK))
+            continue
         font, size, _ = STYLES.get(style, STYLES["body"])
         text = text.strip() if style == "heading" else text
         wrapped.extend((piece, style) for piece in wrap(text, TEXT_WIDTH, font, size))
@@ -234,14 +238,14 @@ def render(title: str, header_lines: Iterable[str], body: Iterable[Line], *, wat
     body_top = HEADER_TOP - 16 * len(titles)
     per_page = int((body_top - FOOTER_TOP - (len(footers) - 1) * 9) / BODY_LEADING)
     first_page_capacity = max(1, per_page - len(header) - 1)
-    pages: list[list[Line]] = []
-    cursor = 0
-    while True:
-        capacity = first_page_capacity if not pages else per_page
-        pages.append(wrapped[cursor : cursor + capacity])
-        cursor += capacity
-        if cursor >= len(wrapped):
-            break
+    # A PAGE_BREAK line starts a new page (an approved report's approval stands on its own last page).
+    pages: list[list[Line]] = [[]]
+    for line in wrapped:
+        capacity = first_page_capacity if len(pages) == 1 else per_page
+        if line[1] == PAGE_BREAK or len(pages[-1]) >= capacity:
+            pages.append([])
+        if line[1] != PAGE_BREAK:
+            pages[-1].append(line)
     total = len(pages)
     fonts = _Fonts()
     objects: list[bytes] = []

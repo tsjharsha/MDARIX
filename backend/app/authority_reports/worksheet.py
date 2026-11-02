@@ -596,3 +596,16 @@ def frozen(sections: list[dict]) -> list[dict]:
         }
         for section in sections
     ]
+
+
+def mandatory(sections: list[dict]) -> dict:
+    """The mandatory-fields meter (0.10.75): the form's fields that must have a value before submission (its "must
+    have" class, never a patient or reporter field), how many have one, and the ones still empty, in the form's order."""
+    fields = [
+        item
+        for section in sections
+        for item in section["fields"]
+        if item["missing_class"] == forms.MUST and not item.get("personal")
+    ]
+    missing = [item["id"] for item in fields if item["status"] == forms.MUST]
+    return {"total": len(fields), "filled": len(fields) - len(missing), "missing": missing}
