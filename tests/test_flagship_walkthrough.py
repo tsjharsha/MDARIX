@@ -68,7 +68,18 @@ FIELDS = [
     ("flagship", "Immediate action", "Triage", "entered"),
     ("flagship", "Awareness time", "Triage", "prefilled: the complaint's awareness"),
     ("flagship", "Harm level (US, India)", "Market assessment", "prefilled: the triage record's severity"),
-    ("flagship", "Answers to each market's questions", "Market assessment", "entered: the market's own questions"),
+    (
+        "flagship",
+        "Factual answers (death, serious injury, malfunction)",
+        "Market assessment",
+        "prefilled: the complaint record's fields, each confirmed by the person (0.10.72)",
+    ),
+    (
+        "flagship",
+        "Judgement answers (causation, recurrence, remedial action, unexpected) and the conclusion",
+        "Market assessment",
+        "entered: the person's judgement, never prefilled",
+    ),
     ("flagship", "Worksheet fields from the record", "Report worksheet", "prefilled: complaint, product, assessment"),
     ("flagship", "Manufacturer report number (front page)", "Report worksheet", "entered"),
     ("flagship", "G8 manufacturer report number", "Report worksheet", "prefilled: the worksheet's front page"),
@@ -90,6 +101,34 @@ FIELDS = [
     ("rising", "Investigation question, complaints", "Open an investigation", "prefilled: the trend's complaints"),
     ("rising", "Suspect factor", "Lot impact", "prefilled: the factor most of the investigation's lots share"),
 ]
+
+
+# The walk's action count (0.10.72, Release B): each main button, each answer the person enters (choose it and type its
+# rationale: two actions) and each suggestion from the record they confirm (one action). 0.10.71: 22 buttons and 16
+# entered answers, 54 actions.
+ACTIONS_BEFORE = 54
+
+
+def _answers_from_record(detail: dict, market: str, wanted: dict) -> tuple[dict, int]:
+    """The market's answers as the person gives them: the record's suggestions confirmed (each must be the walk's own
+    answer), the rest entered with a rationale. Returns the answers and the actions they took."""
+    item = _market(detail, market)
+    suggested, answers, actions = item["suggestions"], {}, 0
+    for question, answer in wanted.items():
+        offer = suggested.get(question)
+        if offer:
+            assert offer["answer"] == answer, (question, offer)
+            answers[question] = {
+                "answer": answer,
+                "rationale": offer["source"],
+                "evidence": [offer["evidence"]],
+                "confirmed": True,
+            }
+            actions += 1
+        else:
+            answers.update(_answers(**{question: answer}))
+            actions += 2
+    return answers, actions
 
 
 def _ok(response, status: int = 200):
@@ -146,7 +185,10 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     detail = _ok(user.get(f"/api/v1/complaints/{complaint}/market-assessments"))
     assert (detail["severity_level"], detail["severity_source"]) == ("NEGLIGIBLE", "The triage record")
     _acknowledge(user, "US")
-    us = _save(user, complaint, "US", _answers(**FLAGSHIP_US), harm_level=detail["severity_level"])
+    # The factual questions arrive from the complaint record; causation, recurrence and remedial action never do.
+    assert sorted(_market(detail, "US")["suggestions"]) == ["US1", "US2A", "US2B", "US2C", "US4"]
+    answers, actions = _answers_from_record(detail, "US", FLAGSHIP_US)
+    us = _save(user, complaint, "US", answers, harm_level=detail["severity_level"])
     assert us["evaluation"]["report_type"] == "US_30_DAY"
     assert _sign(user, complaint, "US", us, "REPORTABLE", password=PASSWORD).status_code == 200
     from backend.app.db.models.foundation import Complaint
@@ -159,8 +201,30 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     assert signed["due_on"] == (aware.astimezone(zone_info("America/New_York")).date() + timedelta(days=30)).isoformat()
 
     # 3. India, the story's second market (the assessment's next step, "Assess India (CDSCO) too"): not reportable.
+    origins = {key: entry["origin"] for key, entry in signed["answers"].items()}
+    assert origins == {
+        **dict.fromkeys(["US1", "US2A", "US2B", "US2C", "US4"], "CONFIRMED"),
+        **dict.fromkeys(["US3", "US5", "US6"], "ENTERED"),
+    }
+    # The audit trail keeps the same origins (0.10.72, B1).
+    from backend.app.db.models.foundation import AuditEvent
+    from backend.app.db.tenant_scope import bind_system
+
+    with SessionLocal() as db:
+        bind_system(db, "test: the signed assessment's audit")
+        audit = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.tenant_id == trial["tenant_id"], AuditEvent.action == "COMPLAINT_MARKET_CONCLUSION_SIGNED"
+            )
+            .one()
+        )
+        assert audit.details["answer_origins"] == origins
     _acknowledge(user, "IN")
-    india = _save(user, complaint, "IN", _answers(**FLAGSHIP_IN), harm_level=detail["severity_level"])
+    assert sorted(_market(detail, "IN")["suggestions"]) == ["IN2A", "IN2B", "IN2D", "IN2F"]
+    answers, more = _answers_from_record(detail, "IN", FLAGSHIP_IN)
+    actions += more
+    india = _save(user, complaint, "IN", answers, harm_level=detail["severity_level"])
     assert india["evaluation"]["suggested"] == "NOT_REPORTABLE"
     reason = "No adverse event: nobody was harmed, a malfunction only."
     assert _sign(user, complaint, "IN", india, "NOT_REPORTABLE", password=PASSWORD, reason=reason).status_code == 200
@@ -333,6 +397,9 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     assert label is None and view["state"] == "READY_TO_SIGN", view["checklist"]
     ready = _ok(user.post(f"/api/v1/oversight/events/{complaint}/ready", json={"password": PASSWORD, "reason": ""}))
     assert ready["ready"]["state"] == "READY"
+    # The action count drops: the market answers took 23 actions instead of 32.
+    assert actions == 23
+    assert len(WALK) + actions < ACTIONS_BEFORE, len(WALK) + actions
 
 
 def test_a_finished_sample_event_asks_for_nothing_and_an_old_one_is_signed_again(trial):

@@ -522,6 +522,71 @@ def answers_problem(question_set: QuestionSet, answers: dict, *, complete: bool)
     return None
 
 
+# --------------------------------------------------------------------------------------------- facts from the record
+
+# Release B (0.10.72), B1: the factual questions a complaint's own record answers, for the person to confirm or
+# correct. Never causation, recurrence, remedial action, "unexpected" or the conclusion: those stay the person's
+# judgement. A field the record leaves empty (Unknown) suggests nothing: it is never read as No. A serious injury on the
+# record suggests no criterion (which one applies is a judgement); no serious injury answers each criterion No.
+_DEATH_QUESTIONS = ("US1", "IN2A")
+_INJURY_QUESTIONS = ("US2A", "US2B", "US2C", "IN2B", "IN2D", "IN2F")
+_MALFUNCTION_QUESTIONS = ("US4",)
+JUDGEMENT_QUESTIONS = ("US3", "US5", "US6", "IN1", "IN2C", "IN2E", "IN3")
+CONFIRMED, CORRECTED, ENTERED = "CONFIRMED", "CORRECTED", "ENTERED"
+
+
+def suggestions(question_set: QuestionSet, record: dict) -> dict[str, dict]:
+    """The factual answers the complaint's record states, each with its source, for the questions of this set."""
+    death, injury, malfunction = record.get("death"), record.get("serious_injury"), record.get("malfunction")
+    found: dict[str, dict] = {}
+
+    def suggest(ids, answer, source, evidence):
+        for question_id in ids:
+            found[question_id] = {
+                "answer": answer,
+                "source": f"From the complaint record: {source}",
+                "evidence": evidence,
+            }
+
+    if death is not None:
+        suggest(
+            _DEATH_QUESTIONS,
+            YES if death else NO,
+            "a death was reported" if death else "no death was reported",
+            "Patient outcome fields",
+        )
+    if injury is False:
+        suggest(_INJURY_QUESTIONS, NO, "no serious injury was reported", "Patient outcome fields")
+    if malfunction is not None:
+        suggest(
+            _MALFUNCTION_QUESTIONS,
+            YES if malfunction else NO,
+            "a malfunction was reported" if malfunction else "no malfunction was reported",
+            "Malfunction field",
+        )
+    asked = {question.id for question in question_set.questions if not question.extra}
+    return {key: value for key, value in found.items() if key in asked}
+
+
+def mark_origins(answers: dict, suggested: dict[str, dict], confirmed: set[str]) -> dict:
+    """Each answer's origin, kept on the answer: a suggestion the person confirmed, one they corrected, or entered."""
+    for question_id, item in answers.items():
+        offer = suggested.get(question_id)
+        if item.get("answer") is None:
+            continue
+        if offer and item["answer"] != offer["answer"]:
+            item.update(origin=CORRECTED, suggested=offer["answer"], source=offer["source"])
+        elif offer and question_id in confirmed:
+            item.update(origin=CONFIRMED, suggested=offer["answer"], source=offer["source"])
+        else:
+            item["origin"] = ENTERED
+    return answers
+
+
+def origins(answers: dict) -> dict[str, str]:
+    return {key: item["origin"] for key, item in (answers or {}).items() if item.get("origin")}
+
+
 # --------------------------------------------------------------------------------------------- the harm scale
 
 SCALE_VERSION = "scale-starter-1"

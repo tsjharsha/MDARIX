@@ -64,6 +64,8 @@ class AnswerIn(BaseModel):
     answer: str | None = Field(default=None, max_length=20)
     rationale: str = Field(default="", max_length=markets.RATIONALE_MAX * 2)
     evidence: list[str] = Field(default_factory=list, max_length=markets.EVIDENCE_MAX * 2)
+    # The person pressed Confirm on the answer the complaint's record suggested (0.10.72, B1).
+    confirmed: bool = False
 
 
 class DraftRequest(BaseModel):
@@ -214,6 +216,7 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
                 "preselected": market in markets.markets_of(record.get("country")),
                 "required": market in summary,
                 "question_set": question_set.as_dict(),
+                "suggestions": markets.suggestions(question_set, record),
                 "question_set_current": question_set.version == codes[market],
                 "threshold": {"level": markets.THRESHOLDS[market], "label": markets.THRESHOLD_LABELS[market]},
                 "current": assessments.row_view(current, names, codes[market]),
@@ -259,8 +262,10 @@ def market_assessments(
     return detail(db, control_db, ctx, complaint_id)
 
 
-def _clean_draft(question_set: markets.QuestionSet, payload: DraftRequest) -> dict:
+def _clean_draft(question_set: markets.QuestionSet, payload: DraftRequest, record: dict) -> dict:
     answers = markets.clean_answers(question_set, {key: value.model_dump() for key, value in payload.answers.items()})
+    confirmed = {key for key, value in payload.answers.items() if value.confirmed}
+    markets.mark_origins(answers, markets.suggestions(question_set, record), confirmed)
     return {
         "answers": answers,
         "harm_level": (payload.harm_level or "").strip().upper() or None,
@@ -301,7 +306,7 @@ def save_draft(
         )
     draft = next((row for row in versions if row.conclusion is None), None)
     question_set = guides.by_code(db, tenant_id, market, draft.question_set if draft is not None else None)
-    clean = _clean_draft(question_set, payload)
+    clean = _clean_draft(question_set, payload, record)
     problem = markets.answers_problem(question_set, clean["answers"], complete=False) or markets.harm_problem(
         clean["harm_level"],
         clean["harm_code"],
@@ -361,6 +366,7 @@ def save_draft(
                 "question_set": question_set.version,
                 "suggested": evaluation["suggested"],
                 "answered": len(clean["answers"]),
+                "answer_origins": markets.origins(clean["answers"]),
             },
             created_at=now,
         )
@@ -542,6 +548,7 @@ def sign_conclusion(
                 "suggested": evaluation["suggested"],
                 "conclusion": conclusion,
                 "overridden": conclusion != evaluation["suggested"],
+                "answer_origins": markets.origins(answers),
                 "report_type": report_type,
                 "signature_id": str(record_row.id),
                 "fingerprint": content_fingerprint,

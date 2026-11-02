@@ -4,7 +4,7 @@
 // checks only say early what it would refuse. A person answers and signs; MDARIX never answers and never submits.
 import type { Tone } from "../admin/console/dashboardModel";
 import { collapsed } from "./complaintReview";
-import { questionNumber } from "../../app/labels";
+import { marketLabel, questionNumber } from "../../app/labels";
 
 export const ASSESSMENT_LIMITS = { reasonMin: 10, rationaleMax: 2000, referenceMax: 120 };
 
@@ -26,7 +26,8 @@ export const CONCLUSION_LABELS: Record<Suggestion, string> = {
   PENDING_INFORMATION: "Pending information",
   NOT_REPORTABLE: "Not reportable",
 };
-export const MARKET_SHORT: Record<Market, string> = { US: "US", EU_NI: "EU/NI", GB: "GB", IN: "India" };
+// The tab and chip names: the label map's words where the code would read as a code ("EU/NI", 0.10.72).
+export const MARKET_SHORT: Record<Market, string> = { US: "US", EU_NI: marketLabel("EU_NI"), GB: "GB", IN: "India" };
 
 export type Question = {
   id: string;
@@ -54,7 +55,20 @@ export type QuestionSet = {
   questions: Question[];
 };
 
-export type AnswerEntry = { answer: Answer | null; rationale: string; evidence: string[] };
+/** origin (0.10.72, B1): a suggestion from the complaint's record the person confirmed or corrected, or entered. */
+export type AnswerOrigin = "CONFIRMED" | "CORRECTED" | "ENTERED";
+export type AnswerEntry = {
+  answer: Answer | null;
+  rationale: string;
+  evidence: string[];
+  origin?: AnswerOrigin;
+  suggested?: Answer;
+  source?: string;
+  /** Sent when the person pressed Confirm on the record's suggestion. */
+  confirmed?: boolean;
+};
+/** A factual answer the complaint's record states, with its source ("From the complaint record: …"). */
+export type Suggestion_ = { answer: Answer; source: string; evidence: string };
 
 export type Version = {
   id: string;
@@ -116,6 +130,8 @@ export type MarketItem = {
   preselected: boolean;
   required: boolean;
   question_set: QuestionSet;
+  /** The factual answers the complaint's record states (never a judgement question), to confirm or correct. */
+  suggestions?: Record<string, Suggestion_>;
   /** False when a draft keeps a guide version older than the one in use now (T-G15). */
   question_set_current?: boolean;
   threshold: { level: string; label: string };
@@ -240,7 +256,12 @@ export function formOf(item: MarketItem, severityLevel: string | null): Assessme
 
 export function draftBody(form: AssessmentForm) {
   return {
-    answers: form.answers,
+    answers: Object.fromEntries(
+      Object.entries(form.answers).map(([key, entry]) => [
+        key,
+        { ...entry, confirmed: !!entry.confirmed || entry.origin === "CONFIRMED" },
+      ]),
+    ),
     harm_level: form.harm.level || null,
     harm_code: form.harm.term || null,
     harm_level_reason: collapsed(form.harm.reason),
@@ -253,7 +274,7 @@ export function answersProblem(questions: Question[], form: AssessmentForm): str
   for (const question of questions) {
     if (question.extra) continue;
     const entry = form.answers[question.id];
-    if (!entry?.answer) return `Answer question ${questionNumber(question.id)}`;
+    if (!entry?.answer) return `Answer or confirm question ${questionNumber(question.id)}`;
     if (collapsed(entry.rationale).length < ASSESSMENT_LIMITS.reasonMin)
       return question.id === "US5" && entry.answer === "NO"
         ? "Question 5 is No: say why a recurrence would not be likely to cause harm"

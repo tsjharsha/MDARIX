@@ -5980,3 +5980,18 @@ div.uw-task-count:hover {
 .uw-receipt-people dd {
   margin: 0;
 }
+
+/* 0.10.72 (B1): a factual answer the complaint's record states, to confirm or correct. */
+.uw-ma-suggested {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--ms-teal);
+  background: var(--ac-soft, transparent);
+}
+.uw-ma-suggested p {
+  margin: 0;
+}
+.uw-ma-suggested .ca-action-row {
+  margin: 0;
+}
