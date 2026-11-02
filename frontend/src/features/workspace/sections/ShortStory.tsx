@@ -190,7 +190,12 @@ export function DecideTheRoute({
         <div>
           <dt>Because</dt>
           <dd>
-            {story.route.source_quote && <q>{story.route.source_quote}</q>} {story.route.source_fact}
+            {story.route.source_quote && (
+              <>
+                <q>{story.route.source_quote}</q>.
+              </>
+            )}{" "}
+            {story.route.source_fact}
           </dd>
         </div>
         <div>
@@ -357,7 +362,12 @@ export function IntakeSummary({ story, onSaved }: { story: ShortStory; onSaved: 
         <div>
           <dt>The fact it rests on</dt>
           <dd>
-            {story.route.source_quote && <q>{story.route.source_quote}</q>} {story.route.source_fact}
+            {story.route.source_quote && (
+              <>
+                <q>{story.route.source_quote}</q>.
+              </>
+            )}{" "}
+            {story.route.source_fact}
           </dd>
         </div>
         <div>
@@ -384,7 +394,9 @@ export function IntakeSummary({ story, onSaved }: { story: ShortStory; onSaved: 
               {story.markets.map((row) => (
                 <li key={row.market}>
                   <strong>{row.label}:</strong> {row.open ? "still open" : row.state}
-                  {row.deadline ? `; ${row.deadline_title ?? "deadline"}: ${row.deadline}` : ""}
+                  {row.deadline
+                    ? `; ${/provisional/i.test(row.deadline_title ?? "") ? "provisional deadline" : "deadline"} ${row.deadline}`
+                    : ""}
                   {row.why ? `. ${row.why}` : ""}
                 </li>
               ))}

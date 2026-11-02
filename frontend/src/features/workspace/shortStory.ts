@@ -60,10 +60,12 @@ export type ShortStory = {
   practice_label: string | null;
 };
 
-/** "Step 2 of 4: Decide the route", or "Finished" once the summary is seen. */
+/** "Step 2 of 4: Decide the route"; once the summary is seen, "Step 4 of 4: The intake decision summary · done". */
 export function stepText(story: Pick<ShortStory, "steps" | "current">): string {
   const step = story.steps[story.current];
-  return step ? `Step ${story.current + 1} of ${story.steps.length}: ${step.label}` : "Finished: the summary is seen";
+  if (step) return `Step ${story.current + 1} of ${story.steps.length}: ${step.label}`;
+  const last = story.steps[story.steps.length - 1];
+  return `Step ${story.steps.length} of ${story.steps.length}: ${last?.label ?? "done"} · done`;
 }
 
 /** "Resume SAMPLE-RV-11 · step 2 of 4", for a person whose story is started and not finished; null otherwise. */

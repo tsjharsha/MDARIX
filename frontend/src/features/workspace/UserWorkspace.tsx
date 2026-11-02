@@ -271,7 +271,7 @@ const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
   },
   "Getting started": {
     description: "The sample event and its stories",
-    guide: "Start with the sample event's short story; your own export is under Help, Try your own data.",
+    guide: "Start with the sample event's short story; the other stories and your trial are below.",
   },
   Investigations: {
     description: "One investigation, from its question to its decision",

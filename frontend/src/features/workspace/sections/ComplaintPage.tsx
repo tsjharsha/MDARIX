@@ -128,6 +128,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
   const nearest = work?.due[0] ?? null;
   const harm = event.harm ? HARM[event.harm] : null;
+  const storyShown = story === "short" && event.ref === FLAGSHIP;
   return (
     <div className="uw-cp">
       <header className="uw-cp-head" aria-label="The complaint at a glance">
@@ -182,8 +183,11 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           {step ? (
             <button
               type="button"
-              // Ready to close is signed by the form in Decisions & actions: shown there, it is that form's button.
-              className={!step.opens && active === "Decisions & actions" ? "ac-secondary" : "ac-primary"}
+              // Ready to close is signed by the form in Decisions & actions: shown there, it is that form's button. While
+              // the short story shows its step, that step's button is the one main button (0.10.71).
+              className={
+                storyShown || (!step.opens && active === "Decisions & actions") ? "ac-secondary" : "ac-primary"
+              }
               onClick={() => (step.opens ? go(step.opens) : choose("Decisions & actions"))}
             >
               {step.label} <ChevronRight size={15} aria-hidden="true" />
@@ -198,7 +202,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
         </div>
       </header>
       {/* The short story's step to do now (0.10.71, A4), from what was saved on this record. */}
-      {story === "short" && event.ref === FLAGSHIP && <ShortStoryPanel view={view} onChanged={changed} />}
+      {storyShown && <ShortStoryPanel view={view} onChanged={changed} />}
       <Tabs tabs={COMPLAINT_SECTIONS} active={active} onChange={choose} label="Complaint sections">
         {active === "Summary" && (
           <>

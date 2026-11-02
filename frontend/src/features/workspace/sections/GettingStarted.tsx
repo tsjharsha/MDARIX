@@ -232,7 +232,10 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   const body = (
     <div className="ac-overview uw-trial">
       <QualityLoop
-        stations={loopFromStory(story.data)}
+        stations={loopFromStory(story.data).filter(
+          // A sample-only trial has no own data to try (0.10.71).
+          (station) => !(session?.sample_only && station.key === "YOUR_DATA"),
+        )}
         eyebrow={
           trial?.days_left !== undefined
             ? `Your free trial · ${countOf(trial.days_left, "day")} left`
@@ -276,7 +279,7 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
         title="Your story, chapter by chapter"
         eyebrow={
           navigation === "new"
-            ? `${chapters.filter((chapter) => chapter.code !== "YOUR_DATA" && chapter.acted.done).length} of ${chapters.filter((chapter) => chapter.code !== "YOUR_DATA").length || total - 1} tried · your own data is optional`
+            ? `${chapters.filter((chapter) => chapter.code !== "YOUR_DATA" && chapter.acted.done).length} of ${chapters.filter((chapter) => chapter.code !== "YOUR_DATA").length || total - 1} tried${session?.sample_only ? "" : " · your own data is optional"}`
             : `${acted} of ${total} tried`
         }
         source={story}

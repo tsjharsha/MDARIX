@@ -300,7 +300,7 @@ describe("A4: the short story, from what was saved", () => {
       "Owner: Asha Quality; reply due",
       "In progress · SVC-24-1107 (sample service ticket) · owner Asha Quality",
       "Market assessments (United States, India)",
-      "United States (FDA):</strong> still open; United States (FDA): not assessed yet, provisional deadline: Tue 1 Dec 2026",
+      "United States (FDA):</strong> still open; provisional deadline Tue 1 Dec 2026",
       "India (CDSCO):</strong> still open. Assessed because your procedure asks every market",
       "Who acts next",
       "Asha Quality: Assess the United States (FDA) market",
@@ -334,16 +334,21 @@ describe("A4: the short story, from what was saved", () => {
     expect(resumeText(shortStory(2))).toBe("Resume SAMPLE-RV-11 · step 3 of 4");
     expect(resumeText(shortStory(4))).toBeNull();
     expect(stepText(shortStory(1))).toBe("Step 2 of 4: Decide the route");
+    expect(stepText(shortStory(4))).toBe("Step 4 of 4: The intake decision summary · done");
     resources.data[SHORT_STORY_PATH] = shortStory(2);
     expect(render(<ResumeShortStory />, api())).toContain("Resume SAMPLE-RV-11 · step 3 of 4");
     expect(render(<ResumeShortStory />, api({ isTrial: false }))).not.toContain("Resume");
   });
 });
 
+const sources = import.meta.glob(["./sections/*.tsx"], { query: "?raw", import: "default", eager: true }) as Record<
+  string,
+  string
+>;
+const source = (name: string) => sources[`./sections/${name}.tsx`] ?? "";
+
 describe("A6: separation of duties, shown honestly", () => {
-  it("labels a solo trial owner's own approval at the button", async () => {
-    const { readFileSync } = await import("node:fs");
-    const source = (name: string) => readFileSync(new URL(`./sections/${name}.tsx`, import.meta.url), "utf8");
+  it("labels a solo trial owner's own approval at the button", () => {
     expect(renderToStaticMarkup(<PracticeApproval shown />)).toContain(
       "Practice approval: in a pilot a colleague approves this.",
     );
