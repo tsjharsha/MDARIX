@@ -5696,3 +5696,14 @@ div.uw-task-count:hover {
   flex-basis: 100%;
   margin: 0;
 }
+/* The investigation's sections never widen the page on a phone: wide lists scroll inside their own box. */
+.uw-case-sections,
+.uw-case-sections .ca-section {
+  min-width: 0;
+  max-width: 100%;
+}
+.uw-case-part {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}

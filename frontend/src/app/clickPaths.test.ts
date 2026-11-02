@@ -209,7 +209,7 @@ describe("the click paths a–m on the new navigation (stages 7 and 8)", () => {
     const task = { task_type: "REPORTABILITY_DECISION", investigation: null, details: { complaint_id: "c1" } } as never;
     expect(routeFor(taskDestination(task).section, taskDestination(task).tab, "mvp", "new")).toEqual({
       section: "Complaints",
-      tab: "Reporting?complaint=c1",
+      tab: "Reporting?complaint=c1&part=assess",
     });
   });
 });

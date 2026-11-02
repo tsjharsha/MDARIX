@@ -58,5 +58,11 @@ describe("the flagship walk-through, by each screen's main button", () => {
       // A record the screen opens on: never a list to search.
       if (target.record.kind !== "case") expect(query, target.tab).toContain("c1");
     }
+    // "Assess the United States (FDA) market" opens the complaint's assessment, not its list of reports (0.10.68
+    // opened Reporting on the reports, with no assessment in sight).
+    expect(routeFor("Complaints", "Reportability?complaint=c1", "mvp", "new").tab).toBe(
+      "Reporting?complaint=c1&part=assess",
+    );
+    expect(source("ComplaintViews")).toContain('tabParam(carried, "part") === "assess"');
   });
 });

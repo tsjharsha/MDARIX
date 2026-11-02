@@ -222,7 +222,9 @@ export function filterInventory(items: InventoryItem[] | null | undefined, filte
 export function sourceText(
   evidence: Pick<InventoryEvidence, "source_system" | "source_identifier" | "source_reference">,
 ) {
-  const system = safeText(evidence.source_system);
+  // A system's code reads as words: the sample's own records say "Sample data" (stage 8: no codes on screen).
+  const raw = safeText(evidence.source_system);
+  const system = raw === "MDARIX_SAMPLE" ? "Sample data" : raw;
   const record = safeText(evidence.source_identifier) ?? safeText(evidence.source_reference);
   return [system, record].filter(Boolean).join(" · ") || "—";
 }

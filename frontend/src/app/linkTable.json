@@ -635,7 +635,10 @@
         "section": "Complaints",
         "tab": "Reporting"
       },
-      "keep": "query"
+      "keep": "query",
+      "add": {
+        "part": "assess"
+      }
     },
     {
       "section": "Complaints",

@@ -112,7 +112,7 @@ export function CaseSections({
       <Tabs tabs={CASE_SECTIONS} active={active} onChange={(next) => go(next)} label="Investigation sections">
         {active === "Summary" && (
           <>
-            <div id={partId("scope")}>
+            <div className="uw-case-part" id={partId("scope")}>
               <CaseScopePanel
                 key={`scope:${id}:${scopeRound}`}
                 investigationId={id}
@@ -121,7 +121,7 @@ export function CaseSections({
               />
             </div>
             {isTrial && (
-              <div id={partId("lot-impact")}>
+              <div className="uw-case-part" id={partId("lot-impact")}>
                 <LotImpactPanel
                   key={`lot:${id}:${lotRound}`}
                   investigationId={id}
@@ -135,10 +135,10 @@ export function CaseSections({
         )}
         {active === "Evidence" && (
           <>
-            <div id={partId("evidence")}>
+            <div className="uw-case-part" id={partId("evidence")}>
               <CaseEvidencePanel key={id} investigationId={id} caseLabel={caseLabel} />
             </div>
-            <div id={partId("intelligence")}>
+            <div className="uw-case-part" id={partId("intelligence")}>
               <CaseIntelligencePanel
                 key={id}
                 investigationId={id}
@@ -148,7 +148,11 @@ export function CaseSections({
                 readOnly={readOnly}
               />
             </div>
-            <details className="uw-more" id={partId("analysis")} open={part === "analysis" || part === "ask"}>
+            <details
+              className="uw-more uw-case-part"
+              id={partId("analysis")}
+              open={part === "analysis" || part === "ask"}
+            >
               <summary>The analysis workspace and Ask MDARIX</summary>
               <Embedded>
                 <InvestigationWorkspacePanel
@@ -175,7 +179,7 @@ export function CaseSections({
         )}
         {active === "Decisions & actions" && (
           <>
-            <div id={partId("reviews")}>
+            <div className="uw-case-part" id={partId("reviews")}>
               <CaseReviewsPanel
                 key={id}
                 investigationId={id}
@@ -184,7 +188,7 @@ export function CaseSections({
                 readOnly={readOnly}
               />
             </div>
-            <div id={partId("brief")}>
+            <div className="uw-case-part" id={partId("brief")}>
               <CaseDecisionBriefPanel
                 key={id}
                 investigationId={id}
@@ -194,7 +198,7 @@ export function CaseSections({
                 onOpenDecision={() => go("Decisions & actions", "decision")}
               />
             </div>
-            <div id={partId("decision")}>
+            <div className="uw-case-part" id={partId("decision")}>
               <CaseDecisionPanel
                 key={id}
                 investigationId={id}

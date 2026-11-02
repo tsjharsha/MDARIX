@@ -280,5 +280,13 @@ describe("the investigation's one progress line (stage 8)", () => {
     const steps = Object.keys(STEP_PLACE).map((key) => step(key, "DONE"));
     expect(caseProgress(steps).every((item) => item.state === "DONE")).toBe(true);
     expect(nextCaseStep(steps)).toBeNull();
+    // An analysis never run (AI off) is no step left once the decision is signed.
+    const decided = steps.map((step) => (step.key === "analysis" ? { ...step, status: "NOT_STARTED" as const } : step));
+    expect(nextCaseStep(decided)).toBeNull();
+    // Before it, an analysis not run is skipped: the next step is the brief.
+    const open = decided.map((step) =>
+      ["brief", "human_review"].includes(step.key) ? { ...step, status: "NOT_STARTED" as const } : step,
+    );
+    expect(nextCaseStep(open)?.key).toBe("brief");
   });
 });

@@ -492,6 +492,9 @@ export function caseProgress(steps: CaseStep[]): SectionProgress[] {
 export function nextCaseStep(
   steps: CaseStep[],
 ): { key: string; label: string; section: CaseSection; part: string } | null {
-  const next = steps.find((step) => STEP_PLACE[step.key] && !SETTLED.includes(step.status));
+  // Once the decision is signed the investigation's work is done: an analysis never run is no step left.
+  if (steps.some((step) => step.key === "human_review" && step.status === "DONE")) return null;
+  // The analysis only warns in the brief's gate (with AI off people record observations instead): never the next step.
+  const next = steps.find((step) => STEP_PLACE[step.key] && step.key !== "analysis" && !SETTLED.includes(step.status));
   return next ? { key: next.key, label: next.label, ...STEP_PLACE[next.key] } : null;
 }
