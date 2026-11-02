@@ -17,13 +17,17 @@ RUN npm run build
 # Caddy's own main package (cmd/caddy/main.go) is built as a module of its own, so a dependency with a security fix can
 # be raised above the version the Caddy release pins: golang.org/x/net v0.60.0 (CVE-2026-78669; v2.11.7 pins v0.59.0).
 # Drop the raise once a Caddy release requires the fixed version itself. The last line prints what was built.
+# The module downloads are tried up to five times: the 0.10.67 deploy stopped twice on a dropped HTTP/2 stream from
+# proxy.golang.org / sum.golang.org. What one attempt downloaded stays in the module cache; the next fetches the rest.
 FROM golang:1.26.9-alpine@sha256:cdfd4fe2da6b225d8b40c6b7a105736e548e83ff56d5d8f9394446eeb5eb84e0 AS caddy-build
 WORKDIR /src/caddy
 RUN printf '%s\n' 'package main' '' 'import (' '	caddycmd "github.com/caddyserver/caddy/v2/cmd"' \
         '	_ "github.com/caddyserver/caddy/v2/modules/standard"' ')' '' 'func main() { caddycmd.Main() }' > main.go \
     && go mod init mdarix.local/caddy \
-    && go get github.com/caddyserver/caddy/v2@v2.11.7 golang.org/x/net@v0.60.0 \
-    && go mod tidy \
+    && for attempt in 1 2 3 4 5; do \
+         go get github.com/caddyserver/caddy/v2@v2.11.7 golang.org/x/net@v0.60.0 && go mod tidy && break; \
+         [ "$attempt" = 5 ] && exit 1; echo "module download attempt $attempt failed; trying again"; sleep 15; \
+       done \
     && GOMAXPROCS=2 CGO_ENABLED=0 go build -p=2 -trimpath -o /go/bin/caddy . \
     && go version -m /go/bin/caddy | grep -E 'caddyserver/caddy/v2[[:space:]]|golang.org/x/net[[:space:]]'
 
