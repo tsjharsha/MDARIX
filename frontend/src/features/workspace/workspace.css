@@ -7365,6 +7365,11 @@ button.uw-org:hover {
 }
 .uw-form-card {
   display: grid;
+  /* Five forms (0.10.76): long titles and the starter badge wrap inside their card. */
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  min-width: 0;
+  overflow-wrap: anywhere;
   gap: 6px;
   padding: 14px;
   border: 1px solid var(--ms-line);
@@ -7379,6 +7384,8 @@ button.uw-org:hover {
 }
 .uw-form-card > :last-child {
   justify-self: start;
+  max-width: 100%;
+  white-space: normal;
 }
 @media (max-width: 640px) {
   .uw-tnode {
