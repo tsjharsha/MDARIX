@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import exists, func, or_, select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import case, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.db.data_plane import get_data_plane_db
@@ -119,6 +119,9 @@ def list_complaints(
     order: str | None = Query(None, max_length=10),
     # The new navigation's list (0.10.68): each complaint's owner, stage, deadlines and markets, as its page shows them.
     work: bool = Query(False),
+    # A list view of the new navigation (0.10.74, C2): open, due-week, legal-week, reportability, waiting-reporter,
+    # my-approval or signed-month (backend/app/oversight/router.py LIST_VIEWS).
+    view: str = Query("", max_length=40),
     db: Session = Depends(get_data_plane_db),
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
@@ -170,11 +173,27 @@ def list_complaints(
                 func.lower(Complaint.description).like(pattern, escape="\\"),
             )
         )
+    default = [RECEIVED_AT.desc().nullslast()]
+    if view:
+        from backend.app.oversight import closure
+        from backend.app.oversight.router import LIST_VIEWS, list_view
+
+        if view not in LIST_VIEWS:
+            raise HTTPException(status_code=422, detail={"code": "UNKNOWN_LIST_VIEW", "message": "No such list view"})
+        if view == "open":
+            query = query.filter(
+                or_(Complaint.status.is_(None), func.lower(Complaint.status).notin_(closure.CLOSED_STATUSES))
+            )
+        else:
+            moments = list_view(db, control_db, tenant_id, view, str(ctx.user_id))
+            query = query.filter(Complaint.id.in_([uuid.UUID(key) for key in moments] or [None]))
+            # Most urgent first (the newest signature first for "signed-month"); undated after the dated ones.
+            ranked = sorted(moments, key=lambda key: moments[key] or "~", reverse=view == "signed-month")
+            if ranked:
+                default = [case({uuid.UUID(key): rank for rank, key in enumerate(ranked)}, value=Complaint.id)]
     total = query.count()
-    # Newest first unless a column heading asks for another order (``sort``/``order``) across every page.
-    ordered = order_query(
-        query, sort, order, _sorts(), default=[RECEIVED_AT.desc().nullslast()], tiebreak=[Complaint.id]
-    )
+    # Newest first (a list view: its own order) unless a column heading asks for another order across every page.
+    ordered = order_query(query, sort, order, _sorts(), default=default, tiebreak=[Complaint.id])
     rows = ordered.offset((page - 1) * page_size).limit(page_size).all()
     ids = [complaint.id for complaint, *_ in rows]
     if work:
