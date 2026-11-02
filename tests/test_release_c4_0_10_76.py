@@ -211,7 +211,11 @@ def test_a_signed_reportable_canada_conclusion_creates_the_health_canada_report(
         for section in _ok(user.get(f"{REPORTS}/{report['id']}"))["sections"]
         for item in section["fields"]
     }
-    assert (values["A5"], values["B1"], values["C1"]) == ("Preliminary", "30-Day; Canadian", "PulseWatch 410 Patient Monitor (Sample)")
+    assert (values["A5"], values["B1"], values["C1"]) == (
+        "Preliminary",
+        "30-Day; Canadian",
+        "PulseWatch 410 Patient Monitor (Sample)",
+    )
     trees = {tree["market"]: tree for tree in _ok(user.get(TREES))["markets"]}
     assert trees["CA"]["enabled"] and trees["CA"]["tests"] == {"passed": 6, "total": 6, "current": True}
     assert trees["CA"]["form"] == {"title": forms.HC_MDPR.title, "starter": True}
@@ -267,9 +271,7 @@ def test_the_classic_navigation_keeps_us_and_india_and_the_refresh_adds_rv07s_re
             db.commit()
             # The classic navigation: no report made, and the EU market reads "worksheet comes later" as before.
             assert reports_0_10_75.refresh(db, tenant_id, apply=False) == 0
-        rv07 = next(
-            item for item in _ok(user.get(REPORTS))["items"] if item["complaint_ref"] == "SAMPLE-RV-07"
-        )
+        rv07 = next(item for item in _ok(user.get(REPORTS))["items"] if item["complaint_ref"] == "SAMPLE-RV-07")
         assert (rv07["state"], rv07["can_start"]) == ("NO_WORKSHEET", False)
     finally:
         _purge(tenant_id)

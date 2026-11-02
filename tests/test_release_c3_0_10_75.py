@@ -136,7 +136,13 @@ def test_signing_reportable_creates_exactly_one_report_and_a_draft_creates_none(
     assert [stage["label"] for stage in detail["stages"]] == [label for _, label in rules.STAGES]
     assert [stage["state"] for stage in detail["stages"]][:2] == ["CURRENT", "LATER"]
     assert detail["preparers"] and detail["mandatory"]["missing"]
-    assert len(_audit(trial["tenant_id"], "REPORT_CREATED_FROM_CONCLUSION")) == 1
+    # This complaint's (0.10.76: the sample's SAMPLE-RV-07 has its own, made when the sample was staged).
+    created = [
+        e
+        for e in _audit(trial["tenant_id"], "REPORT_CREATED_FROM_CONCLUSION")
+        if e.details["complaint_id"] == complaint
+    ]
+    assert len(created) == 1
     # Signing reportable again (a new version) keeps the one report.
     _ok(_sign_us(user, complaint, "REPORTABLE"))
     assert [item["id"] for item in _reports(user, complaint)] == [report["id"]]

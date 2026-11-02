@@ -37,7 +37,9 @@ title listed every question), and SAMPLE-RV-11's linked service work, in progres
 SPO2_READING_HIGH's IMDRF Annex A term; the sample guide's example text, its approval re-recorded), and 0.10.73's
 Free Trial plan, whose "up to 3 users" and licensed-user limit read the trial's safety cap (``refresh_plan``), and
 0.10.75's reports: on the new navigation, the report of each US or India conclusion signed reportable before the
-upgrade that has none (backend/app/trial/reports_0_10_75.py; the sample's own reports fit the status path as they are). The sample's dates themselves are brought to today by the
+upgrade that has none (backend/app/trial/reports_0_10_75.py; the sample's own reports fit the status path as they are);
+from 0.10.76 the same step covers EU / NI, Great Britain and Canada, so SAMPLE-RV-07's signed EU conclusion gets its
+EU MIR worksheet, once. The sample's dates themselves are brought to today by the
 hourly "trial-sample-clock" job (backend/app/trial/sample_clock.py) while nobody has worked on the sample. Each trial
 is committed on its own, with an audit event.
 """
