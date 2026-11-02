@@ -30,6 +30,16 @@ const notes = [];
 async function settle(page) {
   await page.waitForLoadState("networkidle").catch(() => {});
   await page.waitForTimeout(600);
+  // A panel still reading its records would be measured half drawn.
+  await page
+    .waitForFunction(
+      () => !/Reading your records|Reading…|Loading your/.test(document.querySelector("main")?.innerText || ""),
+      null,
+      {
+        timeout: 12_000,
+      },
+    )
+    .catch(() => {});
   const ack = page.getByRole("button", { name: "Acknowledge", exact: true }).first();
   if (await ack.isVisible().catch(() => false)) await ack.click().catch(() => {});
 }
