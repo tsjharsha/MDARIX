@@ -27,6 +27,7 @@ import {
   submissionBody,
   submissionProblem,
   isMissing,
+  reportPlace,
   worksheetMeter,
   filledCounts,
   summaryLine,
@@ -39,7 +40,7 @@ import {
 } from "../authorityReports";
 
 /** The regulatory rule: review or approval rights may prepare, approve and record (the server's rule). */
-function useCanReport() {
+export function useCanReport() {
   const review = useCan("regulatory.review");
   const approve = useCan("regulatory.approve");
   return review || approve;
@@ -59,6 +60,10 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
   const [error, setError] = useState("");
   const canWrite = useCanReport();
   const workspace = useContext(WorkspaceContext);
+  // The new navigation opens a report on its own page in the Reports tab (0.10.75, C3); classic keeps the panel.
+  const fresh = useNavigation() === "new";
+  const show = (id: string) =>
+    fresh && workspace ? workspace.open(reportPlace(id).section, reportPlace(id).tab) : setOpen(id);
   const items = list.data?.items ?? [];
   const waiting = items.filter(
     (item) => !["ACCEPTED", "COMPLETE", "SUBMITTED_NO_ACK", "FOLLOW_UP_DUE"].includes(item.state),
@@ -68,7 +73,7 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
     try {
       const made = await send<ReportDetail>(REPORTS, "POST", { complaint_id: item.complaint_id, market: item.market });
       list.reload();
-      setOpen(made.id);
+      show(made.id);
     } catch (reason) {
       setError(errorText(reason, "The worksheet was not started."));
     }
@@ -136,7 +141,7 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
                   </p>
                   <div className="ca-action-row">
                     {item.id ? (
-                      <button type="button" className="ac-secondary" onClick={() => setOpen(item.id)}>
+                      <button type="button" className="ac-secondary" onClick={() => show(item.id!)}>
                         Open the worksheet
                       </button>
                     ) : item.can_start && canWrite ? (
@@ -292,7 +297,7 @@ export function ReportDrawer({
   );
 }
 
-function useAction(onChanged: (detail: ReportDetail) => void, failure: string) {
+export function useAction(onChanged: (detail: ReportDetail) => void, failure: string) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const run = async (path: string, method: "POST" | "PUT", body?: unknown) => {
@@ -356,7 +361,7 @@ function NextStep({
   return null;
 }
 
-function Approval({ detail, onChanged }: { detail: ReportDetail; onChanged: (detail: ReportDetail) => void }) {
+export function Approval({ detail, onChanged }: { detail: ReportDetail; onChanged: (detail: ReportDetail) => void }) {
   const snapshot = detail.pending_snapshot!;
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -455,7 +460,13 @@ const EMPTY_SUBMISSION: SubmissionForm = {
   differences: [],
 };
 
-function RecordSubmission({ detail, onChanged }: { detail: ReportDetail; onChanged: (detail: ReportDetail) => void }) {
+export function RecordSubmission({
+  detail,
+  onChanged,
+}: {
+  detail: ReportDetail;
+  onChanged: (detail: ReportDetail) => void;
+}) {
   const [form, setForm] = useState<SubmissionForm>({
     ...EMPTY_SUBMISSION,
     route: detail.routes[0]?.code ?? "",
@@ -611,7 +622,7 @@ function RecordSubmission({ detail, onChanged }: { detail: ReportDetail; onChang
   );
 }
 
-function RecordEvidence({
+export function RecordEvidence({
   detail,
   attempt,
   onChanged,
@@ -703,7 +714,7 @@ function RecordEvidence({
   );
 }
 
-function AfterAcceptance({
+export function AfterAcceptance({
   detail,
   onChanged,
   onOpen,
@@ -811,6 +822,8 @@ function AfterAcceptance({
 
 function Downloads({ detail }: { detail: ReportDetail }) {
   const canExport = useCan("data.export");
+  // The new navigation generates the PDF once the report is approved (0.10.75, C3): no working-draft download.
+  const fresh = useNavigation() === "new";
   const [error, setError] = useState("");
   if (!canExport) return null;
   const approved = detail.snapshots.find((row) => row.state === "APPROVED");
@@ -826,12 +839,16 @@ function Downloads({ detail }: { detail: ReportDetail }) {
   };
   return (
     <div className="ca-action-row uw-doc-downloads">
-      <button type="button" className="ac-secondary" onClick={() => void get("pdf")}>
-        <Download size={15} aria-hidden="true" /> PDF (working draft)
-      </button>
-      <button type="button" className="ac-secondary" onClick={() => void get("docx")}>
-        <Download size={15} aria-hidden="true" /> DOCX
-      </button>
+      {!fresh && (
+        <>
+          <button type="button" className="ac-secondary" onClick={() => void get("pdf")}>
+            <Download size={15} aria-hidden="true" /> PDF (working draft)
+          </button>
+          <button type="button" className="ac-secondary" onClick={() => void get("docx")}>
+            <Download size={15} aria-hidden="true" /> DOCX
+          </button>
+        </>
+      )}
       {approved && (
         <button type="button" className="ac-secondary" onClick={() => void get("pdf", approved.id)}>
           <FileText size={15} aria-hidden="true" /> Approved snapshot {approved.version} (PDF)
@@ -903,7 +920,7 @@ function Worksheet({
   );
 }
 
-function FieldRow({
+export function FieldRow({
   detail,
   item,
   onChanged,
@@ -989,7 +1006,7 @@ function FieldRow({
   );
 }
 
-function SubmissionRecord({ detail }: { detail: ReportDetail }) {
+export function SubmissionRecord({ detail }: { detail: ReportDetail }) {
   if (!detail.snapshots.length && !detail.submissions.length) return null;
   const file = (attempt: Submission, evidence: { id: string; file_name: string | null }) =>
     void downloadFile(`${REPORTS}/${detail.id}/submissions/${attempt.id}/evidence/${evidence.id}/file`, {

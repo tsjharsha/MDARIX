@@ -7193,6 +7193,209 @@ button.uw-org:hover {
   display: block;
 }
 
+/* Decision trees (0.10.75, C3): a market's questions in order, the answer, the clause, then the outcome. */
+.uw-trees {
+  display: grid;
+  gap: var(--ms-space-4);
+}
+.uw-tree-markets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-2);
+}
+.uw-tree-body {
+  display: grid;
+  gap: var(--ms-space-3);
+  padding-top: 4px;
+}
+.uw-tree-for select {
+  max-width: 100%;
+}
+.uw-tree-what {
+  margin: 0;
+  color: var(--ms-muted);
+}
+.uw-tree {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-tree > li {
+  position: relative;
+}
+/* The line from one question to the next. */
+.uw-tree > li + li::before {
+  content: "";
+  position: absolute;
+  top: -16px;
+  left: 26px;
+  width: 2px;
+  height: 16px;
+  background: var(--ms-teal);
+}
+.uw-tnode {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-surface);
+}
+.uw-tnode.is-extra {
+  border-style: dashed;
+}
+.uw-tn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ms-mint);
+  color: var(--ms-teal-dark);
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-bold);
+}
+.uw-tq {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.uw-tq b {
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-tq small {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.uw-tans {
+  display: flex;
+  gap: 6px;
+}
+.uw-pill {
+  padding: 3px 10px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: var(--ms-radius-pill);
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-semibold);
+  white-space: nowrap;
+}
+.uw-pill.is-on {
+  border-color: var(--ms-teal);
+  background: var(--ms-teal);
+  color: var(--ms-surface);
+}
+.uw-tout {
+  display: grid;
+  gap: 2px;
+  padding: 14px 16px;
+  border: 1px dashed var(--ms-line-strong);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-subtle);
+}
+.uw-tout.is-reportable {
+  border: 1px solid var(--ms-warn-line);
+  background: var(--ms-warn-bg);
+  color: var(--ms-warn);
+}
+.uw-tout span {
+  color: var(--ms-ink-2);
+}
+
+/* Reports (0.10.75, C3): the mandatory-fields meter, the forms, the report's page. */
+.uw-meter-cell {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.uw-meter {
+  display: inline-block;
+  width: 96px;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-ground);
+}
+.uw-meter i {
+  display: block;
+  height: 100%;
+  background: var(--ms-teal);
+}
+.uw-meter.is-big {
+  width: 100%;
+  height: 10px;
+}
+.uw-rp-meterbar {
+  display: grid;
+  gap: 6px;
+  padding: 0 20px 12px;
+  border-bottom: 1px solid var(--ms-line);
+  background: var(--ms-surface);
+  font-size: var(--ms-fs-14);
+}
+.uw-report-page .uw-card-head .ca-check {
+  margin: 0;
+  font-size: var(--ms-fs-14);
+}
+.uw-report-page .uw-rp-fields {
+  margin: 0;
+}
+.uw-report-page .uw-rail .ca-form-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.uw-forms-card {
+  display: grid;
+  gap: var(--ms-space-3);
+  margin-top: var(--ms-space-4);
+}
+.uw-forms-card h2 {
+  margin: 0;
+  font-size: var(--ms-fs-16);
+}
+.uw-forms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.uw-form-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-subtle);
+}
+.uw-form-card > :last-child {
+  justify-self: start;
+}
+@media (max-width: 640px) {
+  .uw-tnode {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .uw-tans {
+    grid-column: 2;
+    flex-wrap: wrap;
+  }
+  .uw-tree > li + li::before {
+    left: 26px;
+  }
+  .uw-rp-meterbar {
+    padding: 0 var(--ms-space-4) 12px;
+  }
+  /* A long text in a phone card (what happened, the investigation's question) reads under its label, full width
+     (0.10.75: it was squeezed into the card's second column). */
+  .ac-table.ms-cards td:has(> .uw-what) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
+
 /* The phone's search: an icon that opens the same search as a bar under the top bar. */
 .uw-search-toggle {
   display: none;

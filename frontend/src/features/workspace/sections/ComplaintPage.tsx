@@ -19,7 +19,7 @@ import {
   type RelatedGroup,
 } from "../oversight";
 import { communicationsTab } from "../communications";
-import { reportsTab } from "../authorityReports";
+import { reportPlace, reportsTab } from "../authorityReports";
 import { DecisionRecord, OwnerPicker, ReadyForm } from "./Oversight";
 import { ProblemCode, useImdrfLinks } from "./ProblemCode";
 import { InlineError } from "./boardParts";
@@ -29,6 +29,7 @@ import { COMPLAINT_STEP_WHY } from "../whyAsked";
 import { ServiceWork, serviceText } from "./ServiceWork";
 import { ShortStoryPanel, useShortStory } from "./ShortStory";
 import { InlineTriage } from "./Triage";
+import { treePlace } from "./DecisionTrees";
 import { FLAGSHIP } from "../entrance";
 
 const HARM = {
@@ -250,6 +251,27 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                   <dt>Problem</dt>
                   <dd>
                     {event.problem_code ? <ProblemCode code={event.problem_code} links={links} /> : "None recorded"}
+                  </dd>
+                  <dt>Decision path</dt>
+                  <dd>
+                    {markets.length
+                      ? markets.map((market, index) => (
+                          <span key={market}>
+                            {index > 0 && " · "}
+                            <button
+                              type="button"
+                              className="ac-link"
+                              onClick={() => {
+                                const place = treePlace(market, event.complaint_id);
+                                open(place.section, place.tab);
+                              }}
+                            >
+                              {marketLabel(market)}
+                            </button>
+                          </span>
+                        ))
+                      : "No market to assess"}
+                    <small>Each market's tree: the question, the answer, the clause and the outcome.</small>
                   </dd>
                   <dt>Awareness</dt>
                   <dd>
@@ -529,6 +551,11 @@ function Related({
   const action = (group: RelatedGroup): { label: string; run: () => void } | null => {
     if (group.key === "communications")
       return { label: "Open the log", run: () => open("Complaints", communicationsTab(id)) };
+    if (group.key === "reports" && group.items?.length === 1) {
+      // One report: its own page in the Reports tab (0.10.75, C3).
+      const place = reportPlace(group.items[0].id);
+      return { label: "Open the report", run: () => open(place.section, place.tab) };
+    }
     if (group.key === "reports") return { label: "Open the reports", run: () => open("Complaints", reportsTab(id)) };
     if (group.key === "assessments" && markets?.opens)
       return { label: "Open the assessments", run: () => onOpen(markets.opens) };

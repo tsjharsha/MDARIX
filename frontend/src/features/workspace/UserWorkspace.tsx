@@ -87,7 +87,8 @@ import { SettingsSection } from "./sections/Settings";
 import { TeamSection } from "./sections/Team";
 import { ComplaintPage } from "./sections/ComplaintPage";
 import { HomeSection } from "./sections/Home";
-import { DecisionTreesSection, ReportsSection } from "./sections/ReleaseCShells";
+import { DecisionTreesSection } from "./sections/DecisionTrees";
+import { ReportsSection } from "./sections/ReportsTab";
 import {
   AvatarMenu,
   GlobalSearch,
@@ -265,13 +266,15 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   "Decision trees": {
     icon: GitBranch,
     description: "Is it reportable, and by when?",
-    guide: "One tree per market: the questions each complaint is walked through, and where its answers lead.",
+    guide:
+      "One tree per market. Each complaint is walked through it; a reportable outcome creates the report with its data.",
     context: false,
   },
   Reports: {
     icon: FileText,
     description: "Authority reports",
-    guide: "Every authority report: its mandatory fields, its approval and its PDF.",
+    guide:
+      'Created automatically when a decision tree concludes "reportable". You complete, approve and generate the PDF; you submit it through the authority\'s own channel.',
     context: false,
   },
 };

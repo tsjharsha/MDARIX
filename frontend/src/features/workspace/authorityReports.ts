@@ -20,7 +20,14 @@ export type ObligationState =
   | "ACCEPTED"
   | "SUBMITTED_NO_ACK"
   | "FOLLOW_UP_DUE"
-  | "COMPLETE";
+  | "COMPLETE"
+  | "CANCELLED";
+
+/** The report's status path on the new navigation (0.10.75, Release C part C3; the server's rules.STAGES). */
+export type ReportStage = "CREATED" | "COMPLETE" | "APPROVAL" | "APPROVED" | "SUBMITTED" | "ACKNOWLEDGED";
+export type StageStep = { code: ReportStage; label: string; state: "DONE" | "CURRENT" | "LATER" };
+/** The mandatory-fields meter: the form's must-have fields, how many have a value, and the empty ones. */
+export type Mandatory = { total: number; filled: number; missing?: string[] };
 
 export type ReportListItem = {
   id: string | null;
@@ -45,6 +52,13 @@ export type ReportListItem = {
   assessment: string | null;
   can_start: boolean;
   sample: boolean;
+  /** 0.10.75: a started report's place on the status path (null when cancelled or not started). */
+  stage?: ReportStage | null;
+  stage_label?: string;
+  mandatory?: Mandatory;
+  submitted_at?: string | null;
+  /** The Reports tab's list views it belongs to ("open", "my-approval", "submitted-month"). */
+  views?: string[];
 };
 
 export type ReportList = {
@@ -184,6 +198,13 @@ export type ReportDetail = {
   state_label: string;
   next_step: string;
   steps: { state: ObligationState; label: string }[];
+  stage?: ReportStage | null;
+  stage_label?: string;
+  stages?: StageStep[];
+  mandatory?: Mandatory;
+  approved_snapshot?: Snapshot | null;
+  preparers?: string[];
+  cancelled_reason?: string | null;
   deadline: DeadlineFields;
   assessment: {
     conclusion: string | null;
@@ -268,6 +289,31 @@ export function stepIndex(state: ObligationState): number {
 
 /** The states in which the obligation's deadline is met (the server's rules.MET). */
 export const MET_STATES: readonly ObligationState[] = ["ACCEPTED", "SUBMITTED_NO_ACK", "FOLLOW_UP_DUE", "COMPLETE"];
+/** Nothing more is owed: met, or cancelled by a later "not reportable" conclusion (the server's rules.CLOSED). */
+export const CLOSED_STATES: readonly ObligationState[] = [...MET_STATES, "CANCELLED"];
+
+/** The Reports tab's list views (0.10.75): each a filter the server marks on the list's items (``views``). */
+export const REPORT_VIEWS = {
+  "Open reports": { code: "open", detail: "Every report still owed, the nearest deadline first." },
+  "Waiting for my approval": {
+    code: "my-approval",
+    detail: "Sent for approval and not prepared by you (in a trial, your own too, as practice).",
+  },
+  "Submitted this month": {
+    code: "submitted-month",
+    detail: "Submitted through the authority's channel since the first of the month.",
+  },
+} as const;
+export type ReportView = keyof typeof REPORT_VIEWS;
+export const REPORT_VIEW_NAMES = Object.keys(REPORT_VIEWS) as ReportView[];
+
+/** Where one report opens on the new navigation: the Reports tab, the report named in its address. */
+export const reportPlace = (id: string) => ({ section: "Reports" as const, tab: `?${new URLSearchParams({ report: id })}` });
+
+/** The reports of a list view: started reports only (a market not yet concluded is not a report). */
+export function reportsInView(items: readonly ReportListItem[], view: ReportView): ReportListItem[] {
+  return items.filter((item) => item.id && (item.views ?? []).includes(REPORT_VIEWS[view].code));
+}
 
 /** A report's deadline on the wire (authority_reports/router.py ``due_fields``). */
 export type DeadlineFields = {
@@ -282,7 +328,7 @@ export type DeadlineFields = {
 
 /** A report's deadline for its chip (app/chips.tsx DeadlineChip), or null once it is met or has no day yet. */
 export function deadlineDue(item: DeadlineFields, state?: ObligationState): DueLike | null {
-  if (!item.due_on || (state && MET_STATES.includes(state))) return null;
+  if (!item.due_on || (state && CLOSED_STATES.includes(state))) return null;
   return {
     due_at: item.due_at,
     due_date: item.due_on,
@@ -297,6 +343,7 @@ export function deadlineText(item: DeadlineFields, state?: ObligationState, now 
   if (!item.due_on) return "No deadline yet";
   const when = deadlineLabel({ due_label: item.due_label, due_date: item.due_on });
   if (state && MET_STATES.includes(state)) return `Deadline ${when}: met by the submission`;
+  if (state === "CANCELLED") return "No deadline: not reportable";
   const left = timeLeft(
     {
       due_at: item.due_at,
