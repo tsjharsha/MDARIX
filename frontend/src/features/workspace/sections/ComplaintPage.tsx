@@ -4,9 +4,9 @@ import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { DeadlineChip, HarmChip } from "../../../app/chips";
 import { marketLabel } from "../../../app/labels";
-import { NEW_PLACES, placeOf } from "../../../app/linkTable";
+import { NEW_PLACES } from "../../../app/linkTable";
 import { offeredTab } from "../../../app/featureSet";
-import { renamed, useCan, useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { renamed, useCan, useOpenTarget, useWorkspace } from "../workspaceContext";
 import { tabParam, withTabParam } from "../workspaceAddress";
 import { CHECK_TONES, EVENT_TONES, eventPath, type CheckItem, type EventView, type Opens } from "../oversight";
 import { communicationsTab } from "../communications";
@@ -79,11 +79,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   useEffect(() => {
     if (readable && readable !== ref) reportTab?.(withTabParam(shownTab ?? tab, "ref", readable), "replace");
   }, [readable]);
-  const go = (opens: Opens | null) => {
-    if (!opens) return;
-    const place = placeOf(opens);
-    open(place.section as WorkspaceSection, place.tab);
-  };
+  const go = useOpenTarget();
   const choose = (next: ComplaintSection) => {
     setActive(next);
     reportTab?.(renamed(shownTab ?? tab, next));

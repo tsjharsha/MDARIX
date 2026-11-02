@@ -6,7 +6,7 @@ import { taskDestination } from "../features/workspace/tasks";
  * Quality plan stage 7: the register's click paths a–m on the new navigation, counted step by step. A step either
  * opens a place (it must exist on the new navigation: linkTable.json newPlaces) or presses a button (its words must
  * be on the screen that shows it: the component's source). The count starts on My work, the first screen after
- * sign-in (a trial starts on Getting started until stage 8's entrance).
+ * sign-in (a trial on the new navigation starts on the entrance the first time: stage 8).
  */
 type Step = { go: [string, string?] } | { press: string; in: string };
 
@@ -101,16 +101,18 @@ export const PATHS: Array<{
       MENU("Trends"),
       { go: ["Trends", "Trends to review?signal=SIG000001"] },
       { press: "Open an investigation", in: "SignalDetail" },
-      { go: ["Investigations", "Decision Brief"] },
+      // The brief, the reviews and the decision are one section of the investigation (stage 8), not three tabs.
+      { go: ["Investigations", "Decisions & actions"] },
       { press: "Compose", in: "CaseDecisionBrief" },
       { press: "Submit", in: "CaseDecisionBrief" },
+      // The reviewer's task opens the same section, on the brief (a former tab's address: linkTable.json newHomes).
       { go: ["Investigations", "Decision Brief"] },
       { press: "Accept", in: "CaseDecisionBrief" },
-      { go: ["Investigations", "Decision"] },
+      // The decision is below the brief in the same section: no tab to open.
       { press: "Sign", in: "CaseDecision" },
       { press: "Sign", in: "CaseDecision" },
     ],
-    note: "the case page keeps its tabs until stage 8 (Decision Brief is one tab click)",
+    note: "10 since stage 8 (11 + 1 in stage 7, with the Decision Brief and Decision tabs)",
   },
   {
     key: "g",
@@ -181,15 +183,21 @@ export const PATHS: Array<{
   },
 ];
 
-describe("the click paths a–m on the new navigation (stage 7)", () => {
+describe("the click paths a–m on the new navigation (stages 7 and 8)", () => {
   it.each(PATHS.map((path) => [path.key, path] as const))("path %s: every step exists, within the count", (_, path) => {
     for (const step of path.steps)
       if ("go" in step) expect(lands(step.go), `${path.key}: ${step.go.join(" › ")}`).toBe(true);
       else expect(sourceOf(step.in), `${path.key}: "${step.press}" on ${step.in}`).toContain(step.press);
-    // f keeps the case page's tab (stage 8 turns its 11 tabs into 4 sections): one over the proposal, said so.
-    const allowance = path.key === "f" ? 1 : 0;
-    expect(path.steps.length, `${path.key}: ${path.task}`).toBeLessThanOrEqual(path.proposed + allowance);
+    expect(path.steps.length, `${path.key}: ${path.task}`).toBeLessThanOrEqual(path.proposed);
     expect(path.steps.length, `${path.key} is no longer than today`).toBeLessThanOrEqual(path.today);
+  });
+
+  it("counts path f in 10 steps: the investigation's sections hold the brief and the decision (stage 8)", () => {
+    expect(PATHS.find((path) => path.key === "f")!.steps).toHaveLength(10);
+    expect(routeFor("Investigations", "Decision Brief", "mvp", "new")).toEqual({
+      section: "Investigations",
+      tab: "Decisions & actions?part=brief",
+    });
   });
 
   it("starts on the menu's own screens", () => {

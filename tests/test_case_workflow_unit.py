@@ -429,7 +429,7 @@ def test_unreviewed_evidence_open_questions_and_urgent_requests():
     assert checks["no_blocking_request"] == "BLOCKED" and checks["decision"] == "PENDING"
     rationale = _by_key(result["checks"], "rationale")
     assert rationale["evidence_reviewed"] == "2 of 5 pieces of evidence are not reviewed yet"
-    assert rationale["unknowns"] == "2 open questions still to answer"
+    assert rationale["unknowns"] == "2 open unknowns still to answer"
     assert rationale["no_blocking_request"] == "1 high or critical evidence request still open"
     without_block = readiness.evaluate(_facts(evidence={"total": 5, "unreviewed": 2}))
     assert _by_key(without_block["steps"], "detail")["evidence"] == "2 of 5 still to review"

@@ -104,11 +104,11 @@ export type CaseTransition = {
 
 const START: CaseTransition = { to: "IN_PROGRESS", label: "Start work", prompt: "Why does work start now?" };
 const RESUME: CaseTransition = { to: "IN_PROGRESS", label: "Resume", prompt: "Why can work resume?" };
-const HOLD: CaseTransition = { to: "ON_HOLD", label: "Put on hold", prompt: "Why is the case put on hold?" };
+const HOLD: CaseTransition = { to: "ON_HOLD", label: "Put on hold", prompt: "Why is the investigation put on hold?" };
 const CANCEL: CaseTransition = {
   to: "CANCELLED",
-  label: "Cancel case",
-  prompt: "Why is the case cancelled?",
+  label: "Cancel investigation",
+  prompt: "Why is the investigation cancelled?",
   danger: true,
 };
 
@@ -240,7 +240,7 @@ export const CASE_STEPS: ReadonlyArray<{ key: string; label: string; destination
     label: "Analysis",
     destination: { section: "Investigations", tab: "Workspace", anchor: "workflow-analysis" },
   },
-  // Hypotheses and gaps are judged in the Intelligence tab (AI and hand-made side by side); the AI workspace stays
+  // Hypotheses and unknowns are judged in the Intelligence tab (AI and hand-made side by side); the AI workspace stays
   // reachable from Analysis and from the Workspace tab.
   {
     key: "hypotheses",
@@ -249,7 +249,7 @@ export const CASE_STEPS: ReadonlyArray<{ key: string; label: string; destination
   },
   {
     key: "gaps",
-    label: "Gaps",
+    label: "Unknowns",
     destination: { section: "Investigations", tab: "Intelligence", view: "Unknowns" },
   },
   // Risk and regulatory reviews are requested and recorded in the case's Reviews tab; the brief in its own tab.
@@ -448,4 +448,50 @@ export function rankMyCases(cases: MyCase[] | null | undefined, now = new Date()
         a.index - b.index,
     )
     .map((item) => item.row);
+}
+
+/** The investigation's four sections on the new navigation (stage 8), the same as one complaint's page. */
+export const CASE_SECTIONS = ["Summary", "Evidence", "Decisions & actions", "History"] as const;
+export type CaseSection = (typeof CASE_SECTIONS)[number];
+
+/** Where each of the case's steps is done on the new navigation: its section, and the part of it to scroll to. */
+export const STEP_PLACE: Readonly<Record<string, { section: CaseSection; part: string }>> = {
+  overview: { section: "Summary", part: "summary" },
+  scope: { section: "Summary", part: "scope" },
+  evidence: { section: "Evidence", part: "evidence" },
+  analysis: { section: "Evidence", part: "analysis" },
+  hypotheses: { section: "Evidence", part: "intelligence" },
+  gaps: { section: "Evidence", part: "intelligence" },
+  risk_regulatory: { section: "Decisions & actions", part: "reviews" },
+  brief: { section: "Decisions & actions", part: "brief" },
+  human_review: { section: "Decisions & actions", part: "decision" },
+};
+
+// A step that is finished, or that the organization cannot record yet, is not work anyone owes.
+const SETTLED: readonly StepStatus[] = ["DONE", "NOT_AVAILABLE"];
+
+export type SectionProgress = { section: CaseSection; state: "DONE" | "CURRENT" | "OPEN"; done: number; total: number };
+
+/**
+ * The one progress line (stage 8): each section with how many of its steps are done, the first unfinished one
+ * current. History holds no step: it is done once the decision is signed (human review done).
+ */
+export function caseProgress(steps: CaseStep[]): SectionProgress[] {
+  const decided = steps.some((step) => step.key === "human_review" && step.status === "DONE");
+  let current = false;
+  return CASE_SECTIONS.map((section) => {
+    const own = steps.filter((step) => STEP_PLACE[step.key]?.section === section);
+    const done = own.filter((step) => SETTLED.includes(step.status)).length;
+    const finished = section === "History" ? decided : done === own.length;
+    const state = finished ? "DONE" : current ? "OPEN" : ((current = true), "CURRENT");
+    return { section, state, done: section === "History" ? Number(decided) : done, total: own.length || 1 };
+  });
+}
+
+/** The next step as the investigation's main button (8.7): the first step not done, where it is done; else none. */
+export function nextCaseStep(
+  steps: CaseStep[],
+): { key: string; label: string; section: CaseSection; part: string } | null {
+  const next = steps.find((step) => STEP_PLACE[step.key] && !SETTLED.includes(step.status));
+  return next ? { key: next.key, label: next.label, ...STEP_PLACE[next.key] } : null;
 }

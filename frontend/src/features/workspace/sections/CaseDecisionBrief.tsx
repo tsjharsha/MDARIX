@@ -6,7 +6,7 @@ import { Drawer, Table, errorText, formatDate, send, useResource } from "../../c
 import { safeText } from "../../../app/displayId";
 import { roleLabel } from "../../../app/roles";
 import { AiInterpretationNote, StatementKind } from "../../shared/StatementKind";
-import { useCanRunAi, useWorkspace } from "../workspaceContext";
+import { useCanRunAi, usePanelFlag, useWorkspace } from "../workspaceContext";
 import {
   ACTION_MAX,
   BRIEF_REVIEW_ACTIONS,
@@ -116,7 +116,8 @@ export function CaseDecisionBriefPanel({
   const [useAi, setUseAi] = useState(false);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState<{ text: string; tone: "critical" | "warning" } | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  // The submit drawer has its own address (panel=submit-brief:1), so Back closes it and a refresh reopens it.
+  const [submitting, setSubmitting] = usePanelFlag("submit-brief");
   // The brief accepted for decision on this screen: the next step, signing, is offered at the top and in the review.
   const [accepted, setAccepted] = useState(false);
   const reviewControls = { startReview: controls.startReview && !readOnly, review: controls.review && !readOnly };
@@ -145,14 +146,14 @@ export function CaseDecisionBriefPanel({
       () => postJson(briefPath(investigationId), { use_ai_draft: useAi }, useAi ? { timeoutMs: AI_TIMEOUT_MS } : {}),
       useAi
         ? "A new brief version was composed with an AI draft. Edit the draft into your own words before submitting."
-        : "A new brief version was composed from the case's records.",
+        : "A new brief version was composed from the investigation's records.",
       "The brief could not be composed.",
     );
   const refresh = () =>
     run(
       "refresh",
       () => send(briefPath(investigationId, "draft/refresh"), "POST"),
-      "The draft was refreshed from the case's current records.",
+      "The draft was refreshed from the investigation's current records.",
       "The draft could not be refreshed.",
     );
   const save = () =>
@@ -263,8 +264,8 @@ export function CaseDecisionBriefPanel({
             title="No brief yet"
             detail={
               author.compose
-                ? "Compose the first version from the case's records. You then write the narrative and submit it for a quality review."
-                : "The case's investigator composes the brief once the investigation is far enough along."
+                ? "Compose the first version from the investigation's records. You then write the narrative and submit it for a quality review."
+                : "The investigator composes the brief once the investigation is far enough along."
             }
           />
         )}
@@ -609,7 +610,7 @@ function ComposedSections({ version }: { version: BriefVersion }) {
   const ai = aiDisclosure(content);
   const facts = briefLines(content.established_facts);
   return (
-    <Panel eyebrow="Composed from the case's records" title="What the brief contains">
+    <Panel eyebrow="Composed from the investigation's records" title="What the brief contains">
       <p className="ac-muted">
         Each statement shows its kind (Fact, Source assertion, Derived observation or AI interpretation) and who made
         it.
@@ -661,7 +662,7 @@ function ComposedSections({ version }: { version: BriefVersion }) {
               .join(" · ")}
           </p>
         )}
-        <Lines lines={briefLines(inventory.items)} empty="No evidence in the case yet." />
+        <Lines lines={briefLines(inventory.items)} empty="No evidence in the investigation yet." />
       </Section>
       <div className="uw-intel-board">
         <Section title="Supporting evidence" count={briefLines(content.supporting_evidence).length}>
@@ -672,7 +673,11 @@ function ComposedSections({ version }: { version: BriefVersion }) {
         </Section>
       </div>
       <Section title="Leading hypothesis">
-        <Lines lines={leading} kind="HYPOTHESIS" empty="No hypothesis is leading. That is a valid state of a case." />
+        <Lines
+          lines={leading}
+          kind="HYPOTHESIS"
+          empty="No hypothesis is leading. That is a valid state of an investigation."
+        />
       </Section>
       <Section title="Alternative hypotheses" count={briefLines(content.alternative_hypotheses).length}>
         <Lines lines={briefLines(content.alternative_hypotheses)} kind="HYPOTHESIS" empty="None recorded." />
@@ -986,8 +991,8 @@ function QualityReviewPanel({
           </label>
           {action && problem && <p className="uw-hint">{problem}</p>}
           <p className="ac-muted">
-            Accepting for decision confirms the brief is fit to decide on. It does not decide the case: authorized
-            approvers do, in the case's Decision tab.
+            Accepting for decision confirms the brief is fit to decide on. It does not decide the investigation:
+            authorized approvers do, in the investigation's Decision tab.
           </p>
           <div className="ca-action-row">
             <button type="submit" className="ac-primary" disabled={busy || !!problem}>

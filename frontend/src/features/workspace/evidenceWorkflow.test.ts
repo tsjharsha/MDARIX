@@ -141,7 +141,7 @@ describe("the case's evidence inventory", () => {
 
   it("names origins and sources without UUIDs", () => {
     expect(originLabel("REQUEST")).toBe("From a request");
-    expect(originLabel("DIRECT")).toBe("Recorded on the case");
+    expect(originLabel("DIRECT")).toBe("Recorded on the investigation");
     expect(sourceText({ source_system: "SAP QM", source_identifier: "QN-1234" })).toBe("SAP QM · QN-1234");
     expect(sourceText({ source_system: null, source_identifier: UUID, source_reference: "REF-9" })).toBe("REF-9");
     expect(sourceText({})).toBe("—");

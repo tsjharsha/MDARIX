@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   CASE_STEPS,
+  STEP_PLACE,
   caseDueState,
+  caseProgress,
   casePriorityLabel,
   caseState,
   caseStateLabel,
@@ -12,6 +14,7 @@ import {
   dayFromDueAt,
   dueAtFromDay,
   myCaseTiles,
+  nextCaseStep,
   planningChange,
   rankMyCases,
   readinessChecks,
@@ -20,12 +23,13 @@ import {
   transitionBody,
   transitionPath,
   transitionProblem,
+  type StepStatus,
 } from "./caseWorkflow";
 
 const UUID = "0b6f8f9e-1111-4222-8333-444455556666";
 const now = new Date("2026-10-06T12:00:00Z");
 
-describe("how a case's state reads", () => {
+describe("how an investigation's state reads", () => {
   it("shows the server's label, else the known label, else the plain status", () => {
     expect(caseStateLabel({ workflow_state: "ON_HOLD", workflow_state_label: "Paused by QA" })).toBe("Paused by QA");
     expect(caseStateLabel({ workflow_state: "READY_FOR_DECISION" })).toBe("Ready for decision");
@@ -51,15 +55,15 @@ describe("how a case's state reads", () => {
   });
 });
 
-describe("state changes offered on the case header", () => {
+describe("state changes offered on the investigation header", () => {
   const all = { work: true, assign: true };
   const labels = (state: string | null, can = all) =>
     caseTransitions({ workflow_state: state }, can).map((item) => `${item.label}>${item.to}`);
 
   it("starts, holds, resumes and cancels by state", () => {
-    expect(labels("OPEN")).toEqual(["Start work>IN_PROGRESS", "Cancel case>CANCELLED"]);
-    expect(labels("IN_PROGRESS")).toEqual(["Put on hold>ON_HOLD", "Cancel case>CANCELLED"]);
-    expect(labels("ON_HOLD")).toEqual(["Resume>IN_PROGRESS", "Cancel case>CANCELLED"]);
+    expect(labels("OPEN")).toEqual(["Start work>IN_PROGRESS", "Cancel investigation>CANCELLED"]);
+    expect(labels("IN_PROGRESS")).toEqual(["Put on hold>ON_HOLD", "Cancel investigation>CANCELLED"]);
+    expect(labels("ON_HOLD")).toEqual(["Resume>IN_PROGRESS", "Cancel investigation>CANCELLED"]);
     for (const state of ["BRIEF_IN_REVIEW", "READY_FOR_DECISION", "DECIDED", "CLOSED", "CANCELLED"])
       expect(labels(state)).toEqual([]);
     expect(labels(null)).toEqual([]);
@@ -67,7 +71,7 @@ describe("state changes offered on the case header", () => {
 
   it("follows the person's permissions: work for start/hold/resume, assign for cancel", () => {
     expect(labels("OPEN", { work: true, assign: false })).toEqual(["Start work>IN_PROGRESS"]);
-    expect(labels("IN_PROGRESS", { work: false, assign: true })).toEqual(["Cancel case>CANCELLED"]);
+    expect(labels("IN_PROGRESS", { work: false, assign: true })).toEqual(["Cancel investigation>CANCELLED"]);
     expect(labels("ON_HOLD", { work: false, assign: false })).toEqual([]);
   });
 
@@ -109,7 +113,7 @@ describe("priority and due date", () => {
     expect(planningChange({}, { priority: "URGENT", dueDay: "" })).toBeNull();
   });
 
-  it("flags a case overdue or due soon, never once it is decided, closed or cancelled", () => {
+  it("flags an investigation overdue or due soon, never once it is decided, closed or cancelled", () => {
     expect(caseDueState({ workflow_state: "IN_PROGRESS", due_at: "2026-10-05T12:00:00Z" }, now)).toBe("overdue");
     expect(caseDueState({ workflow_state: "OPEN", due_at: "2026-10-07T12:00:00Z" }, now)).toBe("due_soon");
     expect(caseDueState({ workflow_state: "OPEN", due_at: "2026-10-30T12:00:00Z", overdue: true }, now)).toBe(
@@ -121,7 +125,7 @@ describe("priority and due date", () => {
   });
 });
 
-describe("the case stepper", () => {
+describe("the investigation stepper", () => {
   it("lists the nine steps in order with the server's status, and Not available for a step not reported", () => {
     const steps = caseSteps({
       steps: [
@@ -137,7 +141,7 @@ describe("the case stepper", () => {
       "Evidence",
       "Analysis",
       "Hypotheses",
-      "Gaps",
+      "Unknowns",
       "Risk & Regulatory",
       "Decision Brief",
       "Human review",
@@ -237,7 +241,7 @@ describe("my investigations", () => {
     expect(myCaseTiles(null).every((tile) => tile.value === null)).toBe(true);
   });
 
-  it("ranks overdue cases first, then by priority, then by the nearest due date", () => {
+  it("ranks overdue investigations first, then by priority, then by the nearest due date", () => {
     const cases = [
       { id: "a", priority: "LOW", due_at: "2026-10-20T12:00:00Z", workflow_state: "OPEN" },
       { id: "b", priority: "CRITICAL", due_at: "2026-10-30T12:00:00Z", workflow_state: "IN_PROGRESS" },
@@ -247,5 +251,34 @@ describe("my investigations", () => {
     ];
     expect(rankMyCases(cases, now).map((row) => row.id)).toEqual(["c", "d", "b", "a", "e"]);
     expect(rankMyCases(null, now)).toEqual([]);
+  });
+});
+
+describe("the investigation's one progress line (stage 8)", () => {
+  const step = (key: string, status: StepStatus) => ({ key, label: key, status, detail: null, destination: null });
+  it("counts each section's steps and names the first unfinished step as the next one", () => {
+    const steps = [
+      step("overview", "DONE"),
+      step("scope", "DONE"),
+      step("evidence", "DONE"),
+      step("analysis", "NOT_AVAILABLE"),
+      step("hypotheses", "DONE"),
+      step("gaps", "IN_PROGRESS"),
+      step("risk_regulatory", "NOT_STARTED"),
+      step("brief", "NOT_STARTED"),
+      step("human_review", "NOT_STARTED"),
+    ];
+    expect(caseProgress(steps)).toEqual([
+      { section: "Summary", state: "DONE", done: 2, total: 2 },
+      { section: "Evidence", state: "CURRENT", done: 3, total: 4 },
+      { section: "Decisions & actions", state: "OPEN", done: 0, total: 3 },
+      { section: "History", state: "OPEN", done: 0, total: 1 },
+    ]);
+    expect(nextCaseStep(steps)).toEqual({ key: "gaps", label: "gaps", section: "Evidence", part: "intelligence" });
+  });
+  it("is done, with no next step, once the decision is signed", () => {
+    const steps = Object.keys(STEP_PLACE).map((key) => step(key, "DONE"));
+    expect(caseProgress(steps).every((item) => item.state === "DONE")).toBe(true);
+    expect(nextCaseStep(steps)).toBeNull();
   });
 });

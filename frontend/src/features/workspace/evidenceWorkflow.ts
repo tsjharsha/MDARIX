@@ -28,14 +28,18 @@ export const RELATIONSHIPS = [
 export type Relationship = (typeof RELATIONSHIPS)[number];
 
 export const REVIEW_STATUS: Record<ReviewStatus, { label: string; tone: Tone; help: string }> = {
-  UNREVIEWED: { label: "Unreviewed", tone: "neutral", help: "Nobody has judged this evidence for this case yet." },
-  ACCEPTED: { label: "Accepted", tone: "good", help: "Reliable enough to use in this case." },
+  UNREVIEWED: {
+    label: "Unreviewed",
+    tone: "neutral",
+    help: "Nobody has judged this evidence for this investigation yet.",
+  },
+  ACCEPTED: { label: "Accepted", tone: "good", help: "Reliable enough to use in this investigation." },
   ACCEPTED_WITH_LIMITATION: {
     label: "Accepted with limitation",
     tone: "warning",
     help: "Usable, with a limitation every reader must see.",
   },
-  REJECTED: { label: "Rejected", tone: "critical", help: "Not usable in this case. Say why." },
+  REJECTED: { label: "Rejected", tone: "critical", help: "Not usable in this investigation. Say why." },
   QUARANTINED: { label: "Quarantined", tone: "serious", help: "Held back until a question about it is settled." },
   SUPERSEDED: { label: "Superseded", tone: "neutral", help: "Replaced by a newer record. Say which, and why." },
 };
@@ -43,15 +47,15 @@ export const REVIEW_STATUS: Record<ReviewStatus, { label: string; tone: Tone; he
 export const RELATIONSHIP: Record<Relationship, { label: string; tone: Tone; help: string }> = {
   SUPPORTING: { label: "Supporting", tone: "good", help: "Consistent with an explanation under consideration." },
   CONTRADICTING: { label: "Contradicting", tone: "critical", help: "Speaks against an explanation." },
-  CONTEXTUAL: { label: "Contextual", tone: "neutral", help: "Background that frames the case." },
+  CONTEXTUAL: { label: "Contextual", tone: "neutral", help: "Background that frames the investigation." },
   UNRESOLVED: { label: "Unresolved", tone: "warning", help: "Its bearing on the question is not settled yet." },
-  UNRELATED: { label: "Unrelated", tone: "neutral", help: "Does not bear on this case's question." },
+  UNRELATED: { label: "Unrelated", tone: "neutral", help: "Does not bear on this investigation's question." },
   UNREVIEWED: { label: "Not judged", tone: "neutral", help: "Its relationship has not been judged yet." },
 };
 
 /** Why the review form explains the two choices separately. */
 export const QUALITY_VS_RELATIONSHIP =
-  "Quality and relationship are separate judgements. The review status says whether the record can be relied on; the relationship says how it bears on this case's question. Reliable evidence can contradict an explanation, and weak evidence can seem to support one.";
+  "Quality and relationship are separate judgements. The review status says whether the record can be relied on; the relationship says how it bears on this investigation's question. Reliable evidence can contradict an explanation, and weak evidence can seem to support one.";
 
 const code = (value: unknown) =>
   String(value ?? "")
@@ -140,7 +144,7 @@ export const inventoryPath = (investigationId: string) =>
 
 const ORIGIN_LABELS: Record<string, string> = {
   LINKED: "Linked",
-  DIRECT: "Recorded on the case",
+  DIRECT: "Recorded on the investigation",
   REQUEST: "From a request",
 };
 export const originLabel = (origin: unknown) =>

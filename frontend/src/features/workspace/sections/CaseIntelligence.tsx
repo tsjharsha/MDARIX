@@ -42,10 +42,10 @@ export function CaseIntelligencePanel({
       </p>
       {readOnly && (
         <p className="ac-message tone-warning" role="note">
-          This case is closed: its intelligence can be read but not changed.
+          This investigation is closed: its intelligence can be read but not changed.
         </p>
       )}
-      <Tabs tabs={INTELLIGENCE_VIEWS} active={view} onChange={onView} label="Case intelligence views">
+      <Tabs tabs={INTELLIGENCE_VIEWS} active={view} onChange={onView} label="Investigation intelligence views">
         {view === "Hypotheses" && (
           <HypothesesView
             investigationId={investigationId}

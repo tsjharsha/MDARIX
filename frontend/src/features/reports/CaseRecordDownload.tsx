@@ -37,8 +37,8 @@ export function CaseRecordDownload({ investigationId, label }: { investigationId
     }
   };
   return (
-    <div className="rp-record" role="group" aria-label="Download case record">
-      <span>Download case record</span>
+    <div className="rp-record" role="group" aria-label="Download investigation record">
+      <span>Download investigation record</span>
       {FORMATS.map(([format, name]) => (
         <button
           key={format}

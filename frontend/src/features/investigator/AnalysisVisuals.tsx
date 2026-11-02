@@ -154,7 +154,7 @@ export function AnalysisVisual({ analysis }: { analysis: InvestigationAnalysis }
         <div className="av-tiles">
           <Tile label="Observations" value={analysis.observations.length} tone="info" />
           <Tile label="Contradictions" value={analysis.contradictions.length} tone="against" />
-          <Tile label="Gaps" value={gaps.length} tone="warn" />
+          <Tile label="Unknowns" value={gaps.length} tone="warn" />
           <Tile label="Questions" value={analysis.questions_to_investigate.length} tone="neutral" />
         </div>
         {dropped > 0 && (

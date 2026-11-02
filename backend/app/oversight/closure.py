@@ -363,7 +363,7 @@ def checklist(found: dict) -> list[dict]:
                 "Escalated to a case: its investigation decision is not signed"
                 if escalated
                 else "No disposition or investigation decision is signed",
-                links.target("Investigations")
+                _case_decision(found, disposition)
                 if escalated
                 else links.target("Complaints", "Dispositions", record=("disposition", complaint.id)),
             )
@@ -412,6 +412,15 @@ def checklist(found: dict) -> list[dict]:
     for item in items:
         item["action"] = actions.get(item["code"]) if item["result"] == BLOCKED else None
     return items
+
+
+def _case_decision(found: dict, disposition) -> dict:
+    """An escalated complaint's decision opens on its investigation's decision, not on the list of investigations
+    (stage 8: the walk-through's next step needs no search)."""
+    case = next((row for row in found["cases"] if row.id == disposition.investigation_id), None)
+    return (
+        links.target("Investigations", "Decision", record=("case", case.id)) if case else links.target("Investigations")
+    )
 
 
 def fingerprint(complaint_id, items: list[dict]) -> str:

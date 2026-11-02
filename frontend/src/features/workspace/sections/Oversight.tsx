@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { placeOf } from "../../../app/linkTable";
 import { DeadlineChip } from "../../../app/chips";
 import { DecideAndSign } from "./common";
 import { marketLabel } from "../../../app/labels";
@@ -7,7 +6,7 @@ import { CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, send, useResource, type Column } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
-import { useCan, useTabParam, useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { useCan, useOpenTarget, useTabParam, useWorkspace } from "../workspaceContext";
 import {
   CHECK_TONES,
   EVENT_TONES,
@@ -29,14 +28,7 @@ import {
 } from "../oversight";
 import { InlineError, Why } from "./boardParts";
 
-function useOpen() {
-  const { open } = useWorkspace();
-  return (opens: Opens) => {
-    if (!opens) return;
-    const place = placeOf(opens);
-    open(place.section as WorkspaceSection, place.tab);
-  };
-}
+const useOpen = useOpenTarget;
 
 /**
  * The Quality and Regulatory Oversight view (T-G9), in Readiness: everything overdue or due soon across triage,

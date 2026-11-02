@@ -66,7 +66,7 @@ describe("Getting started after an import whose signals are being found", () => 
     expect(shown.signals_pending).toBe(true);
     expect(shown.chapters[1].finding).toEqual({ value: null, text: FINDING_SIGNALS_NOW, state: "NOT_SET" });
     expect(shown.chapters[0]).toBe(story.chapters[0]);
-    expect(storyHeadline(shown).detail).toContain("Finding signals in the complaints you just imported.");
+    expect(storyHeadline(shown).detail).toContain("Finding trends in the complaints you just imported.");
     // The story itself is not changed.
     expect(story.chapters[1].finding.text).toBe("1 signal waiting for a decision or a case");
   });

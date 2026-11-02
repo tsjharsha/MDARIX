@@ -28,7 +28,7 @@ STEPS = (
     ("evidence", "Evidence"),
     ("analysis", "Analysis"),
     ("hypotheses", "Hypotheses"),
-    ("gaps", "Gaps and open questions"),
+    ("gaps", "Unknowns"),
     ("risk_regulatory", "Risk and regulatory review"),
     ("brief", "Investigation brief"),
     ("human_review", "Human review and decision"),
@@ -39,7 +39,7 @@ CHECKS = (
     ("analysis_run", "Analysis has been run"),
     ("hypotheses_present", "Hypotheses are recorded"),
     ("contradictions_documented", "Contradicting evidence is judged"),
-    ("unknowns", "Open questions are answered"),
+    ("unknowns", "Unknowns are answered"),
     ("no_blocking_request", "No urgent evidence request is open"),
     ("risk_review", "Risk review"),
     ("regulatory_review", "Regulatory review"),
@@ -268,17 +268,17 @@ def evaluate(facts: dict) -> dict:
     else:
         total, open_count = int(unknowns.get("total") or 0), int(unknowns.get("open") or 0)
         if open_count:
-            status, detail = "IN_PROGRESS", f"{_plural(open_count, 'open question')}"
+            status, detail = "IN_PROGRESS", f"{_plural(open_count, 'open unknown')}"
         elif total:
-            status, detail = "DONE", f"All {_plural(total, 'question')} answered"
+            status, detail = "DONE", f"All {_plural(total, 'unknown')} answered"
         else:
-            status, detail = "NOT_STARTED", "No open questions recorded yet"
+            status, detail = "NOT_STARTED", "No unknowns recorded yet"
         steps["gaps"] = _step("gaps", labels["gaps"], status, detail)
         checks["unknowns"] = _check(
             "unknowns",
             check_labels["unknowns"],
             "PENDING" if open_count else "PASS",
-            f"{_plural(open_count, 'open question')} still to answer" if open_count else "No open questions",
+            f"{_plural(open_count, 'open unknown')} still to answer" if open_count else "No open unknowns",
         )
 
     if requests is None:

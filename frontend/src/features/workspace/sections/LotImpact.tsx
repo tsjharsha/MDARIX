@@ -80,7 +80,7 @@ export function LotImpactPanel({
       setPreview(null);
       screen.reload();
       onChanged?.();
-      notify("Kept with the case scope.");
+      notify("Kept with the investigation scope.");
     } catch (reason) {
       setError(errorText(reason, "The list was not kept."));
     } finally {
@@ -91,7 +91,7 @@ export function LotImpactPanel({
   if (!view)
     return (
       <div id={LOT_IMPACT_ANCHOR} className="uw-anchor" ref={anchor}>
-        <Panel eyebrow="Case scope" title={title} source={screen}>
+        <Panel eyebrow="Investigation scope" title={title} source={screen}>
           {null}
         </Panel>
       </div>
@@ -105,7 +105,7 @@ export function LotImpactPanel({
   const problem = list ? exclusionProblem(excluded, list.lots, view.reason_min) : "";
   return (
     <div id={LOT_IMPACT_ANCHOR} className="uw-anchor uw-li" ref={anchor}>
-      <Panel eyebrow="Case scope" title={title} source={screen}>
+      <Panel eyebrow="Investigation scope" title={title} source={screen}>
         <p className="uw-li-never">
           <ShieldCheck size={16} aria-hidden="true" /> {view.never_decides}
         </p>
@@ -156,8 +156,8 @@ export function LotImpactPanel({
             {editsPending && (
               <p className="ac-muted">
                 {view.source === "saved"
-                  ? "Keep the list again to update its totals and the case scope."
-                  : "Nothing is kept yet: keep this factor with the case to use it and sign the list."}
+                  ? "Keep the list again to update its totals and the investigation scope."
+                  : "Nothing is kept yet: keep this factor with the investigation to use it and sign the list."}
               </p>
             )}
             <div className="ca-action-row">
@@ -167,7 +167,7 @@ export function LotImpactPanel({
                 disabled={busy || !!problem || !editsPending}
                 onClick={() => void keep()}
               >
-                <Save size={15} aria-hidden="true" /> {busy ? "Keeping…" : "Keep this list with the case"}
+                <Save size={15} aria-hidden="true" /> {busy ? "Keeping…" : "Keep this list with the investigation"}
               </button>
             </div>
             <InlineError text={problem || error} />
@@ -212,12 +212,12 @@ function FactorNote({ view }: { view: LotImpactView }) {
   if (view.source === "suggested" && view.suggestion)
     return (
       <p className="uw-li-suggestion">
-        Suggested from the case's lots: <strong>{view.suggestion.label}</strong> ({view.suggestion.why}). You choose:
-        pick another factor above if the evidence points elsewhere.
+        Suggested from the investigation's lots: <strong>{view.suggestion.label}</strong> ({view.suggestion.why}). You
+        choose: pick another factor above if the evidence points elsewhere.
       </p>
     );
   if (view.source === "preview")
-    return <p className="ac-muted">A preview: nothing is kept until you keep it with the case.</p>;
+    return <p className="ac-muted">A preview: nothing is kept until you keep it with the investigation.</p>;
   return null;
 }
 
@@ -428,7 +428,7 @@ function SignedList({ view }: { view: LotImpactView }) {
       <p>
         Signed by <strong>{signature.signer_name}</strong>
         {signature.signer_role ? ` (${signature.signer_role})` : ""} on {formatDate(signature.signed_at)}
-        {signature.scope_version ? `, kept as case scope version ${signature.scope_version}` : ""}.
+        {signature.scope_version ? `, kept as investigation scope version ${signature.scope_version}` : ""}.
       </p>
       <p className="ac-muted">Meaning: {signature.meaning}</p>
       <p className="ac-muted">
@@ -473,7 +473,7 @@ function SignForm({
     return (
       <Panel eyebrow="Signature" title="Sign the list">
         <p className="ac-note">
-          A colleague who signs decisions signs the list. Your role can prepare it and keep it with the case.
+          A colleague who signs decisions signs the list. Your role can prepare it and keep it with the investigation.
         </p>
       </Panel>
     );
@@ -557,14 +557,14 @@ function Downloads({
     setError("");
     try {
       await downloadFile(`${lotImpactBase(investigationId)}/list.${kind}`, {
-        fallbackName: `mdarix-lot-impact-${label ?? "case"}.${kind}`,
+        fallbackName: `mdarix-lot-impact-${label ?? "investigation"}.${kind}`,
       });
     } catch (reason) {
       setError(errorText(reason, "The file could not be downloaded."));
     }
   };
   return (
-    <Panel eyebrow="Export" title={signed ? "The signed list" : "The list kept with the case"}>
+    <Panel eyebrow="Export" title={signed ? "The signed list" : "The list kept with the investigation"}>
       <div className="ca-action-row uw-doc-downloads">
         <button type="button" className="ac-secondary" onClick={() => void get("pdf")}>
           <Download size={15} aria-hidden="true" /> PDF

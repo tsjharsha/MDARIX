@@ -46,10 +46,10 @@ describe("Finding signals on the dashboard and on Readiness", () => {
     const html = panel(true);
     expect(html).toContain(FINDING_SIGNALS_TRIAGE);
     expect(FINDING_SIGNALS_TRIAGE).toBe(
-      "Finding signals in the complaints you just imported… The counts update by themselves when they are ready.",
+      "Finding trends in the complaints you just imported… The counts update by themselves when they are ready.",
     );
-    expect(html).toContain("Finding signals…");
-    expect(html).not.toContain("No open signals");
+    expect(html).toContain("Finding trends…");
+    expect(html).not.toContain("No open trends");
     // The summary and the open signals both wait with the status read.
     expect(reads.calls.map((call) => call.options)).toEqual([WHILE_FINDING_SIGNALS, WHILE_FINDING_SIGNALS]);
     expect(WHILE_FINDING_SIGNALS.statusPath).toBe(DETECTION_STATUS_PATH);
@@ -57,7 +57,7 @@ describe("Finding signals on the dashboard and on Readiness", () => {
     expect(WHILE_FINDING_SIGNALS.refreshWhile({})).toBe(false);
     const done = panel(false);
     expect(done).not.toContain(FINDING_SIGNALS_NOW);
-    expect(done).toContain("No open signals");
+    expect(done).toContain("No open trends");
   });
 
   it("says so on Readiness's trend check instead of its number", () => {

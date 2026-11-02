@@ -3,7 +3,7 @@
 // (/api/v1/capas/.../effectiveness, backend/app/capa_effectiveness) decides every action; a person signs the result.
 import type { Tone } from "../admin/console/dashboardModel";
 import { collapsed } from "./complaintReview";
-import { timeLeft, type DueLike } from "../../app/dates";
+import { timeLeft } from "../../app/dates";
 
 export const RECORDS_TABS = ["Effectiveness checks", "Risk file input"] as const;
 export type RecordsTab = (typeof RECORDS_TABS)[number];

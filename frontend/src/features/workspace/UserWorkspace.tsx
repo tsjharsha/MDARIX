@@ -267,6 +267,11 @@ const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
     description: "Profile, security, away",
     guide: "Your profile, sign-in security, the roles you hold, and when you will be away.",
   },
+  Investigations: {
+    description: "One investigation, from its question to its decision",
+    guide:
+      "One investigation in four sections: its summary, its evidence, its decisions and actions, and its history. The main button names the next step.",
+  },
 };
 
 /** Under the MVP feature set Records and My Work also hold what the parked sections did (app/featureSet.ts). */

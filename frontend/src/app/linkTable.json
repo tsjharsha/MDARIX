@@ -396,17 +396,7 @@
     },
     "Investigations": {
       "path": "/app/investigations",
-      "tabs": [
-        "Workspace",
-        "Evidence",
-        "Intelligence",
-        "Ask MDARIX",
-        "Scope",
-        "Reviews",
-        "Decision Brief",
-        "Decision",
-        "Record"
-      ]
+      "tabs": ["Summary", "Evidence", "Decisions & actions", "History"]
     },
     "Import data": {
       "path": "/app/import-data",
@@ -461,7 +451,7 @@
     },
     "case": {
       "section": "Investigations",
-      "tab": "Workspace",
+      "tab": "Summary",
       "param": "case"
     },
     "signal": {
@@ -766,6 +756,96 @@
     },
     {
       "section": "Investigations",
+      "tab": "Workspace",
+      "to": {
+        "section": "Investigations",
+        "tab": "Summary"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Investigations",
+      "tab": "Scope",
+      "to": {
+        "section": "Investigations",
+        "tab": "Summary"
+      },
+      "keep": "query",
+      "add": {
+        "part": "scope"
+      }
+    },
+    {
+      "section": "Investigations",
+      "tab": "Intelligence",
+      "to": {
+        "section": "Investigations",
+        "tab": "Evidence"
+      },
+      "keep": "query",
+      "add": {
+        "part": "intelligence"
+      }
+    },
+    {
+      "section": "Investigations",
+      "tab": "Ask MDARIX",
+      "to": {
+        "section": "Investigations",
+        "tab": "Evidence"
+      },
+      "keep": "query",
+      "add": {
+        "part": "ask"
+      }
+    },
+    {
+      "section": "Investigations",
+      "tab": "Reviews",
+      "to": {
+        "section": "Investigations",
+        "tab": "Decisions & actions"
+      },
+      "keep": "query",
+      "add": {
+        "part": "reviews"
+      }
+    },
+    {
+      "section": "Investigations",
+      "tab": "Decision Brief",
+      "to": {
+        "section": "Investigations",
+        "tab": "Decisions & actions"
+      },
+      "keep": "query",
+      "add": {
+        "part": "brief"
+      }
+    },
+    {
+      "section": "Investigations",
+      "tab": "Decision",
+      "to": {
+        "section": "Investigations",
+        "tab": "Decisions & actions"
+      },
+      "keep": "query",
+      "add": {
+        "part": "decision"
+      }
+    },
+    {
+      "section": "Investigations",
+      "tab": "Record",
+      "to": {
+        "section": "Investigations",
+        "tab": "History"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Investigations",
       "tab": "All investigations",
       "to": {
         "section": "Complaints",
@@ -792,6 +872,33 @@
     }
   ],
   "classicHomes": [
+    {
+      "section": "Investigations",
+      "tab": "Summary",
+      "to": {
+        "section": "Investigations",
+        "tab": "Workspace"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Investigations",
+      "tab": "Decisions & actions",
+      "to": {
+        "section": "Investigations",
+        "tab": "Decision"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Investigations",
+      "tab": "History",
+      "to": {
+        "section": "Investigations",
+        "tab": "Record"
+      },
+      "keep": "query"
+    },
     {
       "section": "Complaint",
       "to": {

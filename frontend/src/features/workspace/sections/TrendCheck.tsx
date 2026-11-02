@@ -52,7 +52,7 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
       board.reload();
       if (made?.business_id || made?.id) onOpenSignal(String(made.business_id ?? made.id));
     } catch (failure) {
-      setError(errorText(failure, "The signal was not raised."));
+      setError(errorText(failure, "The trend was not raised."));
     } finally {
       setBusy(null);
     }
@@ -162,7 +162,7 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
                     className="ac-link"
                     onClick={() => onOpenSignal(String(row.open_signals[0].business_id ?? row.open_signals[0].id))}
                   >
-                    {row.open_signals[0].business_id ?? "Open signal"}
+                    {row.open_signals[0].business_id ?? "Open trend"}
                   </button>
                 ) : canTriage && canRaiseFromTrend(row) ? (
                   <button
@@ -171,7 +171,7 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
                     disabled={busy === row.key}
                     onClick={() => void raise(row)}
                   >
-                    <Plus size={14} aria-hidden="true" /> {busy === row.key ? "Raising…" : "Raise a signal"}
+                    <Plus size={14} aria-hidden="true" /> {busy === row.key ? "Raising…" : "Raise a trend"}
                   </button>
                 ) : null,
             },

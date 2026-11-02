@@ -5236,3 +5236,76 @@ div.uw-task-count:hover {
     display: flex;
   }
 }
+
+/* Stage 8: the investigation's one progress line over its four sections (CaseHeader.tsx CaseProgressLine). */
+.uw-case-progress {
+  display: grid;
+  gap: var(--ms-space-3);
+  margin: 0 0 var(--ms-space-4);
+  padding: var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+}
+.uw-case-progress ol {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ms-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: section;
+}
+.uw-case-progress li button {
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--ms-space-2) var(--ms-space-3);
+  border: 1px solid var(--ms-line);
+  border-top: 4px solid var(--ms-line);
+  border-radius: 6px;
+  background: var(--ms-surface);
+  color: var(--ms-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.uw-case-progress li button small {
+  color: var(--ms-muted);
+}
+.uw-case-progress li.state-done button {
+  border-top-color: var(--ms-good);
+}
+.uw-case-progress li.state-done strong::before {
+  content: "✓ ";
+  color: var(--ms-good);
+}
+.uw-case-progress li.state-current button {
+  border-color: var(--ms-navy);
+  border-top-color: var(--ms-navy);
+}
+.uw-case-progress > .ac-primary {
+  justify-self: start;
+}
+.uw-case-steps {
+  display: grid;
+  gap: var(--ms-space-2);
+  margin: 0 0 var(--ms-space-3);
+  padding: 0;
+  list-style: none;
+}
+.uw-case-steps li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--ms-space-2);
+  align-items: start;
+}
+.uw-case-steps small {
+  display: block;
+  color: var(--ms-muted);
+}
+@media (max-width: 640px) {
+  .uw-case-progress ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
