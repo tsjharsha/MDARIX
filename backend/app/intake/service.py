@@ -32,6 +32,7 @@ from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordF
 from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
 from backend.app.intake import rules
 from backend.app.reportability import markets
+from backend.app.business_ids import complaint_ref
 
 SOURCE_TYPE = "IntakeEvent"
 FOLLOW_UP, QMS, REVIEW = "FIRST_CONTACT_FOLLOW_UP", "QMS_COMPLAINT", "SERVICE_ONLY_REVIEW"
@@ -443,7 +444,8 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
         found[(COMPLAINT, complaint.id)] = {
             "kind": COMPLAINT,
             "id": complaint.id,
-            "ref": complaint.business_id or complaint.complaint_identifier,
+            "ref": complaint_ref(complaint),
+            "business_id": complaint.business_id,
             "identifier": complaint.complaint_identifier,
             "source": "Imported complaint",
             "country": complaint.country,
@@ -851,7 +853,7 @@ def _side(kind: str, row, products: dict) -> dict:
     return {
         "kind": COMPLAINT,
         "id": str(row.id),
-        "ref": row.business_id or row.complaint_identifier,
+        "ref": complaint_ref(row),
         "source": "Sample complaint" if row.source_system == "MDARIX_SAMPLE" else "Uploaded complaint",
         "product_name": products.get(row.product_id),
         "words": row.description,

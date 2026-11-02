@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { marketLabel } from "../../../app/labels";
 import { CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, send, useResource, type Column } from "../../customer-admin/shared";
@@ -142,7 +143,7 @@ function itemColumns(go: (opens: Opens) => void): Column<OversightItem>[] {
       ),
     },
     { key: "product", label: "Product", render: (row) => row.product ?? "—" },
-    { key: "market", label: "Market", render: (row) => row.market ?? "—" },
+    { key: "market", label: "Market", render: (row) => marketLabel(row.market) },
     {
       key: "owner",
       label: "Owner",
@@ -206,7 +207,9 @@ function FilterBar({
         <select value={filters.market} onChange={(e) => onChange({ ...filters, market: e.target.value })}>
           <option value="">Every market</option>
           {options.markets.map((code) => (
-            <option key={code}>{code}</option>
+            <option key={code} value={code}>
+              {marketLabel(code)}
+            </option>
           ))}
         </select>
       </label>
@@ -346,7 +349,7 @@ export function EventDrawer({
           <dt>Product</dt>
           <dd>{event.product ?? "—"}</dd>
           <dt>Market</dt>
-          <dd>{event.market ?? "—"}</dd>
+          <dd>{marketLabel(event.market)}</dd>
           <dt>Awareness</dt>
           <dd>{formatDate(event.awareness_at)}</dd>
           <dt>Nearest deadline</dt>

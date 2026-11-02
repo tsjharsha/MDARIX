@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { questionNumber } from "../../../app/labels";
 import {
   ArrowDown,
   ArrowUp,
@@ -253,7 +254,7 @@ function QuestionTable({ view }: { view: GuideVersion }) {
         <table className="uw-dg-table">
           <thead>
             <tr>
-              <th scope="col">ID</th>
+              <th scope="col">No.</th>
               <th scope="col">Question</th>
               <th scope="col">Clause</th>
               <th scope="col">Basis</th>
@@ -262,7 +263,7 @@ function QuestionTable({ view }: { view: GuideVersion }) {
           <tbody>
             {view.question_set.questions.map((question) => (
               <tr key={question.id} className={question.extra ? "uw-dg-extra" : ""}>
-                <th scope="row">{question.id}</th>
+                <th scope="row">{questionNumber(question.id)}</th>
                 <td>
                   <strong>{question.text}</strong>
                   {question.note && <p className="uw-hint">{question.note}</p>}
@@ -358,7 +359,7 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
           <table className="uw-dg-table uw-dg-edit">
             <thead>
               <tr>
-                <th scope="col">ID</th>
+                <th scope="col">No.</th>
                 <th scope="col">Wording</th>
                 <th scope="col">Clause</th>
                 <th scope="col">Basis</th>
@@ -371,7 +372,7 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
               {questions.map((question, index) => (
                 <tr key={`${question.id}-${index}`} className={question.extra ? "uw-dg-extra" : ""}>
                   <th scope="row">
-                    {question.id || "New"}
+                    {question.id ? questionNumber(question.id) : "New"}
                     <span className="uw-cr-meta uw-dg-kind">{question.extra ? "extra" : "core"}</span>
                   </th>
                   {question.extra ? (
@@ -598,7 +599,7 @@ function TestEditor({ view, onAdd }: { view: GuideVersion; onAdd: (test: TestCas
       <div className="ca-form-grid">
         {core.map((question) => (
           <label key={question.id} className="ca-field">
-            {question.id}
+            {questionNumber(question.id)}. {question.text}
             <select
               value={answers[question.id] ?? ""}
               onChange={(event) => setAnswers({ ...answers, [question.id]: event.target.value })}

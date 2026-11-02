@@ -27,6 +27,7 @@ from backend.app.db.models.signals import Signal
 from backend.app.readiness_home import service
 from backend.app.reportability import rules as report_rules
 from backend.app.standards import DISCLAIMER, entries, known
+from backend.app.complaint_disposition.triggers import LABELS as TRIGGER_LABELS
 
 PERIOD_DEFAULT, PERIOD_MIN, PERIOD_MAX = 365, 30, 1095
 TOP_GROUPS = 15
@@ -317,7 +318,9 @@ def lines(data: dict) -> list[tuple[str, str]]:
             f"{branches.get('ESCALATED_BY_TRIGGER', 0)} escalated by a trigger and "
             f"{branches.get('ESCALATED_BY_CHOICE', 0)} by choice."
         )
-        triggered = [f"{code} {count}" for code, count in signed["by_trigger"].items() if count]
+        triggered = [
+            f"{TRIGGER_LABELS.get(code, code)} {count}" for code, count in signed["by_trigger"].items() if count
+        ]
         if triggered:
             body("Escalations by trigger: " + "; ".join(triggered) + ".")
 

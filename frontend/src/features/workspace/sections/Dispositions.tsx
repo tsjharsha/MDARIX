@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { triggerLabel, versionWords } from "../../../app/labels";
 import { CheckCircle2, FileWarning, GitBranch, Inbox, Link2, ShieldAlert, Timer, Wrench } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
@@ -175,10 +176,7 @@ export function DispositionCard({ item, onOpen }: { item: BoardItem; onOpen: () 
           {signed ? (
             <ToneBadge tone={tone} label={signed.branch_label} />
           ) : item.triggers.length ? (
-            <ToneBadge
-              tone="critical"
-              label={`Trigger: ${item.triggers.join(", ").replace(/_/g, " ").toLowerCase()}`}
-            />
+            <ToneBadge tone="critical" label={`Trigger: ${item.triggers.map(triggerLabel).join(", ").toLowerCase()}`} />
           ) : known ? (
             <ToneBadge tone={BRANCH_TONES.KNOWN_ISSUE} label="Known issue" />
           ) : item.routine_offered ? (
@@ -615,7 +613,7 @@ export function DispositionPanel({
                 {proposed.state === "CONFIRMED"
                   ? `Confirmed by ${proposed.confirmed_by}`
                   : "Proposed: your signature confirms it"}{" "}
-                · coding criteria {screen.coding_criteria.version} · Unknown is never guessed
+                · coding criteria, {versionWords(screen.coding_criteria.version)} · Unknown is never guessed
               </p>
               <details className="uw-dp-show">
                 <summary>Show the coding criteria</summary>
@@ -637,7 +635,7 @@ export function DispositionPanel({
               />
             )}
             <details className="uw-dp-show">
-              <summary>Show the disposition rules ({screen.disposition_rules.version})</summary>
+              <summary>Show the disposition rules ({versionWords(screen.disposition_rules.version)})</summary>
               <ol>
                 {screen.disposition_rules.rules.map((rule) => (
                   <li key={rule}>{rule}</li>
@@ -887,7 +885,7 @@ export function ResolutionTrend() {
                 (item) => `${item.product_name}, ${item.problem_code.replace(/_/g, " ").toLowerCase()}: ${item.count}`,
               )
               .join("; ")}
-            . The next such complaint is escalated by RECURRENCE until a case covers it.
+            . The next such complaint is escalated by the recurrence trigger until a case covers it.
           </span>
         </div>
       )}

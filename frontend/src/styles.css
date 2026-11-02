@@ -11559,3 +11559,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .ms-id {
   white-space: nowrap;
 }
+.uw-cr-id,
+.ac-table tbody td:first-child {
+  white-space: nowrap;
+}

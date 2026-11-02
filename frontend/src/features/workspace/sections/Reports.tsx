@@ -1,11 +1,12 @@
 import { useContext, useState } from "react";
+import { marketLabel, versionWords } from "../../../app/labels";
 import { CheckCircle2, ClipboardList, Download, FileText, Send, ShieldCheck, Undo2 } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
 import { WorkspaceContext, useCan } from "../workspaceContext";
 import { communicationsTab } from "../communications";
-import { countOf } from "./common";
+import { AlsoKnownAs, countOf } from "./common";
 import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
 import {
@@ -95,7 +96,7 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
         {list.data && (
           <p className="uw-ma-starter" role="note">
             <Send size={15} aria-hidden="true" /> {list.data.never_submits}{" "}
-            {list.data.forms.map((form) => `${form.market}: ${form.version}`).join("; ")}.
+            {list.data.forms.map((form) => `${marketLabel(form.market)}: ${versionWords(form.version)}`).join("; ")}.
           </p>
         )}
         <InlineError text={error} />
@@ -191,11 +192,12 @@ export function ReportDrawer({
   return (
     <Drawer title={`${detail.form.title}: ${detail.complaint.ref}`} onClose={onClose}>
       <div className="uw-dp uw-rp">
+        <AlsoKnownAs id={detail.complaint.business_id} shown={detail.complaint.ref} />
         <div className="uw-cr-decision">
           <ToneBadge tone={stateTone(detail.state, detail.deadline.overdue)} label={detail.state_label} />
           <span className="uw-cr-meta">{deadlineText(detail.deadline, detail.state)}</span>
           <span className="uw-cr-meta">
-            {detail.form.version} · {detail.market_label}
+            {versionWords(detail.form.version)} · {detail.market_label}
             {detail.complaint.sample ? " · sample" : ""}
           </span>
         </div>

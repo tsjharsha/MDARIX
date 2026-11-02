@@ -5,7 +5,7 @@ import { Drawer, errorText, formatDate, send, useResource } from "../../customer
 import { useCan } from "../workspaceContext";
 import { DeadlineChip, HarmChip, StateChip, type Harm } from "../../../app/chips";
 import { deadlineLabel } from "../../../app/dates";
-import { countOf } from "./common";
+import { AlsoKnownAs, countOf } from "./common";
 import { ChipFilter, Hero, InlineError } from "./boardParts";
 import {
   INTAKE,
@@ -314,6 +314,7 @@ function TriageDrawer({
   return (
     <Drawer title={`Triage ${item.ref}`} onClose={onClose}>
       <div className="uw-dp">
+        <AlsoKnownAs id={item.business_id} shown={item.ref} />
         {item.words && <q className="uw-cr-text">{item.words}</q>}
         {item.problems && item.problems.length > 0 && (
           <p className="uw-hint">

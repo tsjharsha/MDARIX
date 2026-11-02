@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { codeWords } from "../../../app/labels";
 import { AlertTriangle, Play } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
@@ -146,7 +147,7 @@ function RulePanel({ rule, canEdit, onSaved }: { rule: DetectionRule; canEdit: b
       <dl className="ca-facts">
         <div>
           <dt>Rule</dt>
-          <dd>{rule.rule_code}</dd>
+          <dd>{codeWords(rule.rule_code)}</dd>
         </div>
         <div>
           <dt>Version</dt>

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from backend.app.communications import rules
 from backend.app.db.models.foundation import Complaint
 from backend.app.db.models.guides_communications import CommunicationEntry, CommunicationSettings, ExternalParty
+from backend.app.business_ids import complaint_ref
 
 TASK_TYPE = "EXTERNAL_REPLY_DUE"
 SOURCE_TYPE = "CommunicationEntry"
@@ -267,7 +268,7 @@ def summary(db: Session, tenant_id, today: date, complaint_ids=None) -> dict:
         )
     }
     refs = {
-        row.id: row.business_id or row.complaint_identifier
+        row.id: complaint_ref(row)
         for row in db.query(Complaint.id, Complaint.business_id, Complaint.complaint_identifier).filter(
             Complaint.tenant_id == tenant_id,
             Complaint.id.in_([row.complaint_id for row in rows if row.complaint_id] or [None]),

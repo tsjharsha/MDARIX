@@ -52,6 +52,7 @@ from backend.app.request_context import AuthenticatedRequestContext, get_request
 from backend.app.standards import STARTER_MARK, chips
 from backend.app.workflow import approvals
 from backend.app.workflow.tasks import run_hook
+from backend.app.business_ids import complaint_ref
 
 logger = logging.getLogger("mdarix.authority_reports")
 router = APIRouter(prefix="/api/v1/reports", tags=["Authority reports"])
@@ -353,7 +354,8 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "kind": obligation.kind,
         "complaint": {
             "id": record["id"],
-            "ref": record["business_id"] or record["complaint_identifier"],
+            "ref": complaint_ref(record),
+            "business_id": record["business_id"],
             "complaint_identifier": record["complaint_identifier"],
             "product_name": record["product_name"],
             "version": record["version"],
@@ -499,7 +501,7 @@ def report_list(
     def base(complaint, market):
         return {
             "complaint_id": str(complaint.id),
-            "complaint_ref": complaint.business_id or complaint.complaint_identifier,
+            "complaint_ref": complaint_ref(complaint),
             "complaint_identifier": complaint.complaint_identifier,
             "description": complaint.description,
             "market": market,

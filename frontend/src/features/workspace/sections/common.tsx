@@ -58,6 +58,16 @@ export function NeedsProduct({ children }: { children: (view: Product360) => Rea
   );
 }
 
+/** A record's other ID, in its details only: the screen shows one (the customer's own reference, J18). */
+export function AlsoKnownAs({ id, shown }: { id?: string | null; shown?: string | null }) {
+  if (!id || id === shown) return null;
+  return (
+    <p className="uw-cr-meta">
+      Also known as <span className="ms-id">{id}</span>
+    </p>
+  );
+}
+
 // Severities read as harm (an outlined chip with its shape); every other status is a neutral state (V1).
 const SEVERITY_HARM: Record<string, Harm> = {
   CRITICAL: "critical",

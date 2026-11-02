@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { zoneLabel } from "../../../app/labels";
 import {
   CheckCircle2,
   ClipboardList,
@@ -393,7 +394,7 @@ function LogDrawer({
           </label>
         </div>
         <section className="ca-drawer-section">
-          <h4>Times ({form.zone})</h4>
+          <h4>Times ({zoneLabel(form.zone)})</h4>
           <div className="ca-form-grid">
             <label className="ca-field">
               {kind === "CONTACT" ? "Time of the call (awareness)" : "Received"}
@@ -454,7 +455,7 @@ function LogDrawer({
               >
                 {(guide.zones ?? [form.zone]).map((zone) => (
                   <option key={zone} value={zone}>
-                    {zone.replace(/_/g, " ")}
+                    {zoneLabel(zone)}
                   </option>
                 ))}
               </select>

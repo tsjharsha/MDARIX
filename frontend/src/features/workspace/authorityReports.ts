@@ -161,6 +161,7 @@ export type ReportDetail = {
     id: string;
     ref: string;
     complaint_identifier: string;
+    business_id?: string | null;
     product_name: string | null;
     version: string | null;
     country: string | null;

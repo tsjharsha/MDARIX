@@ -1,4 +1,5 @@
 import { useContext, useEffect, useId, useState } from "react";
+import { versionWords } from "../../../app/labels";
 import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
@@ -223,7 +224,7 @@ export function MarketPanel({
       <header className="uw-ma-head">
         <h3>{item.question_set.title}</h3>
         <span className="uw-cr-meta">
-          Guide {item.question_set.version} · scale {detail.scale.version}
+          Guide: {versionWords(item.question_set.version)} · scale: {versionWords(detail.scale.version)}
           {item.preselected ? " · the event's market" : ""}
           {item.question_set_current === false ? " · started before your current guide version: it keeps this one" : ""}
         </span>
@@ -356,8 +357,9 @@ export function MarketPanel({
           </div>
           {problem && <p className="uw-hint">{problem}</p>}
           <p className="ac-muted">
-            Your signature covers every answer with its rationale and evidence, the harm level and scale version{" "}
-            {detail.scale.version}, and question set {item.question_set.version}. A change later is a new version.
+            Your signature covers every answer with its rationale and evidence, the harm level and the scale (
+            {versionWords(detail.scale.version)}), and the question set ({versionWords(item.question_set.version)}). A
+            change later is a new version.
           </p>
           <div className="ca-action-row">
             <button type="submit" className="ac-primary" disabled={busy || !!problem}>
@@ -500,7 +502,7 @@ export function ScalePanel({
   return (
     <section className="ca-drawer-section uw-ma-scale" aria-label="Harm-severity scale">
       <h4>
-        <Gauge size={15} aria-hidden="true" /> Harm-severity scale {scale.version}{" "}
+        <Gauge size={15} aria-hidden="true" /> Harm-severity scale, {versionWords(scale.version)}{" "}
         <span className="uw-ma-starter-chip">Starter text</span>
       </h4>
       <ol className="uw-ma-levels">

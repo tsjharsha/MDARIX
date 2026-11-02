@@ -35,6 +35,7 @@ from backend.app.db.models.market_assessment import ComplaintClassification, Com
 from backend.app.db.models.reportability import ComplaintReportability
 from backend.app.reportability import markets
 from backend.app.reportability import rules as reporting_rules
+from backend.app.business_ids import complaint_ref
 
 READ_LIMIT = 5000
 RECEIVED_AT = func.coalesce(Complaint.complaint_timestamp, Complaint.event_timestamp, Complaint.created_at)
@@ -49,7 +50,7 @@ def _iso(value) -> str | None:
 
 
 def ref_of(complaint: Complaint) -> str:
-    return complaint.business_id or complaint.complaint_identifier
+    return complaint_ref(complaint)
 
 
 def versions_of(db: Session, tenant_id: uuid.UUID, complaint_id, lock: bool = False) -> list[ComplaintDisposition]:
