@@ -58,7 +58,7 @@ export function CaseDue({ row }: { row: CaseWorkflowFields }) {
 }
 
 /** Who owns the case, when the response names them (never a UUID). */
-const ownerText = (row: Record<string, unknown> | null | undefined) =>
+export const ownerText = (row: Record<string, unknown> | null | undefined) =>
   safeText(row?.owner_name) ?? safeText(row?.owner_display_name) ?? safeText(row?.owner_ref) ?? "No owner recorded";
 
 /**

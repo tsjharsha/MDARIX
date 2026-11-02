@@ -6000,3 +6000,28 @@ div.uw-task-count:hover {
 .uw-ma-levels[hidden] {
   display: none;
 }
+
+/* 0.10.72 (B2): the investigation's Summary leads with what the decision rests on. */
+.uw-case-part[hidden] {
+  display: none;
+}
+.uw-board-sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.uw-board-sides h3,
+.uw-board-blocks + p,
+section[aria-label="What blocks the decision"] h3 {
+  margin: 8px 0 4px;
+  font-size: 0.95rem;
+}
+.uw-board-sides ul,
+.uw-board-blocks {
+  margin: 0;
+  padding-left: 18px;
+}
+.uw-change-context > summary,
+.uw-not-started {
+  margin: 4px 0 8px;
+}

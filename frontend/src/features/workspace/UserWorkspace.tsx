@@ -735,9 +735,19 @@ export function UserWorkspace({
                     </div>
                   </div>
                 )}
-                {NAV[section].context && (!fresh || section === "Investigations" || section === "Trends") && (
-                  <ContextBar />
-                )}
+                {NAV[section].context &&
+                  (!fresh || section === "Investigations" || section === "Trends") &&
+                  (navigation === "new" ? (
+                    // The selectors are revealed on request on the new navigation (0.10.72, B2 and B5).
+                    <details className="uw-more uw-change-context">
+                      <summary>
+                        {section === "Investigations" ? "Change investigation" : "Change product or version"}
+                      </summary>
+                      <ContextBar />
+                    </details>
+                  ) : (
+                    <ContextBar />
+                  ))}
                 {/* A colleague the owner invited is greeted by name on their first screens (UX-26). */}
                 {trial?.is_trial && <ColleagueWelcome me={trial.me} />}
                 {trial?.is_trial && section !== "Share feedback" && (
