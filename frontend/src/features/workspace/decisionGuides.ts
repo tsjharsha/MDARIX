@@ -2,6 +2,7 @@
 // MDARIX's starter engine. The server (/api/v1/decision-guides, backend/app/decision_guides) checks every edit, runs
 // the test cases and decides whether a version can be published; these only shape what the person sees and sends.
 import type { Tone } from "../admin/console/dashboardModel";
+import { questionNumber } from "../../app/labels";
 import type { Market, Question, QuestionSet } from "./marketAssessment";
 import type { ApprovalStanding } from "./authorityReports";
 
@@ -195,7 +196,7 @@ export function answersText(
   const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
   const given = Object.entries(test.answers).sort(([a], [b]) => rank(a) - rank(b));
   return given.length
-    ? given.map(([id, answer]) => `${id} ${labels[answer] ?? answer}`).join(", ")
+    ? given.map(([id, answer]) => `${questionNumber(id)} ${labels[answer] ?? answer}`).join(", ")
     : "none (all Unknown)";
 }
 

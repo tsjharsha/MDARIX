@@ -1,0 +1,4858 @@
+{
+  "/api/v1/communications": {
+    "attempts_limit": 3,
+    "colleagues": [
+      {
+        "id": "8b6611c2-acdd-4180-b748-4d0a002952ad",
+        "name": "Asha Quality"
+      }
+    ],
+    "complaint": null,
+    "counts": {
+      "open": 3,
+      "overdue": 1,
+      "unresolved": 1
+    },
+    "items": [
+      {
+        "attempts": [
+          {
+            "at": "2026-10-27T01:47:53.245561+00:00",
+            "channel": "EMAIL",
+            "channel_label": "E-mail",
+            "contact": "PRIMARY",
+            "contact_name": "Ward nurse (fictional)",
+            "in_mdarix": true,
+            "logged_at": "2026-10-27T01:57:53.245561+00:00",
+            "logged_by": "MDARIX sample author",
+            "note": null,
+            "number": 1,
+            "outcome": "SENT",
+            "outcome_label": "Sent, waiting for a reply",
+            "unanswered": true
+          },
+          {
+            "at": "2026-10-29T01:47:53.245561+00:00",
+            "channel": "PHONE",
+            "channel_label": "Phone",
+            "contact": "PRIMARY",
+            "contact_name": "Ward nurse (fictional)",
+            "in_mdarix": true,
+            "logged_at": "2026-10-29T02:07:53.245561+00:00",
+            "logged_by": "MDARIX sample author",
+            "note": "Sample: called the ward; the nurse was off shift.",
+            "number": 2,
+            "outcome": "NO_ANSWER",
+            "outcome_label": "No answer",
+            "unanswered": true
+          }
+        ],
+        "attempts_limit": 3,
+        "channel": "EMAIL",
+        "channel_label": "E-mail",
+        "close_note": null,
+        "closed_at": null,
+        "closed_by": null,
+        "complaint_id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+        "complaint_ref": "SAMPLE-RV-08",
+        "contact_now": {
+          "details": "nurse.sample@hospital.invalid; +1 555 0100 (sample)",
+          "name": "Ward nurse (fictional)"
+        },
+        "current_contact": "PRIMARY",
+        "direction": "SENT",
+        "direction_label": "Sent",
+        "evidence": [],
+        "id": "7acec452-a15d-42e3-a0f5-8cdbac11a795",
+        "in_mdarix": true,
+        "in_reply_to": null,
+        "intake_reference": null,
+        "is_request": true,
+        "logged_at": "2026-10-27T01:57:53.245561+00:00",
+        "logged_by": "MDARIX sample author",
+        "not_sent_yet": false,
+        "note": null,
+        "occurred_at": "2026-10-27T01:47:53.245561+00:00",
+        "origin": {
+          "label": "Raised by an Unknown answer in the US assessment",
+          "market": "US",
+          "questions": ["US2A", "US2B", "US2C", "US3"],
+          "type": "MarketAssessment"
+        },
+        "overdue": true,
+        "owner": "Asha Quality",
+        "owner_id": "8b6611c2-acdd-4180-b748-4d0a002952ad",
+        "party": {
+          "complaint_id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+          "id": "9d95b816-cebe-4307-acd3-b02fa4c75fca",
+          "name": "Reporter of SAMPLE-RV-08 (ward nurse, fictional)",
+          "note": null,
+          "primary": {
+            "details": "nurse.sample@hospital.invalid; +1 555 0100 (sample)",
+            "name": "Ward nurse (fictional)"
+          },
+          "sample": true,
+          "second": null,
+          "type": "REPORTER",
+          "type_label": "Reporter"
+        },
+        "purpose": "INFORMATION_REQUEST",
+        "purpose_label": "Information request",
+        "qms_reference": null,
+        "reply_due_on": "2026-10-30",
+        "sample": true,
+        "status": "OPEN",
+        "status_label": "Open",
+        "subject": "Ask the reporter: the patient's outcome after the free flow (four US questions on harm are Unknown in the US assessment)",
+        "unanswered": 2
+      },
+      {
+        "attempts": [],
+        "attempts_limit": 3,
+        "channel": "PHONE",
+        "channel_label": "Phone",
+        "close_note": null,
+        "closed_at": null,
+        "closed_by": null,
+        "complaint_id": null,
+        "complaint_ref": null,
+        "contact_now": {
+          "details": null,
+          "name": null
+        },
+        "current_contact": "PRIMARY",
+        "direction": "SENT",
+        "direction_label": "Sent",
+        "evidence": [],
+        "id": "69663e24-755b-4081-b634-5fb3fdf7462d",
+        "in_mdarix": null,
+        "in_reply_to": null,
+        "intake_reference": "SAMPLE-CALL-03",
+        "is_request": true,
+        "logged_at": "2026-11-01T23:47:53.245561+00:00",
+        "logged_by": "MDARIX sample author",
+        "not_sent_yet": true,
+        "note": null,
+        "occurred_at": "2026-11-01T23:47:53.245561+00:00",
+        "origin": {
+          "event": "f5594af7-e8a5-4172-b2fd-6abb4ebe05a4",
+          "label": "Follow-up of first contact SAMPLE-CALL-03",
+          "questions": ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q8", "Q9"],
+          "reference": "SAMPLE-CALL-03",
+          "type": "IntakeEvent"
+        },
+        "overdue": false,
+        "owner": "MDARIX sample author",
+        "owner_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "party": {
+          "complaint_id": null,
+          "id": "a42087f2-ab0d-4444-bebe-b19fda696342",
+          "name": "Reporter of SAMPLE-CALL-03, Sample General Hospital (Sample)",
+          "note": null,
+          "primary": {
+            "details": null,
+            "name": null
+          },
+          "sample": true,
+          "second": null,
+          "type": "REPORTER",
+          "type_label": "Reporter"
+        },
+        "purpose": "INFORMATION_REQUEST",
+        "purpose_label": "Information request",
+        "qms_reference": null,
+        "reply_due_on": "2026-11-03",
+        "sample": true,
+        "status": "OPEN",
+        "status_label": "Open",
+        "subject": "First-contact follow-up of SAMPLE-CALL-03: ask question 1, question 2, question 3, question 4, question 5, question 6, question 8, question 9",
+        "unanswered": 0
+      },
+      {
+        "attempts": [],
+        "attempts_limit": 3,
+        "channel": "PHONE",
+        "channel_label": "Phone",
+        "close_note": null,
+        "closed_at": null,
+        "closed_by": null,
+        "complaint_id": null,
+        "complaint_ref": null,
+        "contact_now": {
+          "details": null,
+          "name": null
+        },
+        "current_contact": "PRIMARY",
+        "direction": "SENT",
+        "direction_label": "Sent",
+        "evidence": [],
+        "id": "fef3350a-76f1-4b22-b294-b7d0eac93bf7",
+        "in_mdarix": null,
+        "in_reply_to": null,
+        "intake_reference": "SAMPLE-CALL-04",
+        "is_request": true,
+        "logged_at": "2026-11-01T20:47:53.245561+00:00",
+        "logged_by": "MDARIX sample author",
+        "not_sent_yet": true,
+        "note": null,
+        "occurred_at": "2026-11-01T20:47:53.245561+00:00",
+        "origin": {
+          "event": "087d6e2e-4a90-4cbe-bb00-d11b866f881e",
+          "label": "Follow-up of first contact SAMPLE-CALL-04",
+          "questions": ["NO_DEFICIENCY"],
+          "reference": "SAMPLE-CALL-04",
+          "type": "IntakeEvent"
+        },
+        "overdue": false,
+        "owner": "MDARIX sample author",
+        "owner_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "party": {
+          "complaint_id": null,
+          "id": "ac89ff5d-0ec0-43ce-b9bf-cceef1878b2c",
+          "name": "Reporter of SAMPLE-CALL-04, Sample Care Home (Sample)",
+          "note": null,
+          "primary": {
+            "details": null,
+            "name": null
+          },
+          "sample": true,
+          "second": null,
+          "type": "REPORTER",
+          "type_label": "Reporter"
+        },
+        "purpose": "INFORMATION_REQUEST",
+        "purpose_label": "Information request",
+        "qms_reference": null,
+        "reply_due_on": "2026-11-03",
+        "sample": true,
+        "status": "OPEN",
+        "status_label": "Open",
+        "subject": "First-contact follow-up of SAMPLE-CALL-04: ask whether any deficiency is alleged",
+        "unanswered": 0
+      },
+      {
+        "attempts": [],
+        "attempts_limit": 3,
+        "channel": "EMAIL",
+        "channel_label": "E-mail",
+        "close_note": null,
+        "closed_at": "2026-10-25T02:17:53.245561+00:00",
+        "closed_by": "MDARIX sample author",
+        "complaint_id": "cd21de8d-7828-4f81-b33b-28e60a1c9f2a",
+        "complaint_ref": "SAMPLE-RV-03",
+        "contact_now": {
+          "details": "quality@medsupply.invalid",
+          "name": "Asha Rao, quality contact (sample)"
+        },
+        "current_contact": "PRIMARY",
+        "direction": "RECEIVED",
+        "direction_label": "Received",
+        "evidence": ["Distributor's e-mail (sample)", "Site list (sample spreadsheet)"],
+        "id": "c797a75e-4561-4390-82df-01d7b638951f",
+        "in_mdarix": true,
+        "in_reply_to": "22980526-9b31-45da-881e-d07f01684132",
+        "intake_reference": null,
+        "is_request": false,
+        "logged_at": "2026-10-25T02:17:53.245561+00:00",
+        "logged_by": "MDARIX sample author",
+        "not_sent_yet": false,
+        "note": null,
+        "occurred_at": "2026-10-25T01:47:53.245561+00:00",
+        "origin": null,
+        "overdue": false,
+        "owner": null,
+        "owner_id": null,
+        "party": {
+          "complaint_id": null,
+          "id": "1279d5e0-d4db-460c-ba26-f667b2dee087",
+          "name": "MedSupply Partners (sample distributor)",
+          "note": null,
+          "primary": {
+            "details": "quality@medsupply.invalid",
+            "name": "Asha Rao, quality contact (sample)"
+          },
+          "sample": true,
+          "second": {
+            "details": "operations@medsupply.invalid",
+            "name": "Vikram Das, operations (sample)"
+          },
+          "type": "DISTRIBUTOR",
+          "type_label": "Distributor"
+        },
+        "purpose": "RESPONSE",
+        "purpose_label": "Response",
+        "qms_reference": "SAMPLE-QMS-COMM-0042",
+        "reply_due_on": null,
+        "sample": true,
+        "status": "CLOSED",
+        "status_label": "Closed",
+        "subject": "Two other sites reported intermittent pressure alarms on Rev B; 14 units of lot 3 held and quarantined",
+        "unanswered": 0
+      },
+      {
+        "attempts": [
+          {
+            "at": "2026-10-23T01:47:53.245561+00:00",
+            "channel": "EMAIL",
+            "channel_label": "E-mail",
+            "contact": "PRIMARY",
+            "contact_name": "Asha Rao, quality contact (sample)",
+            "in_mdarix": true,
+            "logged_at": "2026-10-23T01:42:53.245561+00:00",
+            "logged_by": "MDARIX sample author",
+            "note": null,
+            "number": 1,
+            "outcome": "SENT",
+            "outcome_label": "Sent, waiting for a reply",
+            "unanswered": false
+          }
+        ],
+        "attempts_limit": 3,
+        "channel": "EMAIL",
+        "channel_label": "E-mail",
+        "close_note": "Two other sites reported intermittent pressure alarms on Rev B; 14 units of lot 3 held and quarantined",
+        "closed_at": "2026-10-25T02:17:53.245561+00:00",
+        "closed_by": "MDARIX sample author",
+        "complaint_id": "cd21de8d-7828-4f81-b33b-28e60a1c9f2a",
+        "complaint_ref": "SAMPLE-RV-03",
+        "contact_now": {
+          "details": "quality@medsupply.invalid",
+          "name": "Asha Rao, quality contact (sample)"
+        },
+        "current_contact": "PRIMARY",
+        "direction": "SENT",
+        "direction_label": "Sent",
+        "evidence": [],
+        "id": "22980526-9b31-45da-881e-d07f01684132",
+        "in_mdarix": true,
+        "in_reply_to": null,
+        "intake_reference": null,
+        "is_request": true,
+        "logged_at": "2026-10-23T01:42:53.245561+00:00",
+        "logged_by": "MDARIX sample author",
+        "not_sent_yet": false,
+        "note": null,
+        "occurred_at": "2026-10-23T01:47:53.245561+00:00",
+        "origin": null,
+        "overdue": false,
+        "owner": "MDARIX sample author",
+        "owner_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "party": {
+          "complaint_id": null,
+          "id": "1279d5e0-d4db-460c-ba26-f667b2dee087",
+          "name": "MedSupply Partners (sample distributor)",
+          "note": null,
+          "primary": {
+            "details": "quality@medsupply.invalid",
+            "name": "Asha Rao, quality contact (sample)"
+          },
+          "sample": true,
+          "second": {
+            "details": "operations@medsupply.invalid",
+            "name": "Vikram Das, operations (sample)"
+          },
+          "type": "DISTRIBUTOR",
+          "type_label": "Distributor"
+        },
+        "purpose": "INFORMATION_REQUEST",
+        "purpose_label": "Information request",
+        "qms_reference": null,
+        "reply_due_on": "2026-10-26",
+        "sample": true,
+        "status": "ANSWERED",
+        "status_label": "Answered",
+        "subject": "Ask the distributor whether other sites reported pressure alarms on OrbitCare 300 Rev B pumps",
+        "unanswered": 0
+      },
+      {
+        "attempts": [
+          {
+            "at": "2026-10-13T01:47:53.245561+00:00",
+            "channel": "EMAIL",
+            "channel_label": "E-mail",
+            "contact": "PRIMARY",
+            "contact_name": "Biomedical engineering desk (sample)",
+            "in_mdarix": true,
+            "logged_at": "2026-10-13T02:02:53.245561+00:00",
+            "logged_by": "MDARIX sample author",
+            "note": null,
+            "number": 1,
+            "outcome": "SENT",
+            "outcome_label": "Sent, waiting for a reply",
+            "unanswered": true
+          },
+          {
+            "at": "2026-10-16T01:47:53.245561+00:00",
+            "channel": "EMAIL",
+            "channel_label": "E-mail",
+            "contact": "PRIMARY",
+            "contact_name": "Biomedical engineering desk (sample)",
+            "in_mdarix": true,
+            "logged_at": "2026-10-16T02:17:53.245561+00:00",
+            "logged_by": "MDARIX sample author",
+            "note": null,
+            "number": 2,
+            "outcome": "SENT",
+            "outcome_label": "Sent, waiting for a reply",
+            "unanswered": true
+          },
+          {
+            "at": "2026-10-19T01:47:53.245561+00:00",
+            "channel": "PHONE",
+            "channel_label": "Phone",
+            "contact": "PRIMARY",
+            "contact_name": "Biomedical engineering desk (sample)",
+            "in_mdarix": true,
+            "logged_at": "2026-10-19T02:17:53.245561+00:00",
+            "logged_by": "MDARIX sample author",
+            "note": null,
+            "number": 3,
+            "outcome": "NO_ANSWER",
+            "outcome_label": "No answer",
+            "unanswered": true
+          },
+          {
+            "at": "2026-10-21T01:47:53.245561+00:00",
+            "channel": "EMAIL",
+            "channel_label": "E-mail",
+            "contact": "SECOND",
+            "contact_name": "Head of biomedical engineering (sample)",
+            "in_mdarix": true,
+            "logged_at": "2026-10-21T02:17:53.245561+00:00",
+            "logged_by": "MDARIX sample author",
+            "note": null,
+            "number": 4,
+            "outcome": "SENT",
+            "outcome_label": "Sent, waiting for a reply",
+            "unanswered": true
+          },
+          {
+            "at": "2026-10-23T01:47:53.245561+00:00",
+            "channel": "PHONE",
+            "channel_label": "Phone",
+            "contact": "SECOND",
+            "contact_name": "Head of biomedical engineering (sample)",
+            "in_mdarix": false,
+            "logged_at": "2026-10-24T01:47:53.245561+00:00",
+            "logged_by": "MDARIX sample author",
+            "note": null,
+            "number": 5,
+            "outcome": "NO_ANSWER",
+            "outcome_label": "No answer",
+            "unanswered": true
+          },
+          {
+            "at": "2026-10-25T01:47:53.245561+00:00",
+            "channel": "PHONE",
+            "channel_label": "Phone",
+            "contact": "SECOND",
+            "contact_name": "Head of biomedical engineering (sample)",
+            "in_mdarix": true,
+            "logged_at": "2026-10-25T02:17:53.245561+00:00",
+            "logged_by": "MDARIX sample author",
+            "note": null,
+            "number": 6,
+            "outcome": "MESSAGE_LEFT",
+            "outcome_label": "Message left, no answer",
+            "unanswered": true
+          }
+        ],
+        "attempts_limit": 3,
+        "channel": "EMAIL",
+        "channel_label": "E-mail",
+        "close_note": "No answer after 3 attempts to each contact",
+        "closed_at": "2026-10-25T02:17:53.245561+00:00",
+        "closed_by": "MDARIX sample author",
+        "complaint_id": "021a8f6c-b511-44ea-ba4c-754e151b05ec",
+        "complaint_ref": "SAMPLE-RV-01",
+        "contact_now": {
+          "details": "biomed.head@stsample.invalid; +1 555 0199 (sample)",
+          "name": "Head of biomedical engineering (sample)"
+        },
+        "current_contact": "SECOND",
+        "direction": "SENT",
+        "direction_label": "Sent",
+        "evidence": [],
+        "id": "15cd2d52-6673-4013-b88e-fb61153db108",
+        "in_mdarix": true,
+        "in_reply_to": null,
+        "intake_reference": null,
+        "is_request": true,
+        "logged_at": "2026-10-13T02:02:53.245561+00:00",
+        "logged_by": "MDARIX sample author",
+        "not_sent_yet": false,
+        "note": null,
+        "occurred_at": "2026-10-13T01:47:53.245561+00:00",
+        "origin": null,
+        "overdue": false,
+        "owner": "MDARIX sample author",
+        "owner_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "party": {
+          "complaint_id": null,
+          "id": "72ee0594-a360-4082-8a46-adc1eeaec453",
+          "name": "St. Sample General Hospital, biomedical engineering (sample)",
+          "note": null,
+          "primary": {
+            "details": "biomed@stsample.invalid",
+            "name": "Biomedical engineering desk (sample)"
+          },
+          "sample": true,
+          "second": {
+            "details": "biomed.head@stsample.invalid; +1 555 0199 (sample)",
+            "name": "Head of biomedical engineering (sample)"
+          },
+          "type": "HOSPITAL",
+          "type_label": "Hospital"
+        },
+        "purpose": "INFORMATION_REQUEST",
+        "purpose_label": "Information request",
+        "qms_reference": null,
+        "reply_due_on": "2026-10-18",
+        "sample": true,
+        "status": "UNRESOLVED",
+        "status_label": "Unresolved after attempts",
+        "subject": "Ask the hospital for the monitor and its alarm log from the night of the event",
+        "unanswered": 3
+      }
+    ],
+    "labels": {
+      "channels": {
+        "EMAIL": "E-mail",
+        "IN_PERSON": "In person",
+        "LETTER": "Letter",
+        "OTHER": "Other",
+        "PHONE": "Phone",
+        "PORTAL": "Customer portal"
+      },
+      "directions": {
+        "RECEIVED": "Received",
+        "SENT": "Sent"
+      },
+      "outcomes": {
+        "BOUNCED": "Bounced or wrong address",
+        "MESSAGE_LEFT": "Message left, no answer",
+        "NO_ANSWER": "No answer",
+        "SENT": "Sent, waiting for a reply"
+      },
+      "party_types": {
+        "DISTRIBUTOR": "Distributor",
+        "HOSPITAL": "Hospital",
+        "REPORTER": "Reporter",
+        "SERVICE_PARTNER": "Service partner"
+      },
+      "purposes": {
+        "INFORMATION_REQUEST": "Information request",
+        "RESPONSE": "Response",
+        "UPDATE": "Update"
+      },
+      "statuses": {
+        "ANSWERED": "Answered",
+        "CLOSED": "Closed",
+        "OPEN": "Open",
+        "UNRESOLVED": "Unresolved after attempts"
+      }
+    },
+    "never_sends": "MDARIX sends nothing to your contacts: send from your own mail or phone, then record it here at once. Formal responses to the complainant and field safety notices stay records of your QMS: link them by their ID.",
+    "parties": [
+      {
+        "complaint_id": null,
+        "id": "1279d5e0-d4db-460c-ba26-f667b2dee087",
+        "name": "MedSupply Partners (sample distributor)",
+        "note": null,
+        "primary": {
+          "details": "quality@medsupply.invalid",
+          "name": "Asha Rao, quality contact (sample)"
+        },
+        "sample": true,
+        "second": {
+          "details": "operations@medsupply.invalid",
+          "name": "Vikram Das, operations (sample)"
+        },
+        "type": "DISTRIBUTOR",
+        "type_label": "Distributor"
+      },
+      {
+        "complaint_id": null,
+        "id": "72ee0594-a360-4082-8a46-adc1eeaec453",
+        "name": "St. Sample General Hospital, biomedical engineering (sample)",
+        "note": null,
+        "primary": {
+          "details": "biomed@stsample.invalid",
+          "name": "Biomedical engineering desk (sample)"
+        },
+        "sample": true,
+        "second": {
+          "details": "biomed.head@stsample.invalid; +1 555 0199 (sample)",
+          "name": "Head of biomedical engineering (sample)"
+        },
+        "type": "HOSPITAL",
+        "type_label": "Hospital"
+      }
+    ],
+    "s4": {
+      "in_mdarix": 12,
+      "outside": 1
+    }
+  },
+  "/api/v1/communications/7acec452-a15d-42e3-a0f5-8cdbac11a795": {
+    "attempts": [
+      {
+        "at": "2026-10-27T01:47:53.245561+00:00",
+        "channel": "EMAIL",
+        "channel_label": "E-mail",
+        "contact": "PRIMARY",
+        "contact_name": "Ward nurse (fictional)",
+        "in_mdarix": true,
+        "logged_at": "2026-10-27T01:57:53.245561+00:00",
+        "logged_by": "MDARIX sample author",
+        "note": null,
+        "number": 1,
+        "outcome": "SENT",
+        "outcome_label": "Sent, waiting for a reply",
+        "unanswered": true
+      },
+      {
+        "at": "2026-10-29T01:47:53.245561+00:00",
+        "channel": "PHONE",
+        "channel_label": "Phone",
+        "contact": "PRIMARY",
+        "contact_name": "Ward nurse (fictional)",
+        "in_mdarix": true,
+        "logged_at": "2026-10-29T02:07:53.245561+00:00",
+        "logged_by": "MDARIX sample author",
+        "note": "Sample: called the ward; the nurse was off shift.",
+        "number": 2,
+        "outcome": "NO_ANSWER",
+        "outcome_label": "No answer",
+        "unanswered": true
+      }
+    ],
+    "attempts_limit": 3,
+    "channel": "EMAIL",
+    "channel_label": "E-mail",
+    "close_note": null,
+    "closed_at": null,
+    "closed_by": null,
+    "complaint_id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+    "complaint_ref": "SAMPLE-RV-08",
+    "contact_now": {
+      "details": "nurse.sample@hospital.invalid; +1 555 0100 (sample)",
+      "name": "Ward nurse (fictional)"
+    },
+    "current_contact": "PRIMARY",
+    "direction": "SENT",
+    "direction_label": "Sent",
+    "evidence": [],
+    "id": "7acec452-a15d-42e3-a0f5-8cdbac11a795",
+    "in_mdarix": true,
+    "in_reply_to": null,
+    "intake_reference": null,
+    "is_request": true,
+    "logged_at": "2026-10-27T01:57:53.245561+00:00",
+    "logged_by": "MDARIX sample author",
+    "never_sends": "MDARIX sends nothing to your contacts: send from your own mail or phone, then record it here at once. Formal responses to the complainant and field safety notices stay records of your QMS: link them by their ID.",
+    "not_sent_yet": false,
+    "note": null,
+    "occurred_at": "2026-10-27T01:47:53.245561+00:00",
+    "origin": {
+      "label": "Raised by an Unknown answer in the US assessment",
+      "market": "US",
+      "questions": ["US2A", "US2B", "US2C", "US3"],
+      "type": "MarketAssessment"
+    },
+    "overdue": true,
+    "owner": "Asha Quality",
+    "owner_id": "8b6611c2-acdd-4180-b748-4d0a002952ad",
+    "party": {
+      "complaint_id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+      "id": "9d95b816-cebe-4307-acd3-b02fa4c75fca",
+      "name": "Reporter of SAMPLE-RV-08 (ward nurse, fictional)",
+      "note": null,
+      "primary": {
+        "details": "nurse.sample@hospital.invalid; +1 555 0100 (sample)",
+        "name": "Ward nurse (fictional)"
+      },
+      "sample": true,
+      "second": null,
+      "type": "REPORTER",
+      "type_label": "Reporter"
+    },
+    "purpose": "INFORMATION_REQUEST",
+    "purpose_label": "Information request",
+    "qms_reference": null,
+    "replies": [],
+    "reply_due_on": "2026-10-30",
+    "sample": true,
+    "status": "OPEN",
+    "status_label": "Open",
+    "subject": "Ask the reporter: the patient's outcome after the free flow (four US questions on harm are Unknown in the US assessment)",
+    "unanswered": 2
+  },
+  "/api/v1/communications?complaint_id=888ef48a-08d0-4b62-acc5-53417693cf3c": {
+    "attempts_limit": 3,
+    "colleagues": [
+      {
+        "id": "8b6611c2-acdd-4180-b748-4d0a002952ad",
+        "name": "Asha Quality"
+      }
+    ],
+    "complaint": {
+      "description": "Nurse reports the pump free-flowed briefly after the door was opened; a patient was connected, outcome not yet known.",
+      "id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+      "identifier": "SAMPLE-RV-08",
+      "ref": "SAMPLE-RV-08",
+      "sample": true
+    },
+    "counts": {
+      "open": 1,
+      "overdue": 1,
+      "unresolved": 0
+    },
+    "items": [
+      {
+        "attempts": [
+          {
+            "at": "2026-10-27T01:47:53.245561+00:00",
+            "channel": "EMAIL",
+            "channel_label": "E-mail",
+            "contact": "PRIMARY",
+            "contact_name": "Ward nurse (fictional)",
+            "in_mdarix": true,
+            "logged_at": "2026-10-27T01:57:53.245561+00:00",
+            "logged_by": "MDARIX sample author",
+            "note": null,
+            "number": 1,
+            "outcome": "SENT",
+            "outcome_label": "Sent, waiting for a reply",
+            "unanswered": true
+          },
+          {
+            "at": "2026-10-29T01:47:53.245561+00:00",
+            "channel": "PHONE",
+            "channel_label": "Phone",
+            "contact": "PRIMARY",
+            "contact_name": "Ward nurse (fictional)",
+            "in_mdarix": true,
+            "logged_at": "2026-10-29T02:07:53.245561+00:00",
+            "logged_by": "MDARIX sample author",
+            "note": "Sample: called the ward; the nurse was off shift.",
+            "number": 2,
+            "outcome": "NO_ANSWER",
+            "outcome_label": "No answer",
+            "unanswered": true
+          }
+        ],
+        "attempts_limit": 3,
+        "channel": "EMAIL",
+        "channel_label": "E-mail",
+        "close_note": null,
+        "closed_at": null,
+        "closed_by": null,
+        "complaint_id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+        "complaint_ref": "SAMPLE-RV-08",
+        "contact_now": {
+          "details": "nurse.sample@hospital.invalid; +1 555 0100 (sample)",
+          "name": "Ward nurse (fictional)"
+        },
+        "current_contact": "PRIMARY",
+        "direction": "SENT",
+        "direction_label": "Sent",
+        "evidence": [],
+        "id": "7acec452-a15d-42e3-a0f5-8cdbac11a795",
+        "in_mdarix": true,
+        "in_reply_to": null,
+        "intake_reference": null,
+        "is_request": true,
+        "logged_at": "2026-10-27T01:57:53.245561+00:00",
+        "logged_by": "MDARIX sample author",
+        "not_sent_yet": false,
+        "note": null,
+        "occurred_at": "2026-10-27T01:47:53.245561+00:00",
+        "origin": {
+          "label": "Raised by an Unknown answer in the US assessment",
+          "market": "US",
+          "questions": ["US2A", "US2B", "US2C", "US3"],
+          "type": "MarketAssessment"
+        },
+        "overdue": true,
+        "owner": "Asha Quality",
+        "owner_id": "8b6611c2-acdd-4180-b748-4d0a002952ad",
+        "party": {
+          "complaint_id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+          "id": "9d95b816-cebe-4307-acd3-b02fa4c75fca",
+          "name": "Reporter of SAMPLE-RV-08 (ward nurse, fictional)",
+          "note": null,
+          "primary": {
+            "details": "nurse.sample@hospital.invalid; +1 555 0100 (sample)",
+            "name": "Ward nurse (fictional)"
+          },
+          "sample": true,
+          "second": null,
+          "type": "REPORTER",
+          "type_label": "Reporter"
+        },
+        "purpose": "INFORMATION_REQUEST",
+        "purpose_label": "Information request",
+        "qms_reference": null,
+        "reply_due_on": "2026-10-30",
+        "sample": true,
+        "status": "OPEN",
+        "status_label": "Open",
+        "subject": "Ask the reporter: the patient's outcome after the free flow (four US questions on harm are Unknown in the US assessment)",
+        "unanswered": 2
+      }
+    ],
+    "labels": {
+      "channels": {
+        "EMAIL": "E-mail",
+        "IN_PERSON": "In person",
+        "LETTER": "Letter",
+        "OTHER": "Other",
+        "PHONE": "Phone",
+        "PORTAL": "Customer portal"
+      },
+      "directions": {
+        "RECEIVED": "Received",
+        "SENT": "Sent"
+      },
+      "outcomes": {
+        "BOUNCED": "Bounced or wrong address",
+        "MESSAGE_LEFT": "Message left, no answer",
+        "NO_ANSWER": "No answer",
+        "SENT": "Sent, waiting for a reply"
+      },
+      "party_types": {
+        "DISTRIBUTOR": "Distributor",
+        "HOSPITAL": "Hospital",
+        "REPORTER": "Reporter",
+        "SERVICE_PARTNER": "Service partner"
+      },
+      "purposes": {
+        "INFORMATION_REQUEST": "Information request",
+        "RESPONSE": "Response",
+        "UPDATE": "Update"
+      },
+      "statuses": {
+        "ANSWERED": "Answered",
+        "CLOSED": "Closed",
+        "OPEN": "Open",
+        "UNRESOLVED": "Unresolved after attempts"
+      }
+    },
+    "never_sends": "MDARIX sends nothing to your contacts: send from your own mail or phone, then record it here at once. Formal responses to the complainant and field safety notices stay records of your QMS: link them by their ID.",
+    "parties": [
+      {
+        "complaint_id": null,
+        "id": "1279d5e0-d4db-460c-ba26-f667b2dee087",
+        "name": "MedSupply Partners (sample distributor)",
+        "note": null,
+        "primary": {
+          "details": "quality@medsupply.invalid",
+          "name": "Asha Rao, quality contact (sample)"
+        },
+        "sample": true,
+        "second": {
+          "details": "operations@medsupply.invalid",
+          "name": "Vikram Das, operations (sample)"
+        },
+        "type": "DISTRIBUTOR",
+        "type_label": "Distributor"
+      },
+      {
+        "complaint_id": null,
+        "id": "72ee0594-a360-4082-8a46-adc1eeaec453",
+        "name": "St. Sample General Hospital, biomedical engineering (sample)",
+        "note": null,
+        "primary": {
+          "details": "biomed@stsample.invalid",
+          "name": "Biomedical engineering desk (sample)"
+        },
+        "sample": true,
+        "second": {
+          "details": "biomed.head@stsample.invalid; +1 555 0199 (sample)",
+          "name": "Head of biomedical engineering (sample)"
+        },
+        "type": "HOSPITAL",
+        "type_label": "Hospital"
+      },
+      {
+        "complaint_id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+        "id": "9d95b816-cebe-4307-acd3-b02fa4c75fca",
+        "name": "Reporter of SAMPLE-RV-08 (ward nurse, fictional)",
+        "note": null,
+        "primary": {
+          "details": "nurse.sample@hospital.invalid; +1 555 0100 (sample)",
+          "name": "Ward nurse (fictional)"
+        },
+        "sample": true,
+        "second": null,
+        "type": "REPORTER",
+        "type_label": "Reporter"
+      }
+    ],
+    "s4": {
+      "in_mdarix": 3,
+      "outside": 0
+    }
+  },
+  "/api/v1/complaints/reportability?show=open&page=1&page_size=25": {
+    "items": [
+      {
+        "aware_at": "2026-09-03T12:00:00+00:00",
+        "aware_date": "2026-09-03",
+        "aware_source": "RECEIVED_DATE",
+        "binding": {
+          "basis": ["MDR_87"],
+          "day_basis": "CALENDAR",
+          "days": 15,
+          "days_left": -46,
+          "due_at": "2026-09-17T18:29:59+00:00",
+          "due_date": "2026-09-17",
+          "due_label": "Thu 17 Sep 2026, 23:59 IST",
+          "due_zone": "Asia/Kolkata",
+          "market": "IN",
+          "state": "OVERDUE",
+          "triggers": ["SERIOUS_INJURY"],
+          "window": "EU MDR: serious incident (15 days)"
+        },
+        "business_id": "CMP000046",
+        "case": null,
+        "clocks": [
+          {
+            "basis": ["MDR_87"],
+            "day_basis": "CALENDAR",
+            "days": 15,
+            "days_left": -46,
+            "due_at": "2026-09-17T18:29:59+00:00",
+            "due_date": "2026-09-17",
+            "due_label": "Thu 17 Sep 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "market": "IN",
+            "state": "OVERDUE",
+            "triggers": ["SERIOUS_INJURY"],
+            "window": "EU MDR: serious incident (15 days)"
+          },
+          {
+            "basis": ["IN_MDR"],
+            "day_basis": "CALENDAR",
+            "days": 15,
+            "days_left": -46,
+            "due_at": "2026-09-17T18:29:59+00:00",
+            "due_date": "2026-09-17",
+            "due_label": "Thu 17 Sep 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "market": "IN",
+            "state": "OVERDUE",
+            "triggers": ["SERIOUS_INJURY"],
+            "window": "India MDR 2017: serious adverse event (15 days)"
+          }
+        ],
+        "complaint_identifier": "MSD/CC/26/002",
+        "complaint_type": null,
+        "country": "India, Germany",
+        "days_since_aware": 60,
+        "death": false,
+        "decision": null,
+        "description": "Leak at the luer connector of the kit; the extension line came from a second lot.",
+        "follow_ups": [
+          {
+            "code": "NO_AWARENESS_DATE",
+            "label": "No awareness date recorded: the clock starts on the received date"
+          }
+        ],
+        "id": "63de9124-7eba-4d09-86a3-1d91fbe71e97",
+        "in_review": false,
+        "malfunction": true,
+        "markets": [
+          {
+            "clock": null,
+            "draft": false,
+            "enabled": true,
+            "filed": false,
+            "label": "EU and Northern Ireland (EU MDR)",
+            "market": "EU_NI",
+            "preselected": true,
+            "report_type": null,
+            "report_type_label": null,
+            "state": "NOT_STARTED",
+            "suggested": null,
+            "version": null
+          },
+          {
+            "clock": null,
+            "draft": false,
+            "enabled": true,
+            "filed": false,
+            "label": "India (CDSCO)",
+            "market": "IN",
+            "preselected": true,
+            "report_type": null,
+            "report_type_label": null,
+            "state": "NOT_STARTED",
+            "suggested": null,
+            "version": null
+          }
+        ],
+        "patient_involved": null,
+        "problem_code": null,
+        "product_id": "31ba63ce-5de9-41a9-a162-7ff49ffc7b8d",
+        "product_name": "Infusion Set Kit IK-5 (Sample)",
+        "received_date": "2026-09-03",
+        "serious_injury": true,
+        "settled_by_case": false,
+        "severity": null,
+        "state": "OVERDUE",
+        "status": "under investigation",
+        "triggers": ["SERIOUS_INJURY", "MALFUNCTION"],
+        "version": null
+      },
+      {
+        "aware_at": "2026-10-21T01:47:53.245561+00:00",
+        "aware_date": "2026-10-21",
+        "aware_source": "AWARENESS_DATE",
+        "binding": {
+          "basis": [],
+          "day_basis": "CALENDAR",
+          "days": 15,
+          "days_left": 3,
+          "due_at": "2026-11-05T18:29:59+00:00",
+          "due_date": "2026-11-05",
+          "due_label": "Thu 5 Nov 2026, 23:59 IST",
+          "due_zone": "Asia/Kolkata",
+          "market": "EU_NI",
+          "source": "WINDOW",
+          "state": "DUE_SOON",
+          "triggers": [],
+          "window": "EU MDR: serious incident (15 days)"
+        },
+        "business_id": "CMP000035",
+        "case": null,
+        "clocks": [],
+        "complaint_identifier": "SAMPLE-RV-07",
+        "complaint_type": null,
+        "country": "France",
+        "days_since_aware": 12,
+        "death": false,
+        "decision": null,
+        "description": "Flow sensor showed zero flow for 40 seconds; staff switched to manual ventilation. No harm.",
+        "follow_ups": [],
+        "id": "bede1304-c714-4782-ae8d-a3dad8fa1f6a",
+        "in_review": false,
+        "malfunction": true,
+        "markets": [
+          {
+            "clock": {
+              "day_basis": "CALENDAR",
+              "days": 15,
+              "days_left": 3,
+              "due_at": "2026-11-05T18:29:59+00:00",
+              "due_date": "2026-11-05",
+              "due_label": "Thu 5 Nov 2026, 23:59 IST",
+              "due_zone": "Asia/Kolkata",
+              "source": "WINDOW",
+              "state": "DUE_SOON",
+              "window": "EU MDR: serious incident (15 days)"
+            },
+            "draft": false,
+            "enabled": true,
+            "filed": false,
+            "label": "EU and Northern Ireland (EU MDR)",
+            "market": "EU_NI",
+            "preselected": true,
+            "report_type": "EU_15_DAY",
+            "report_type_label": "Serious incident: 15 days (EU MDR Art. 87(3))",
+            "state": "REPORTABLE",
+            "suggested": null,
+            "version": 1
+          }
+        ],
+        "patient_involved": true,
+        "problem_code": "FLOW_ZERO_READING",
+        "product_id": "c56e7264-b4d1-4624-bf28-94b01dcb41db",
+        "product_name": "VentraLink 250 Respiratory Controller (Sample)",
+        "received_date": "2026-10-21",
+        "serious_injury": false,
+        "settled_by_case": false,
+        "severity": "Negligible",
+        "state": "DUE_SOON",
+        "status": "open",
+        "triggers": ["MALFUNCTION"],
+        "version": "Rev B"
+      },
+      {
+        "aware_at": "2026-10-09T01:47:53.245561+00:00",
+        "aware_date": "2026-10-09",
+        "aware_source": "AWARENESS_DATE",
+        "binding": {
+          "basis": ["CFR803_50", "CFR803_53"],
+          "day_basis": "CALENDAR",
+          "days": 30,
+          "days_left": 5,
+          "due_at": "2026-11-07T18:29:59+00:00",
+          "due_date": "2026-11-07",
+          "due_label": "Sat 7 Nov 2026, 23:59 IST",
+          "due_zone": "Asia/Kolkata",
+          "market": "US",
+          "state": "DUE_SOON",
+          "triggers": ["SERIOUS_INJURY", "MALFUNCTION"],
+          "window": "FDA MDR: death, serious injury or malfunction (30 calendar days)"
+        },
+        "business_id": "CMP000034",
+        "case": null,
+        "clocks": [
+          {
+            "basis": ["CFR803_50", "CFR803_53"],
+            "day_basis": "CALENDAR",
+            "days": 30,
+            "days_left": 5,
+            "due_at": "2026-11-07T18:29:59+00:00",
+            "due_date": "2026-11-07",
+            "due_label": "Sat 7 Nov 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "market": "US",
+            "state": "DUE_SOON",
+            "triggers": ["SERIOUS_INJURY", "MALFUNCTION"],
+            "window": "FDA MDR: death, serious injury or malfunction (30 calendar days)"
+          }
+        ],
+        "complaint_identifier": "SAMPLE-RV-06",
+        "complaint_type": null,
+        "country": "US",
+        "days_since_aware": 24,
+        "death": false,
+        "decision": null,
+        "description": "The pressure alarm did not sound during an occlusion; heparin was under-infused and the patient was moved to intensive care.",
+        "follow_ups": [],
+        "id": "557201aa-8692-4e47-8001-41c619db7e7c",
+        "in_review": false,
+        "malfunction": true,
+        "markets": [
+          {
+            "clock": null,
+            "draft": false,
+            "enabled": true,
+            "filed": false,
+            "label": "United States (FDA)",
+            "market": "US",
+            "preselected": true,
+            "report_type": null,
+            "report_type_label": null,
+            "state": "NOT_STARTED",
+            "suggested": null,
+            "version": null
+          }
+        ],
+        "patient_involved": true,
+        "problem_code": "UNDER_INFUSION_NO_ALARM",
+        "product_id": "59953271-58d2-4cb2-a74f-5387c9dd4de2",
+        "product_name": "OrbitCare 300 Infusion Pump (Sample)",
+        "received_date": "2026-10-09",
+        "serious_injury": true,
+        "settled_by_case": false,
+        "severity": "Critical",
+        "state": "DUE_SOON",
+        "status": "open",
+        "triggers": ["SERIOUS_INJURY", "MALFUNCTION"],
+        "version": "Rev B"
+      },
+      {
+        "aware_at": "2026-10-25T01:47:53.245561+00:00",
+        "aware_date": "2026-10-25",
+        "aware_source": "AWARENESS_DATE",
+        "binding": {
+          "basis": ["IN_MDR"],
+          "day_basis": "CALENDAR",
+          "days": 15,
+          "days_left": 6,
+          "due_at": "2026-11-08T18:29:59+00:00",
+          "due_date": "2026-11-08",
+          "due_label": "Sun 8 Nov 2026, 23:59 IST",
+          "due_zone": "Asia/Kolkata",
+          "market": "IN",
+          "state": "RUNNING",
+          "triggers": ["SERIOUS_INJURY"],
+          "window": "India MDR 2017: serious adverse event (15 days)"
+        },
+        "business_id": "CMP000044",
+        "case": null,
+        "clocks": [
+          {
+            "basis": ["IN_MDR"],
+            "day_basis": "CALENDAR",
+            "days": 15,
+            "days_left": 6,
+            "due_at": "2026-11-08T18:29:59+00:00",
+            "due_date": "2026-11-08",
+            "due_label": "Sun 8 Nov 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "market": "IN",
+            "state": "RUNNING",
+            "triggers": ["SERIOUS_INJURY"],
+            "window": "India MDR 2017: serious adverse event (15 days)"
+          }
+        ],
+        "complaint_identifier": "SAMPLE-RV-10",
+        "complaint_type": null,
+        "country": "India",
+        "days_since_aware": 8,
+        "death": false,
+        "decision": null,
+        "description": "SpO2 probe overheated at the finger sensor during overnight monitoring; the patient's finger had a burn that the ward doctor treated. The hospital reported it four weeks later and returned the probe.",
+        "follow_ups": [],
+        "id": "66cc548a-7023-4e1c-9ef8-472a954ce865",
+        "in_review": false,
+        "malfunction": true,
+        "markets": [
+          {
+            "clock": {
+              "day_basis": "CALENDAR",
+              "days": 15,
+              "days_left": 6,
+              "due_at": "2026-11-08T18:29:59+00:00",
+              "due_date": "2026-11-08",
+              "due_label": "Sun 8 Nov 2026, 23:59 IST",
+              "due_zone": "Asia/Kolkata",
+              "source": "WINDOW",
+              "state": "RUNNING",
+              "window": "India MDR 2017: serious adverse event (15 days)"
+            },
+            "draft": false,
+            "enabled": true,
+            "filed": false,
+            "label": "India (CDSCO)",
+            "market": "IN",
+            "preselected": true,
+            "report_type": "IN_SERIOUS_ADVERSE_EVENT",
+            "report_type_label": "Serious adverse event (India MDR 2017 Rule 26)",
+            "state": "REPORTABLE",
+            "suggested": null,
+            "version": 1
+          }
+        ],
+        "patient_involved": true,
+        "problem_code": "PROBE_OVERHEAT",
+        "product_id": "8db67fb1-8e2b-46e1-84d8-7fc365db255f",
+        "product_name": "PulseWatch 410 Patient Monitor (Sample)",
+        "received_date": "2026-10-25",
+        "serious_injury": true,
+        "settled_by_case": false,
+        "severity": "Serious",
+        "state": "RUNNING",
+        "status": "open",
+        "triggers": ["SERIOUS_INJURY", "MALFUNCTION"],
+        "version": "Rev A"
+      },
+      {
+        "aware_at": "2026-10-30T01:47:53.245561+00:00",
+        "aware_date": "2026-10-30",
+        "aware_source": "AWARENESS_DATE",
+        "binding": {
+          "basis": ["CFR803_50", "CFR803_53"],
+          "day_basis": "CALENDAR",
+          "days": 30,
+          "days_left": 26,
+          "due_at": "2026-11-28T18:29:59+00:00",
+          "due_date": "2026-11-28",
+          "due_label": "Sat 28 Nov 2026, 23:59 IST",
+          "due_zone": "Asia/Kolkata",
+          "market": "US",
+          "state": "RUNNING",
+          "triggers": ["MALFUNCTION"],
+          "window": "FDA MDR: death, serious injury or malfunction (30 calendar days)"
+        },
+        "business_id": "CMP000036",
+        "case": null,
+        "clocks": [
+          {
+            "basis": ["CFR803_50", "CFR803_53"],
+            "day_basis": "CALENDAR",
+            "days": 30,
+            "days_left": 26,
+            "due_at": "2026-11-28T18:29:59+00:00",
+            "due_date": "2026-11-28",
+            "due_label": "Sat 28 Nov 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "market": "US",
+            "state": "RUNNING",
+            "triggers": ["MALFUNCTION"],
+            "window": "FDA MDR: death, serious injury or malfunction (30 calendar days)"
+          }
+        ],
+        "complaint_identifier": "SAMPLE-RV-08",
+        "complaint_type": null,
+        "country": "US",
+        "days_since_aware": 3,
+        "death": null,
+        "decision": null,
+        "description": "Nurse reports the pump free-flowed briefly after the door was opened; a patient was connected, outcome not yet known.",
+        "follow_ups": [
+          {
+            "code": "PATIENT_OUTCOME",
+            "label": "A patient was involved, but whether anyone was seriously injured or died is not recorded"
+          }
+        ],
+        "id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+        "in_review": false,
+        "malfunction": true,
+        "markets": [
+          {
+            "clock": {
+              "day_basis": "CALENDAR",
+              "days": 30,
+              "days_left": 26,
+              "due_at": "2026-11-28T18:29:59+00:00",
+              "due_date": "2026-11-28",
+              "due_label": "Sat 28 Nov 2026, 23:59 IST",
+              "due_zone": "Asia/Kolkata",
+              "source": "WINDOW",
+              "state": "RUNNING",
+              "window": "FDA MDR: death, serious injury or malfunction (30 calendar days)"
+            },
+            "draft": true,
+            "enabled": true,
+            "filed": false,
+            "label": "United States (FDA)",
+            "market": "US",
+            "preselected": true,
+            "report_type": null,
+            "report_type_label": null,
+            "state": "DRAFT",
+            "suggested": "PENDING_INFORMATION",
+            "version": 1
+          }
+        ],
+        "patient_involved": true,
+        "problem_code": "FREE_FLOW_DOOR",
+        "product_id": "59953271-58d2-4cb2-a74f-5387c9dd4de2",
+        "product_name": "OrbitCare 300 Infusion Pump (Sample)",
+        "received_date": "2026-10-30",
+        "serious_injury": null,
+        "settled_by_case": false,
+        "severity": null,
+        "state": "RUNNING",
+        "status": "open",
+        "triggers": ["MALFUNCTION"],
+        "version": "Rev B"
+      },
+      {
+        "aware_at": "2026-11-01T01:47:53.245561+00:00",
+        "aware_date": "2026-11-01",
+        "aware_source": "AWARENESS_DATE",
+        "binding": {
+          "basis": ["CFR803_50", "CFR803_53"],
+          "day_basis": "CALENDAR",
+          "days": 30,
+          "days_left": 28,
+          "due_at": "2026-11-30T18:29:59+00:00",
+          "due_date": "2026-11-30",
+          "due_label": "Mon 30 Nov 2026, 23:59 IST",
+          "due_zone": "Asia/Kolkata",
+          "market": "US",
+          "state": "RUNNING",
+          "triggers": ["MALFUNCTION"],
+          "window": "FDA MDR: death, serious injury or malfunction (30 calendar days)"
+        },
+        "business_id": "CMP000038",
+        "case": null,
+        "clocks": [
+          {
+            "basis": ["CFR803_50", "CFR803_53"],
+            "day_basis": "CALENDAR",
+            "days": 30,
+            "days_left": 28,
+            "due_at": "2026-11-30T18:29:59+00:00",
+            "due_date": "2026-11-30",
+            "due_label": "Mon 30 Nov 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "market": "US",
+            "state": "RUNNING",
+            "triggers": ["MALFUNCTION"],
+            "window": "FDA MDR: death, serious injury or malfunction (30 calendar days)"
+          }
+        ],
+        "complaint_identifier": "SAMPLE-RV-11",
+        "complaint_type": null,
+        "country": "US",
+        "days_since_aware": 1,
+        "death": false,
+        "decision": null,
+        "description": "Biomedical engineering checked a monitor against a reference oximeter: its SpO2 read 4 to 6 points high on two patients. No harm was reported. The monitor is out of use and sent for service.",
+        "follow_ups": [],
+        "id": "de3bae67-0ed9-4e89-99a1-4c20d09f9c3d",
+        "in_review": false,
+        "malfunction": true,
+        "markets": [
+          {
+            "clock": null,
+            "draft": false,
+            "enabled": true,
+            "filed": false,
+            "label": "United States (FDA)",
+            "market": "US",
+            "preselected": true,
+            "report_type": null,
+            "report_type_label": null,
+            "state": "NOT_STARTED",
+            "suggested": null,
+            "version": null
+          }
+        ],
+        "patient_involved": true,
+        "problem_code": "SPO2_READING_HIGH",
+        "product_id": "8db67fb1-8e2b-46e1-84d8-7fc365db255f",
+        "product_name": "PulseWatch 410 Patient Monitor (Sample)",
+        "received_date": "2026-11-01",
+        "serious_injury": false,
+        "settled_by_case": false,
+        "severity": null,
+        "state": "RUNNING",
+        "status": "open",
+        "triggers": ["MALFUNCTION"],
+        "version": "Rev A"
+      },
+      {
+        "aware_at": "2026-08-14T12:00:00+00:00",
+        "aware_date": "2026-08-14",
+        "aware_source": "RECEIVED_DATE",
+        "binding": null,
+        "business_id": "CMP000045",
+        "case": null,
+        "clocks": [],
+        "complaint_identifier": "MSD/CC/26/001",
+        "complaint_type": null,
+        "country": "India",
+        "days_since_aware": 80,
+        "death": false,
+        "decision": null,
+        "description": "SpO2 reading 5 points higher than the ward monitor during a routine check.",
+        "follow_ups": [
+          {
+            "code": "NO_AWARENESS_DATE",
+            "label": "No awareness date recorded: the clock starts on the received date"
+          }
+        ],
+        "id": "32048a33-8b18-47f6-9f49-729dc640ab46",
+        "in_review": false,
+        "malfunction": true,
+        "markets": [
+          {
+            "clock": null,
+            "draft": false,
+            "enabled": true,
+            "filed": false,
+            "label": "India (CDSCO)",
+            "market": "IN",
+            "preselected": true,
+            "report_type": null,
+            "report_type_label": null,
+            "state": "NOT_STARTED",
+            "suggested": null,
+            "version": null
+          }
+        ],
+        "patient_involved": null,
+        "problem_code": null,
+        "product_id": "8ea22367-c59d-41c0-8cd4-14a38fa28ec1",
+        "product_name": "Pulse Oximeter PX-20 (Sample)",
+        "received_date": "2026-08-14",
+        "serious_injury": false,
+        "settled_by_case": false,
+        "severity": null,
+        "state": "NO_WINDOW",
+        "status": "open",
+        "triggers": ["MALFUNCTION"],
+        "version": "1.4.2+build"
+      },
+      {
+        "aware_at": "2026-10-21T12:00:00+00:00",
+        "aware_date": "2026-10-21",
+        "aware_source": "RECEIVED_DATE",
+        "binding": null,
+        "business_id": "CMP000047",
+        "case": null,
+        "clocks": [],
+        "complaint_identifier": "MSD/CC/26/003",
+        "complaint_type": null,
+        "country": "Germany",
+        "days_since_aware": 12,
+        "death": false,
+        "decision": null,
+        "description": "Cathéter tip kinked during insertion; replaced, no harm to the patient.",
+        "follow_ups": [
+          {
+            "code": "NO_AWARENESS_DATE",
+            "label": "No awareness date recorded: the clock starts on the received date"
+          }
+        ],
+        "id": "fab17c31-be1f-4265-85b2-cb0823089dcf",
+        "in_review": false,
+        "malfunction": true,
+        "markets": [
+          {
+            "clock": null,
+            "draft": false,
+            "enabled": true,
+            "filed": false,
+            "label": "EU and Northern Ireland (EU MDR)",
+            "market": "EU_NI",
+            "preselected": true,
+            "report_type": null,
+            "report_type_label": null,
+            "state": "NOT_STARTED",
+            "suggested": null,
+            "version": null
+          }
+        ],
+        "patient_involved": null,
+        "problem_code": null,
+        "product_id": "bfa269c1-45cb-4ebc-85bd-31a8ee8ae1bc",
+        "product_name": "Cathéter Guide CG-2 (Sample)",
+        "received_date": "2026-10-21",
+        "serious_injury": null,
+        "settled_by_case": false,
+        "severity": null,
+        "state": "NO_WINDOW",
+        "status": "closed",
+        "triggers": ["MALFUNCTION"],
+        "version": null
+      },
+      {
+        "aware_at": "2026-11-01T01:47:53.245561+00:00",
+        "aware_date": "2026-11-01",
+        "aware_source": "AWARENESS_DATE",
+        "binding": null,
+        "business_id": "CMP000043",
+        "case": null,
+        "clocks": [],
+        "complaint_identifier": "SAMPLE-RT-05",
+        "complaint_type": null,
+        "country": "Germany",
+        "days_since_aware": 1,
+        "death": false,
+        "decision": null,
+        "description": "The controller switched off on battery during a patient transport although the battery indicator showed full. Staff ventilated the patient manually. No harm. The hospital reported it a month later, after its incident review.",
+        "follow_ups": [],
+        "id": "8b45fe05-dceb-4f53-b73a-1bcbcc16ad26",
+        "in_review": false,
+        "malfunction": true,
+        "markets": [
+          {
+            "clock": null,
+            "draft": false,
+            "enabled": true,
+            "filed": false,
+            "label": "EU and Northern Ireland (EU MDR)",
+            "market": "EU_NI",
+            "preselected": true,
+            "report_type": null,
+            "report_type_label": null,
+            "state": "NOT_STARTED",
+            "suggested": null,
+            "version": null
+          }
+        ],
+        "patient_involved": true,
+        "problem_code": "BATTERY_SHUTDOWN",
+        "product_id": "c56e7264-b4d1-4624-bf28-94b01dcb41db",
+        "product_name": "VentraLink 250 Respiratory Controller (Sample)",
+        "received_date": "2026-11-01",
+        "serious_injury": false,
+        "settled_by_case": false,
+        "severity": null,
+        "state": "NO_WINDOW",
+        "status": "open",
+        "triggers": ["MALFUNCTION"],
+        "version": "Rev B"
+      }
+    ],
+    "page": 1,
+    "page_size": 25,
+    "pages": 1,
+    "show": "open",
+    "summary": {
+      "configured": true,
+      "decided": 1,
+      "decided_in_window": 0,
+      "decided_late": 0,
+      "due_soon": 2,
+      "follow_up": 4,
+      "held_on_second_look": 1,
+      "in_review": 0,
+      "lookback_days": 365,
+      "no_window": 3,
+      "open": 9,
+      "overdue": 1,
+      "running": 6,
+      "windows": 4
+    },
+    "total": 9,
+    "truncated": false
+  },
+  "/api/v1/complaints/second-look?state=open&page=1&page_size=25": {
+    "items": [
+      {
+        "awareness_date": "2026-10-24",
+        "business_id": "CMP000029",
+        "complaint_identifier": "SAMPLE-RV-01",
+        "complaint_type": null,
+        "death": null,
+        "decision": null,
+        "description": "Monitor's SpO2 reading dropped out overnight; the patient desaturated and was moved to intensive care. Record cancelled as a suspected duplicate.",
+        "explanation": null,
+        "id": "021a8f6c-b511-44ea-ba4c-754e151b05ec",
+        "malfunction": true,
+        "patient_involved": true,
+        "problem_code": "SPO2_DROPOUT_HARM",
+        "product_id": "8db67fb1-8e2b-46e1-84d8-7fc365db255f",
+        "product_name": "PulseWatch 410 Patient Monitor (Sample)",
+        "reasons": [
+          {
+            "code": "CANCELLED",
+            "label": "Cancelled or rejected (status: Cancelled)"
+          }
+        ],
+        "received_date": "2026-10-24",
+        "score": 230,
+        "serious_injury": true,
+        "severity": "Critical",
+        "signs": [
+          {
+            "code": "SERIOUS_INJURY",
+            "label": "Serious injury"
+          },
+          {
+            "code": "PATIENT_INVOLVED",
+            "label": "Patient involved"
+          },
+          {
+            "code": "MALFUNCTION",
+            "label": "Malfunction"
+          },
+          {
+            "code": "SEVERITY",
+            "label": "Severity: Critical"
+          },
+          {
+            "code": "PROBLEM_CODE",
+            "label": "Problem code: SPO2_DROPOUT_HARM"
+          }
+        ],
+        "source_system": "MDARIX_SAMPLE",
+        "status": "Cancelled",
+        "version": "Rev B",
+        "words": []
+      },
+      {
+        "awareness_date": "2026-10-27",
+        "business_id": "CMP000030",
+        "complaint_identifier": "SAMPLE-RV-02",
+        "complaint_type": "Inquiry",
+        "death": null,
+        "decision": null,
+        "description": "Respiratory therapist asked how to clear alarm A-17; the flow reading had spiked while the patient was choking.",
+        "explanation": null,
+        "id": "861b335d-c023-4192-a022-35fd36c7e938",
+        "malfunction": null,
+        "patient_involved": true,
+        "problem_code": null,
+        "product_id": "c56e7264-b4d1-4624-bf28-94b01dcb41db",
+        "product_name": "VentraLink 250 Respiratory Controller (Sample)",
+        "reasons": [
+          {
+            "code": "INQUIRY",
+            "label": "Logged as an inquiry or service record (Inquiry)"
+          }
+        ],
+        "received_date": "2026-10-27",
+        "score": 90,
+        "serious_injury": null,
+        "severity": null,
+        "signs": [
+          {
+            "code": "PATIENT_INVOLVED",
+            "label": "Patient involved"
+          },
+          {
+            "code": "WORDS",
+            "label": "Mentions choking, alarm"
+          }
+        ],
+        "source_system": "MDARIX_SAMPLE",
+        "status": "open",
+        "version": "Rev B",
+        "words": ["choking", "alarm"]
+      },
+      {
+        "awareness_date": "2026-06-25",
+        "business_id": "CMP000033",
+        "complaint_identifier": "SAMPLE-RV-05",
+        "complaint_type": null,
+        "death": null,
+        "decision": null,
+        "description": "Returned pump tested: no fault found. Alarm history showed one unexplained restart.",
+        "explanation": null,
+        "id": "593de4cb-6c40-41da-af5f-e8c765f679ed",
+        "malfunction": null,
+        "patient_involved": null,
+        "problem_code": "NFF",
+        "product_id": "59953271-58d2-4cb2-a74f-5387c9dd4de2",
+        "product_name": "OrbitCare 300 Infusion Pump (Sample)",
+        "reasons": [
+          {
+            "code": "NFF_RECURRING",
+            "count": 3,
+            "label": "No Fault Found recurs: 3 records on OrbitCare 300 Infusion Pump (Sample) in 12 months"
+          }
+        ],
+        "received_date": "2026-06-25",
+        "score": 65,
+        "serious_injury": null,
+        "severity": null,
+        "signs": [
+          {
+            "code": "WORDS",
+            "label": "Mentions alarm"
+          }
+        ],
+        "source_system": "MDARIX_SAMPLE",
+        "status": "Closed",
+        "version": "Rev A",
+        "words": ["alarm"]
+      },
+      {
+        "awareness_date": "2026-08-06",
+        "business_id": "CMP000032",
+        "complaint_identifier": "SAMPLE-RV-04",
+        "complaint_type": null,
+        "death": null,
+        "decision": null,
+        "description": "Returned pump tested: no fault found. Nurse reported the pump stopped once.",
+        "explanation": null,
+        "id": "e64b8eca-b847-4e11-b3d4-b7ca543d3917",
+        "malfunction": null,
+        "patient_involved": null,
+        "problem_code": "NFF",
+        "product_id": "59953271-58d2-4cb2-a74f-5387c9dd4de2",
+        "product_name": "OrbitCare 300 Infusion Pump (Sample)",
+        "reasons": [
+          {
+            "code": "NFF_RECURRING",
+            "count": 3,
+            "label": "No Fault Found recurs: 3 records on OrbitCare 300 Infusion Pump (Sample) in 12 months"
+          }
+        ],
+        "received_date": "2026-08-06",
+        "score": 35,
+        "serious_injury": null,
+        "severity": null,
+        "signs": [],
+        "source_system": "MDARIX_SAMPLE",
+        "status": "Closed",
+        "version": "Rev A",
+        "words": []
+      },
+      {
+        "awareness_date": "2026-10-13",
+        "business_id": "CMP000031",
+        "complaint_identifier": "SAMPLE-RV-03",
+        "complaint_type": null,
+        "death": null,
+        "decision": null,
+        "description": "Returned pump tested: no fault found. Ward reported intermittent pressure alarms during infusion.",
+        "explanation": null,
+        "id": "cd21de8d-7828-4f81-b33b-28e60a1c9f2a",
+        "malfunction": null,
+        "patient_involved": null,
+        "problem_code": "NFF",
+        "product_id": "59953271-58d2-4cb2-a74f-5387c9dd4de2",
+        "product_name": "OrbitCare 300 Infusion Pump (Sample)",
+        "reasons": [
+          {
+            "code": "NFF_RECURRING",
+            "count": 3,
+            "label": "No Fault Found recurs: 3 records on OrbitCare 300 Infusion Pump (Sample) in 12 months"
+          }
+        ],
+        "received_date": "2026-10-13",
+        "score": 35,
+        "serious_injury": null,
+        "severity": null,
+        "signs": [],
+        "source_system": "MDARIX_SAMPLE",
+        "status": "Closed",
+        "version": "Rev B",
+        "words": []
+      }
+    ],
+    "page": 1,
+    "page_size": 25,
+    "pages": 1,
+    "state": "open",
+    "summary": {
+      "by_reason": {
+        "CANCELLED": 1,
+        "INQUIRY": 1,
+        "NFF_RECURRING": 3
+      },
+      "confirmed": 0,
+      "dismissed": 0,
+      "to_review": 5,
+      "with_harm": 1
+    },
+    "total": 5,
+    "truncated": false
+  },
+  "/api/v1/decision-guides": {
+    "core_rule": "The questions that drive the conclusion keep the regulation's wording: the question, its definition and its clause are locked, and you add your own explanation and examples beside them. They cannot be removed, and their conclusion logic stays fixed. Extra questions are recorded and printed with the answers; they never change the conclusion.",
+    "markets": [
+      {
+        "current": {
+          "approved_by": "MDARIX sample approver",
+          "code": "US-v2",
+          "extra_questions": 1,
+          "published_at": "2026-10-29T01:47:53.245561+00:00",
+          "questions": 9,
+          "sample": true,
+          "starter": false,
+          "state": "PUBLISHED",
+          "state_label": "Published: in use",
+          "tests": 6,
+          "title": "US medical device reporting (21 CFR Part 803)",
+          "version": 2
+        },
+        "enabled": true,
+        "history": [
+          {
+            "approved_by": null,
+            "code": "US-v3",
+            "published_at": null,
+            "sample": true,
+            "starter": false,
+            "state": "DRAFT",
+            "state_label": "Draft",
+            "version": 3
+          },
+          {
+            "approved_by": "MDARIX sample approver",
+            "code": "US-v2",
+            "published_at": "2026-10-29T01:47:53.245561+00:00",
+            "sample": true,
+            "starter": false,
+            "state": "PUBLISHED",
+            "state_label": "Published: in use",
+            "version": 2
+          },
+          {
+            "approved_by": null,
+            "code": "US-starter-1",
+            "published_at": null,
+            "sample": false,
+            "starter": true,
+            "state": "SUPERSEDED",
+            "state_label": "MDARIX starter: superseded by your version",
+            "version": 1
+          }
+        ],
+        "label": "United States (FDA)",
+        "market": "US",
+        "open": {
+          "approved_by": null,
+          "code": "US-v3",
+          "editors": ["MDARIX sample author"],
+          "problems": ["1 of 7 worked complaints in the test matrix fail: fix them, then run again"],
+          "published_at": null,
+          "sample": true,
+          "starter": false,
+          "state": "DRAFT",
+          "state_label": "Draft",
+          "version": 3
+        }
+      },
+      {
+        "current": {
+          "approved_by": null,
+          "code": "EU-starter-1",
+          "extra_questions": 0,
+          "published_at": null,
+          "questions": 11,
+          "sample": false,
+          "starter": true,
+          "state": "PUBLISHED",
+          "state_label": "MDARIX starter: in use",
+          "tests": 5,
+          "title": "EU and Northern Ireland vigilance (EU MDR Art. 87)",
+          "version": 1
+        },
+        "enabled": true,
+        "history": [
+          {
+            "approved_by": null,
+            "code": "EU-starter-1",
+            "published_at": null,
+            "sample": false,
+            "starter": true,
+            "state": "PUBLISHED",
+            "state_label": "MDARIX starter: in use",
+            "version": 1
+          }
+        ],
+        "label": "EU and Northern Ireland (EU MDR)",
+        "market": "EU_NI",
+        "open": null
+      },
+      {
+        "current": {
+          "approved_by": null,
+          "code": "GB-starter-1",
+          "extra_questions": 0,
+          "published_at": null,
+          "questions": 11,
+          "sample": false,
+          "starter": true,
+          "state": "PUBLISHED",
+          "state_label": "MDARIX starter: in use",
+          "tests": 5,
+          "title": "Great Britain vigilance (UK MDR 2002 as amended by SI 2024/1368)",
+          "version": 1
+        },
+        "enabled": false,
+        "history": [
+          {
+            "approved_by": null,
+            "code": "GB-starter-1",
+            "published_at": null,
+            "sample": false,
+            "starter": true,
+            "state": "PUBLISHED",
+            "state_label": "MDARIX starter: in use",
+            "version": 1
+          }
+        ],
+        "label": "Great Britain (MHRA)",
+        "market": "GB",
+        "open": null
+      },
+      {
+        "current": {
+          "approved_by": null,
+          "code": "IN-starter-1",
+          "extra_questions": 0,
+          "published_at": null,
+          "questions": 8,
+          "sample": false,
+          "starter": true,
+          "state": "PUBLISHED",
+          "state_label": "MDARIX starter: in use",
+          "tests": 3,
+          "title": "India adverse event reporting (Medical Devices Rules 2017)",
+          "version": 1
+        },
+        "enabled": true,
+        "history": [
+          {
+            "approved_by": null,
+            "code": "IN-starter-1",
+            "published_at": null,
+            "sample": false,
+            "starter": true,
+            "state": "PUBLISHED",
+            "state_label": "MDARIX starter: in use",
+            "version": 1
+          }
+        ],
+        "label": "India (CDSCO)",
+        "market": "IN",
+        "open": null
+      }
+    ],
+    "never_decides": "A guide points to a conclusion; a person confirms or overrides it with a reason, and signs.",
+    "practice_label": "Practice record: made in a free trial with sample or de-identified data. Not your regulatory record.",
+    "scale_note": "The harm-severity scale stays MDARIX's fixed starter scale in the trial (scale-starter-1).",
+    "starter_mark": "Starter text — awaiting regulatory confirmation: check it against your own procedure."
+  },
+  "/api/v1/decision-guides/US/versions/3": {
+    "answer_labels": {
+      "NO": "No",
+      "NOT_APPLICABLE": "Not applicable",
+      "UNKNOWN": "Unknown",
+      "YES": "Yes"
+    },
+    "approved_at": null,
+    "approved_by": null,
+    "based_on": "US-v2",
+    "catalog": [
+      {
+        "id": "ISO13485_4_2_5",
+        "jurisdiction": "International",
+        "short": "ISO 13485 4.2.5",
+        "title": "Control of records"
+      },
+      {
+        "id": "ISO13485_5_6_2",
+        "jurisdiction": "International",
+        "short": "ISO 13485 5.6.2",
+        "title": "Management review input"
+      },
+      {
+        "id": "ISO13485_6_2",
+        "jurisdiction": "International",
+        "short": "ISO 13485 6.2",
+        "starter": true,
+        "title": "Human resources: competence, training and awareness"
+      },
+      {
+        "id": "ISO13485_7_3_9",
+        "jurisdiction": "International",
+        "short": "ISO 13485 7.3.9",
+        "title": "Control of design and development changes"
+      },
+      {
+        "id": "ISO13485_7_4",
+        "jurisdiction": "International",
+        "short": "ISO 13485 7.4",
+        "title": "Purchasing (suppliers)"
+      },
+      {
+        "id": "ISO13485_8_2_1",
+        "jurisdiction": "International",
+        "short": "ISO 13485 8.2.1",
+        "starter": true,
+        "title": "Feedback"
+      },
+      {
+        "id": "ISO13485_8_2_2",
+        "jurisdiction": "International",
+        "short": "ISO 13485 8.2.2",
+        "starter": true,
+        "title": "Complaint handling"
+      },
+      {
+        "id": "ISO13485_8_2_3",
+        "jurisdiction": "International",
+        "short": "ISO 13485 8.2.3",
+        "title": "Reporting to regulatory authorities"
+      },
+      {
+        "id": "ISO13485_8_4",
+        "jurisdiction": "International",
+        "short": "ISO 13485 8.4",
+        "title": "Analysis of data"
+      },
+      {
+        "id": "ISO13485_8_5_2",
+        "jurisdiction": "International",
+        "short": "ISO 13485 8.5.2",
+        "title": "Corrective action"
+      },
+      {
+        "id": "QMSR",
+        "jurisdiction": "United States",
+        "short": "21 CFR 820 (QMSR)",
+        "title": "Quality Management System Regulation, incorporating ISO 13485:2016 since 2 February 2026"
+      },
+      {
+        "id": "CFR820_35",
+        "jurisdiction": "United States",
+        "short": "21 CFR 820.35",
+        "title": "Control of records (QMSR)"
+      },
+      {
+        "id": "CFR803_3",
+        "jurisdiction": "United States",
+        "short": "21 CFR 803.3",
+        "starter": true,
+        "title": "Definitions: serious injury, caused or contributed, malfunction, remedial action"
+      },
+      {
+        "id": "CFR803_17",
+        "jurisdiction": "United States",
+        "short": "21 CFR 803.17",
+        "title": "Written MDR procedures"
+      },
+      {
+        "id": "CFR803_19",
+        "jurisdiction": "United States",
+        "short": "21 CFR 803.19",
+        "starter": true,
+        "title": "Exemptions, variances and alternative reporting (FDA's VMSR program)"
+      },
+      {
+        "id": "CFR803_50",
+        "jurisdiction": "United States",
+        "short": "21 CFR 803.50",
+        "title": "30-day reports by manufacturers"
+      },
+      {
+        "id": "CFR803_53",
+        "jurisdiction": "United States",
+        "short": "21 CFR 803.53",
+        "title": "5-day reports"
+      },
+      {
+        "id": "CFR11_10E",
+        "jurisdiction": "United States",
+        "short": "21 CFR 11.10(e)",
+        "title": "Audit trails"
+      },
+      {
+        "id": "CFR11_50",
+        "jurisdiction": "United States",
+        "short": "21 CFR 11.50",
+        "title": "Signature manifestations"
+      },
+      {
+        "id": "CFR11_70",
+        "jurisdiction": "United States",
+        "short": "21 CFR 11.70",
+        "title": "Signature/record linking"
+      },
+      {
+        "id": "CFR11_200",
+        "jurisdiction": "United States",
+        "short": "21 CFR 11.200",
+        "title": "Electronic signature components and controls"
+      },
+      {
+        "id": "MDR_2",
+        "jurisdiction": "European Union",
+        "short": "EU MDR Art. 2(64)–(66)",
+        "starter": true,
+        "title": "Definitions: incident, serious incident, serious public health threat"
+      },
+      {
+        "id": "MDR_83",
+        "jurisdiction": "European Union",
+        "short": "EU MDR Art. 83",
+        "title": "Post-market surveillance system"
+      },
+      {
+        "id": "MDR_87",
+        "jurisdiction": "European Union",
+        "short": "EU MDR Art. 87",
+        "title": "Reporting of serious incidents and field safety corrective actions"
+      },
+      {
+        "id": "MDR_88",
+        "jurisdiction": "European Union",
+        "short": "EU MDR Art. 88",
+        "title": "Trend reporting"
+      },
+      {
+        "id": "IVDR_82",
+        "jurisdiction": "European Union",
+        "short": "EU IVDR Art. 82",
+        "starter": true,
+        "title": "Reporting of serious incidents and field safety corrective actions (in-vitro diagnostics)"
+      },
+      {
+        "id": "MDCG_2023_3",
+        "jurisdiction": "European Union",
+        "short": "MDCG 2023-3",
+        "starter": true,
+        "title": "Questions and answers on vigilance terms and concepts (EU MDR)"
+      },
+      {
+        "id": "ISO14971_10",
+        "jurisdiction": "International",
+        "short": "ISO 14971 clause 10",
+        "title": "Production and post-production activities"
+      },
+      {
+        "id": "IEC62304_9",
+        "jurisdiction": "International",
+        "short": "IEC 62304 clause 9",
+        "title": "Software problem resolution process"
+      },
+      {
+        "id": "IMDRF_AET",
+        "jurisdiction": "International",
+        "short": "IMDRF AET",
+        "title": "Adverse event terminology"
+      },
+      {
+        "id": "UK_MDR",
+        "jurisdiction": "United Kingdom",
+        "short": "UK MDR 2002 (as amended)",
+        "title": "Post-market surveillance and vigilance (Great Britain)"
+      },
+      {
+        "id": "CA_MDR",
+        "jurisdiction": "Canada",
+        "short": "SOR/98-282 ss. 59–61",
+        "title": "Mandatory problem reporting (Canada)"
+      },
+      {
+        "id": "IN_MDR",
+        "jurisdiction": "India",
+        "short": "India MDR 2017 Rules 3, 26",
+        "starter": true,
+        "title": "Medical Devices Rules 2017: definitions and post-market reporting of adverse events"
+      }
+    ],
+    "change_reason": null,
+    "code": "US-v3",
+    "core_rule": "The questions that drive the conclusion keep the regulation's wording: the question, its definition and its clause are locked, and you add your own explanation and examples beside them. They cannot be removed, and their conclusion logic stays fixed. Extra questions are recorded and printed with the answers; they never change the conclusion.",
+    "editable": true,
+    "editors": ["MDARIX sample author"],
+    "expected_labels": {
+      "NOT_REPORTABLE": "Not reportable",
+      "PENDING_INFORMATION": "Pending information",
+      "REPORTABLE": "Reportable"
+    },
+    "id": "b4a910fc-04f6-43c6-865a-ee8a6b1e4314",
+    "market": "US",
+    "market_label": "United States (FDA)",
+    "matrix_changed": [],
+    "matrix_rule": "The test matrix: worked complaints with the answer this market's guide must point to. MDARIX's starter rows are in every version; add your own. A version is sent for approval only when every row passes, and its approval runs the matrix again: a changed answer blocks it.",
+    "never_decides": "A guide points to a conclusion; a person confirms or overrides it with a reason, and signs.",
+    "practice_label": "Practice record: made in a free trial with sample or de-identified data. Not your regulatory record.",
+    "problems": ["1 of 7 worked complaints in the test matrix fail: fix them, then run again"],
+    "published_at": null,
+    "question_set": {
+      "basis": ["CFR803_3", "CFR803_50", "CFR803_53"],
+      "market": "US",
+      "market_label": "United States (FDA)",
+      "note": null,
+      "questions": [
+        {
+          "basis": ["CFR803_50"],
+          "clause": "21 CFR 803.50(a)(1)",
+          "definition": "A death of a patient, user or other person that the information reasonably suggests.",
+          "examples": null,
+          "explanation": null,
+          "extra": false,
+          "id": "US1",
+          "note": null,
+          "serious": true,
+          "starter": true,
+          "text": "Did a death occur?"
+        },
+        {
+          "basis": ["CFR803_3"],
+          "clause": "21 CFR 803.3(w)(1)",
+          "definition": "Serious injury (21 CFR 803.3(w)) is an injury or illness that is life-threatening, results in permanent impairment of a body function or permanent damage to a body structure, or needs medical or surgical intervention to preclude such permanent impairment or damage. Permanent means irreversible, excluding trivial impairment or damage. Answer each part on its own.",
+          "examples": null,
+          "explanation": "Our procedure (sample QP-08): permanent means it does not heal by itself or with treatment. An injury that needed treatment to prevent permanent damage is part (c), even if the patient recovered.",
+          "extra": false,
+          "id": "US2A",
+          "note": null,
+          "serious": true,
+          "starter": true,
+          "text": "Serious injury, part (a): is the injury or illness life-threatening?"
+        },
+        {
+          "basis": ["CFR803_3"],
+          "clause": "21 CFR 803.3(w)(2)",
+          "definition": "Serious injury (21 CFR 803.3(w)) is an injury or illness that is life-threatening, results in permanent impairment of a body function or permanent damage to a body structure, or needs medical or surgical intervention to preclude such permanent impairment or damage. Permanent means irreversible, excluding trivial impairment or damage. Answer each part on its own.",
+          "examples": null,
+          "explanation": "Our procedure (sample QP-08): permanent means it does not heal by itself or with treatment. An injury that needed treatment to prevent permanent damage is part (c), even if the patient recovered.",
+          "extra": false,
+          "id": "US2B",
+          "note": null,
+          "serious": true,
+          "starter": true,
+          "text": "Serious injury, part (b): does it result in permanent impairment of a body function or permanent damage to a body structure?"
+        },
+        {
+          "basis": ["CFR803_3"],
+          "clause": "21 CFR 803.3(w)(3)",
+          "definition": "Serious injury (21 CFR 803.3(w)) is an injury or illness that is life-threatening, results in permanent impairment of a body function or permanent damage to a body structure, or needs medical or surgical intervention to preclude such permanent impairment or damage. Permanent means irreversible, excluding trivial impairment or damage. Answer each part on its own.",
+          "examples": "Sample examples: a cut closed with sutures to prevent permanent scarring is part (c); a bruise that healed without treatment is not.",
+          "explanation": "Our procedure (sample QP-08): permanent means it does not heal by itself or with treatment. An injury that needed treatment to prevent permanent damage is part (c), even if the patient recovered.",
+          "extra": false,
+          "id": "US2C",
+          "note": null,
+          "serious": true,
+          "starter": true,
+          "text": "Serious injury, part (c): does it need medical or surgical intervention to preclude permanent impairment of a body function or permanent damage to a body structure?"
+        },
+        {
+          "basis": ["CFR803_3"],
+          "clause": "21 CFR 803.3(c)",
+          "definition": "Caused or contributed (21 CFR 803.3(c)): the death or serious injury was, or may have been, attributed to the device, including through its failure, malfunction, improper or inadequate design, manufacture or labelling, or user error.",
+          "examples": null,
+          "explanation": null,
+          "extra": false,
+          "id": "US3",
+          "note": null,
+          "serious": false,
+          "starter": true,
+          "text": "Did the device cause or contribute to the death or serious injury?"
+        },
+        {
+          "basis": ["CFR803_3"],
+          "clause": "21 CFR 803.3(k)",
+          "definition": "Malfunction (21 CFR 803.3(k)): the device failed to meet its performance specifications or otherwise perform as intended.",
+          "examples": null,
+          "explanation": null,
+          "extra": false,
+          "id": "US4",
+          "note": null,
+          "serious": false,
+          "starter": true,
+          "text": "Did the device malfunction?"
+        },
+        {
+          "basis": ["CFR803_50"],
+          "clause": "21 CFR 803.50(a)(2)",
+          "definition": "A malfunction is reportable when the device, or a similar device you market, would be likely to cause or contribute to a death or serious injury if the malfunction were to recur.",
+          "examples": null,
+          "explanation": null,
+          "extra": false,
+          "id": "US5",
+          "note": "Recurrence is presumed: answer what would follow if it recurred, not whether it will recur. A No needs its reason.",
+          "serious": false,
+          "starter": true,
+          "text": "Would the malfunction be likely to cause or contribute to a death or serious injury if it were to recur?"
+        },
+        {
+          "basis": ["CFR803_53", "CFR803_3"],
+          "clause": "21 CFR 803.53(a), (b); 803.3(v)",
+          "definition": "Remedial action (21 CFR 803.3(v)) is any action other than routine maintenance or servicing of a device where such action is necessary to prevent recurrence of a reportable event. Yes gives the 5-work-day report (803.53); otherwise a reportable event gets the 30-calendar-day report (803.50).",
+          "examples": null,
+          "explanation": null,
+          "extra": false,
+          "id": "US6",
+          "note": null,
+          "serious": false,
+          "starter": true,
+          "text": "Is remedial action needed to prevent an unreasonable risk of substantial harm to the public health, or has FDA asked in writing for a 5-day report?"
+        },
+        {
+          "basis": ["CFR803_19"],
+          "clause": "21 CFR 803.19 (VMSR program)",
+          "definition": "Under VMSR, eligible malfunction reports may be sent quarterly in summary form. Record the answer and the product code: the reporting route is chosen when the report is prepared. This answer never changes the conclusion.",
+          "examples": null,
+          "explanation": null,
+          "extra": true,
+          "id": "X1",
+          "note": "Sample: check the product code against FDA's VMSR list.",
+          "serious": false,
+          "starter": false,
+          "text": "Does our organization take part in FDA's Voluntary Malfunction Summary Reporting (VMSR) program for this device's product code?"
+        }
+      ],
+      "starter_mark": "Starter text — awaiting regulatory confirmation: check it against your own procedure.",
+      "title": "US medical device reporting (21 CFR Part 803)",
+      "version": "US-v3"
+    },
+    "report_types": [
+      {
+        "code": "US_30_DAY",
+        "label": "30-calendar-day report (21 CFR 803.50)"
+      },
+      {
+        "code": "US_5_WORK_DAY",
+        "label": "5-work-day report (21 CFR 803.53)"
+      }
+    ],
+    "requested_at": null,
+    "requested_by": null,
+    "sample": true,
+    "scale_note": "The harm-severity scale stays MDARIX's fixed starter scale in the trial (scale-starter-1).",
+    "signature": null,
+    "starter": false,
+    "starter_mark": "Starter text — awaiting regulatory confirmation: check it against your own procedure.",
+    "state": "DRAFT",
+    "state_label": "Draft",
+    "superseded_at": null,
+    "test_cases": [
+      {
+        "answers": {
+          "US1": "YES",
+          "US2A": "NO",
+          "US2B": "NO",
+          "US2C": "NO",
+          "US3": "YES",
+          "US4": "NO",
+          "US5": "NO",
+          "US6": "NO"
+        },
+        "expected": "REPORTABLE",
+        "expected_report_type": "US_30_DAY",
+        "id": "T1",
+        "name": "A death the device caused or contributed to: the 30-day report",
+        "starter": true
+      },
+      {
+        "answers": {
+          "US1": "NO",
+          "US2A": "NO",
+          "US2B": "NO",
+          "US2C": "YES",
+          "US3": "YES",
+          "US4": "NO",
+          "US5": "NO",
+          "US6": "NO"
+        },
+        "expected": "REPORTABLE",
+        "expected_report_type": "US_30_DAY",
+        "id": "T2",
+        "name": "Serious injury, part (c), caused by the device: the 30-day report",
+        "starter": true
+      },
+      {
+        "answers": {
+          "US1": "NO",
+          "US2A": "NO",
+          "US2B": "NO",
+          "US2C": "NO",
+          "US3": "NO",
+          "US4": "YES",
+          "US5": "YES",
+          "US6": "NO"
+        },
+        "expected": "REPORTABLE",
+        "expected_report_type": "US_30_DAY",
+        "id": "T3",
+        "name": "No injury, a malfunction likely to cause serious injury if it recurred: the 30-day report",
+        "starter": true
+      },
+      {
+        "answers": {
+          "US1": "NO",
+          "US2A": "NO",
+          "US2B": "NO",
+          "US2C": "NO",
+          "US3": "NO",
+          "US4": "YES",
+          "US5": "YES",
+          "US6": "YES"
+        },
+        "expected": "REPORTABLE",
+        "expected_report_type": "US_5_WORK_DAY",
+        "id": "T4",
+        "name": "The same, with remedial action needed for public health: the 5-work-day report",
+        "starter": true
+      },
+      {
+        "answers": {
+          "US1": "NO",
+          "US2A": "NO",
+          "US2B": "NO",
+          "US2C": "NO",
+          "US3": "NO",
+          "US4": "YES",
+          "US5": "NO",
+          "US6": "NO"
+        },
+        "expected": "NOT_REPORTABLE",
+        "expected_report_type": null,
+        "id": "T5",
+        "name": "A malfunction that would not cause serious harm if it recurred: not reportable",
+        "starter": true
+      },
+      {
+        "answers": {
+          "US1": "NO",
+          "US2A": "NO",
+          "US2B": "UNKNOWN",
+          "US2C": "NO",
+          "US3": "YES",
+          "US4": "NO",
+          "US5": "NO",
+          "US6": "NO"
+        },
+        "expected": "PENDING_INFORMATION",
+        "expected_report_type": null,
+        "id": "T6",
+        "name": "The patient's outcome is unknown: pending information (Unknown is never No)",
+        "starter": true
+      },
+      {
+        "answers": {
+          "US1": "NO",
+          "US2A": "NO",
+          "US2B": "UNKNOWN",
+          "US2C": "NO",
+          "US3": "YES",
+          "US4": "YES",
+          "US5": "NO",
+          "US6": "NO"
+        },
+        "expected": "NOT_REPORTABLE",
+        "expected_report_type": null,
+        "id": "T7",
+        "name": "Our test: outcome unknown, malfunction not likely to harm: expected not reportable",
+        "starter": false
+      }
+    ],
+    "test_results": {
+      "current": true,
+      "failed": 1,
+      "fingerprint": "290a5deb4eac01f58795d49f7278aec073348fd5cdd2ee71520ac1f1c9967a5b",
+      "passed": 6,
+      "results": [
+        {
+          "actual": "REPORTABLE",
+          "actual_report_type": "US_30_DAY",
+          "expected": "REPORTABLE",
+          "expected_report_type": "US_30_DAY",
+          "id": "T1",
+          "name": "A death the device caused or contributed to: the 30-day report",
+          "passed": true
+        },
+        {
+          "actual": "REPORTABLE",
+          "actual_report_type": "US_30_DAY",
+          "expected": "REPORTABLE",
+          "expected_report_type": "US_30_DAY",
+          "id": "T2",
+          "name": "Serious injury, part (c), caused by the device: the 30-day report",
+          "passed": true
+        },
+        {
+          "actual": "REPORTABLE",
+          "actual_report_type": "US_30_DAY",
+          "expected": "REPORTABLE",
+          "expected_report_type": "US_30_DAY",
+          "id": "T3",
+          "name": "No injury, a malfunction likely to cause serious injury if it recurred: the 30-day report",
+          "passed": true
+        },
+        {
+          "actual": "REPORTABLE",
+          "actual_report_type": "US_5_WORK_DAY",
+          "expected": "REPORTABLE",
+          "expected_report_type": "US_5_WORK_DAY",
+          "id": "T4",
+          "name": "The same, with remedial action needed for public health: the 5-work-day report",
+          "passed": true
+        },
+        {
+          "actual": "NOT_REPORTABLE",
+          "actual_report_type": null,
+          "expected": "NOT_REPORTABLE",
+          "expected_report_type": null,
+          "id": "T5",
+          "name": "A malfunction that would not cause serious harm if it recurred: not reportable",
+          "passed": true
+        },
+        {
+          "actual": "PENDING_INFORMATION",
+          "actual_report_type": null,
+          "expected": "PENDING_INFORMATION",
+          "expected_report_type": null,
+          "id": "T6",
+          "name": "The patient's outcome is unknown: pending information (Unknown is never No)",
+          "passed": true
+        },
+        {
+          "actual": "PENDING_INFORMATION",
+          "actual_report_type": null,
+          "expected": "NOT_REPORTABLE",
+          "expected_report_type": null,
+          "id": "T7",
+          "name": "Our test: outcome unknown, malfunction not likely to harm: expected not reportable",
+          "passed": false
+        }
+      ],
+      "run_at": "2026-11-01T03:47:53.245561+00:00",
+      "run_by": "MDARIX sample author"
+    },
+    "title": "US medical device reporting (21 CFR Part 803)",
+    "version": 3,
+    "you_asked": false,
+    "you_edited": false
+  },
+  "/api/v1/oversight": {
+    "as_of": "2026-11-02T03:09:21.789235+00:00",
+    "away": [
+      {
+        "backup_id": "8b6611c2-acdd-4180-b748-4d0a002952ad",
+        "backup_name": "Asha Quality",
+        "ends_on": "2026-12-02",
+        "id": "e7b051bc-9f16-49e5-ac6f-3f3b5f80b2cd",
+        "note": "Sample: at a supplier audit (fictional).",
+        "sample": true,
+        "starts_on": "2026-10-31",
+        "user_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "user_name": "MDARIX sample author"
+      }
+    ],
+    "counts": {
+      "CAPA": {
+        "due_soon": 0,
+        "label": "CAPA",
+        "overdue": 0
+      },
+      "COMMUNICATION": {
+        "due_soon": 0,
+        "label": "Communications",
+        "overdue": 1
+      },
+      "GUIDE": {
+        "due_soon": 0,
+        "label": "Guide approvals",
+        "overdue": 0
+      },
+      "OBLIGATION": {
+        "due_soon": 0,
+        "label": "Report obligations",
+        "overdue": 0
+      },
+      "REPORTING": {
+        "due_soon": 0,
+        "label": "Reporting deadlines",
+        "overdue": 0
+      },
+      "TASK": {
+        "due_soon": 0,
+        "label": "Other tasks",
+        "overdue": 0
+      },
+      "TRIAGE": {
+        "due_soon": 4,
+        "label": "Triage and first contact",
+        "overdue": 0
+      }
+    },
+    "due_soon": 4,
+    "event_counts": {
+      "CLOSED": 1,
+      "CLOSED_BEFORE_READY": 2,
+      "FILED": 0,
+      "NOT_FILED": 0,
+      "NOT_READY": 6,
+      "READY_TO_SIGN": 1
+    },
+    "events": [
+      {
+        "blocked": 2,
+        "complaint_id": "021a8f6c-b511-44ea-ba4c-754e151b05ec",
+        "market": "US",
+        "next": "Assess the United States (FDA) market",
+        "owner_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "owner_name": "MDARIX sample author",
+        "product": "PulseWatch 410 Patient Monitor (Sample)",
+        "ref": "SAMPLE-RV-01",
+        "sample": true,
+        "stage": "Market assessment",
+        "state": "CLOSED_BEFORE_READY",
+        "state_label": "Closed in the QMS before it was ready"
+      },
+      {
+        "blocked": 1,
+        "complaint_id": "cd21de8d-7828-4f81-b33b-28e60a1c9f2a",
+        "market": "US",
+        "next": "Sign the disposition",
+        "owner_id": null,
+        "owner_name": null,
+        "product": "OrbitCare 300 Infusion Pump (Sample)",
+        "ref": "SAMPLE-RV-03",
+        "sample": true,
+        "stage": "Decision",
+        "state": "CLOSED_BEFORE_READY",
+        "state_label": "Closed in the QMS before it was ready"
+      },
+      {
+        "blocked": 0,
+        "complaint_id": "72ec6d4c-3dee-486a-a60b-f19822d28267",
+        "market": "US",
+        "next": null,
+        "owner_id": "8b6611c2-acdd-4180-b748-4d0a002952ad",
+        "owner_name": "Asha Quality",
+        "product": "PulseWatch 410 Patient Monitor (Sample)",
+        "ref": "SAMPLE-RT-03",
+        "sample": true,
+        "stage": "Ready to close",
+        "state": "READY_TO_SIGN",
+        "state_label": "Checklist clear: the owner signs ready to close"
+      },
+      {
+        "blocked": 2,
+        "complaint_id": "8b45fe05-dceb-4f53-b73a-1bcbcc16ad26",
+        "market": "EU_NI",
+        "next": "Assess the EU and Northern Ireland (EU MDR) market",
+        "owner_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "owner_name": "MDARIX sample author",
+        "product": "VentraLink 250 Respiratory Controller (Sample)",
+        "ref": "SAMPLE-RT-05",
+        "sample": true,
+        "stage": "Market assessment",
+        "state": "NOT_READY",
+        "state_label": "Not ready to close"
+      },
+      {
+        "blocked": 2,
+        "complaint_id": "861b335d-c023-4192-a022-35fd36c7e938",
+        "market": "EU_NI",
+        "next": "Assess the EU and Northern Ireland (EU MDR) market",
+        "owner_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "owner_name": "MDARIX sample author",
+        "product": "VentraLink 250 Respiratory Controller (Sample)",
+        "ref": "SAMPLE-RV-02",
+        "sample": true,
+        "stage": "Market assessment",
+        "state": "NOT_READY",
+        "state_label": "Not ready to close"
+      },
+      {
+        "blocked": 2,
+        "complaint_id": "557201aa-8692-4e47-8001-41c619db7e7c",
+        "market": "US",
+        "next": "Assess the United States (FDA) market",
+        "owner_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "owner_name": "MDARIX sample author",
+        "product": "OrbitCare 300 Infusion Pump (Sample)",
+        "ref": "SAMPLE-RV-06",
+        "sample": true,
+        "stage": "Market assessment",
+        "state": "NOT_READY",
+        "state_label": "Not ready to close"
+      },
+      {
+        "blocked": 2,
+        "complaint_id": "bede1304-c714-4782-ae8d-a3dad8fa1f6a",
+        "market": "EU_NI",
+        "next": "Start the EU and Northern Ireland (EU MDR) report",
+        "owner_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "owner_name": "MDARIX sample author",
+        "product": "VentraLink 250 Respiratory Controller (Sample)",
+        "ref": "SAMPLE-RV-07",
+        "sample": true,
+        "stage": "Market assessment",
+        "state": "NOT_READY",
+        "state_label": "Not ready to close"
+      },
+      {
+        "blocked": 3,
+        "complaint_id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+        "market": "US",
+        "next": "Sign the United States (FDA) market assessment",
+        "owner_id": "8b6611c2-acdd-4180-b748-4d0a002952ad",
+        "owner_name": "Asha Quality",
+        "product": "OrbitCare 300 Infusion Pump (Sample)",
+        "ref": "SAMPLE-RV-08",
+        "sample": true,
+        "stage": "Market assessment",
+        "state": "NOT_READY",
+        "state_label": "Not ready to close"
+      },
+      {
+        "blocked": 2,
+        "complaint_id": "66cc548a-7023-4e1c-9ef8-472a954ce865",
+        "market": "IN",
+        "next": "Complete the India (CDSCO) report (draft: correction required)",
+        "owner_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "owner_name": "MDARIX sample author",
+        "product": "PulseWatch 410 Patient Monitor (Sample)",
+        "ref": "SAMPLE-RV-10",
+        "sample": true,
+        "stage": "Market assessment",
+        "state": "NOT_READY",
+        "state_label": "Not ready to close"
+      },
+      {
+        "blocked": 1,
+        "complaint_id": "b73d2cc3-998f-413f-92dc-38154fc9f153",
+        "market": "US",
+        "next": "Sign the disposition",
+        "owner_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "owner_name": "MDARIX sample author",
+        "product": "PulseWatch 410 Patient Monitor (Sample)",
+        "ref": "SAMPLE-RV-09",
+        "sample": true,
+        "stage": "Decision",
+        "state": "CLOSED",
+        "state_label": "Closed in the QMS"
+      }
+    ],
+    "filters": {
+      "categories": [
+        {
+          "code": "TRIAGE",
+          "label": "Triage and first contact"
+        },
+        {
+          "code": "REPORTING",
+          "label": "Reporting deadlines"
+        },
+        {
+          "code": "OBLIGATION",
+          "label": "Report obligations"
+        },
+        {
+          "code": "COMMUNICATION",
+          "label": "Communications"
+        },
+        {
+          "code": "GUIDE",
+          "label": "Guide approvals"
+        },
+        {
+          "code": "CAPA",
+          "label": "CAPA"
+        },
+        {
+          "code": "TASK",
+          "label": "Other tasks"
+        }
+      ],
+      "markets": ["EU_NI", "IN", "US"],
+      "products": [
+        "Infusion Set Kit IK-5 (Sample)",
+        "OrbitCare 300 Infusion Pump (Sample)",
+        "Pulse Oximeter PX-20 (Sample)",
+        "PulseWatch 410 Patient Monitor (Sample)",
+        "VentraLink 250 Respiratory Controller (Sample)"
+      ]
+    },
+    "items": [
+      {
+        "alerts": true,
+        "away": null,
+        "category": "COMMUNICATION",
+        "category_label": "Communications",
+        "complaint_id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+        "due_at": "2026-10-30T18:29:59+00:00",
+        "due_label": "Fri 30 Oct 2026, 23:59 IST",
+        "escalated_to": ["Asha Quality"],
+        "hours_left": -56.7,
+        "key": "task:2e322205-c2da-418d-a6d8-0d31225c3f60",
+        "market": "US",
+        "opens": {
+          "section": "Complaints",
+          "tab": "Communications?complaint=888ef48a-08d0-4b62-acc5-53417693cf3c"
+        },
+        "owner": "Asha Quality",
+        "owner_id": "8b6611c2-acdd-4180-b748-4d0a002952ad",
+        "product": "OrbitCare 300 Infusion Pump (Sample)",
+        "queue": null,
+        "ref": "SAMPLE-RV-08",
+        "state": "OVERDUE",
+        "state_label": "Overdue",
+        "title": "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional) on CMP000036: Ask the reporter: the patient's outcome after the free flow (four US questions on harm are Unknown in the US assessment)"
+      },
+      {
+        "alerts": true,
+        "away": null,
+        "category": "TRIAGE",
+        "category_label": "Triage and first contact",
+        "complaint_id": "de3bae67-0ed9-4e89-99a1-4c20d09f9c3d",
+        "due_at": "2026-11-02T22:47:53.245561+00:00",
+        "due_label": "Tue 3 Nov 2026, 04:17 IST",
+        "escalated_to": [],
+        "hours_left": 19.6,
+        "key": "triage:COMPLAINT:de3bae67-0ed9-4e89-99a1-4c20d09f9c3d",
+        "market": "US",
+        "opens": {
+          "section": "Complaints",
+          "tab": "Triage"
+        },
+        "owner": null,
+        "owner_id": null,
+        "product": "PulseWatch 410 Patient Monitor (Sample)",
+        "queue": "Triage",
+        "ref": "SAMPLE-RV-11",
+        "state": "DUE_SOON",
+        "state_label": "Due soon",
+        "title": "Triage: flagged, not yet complete"
+      },
+      {
+        "alerts": true,
+        "away": null,
+        "category": "TRIAGE",
+        "category_label": "Triage and first contact",
+        "complaint_id": null,
+        "due_at": "2026-11-02T23:47:53.245561+00:00",
+        "due_label": "Tue 3 Nov 2026, 05:17 IST",
+        "escalated_to": [],
+        "hours_left": 20.6,
+        "key": "triage:INTAKE:0fe3d100-9532-46a7-8d49-5af79d7b2bc5",
+        "market": null,
+        "opens": {
+          "section": "Complaints",
+          "tab": "Triage"
+        },
+        "owner": null,
+        "owner_id": null,
+        "product": "OrbitCare 300 Infusion Pump (Sample)",
+        "queue": "Triage",
+        "ref": "SAMPLE-URG-01",
+        "state": "DUE_SOON",
+        "state_label": "Due soon",
+        "title": "Triage: flagged, not yet complete"
+      },
+      {
+        "alerts": true,
+        "away": null,
+        "category": "TRIAGE",
+        "category_label": "Triage and first contact",
+        "complaint_id": "32048a33-8b18-47f6-9f49-729dc640ab46",
+        "due_at": "2026-11-03T01:47:57.764887+00:00",
+        "due_label": "Tue 3 Nov 2026, 07:17 IST",
+        "escalated_to": [],
+        "hours_left": 22.6,
+        "key": "triage:COMPLAINT:32048a33-8b18-47f6-9f49-729dc640ab46",
+        "market": "IN",
+        "opens": {
+          "section": "Complaints",
+          "tab": "Triage"
+        },
+        "owner": null,
+        "owner_id": null,
+        "product": "Pulse Oximeter PX-20 (Sample)",
+        "queue": "Triage",
+        "ref": "MSD/CC/26/001",
+        "state": "DUE_SOON",
+        "state_label": "Due soon",
+        "title": "Triage: flagged, not yet complete"
+      },
+      {
+        "alerts": true,
+        "away": null,
+        "category": "TRIAGE",
+        "category_label": "Triage and first contact",
+        "complaint_id": "63de9124-7eba-4d09-86a3-1d91fbe71e97",
+        "due_at": "2026-11-03T01:47:57.764887+00:00",
+        "due_label": "Tue 3 Nov 2026, 07:17 IST",
+        "escalated_to": [],
+        "hours_left": 22.6,
+        "key": "triage:COMPLAINT:63de9124-7eba-4d09-86a3-1d91fbe71e97",
+        "market": "IN",
+        "opens": {
+          "section": "Complaints",
+          "tab": "Triage"
+        },
+        "owner": null,
+        "owner_id": null,
+        "product": "Infusion Set Kit IK-5 (Sample)",
+        "queue": "Triage",
+        "ref": "MSD/CC/26/002",
+        "state": "DUE_SOON",
+        "state_label": "Due soon",
+        "title": "Triage: flagged, not yet complete"
+      }
+    ],
+    "never": "An alert tells people in MDARIX; it never closes or changes the item. MDARIX sends no e-mail about it and never decides: a person does, and signs.",
+    "overdue": 1,
+    "settings": {
+      "escalation_role": "LEADER",
+      "escalation_role_label": "Leader (Quality Manager)",
+      "holidays": [],
+      "reminder_hours": 24,
+      "time_zone": "Asia/Kolkata",
+      "updated_at": null,
+      "work_days": [0, 1, 2, 3, 4]
+    },
+    "staffing": "Only one person can receive alerts: invite a colleague, so an overdue item reaches someone else.",
+    "total": 16
+  },
+  "/api/v1/oversight/alerts": {
+    "absences": [
+      {
+        "backup_id": "8b6611c2-acdd-4180-b748-4d0a002952ad",
+        "backup_name": "Asha Quality",
+        "ends_on": "2026-12-02",
+        "id": "e7b051bc-9f16-49e5-ac6f-3f3b5f80b2cd",
+        "note": "Sample: at a supplier audit (fictional).",
+        "sample": true,
+        "starts_on": "2026-10-31",
+        "user_id": "914a3482-1bdd-48ec-b09f-bf50b841a6ba",
+        "user_name": "MDARIX sample author"
+      }
+    ],
+    "escalations": 1,
+    "items": [
+      {
+        "category": "COMMUNICATION",
+        "category_label": "Communications",
+        "due_at": "2026-10-30T18:29:59+00:00",
+        "due_label": "Fri 30 Oct 2026, 23:59 IST",
+        "hours_left": -56.7,
+        "id": "5468a72a-fe82-469c-a82e-461e9f8b7de1",
+        "ids": ["8ae2e3ff-34e4-4545-93ac-d0592d3d7113", "5468a72a-fe82-469c-a82e-461e9f8b7de1"],
+        "opens": {
+          "section": "Complaints",
+          "tab": "Communications?complaint=888ef48a-08d0-4b62-acc5-53417693cf3c"
+        },
+        "owner": "Asha Quality",
+        "raised_at": "2026-11-02T01:48:11.817531+00:00",
+        "read": false,
+        "reason": "NO_ONE_ELSE",
+        "reason_label": "Nobody else can be reached: invite a colleague or name a backup",
+        "ref": "SAMPLE-RV-08",
+        "state": "OVERDUE",
+        "state_label": "Overdue",
+        "tier": "ESCALATION",
+        "tier_label": "Escalation",
+        "title": "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional) on CMP000036: Ask the reporter: the patient's outcome after the free flow (four US questions on harm are Unknown in the US assessment)"
+      },
+      {
+        "category": "TRIAGE",
+        "category_label": "Triage and first contact",
+        "due_at": "2026-11-02T22:47:53.245561+00:00",
+        "due_label": "Tue 3 Nov 2026, 04:17 IST",
+        "hours_left": 19.6,
+        "id": "b43024fa-e1cb-400b-bc5e-8546c8281632",
+        "ids": ["b43024fa-e1cb-400b-bc5e-8546c8281632"],
+        "opens": {
+          "section": "Complaints",
+          "tab": "Triage"
+        },
+        "owner": null,
+        "raised_at": "2026-11-02T01:48:11.817531+00:00",
+        "read": false,
+        "reason": "NO_OWNER",
+        "reason_label": "Nobody owns it yet",
+        "ref": "SAMPLE-RV-11",
+        "state": "DUE_SOON",
+        "state_label": "Due soon",
+        "tier": "REMINDER",
+        "tier_label": "Reminder",
+        "title": "Triage: flagged, not yet complete"
+      },
+      {
+        "category": "TRIAGE",
+        "category_label": "Triage and first contact",
+        "due_at": "2026-11-02T23:47:53.245561+00:00",
+        "due_label": "Tue 3 Nov 2026, 05:17 IST",
+        "hours_left": 20.6,
+        "id": "98d8b3e3-f8df-425e-8541-92d5a75cc237",
+        "ids": ["98d8b3e3-f8df-425e-8541-92d5a75cc237"],
+        "opens": {
+          "section": "Complaints",
+          "tab": "Triage"
+        },
+        "owner": null,
+        "raised_at": "2026-11-02T01:48:11.817531+00:00",
+        "read": false,
+        "reason": "NO_OWNER",
+        "reason_label": "Nobody owns it yet",
+        "ref": "SAMPLE-URG-01",
+        "state": "DUE_SOON",
+        "state_label": "Due soon",
+        "tier": "REMINDER",
+        "tier_label": "Reminder",
+        "title": "Triage: flagged, not yet complete"
+      },
+      {
+        "category": "TRIAGE",
+        "category_label": "Triage and first contact",
+        "due_at": "2026-11-03T01:47:57.764887+00:00",
+        "due_label": "Tue 3 Nov 2026, 07:17 IST",
+        "hours_left": 22.6,
+        "id": "0774461c-1d88-4129-a3d3-5c9c5a332483",
+        "ids": ["0774461c-1d88-4129-a3d3-5c9c5a332483"],
+        "opens": {
+          "section": "Complaints",
+          "tab": "Triage"
+        },
+        "owner": null,
+        "raised_at": "2026-11-02T01:48:11.817531+00:00",
+        "read": false,
+        "reason": "NO_OWNER",
+        "reason_label": "Nobody owns it yet",
+        "ref": "MSD/CC/26/001",
+        "state": "DUE_SOON",
+        "state_label": "Due soon",
+        "tier": "REMINDER",
+        "tier_label": "Reminder",
+        "title": "Triage: flagged, not yet complete"
+      },
+      {
+        "category": "TRIAGE",
+        "category_label": "Triage and first contact",
+        "due_at": "2026-11-03T01:47:57.764887+00:00",
+        "due_label": "Tue 3 Nov 2026, 07:17 IST",
+        "hours_left": 22.6,
+        "id": "0e66ad46-09d9-4eaa-81ce-2446ec80c368",
+        "ids": ["0e66ad46-09d9-4eaa-81ce-2446ec80c368"],
+        "opens": {
+          "section": "Complaints",
+          "tab": "Triage"
+        },
+        "owner": null,
+        "raised_at": "2026-11-02T01:48:11.817531+00:00",
+        "read": false,
+        "reason": "NO_OWNER",
+        "reason_label": "Nobody owns it yet",
+        "ref": "MSD/CC/26/002",
+        "state": "DUE_SOON",
+        "state_label": "Due soon",
+        "tier": "REMINDER",
+        "tier_label": "Reminder",
+        "title": "Triage: flagged, not yet complete"
+      }
+    ],
+    "never": "An alert tells people in MDARIX; it never closes or changes the item. MDARIX sends no e-mail about it and never decides: a person does, and signs.",
+    "people": [],
+    "unread": 5
+  },
+  "/api/v1/oversight/settings": {
+    "escalation_role": "LEADER",
+    "escalation_role_label": "Leader (Quality Manager)",
+    "holidays": [],
+    "range": [1, 168],
+    "reminder_hours": 24,
+    "roles": [
+      {
+        "code": "LEADER",
+        "label": "Leader (Quality Manager)"
+      },
+      {
+        "code": "REVIEWER",
+        "label": "Quality Reviewer"
+      },
+      {
+        "code": "APPROVER",
+        "label": "Authorized Decision Maker"
+      },
+      {
+        "code": "REGULATORY_REVIEWER",
+        "label": "Regulatory Reviewer"
+      }
+    ],
+    "time_zone": "Asia/Kolkata",
+    "updated_at": null,
+    "weekdays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    "work_days": [0, 1, 2, 3, 4],
+    "zones": [
+      "UTC",
+      "Africa/Abidjan",
+      "Africa/Accra",
+      "Africa/Addis_Ababa",
+      "Africa/Algiers",
+      "Africa/Asmara",
+      "Africa/Bamako",
+      "Africa/Bangui",
+      "Africa/Banjul",
+      "Africa/Bissau",
+      "Africa/Blantyre",
+      "Africa/Brazzaville",
+      "Africa/Bujumbura",
+      "Africa/Cairo",
+      "Africa/Casablanca",
+      "Africa/Ceuta",
+      "Africa/Conakry",
+      "Africa/Dakar",
+      "Africa/Dar_es_Salaam",
+      "Africa/Djibouti",
+      "Africa/Douala",
+      "Africa/El_Aaiun",
+      "Africa/Freetown",
+      "Africa/Gaborone",
+      "Africa/Harare",
+      "Africa/Johannesburg",
+      "Africa/Juba",
+      "Africa/Kampala",
+      "Africa/Khartoum",
+      "Africa/Kigali",
+      "Africa/Kinshasa",
+      "Africa/Lagos",
+      "Africa/Libreville",
+      "Africa/Lome",
+      "Africa/Luanda",
+      "Africa/Lubumbashi",
+      "Africa/Lusaka",
+      "Africa/Malabo",
+      "Africa/Maputo",
+      "Africa/Maseru",
+      "Africa/Mbabane",
+      "Africa/Mogadishu",
+      "Africa/Monrovia",
+      "Africa/Nairobi",
+      "Africa/Ndjamena",
+      "Africa/Niamey",
+      "Africa/Nouakchott",
+      "Africa/Ouagadougou",
+      "Africa/Porto-Novo",
+      "Africa/Sao_Tome",
+      "Africa/Timbuktu",
+      "Africa/Tripoli",
+      "Africa/Tunis",
+      "Africa/Windhoek",
+      "America/Adak",
+      "America/Anchorage",
+      "America/Anguilla",
+      "America/Antigua",
+      "America/Araguaina",
+      "America/Argentina/Buenos_Aires",
+      "America/Argentina/Catamarca",
+      "America/Argentina/ComodRivadavia",
+      "America/Argentina/Cordoba",
+      "America/Argentina/Jujuy",
+      "America/Argentina/La_Rioja",
+      "America/Argentina/Mendoza",
+      "America/Argentina/Rio_Gallegos",
+      "America/Argentina/Salta",
+      "America/Argentina/San_Juan",
+      "America/Argentina/San_Luis",
+      "America/Argentina/Tucuman",
+      "America/Argentina/Ushuaia",
+      "America/Aruba",
+      "America/Asuncion",
+      "America/Atikokan",
+      "America/Atka",
+      "America/Bahia",
+      "America/Bahia_Banderas",
+      "America/Barbados",
+      "America/Belem",
+      "America/Belize",
+      "America/Blanc-Sablon",
+      "America/Boa_Vista",
+      "America/Bogota",
+      "America/Boise",
+      "America/Cambridge_Bay",
+      "America/Campo_Grande",
+      "America/Cancun",
+      "America/Caracas",
+      "America/Catamarca",
+      "America/Cayenne",
+      "America/Cayman",
+      "America/Chicago",
+      "America/Chihuahua",
+      "America/Ciudad_Juarez",
+      "America/Coral_Harbour",
+      "America/Cordoba",
+      "America/Costa_Rica",
+      "America/Creston",
+      "America/Cuiaba",
+      "America/Curacao",
+      "America/Danmarkshavn",
+      "America/Dawson",
+      "America/Dawson_Creek",
+      "America/Denver",
+      "America/Detroit",
+      "America/Dominica",
+      "America/Edmonton",
+      "America/Eirunepe",
+      "America/El_Salvador",
+      "America/Ensenada",
+      "America/Fort_Nelson",
+      "America/Fort_Wayne",
+      "America/Fortaleza",
+      "America/Glace_Bay",
+      "America/Goose_Bay",
+      "America/Grand_Turk",
+      "America/Grenada",
+      "America/Guadeloupe",
+      "America/Guatemala",
+      "America/Guayaquil",
+      "America/Guyana",
+      "America/Halifax",
+      "America/Havana",
+      "America/Hermosillo",
+      "America/Indiana/Indianapolis",
+      "America/Indiana/Knox",
+      "America/Indiana/Marengo",
+      "America/Indiana/Petersburg",
+      "America/Indiana/Tell_City",
+      "America/Indiana/Vevay",
+      "America/Indiana/Vincennes",
+      "America/Indiana/Winamac",
+      "America/Inuvik",
+      "America/Iqaluit",
+      "America/Jamaica",
+      "America/Jujuy",
+      "America/Juneau",
+      "America/Kentucky/Louisville",
+      "America/Kentucky/Monticello",
+      "America/Knox_IN",
+      "America/Kralendijk",
+      "America/La_Paz",
+      "America/Lima",
+      "America/Los_Angeles",
+      "America/Lower_Princes",
+      "America/Maceio",
+      "America/Managua",
+      "America/Manaus",
+      "America/Marigot",
+      "America/Martinique",
+      "America/Matamoros",
+      "America/Mazatlan",
+      "America/Mendoza",
+      "America/Menominee",
+      "America/Merida",
+      "America/Metlakatla",
+      "America/Mexico_City",
+      "America/Miquelon",
+      "America/Moncton",
+      "America/Monterrey",
+      "America/Montevideo",
+      "America/Montserrat",
+      "America/Nassau",
+      "America/New_York",
+      "America/Nipigon",
+      "America/Nome",
+      "America/Noronha",
+      "America/North_Dakota/Beulah",
+      "America/North_Dakota/Center",
+      "America/North_Dakota/New_Salem",
+      "America/Nuuk",
+      "America/Ojinaga",
+      "America/Panama",
+      "America/Pangnirtung",
+      "America/Paramaribo",
+      "America/Phoenix",
+      "America/Port-au-Prince",
+      "America/Port_of_Spain",
+      "America/Porto_Acre",
+      "America/Porto_Velho",
+      "America/Puerto_Rico",
+      "America/Punta_Arenas",
+      "America/Rainy_River",
+      "America/Rankin_Inlet",
+      "America/Recife",
+      "America/Regina",
+      "America/Resolute",
+      "America/Rio_Branco",
+      "America/Rosario",
+      "America/Santa_Isabel",
+      "America/Santarem",
+      "America/Santiago",
+      "America/Santo_Domingo",
+      "America/Sao_Paulo",
+      "America/Scoresbysund",
+      "America/Shiprock",
+      "America/Sitka",
+      "America/St_Barthelemy",
+      "America/St_Johns",
+      "America/St_Kitts",
+      "America/St_Lucia",
+      "America/St_Thomas",
+      "America/St_Vincent",
+      "America/Swift_Current",
+      "America/Tegucigalpa",
+      "America/Thule",
+      "America/Thunder_Bay",
+      "America/Tijuana",
+      "America/Toronto",
+      "America/Tortola",
+      "America/Vancouver",
+      "America/Virgin",
+      "America/Whitehorse",
+      "America/Winnipeg",
+      "America/Yakutat",
+      "America/Yellowknife",
+      "Antarctica/Casey",
+      "Antarctica/Davis",
+      "Antarctica/DumontDUrville",
+      "Antarctica/Macquarie",
+      "Antarctica/Mawson",
+      "Antarctica/McMurdo",
+      "Antarctica/Palmer",
+      "Antarctica/Rothera",
+      "Antarctica/South_Pole",
+      "Antarctica/Syowa",
+      "Antarctica/Troll",
+      "Antarctica/Vostok",
+      "Arctic/Longyearbyen",
+      "Asia/Aden",
+      "Asia/Almaty",
+      "Asia/Amman",
+      "Asia/Anadyr",
+      "Asia/Aqtau",
+      "Asia/Aqtobe",
+      "Asia/Ashgabat",
+      "Asia/Atyrau",
+      "Asia/Baghdad",
+      "Asia/Bahrain",
+      "Asia/Baku",
+      "Asia/Bangkok",
+      "Asia/Barnaul",
+      "Asia/Beirut",
+      "Asia/Bishkek",
+      "Asia/Brunei",
+      "Asia/Chita",
+      "Asia/Choibalsan",
+      "Asia/Colombo",
+      "Asia/Damascus",
+      "Asia/Dhaka",
+      "Asia/Dili",
+      "Asia/Dubai",
+      "Asia/Dushanbe",
+      "Asia/Famagusta",
+      "Asia/Gaza",
+      "Asia/Hanoi",
+      "Asia/Hebron",
+      "Asia/Ho_Chi_Minh",
+      "Asia/Hong_Kong",
+      "Asia/Hovd",
+      "Asia/Irkutsk",
+      "Asia/Jakarta",
+      "Asia/Jayapura",
+      "Asia/Jerusalem",
+      "Asia/Kabul",
+      "Asia/Kamchatka",
+      "Asia/Karachi",
+      "Asia/Kashgar",
+      "Asia/Kathmandu",
+      "Asia/Khandyga",
+      "Asia/Kolkata",
+      "Asia/Krasnoyarsk",
+      "Asia/Kuala_Lumpur",
+      "Asia/Kuching",
+      "Asia/Kuwait",
+      "Asia/Macau",
+      "Asia/Magadan",
+      "Asia/Makassar",
+      "Asia/Manila",
+      "Asia/Muscat",
+      "Asia/Nicosia",
+      "Asia/Novokuznetsk",
+      "Asia/Novosibirsk",
+      "Asia/Omsk",
+      "Asia/Oral",
+      "Asia/Phnom_Penh",
+      "Asia/Pontianak",
+      "Asia/Pyongyang",
+      "Asia/Qatar",
+      "Asia/Qostanay",
+      "Asia/Qyzylorda",
+      "Asia/Riyadh",
+      "Asia/Sakhalin",
+      "Asia/Samarkand",
+      "Asia/Seoul",
+      "Asia/Shanghai",
+      "Asia/Singapore",
+      "Asia/Srednekolymsk",
+      "Asia/Taipei",
+      "Asia/Tashkent",
+      "Asia/Tbilisi",
+      "Asia/Tehran",
+      "Asia/Thimphu",
+      "Asia/Tokyo",
+      "Asia/Tomsk",
+      "Asia/Ulaanbaatar",
+      "Asia/Urumqi",
+      "Asia/Ust-Nera",
+      "Asia/Vientiane",
+      "Asia/Vladivostok",
+      "Asia/Yakutsk",
+      "Asia/Yangon",
+      "Asia/Yekaterinburg",
+      "Asia/Yerevan",
+      "Atlantic/Azores",
+      "Atlantic/Bermuda",
+      "Atlantic/Canary",
+      "Atlantic/Cape_Verde",
+      "Atlantic/Faroe",
+      "Atlantic/Jan_Mayen",
+      "Atlantic/Madeira",
+      "Atlantic/Reykjavik",
+      "Atlantic/South_Georgia",
+      "Atlantic/St_Helena",
+      "Atlantic/Stanley",
+      "Australia/Adelaide",
+      "Australia/Brisbane",
+      "Australia/Broken_Hill",
+      "Australia/Currie",
+      "Australia/Darwin",
+      "Australia/Eucla",
+      "Australia/Hobart",
+      "Australia/Lindeman",
+      "Australia/Lord_Howe",
+      "Australia/Melbourne",
+      "Australia/Perth",
+      "Australia/Sydney",
+      "Europe/Amsterdam",
+      "Europe/Andorra",
+      "Europe/Astrakhan",
+      "Europe/Athens",
+      "Europe/Belgrade",
+      "Europe/Berlin",
+      "Europe/Bratislava",
+      "Europe/Brussels",
+      "Europe/Bucharest",
+      "Europe/Budapest",
+      "Europe/Busingen",
+      "Europe/Chisinau",
+      "Europe/Copenhagen",
+      "Europe/Dublin",
+      "Europe/Gibraltar",
+      "Europe/Guernsey",
+      "Europe/Helsinki",
+      "Europe/Isle_of_Man",
+      "Europe/Istanbul",
+      "Europe/Jersey",
+      "Europe/Kaliningrad",
+      "Europe/Kirov",
+      "Europe/Kyiv",
+      "Europe/Lisbon",
+      "Europe/Ljubljana",
+      "Europe/London",
+      "Europe/Luxembourg",
+      "Europe/Madrid",
+      "Europe/Malta",
+      "Europe/Mariehamn",
+      "Europe/Minsk",
+      "Europe/Monaco",
+      "Europe/Moscow",
+      "Europe/Nicosia",
+      "Europe/Oslo",
+      "Europe/Paris",
+      "Europe/Podgorica",
+      "Europe/Prague",
+      "Europe/Riga",
+      "Europe/Rome",
+      "Europe/Samara",
+      "Europe/San_Marino",
+      "Europe/Sarajevo",
+      "Europe/Saratov",
+      "Europe/Simferopol",
+      "Europe/Skopje",
+      "Europe/Sofia",
+      "Europe/Stockholm",
+      "Europe/Tallinn",
+      "Europe/Tirane",
+      "Europe/Tiraspol",
+      "Europe/Ulyanovsk",
+      "Europe/Uzhgorod",
+      "Europe/Vaduz",
+      "Europe/Vatican",
+      "Europe/Vienna",
+      "Europe/Vilnius",
+      "Europe/Volgograd",
+      "Europe/Warsaw",
+      "Europe/Zagreb",
+      "Europe/Zaporozhye",
+      "Europe/Zurich",
+      "Indian/Antananarivo",
+      "Indian/Chagos",
+      "Indian/Christmas",
+      "Indian/Cocos",
+      "Indian/Comoro",
+      "Indian/Kerguelen",
+      "Indian/Mahe",
+      "Indian/Maldives",
+      "Indian/Mauritius",
+      "Indian/Mayotte",
+      "Indian/Reunion",
+      "Pacific/Apia",
+      "Pacific/Auckland",
+      "Pacific/Bougainville",
+      "Pacific/Chatham",
+      "Pacific/Chuuk",
+      "Pacific/Easter",
+      "Pacific/Efate",
+      "Pacific/Fakaofo",
+      "Pacific/Fiji",
+      "Pacific/Funafuti",
+      "Pacific/Galapagos",
+      "Pacific/Gambier",
+      "Pacific/Guadalcanal",
+      "Pacific/Guam",
+      "Pacific/Honolulu",
+      "Pacific/Johnston",
+      "Pacific/Kanton",
+      "Pacific/Kiritimati",
+      "Pacific/Kosrae",
+      "Pacific/Kwajalein",
+      "Pacific/Majuro",
+      "Pacific/Marquesas",
+      "Pacific/Midway",
+      "Pacific/Nauru",
+      "Pacific/Niue",
+      "Pacific/Norfolk",
+      "Pacific/Noumea",
+      "Pacific/Pago_Pago",
+      "Pacific/Palau",
+      "Pacific/Pitcairn",
+      "Pacific/Pohnpei",
+      "Pacific/Port_Moresby",
+      "Pacific/Rarotonga",
+      "Pacific/Saipan",
+      "Pacific/Samoa",
+      "Pacific/Tahiti",
+      "Pacific/Tarawa",
+      "Pacific/Tongatapu",
+      "Pacific/Wake",
+      "Pacific/Wallis",
+      "Pacific/Yap"
+    ]
+  },
+  "/api/v1/readiness": {
+    "as_of": "2026-11-02",
+    "basis_note": "MDARIX organizes the evidence these ask for; it does not certify compliance. Your quality system and its validation stay yours.",
+    "checks": [
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_2_2",
+            "short": "ISO 13485 8.2.2",
+            "title": "Complaint handling"
+          },
+          {
+            "id": "CFR820_35",
+            "short": "21 CFR 820.35",
+            "title": "Control of records (QMSR)"
+          }
+        ],
+        "code": "COMPLAINTS_TO_RECHECK",
+        "detail": "1 of 5 records to recheck reports a death or serious injury",
+        "harm": 1,
+        "items": [
+          {
+            "id": "021a8f6c-b511-44ea-ba4c-754e151b05ec",
+            "ref": "CMP000029"
+          },
+          {
+            "id": "861b335d-c023-4192-a022-35fd36c7e938",
+            "ref": "CMP000030"
+          },
+          {
+            "id": "593de4cb-6c40-41da-af5f-e8c765f679ed",
+            "ref": "CMP000033"
+          },
+          {
+            "id": "e64b8eca-b847-4e11-b3d4-b7ca543d3917",
+            "ref": "CMP000032"
+          },
+          {
+            "id": "cd21de8d-7828-4f81-b33b-28e60a1c9f2a",
+            "ref": "CMP000031"
+          }
+        ],
+        "opens": {
+          "section": "Complaints",
+          "tab": "Second look"
+        },
+        "state": "CRITICAL",
+        "title": "Complaints to recheck",
+        "value": 5,
+        "why": "Recent FDA inspection findings include complaints cancelled or logged as inquiries although they met the firm's own complaint definition, and No Fault Found codes that hid a recurring problem."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_2_2",
+            "short": "ISO 13485 8.2.2",
+            "title": "Complaint handling"
+          }
+        ],
+        "code": "COMPLAINTS_PAST_TARGET",
+        "detail": "15 complaints open in no signal or case; 1 due within a week; target 30 days",
+        "items": [
+          {
+            "id": "bc01602c-7a0e-4549-8577-9c20e0bcb638",
+            "ref": "CMP000048"
+          },
+          {
+            "id": "32048a33-8b18-47f6-9f49-729dc640ab46",
+            "ref": "CMP000045"
+          },
+          {
+            "id": "63de9124-7eba-4d09-86a3-1d91fbe71e97",
+            "ref": "CMP000046"
+          },
+          {
+            "id": "2e1a1d84-1698-4cf0-a959-cda66ae2da71",
+            "ref": "CMP000027"
+          },
+          {
+            "id": "d0464716-daaf-4a40-85ed-eea325beb215",
+            "ref": "CMP000023"
+          },
+          {
+            "id": "954ad07b-9fd8-4824-936a-a9ebf5b23d89",
+            "ref": "CMP000028"
+          }
+        ],
+        "oldest_days": 211,
+        "open_unlinked": 15,
+        "opens": {
+          "section": "Complaints",
+          "tab": "Backlog"
+        },
+        "state": "CRITICAL",
+        "title": "Complaints past target",
+        "value": 6,
+        "why": "Complaint handling is among the observations FDA cites most often, complaint backlogs included."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_2_3",
+            "short": "ISO 13485 8.2.3",
+            "title": "Reporting to regulatory authorities"
+          },
+          {
+            "id": "CFR803_50",
+            "short": "21 CFR 803.50",
+            "title": "30-day reports by manufacturers"
+          },
+          {
+            "id": "CFR803_53",
+            "short": "21 CFR 803.53",
+            "title": "5-day reports"
+          },
+          {
+            "id": "MDR_87",
+            "short": "EU MDR Art. 87",
+            "title": "Reporting of serious incidents and field safety corrective actions"
+          }
+        ],
+        "code": "REPORTING_CLOCKS",
+        "configured": true,
+        "detail": "1 overdue, 2 due soon, 4 with missing answers; 0 decided after the window",
+        "due_soon": 2,
+        "items": [
+          {
+            "id": "63de9124-7eba-4d09-86a3-1d91fbe71e97",
+            "ref": "CMP000046"
+          },
+          {
+            "id": "bede1304-c714-4782-ae8d-a3dad8fa1f6a",
+            "ref": "CMP000035"
+          },
+          {
+            "id": "557201aa-8692-4e47-8001-41c619db7e7c",
+            "ref": "CMP000034"
+          },
+          {
+            "id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+            "ref": "CMP000036"
+          },
+          {
+            "id": "32048a33-8b18-47f6-9f49-729dc640ab46",
+            "ref": "CMP000045"
+          },
+          {
+            "id": "fab17c31-be1f-4265-85b2-cb0823089dcf",
+            "ref": "CMP000047"
+          }
+        ],
+        "open": 9,
+        "opens": {
+          "section": "Complaints",
+          "tab": "Reportability"
+        },
+        "overdue": 1,
+        "scale_disagreements": 0,
+        "state": "CRITICAL",
+        "title": "Reporting clocks",
+        "value": 6,
+        "why": "FDA has cited a report filed about nine months late; FDA, EU, UK and Canadian rules set reporting windows of 2 to 30 days from awareness."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_4",
+            "short": "ISO 13485 8.4",
+            "title": "Analysis of data"
+          },
+          {
+            "id": "MDR_88",
+            "short": "EU MDR Art. 88",
+            "title": "Trend reporting"
+          }
+        ],
+        "code": "TRENDS_WITHOUT_ACTION",
+        "decided_without_action": 0,
+        "detail": "0 decided signals with no CAPA and no risk review; 0 significant rises with no signal",
+        "items": [],
+        "opens": {
+          "section": "Signals",
+          "tab": "Signal inbox"
+        },
+        "rising_without_signal": 0,
+        "state": "CLEAR",
+        "title": "Trends without CAPA or risk review",
+        "value": 0,
+        "why": "Trends must reach CAPA and the risk file: FDA's QMSR inspections follow the risk file, and the EU MDR (Article 88) asks for statistically significant increases to be reported."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO14971_10",
+            "short": "ISO 14971 clause 10",
+            "title": "Production and post-production activities"
+          }
+        ],
+        "code": "RISK_FILE_INPUT",
+        "detail": "6 products with harm, malfunctions or rising trends and no risk review in the last year; 0 with risk reassessments overdue, 0 open; 0 with no risks in MDARIX",
+        "items": [
+          {
+            "id": "8db67fb1-8e2b-46e1-84d8-7fc365db255f",
+            "label": "PulseWatch 410 Patient Monitor (Sample)",
+            "ref": "PROD000002"
+          },
+          {
+            "id": "59953271-58d2-4cb2-a74f-5387c9dd4de2",
+            "label": "OrbitCare 300 Infusion Pump (Sample)",
+            "ref": "PROD000001"
+          },
+          {
+            "id": "31ba63ce-5de9-41a9-a162-7ff49ffc7b8d",
+            "label": "Infusion Set Kit IK-5 (Sample)",
+            "ref": "PROD000005"
+          },
+          {
+            "id": "c56e7264-b4d1-4624-bf28-94b01dcb41db",
+            "label": "VentraLink 250 Respiratory Controller (Sample)",
+            "ref": "PROD000003"
+          },
+          {
+            "id": "8ea22367-c59d-41c0-8cd4-14a38fa28ec1",
+            "label": "Pulse Oximeter PX-20 (Sample)",
+            "ref": "PROD000004"
+          },
+          {
+            "id": "bfa269c1-45cb-4ebc-85bd-31a8ee8ae1bc",
+            "label": "Cathéter Guide CG-2 (Sample)",
+            "ref": "PROD000006"
+          }
+        ],
+        "opens": {
+          "section": "Records",
+          "tab": "Risk file input"
+        },
+        "products": 6,
+        "state": "CRITICAL",
+        "title": "Post-market data not in the risk file",
+        "value": 6,
+        "why": "Under the QMSR, FDA inspections follow the risk file and name post-market data not used as input to risk management a significant deficiency; ISO 14971:2019 clause 10 asks for post-production information to reach risk management."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_2_2",
+            "short": "ISO 13485 8.2.2",
+            "title": "Complaint handling"
+          }
+        ],
+        "code": "HARM_CLOSED_WITHOUT_CASE",
+        "detail": "Closed in the last 365 days, reporting a death or serious injury, in no case",
+        "items": [
+          {
+            "id": "b73d2cc3-998f-413f-92dc-38154fc9f153",
+            "label": "PulseWatch 410 Patient Monitor (Sample)",
+            "ref": "SAMPLE-RV-09"
+          }
+        ],
+        "opens": {
+          "section": "Complaints",
+          "tab": "Reportability"
+        },
+        "state": "CRITICAL",
+        "title": "Harm complaints closed without an investigation",
+        "value": 1,
+        "why": "FDA has cited complaints of potentially fatal harm closed without corrective action."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_5_2",
+            "short": "ISO 13485 8.5.2",
+            "title": "Corrective action"
+          }
+        ],
+        "code": "CAPA_EFFECTIVENESS",
+        "detail": "1 closed without a check, 0 checks overdue, 1 with no check planned",
+        "effective": 0,
+        "items": [
+          {
+            "id": "73718fd2-b044-42a6-853b-7d3bbd17814d",
+            "ref": "CAPA000001"
+          }
+        ],
+        "not_planned": 1,
+        "opens": {
+          "section": "Records",
+          "tab": "Effectiveness checks"
+        },
+        "state": "CRITICAL",
+        "title": "CAPAs without a verified effect",
+        "value": 1,
+        "why": "CAPA is among the observations FDA cites most often, and closing a CAPA without verifying that it worked is a recurring finding."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_4",
+            "short": "ISO 13485 8.4",
+            "title": "Analysis of data"
+          }
+        ],
+        "code": "TRIAGE_OVERDUE",
+        "detail": "New or in triage, past the due date their priority set",
+        "items": [],
+        "opens": {
+          "section": "Signals",
+          "tab": "Signal inbox"
+        },
+        "state": "CLEAR",
+        "title": "Signals waiting past their triage date",
+        "value": 0,
+        "why": "Signals left waiting are trends nobody has looked at."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_2_2",
+            "short": "ISO 13485 8.2.2",
+            "title": "Complaint handling"
+          }
+        ],
+        "code": "DISPOSITIONS_DUE",
+        "detail": "6 complaints without a disposition past the 30-day target; 0 dispositions to review (a trigger met after signing); 0 escalations to a case in the last 30 days",
+        "escalated": 0,
+        "items": [
+          {
+            "id": "bc01602c-7a0e-4549-8577-9c20e0bcb638",
+            "label": "No disposition, 211 days",
+            "ref": "FIX-3"
+          },
+          {
+            "id": "32048a33-8b18-47f6-9f49-729dc640ab46",
+            "label": "No disposition, 80 days",
+            "ref": "MSD/CC/26/001"
+          },
+          {
+            "id": "63de9124-7eba-4d09-86a3-1d91fbe71e97",
+            "label": "No disposition, 60 days",
+            "ref": "MSD/CC/26/002"
+          },
+          {
+            "id": "2e1a1d84-1698-4cf0-a959-cda66ae2da71",
+            "label": "No disposition, 52 days",
+            "ref": "SAMPLE-VENTRA-250-CMP-003"
+          },
+          {
+            "id": "d0464716-daaf-4a40-85ed-eea325beb215",
+            "label": "No disposition, 45 days",
+            "ref": "SAMPLE-PULSE-410-CMP-005"
+          },
+          {
+            "id": "954ad07b-9fd8-4824-936a-a9ebf5b23d89",
+            "label": "No disposition, 33 days",
+            "ref": "SAMPLE-VENTRA-250-CMP-004"
+          }
+        ],
+        "opens": {
+          "section": "Complaints",
+          "tab": "Dispositions"
+        },
+        "past_target": 6,
+        "state": "ATTENTION",
+        "title": "Dispositions past the 30-day target or to review",
+        "to_review": 0,
+        "value": 6,
+        "why": "ISO 13485 clause 8.2.2 lets a complaint close without an investigation only when the reason is documented; a complaint left without a decision is a backlog finding."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_4",
+            "short": "ISO 13485 8.4",
+            "title": "Analysis of data"
+          },
+          {
+            "id": "ISO13485_8_2_2",
+            "short": "ISO 13485 8.2.2",
+            "title": "Complaint handling"
+          }
+        ],
+        "code": "RECURRING_SERVICE_LEVEL",
+        "detail": "2 or more service-level resolutions on one product and problem code within 30 days that no open case covers (starter threshold); the next such complaint is escalated by the recurrence trigger",
+        "items": [],
+        "opens": {
+          "section": "Signals",
+          "tab": "By resolution"
+        },
+        "state": "CLEAR",
+        "title": "Recurring service-level matters",
+        "value": 0,
+        "why": "A recurring problem fixed in the field each time is a trend: closed service tickets must still reach the analysis of data."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_2_2",
+            "short": "ISO 13485 8.2.2",
+            "title": "Complaint handling"
+          }
+        ],
+        "code": "EXTERNAL_REQUESTS",
+        "detail": "3 open requests, 1 past the reply due date; 1 request unresolved after attempts",
+        "items": [
+          {
+            "id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+            "label": "Overdue: Reporter of SAMPLE-RV-08 (ward nurse, fictional), reply due 2026-10-30, 2 attempts",
+            "ref": "SAMPLE-RV-08"
+          },
+          {
+            "id": "fef3350a-76f1-4b22-b294-b7d0eac93bf7",
+            "label": "Open: Reporter of SAMPLE-CALL-04, Sample Care Home (Sample), reply due 2026-11-03, 0 attempts",
+            "ref": null
+          },
+          {
+            "id": "69663e24-755b-4081-b634-5fb3fdf7462d",
+            "label": "Open: Reporter of SAMPLE-CALL-03, Sample General Hospital (Sample), reply due 2026-11-03, 0 attempts",
+            "ref": null
+          }
+        ],
+        "opens": {
+          "section": "Complaints",
+          "tab": "Communications"
+        },
+        "overdue": 1,
+        "state": "ATTENTION",
+        "title": "Requests to external contacts",
+        "unresolved": 1,
+        "value": 3,
+        "why": "A question to a reporter, distributor, hospital or service partner needs an owner, a due date and a record of every attempt; an unanswered one is a gap in the complaint file."
+      }
+    ],
+    "detection_pending": false,
+    "home": [
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_2_2",
+            "short": "ISO 13485 8.2.2",
+            "title": "Complaint handling"
+          },
+          {
+            "id": "CFR820_35",
+            "short": "21 CFR 820.35",
+            "title": "Control of records (QMSR)"
+          }
+        ],
+        "code": "COMPLAINTS_TO_RECHECK",
+        "detail": "1 of 5 records to recheck reports a death or serious injury",
+        "harm": 1,
+        "items": [
+          {
+            "id": "021a8f6c-b511-44ea-ba4c-754e151b05ec",
+            "ref": "CMP000029"
+          },
+          {
+            "id": "861b335d-c023-4192-a022-35fd36c7e938",
+            "ref": "CMP000030"
+          },
+          {
+            "id": "593de4cb-6c40-41da-af5f-e8c765f679ed",
+            "ref": "CMP000033"
+          },
+          {
+            "id": "e64b8eca-b847-4e11-b3d4-b7ca543d3917",
+            "ref": "CMP000032"
+          },
+          {
+            "id": "cd21de8d-7828-4f81-b33b-28e60a1c9f2a",
+            "ref": "CMP000031"
+          }
+        ],
+        "opens": {
+          "section": "Complaints",
+          "tab": "Second look"
+        },
+        "state": "CRITICAL",
+        "title": "Complaints to recheck",
+        "value": 5,
+        "why": "Recent FDA inspection findings include complaints cancelled or logged as inquiries although they met the firm's own complaint definition, and No Fault Found codes that hid a recurring problem."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_2_2",
+            "short": "ISO 13485 8.2.2",
+            "title": "Complaint handling"
+          }
+        ],
+        "code": "COMPLAINTS_PAST_TARGET",
+        "detail": "15 complaints open in no signal or case; 1 due within a week; target 30 days",
+        "items": [
+          {
+            "id": "bc01602c-7a0e-4549-8577-9c20e0bcb638",
+            "ref": "CMP000048"
+          },
+          {
+            "id": "32048a33-8b18-47f6-9f49-729dc640ab46",
+            "ref": "CMP000045"
+          },
+          {
+            "id": "63de9124-7eba-4d09-86a3-1d91fbe71e97",
+            "ref": "CMP000046"
+          },
+          {
+            "id": "2e1a1d84-1698-4cf0-a959-cda66ae2da71",
+            "ref": "CMP000027"
+          },
+          {
+            "id": "d0464716-daaf-4a40-85ed-eea325beb215",
+            "ref": "CMP000023"
+          },
+          {
+            "id": "954ad07b-9fd8-4824-936a-a9ebf5b23d89",
+            "ref": "CMP000028"
+          }
+        ],
+        "oldest_days": 211,
+        "open_unlinked": 15,
+        "opens": {
+          "section": "Complaints",
+          "tab": "Backlog"
+        },
+        "state": "CRITICAL",
+        "title": "Complaints past target",
+        "value": 6,
+        "why": "Complaint handling is among the observations FDA cites most often, complaint backlogs included."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_2_3",
+            "short": "ISO 13485 8.2.3",
+            "title": "Reporting to regulatory authorities"
+          },
+          {
+            "id": "CFR803_50",
+            "short": "21 CFR 803.50",
+            "title": "30-day reports by manufacturers"
+          },
+          {
+            "id": "CFR803_53",
+            "short": "21 CFR 803.53",
+            "title": "5-day reports"
+          },
+          {
+            "id": "MDR_87",
+            "short": "EU MDR Art. 87",
+            "title": "Reporting of serious incidents and field safety corrective actions"
+          }
+        ],
+        "code": "REPORTING_CLOCKS",
+        "configured": true,
+        "detail": "1 overdue, 2 due soon, 4 with missing answers; 0 decided after the window",
+        "due_soon": 2,
+        "items": [
+          {
+            "id": "63de9124-7eba-4d09-86a3-1d91fbe71e97",
+            "ref": "CMP000046"
+          },
+          {
+            "id": "bede1304-c714-4782-ae8d-a3dad8fa1f6a",
+            "ref": "CMP000035"
+          },
+          {
+            "id": "557201aa-8692-4e47-8001-41c619db7e7c",
+            "ref": "CMP000034"
+          },
+          {
+            "id": "888ef48a-08d0-4b62-acc5-53417693cf3c",
+            "ref": "CMP000036"
+          },
+          {
+            "id": "32048a33-8b18-47f6-9f49-729dc640ab46",
+            "ref": "CMP000045"
+          },
+          {
+            "id": "fab17c31-be1f-4265-85b2-cb0823089dcf",
+            "ref": "CMP000047"
+          }
+        ],
+        "open": 9,
+        "opens": {
+          "section": "Complaints",
+          "tab": "Reportability"
+        },
+        "overdue": 1,
+        "scale_disagreements": 0,
+        "state": "CRITICAL",
+        "title": "Reporting clocks",
+        "value": 6,
+        "why": "FDA has cited a report filed about nine months late; FDA, EU, UK and Canadian rules set reporting windows of 2 to 30 days from awareness."
+      },
+      {
+        "basis": [
+          {
+            "id": "ISO13485_8_4",
+            "short": "ISO 13485 8.4",
+            "title": "Analysis of data"
+          },
+          {
+            "id": "MDR_88",
+            "short": "EU MDR Art. 88",
+            "title": "Trend reporting"
+          }
+        ],
+        "code": "TRENDS_WITHOUT_ACTION",
+        "decided_without_action": 0,
+        "detail": "0 decided signals with no CAPA and no risk review; 0 significant rises with no signal",
+        "items": [],
+        "opens": {
+          "section": "Signals",
+          "tab": "Signal inbox"
+        },
+        "rising_without_signal": 0,
+        "state": "CLEAR",
+        "title": "Trends without CAPA or risk review",
+        "value": 0,
+        "why": "Trends must reach CAPA and the risk file: FDA's QMSR inspections follow the risk file, and the EU MDR (Article 88) asks for statistically significant increases to be reported."
+      }
+    ],
+    "note": "Read from your records as imported into MDARIX; rules only, no AI.",
+    "summary": {
+      "attention": 2,
+      "checks": 11,
+      "clear": 3,
+      "critical": 6,
+      "not_set": 0
+    }
+  },
+  "/api/v1/tasks/summary": {
+    "counts": {
+      "assigned": 1,
+      "due_soon": 0,
+      "overdue": 1,
+      "queue": 7,
+      "returned": 0,
+      "waiting": 0
+    },
+    "queues": [
+      {
+        "count": 1,
+        "role": "REVIEWER",
+        "role_label": "Quality Reviewer",
+        "task_type": "QUALITY_REVIEW",
+        "task_type_label": "Quality review"
+      },
+      {
+        "count": 1,
+        "role": "REVIEWER",
+        "role_label": "Quality Reviewer",
+        "task_type": "SERVICE_ONLY_REVIEW",
+        "task_type_label": "QA review of a service-only call"
+      },
+      {
+        "count": 2,
+        "role": "TRIAGE_LEAD",
+        "role_label": "PMS / Signal Triage Lead",
+        "task_type": "FIRST_CONTACT_FOLLOW_UP",
+        "task_type_label": "First-contact follow-up"
+      },
+      {
+        "count": 2,
+        "role": "TRIAGE_LEAD",
+        "role_label": "PMS / Signal Triage Lead",
+        "task_type": "QMS_COMPLAINT",
+        "task_type_label": "Create or link the QMS complaint"
+      },
+      {
+        "count": 1,
+        "role": "TRIAGE_LEAD",
+        "role_label": "PMS / Signal Triage Lead",
+        "task_type": "SIGNAL_TRIAGE",
+        "task_type_label": "Signal triage"
+      }
+    ],
+    "roles": [
+      {
+        "code": "LEADER",
+        "label": "Leader (Quality Manager)"
+      }
+    ]
+  },
+  "/api/v1/tasks?view=assigned&page=1&page_size=50": {
+    "items": [
+      {
+        "accepted_at": null,
+        "actions": {
+          "can_accept": true,
+          "can_claim": false,
+          "can_complete": false,
+          "can_decline": true,
+          "can_reassign": true,
+          "can_release": false
+        },
+        "assigned_role": null,
+        "assigned_role_label": null,
+        "assigned_user": {
+          "id": "8b6611c2-acdd-4180-b748-4d0a002952ad",
+          "name": "Asha Quality"
+        },
+        "business_id": "TASK000007",
+        "completed_at": null,
+        "completion_outcome": null,
+        "created_at": "2026-11-02T01:47:56.505045+00:00",
+        "details": {
+          "complaint_id": "888ef48a-08d0-4b62-acc5-53417693cf3c"
+        },
+        "due_at": "2026-10-30T18:29:59+00:00",
+        "id": "2e322205-c2da-418d-a6d8-0d31225c3f60",
+        "investigation": null,
+        "is_return": false,
+        "overdue": true,
+        "priority": "MEDIUM",
+        "source": {
+          "business_id": null,
+          "id": "7acec452-a15d-42e3-a0f5-8cdbac11a795",
+          "label": "Communication",
+          "type": "CommunicationEntry"
+        },
+        "status": "ASSIGNED",
+        "task_type": "EXTERNAL_REPLY_DUE",
+        "task_type_label": "Reply due from an external contact",
+        "title": "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional) on CMP000036: Ask the reporter: the patient's outcome after the free flow (four US questions on harm are Unknown in the US assessment)",
+        "updated_at": "2026-11-02T01:47:56.505045+00:00"
+      }
+    ],
+    "page": 1,
+    "page_size": 50,
+    "total": 1,
+    "view": "assigned"
+  },
+  "/api/v1/triage/rules": [
+    {
+      "defaults": {
+        "min_complaints": 3,
+        "window_days": 30
+      },
+      "description": "Raises a signal when at least the set number of complaints about the same problem on the same product version occur within the window, and adds later complaints to the open signal.",
+      "enabled": true,
+      "label": "Complaint threshold",
+      "last_run_at": "2026-11-02T01:47:58.198663+00:00",
+      "min_complaints": 3,
+      "rule_code": "COMPLAINT_THRESHOLD",
+      "updated_at": "2026-11-02T01:47:57.138535+00:00",
+      "updated_by_name": null,
+      "version": 1,
+      "window_days": 30
+    }
+  ],
+  "/api/v1/triage/signals?status=NEW%2CTRIAGE%2CMONITOR%2CINVESTIGATION_REQUIRED%2CESCALATED%2CINVESTIGATION_OPEN&sort=priority&page=1&page_size=50": {
+    "counts_by_status": {
+      "CLOSED": 0,
+      "DECISION_RECORDED": 0,
+      "DUPLICATE": 0,
+      "ESCALATED": 0,
+      "INVESTIGATION_OPEN": 0,
+      "INVESTIGATION_REQUIRED": 0,
+      "MERGED": 0,
+      "MONITOR": 0,
+      "NEW": 1,
+      "NO_ACTION": 0,
+      "TRIAGE": 0
+    },
+    "detection_pending": false,
+    "items": [
+      {
+        "age_days": 0,
+        "business_id": "SIG000001",
+        "canonical": null,
+        "complaint_count": 6,
+        "confirmed_priority": null,
+        "created_at": "2026-11-02T01:47:57.083508+00:00",
+        "due_at": "2026-11-07T01:47:57.083508+00:00",
+        "first_event_at": "2026-10-07T01:47:53.245561+00:00",
+        "highest_severity": null,
+        "id": "26952ae8-91a4-43f4-bb29-664547ff29cc",
+        "investigations": [],
+        "last_event_at": "2026-10-28T19:47:53.245561+00:00",
+        "origin": "THRESHOLD_RULE",
+        "origin_label": "Complaint threshold rule",
+        "overdue": false,
+        "owner": null,
+        "priority": "MEDIUM",
+        "problem_key": "PRESSURE_ALARM",
+        "product": {
+          "business_id": "PROD000001",
+          "id": "59953271-58d2-4cb2-a74f-5387c9dd4de2",
+          "name": "OrbitCare 300 Infusion Pump (Sample)"
+        },
+        "product_version": {
+          "business_id": "PV000002",
+          "id": "75f64051-2980-4099-adef-646f900b8278",
+          "version_identifier": "Rev B"
+        },
+        "recent_complaints_7d": 1,
+        "rule_code": "COMPLAINT_THRESHOLD",
+        "serious_harm": false,
+        "status": "NEW",
+        "status_label": "New",
+        "suggested_priority": "MEDIUM",
+        "title": "6 complaints: pressure alarm on OrbitCare 300 Infusion Pump (Sample) Rev B in 30 days",
+        "updated_at": "2026-11-02T01:47:57.083508+00:00"
+      }
+    ],
+    "page": 1,
+    "page_size": 50,
+    "sources": ["MDARIX_SAMPLE", "TRIAL_UPLOAD"],
+    "total": 1
+  },
+  "/api/v1/triage?show=open": {
+    "enabled_markets": ["US", "EU_NI", "IN"],
+    "harm_words_version": "harm-words-starter-1",
+    "items": [
+      {
+        "available_at": "2026-11-02T01:47:57.764887+00:00",
+        "awareness": {
+          "at": "2026-08-14T12:00:00+00:00",
+          "label": "Awareness unresolved: deadline provisional",
+          "linked_ref": null,
+          "source": "RECEIVED",
+          "source_label": "receipt",
+          "unresolved": true
+        },
+        "classification": null,
+        "conflict": [],
+        "deadlines": [
+          {
+            "basis": "15 days (India MDR 2017 Rule 26)",
+            "conservative": true,
+            "day_basis": "CALENDAR",
+            "days": 15,
+            "days_left": -66,
+            "due_at": "2026-08-28T18:29:59+00:00",
+            "due_date": "2026-08-28",
+            "due_label": "Fri 28 Aug 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "label": "India (CDSCO)",
+            "market": "IN",
+            "not_reportable": false,
+            "own": true,
+            "role": "OWN",
+            "role_label": "The event's market",
+            "state": "OVERDUE",
+            "tier": "FLAGGED",
+            "tier_label": "Flagged"
+          },
+          {
+            "basis": "10 days (EU MDR Art. 87(5))",
+            "conservative": true,
+            "day_basis": "CALENDAR",
+            "days": 10,
+            "days_left": -70,
+            "due_at": "2026-08-24T18:29:59+00:00",
+            "due_date": "2026-08-24",
+            "due_label": "Mon 24 Aug 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "label": "EU and Northern Ireland (EU MDR)",
+            "market": "EU_NI",
+            "not_reportable": false,
+            "own": false,
+            "role": "IF_ALSO",
+            "role_label": "If also reportable",
+            "state": "OVERDUE",
+            "tier": "FLAGGED",
+            "tier_label": "Flagged"
+          },
+          {
+            "basis": "30 calendar days (21 CFR 803.50)",
+            "conservative": true,
+            "day_basis": "CALENDAR",
+            "days": 30,
+            "days_left": -50,
+            "due_at": "2026-09-13T18:29:59+00:00",
+            "due_date": "2026-09-13",
+            "due_label": "Sun 13 Sep 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "label": "United States (FDA)",
+            "market": "US",
+            "not_reportable": false,
+            "own": false,
+            "role": "IF_ALSO",
+            "role_label": "If also reportable",
+            "state": "OVERDUE",
+            "tier": "FLAGGED",
+            "tier_label": "Flagged"
+          }
+        ],
+        "delay": {
+          "hours": 1909.8,
+          "text": "79 days"
+        },
+        "earliest_due": "2026-08-28T18:29:59+00:00",
+        "flags": [
+          {
+            "code": "MALFUNCTION",
+            "label": "Malfunction: it could cause a death or serious injury if it recurred"
+          }
+        ],
+        "id": "32048a33-8b18-47f6-9f49-729dc640ab46",
+        "identifier": "MSD/CC/26/001",
+        "import_ref": null,
+        "intake_kind": null,
+        "key": "COMPLAINT:32048a33-8b18-47f6-9f49-729dc640ab46",
+        "kind": "COMPLAINT",
+        "linked": [],
+        "lot": "B2607-11",
+        "members": ["COMPLAINT:32048a33-8b18-47f6-9f49-729dc640ab46"],
+        "own_market": "IN",
+        "problems": null,
+        "product_name": "Pulse Oximeter PX-20 (Sample)",
+        "record": null,
+        "ref": "MSD/CC/26/001",
+        "sample": false,
+        "source": "Imported complaint",
+        "suggestion": null,
+        "tier": "FLAGGED",
+        "tier_label": "Flagged",
+        "triage_clock": {
+          "due_at": "2026-11-03T01:47:57.764887+00:00",
+          "from": "2026-11-02T01:47:57.764887+00:00",
+          "hours_left": 22.6,
+          "state": "RUNNING",
+          "target_hours": 24
+        },
+        "words": "SpO2 reading 5 points higher than the ward monitor during a routine check."
+      },
+      {
+        "available_at": "2026-11-02T01:47:57.764887+00:00",
+        "awareness": {
+          "at": "2026-09-03T12:00:00+00:00",
+          "label": "Awareness unresolved: deadline provisional",
+          "linked_ref": null,
+          "source": "RECEIVED",
+          "source_label": "receipt",
+          "unresolved": true
+        },
+        "classification": null,
+        "conflict": [],
+        "deadlines": [
+          {
+            "basis": "15 days (India MDR 2017 Rule 26)",
+            "conservative": true,
+            "day_basis": "CALENDAR",
+            "days": 15,
+            "days_left": -46,
+            "due_at": "2026-09-17T18:29:59+00:00",
+            "due_date": "2026-09-17",
+            "due_label": "Thu 17 Sep 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "label": "India (CDSCO)",
+            "market": "IN",
+            "not_reportable": false,
+            "own": true,
+            "role": "OWN",
+            "role_label": "The event's market",
+            "state": "OVERDUE",
+            "tier": "FLAGGED",
+            "tier_label": "Flagged"
+          },
+          {
+            "basis": "10 days (EU MDR Art. 87(5))",
+            "conservative": true,
+            "day_basis": "CALENDAR",
+            "days": 10,
+            "days_left": -50,
+            "due_at": "2026-09-13T18:29:59+00:00",
+            "due_date": "2026-09-13",
+            "due_label": "Sun 13 Sep 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "label": "EU and Northern Ireland (EU MDR)",
+            "market": "EU_NI",
+            "not_reportable": false,
+            "own": false,
+            "role": "IF_ALSO",
+            "role_label": "If also reportable",
+            "state": "OVERDUE",
+            "tier": "FLAGGED",
+            "tier_label": "Flagged"
+          },
+          {
+            "basis": "30 calendar days (21 CFR 803.50)",
+            "conservative": true,
+            "day_basis": "CALENDAR",
+            "days": 30,
+            "days_left": -30,
+            "due_at": "2026-10-03T18:29:59+00:00",
+            "due_date": "2026-10-03",
+            "due_label": "Sat 3 Oct 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "label": "United States (FDA)",
+            "market": "US",
+            "not_reportable": false,
+            "own": false,
+            "role": "IF_ALSO",
+            "role_label": "If also reportable",
+            "state": "OVERDUE",
+            "tier": "FLAGGED",
+            "tier_label": "Flagged"
+          }
+        ],
+        "delay": {
+          "hours": 1429.8,
+          "text": "59 days"
+        },
+        "earliest_due": "2026-09-17T18:29:59+00:00",
+        "flags": [
+          {
+            "code": "SERIOUS_INJURY",
+            "label": "Serious injury recorded"
+          },
+          {
+            "code": "MALFUNCTION",
+            "label": "Malfunction: it could cause a death or serious injury if it recurred"
+          }
+        ],
+        "id": "63de9124-7eba-4d09-86a3-1d91fbe71e97",
+        "identifier": "MSD/CC/26/002",
+        "import_ref": null,
+        "intake_kind": null,
+        "key": "COMPLAINT:63de9124-7eba-4d09-86a3-1d91fbe71e97",
+        "kind": "COMPLAINT",
+        "linked": [],
+        "lot": "K2606-03",
+        "members": ["COMPLAINT:63de9124-7eba-4d09-86a3-1d91fbe71e97"],
+        "own_market": "IN",
+        "problems": null,
+        "product_name": "Infusion Set Kit IK-5 (Sample)",
+        "record": null,
+        "ref": "MSD/CC/26/002",
+        "sample": false,
+        "source": "Imported complaint",
+        "suggestion": null,
+        "tier": "FLAGGED",
+        "tier_label": "Flagged",
+        "triage_clock": {
+          "due_at": "2026-11-03T01:47:57.764887+00:00",
+          "from": "2026-11-02T01:47:57.764887+00:00",
+          "hours_left": 22.6,
+          "state": "RUNNING",
+          "target_hours": 24
+        },
+        "words": "Leak at the luer connector of the kit; the extension line came from a second lot."
+      },
+      {
+        "available_at": "2026-11-01T22:47:53.245561+00:00",
+        "awareness": {
+          "at": "2026-11-01T01:47:53.245561+00:00",
+          "label": null,
+          "linked_ref": null,
+          "source": "AWARENESS",
+          "source_label": "awareness recorded",
+          "unresolved": false
+        },
+        "classification": null,
+        "conflict": [],
+        "deadlines": [
+          {
+            "basis": "30 calendar days (21 CFR 803.50)",
+            "conservative": true,
+            "day_basis": "CALENDAR",
+            "days": 30,
+            "days_left": 28,
+            "due_at": "2026-11-30T18:29:59+00:00",
+            "due_date": "2026-11-30",
+            "due_label": "Mon 30 Nov 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "label": "United States (FDA)",
+            "market": "US",
+            "not_reportable": false,
+            "own": true,
+            "role": "OWN",
+            "role_label": "The event's market",
+            "state": "RUNNING",
+            "tier": "FLAGGED",
+            "tier_label": "Flagged"
+          },
+          {
+            "basis": "10 days (EU MDR Art. 87(5))",
+            "conservative": true,
+            "day_basis": "CALENDAR",
+            "days": 10,
+            "days_left": 9,
+            "due_at": "2026-11-11T18:29:59+00:00",
+            "due_date": "2026-11-11",
+            "due_label": "Wed 11 Nov 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "label": "EU and Northern Ireland (EU MDR)",
+            "market": "EU_NI",
+            "not_reportable": false,
+            "own": false,
+            "role": "IF_ALSO",
+            "role_label": "If also reportable",
+            "state": "RUNNING",
+            "tier": "FLAGGED",
+            "tier_label": "Flagged"
+          },
+          {
+            "basis": "15 days (India MDR 2017 Rule 26)",
+            "conservative": true,
+            "day_basis": "CALENDAR",
+            "days": 15,
+            "days_left": 13,
+            "due_at": "2026-11-15T18:29:59+00:00",
+            "due_date": "2026-11-15",
+            "due_label": "Sun 15 Nov 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "label": "India (CDSCO)",
+            "market": "IN",
+            "not_reportable": false,
+            "own": false,
+            "role": "IF_ALSO",
+            "role_label": "If also reportable",
+            "state": "RUNNING",
+            "tier": "FLAGGED",
+            "tier_label": "Flagged"
+          }
+        ],
+        "delay": {
+          "hours": 21,
+          "text": "21 hours"
+        },
+        "earliest_due": "2026-11-30T18:29:59+00:00",
+        "flags": [
+          {
+            "code": "MALFUNCTION",
+            "label": "Malfunction: it could cause a death or serious injury if it recurred"
+          }
+        ],
+        "id": "de3bae67-0ed9-4e89-99a1-4c20d09f9c3d",
+        "identifier": "SAMPLE-RV-11",
+        "import_ref": null,
+        "intake_kind": null,
+        "key": "COMPLAINT:de3bae67-0ed9-4e89-99a1-4c20d09f9c3d",
+        "kind": "COMPLAINT",
+        "linked": [],
+        "lot": "SAMPLE-PULSE-410-LOT-002",
+        "members": ["COMPLAINT:de3bae67-0ed9-4e89-99a1-4c20d09f9c3d"],
+        "own_market": "US",
+        "problems": null,
+        "product_name": "PulseWatch 410 Patient Monitor (Sample)",
+        "record": null,
+        "ref": "SAMPLE-RV-11",
+        "sample": true,
+        "source": "Imported complaint",
+        "suggestion": null,
+        "tier": "FLAGGED",
+        "tier_label": "Flagged",
+        "triage_clock": {
+          "due_at": "2026-11-02T22:47:53.245561+00:00",
+          "from": "2026-11-01T22:47:53.245561+00:00",
+          "hours_left": 19.6,
+          "state": "RUNNING",
+          "target_hours": 24
+        },
+        "words": "Biomedical engineering checked a monitor against a reference oximeter: its SpO2 read 4 to 6 points high on two patients. No harm was reported. The monitor is out of use and sent for service."
+      },
+      {
+        "available_at": "2026-11-01T23:47:53.245561+00:00",
+        "awareness": {
+          "at": "2026-10-31T19:47:53.245561+00:00",
+          "label": "Awareness unresolved: deadline provisional",
+          "linked_ref": null,
+          "source": "FIRST_KNOWLEDGE",
+          "source_label": "first knowledge",
+          "unresolved": true
+        },
+        "classification": null,
+        "conflict": [],
+        "deadlines": [
+          {
+            "basis": "30 calendar days (21 CFR 803.50)",
+            "conservative": true,
+            "day_basis": "CALENDAR",
+            "days": 30,
+            "days_left": 28,
+            "due_at": "2026-11-30T18:29:59+00:00",
+            "due_date": "2026-11-30",
+            "due_label": "Mon 30 Nov 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "label": "United States (FDA)",
+            "market": "US",
+            "not_reportable": false,
+            "own": true,
+            "role": "OWN",
+            "role_label": "The event's market",
+            "state": "RUNNING",
+            "tier": "FLAGGED",
+            "tier_label": "Flagged"
+          },
+          {
+            "basis": "10 days (EU MDR Art. 87(5))",
+            "conservative": true,
+            "day_basis": "CALENDAR",
+            "days": 10,
+            "days_left": 8,
+            "due_at": "2026-11-10T18:29:59+00:00",
+            "due_date": "2026-11-10",
+            "due_label": "Tue 10 Nov 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "label": "EU and Northern Ireland (EU MDR)",
+            "market": "EU_NI",
+            "not_reportable": false,
+            "own": false,
+            "role": "IF_ALSO",
+            "role_label": "If also reportable",
+            "state": "RUNNING",
+            "tier": "FLAGGED",
+            "tier_label": "Flagged"
+          },
+          {
+            "basis": "15 days (India MDR 2017 Rule 26)",
+            "conservative": true,
+            "day_basis": "CALENDAR",
+            "days": 15,
+            "days_left": 13,
+            "due_at": "2026-11-15T18:29:59+00:00",
+            "due_date": "2026-11-15",
+            "due_label": "Sun 15 Nov 2026, 23:59 IST",
+            "due_zone": "Asia/Kolkata",
+            "label": "India (CDSCO)",
+            "market": "IN",
+            "not_reportable": false,
+            "own": false,
+            "role": "IF_ALSO",
+            "role_label": "If also reportable",
+            "state": "RUNNING",
+            "tier": "FLAGGED",
+            "tier_label": "Flagged"
+          }
+        ],
+        "delay": {
+          "hours": 28,
+          "text": "1 day"
+        },
+        "earliest_due": "2026-11-30T18:29:59+00:00",
+        "flags": [
+          {
+            "code": "URGENT_INTAKE",
+            "label": "Urgent intake: a complaint by definition, triaged at once"
+          },
+          {
+            "code": "HARM_WORDS",
+            "label": "Mentions ICU, pt",
+            "words": ["ICU", "pt"]
+          }
+        ],
+        "id": "0fe3d100-9532-46a7-8d49-5af79d7b2bc5",
+        "identifier": null,
+        "import_ref": null,
+        "intake_kind": "URGENT",
+        "key": "INTAKE:0fe3d100-9532-46a7-8d49-5af79d7b2bc5",
+        "kind": "INTAKE",
+        "linked": [],
+        "lot": "SAMPLE-ORBIT-300-LOT-003",
+        "members": ["INTAKE:0fe3d100-9532-46a7-8d49-5af79d7b2bc5"],
+        "own_market": "US",
+        "problems": null,
+        "product_name": "OrbitCare 300 Infusion Pump (Sample)",
+        "record": null,
+        "ref": "SAMPLE-URG-01",
+        "sample": true,
+        "source": "Urgent intake",
+        "suggestion": null,
+        "tier": "FLAGGED",
+        "tier_label": "Flagged",
+        "triage_clock": {
+          "due_at": "2026-11-02T23:47:53.245561+00:00",
+          "from": "2026-11-01T23:47:53.245561+00:00",
+          "hours_left": 20.6,
+          "state": "RUNNING",
+          "target_hours": 24
+        },
+        "words": "Distributor service engineer on site: the OrbitCare 300 free-flowed during set-up after the door was opened. The pt was moved to ICU for monitoring. Pump taken out of use and kept for return."
+      }
+    ],
+    "now": "2026-11-02T03:10:51.389945+00:00",
+    "people": [
+      {
+        "id": "8b6611c2-acdd-4180-b748-4d0a002952ad",
+        "name": "Asha Quality"
+      }
+    ],
+    "provisional_version": "provisional-starter-1",
+    "starter_mark": "Starter text — awaiting regulatory confirmation: check it against your own procedure.",
+    "summary": {
+      "conflicts": 0,
+      "done": 10,
+      "open": 4
+    }
+  }
+}
