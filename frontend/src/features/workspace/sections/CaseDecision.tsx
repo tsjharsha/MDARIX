@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { DecideAndSign } from "./common";
+import { DecideAndSign, shortPrint } from "./common";
 import { ClipboardCheck, FileSignature, Gavel, Undo2 } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
@@ -992,11 +992,13 @@ function SignDrawer({
           <strong>What your signature means: </strong>
           {meaning}
         </p>
-        <p className="ac-muted">
-          Your signature records who you are, the time, this meaning and a fingerprint of the brief version you
-          reviewed, so any later change is detected.
-        </p>
-        <DecideAndSign />
+        <DecideAndSign
+          signs={`The decision "${outcome}" on this investigation.`}
+          restsOn={[
+            `${briefLabel}, fingerprint ${shortPrint(context.briefContentHash)}: its evidence, unknowns and reviews as approved.`,
+            "Your signature records who you are, the time and this meaning, so any later change is detected.",
+          ]}
+        />
         <label className="ca-field">
           Your password
           <input

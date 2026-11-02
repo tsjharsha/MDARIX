@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { DeadlineChip } from "../../../app/chips";
-import { DecideAndSign } from "./common";
+import { DecideAndSign, shortPrint } from "./common";
 import { marketLabel } from "../../../app/labels";
 import { CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
@@ -546,7 +546,14 @@ export function ReadyForm({ view, onChanged }: { view: EventView; onChanged: (vi
             </label>
           )}
           <div className="ca-form-grid">
-            <DecideAndSign />
+            <DecideAndSign
+              signs={`${view.event.ref} is ready to close in your QMS${view.blocked ? `, with ${view.blocked} ${view.blocked === 1 ? "item" : "items"} open` : ""}.`}
+              restsOn={[
+                `The checklist as it stands: ${view.checklist.filter((item) => item.result === "PASS").length} done, ${view.blocked} open.`,
+                (view.work?.markets ?? []).length ? `Markets: ${(view.work?.markets ?? []).join(", ")}.` : null,
+                `Decision record version ${view.decision_record.version}, fingerprint ${shortPrint(view.decision_record.sha256)}.`,
+              ]}
+            />
             <label className="ca-field">
               Your password
               <input

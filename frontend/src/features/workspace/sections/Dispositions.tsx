@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { WhyAsked } from "../../shared/Basis";
+import { DISPOSITION_WHY } from "../whyAsked";
 import { triggerLabel, versionWords } from "../../../app/labels";
 import { CheckCircle2, FileWarning, GitBranch, Inbox, Link2, ShieldAlert, Timer, Wrench } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
@@ -724,6 +726,7 @@ function QuestionHead({ number, text, state }: { number: number; text: string; s
       <span className="uw-dp-number">{number}</span>
       <strong>{text}</strong>
       <ToneBadge tone={badge.tone} label={badge.label} />
+      <WhyAsked why={DISPOSITION_WHY[number]} />
     </div>
   );
 }

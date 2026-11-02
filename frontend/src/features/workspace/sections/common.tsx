@@ -62,9 +62,39 @@ export function NeedsProduct({ children }: { children: (view: Product360) => Rea
 export const DECIDE_AND_SIGN =
   "You decide and sign. MDARIX prepared this from your records; it never decides or submits.";
 
-export function DecideAndSign() {
-  return <p className="ms-decide">{DECIDE_AND_SIGN}</p>;
+/**
+ * The summary before a signature (stage 8, 8.3): first what is being signed, then what it rests on (the evidence and
+ * its fingerprint, the versions, the markets) in plain words, then the one line that the person decides. Without facts
+ * it is the line alone.
+ */
+export function DecideAndSign({ signs, restsOn = [] }: { signs?: string; restsOn?: Array<string | null | false> }) {
+  const facts = restsOn.filter((fact): fact is string => !!fact);
+  if (!signs && !facts.length) return <p className="ms-decide">{DECIDE_AND_SIGN}</p>;
+  return (
+    <section className="uw-sign-summary ca-wide" aria-label="What you sign">
+      {signs && (
+        <p>
+          <strong>You sign: </strong>
+          {signs}
+        </p>
+      )}
+      {facts.length > 0 && (
+        <>
+          <p className="uw-sign-rests">It rests on:</p>
+          <ul>
+            {facts.map((fact) => (
+              <li key={fact}>{fact}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="ms-decide">{DECIDE_AND_SIGN}</p>
+    </section>
+  );
 }
+
+/** A fingerprint as people can compare it: its first twelve characters. */
+export const shortPrint = (hash: unknown) => (typeof hash === "string" && hash ? hash.slice(0, 12) : null);
 
 /** A record's other ID, in its details only: the screen shows one (the customer's own reference, J18). */
 export function AlsoKnownAs({ id, shown }: { id?: string | null; shown?: string | null }) {

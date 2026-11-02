@@ -14,6 +14,8 @@ import { reportsTab } from "../authorityReports";
 import { DecisionRecord, OwnerPicker, ReadyForm } from "./Oversight";
 import { ProblemCode, useImdrfLinks } from "./ProblemCode";
 import { InlineError } from "./boardParts";
+import { WhyAsked } from "../../shared/Basis";
+import { COMPLAINT_STEP_WHY } from "../whyAsked";
 
 export const COMPLAINT_SECTIONS = NEW_PLACES.Complaint.tabs;
 type ComplaintSection = (typeof COMPLAINT_SECTIONS)[number];
@@ -263,6 +265,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
               <OwnerPicker view={view} onChanged={changed} />
             </Panel>
             <Panel eyebrow="Decisions & actions" title="Ready to close">
+              <WhyAsked why={COMPLAINT_STEP_WHY.READY} />
               <WhoSigns view={view} code="READY" />
               <ReadyForm view={view} onChanged={changed} />
               {view.changed_since_signed && (
@@ -307,6 +310,7 @@ function CheckRow({
       <ToneBadge tone={CHECK_TONES[item.result]} label={item.result_label} />
       <span>
         <strong>{item.label}.</strong> {item.detail}
+        {open && <WhyAsked why={COMPLAINT_STEP_WHY[item.code]} />}
         {open && <WhoSigns view={view} code={item.code} />}
       </span>
       <span className="uw-cp-step-actions">

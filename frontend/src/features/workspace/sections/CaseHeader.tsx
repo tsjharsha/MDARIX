@@ -30,6 +30,8 @@ import {
 } from "../caseWorkflow";
 import { priorityTone } from "../tasks";
 import { StatusBadge } from "./common";
+import { WhyAsked } from "../../shared/Basis";
+import { CASE_STEP_WHY } from "../whyAsked";
 
 /** A case's state: its workflow state's label when the server sends one, else its plain status as before. */
 export function CaseStateBadge({ row }: { row: CaseWorkflowFields | null | undefined }) {
@@ -199,6 +201,7 @@ export function CaseHeader({
                   <span>
                     <strong>{step.label}</strong>
                     {step.detail && <small>{step.detail}</small>}
+                    <WhyAsked why={CASE_STEP_WHY[step.key]} />
                   </span>
                 </li>
               ))}
@@ -356,9 +359,12 @@ export function CaseProgressLine({
         ))}
       </ol>
       {next ? (
-        <button type="button" className="ac-primary" onClick={() => onSection(next.section, next.part)}>
-          Next: {next.label} <ChevronRight size={15} aria-hidden="true" />
-        </button>
+        <div>
+          <button type="button" className="ac-primary" onClick={() => onSection(next.section, next.part)}>
+            Next: {next.label} <ChevronRight size={15} aria-hidden="true" />
+          </button>
+          <WhyAsked why={CASE_STEP_WHY[next.key]} />
+        </div>
       ) : (
         <p className="ac-muted">Every step is done: the decision is signed. Its record is in History.</p>
       )}

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { WhyAsked } from "../../shared/Basis";
+import { TRIAGE_WHY } from "../whyAsked";
 import { CheckCircle2, Clock, FileWarning, Flag, Link2, Siren } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
@@ -425,6 +427,7 @@ function TriageDrawer({
             <div className="ca-form-grid">
               <label className="ca-field">
                 Severity (harm-severity scale)
+                <WhyAsked why={TRIAGE_WHY.severity} />
                 <select value={form.severity} onChange={(event) => set({ severity: event.target.value })}>
                   <option value="">Choose…</option>
                   {(guide.data?.levels ?? []).map((level) => (
@@ -454,6 +457,7 @@ function TriageDrawer({
                 onChange={(v) => set({ backup: v })}
               />
             </div>
+            <WhyAsked why={TRIAGE_WHY.owners} />
             <label className="ca-check">
               <input
                 type="checkbox"
@@ -472,6 +476,7 @@ function TriageDrawer({
             </label>
             <label className="ca-field">
               Immediate action
+              <WhyAsked why={TRIAGE_WHY.action} />
               <textarea value={form.action} onChange={(event) => set({ action: event.target.value })} rows={2} />
             </label>
             <label className="ca-field">
@@ -481,6 +486,7 @@ function TriageDrawer({
             <div className="ca-form-grid">
               <label className="ca-field">
                 Awareness time {needsAwareness ? "(confirm it)" : ""}
+                <WhyAsked why={TRIAGE_WHY.awareness} />
                 <input
                   type="datetime-local"
                   value={form.aware}

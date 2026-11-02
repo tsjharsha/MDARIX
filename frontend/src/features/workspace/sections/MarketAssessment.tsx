@@ -1,5 +1,6 @@
 import { useContext, useEffect, useId, useState } from "react";
 import { DecideAndSign } from "./common";
+import { MARKET_QUESTION_WHY } from "../whyAsked";
 import { versionWords } from "../../../app/labels";
 import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
@@ -35,7 +36,7 @@ import {
   type Version,
 } from "../marketAssessment";
 import { InlineError } from "./boardParts";
-import { BasisChips } from "../../shared/Basis";
+import { WhyAsked, BasisChips } from "../../shared/Basis";
 
 /** Whether the signed-in role may save and sign an assessment (regulatory review or approval: the server's rule). */
 function useCanAssess() {
@@ -336,7 +337,19 @@ export function MarketPanel({
             </label>
           )}
           <div className="ca-form-grid">
-            <DecideAndSign />
+            <DecideAndSign
+              signs={`${item.label}: ${sign.conclusion ? CONCLUSION_LABELS[sign.conclusion].toLowerCase() : "your conclusion"} for ${
+                detail.complaint.complaint_identifier ?? detail.complaint.business_id ?? "this complaint"
+              }${sign.conclusion === "REPORTABLE" && item.draft.report_type_label ? `, ${item.draft.report_type_label}` : ""}.`}
+              restsOn={[
+                `Your answers to ${Object.values(item.draft.answers).filter((entry) => entry.answer).length} of ${questions.length} questions, saved as draft version ${item.draft.version}.`,
+                `${item.question_set.title} (${versionWords(item.draft.question_set)}), its clauses locked.`,
+                item.draft.harm_level
+                  ? `Harm level ${item.draft.harm_level.toLowerCase()} on the harm-severity scale.`
+                  : null,
+                item.clock ? `The ${item.label} clock: due ${deadlineLabel(item.clock)}.` : null,
+              ]}
+            />
             <label className="ca-field">
               Your password
               <input
@@ -431,7 +444,7 @@ function QuestionRow({
         <p id={definitionId} className="ac-muted" hidden={!open}>
           {question.definition}
         </p>
-        {question.note && <p className="uw-hint">{question.note}</p>}
+        <WhyAsked why={{ why: question.note || MARKET_QUESTION_WHY, basis: [] }} clause={question.clause} />
         <OwnText question={question} />
         <div className="uw-ma-answers" role="radiogroup" aria-label={`Answer to ${question.id}`}>
           {ANSWERS.map((answer) => (

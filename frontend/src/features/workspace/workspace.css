@@ -5309,3 +5309,40 @@ div.uw-task-count:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Stage 8: "Why am I asked?" under each question and step (shared/Basis.tsx WhyAsked). */
+.uw-why-asked {
+  display: block;
+  margin-top: var(--ms-space-1);
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+}
+.uw-why-asked strong {
+  color: var(--ms-ink);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-why-asked .uw-basis,
+.uw-why-asked .uw-basis-chip {
+  margin-left: var(--ms-space-1);
+}
+.uw-sign-summary {
+  display: grid;
+  gap: var(--ms-space-1);
+  margin: var(--ms-space-2) 0;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-left: 4px solid var(--ms-navy);
+  border-radius: 6px;
+  background: var(--ms-subtle);
+}
+.uw-sign-summary p,
+.uw-sign-summary ul {
+  margin: 0;
+}
+.uw-sign-summary ul {
+  padding-left: var(--ms-space-5);
+}
+.uw-sign-rests {
+  color: var(--ms-ink-2);
+  font-weight: var(--ms-fw-semibold);
+}

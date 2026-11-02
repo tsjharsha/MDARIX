@@ -6,7 +6,7 @@ import { Drawer, errorText, formatDate, send, useResource } from "../../customer
 import { downloadFile } from "../../reports/download";
 import { WorkspaceContext, useCan, useTabParam } from "../workspaceContext";
 import { communicationsTab } from "../communications";
-import { AlsoKnownAs, countOf, DecideAndSign } from "./common";
+import { AlsoKnownAs, countOf, DecideAndSign, shortPrint } from "./common";
 import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
 import {
@@ -390,7 +390,18 @@ function Approval({ detail, onChanged }: { detail: ReportDetail; onChanged: (det
         </p>
       )}
       <div className="ca-form-grid">
-        <DecideAndSign />
+        <DecideAndSign
+          signs={`Approval of snapshot ${snapshot.version} of the ${detail.form.title} for ${detail.complaint.ref}, as frozen.`}
+          restsOn={[
+            `${detail.counts.FROM_RECORD ?? 0} fields filled from your records, ${detail.counts.MUST_HAVE ?? 0} still to enter; fingerprint ${shortPrint(snapshot.content_fingerprint)}.`,
+            detail.assessment
+              ? `The ${detail.market_label} conclusion: ${String(detail.assessment.conclusion ?? "")
+                  .toLowerCase()
+                  .replace("_", " ")}, version ${detail.assessment.version}, signed by ${detail.assessment.signed_by}.`
+              : null,
+            `${detail.form.title}, ${detail.form.version}.`,
+          ]}
+        />
         <label className="ca-field">
           Your password
           <input
