@@ -66,9 +66,10 @@ then `--apply`) once after the upgrade: it rewords two kinds of older sample rec
 - On a phone the section's tabs are one row that scrolls inside itself, the context bar is two columns and the count
   tiles are compact, so Triage's first card shows sooner. Quotes show three lines, not two cut at 34 characters.
 - Form fields on one grid line up; Getting started has one primary button (the next chapter), not ten.
-- No page is wider than a phone: grids shrink to the screen, a fieldset no longer takes its longest line's width
-  (Reporting windows was 780 px wide at 390), a list that is not a card list keeps its own scroll box, and on a phone
-  the M tile stands for the name in the top bar.
+- No page is wider than a phone: panels, forms, fields and drawer sections are one column that shrinks with the
+  screen (an auto column grew to its widest line: Reporting windows was 780 px wide at 390), grids and selects never
+  ask for more room than there is, buttons wrap on a phone, a list that is not a card list keeps its own scroll box,
+  and on a phone the M tile stands for the name in the top bar.
 
 ### Changed: fewer words, said once (V5, V6)
 
