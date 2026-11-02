@@ -386,6 +386,9 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
             "authority": form.authority,
             "source_document": form.source_document,
             "clauses": chips(form.basis),
+            "starter": form.starter,
+            "report_types": list(form.report_types),
+            "report_kind": forms.report_kind(form, obligation.entries or {}),
         },
         "routes": [
             {
@@ -517,6 +520,8 @@ def report_list(
     }
     items = []
     paths = _list_paths(db, control_db, ctx, tenant_id, [row for row in obligations if row.complaint_id in complaints])
+    # The EU, GB and Canada worksheets are the new navigation's (0.10.76); the classic one keeps the US and India.
+    fresh = new_navigation(control_db, tenant_id)
 
     def base(complaint, market):
         return {
@@ -533,7 +538,7 @@ def report_list(
         complaint = complaints.get(row.complaint_id)
         if complaint is None or (row.complaint_id, row.market) in started:
             continue
-        form = forms.BY_MARKET.get(row.market)
+        form = forms.form_for(row.market, fresh)
         state = rules.NOT_STARTED if form else rules.NO_WORKSHEET
         if row.filed_on:
             state = rules.NO_WORKSHEET if not form else rules.NOT_STARTED
@@ -579,7 +584,9 @@ def report_list(
     return {
         "items": items,
         "forms": [
-            {"market": market, "title": form.title, "version": form.version} for market, form in forms.BY_MARKET.items()
+            {"market": market, "title": form.title, "version": form.version, "starter": form.starter}
+            for market, form in forms.BY_MARKET.items()
+            if forms.form_for(market, fresh)
         ],
         "never_submits": rules.NEVER_SUBMITS,
         "starter_mark": STARTER_MARK,
@@ -620,7 +627,7 @@ def _list_paths(db, control_db, ctx, tenant_id, obligations: list[ReportObligati
     except Exception:  # an unknown zone name: count the month in UTC
         zone = timezone.utc
     month = _now().astimezone(zone).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    practice, me = _trial(control_db, tenant_id), str(ctx.user_id)
+    practice = _trial(control_db, tenant_id)
     out = {}
     for row in obligations:
         try:
@@ -634,11 +641,25 @@ def _list_paths(db, control_db, ctx, tenant_id, obligations: list[ReportObligati
         )
         waiting = pending.get(row.id)
         path = rules.stage_view(row.state, len(meter["missing"]), waiting is not None)
+        signer = context["current"].signed_by if context is not None and context["current"] else None
+        mine = (
+            waiting is not None
+            and (
+                standing(
+                    control_db,
+                    ctx,
+                    tenant_id,
+                    set(waiting.preparers or []) | _preparers(row),
+                    (waiting.fields or {}).get("conclusion_signer") or signer,
+                    practice,
+                )["may_approve"]
+            )
+        )
         views = [
             name
             for name, holds in (
                 ("open", row.state not in rules.CLOSED),
-                ("my-approval", waiting is not None and (practice or waiting.requested_by != me)),
+                ("my-approval", mine),
                 ("submitted-month", row.id in latest and latest[row.id] >= month),
             )
             if holds
@@ -721,6 +742,10 @@ def start_report(
         is None
     ):
         raise _error(404, "COMPLAINT_NOT_FOUND", "No such complaint in your organization")
+    if market in forms.BY_MARKET and forms.form_for(market, new_navigation(control_db, tenant_id)) is None:
+        raise _error(
+            409, "NO_WORKSHEET", "This market's worksheet comes later: record the filing on its signed conclusion"
+        )
     try:
         obligation = start(db, tenant_id, payload.complaint_id, market, str(ctx.user_id), _now())
         _audit(db, ctx, "REPORT_WORKSHEET_STARTED", obligation, form=obligation.form_code)
@@ -841,6 +866,8 @@ def set_field(
         raise _error(422, "FIELD_NOT_USED", "This field is not used in this report")
     entries = dict(obligation.entries or {})
     value = None if payload.clear else _text(payload.value, worksheet.VALUE_MAX)
+    if value and field.options and value not in field.options:
+        raise _error(422, "NOT_A_CHOICE", f"Choose one of: {'; '.join(field.options)}", choices=list(field.options))
     if payload.clear:
         entries.pop(field_id, None)
     elif value:
@@ -998,7 +1025,7 @@ def _approval_tasks(db, control_db, ctx, obligation: ReportObligation, snapshot:
             "obligation_id": str(obligation.id),
             "market": obligation.market,
             "category": "OBLIGATION",
-            "opens": links.target("Complaints", "Reports", record=("complaint", obligation.complaint_id)),
+            "opens": links.target("Complaints", "Reports", record=("report", obligation.id)),
         },
     )
 

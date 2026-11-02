@@ -38,7 +38,7 @@ router = APIRouter(prefix="/api/v1/decision-trees", tags=["Decision trees"])
 COMPLAINTS_MAX = 200
 NEVER_DECIDES = (
     "Each tree points to a conclusion from the answers; a person confirms or overrides it with a reason, and signs. A "
-    "reportable conclusion of the US or India creates its report."
+    "reportable conclusion creates the market's report."
 )
 
 
@@ -68,6 +68,12 @@ def _tree(market: str, row: DecisionGuideVersion | None, names: dict) -> dict:
             {"id": item["id"], "text": item["text"], "clause": item["clause"], "extra": item["extra"]}
             for item in view["question_set"]["questions"]
         ],
+        # The report a reportable outcome creates (0.10.76: EU / NI, Great Britain and Canada join, as starters).
+        "form": (
+            {"title": forms.BY_MARKET[market].title, "starter": forms.BY_MARKET[market].starter}
+            if market in forms.BY_MARKET
+            else None
+        ),
     }
 
 
@@ -167,7 +173,8 @@ def decision_trees(
             )
         )
     walked.sort(key=lambda item: item[:2])
-    shown = [market for market in markets.MARKETS if market in enabled or market in published]
+    # Every market's tree (0.10.76): one not in the organization's reporting windows says so ("enabled").
+    shown = list(markets.MARKETS)
     names = people(control_db, tenant_id, [row.approved_by for row in published.values() if row.approved_by])
     out = {
         "markets": [{**_tree(market, published.get(market), names), "enabled": market in enabled} for market in shown],

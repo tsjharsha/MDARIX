@@ -146,7 +146,8 @@ def load(db: Session, control_db: Session, tenant_id: uuid.UUID, complaint_id: u
         )
         .first()
     )
-    registry_market = "IN" if market == markets.IN else market
+    # The registry names the EU market "EU" (regulatory_reference.MARKETS); every other market by its own code.
+    registry_market = {markets.EU_NI: "EU"}.get(market, market)
     registrations = (
         db.query(ProductRegistration)
         .filter(
@@ -423,6 +424,79 @@ def _single_use(context):
     return _product(context, None if flag is None else ("Yes" if flag else "No"), "The product's single-use field")
 
 
+def _party_name(context, roles: tuple[str, ...], label: str):
+    found = _party(context, roles, label)
+    party = next((item for item in context["parties"] if item.role in roles), None)
+    return (party.organisation, found[1]) if found and party and party.organisation else None
+
+
+def _signed(context):
+    row = context["current"]
+    return row if row is not None and row.conclusion == markets.REPORTABLE else None
+
+
+def _mir_classification(context):
+    """EU and GB 1.2g from the signed conclusion's report type: 2 days a public health threat; 10 days a death
+    (question 2) or else an unanticipated serious deterioration; 15 days all other reportable incidents."""
+    row = _signed(context)
+    kind = (row.report_type or "") if row else ""
+    if kind.endswith("_2_DAY"):
+        value = "Serious public health threat"
+    elif kind.endswith("_10_DAY"):
+        died = _answer(context, f"{kind.split('_')[0]}2") == markets.YES
+        value = "Death" if died else "Unanticipated serious deterioration in state of health"
+    elif kind.endswith("_15_DAY"):
+        value = "All other reportable incidents"
+    else:
+        return None
+    return value, _assessment(context, "The signed conclusion's report type")
+
+
+def _conclusion_date(context):
+    row = _signed(context)
+    if row is None or row.signed_at is None:
+        return None
+    return row.signed_at.date().isoformat(), _assessment(context, "The day the reportable conclusion was signed")
+
+
+def _ca_classification(context):
+    """Canada B1 from the signed conclusion's report type."""
+    row = _signed(context)
+    kind = {"CA_10_DAY": "10-Day; Canadian", "CA_30_DAY": "30-Day; Canadian", "CA_FOREIGN": "Foreign"}.get(
+        (row.report_type or "") if row else ""
+    )
+    return (kind, _assessment(context, "The signed Canada conclusion's report type")) if kind else None
+
+
+def _consequences(context):
+    """Canada B4 from the complaint's harm fields: what the record states, never more."""
+    complaint = context["complaint"]
+    if complaint.death:
+        value = "Death"
+    elif complaint.serious_injury:
+        value = "Serious injury"
+    elif complaint.death is False and complaint.serious_injury is False:
+        value = "No death or serious injury reported"
+    else:
+        return None
+    return value, _complaint(context, "The complaint's harm fields")
+
+
+def _lot_serial(context):
+    parts = [found[0] for found in (_lots(context), SOURCES["serial"](context)) if found]
+    return ("; ".join(parts), _complaint(context, "The complaint's lot and serial number")) if parts else None
+
+
+def _user_type(table: dict):
+    return lambda c: _classification(c, table, "user_type", "The confirmed classification's user type")
+
+
+def _returned(value: str):
+    return lambda c: (
+        (value, _complaint(c, "The complaint's device-returned field")) if c["complaint"].device_returned else None
+    )
+
+
 def _immediate_action(context):
     triage = context["triage"]
     text = triage.immediate_action if triage else None
@@ -518,6 +592,48 @@ SOURCES = {
     "investigation_needed": lambda c: ("Yes", _case(c)[1]) if c["case"] else None,
     "immediate_action": _immediate_action,
     "request": lambda c: None,  # a response obligation's request is set by build()
+    # 0.10.76 (C4): the EU, GB and Canada forms.
+    "conclusion_date": _conclusion_date,
+    "mir_classification": _mir_classification,
+    "ca_classification": _ca_classification,
+    "consequences": _consequences,
+    "lot_serial": _lot_serial,
+    "manufacturer_name": lambda c: _party_name(c, ("MANUFACTURER",), "The market's responsible party (manufacturer)"),
+    "manufacturer": lambda c: _party(c, ("MANUFACTURER",), "The market's responsible party (manufacturer)"),
+    "importer": lambda c: _party(c, ("IMPORTER",), "The market's importer"),
+    "contact_office": lambda c: _party(c, ("MANUFACTURER", "IMPORTER"), "The market's responsible party"),
+    "authorised_rep": lambda c: _party(c, ("AUTHORISED_REPRESENTATIVE",), "The EU authorised representative"),
+    "uk_responsible_person": lambda c: _party(
+        c, ("UK_RESPONSIBLE_PERSON", "AUTHORISED_REPRESENTATIVE"), "The UK Responsible Person"
+    ),
+    "eu_certificate": lambda c: _registration(c, ("CE",), "registration_number", "The EU registration (CE)"),
+    "gb_certificate": lambda c: _registration(c, ("UKCA",), "registration_number", "The GB registration (UKCA)"),
+    "ca_licence": lambda c: _registration(c, ("MDL",), "registration_number", "The Health Canada device licence"),
+    "gb_nca": lambda c: (
+        "Medicines and Healthcare products Regulatory Agency (MHRA)",
+        _source("Form", None, "The authority for an incident in Great Britain"),
+    ),
+    "gmdn_system": lambda c: _product(
+        c, "GMDN" if c["product"] and c["product"].gmdn_code else None, "The product's GMDN code"
+    ),
+    "incident_country": lambda c: (
+        (c["record"]["country"], _complaint(c, "The complaint's event country")) if c["record"].get("country") else None
+    ),
+    "mir_location": _returned("Manufacturer"),
+    "ca_available": _returned("Returned to Manufacturer/Importer"),
+    "mir_operator": _user_type(
+        {
+            "HEALTHCARE_PROFESSIONAL": "Healthcare professional",
+            "LAY_USER": "Patient/lay user",
+            "PATIENT": "Patient/lay user",
+        }
+    ),
+    "mir_reporter_role": _user_type(
+        {"HEALTHCARE_PROFESSIONAL": "Healthcare professional", "LAY_USER": "Lay user", "PATIENT": "Patient"}
+    ),
+    "ca_complainant": _user_type(
+        {"HEALTHCARE_PROFESSIONAL": "Health professional", "LAY_USER": "Consumer", "PATIENT": "Consumer"}
+    ),
 }
 
 
@@ -526,11 +642,14 @@ def build(
 ) -> list[dict]:
     """The worksheet's sections, each field with its value, status and source, in the form's order."""
     personal = SAMPLE_PERSONAL.get(context["complaint"].complaint_identifier, {}) if context["sample"] else {}
+    # The report type decides which fields are mandatory (0.10.76: the EU, GB and Canada forms).
+    kind = forms.report_kind(form, entries)
     out = []
     for section in form.sections:
         rows = []
         for item in section.fields:
             entry = entries.get(item.id) or {}
+            missing = forms.missing_class(item, kind)
             found = None
             if item.personal:
                 value = personal.get(item.id)
@@ -539,6 +658,11 @@ def build(
                 # The front page's number, entered once (stage 8: nothing typed twice).
                 front = (entries.get("MFR_REPORT") or {}).get("value")
                 found = (front, _source("Worksheet", None, "This worksheet's front page")) if front else None
+            elif item.source == "report_type":
+                found = (
+                    form.report_types[0],
+                    _source("Worksheet", None, "A new report starts as the form's first type"),
+                )
             elif item.source == "request":
                 found = (
                     (request, _source("Obligation", None, "The authority's request, as recorded")) if request else None
@@ -555,7 +679,7 @@ def build(
                 status = (
                     OUTSIDE
                     if item.personal and not context["sample"]
-                    else (forms.NOT_USED if item.missing == forms.NOT_USED else item.missing)
+                    else (forms.NOT_USED if missing == forms.NOT_USED else missing)
                 )
             rows.append(
                 {
@@ -567,8 +691,9 @@ def build(
                     "status_label": STATUS_LABELS[status],
                     "source": source,
                     "personal": item.personal,
-                    "missing_class": item.missing,
-                    "editable": not item.personal and item.missing != forms.NOT_USED,
+                    "missing_class": missing,
+                    "editable": not item.personal and missing != forms.NOT_USED,
+                    "options": list(item.options) or None,
                     "note": item.note or None,
                     "by": names.get(entry.get("by")) if entry else None,
                     "at": entry.get("at") if entry else None,

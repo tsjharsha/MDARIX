@@ -8,6 +8,11 @@ as the signing would have made it: prepared by the conclusion's signer, from the
 The sample's own reports (SAMPLE-RV-09 in the US, acknowledged; SAMPLE-RV-10 in India, a correction after a bounced
 e-mail) already exist and fit the status path as they are: nothing of theirs changes. A trial on the classic
 navigation is left as it is. The caller commits.
+
+From 0.10.76 (C4) the EU / NI, Great Britain and Canada forms join (forms.BY_MARKET), so the same step creates the
+report of such a conclusion too: the sample's own SAMPLE-RV-07 (EU / NI, signed reportable by the sample author) gets
+its EU MIR worksheet, a sample report prepared by the sample author. A new trial gets it when its sample is staged
+(sample_clock.py).
 """
 
 from __future__ import annotations
@@ -55,7 +60,17 @@ def refresh(db: Session, tenant_id, apply: bool, now: datetime | None = None) ->
         return len(missing)
     now = now or datetime.now(timezone.utc)
     for signed in missing:
-        obligation = start(db, tenant_id, signed.complaint_id, signed.market, signed.signed_by, now, candidate=signed)
+        # The sample's own conclusion (SAMPLE-RV-07's EU, from 0.10.76) gives a sample report.
+        obligation = start(
+            db,
+            tenant_id,
+            signed.complaint_id,
+            signed.market,
+            signed.signed_by,
+            now,
+            source_system=getattr(signed, "source_system", None),
+            candidate=signed,
+        )
         db.add(
             make_audit_event(
                 tenant_id=tenant_id,

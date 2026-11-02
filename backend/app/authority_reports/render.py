@@ -87,6 +87,13 @@ def lines(view: dict) -> list[tuple[str, str]]:
         (f"Field order: {view['form']['source_document']}.", "muted"),
         (f"Clauses: {clauses} (pending approval)" if clauses else "", "muted"),
         (view["starter_mark"], "muted"),
+        # 0.10.76: the EU, GB and Canada forms are starters, and say which report type this one is.
+        (
+            f"Starter form, for your consultant to confirm. Type of report: {view['form'].get('report_kind')}."
+            if view["form"].get("starter")
+            else "",
+            "muted",
+        ),
         (view["never_submits"], "muted"),
     ]
     for section in view["sections"]:

@@ -338,7 +338,8 @@ def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
                 complaint_id=row.complaint_id,
                 owner_id=row.created_by,
                 market=row.market,
-                opens=links.target("Complaints", "Reports", record=("complaint", row.complaint_id)),
+                # The report itself (0.10.76): its page on the new navigation, its panel on the classic one.
+                opens=links.target("Complaints", "Reports", record=("report", row.id)),
             )
         )
     for row in _candidates(db, tenant_id):
