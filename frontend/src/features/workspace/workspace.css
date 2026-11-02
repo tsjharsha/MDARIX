@@ -6120,3 +6120,16 @@ section[aria-label="What blocks the decision"] h3 {
     max-width: 400px;
   }
 }
+/* Up to 1599 px the top-right buttons show their icons, their names kept for screen readers and as tooltips, so the
+   organization's name fits in full. */
+@media (min-width: 1280px) and (max-width: 1599px) {
+  .ac-header .uw-top-only .ac-hide-sm,
+  .ac-header .uw-sign-out .ac-hide-sm {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

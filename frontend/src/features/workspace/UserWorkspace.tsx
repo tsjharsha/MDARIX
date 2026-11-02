@@ -626,6 +626,7 @@ export function UserWorkspace({
                     key={name}
                     className={section === name ? "ac-secondary selected uw-top-only" : "ac-secondary uw-top-only"}
                     aria-current={section === name ? "page" : undefined}
+                    title={placeLabel(name, navigation)}
                     onClick={() => open(name)}
                   >
                     <Icon size={16} aria-hidden="true" />{" "}
@@ -655,12 +656,19 @@ export function UserWorkspace({
                 type="button"
                 className={section === "My Account" ? "ac-secondary selected uw-top-only" : "ac-secondary uw-top-only"}
                 aria-current={section === "My Account" ? "page" : undefined}
+                title="Account"
                 onClick={() => open("My Account")}
               >
                 <UserRound size={16} aria-hidden="true" /> <span className="ac-hide-sm">Account</span>
               </button>
             )}
-            <button type="button" className="ac-secondary" onClick={() => void signOut()} aria-label="Sign out">
+            <button
+              type="button"
+              className="ac-secondary uw-sign-out"
+              onClick={() => void signOut()}
+              aria-label="Sign out"
+              title="Sign out"
+            >
               <LogOut size={16} /> <span className="ac-hide-sm">Sign out</span>
             </button>
           </div>
