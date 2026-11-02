@@ -70,6 +70,19 @@
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
+.ac-brand-word {
+  font-weight: inherit;
+}
+/* On a phone the tile stands for the name, so the top bar's buttons stay on the screen. */
+@media (max-width: 480px) {
+  .ac-brand:has(.ac-brand-tile) .ac-brand-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+}
 /* The M tile, as on the website (H). */
 .ac-brand-tile {
   display: inline-grid;

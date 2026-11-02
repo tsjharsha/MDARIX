@@ -457,7 +457,7 @@ export function UserWorkspace({
             <i className="ac-brand-tile" aria-hidden="true">
               M
             </i>
-            MDARIX
+            <b className="ac-brand-word">MDARIX</b>
           </div>
           <div className="uw-tenant" title="Every screen shows only this organization's data">
             <Building2 size={15} aria-hidden="true" />
