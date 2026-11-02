@@ -149,6 +149,21 @@ def _versions(db: Session, tenant_id, complaint_id, market: str, lock: bool = Fa
     return query.order_by(ComplaintMarketAssessment.version).all()
 
 
+def _severity_level(db: Session, tenant_id, complaint_id, severity) -> dict:
+    """The harm level the questions start from: the QMS severity's mapped level, else the level the triage record
+    already chose on the same scale (stage 8: the harm is not asked twice), with where it came from."""
+    from backend.app.oversight.closure import triage_record
+
+    level = markets.level_of_severity(severity)
+    if level:
+        return {"severity_level": level, "severity_source": "Your QMS severity"}
+    record = triage_record(db, tenant_id, complaint_id)
+    chosen = (record.severity or "").upper() if record is not None and record.completed_at else ""
+    if chosen in markets.LEVELS:
+        return {"severity_level": chosen, "severity_source": "The triage record"}
+    return {"severity_level": None, "severity_source": None}
+
+
 def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today: date | None = None) -> dict:
     """Everything the assessment screen shows for one complaint: each market's questions, versions and draft, the
     scale with the complaint's mapped level, the person's training on what a signature relies on, and any earlier
@@ -223,7 +238,7 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
         "markets": items,
         "scale": markets.scale(),
         "severity": record.get("severity"),
-        "severity_level": markets.level_of_severity(record.get("severity")),
+        **_severity_level(db, tenant_id, complaint_id, record.get("severity")),
         "answer_labels": markets.ANSWER_LABELS,
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,

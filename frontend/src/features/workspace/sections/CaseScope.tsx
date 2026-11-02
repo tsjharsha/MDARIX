@@ -56,7 +56,9 @@ export function CaseScopePanel({
     <>
       <Panel
         eyebrow="Scope"
-        title={current ? `What this case covers · version ${current.version}` : "What this case covers"}
+        title={
+          current ? `What this investigation covers · version ${current.version}` : "What this investigation covers"
+        }
         source={scope}
         action={
           canEdit && !editing ? (
@@ -81,8 +83,8 @@ export function CaseScopePanel({
             title="No scope recorded yet"
             detail={
               canEdit
-                ? "Set the scope: the question, the versions, complaints, lots, markets and failure modes this case covers."
-                : "The case's investigator sets what it covers."
+                ? "Set the scope: the question, the versions, complaints, lots, markets and failure modes this investigation covers."
+                : "The investigator sets what it covers."
             }
           />
         )}

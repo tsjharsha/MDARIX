@@ -731,7 +731,7 @@ export function signErrorView(error: unknown): { text: string; reload: boolean; 
     BRIEF_TAMPERED:
       "The brief no longer matches its fingerprint, so it cannot be signed. Report this to your quality lead.",
     SUPERSEDE_REQUIRED:
-      "A decision was signed on this case meanwhile. Review it: a new decision must supersede it, with a reason.",
+      "A decision was signed on this investigation meanwhile. Review it: a new decision must supersede it, with a reason.",
   };
   const refusals: Record<string, string> = {
     SOD_DENIED: "You prepared or reviewed this brief, so another authorized decision maker must sign.",

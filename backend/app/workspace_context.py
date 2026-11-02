@@ -167,6 +167,14 @@ def put_context(
     return {**_out(row), **_business_ids(business, ctx, row)}
 
 
+def _is_uuid(value: str) -> bool:
+    try:
+        UUID(value)
+    except ValueError:
+        return False
+    return True
+
+
 @router.get("/resolve")
 def resolve_investigation(
     investigation: str = Query(min_length=1, max_length=120),
@@ -183,6 +191,9 @@ def resolve_investigation(
         match = query.filter(Investigation.business_id == value.upper()).first()
         if match is None:
             match = query.filter(Investigation.investigation_identifier == value).first()
+        # A server-sent target names the case by its id (an escalated complaint's decision, stage 8).
+        if match is None and _is_uuid(value):
+            match = query.filter(Investigation.id == UUID(value)).first()
     if match is None:
         raise HTTPException(
             404, detail={"code": "INVESTIGATION_NOT_FOUND", "message": "Investigation is not available for this tenant"}

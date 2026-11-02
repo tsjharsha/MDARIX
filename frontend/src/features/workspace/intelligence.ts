@@ -298,7 +298,7 @@ export const statusBody = (form: StatusForm) => ({ human_status: form.status, re
 export type LinkForm = { evidenceId: string; relation: Relation | ""; rationale: string };
 
 export function linkProblem(form: LinkForm): string | null {
-  if (!form.evidenceId) return "Choose the evidence from this case.";
+  if (!form.evidenceId) return "Choose the evidence from this investigation.";
   if (!form.relation) return "Say how it bears on the hypothesis.";
   return textProblem(form.rationale, "the rationale");
 }
@@ -393,7 +393,7 @@ const UNKNOWN_MOVES: Record<UnknownStatus, UnknownTransition[]> = {
     {
       to: "accepted_limitation",
       label: "Accept as a limitation",
-      prompt: "Why can the case go on without resolving it, and what does that limit?",
+      prompt: "Why can the investigation go on without resolving it, and what does that limit?",
     },
     { to: "superseded", label: "Mark superseded", prompt: "What replaces it, and why?" },
   ],
@@ -402,7 +402,7 @@ const UNKNOWN_MOVES: Record<UnknownStatus, UnknownTransition[]> = {
     {
       to: "accepted_limitation",
       label: "Accept as a limitation",
-      prompt: "Why can the case go on without resolving it, and what does that limit?",
+      prompt: "Why can the investigation go on without resolving it, and what does that limit?",
     },
     { to: "open", label: "Back to open", prompt: "Why is work on it paused?" },
     { to: "superseded", label: "Mark superseded", prompt: "What replaces it, and why?" },

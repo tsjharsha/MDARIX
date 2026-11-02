@@ -106,7 +106,7 @@ def test_signals_are_found_after_the_answer_and_are_the_ones_found_before(held_b
     story = user.get("/api/v1/trial/story").json()
     assert story["signals_pending"] is False
     trends = next(chapter for chapter in story["chapters"] if chapter["code"] == "TRENDS_TO_CASES")
-    assert "waiting for a decision or a case" in trends["finding"]["text"]
+    assert "waiting for a decision or an investigation" in trends["finding"]["text"]
 
     # The same file in another trial, with detection run in the request as in 0.10.39: the same signals.
     held_back.clear()

@@ -443,6 +443,32 @@ describe("the new navigation (stage 7, 0.10.68)", () => {
     ).toEqual({ section: "Complaint", tab: `Summary?ref=${id}` });
   });
 
+  it("maps every former investigation tab to its section and part (stage 8, 8.1)", () => {
+    expect(NEW_PLACES.Investigations.tabs).toEqual(["Summary", "Evidence", "Decisions & actions", "History"]);
+    const homes: Array<[string, string]> = [
+      ["Workspace", "Summary"],
+      ["Scope", "Summary?part=scope"],
+      ["Evidence", "Evidence"],
+      ["Intelligence?view=Unknowns", "Evidence?view=Unknowns&part=intelligence"],
+      ["Ask MDARIX", "Evidence?part=ask"],
+      ["Reviews?review=REV000001", "Decisions & actions?review=REV000001&part=reviews"],
+      ["Decision Brief", "Decisions & actions?part=brief"],
+      ["Decision?follow_up=FU000001", "Decisions & actions?follow_up=FU000001&part=decision"],
+      ["Record", "History"],
+    ];
+    for (const [tab, home] of homes)
+      expect(routeFor("Investigations", tab, "mvp", "new"), tab).toEqual({ section: "Investigations", tab: home });
+    // Every classic tab of the case page has a home (none is left on a tab the new screen does not have).
+    for (const tab of PLACES.Investigations.tabs) expect(landsOn("Investigations", tab, "new").ok, tab).toBe(true);
+    // The classic navigation keeps today's tabs, and opens a section's address on the tab that held it.
+    expect(routeFor("Investigations", "Decision", "mvp", "classic").tab).toBe("Decision");
+    expect(routeFor("Investigations", "Decisions & actions?part=brief", "mvp", "classic").tab).toBe(
+      "Decision?part=brief",
+    );
+    expect(routeFor("Investigations", "History", "mvp", "classic").tab).toBe("Record");
+    expect(recordPlace("case", "INV000002", {}, "new")).toEqual({ section: "Investigations", tab: "Summary" });
+  });
+
   it("opens the new navigation's own addresses on the classic one too", () => {
     for (const section of ["Trends", "Settings", "Team"])
       expect(landsOn(section, undefined, "classic").ok, section).toBe(true);

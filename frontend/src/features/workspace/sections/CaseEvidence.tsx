@@ -15,7 +15,7 @@ import {
 } from "../../customer-admin/shared";
 import { safeText } from "../../../app/displayId";
 import { roleLabel } from "../../../app/roles";
-import { useWorkspace } from "../workspaceContext";
+import { usePanelFlag, usePanelState, useWorkspace } from "../workspaceContext";
 import {
   EMPTY_INVENTORY_FILTER,
   QUALITY_VS_RELATIONSHIP,
@@ -67,12 +67,19 @@ import { readableSize } from "./ImportData";
 export function CaseEvidencePanel({ investigationId, caseLabel }: { investigationId: string; caseLabel: string }) {
   const inventory = useResource<EvidenceInventory>(inventoryPath(investigationId));
   const [filter, setFilter] = useState<InventoryFilter>(EMPTY_INVENTORY_FILTER);
-  const [reviewing, setReviewing] = useState<InventoryItem | null>(null);
-  const [provenance, setProvenance] = useState<InventoryItem | null>(null);
-  const [linking, setLinking] = useState(false);
-  const [requesting, setRequesting] = useState(false);
-  const [request, setRequest] = useState<string | null>(null);
   const items = listOf(inventory.data?.items) as InventoryItem[];
+  // Each drawer has its own address (panel=<kind>:<id>), so Back closes it and a refresh reopens it.
+  const byId = (id: string) => items.find((item) => String(item.evidence?.id) === id) ?? null;
+  const evidenceKey = (item: InventoryItem) => String(item.evidence?.id);
+  const [reviewing, setReviewing] = usePanelState<InventoryItem>("review-evidence", evidenceKey, byId);
+  const [provenance, setProvenance] = usePanelState<InventoryItem>("provenance", evidenceKey, byId);
+  const [linking, setLinking] = usePanelFlag("link-evidence-records");
+  const [requesting, setRequesting] = usePanelFlag("new-request");
+  const [request, setRequest] = usePanelState<string>(
+    "request",
+    (id) => id,
+    (id) => id,
+  );
   const shown = filterInventory(items, filter);
   const actions = inventory.data?.actions ?? {};
   const total = inventory.data?.counts?.total ?? items.length;
@@ -80,7 +87,7 @@ export function CaseEvidencePanel({ investigationId, caseLabel }: { investigatio
     <>
       <Panel
         eyebrow={caseLabel}
-        title="Case evidence"
+        title="Investigation evidence"
         source={inventory}
         action={
           actions.can_link || actions.can_request ? (
@@ -150,14 +157,14 @@ export function CaseEvidencePanel({ investigationId, caseLabel }: { investigatio
           )}
         </div>
         <Table
-          caption="Case evidence"
+          caption="Investigation evidence"
           rows={shown}
           rowKey={(row) => String(row.evidence?.id)}
           empty={
             items.length
               ? { title: "No matching evidence", detail: "Change the filters to see more." }
               : {
-                  title: "No evidence in this case yet",
+                  title: "No evidence in this investigation yet",
                   detail: "Link records from the evidence library, or request evidence from colleagues or suppliers.",
                 }
           }
@@ -477,7 +484,11 @@ function LinkDrawer({
     setError("");
     try {
       await send(linkPath(investigationId), "POST", linkBody(chosen, relationship, reason));
-      notify(chosen.length === 1 ? "1 record linked to the case." : `${chosen.length} records linked to the case.`);
+      notify(
+        chosen.length === 1
+          ? "1 record linked to the investigation."
+          : `${chosen.length} records linked to the investigation.`,
+      );
       onDone();
     } catch (failure) {
       setError(errorText(failure, "The evidence was not linked."));
@@ -485,7 +496,7 @@ function LinkDrawer({
     }
   };
   return (
-    <Drawer title="Link evidence to the case" onClose={onClose}>
+    <Drawer title="Link evidence to the investigation" onClose={onClose}>
       <form className="ca-form ca-drawer-section" onSubmit={submit}>
         <SearchBox value={query} onChange={setQuery} label="Search the evidence library" />
         <p className="ac-note" role="status">
@@ -741,7 +752,7 @@ function ProvenanceDrawer({
             </section>
           )}
           <section className="ca-drawer-section">
-            <h3>Review history in this case</h3>
+            <h3>Review history in this investigation</h3>
             {history.length ? (
               <ol className="ca-timeline uw-task-history">
                 {history.map((event, index) => (
@@ -756,7 +767,7 @@ function ProvenanceDrawer({
                 ))}
               </ol>
             ) : (
-              <p className="ac-muted">Not reviewed in this case yet.</p>
+              <p className="ac-muted">Not reviewed in this investigation yet.</p>
             )}
           </section>
           <section className="ca-drawer-section">

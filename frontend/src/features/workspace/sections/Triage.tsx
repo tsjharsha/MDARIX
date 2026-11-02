@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { WhyAsked } from "../../shared/Basis";
+import { TRIAGE_WHY } from "../whyAsked";
 import { CheckCircle2, Clock, FileWarning, Flag, Link2, Siren } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { useCan, useTabParam } from "../workspaceContext";
+import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import { DeadlineChip, HarmChip, StateChip, type Harm } from "../../../app/chips";
 import { deadlineLabel } from "../../../app/dates";
 import { AlsoKnownAs, countOf } from "./common";
@@ -274,6 +276,7 @@ function TriageDrawer({
 }) {
   const guide = useResource<Guide>(`${INTAKE}/guide`);
   const canWrite = useCanTriage();
+  const { navigation, open } = useWorkspace();
   const record = item.record;
   const [form, setForm] = useState<RecordForm>({
     severity: record?.severity ?? "",
@@ -318,6 +321,10 @@ function TriageDrawer({
         awareness_note: form.awareNote,
       });
       onDone();
+      // The next step, always (stage 8): on the new navigation a triaged complaint opens its page, whose main button
+      // is its next action.
+      if (navigation === "new" && item.kind === "COMPLAINT")
+        open("Complaint", `Summary?ref=${encodeURIComponent(item.ref)}`);
     } catch (reason) {
       setError(errorText(reason, "The triage record was not saved"));
     } finally {
@@ -425,6 +432,7 @@ function TriageDrawer({
             <div className="ca-form-grid">
               <label className="ca-field">
                 Severity (harm-severity scale)
+                <WhyAsked why={TRIAGE_WHY.severity} />
                 <select value={form.severity} onChange={(event) => set({ severity: event.target.value })}>
                   <option value="">Choose…</option>
                   {(guide.data?.levels ?? []).map((level) => (
@@ -454,6 +462,7 @@ function TriageDrawer({
                 onChange={(v) => set({ backup: v })}
               />
             </div>
+            <WhyAsked why={TRIAGE_WHY.owners} />
             <label className="ca-check">
               <input
                 type="checkbox"
@@ -472,6 +481,7 @@ function TriageDrawer({
             </label>
             <label className="ca-field">
               Immediate action
+              <WhyAsked why={TRIAGE_WHY.action} />
               <textarea value={form.action} onChange={(event) => set({ action: event.target.value })} rows={2} />
             </label>
             <label className="ca-field">
@@ -481,6 +491,7 @@ function TriageDrawer({
             <div className="ca-form-grid">
               <label className="ca-field">
                 Awareness time {needsAwareness ? "(confirm it)" : ""}
+                <WhyAsked why={TRIAGE_WHY.awareness} />
                 <input
                   type="datetime-local"
                   value={form.aware}

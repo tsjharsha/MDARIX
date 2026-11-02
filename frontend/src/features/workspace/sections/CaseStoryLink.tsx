@@ -31,7 +31,7 @@ export function CaseStoryLink({
   };
   return (
     <button type="button" className={className} onClick={go}>
-      <History size={15} aria-hidden="true" /> See the full case story in{" "}
+      <History size={15} aria-hidden="true" /> See the full investigation story in{" "}
       {featureSetOf(session?.feature_set) === "mvp" ? "Records" : "Trust & Audit"}
     </button>
   );

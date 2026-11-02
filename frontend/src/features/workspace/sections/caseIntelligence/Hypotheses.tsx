@@ -5,7 +5,7 @@ import { Empty, Panel, ToneBadge } from "../../../admin/console/charts";
 import { Drawer, formatDate, listOf, useResource } from "../../../customer-admin/shared";
 import { safeText } from "../../../../app/displayId";
 import { StatementKind } from "../../../shared/StatementKind";
-import { useCan } from "../../workspaceContext";
+import { useCan, usePanelFlag, usePanelState } from "../../workspaceContext";
 import {
   HUMAN_STATUS,
   NEW_HYPOTHESIS,
@@ -57,15 +57,32 @@ export function HypothesesView({
   const canReview = useCan("evidence.review");
   const [includeRetired, setIncludeRetired] = useState(false);
   const hypotheses = useResource<HypothesisList>(hypothesesPath(investigationId, { includeRetired }));
-  const [adding, setAdding] = useState(() => startAdding && canWork && !readOnly);
+  const items = listOf(hypotheses.data?.items) as IntelHypothesis[];
+  // Each drawer has its own address (panel=<kind>:<id>), so Back closes it and a refresh reopens it.
+  const byId = (id: string) => items.find((item) => item.id === id) ?? null;
+  const [addressed, setAdding] = usePanelFlag("add-hypothesis");
+  // Asked for by "Add hypotheses by hand": open from the first render, then held by the address.
+  const adding = addressed || (!!startAdding && canWork && !readOnly);
   // The request is used once: coming back to the view later does not open the form again.
   useEffect(() => {
-    if (startAdding) onAddingShown?.();
+    if (!startAdding) return;
+    if (canWork && !readOnly) setAdding(true);
+    onAddingShown?.();
   }, [startAdding]);
-  const [judging, setJudging] = useState<IntelHypothesis | null>(null);
-  const [linking, setLinking] = useState<IntelHypothesis | null>(null);
-  const [retracting, setRetracting] = useState<{ hypothesis: IntelHypothesis; link: EvidenceLink } | null>(null);
-  const items = listOf(hypotheses.data?.items) as IntelHypothesis[];
+  const [judging, setJudging] = usePanelState<IntelHypothesis>("judge", (item) => item.id, byId);
+  const [linking, setLinking] = usePanelState<IntelHypothesis>("link-evidence", (item) => item.id, byId);
+  const [retracting, setRetracting] = usePanelState<{ hypothesis: IntelHypothesis; link: EvidenceLink }>(
+    "withdraw-link",
+    ({ hypothesis, link }) => `${hypothesis.id}.${link.id}`,
+    (key) => {
+      const [id, linkId] = key.split(".");
+      const hypothesis = byId(id);
+      const link = groupEvidence(hypothesis?.evidence)
+        .flatMap((group) => group.active)
+        .find((item) => item.id === linkId);
+      return hypothesis && link ? { hypothesis, link } : null;
+    },
+  );
   const fromAi = items.filter((item) => String(item.origin ?? "").toUpperCase() === "AI");
   const fromPeople = items.filter((item) => String(item.origin ?? "").toUpperCase() !== "AI");
   const can = (item: IntelHypothesis) => ({
@@ -453,7 +470,7 @@ function LinkEvidenceDrawer({
       >
         <EvidenceSelect
           investigationId={investigationId}
-          label="Evidence from this case"
+          label="Evidence from this investigation"
           value={form.evidenceId}
           onChange={(evidenceId) => setForm((value) => ({ ...value, evidenceId }))}
         />

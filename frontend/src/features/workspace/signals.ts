@@ -145,7 +145,7 @@ export type SignalDetail = SignalSummary & {
 export const DETECTION_STATUS_PATH = "/api/v1/triage/detection";
 
 /** What a screen says while an import's signals are being found (the trial story's words, backend/app/trial/story.py). */
-export const FINDING_SIGNALS_NOW = "Finding signals in the complaints you just imported…";
+export const FINDING_SIGNALS_NOW = "Finding trends in the complaints you just imported…";
 
 /** Read a resource again, after a light status read every few seconds, while it says an import's signals are being
  * found (customer-admin/shared.tsx useResource). */
@@ -849,15 +849,15 @@ export const DISPOSITION_LABEL: Record<Disposition, string> = {
   ESCALATED: "Escalate",
   MONITOR: "Monitor",
   NO_ACTION: "No action needed",
-  DUPLICATE: "Duplicate of another signal",
+  DUPLICATE: "Duplicate of another trend",
 };
 
 export const DISPOSITION_HELP: Record<Disposition, string> = {
-  INVESTIGATION_REQUIRED: "A case is needed. Create the investigation from this signal next.",
+  INVESTIGATION_REQUIRED: "An investigation is needed. Create the investigation from this trend next.",
   ESCALATED: "Raise it to management or the regulatory team now.",
   MONITOR: "Keep watching. Say when to look again and what would reopen it.",
   NO_ACTION: "No further action is needed. Say why.",
-  DUPLICATE: "Another signal already covers this problem. Its complaints stay on this record.",
+  DUPLICATE: "Another trend already covers this problem. Its complaints stay on this record.",
 };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -867,7 +867,7 @@ export function dispositionProblem(form: DispositionForm, today: string): string
   if (!form.disposition || !(DISPOSITIONS as readonly string[]).includes(form.disposition))
     return "Choose a disposition.";
   if (form.disposition === "DUPLICATE" && !form.canonicalSignalId.trim())
-    return "Choose the signal this one duplicates.";
+    return "Choose the trend this one duplicates.";
   if (form.disposition === "MONITOR") {
     if (!DAY.test(form.monitorReviewDate)) return "Choose the date to review it again.";
     if (form.monitorReviewDate <= today) return "The review date must be in the future.";
@@ -889,7 +889,7 @@ export function dispositionBody(form: DispositionForm) {
 }
 
 export function mergeProblem(sources: string[], reason: string) {
-  if (!sources.length) return "Choose at least one signal to merge into this one.";
+  if (!sources.length) return "Choose at least one trend to merge into this one.";
   return textProblem(reason, REASON_MIN, DISPOSITION_REASON_MAX);
 }
 
@@ -938,7 +938,7 @@ export type InvestigationForm = {
 };
 
 export function investigationProblem(form: InvestigationForm): string | null {
-  if (!form.complaintIds.length) return "Keep at least one complaint for the case.";
+  if (!form.complaintIds.length) return "Keep at least one complaint for the investigation.";
   return textProblem(form.question, QUESTION_MIN, QUESTION_MAX, "an investigation question");
 }
 
@@ -975,7 +975,7 @@ export const EMPTY_NEW_SIGNAL: NewSignalForm = {
 };
 
 export function newSignalProblem(form: NewSignalForm): string | null {
-  if (form.title.trim().length < 3) return "Give the signal a title.";
+  if (form.title.trim().length < 3) return "Give the trend a title.";
   if (!form.productId) return "Choose the product.";
   if (!form.complaintIds.length) return "Choose at least one complaint.";
   if (form.priority && !isPriority(code(form.priority))) return "Choose a priority.";
@@ -1048,7 +1048,7 @@ export function ruleBody(form: RuleForm) {
 /** "Opens a signal when 3 or more complaints about the same problem arrive within 30 days." */
 export function ruleSentence(rule: Pick<DetectionRule, "min_complaints" | "window_days">): string {
   const days = rule.window_days === 1 ? "1 day" : `${rule.window_days} days`;
-  return `Opens a signal when ${rule.min_complaints} or more complaints about the same product problem arrive within ${days}.`;
+  return `Opens a trend when ${rule.min_complaints} or more complaints about the same product problem arrive within ${days}.`;
 }
 
 /** The signal IDs a detection run lists under one heading (or just how many, when it gives a number). */
@@ -1067,7 +1067,7 @@ export function runSummary(result: RuleRunResult | null | undefined): string {
   const created = runIds(result.created).count;
   const updated = runIds(result.updated).count;
   const reopened = runIds(result.monitor_reopened).count;
-  if (!created && !updated && !reopened) return "Detection ran: no new or changed signals.";
+  if (!created && !updated && !reopened) return "Detection ran: no new or changed trends.";
   const part = (count: number, word: string) => (count ? `${count} ${word}` : `none ${word}`);
-  return `Detection ran: ${part(created, created === 1 ? "signal created" : "signals created")}, ${part(updated, "updated")}, ${part(reopened, "reopened from monitoring")}.`;
+  return `Detection ran: ${part(created, created === 1 ? "trend created" : "trends created")}, ${part(updated, "updated")}, ${part(reopened, "reopened from monitoring")}.`;
 }

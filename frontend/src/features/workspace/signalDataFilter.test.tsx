@@ -73,6 +73,6 @@ describe("the Signal inbox's Data filter", () => {
     expect(parseSignalsTab(tab).filters.source).toBe(IMPORTED_SOURCE);
     expect(parseSignalsTab("Signal inbox?source=<script>").filters.source).toBe("");
     expect(parseSignalsTab(undefined).filters.source).toBe("");
-    expect(inboxEmpty({ ...DEFAULT_SIGNAL_FILTERS, source: SAMPLE_SOURCE }, false).title).toBe("No matching signals");
+    expect(inboxEmpty({ ...DEFAULT_SIGNAL_FILTERS, source: SAMPLE_SOURCE }, false).title).toBe("No matching trends");
   });
 });

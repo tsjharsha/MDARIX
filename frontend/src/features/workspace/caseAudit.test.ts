@@ -81,8 +81,8 @@ describe("addresses", () => {
   it("names an exported audit trail after the case, never after nothing", () => {
     expect(trustExportName("INV000147", "json")).toBe("INV000147-audit-trail.json");
     expect(trustExportName("Selected investigation", "csv")).toBe("Selected-investigation-audit-trail.csv");
-    expect(trustExportName("", "csv")).toBe("case-audit-trail.csv");
-    expect(trustExportName("../..", "csv")).toBe("case-audit-trail.csv");
+    expect(trustExportName("", "csv")).toBe("investigation-audit-trail.csv");
+    expect(trustExportName("../..", "csv")).toBe("investigation-audit-trail.csv");
   });
 });
 

@@ -6,7 +6,7 @@ import { titleCase } from "../../../admin/console/dashboardModel";
 import { Drawer, Table, listOf, useResource, type Column } from "../../../customer-admin/shared";
 import { safeText } from "../../../../app/displayId";
 import { statementOriginLabel } from "../../../shared/epistemic";
-import { useCan } from "../../workspaceContext";
+import { useCan, usePanelFlag, usePanelState } from "../../workspaceContext";
 import {
   NEW_UNKNOWN,
   UNKNOWN_CATEGORIES,
@@ -46,10 +46,21 @@ export function UnknownsView({
   const canRequest = useCan("evidence.request") && !readOnly;
   const [includeSuperseded, setIncludeSuperseded] = useState(false);
   const unknowns = useResource<UnknownList>(unknownsPath(investigationId, includeSuperseded));
-  const [adding, setAdding] = useState(false);
-  const [changing, setChanging] = useState<{ unknown: IntelUnknown; transition: UnknownTransition } | null>(null);
-  const [requesting, setRequesting] = useState<IntelUnknown | null>(null);
   const rows = listOf(unknowns.data?.items) as IntelUnknown[];
+  // Each drawer has its own address (panel=<kind>:<id>), so Back closes it and a refresh reopens it.
+  const byId = (id: string) => rows.find((row) => row.id === id) ?? null;
+  const [adding, setAdding] = usePanelFlag("add-unknown");
+  const [changing, setChanging] = usePanelState<{ unknown: IntelUnknown; transition: UnknownTransition }>(
+    "unknown-status",
+    ({ unknown, transition }) => `${unknown.id}.${transition.to}`,
+    (key) => {
+      const [id, to] = key.split(".");
+      const unknown = byId(id);
+      const transition = unknownTransitions(unknown?.status).find((item) => item.to === to);
+      return unknown && transition ? { unknown, transition } : null;
+    },
+  );
+  const [requesting, setRequesting] = usePanelState<IntelUnknown>("request-evidence", (row) => row.id, byId);
   const done = () => {
     setAdding(false);
     setChanging(null);
@@ -170,7 +181,7 @@ export function UnknownsView({
     >
       <p className="ac-note">
         What the case does not know yet. Each status change carries a reason; an unknown accepted as a limitation stays
-        visible wherever the case is summarized.
+        visible wherever the investigation is summarized.
       </p>
       <div className="ca-toolbar">
         <label className="ca-check">
@@ -183,12 +194,12 @@ export function UnknownsView({
         </label>
       </div>
       <Table
-        caption="Case unknowns"
+        caption="Investigation unknowns"
         rows={rows}
         rowKey={(row) => String(row.id)}
         empty={{
           title: "No unknowns recorded",
-          detail: "Add what the case still needs to find out, or run Unknowns in the workspace.",
+          detail: "Add what the investigation still needs to find out, or run Unknowns in the workspace.",
         }}
         columns={columns}
       />

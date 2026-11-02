@@ -15,7 +15,7 @@ export function newlyTried(before: readonly string[] | null, story: TrialStory |
 }
 
 /**
- * "Chapter 2 done. Next: Turn a rising trend into a case": shown anywhere in a trial's workspace as soon as the
+ * "Chapter 2 done. Next: Turn a rising trend into an investigation": shown anywhere in a trial's workspace as soon as the
  * organization acts in a chapter, with a button that opens the next one, so nobody has to find their way back to
  * Getting started. The story is read when the screen changes and every half minute while the page is in sight, and
  * once more when it comes back into sight; nothing shows on first load. It reads which chapters were tried only

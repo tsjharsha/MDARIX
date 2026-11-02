@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Boxes, CalendarClock, ChevronRight, Pause, Play, XCircle } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { displayId, safeText } from "../../../app/displayId";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { useCan, usePanelState, useWorkspace } from "../workspaceContext";
 import {
   CHECK_RESULT,
   STEP_STATUS,
@@ -12,8 +12,10 @@ import {
   casePriorityLabel,
   caseStateLabel,
   caseStateTone,
+  caseProgress,
   caseSteps,
   caseTransitions,
+  nextCaseStep,
   readinessChecks,
   readinessHeadline,
   readinessPath,
@@ -21,12 +23,15 @@ import {
   transitionPath,
   transitionProblem,
   type CaseReadiness,
+  type CaseSection,
   type CaseTransition,
   type CaseWorkflowFields,
   type StepDestination,
 } from "../caseWorkflow";
 import { priorityTone } from "../tasks";
 import { StatusBadge } from "./common";
+import { WhyAsked } from "../../shared/Basis";
+import { CASE_STEP_WHY } from "../whyAsked";
 
 /** A case's state: its workflow state's label when the server sends one, else its plain status as before. */
 export function CaseStateBadge({ row }: { row: CaseWorkflowFields | null | undefined }) {
@@ -67,6 +72,7 @@ export function CaseHeader({
   onManage,
   onLotImpact,
   onStep,
+  onSection,
   onChanged,
 }: {
   investigationId: string;
@@ -76,23 +82,31 @@ export function CaseHeader({
   /** Opens the case's Lot impact (a free trial, T-G5); absent where it is not offered. */
   onLotImpact?: () => void;
   onStep: (destination: StepDestination) => void;
+  /** The new navigation (stage 8): one progress line over the four sections instead of the stepper, and the next
+   * step as the main button; it opens the section and the part where the step is done. */
+  onSection?: (section: CaseSection, part?: string) => void;
   onChanged: () => void;
 }) {
   const canWork = useCan("investigation.work");
   const canAssign = useCan("investigation.assign");
   const readiness = useResource<CaseReadiness>(readinessPath(investigationId));
-  const [transition, setTransition] = useState<CaseTransition | null>(null);
   const current: Record<string, any> = {
     ...(row ?? {}),
     workflow_state: row?.workflow_state ?? readiness.data?.workflow_state ?? null,
   };
   const transitions = caseTransitions(current, { work: canWork, assign: canAssign });
+  // The state change asked for has its own address (panel=state-change:<state>), so Back closes it.
+  const [transition, setTransition] = usePanelState<CaseTransition>(
+    "state-change",
+    (item) => item.to,
+    (to) => transitions.find((item) => item.to === to) ?? null,
+  );
   const steps = caseSteps(readiness.data);
   const checks = readinessChecks(readiness.data);
   const label = displayId(current, "investigation_identifier", "Investigation");
   return (
     <>
-      <Panel eyebrow="Case" title={label} action={<CaseStateBadge row={current} />}>
+      <Panel eyebrow={onSection ? "Investigation" : "Case"} title={label} action={<CaseStateBadge row={current} />}>
         <p className="uw-case-question">{safeText(current.investigation_question) ?? "No question recorded."}</p>
         <dl className="ca-facts">
           <div>
@@ -146,53 +160,76 @@ export function CaseHeader({
           </div>
         )}
       </Panel>
-      <Panel eyebrow="Case progress" title="Where this case stands" source={readiness}>
-        <ol className="uw-stepper" aria-label="Case steps">
-          {steps.map((step, index) => {
-            const status = STEP_STATUS[step.status];
-            return (
-              <li key={step.key} className={`uw-step tone-${status.tone}`}>
-                <button
-                  type="button"
-                  disabled={!step.destination}
-                  onClick={() => step.destination && onStep(step.destination)}
-                  aria-label={`${index + 1}. ${step.label}: ${status.label}${step.detail ? `. ${step.detail}` : ""}`}
-                >
-                  <span className="uw-step-number" aria-hidden="true">
-                    {index + 1}
-                  </span>
-                  <span className="uw-step-text">
-                    <strong>{step.label}</strong>
-                    <small>{status.label}</small>
-                  </span>
-                </button>
-                {step.detail && <small className="uw-step-detail">{step.detail}</small>}
-              </li>
-            );
-          })}
-        </ol>
-        <section className="ca-drawer-section">
-          <h3>Readiness checklist</h3>
-          <p className="ac-muted">{readinessHeadline(checks)}</p>
-          {checks.length > 0 && (
-            <details className="uw-more">
-              <summary>Show each check ({checks.length})</summary>
-              <ul className="uw-checklist" aria-label="Readiness checks">
-                {checks.map((check) => (
-                  <li key={check.key}>
-                    <ToneBadge tone={CHECK_RESULT[check.result].tone} label={CHECK_RESULT[check.result].label} />
-                    <span>
-                      <strong>{check.label}</strong>
-                      {check.rationale && <small>{check.rationale}</small>}
-                    </span>
+      {onSection ? <CaseProgressLine steps={steps} onSection={onSection} /> : null}
+      <Collapsed when={!!onSection} summary="Each step and the readiness checklist">
+        <Panel
+          eyebrow="Investigation progress"
+          title={onSection ? "Each step and the readiness checklist" : "Where this investigation stands"}
+          source={readiness}
+        >
+          {!onSection && (
+            <ol className="uw-stepper" aria-label="Investigation steps">
+              {steps.map((step, index) => {
+                const status = STEP_STATUS[step.status];
+                return (
+                  <li key={step.key} className={`uw-step tone-${status.tone}`}>
+                    <button
+                      type="button"
+                      disabled={!step.destination}
+                      onClick={() => step.destination && onStep(step.destination)}
+                      aria-label={`${index + 1}. ${step.label}: ${status.label}${step.detail ? `. ${step.detail}` : ""}`}
+                    >
+                      <span className="uw-step-number" aria-hidden="true">
+                        {index + 1}
+                      </span>
+                      <span className="uw-step-text">
+                        <strong>{step.label}</strong>
+                        <small>{status.label}</small>
+                      </span>
+                    </button>
+                    {step.detail && <small className="uw-step-detail">{step.detail}</small>}
                   </li>
-                ))}
-              </ul>
-            </details>
+                );
+              })}
+            </ol>
           )}
-          <p className="ac-note">Readiness shows what is in place and what is missing.</p>
-        </section>
-      </Panel>
+          {onSection && (
+            <ul className="uw-case-steps" aria-label="Investigation steps">
+              {steps.map((step) => (
+                <li key={step.key}>
+                  <ToneBadge tone={STEP_STATUS[step.status].tone} label={STEP_STATUS[step.status].label} />
+                  <span>
+                    <strong>{step.label}</strong>
+                    {step.detail && <small>{step.detail}</small>}
+                    <WhyAsked why={CASE_STEP_WHY[step.key]} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <section className="ca-drawer-section">
+            <h3>Readiness checklist</h3>
+            <p className="ac-muted">{readinessHeadline(checks)}</p>
+            {checks.length > 0 && (
+              <details className="uw-more">
+                <summary>Show each check ({checks.length})</summary>
+                <ul className="uw-checklist" aria-label="Readiness checks">
+                  {checks.map((check) => (
+                    <li key={check.key}>
+                      <ToneBadge tone={CHECK_RESULT[check.result].tone} label={CHECK_RESULT[check.result].label} />
+                      <span>
+                        <strong>{check.label}</strong>
+                        {check.rationale && <small>{check.rationale}</small>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            <p className="ac-note">Readiness shows what is in place and what is missing.</p>
+          </section>
+        </Panel>
+      </Collapsed>
       {transition && (
         <TransitionDrawer
           investigationId={investigationId}
@@ -239,7 +276,7 @@ function TransitionDrawer({
       notify(`${label}: ${transition.label.toLowerCase()} recorded.`);
       onDone();
     } catch (failure) {
-      setError(errorText(failure, "The case's state was not changed."));
+      setError(errorText(failure, "The investigation's state was not changed."));
       setBusy(false);
     }
   };
@@ -258,7 +295,7 @@ function TransitionDrawer({
           />
         </label>
         {reason.trim() && problem && <p className="ac-muted">{problem}</p>}
-        <p className="ac-muted">Recorded in the case's history and the audit trail.</p>
+        <p className="ac-muted">Recorded in the investigation's history and the audit trail.</p>
         {error && (
           <p className="ac-message tone-critical" role="alert">
             {error}
@@ -283,5 +320,66 @@ export function OpenCaseLink({ label, onClick }: { label: string; onClick: () =>
     <button type="button" className="ac-link" onClick={onClick}>
       {label} <ChevronRight size={14} aria-hidden="true" />
     </button>
+  );
+}
+
+/**
+ * The investigation's one progress line (stage 8): Summary · Evidence · Decisions & actions · History, each with how
+ * many of its steps are done, and the next step as the screen's main button (8.7). Each section opens on a click.
+ */
+export function CaseProgressLine({
+  steps,
+  onSection,
+}: {
+  steps: ReturnType<typeof caseSteps>;
+  onSection: (section: CaseSection, part?: string) => void;
+}) {
+  const progress = caseProgress(steps);
+  const next = nextCaseStep(steps);
+  return (
+    <nav className="uw-case-progress" aria-label="Where this investigation stands">
+      <ol>
+        {progress.map((item) => (
+          <li key={item.section} className={`state-${item.state.toLowerCase()}`}>
+            <button
+              type="button"
+              aria-current={item.state === "CURRENT" ? "step" : undefined}
+              onClick={() => onSection(item.section)}
+            >
+              <strong>{item.section}</strong>
+              <small>
+                {item.state === "DONE"
+                  ? "Done"
+                  : item.section === "History"
+                    ? "Once the decision is signed"
+                    : `${item.done} of ${item.total} done`}
+              </small>
+            </button>
+          </li>
+        ))}
+      </ol>
+      {next ? (
+        <div>
+          <button type="button" className="ac-primary" onClick={() => onSection(next.section, next.part)}>
+            Next: {next.label} <ChevronRight size={15} aria-hidden="true" />
+          </button>
+          <WhyAsked why={CASE_STEP_WHY[next.key]} />
+        </div>
+      ) : (
+        <p className="ac-muted">Every step is done: the decision is signed. Its record is in History.</p>
+      )}
+    </nav>
+  );
+}
+
+/** On the new navigation the step list and the readiness checklist sit behind one line: the progress line leads. */
+function Collapsed({ when, summary, children }: { when: boolean; summary: string; children: ReactNode }) {
+  return when ? (
+    <details className="uw-more uw-case-more">
+      <summary>{summary}</summary>
+      {children}
+    </details>
+  ) : (
+    <>{children}</>
   );
 }

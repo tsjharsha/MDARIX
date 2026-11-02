@@ -7,7 +7,7 @@ import { Drawer, Table, formatDate, listOf, useResource } from "../../../custome
 import { safeText } from "../../../../app/displayId";
 import { StatementKind } from "../../../shared/StatementKind";
 import { STATEMENT_KIND, statementOriginLabel } from "../../../shared/epistemic";
-import { useCan } from "../../workspaceContext";
+import { useCan, usePanelFlag } from "../../workspaceContext";
 import {
   EMPTY_OBSERVATION_FILTER,
   NEW_OBSERVATION,
@@ -40,7 +40,7 @@ export function ObservationsView({
   const canWork = useCan("investigation.work") && !readOnly;
   const observations = useResource<{ items?: Observation[] | null }>(intelligencePath(investigationId, "observations"));
   const [filter, setFilter] = useState<ObservationFilter>(EMPTY_OBSERVATION_FILTER);
-  const [recording, setRecording] = useState(false);
+  const [recording, setRecording] = usePanelFlag("record-observation");
   const items = listOf(observations.data?.items) as Observation[];
   const shown = filterObservations(items, filter);
   const chip = (group: keyof ObservationFilter, key: string, label: ReactNode) => (
@@ -68,8 +68,8 @@ export function ObservationsView({
       }
     >
       <p className="ac-note">
-        What the case's evidence shows, each with its kind: a fact recorded in a source, what a source asserts, or what
-        is derived from the records.
+        What the investigation's evidence shows, each with its kind: a fact recorded in a source, what a source asserts,
+        or what is derived from the records.
       </p>
       <div className="uw-evidence-chips">
         <div className="ca-chips" role="group" aria-label="Filter by kind">
@@ -82,13 +82,13 @@ export function ObservationsView({
         </div>
       </div>
       <Table
-        caption="Case observations"
+        caption="Investigation observations"
         rows={shown}
         rowKey={(row) => String(row.id)}
         empty={
           items.length
             ? { title: "No matching observations", detail: "Change the filters to see more." }
-            : { title: "No observations yet", detail: "Record what a piece of the case's evidence shows." }
+            : { title: "No observations yet", detail: "Record what a piece of the investigation's evidence shows." }
         }
         columns={[
           {

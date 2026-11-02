@@ -440,9 +440,9 @@ def test_composing_editing_and_refreshing_a_draft(org):
     context = content["context"]
     assert context["scope_version"] == 1 and len(context["evidence_set_hash"]) == 64
     assert content["unavailable"] == []
-    assert body["narrative"]["problem_statement"] == "" and body["narrative"]["contributor_names"] == [
-        "Investigator Brief"
-    ]
+    # The problem statement starts as the investigation's question, AI off too (0.10.69: nothing typed twice).
+    assert body["narrative"]["problem_statement"] == " ".join(QUESTION.split())
+    assert body["narrative"]["contributor_names"] == ["Investigator Brief"]
 
     again = client.post(base, json={})
     assert again.status_code == 409 and _code(again) == "BRIEF_ALREADY_OPEN"
@@ -542,7 +542,7 @@ def test_submission_is_refused_until_the_gate_allows_it(org):
 
     refused = client.post(base + "/submit", json={})
     assert refused.status_code == 409 and _code(refused) == "BRIEF_NOT_READY"
-    assert {"evidence_reviewed", "problem_statement", "proposed_conclusion"} <= _blocking(refused)
+    assert {"evidence_reviewed", "proposed_conclusion"} <= _blocking(refused)
 
     now = datetime.now(timezone.utc)
     _add(

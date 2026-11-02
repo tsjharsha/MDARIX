@@ -34,7 +34,7 @@ export type GuidePart = { id: string; title: string; summary: string; sections: 
 
 export const ROLE_SUMMARY: readonly [string, string][] = [
   ["Viewer", "Reads everything their organization shares; changes nothing."],
-  ["PMS / Signal Triage Lead", "Triages signals, opens and assigns investigations, changes the complaint settings."],
+  ["PMS / Signal Triage Lead", "Triages trends, opens and assigns investigations, changes the complaint settings."],
   ["Quality Investigator", "Works investigations: evidence, hypotheses, unknowns, scope and the Decision Brief."],
   ["Risk Reviewer", "Records risk reviews and reviews evidence."],
   ["Regulatory Reviewer", "Records regulatory reviews and reportability decisions, and sets the reporting windows."],
@@ -209,8 +209,8 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Readiness: what an inspector would find in your records today.",
               "My Work: your tasks, approvals and evidence requests.",
               "Complaints: the second look, the backlog, reportability and the reporting windows.",
-              "Signals: the signal inbox, the trend check and the detection rules.",
-              "Investigations: open and work your cases, from evidence to the signed decision.",
+              "Signals: the trend inbox, the trend check and the detection rules.",
+              "Investigations: open and work your investigations, from evidence to the signed decision.",
               "Records: CAPA effectiveness checks, risk file input, the audit trail, reports and signature verification.",
               "Import data: bring in your CSV or Excel exports.",
               "My Account: your profile, security and access. Share feedback: tell the MDARIX team what to improve.",
@@ -275,6 +275,17 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         purpose:
           "The quality loop MDARIX closes, chapter by chapter: what your records show in each, why inspectors care, and where to try it. Start on the sample data, then on your own export.",
         tasks: [
+          {
+            title: "Pick a five-minute story (the new navigation)",
+            steps: [
+              "On the new navigation a trial opens on four stories, each about five minutes: A complaint just arrived: what now?, Is a problem rising?, Is this reportable, and by when, in the US and India? and Try it on your own export.",
+              "Choose a story. It opens on the sample's own record, and a bar at the top shows the step you are on, with Back to the stories.",
+              "On each screen the main button is the next step; Why am I asked? under each question gives its reason and clause.",
+              "The ten chapters are under Explore all capabilities. Uploading your own export is optional and outside the count.",
+            ],
+            result:
+              "After your first visit the trial opens on My work; The five-minute stories link there brings you back.",
+          },
           {
             title: "Follow the story",
             steps: [
@@ -358,7 +369,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Under Why it matters, small chips name the check's regulatory basis, for example ISO 13485 8.2.2 or 21 CFR 803.50; point at a chip for its title. MDARIX organizes the evidence these ask for; it does not certify compliance.",
               "Choose Open on a check to go to the screen where you act on it.",
             ],
-            note: "The eleven checks: Complaints to recheck, Complaints past target, Reporting clocks, Trends without CAPA or risk review, Post-market data not in the risk file, Harm complaints closed without an investigation, CAPAs without a verified effect, Signals waiting past their triage date, Dispositions past the target or to review, Recurring service-level matters, Requests to external contacts.",
+            note: "The eleven checks: Complaints to recheck, Complaints past target, Reporting clocks, Trends without CAPA or risk review, Post-market data not in the risk file, Harm complaints closed without an investigation, CAPAs without a verified effect, Trends waiting past their triage date, Dispositions past the target or to review, Recurring service-level matters, Requests to external contacts.",
           },
           {
             title: "Download the summary for management review or an inspector",
@@ -383,7 +394,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Work a task",
             steps: [
               "Choose a tab: Assigned to me, Role queues, Waiting, Returned to me, Due soon, Overdue or Completed.",
-              "Choose Open to go to the task's case or screen, or Details to see its history.",
+              "Choose Open to go to the task's investigation or screen, or Details to see its history.",
               "Use the actions offered: Accept or Claim act at once; Decline, Release and Reassign need a reason of at least 10 characters; Complete takes an optional note.",
             ],
             result: "Recorded in the task's history and the audit trail.",
@@ -393,7 +404,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             who: "Authorized Decision Maker and Leader.",
             steps: [
               "Open the Approvals tab.",
-              "Under Briefs awaiting your decision, choose Open to go to the case's Decision step.",
+              "Under Briefs awaiting your decision, choose Open to go to the investigation's Decision step.",
             ],
             note: "You never sign a brief you prepared or reviewed, and administrators never sign.",
           },
@@ -404,7 +415,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "On a request, choose Acknowledge, Respond (your answer and optional files), or Cannot provide with a reason.",
               "On a request you sent, choose Review into evidence to accept the response as evidence or reject it with a reason.",
             ],
-            note: "A response is never evidence by itself: the person who asked reviews it into the case's evidence.",
+            note: "A response is never evidence by itself: the person who asked reviews it into the investigation's evidence.",
           },
         ],
       },
@@ -412,9 +423,9 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
   },
   {
     id: "complaints-signals",
-    title: "Complaints and signals",
+    title: "Complaints and trends",
     summary:
-      "Close routine complaints at service level with a documented reason, find the complaints that hide, keep every reporting clock, and turn a rising trend into a case.",
+      "Close routine complaints at service level with a documented reason, find the complaints that hide, keep every reporting clock, and turn a rising trend into an investigation.",
     sections: [
       {
         id: "first-contact",
@@ -425,7 +436,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         tasks: [
           {
             title: "Log a call and sign the check",
-            who: "Leader, and anyone who triages signals, opens cases or reviews quality.",
+            who: "Leader, and anyone who triages trends, opens investigations or reviews quality.",
             steps: [
               "Open Complaints › First contact and choose Log a call. Write the caller's words as they said them, the product, lot or serial number, what was asked for and the time of the call (that is the awareness time; it never moves).",
               "Answer questions 1 to 9: Yes, No, Unknown or Not applicable (with a reason); questions 4 to 6 may be Not stated. No means not alleged. Unknown and Not stated are never No.",
@@ -461,15 +472,15 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Dispositions: close a routine complaint in minutes",
         where: "Complaints › Dispositions, and Signals › By resolution",
         purpose:
-          "Most complaints are resolved at service level. You decide how each one is resolved, in a fixed order, and sign once; a complaint that meets an escalation trigger opens a case. The disposition never replaces the reportability assessment.",
+          "Most complaints are resolved at service level. You decide how each one is resolved, in a fixed order, and sign once; a complaint that meets an escalation trigger opens an investigation. The disposition never replaces the reportability assessment.",
         tasks: [
           {
             title: "Close a routine complaint on the routine path",
-            who: "Leader, and anyone who triages signals, opens cases or reviews quality.",
+            who: "Leader, and anyone who triages trends, opens investigations or reviews quality.",
             steps: [
               "Open Complaints › Dispositions. A complaint marked Routine path is not on the reportability watch, has no second-look flag and meets no escalation trigger: choose Close on the routine path.",
               "Read the summary in the reporter's words and, for each enabled market, the basis: not on the reportability watch, so not reportable.",
-              "Question 1 shows No trigger met; Show the triggers lists the five starter triggers. Question 2 lists any open case with the same product and problem code, or the same lot.",
+              "Question 1 shows No trigger met; Show the triggers lists the five starter triggers. Question 2 lists any open investigation with the same product and problem code, or the same lot.",
               "Under question 3, Resolved at service level is chosen: fill in the troubleshooting, the correction, what was done, the result, the service ticket and why no investigation is needed (ISO 13485:2016 clause 8.2.2).",
               "Choose the Root-cause attribution: device-related, use-related, environment-related or undetermined (with a reason). Show definitions explains each.",
               "Check the classification for trends: Use environment and User type, proposed from your records. A value not on the list stays Unknown, with the source value shown; nothing is guessed. Show the coding criteria explains how to code.",
@@ -482,9 +493,9 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           {
             title: "Link a known issue, or escalate",
             steps: [
-              "When an open case matches, choose it under question 2 and say why it is the same issue: the complaint joins the case's scope as a contributing complaint, with a new scope version.",
-              "When a trigger is met, question 1 shows it with its facts and the other branches are refused: say why the case is needed and sign; a case opens with the complaint in its scope.",
-              "Otherwise choose Escalate: open a case under question 4, with your reason.",
+              "When an open investigation matches, choose it under question 2 and say why it is the same issue: the complaint joins the investigation's scope as a contributing complaint, with a new scope version.",
+              "When a trigger is met, question 1 shows it with its facts and the other branches are refused: say why the investigation is needed and sign; an investigation opens with the complaint in its scope.",
+              "Otherwise choose Escalate: open an investigation under question 4, with your reason.",
             ],
             note: "A signed disposition is never edited. To change it, sign a new version with its reason; the earlier one stays visible. Readiness lists a disposition to review when a trigger is met after signing.",
           },
@@ -492,7 +503,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "See service-level matters as a trend",
             steps: [
               "Open Signals › By resolution and group by product and problem code, lot, use environment, user type or attribution.",
-              "Two or more service-level resolutions on one product and problem code within 30 days, with no open case covering them, show as a Recurring service-level matter here and on Readiness; the next such complaint is escalated.",
+              "Two or more service-level resolutions on one product and problem code within 30 days, with no open investigation covering them, show as a Recurring service-level matter here and on Readiness; the next such complaint is escalated.",
             ],
           },
         ],
@@ -523,7 +534,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         id: "backlog",
         title: "Backlog",
         where: "Complaints › Backlog",
-        purpose: "See which open complaints wait in no signal and no case past your target.",
+        purpose: "See which open complaints wait in no trend and no investigation past your target.",
         tasks: [
           {
             title: "Work the oldest complaints first",
@@ -664,7 +675,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "When the answer comes, choose Record the reply with what they said, the evidence and the QMS record ID. The request is Answered.",
             ],
             result:
-              "Open and overdue requests show in My Work (the owner's), in Readiness and on the case's Decision Brief. Each message counts as recorded in MDARIX when it is logged before sending or within one working hour.",
+              "Open and overdue requests show in My Work (the owner's), in Readiness and on the investigation's Decision Brief. Each message counts as recorded in MDARIX when it is logged before sending or within one working hour.",
             note: "An Unknown answer in a market assessment, or in a first-contact check, raises a request to the reporter here. Formal responses to the complainant and field safety notices stay records of your QMS: link them by their ID.",
           },
         ],
@@ -749,40 +760,40 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Signals: triage a pattern of complaints",
         where: "Signals › Signal inbox",
         purpose:
-          "Review new signals, decide what each needs and follow complaint trends. Signals are recorded observations, not conclusions about cause.",
+          "Review new trends, decide what each needs and follow complaint trends. Trends are recorded observations, not conclusions about cause.",
         tasks: [
           {
-            title: "Find the signals that need you",
+            title: "Find the trends that need you",
             steps: [
               "Filter by status (Open, All and each status), priority, product, origin and owner, and sort by Priority, Due date, Latest complaint, Complaints or Created.",
-              "Choose a signal to open it: its complaints, what they have in common (straight from the records, each point linked to its complaints) and its trend check.",
+              "Choose a trend to open it: its complaints, what they have in common (straight from the records, each point linked to its complaints) and its trend check.",
             ],
           },
           {
-            title: "Open a case in one click",
+            title: "Open an investigation in one click",
             who: "PMS / Signal Triage Lead, Quality Investigator, Leader.",
-            steps: ["On the signal, choose Open an investigation."],
+            steps: ["On the trend, choose Open an investigation."],
             result:
-              "The signal is marked as needing an investigation and a case opens with every complaint. To choose the question, the complaints or the investigator first, choose Open an investigation with options….",
+              "The trend is marked as needing an investigation and an investigation opens with every complaint. To choose the question, the complaints or the investigator first, choose Open an investigation with options….",
           },
           {
-            title: "Triage a signal",
+            title: "Triage a trend",
             who: "PMS / Signal Triage Lead and Leader.",
             steps: [
               "Start triage begins the triage.",
               "Set priority: confirm MDARIX's suggestion, or choose Critical, High, Medium or Low and say why.",
-              "Record disposition: Investigation required, Escalate, Monitor (with a date to review again), No action needed, or Duplicate of another signal, with a Reason.",
-              "Merge signals or Add complaints, each with a Reason of at least 10 characters.",
+              "Record disposition: Investigation required, Escalate, Monitor (with a date to review again), No action needed, or Duplicate of another trend, with a Reason.",
+              "Merge trends or Add complaints, each with a Reason of at least 10 characters.",
             ],
-            result: "Every change is recorded in the signal's history and the audit trail.",
+            result: "Every change is recorded in the trend's history and the audit trail.",
           },
           {
-            title: "Create a signal yourself",
+            title: "Create a trend yourself",
             who: "PMS / Signal Triage Lead and Leader.",
             steps: [
-              "Choose New signal.",
+              "Choose New trend.",
               "Give a Title, choose the Product (and optionally the Version), and tick at least one complaint.",
-              "Optionally set a Priority and say why, then choose Create signal.",
+              "Optionally set a Priority and say why, then choose Create trend.",
             ],
           },
         ],
@@ -799,7 +810,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             steps: [
               "Group By version, By problem code or By complaint type.",
               "Each row's Result is Significant rise (chance under 1% if nothing changed, allowing for the groups checked at once), Higher than usual (under 5%), In line with history, Too few to assess or History too short. Chance shows the adjusted value, with the group's own value beside it.",
-              "On a rising row with no open signal, choose Raise a signal (PMS / Signal Triage Lead and Leader).",
+              "On a rising row with no open trend, choose Raise a trend (PMS / Signal Triage Lead and Leader).",
             ],
             note: "The line under the table names the basis: ISO 13485 8.4 (analysis of data) and EU MDR Art. 88 (trend reporting).",
           },
@@ -807,7 +818,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Change a detection rule",
             who: "PMS / Signal Triage Lead and Leader.",
             steps: [
-              "Open Signals › Detection rules. A rule opens a signal when enough complaints about the same problem arrive within a number of days.",
+              "Open Signals › Detection rules. A rule opens a trend when enough complaints about the same problem arrive within a number of days.",
               "In Change the rule, set Minimum complaints and Within (days), give a Reason for the change and choose Save rule.",
               "Choose Run detection now to apply it at once.",
             ],
@@ -820,14 +831,14 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
   {
     id: "investigations",
     title: "Investigations",
-    summary: "Work a case from its question to a signed decision and its CAPA.",
+    summary: "Work an investigation from its question to a signed decision and its CAPA.",
     sections: [
       {
         id: "cases",
-        title: "Open and manage a case",
+        title: "Open and manage an investigation",
         where: "Investigations › All investigations and Workspace",
         purpose:
-          "Open a case and work through it step by step. MDARIX organizes evidence and possible explanations; it never concludes a root cause for you.",
+          "Open an investigation and work through it step by step. MDARIX organizes evidence and possible explanations; it never concludes a root cause for you.",
         tasks: [
           {
             title: "Open an investigation",
@@ -839,18 +850,19 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             result: "The investigation opens, assigned to you, on its Workspace.",
           },
           {
-            title: "Follow the case progress",
+            title: "Follow the investigation progress",
             steps: [
-              "On Workspace, Where this case stands shows the steps: Overview, Scope, Evidence, Analysis, Hypotheses, Gaps and open questions, Risk and regulatory review, Investigation brief, Human review and decision.",
+              "On Workspace, Where this investigation stands shows the steps: Overview, Scope, Evidence, Analysis, Hypotheses, Unknowns, Risk and regulatory review, Investigation brief, Human review and decision.",
               "Choose a step to go to it. The Readiness checklist (Show each check) lists what is in place and what is missing.",
+              "On the new navigation an investigation has four sections, Summary, Evidence, Decisions & actions and History, under one progress line; its main button names the next step.",
             ],
           },
           {
-            title: "Change the case's state, owner, priority or due date",
+            title: "Change the investigation's state, owner, priority or due date",
             steps: [
-              "Start work, Put on hold, Resume or Cancel case: each asks why, at least 10 characters.",
+              "Start work, Put on hold, Resume or Cancel investigation: each asks why, at least 10 characters.",
               "Priority and due date (or Manage on the list): give a Reason for the change, then change the question, Assign to a colleague, or set the Priority and Due date.",
-              "When the case is done, Manage shows the criteria Before closing and Close investigation.",
+              "When the investigation is done, Manage shows the criteria Before closing and Close investigation.",
             ],
           },
         ],
@@ -860,10 +872,10 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Evidence",
         where: "Investigations › Evidence",
         purpose:
-          "The case's evidence, each with two separate judgements: its review status (can it be relied on?) and its relationship to the question (does it support, contradict or give context?).",
+          "The investigation's evidence, each with two separate judgements: its review status (can it be relied on?) and its relationship to the question (does it support, contradict or give context?).",
         tasks: [
           {
-            title: "Link evidence to the case",
+            title: "Link evidence to the investigation",
             steps: [
               "Choose Link evidence, search the evidence library and tick the records.",
               "Optionally set the Relationship and say why they belong, then choose Link record.",
@@ -934,12 +946,12 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Ask MDARIX",
         where: "Investigations › Ask MDARIX",
         purpose:
-          "Ask a question about the active case and get an answer built from the case's records, each point linked to its source. A person reviews every answer.",
+          "Ask a question about the active investigation and get an answer built from the investigation's records, each point linked to its source. A person reviews every answer.",
         tasks: [
           {
-            title: "Ask a question about the case",
+            title: "Ask a question about the investigation",
             steps: [
-              "Choose the case in the context bar.",
+              "Choose the investigation in the context bar.",
               "Write your Question, for example: What changed in Rev B, and what evidence is still missing?",
               "Choose Ask MDARIX.",
             ],
@@ -954,7 +966,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Scope and reviews",
         where: "Investigations › Scope and Investigations › Reviews",
         purpose:
-          "The scope says exactly what the case covers; risk and regulatory reviewers judge it with their own rationale.",
+          "The scope says exactly what the investigation covers; risk and regulatory reviewers judge it with their own rationale.",
         tasks: [
           {
             title: "Set the scope",
@@ -967,7 +979,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           {
             title: "Request a risk or regulatory review",
             steps: [
-              "On Reviews, see Which reviews this case needs (Required or Not required by your policy).",
+              "On Reviews, see Which reviews this investigation needs (Required or Not required by your policy).",
               "Choose Request risk review or Request regulatory review, optionally say what to look at, and confirm.",
             ],
           },
@@ -986,15 +998,15 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
       {
         id: "lot-impact",
         title: "Lot impact: which other lots share the suspect part (free trial)",
-        where: "Investigations › Scope › Lot impact (one click from the case: Lot impact on its summary)",
+        where: "Investigations › Scope › Lot impact (one click from the investigation: Lot impact on its summary)",
         purpose:
-          "Once a signal is confirmed, see what else is out there: every lot that shares the suspect component lot, supplier or product version, where its units went and how many are still in stock. MDARIX lists; you decide any field action in your QMS. MDARIX recommends no recall.",
+          "Once a trend is confirmed, see what else is out there: every lot that shares the suspect component lot, supplier or product version, where its units went and how many are still in stock. MDARIX lists; you decide any field action in your QMS. MDARIX recommends no recall.",
         tasks: [
           {
             title: "Choose the suspect factor",
             steps: [
-              "Open the case and choose Lot impact on its summary: Scope opens at its Lot impact section.",
-              "Read the suggestion: the component lot, supplier or version most of the case's lots share. Keep it, or pick another in Suspect factor.",
+              "Open the investigation and choose Lot impact on its summary: Scope opens at its Lot impact section.",
+              "Read the suggestion: the component lot, supplier or version most of the investigation's lots share. Keep it, or pick another in Suspect factor.",
               "Read the list: lots with complaints (with complaints per 1,000 units released), lots without complaints yet, units released, shipped by country and consignee, and still in stock. Open a lot's shipments to see each consignee.",
             ],
             result:
@@ -1002,18 +1014,18 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             note: "Distribution comes from Import data › Distribution (lot, consignee, country, units, ship date); lot genealogy from Import data › Lot genealogy. Consignees are organizations; names of people are refused.",
           },
           {
-            title: "Leave a lot out and keep the list with the case",
+            title: "Leave a lot out and keep the list with the investigation",
             who: "Quality Investigator and Leader.",
             steps: [
               "Tick Leave out on a lot and say why (at least 10 characters).",
-              "Choose Keep this list with the case: the case scope gets a new version, with the lots kept and the lots left out and their reasons.",
+              "Choose Keep this list with the investigation: the investigation scope gets a new version, with the lots kept and the lots left out and their reasons.",
             ],
           },
           {
             title: "Sign the list",
             who: "Anyone who signs decisions, reviews quality or approves regulatory content.",
             steps: [
-              "Read the list kept with the case, enter Your password and Authenticator code, and choose Sign the list.",
+              "Read the list kept with the investigation, enter Your password and Authenticator code, and choose Sign the list.",
               "Download the PDF or CSV for your field action file (Practice record in a free trial).",
             ],
             result:
@@ -1032,7 +1044,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Write and submit the brief (investigator)",
             who: "Quality Investigator and Leader.",
             steps: [
-              "Choose Compose the brief: it is composed from the case's records.",
+              "Choose Compose the brief: it is composed from the investigation's records.",
               "In Narrative, write the Problem statement, the Proposed conclusion (your own words), the Recommended actions (one per line) and optional Notes for the reviewer. Choose Save narrative.",
               "Check the Readiness scorecard, then choose Submit for quality review.",
             ],
@@ -1046,7 +1058,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "In Your review choose Accept for decision, a Return for more evidence, analysis, a risk or a regulatory review, Reject the proposed conclusion, or Escalate. Every choice except Accept needs a Comment of at least 10 characters.",
               "Choose Record review.",
             ],
-            result: "Accepted, the brief is Approved for decision and the case is ready for a decision.",
+            result: "Accepted, the brief is Approved for decision and the investigation is ready for a decision.",
           },
         ],
         tips: ["The person who writes or submits a brief never reviews or signs it."],
@@ -1099,19 +1111,19 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
       },
       {
         id: "record",
-        title: "The case record",
+        title: "The investigation record",
         where: "Investigations › Record and Investigations › CAPAs",
         purpose:
-          "Everything a case holds, from its question and evidence to its reviews, decision and audit trail, in one record you can hand an inspector.",
+          "Everything an investigation holds, from its question and evidence to its reviews, decision and audit trail, in one record you can hand an inspector.",
         tasks: [
           {
-            title: "Download the case record",
+            title: "Download the investigation record",
             who: "Every role except Viewer.",
-            steps: ["On Record, under Download case record, choose PDF, CSV or JSON."],
+            steps: ["On Record, under Download investigation record, choose PDF, CSV or JSON."],
           },
           {
-            title: "See the case's CAPAs",
-            steps: ["Open CAPAs: each CAPA with its type, the case it came from, its status and due date."],
+            title: "See the investigation's CAPAs",
+            steps: ["Open CAPAs: each CAPA with its type, the investigation it came from, its status and due date."],
           },
         ],
       },
@@ -1165,12 +1177,12 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Each product shows its state, for example Not reviewed against the risk file or Reviewed.",
               "Choose Risks and reviews to see the risks, the risk reviews and the reassessments open.",
             ],
-            note: "Input reaches the risk file through a case's risk review and the Risk reassessment required follow-up of a signed decision.",
+            note: "Input reaches the risk file through an investigation's risk review and the Risk reassessment required follow-up of a signed decision.",
           },
           {
             title: "Say whether each risk control worked",
             steps: [
-              "In a case's risk review, tick each risk in the risk file you assessed and answer Did its risk control work?: Yes, No or Not assessable, with the reason.",
+              "In an investigation's risk review, tick each risk in the risk file you assessed and answer Did its risk control work?: Yes, No or Not assessable, with the reason.",
               "A No needs a risk file update with its owner and due date. A new failure mode or hazard, not in the risk file, is added with Add a new failure mode or hazard, with its owner and due date.",
             ],
             result:
@@ -1182,7 +1194,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         id: "documents",
         title: "Ready-to-use documents",
         where:
-          "Records › Reports (the management review report also from Readiness; the case documents from a case's Reviews step)",
+          "Records › Reports (the management review report also from Readiness; the investigation documents from an investigation's Reviews step)",
         purpose:
           "Five documents to file in your QMS and hand to an auditor: the management review report with its PMS section, the CAPA log, the investigation report, the risk-review extract and the change-impact input. MDARIX fills the data sections from your records; you write the judgement sections.",
         tasks: [
@@ -1190,7 +1202,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Generate a document",
             steps: [
               "Open Records › Reports and choose the document under Ready-to-use documents.",
-              "Choose the Period (or the Case, or the Change record) and choose Generate, cut-off now.",
+              "Choose the Period (or the Investigation, or the Change record) and choose Generate, cut-off now.",
               "Open the version: each section folds open; under each figure, its records open the screen that holds them.",
             ],
             result:
@@ -1222,10 +1234,10 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         id: "audit",
         title: "Audit trail, reports and signatures",
         where: "Records › Audit trail, Reports and Verify a signature",
-        purpose: "Every recorded step of a case, who made it and when, and proof that nothing changed since.",
+        purpose: "Every recorded step of an investigation, who made it and when, and proof that nothing changed since.",
         tasks: [
           {
-            title: "Read a case's timeline",
+            title: "Read an investigation's timeline",
             steps: [
               "Choose the investigation in the context bar and open Case timeline.",
               "Filter by category, person and dates. Each event says who made it: a person, AI or MDARIX itself.",
@@ -1235,14 +1247,14 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           {
             title: "Check that nothing changed",
             steps: [
-              "Open Integrity: MDARIX checks each signature, the case's audit chain and each brief's fingerprint.",
+              "Open Integrity: MDARIX checks each signature, the investigation's audit chain and each brief's fingerprint.",
               "Verified means every event was checked and none changed.",
             ],
           },
           {
-            title: "Replay a case and verify a signature",
+            title: "Replay an investigation and verify a signature",
             steps: [
-              "Open Replay to see the case as known when the decision was signed, or at a moment you choose.",
+              "Open Replay to see the investigation as known when the decision was signed, or at a moment you choose.",
               "Open Verify a signature, choose the Investigation and Decision, and choose Check signatures.",
             ],
           },

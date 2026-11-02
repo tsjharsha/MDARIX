@@ -161,7 +161,9 @@ describe("the lot impact helpers", () => {
     );
     expect(factorOf(factorKey(option), [option])).toEqual({ kind: "COMPONENT_LOT", id: "c1", lot: option.lot });
     expect(factorOf("nothing", [option])).toBeNull();
-    expect(optionText(option)).toBe("Pressure Sensor (Sample) lot NS-SL-2417 (Sample): 5 lots, 2 of this case's");
+    expect(optionText(option)).toBe(
+      "Pressure Sensor (Sample) lot NS-SL-2417 (Sample): 5 lots, 2 of this investigation's",
+    );
   });
 
   it("groups the lots, writes countries and asks a reason for each lot left out", () => {
@@ -226,13 +228,13 @@ describe("the case's Lot impact", () => {
     // A section of the Scope step, with its own heading and anchor (no tab of its own).
     expect(html).toContain('id="lot-impact"');
     expect(html).toContain("Lot impact: what else is out there for INV-0001");
-    expect(html).toContain("Suggested from the case&#x27;s lots");
+    expect(html).toContain("Suggested from the investigation&#x27;s lots");
     expect(html).toContain("It recommends no recall");
     expect(html).toContain("Lots with complaints · 1");
     expect(html).toContain("Lots without complaints yet · 1");
     expect(html).toContain("Distribution not imported");
     expect(html).toContain("60 per 1,000 units");
-    expect(html).toContain("Keep this list with the case");
+    expect(html).toContain("Keep this list with the investigation");
     // Nothing is kept yet: no signature and no export.
     expect(html).not.toContain("Sign the list");
     expect(html).not.toContain("PDF");

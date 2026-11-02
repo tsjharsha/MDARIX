@@ -42,3 +42,23 @@ export function SignatureBasis() {
     </p>
   );
 }
+
+/**
+ * "Why am I asked?" (stage 8, 8.2): one line under a question or a step, its reason and the clause it answers to
+ * (features/workspace/whyAsked.ts; a market's question passes its guide's locked clause).
+ */
+export function WhyAsked({
+  why,
+  clause,
+}: {
+  why: { why: string; basis: readonly string[] } | null | undefined;
+  clause?: string | null;
+}) {
+  if (!why) return null;
+  return (
+    <small className="uw-why-asked">
+      <strong>Why am I asked?</strong> {why.why} {clause && <span className="uw-basis-chip">{clause}</span>}
+      <BasisChips ids={why.basis} label="Clause" />
+    </small>
+  );
+}

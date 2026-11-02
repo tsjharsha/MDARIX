@@ -62,7 +62,7 @@ def test_what_changed_since_last_week_in_loop_order():
     assert content["first"] is False
     assert content["changes"] == [
         "Hidden complaints found: 7 to 5",
-        "Signals triaged: Needs attention to Clear (2 to 0)",
+        "Trends triaged: Needs attention to Clear (2 to 0)",
         "Risk file fed: Needs attention to Critical (3 to 3)",
     ]
     assert digest.compose(READINESS, digest.snapshot(READINESS))["changes"] == []

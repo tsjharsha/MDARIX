@@ -34,7 +34,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
     inSample: [
       "SAMPLE-RV-11: a PulseWatch 410 monitor read SpO2 4 to 6 points high against a reference oximeter. Nobody was harmed; the monitor is out of use and sent for service.",
       "Triage it first (due within the day), then answer each market's questions: in the US a malfunction that could cause a serious injury if it happened again is a 30-day report; in India nobody was harmed, so there is no adverse event to report.",
-      "The US conclusion opens a case: record the service work or the CAPA to raise in your QMS, then sign ready to close.",
+      "The US conclusion escalates it to an investigation, with the complaint's own record as its first evidence; the US report is prefilled from your records. Each step ends with the next one as its main button, up to ready to close.",
     ],
     requirement:
       "A malfunction is reported to FDA within 30 calendar days when a recurrence would be likely to cause or contribute to a serious injury; India reports adverse events.",
@@ -140,7 +140,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
     title: "CAPAs closed without proof they worked",
     inSample: [
       "SAMPLE-CAPA-01: closed without an effectiveness check.",
-      "SAMPLE-CAPA-02: opened after the sample case's brief, due in 45 days; its effectiveness check is planned 30 days later.",
+      "SAMPLE-CAPA-02: opened after the sample investigation's brief, due in 45 days; its effectiveness check is planned 30 days later.",
     ],
     requirement: "Corrective action is verified to be effective and to have no adverse effect.",
     reference: cite("ISO13485_8_5_2"),
@@ -184,7 +184,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
       "Corrective action is proportionate to the effects of the problem, including the product already in the field.",
     reference: cite("ISO13485_8_5_2"),
     opens: { section: "Investigations", tab: "Scope" },
-    action: "Open the case scope",
+    action: "Open the lot impact",
   },
   {
     key: "imports",

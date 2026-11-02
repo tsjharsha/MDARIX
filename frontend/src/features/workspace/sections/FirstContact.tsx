@@ -16,6 +16,8 @@ import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { useTabParam, useWorkspace } from "../workspaceContext";
 import { countOf, DecideAndSign } from "./common";
+import { WhyAsked } from "../../shared/Basis";
+import { FIRST_CONTACT_WHY } from "../whyAsked";
 import { ChipFilter, Hero, InlineError } from "./boardParts";
 import { EscalateButton, useCanTriage } from "./Triage";
 import {
@@ -520,6 +522,7 @@ function Questions({
               <strong>
                 {question.id.replace("Q", "")}. {question.text}
               </strong>
+              <WhyAsked why={FIRST_CONTACT_WHY[question.id]} />
               <div className="uw-fc-answers" role="radiogroup" aria-label={`Question ${question.id.replace("Q", "")}`}>
                 {answerChoices(guide, question).map((choice) => (
                   <label key={choice.code}>
@@ -847,7 +850,15 @@ function SignForm({
         </label>
       )}
       <div className="ca-form-grid">
-        <DecideAndSign />
+        <DecideAndSign
+          signs={`The first-contact check of ${item.reference}: ${
+            guide.outcomes.find((outcome) => outcome.code === form.classification)?.label ?? "your classification"
+          }.`}
+          restsOn={[
+            `Your answers to ${guide.questions.filter((question) => !question.free_text && item.answers?.[question.id]?.answer).length} questions, as saved.`,
+            `The reporter's words as logged, and the awareness time of the call.`,
+          ]}
+        />
         <label className="ca-field">
           Your password
           <input

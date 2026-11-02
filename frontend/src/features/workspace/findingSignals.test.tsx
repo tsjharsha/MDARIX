@@ -6,7 +6,7 @@ import { storyHeadline, type TrialStory } from "./trialStory";
 import type { SignalFilters } from "./signals";
 
 // 0.10.40: an import answers before its signals are found (they follow within seconds). The import result says so,
-// the signal inbox and the trial's story show "Finding signals…" and read again in the background until they are in.
+// the signal inbox and the trial's story show "Finding trends…" and read again in the background until they are in.
 
 const FILTERS = {
   status: "ALL",
@@ -30,9 +30,9 @@ describe("signals found after the import answers", () => {
   });
 
   it("shows Finding signals in an empty inbox while they are found, else the usual empty states", () => {
-    expect(inboxEmpty(FILTERS, true).title).toBe("Finding signals…");
-    expect(inboxEmpty({ ...FILTERS, q: "pump" }, true).title).toBe("Finding signals…");
-    expect(inboxEmpty({ ...FILTERS, q: "pump" }, false).title).toBe("No matching signals");
+    expect(inboxEmpty(FILTERS, true).title).toBe("Finding trends…");
+    expect(inboxEmpty({ ...FILTERS, q: "pump" }, true).title).toBe("Finding trends…");
+    expect(inboxEmpty({ ...FILTERS, q: "pump" }, false).title).toBe("No matching trends");
     expect(inboxEmpty(FILTERS, false).title).toBe("No signals");
   });
 
@@ -60,13 +60,13 @@ describe("signals found after the import answers", () => {
           promise: "Signals count every complaint per product version.",
           pain: "",
           opens: { section: "Signals", tab: "Signal inbox" },
-          finding: { value: null, text: "Finding signals in the complaints you just imported…", state: "NOT_SET" },
+          finding: { value: null, text: "Finding trends in the complaints you just imported…", state: "NOT_SET" },
           acted: { done: false, count: 0 },
         },
       ],
     };
     expect(storyHeadline(story).detail).toBe(
-      "Finding signals in the complaints you just imported. Signals count every complaint per product version.",
+      "Finding trends in the complaints you just imported. Signals count every complaint per product version.",
     );
   });
 });

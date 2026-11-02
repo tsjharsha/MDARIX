@@ -1042,7 +1042,7 @@ def test_the_trial_finds_the_rise_per_device_and_its_signal_from_the_first_minut
 
     chapters = {chapter["code"]: chapter for chapter in user.get("/api/v1/trial/story").json()["chapters"]}
     trends = chapters["TRENDS_TO_CASES"]["finding"]
-    assert trends["value"] >= 1 and "waiting for a decision or a case" in trends["text"], trends
+    assert trends["value"] >= 1 and "waiting for a decision or an investigation" in trends["text"], trends
     assert chapters["TRENDS_TO_CASES"]["acted"]["done"] is False  # detection is not a person's action
 
     # A lot's quantity comes in with the lot import, checked before anything is saved.

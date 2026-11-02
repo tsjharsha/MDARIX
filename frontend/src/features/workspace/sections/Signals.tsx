@@ -34,7 +34,7 @@ export function SignalsSection({ tab }: { tab?: string }) {
   };
   return (
     <>
-      <Tabs tabs={tabs} active={active} onChange={setActive} label="Signal sections">
+      <Tabs tabs={tabs} active={active} onChange={setActive} label="Trend sections">
         {active === "Signal inbox" && (
           <SignalInbox
             key={targetKey}
@@ -103,19 +103,19 @@ export function Trends() {
             year: "numeric",
             timeZone: "UTC",
           })} (latest signal)`
-        : "Signals by event date · last 30 days",
+        : "Trends by event date · last 30 days",
     };
   }, [signals.data]);
   return (
     <div className="ac-grid two">
       <Panel eyebrow="Signals" title={model.title} source={signals}>
-        <ColumnChart data={model.trend} unit="signals" caption="latest 100 recorded signals" />
+        <ColumnChart data={model.trend} unit="signals" caption="latest 100 recorded trends" />
       </Panel>
       <Panel eyebrow="Signals" title="By recorded severity" source={signals}>
         {model.severity.length ? (
           <BarList items={model.severity} colour="series" />
         ) : (
-          <p className="ac-muted">No signals recorded yet.</p>
+          <p className="ac-muted">No trends recorded yet.</p>
         )}
         <p className="ac-note">Severity is shown only when the source system recorded it.</p>
       </Panel>
