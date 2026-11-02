@@ -119,7 +119,7 @@ def test_the_sample_keeps_the_trend_units_and_adds_genealogy_and_distribution(tr
         for lot in rev_b:
             units[lot.effective_timestamp.date()] += lot.quantity
         assert sorted(units.values()) == [150, 150, 150] and len(rev_b) == 6
-        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 43
+        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 44  # with the flagship
         new = [lot.id for lot in rev_b if lot.lot_identifier[-3:] in ("006", "007", "008")]
         assert db.query(Complaint).filter(Complaint.lot_batch_id.in_(new)).count() == 0
         assert db.query(LotComponent).filter(LotComponent.tenant_id == tenant_id).count() == 12
