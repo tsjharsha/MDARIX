@@ -6014,7 +6014,7 @@ div.uw-task-count:hover {
 .uw-board-blocks + p,
 section[aria-label="What blocks the decision"] h3 {
   margin: 8px 0 4px;
-  font-size: 0.95rem;
+  font-size: var(--ms-fs-16);
 }
 .uw-board-sides ul,
 .uw-board-blocks {
@@ -6069,7 +6069,7 @@ section[aria-label="What blocks the decision"] h3 {
 }
 .uw-urgent-title {
   margin: 0 0 6px;
-  font-size: 1rem;
+  font-size: var(--ms-fs-16);
 }
 .uw-urgent ul {
   display: grid;
@@ -6107,4 +6107,16 @@ section[aria-label="What blocks the decision"] h3 {
 }
 .uw-trend-lead li p {
   margin: 0 0 4px;
+}
+
+/* 0.10.72 (addendum): the organization's name in full at desktop widths (it was cut at 1440); narrower screens keep
+   the truncation above. */
+@media (min-width: 1280px) {
+  .ac-header:has(.uw-tenant) {
+    gap: 10px;
+  }
+  .uw-tenant {
+    flex: 0 0 auto;
+    max-width: 400px;
+  }
 }

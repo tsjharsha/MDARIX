@@ -7,6 +7,10 @@
 
 type DateInput = string | number | Date | null | undefined;
 
+// One style per kind on every screen (0.10.72): "3 Oct 2026" and "3 Oct 2026, 14:05", as the legal deadlines read
+// ("Tue 1 Dec 2026, 23:59 IST"), whatever the browser's language ("Nov 1, 2026, 10:54 PM" sat beside them before).
+const DAY_FIRST = "en-GB";
+
 // A calendar date without a time ("2026-03-04", a *_date field). JavaScript reads it as midnight UTC, which is the
 // day before anywhere west of Greenwich; it is read as that day where the person is instead.
 const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -28,19 +32,20 @@ function toDate(value: DateInput): Date | null {
 /** "3 Oct 2026" (or the reader's order of day, month and year). */
 export function formatDay(value: DateInput, fallback = "—"): string {
   const date = toDate(value);
-  return date ? date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : fallback;
+  return date ? date.toLocaleDateString(DAY_FIRST, { day: "numeric", month: "short", year: "numeric" }) : fallback;
 }
 
 /** "3 Oct 2026, 14:05": date and time where the person is (the screen names the zone once, ``zoneName``). */
 export function formatDateTime(value: DateInput, fallback = "—"): string {
   const date = toDate(value);
   return date
-    ? date.toLocaleString(undefined, {
+    ? date.toLocaleString(DAY_FIRST, {
         day: "numeric",
         month: "short",
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        hourCycle: "h23",
       })
     : fallback;
 }

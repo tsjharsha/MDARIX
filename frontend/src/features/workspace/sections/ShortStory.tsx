@@ -277,7 +277,9 @@ export function DecideTheRoute({
         </label>
       </div>
       <section className="uw-short-records" aria-label="What Confirm the route records">
-        <h4>Confirm the route records</h4>
+        <p>
+          <strong>Confirm the route records</strong>
+        </p>
         <ul>
           <li>
             The triage record of {FLAGSHIP}: severity {severity ? levelLabel(severity).toLowerCase() : "(choose one)"},
