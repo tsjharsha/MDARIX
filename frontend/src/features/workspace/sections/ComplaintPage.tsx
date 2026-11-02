@@ -35,11 +35,14 @@ export const headline = (text: string | null | undefined, max = 140) => {
   return words.length > max ? `${words.slice(0, max - 1).trimEnd()}…` : words;
 };
 
-/** The nearest dated item of each market, then the nearest target of the organization's own (one chip each). */
+const LEGAL = ["REPORTING", "OBLIGATION"];
+
+/** One chip per market's legal deadline, then one per kind of the organization's own target (a triage target, a
+ * reply due), each the nearest. */
 export function deadlineChips(due: NonNullable<EventView["work"]>["due"]) {
   const seen = new Set<string>();
   return due.filter((item) => {
-    const key = item.market ?? "";
+    const key = LEGAL.includes(item.category) ? `market:${item.market ?? ""}` : item.category;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -128,7 +131,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
             <DeadlineChip
               key={item.key}
               item={item}
-              prefix={item.market ? marketLabel(item.market) : item.category_label}
+              prefix={LEGAL.includes(item.category) && item.market ? marketLabel(item.market) : item.category_label}
             />
           ))}
           <ToneBadge tone={EVENT_TONES[view.state]} label={view.state_label} />

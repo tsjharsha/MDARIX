@@ -603,7 +603,7 @@ export function UserWorkspace({
                   <button
                     type="button"
                     key={name}
-                    className={section === name ? "ac-secondary selected" : "ac-secondary"}
+                    className={section === name ? "ac-secondary selected uw-top-only" : "ac-secondary uw-top-only"}
                     aria-current={section === name ? "page" : undefined}
                     onClick={() => open(name)}
                   >
@@ -632,7 +632,7 @@ export function UserWorkspace({
             {topSections.includes("My Account") && (
               <button
                 type="button"
-                className={section === "My Account" ? "ac-secondary selected" : "ac-secondary"}
+                className={section === "My Account" ? "ac-secondary selected uw-top-only" : "ac-secondary uw-top-only"}
                 aria-current={section === "My Account" ? "page" : undefined}
                 onClick={() => open("My Account")}
               >
@@ -663,6 +663,24 @@ export function UserWorkspace({
                   <span>
                     <strong>{placeLabel(name, navigation)}</strong>
                     <small>{description}</small>
+                  </span>
+                </button>
+              );
+            })}
+            {/* On a phone the top-right screens (Settings, Team, Account) are in this menu, so the header fits. */}
+            {topSections.map((name) => {
+              const { icon: Icon } = NAV[name];
+              return (
+                <button
+                  type="button"
+                  key={`top-${name}`}
+                  className={section === name ? "selected uw-nav-top" : "uw-nav-top"}
+                  aria-current={section === name ? "page" : undefined}
+                  onClick={() => open(name)}
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  <span>
+                    <strong>{placeLabel(name, navigation)}</strong>
                   </span>
                 </button>
               );

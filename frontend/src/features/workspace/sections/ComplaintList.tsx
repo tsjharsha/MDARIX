@@ -381,7 +381,7 @@ export function workColumns(
       render: (row: any) => (
         <span className="uw-what">
           <button type="button" className="ac-link" onClick={() => onOpen(row)}>
-            <strong>{displayId(row, "complaint_identifier")}</strong>
+            <strong>{row.complaint_identifier ?? row.business_id}</strong>
           </button>{" "}
           <span className="uw-what-text">{row.description ?? "No description recorded"}</span>
           <ProblemCode code={row.problem_code} links={links} />
@@ -406,7 +406,7 @@ export function workColumns(
       label: "",
       render: (row: any) => {
         const request = openInvestigation ? investigationRequestFor(row) : null;
-        const ref = displayId(row, "complaint_identifier", "this complaint");
+        const ref = row.complaint_identifier ?? row.business_id ?? "this complaint";
         return (
           <span className="uw-row-actions">
             <button type="button" className="ac-secondary" aria-label={`Open ${ref}`} onClick={() => onOpen(row)}>

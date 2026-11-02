@@ -5224,3 +5224,15 @@ div.uw-task-count:hover {
   border-color: var(--ms-teal);
   color: var(--ms-teal-dark);
 }
+/* The new navigation on a phone: Settings, Team and Account move from the header into the menu (0.10.68). */
+.ac-nav .uw-nav-top {
+  display: none;
+}
+@media (max-width: 640px) {
+  .ac-user .uw-top-only {
+    display: none;
+  }
+  .ac-nav .uw-nav-top {
+    display: flex;
+  }
+}
