@@ -11,7 +11,15 @@ import {
 } from "lucide-react";
 import { BESIDE_YOUR_QMS, PMS_FRAMING } from "./besideYourQms";
 import { TRIAL_GUIDE_PATH } from "./trialGuide";
-import { COVERAGE, COVERAGE_MARKETS, COVERAGE_NOTE, GUIDE_PARTS, GUIDE_SECTIONS, ROLE_SUMMARY } from "./userGuide";
+import {
+  COVERAGE,
+  COVERAGE_MARKETS,
+  COVERAGE_NOTE,
+  GUIDE_PARTS as PARTS,
+  GUIDE_SECTIONS,
+  ROLE_SUMMARY,
+} from "./userGuide";
+import { newPathText } from "../../app/linkTable";
 import "./trialGuide.css";
 import "./userGuide.css";
 
@@ -21,6 +29,10 @@ import "./userGuide.css";
  * manual. It holds no organization data, so it opens without a session and saves as a PDF with the browser's print.
  */
 export function UserGuidePage() {
+  // An organization on the new navigation opens the guide from Help with ?navigation=new: its paths name the new places.
+  const fresh =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("navigation") === "new";
+  const GUIDE_PARTS = fresh ? (JSON.parse(newPathText(JSON.stringify(PARTS))) as typeof PARTS) : PARTS;
   return (
     <div className="help-page tg-page ug-page">
       <a className="app-skip" href="#help-main">

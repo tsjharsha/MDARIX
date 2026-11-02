@@ -191,7 +191,7 @@ export function DispositionCard({ item, onOpen }: { item: BoardItem; onOpen: () 
         </div>
         {item.description && <q className="uw-cr-text uw-cr-clip">{item.description}</q>}
         {item.known_issue.length > 0 && !signed && (
-          <p className="uw-cr-meta">Open case with the same problem or lot: {item.known_issue.join(", ")}</p>
+          <p className="uw-cr-meta">Open investigation with the same problem or lot: {item.known_issue.join(", ")}</p>
         )}
         {signed && (
           <p className="uw-cr-meta">

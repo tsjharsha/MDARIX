@@ -13,6 +13,7 @@ import { decisionTab } from "./decisionTabs";
 import { recordsTab } from "./effectiveness";
 import { reportsTab } from "./authorityReports";
 import { GUIDES_TAB } from "./decisionGuides";
+import { eventTab } from "./oversight";
 
 export type TaskView = "assigned" | "queue" | "waiting" | "returned" | "due_soon" | "overdue" | "completed" | "created";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -248,8 +249,21 @@ export function taskDestination(
         ? { section: "Investigations", tab: "Workspace" }
         : { section: "My Work", tab: "Evidence requests" };
   }
+  // A step sent from a complaint's page (0.10.68) opens that complaint: its page on the new navigation, its Oversight
+  // checklist on the classic one (linkTable.json).
+  if (type === "COMPLAINT_STEP") {
+    const complaint = typeof task.details?.complaint_id === "string" ? task.details.complaint_id : "";
+    return { section: "Readiness", tab: eventTab(complaint) };
+  }
   // A reporting clock due soon or overdue opens the reportability watch; a CAPA's effectiveness check opens that CAPA.
-  if (type === "REPORTABILITY_DECISION") return { section: "Complaints", tab: "Reportability" };
+  if (type === "REPORTABILITY_DECISION") {
+    // Opens the complaint's market assessment at once (0.10.68: click path b).
+    const complaint = typeof task.details?.complaint_id === "string" ? task.details.complaint_id : null;
+    return {
+      section: "Complaints",
+      tab: complaint ? `Reportability?complaint=${encodeURIComponent(complaint)}` : "Reportability",
+    };
+  }
   // A call's follow-up, its QMS-complaint task and the QA review of a "service only" open the first contact (0.10.57).
   if (FIRST_CONTACT_TASKS.includes(type)) return { section: "Complaints", tab: "First contact" };
   // A reply due from an external contact opens the complaint's communications log (0.10.59).

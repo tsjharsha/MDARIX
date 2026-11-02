@@ -35,6 +35,12 @@ NOBODY = (
 
 def approvers(control_db: Session, tenant_id, excluded) -> list[tuple[str, str]]:
     """``[(user id, name)]`` of the active colleagues who may approve, outside ``excluded``, by name."""
+    return holders(control_db, tenant_id, PERMISSIONS, excluded)
+
+
+def holders(control_db: Session, tenant_id, permissions, excluded=()) -> list[tuple[str, str]]:
+    """``[(user id, name)]`` of the active colleagues (never an administrator) who hold any of ``permissions``,
+    outside ``excluded``, by name: who may sign a step, shown before the work starts (0.10.68, 7.8)."""
     from backend.app.db.models.foundation import AuthUser
     from backend.app.workflow.people import display_name, permissions_of
 
@@ -48,7 +54,7 @@ def approvers(control_db: Session, tenant_id, excluded) -> list[tuple[str, str]]
     ):
         if str(user.id) in skip or is_administrator_role(user.role):
             continue
-        if any(permission in permissions_of(control_db, user) for permission in PERMISSIONS):
+        if any(permission in permissions_of(control_db, user) for permission in permissions):
             found.append((str(user.id), display_name(user) or "A colleague"))
     return found
 

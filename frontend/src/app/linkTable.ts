@@ -6,15 +6,43 @@ import type { FeatureSet } from "./featureSet";
  * It is applied when the workspace starts (the address it was opened on) and on every navigation (open()), and it is
  * kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Stage 7 changes the places.
  */
-export type Place = { section: string; tab?: string };
+export type Place = { section: string; tab?: string | undefined };
 
 /** The workspace screens of the MVP feature set: each one's address and its tabs. */
 export const PLACES: Readonly<Record<string, { path: string; tabs: readonly string[] }>> = table.places;
+
+/** An organization's navigation (session context `navigation`, tenants.navigation): today's menu or the new one. */
+export type Navigation = "classic" | "new";
+export const navigationOf = (value: unknown): Navigation => (value === "new" ? "new" : "classic");
+
+/** The screens of the new navigation (stage 7): each one's address, its name in the menu, its tabs and views. */
+export type NewPlace = {
+  path: string;
+  label?: string;
+  tabs: readonly string[];
+  views?: Readonly<Record<string, readonly string[]>>;
+};
+export const NEW_PLACES: Readonly<Record<string, NewPlace>> = table.newPlaces;
+
+/** The new navigation's menu: the four main screens, and Settings, Team and Account at the top right. */
+export const NEW_MENU: { main: readonly string[]; top: readonly string[] } = table.newMenu;
+
+/** The screens of a navigation. */
+export const placesFor = (
+  navigation: Navigation,
+): Readonly<Record<string, { path: string; tabs: readonly string[] }>> => (navigation === "new" ? NEW_PLACES : PLACES);
+
+/** A screen's name as its menu and heading say it: "My work", "Account" on the new navigation. */
+export const placeLabel = (section: string, navigation: Navigation): string =>
+  (navigation === "new" && NEW_PLACES[section]?.label) || section;
 
 /** Where each kind of record opens, and the address parameter that names it. */
 export type RecordKind = keyof typeof table.records;
 export const RECORD_PLACES: Readonly<Record<RecordKind, { section: string; tab: string; param: string }>> =
   table.records;
+/** Where each kind of record opens on the new navigation: a complaint on its own page. */
+export const NEW_RECORD_PLACES: Readonly<Record<RecordKind, { section: string; tab: string; param: string }>> =
+  table.newRecords;
 
 /** Former addresses (/app/<view>): the section, and tab, each one opened. */
 export const OLD_VIEWS = table.oldViews as unknown as Readonly<Record<string, [string, string?]>>;
@@ -27,6 +55,45 @@ export const MY_WORK_APPROVALS_TAB = "Approvals";
 
 type OldSection = { section: string; tab?: string; to: Place; keep?: "query" | "view" };
 const OLD_SECTIONS: readonly OldSection[] = table.oldSections as OldSection[];
+
+/**
+ * A row of newHomes (classic place -> its home on the new navigation) or classicHomes (the reverse, for an address of
+ * the new navigation opened by an organization on the classic one): `has` names a parameter the tab must carry,
+ * `keep` keeps what it carries, `rename` renames a parameter (Oversight?event=<id> -> Complaint?ref=<id>), `add`
+ * sets one (the view a former tab is now).
+ */
+type HomeRow = {
+  section: string;
+  tab?: string;
+  has?: string;
+  to: Place;
+  keep?: "query";
+  rename?: Record<string, string>;
+  add?: Record<string, string>;
+};
+export const NEW_HOMES: readonly HomeRow[] = table.newHomes as HomeRow[];
+const CLASSIC_HOMES: readonly HomeRow[] = table.classicHomes as HomeRow[];
+
+/** A place through one table of homes: the first row that names its section (and tab, and parameter) decides. */
+function homeOf(
+  rows: readonly HomeRow[],
+  section: string,
+  tab: string | undefined,
+): { section: string; tab: string | undefined } {
+  const { name, query } = tabParts(tab);
+  const carried = new URLSearchParams(query);
+  const row = rows.find(
+    (item) =>
+      item.section === section && (item.tab === undefined || item.tab === name) && (!item.has || carried.has(item.has)),
+  );
+  if (!row) return { section, tab };
+  const params = new URLSearchParams();
+  if (row.keep === "query") for (const [key, value] of carried) params.append(row.rename?.[key] ?? key, value);
+  for (const [key, value] of Object.entries(row.add ?? {})) if (!params.has(key)) params.set(key, value);
+  const rest = params.toString();
+  const to = row.to.tab ?? "";
+  return { section: row.to.section, tab: rest ? `${to}?${rest}` : row.to.tab };
+}
 
 /** A tab's name and what it carries after "?" (a case, a request, a view). */
 export function tabParts(tab: string | undefined | null): { name: string; query: string } {
@@ -58,8 +125,27 @@ export function routeFor(
   section: string,
   tab: string | undefined,
   featureSet: FeatureSet,
+  navigation: Navigation = "classic",
 ): { section: string; tab: string | undefined } {
   if (featureSet !== "mvp") return { section, tab };
+  const classic = classicRoute(section, tab);
+  // The new navigation (stage 7) moves every classic place to its new home; a place already on it stays.
+  if (navigation === "new")
+    return onNewPlace(section, tab) ? { section, tab } : homeOf(NEW_HOMES, classic.section, classic.tab);
+  return CLASSIC_HOMES.some((row) => row.section === classic.section)
+    ? homeOf(CLASSIC_HOMES, classic.section, classic.tab)
+    : classic;
+}
+
+/** Whether a place is one of the new navigation's own: its screen, and its tab when it names one. */
+function onNewPlace(section: string, tab: string | undefined): boolean {
+  const place = NEW_PLACES[section];
+  const name = tabParts(tab).name;
+  return !!place && (!name || place.tabs.includes(name));
+}
+
+/** The classic place of a link: a parked section's screen, a former tab's new name. */
+function classicRoute(section: string, tab: string | undefined): { section: string; tab: string | undefined } {
   const { name, query } = tabParts(tab);
   const row = OLD_SECTIONS.find((item) => item.section === section && (item.tab === undefined || item.tab === name));
   if (!row) return { section, tab: currentTab(section, tab) };
@@ -70,8 +156,13 @@ export function routeFor(
 }
 
 /** The place a record opens: its section and tab, the record named by its parameter (Reports?report=<id>). */
-export function recordPlace(kind: RecordKind, id: string, extra: Record<string, string> = {}): Place {
-  const place = RECORD_PLACES[kind];
+export function recordPlace(
+  kind: RecordKind,
+  id: string,
+  extra: Record<string, string> = {},
+  navigation: Navigation = "classic",
+): Place {
+  const place = (navigation === "new" ? NEW_RECORD_PLACES : RECORD_PLACES)[kind];
   const params = new URLSearchParams(kind === "case" ? extra : { [place.param]: id, ...extra });
   const query = params.toString();
   return { section: place.section, tab: query ? `${place.tab}?${query}` : place.tab };
@@ -103,4 +194,26 @@ export function placeOf(opens: Opens): Place {
   const tab = target.tab ?? "";
   const param = own ? home.param : record.kind;
   return { section: target.section, tab: `${tab}?${new URLSearchParams({ [param]: record.id })}` };
+}
+
+/**
+ * Words that point somewhere (7.10): a text's "A › B" paths (the user guide, the trial guide) as an organization on the
+ * new navigation reads them, through the same table: "Complaints › Reports" reads "Complaints › Reporting",
+ * "Readiness › Oversight" "My work › Team overview". A path the table does not know stays as written.
+ */
+export function newPathText(text: string): string {
+  const longest = (items: readonly string[]) => [...items].sort((a, b) => b.length - a.length).join("|");
+  // Screen and tab names are words, spaces and "&" only (linkTable.json), so they need no escaping in the pattern.
+  const tabs = longest([...new Set(Object.values(PLACES).flatMap((place) => place.tabs))]);
+  const pattern = new RegExp(`(?<![A-Za-z])(${longest(Object.keys(PLACES))}) › (${tabs})?`, "g");
+  return text.replace(pattern, (whole, section: string, tab: string | undefined) => {
+    const own = !!tab && PLACES[section].tabs.includes(tab);
+    if (!own && PLACES[section].tabs.length) return whole;
+    const place = routeFor(section, own ? tab : undefined, "mvp", "new");
+    const label = placeLabel(place.section, "new");
+    if (!own) return `${label} › ${tab ?? ""}`;
+    const now = tabParts(place.tab);
+    const view = new URLSearchParams(now.query).get("view");
+    return [label, now.name, view].filter(Boolean).join(" › ");
+  });
 }

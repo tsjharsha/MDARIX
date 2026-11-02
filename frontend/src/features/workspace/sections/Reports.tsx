@@ -79,7 +79,7 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
             ? waiting.length
               ? `${countOf(waiting.length, "report")} to finish`
               : "No report waits"
-            : "Reading the reports…"
+            : "Authority reports"
         }
         detail="From a market assessment to a report ready to file: the worksheet in the authority's field order, a second person's approval, and the submission you record after entering it in the authority's route."
       />

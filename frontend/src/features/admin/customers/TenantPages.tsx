@@ -23,6 +23,7 @@ import {
   REASON_MIN,
   TENANT_FIELD_GROUPS,
   TENANT_TYPES,
+  NAVIGATIONS,
   blockedByCustomer,
   changeErrorText,
   lifecycleStatusLabel,
@@ -385,7 +386,7 @@ export function TenantPage({
             what="tenant"
             record={tenant}
             groups={presentGroups(tenant, TENANT_FIELD_GROUPS)}
-            choices={{ tenant_type: TENANT_TYPES }}
+            choices={{ tenant_type: TENANT_TYPES, navigation: NAVIGATIONS }}
             url={`/api/v1/platform-admin/tenants/${tenantId}`}
             onClose={() => setEditing(false)}
             onReload={() => {
@@ -410,6 +411,7 @@ const TENANT_DETAILS: Array<[string, string]> = [
   ["Tenant type", "tenant_type"],
   ["Deployment", "deployment_model"],
   ["Configuration version", "configuration_version"],
+  ["Navigation", "navigation"],
   ["Primary region", "primary_region"],
   ["Data residency", "residency_region"],
   ["Database region", "database_region"],
@@ -436,7 +438,7 @@ function TenantOverview({ tenant, onEdit }: { tenant: any; onEdit: () => void })
             <dd>
               {key === "business_id"
                 ? displayId(tenant, "tenant_identifier")
-                : key === "tenant_type" && tenant[key]
+                : (key === "tenant_type" || key === "navigation") && tenant[key]
                   ? titleCase(tenant[key])
                   : tenant[key] || "—"}
             </dd>

@@ -220,8 +220,14 @@ def _task_items(db: Session, tenant_id) -> list[dict]:
         )
         # An approval task (workflow/approvals.py) names its own category and the screen it opens.
         opens = details.get("opens") or links.target("My Work")
-        if task.task_type == REPLY_TASK and complaint_id:
+        # A reply due opens its request in the log, a step sent from a complaint's page opens that complaint
+        # (0.10.68: one click from the reminder to the record, not to a list).
+        if task.task_type == REPLY_TASK and task.source_entity_type == "CommunicationEntry":
+            opens = links.target("Complaints", "Communications", record=("communication", task.source_entity_id))
+        elif task.task_type == REPLY_TASK and complaint_id:
             opens = links.target("Complaints", "Communications", record=("complaint", complaint_id))
+        elif task.task_type == "COMPLAINT_STEP" and complaint_id:
+            opens = links.target(record=("complaint", complaint_id))
         found.append(
             _item(
                 f"task:{task.id}",
@@ -253,7 +259,9 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
             "backup_id": record.get("backup_owner"),
             "queue": None if owner else "Triage",
             "product": item.get("product_name"),
-            "opens": links.target("Complaints", "Triage"),
+            "opens": links.target("Complaints", "Triage", record=("complaint", complaint_id))
+            if complaint_id
+            else links.target("Complaints", "Triage"),
         }
         found.append(
             _item(
@@ -322,7 +330,7 @@ def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
                 complaint_id=row.complaint_id,
                 owner_id=row.signed_by or row.created_by,
                 market=row.market,
-                opens=links.target("Complaints", "Reportability")
+                opens=links.target("Complaints", "Reportability", record=("complaint", row.complaint_id))
                 if pending
                 else links.target("Complaints", "Reports", record=("complaint", row.complaint_id)),
             )
@@ -375,7 +383,7 @@ def _capa_items(db: Session, tenant_id) -> list[dict]:
             ref=row.business_id or row.capa_identifier,
             queue="Your QMS",
             product=names.get(row.product_id),
-            opens=links.target("Records", "Effectiveness checks"),
+            opens=links.target("Records", "Effectiveness checks", record=("capa", row.id)),
             alerts=False,
         )
         for row in db.query(Capa).filter(Capa.tenant_id == tenant_id, Capa.due_at.isnot(None)).limit(READ_LIMIT)

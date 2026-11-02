@@ -55,11 +55,14 @@ TASK_TYPES: dict[str, TaskType] = {
     # An information request to a reporter, distributor, hospital or service partner (tr06, G30): its owner's task
     # until it is answered, closed or unresolved after attempts.
     "EXTERNAL_REPLY_DUE": TaskType("Reply due from an external contact", SIGNAL_TRIAGE_PERMISSION, "TRIAGE_LEAD"),
+    # A step of a complaint sent to a colleague from its page (0.10.68, "Send to"): always for a named person who
+    # may sign that step; finished when that person has done it, or by hand.
+    "COMPLAINT_STEP": TaskType("A step on a complaint", SIGNAL_TRIAGE_PERMISSION, "TRIAGE_LEAD"),
 }
 
 # Task types a person finishes by hand (POST /api/v1/tasks/{id}/complete); every other type is finished by the
 # action it asks for (a signature, a supplier's reply, closing the case ...).
-MANUAL_COMPLETION_TYPES = frozenset({"FOLLOW_UP", "IMPACT_ASSESSMENT", "EVIDENCE_REVIEW"})
+MANUAL_COMPLETION_TYPES = frozenset({"FOLLOW_UP", "IMPACT_ASSESSMENT", "EVIDENCE_REVIEW", "COMPLAINT_STEP"})
 
 # The records a task can be about, as stored in workflow_tasks.source_entity_type.
 SOURCE_LABELS: dict[str, str] = {

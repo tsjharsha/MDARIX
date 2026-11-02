@@ -1,11 +1,14 @@
 {
-  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. Stage 7 changes the right-hand sides.",
+  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. newPlaces, newMenu, newRecords and newHomes (stage 7, 0.10.68): the screens of the new navigation, its menu, where each record opens there, and the new home of every screen and tab above; they apply only to an organization on the new navigation (tenants.navigation = new). classicHomes: where an address of the new navigation opens for an organization on the classic one.",
   "places": {
     "Getting started": {
       "path": "/app/getting-started",
       "tabs": ["Your data", "Team", "About the sample data", "Your trial"]
     },
-    "Readiness": { "path": "/app/readiness", "tabs": ["Inspection checks", "Oversight"] },
+    "Readiness": {
+      "path": "/app/readiness",
+      "tabs": ["Inspection checks", "Oversight"]
+    },
     "My Work": {
       "path": "/app/my-work",
       "tabs": [
@@ -71,24 +74,68 @@
       "path": "/app/records",
       "tabs": ["Effectiveness checks", "Risk file input", "Audit trail", "Reports", "Verify a signature"]
     },
-    "Import data": { "path": "/app/import-data", "tabs": [] },
-    "My Account": { "path": "/app/account", "tabs": ["Profile", "Security", "Access"] },
-    "Share feedback": { "path": "/app/feedback", "tabs": [] },
+    "Import data": {
+      "path": "/app/import-data",
+      "tabs": []
+    },
+    "My Account": {
+      "path": "/app/account",
+      "tabs": ["Profile", "Security", "Access"]
+    },
+    "Share feedback": {
+      "path": "/app/feedback",
+      "tabs": []
+    },
     "Look ahead": {
       "path": "/app/look-ahead",
       "tabs": ["How a distributor reports", "As your distributor sees it", "As your authorised representative sees it"]
     },
-    "Next steps": { "path": "/app/next-steps", "tabs": [] }
+    "Next steps": {
+      "path": "/app/next-steps",
+      "tabs": []
+    }
   },
   "records": {
-    "complaint": { "section": "Readiness", "tab": "Oversight", "param": "event" },
-    "report": { "section": "Complaints", "tab": "Reports", "param": "report" },
-    "communication": { "section": "Complaints", "tab": "Communications", "param": "communication" },
-    "disposition": { "section": "Complaints", "tab": "Dispositions", "param": "complaint" },
-    "capa": { "section": "Records", "tab": "Effectiveness checks", "param": "capa" },
-    "case": { "section": "Investigations", "tab": "Workspace", "param": "case" },
-    "signal": { "section": "Signals", "tab": "Signal inbox", "param": "signal" },
-    "request": { "section": "My Work", "tab": "Evidence requests", "param": "request" }
+    "complaint": {
+      "section": "Readiness",
+      "tab": "Oversight",
+      "param": "event"
+    },
+    "report": {
+      "section": "Complaints",
+      "tab": "Reports",
+      "param": "report"
+    },
+    "communication": {
+      "section": "Complaints",
+      "tab": "Communications",
+      "param": "communication"
+    },
+    "disposition": {
+      "section": "Complaints",
+      "tab": "Dispositions",
+      "param": "complaint"
+    },
+    "capa": {
+      "section": "Records",
+      "tab": "Effectiveness checks",
+      "param": "capa"
+    },
+    "case": {
+      "section": "Investigations",
+      "tab": "Workspace",
+      "param": "case"
+    },
+    "signal": {
+      "section": "Signals",
+      "tab": "Signal inbox",
+      "param": "signal"
+    },
+    "request": {
+      "section": "My Work",
+      "tab": "Evidence requests",
+      "param": "request"
+    }
   },
   "oldViews": {
     "home": ["Dashboard"],
@@ -114,42 +161,127 @@
     "import-data": ["Import data"],
     "account": ["My Account"],
     "feedback": ["Share feedback"],
-    "look-ahead": ["Look ahead"]
+    "look-ahead": ["Look ahead"],
+    "trends": ["Trends"],
+    "settings": ["Settings"],
+    "team": ["Team"]
   },
   "oldSections": [
-    { "section": "Dashboard", "to": { "section": "Readiness" } },
-    { "section": "Products", "to": { "section": "Readiness" } },
+    {
+      "section": "Dashboard",
+      "to": {
+        "section": "Readiness"
+      }
+    },
+    {
+      "section": "Products",
+      "to": {
+        "section": "Readiness"
+      }
+    },
     {
       "section": "Evidence",
       "tab": "Requests",
-      "to": { "section": "My Work", "tab": "Evidence requests" },
+      "to": {
+        "section": "My Work",
+        "tab": "Evidence requests"
+      },
       "keep": "query"
     },
-    { "section": "Evidence", "to": { "section": "Investigations", "tab": "Evidence" } },
-    { "section": "Decisions", "tab": "Approvals", "to": { "section": "My Work", "tab": "Approvals" } },
+    {
+      "section": "Evidence",
+      "to": {
+        "section": "Investigations",
+        "tab": "Evidence"
+      }
+    },
+    {
+      "section": "Decisions",
+      "tab": "Approvals",
+      "to": {
+        "section": "My Work",
+        "tab": "Approvals"
+      }
+    },
     {
       "section": "Decisions",
       "tab": "Verify a signature",
-      "to": { "section": "Records", "tab": "Verify a signature" }
+      "to": {
+        "section": "Records",
+        "tab": "Verify a signature"
+      }
     },
     {
       "section": "Decisions",
       "tab": "Decision",
-      "to": { "section": "Investigations", "tab": "Decision" },
+      "to": {
+        "section": "Investigations",
+        "tab": "Decision"
+      },
       "keep": "query"
     },
-    { "section": "Decisions", "to": { "section": "Investigations", "tab": "Decision" } },
-    { "section": "Intelligence", "tab": "Reports", "to": { "section": "Records", "tab": "Reports" } },
+    {
+      "section": "Decisions",
+      "to": {
+        "section": "Investigations",
+        "tab": "Decision"
+      }
+    },
+    {
+      "section": "Intelligence",
+      "tab": "Reports",
+      "to": {
+        "section": "Records",
+        "tab": "Reports"
+      }
+    },
     {
       "section": "Intelligence",
       "tab": "Risk & traceability",
-      "to": { "section": "Investigations", "tab": "Reviews" }
+      "to": {
+        "section": "Investigations",
+        "tab": "Reviews"
+      }
     },
-    { "section": "Intelligence", "tab": "Regulatory copilot", "to": { "section": "Investigations", "tab": "Reviews" } },
-    { "section": "Intelligence", "to": { "section": "Investigations", "tab": "Ask MDARIX" } },
-    { "section": "Trust & Audit", "tab": "", "to": { "section": "Records", "tab": "Audit trail" } },
-    { "section": "Trust & Audit", "tab": "AI assurance", "to": { "section": "Records", "tab": "Audit trail" } },
-    { "section": "Trust & Audit", "to": { "section": "Records", "tab": "Audit trail" }, "keep": "view" }
+    {
+      "section": "Intelligence",
+      "tab": "Regulatory copilot",
+      "to": {
+        "section": "Investigations",
+        "tab": "Reviews"
+      }
+    },
+    {
+      "section": "Intelligence",
+      "to": {
+        "section": "Investigations",
+        "tab": "Ask MDARIX"
+      }
+    },
+    {
+      "section": "Trust & Audit",
+      "tab": "",
+      "to": {
+        "section": "Records",
+        "tab": "Audit trail"
+      }
+    },
+    {
+      "section": "Trust & Audit",
+      "tab": "AI assurance",
+      "to": {
+        "section": "Records",
+        "tab": "Audit trail"
+      }
+    },
+    {
+      "section": "Trust & Audit",
+      "to": {
+        "section": "Records",
+        "tab": "Audit trail"
+      },
+      "keep": "view"
+    }
   ],
   "viewIds": {
     "Getting started": "getting-started",
@@ -169,11 +301,528 @@
     "My Account": "account",
     "Share feedback": "feedback",
     "Look ahead": "look-ahead",
-    "Next steps": "next-steps"
+    "Next steps": "next-steps",
+    "Trends": "trends",
+    "Settings": "settings",
+    "Team": "team",
+    "Complaint": "complaint"
   },
   "oldTabs": {
-    "Signals": { "All signals": "Recent complaints" },
-    "My Work": { "Needs an owner": "Role queues" },
-    "Investigations": { "Story": "Workspace" }
-  }
+    "Signals": {
+      "All signals": "Recent complaints"
+    },
+    "My Work": {
+      "Needs an owner": "Role queues"
+    },
+    "Investigations": {
+      "Story": "Workspace"
+    }
+  },
+  "newPlaces": {
+    "My Work": {
+      "path": "/app/my-work",
+      "label": "My work",
+      "tabs": ["Tasks for me", "Approvals", "Evidence requests", "Queues", "Team overview", "My AI conversations"],
+      "views": {
+        "Tasks for me": [
+          "Assigned to me",
+          "Role queues",
+          "Waiting",
+          "Returned to me",
+          "Due soon",
+          "Overdue",
+          "Completed"
+        ],
+        "Queues": ["Calls to check", "Possible duplicates", "Ready to close as routine"]
+      }
+    },
+    "Complaints": {
+      "path": "/app/complaints",
+      "tabs": [
+        "To triage",
+        "Due soon",
+        "Past target",
+        "Second look",
+        "Reporting",
+        "Communications",
+        "Investigations",
+        "Dismissed",
+        "All complaints"
+      ]
+    },
+    "Complaint": {
+      "path": "/app/complaints/<ref>",
+      "label": "Complaint",
+      "tabs": ["Summary", "Evidence", "Decisions & actions", "History"]
+    },
+    "Trends": {
+      "path": "/app/trends",
+      "tabs": ["Trend check", "Trends to review", "Over time", "By resolution"]
+    },
+    "Records": {
+      "path": "/app/records",
+      "tabs": [
+        "Inspection readiness",
+        "Documents",
+        "Decision records",
+        "CAPA records",
+        "Effectiveness checks",
+        "Risk file input",
+        "Audit trail",
+        "Verify a signature",
+        "Exports"
+      ]
+    },
+    "Settings": {
+      "path": "/app/settings",
+      "tabs": [
+        "Complaint review rules",
+        "Reporting windows",
+        "Reportability guides",
+        "Working calendar",
+        "Trend rules",
+        "Contact attempts",
+        "Import templates"
+      ]
+    },
+    "Team": {
+      "path": "/app/team",
+      "tabs": []
+    },
+    "My Account": {
+      "path": "/app/account",
+      "label": "Account",
+      "tabs": ["Profile", "Security", "Access", "Away"]
+    },
+    "Investigations": {
+      "path": "/app/investigations",
+      "tabs": [
+        "Workspace",
+        "Evidence",
+        "Intelligence",
+        "Ask MDARIX",
+        "Scope",
+        "Reviews",
+        "Decision Brief",
+        "Decision",
+        "Record"
+      ]
+    },
+    "Import data": {
+      "path": "/app/import-data",
+      "tabs": []
+    },
+    "Getting started": {
+      "path": "/app/getting-started",
+      "tabs": ["Your data", "About the sample data", "Your trial"]
+    },
+    "Share feedback": {
+      "path": "/app/feedback",
+      "tabs": []
+    },
+    "Look ahead": {
+      "path": "/app/look-ahead",
+      "tabs": ["How a distributor reports", "As your distributor sees it", "As your authorised representative sees it"]
+    },
+    "Next steps": {
+      "path": "/app/next-steps",
+      "tabs": []
+    }
+  },
+  "newMenu": {
+    "main": ["My Work", "Complaints", "Trends", "Records"],
+    "top": ["Settings", "Team", "My Account"]
+  },
+  "newRecords": {
+    "complaint": {
+      "section": "Complaint",
+      "tab": "Summary",
+      "param": "ref"
+    },
+    "report": {
+      "section": "Complaints",
+      "tab": "Reporting",
+      "param": "report"
+    },
+    "communication": {
+      "section": "Complaints",
+      "tab": "Communications",
+      "param": "communication"
+    },
+    "disposition": {
+      "section": "My Work",
+      "tab": "Queues",
+      "param": "complaint"
+    },
+    "capa": {
+      "section": "Records",
+      "tab": "Effectiveness checks",
+      "param": "capa"
+    },
+    "case": {
+      "section": "Investigations",
+      "tab": "Workspace",
+      "param": "case"
+    },
+    "signal": {
+      "section": "Trends",
+      "tab": "Trends to review",
+      "param": "signal"
+    },
+    "request": {
+      "section": "My Work",
+      "tab": "Evidence requests",
+      "param": "request"
+    }
+  },
+  "newHomes": [
+    {
+      "section": "Getting started",
+      "tab": "Team",
+      "to": {
+        "section": "Team"
+      }
+    },
+    {
+      "section": "Readiness",
+      "tab": "Oversight",
+      "has": "event",
+      "to": {
+        "section": "Complaint",
+        "tab": "Summary"
+      },
+      "keep": "query",
+      "rename": {
+        "event": "ref"
+      }
+    },
+    {
+      "section": "Readiness",
+      "tab": "Oversight",
+      "to": {
+        "section": "My Work",
+        "tab": "Team overview"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Readiness",
+      "to": {
+        "section": "Records",
+        "tab": "Inspection readiness"
+      }
+    },
+    {
+      "section": "My Work",
+      "tab": "Assigned to me",
+      "to": {
+        "section": "My Work",
+        "tab": "Tasks for me"
+      },
+      "keep": "query",
+      "add": {
+        "view": "Assigned to me"
+      }
+    },
+    {
+      "section": "My Work",
+      "tab": "Role queues",
+      "to": {
+        "section": "My Work",
+        "tab": "Tasks for me"
+      },
+      "keep": "query",
+      "add": {
+        "view": "Role queues"
+      }
+    },
+    {
+      "section": "My Work",
+      "tab": "Waiting",
+      "to": {
+        "section": "My Work",
+        "tab": "Tasks for me"
+      },
+      "keep": "query",
+      "add": {
+        "view": "Waiting"
+      }
+    },
+    {
+      "section": "My Work",
+      "tab": "Returned to me",
+      "to": {
+        "section": "My Work",
+        "tab": "Tasks for me"
+      },
+      "keep": "query",
+      "add": {
+        "view": "Returned to me"
+      }
+    },
+    {
+      "section": "My Work",
+      "tab": "Due soon",
+      "to": {
+        "section": "My Work",
+        "tab": "Tasks for me"
+      },
+      "keep": "query",
+      "add": {
+        "view": "Due soon"
+      }
+    },
+    {
+      "section": "My Work",
+      "tab": "Overdue",
+      "to": {
+        "section": "My Work",
+        "tab": "Tasks for me"
+      },
+      "keep": "query",
+      "add": {
+        "view": "Overdue"
+      }
+    },
+    {
+      "section": "My Work",
+      "tab": "Completed",
+      "to": {
+        "section": "My Work",
+        "tab": "Tasks for me"
+      },
+      "keep": "query",
+      "add": {
+        "view": "Completed"
+      }
+    },
+    {
+      "section": "Complaints",
+      "tab": "Triage",
+      "to": {
+        "section": "Complaints",
+        "tab": "To triage"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Complaints",
+      "tab": "First contact",
+      "to": {
+        "section": "My Work",
+        "tab": "Queues"
+      },
+      "keep": "query",
+      "add": {
+        "view": "Calls to check"
+      }
+    },
+    {
+      "section": "Complaints",
+      "tab": "Dispositions",
+      "to": {
+        "section": "My Work",
+        "tab": "Queues"
+      },
+      "keep": "query",
+      "add": {
+        "view": "Ready to close as routine"
+      }
+    },
+    {
+      "section": "Complaints",
+      "tab": "Backlog",
+      "to": {
+        "section": "Complaints",
+        "tab": "Past target"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Complaints",
+      "tab": "Reportability",
+      "to": {
+        "section": "Complaints",
+        "tab": "Reporting"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Complaints",
+      "tab": "Reports",
+      "to": {
+        "section": "Complaints",
+        "tab": "Reporting"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Complaints",
+      "tab": "Complaint list",
+      "to": {
+        "section": "Complaints",
+        "tab": "All complaints"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Complaints",
+      "tab": "Review settings",
+      "to": {
+        "section": "Settings",
+        "tab": "Complaint review rules"
+      }
+    },
+    {
+      "section": "Complaints",
+      "tab": "Reporting windows",
+      "to": {
+        "section": "Settings",
+        "tab": "Reporting windows"
+      }
+    },
+    {
+      "section": "Complaints",
+      "tab": "Decision guides",
+      "to": {
+        "section": "Settings",
+        "tab": "Reportability guides"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Signals",
+      "tab": "Signal inbox",
+      "to": {
+        "section": "Trends",
+        "tab": "Trends to review"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Signals",
+      "tab": "Product complaints",
+      "to": {
+        "section": "Complaints",
+        "tab": "All complaints"
+      }
+    },
+    {
+      "section": "Signals",
+      "tab": "Complaint list",
+      "to": {
+        "section": "Complaints",
+        "tab": "All complaints"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Signals",
+      "tab": "Recent complaints",
+      "to": {
+        "section": "Complaints",
+        "tab": "All complaints"
+      }
+    },
+    {
+      "section": "Signals",
+      "tab": "Trends",
+      "to": {
+        "section": "Trends",
+        "tab": "Over time"
+      }
+    },
+    {
+      "section": "Signals",
+      "tab": "Trend check",
+      "to": {
+        "section": "Trends",
+        "tab": "Trend check"
+      }
+    },
+    {
+      "section": "Signals",
+      "tab": "By resolution",
+      "to": {
+        "section": "Trends",
+        "tab": "By resolution"
+      }
+    },
+    {
+      "section": "Signals",
+      "tab": "Detection rules",
+      "to": {
+        "section": "Settings",
+        "tab": "Trend rules"
+      }
+    },
+    {
+      "section": "Signals",
+      "to": {
+        "section": "Trends",
+        "tab": "Trend check"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Investigations",
+      "tab": "All investigations",
+      "to": {
+        "section": "Complaints",
+        "tab": "Investigations"
+      },
+      "keep": "query"
+    },
+    {
+      "section": "Investigations",
+      "tab": "CAPAs",
+      "to": {
+        "section": "Records",
+        "tab": "CAPA records"
+      }
+    },
+    {
+      "section": "Records",
+      "tab": "Reports",
+      "to": {
+        "section": "Records",
+        "tab": "Documents"
+      },
+      "keep": "query"
+    }
+  ],
+  "classicHomes": [
+    {
+      "section": "Complaint",
+      "to": {
+        "section": "Readiness",
+        "tab": "Oversight"
+      },
+      "keep": "query",
+      "rename": {
+        "ref": "event"
+      }
+    },
+    {
+      "section": "Trends",
+      "to": {
+        "section": "Signals",
+        "tab": "Trend check"
+      }
+    },
+    {
+      "section": "Settings",
+      "to": {
+        "section": "Complaints",
+        "tab": "Review settings"
+      }
+    },
+    {
+      "section": "Team",
+      "to": {
+        "section": "Getting started",
+        "tab": "Team"
+      }
+    }
+  ]
 }

@@ -69,7 +69,7 @@ describe("step-by-step user guide", () => {
       ["Save and sign", "../workspace/sections/MarketAssessment.tsx"],
       ["Record the filing", "../workspace/sections/MarketAssessment.tsx"],
       ["Create signal", "../workspace/sections/SignalInbox.tsx"],
-      ["Open case", "../workspace/sections/SignalDetail.tsx"],
+      ["Open an investigation", "../workspace/sections/SignalDetail.tsx"],
       ["Raise a signal", "../workspace/sections/TrendCheck.tsx"],
       ["Run detection now", "../workspace/sections/DetectionRules.tsx"],
       ["Open an investigation", "../workspace/sections/Investigations.tsx"],

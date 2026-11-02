@@ -33,7 +33,9 @@ from sqlalchemy.orm import Session
 
 from backend.app.access.permissions import (
     DATA_EXPORT,
+    DECISION_SIGN,
     EVIDENCE_REQUEST,
+    INVESTIGATION_CREATE,
     INVESTIGATION_WORK,
     QUALITY_REVIEW,
     REGULATORY_APPROVE,
@@ -48,6 +50,7 @@ from backend.app.db.models.oversight import DueAlert, EventClosure, OversightSet
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import require_any_permission
+from backend.app import links
 from backend.app.oversight import closure, rules, service
 from backend.app.reportability.deadlines import due_label
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -297,6 +300,149 @@ def _event_summary(complaint, facts: dict, row: EventClosure | None, products: d
         "state_label": EVENT_STATES[state],
         "sample": complaint.source_system is not None,
     }
+
+
+# Who may sign each step of a complaint: the permissions its signing route checks (intake, market assessment,
+# authority report approval, disposition or case decision, CAPA effectiveness, ready to close). Shown before the work
+# starts (7.8); separation of duties is unchanged: each route still refuses the same person where it did.
+STEP_SIGNERS: dict[str, tuple[str, ...]] = {
+    "TRIAGE": (SIGNAL_TRIAGE, INVESTIGATION_CREATE, QUALITY_REVIEW),
+    "FIRST_CONTACT": (SIGNAL_TRIAGE, INVESTIGATION_CREATE, QUALITY_REVIEW),
+    "MARKETS": (REGULATORY_REVIEW, REGULATORY_APPROVE),
+    "OBLIGATIONS": (REGULATORY_REVIEW, REGULATORY_APPROVE),
+    "DECISION": (SIGNAL_TRIAGE, INVESTIGATION_CREATE, QUALITY_REVIEW),
+    "CASE_DECISION": (DECISION_SIGN,),
+    "CAPA": (QUALITY_REVIEW, DECISION_SIGN),
+    "READY": (
+        SIGNAL_TRIAGE,
+        INVESTIGATION_WORK,
+        EVIDENCE_REQUEST,
+        QUALITY_REVIEW,
+        REGULATORY_REVIEW,
+        REGULATORY_APPROVE,
+    ),
+}
+# The steps another person must sign: an authority report's snapshot is approved by someone other than its preparer.
+SECOND_PERSON = {"OBLIGATIONS"}
+
+
+def _signers(control_db, tenant_id, me: str, has_case: bool) -> dict[str, dict]:
+    from backend.app.workflow import approvals
+
+    out = {}
+    for code, permissions in STEP_SIGNERS.items():
+        if code == "CASE_DECISION":
+            continue
+        wanted = STEP_SIGNERS["CASE_DECISION"] if code == "DECISION" and has_case else permissions
+        people = approvals.holders(control_db, tenant_id, wanted)
+        out[code] = {
+            "people": [{"id": ref, "name": name} for ref, name in people],
+            "you": any(ref == me for ref, _ in people),
+            "second_person": code in SECOND_PERSON,
+        }
+    return out
+
+
+def complaint_work(db, control_db, tenant_id, complaints: list) -> dict[str, dict]:
+    """What the new navigation shows for each complaint (0.10.68), from the same reads as Oversight and the event:
+    its owner, stage, next action, its dated items (a deadline per market, then its own targets, soonest first) and
+    the markets they are for. The complaint page, the complaint list and My work show these values, so they agree
+    with Oversight (tests/test_complaint_page.py)."""
+    from backend.app.reportability import markets
+
+    if not complaints:
+        return {}
+    ids = {str(complaint.id) for complaint in complaints}
+    now = service.now_utc()
+    views, context = _item_views(db, control_db, tenant_id, now)
+    due = [view for view in views if view["complaint_id"] in ids]
+    clocks = _watch_clocks(db, control_db, tenant_id, ids, now, context["settings"]["reminder_hours"])
+    tasks = closure.open_tasks_by_complaint(db, tenant_id)
+    triage = closure.open_on_triage(db, tenant_id)
+    rows = {
+        row.complaint_id: row
+        for row in db.query(EventClosure).filter(
+            EventClosure.tenant_id == tenant_id, EventClosure.complaint_id.in_([c.id for c in complaints])
+        )
+    }
+    products = _products(db, tenant_id)
+    # shortcut: each complaint's checklist is read one by one (a few queries each) for one page of a list; batch the
+    # reads if a page ever holds more than the list's 200.
+    found = {
+        str(c.id): _event_summary(c, closure.facts(db, tenant_id, c, tasks, triage), rows.get(c.id), products)
+        for c in complaints
+    }
+    names = _names(control_db, tenant_id, {item["owner_id"] for item in found.values()})
+    out = {}
+    for complaint in complaints:
+        key = str(complaint.id)
+        item = found[key]
+        mine = [view for view in due if view["complaint_id"] == key]
+        # A market not assessed yet runs the reportability watch's provisional clock, which Oversight does not list
+        # (it lists a market's clock once its assessment is started): shown here, so the page says what the watch says.
+        dated = {view["market"] for view in mine if view["category"] in ("REPORTING", "OBLIGATION")}
+        mine += [clock for clock in clocks.get(key, []) if clock["market"] not in dated]
+        mine.sort(key=lambda view: view["due_at"])
+        own = markets.market_of(complaint.country)
+        out[key] = {
+            "owner_id": item["owner_id"],
+            "owner_name": names.get(item["owner_id"] or "") if item["owner_id"] else None,
+            "stage": item["stage"],
+            "next": item["next"],
+            "state": item["state"],
+            "due": [
+                {
+                    k: view[k]
+                    for k in (
+                        "key",
+                        "category",
+                        "category_label",
+                        "title",
+                        "market",
+                        "due_at",
+                        "due_label",
+                        "state",
+                        "state_label",
+                        "hours_left",
+                        "opens",
+                    )
+                }
+                for view in mine
+            ],
+            "markets": sorted({view["market"] for view in mine if view["market"]} | ({own} if own else set())),
+        }
+    return out
+
+
+def _watch_clocks(db, control_db, tenant_id, ids: set[str], now, reminder_hours: int) -> dict[str, list[dict]]:
+    """The reportability watch's running clock of each complaint (its binding deadline), as a dated item."""
+    from backend.app.reportability import markets
+    from backend.app.reportability import service as reportability
+
+    out: dict[str, list[dict]] = {}
+    for item in reportability.watch(db, control_db, tenant_id, show="open", page_size=10_000, today=now)["items"]:
+        binding = item.get("binding")
+        if str(item["id"]) not in ids or not binding or not binding.get("due_at"):
+            continue
+        due_at = datetime.fromisoformat(binding["due_at"])
+        market = binding.get("market")
+        state = rules.state_of(due_at, now, reminder_hours)
+        out.setdefault(str(item["id"]), []).append(
+            {
+                "key": f"watch:{item['id']}:{market}",
+                "category": "REPORTING",
+                "category_label": rules.CATEGORIES["REPORTING"],
+                "title": f"{markets.MARKET_LABELS.get(market, market)}: not assessed yet, provisional deadline",
+                "market": market,
+                "due_at": due_at.isoformat(),
+                "due_label": binding.get("due_label"),
+                "state": state,
+                "state_label": rules.STATE_LABELS[state],
+                "hours_left": rules.hours_left(due_at, now),
+                "opens": links.target("Complaints", "Reportability", record=("complaint", item["id"])),
+            }
+        )
+    return out
 
 
 def _staffing(everyone: list[dict], role: str) -> str | None:
@@ -702,7 +848,22 @@ def cancel_absence(
 
 
 def _complaint(db, tenant_id, complaint_id) -> Complaint:
-    complaint = db.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.id == complaint_id).one_or_none()
+    """A complaint by its id, else (the complaint page, /app/complaints/<ref>) by the reference people see: the
+    customer's own (unique in the organization), else its MDARIX ID."""
+    key = complaint_id if isinstance(complaint_id, uuid.UUID) else None
+    if key is None:
+        try:
+            key = uuid.UUID(str(complaint_id))
+        except ValueError:
+            key = None
+    query = db.query(Complaint).filter(Complaint.tenant_id == tenant_id)
+    complaint = query.filter(Complaint.id == key).one_or_none() if key else None
+    if complaint is None and key is None:
+        ref = str(complaint_id)[:120]
+        complaint = (
+            query.filter(Complaint.complaint_identifier == ref).one_or_none()
+            or query.filter(Complaint.business_id == ref).one_or_none()
+        )
     if complaint is None:
         raise _error(404, "COMPLAINT_NOT_FOUND", "No such complaint in your organization")
     return complaint
@@ -716,10 +877,6 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     items = closure.checklist(found)
     blocked = [item for item in items if item["result"] == closure.BLOCKED]
     owner = closure.owner_of(row, found["record"])
-    now = service.now_utc()
-    due = [
-        item for item in service.due_items(db, control_db, tenant_id, now) if item["complaint_id"] == str(complaint.id)
-    ]
     refs = {owner, row.signed_by if row else None, row.filed_by if row else None}
     refs |= {e.signed_by for e in found["first_contact"]} | {d.signed_by for d in found["dispositions"]}
     refs |= {v.signed_by for versions in found["assessments"].values() for v in versions}
@@ -731,9 +888,11 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     record = closure.decision_record(control_db, found, row, names)
     signed_print = row.content_fingerprint if row is not None else None
     changed = bool(row and row.ready_state and signed_print != closure.fingerprint(complaint.id, items))
-    nearest = due[0] if due else None
+    work = complaint_work(db, control_db, tenant_id, [complaint])[str(complaint.id)]
+    nearest = work["due"][0] if work["due"] else None
     state = _event_state(complaint, items, row)
     product = _products(db, tenant_id).get(complaint.product_id)
+    version, lot = _version_and_lot(db, tenant_id, complaint)
     return {
         "event": {
             "complaint_id": str(complaint.id),
@@ -741,6 +900,19 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
             "business_id": complaint.business_id,
             "product": product,
             "lot_batch_id": str(complaint.lot_batch_id) if complaint.lot_batch_id else None,
+            # What happened, as the complaint records it (the complaint page's header, 0.10.68).
+            "description": complaint.description,
+            "problem_code": complaint.problem_code,
+            "version": version,
+            "lot": lot,
+            "country": complaint.country,
+            "harm": "DEATH"
+            if complaint.death
+            else "SERIOUS_INJURY"
+            if complaint.serious_injury
+            else "PATIENT_INVOLVED"
+            if complaint.patient_involved
+            else None,
             "market": markets.market_of(complaint.country),
             "awareness_at": _iso(complaint.awareness_timestamp),
             "status_in_qms": complaint.status,
@@ -750,13 +922,8 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
             "sample": complaint.source_system is not None,
         },
         "summary": {
-            "nearest_deadline": {
-                "title": nearest["title"],
-                "due_at": nearest["due_at"].isoformat(),
-                "opens": nearest["opens"],
-            }
-            if nearest
-            else None,
+            # The nearest dated item, the reportability watch's provisional clock included (0.10.68).
+            "nearest_deadline": {key: nearest[key] for key in ("title", "due_at", "opens")} if nearest else None,
             "open_requests": len(found["requests"]),
             "next_action": {"label": blocked[0]["action"], "detail": blocked[0]["detail"], "opens": blocked[0]["opens"]}
             if blocked
@@ -783,7 +950,31 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
         "reason_min": closure.REASON_MIN,
         "never_closes": closure.NEVER_CLOSES,
         "practice_label": _practice(control_db, tenant_id),
+        # The owner, stage, next action and dated items the lists and My work show for it (0.10.68).
+        "work": work,
+        # Who may sign each step, before the work starts (7.8).
+        "signers": _signers(control_db, tenant_id, me, bool(found["cases"])),
     }
+
+
+def _version_and_lot(db, tenant_id, complaint) -> tuple[str | None, str | None]:
+    from backend.app.db.models.foundation import LotBatch, ProductVersion
+
+    version = (
+        db.query(ProductVersion.version_identifier)
+        .filter(ProductVersion.tenant_id == tenant_id, ProductVersion.id == complaint.product_version_id)
+        .scalar()
+        if complaint.product_version_id
+        else None
+    )
+    lot = (
+        db.query(LotBatch.lot_identifier)
+        .filter(LotBatch.tenant_id == tenant_id, LotBatch.id == complaint.lot_batch_id)
+        .scalar()
+        if complaint.lot_batch_id
+        else None
+    )
+    return version, lot
 
 
 def _practice(control_db, tenant_id) -> str | None:
@@ -794,13 +985,72 @@ def _practice(control_db, tenant_id) -> str | None:
 
 @router.get("/events/{complaint_id}")
 def event(
-    complaint_id: uuid.UUID,
+    # The complaint's id, or (the complaint page, 0.10.68) the reference people see: its own, else its MDARIX ID.
+    complaint_id: str,
     db: Session = Depends(get_data_plane_db),
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     tenant_id = _tenant(ctx)
     return event_view(db, control_db, tenant_id, _complaint(db, tenant_id, complaint_id), str(ctx.user_id))
+
+
+class SendBody(BaseModel):
+    step: str = Field(pattern="^(TRIAGE|FIRST_CONTACT|MARKETS|OBLIGATIONS|DECISION|CAPA|READY)$")
+    to_user_id: str = Field(min_length=1, max_length=64)
+    note: str | None = Field(default=None, max_length=500)
+
+
+@router.post("/events/{complaint_id}/send", dependencies=[WRITERS])
+def send_step(
+    complaint_id: uuid.UUID,
+    body: SendBody,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """ "Send to <colleague>" (0.10.68, 7.8): the step lands in that person's My work as a task naming the complaint.
+    Only a colleague who may sign the step can receive it; sending changes no record and signs nothing."""
+    from backend.app.workflow.tasks import create_task
+
+    tenant_id = _tenant(ctx)
+    complaint = _complaint(db, tenant_id, complaint_id)
+    me = str(ctx.user_id)
+    found = closure.facts(db, tenant_id, complaint)
+    signers = _signers(control_db, tenant_id, me, bool(found["cases"]))[body.step]
+    person = next((item for item in signers["people"] if item["id"] == body.to_user_id), None)
+    if person is None:
+        raise _error(409, "NOT_A_SIGNER", "That colleague may not sign this step; choose one of the people named.")
+    action = next(
+        (item["action"] for item in closure.checklist(found) if item["code"] == body.step and item.get("action")),
+        None,
+    )
+    title = f"{action or STEP_TITLES[body.step]} on {complaint.complaint_identifier}"
+    task = create_task(
+        db,
+        tenant_id,
+        task_type="COMPLAINT_STEP",
+        title=title,
+        source_type="Complaint",
+        source_id=complaint.id,
+        assigned_user_id=person["id"],
+        created_by=me,
+        details={"complaint_id": str(complaint.id), "step": body.step, "note": (body.note or "").strip() or None},
+    )
+    _audit(db, ctx, "COMPLAINT_STEP_SENT", "Complaint", complaint.id, step=body.step, to=person["id"])
+    db.commit()
+    return {"task_id": str(task.id), "to": person["name"], "title": task.title}
+
+
+STEP_TITLES = {
+    "TRIAGE": "Complete the triage",
+    "FIRST_CONTACT": "Sign the first-contact check",
+    "MARKETS": "Sign the market assessments",
+    "OBLIGATIONS": "Approve the authority report",
+    "DECISION": "Sign the decision",
+    "CAPA": "Sign the CAPA's effectiveness check",
+    "READY": "Sign ready to close",
+}
 
 
 def _closure_for_update(db, tenant_id, complaint_id) -> EventClosure:
