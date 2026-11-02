@@ -5679,3 +5679,20 @@ div.uw-task-count:hover {
   color: var(--ms-muted);
   font-size: var(--ms-fs-12);
 }
+
+/* Stage 8 (8.7): the next step at the end of each step done on another screen (ComplaintNextStep.tsx). */
+.uw-next-after {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-2) var(--ms-space-4);
+  align-items: center;
+  margin: var(--ms-space-4) 0 0;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border: 1px solid var(--ms-mint-line);
+  border-radius: 6px;
+  background: var(--ms-mint);
+}
+.uw-next-after .ac-eyebrow {
+  flex-basis: 100%;
+  margin: 0;
+}

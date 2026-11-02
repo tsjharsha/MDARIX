@@ -1,5 +1,6 @@
 import { useContext, useEffect, useId, useState } from "react";
 import { DecideAndSign } from "./common";
+import { ComplaintNextStep } from "./ComplaintNextStep";
 import { MARKET_QUESTION_WHY } from "../whyAsked";
 import { versionWords } from "../../../app/labels";
 import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
@@ -62,6 +63,7 @@ export function MarketAssessmentDrawer({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { story } = useWorkspace();
   const detail = useResource<AssessmentDetail>(assessmentPath(complaint.id));
   const data = detail.data;
   const shown = data?.markets ?? [];
@@ -91,6 +93,15 @@ export function MarketAssessmentDrawer({
         >
           <MarketPanel key={active.market} detail={data} item={active} onSaved={reload} />
         </Tabs>
+      )}
+      {data && active && (
+        <ComplaintNextStep
+          complaintId={complaint.id}
+          refreshKey={shown.map((item) => `${item.current?.version ?? 0}.${item.draft?.version ?? 0}`).join()}
+          first={
+            alsoIndia(story, shown, active) ? { label: "Assess India (CDSCO) too", run: () => setMarket("IN") } : null
+          }
+        />
       )}
     </Drawer>
   );
@@ -784,5 +795,22 @@ export function OwnText({ question }: { question: Pick<Question, "explanation" |
         </p>
       )}
     </>
+  );
+}
+
+/**
+ * The flagship story asks "in the US and India?": once the market shown is signed, India comes next when it is
+ * enabled and not assessed yet. Outside that story the complaint's own next action leads.
+ */
+export function alsoIndia(
+  story: string | null | undefined,
+  shown: ReadonlyArray<Pick<MarketItem, "market" | "current">>,
+  active: Pick<MarketItem, "market" | "current">,
+): boolean {
+  return (
+    story === "reportable" &&
+    active.market !== "IN" &&
+    !!active.current &&
+    shown.some((item) => item.market === "IN" && !item.current)
   );
 }

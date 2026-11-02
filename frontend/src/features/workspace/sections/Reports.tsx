@@ -7,6 +7,7 @@ import { downloadFile } from "../../reports/download";
 import { WorkspaceContext, useCan, useTabParam } from "../workspaceContext";
 import { communicationsTab } from "../communications";
 import { AlsoKnownAs, countOf, DecideAndSign, shortPrint } from "./common";
+import { ComplaintNextStep } from "./ComplaintNextStep";
 import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
 import {
@@ -279,6 +280,10 @@ export function ReportDrawer({
         <p className="ac-muted">
           {detail.starter_mark} Field order: {detail.form.source_document}.
         </p>
+        <ComplaintNextStep
+          complaintId={detail.complaint.id}
+          refreshKey={`${detail.state}.${detail.snapshots.length}.${detail.submissions.length}`}
+        />
       </div>
     </Drawer>
   );

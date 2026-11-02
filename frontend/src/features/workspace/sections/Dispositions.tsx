@@ -9,6 +9,7 @@ import { ImdrfCodes, RecordOrigin } from "./ImportReports";
 import { formatDay } from "../../../app/dates";
 import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import { countOf, DecideAndSign } from "./common";
+import { ComplaintNextStep } from "./ComplaintNextStep";
 import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
 import { TrainingPanel } from "./MarketAssessment";
 import { EscalateButton } from "./Triage";
@@ -252,6 +253,9 @@ export function DispositionDrawer({
           }}
           onTrained={screen.reload}
         />
+      )}
+      {screen.data && (
+        <ComplaintNextStep complaintId={complaintId} refreshKey={String(screen.data.current?.version ?? 0)} />
       )}
     </Drawer>
   );

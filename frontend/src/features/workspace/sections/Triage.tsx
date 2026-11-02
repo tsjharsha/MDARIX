@@ -4,7 +4,7 @@ import { TRIAGE_WHY } from "../whyAsked";
 import { CheckCircle2, Clock, FileWarning, Flag, Link2, Siren } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { useCan, useTabParam } from "../workspaceContext";
+import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import { DeadlineChip, HarmChip, StateChip, type Harm } from "../../../app/chips";
 import { deadlineLabel } from "../../../app/dates";
 import { AlsoKnownAs, countOf } from "./common";
@@ -276,6 +276,7 @@ function TriageDrawer({
 }) {
   const guide = useResource<Guide>(`${INTAKE}/guide`);
   const canWrite = useCanTriage();
+  const { navigation, open } = useWorkspace();
   const record = item.record;
   const [form, setForm] = useState<RecordForm>({
     severity: record?.severity ?? "",
@@ -320,6 +321,10 @@ function TriageDrawer({
         awareness_note: form.awareNote,
       });
       onDone();
+      // The next step, always (stage 8): on the new navigation a triaged complaint opens its page, whose main button
+      // is its next action.
+      if (navigation === "new" && item.kind === "COMPLAINT")
+        open("Complaint", `Summary?ref=${encodeURIComponent(item.ref)}`);
     } catch (reason) {
       setError(errorText(reason, "The triage record was not saved"));
     } finally {

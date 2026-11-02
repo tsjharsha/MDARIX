@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Empty, Panel } from "../../admin/console/charts";
-import { Tabs } from "../../customer-admin/shared";
+import { Tabs, useResource } from "../../customer-admin/shared";
+import { ComplaintNextStep } from "./ComplaintNextStep";
 import { displayId } from "../../../app/displayId";
 import { offeredTab } from "../../../app/featureSet";
 import { tabParts } from "../../../app/linkTable";
@@ -59,6 +60,9 @@ export function CaseSections({
   const [reviewFocus, setReviewFocus] = useState(false);
   const [scopeRound, setScopeRound] = useState(0);
   const [lotRound, setLotRound] = useState(0);
+  const scope = useResource<{ current?: { version: number; included_complaints?: Array<{ id: string }> } | null }>(
+    work.investigationId ? `/api/v1/investigations/${encodeURIComponent(work.investigationId)}/scope` : null,
+  );
   const selected = work.investigations.find((item) => String(item.id) === work.investigationId);
   const caseLabel = selected ? displayId(selected, "investigation_identifier") : "this investigation";
   const readOnly =
@@ -204,6 +208,13 @@ export function CaseSections({
                 }}
               />
             </div>
+            {/* An investigation opened from one complaint ends with that complaint's next step (8.7). */}
+            {scope.data?.current?.included_complaints?.length === 1 && (
+              <ComplaintNextStep
+                complaintId={scope.data.current.included_complaints[0].id}
+                refreshKey={String(scope.data.current.version)}
+              />
+            )}
           </>
         )}
         {active === "History" && (
