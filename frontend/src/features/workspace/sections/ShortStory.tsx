@@ -9,6 +9,7 @@ import { SHORT_STORY_PATH, SHORT_STORY_SAVED, resumeText, storySaved, type Short
 import { requestJson } from "../../../app/apiClient";
 import { InlineError } from "./boardParts";
 import { PRACTICE_APPROVAL } from "./PracticeApproval";
+import { INTAKE } from "../intake";
 
 /** The short story's progress, read again whenever a step is saved anywhere on the page. */
 export function useShortStory(enabled = true) {
@@ -29,6 +30,8 @@ const dayAfter = (days: number) => {
 };
 
 const HOSPITAL = "Biomedical engineering, the reporting hospital (sample)";
+/** The triage severity proposed from the reporter's "No harm was reported": never saved until the person confirms it. */
+export const PROPOSED_SEVERITY = "NEGLIGIBLE";
 
 /**
  * The short story on SAMPLE-RV-11 (0.10.71, A4), on the complaint's own page: the step to do now, from what was saved
@@ -158,12 +161,18 @@ export function DecideTheRoute({
       `Monitor out of use and sent for service${view.service ? `, under ${view.service.reference}` : ""}.`,
   );
   const save = useSave(onSaved, "The route was not saved.");
+  // The triage needs a severity: the proposal and its basis are shown, and nothing is saved until the person confirms
+  // it or chooses another level (0.10.72, F1: "Confirm the route" saved Negligible silently).
+  const guide = useResource<{ levels: Array<{ code: string; label: string }> }>(`${INTAKE}/guide`);
+  const [severity, setSeverity] = useState(PROPOSED_SEVERITY);
+  const [severityConfirmed, setSeverityConfirmed] = useState(false);
+  const levelLabel = (code: string) => guide.data?.levels.find((level) => level.code === code)?.label ?? code;
   const complaint = view.event.complaint_id;
   const confirm = () =>
     save.run(async () => {
       await send(`/api/v1/triage/COMPLAINT/${complaint}/record`, "POST", {
-        // No harm was reported: the triage's harm level so far. The market assessments ask it again, from this.
-        severity: "NEGLIGIBLE",
+        // The severity the person confirmed or chose here; the market assessments start from it.
+        severity,
         event_owner: owner,
         triage_owner: owner,
         immediate_action: action,
@@ -199,8 +208,14 @@ export function DecideTheRoute({
           </dd>
         </div>
         <div>
-          <dt>Harm so far</dt>
-          <dd>Negligible: no harm was reported. Whether it changed treatment is the next step's question.</dd>
+          <dt>The reporter says</dt>
+          <dd>
+            <q>No harm was reported</q>.
+          </dd>
+        </div>
+        <div>
+          <dt>Effect on treatment</dt>
+          <dd>Unknown: asked of the hospital in step 3.</dd>
         </div>
       </dl>
       <div className="uw-short-form">
@@ -230,7 +245,50 @@ export function DecideTheRoute({
           Immediate action
           <input value={action} onChange={(event) => setAction(event.target.value)} />
         </label>
+        <label className="ca-field">
+          Triage severity
+          <select
+            value={severity}
+            onChange={(event) => {
+              setSeverity(event.target.value);
+              setSeverityConfirmed(event.target.value !== "");
+            }}
+          >
+            <option value="">Choose a level</option>
+            {(guide.data?.levels ?? [{ code: PROPOSED_SEVERITY, label: "Negligible" }]).map((level) => (
+              <option key={level.code} value={level.code}>
+                {level.label}
+              </option>
+            ))}
+          </select>
+          <small className="ms-reason">
+            Proposed: {levelLabel(PROPOSED_SEVERITY)}, from the reporter's statement "No harm was reported". The effect
+            on treatment is still unknown; change it if you judge otherwise.
+          </small>
+        </label>
+        <label className="ca-check uw-short-wide">
+          <input
+            type="checkbox"
+            checked={severityConfirmed}
+            disabled={!severity}
+            onChange={(event) => setSeverityConfirmed(event.target.checked)}
+          />
+          I confirm the triage severity: {severity ? levelLabel(severity) : "none chosen"}
+        </label>
       </div>
+      <section className="uw-short-records" aria-label="What Confirm the route records">
+        <h4>Confirm the route records</h4>
+        <ul>
+          <li>
+            The triage record of {FLAGSHIP}: severity {severity ? levelLabel(severity).toLowerCase() : "(choose one)"},
+            complaint owner {people.find((person) => person.id === owner)?.name ?? "(choose one)"}, immediate action as
+            written above.
+          </li>
+          <li>
+            The service work's owner: {people.find((person) => person.id === serviceOwner)?.name ?? "(choose one)"}.
+          </li>
+        </ul>
+      </section>
       <p className="ac-note">
         Service: {view.service ? `${view.service.status_label} · ${view.service.reference}` : "none linked yet"}.
         Completing the service never closes the complaint.
@@ -239,14 +297,20 @@ export function DecideTheRoute({
         <button
           type="button"
           className="ac-primary"
-          disabled={save.busy || !owner || !serviceOwner || action.trim().length < 10}
+          disabled={
+            save.busy || !owner || !serviceOwner || action.trim().length < 10 || !severity || !severityConfirmed
+          }
           aria-describedby="route-why"
           onClick={() => void confirm()}
         >
           Confirm the route <ChevronRight size={15} aria-hidden="true" />
         </button>
         <small id="route-why" className="ms-reason">
-          {!owner || !serviceOwner ? "Name both owners first." : "Saves the triage record and the service owner."}
+          {!owner || !serviceOwner
+            ? "Name both owners first."
+            : !severityConfirmed
+              ? "Confirm or change the triage severity first."
+              : "Saves the triage record and the service owner, as listed above."}
         </small>
       </div>
       <InlineError text={save.error} />

@@ -380,3 +380,18 @@ describe("A6: separation of duties, shown honestly", () => {
     expect(html).toContain("Practice approval: in a pilot a colleague approves this.");
   });
 });
+
+describe("F1 (0.10.72): Confirm the route never saves a harm judgement silently", () => {
+  it("shows the reporter's statement, the unknown effect, the proposed severity to confirm, and what the click records", () => {
+    const route = onPage(1);
+    expect(route).toContain("<q>No harm was reported</q>");
+    expect(route).toContain("Unknown: asked of the hospital in step 3.");
+    expect(route).not.toContain("Negligible: no harm was reported");
+    expect(route).toContain("Proposed: ");
+    expect(route).toContain("I confirm the triage severity: ");
+    expect(route).toContain("Confirm the route records");
+    // Nothing is saved until the severity is confirmed or changed: the button waits (it was enabled before 0.10.72).
+    expect(route).toMatch(/<button type="button" class="ac-primary" disabled=""[^>]*>Confirm the route/);
+    expect(route).toContain("Confirm or change the triage severity first.");
+  });
+});
