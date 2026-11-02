@@ -29,7 +29,8 @@ the trend's units in the field stay the same) unless they are there, and the sam
 single-use fields and the sample lots' expiry dates (``SAMPLE_PRODUCT_FACTS``, 0.10.64) where they are not set, and
 the flagship complaint SAMPLE-RV-11 and a calm day 0 (backend/app/trial/sample_calm.py: finished triage for what the
 story does not need open, the sample's first-contact tasks due two working days ahead, RV-09 signed ready to close, the
-absence to the trial's end) unless they are there (0.10.64), and today's wording on sample records written before
+absence to the trial's end) unless they are there (0.10.64), RV-09's ready to close signed again with its checklist
+as it stood, the day after its US report was accepted (0.10.70: it was signed over an empty checklist), and today's wording on sample records written before
 0.10.66 (backend/app/trial/sample_words.py: the RV-08 request named the US questions by code; a follow-up task's
 title listed every question). The sample's dates themselves are brought to today by the
 hourly "trial-sample-clock" job (backend/app/trial/sample_clock.py) while nobody has worked on the sample. Each trial
@@ -83,7 +84,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.db.models.foundation import LotBatch, Product, ProductVersion
     from sqlalchemy import or_
     from backend.app.signals.hooks import seed_demo_signals
-    from backend.app.trial.sample_calm import has_calm_story, stage_calm_story
+    from backend.app.trial.sample_calm import has_calm_story, rerecord_rv09, stage_calm_story
     from backend.app.trial.sample_clock import _absence_to_trial_end
     from backend.app.trial.sample_data import (
         FLAGSHIP,
@@ -165,6 +166,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             )
             calm_missing = not has_calm_story(session, tenant_id)
             old_words = reword_sample(session, tenant_id, apply=False)
+            # RV-09 signed ready to close over an empty checklist before 0.10.70 (sample_calm.py).
+            rv09_unrecorded = not calm_missing and rerecord_rv09(session, tenant_id, apply=False)
             if not (
                 story_missing
                 or flagship_missing
@@ -182,6 +185,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or lot_impact_missing
                 or facts_missing
                 or old_words
+                or rv09_unrecorded
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -207,6 +211,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                         else []
                     ),
                     *([f"today's wording on {old_words} sample records (0.10.66)"] if old_words else []),
+                    *(["RV-09's ready to close with its checklist as it stood (0.10.70)"] if rv09_unrecorded else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -245,6 +250,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 _absence_to_trial_end(session, tenant_id)
             if old_words:
                 added["reworded"] = reword_sample(session, tenant_id, apply=True)
+            if rv09_unrecorded:
+                added["rv09_rerecorded"] = rerecord_rv09(session, tenant_id, apply=True, now=now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,

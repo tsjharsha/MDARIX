@@ -151,7 +151,7 @@ def test_the_case_suggests_the_sensor_lot_and_lists_the_lots_that_share_it(trial
     screen = _ok(trial["user"].get(trial["base"]))
     assert "recommends no recall" in screen["never_decides"] and screen["practice_label"]
     assert screen["suggestion"]["label"] == "Pressure Sensor (Sample) lot NS-SL-2417 (Sample)"
-    assert screen["suggestion"]["why"] == "2 of the case's 2 lots share it"
+    assert screen["suggestion"]["why"] == "2 of the investigation's 2 lots share it"
     assert screen["source"] == "suggested" and screen["saved"] is None and screen["signed"] is None
     kinds = {item["kind"] for item in screen["options"]}
     assert kinds == {"COMPONENT_LOT", "SUPPLIER", "PRODUCT_VERSION"}

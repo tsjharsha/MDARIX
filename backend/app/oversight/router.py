@@ -295,7 +295,7 @@ def _event_summary(complaint, facts: dict, row: EventClosure | None, products: d
         "owner_id": closure.owner_of(row, facts["record"]),
         "stage": current["label"] if current else "Closed in the QMS",
         "blocked": len(blocked),
-        "next": blocked[0]["action"] if blocked else None,
+        "next": blocked[0]["action"] if blocked and not closure.settled(complaint, items, row) else None,
         "state": state,
         "state_label": EVENT_STATES[state],
         "sample": complaint.source_system is not None,
@@ -926,7 +926,7 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
             "nearest_deadline": {key: nearest[key] for key in ("title", "due_at", "opens")} if nearest else None,
             "open_requests": len(found["requests"]),
             "next_action": {"label": blocked[0]["action"], "detail": blocked[0]["detail"], "opens": blocked[0]["opens"]}
-            if blocked
+            if blocked and not closure.settled(complaint, items, row)
             else None,
         },
         "stages": closure.stage_line(found, items, row),

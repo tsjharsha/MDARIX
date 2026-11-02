@@ -490,7 +490,7 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
         "note": (
             "A check beside the count rule, never a verdict: it compares each group's last 30 days with its own "
             "history and, for a version that replaced another, with that version too, and shows the stronger "
-            "comparison; it never raises a signal by itself. The result allows for the number of groups checked at "
+            "comparison; it never raises a trend to review by itself. The result allows for the number of groups checked at "
             "once (the adjusted chance), and an event linked from several records counts once. Where every lot has a "
             "quantity, the comparison follows the units in the field; elsewhere, and for single-use or consumable "
             "products, it counts by calendar days, so a version shipped in growing numbers can show a higher rate for "
