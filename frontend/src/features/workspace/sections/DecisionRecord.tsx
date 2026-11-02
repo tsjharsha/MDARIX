@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ToneBadge } from "../../admin/console/charts";
 import { Drawer, formatDate, listOf, useResource } from "../../customer-admin/shared";
 import { safeText } from "../../../app/displayId";
-import { roleLabel } from "../../../app/roles";
+import { roleNote } from "../../../app/roles";
 import { shortHash } from "../decisionBrief";
 import {
   decisionRecordPath,
@@ -173,7 +173,7 @@ export function DecisionRecordDrawer({
                 <dt>Signed by</dt>
                 <dd>
                   {safeText(signature.signer_name) ?? "—"}
-                  {safeText(signature.signer_role) ? ` (${roleLabel(signature.signer_role)})` : ""}
+                  {safeText(signature.signer_role) ? roleNote(signature.signer_role) : ""}
                 </dd>
               </div>
               <div>

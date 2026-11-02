@@ -180,8 +180,8 @@ export function UnknownsView({
       }
     >
       <p className="ac-note">
-        What the case does not know yet. Each status change carries a reason; an unknown accepted as a limitation stays
-        visible wherever the investigation is summarized.
+        What the investigation does not know yet. Each status change carries a reason; an unknown accepted as a
+        limitation stays visible wherever the investigation is summarized.
       </p>
       <div className="ca-toolbar">
         <label className="ca-check">

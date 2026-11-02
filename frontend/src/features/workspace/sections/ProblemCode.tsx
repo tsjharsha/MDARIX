@@ -1,5 +1,4 @@
 import { useResource } from "../../customer-admin/shared";
-import { imdrfText } from "./ImportReports";
 
 type ImdrfLink = { release: string; annex: string; code: string; term: string | null };
 export type ImdrfLinks = Record<string, ImdrfLink[]>;
@@ -18,20 +17,64 @@ export function useImdrfLinks(codes: readonly (string | null | undefined)[]): Im
   return links.data?.links ?? {};
 }
 
-/** "IMDRF A0601 Loss of signal": the IMDRF terms a problem code maps to, or null when none is approved yet. */
-export function imdrfTermText(code: string | null | undefined, links: ImdrfLinks): string | null {
-  const found = (code && links[code]) || [];
-  return found.length ? `IMDRF ${found.map(imdrfText).join("; ")}` : null;
+/**
+ * A problem code as a person reads it (0.10.70): the IMDRF term is the label, and the customer's own code, never
+ * altered, is the small "your code" detail. `{ term: "Infusion or Flow Problem; Protective Measures Problem",
+ * imdrf: "A14, A16", code }`; without an approved link the term is null and the code is all there is.
+ */
+export function problemCodeParts(
+  code: string,
+  links: ImdrfLinks,
+): { term: string | null; imdrf: string; code: string } {
+  const found = links[code] ?? [];
+  return {
+    term: found.length ? found.map((link) => link.term ?? link.code).join("; ") : null,
+    imdrf: found.map((link) => link.code).join(", "),
+    code,
+  };
 }
 
-/** The customer's problem code as recorded, with its IMDRF term beside it (0.10.68). */
-export function ProblemCode({ code, links }: { code: string | null | undefined; links: ImdrfLinks }) {
+/** The same in one line, for a choice in a list: "Protective Measures Problem (IMDRF A16) · your code PRESSURE_ALARM". */
+export function problemCodeText(code: string, links: ImdrfLinks): string {
+  const parts = problemCodeParts(code, links);
+  return parts.term ? `${parts.term} (IMDRF ${parts.imdrf}) · your code ${code}` : code;
+}
+
+/** A problem code: its IMDRF term first, the customer's own code as the small "your code" detail. */
+export function ProblemCode({
+  code,
+  links,
+  loaded = false,
+}: {
+  code: string | null | undefined;
+  links: ImdrfLinks;
+  /** The links are read: an unmapped code then says so. */
+  loaded?: boolean;
+}) {
   if (!code) return null;
-  const term = imdrfTermText(code, links);
+  const parts = problemCodeParts(code, links);
+  if (!parts.term)
+    return (
+      <span className="uw-problem-code">
+        <code>{code}</code>
+        <small> · your code{loaded ? "; no IMDRF term mapped yet" : ""}</small>
+      </span>
+    );
   return (
     <span className="uw-problem-code">
-      <code>{code}</code>
-      {term && <small> · {term}</small>}
+      <span title={`IMDRF ${parts.imdrf}`}>{parts.term}</span>
+      <small>
+        {" "}
+        · IMDRF {parts.imdrf} · your code <code>{code}</code>
+      </small>
     </span>
   );
+}
+
+/** One problem code that reads its own links (a drawer, a card). */
+export function ProblemCodeOf({ code }: { code: string | null | undefined }) {
+  const links = useResource<{ links: ImdrfLinks }>(
+    code ? `/api/v1/regulatory-reference/imdrf/links?${new URLSearchParams({ code })}` : null,
+  );
+  return <ProblemCode code={code} links={links.data?.links ?? {}} loaded={!!links.data} />;
 }

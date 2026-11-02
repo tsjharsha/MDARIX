@@ -518,7 +518,7 @@ export function CaseDocumentLinks({ investigationId }: { investigationId: string
   const { open } = useWorkspace();
   return (
     <p className="ca-action-row uw-doc-case-links">
-      <span className="ac-muted">Documents for this case:</span>
+      <span className="ac-muted">Documents for this investigation:</span>
       {(
         [
           ["INVESTIGATION_REPORT", "Investigation report"],

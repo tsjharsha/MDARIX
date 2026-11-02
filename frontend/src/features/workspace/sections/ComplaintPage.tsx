@@ -63,6 +63,18 @@ export function nextStep(view: Pick<EventView, "summary" | "state" | "blocked">)
 }
 
 /**
+ * The header's "Needs attention" (exported for its test): what is open, in what it lacks ("On the triage list: its
+ * triage record is not complete"), not the check's goal ("Triage is complete", which read as done). A finished event
+ * (no next step) says its open items were signed with its reason.
+ */
+export function attentionText(blocked: Array<{ detail: string }>, hasStep: boolean): string {
+  if (!blocked.length) return "Nothing open";
+  if (!hasStep)
+    return `Nothing: ${blocked.length === 1 ? "1 item was" : `${blocked.length} items were`} signed open, with a reason`;
+  return `${blocked.length} open: ${blocked[0].detail}`;
+}
+
+/**
  * One complaint's page (the new navigation, 0.10.68; /app/complaints/<ref>): the Oversight event checklist promoted
  * to a page. Its header answers five questions (what happened, what needs attention, owner, due, next action);
  * its sections are Summary, Evidence, Decisions & actions and History. Every step of the complaint opens from here
@@ -138,7 +150,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
         <dl className="uw-cp-facts">
           <div>
             <dt>Needs attention</dt>
-            <dd>{blocked.length ? `${blocked.length} open: ${blocked[0].label}` : "Nothing open"}</dd>
+            <dd>{attentionText(blocked, !!step)}</dd>
           </div>
           <div>
             <dt>Owner</dt>
@@ -165,7 +177,11 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
               {step.label} <ChevronRight size={15} aria-hidden="true" />
             </button>
           ) : (
-            <p className="ac-muted">Nothing to do: every MDARIX decision on it is signed.</p>
+            <p className="ac-muted">
+              {blocked.length
+                ? "Nothing to do: closed in your QMS, signed ready to close with its reason."
+                : "Nothing to do: every MDARIX decision on it is signed."}
+            </p>
           )}
         </div>
       </header>

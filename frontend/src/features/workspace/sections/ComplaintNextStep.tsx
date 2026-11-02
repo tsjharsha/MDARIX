@@ -5,6 +5,10 @@ import { useOpenTarget, useWorkspace } from "../workspaceContext";
 import { eventPath, type EventView } from "../oversight";
 import { nextStep } from "./ComplaintPage";
 
+/** The tab a next step opens on ("Reportability"), from the server's place. */
+const stepTab = (step: { opens: { target?: { tab?: string | null } | null } | null }) =>
+  step.opens?.target?.tab ?? null;
+
 /**
  * The next step, always (stage 8, 8.7): at the end of each step done on another screen (triage, a market's
  * assessment, the report, the disposition), the complaint's next action is the main button, and its page one click
@@ -15,11 +19,15 @@ export function ComplaintNextStep({
   complaintId,
   refreshKey,
   first,
+  here,
 }: {
   complaintId: string;
   /** Changes when the step was saved or signed here, so the next action is read again. */
   refreshKey: string;
   first?: { label: string; run: () => void } | null;
+  /** The tab this screen is (Reportability, Dispositions, Reports): a next step done here is said, not a second main
+   * button beside the screen's own (0.10.70: one main button per drawer). */
+  here?: string;
 }) {
   const { navigation, open } = useWorkspace();
   const go = useOpenTarget();
@@ -31,13 +39,18 @@ export function ComplaintNextStep({
   const step = nextStep(view.data);
   const ref = view.data.event.ref;
   const page = (tab = "Summary") => open("Complaint", `${tab}?ref=${encodeURIComponent(ref)}`);
+  const onThisScreen = !first && !!step && !!here && stepTab(step) === here;
   const main =
     first ??
-    (step ? { label: step.label, run: () => (step.opens ? go(step.opens) : page("Decisions & actions")) } : null);
+    (step && !onThisScreen
+      ? { label: step.label, run: () => (step.opens ? go(step.opens) : page("Decisions & actions")) }
+      : null);
   return (
     <section className="uw-next-after" aria-label="The next step">
       <span className="ac-eyebrow">Next step on {ref}</span>
-      {main ? (
+      {onThisScreen ? (
+        <span className="ac-muted">{step.label}: here, above.</span>
+      ) : main ? (
         <button type="button" className="ac-primary" onClick={main.run}>
           {main.label} <ChevronRight size={15} aria-hidden="true" />
         </button>

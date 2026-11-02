@@ -282,6 +282,7 @@ export function ReportDrawer({
         </p>
         <ComplaintNextStep
           complaintId={detail.complaint.id}
+          here="Reports"
           refreshKey={`${detail.state}.${detail.snapshots.length}.${detail.submissions.length}`}
         />
       </div>
@@ -922,7 +923,7 @@ function FieldRow({
       <p className={item.value ? "uw-rp-value" : "uw-rp-value empty"}>{item.value ?? "—"}</p>
       <p className="uw-cr-meta">
         {item.source
-          ? `From ${item.source.label.replace(/^The /, "the ")}${item.source.ref ? `: ${item.source.ref}` : ""}`
+          ? `From ${item.source.label.replace(/^(The|An|A) /, (word) => word.toLowerCase())}${item.source.ref ? `: ${item.source.ref}` : ""}`
           : ""}
         {item.by
           ? `${item.source ? " · " : ""}${item.status === "CONFIRMED" ? "Confirmed" : "Entered"} by ${item.by} ${formatDate(item.at)}`

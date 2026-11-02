@@ -3,6 +3,7 @@ import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Tabs, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
 import { useReportedTab } from "../workspaceContext";
+import { ProblemCodeOf } from "./ProblemCode";
 import {
   LOOK_AHEAD_TABS,
   PREVIEW_PATHS,
@@ -216,7 +217,7 @@ export function RepresentativeBody({ data }: { data: RepresentativePreview }) {
                 {recurring.service_level.map((item) => (
                   <li key={`${item.product_id}-${item.problem_code}`}>
                     <p>
-                      <strong>{item.product_name}</strong> · {item.problem_code}
+                      <strong>{item.product_name}</strong> · <ProblemCodeOf code={item.problem_code} />
                     </p>
                     <span>
                       {item.count} service-level resolutions: {item.complaints.join(", ")}

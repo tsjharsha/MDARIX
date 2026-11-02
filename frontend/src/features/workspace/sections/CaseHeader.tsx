@@ -139,7 +139,7 @@ export function CaseHeader({
               <button
                 type="button"
                 key={`${item.to}:${item.label}`}
-                className={item.danger ? "ac-secondary" : "ac-primary"}
+                className={item.danger || onSection ? "ac-secondary" : "ac-primary"}
                 onClick={() => setTransition(item)}
               >
                 {item.to === "ON_HOLD" ? (

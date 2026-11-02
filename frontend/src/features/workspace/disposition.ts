@@ -8,7 +8,7 @@ import type { TrainingDocument } from "./marketAssessment";
 export type Branch = "ESCALATED_BY_TRIGGER" | "KNOWN_ISSUE" | "SERVICE_LEVEL" | "ESCALATED_BY_CHOICE";
 export const BRANCH_LABELS: Record<Branch, string> = {
   ESCALATED_BY_TRIGGER: "Escalated: trigger met",
-  KNOWN_ISSUE: "Known issue, linked to an open case",
+  KNOWN_ISSUE: "Known issue, linked to an open investigation",
   SERVICE_LEVEL: "Resolved at service level",
   ESCALATED_BY_CHOICE: "Escalated by choice",
 };
@@ -215,7 +215,7 @@ export function signProblem(screen: DispositionScreen, form: DispositionForm, tr
     form.branch !== "KNOWN_ISSUE" &&
     short(form.notKnownReason, reasonMin)
   )
-    return "An open case matches: say why this is not that known issue.";
+    return "An open investigation matches: say why this is not that known issue.";
   if (form.branch === "SERVICE_LEVEL") {
     const record = form.record;
     if (short(record.troubleshooting, reasonMin)) return "Describe the troubleshooting done.";

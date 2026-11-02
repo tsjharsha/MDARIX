@@ -79,13 +79,13 @@ export function Dispositions() {
               : "Every open complaint has a disposition"
             : "Dispositions"
         }
-        detail="Most complaints are resolved at service level with a documented reason (ISO 13485 clause 8.2.2). A complaint that meets an escalation trigger opens a case."
+        detail="Most complaints are resolved at service level with a documented reason (ISO 13485 clause 8.2.2). A complaint that meets an escalation trigger opens an investigation."
       />
       <div className="uw-cr-stats">
         <StatTile
           label="Waiting"
           value={summary ? summary.waiting : null}
-          detail="Open, in no case, no disposition yet"
+          detail="Open, in no investigation, no disposition yet"
           icon={<Inbox size={18} />}
           tone={summary?.waiting ? "warning" : undefined}
           onOpen={() => choose("waiting")}
@@ -105,7 +105,7 @@ export function Dispositions() {
           onOpen={() => choose("signed")}
         />
         <StatTile
-          label="Escalated to a case"
+          label="Escalated to an investigation"
           value={summary ? summary.by_branch.ESCALATED_BY_TRIGGER + summary.by_branch.ESCALATED_BY_CHOICE : null}
           detail={summary ? `${summary.by_branch.ESCALATED_BY_TRIGGER} by a trigger` : "By trigger or by choice"}
           icon={<ShieldAlert size={18} />}
@@ -135,7 +135,7 @@ export function Dispositions() {
         ) : (
           <Empty
             title={show === "signed" ? "No disposition signed yet" : "Nothing waits for a disposition"}
-            detail="Open complaints that are in no case appear here until a person signs how each is resolved."
+            detail="Open complaints that are in no investigation appear here until a person signs how each is resolved."
           />
         )}
         <Pager page={page} pages={list.data?.pages ?? 1} onPage={setPage} />
@@ -199,7 +199,7 @@ export function DispositionCard({ item, onOpen }: { item: BoardItem; onOpen: () 
         {signed && (
           <p className="uw-cr-meta">
             Version {signed.version} · {signed.signed_by} · {formatDate(signed.signed_at)}
-            {signed.investigation_ref ? ` · case ${signed.investigation_ref}` : ""}
+            {signed.investigation_ref ? ` · investigation ${signed.investigation_ref}` : ""}
             {signed.attribution_label ? ` · ${signed.attribution_label}` : ""}
           </p>
         )}
@@ -208,7 +208,7 @@ export function DispositionCard({ item, onOpen }: { item: BoardItem; onOpen: () 
             {signed
               ? "Open the disposition"
               : known
-                ? "Link to the open case"
+                ? "Link to the open investigation"
                 : item.routine_offered && !item.triggers.length
                   ? "Close on the routine path"
                   : "Decide the disposition"}
@@ -223,7 +223,7 @@ export function DispositionCard({ item, onOpen }: { item: BoardItem; onOpen: () 
 const STATE_LABELS: Record<QuestionState, { label: string; tone: "good" | "neutral" | "critical" | "warning" }> = {
   taken: { label: "This branch", tone: "good" },
   no: { label: "No", tone: "neutral" },
-  refused: { label: "Refused: a trigger is met", tone: "critical" },
+  refused: { label: "Closed: a trigger is met", tone: "critical" },
   open: { label: "Not reached", tone: "neutral" },
 };
 
@@ -241,7 +241,8 @@ export function DispositionDrawer({
 }) {
   const screen = useResource<DispositionScreen>(dispositionPath(complaintId));
   return (
-    <Drawer title={`${title}: disposition`} onClose={onClose}>
+    // A drawer opened by its address names its complaint once the screen is read (it said "Complaint").
+    <Drawer title={`${screen.data?.complaint.ref ?? title}: disposition`} onClose={onClose}>
       {screen.state === "error" && <InlineError text="The disposition could not be read." />}
       {screen.data && (
         <DispositionPanel
@@ -255,7 +256,11 @@ export function DispositionDrawer({
         />
       )}
       {screen.data && (
-        <ComplaintNextStep complaintId={complaintId} refreshKey={String(screen.data.current?.version ?? 0)} />
+        <ComplaintNextStep
+          complaintId={complaintId}
+          here="Dispositions"
+          refreshKey={String(screen.data.current?.version ?? 0)}
+        />
       )}
     </Drawer>
   );
@@ -391,7 +396,7 @@ export function DispositionPanel({
                   <ul className="uw-dp-facts">
                     {screen.triggers.map((item) => (
                       <li key={`${item.code}-${item.field}`}>
-                        <ToneBadge tone="critical" label={item.code} /> {item.fact}
+                        <ToneBadge tone="critical" label={triggerLabel(item.code)} /> {item.fact}
                       </li>
                     ))}
                   </ul>
@@ -411,7 +416,7 @@ export function DispositionPanel({
                 </details>
                 {triggered && (
                   <label className="ca-field">
-                    Why the case is needed
+                    Why the investigation is needed
                     <textarea
                       rows={2}
                       value={form.rationale}
@@ -426,7 +431,7 @@ export function DispositionPanel({
                 {screen.candidates.length ? (
                   <fieldset className="uw-dp-choices" disabled={triggered}>
                     <legend className="uw-cr-meta">
-                      Open cases with the same product and problem code, or the same lot
+                      Open investigations with the same product and problem code, or the same lot
                     </legend>
                     {screen.candidates.map((item) => (
                       <label key={item.id} className="uw-dp-choice">
@@ -445,7 +450,7 @@ export function DispositionPanel({
                   </fieldset>
                 ) : (
                   <p className="uw-cr-meta">
-                    No: no open case holds the same product and problem code, or the same lot.
+                    No: no open investigation holds the same product and problem code, or the same lot.
                   </p>
                 )}
                 {!triggered && form.branch === "KNOWN_ISSUE" && (
@@ -582,7 +587,7 @@ export function DispositionPanel({
                     checked={form.branch === "ESCALATED_BY_CHOICE"}
                     onChange={() => choose("ESCALATED_BY_CHOICE")}
                   />
-                  <span>Escalate: open a case</span>
+                  <span>Escalate: open an investigation</span>
                 </label>
                 {form.branch === "ESCALATED_BY_CHOICE" && (
                   <label className="ca-field">
@@ -788,7 +793,7 @@ export function SignedDisposition({ version }: { version: DispositionVersion }) 
         {version.triggers.length > 0 && (
           <>
             <dt>Triggers met</dt>
-            <dd>{version.triggers.map((item) => `${item.code}: ${item.fact}`).join("; ")}</dd>
+            <dd>{version.triggers.map((item) => `${triggerLabel(item.code)}: ${item.fact}`).join("; ")}</dd>
           </>
         )}
         {version.investigation_ref && (

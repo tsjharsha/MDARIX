@@ -103,9 +103,10 @@ describe("where a record came from and its reference data", () => {
     expect(imdrfText({ release: "2025", annex: "A", code: "A16", term: null })).toBe("A16");
   });
 
-  it("labels problem codes with their IMDRF codes in the filter", () => {
-    expect(imdrfLabels(["PRESSURE_ALARM", "NFF"], { PRESSURE_ALARM: [{ code: "A16" }] })).toEqual({
-      PRESSURE_ALARM: "PRESSURE_ALARM · IMDRF A16",
+  it("labels problem codes by their IMDRF term first, the customer's code as its detail (0.10.70)", () => {
+    const link = { release: "2025", annex: "A", code: "A16", term: "Protective Measures Problem" };
+    expect(imdrfLabels(["PRESSURE_ALARM", "NFF"], { PRESSURE_ALARM: [link] })).toEqual({
+      PRESSURE_ALARM: "Protective Measures Problem (IMDRF A16) · your code PRESSURE_ALARM",
     });
   });
 
