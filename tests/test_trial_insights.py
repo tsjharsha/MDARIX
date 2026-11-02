@@ -241,29 +241,29 @@ def test_the_sample_keeps_every_earlier_field_and_adds_the_headline_trend_and_re
     result = _insights(_sample_workspace(workspaces))
     for field in LEGACY_FIELDS:
         assert field in result
-    assert result["scope"] == "sample data" and result["total_complaints"] == 37 and result["note"] == NOTE
+    assert result["scope"] == "sample data" and result["total_complaints"] == 38 and result["note"] == NOTE
     assert result["by_version"][0]["version"] == "Rev B" and result["by_version"][0]["complaints"] == 17
     # The finding names the product as people read it, not its identifier.
-    assert "46% of complaints (17 of 37) concern OrbitCare 300 Infusion Pump (Sample) Rev B." in result["findings"]
-    assert "Complaints in the last 3 months average 8.3 per month, up from 3.0 before." in result["findings"]
+    assert "45% of complaints (17 of 38) concern OrbitCare 300 Infusion Pump (Sample) Rev B." in result["findings"]
+    assert "Complaints in the last 3 months average 8.7 per month, up from 3.0 before." in result["findings"]
 
     headline = result["headline"]
-    assert headline["total"] == 37 and headline["harm"] == 3 and headline["malfunction"] == 5
+    assert headline["total"] == 38 and headline["harm"] == 3 and headline["malfunction"] == 6
     assert headline["top_version"] == {
         "label": "OrbitCare 300 Infusion Pump (Sample) Rev B",
         "version": "Rev B",
         "complaints": 17,
-        "share": 46,
+        "share": 45,
     }
-    assert headline["rate"] == {"recent": 8.3, "earlier": 3.0, "direction": "up"}
+    assert headline["rate"] == {"recent": 8.7, "earlier": 3.0, "direction": "up"}
 
     trend = result["trend"]
     assert [item["month"] for item in trend["months"]] == [f"2026-{m:02d}" for m in range(4, 11)]
-    assert sum(item["complaints"] for item in trend["months"]) == 37
-    assert trend["recent_months"] == 3 and trend["recent_average"] == 8.3 and trend["earlier_average"] == 3.0
+    assert sum(item["complaints"] for item in trend["months"]) == 38
+    assert trend["recent_months"] == 3 and trend["recent_average"] == 8.7 and trend["earlier_average"] == 3.0
 
     records = result["records"]
-    assert len(records) == 37
+    assert len(records) == 38
     assert set(records[0]) == {
         "id",
         "ref",
@@ -276,7 +276,7 @@ def test_the_sample_keeps_every_earlier_field_and_adds_the_headline_trend_and_re
         "malfunction",
         "status",
     }
-    assert sum(row["harm"] for row in records) == 3 and sum(row["malfunction"] for row in records) == 5
+    assert sum(row["harm"] for row in records) == 3 and sum(row["malfunction"] for row in records) == 6
     assert {row["version"] for row in records} <= set(result["version_labels"])
     assert "OrbitCare 300 Infusion Pump (Sample) Rev B" in result["version_labels"].values()
 
@@ -317,19 +317,19 @@ def test_every_sample_question_is_answered_from_the_records(workspaces):
     lots = _question(result, "lots")["answer"]
     assert lots["summary"] == (
         "Lots SAMPLE-ORBIT-300-LOT-003 and SAMPLE-ORBIT-300-LOT-004 are both OrbitCare 300 Infusion Pump (Sample) "
-        "Rev B lots made at Assembly Site 1 (Sample); together they have 15 of 37 complaints."
+        "Rev B lots made at Assembly Site 1 (Sample); together they have 15 of 38 complaints."
     )
     assert [row[5] for row in lots["table"]["rows"]] == ["6.0", "4.0"]  # per 100 units: 9 and 6 of 150
     assert any("do not link a lot to the component lots" in line for line in lots["missing"])
 
     rise = _question(result, "rise")["answer"]
-    assert rise["summary"].startswith("Complaints rose from 3.0 to 8.3 per month. Per 1,000 units released: ")
+    assert rise["summary"].startswith("Complaints rose from 3.0 to 8.7 per month. Per 1,000 units released: ")
     assert "OrbitCare 300 Infusion Pump (Sample) Rev B 37.8 (17 complaints from 450 units)" in rise["summary"]
     assert rise["missing"] == []
 
     harm = _question(result, "harm")["answer"]
-    assert harm["summary"] == "3 complaints report harm (3 serious injuries) and 5 complaints report a malfunction."
-    assert harm["ids_total"] == 5 and harm["missing"] == [
+    assert harm["summary"] == "3 complaints report harm (3 serious injuries) and 6 complaints report a malfunction."
+    assert harm["ids_total"] == 6 and harm["missing"] == [
         "32 complaints leave death, serious injury and malfunction empty."
     ]
 
@@ -341,8 +341,8 @@ def test_every_sample_question_is_answered_from_the_records(workspaces):
     assert codes["missing"] == ["11 complaints have no problem code and are not counted here."]
 
     origin = _question(result, "origin")["answer"]
-    assert origin["summary"] == "US has the most complaints (7 of 9 with a country; 3 countries in all)."
-    assert origin["bars"][0] == {"label": "US", "count": 7}
+    assert origin["summary"] == "US has the most complaints (8 of 10 with a country; 3 countries in all)."
+    assert origin["bars"][0] == {"label": "US", "count": 8}
     assert origin["missing"] == ["28 complaints have no country.", "No complaint records a reporter type."]
 
     evidence = _question(result, "evidence")["answer"]
@@ -421,7 +421,7 @@ def test_open_requests_and_questions_are_listed_for_their_own_workspace_only(wor
     result = _insights(mine)
     ours = _question(result, "evidence")["answer"]
     assert ours["table"] is None and ours["summary"].startswith("No evidence request or open question")
-    assert result["total_complaints"] == 37 and len(result["records"]) == 37
+    assert result["total_complaints"] == 38 and len(result["records"]) == 38
     with SessionLocal() as db:
         bind_tenant(db, mine)
         own_ids = {row.business_id for row in db.query(Complaint).filter(Complaint.tenant_id == mine)}

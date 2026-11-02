@@ -29,6 +29,20 @@ export type SamplePain = {
 
 export const SAMPLE_PAINS: readonly SamplePain[] = [
   {
+    key: "flagship",
+    title: "Is this reportable, and by when, in the US and India?",
+    inSample: [
+      "SAMPLE-RV-11: a PulseWatch 410 monitor read SpO2 4 to 6 points high against a reference oximeter. Nobody was harmed; the monitor is out of use and sent for service.",
+      "Triage it first (due within the day), then answer each market's questions: in the US a malfunction that could cause a serious injury if it happened again is a 30-day report; in India nobody was harmed, so there is no adverse event to report.",
+      "The US conclusion opens a case: record the service work or the CAPA to raise in your QMS, then sign ready to close.",
+    ],
+    requirement:
+      "A malfunction is reported to FDA within 30 calendar days when a recurrence would be likely to cause or contribute to a serious injury; India reports adverse events.",
+    reference: cite("21 CFR 803"),
+    opens: { section: "Complaints", tab: "Triage" },
+    action: "Start with triage",
+  },
+  {
     key: "routine",
     title: "Routine complaints that wait for a person",
     inSample: [
@@ -152,7 +166,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
     inSample: [
       "SAMPLE-RV-08: a question to the reporter for the patient's outcome, two attempts unanswered and the reply overdue.",
       "SAMPLE-RV-01: a request to the hospital that stayed unanswered after three attempts to each contact.",
-      "The sample author is away for a week with you as the backup; SAMPLE-RV-08 and SAMPLE-RT-03 have you as their owner.",
+      "The sample author is away until your trial ends, with you as the backup; SAMPLE-RV-08 and SAMPLE-RT-03 have you as their owner.",
     ],
     requirement: "Complaint handling keeps its records: who was asked what, when, and who answers for each event.",
     reference: cite("ISO13485_8_2_2"),
@@ -203,7 +217,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
 export const SAMPLE_MADE: readonly string[] = [
   "Synthetic: written for MDARIX. No real company, device, patient or person, and no personal data.",
   "Built from the pain points above: each part re-creates a finding quality teams and inspectors keep meeting, so what MDARIX shows on the sample is what it looks for in your own records.",
-  "Dated from the day your trial started, so reporting clocks, trends and due dates are live.",
+  "Its dates move with your trial, so reporting clocks, trends and due dates read the same on day 29 as on day 1. Once you work on it, its dates stay where you left them; restart the sample story (under About the sample data) to see it as on day one.",
   'Easy to tell apart: product, lot, complaint, investigation, CAPA and risk identifiers start with SAMPLE-, and product, supplier, evidence, CAPA and risk names end in "(Sample)".',
   "In your organization's workspace only. It does not count toward your upload limit; once your own data is in you can remove it (the trial owner, under About the sample data), and it is deleted with the trial's data in any case.",
 ];

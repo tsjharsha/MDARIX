@@ -25,7 +25,7 @@ import { BookDemo, DEMO_REQUEST_PATH, type TrialDemoRequest } from "./BookDemo";
 import { TrialJourney } from "./TrialJourney";
 import { EndTrialPanel } from "./EndTrial";
 import { CitedFor } from "./CitedFor";
-import { RemoveSamplePanel } from "./RemoveSample";
+import { RemoveSamplePanel, RestartSamplePanel } from "./RemoveSample";
 import { TeamPanel } from "./TrialTeam";
 import { BESIDE_YOUR_QMS } from "../../help/besideYourQms";
 import { STORY_CHAPTERS, journeyProgress, type JourneyKey } from "../../help/trialGuide";
@@ -435,6 +435,17 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
               allowed={allowed}
               onOpen={(opens) => {
                 if (allowed(opens.section)) open(opens.section as WorkspaceSection, opens.tab);
+              }}
+            />
+          )}
+          {tab === "About the sample data" && hasSample && (
+            <RestartSamplePanel
+              onRestarted={(text) => {
+                notify(text);
+                status.reload();
+                story.reload();
+                insights.reload();
+                work.refreshProducts();
               }}
             />
           )}

@@ -26,8 +26,12 @@ the two events that user owns (backend/app/trial/sample_oversight.py) unless the
 three OrbitCare lots without complaints and the distribution with its import run for a case's Lot impact
 (backend/app/trial/sample_lot_impact.py; lot 005 then releases 60 units and the new lots 30 each, made the same day, so
 the trend's units in the field stay the same) unless they are there, and the sample products' device categories and
-single-use fields and the sample lots' expiry dates (``SAMPLE_PRODUCT_FACTS``, 0.10.64) where they are not set. Each
-trial is committed on its own, with an audit event.
+single-use fields and the sample lots' expiry dates (``SAMPLE_PRODUCT_FACTS``, 0.10.64) where they are not set, and
+the flagship complaint SAMPLE-RV-11 and a calm day 0 (backend/app/trial/sample_calm.py: finished triage for what the
+story does not need open, the sample's first-contact tasks due two working days ahead, RV-09 signed ready to close, the
+absence to the trial's end) unless they are there (0.10.64). The sample's dates themselves are brought to today by the
+hourly "trial-sample-clock" job (backend/app/trial/sample_clock.py) while nobody has worked on the sample. Each trial
+is committed on its own, with an audit event.
 """
 
 from __future__ import annotations
@@ -77,15 +81,20 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.db.models.foundation import LotBatch, Product, ProductVersion
     from sqlalchemy import or_
     from backend.app.signals.hooks import seed_demo_signals
+    from backend.app.trial.sample_calm import has_calm_story, stage_calm_story
+    from backend.app.trial.sample_clock import _absence_to_trial_end
     from backend.app.trial.sample_data import (
+        FLAGSHIP,
         SAMPLE_PRODUCT_FACTS,
         SAMPLE_SOURCE,
         has_sample_data,
         has_story_examples,
+        seed_flagship,
         seed_lot_quantities,
         seed_product_facts,
         seed_story_examples,
     )
+    from backend.app.db.models.foundation import Complaint
     from backend.app.trial.sample_assessments import has_sample_assessments, stage_sample_assessments
     from backend.app.trial.sample_decision import has_sample_decision, stage_sample_decision
     from backend.app.trial.sample_dispositions import has_routine_examples, seed_routine_examples
@@ -145,8 +154,17 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 )
                 .count()
             )
+            flagship_missing = (
+                session.query(Complaint.id)
+                .filter(Complaint.tenant_id == tenant_id, Complaint.complaint_identifier == FLAGSHIP)
+                .first()
+                is None
+            )
+            calm_missing = not has_calm_story(session, tenant_id)
             if not (
                 story_missing
+                or flagship_missing
+                or calm_missing
                 or lots_missing
                 or decision_missing
                 or assessments_missing
@@ -177,6 +195,12 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *(["the sample absence and event owners"] if oversight_missing else []),
                     *(["the sample lot genealogy and distribution"] if lot_impact_missing else []),
                     *(["the sample products' device categories and lot expiry dates"] if facts_missing else []),
+                    *(["the flagship complaint SAMPLE-RV-11"] if flagship_missing else []),
+                    *(
+                        ["a calm day 0 (finished triage, tasks due later, RV-09 ready to close)"]
+                        if calm_missing
+                        else []
+                    ),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -207,6 +231,12 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["lot_impact"] = stage_sample_lot_impact(session, tenant_id, now)
             # Last: every sample lot exists by now.
             added["product_facts"] = seed_product_facts(session, tenant_id)
+            if flagship_missing and not story_missing:
+                added["flagship"] = seed_flagship(session, tenant_id, now)
+            if calm_missing:
+                # After the flagship and the intake: it finishes the triage the story does not need open.
+                added["calm"] = stage_calm_story(session, tenant_id, now)
+                _absence_to_trial_end(session, tenant_id)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,

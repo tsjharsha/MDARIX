@@ -106,10 +106,11 @@ def test_the_sample_shows_an_escalation_a_reminder_and_an_away_colleague(trial):
     reply = by_ref[("SAMPLE-RV-08", "COMMUNICATION")]
     assert reply["tier"] == "ESCALATION" and reply["state"] == "OVERDUE" and reply["reason"] == "NO_ONE_ELSE"
     assert len(reply["ids"]) == 2  # the reminder and the escalation, one line
-    qms = by_ref[("SAMPLE-CALL-02", "TRIAGE")]
-    assert qms["tier"] == "ESCALATION" and qms["category"] == "TRIAGE"
-    assert any(item["state"] == "DUE_SOON" and item["category"] == "TRIAGE" for item in mine["items"])
-    assert mine["unread"] == len(mine["items"]) and mine["escalations"] >= 2
+    # 0.10.64, a calm day 0: SAMPLE-CALL-02's QMS task is due later (it was escalated, "overdue"), and the only
+    # triage reminders are the story's two steps.
+    assert ("SAMPLE-CALL-02", "TRIAGE") not in by_ref
+    assert {ref for ref, category in by_ref if category == "TRIAGE"} == {"SAMPLE-URG-01", "SAMPLE-RV-11"}
+    assert mine["unread"] == len(mine["items"]) == 3 and mine["escalations"] == 1
     assert mine["absences"][0]["user_name"] == "MDARIX sample author" and "never" in mine
     # Reading never resolves an alert.
     assert _ok(user.post(f"{VIEW}/alerts/read", json={"ids": reply["ids"]}))["read"] == 2
@@ -118,7 +119,7 @@ def test_the_sample_shows_an_escalation_a_reminder_and_an_away_colleague(trial):
     assert again["unread"] == mine["unread"] - 1
 
     view = _ok(user.get(VIEW))
-    assert view["overdue"] >= 2 and view["due_soon"] >= 1
+    assert view["overdue"] == 1 and view["due_soon"] == 2
     rv08 = next(item for item in view["items"] if item["ref"] == "SAMPLE-RV-08" and item["category"] == "COMMUNICATION")
     assert rv08["owner"] and rv08["escalated_to"] and rv08["hours_left"] < 0
     assert view["away"][0]["backup_id"] == trial["user_id"]
@@ -226,12 +227,12 @@ def test_an_absence_sends_the_owners_alerts_to_the_backup(trial):
     _ok(user.post(f"{VIEW}/absences/{mine['id']}/cancel"))
     back = _ok(user.get(f"{VIEW}/alerts"))
     assert any(item["ref"] == "SAMPLE-RV-08" and item["category"] == "COMMUNICATION" for item in back["items"])
-    reply = next(
-        item
+    # The sample story's escalations go to the trial owner; a colleague holding the escalation role does not inherit
+    # them (0.10.64, J2: on 0.10.63 the colleague was told, ESCALATION_ROLE).
+    assert not any(
+        item["ref"] == "SAMPLE-RV-08" and item["category"] == "COMMUNICATION"
         for item in _ok(colleague.get(f"{VIEW}/alerts"))["items"]
-        if item["ref"] == "SAMPLE-RV-08" and item["category"] == "COMMUNICATION"
     )
-    assert reply["reason"] == "ESCALATION_ROLE"  # a colleague now holds the escalation role
 
 
 def test_the_event_owner_signs_ready_to_close_and_files_the_decision_record(trial):
@@ -244,11 +245,11 @@ def test_the_event_owner_signs_ready_to_close_and_files_the_decision_record(tria
     assert codes["MARKETS"]["result"] == "BLOCKED" and codes["REQUESTS"]["result"] == "BLOCKED"
     assert codes["MARKETS"]["action"].startswith("Sign the United States")
     assert codes["REQUESTS"]["action"] == "Answer or close the open information request"
-    assert events["SAMPLE-RV-08"]["next"] == "Complete the triage record (on the triage list)"
+    assert events["SAMPLE-RV-08"]["next"] == "Sign the United States (FDA) market assessment"
     assert codes["REQUESTS"]["opens"]["tab"].startswith("Communications?complaint=")
     assert [stage["code"] for stage in blocked["stages"]][-1] == "CLOSED" and blocked["summary"]["next_action"][
         "label"
-    ] == "Complete the triage record (on the triage list)"
+    ] == "Sign the United States (FDA) market assessment"
     refused = user.post(f"{VIEW}/events/{blocked['event']['complaint_id']}/ready", json={"password": PASSWORD})
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "REASON_REQUIRED"
 

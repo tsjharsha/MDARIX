@@ -376,6 +376,7 @@ export function EventDrawer({
           {view.stages.map((stage) => (
             <li key={stage.code} className={`stage-${stage.state.toLowerCase()}`}>
               {stage.label}
+              {stage.state === "NOT_NEEDED" && <span className="ac-muted">: not needed</span>}
             </li>
           ))}
         </ol>

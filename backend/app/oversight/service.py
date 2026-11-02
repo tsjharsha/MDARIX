@@ -428,6 +428,16 @@ def due_items(db: Session, control_db: Session | None, tenant_id, now: datetime 
     for item in items:
         if item["due_at"].tzinfo is None:
             item["due_at"] = item["due_at"].replace(tzinfo=timezone.utc)
+    # A reporting reminder task stands for a complaint's reporting clock, which a report or market item already shows:
+    # one line per complaint (J31; RV-07, RV-08 and RV-10 showed twice).
+    reported = {item["complaint_id"] for item in items if item["key"].startswith(("obligation:", "assessment:"))}
+    items = [
+        item
+        for item in items
+        if not (
+            item["key"].startswith("task:") and item["category"] == "REPORTING" and item["complaint_id"] in reported
+        )
+    ]
     _with_complaints(db, tenant_id, items)
     items.sort(key=lambda item: (item["due_at"], item["key"]))
     return items
@@ -443,6 +453,24 @@ def escalation_people(everyone: list[dict], role: str) -> list[str]:
     return [person["id"] for person in everyone if wanted in person["roles"]]
 
 
+def _trial_owner(control_db: Session | None, tenant_id) -> str | None:
+    """The id of the person who started the trial, or None (not a trial, or no control plane at hand)."""
+    if control_db is None:
+        return None
+    from backend.app.db.models.foundation import AuthUser
+    from backend.app.trial.team import trial_request
+
+    request = trial_request(control_db, tenant_id)
+    if request is None:
+        return None
+    found = (
+        control_db.query(AuthUser.id)
+        .filter(AuthUser.tenant_id == tenant_id, AuthUser.username == request.email.strip().lower())
+        .scalar()
+    )
+    return str(found) if found else None
+
+
 def sweep(db: Session, control_db: Session | None, tenant_id, now: datetime | None = None) -> dict:
     """Raise and resolve the organization's alerts (see the module docstring). Flushes; the caller commits."""
     from backend.app.enterprise_audit import make_audit_event
@@ -455,13 +483,20 @@ def sweep(db: Session, control_db: Session | None, tenant_id, now: datetime | No
     everyone = people(control_db, tenant_id)
     active = {person["id"] for person in everyone}
     escalating = escalation_people(everyone, view["escalation_role"])
+    # The sample story's escalations go to the person who started the trial, not to every Leader: an invited colleague
+    # does not inherit them (J2).
+    owner = _trial_owner(control_db, tenant_id)
     away = absences(db, tenant_id, today)
     wanted: dict[tuple, tuple[dict, str]] = {}
     for item in due_items(db, control_db, tenant_id, now):
         if not item["alerts"]:
             continue
         state = rules.state_of(item["due_at"], now, view["reminder_hours"])
-        for tier, person, reason in rules.recipients(item, state, active, away, escalating, today):
+        # shortcut: the sample's records are known by their SAMPLE- references; a source_system per item if that changes.
+        sample = owner is not None and (item["ref"] or "").startswith("SAMPLE-")
+        for tier, person, reason in rules.recipients(
+            item, state, active, away, [owner] if sample else escalating, today
+        ):
             wanted[(item["key"], tier, person)] = (item, reason)
     existing = {
         (alert.item_key, alert.tier, alert.recipient_id): alert

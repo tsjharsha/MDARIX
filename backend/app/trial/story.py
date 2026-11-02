@@ -44,7 +44,9 @@ CHAPTERS = (
         "Each market you report to asks its own seriousness and causation questions, with the regulation's clause "
         "beside each: death, each serious-injury criterion, caused or contributed, and a malfunction judged as if it "
         "recurred. The harm-severity scale shows each market's threshold, an Unknown keeps the market pending, and "
-        "you sign each market's conclusion after a short practice training on the questions.",
+        "you sign each market's conclusion after a short practice training on the questions. Try it on SAMPLE-RV-11: a "
+        "monitor reading SpO2 too high, nobody harmed, sent for service. Is it reportable, and by when, in the US and "
+        "India?",
         "Reports filed months late, or never evaluated, are a repeat finding in FDA inspections; seriousness judged "
         "without stated criteria is hard to defend.",
         {"section": "Complaints", "tab": "Reportability"},
