@@ -220,7 +220,7 @@ function ReportListView({ onOpen }: { onOpen: (id: string) => void }) {
                 {form.starter ? (
                   <ToneBadge tone="neutral" label="Starter, for your consultant to confirm" />
                 ) : (
-                  <ToneBadge tone="good" label="In MDARIX" />
+                  <ToneBadge tone="good" label="In MDARIX today" />
                 )}
               </div>
             ))}
