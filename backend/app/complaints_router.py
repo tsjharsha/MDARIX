@@ -10,6 +10,7 @@ from sqlalchemy import exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.session import get_db
 from backend.app.db.models.foundation import Complaint, InvestigationComplaint, LotBatch, Product, ProductVersion
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.sorting import order_query
@@ -116,7 +117,10 @@ def list_complaints(
     page_size: int = Query(50, ge=1, le=200),
     sort: str | None = Query(None, max_length=60),
     order: str | None = Query(None, max_length=10),
+    # The new navigation's list (0.10.68): each complaint's owner, stage, deadlines and markets, as its page shows them.
+    work: bool = Query(False),
     db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     tenant_id = uuid.UUID(ctx.tenant_id)
@@ -173,6 +177,12 @@ def list_complaints(
     )
     rows = ordered.offset((page - 1) * page_size).limit(page_size).all()
     ids = [complaint.id for complaint, *_ in rows]
+    if work:
+        from backend.app.oversight.router import complaint_work
+
+        worked = complaint_work(db, control_db, tenant_id, [complaint for complaint, *_ in rows])
+    else:
+        worked = {}
     linked = (
         dict(
             db.query(InvestigationComplaint.complaint_id, func.count(InvestigationComplaint.id))
@@ -237,6 +247,7 @@ def list_complaints(
                 "serious_injury": complaint.serious_injury,
                 "death": complaint.death,
                 "malfunction": complaint.malfunction,
+                **({"work": worked[str(complaint.id)]} if work else {}),
             }
             for complaint, product_identifier, product_name, version, product_business_id in rows
         ],

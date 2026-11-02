@@ -191,8 +191,8 @@ def second_look(
     page_size: int = 25,
     today: date | None = None,
 ) -> dict:
-    """The records worth a second look (``state=open``: not decided yet; ``decided``: decided), most serious first,
-    with a summary of everything flagged."""
+    """The records worth a second look (``state=open``: not decided yet; ``decided``: decided; ``dismissed``: decided
+    as not a complaint, the Complaints view "Dismissed"), most serious first, with a summary of everything flagged."""
     today = today or today_utc()
     words = settings_of(db, tenant_id)["second_look_words"]
     rows = _candidates(db, tenant_id, product_id).order_by(RECEIVED_AT.desc(), Complaint.id).limit(READ_LIMIT + 1).all()
@@ -223,11 +223,14 @@ def second_look(
         "dismissed": sum(1 for item in decided_items if item["decision"]["decision"] == "DISMISSED"),
         "by_reason": {code: by_reason.get(code, 0) for code in (rules.CANCELLED, rules.INQUIRY, rules.NFF_RECURRING)},
     }
-    chosen = decided_items if state == "decided" else open_items
+    chosen = {
+        "decided": decided_items,
+        "dismissed": [item for item in decided_items if item["decision"]["decision"] == "DISMISSED"],
+    }.get(state, open_items)
     start = (page - 1) * page_size
     return {
         "summary": summary,
-        "state": "decided" if state == "decided" else "open",
+        "state": state if state in ("decided", "dismissed") else "open",
         "total": len(chosen),
         "page": page,
         "page_size": page_size,

@@ -54,7 +54,86 @@ import { BasisLine, SignatureBasis } from "../../shared/Basis";
 import { RiskFileInput } from "./RiskFile";
 import { TrustSection } from "./Trust";
 import { DocumentsPanel } from "./Documents";
-import { parseDocumentLink } from "../documents";
+import { documentLink, parseDocumentLink } from "../documents";
+import { NEW_PLACES } from "../../../app/linkTable";
+import { offeredTab } from "../../../app/featureSet";
+import { InspectionChecks, SummaryDownload } from "./Readiness";
+import { ExportButton, OversightView } from "./Oversight";
+import { Capas } from "./Investigations";
+import { NO_FILTERS } from "../oversight";
+
+const NEW_RECORDS_TABS = NEW_PLACES.Records.tabs;
+type NewRecordsTab = (typeof NEW_RECORDS_TABS)[number];
+
+/**
+ * Records on the new navigation (0.10.68): what you hand an inspector. Inspection readiness (the classic Readiness
+ * home), the ready-to-use documents, each complaint's decision record, the CAPA records and their effectiveness checks,
+ * the risk file input, the organization's audit trail, signature verification, and every export in one place.
+ */
+export function NewRecordsSection({ tab }: { tab?: string }) {
+  const { session } = useWorkspace();
+  const menu = (section: "Trust & Audit" | "Intelligence" | "Decisions") =>
+    sectionAllowed(section, session?.allowed_menu, session?.business_permissions);
+  const tabs = NEW_RECORDS_TABS.filter(
+    (item) =>
+      (item !== "Audit trail" || menu("Trust & Audit")) &&
+      (item !== "Documents" || menu("Intelligence")) &&
+      (item !== "Verify a signature" || menu("Decisions")),
+  ) as NewRecordsTab[];
+  const [target] = useState(() => parseRecordsTab(tab));
+  const [auditView] = useState(() => recordsAuditView(tab));
+  const [documents] = useState(() => parseDocumentLink(tab?.replace(/^[^?]*/, "Reports")));
+  const [active, setActive] = useReportedTab<NewRecordsTab>(() => offeredTab(tab, tabs, "Inspection readiness"));
+  return (
+    <Tabs tabs={tabs} active={active} onChange={setActive} label="Record sections">
+      {active === "Inspection readiness" && <InspectionChecks />}
+      {active === "Documents" && (
+        <>
+          <DocumentsPanel initialCode={documents.code} initialScope={documents.scope} />
+          <ReportsPanel />
+        </>
+      )}
+      {active === "Decision records" && <OversightView part="events" />}
+      {active === "CAPA records" && <Capas />}
+      {active === "Effectiveness checks" && <EffectivenessBoard initialCapa={target.capa} />}
+      {active === "Risk file input" && <RiskFileInput />}
+      {active === "Audit trail" && <TrustSection tab={auditView ?? undefined} />}
+      {active === "Verify a signature" && (
+        <Embedded>
+          <SignatureVerificationWorkspace />
+        </Embedded>
+      )}
+      {active === "Exports" && <Exports />}
+    </Tabs>
+  );
+}
+
+/** Every export in one place (path i): the readiness summary and inspection pack, the oversight list, the documents. */
+function Exports() {
+  const { open } = useWorkspace();
+  return (
+    <Panel eyebrow="Records" title="Exports">
+      <SummaryDownload />
+      <div className="ca-action-row">
+        <span>Everything overdue or due soon, for the monthly product review:</span>
+        <ExportButton filters={{ ...NO_FILTERS, show: "all" }} />
+      </div>
+      <div className="ca-action-row">
+        <button
+          type="button"
+          className="ac-secondary"
+          onClick={() => open("Records", documentLink("MANAGEMENT_REVIEW"))}
+        >
+          <FileSearch size={15} aria-hidden="true" /> Management review report and other documents
+        </button>
+      </div>
+      <p className="ac-muted">
+        Each complaint's decision record downloads from its page (History), and each investigation's record and audit
+        export from the investigation.
+      </p>
+    </Panel>
+  );
+}
 
 /**
  * Records: what goes to an inspector or a management review. Effectiveness checks: every CAPA's check, planned with

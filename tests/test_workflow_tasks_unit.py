@@ -46,12 +46,14 @@ CONTRACT = {
     "SERVICE_ONLY_REVIEW": ("quality.review", "REVIEWER"),
     # The communications log (tr06): a request's owner until its reply arrives or it ends.
     "EXTERNAL_REPLY_DUE": ("signal.triage", "TRIAGE_LEAD"),
+    # A step sent from a complaint's page to a colleague who may sign it (0.10.68).
+    "COMPLAINT_STEP": ("signal.triage", "TRIAGE_LEAD"),
 }
 
 
 def test_every_task_type_matches_the_contract():
     assert {code: (item.permission, item.queue_role) for code, item in TASK_TYPES.items()} == CONTRACT
-    assert MANUAL_COMPLETION_TYPES == {"FOLLOW_UP", "IMPACT_ASSESSMENT", "EVIDENCE_REVIEW"}
+    assert MANUAL_COMPLETION_TYPES == {"FOLLOW_UP", "IMPACT_ASSESSMENT", "EVIDENCE_REVIEW", "COMPLAINT_STEP"}
     assert all(task_type_label(code) for code in TASK_TYPES)
     with pytest.raises(ValueError):
         task_type("NOT_A_TYPE")

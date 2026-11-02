@@ -761,9 +761,9 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           {
             title: "Open a case in one click",
             who: "PMS / Signal Triage Lead, Quality Investigator, Leader.",
-            steps: ["On the signal, choose Open case."],
+            steps: ["On the signal, choose Open an investigation."],
             result:
-              "The signal is marked as needing an investigation and a case opens with every complaint. To choose the question, the complaints or the investigator first, choose Open case with options….",
+              "The signal is marked as needing an investigation and a case opens with every complaint. To choose the question, the complaints or the investigator first, choose Open an investigation with options….",
           },
           {
             title: "Triage a signal",

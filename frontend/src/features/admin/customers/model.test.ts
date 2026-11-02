@@ -189,6 +189,14 @@ describe("editing details", () => {
     ]);
   });
 
+  it("offers the organization's navigation (classic or new) when the server returns it (0.10.68)", () => {
+    const tenant = { display_name: "Apex EU", name: "apex-eu", navigation: "classic" };
+    const groups = presentGroups(tenant, TENANT_FIELD_GROUPS);
+    expect(groups.flatMap((group) => group.fields.map((field) => field.key))).toContain("navigation");
+    const form = formFrom(tenant, groups);
+    expect(changedFields(tenant, { ...form, navigation: "new" }, groups)).toEqual({ navigation: "new" });
+  });
+
   it("edits the tenant fields the server returns", () => {
     const tenant = { display_name: "Apex EU", name: "apex-eu", tenant_type: "STANDARD", primary_region: "EU" };
     const groups = presentGroups(tenant, TENANT_FIELD_GROUPS);

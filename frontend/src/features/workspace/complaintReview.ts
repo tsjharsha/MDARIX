@@ -194,7 +194,12 @@ export const collapsed = (value: string) => value.replace(/\s+/g, " ").trim();
 
 // Lists ------------------------------------------------------------------------------------------------------------
 
-export function secondLookPath(state: "open" | "decided", productId: string, page: number, pageSize = PAGE_SIZE) {
+export function secondLookPath(
+  state: "open" | "decided" | "dismissed",
+  productId: string,
+  page: number,
+  pageSize = PAGE_SIZE,
+) {
   const params = new URLSearchParams({ state, page: String(page), page_size: String(pageSize) });
   if (productId) params.set("product_id", productId);
   return `/api/v1/complaints/second-look?${params}`;

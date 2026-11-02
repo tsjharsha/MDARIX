@@ -92,7 +92,7 @@ export const trialTabFor = (name?: string): TrialTab | undefined =>
  * is the progress MDARIX sees (/api/v1/trial/story).
  */
 export function GettingStartedSection({ focus }: { focus?: string } = {}) {
-  const { open, work, session, notify } = useWorkspace();
+  const { open, work, session, notify, navigation } = useWorkspace();
   const status = useResource<TrialStatus>("/api/v1/trial/status");
   // Complaints imported on this page: until the insights are read from them (a busy server takes a while, and the
   // first read may time out), the panel says it is reading them and reads again, rather than showing the sample's
@@ -197,7 +197,7 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
     demoRequested: !!demo.data?.request,
   });
   const goJourney = (key: JourneyKey) => {
-    if (key === "team") return showTab("Team");
+    if (key === "team") return navigation === "new" ? open("Team") : showTab("Team");
     if (key === "sample") return scrollTo("trial-story");
     if (key === "own-data") return showTab("Your data");
     if (key === "feedback") return open("Share feedback");
@@ -207,7 +207,10 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   // Rated during this visit: the rating stays on screen with its thank-you and "tell us more", though the feedback
   // reloaded after it now holds a submission.
   const [ratedNow, setRatedNow] = useState(false);
-  const tabs = TRIAL_TABS.filter((item) => item !== "About the sample data" || hasSample);
+  // On the new navigation the team is its own screen, Team (0.10.68).
+  const tabs = TRIAL_TABS.filter(
+    (item) => (item !== "About the sample data" || hasSample) && (item !== "Team" || navigation !== "new"),
+  );
 
   if (status.state === "ready" && trial && !trial.is_trial)
     return <Empty title="Not a trial workspace" detail="Getting started is shown during a free trial." />;

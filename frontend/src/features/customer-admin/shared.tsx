@@ -333,7 +333,8 @@ export type ServerSort = { sort: SortState; onSort: (key: string) => void; keys:
 type TableProps<T> = {
   rows: T[];
   columns: Column<T>[];
-  empty: { title: string; detail: string };
+  /** What an empty list says, and its next action (0.10.68). */
+  empty: { title: string; detail: string; action?: ReactNode };
   rowKey: (row: T, index: number) => string;
   caption: string;
   /** The server sorts and pages this list; the rows are one page, already in order. */
@@ -378,7 +379,7 @@ function ChoosableTable<T>({
   const [saved, setSaved] = useState<string[] | null>(() => loadSelection(id));
   // Column widths set by dragging a heading's edge; "Reset to default" clears them with the field choice.
   const { layout, commit } = useColumnLayout(id);
-  if (!rows.length) return <Empty title={empty.title} detail={empty.detail} />;
+  if (!rows.length) return <Empty title={empty.title} detail={empty.detail} action={empty.action} />;
   const options = [
     ...named.map((column) => ({ key: column.key, label: column.label })),
     ...extraKeys.map((key) => ({ key, label: fieldLabel(key) })),
@@ -463,7 +464,7 @@ function PlainTable<T>({
     if (serverSort) serverSort.onSort(key);
     else local.toggle(key);
   };
-  if (!rows.length) return <Empty title={empty.title} detail={empty.detail} />;
+  if (!rows.length) return <Empty title={empty.title} detail={empty.detail} action={empty.action} />;
   const pages = pageSize ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
   const current = Math.min(page, pages);
   const visible = pageSize ? sorted.slice((current - 1) * pageSize, current * pageSize) : sorted;

@@ -23,6 +23,9 @@ export type AppView =
   | "account"
   | "feedback"
   | "look-ahead"
+  | "trends"
+  | "settings"
+  | "team"
   | "customer-admin"
   | "admin"
   | "admin-stage2"
@@ -91,6 +94,10 @@ export const APP_ROUTES: Record<AppView, string> = {
   account: "/app/account",
   feedback: "/app/feedback",
   "look-ahead": "/app/look-ahead",
+  // The new navigation (0.10.68, tenants.navigation = new): its screens; /app/complaints/<ref> is one complaint.
+  trends: "/app/trends",
+  settings: "/app/settings",
+  team: "/app/team",
   "customer-admin": "/app/customer-admin",
   admin: "/app/admin",
   "admin-stage2": "/app/admin/stage2",
@@ -136,6 +143,8 @@ export const APP_ROUTES: Record<AppView, string> = {
 
 export function viewFromPath(pathname: string): AppView {
   const normalized = pathname.split("?")[0].replace(/\/$/, "") || "/";
+  // One complaint's page (/app/complaints/<ref>) is the Complaints screen's; workspaceAddress.ts reads the reference.
+  if (/^\/app\/complaints\/[^/]+$/.test(normalized)) return "complaints";
   const match = (Object.entries(APP_ROUTES) as [AppView, string][]).find(([, path]) => path === normalized);
   return match?.[0] ?? "home";
 }

@@ -263,7 +263,8 @@ def checklist(found: dict) -> list[dict]:
                 "Triage is complete",
                 BLOCKED,
                 "On the triage list: its triage record is not complete",
-                links.target("Complaints", "Triage"),
+                # Each step opens on this complaint, not on the whole list (0.10.68: the complaint page opens it).
+                links.target("Complaints", "Triage", record=("complaint", complaint.id)),
             )
         )
     elif record is None:
@@ -311,7 +312,7 @@ def checklist(found: dict) -> list[dict]:
             "; ".join(open_markets)
             if open_markets
             else (f"{_n(len(wanted), 'market')} signed" if wanted else "No market to assess"),
-            links.target("Complaints", "Reportability") if open_markets else None,
+            links.target("Complaints", "Reportability", record=("complaint", complaint.id)) if open_markets else None,
         )
     )
     started = {row.market for row in found["obligations"] if row.kind == "INITIAL"}
@@ -362,7 +363,9 @@ def checklist(found: dict) -> list[dict]:
                 "Escalated to a case: its investigation decision is not signed"
                 if escalated
                 else "No disposition or investigation decision is signed",
-                links.target("Investigations") if escalated else links.target("Complaints", "Dispositions"),
+                links.target("Investigations")
+                if escalated
+                else links.target("Complaints", "Dispositions", record=("disposition", complaint.id)),
             )
         )
     requests = found["requests"]
@@ -403,7 +406,7 @@ def checklist(found: dict) -> list[dict]:
                 INFO,
                 ", ".join(row.business_id or row.capa_identifier for row in capas)
                 + ": they may stay open and stay on the oversight view until they close in your QMS",
-                links.target("Records", "Effectiveness checks"),
+                links.target("Records", "Effectiveness checks", record=("capa", capas[0].id)),
             )
         )
     for item in items:

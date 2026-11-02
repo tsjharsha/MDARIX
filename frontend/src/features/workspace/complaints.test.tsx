@@ -71,17 +71,20 @@ describe("the Complaints section", () => {
       "Decision guides",
     ]);
     // Triage before every other queue (T-G19); then routine first: the complaints waiting for a disposition (T-G36).
-    expect(render(<ComplaintsSection />)).toContain("Reading the triage list");
-    expect(render(<ComplaintsSection tab="First contact" />)).toContain("Reading the calls");
+    expect(render(<ComplaintsSection />)).toContain("The triage list");
+    expect(render(<ComplaintsSection tab="First contact" />)).toContain("Calls and urgent intakes");
     expect(render(<ComplaintsSection tab="Dispositions" />)).toContain("Complaints waiting, newest first");
-    expect(render(<ComplaintsSection tab="Second look" />)).toContain("Checking your records");
-    expect(render(<ComplaintsSection tab="Backlog" />)).toContain("Reading your open complaints");
-    expect(render(<ComplaintsSection tab="Unknown" />)).toContain("Reading the triage list");
+    expect(render(<ComplaintsSection tab="Second look" />)).toContain("Possible hidden complaints");
+    expect(render(<ComplaintsSection tab="Backlog" />)).toContain("Open complaints against your target");
+    expect(render(<ComplaintsSection tab="Unknown" />)).toContain("The triage list");
     // A link may open one complaint's reports (T-G2b).
-    expect(render(<ComplaintsSection tab="Reports?complaint=c1" />)).toContain("Reading the reports");
+    expect(render(<ComplaintsSection tab="Reports?complaint=c1" />)).toContain("This complaint&#x27;s reports");
     // ... or one complaint's communications log, and the decision guides (T-G30, T-G15).
-    expect(render(<ComplaintsSection tab="Communications?complaint=c1" />)).toContain("Reading the log");
+    expect(render(<ComplaintsSection tab="Communications?complaint=c1" />)).toContain("The communications log");
     expect(render(<ComplaintsSection tab="Decision guides" />)).toContain("Reading the guides");
+    // One loading pattern (0.10.68): the list's skeleton says it is loading; the heading above it does not repeat it.
+    for (const tab of ["Triage", "First contact", "Second look", "Backlog", "Reports", "Communications"])
+      expect(render(<ComplaintsSection tab={tab} />), tab).not.toMatch(/<h2[^>]*>(Reading|Checking)[^<]*…/);
   });
 
   it("has its own address and menu entry", () => {

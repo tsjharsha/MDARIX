@@ -333,7 +333,8 @@ function SignalBody({
         <div className="ca-action-row">
           {actions.can_open_case && canCreateCase && (
             <button type="button" className="ac-primary" disabled={opening} onClick={() => void openCaseNow()}>
-              <FileSearch size={16} aria-hidden="true" /> {opening ? "Opening the case…" : "Open case"}
+              <FileSearch size={16} aria-hidden="true" />{" "}
+              {opening ? "Opening the investigation…" : "Open an investigation"}
             </button>
           )}
           {actions.can_start && (
@@ -363,7 +364,7 @@ function SignalBody({
           )}
           {actions.can_create_investigation && canCreateCase && (
             <button type="button" className="ac-secondary" onClick={() => setMode("investigation")}>
-              {actions.can_open_case ? "Open case with options…" : "Create investigation"}
+              {actions.can_open_case ? "Open an investigation with options…" : "Create investigation"}
             </button>
           )}
           {!anyAction && <p className="ac-muted">Nothing for you to do on this signal right now.</p>}

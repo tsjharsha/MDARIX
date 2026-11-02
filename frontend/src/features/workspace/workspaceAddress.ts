@@ -1,5 +1,5 @@
 import { APP_ROUTES, viewFromPath, type AppView } from "../../app/router";
-import { OLD_VIEWS, PLACES, tabParts } from "../../app/linkTable";
+import { NEW_PLACES, OLD_VIEWS, PLACES, tabParts } from "../../app/linkTable";
 import type { WorkspaceSection } from "./workspaceContext";
 
 /**
@@ -10,6 +10,7 @@ import type { WorkspaceSection } from "./workspaceContext";
  *   /app/complaints?tab=Reports&complaint=<id>&report=<id>      a complaint's reports, one report's panel open
  *   /app/signals?tab=Signal+inbox&priority=HIGH&signal=SIG000023 the inbox's filters and one signal
  *   /app/investigations?case=INV000147&step=Decision            the case page: the case and its step
+ *   /app/complaints/RV-06?tab=History                            one complaint's page (new navigation, 0.10.68)
  *
  * A tab name carries its record, panel and filters after "?" ("Reports?complaint=<id>", see linkTable.ts recordPlace);
  * the address spells them out beside the tab. Each section's path is in app/linkTable.json; a former address (a path,
@@ -21,7 +22,7 @@ const RESERVED = ["section", "tab", "step", "case"];
 
 /** The path of a section: its place's (linkTable.json), else the former view that named it, else the home. */
 function pathOf(section: string, tab = ""): { path: string; own: boolean } {
-  const place = PLACES[section];
+  const place = PLACES[section] ?? NEW_PLACES[section];
   if (place) return { path: place.path, own: true };
   const views = Object.entries(OLD_VIEWS).filter(([, [name]]) => name === section);
   const view = (views.find(([, [, named]]) => named === tab) ??
@@ -45,8 +46,23 @@ export function isWorkspaceHistoryState(value: unknown): value is WorkspaceHisto
   );
 }
 
+/** The section of one complaint's page, and its path's prefix: /app/complaints/<ref>. */
+export const COMPLAINT_PAGE = "Complaint";
+const COMPLAINT_PATH = /^\/app\/complaints\/([^/]+)\/?$/;
+
 export function addressFor(location: { section: string; tab?: string; caseRef?: string | null }): string {
   const { name, query } = tabParts(location.tab);
+  if (location.section === COMPLAINT_PAGE) {
+    // The complaint's reference is the path; its section (other than Summary) and what it carries follow.
+    const carried = new URLSearchParams(query);
+    const ref = carried.get("ref") ?? "";
+    carried.delete("ref");
+    const params = new URLSearchParams();
+    if (name && name !== "Summary") params.set("tab", name);
+    for (const [key, value] of carried) if (!RESERVED.includes(key)) params.append(key, value);
+    const text = params.toString();
+    return `/app/complaints/${encodeURIComponent(ref)}${text ? `?${text}` : ""}`;
+  }
   const { path, own } = pathOf(location.section, name);
   const params = new URLSearchParams();
   if (!own) params.set("section", location.section);
@@ -70,6 +86,15 @@ export function locationFromAddress(
   sections: readonly string[],
 ): { section: WorkspaceSection; tab?: string } | null {
   const params = new URLSearchParams(search);
+  const page = COMPLAINT_PATH.exec(pathname);
+  if (page) {
+    const carried = new URLSearchParams({ ref: decodeURIComponent(page[1]) });
+    for (const [key, value] of params) if (!RESERVED.includes(key)) carried.append(key, value);
+    return {
+      section: COMPLAINT_PAGE as WorkspaceSection,
+      tab: `${(params.get("tab") ?? "").trim() || "Summary"}?${carried}`,
+    };
+  }
   const named = params.get("section");
   if (named && !sections.includes(named)) return null;
   const [section, defaultTab] = named
