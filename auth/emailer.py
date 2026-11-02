@@ -15,12 +15,13 @@ import html
 import os
 import smtplib
 import ssl
-import urllib.parse
 from dataclasses import dataclass
 from email.message import EmailMessage
 from email.utils import make_msgid, parseaddr
 
 from dotenv import load_dotenv
+
+from backend.app import links
 
 # How long an invitation link works, as the emails say it (auth.durable.INVITATION_SECONDS; a test keeps the two
 # in step).
@@ -404,8 +405,7 @@ def send_trial_reminder(recipient: str, organization: str, *, days_left: int, en
                 "pilot on request.",
                 "If you do nothing, the workspace closes when the trial ends and its data is deleted 30 days later, "
                 "on the date above at the earliest.",
-                f"What a pilot on your real data involves is in Next steps, in your workspace: "
-                f"{company().app_url}/app/next-steps",
+                f"What a pilot on your real data involves is in Next steps, in your workspace: {_app_link('Next steps')}",
             ),
             button=("Open MDARIX", f"{company().app_url}/app"),
             reason="You are receiving this email because you started a free MDARIX trial.",
@@ -1172,12 +1172,18 @@ def _work_reason(organization: str) -> str:
     return f"You are receiving this email because of your work in MDARIX for {organization}."
 
 
-def _case_link(view: str, case: str | None) -> str | None:
-    """A deep link that opens one investigation on a screen (/app/<view>?case=INV000147), or None without a case."""
+def _app_link(section: str, tab: str | None = None, *, case: str | None = None) -> str:
+    """A link to a workspace screen, in the browser's own address scheme (backend/app/links.py app_path)."""
+    return f"{company().app_url}{links.app_path(section, tab, record=('case', case) if case else None)}"
+
+
+def _case_link(step: str | None, case: str | None) -> str | None:
+    """A deep link that opens one investigation on its case page, at a step (/app/investigations?case=INV000147&
+    step=Decision), or None without a case."""
     case = str(case or "").strip()
     if not case:
         return None
-    return f"{company().app_url}/app/{view}?case={urllib.parse.quote(case, safe='')}"
+    return _app_link("Investigations", step, case=case)
 
 
 def send_assignment_notice(
@@ -1185,7 +1191,7 @@ def send_assignment_notice(
 ) -> str:
     """An investigation was assigned to the recipient. With ``case`` (the investigation's business id) the button
     opens that investigation; without it, My work."""
-    case_url = _case_link("investigations", case)
+    case_url = _case_link(None, case)
     return _send(
         recipient,
         Message(
@@ -1195,9 +1201,7 @@ def send_assignment_notice(
                 (f"{assigned_by} assigned you" if assigned_by else "You were assigned")
                 + f" investigation {reference} in MDARIX for {organization}.",
             ),
-            button=("Open the investigation", case_url)
-            if case_url
-            else ("Open My work", f"{company().app_url}/app/my-work"),
+            button=("Open the investigation", case_url) if case_url else ("Open My work", _app_link("My Work")),
             reason=_work_reason(organization),
         ),
     )
@@ -1208,7 +1212,7 @@ def send_review_pending_notice(
 ) -> str:
     """A decision is waiting for the recipient's approval. With ``case`` (the investigation's business id) the
     button opens that case's decision."""
-    case_url = _case_link("decision", case)
+    case_url = _case_link("Decision", case)
     return _send(
         recipient,
         Message(
@@ -1219,8 +1223,9 @@ def send_review_pending_notice(
                 + f" a decision on {reference} for approval in MDARIX for {organization}.",
                 "Approving or rejecting it needs your password and authenticator code.",
             ),
-            # The Decisions screen, where the decision is reviewed and signed (frontend route /app/decision).
-            button=("Open Decisions", case_url or f"{company().app_url}/app/decision"),
+            # The case's Decision step, where the decision is reviewed and signed; without a case, My Work's
+            # approvals. ("Open Decisions" named a section the MVP parks, 0.10.67.)
+            button=("Open the decision", case_url or _app_link("My Work", "Approvals")),
             reason=_work_reason(organization),
         ),
     )
@@ -1237,7 +1242,7 @@ def send_signoff_completed_notice(
 ) -> str:
     """A decision on a case the recipient owns was signed: approved, rejected, or (outcome unknown) signed off. With
     ``case`` (the investigation's business id) the button opens that case's decision."""
-    case_url = _case_link("decision", case)
+    case_url = _case_link("Decision", case)
     done = {"APPROVE": "approved", "REJECT": "rejected"}.get(str(decision or "").upper(), "signed off")
     return _send(
         recipient,
@@ -1251,7 +1256,7 @@ def send_signoff_completed_notice(
             ),
             button=("Open the decision", case_url)
             if case_url
-            else ("Open investigations", f"{company().app_url}/app/investigations"),
+            else ("Open investigations", _app_link("Investigations")),
             reason=_work_reason(organization),
         ),
     )
@@ -1270,7 +1275,8 @@ def send_risk_review_requested_notice(
                 (f"{requested_by} asked" if requested_by else "You were asked")
                 + f" for a review of risk {reference} in MDARIX for {organization}.",
             ),
-            button=("Open Risk & Traceability", f"{company().app_url}/app/risk-traceability"),
+            # The review is a task in My Work (Risk & Traceability is parked under the MVP: the link went nowhere).
+            button=("Open My work", _app_link("My Work")),
             reason=_work_reason(organization),
         ),
     )
@@ -1303,7 +1309,7 @@ def _support_decider(organization: str, trial: bool) -> tuple[str, tuple[str, st
     if trial:
         return (
             "you approve it",
-            ("Open Getting started › Team", f"{company().app_url}/app"),
+            ("Open Getting started › Team", _app_link("Getting started", "Team")),
             f"You are receiving this email because you run the MDARIX free trial of {organization}.",
         )
     return (
@@ -1528,7 +1534,7 @@ def send_readiness_digest(recipient: str, *, organization: str, week: str, conte
                 )
                 for station in stations
             ),
-            button=("Open Readiness", f"{company().app_url}/app/readiness"),
+            button=("Open Readiness", _app_link("Readiness")),
             closing=(
                 "On Readiness, the inspection pack (ZIP) holds the summary PDF and every record behind these checks.",
             ),

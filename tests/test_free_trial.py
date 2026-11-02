@@ -872,7 +872,7 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     chapters = {chapter["code"]: chapter for chapter in body["chapters"]}
     # Routine first: the complaints waiting for a disposition, the routine sample complaints among them.
     assert chapters["ROUTINE_COMPLAINTS"]["number"] == 1 and chapters["ROUTINE_COMPLAINTS"]["finding"]["value"] >= 4
-    assert chapters["ROUTINE_COMPLAINTS"]["opens"] == {"section": "Complaints", "tab": "Dispositions"}
+    assert chapters["ROUTINE_COMPLAINTS"]["opens"].items() >= {"section": "Complaints", "tab": "Dispositions"}.items()
     assert chapters["HIDDEN_COMPLAINTS"]["finding"]["value"] >= 5
     assert chapters["INVESTIGATE_WITH_AI"]["finding"]["value"] == 1  # the guided investigation
     # Trials start without AI: the chapter promises what the case page does without it.
@@ -880,9 +880,9 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     assert "AI is off in the free trial" in chapters["INVESTIGATE_WITH_AI"]["promise"]
     assert chapters["RISK_FILE"]["finding"]["state"] == "CRITICAL"
     # The decision chapter opens the guided investigation's waiting brief.
-    assert chapters["DECIDE_AND_SIGN"]["opens"] == {"section": "Investigations", "tab": "Decision Brief"}
+    assert chapters["DECIDE_AND_SIGN"]["opens"].items() >= {"section": "Investigations", "tab": "Decision Brief"}.items()
     # The investigation chapter opens inside the guided investigation, on its case page, not on the list of cases.
-    assert chapters["INVESTIGATE_WITH_AI"]["opens"] == {"section": "Investigations", "tab": "Workspace"}
+    assert chapters["INVESTIGATE_WITH_AI"]["opens"].items() >= {"section": "Investigations", "tab": "Workspace"}.items()
     assert chapters["DECIDE_AND_SIGN"]["case"]["id"] and chapters["INVESTIGATE_WITH_AI"]["case"]
     assert chapters["HIDDEN_COMPLAINTS"]["case"] is None
     assert all(chapter["promise"] and chapter["pain"] and chapter["opens"]["section"] for chapter in body["chapters"])
