@@ -195,3 +195,25 @@ export function placeOf(opens: Opens): Place {
   const param = own ? home.param : record.kind;
   return { section: target.section, tab: `${tab}?${new URLSearchParams({ [param]: record.id })}` };
 }
+
+/**
+ * Words that point somewhere (7.10): a text's "A › B" paths (the user guide, the trial guide) as an organization on the
+ * new navigation reads them, through the same table: "Complaints › Reports" reads "Complaints › Reporting",
+ * "Readiness › Oversight" "My work › Team overview". A path the table does not know stays as written.
+ */
+export function newPathText(text: string): string {
+  const longest = (items: readonly string[]) => [...items].sort((a, b) => b.length - a.length).join("|");
+  // Screen and tab names are words, spaces and "&" only (linkTable.json), so they need no escaping in the pattern.
+  const tabs = longest([...new Set(Object.values(PLACES).flatMap((place) => place.tabs))]);
+  const pattern = new RegExp(`(?<![A-Za-z])(${longest(Object.keys(PLACES))}) › (${tabs})?`, "g");
+  return text.replace(pattern, (whole, section: string, tab: string | undefined) => {
+    const own = !!tab && PLACES[section].tabs.includes(tab);
+    if (!own && PLACES[section].tabs.length) return whole;
+    const place = routeFor(section, own ? tab : undefined, "mvp", "new");
+    const label = placeLabel(place.section, "new");
+    if (!own) return `${label} › ${tab ?? ""}`;
+    const now = tabParts(place.tab);
+    const view = new URLSearchParams(now.query).get("view");
+    return [label, now.name, view].filter(Boolean).join(" › ");
+  });
+}

@@ -84,7 +84,11 @@ export function HelpMenu({
             </li>
           )}
           <li>
-            <a href={USER_GUIDE_PATH} target="_blank" rel="noopener">
+            <a
+              href={workspace?.navigation === "new" ? `${USER_GUIDE_PATH}?navigation=new` : USER_GUIDE_PATH}
+              target="_blank"
+              rel="noopener"
+            >
               <ListChecks size={15} aria-hidden="true" />
               <span className="help-menu-item">
                 Step-by-step user guide

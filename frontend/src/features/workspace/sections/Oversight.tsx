@@ -423,7 +423,7 @@ export function EventDrawer({
               </span>
               {item.opens && item.result !== "PASS" && (
                 <button type="button" className="ac-link" onClick={() => go(item.opens)}>
-                  Resolve <ChevronRight size={13} aria-hidden="true" />
+                  {item.action ?? "Open"} <ChevronRight size={13} aria-hidden="true" />
                 </button>
               )}
             </li>
