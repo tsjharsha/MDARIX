@@ -1,3 +1,4 @@
+import { PracticeApproval } from "./PracticeApproval";
 import { useState } from "react";
 import { DeadlineChip } from "../../../app/chips";
 import { DecideAndSign, shortPrint } from "./common";
@@ -607,6 +608,26 @@ export function DecisionRecord({ view, onChanged }: { view: EventView; onChanged
           {view.event.ref} · version {record.version}
         </span>
       </header>
+      {view.record_people && (
+        // Separation of duties, shown honestly (0.10.71, A6).
+        <dl className="uw-receipt-people">
+          <div>
+            <dt>Prepared by</dt>
+            <dd>{view.record_people.prepared_by.join(", ") || "Nobody yet"}</dd>
+          </div>
+          <div>
+            <dt>May approve</dt>
+            <dd>{view.record_people.may_approve.join(", ") || "Nobody holds the role yet"}</dd>
+          </div>
+          <div>
+            <dt>Approved by</dt>
+            <dd>
+              {view.record_people.approved_by.join(", ") || "Nobody yet"}
+              <PracticeApproval shown={!!view.record_people.practice_note} />
+            </dd>
+          </div>
+        </dl>
+      )}
       {record.entries.length ? (
         <ol className="uw-ov-record uw-receipt-lines">
           {record.entries.map((entry, index) => (

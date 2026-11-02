@@ -11322,6 +11322,17 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   color: var(--ms-muted);
   font-size: var(--ms-fs-12);
 }
+/* Help › About: the release, read only (0.10.71). */
+.help-menu-about {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--ms-line);
+  color: var(--ms-ink);
+  font-size: var(--ms-fs-14);
+}
 .help-menu-list a:hover,
 .help-menu-list button:hover,
 .help-menu-list a:focus-visible,

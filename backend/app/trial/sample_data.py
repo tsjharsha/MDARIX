@@ -713,6 +713,35 @@ def seed_flagship(db: Session, tenant_id, now: datetime | None = None) -> int:
         # It reached MDARIX three hours ago, as an import would have brought it: triage is due within the day.
         complaint.ingestion_timestamp = now - timedelta(hours=3)
     db.flush()
+    seed_flagship_service(db, tenant_id, apply=True)
+    return 1
+
+
+# The flagship's service work (0.10.71, A5): the hospital's monitor went for service the day Biomedical engineering
+# reported it, under the customer's own service ticket; nobody owns it in MDARIX yet (the short story names the owner).
+FLAGSHIP_SERVICE = {"service_reference": "SVC-24-1107 (sample service ticket)", "service_status": "IN_PROGRESS"}
+
+
+def seed_flagship_service(db: Session, tenant_id, apply: bool) -> int:
+    """Link the flagship's service work, in progress since its awareness, where it has none (a trial seeded before
+    0.10.71, from scripts/refresh_trial_story.py). Returns 1 when it does (or would), else 0; flushes."""
+    complaint = (
+        db.query(Complaint)
+        .filter(
+            Complaint.tenant_id == tenant_id,
+            Complaint.source_system == SAMPLE_SOURCE,
+            Complaint.complaint_identifier == FLAGSHIP,
+            Complaint.service_reference.is_(None),
+        )
+        .first()
+    )
+    if complaint is None:
+        return 0
+    if apply:
+        complaint.service_reference = FLAGSHIP_SERVICE["service_reference"]
+        complaint.service_status = FLAGSHIP_SERVICE["service_status"]
+        complaint.service_status_at = complaint.awareness_timestamp or complaint.created_at
+        db.flush()
     return 1
 
 

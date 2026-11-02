@@ -17,6 +17,9 @@ import { InlineError } from "./boardParts";
 import { ChartOrTable, ClockLanes, type Lane } from "./WowCharts";
 import { WhyAsked } from "../../shared/Basis";
 import { COMPLAINT_STEP_WHY } from "../whyAsked";
+import { ServiceWork, serviceText } from "./ServiceWork";
+import { ShortStoryPanel } from "./ShortStory";
+import { FLAGSHIP } from "../entrance";
 
 export const COMPLAINT_SECTIONS = NEW_PLACES.Complaint.tabs;
 type ComplaintSection = (typeof COMPLAINT_SECTIONS)[number];
@@ -82,7 +85,7 @@ export function attentionText(blocked: Array<{ detail: string }>, hasStep: boole
  * investigation, the CAPA and ready to close), each saying who may sign it before the work starts.
  */
 export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObject<HTMLHeadingElement | null> }) {
-  const { open, reportTab, shownTab } = useWorkspace();
+  const { open, reportTab, shownTab, story } = useWorkspace();
   const ref = tabParam(tab, "ref") ?? "";
   const resource = useResource<EventView>(ref ? eventPath(ref) : null);
   const [shown, setShown] = useState<EventView | null>(null);
@@ -125,6 +128,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
   const nearest = work?.due[0] ?? null;
   const harm = event.harm ? HARM[event.harm] : null;
+  const storyShown = story === "short" && event.ref === FLAGSHIP;
   return (
     <div className="uw-cp">
       <header className="uw-cp-head" aria-label="The complaint at a glance">
@@ -147,6 +151,14 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           ))}
           <ToneBadge tone={EVENT_TONES[view.state]} label={view.state_label} />
         </div>
+        {view.service?.header && (
+          // Completing the service never closes the complaint (0.10.71, A5): the quality work is still open.
+          <p className="uw-cp-service" role="status">
+            <strong>{view.service.header}</strong> · Quality owner:{" "}
+            {work?.owner_name ?? event.owner_name ?? "not named yet"}
+            {step ? ` · Next: ${step.label}` : ""}
+          </p>
+        )}
         <dl className="uw-cp-facts">
           <div>
             <dt>Needs attention</dt>
@@ -171,8 +183,11 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           {step ? (
             <button
               type="button"
-              // Ready to close is signed by the form in Decisions & actions: shown there, it is that form's button.
-              className={!step.opens && active === "Decisions & actions" ? "ac-secondary" : "ac-primary"}
+              // Ready to close is signed by the form in Decisions & actions: shown there, it is that form's button. While
+              // the short story shows its step, that step's button is the one main button (0.10.71).
+              className={
+                storyShown || (!step.opens && active === "Decisions & actions") ? "ac-secondary" : "ac-primary"
+              }
               onClick={() => (step.opens ? go(step.opens) : choose("Decisions & actions"))}
             >
               {step.label} <ChevronRight size={15} aria-hidden="true" />
@@ -186,6 +201,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           )}
         </div>
       </header>
+      {/* The short story's step to do now (0.10.71, A4), from what was saved on this record. */}
+      {storyShown && <ShortStoryPanel view={view} onChanged={changed} />}
       <Tabs tabs={COMPLAINT_SECTIONS} active={active} onChange={choose} label="Complaint sections">
         {active === "Summary" && (
           <>
@@ -204,6 +221,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                 <dd>{formatDate(event.awareness_at)}</dd>
                 <dt>In your QMS</dt>
                 <dd>{event.status_in_qms}</dd>
+                <dt>Service work</dt>
+                <dd>{serviceText(view)}</dd>
                 {event.business_id && event.business_id !== event.ref && (
                   <>
                     <dt>Also known as</dt>
@@ -282,6 +301,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                   ))}
               </ul>
               <OwnerPicker view={view} onChanged={changed} />
+              <ServiceWork view={view} onChanged={changed} />
             </Panel>
             <Panel eyebrow="Decisions & actions" title="Ready to close">
               <WhyAsked why={COMPLAINT_STEP_WHY.READY} />

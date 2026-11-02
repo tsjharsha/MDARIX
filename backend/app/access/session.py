@@ -291,6 +291,9 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         "feature_set": for_tenant(db, user.tenant_id),
         # classic or new (tenants.navigation, set in Tenant 360): the workspace's navigation; nothing shows it yet.
         "navigation": (tenant.navigation if tenant is not None else None) or "classic",
+        # An evaluation on the sample only (tenants.sample_only, 0.10.71): the screens hide every upload and import
+        # action and offer "Discuss a pilot"; the import routes refuse it (403 SAMPLE_ONLY_TRIAL).
+        "sample_only": bool(tenant.sample_only) if tenant is not None else False,
         # A cell's licence: VALID, GRACE, EXPIRED (read-only), SUSPENDED, or NONE outside a cell.
         "licence": licence_state(db, user.tenant_id),
     }

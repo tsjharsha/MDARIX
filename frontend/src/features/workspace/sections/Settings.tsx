@@ -34,11 +34,13 @@ export const SETTING_PERMISSIONS: Record<SettingsTab, readonly BusinessPermissio
  * them; each says who can change it, and the form is shown only to them (the server refuses anyone else).
  */
 export function SettingsSection({ tab }: { tab?: string }) {
-  const [active, setActive] = useReportedTab<SettingsTab>(() =>
-    offeredTab(tab, SETTINGS_TABS, "Complaint review rules"),
-  );
+  // A sample-only trial imports nothing, so it has no import templates (0.10.71).
+  const sampleOnly = !!useWorkspace().session?.sample_only;
+  const tabs = SETTINGS_TABS.filter((item) => !(sampleOnly && item === "Import templates"));
+  const [chosen, setActive] = useReportedTab<SettingsTab>(() => offeredTab(tab, tabs, "Complaint review rules"));
+  const active = tabs.includes(chosen) ? chosen : tabs[0];
   return (
-    <Tabs tabs={SETTINGS_TABS} active={active} onChange={setActive} label="Settings">
+    <Tabs tabs={tabs} active={active} onChange={setActive} label="Settings">
       <SettingOwner tab={active} />
       {active === "Complaint review rules" && <ReviewSettingsPanel />}
       {active === "Reporting windows" && <ReportingWindows />}

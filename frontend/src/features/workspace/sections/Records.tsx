@@ -73,7 +73,7 @@ type NewRecordsTab = (typeof NEW_RECORDS_TABS)[number];
 export function NewRecordsSection({ tab }: { tab?: string }) {
   const { session } = useWorkspace();
   const menu = (section: "Trust & Audit" | "Intelligence" | "Decisions") =>
-    sectionAllowed(section, session?.allowed_menu, session?.business_permissions);
+    sectionAllowed(section, session?.allowed_menu, session?.business_permissions, session?.sample_only);
   const tabs = NEW_RECORDS_TABS.filter(
     (item) =>
       (item !== "Audit trail" || menu("Trust & Audit")) &&
@@ -148,7 +148,7 @@ export function RecordsSection({ tab }: { tab?: string }) {
   const [target] = useState(() => parseRecordsTab(tab));
   const [auditView] = useState(() => recordsAuditView(tab));
   const menu = (section: "Trust & Audit" | "Intelligence" | "Decisions") =>
-    sectionAllowed(section, session?.allowed_menu, session?.business_permissions);
+    sectionAllowed(section, session?.allowed_menu, session?.business_permissions, session?.sample_only);
   const tabs: readonly (RecordsTab | MvpRecordsTab)[] = mvp
     ? MVP_RECORDS_TABS.filter(
         (item) =>

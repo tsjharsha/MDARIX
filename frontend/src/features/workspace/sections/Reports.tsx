@@ -1,3 +1,4 @@
+import { PracticeApproval } from "./PracticeApproval";
 import { useContext, useState } from "react";
 import { marketLabel, versionWords } from "../../../app/labels";
 import { CheckCircle2, ClipboardList, Download, FileText, Send, ShieldCheck, Undo2 } from "lucide-react";
@@ -437,6 +438,7 @@ function Approval({ detail, onChanged }: { detail: ReportDetail; onChanged: (det
         <button type="submit" className="ac-primary" disabled={action.busy || !password}>
           {action.busy ? "Approving…" : "Approve the snapshot"}
         </button>
+        <PracticeApproval shown={standing?.same_person} />
       </div>
       <InlineError text={action.error} />
     </form>

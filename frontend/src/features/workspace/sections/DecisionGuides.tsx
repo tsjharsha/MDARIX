@@ -1,3 +1,4 @@
+import { PracticeApproval } from "./PracticeApproval";
 import { useState } from "react";
 import { DecideAndSign } from "./common";
 import { questionNumber } from "../../../app/labels";
@@ -825,6 +826,7 @@ function Publish({
             >
               {action.busy ? "Approving…" : "Approve and publish"}
             </button>
+            <PracticeApproval shown={view.approval?.same_person} />
           </div>
         </form>
       )}

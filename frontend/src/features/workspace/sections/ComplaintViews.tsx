@@ -27,16 +27,19 @@ export type ComplaintView = (typeof COMPLAINT_VIEWS)[number];
  * "Due soon" and "Past target" against the organization's target; "Second look" and "Dismissed" for possible hidden
  * complaints; "Reporting", the one home of the reportability decisions and the authority reports; "Communications";
  * "Investigations"; and "All complaints", the list itself (an extra view: the unfiltered list, with its own filters).
- * "Import your data" and "Log a call" are actions on the list's header. Each complaint opens its own page.
+ * "Import your data" (outside a trial) and "Log a call" are actions on the list's header. Each complaint opens its own page.
  */
 export function ComplaintViews({ tab }: { tab?: string }) {
-  const { open, session } = useWorkspace();
+  const { open, session, isTrial } = useWorkspace();
   const [carried] = useState(() => tab);
   const [view, setView] = useReportedTab<ComplaintView>(() => offeredTab(tab, COMPLAINT_VIEWS, "To triage"));
   // The screens these views came from still name their former tabs (Triage's "Open the reporting clock"): the link
   // table opens each one's new home.
   const go = (classic: string) => open("Complaints", classic);
-  const canImport = sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions);
+  // A trial's own data is under Help › Try your own data (0.10.71), not on the list's header; a pilot keeps it here.
+  const canImport =
+    !isTrial &&
+    sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions, session?.sample_only);
   const canLog = useCan("signal.triage") || useCan("investigation.create") || useCan("quality.review");
   const complaint = tabParam(carried, "complaint");
   return (

@@ -3,6 +3,7 @@ import {
   BookOpen,
   Bug,
   CircleHelp,
+  Info,
   LifeBuoy,
   ListChecks,
   NotebookText,
@@ -16,6 +17,15 @@ import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
 import { NEXT_STEPS_HELP, NEXT_STEPS_LINK } from "../help/trialNextSteps";
 import { WorkspaceContext } from "../workspace/workspaceContext";
 import { USER_GUIDE_PATH } from "../help/userGuide";
+import { BUILT_VERSION } from "./appVersion";
+
+/** Where a trial uploads its own export (0.10.71: not on the entrance or the Complaints header). */
+export const TRY_OWN_DATA = "Try your own data";
+/** What a sample-only trial offers instead of an upload: Next steps, from trial to pilot. */
+export const DISCUSS_PILOT = "Discuss a pilot";
+
+/** Help › About (0.10.71, A7): the release this screen runs; /health/version answers the same for the server. */
+export const releaseLine = (version: string) => (version ? `MDARIX release v${version}` : "MDARIX release not known");
 
 /** The website's video series (frontend/src/site/videos.tsx), opened beside the product. */
 export const VIDEOS_PATH = "/videos";
@@ -30,17 +40,22 @@ export const VIDEOS_PATH = "/videos";
 export function HelpMenu({
   onGettingStarted,
   more = [],
+  defaultOpen = false,
 }: {
   onGettingStarted?: () => void;
   /** Screens the new navigation reaches from Help (0.10.68): Look ahead and Share feedback. */
   more?: Array<{ label: string; detail: string; onSelect: () => void }>;
+  /** Open on first render (its tests render it as markup). */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [reporting, setReporting] = useState(false);
   const info = useSiteInfo();
   // In a trial workspace: Next steps, from trial to pilot (UserWorkspace says whether it is a trial).
   const workspace = useContext(WorkspaceContext);
   const onNextSteps = workspace?.isTrial ? () => workspace.open("Next steps") : undefined;
+  // A sample-only trial (0.10.71) offers "Discuss a pilot" where a trial offers its own data.
+  const sampleOnly = !!workspace?.session?.sample_only;
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -70,7 +85,7 @@ export function HelpMenu({
       </button>
       {open && (
         <ul id="help-menu-list" className="help-menu-list" aria-label="Help">
-          {onGettingStarted && (
+          {onGettingStarted && !sampleOnly && (
             <li>
               <button
                 type="button"
@@ -79,7 +94,32 @@ export function HelpMenu({
                   onGettingStarted();
                 }}
               >
-                <BookOpen size={15} aria-hidden="true" /> Getting started and import templates
+                <BookOpen size={15} aria-hidden="true" />{" "}
+                {workspace?.navigation === "new" ? (
+                  <span className="help-menu-item">
+                    {TRY_OWN_DATA}
+                    <small>Upload your complaints export; the sample stays until you remove it</small>
+                  </span>
+                ) : (
+                  "Getting started and import templates"
+                )}
+              </button>
+            </li>
+          )}
+          {onNextSteps && sampleOnly && (
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onNextSteps();
+                }}
+              >
+                <Signpost size={15} aria-hidden="true" />
+                <span className="help-menu-item">
+                  {DISCUSS_PILOT}
+                  <small>This evaluation uses the sample only</small>
+                </span>
               </button>
             </li>
           )}
@@ -175,6 +215,13 @@ export function HelpMenu({
             <a href="/security" target="_blank" rel="noopener">
               <ShieldCheck size={15} aria-hidden="true" /> Security and privacy
             </a>
+          </li>
+          <li className="help-menu-about">
+            <Info size={15} aria-hidden="true" />
+            <span className="help-menu-item">
+              About
+              <small>{releaseLine(BUILT_VERSION)}</small>
+            </span>
           </li>
         </ul>
       )}

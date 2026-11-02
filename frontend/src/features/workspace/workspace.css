@@ -5127,6 +5127,24 @@ div.uw-task-count:hover {
   font-size: var(--ms-fs-16);
   color: var(--ms-ink);
 }
+/* Service complete, quality still open (0.10.71, A5): one plain line, never a closed state. */
+.uw-cp-service {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--ms-teal);
+  border-radius: var(--ms-radius-sm);
+  background: var(--ms-mint);
+  color: var(--ms-ink);
+}
+.uw-service-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+}
+.uw-service-form .ca-field {
+  min-width: 180px;
+}
 .uw-cp-chips {
   display: flex;
   flex-wrap: wrap;
@@ -5347,7 +5365,7 @@ div.uw-task-count:hover {
   font-weight: var(--ms-fw-semibold);
 }
 
-/* Stage 8: the five-minute entrance (Entrance.tsx), its story bar, and "Explore all capabilities". */
+/* Stage 8: the entrance (Entrance.tsx), its story bar, and "Explore all capabilities". */
 .uw-entrance {
   display: grid;
   gap: var(--ms-space-4);
@@ -5359,6 +5377,59 @@ div.uw-task-count:hover {
 }
 .uw-entrance header p {
   margin: var(--ms-space-1) 0 0;
+}
+/* 0.10.71 (A3): one event first, in the reporter's words; the other stories and the restart under "More". */
+.uw-entrance-event {
+  display: grid;
+  gap: var(--ms-space-3);
+  padding: var(--ms-space-5);
+  border: 1px solid var(--ms-line);
+  border-top: 4px solid var(--ms-teal);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+  box-shadow: var(--ms-shadow-1);
+}
+.uw-entrance-event h2 {
+  margin: 0;
+  font-size: var(--ms-fs-24);
+  line-height: 1.25;
+}
+.uw-entrance-event .ac-eyebrow {
+  margin: 0;
+}
+.uw-entrance-words {
+  margin: 0;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border-left: 3px solid var(--ms-mint-line);
+  background: var(--ms-subtle);
+  color: var(--ms-ink);
+  font-size: var(--ms-fs-16);
+  line-height: 1.5;
+}
+.uw-entrance-tag {
+  margin: 0;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.uw-entrance-more > summary {
+  min-height: 44px;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+  font-weight: var(--ms-fw-semibold);
+  cursor: pointer;
+}
+.uw-entrance-more[open] > summary {
+  margin-bottom: var(--ms-space-3);
+}
+@media (max-width: 640px) {
+  .uw-entrance-event {
+    padding: var(--ms-space-4);
+  }
+  .uw-entrance-event h2 {
+    font-size: var(--ms-fs-20);
+  }
 }
 .uw-entrance-tiles {
   display: grid;
@@ -5393,10 +5464,6 @@ div.uw-task-count:hover {
 .uw-entrance-tile svg {
   color: var(--ms-teal-dark);
 }
-.uw-entrance-tile.is-own button {
-  border-top-color: var(--ms-line-strong);
-  background: var(--ms-subtle);
-}
 .uw-entrance-tile strong {
   font-size: var(--ms-fs-16);
 }
@@ -5418,10 +5485,6 @@ div.uw-task-count:hover {
   align-self: end;
   color: var(--ms-teal-dark);
   font-weight: var(--ms-fw-semibold);
-}
-.uw-entrance-numbers h3 {
-  margin: 0 0 var(--ms-space-2);
-  font-size: var(--ms-fs-16);
 }
 .uw-explore {
   margin: var(--ms-space-4) 0 0;
@@ -5744,4 +5807,176 @@ div.uw-task-count:hover {
   .ac-user > .uw-who {
     display: none;
   }
+}
+
+/* 0.10.71 (A4): the short story on SAMPLE-RV-11, on the complaint's own page; the step to do now, from what was saved. */
+.uw-short {
+  display: grid;
+  gap: var(--ms-space-3);
+  margin: var(--ms-space-4) 0;
+  padding: var(--ms-space-4);
+  border: 1px solid var(--ms-mint-line);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+  box-shadow: var(--ms-shadow-1);
+}
+.uw-short-head h2 {
+  margin: 0 0 var(--ms-space-2);
+  font-size: var(--ms-fs-20);
+}
+.uw-short-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-2) var(--ms-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-14);
+}
+.uw-short-steps li {
+  display: inline-flex;
+  gap: var(--ms-space-1);
+  align-items: center;
+}
+.uw-short-steps li.is-done {
+  color: var(--ms-teal-dark);
+}
+.uw-short-steps li.is-current {
+  color: var(--ms-ink);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-short-body {
+  display: grid;
+  gap: var(--ms-space-3);
+}
+.uw-short-body h3 {
+  margin: 0;
+  font-size: var(--ms-fs-16);
+}
+.uw-short-call {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(220px, 2fr);
+  gap: var(--ms-space-4);
+}
+.uw-short-words {
+  margin: var(--ms-space-2) 0;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border-left: 3px solid var(--ms-mint-line);
+  background: var(--ms-subtle);
+  font-size: var(--ms-fs-16);
+  line-height: 1.6;
+}
+.uw-short-why {
+  display: grid;
+  gap: var(--ms-space-1);
+  margin: 0;
+  padding-left: var(--ms-space-4);
+  font-size: var(--ms-fs-14);
+}
+.uw-short-facts,
+.uw-short-route,
+.uw-short-summary {
+  display: grid;
+  gap: var(--ms-space-2);
+  margin: 0;
+}
+.uw-short-facts div,
+.uw-short-route div,
+.uw-short-summary div {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 3fr;
+  gap: var(--ms-space-2);
+}
+.uw-short-facts dt,
+.uw-short-route dt,
+.uw-short-summary dt {
+  color: var(--ms-ink-2);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-short-facts dd,
+.uw-short-route dd,
+.uw-short-summary dd {
+  margin: 0;
+}
+.uw-short-markets {
+  margin: 0;
+  padding-left: var(--ms-space-4);
+}
+.uw-short-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-2) var(--ms-space-3);
+  align-items: flex-end;
+}
+.uw-short-form .ca-field {
+  min-width: 200px;
+}
+.uw-short-form .uw-short-wide {
+  flex: 1 1 100%;
+}
+.uw-short-practice {
+  margin: 0;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.uw-practice-approval {
+  display: block;
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+  font-style: italic;
+}
+.uw-short-resume {
+  margin: 0 0 var(--ms-space-3);
+}
+@media (max-width: 640px) {
+  .uw-short {
+    padding: var(--ms-space-3);
+  }
+  .uw-short-call,
+  .uw-short-facts div,
+  .uw-short-route div,
+  .uw-short-summary div {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .uw-short-form .ca-field {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+}
+/* "Print or save as PDF" prints the intake decision summary alone (the class is set only while printing it). */
+@media print {
+  body.uw-print-summary * {
+    visibility: hidden;
+  }
+  body.uw-print-summary .uw-intake-summary,
+  body.uw-print-summary .uw-intake-summary * {
+    visibility: visible;
+  }
+  body.uw-print-summary .uw-intake-summary {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  body.uw-print-summary .uw-no-print {
+    display: none;
+  }
+}
+
+/* 0.10.71 (A6): who prepared, who may approve and who approved, above the decision record's lines. */
+.uw-receipt-people {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--ms-space-2) var(--ms-space-4);
+  margin: 0 0 var(--ms-space-3);
+}
+.uw-receipt-people dt {
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-receipt-people dd {
+  margin: 0;
 }

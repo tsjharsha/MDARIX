@@ -731,6 +731,7 @@ def _tenant_detail(tenant: Tenant, customer: Customer | None) -> dict:
         "schema_version": tenant.schema_version,
         "configuration_version": tenant.configuration_version,
         "navigation": tenant.navigation,
+        "sample_only": bool(tenant.sample_only),
         "provisioning_status": tenant.provisioning_status,
         "status": tenant.status,
         "activated_at": tenant.activated_at,
@@ -1057,9 +1058,19 @@ TENANT_EDITABLE_FIELDS = (
     "storage_region",
     "configuration_version",
     "navigation",
+    "sample_only",
 )
 TENANT_REQUIRED_FIELDS = frozenset(
-    {"display_name", "name", "tenant_type", "deployment_model", "primary_region", "residency_region", "navigation"}
+    {
+        "display_name",
+        "name",
+        "tenant_type",
+        "deployment_model",
+        "primary_region",
+        "residency_region",
+        "navigation",
+        "sample_only",
+    }
 )
 
 

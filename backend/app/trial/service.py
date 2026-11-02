@@ -470,6 +470,9 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         customer, tenant = build_customer_tenant(
             db=db, tenant_key=_trial_tenant_key(row.organization), name=row.organization, status="ACTIVE", now=now
         )
+        # A new free trial starts on the new navigation (0.10.71, A1), set here and not by the column's default, so
+        # existing organizations and pilots keep theirs; Tenant 360 still switches it either way.
+        tenant.navigation = "new"
         db.add(customer)
         db.add(tenant)
         db.flush()

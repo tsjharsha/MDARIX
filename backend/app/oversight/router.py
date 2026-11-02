@@ -51,7 +51,7 @@ from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import require_any_permission
 from backend.app import links
-from backend.app.oversight import closure, rules, service
+from backend.app.oversight import closure, rules, service, service_work
 from backend.app.reportability.deadlines import due_label
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
@@ -884,6 +884,9 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     refs |= {d.authorized_by_ref for d in found["decisions"]}
     if found["record"] is not None:
         refs |= {found["record"].completed_by, found["record"].triage_owner}
+    refs.add(complaint.service_owner)
+    refs |= {v.created_by for versions in found["assessments"].values() for v in versions}
+    refs |= {s.requested_by for s in found["snapshots"]}
     names = _names(control_db, tenant_id, refs)
     record = closure.decision_record(control_db, found, row, names)
     signed_print = row.content_fingerprint if row is not None else None
@@ -891,6 +894,7 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     work = complaint_work(db, control_db, tenant_id, [complaint])[str(complaint.id)]
     nearest = work["due"][0] if work["due"] else None
     state = _event_state(complaint, items, row)
+    signers = _signers(control_db, tenant_id, me, bool(found["cases"]))
     product = _products(db, tenant_id).get(complaint.product_id)
     version, lot = _version_and_lot(db, tenant_id, complaint)
     return {
@@ -945,6 +949,8 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
         if row is not None and row.ready_state
         else None,
         "decision_record": record,
+        # The linked service work (0.10.71, A5): its reference, owner and status; it never moves the complaint.
+        "service": service_work.view(complaint, names),
         "you_are_owner": owner == me,
         "people": [{"id": p["id"], "name": p["name"]} for p in service.people(control_db, tenant_id)],
         "reason_min": closure.REASON_MIN,
@@ -953,7 +959,48 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
         # The owner, stage, next action and dated items the lists and My work show for it (0.10.68).
         "work": work,
         # Who may sign each step, before the work starts (7.8).
-        "signers": _signers(control_db, tenant_id, me, bool(found["cases"])),
+        "signers": signers,
+        # Who prepared, who may approve and who approved the decision record's work (0.10.71, A6); apart from the
+        # record so its fingerprint is unchanged.
+        "record_people": _record_people(found, row, names, signers, me, bool(_practice(control_db, tenant_id))),
+    }
+
+
+def _record_people(found: dict, row, names: dict, signers: dict, me: str, trial: bool) -> dict:
+    from backend.app.workflow.approvals import PRACTICE_APPROVAL
+
+    """Separation of duties, shown honestly (0.10.71, A6): who prepared the event's work (the triage record, the
+    market assessments, the reports asked for approval), who may approve it (the market conclusions and the reports)
+    and who approved (every signature). Working alone in a trial one person is all three: practice approval."""
+
+    def named(refs) -> list[str]:
+        found_names: list[str] = []
+        for ref in refs:
+            name = names.get(ref or "")
+            if ref and name and name not in found_names:
+                found_names.append(name)
+        return found_names
+
+    record = found["record"]
+    versions = [v for items in found["assessments"].values() for v in items]
+    prepared = named(
+        [record.completed_by if record is not None and record.completed_at else None]
+        + [v.created_by for v in versions]
+        + [s.requested_by for s in found["snapshots"]]
+    )
+    may = [p for code in ("MARKETS", "OBLIGATIONS") for p in (signers.get(code) or {}).get("people", [])]
+    approved = named(
+        [v.signed_by for v in versions if v.signed_at is not None]
+        + [s.approved_by for s in found["snapshots"] if s.approved_at is not None]
+        + [d.signed_by for d in found["dispositions"] if d.signed_at is not None]
+        + [row.signed_by if row is not None and row.signed_at else None]
+    )
+    alone = {p["id"] for p in may} == {me}
+    return {
+        "prepared_by": prepared,
+        "may_approve": list(dict.fromkeys(p["name"] for p in may)),
+        "approved_by": approved,
+        "practice_note": PRACTICE_APPROVAL if trial and alone else None,
     }
 
 
@@ -1040,6 +1087,51 @@ def send_step(
     _audit(db, ctx, "COMPLAINT_STEP_SENT", "Complaint", complaint.id, step=body.step, to=person["id"])
     db.commit()
     return {"task_id": str(task.id), "to": person["name"], "title": task.title}
+
+
+class ServiceBody(BaseModel):
+    reference: str = Field(max_length=service_work.REFERENCE_MAX * 2)
+    status: str = Field(max_length=20)
+    owner_id: str | None = Field(default=None, max_length=64)
+
+
+@router.put("/events/{complaint_id}/service", dependencies=[WRITERS])
+def record_service(
+    complaint_id: uuid.UUID,
+    body: ServiceBody,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The complaint's linked service work (0.10.71, A5): its reference in the customer's service system, its owner and
+    status, dated now. It changes nothing else: the complaint, its assessments and its checklist stay as they are."""
+    tenant_id = _tenant(ctx)
+    complaint = _complaint(db, tenant_id, complaint_id)
+    reference, status = " ".join(body.reference.split()), body.status.strip().upper()
+    owner = (body.owner_id or "").strip() or None
+    people = {item["id"] for item in service.people(control_db, tenant_id)}
+    problem = service_work.problem(reference, status, owner, people)
+    if problem:
+        raise _error(422, "SERVICE_INVALID", problem)
+    before = {
+        "reference": complaint.service_reference,
+        "status": complaint.service_status,
+        "owner": complaint.service_owner,
+    }
+    complaint.service_reference, complaint.service_owner = reference, owner
+    if status != complaint.service_status or complaint.service_status_at is None:
+        complaint.service_status, complaint.service_status_at = status, service.now_utc()
+    _audit(
+        db,
+        ctx,
+        "COMPLAINT_SERVICE_RECORDED",
+        "Complaint",
+        complaint.id,
+        before=before,
+        after={"reference": reference, "status": status, "owner": owner},
+    )
+    db.commit()
+    return event_view(db, control_db, tenant_id, complaint, str(ctx.user_id))
 
 
 STEP_TITLES = {
