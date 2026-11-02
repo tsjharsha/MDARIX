@@ -257,7 +257,21 @@ describe("the team: a persona per invitation", () => {
 
   it("lists each person's persona, with a lock for a colleague, and lets the owner change it", () => {
     expect(markup).toContain("Regulatory Leader");
-    expect(markup).toContain('aria-label="set by the trial owner"');
+    expect(markup).toContain("Set by you: they cannot change it");
+    // A colleague viewing the team sees the persona with its lock, and nothing to change.
+    const seen = renderToStaticMarkup(
+      <TeamView
+        team={{ state: "ready", data: { ...team, can_invite: false, can_manage: false }, reload: () => undefined }}
+        busy={false}
+        message={null}
+        onInvite={async () => true}
+        onResend={() => undefined}
+        onConfirm={() => undefined}
+        onChanged={() => undefined}
+      />,
+    );
+    expect(seen).toContain('aria-label="set by the trial owner"');
+    expect(seen).not.toContain("Persona of Rahul Colleague");
     expect(markup).toContain("Persona of Rahul Colleague");
     const confirm = personaConfirmation(team.members[1], team.personas![5], () => undefined);
     expect(confirm.title).toBe("Make Rahul Colleague a Decision Maker?");

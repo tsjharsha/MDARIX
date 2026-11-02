@@ -632,6 +632,12 @@ export function UserWorkspace({
                   {tenantName}
                 </span>
               )}
+              {/* One label for the trial's data (V5), as on the classic bar; PDFs carry a watermark. */}
+              {trial?.is_trial && (
+                <span className="ms-chip uw-sample-chip uw-top-sample" title={TRIAL_DATA_NOTE}>
+                  {(trial.sample?.complaints ?? 0) > 0 ? "Sample data" : "Practice records"}
+                </span>
+              )}
               <GlobalSearch open={open} />
               <PersonaSwitch
                 persona={persona}

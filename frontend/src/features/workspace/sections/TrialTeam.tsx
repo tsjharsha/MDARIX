@@ -229,7 +229,7 @@ export function TeamView({
                   </strong>
                   <small>{member.email}</small>
                 </div>
-                {member.persona_label && (
+                {member.persona_label && !(data.can_manage && !member.is_owner && personas.length > 0) && (
                   <span
                     className="ms-chip uw-team-persona"
                     title={member.persona_locked ? "Set by the trial owner" : undefined}
@@ -242,7 +242,8 @@ export function TeamView({
                   {memberStatus(member)}
                 </span>
                 {data.can_manage && !member.is_owner && personas.length > 0 && (
-                  <label className="uw-team-change">
+                  <label className="uw-team-change" title="Set by you: they cannot change it">
+                    <Lock size={13} aria-hidden="true" />
                     <span className="ca-sr-only">Persona of {member.display_name || member.email}</span>
                     <select
                       value={member.persona ?? ""}
@@ -336,15 +337,17 @@ export function TeamView({
                       </option>
                     ))}
                   </select>
-                  <small id="uw-team-persona-hint" className="ac-muted">
-                    {chosen ? `${chosen.sub}. ` : ""}They see this persona's screens and sign as its role. Only you can
-                    change it.
-                  </small>
                 </label>
               )}
               <button type="submit" className="ac-primary" disabled={busy}>
                 {busy ? "Sending…" : "Send the invitation"}
               </button>
+              {personas.length > 0 && (
+                <small id="uw-team-persona-hint" className="ac-muted uw-team-hint">
+                  {chosen ? `${chosen.label}: ${chosen.sub.toLowerCase()}. ` : ""}They see this persona's screens and
+                  sign as its role. Only you can change it.
+                </small>
+              )}
             </form>
           )}
           {data.can_invite && full && (

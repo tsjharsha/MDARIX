@@ -78,7 +78,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
           tone="soon"
           value={reading ? null : counts.week}
           title="Due this week"
-          detail="Legal clocks, replies and tasks in the next 7 days"
+          detail="Deadlines in the next 7 days"
         />
         <Stat
           tone="risk"
@@ -129,6 +129,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
         )}
         <div className="uw-home-side">
           {persona === "regulatory" && <LegalClocks clocks={clocks} onOpen={go} />}
+          {(persona === "investigator" || persona === "risk") && <OpenInvestigations />}
           <section className="uw-card uw-card-pad uw-home-trend" aria-labelledby="home-trend">
             <span className="ac-eyebrow" id="home-trend">
               Trends
@@ -242,7 +243,7 @@ function LegalClocks({ clocks, onOpen }: { clocks: OversightItem[]; onOpen: (ite
     <section className="uw-card" aria-labelledby="home-clocks">
       <div className="uw-card-head">
         <h2 id="home-clocks">Legal clocks</h2>
-        <span className="ac-muted">Each in its own time zone</span>
+        <span className="ac-muted">Soonest first</span>
       </div>
       {clocks.length ? (
         <ul className="uw-home-clocks">
@@ -271,6 +272,60 @@ function LegalClocks({ clocks, onOpen }: { clocks: OversightItem[]; onOpen: (ite
       ) : (
         <p className="ac-muted uw-card-pad">No legal clock is running.</p>
       )}
+    </section>
+  );
+}
+
+type CaseRow = {
+  id: string;
+  business_id?: string | null;
+  investigation_question?: string | null;
+  product_id?: string | null;
+  status?: string | null;
+  workflow_state_label?: string | null;
+  owner_name?: string | null;
+};
+
+/** The Investigator's and Risk Reviewer's open investigations: the question, where it stands, its owner. */
+function OpenInvestigations() {
+  const { open, work } = useWorkspace();
+  const cases = useResource<{ records: CaseRow[] }>("/api/v1/data-plane/investigations?limit=20");
+  const rows = (cases.data?.records ?? [])
+    .filter((row) => !/^(CLOSED|CANCELLED)$/i.test(String(row.status ?? "")))
+    .slice(0, 3);
+  if (cases.state !== "ready" || !rows.length) return null;
+  return (
+    <section className="uw-card uw-card-pad uw-home-trend" aria-labelledby="home-cases">
+      <span className="ac-eyebrow" id="home-cases">
+        Open investigations
+      </span>
+      <ul>
+        {rows.map((row) => (
+          <li key={row.id}>
+            <p>
+              <strong>
+                {row.business_id ? `${row.business_id} · ` : ""}
+                {row.investigation_question ?? "An investigation"}
+              </strong>
+            </p>
+            <p className="ac-muted">
+              {[row.workflow_state_label, row.owner_name ? `Owner: ${row.owner_name}` : null]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+            <button
+              type="button"
+              className="ac-secondary"
+              onClick={() => {
+                work.setInvestigationId(row.id, row.product_id ?? undefined);
+                open("Investigations", "Summary");
+              }}
+            >
+              Open the investigation
+            </button>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
