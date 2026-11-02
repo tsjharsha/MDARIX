@@ -57,7 +57,12 @@ def test_a_new_trial_has_todays_words_and_a_running_one_is_reworded_once(trial):
         assert tasks and not any("question 1," in task.title for task in tasks)
         assert reword_sample(db, trial, apply=False) == 0
         # A trial seeded before 0.10.66.
-        entry = next(row for row in db.query(CommunicationEntry).filter(CommunicationEntry.subject == RV08_REQUEST))
+        entry = next(
+            row
+            for row in db.query(CommunicationEntry).filter(
+                CommunicationEntry.tenant_id == trial, CommunicationEntry.subject == RV08_REQUEST
+            )
+        )
         entry.subject = RV08_REQUEST_BEFORE
         tasks[0].title = "Follow up SAMPLE-CALL-03 with the reporter: ask about question 1, question 2"
         db.flush()
