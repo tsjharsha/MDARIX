@@ -217,7 +217,26 @@ export type EventView = {
   };
   /** Who may sign each step, before the work starts (0.10.68, 7.8). */
   signers?: Record<string, { people: Person[]; you: boolean; second_person: boolean }>;
+  /** The linked service work (0.10.71, A5); it never closes or advances the complaint. */
+  service?: ServiceWork | null;
 };
+
+export type ServiceStatus = "OPEN" | "IN_PROGRESS" | "COMPLETE";
+export type ServiceWork = {
+  reference: string;
+  owner_id: string | null;
+  owner_name: string | null;
+  status: ServiceStatus;
+  status_label: string;
+  status_at: string | null;
+  /** "Service complete · Quality assessment open" once complete. */
+  header: string | null;
+};
+export const SERVICE_STATUSES: Array<[ServiceStatus, string]> = [
+  ["OPEN", "Open"],
+  ["IN_PROGRESS", "In progress"],
+  ["COMPLETE", "Complete"],
+];
 
 export type Filters = { product: string; market: string; category: string; show: "attention" | "all" };
 export const NO_FILTERS: Filters = { product: "", market: "", category: "", show: "attention" };

@@ -5127,6 +5127,24 @@ div.uw-task-count:hover {
   font-size: var(--ms-fs-16);
   color: var(--ms-ink);
 }
+/* Service complete, quality still open (0.10.71, A5): one plain line, never a closed state. */
+.uw-cp-service {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--ms-teal);
+  border-radius: var(--ms-radius-sm);
+  background: var(--ms-mint);
+  color: var(--ms-ink);
+}
+.uw-service-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+}
+.uw-service-form .ca-field {
+  min-width: 180px;
+}
 .uw-cp-chips {
   display: flex;
   flex-wrap: wrap;

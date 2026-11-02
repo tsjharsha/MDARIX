@@ -17,6 +17,7 @@ import { InlineError } from "./boardParts";
 import { ChartOrTable, ClockLanes, type Lane } from "./WowCharts";
 import { WhyAsked } from "../../shared/Basis";
 import { COMPLAINT_STEP_WHY } from "../whyAsked";
+import { ServiceWork, serviceText } from "./ServiceWork";
 
 export const COMPLAINT_SECTIONS = NEW_PLACES.Complaint.tabs;
 type ComplaintSection = (typeof COMPLAINT_SECTIONS)[number];
@@ -147,6 +148,14 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           ))}
           <ToneBadge tone={EVENT_TONES[view.state]} label={view.state_label} />
         </div>
+        {view.service?.header && (
+          // Completing the service never closes the complaint (0.10.71, A5): the quality work is still open.
+          <p className="uw-cp-service" role="status">
+            <strong>{view.service.header}</strong> · Quality owner:{" "}
+            {work?.owner_name ?? event.owner_name ?? "not named yet"}
+            {step ? ` · Next: ${step.label}` : ""}
+          </p>
+        )}
         <dl className="uw-cp-facts">
           <div>
             <dt>Needs attention</dt>
@@ -204,6 +213,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                 <dd>{formatDate(event.awareness_at)}</dd>
                 <dt>In your QMS</dt>
                 <dd>{event.status_in_qms}</dd>
+                <dt>Service work</dt>
+                <dd>{serviceText(view)}</dd>
                 {event.business_id && event.business_id !== event.ref && (
                   <>
                     <dt>Also known as</dt>
@@ -282,6 +293,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                   ))}
               </ul>
               <OwnerPicker view={view} onChanged={changed} />
+              <ServiceWork view={view} onChanged={changed} />
             </Panel>
             <Panel eyebrow="Decisions & actions" title="Ready to close">
               <WhyAsked why={COMPLAINT_STEP_WHY.READY} />

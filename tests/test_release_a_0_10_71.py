@@ -244,3 +244,77 @@ def test_a_sample_only_trial_is_refused_in_plain_words_and_a_normal_trial_keeps_
     finally:
         assert _set_tenant(admin, tenant_id, sample_only=False).status_code == 200
     assert user.post("/api/v1/data/import/complaints/check", content=csv, headers=headers).status_code != 403
+
+
+# ------------------------------------------------------------------------------------------- A5: service work
+
+EVENT = "/api/v1/oversight/events/SAMPLE-RV-11"
+
+
+def _quality_state(view: dict) -> dict:
+    """What the quality side of a complaint is: none of it may move when the service does."""
+    return {
+        "status_in_qms": view["event"]["status_in_qms"],
+        "state": view["state"],
+        "next_action": view["summary"]["next_action"],
+        "checklist": [(item["code"], item["result"]) for item in view["checklist"]],
+        "stages": view["stages"],
+        "due": [(item["key"], item["due_at"], item["state"]) for item in view["work"]["due"]],
+        "stage": view["work"]["stage"],
+        "ready": view["ready"],
+    }
+
+
+def test_completing_the_service_leaves_the_complaint_open_and_says_so(trial):
+    from backend.app.oversight.service_work import COMPLETE_LINE
+    from backend.app.trial.sample_data import FLAGSHIP_SERVICE
+
+    user = trial["user"]
+    view = _ok(user.get(EVENT))
+    # The sample: RV-11's service in progress under its service ticket, since its awareness, nobody named yet.
+    assert view["service"]["reference"] == FLAGSHIP_SERVICE["service_reference"]
+    assert view["service"]["status"] == "IN_PROGRESS" and view["service"]["owner_id"] is None
+    assert view["service"]["status_at"] == view["event"]["awareness_at"] and view["service"]["header"] is None
+    before = _quality_state(view)
+    me = next(person["id"] for person in view["people"])
+    path = f"/api/v1/oversight/events/{view['event']['complaint_id']}/service"
+    assert user.put(path, json={"reference": "SVC-24-1107", "status": "SCHEDULED"}).status_code == 422
+    assert user.put(path, json={"reference": "S", "status": "OPEN"}).status_code == 422
+    assert user.put(path, json={"reference": "SVC", "status": "OPEN", "owner_id": "nobody"}).status_code == 422
+    done = _ok(user.put(path, json={"reference": "SVC-24-1107", "status": "COMPLETE", "owner_id": me}))
+    assert done["service"]["status"] == "COMPLETE" and done["service"]["owner_id"] == me
+    assert done["service"]["header"] == COMPLETE_LINE == "Service complete · Quality assessment open"
+    # Nothing on the quality side moved: the complaint, its assessments' clocks, its checklist, its next step.
+    assert _quality_state(done) == before
+    assert _quality_state(_ok(user.get(EVENT))) == before
+    assert before["next_action"] is not None and before["status_in_qms"] != "Closed"
+
+
+def test_the_refresh_links_the_flagship_service_once(trial):
+    """scripts/refresh_trial_story.py: a trial seeded before 0.10.71 gets RV-11's service work, once (dry run first)."""
+    from backend.app.db.models.foundation import Complaint
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.trial.sample_data import FLAGSHIP, seed_flagship_service
+
+    tenant_id = uuid.UUID(trial["tenant_id"])
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        row = db.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.complaint_identifier == FLAGSHIP)
+        saved = [(c.service_reference, c.service_status, c.service_status_at, c.service_owner) for c in row][0]
+        row.update(
+            {"service_reference": None, "service_status": None, "service_status_at": None, "service_owner": None}
+        )
+        assert seed_flagship_service(db, tenant_id, apply=False) == 1
+        assert row.one().service_reference is None  # the dry run changes nothing
+        assert seed_flagship_service(db, tenant_id, apply=True) == 1
+        assert row.one().service_status == "IN_PROGRESS"
+        assert seed_flagship_service(db, tenant_id, apply=True) == 0  # idempotent
+        row.update(
+            {
+                "service_reference": saved[0],
+                "service_status": saved[1],
+                "service_status_at": saved[2],
+                "service_owner": saved[3],
+            }
+        )
+        db.commit()
