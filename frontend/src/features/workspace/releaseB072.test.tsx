@@ -15,7 +15,9 @@ const sources = import.meta.glob(["./sections/*.tsx", "./*.tsx"], {
   import: "default",
   eager: true,
 }) as Record<string, string>;
-const source = (name: string) => sources[`./sections/${name}.tsx`] ?? sources[`./${name}.tsx`] ?? "";
+// Line endings as LF: a Windows checkout (core.autocrlf) reads the sources with CRLF (0.10.74: F2 failed there).
+const source = (name: string) =>
+  (sources[`./sections/${name}.tsx`] ?? sources[`./${name}.tsx`] ?? "").replace(/\r\n/g, "\n");
 
 function workspace(navigation: "new" | "classic" = "new"): WorkspaceApi {
   return {
@@ -155,9 +157,12 @@ describe("B3: the complaint page shows one action per row and does the triage it
     // Saved on the page, it stays on the page.
     expect(source("Triage")).toContain('item.kind === "COMPLAINT" && !inline');
   });
-  it("reveals the coding, the record's data and the stage list on request", () => {
-    expect(page()).toContain("<summary>Coding and record details</summary>");
-    expect(page()).toContain("<summary>Stage by stage</summary>");
+  it("keeps the coding and the record's data in Details, and the stage line as the path (0.10.74, C2)", () => {
+    // Release C's record page (the approved design): Details holds what B3 revealed on request, and the stages are
+    // the highlights panel's path instead of a "Stage by stage" list.
+    expect(page()).toContain('Summary: "Details"');
+    expect(page()).toContain("<dt>Problem</dt>");
+    expect(page()).toContain("<StagePath stages={view.stages} />");
   });
   it("leads with the intake decision summary once step 4 is reached (Addendum 2)", () => {
     expect(page()).toContain("<summary>The full complaint record</summary>");

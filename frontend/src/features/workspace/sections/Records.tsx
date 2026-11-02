@@ -13,7 +13,15 @@ import {
 import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { formatDay, localDay } from "../../../app/dates";
-import { sectionAllowed, useCan, useFeatureSet, useReportedTab, useTabParam, useWorkspace } from "../workspaceContext";
+import {
+  chooseCase,
+  sectionAllowed,
+  useCan,
+  useFeatureSet,
+  useReportedTab,
+  useTabParam,
+  useWorkspace,
+} from "../workspaceContext";
 import { MVP_RECORDS_TABS, recordsAuditView, type MvpRecordsTab } from "../../../app/featureSet";
 import { ReportsPanel } from "../../reports/ReportsPanel";
 import { SignatureVerificationWorkspace } from "../../signature/SignatureVerificationWorkspace";
@@ -89,6 +97,10 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
   const { isTrial } = useWorkspace();
   const story = useShortStory(!!isTrial);
   const finished = story.data?.available && story.data.steps[3]?.done ? story.data.complaint : null;
+  // The latest record this person signed leads, for every organization (0.10.74, C2); the short story's intake
+  // decision summary leads while the person has signed nothing yet.
+  const signed = useResource<{ record: SignedRecord | null }>("/api/v1/oversight/latest-signed");
+  const latest = signed.data?.record ?? null;
   const all = (
     <Tabs tabs={tabs} active={active} onChange={setActive} label="Record sections">
       {active === "Inspection readiness" && <InspectionChecks />}
@@ -113,10 +125,14 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
   );
   // The record of the work just finished leads, with its Download; every other record sits behind "All records"
   // (0.10.72, B6). With nothing just finished, Records opens as before.
-  if (!finished) return all;
+  if (!finished && !latest) return all;
   return (
     <>
-      <LatestRecord complaintId={finished.id} reference={finished.ref} />
+      {latest ? (
+        <LatestSigned record={latest} />
+      ) : (
+        finished && <LatestRecord complaintId={finished.id} reference={finished.ref} />
+      )}
       <details className="uw-more" open={!!tab}>
         <summary>
           All records: inspection readiness, documents, decision records, audit trail, signatures, exports
@@ -124,6 +140,68 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
         {all}
       </details>
     </>
+  );
+}
+
+/** The newest record a person signed (backend/app/oversight/record_page.py latest_signed). */
+export type SignedRecord = {
+  what: string;
+  signed_at: string | null;
+  signed_by: string | null;
+  meaning: string | null;
+  complaint: { id: string; ref: string } | null;
+  investigation: { id: string; ref: string } | null;
+};
+
+/**
+ * The record the person signed last (0.10.74, C2): what it is, when, and the record it belongs to, with its decision
+ * record to download (a complaint) or its page to open.
+ */
+export function LatestSigned({ record }: { record: SignedRecord }) {
+  const { open, work, notify } = useWorkspace();
+  const canExport = useCan("data.export");
+  const [error, setError] = useState("");
+  const reference = record.complaint?.ref ?? record.investigation?.ref ?? null;
+  const openIt = () => {
+    if (record.complaint) return open("Complaint", `Summary?ref=${encodeURIComponent(record.complaint.ref)}`);
+    if (record.investigation) {
+      const ref = record.investigation.ref;
+      return void chooseCase(work, ref).then((found) =>
+        found ? open("Investigations", "Summary") : notify(`${ref} could not be opened right now.`, "critical"),
+      );
+    }
+    open("Records", "Decision records");
+  };
+  return (
+    <Panel eyebrow="Your latest signed record" title={reference ? `${record.what} · ${reference}` : record.what}>
+      <p className="ac-muted">
+        Signed {formatDate(record.signed_at)}
+        {record.signed_by ? ` by ${record.signed_by}` : ""}. Ready to hand to a colleague or an inspector.
+      </p>
+      <div className="ca-action-row">
+        {canExport && record.complaint && (
+          <button
+            type="button"
+            className="ac-primary"
+            onClick={() =>
+              void downloadFile(`${eventPath(record.complaint!.id)}/decision-record.pdf`, {
+                fallbackName: `mdarix-event-record-${record.complaint!.ref}.pdf`,
+              }).catch((reason) => setError(errorText(reason, "The record could not be downloaded.")))
+            }
+          >
+            Download the decision record (PDF)
+          </button>
+        )}
+        <button
+          type="button"
+          className={canExport && record.complaint ? "ac-secondary" : "ac-primary"}
+          onClick={openIt}
+        >
+          {reference ? `Open ${reference}` : "Open the decision records"}
+        </button>
+      </div>
+      <InlineError text={error} />
+    </Panel>
   );
 }
 

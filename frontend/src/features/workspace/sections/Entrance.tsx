@@ -153,20 +153,24 @@ export function StoryBar({ section, tab }: { section: string; tab?: string }) {
         : storyStep(scenario, place)
       : -1;
   const back = () => open(scenario.start.section as WorkspaceSection, scenario.start.tab);
+  // The short story once its intake decision summary is reached: finished, not "off the path" (0.10.74).
+  const finished = isShort && !!short.data?.steps.length && short.data.steps.every((item) => item.done);
   return (
     <nav className="uw-story-bar" aria-label="Your story">
       <span className="uw-story-title">{scenario.title}</span>
       <span className="uw-story-step" aria-live="polite">
-        {step < 0
-          ? "Off the story's path"
-          : isShort
-            ? short.data
-              ? stepText(short.data)
-              : "Reading your progress…"
-            : `Step ${step + 1} of ${scenario.steps.length}: ${scenario.steps[step].label}`}
+        {finished && step < 0
+          ? "Story finished"
+          : step < 0
+            ? "Off the story's path"
+            : isShort
+              ? short.data
+                ? stepText(short.data)
+                : "Reading your progress…"
+              : `Step ${step + 1} of ${scenario.steps.length}: ${scenario.steps[step].label}`}
       </span>
       <span className="uw-story-actions">
-        {step < 0 && (
+        {step < 0 && !finished && (
           <button type="button" className="ac-link" onClick={back}>
             <ArrowLeft size={14} aria-hidden="true" /> {isShort ? `Resume ${FLAGSHIP}` : "Back to the story"}
           </button>

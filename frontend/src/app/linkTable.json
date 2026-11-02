@@ -1,5 +1,5 @@
 {
-  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. newPlaces, newMenu, newRecords and newHomes (stage 7, 0.10.68): the screens of the new navigation, its menu, where each record opens there, and the new home of every screen and tab above; they apply only to an organization on the new navigation (tenants.navigation = new). classicHomes: where an address of the new navigation opens for an organization on the classic one. 0.10.73 (Release C, C1): the new navigation's tabs (newMenu.main) are Home (My work), Complaints, Decision trees, Reports, Investigations, Trends, Records and Team; each persona shows some of them (access_control/personas.py).",
+  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. newPlaces, newMenu, newRecords and newHomes (stage 7, 0.10.68): the screens of the new navigation, its menu, where each record opens there, and the new home of every screen and tab above; they apply only to an organization on the new navigation (tenants.navigation = new). classicHomes: where an address of the new navigation opens for an organization on the classic one. 0.10.73 (Release C, C1): the new navigation's tabs (newMenu.main) are Home (My work), Complaints, Decision trees, Reports, Investigations, Trends, Records and Team; each persona shows some of them (access_control/personas.py). 0.10.74 (C2): Complaints' list views (features/workspace/listViews.ts) are its tabs; one complaint's page shows Details (address name Summary), Related and Activity, and opens its former sections' addresses (Evidence: Related; Decisions & actions: Details; History: Activity); Investigations lists every investigation (All investigations).",
   "places": {
     "Getting started": {
       "path": "/app/getting-started",
@@ -343,11 +343,20 @@
     "Complaints": {
       "path": "/app/complaints",
       "tabs": [
+        "All open complaints",
+        "Due this week",
+        "Legal clocks this week",
+        "Reportability: decision needed",
+        "Waiting for the reporter",
+        "Waiting for my approval",
+        "Signed this month",
         "To triage",
+        "Calls to check",
         "Due soon",
         "Past target",
         "Second look",
         "Reporting",
+        "Authority reports",
         "Communications",
         "Investigations",
         "Dismissed",
@@ -357,7 +366,7 @@
     "Complaint": {
       "path": "/app/complaints/<ref>",
       "label": "Complaint",
-      "tabs": ["Summary", "Evidence", "Decisions & actions", "History"]
+      "tabs": ["Summary", "Related", "Activity", "Evidence", "Decisions & actions", "History"]
     },
     "Trends": {
       "path": "/app/trends",
@@ -400,7 +409,7 @@
     },
     "Investigations": {
       "path": "/app/investigations",
-      "tabs": ["Summary", "Evidence", "Decisions & actions", "History"]
+      "tabs": ["Summary", "Evidence", "Decisions & actions", "History", "All investigations"]
     },
     "Import data": {
       "path": "/app/import-data",
@@ -863,8 +872,8 @@
       "section": "Investigations",
       "tab": "All investigations",
       "to": {
-        "section": "Complaints",
-        "tab": "Investigations"
+        "section": "Investigations",
+        "tab": "All investigations"
       },
       "keep": "query"
     },

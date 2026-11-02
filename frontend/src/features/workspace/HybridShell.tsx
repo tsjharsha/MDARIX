@@ -179,8 +179,15 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
   const [text, setText] = useState("");
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [shown, setShown] = useState(false);
+  // On a phone the search is an icon that opens the same search as a bar under the top bar (0.10.74, C2).
+  const [phoneOpen, setPhoneOpen] = useState(false);
   const root = useRef<HTMLFormElement>(null);
+  const input = useRef<HTMLInputElement>(null);
   useDismiss(shown, () => setShown(false), root);
+  useDismiss(phoneOpen, () => setPhoneOpen(false), root);
+  useEffect(() => {
+    if (phoneOpen) input.current?.focus();
+  }, [phoneOpen]);
   useEffect(() => {
     const q = text.trim();
     if (q.length < 2) {
@@ -192,6 +199,7 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
       const term = encodeURIComponent(q);
       const go = (place: { section: string; tab?: string }) => () => {
         setShown(false);
+        setPhoneOpen(false);
         setText("");
         open(place.section as WorkspaceSection, place.tab);
       };
@@ -251,7 +259,7 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
   }, [text]);
   return (
     <form
-      className="uw-search"
+      className={`uw-search${phoneOpen ? " is-open" : ""}`}
       role="search"
       ref={root}
       onSubmit={(event) => {
@@ -259,8 +267,18 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
         hits?.[0]?.go();
       }}
     >
-      <Search size={16} aria-hidden="true" />
+      <button
+        type="button"
+        className="uw-search-toggle"
+        aria-label="Search complaints, products and reports"
+        aria-expanded={phoneOpen}
+        onClick={() => setPhoneOpen((value) => !value)}
+      >
+        <Search size={18} aria-hidden="true" />
+      </button>
+      <Search size={16} aria-hidden="true" className="uw-search-icon" />
       <input
+        ref={input}
         type="search"
         value={text}
         placeholder="Search complaints, products, reports"
