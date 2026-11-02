@@ -5346,3 +5346,115 @@ div.uw-task-count:hover {
   color: var(--ms-ink-2);
   font-weight: var(--ms-fw-semibold);
 }
+
+/* Stage 8: the five-minute entrance (Entrance.tsx), its story bar, and "Explore all capabilities". */
+.uw-entrance {
+  display: grid;
+  gap: var(--ms-space-4);
+  margin: 0 0 var(--ms-space-5);
+}
+.uw-entrance header h2 {
+  margin: 0;
+  font-size: var(--ms-fs-24);
+}
+.uw-entrance header p {
+  margin: var(--ms-space-1) 0 0;
+}
+.uw-entrance-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--ms-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-entrance-tile button {
+  display: grid;
+  gap: var(--ms-space-2);
+  align-content: start;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  padding: var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-top: 4px solid var(--ms-teal);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+  box-shadow: var(--ms-shadow-1);
+  color: var(--ms-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.uw-entrance-tile button:hover,
+.uw-entrance-tile button:focus-visible {
+  border-color: var(--ms-teal);
+}
+.uw-entrance-tile svg {
+  color: var(--ms-teal-dark);
+}
+.uw-entrance-tile.is-own button {
+  border-top-color: var(--ms-line-strong);
+  background: var(--ms-subtle);
+}
+.uw-entrance-tile strong {
+  font-size: var(--ms-fs-16);
+}
+.uw-entrance-lede {
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-14);
+}
+.uw-entrance-time {
+  display: inline-flex;
+  gap: var(--ms-space-1);
+  align-items: center;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.uw-entrance-go {
+  align-self: end;
+  color: var(--ms-teal-dark);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-entrance-numbers h3 {
+  margin: 0 0 var(--ms-space-2);
+  font-size: var(--ms-fs-16);
+}
+.uw-explore {
+  margin: var(--ms-space-4) 0 0;
+}
+.uw-explore > summary {
+  min-height: 44px;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+  font-weight: var(--ms-fw-semibold);
+  cursor: pointer;
+}
+.uw-entrance-link {
+  margin: 0 0 var(--ms-space-3);
+}
+.uw-story-bar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-2) var(--ms-space-4);
+  align-items: center;
+  margin: 0 0 var(--ms-space-3);
+  padding: var(--ms-space-2) var(--ms-space-4);
+  border: 1px solid var(--ms-mint-line);
+  border-radius: var(--ms-radius);
+  background: var(--ms-mint);
+  color: var(--ms-ink);
+}
+.uw-story-title {
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-story-actions {
+  display: inline-flex;
+  gap: var(--ms-space-3);
+  margin-left: auto;
+}

@@ -165,6 +165,9 @@ export type WorkspaceApi = {
   isTrial?: boolean;
   /** The organization's navigation in this workspace: new only under the MVP feature set (app/linkTable.ts). */
   navigation?: Navigation;
+  /** The five-minute story under way (entrance.ts), and starting or ending one (stage 8). */
+  story?: string | null;
+  startStory?: (key: string | null) => void;
 };
 
 export const WorkspaceContext = createContext<WorkspaceApi | null>(null);

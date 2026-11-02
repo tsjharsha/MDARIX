@@ -27,6 +27,7 @@ import { TrialJourney } from "./TrialJourney";
 import { EndTrialPanel } from "./EndTrial";
 import { CitedFor } from "./CitedFor";
 import { RemoveSamplePanel, RestartSamplePanel } from "./RemoveSample";
+import { Entrance } from "./Entrance";
 import { TeamPanel } from "./TrialTeam";
 import { BESIDE_YOUR_QMS } from "../../help/besideYourQms";
 import { STORY_CHAPTERS, journeyProgress, type JourneyKey } from "../../help/trialGuide";
@@ -215,7 +216,14 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   if (status.state === "ready" && trial && !trial.is_trial)
     return <Empty title="Not a trial workspace" detail="Getting started is shown during a free trial." />;
 
-  return (
+  const restarted = (text: string) => {
+    notify(text);
+    status.reload();
+    story.reload();
+    insights.reload();
+    work.refreshProducts();
+  };
+  const body = (
     <div className="ac-overview uw-trial">
       <QualityLoop
         stations={loopFromStory(story.data)}
@@ -254,7 +262,15 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
       <TrialJourney steps={journey} source={story} onGo={goJourney} />
 
       <div id="trial-story" className="uw-anchor" />
-      <Panel title="Your story, chapter by chapter" eyebrow={`${acted} of ${total} tried`} source={story}>
+      <Panel
+        title="Your story, chapter by chapter"
+        eyebrow={
+          navigation === "new"
+            ? `${chapters.filter((chapter) => chapter.code !== "YOUR_DATA" && chapter.acted.done).length} of ${chapters.filter((chapter) => chapter.code !== "YOUR_DATA").length || total - 1} tried · your own data is optional`
+            : `${acted} of ${total} tried`
+        }
+        source={story}
+      >
         <p className="uw-trial-lede">
           {BESIDE_YOUR_QMS} Each chapter is one pain FDA and notified bodies cite in 2026, shown on the sample records
           first and on your own export once you upload it. It counts as tried when you act in it: decide, record, run or
@@ -501,6 +517,17 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
         </Tabs>
       </div>
     </div>
+  );
+  // The new navigation (stage 8): the five-minute entrance first, the ten chapters under "Explore all capabilities".
+  if (navigation !== "new") return body;
+  return (
+    <>
+      <Entrance onRestarted={restarted} />
+      <details className="uw-explore" open={!!focusTab}>
+        <summary>Explore all capabilities: the ten chapters, your own data and your trial</summary>
+        {body}
+      </details>
+    </>
   );
 }
 
