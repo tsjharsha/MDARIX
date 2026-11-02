@@ -155,7 +155,7 @@ export function DecideTheRoute({
   const [serviceOwner, setServiceOwner] = useState(view.service?.owner_id ?? me);
   const [action, setAction] = useState(
     story.route.immediate_action ??
-      `Monitor out of use and sent for service${view.service ? ` (${view.service.reference})` : ""}.`,
+      `Monitor out of use and sent for service${view.service ? `, under ${view.service.reference}` : ""}.`,
   );
   const save = useSave(onSaved, "The route was not saved.");
   const complaint = view.event.complaint_id;
@@ -295,7 +295,7 @@ export function OpenQuestion({ story, view, onSaved }: { story: ShortStory; view
       <div className="uw-short-form">
         <label className="ca-field uw-short-wide">
           The question to the hospital
-          <input value={subject} maxLength={200} onChange={(event) => setSubject(event.target.value)} />
+          <textarea value={subject} rows={2} maxLength={200} onChange={(event) => setSubject(event.target.value)} />
         </label>
         <label className="ca-field">
           Owner
