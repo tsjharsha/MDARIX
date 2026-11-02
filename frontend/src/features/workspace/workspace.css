@@ -388,6 +388,20 @@
 .uw-import-aside td small {
   display: block;
 }
+/* Fixing or dismissing a set-aside row (0.10.65): the form under its row, as wide as a phone allows. */
+.uw-import-aside .uw-aside-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 6px;
+  white-space: nowrap;
+}
+.uw-import-fix {
+  display: grid;
+  gap: 8px;
+  max-width: min(520px, calc(100vw - 72px));
+}
 .uw-origin,
 .uw-imdrf {
   margin: 8px 0 0;

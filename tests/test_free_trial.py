@@ -20,6 +20,8 @@ from tests.conftest import authenticated_client
 from tests.signup_profile import PROFILE, PROFILE_LINES
 
 PASSWORD = "Trial password 2026!"
+# A complaints file without a date column, said so (0.10.65): each complaint is dated the day it is imported.
+NO_DATE = {"date_column": "none"}
 
 # Business tables a trial workspace writes to, children first. Other tests count rows in some of these across the
 # whole test database, so trial workspaces created here must not leave business data behind.
@@ -377,7 +379,7 @@ def test_the_owner_removes_the_sample_data_and_keeps_their_own_and_their_progres
         "Complaint Number,Product Code,Product Name,Complaint Description,Lot #,Status\n"
         "OWN-0001,OWN-PUMP,Own Pump,Display flickers at start-up,OWN-LOT-1,Open\n"
     )
-    assert user.post("/api/v1/trial/imports/complaints", content=export).status_code == 200
+    assert user.post("/api/v1/trial/imports/complaints", params=NO_DATE, content=export).status_code == 200
     flagged = {
         item["complaint_identifier"]: item for item in user.get("/api/v1/complaints/second-look").json()["items"]
     }
@@ -458,7 +460,7 @@ def test_csv_import_checks_everything_before_saving():
     # A column the template does not know (here a person's name) is left out, said back and never stored; personal
     # data in the columns that are read is refused, and nothing is saved.
     extra = "complaint_id,product_id,description,patient_name\nC-1,PUMP-1,Alarm,Jane\n"
-    report = user.post("/api/v1/trial/imports/complaints/check", content=extra).json()
+    report = user.post("/api/v1/trial/imports/complaints/check", params=NO_DATE, content=extra).json()
     assert report["ready"] and report["ignored_columns"] == ["patient_name"]
     assert "Jane" not in str(report["preview"])
     personal = (
@@ -466,10 +468,10 @@ def test_csv_import_checks_everything_before_saving():
         "C-1,PUMP-1,Reported by Dr. Smith on 555-123-4567\n"
         "C-2,NOPE,Alarm sounded\n"
     )
-    report = user.post("/api/v1/trial/imports/complaints/check", content=personal).json()
+    report = user.post("/api/v1/trial/imports/complaints/check", params=NO_DATE, content=personal).json()
     messages = " ".join(issue["message"] for issue in report["issues"])
     assert not report["ready"] and "personal data" in messages
-    rejected = user.post("/api/v1/trial/imports/complaints", content=personal)
+    rejected = user.post("/api/v1/trial/imports/complaints", params=NO_DATE, content=personal)
     assert rejected.status_code == 422
 
     good = (

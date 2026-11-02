@@ -43,7 +43,10 @@ def test_a_workspace_csv_import_shows_up_in_product_360():
     check = investigator.post("/api/v1/data/import/products/check", content=products).json()
     assert check["ready"] and check["new_records"] == 2 and check["row_limit"] is None
     assert investigator.post("/api/v1/data/import/products", content=products).status_code == 200
-    complaints = f"complaint_id,product_id,description,version\nC-{product_id},{product_id},Alarm without cause,Rev A\n"
+    complaints = (
+        f"complaint_id,product_id,description,version,received_date\n"
+        f"C-{product_id},{product_id},Alarm without cause,Rev A,2026-10-01\n"
+    )
     assert investigator.post("/api/v1/data/import/complaints", content=complaints).status_code == 200
 
     listed = {item["product_identifier"]: item for item in investigator.get("/api/v1/products").json()}

@@ -39,7 +39,7 @@ def _own_data_trial():
     user, approval, _email = _approved_trial_client()
     removed = user.post("/api/v1/trial/sample-data/removal", json={"confirm": True})
     assert removed.status_code == 200, removed.text
-    imported = user.post("/api/v1/trial/imports/complaints", content=OWN_EXPORT)
+    imported = user.post("/api/v1/trial/imports/complaints", params={"date_column": "none"}, content=OWN_EXPORT)
     assert imported.status_code == 200, imported.text
     return user, approval
 
@@ -258,9 +258,10 @@ def test_nothing_is_held_without_a_request_to_move_the_data_or_with_data_that_ca
 
 
 def _complaints_csv(rows: int, products: int = 2) -> str:
-    lines = ["complaint_id,product_id,product_name,description"]
+    lines = ["complaint_id,product_id,product_name,description,received_date"]
     lines += [
-        f"ROW-{number:05d},ROW-PUMP-{number % products},Row Pump {number % products},Pressure alarm during infusion"
+        f"ROW-{number:05d},ROW-PUMP-{number % products},Row Pump {number % products},Pressure alarm during infusion,"
+        "2026-10-01"
         for number in range(rows)
     ]
     return "\n".join(lines) + "\n"
@@ -282,8 +283,8 @@ def test_the_row_allowance_counts_the_rows_of_the_file():
     ]
 
     # Six rows naming a product, a version and three lots use 6 of the 5,000.
-    six = "complaint_id,product_id,product_name,version,lot_id,description\n" + "".join(
-        f"SIX-{number},SIX-PUMP,Six Pump,Rev A,SIX-LOT-{number % 3},Pressure alarm during infusion\n"
+    six = "complaint_id,product_id,product_name,version,lot_id,description,received_date\n" + "".join(
+        f"SIX-{number},SIX-PUMP,Six Pump,Rev A,SIX-LOT-{number % 3},Pressure alarm during infusion,2026-10-01\n"
         for number in range(6)
     )
     checked = user.post(check, content=six).json()

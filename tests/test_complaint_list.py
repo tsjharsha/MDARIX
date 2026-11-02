@@ -63,7 +63,10 @@ def test_filters_by_version_lot_problem_code_country_and_source():
     assert listed(source_system="MDARIX_SAMPLE")["total"] == 37 and listed(source_system="TRIAL_UPLOAD")["total"] == 0
     # The sources the complaints come from, for "Only your imported data" and "Only the sample data" (DEV-017).
     assert every["sources"] == ["MDARIX_SAMPLE"]
-    own = "complaint_id,product_id,description\nVAL-CMP-001,VAL-PUMP-100,Occlusion alarm with no occlusion present\n"
+    own = (
+        "complaint_id,product_id,description,received_date\n"
+        "VAL-CMP-001,VAL-PUMP-100,Occlusion alarm with no occlusion present,2026-10-20\n"
+    )
     assert user.post("/api/v1/trial/imports/complaints", content=own).status_code == 200
     assert listed()["sources"] == ["MDARIX_SAMPLE", "TRIAL_UPLOAD"]
     imported = listed(source_system="TRIAL_UPLOAD")

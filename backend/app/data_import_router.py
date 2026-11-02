@@ -1,12 +1,17 @@
-"""Workspace data import: products, lots and complaints from CSV into the tenant's own records (Product 360).
+"""Data import, the one upload path (stage 4): products, lots, complaints and the other templates from an Excel
+workbook or a CSV file into the organization's own records.
 
-The same validated import the free trial uses (backend/app/trial/imports.py): the whole file is checked first and
-nothing is written unless every row passes. Open to every organization: it needs only the permission to change
-records. Free-trial workspaces keep their row and file limits; other workspaces use the workspace policy. Each
-import is audited.
+Every upload screen posts here, Getting started in a free trial as Import data everywhere (the trial's old
+/api/v1/trial/imports routes are thin aliases of these, kept for links and scripts: backend/app/trial/router.py). The
+validated import is backend/app/trial/imports.py: the whole file is checked first and nothing is written unless every
+row passes, or the uploader chose to set problem rows aside. It needs only the permission to change records.
+Free-trial workspaces keep their row and file limits (TRIAL_POLICY); other workspaces use the workspace policy. Each
+import is audited (TRIAL_DATA_IMPORTED in a trial, DATA_IMPORTED elsewhere, as before).
 
-The file is sent as bytes, either as the raw body (``text/csv``) or as the ``file`` field of a multipart form, and
-must be UTF-8; ``?date_format=DMY`` or ``MDY`` declares the order of day and month in dates that are not YYYY-MM-DD.
+The file is sent as bytes, either as the raw body (``text/csv``) or as the ``file`` field of a multipart form.
+``date_format`` is ISO (the default), DMY, MDY or AUTO (found from the file, else the organization's usual order);
+``number_format`` GROUP or DECIMAL_COMMA; ``sheet`` names the workbook sheet to read; ``date_column`` names the column
+that holds a complaint's date in a file without a date column MDARIX knows ("none": the import day).
 """
 
 from __future__ import annotations
@@ -16,6 +21,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
@@ -38,16 +44,39 @@ def _policy(db: Session, ctx: AuthenticatedRequestContext) -> imports.ImportPoli
     return imports.TRIAL_POLICY if is_trial else imports.WORKSPACE_POLICY
 
 
+def _usual(data: Session, tenant_id: uuid.UUID) -> dict:
+    """The organization's usual date order and number format, from its time zone (Settings)."""
+    from backend.app.reportability.deadlines import org_zone
+
+    return imports.usual_formats(org_zone(data, tenant_id))
+
+
+def _reading(data: Session, tenant_id, sheet: str | None, number_format: str, date_column: str | None):
+    """How to read the file beyond its date order (imports.FileReading)."""
+    return imports.FileReading(
+        sheet=(sheet or "").strip() or None,
+        numbers=imports.number_format_or_422(number_format),
+        date_column=(date_column or "").strip() or None,
+        usual_order=_usual(data, tenant_id)["date_order"],
+    )
+
+
 async def _body(request: Request, policy: imports.ImportPolicy) -> bytes:
     return await imports.read_upload(request, policy.file_limit_bytes, policy.file_too_large)
 
 
 @router.get("/templates")
-def import_templates(ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)):
+def import_templates(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
     policy = _policy(db, ctx)
     return {
         "row_limit": policy.row_limit,
         "file_limit_bytes": policy.file_limit_bytes,
+        # What the upload screen starts with, and what "find it from the file" falls back on (DD/MM/YYYY in India).
+        "usual": _usual(data, uuid.UUID(str(ctx.tenant_id))),
         # A free trial may start from one complaints export: the products, versions and lots it names are added.
         "creates_references": policy.create_references,
         "templates": [
@@ -89,38 +118,46 @@ def _import_and_audit(
     date_format: str = "ISO",
     options: tuple[bool, bool] = (False, False),
     file_name: str | None = None,
+    reading: imports.FileReading | None = None,
 ) -> dict:
     """The import (all or nothing, unless the uploader chose to set problem rows aside), then its audit record (runs
     in the thread pool). ``options`` is (skip_problem_rows, mask_personal_data); ``file_name`` is the uploaded file's
-    name, recorded for its run report (``imports.file_label``)."""
+    name, recorded for its run report (``imports.file_label``). A free trial's import is recorded as
+    TRIAL_DATA_IMPORTED with its data, in one transaction, as its own route did; any other as DATA_IMPORTED after it,
+    as before (one path, the same audit records)."""
+    trial = policy.source == imports.UPLOAD_SOURCE
+    failure = ("TRIAL_IMPORT_FAILED" if trial else "IMPORT_FAILED", "The import failed; nothing was saved")
     try:
-        result = imports.import_file(data, tenant_id, entity, raw, policy, date_format, *options)
+        result = imports.import_file(
+            data, tenant_id, entity, raw, policy, date_format, *options, reading=reading, actor=str(ctx.user_id)
+        )
+        # Counts only: the rejects file holds the uploader's own rows, personal data included.
+        details = {k: v for k, v in result.items() if k != "rejects_csv"}
+        event = AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            actor_ref=str(ctx.user_id),
+            action="TRIAL_DATA_IMPORTED" if trial else "DATA_IMPORTED",
+            entity_type="TrialImport" if trial else "DataImport",
+            details={**details, "file_name": imports.file_label(file_name)}
+            if trial
+            else {**details, "source": policy.source, "file_name": imports.file_label(file_name)},
+            created_at=datetime.now(timezone.utc),
+        )
+        if trial:
+            db.add(event)
         data.commit()
+        if trial and db is not data:
+            db.commit()
     except HTTPException:
         data.rollback()
         raise
     except Exception as exc:
         data.rollback()
-        raise HTTPException(
-            500, detail={"code": "IMPORT_FAILED", "message": "The import failed; nothing was saved"}
-        ) from exc
-    db.add(
-        AuditEvent(
-            id=uuid.uuid4(),
-            tenant_id=tenant_id,
-            actor_ref=str(ctx.user_id),
-            action="DATA_IMPORTED",
-            entity_type="DataImport",
-            # Counts only: the rejects file holds the uploader's own rows, personal data included.
-            details={
-                **{k: v for k, v in result.items() if k != "rejects_csv"},
-                "source": policy.source,
-                "file_name": imports.file_label(file_name),
-            },
-            created_at=datetime.now(timezone.utc),
-        )
-    )
-    db.commit()
+        raise HTTPException(500, detail={"code": failure[0], "message": failure[1]}) from exc
+    if not trial:
+        db.add(event)
+        db.commit()
     return result
 
 
@@ -131,17 +168,22 @@ async def check_import(
     date_format: str = Query(default="ISO", max_length=8),
     on_problems: str = Query(default="refuse", max_length=8),
     personal_data: str = Query(default="refuse", max_length=8),
+    sheet: str | None = Query(default=None, max_length=64),
+    number_format: str = Query(default="GROUP", max_length=16),
+    date_column: str | None = Query(default=None, max_length=255),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
     order = imports.date_format_or_422(date_format)
     options = imports.import_options(on_problems, personal_data)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
     policy = await run_in_threadpool(_policy, db, ctx)
+    reading = await run_in_threadpool(_reading, data, tenant_id, sheet, number_format, date_column)
     raw = await _body(request, policy)
     # Parsing and checking query the database: off the event loop, so other requests are not held up.
     return await run_in_threadpool(
-        imports.check_file, data, uuid.UUID(str(ctx.tenant_id)), entity, raw, policy, order, *options
+        lambda: imports.check_file(data, tenant_id, entity, raw, policy, order, *options, reading=reading)
     )
 
 
@@ -154,6 +196,9 @@ async def run_import(
     on_problems: str = Query(default="refuse", max_length=8),
     personal_data: str = Query(default="refuse", max_length=8),
     file_name: str | None = Query(default=None, max_length=255),
+    sheet: str | None = Query(default=None, max_length=64),
+    number_format: str = Query(default="GROUP", max_length=16),
+    date_column: str | None = Query(default=None, max_length=255),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
@@ -162,16 +207,18 @@ async def run_import(
     options = imports.import_options(on_problems, personal_data)
     policy = await run_in_threadpool(_policy, db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
+    reading = await run_in_threadpool(_reading, data, tenant_id, sheet, number_format, date_column)
     raw = await _body(request, policy)
     result = await run_in_threadpool(
-        _import_and_audit, db, data, ctx, tenant_id, entity, raw, policy, order, options, file_name
+        _import_and_audit, db, data, ctx, tenant_id, entity, raw, policy, order, options, file_name, reading
     )
-    return imports.after_import(background, tenant_id, result, source="CSV import")
+    source = "trial import" if policy.source == imports.UPLOAD_SOURCE else "CSV import"
+    return imports.after_import(background, tenant_id, result, source=source)
 
 
 @router.get("/quarantine", dependencies=[Depends(require_permission(RECORDS_WRITE))])
 def quarantine_list(
-    status: str = Query(default=import_quarantine.OPEN, pattern="^(OPEN|REPROCESSED)$"),
+    status: str = Query(default=import_quarantine.OPEN, pattern="^(OPEN|REPROCESSED|DISMISSED)$"),
     import_ref: uuid.UUID | None = None,
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     data: Session = Depends(get_data_plane_db),
@@ -188,7 +235,8 @@ def quarantine_reprocess(
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
-    """Import a corrected quarantined row through the usual checks; the row closes only if it passes."""
+    """Import a corrected quarantined row through the usual checks; the row closes only if it passes. ``row`` holds
+    the corrected columns (the others keep their stored values, personal details masked)."""
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     policy = _policy(db, ctx)
     try:
@@ -213,6 +261,42 @@ def quarantine_reprocess(
     )
     db.commit()
     return result
+
+
+class Dismissal(BaseModel):
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+@router.post("/quarantine/{row_id}/dismiss", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+def quarantine_dismiss(
+    row_id: uuid.UUID,
+    body: Dismissal,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """Dismiss a set-aside row with a reason (J11): it leaves the open rows and Triage; audited."""
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    try:
+        row = import_quarantine.dismiss(data, tenant_id, row_id, body.reason, str(ctx.user_id), imports.stored_value)
+        data.commit()
+    except HTTPException:
+        data.rollback()
+        raise
+    db.add(
+        AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            actor_ref=str(ctx.user_id),
+            action="QUARANTINE_ROW_DISMISSED",
+            entity_type="DataImport",
+            # The row's reference and the masked reason only: its values are the organization's records.
+            details={"quarantine_row": str(row_id), "entity": row["entity"], "reason": row["resolution_note"]},
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+    return {"quarantine_row": row}
 
 
 @router.get("/lineage/{entity}", dependencies=[Depends(require_permission(RECORDS_WRITE))])

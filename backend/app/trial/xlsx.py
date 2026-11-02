@@ -1,9 +1,9 @@
-"""Reading the first worksheet of an Excel workbook (.xlsx) as rows of text, with the standard library only.
+"""Reading the worksheets of an Excel workbook (.xlsx) as rows of text, with the standard library only.
 
-An .xlsx file is a zip of XML parts. This reads the workbook's first sheet, its shared strings and the number formats
-of its cell styles: text stays text, numbers are written without a trailing ".0", TRUE/FALSE become Y/N, and a number
-shown as a date becomes YYYY-MM-DD (so dates in a workbook never need a date-order choice). Formulas are read as their
-cached result. Guarded against oversized and malformed files: the zip's total uncompressed size, each part's size, its
+An .xlsx file is a zip of XML parts. This reads the workbook's sheets (their names, which are hidden, its date system),
+a sheet's rows, its shared strings and the number formats of its cell styles: text stays text, numbers are written
+without a trailing ".0", TRUE/FALSE become Y/N, and a number shown as a date becomes YYYY-MM-DD, in the 1900 or the
+1904 date system (so dates in a workbook never need a date-order choice). Formulas are read as their cached result. Guarded against oversized and malformed files: the zip's total uncompressed size, each part's size, its
 compression ratio and its number of parts are checked before anything is unpacked; the worksheet and its shared
 strings are read as a stream (each row leaves memory once read), and reading stops once the sheet holds more rows,
 cells or elements than the import can take, so a small "zip bomb" never becomes millions of objects in memory. Every
@@ -16,6 +16,7 @@ from __future__ import annotations
 import io
 import re
 import zipfile
+from dataclasses import dataclass
 from datetime import date, timedelta
 from xml.etree import ElementTree
 
@@ -81,14 +82,14 @@ def _number(text: str) -> str:
     return text
 
 
-def _serial_date(text: str) -> str | None:
+def _serial_date(text: str, epoch: date = _EXCEL_EPOCH) -> str | None:
     try:
         serial = float(text)
     except ValueError:
         return None
     if not 1 <= serial < 2958466:  # Excel's valid range, 1900-01-01 to 9999-12-31
         return None
-    return (_EXCEL_EPOCH + timedelta(days=int(serial))).isoformat()
+    return (epoch + timedelta(days=int(serial))).isoformat()
 
 
 def _unreadable() -> XlsxError:
@@ -145,20 +146,38 @@ def _stream(archive: zipfile.ZipFile, name: str, max_elements: int, unit: str):
             raise _unreadable() from exc
 
 
-def _first_sheet(archive: zipfile.ZipFile) -> str:
+@dataclass(frozen=True)
+class Sheet:
+    """A worksheet of the workbook, in tab order: its name, its part in the zip and whether Excel hides it."""
+
+    name: str
+    part: str
+    hidden: bool
+
+
+def _sheets(archive: zipfile.ZipFile) -> tuple[list[Sheet], bool]:
+    """The workbook's worksheets in tab order, and whether it counts dates from 1904 (Excel for Mac's old default)."""
     workbook = _xml(archive, "xl/workbook.xml")
     rels = _xml(archive, "xl/_rels/workbook.xml.rels")
     if workbook is None or rels is None:
         raise XlsxError("This is not an Excel workbook (.xlsx). Upload the export as .xlsx or CSV UTF-8.")
-    sheet = workbook.find("m:sheets/m:sheet", _NS)
-    if sheet is None:
-        raise XlsxError("The workbook has no worksheet.")
-    rel_id = sheet.get(f"{{{_NS['r']}}}id")
+    targets = {}
     for rel in rels.findall("rel:Relationship", _NS):
-        if rel.get("Id") == rel_id:
-            target = rel.get("Target", "").lstrip("/")
-            return target if target.startswith("xl/") else f"xl/{target}"
-    raise XlsxError("The workbook's first worksheet could not be found.")
+        target = rel.get("Target", "").lstrip("/")
+        targets[rel.get("Id")] = target if target.startswith("xl/") else f"xl/{target}"
+    sheets = [
+        Sheet(
+            name=sheet.get("name", ""),
+            part=targets.get(sheet.get(f"{{{_NS['r']}}}id"), ""),
+            hidden=sheet.get("state", "visible") in ("hidden", "veryHidden"),
+        )
+        for sheet in workbook.findall("m:sheets/m:sheet", _NS)
+    ]
+    if not sheets:
+        raise XlsxError("The workbook has no worksheet.")
+    settings = workbook.find("m:workbookPr", _NS)
+    date1904 = settings is not None and settings.get("date1904", "").lower() in ("1", "true")
+    return sheets, date1904
 
 
 def _date_styles(archive: zipfile.ZipFile) -> set[int]:
@@ -205,7 +224,7 @@ def _check_sizes(parts: list[zipfile.ZipInfo], max_bytes: int) -> None:
             raise XlsxError(TOO_LARGE)
 
 
-def _cell_text(cell, strings: list[str], dated: set[int]) -> str:
+def _cell_text(cell, strings: list[str], dated: set[int], epoch: date = _EXCEL_EPOCH) -> str:
     kind = cell.get("t", "n")
     value_node = cell.find("m:v", _NS)
     raw_value = value_node.text if value_node is not None and value_node.text is not None else ""
@@ -219,7 +238,7 @@ def _cell_text(cell, strings: list[str], dated: set[int]) -> str:
         return raw_value if kind == "str" else ""
     if raw_value:
         style = int(cell.get("s", "0") or 0) if str(cell.get("s", "0") or 0).isdigit() else 0
-        return (_serial_date(raw_value) if style in dated else None) or _number(raw_value)
+        return (_serial_date(raw_value, epoch) if style in dated else None) or _number(raw_value)
     return ""
 
 
@@ -230,42 +249,89 @@ def too_many_rows(max_rows: int) -> str:
     )
 
 
-def read_rows(raw: bytes, *, max_rows: int | None = None, max_bytes: int | None = None) -> list[list[str]]:
-    """The first worksheet's rows as lists of text (empty cells as ""), in sheet order. Raises XlsxError.
+class Workbook:
+    """An opened workbook: its sheets in tab order (hidden ones marked), its date system, and each sheet's rows on
+    request. The size, compression and macro checks run when it is opened, before anything is unpacked.
 
-    ``max_rows`` is the most data rows the caller takes: reading stops, and the workbook is refused, once the sheet
-    has ``ROW_MARGIN`` more rows with values than that (a file just over the limit is still read and counted).
-    ``max_bytes`` caps the workbook's total unpacked size further than ``MAX_UNCOMPRESSED_BYTES``."""
-    try:
-        archive = zipfile.ZipFile(io.BytesIO(raw))
-    except zipfile.BadZipFile as exc:
-        raise XlsxError("The file could not be opened as an Excel workbook (.xlsx).") from exc
-    # The header row, the data rows the caller takes and the margin.
-    row_cap = 1 + (max_rows if max_rows is not None else 1_000_000) + ROW_MARGIN
-    cell_cap = row_cap * MAX_COLUMNS
-    rows: list[list[str]] = []
-    with archive:
-        parts = archive.infolist()
+    ``max_rows`` is the most data rows the caller takes: reading a sheet stops, and the workbook is refused, once it
+    has ``ROW_MARGIN`` more rows than that (a file just over the limit is still read and counted). ``max_bytes`` caps
+    the workbook's total unpacked size further than ``MAX_UNCOMPRESSED_BYTES``."""
+
+    def __init__(self, raw: bytes, *, max_rows: int | None = None, max_bytes: int | None = None) -> None:
+        try:
+            self._archive = zipfile.ZipFile(io.BytesIO(raw))
+        except zipfile.BadZipFile as exc:
+            raise XlsxError("The file could not be opened as an Excel workbook (.xlsx).") from exc
+        parts = self._archive.infolist()
         _check_sizes(parts, MAX_UNCOMPRESSED_BYTES if max_bytes is None else min(max_bytes, MAX_UNCOMPRESSED_BYTES))
         if any(part.filename == "xl/vbaProject.bin" for part in parts):
             raise XlsxError("Workbooks with macros are not read. Save it as .xlsx without macros, or as CSV UTF-8.")
-        sheet_name = _first_sheet(archive)
-        if sheet_name not in archive.namelist():
-            raise XlsxError("The workbook's first worksheet could not be read.")
-        strings = _shared_strings(archive, cell_cap)
-        dated = _date_styles(archive)
+        self.sheets, self.date1904 = _sheets(self._archive)
+        # The day Excel's day numbers count from: 1899-12-30, or 1904-01-01 in the 1904 date system (J41).
+        self.epoch = date(1904, 1, 1) if self.date1904 else _EXCEL_EPOCH
+        self.max_rows = max_rows
+        # The header row, the data rows the caller takes and the margin.
+        self.row_cap = 1 + (max_rows if max_rows is not None else 1_000_000) + ROW_MARGIN
+        self._cell_cap = self.row_cap * MAX_COLUMNS
+        self._strings: list[str] | None = None
+        self._dated = _date_styles(self._archive)
+
+    def close(self) -> None:
+        self._archive.close()
+
+    def __enter__(self) -> "Workbook":
+        return self
+
+    def __exit__(self, *_exc) -> None:
+        self.close()
+
+    def rows(self, sheet: Sheet, stop_after: int | None = None) -> list[list[str]]:
+        """The sheet's rows as lists of text (empty cells as ""): ``rows[n - 1]`` is the sheet's row n, so a row
+        number said back is the one Excel shows (empty rows are kept as []; empty rows at the end are not).
+        ``stop_after`` stops after that many rows (to look at the first rows only)."""
+        if sheet.part not in self._archive.namelist():
+            raise XlsxError(f"The worksheet '{sheet.name}' could not be read.")
+        if self._strings is None:
+            self._strings = _shared_strings(self._archive, self._cell_cap)
+        rows: list[list[str]] = []
         cells: dict[int, str] = {}
-        for element, _inside in _stream(archive, sheet_name, cell_cap * ELEMENTS_PER_CELL, _TAG_C):
+        number = 0
+        for element, _inside in _stream(self._archive, sheet.part, self._cell_cap * ELEMENTS_PER_CELL, _TAG_C):
             if element.tag == _TAG_C:
                 match = _CELL.match(element.get("r", ""))
                 column = _column_index(match.group(1)) if match else len(cells)
                 if column < MAX_COLUMNS:
-                    cells[column] = _cell_text(element, strings, dated).strip()
+                    cells[column] = _cell_text(element, self._strings, self._dated, self.epoch).strip()
             elif element.tag == _TAG_ROW:
-                if cells:
+                stated = element.get("r", "")
+                number = int(stated) if stated.isdigit() else number + 1
+                if any(cells.values()):
+                    if number - 1 > self.row_cap:
+                        raise XlsxError(too_many_rows(self.max_rows) if self.max_rows is not None else TOO_LARGE)
+                    rows.extend([] for _ in range(number - 1 - len(rows)))
                     width = max(cells) + 1
                     rows.append([cells.get(index, "") for index in range(width)])
-                    if max_rows is not None and len(rows) > row_cap:
-                        raise XlsxError(too_many_rows(max_rows))
+                    if len(rows) > self.row_cap:
+                        raise XlsxError(too_many_rows(self.max_rows) if self.max_rows is not None else TOO_LARGE)
+                    if stop_after is not None and len(rows) >= stop_after:
+                        break
                 cells = {}
-    return rows
+        return rows
+
+    def sheet(self, name: str | None = None) -> Sheet:
+        """The sheet called ``name`` (any case), or the first sheet when None."""
+        if name is None:
+            return self.sheets[0]
+        for sheet in self.sheets:
+            if sheet.name.strip().lower() == name.strip().lower():
+                return sheet
+        names = ", ".join(f"'{sheet.name}'" for sheet in self.sheets if not sheet.hidden)
+        raise XlsxError(f"The workbook has no sheet called '{name}'. Its sheets: {names}.")
+
+
+def read_rows(
+    raw: bytes, *, max_rows: int | None = None, max_bytes: int | None = None, sheet: str | None = None
+) -> list[list[str]]:
+    """One worksheet's rows (``Workbook.rows``): the sheet called ``sheet``, else the first. Raises XlsxError."""
+    with Workbook(raw, max_rows=max_rows, max_bytes=max_bytes) as book:
+        return book.rows(book.sheet(sheet))

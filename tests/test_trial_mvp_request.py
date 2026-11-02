@@ -146,7 +146,8 @@ def test_trial_data_moves_only_once_the_sample_is_removed_and_own_data_is_in(mon
         refused = user.post("/api/v1/trial/mvp-request", json={"expectations": EXPECTATIONS, "move_trial_data": True})
         assert refused.status_code == 422
 
-        assert user.post("/api/v1/trial/imports/complaints", content=EXPORT).status_code == 200
+        imported = user.post("/api/v1/trial/imports/complaints", params={"date_column": "none"}, content=EXPORT)
+        assert imported.status_code == 200
         state = user.get("/api/v1/trial/mvp-request").json()["data_move"]
         assert state["allowed"] is True and state["reason"] is None and state["own_records"] >= 1
         asked = user.post("/api/v1/trial/mvp-request", json={"expectations": EXPECTATIONS, "move_trial_data": True})

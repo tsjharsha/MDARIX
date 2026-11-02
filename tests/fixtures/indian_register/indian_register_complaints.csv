@@ -1,0 +1,7 @@
+Customer Complaint Register FY 2026-27 - Medisynth Devices (Sample) Pvt. Ltd.,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,
+Sr. No.,Complaint No.,Date of Complaint,Complaint Received Date,Event Date (DD/MM/YYYY),Product Name,Model,SW Version,Batch/Lot No.,Serial No.,Death (Y/N),Serious Injury (Y/N),Malfunction Y/N,Country,Description,Status
+1,MSD/CC/26/001,14/08/2026,16/08/2026,12/08/2026,Pulse Oximeter PX-20 (Sample),PX-20,1.4.2+build,B2607-11,PX20-0012345,N,N,Y,India,SpO2 reading 5 points higher than the ward monitor during a routine check.,Open
+2,MSD/CC/26/002,03/09/2026,04/09/2026,01/09/2026,Infusion Set Kit IK-5 (Sample),IK-5,,K2606-03,,No,Yes,1,"India, Germany",Leak at the luer connector of the kit; the extension line came from a second lot.,Under Investigation
+3,MSD/CC/26/002,,,,Infusion Set Kit IK-5 (Sample),IK-5,,K2606-07,,,,,,,
+4,MSD/CC/26/003,21/10/2026,22/10/2026,20/10/2026,Cathéter Guide CG-2 (Sample),CG-2,,C2605-19,,0,NA,Yes,Germany,"Cathéter tip kinked during insertion; replaced, no harm to the patient.",Closed

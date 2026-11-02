@@ -1258,7 +1258,8 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
       {
         id: "import",
         title: "Import your data",
-        where: "Import data · Bring in Excel or CSV files (in a trial also Getting started › Your data)",
+        where:
+          "Import data · Bring in Excel or CSV files (in a trial also Getting started › Your data: the same upload)",
         purpose:
           "Bring in exports from your quality, product and supplier systems as they are. Every file is checked for problems and personal data before anything is saved.",
         tasks: [
@@ -1267,11 +1268,12 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             steps: [
               "Choose the data type, for example Complaints. The page lists the Required and Optional columns.",
               "Choose Download complaints.csv for the template, or use your own export.",
-              "Set Dates in the file, what to do with Rows with problems, and Personal details in the text (refuse them, or replace them with [PERSON], [PHONE] and similar).",
-              "Choose a file (Excel or CSV) and choose Check file. Nothing is saved yet.",
-              "Read how your columns were read and the preview. Fix any problems, or download the rows to fix.",
+              "Choose a file (Excel or CSV) as your system exports it, with its title rows and its own column names, and choose Check file. Nothing is saved yet.",
+              "Read how your file was read: the sheet (choose another if needed), the row with the column names, how each column was read and the columns not used. Dates in the file starts as From the file (else your usual order); Numbers in the file starts with your organization's usual format. Changing either checks the same file again.",
+              "If the file has no date column, choose which column holds the date each complaint was received.",
+              "Set what to do with Rows with problems, and Personal details in the text (refuse them, or replace them with [PERSON], [PHONE] and similar). Fix any problems, or download the rows to fix.",
               "Choose Import N rows.",
-              "Choose See its data-quality report: rows read, written and set aside, and the reason for each row set aside. Fix those rows in your file and import it again.",
+              "Choose See its data-quality report: rows read, new, updated and unchanged, set aside, and the columns not used. For each row set aside, choose Fix and process again (only the fields its reason names) or Dismiss with a reason. Importing the fixed file again also closes it.",
               "A distribution file (free trial) also reports any lot whose units shipped exceed its units released: check the file or the lot's quantity.",
             ],
             result:
