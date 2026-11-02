@@ -86,6 +86,13 @@ every station; "Signals triaged" reads "Trends triaged" (the weekly digest too).
 - The investigation's next step never names the analysis (it only warns in the brief's gate; with AI off it stays
   "not started"); none is named once the decision is signed.
 
+### Changed (separate commit, for the owner to approve): Oversight lists an unassessed market's provisional clock
+
+- Oversight lists the reportability watch's provisional deadline of a market not assessed yet (SAMPLE-RV-06 and
+  SAMPLE-RV-11: FDA), so it says what Reporting and the complaint page say; once an assessment or a report dates the
+  market, that line stands in for it. On a fresh trial: Oversight's items 14 -> 16 (overdue 1 -> 1, due soon 2 -> 2);
+  the bell 3 -> 3, unchanged. Test: `tests/test_oversight_provisional.py`.
+
 ### Changed: texts (8.8)
 
 The trial story's chapters (chapter 4: "Turn a rising trend into an investigation in one click"), About the sample
