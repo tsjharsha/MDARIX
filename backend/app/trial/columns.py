@@ -172,6 +172,9 @@ _SYNONYMS: dict[str, dict[str, tuple[str, ...]]] = {
             "effective date",
             "market release date",
         ),
+        "device_category": ("device category", "category", "device type", "product type", "device class type"),
+        "single_use": ("single use", "single use device", "labelled for single use", "labeled for single use"),
+        "use_period_days": ("use period days", "use period", "days in use", "in use days"),
     },
     "lots": {
         "lot_id": _COMPLAINT_SYNONYMS["lot_id"],
@@ -198,6 +201,7 @@ _SYNONYMS: dict[str, dict[str, tuple[str, ...]]] = {
             "released quantity",
             "units released",
         ),
+        "expiry_date": ("expiry date", "expiration date", "exp date", "use by", "use by date", "shelf life date"),
     },
     "distribution": {
         "lot_id": _COMPLAINT_SYNONYMS["lot_id"],

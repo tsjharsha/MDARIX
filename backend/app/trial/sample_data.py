@@ -194,6 +194,31 @@ _STORY_COMPLAINTS = [
         },
     ),
 ]
+# The flagship story (quality plan stage 3, D): "suspected inaccurate measurement, no reported harm, service required",
+# for the third trial scenario "Is this reportable, and by when, in the US and India?". A US hospital's biomedical
+# engineer finds a PulseWatch 410 reading SpO2 high against a reference oximeter; nobody was harmed, the monitor is out
+# of use for service. On a Rev A lot (made 160 days ago, still in the field) so the Rev B trend stays as it is. Its
+# problem code is its own: no signal, and no other story complaint moves. Awareness one day ago, received the same day:
+# triage is due within 24 hours, the US 30-day clock runs, India's guide finds no adverse event. Same fields as
+# _STORY_COMPLAINTS; seeded with them (seed_flagship), and on its own for trials approved before 0.10.64.
+FLAGSHIP = "SAMPLE-RV-11"
+_FLAGSHIP = (
+    FLAGSHIP,
+    "SAMPLE-PULSE-410",
+    "Rev A",
+    2,
+    1,
+    "Biomedical engineering checked a monitor against a reference oximeter: its SpO2 read 4 to 6 points high on two "
+    "patients. No harm was reported. The monitor is out of use and sent for service.",
+    {
+        "problem_code": "SPO2_READING_HIGH",
+        "country": "US",
+        "patient_involved": True,
+        "serious_injury": False,
+        "death": False,
+        "malfunction": True,
+    },
+)
 # CAPAs from the quality system (Records › Effectiveness checks): one closed without an effectiveness check, and the
 # OrbitCare action the sample brief recommends. That one follows the case: opened when the trial starts (after the
 # sample brief was written and submitted, sample_decision.py), due after the trial's 30 days so it is never overdue in
@@ -550,6 +575,8 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
             )
             counts["evidence"] += 1
     db.flush()
+    # The products' device categories and the lots' expiry dates, before any worksheet is drafted from them.
+    seed_product_facts(db, tenant_id)
     return {"created": True, **counts}
 
 
@@ -574,6 +601,48 @@ def seed_lot_quantities(db: Session, tenant_id) -> int:
     return updated
 
 
+# The sample products' facts (J32, 0.10.64), by product identifier: the device category the report worksheets and
+# Help › What MDARIX covers read, and the shelf life that dates each lot's expiry (made + days; None: no expiry). One
+# line per sample product: a product added to the sample adds its line here.
+SAMPLE_PRODUCT_FACTS: dict[str, dict] = {
+    "SAMPLE-ORBIT-300": {"device_category": "REUSABLE", "single_use": False, "shelf_life_days": 1826},
+    "SAMPLE-PULSE-410": {"device_category": "REUSABLE", "single_use": False, "shelf_life_days": 1826},
+    "SAMPLE-VENTRA-250": {"device_category": "REUSABLE", "single_use": False, "shelf_life_days": 1826},
+}
+
+
+def seed_product_facts(db: Session, tenant_id) -> dict:
+    """Give the sample products their facts and the sample lots their expiry where none is set (trials approved
+    before 0.10.64 included; run after every sample lot exists). Idempotent; never touches a record the organization
+    imported. Flushes but never commits. Returns the products and lots updated."""
+    updated = {"products": 0, "lots": 0}
+    shelf_life = {}
+    for product in db.query(Product).filter(Product.tenant_id == tenant_id, Product.source_system == SAMPLE_SOURCE):
+        facts = SAMPLE_PRODUCT_FACTS.get(product.product_identifier) or {}
+        shelf_life[product.id] = facts.get("shelf_life_days")
+        changed = False
+        for field in ("device_category", "single_use", "use_period_days"):
+            if getattr(product, field) is None and facts.get(field) is not None:
+                setattr(product, field, facts[field])
+                changed = True
+        updated["products"] += changed
+    for lot, product_id in (
+        db.query(LotBatch, ProductVersion.product_id)
+        .join(ProductVersion, ProductVersion.id == LotBatch.product_version_id)
+        .filter(
+            LotBatch.tenant_id == tenant_id,
+            LotBatch.source_system == SAMPLE_SOURCE,
+            LotBatch.expiry_date.is_(None),
+        )
+    ):
+        days = shelf_life.get(product_id)
+        if days and lot.effective_timestamp:
+            lot.expiry_date = (lot.effective_timestamp + timedelta(days=days)).date()
+            updated["lots"] += 1
+    db.flush()
+    return updated
+
+
 def has_story_examples(db: Session, tenant_id) -> bool:
     return (
         db.query(Complaint.id)
@@ -581,6 +650,70 @@ def has_story_examples(db: Session, tenant_id) -> bool:
         .first()
         is not None
     )
+
+
+def _story_complaint(db: Session, tenant_id, now: datetime, products, versions, lots, row) -> None:
+    identifier, product_code, revision, lot_number, days, description, fields = row
+    aware = now - timedelta(days=days)
+    version = versions.get((product_code, revision))
+    lot = lots.get(f"{product_code}-LOT-{lot_number:03d}")
+    db.add(
+        Complaint(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            complaint_identifier=identifier,
+            product_id=products[product_code].id,
+            product_version_id=version.id if version else None,
+            lot_batch_id=lot.id if lot else None,
+            event_timestamp=aware - timedelta(days=1),
+            complaint_timestamp=aware,
+            awareness_timestamp=aware,
+            description=description,
+            source_identifier=identifier,
+            **{"status": "open", **fields},
+            **_stamp(now, days),
+        )
+    )
+
+
+def seed_flagship(db: Session, tenant_id, now: datetime | None = None) -> int:
+    """Add the flagship complaint (``FLAGSHIP``) to a workspace holding the sample products, once. Its record arrived
+    a few hours ago (triage is due within the day). Flushes; returns 1 when added, else 0."""
+    now = now or datetime.now(timezone.utc)
+    product = (
+        db.query(Product)
+        .filter(
+            Product.tenant_id == tenant_id,
+            Product.source_system == SAMPLE_SOURCE,
+            Product.product_identifier == _FLAGSHIP[1],
+        )
+        .first()
+    )
+    if product is None or (
+        db.query(Complaint.id)
+        .filter(Complaint.tenant_id == tenant_id, Complaint.complaint_identifier == FLAGSHIP)
+        .first()
+        is not None
+    ):
+        return 0
+    versions = {
+        (product.product_identifier, version.version_identifier): version
+        for version in db.query(ProductVersion).filter(
+            ProductVersion.tenant_id == tenant_id, ProductVersion.product_id == product.id
+        )
+    }
+    lots = {
+        row.lot_identifier: row
+        for row in db.query(LotBatch).filter(LotBatch.tenant_id == tenant_id, LotBatch.source_system == SAMPLE_SOURCE)
+    }
+    _story_complaint(db, tenant_id, now, {product.product_identifier: product}, versions, lots, _FLAGSHIP)
+    db.flush()
+    flagship = db.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.complaint_identifier == FLAGSHIP)
+    for complaint in flagship:
+        # It reached MDARIX three hours ago, as an import would have brought it: triage is due within the day.
+        complaint.ingestion_timestamp = now - timedelta(hours=3)
+    db.flush()
+    return 1
 
 
 def seed_story_examples(db: Session, tenant_id, now: datetime | None = None) -> dict:
@@ -612,28 +745,10 @@ def seed_story_examples(db: Session, tenant_id, now: datetime | None = None) -> 
         for row in db.query(LotBatch).filter(LotBatch.tenant_id == tenant_id, LotBatch.source_system == SAMPLE_SOURCE)
     }
     counts = {"complaints": 0, "capas": 0, "risks": 0, "reporting_windows": 0}
-    for identifier, product_code, revision, lot_number, days, description, fields in _STORY_COMPLAINTS:
-        aware = now - timedelta(days=days)
-        version = versions.get((product_code, revision))
-        lot = lots.get(f"{product_code}-LOT-{lot_number:03d}")
-        db.add(
-            Complaint(
-                id=uuid.uuid4(),
-                tenant_id=tenant_id,
-                complaint_identifier=identifier,
-                product_id=products[product_code].id,
-                product_version_id=version.id if version else None,
-                lot_batch_id=lot.id if lot else None,
-                event_timestamp=aware - timedelta(days=1),
-                complaint_timestamp=aware,
-                awareness_timestamp=aware,
-                description=description,
-                source_identifier=identifier,
-                **{"status": "open", **fields},
-                **_stamp(now, days),
-            )
-        )
+    for row in _STORY_COMPLAINTS:
+        _story_complaint(db, tenant_id, now, products, versions, lots, row)
         counts["complaints"] += 1
+    counts["complaints"] += seed_flagship(db, tenant_id, now)
     for identifier, product_code, title, status, opened, due, check_in in _STORY_CAPAS:
         db.add(
             Capa(

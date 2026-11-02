@@ -60,7 +60,8 @@ def trial():
 
 
 def test_triage_shows_the_events_own_market_first_and_a_signed_conclusion_instead(trial):
-    items = {item["ref"]: item for item in _ok(trial["user"].get("/api/v1/triage"))["items"]}
+    # The sample author has triaged RV-06 and RV-07 (0.10.64, a calm day 0): they are on the list with the finished ones.
+    items = {item["ref"]: item for item in _ok(trial["user"].get("/api/v1/triage", params={"show": "all"}))["items"]}
     complaints = _ok(trial["user"].get(f"{WATCH}?show=all&page_size=100"))["items"]
     ref = {item["complaint_identifier"]: item["business_id"] for item in complaints}
     # SAMPLE-RV-06 (US): the FDA deadline comes first; the EU and India deadlines only if also reportable.

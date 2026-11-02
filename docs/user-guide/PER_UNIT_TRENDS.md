@@ -29,6 +29,10 @@ format. Load products first, then lots, then complaints.
   replaced over the 180 days before its release.
 - When a lot of a version has no quantity, that version is counted per calendar day, and Signals › Trend check says
   so, with how many groups are affected. The **Counted** column shows which basis each row uses.
+- **Single-use products** (0.10.64): the products file's `single_use` column (Y or N) says whether a product's units
+  are used up; without it, the `device_category` (single-use, kit and IVD count as used up), and without either, the
+  product's words ("disposable", "catheter", "reagent"...). A single-use product is counted per calendar day, or, with
+  a `use_period_days` column, by the units still within that many days of their lot's release.
 
 ## Updating lots you already loaded
 

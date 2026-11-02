@@ -5,6 +5,7 @@ of a case in the Decision Brief flow. Imported by the services and routers and b
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from datetime import datetime, timezone
 
@@ -74,6 +75,30 @@ CAPA_ACTION_TYPE = "CORRECTIVE"
 CAPA_SOURCE_TYPE = "INVESTIGATION_DECISION"
 CAPA_SOURCE_SYSTEM = "MDARIX"
 CAPA_STATUS = "open"
+# The number the customer's QMS gave the CAPA (J22): letters, numbers, spaces and . _ / # : - (up to 120).
+QMS_REFERENCE_MAX = 120
+_QMS_REFERENCE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._/#:-]*$")
+
+
+def capa_qms_words(capa) -> str | None:
+    """Where a CAPA stands in the customer's QMS (J22), wherever the CAPA shows: "QMS reference CAPA-0450" once
+    known; "to raise in your QMS" for one MDARIX recorded without it yet; None for a CAPA that came from the QMS (its
+    own identifier is the QMS's)."""
+    if getattr(capa, "qms_reference", None):
+        return f"QMS reference {capa.qms_reference}"
+    if getattr(capa, "source_system", None) == CAPA_SOURCE_SYSTEM:
+        return "to raise in your QMS"
+    return None
+
+
+def _qms_reference(value: str | None) -> str | None:
+    text = " ".join(str(value or "").split())
+    if not text:
+        return None
+    if not _QMS_REFERENCE.match(text):
+        raise ValueError("Use letters, numbers, spaces or . _ / # : - for the QMS reference")
+    return text
+
 
 PASS = "PASS"
 BLOCKED = "BLOCKED"
@@ -181,6 +206,7 @@ def follow_up_actions(
         and str(action_type or "").upper() == "CAPA_REQUIRED"
         and capa_id is None
         and status != "CANCELLED",
+        "can_set_qms_reference": can_work and capa_id is not None,
     }
 
 
@@ -220,6 +246,12 @@ class ReasonPayload(BaseModel):
 class CapaPayload(BaseModel):
     title: str = Field(min_length=CAPA_TITLE_MIN, max_length=CAPA_TITLE_MAX)
     due_at: datetime | None = None
+    qms_reference: str | None = Field(default=None, max_length=QMS_REFERENCE_MAX)
+
+    @field_validator("qms_reference")
+    @classmethod
+    def _qms(cls, value: str | None) -> str | None:
+        return _qms_reference(value)
 
     @field_validator("title")
     @classmethod
@@ -233,6 +265,17 @@ class CapaPayload(BaseModel):
     @classmethod
     def _due(cls, value: datetime | None) -> datetime | None:
         return as_utc(value)
+
+
+class QmsReferencePayload(BaseModel):
+    """The QMS reference of a CAPA MDARIX recorded; blank clears it."""
+
+    qms_reference: str | None = Field(default=None, max_length=QMS_REFERENCE_MAX)
+
+    @field_validator("qms_reference")
+    @classmethod
+    def _qms(cls, value: str | None) -> str | None:
+        return _qms_reference(value)
 
 
 class ImpactCompletePayload(BaseModel):

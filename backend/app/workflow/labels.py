@@ -85,6 +85,9 @@ SOURCE_LABELS: dict[str, str] = {
     "IntakeEvent": "Contact or urgent intake",
     # A request in the communications log (tr06): its owner's reply-due task.
     "CommunicationEntry": "Communication",
+    # A report snapshot or decision guide version waiting for approval (0.10.64, workflow/approvals.py).
+    "ReportSnapshot": "Report snapshot",
+    "DecisionGuideVersion": "Decision guide version",
 }
 
 # Used only when backend/app/role_codes.py does not carry ROLE_LABELS (an older build).

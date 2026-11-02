@@ -97,10 +97,14 @@ class Question:
     # The answer says whether the harm reaches the market's "serious" threshold (checked against the scale).
     serious: bool = False
     note: str = ""
-    # False once a customer's guide version rewords it (T-G15); an extra question is the customer's own: recorded and
-    # printed with the answer, never part of the conclusion and never required.
+    # False when a customer's guide version of 0.10.59-0.10.63 reworded it (T-G15; locked from 0.10.64); an extra
+    # question is the customer's own: recorded and printed with the answer, never part of the conclusion and never
+    # required.
     starter: bool = True
     extra: bool = False
+    # The organization's own explanation and examples beside the locked wording (0.10.64).
+    explanation: str = ""
+    examples: str = ""
 
     def as_dict(self) -> dict:
         return {
@@ -113,6 +117,8 @@ class Question:
             "note": self.note or None,
             "starter": self.starter,
             "extra": self.extra,
+            "explanation": self.explanation or None,
+            "examples": self.examples or None,
         }
 
 
@@ -675,6 +681,16 @@ IVD_WORDS = re.compile(r"(?i)\b(ivds?|in[- ]vitro|reagents?|assays?|test strips?
 def is_ivd(*texts) -> bool:
     """Whether a product's words mark it as an in-vitro diagnostic (``IVD_WORDS``)."""
     return any(IVD_WORDS.search(str(text or "")) for text in texts)
+
+
+def product_is_ivd(product) -> bool:
+    """Whether a product (a Product row, or None) is an in-vitro diagnostic, read the same way on the watch and in
+    triage: its device category when set (IVD or not), else the words of its name, family, GMDN term or description."""
+    if product is None:
+        return False
+    if getattr(product, "device_category", None):
+        return product.device_category == "IVD"
+    return is_ivd(product.name, product.product_family, product.gmdn_term, product.description)
 
 
 def window_markets(window: dict) -> set[str]:

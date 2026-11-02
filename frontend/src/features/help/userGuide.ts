@@ -44,6 +44,82 @@ export const ROLE_SUMMARY: readonly [string, string][] = [
   ["Customer Administrator", "Manages people and settings for the organization; never reviews or signs."],
 ];
 
+/** One device category of Help › What MDARIX covers (J32): what applies to it in the trial's markets. */
+export type CoverageRow = {
+  category: string;
+  clocks: string;
+  worksheets: string;
+  checks: string;
+  notYet: string;
+};
+
+/** The markets the coverage table speaks of: the trial's reporting markets. */
+export const COVERAGE_MARKETS =
+  "the United States (FDA), the EU and Northern Ireland (EU MDR), Great Britain (MHRA) and India (CDSCO)";
+
+/**
+ * What MDARIX covers, by device category, in the trial's markets: which reporting clocks, report worksheets and checks
+ * apply, and what is not covered yet. Starter text for your regulatory consultant to confirm, kept to what the trial
+ * does today (the device category is a product's field, from the products file).
+ */
+export const COVERAGE: readonly CoverageRow[] = [
+  {
+    category: "Implant",
+    clocks:
+      "Every market's clock, as for any device: US 30 calendar days or 5 work days; EU, NI and GB 2, 10 or 15 days; India 15 days.",
+    worksheets:
+      "US Form FDA 3500A and India MDAE. India's device category reads Implantable from the product. Implant and explant dates (US D6, India B3) are entered by hand.",
+    checks: "Trend per unit in the field when every lot has a quantity: an implanted unit counts as in use.",
+    notYet: "Implant and explant dates from your records; implant cards and registries.",
+  },
+  {
+    category: "Single-use",
+    clocks: "Every market's clock, as for any device.",
+    worksheets:
+      "US 3500A and India MDAE. India reads Single use and US H5 Labeled for single use from the product; the expiration date comes from the lot's expiry date. Reprocessing (US D7) is entered by hand.",
+    checks:
+      "Trend by calendar day: used-up units are not in the field. With a use period (products file, use_period_days), by the units released within it.",
+    notYet: "Reprocessed single-use devices; sterility and shelf-life checks beyond the lot's expiry date.",
+  },
+  {
+    category: "Reusable or capital equipment",
+    clocks: "Every market's clock, as for any device.",
+    worksheets:
+      "US 3500A and India MDAE. India reads Reusable from the product; serial number and lot come from the complaint. Installation, maintenance and calibration dates (India A12, A14, A15) are entered by hand.",
+    checks: "Trend per unit in the field when every lot has a quantity, else per calendar day.",
+    notYet: "An installed base by serial number; service, maintenance and calibration records.",
+  },
+  {
+    category: "Software",
+    clocks: "Every market's clock, as for any device.",
+    worksheets: "US 3500A and India MDAE. India's software version (A8) comes from the product version.",
+    checks: "Trend per version, each new version compared with the one it replaced.",
+    notYet:
+      "Cybersecurity reporting; the users of each version (without lot quantities the trend counts calendar days).",
+  },
+  {
+    category: "IVD (in-vitro diagnostic)",
+    clocks:
+      "US and India as for any device. The EU and NI clocks cite EU IVDR Art. 82 (starter) for a product of this category (without a category, when its name, family, GMDN term or description says IVD).",
+    worksheets: "US 3500A and India MDAE; India's IVD category field is not used yet.",
+    checks: "Trend by calendar day, as a consumable, unless the product is marked not single-use.",
+    notYet:
+      "The EU questions quote the MDR's definitions, not the IVDR's; IVDR trend reporting and performance follow-up; an EU worksheet.",
+  },
+  {
+    category: "Kit",
+    clocks: "Every market's clock, for the kit as one device.",
+    worksheets:
+      "US 3500A and India MDAE. A complaint may name each of the kit's lots on a row of its own in the file; the lot field lists them all.",
+    checks: "Trend by calendar day, as a consumable, unless the product is marked not single-use.",
+    notYet: "Each component's own reportability; lot impact reads the complaint's first lot only.",
+  },
+];
+
+/** Said once under the table: what no category has yet. */
+export const COVERAGE_NOTE =
+  "No category has an EU, NI or GB report worksheet yet: prepare those reports in the authority's own form. MDARIX never submits a report, and a person decides and signs every conclusion.";
+
 export const GUIDE_PARTS: readonly GuidePart[] = [
   {
     id: "basics",
@@ -542,28 +618,28 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Decision guides: make each market's questions your own",
         where: "Complaints › Decision guides",
         purpose:
-          "Every market assessment asks its market's guide. Version 1 is MDARIX's starter. Your organization makes its own version: reword the questions, add your own, run the test cases, and have a colleague approve it. The guide points to a conclusion; a person decides and signs.",
+          "Every market assessment asks its market's guide. Version 1 is MDARIX's starter. Your organization makes its own version: the regulation's wording stays locked, and you add your explanation and examples beside it, your own questions and your worked complaints; then run the test matrix and have a colleague approve it. The guide points to a conclusion; a person decides and signs.",
         tasks: [
           {
             title: "Prepare a new version",
             who: "Anyone with regulatory review or approval rights.",
             steps: [
               "Open Complaints › Decision guides and choose Start a new version on the market. It is a copy of the version in use.",
-              "Reword any question, its definition, its help text and its clause. The questions that drive the conclusion cannot be removed, and their conclusion logic stays fixed.",
+              "The questions that drive the conclusion keep the regulation's wording: the question, its definition and its clause are locked. Write your explanation and examples beside each. These questions cannot be removed, and their conclusion logic stays fixed. A version approved before the lock stays as it was signed.",
               "Choose Add an extra question for what your procedure also asks (for example VMSR participation). It is recorded and printed with the answers; it never changes the conclusion and is never required.",
-              "Give every question its clause and choose its basis from the standards list. A version with a question missing either cannot be published.",
-              "Add test cases: a set of answers and the outcome the guide must point to. A question left blank is Unknown, never No. Choose Save the draft, then Run the test cases.",
+              "Give every extra question its clause and choose its basis from the standards list. A version with a question missing either cannot be published.",
+              "The test matrix holds worked complaints: the answers for a complaint and what the guide must point to in this market. MDARIX's starter worked complaints are in every version; choose Add a worked complaint for your own. A question left blank is Unknown, never No. Choose Save the draft, then Run the test matrix.",
             ],
             result:
-              "Before it is used lists what still blocks it: a missing clause or basis, tests not run on the current content, or a failing test.",
+              "Before it is used lists what still blocks it: a missing clause or basis, a matrix not run on the current content, or a worked complaint that fails. Only a version whose matrix passes can be sent for approval.",
           },
           {
             title: "Approve and publish it",
             who: "A colleague who did not edit the version; never an administrator.",
             steps: [
               "Write What changed and why, and choose Ask a colleague to approve it.",
-              "The colleague opens the version, reads it, enters their password and authenticator code and chooses Approve and publish.",
-              "Download the PDF or DOCX for an audit: every question with its clause, the test cases and their results, and the approval.",
+              "The colleague opens the version and reads it with Test matrix, run again now. If a worked complaint gives a different answer now, the version cannot be approved: its author changes it and sends it again. Otherwise the colleague enters their password and authenticator code and chooses Approve and publish.",
+              "Download the PDF or DOCX for an audit: every question with its clause, your explanation and examples, the test matrix and its results, and the approval.",
             ],
             result:
               "Assessments started from then on use the new version; ones in progress keep theirs. Each signed conclusion names the guide version, and what a signer must have read is the version in use.",
@@ -1006,10 +1082,12 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Open the CAPA and carry out the follow-ups",
             steps: [
               "Under After the decision, Follow-ups lists each follow-up. Choose Act.",
-              "For CAPA required, choose Record the CAPA to raise in your QMS, give the CAPA title (and optionally a due date) and choose Record the CAPA. You raise and run the CAPA in your QMS.",
+              "For CAPA required, choose Record the CAPA to raise in your QMS, give the CAPA title (and optionally a due date and the QMS reference) and choose Record the CAPA. You raise and run the CAPA in your QMS.",
+              "Once your QMS has given the CAPA its number, open the follow-up again, enter it in QMS reference and choose Save QMS reference. The CAPA then reads QMS reference and that number wherever it shows.",
               "For the others, choose Start and later Complete with what was done.",
             ],
-            result: "The CAPA is raised and linked to the signed decision; it is listed on the CAPAs tab.",
+            result:
+              "The CAPA to raise is recorded and linked to the signed decision; it is listed on the CAPAs tab, marked To raise in your QMS until its QMS reference is saved.",
           },
           {
             title: "Not ready to decide",

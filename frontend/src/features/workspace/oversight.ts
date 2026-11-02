@@ -169,7 +169,7 @@ export type EventView = {
     open_requests: number;
     next_action: { label: string; detail: string; opens: Opens } | null;
   };
-  stages: Array<{ code: string; label: string; state: "DONE" | "CURRENT" | "OPEN" | "LATER" }>;
+  stages: Array<{ code: string; label: string; state: "DONE" | "CURRENT" | "OPEN" | "LATER" | "NOT_NEEDED" }>;
   checklist: CheckItem[];
   blocked: number;
   state: EventState;

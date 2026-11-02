@@ -98,6 +98,10 @@ EXEMPT = {
         "POST",
         "/api/v1/trial/sample-data/removal",
     ): "the trial's own sample data; the trial owner only, checked in the route",
+    (
+        "POST",
+        "/api/v1/trial/sample-data/restart",
+    ): "the trial's own sample story (and, if chosen, its own uploads); the trial owner only, checked in the route",
     ("POST", "/api/v1/client-errors"): "public by design: the browser's error boundary reports from the sign-in page "
     "and after a session ended; stores no business data, body capped, rate limited per address",
     (

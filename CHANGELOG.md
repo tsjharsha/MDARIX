@@ -10,6 +10,324 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.64] - 2026-11-02
+
+On the trial maintenance line (`release/0.10`): stage 3 of the quality plan, "A sample that tells one story". A trial
+opened on day 0, 7, 15 or 29 shows the same alerts, deadlines still ahead of the reader, the same trend label and the
+same next steps; the trial owner can restart the sample story; the approver is told; a guide's regulation wording is
+locked and tested; the flagship scenario "Is this reportable, and by when, in the US and India?" is in the sample; and
+records carry a few more true facts (a CAPA's QMS reference, device category, lot expiry).
+
+**Migration `tr09recordfacts`** (after `tr08lotimpact`; `tr03pmssources` stays reserved), expand-only: nullable
+columns, no default, no row changed: `capas.qms_reference`, `lot_batches.expiry_date`, `products.device_category`,
+`complaints.other_lots`. Legacy dedicated organization databases: run `scripts/add_workflow_tables_to_legacy_planes.py`
+(new step tr09). The API, worker (new scheduler job `trial-sample-clock`) and web images change.
+
+**Operators:** run `scripts/refresh_trial_story.py` (dry run first, then `--apply`) once after the upgrade: it gives
+running trials the flagship complaint, a calm day 0, the device categories and lot expiry dates, and relocks the sample
+guide draft. After that the hourly `trial-sample-clock` job keeps each trial's sample current. Two changes are in
+commits of their own for the owner to approve: the single-use field and Readiness's day.
+
+### Changed: the sample's clock, and "Restart the sample story" (J2)
+
+- **The sample's events move with the trial's clock.** The sample is dated from the moment it is seeded (its anchor,
+  kept with the trial request; a trial approved earlier uses its approval time). Every hour the new scheduler job
+  `trial-sample-clock` (`backend/app/trial/sample_clock.py`) moves every sample record, and everything hanging off one,
+  forward by the time since the anchor: times by the exact time passed, dates by the days passed on the organization's
+  calendar. Deadlines stay ahead of the reader, triage targets stay due within the day, the OrbitCare rise stays in the
+  trend check's last 30 days, and the alerts, labels and next steps stay the same. This was chosen over a trend read
+  "as of" the sample's own date, which would have left every deadline and alert ageing. The audit trail and the
+  organization's own records never move; dates written inside a record's text or a signed record's content stay as
+  written.
+- **Once a person works on the sample, its clock stops** (a signed disposition, market conclusion, decision, review or
+  document, a question to MDARIX, a case from a signal, an effectiveness check; own uploads do not count), so signed
+  practice records are never re-dated. Getting started › About the sample data then says so.
+- **Restart the sample story** (Getting started › About the sample data, the trial owner only) removes the sample and
+  everything done on it, then seeds it again dated now. The page asks first, in the page, and says what each choice
+  removes; "Also remove my practice work" also removes the organization's own uploaded records and what was done with
+  them. Audited as `TRIAL_SAMPLE_RESTARTED`; the chapters already tried stay counted. New route
+  `POST /api/v1/trial/sample-data/restart` (`confirm`, `own`; the trial owner only, checked in the route);
+  `GET /api/v1/trial/sample-data/removal` adds `own_records`, `sample_dated_at` and `clock_stopped`.
+
+### Changed: day 0 is calm (J2, J29, J30, J31)
+
+- **The sample author has already done what the story does not need open** (`backend/app/trial/sample_calm.py`): every
+  flagged sample record has a finished triage record except the urgent intake SAMPLE-URG-01 and the flagship
+  SAMPLE-RV-11; the sample's first-contact tasks are due two working days ahead (SAMPLE-CALL-02's QMS task read
+  "overdue" and escalated on day 0); RV-09, the finished US report, was signed ready to close and its decision record
+  filed before it was closed, so it is "Closed in the QMS", not "closed before it was ready".
+- **The sample author's absence lasts to the trial's last day** (it ended on day 6).
+- **The sample story's escalations go to the person who started the trial**, not to every Leader: an invited colleague
+  does not inherit them. The organization's own items escalate as before.
+- **One line per complaint (J31):** a reporting reminder task no longer shows beside the report or market line of the
+  same complaint in the oversight view and the bell.
+- **Steps never needed read "not needed" (J29):** an event's stage line shows triage, market assessment,
+  investigation or decision with a dashed grey border and "not needed" when no check of that stage applies (it ticked
+  them as done).
+- **One number per thing (J19):** stage 2's counts were checked: the bell and My Work's reminder panel read the same
+  alerts; Getting started's loading fallback, the trial guide and the user guide say ten chapters, as the story serves
+  (a test now holds them together).
+
+### Added: the flagship story (D)
+
+- **SAMPLE-RV-11**, "suspected inaccurate measurement, no reported harm, service required": a PulseWatch 410 monitor
+  (Rev A, lot 002) read SpO2 4 to 6 points high against a reference oximeter at a US hospital; nobody was harmed; the
+  monitor is out of use for service. It runs through the existing screens: triage (due within the day), each market's
+  questions (the third scenario, "Is this reportable, and by when, in the US and India?"), the case the US conclusion
+  opens, the service work or the CAPA to raise in the QMS, ready to close.
+- **Expected, from the starter guides:** US reportable, a 30-calendar-day malfunction report (21 CFR 803.50), due 30
+  days after the awareness day in New York; India not reportable (no adverse event: nobody was harmed), no Indian
+  deadline. Getting started's chapter 2 and "About the sample data" describe it.
+
+### Changed (separate commit, for the owner to approve): Readiness is as of the organization's day
+
+- Readiness, its summary, the weekly digest and Getting started's findings count "today" on the organization's
+  calendar, the day stage 2's due times end on: an Indian organization reads 2 Nov from 00:00 IST (it read the UTC
+  date, 1 Nov, until 05:30 IST).
+
+### Sample numbers that change (A and D)
+
+Measured on fresh trials signed up from the United States, seeded at 23:50 UTC on 1 Nov 2026, after the first visit.
+
+- **Bell and My Work's reminders:** 12 (2 escalations: RV-08's reply and SAMPLE-CALL-02's QMS task, "overdue"; 10
+  triage targets due soon: RV-01, RV-02, RV-06, RV-07, RV-08, RV-10, RT-05, CALL-03, RJ-02, URG-01) -> **3**: RV-08's
+  overdue reply (escalated, to the trial owner) and the triage of SAMPLE-RV-11 and SAMPLE-URG-01, due soon. The same on
+  day 7, 15 and 29 (before: from day 1 about ten escalations to every Leader; on day 7 RV-06 overdue).
+- **Oversight view:** overdue 2 -> 1, due soon 10 -> 2. Events: not ready 3 -> 6 (complaints the sample author triaged
+  are events now), closed before ready 3 -> 2 (RV-09 no longer), closed 0 -> 1 (RV-09). RV-08's next action "Complete
+  the triage record" -> "Sign the United States (FDA) market assessment".
+- **Triage:** to triage 10 -> 2 (SAMPLE-RV-11, SAMPLE-URG-01); triaged 0 -> 10 (RV-06's and RV-07's deadlines show
+  under "Triaged").
+- **Complaints:** 43 -> 44 sample complaints (Getting started's counts, the removal preview, the dashboard). The
+  reportability watch adds SAMPLE-RV-11 (US, running, 29 days left). Chapter 1, "complaints waiting for a
+  disposition": 12 -> 13.
+- **Getting started's insights:** total 37 -> 38; "46% of complaints (17 of 37) concern OrbitCare 300 Rev B" -> "45%
+  (17 of 38)"; the last three months average 8.3 -> 8.7 per month (up from 3.0); malfunctions 5 -> 6; "US has the most
+  complaints (7 of 9 with a country)" -> "(8 of 10)"; the lot question "15 of 37" -> "15 of 38".
+- **Trend check:** PulseWatch 410 Rev A "Fewer than 3 recent complaints: not assessed" -> "In line with its history"
+  (the flagship is its third recent complaint). OrbitCare Rev B 9 against 0.96 expected, significant: unchanged, and
+  the same on day 7, 15 and 29.
+- **Readiness:** every check's value unchanged on day 0 (reporting clocks 3, 2 due soon).
+- **My Work's task tabs:** unchanged (assigned 1, role queues 7, overdue 1).
+- **The sample author's absence:** two days ago to day 5 -> two days ago to the trial's last day.
+
+### Tests
+
+- `tests/test_sample_story_days.py` (new): day 0 holds only the story's three alerts, and My Work, the bell, Triage,
+  Reportability, Trends, Readiness, Oversight and the chapters say the same on day 7, 15 and 29 (time is moved by moving
+  every stored time back, then the hourly jobs run); the flagship's expected result and deadline per market, its
+  escalation trigger, the clock stopping once worked on, and the restart; the stage line's "not needed"; one chapter
+  count. `tests/test_readiness_org_day.py` (new): Readiness's day. Updated for the calm sample and the flagship:
+  `test_oversight_api.py`, `test_one_deadline_api.py`, `test_intake_triage_api.py`, `test_free_trial.py`,
+  `test_trial_insights.py`. vitest `removeSample.test.tsx` (what each restart choice removes).
+
+### Changed: the approver is told (J13)
+
+- **A report snapshot or a decision guide version waiting for approval is a task in the approver's My Work.** Asking
+  for approval gives each colleague who may approve (regulatory review or approval rights; never the preparer, the
+  signer of the market conclusion, an editor of the guide version or an administrator) a "Regulatory review" task,
+  "Approve snapshot 1 of the Form FDA 3500A worksheet (eMDR) for CMP000034" or "Approve decision guide version GB-v2",
+  under Assigned to me. It is due at the end of the next working day, or at the report's legal deadline when that is
+  sooner, so the reminders carry it: the bell shows it to the approver once it is due soon, escalates it when overdue,
+  and the oversight view lists it (a line per approver). "Open" goes to the complaint's Reports, or to Decision guides. The task ends
+  when the item is approved (completed), or withdrawn, returned to draft, discarded or replaced by a new snapshot
+  (cancelled). No new task type, no new tab: the existing task list and its counts include them.
+- **Before anyone types a password, the screen says who approves.** A person who may not approve sees, in place of the
+  approve form, why and who: "You prepared this worksheet: a second person must approve the snapshot. A colleague
+  with regulatory approval rights approves this: Rahul Colleague." Before approval is asked, the draft says who will
+  get the task ("When ready, ask for approval: Rahul Colleague gets a task in My Work"). No more refusal after the
+  password and code. With nobody else holding the rights, it says an administrator gives a colleague the Regulatory
+  Reviewer, Authorized Decision Maker or Leader role.
+- **Working alone in a trial, you approve your own practice report or guide version (T-B8).** Only in a trial, only
+  when separation of duties is the only reason, and only when no colleague may approve: the screen says "In a pilot a
+  colleague approves this; in the trial you may approve your own practice report as Leader (Quality Manager)", the
+  approval is signed with password and code as always, and the signature record, the audit event
+  (`same_person: true`) and the snapshot list ("same person (trial practice)") say so. A trial with a colleague who
+  may approve keeps the second person. **A pilot is unchanged:** separation of duties is always enforced there, and an
+  administrator never approves, in a trial either.
+- **The RV-06 report and the India report to correct (RV-10) can now be finished by the trial owner alone**: sign
+  RV-06's US conclusion, start the worksheet, ask for approval, approve it as the practice approval, record the
+  submission; for RV-10, ask for approval of the correction and approve it. With a colleague, the colleague gets the
+  task and approves.
+- **A guide version waiting for approval can be withdrawn by its author** ("Withdraw it: back to draft"): it returns
+  to draft with its content and test results kept, and the approvers' tasks end. Only the person who sent it for
+  approval may (403 `NOT_THE_AUTHOR` otherwise).
+- API: `GET /api/v1/reports/{id}` adds `approval` (`may_approve`, `same_person`, `approvers`, `message`) while the
+  report is a draft, and `same_person` on each snapshot; `GET /api/v1/decision-guides/{market}/versions/{n}` adds
+  `approval` and `you_asked` while a version waits; new `POST /api/v1/decision-guides/{market}/versions/{n}/withdraw`
+  (regulatory review or approval rights, its author only). A task in `GET /api/v1/tasks` carries
+  `details.complaint_id` (only that detail), so a task opens its complaint's screen.
+- Getting started and the trial guide say who approves a report: a colleague, told by a task in My Work; working
+  alone in the trial, you.
+
+**Requirement text (T-G2b, T-G15, T-B8; J13):** a snapshot or guide version waiting for approval is a task in each
+eligible approver's My Work and a reminder; the approval screen states who may approve before any credential is
+asked; the trial records "same person" when one person prepares and approves, only where no colleague may approve;
+the pilot enforces the second person; the author may withdraw a waiting guide version.
+
+**Sample numbers that change:** none. The sample seeds no snapshot or guide version waiting for approval (RV-09's
+snapshot and US-v2 are approved; RV-10 is "correction required"; US-v3 is a draft), so the sample's tasks, bell and
+oversight counts are unchanged. Approval tasks appear only when a person asks for approval. A guide version already
+waiting before this release (no task) still shows on the oversight view and the reminders as before.
+
+**Tests:** `tests/test_approval_told_api.py` (6: the rule; alone in a trial RV-06 and RV-10 are finished and a guide
+version is approved as "same person", each task in the owner's My Work; with a colleague the preparer is told who,
+the colleague gets the task and the bell line, once; the author withdraws a waiting guide version, the colleague
+cannot); vitest `authorityReports.test.tsx` (who approves in place of the form; the practice note above it),
+`decisionGuides.test.tsx` (who approves and Withdraw), `tasks.test.ts` (an approval task opens Reports or Decision
+guides).
+
+### Changed: decision guide wording locked; a guide test matrix (this reverses 0.10.59 decision 1)
+
+The locked wording, the organization's explanation and examples, and the test matrix are kept in each guide version's
+existing data (`decision_guide_versions`, tr06).
+
+**Requirement (for the trial requirements, T-G15, and the MVP's G15):**
+- In a customer's own decision guide, each question that drives the conclusion keeps MDARIX's wording, locked: the
+  question, the regulation's definition, MDARIX's note, the clause citation and its basis. The customer adds their own
+  explanation and examples beside it. They cannot change or delete the locked text: the server refuses it, not only
+  the screen. Versions approved before the lock stay exactly as they were signed; a new version made from one takes
+  the locked wording back, and its old help text becomes its explanation.
+- Every guide version has a test matrix: worked complaints, each with its answers and the outcome the market's guide
+  must point to (reportable with its report type, not reportable, or pending information; a blank answer is Unknown,
+  never No). MDARIX's starter worked complaints are in every version and cannot be removed or changed; the customer
+  adds their own.
+- A version can be sent for approval only when every worked complaint in its matrix passes on its current content.
+- The approval screen runs the matrix again and shows the result. If any worked complaint gives a different answer
+  now (for example after an MDARIX release changed the logic while the version waited), the approval is blocked
+  before any password is asked, and the server refuses it too; its author changes the version and sends it again.
+
+#### Changed
+
+- **Complaints › Decision guides, a draft:** the questions that drive the conclusion show their wording, definition,
+  clause and basis read-only, marked "The regulation's wording: locked", with two fields beside them: "Your
+  explanation" and "Your examples". Extra questions are edited as before.
+- **Test matrix:** "Test cases" is now "Test matrix: N worked complaints". Each row is marked "MDARIX starter" or
+  "Your worked complaint"; only your own rows can be removed. "Add a test case" is now "Add a worked complaint";
+  "Run the test cases" is now "Run the test matrix". A starter row left out of a save is put back.
+- **Approval:** a version waiting for approval shows "Test matrix, run again now": either "All N worked complaints
+  still give the expected answer", or the rows whose answer changed, and "Approve and publish" stays disabled.
+- **Market assessments** show the organization's explanation and examples under each question ("Your explanation",
+  "Your examples").
+- **The PDF and DOCX for an audit** print the explanation and examples, head the tests "Test matrix: worked
+  complaints", mark the organization's own rows, and print the matrix rule.
+- The user guide's "Decision guides" section says the same. The publish-gate lines read "Run the test matrix on this
+  version's current content" and "N of M worked complaints in the test matrix fail" (were "test cases"). A draft
+  started before this release whose wording was changed shows "Question X was reworded before the wording was
+  locked: save the draft to restore the regulation's wording".
+
+#### Fixed
+
+- A customer version could reword the regulation's definition and clause of a question that drives the conclusion,
+  and could delete MDARIX's starter test cases (0.10.59). Both are now refused by the server.
+
+#### Sample numbers and labels that change
+
+- **US-v2** (the sample's own US guide, in use): the help text on the three serious-injury parts (procedure QP-08) is
+  now the organization's explanation beside MDARIX's locked wording, and part (c) also carries examples ("a cut closed
+  with sutures to prevent permanent scarring is part (c); a bruise that healed without treatment is not"). Its
+  US2A, US2B and US2C were marked "Your wording"; now "Starter text". Question and test counts unchanged (9 questions,
+  1 extra; 6 worked complaints, all pass).
+- **US-v3** (the sample draft): unchanged story. It still cannot be sent for approval for one reason only: "1 of 7
+  test cases fail: fix them, then run again" (its own worked complaint, "outcome unknown: expected not reportable").
+- In trials approved before this release, `scripts/refresh_trial_story.py` brings the sample US-v3 draft up to date
+  once (the locked wording back, the old help text as its explanation, the matrix run again), so it reads the same as
+  in a new trial. US-v2 there stays as it was signed. No complaint, deadline or trend figure changes.
+
+#### Tests
+
+- `tests/test_decision_guides_api.py`: a core question's wording is locked and the explanation sits beside it; the
+  starter worked complaints stay in every matrix; the server refuses a change to locked wording and keeps old versions
+  as signed (a copy takes the lock and keeps the old help text); a changed answer in the matrix blocks the approval
+  before any password; a sample draft seeded before the lock is brought up to date once (dry run, apply, idempotent).
+- `frontend/src/features/workspace/decisionGuides.test.tsx`: a core question sends only the organization's own text;
+  the draft shows the locked wording, the explanation field and the matrix marks; the approval shows the matrix run
+  again and a changed answer disables "Approve and publish".
+
+### Changed: small truths in the records (J22, J32)
+
+- **A CAPA's QMS reference (J22).** "Record the CAPA to raise in your QMS" now takes an optional **QMS reference**: the
+  number your QMS gave the CAPA. It can be added later, changed or cleared from the same follow-up ("Save QMS
+  reference"). Wherever the CAPA shows it reads "QMS reference CAPA-0450", or "To raise in your QMS" while MDARIX holds
+  it without one: the follow-up list and its drawer, Records › Effectiveness checks, the CAPAs list (new column "In your
+  QMS"; a CAPA imported from the QMS reads "From your QMS"), the oversight view, a report worksheet's remedial action
+  (US H7) and the CAPA log document. New route `POST /api/v1/follow-ups/{id}/capa/qms-reference`
+  (`investigation.work`, audited `FOLLOW_UP_CAPA_QMS_REFERENCE_SET`); `qms_reference` on the CAPA create body and on
+  every CAPA a follow-up or the effectiveness board returns. MDARIX still never raises or runs the CAPA: your QMS keeps
+  it.
+- **A product's device category (J32):** implant, single-use, reusable or capital equipment, software, IVD or kit. The
+  products file takes an optional `device_category` column (also read as "Device category", "Category", "Device type",
+  "Product type"; plain words such as "Single use", "capital equipment" or "SaMD" are understood, anything else is
+  refused with the list). The Products section shows it ("Not set" when no file gave it); that section is parked in
+  the trial and the MVP, so there the category shows through the worksheets and Help.
+- **A lot's expiry date (J32):** the lots file takes an optional `expiry_date` column (also "Expiry date", "Expiration
+  date", "Use by"); the Products section's lots list it as "Expires".
+- **The report worksheets read them.** India MDAE: A8 *Software version* from the product version, for a software
+  product or a version that reads as a version number ("2.1", "v1.4.2"; a hardware revision such as "Rev B" is not one);
+  A13 *Expiration date* and FDA 3500A D4 *Expiration date* from the lot's expiry date; II *Implantable or
+  non-implantable* and IV *Single use or reusable* from the device category. Each shows its source, for a person to
+  confirm, as every worksheet value does.
+- **A kit's second lot is not a duplicate (J32).** A complaints file may list a complaint once per lot (a kit, a
+  procedure pack): a row of the same complaint with another lot is that complaint's next lot, kept on the complaint
+  (`complaints.other_lots`) and listed in the worksheet's lot field ("L-1; L-2"). It read "Duplicate of row 2" and was
+  set aside. The same lot again, or a second row without a lot, is still a duplicate. Lot impact reads the complaint's
+  first lot only (in Help's "not covered yet").
+- **Help › What MDARIX covers** (a new part of the step-by-step user guide, not a new tab): by device category, in the
+  US, EU and Northern Ireland, Great Britain and India, which reporting clocks, report worksheets and checks apply, and
+  what is not covered yet. Starter text, for the consultant to confirm.
+
+#### Fixed
+
+- **The IVDR citation reads the product the same way on the watch as in triage.** Stage 2's reportability watch (and a
+  case's regulatory review clocks) recognised an in-vitro diagnostic from the product name only, while triage read its
+  name, family, GMDN term and description: a product named "GlucoCheck" in the family "In-vitro diagnostics" cited EU
+  MDR Art. 87 on the watch and EU IVDR Art. 82 in triage. Both now read one function
+  (`reportability/markets.py product_is_ivd`).
+
+#### Sample numbers that change
+
+- **Device category:** the three sample products (OrbitCare 300, PulseWatch 410, VentraLink 250) are "Reusable or
+  capital equipment" (one table, `SAMPLE_PRODUCT_FACTS` in `backend/app/trial/sample_data.py`).
+- **Lot expiry:** every sample lot expires 1,826 days (five years) after it was made, so it moves with the trial's clock
+  like the other sample dates (OrbitCare lot 001, made 200 days before the trial: expires in 1,626 days).
+- **SAMPLE-RV-10 India MDAE worksheet** (live and its approved sample snapshot): II "Implantable or non-implantable"
+  empty -> "Non-implantable device", IV "Single use or reusable" empty -> "Reusable", A13 "Expiration date" empty ->
+  the lot's expiry date. The worksheet's summary: "21 filled · 36 may wait" -> "24 filled · 33 may wait".
+  A8 stays empty (PulseWatch "Rev A" is a hardware revision).
+- **SAMPLE-RV-06 and the finished RV-09 US 3500A worksheets:** D4 "Expiration date" empty -> the lot's expiry date (one
+  more "From record").
+- **Records › CAPAs:** new column "In your QMS": SAMPLE-CAPA-01 and -02 read "From your QMS". The oversight view's CAPA
+  line is unchanged ("(in your QMS)").
+- No trend figure, deadline, signal, alert or citation in the sample changes (no sample product is an IVD).
+
+#### Tests
+
+- `tests/test_record_facts_0_10_64.py` (new): category words; the worksheets' A8, expiry and category fields; a kit's
+  second lot; the IVD read from the product's own words; the sample's facts and their fill-in for running trials; the
+  products and lots files' new columns; the watch citing the IVDR for an IVD family.
+- `tests/test_decision_followups.py`: a recorded CAPA keeps the number the QMS gave it (create, add later, refuse
+  before the CAPA exists or without `investigation.work`, clear, audit).
+- vitest: the follow-up's CAPA text and body, `capaQmsText`, and Help's "What MDARIX covers".
+
+
+### Changed (separate commit, for the owner to approve): a single-use field with its use period
+
+- **Products carry a single-use field and an optional use period** (products file: `single_use` Y/N, `use_period_days`
+  1 to 36,500; migration tr09 then also adds `products.single_use` and `products.use_period_days`).
+- **The trend check's single-use basis reads the product first (J27).** The single-use field decides; without it the
+  device category (single-use, kit and IVD count as used up); without either, stage 2's word list, kept only as the
+  fallback. A single-use product is counted per calendar day, or, with a use period, by the units still within that
+  many days of their lot's release ("Single-use product with a 30-day use period: each lot's units count as in use for
+  30 days after its release."). A product named "catheter" but marked reusable is now counted per unit in the field.
+- **The IVDR citation reads the device category first**: an IVD cites EU IVDR Art. 82 (starter); a product with
+  another category does not, whatever its words; the words decide only when no category is set.
+- **US 3500A H5 "Labeled for single use?"** comes from the single-use field.
+- Help › What MDARIX covers says so; docs/user-guide/PER_UNIT_TRENDS.md explains the order.
+- **Sample:** the three sample products are marked not single-use. No trend figure, signal, citation or deadline
+  changes (none of them matched the word list before).
+- Tests: `tests/test_record_facts_0_10_64.py` (the fields before the words, the use period's unit-days, H5, the
+  products file's two columns).
+
 ## [0.10.63] - 2026-11-02
 
 On the trial maintenance line (`release/0.10`): stage 2 of the quality plan, "Clocks and numbers you can trust". A legal

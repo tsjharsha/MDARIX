@@ -30,6 +30,7 @@ from fastapi import HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.app import product_facts
 from backend.app.csv_safe import FORMULA_TRIGGERS
 from backend.app.db.models.foundation import Complaint, LotBatch, ManufacturingSite, Product, ProductVersion
 from backend.app.trial import business_imports, insight_questions
@@ -82,6 +83,13 @@ COLUMN_HELP: dict[str, dict[str, str]] = {
     "products": {
         "version_release_date": "The day the version was released (YYYY-MM-DD). A version younger than 90 days is "
         "compared with the version it replaced, from this day.",
+        "device_category": "Implant, single-use, reusable (or capital equipment), software, IVD or kit. It decides "
+        "which report fields MDARIX fills (an implant, the software version) and is shown in Help › What MDARIX "
+        "covers.",
+        "single_use": "Y or N: labelled for single use. A single-use product's trend is counted by calendar day, or "
+        "with a use period by the units still in use.",
+        "use_period_days": "For a single-use product, how many days a unit stays in use after its lot's release (a "
+        "whole number). The trend check then counts each lot's units as in use only for those days.",
     },
     "lots": {
         "version": "The product version the lot builds. Its complaints are counted against this version's lots.",
@@ -89,6 +97,8 @@ COLUMN_HELP: dict[str, dict[str, str]] = {
         "quantity": "How many devices the lot released, a whole number (1,250 is fine). With a quantity on every lot "
         "of a version, the trend check counts complaints per unit in the field instead of per calendar day, so a "
         "version shipped in growing numbers is not mistaken for a rising trend.",
+        "expiry_date": "The lot's expiry (use-by) date, if it has one (YYYY-MM-DD): report worksheets fill their "
+        "expiration date from it.",
     },
     "complaints": {
         "awareness_date": "When your organization first learned of the event (YYYY-MM-DD): reporting clocks start "
@@ -143,20 +153,27 @@ TEMPLATES: dict[str, dict] = {
         "title": "Products and versions",
         "required": ["product_id", "product_name"],
         # A version is optional so sources that only list products (e.g. a PLM product list) can load them.
-        "optional": ["version", "product_family", "version_release_date"],
+        "optional": [
+            "version",
+            "product_family",
+            "version_release_date",
+            "device_category",
+            "single_use",
+            "use_period_days",
+        ],
         "example": [
-            ["PUMP-200", "AquaFlow 200 Infusion Pump", "Rev C", "Infusion therapy", "2026-03-15"],
-            ["PUMP-200", "AquaFlow 200 Infusion Pump", "Rev D", "Infusion therapy", "2026-07-01"],
+            ["PUMP-200", "AquaFlow 200 Infusion Pump", "Rev C", "Infusion therapy", "2026-03-15", "Reusable", "N", ""],
+            ["PUMP-200", "AquaFlow 200 Infusion Pump", "Rev D", "Infusion therapy", "2026-07-01", "Reusable", "N", ""],
         ],
     },
     "lots": {
         "title": "Lots and batches",
         "required": ["lot_id", "product_id", "version"],
         # quantity: devices the lot released; the trend check then counts complaints per unit in the field.
-        "optional": ["manufacture_date", "site_id", "quantity"],
+        "optional": ["manufacture_date", "site_id", "quantity", "expiry_date"],
         "example": [
-            ["L24-0815", "PUMP-200", "Rev D", "2026-07-20", "", "250"],
-            ["L24-0902", "PUMP-200", "Rev D", "2026-08-11", "", "300"],
+            ["L24-0815", "PUMP-200", "Rev D", "2026-07-20", "", "250", ""],
+            ["L24-0902", "PUMP-200", "Rev D", "2026-08-11", "", "300", ""],
         ],
     },
     "complaints": {
@@ -383,6 +400,7 @@ def _free_text(column: str) -> bool:
         or column in FLAG_COLUMNS
         or column in COUNT_COLUMNS
         or column in DEVICE_IDS
+        or column in ("device_category", "single_use", "use_period_days")
     )
 
 
@@ -720,6 +738,7 @@ def _check_values(
     key = spec["required"][0]
     identity_columns = spec.get("identity")
     seen: dict[tuple, int] = {}
+    complaint_lots: dict[str, tuple[int, set]] = {}
     for line, row in rows:
         for column in spec["required"]:
             if not row.get(column):
@@ -743,6 +762,15 @@ def _check_values(
                 if iso_date(value) is None:
                     expected = "YYYY-MM-DD" + (f" or {DATE_FORMATS[date_format]}" if date_format != "ISO" else "")
                     report.add(line, column, f"'{value}' is not a date in {expected} format.")
+            elif column == "device_category":
+                if product_facts.category_code(value) is None:
+                    report.add(line, column, product_facts.CATEGORY_HINT)
+            elif column == "use_period_days":
+                if not value.isdigit() or not 1 <= int(value) <= product_facts.USE_PERIOD_MAX:
+                    report.add(line, column, "Use a whole number of days from 1 to 36,500.")
+            elif column == "single_use":
+                if value.lower() not in FLAG_VALUES:
+                    report.add(line, column, "Use Y or N.")
             elif column in DEVICE_IDS:
                 if not DEVICE_IDS[column].match(value):
                     extra = " ( ) $ % * +" if column == "udi" else ""
@@ -778,6 +806,15 @@ def _check_values(
                     report.add(
                         line, column, "Text cannot start with =, +, - or @: spreadsheets would run it as a formula."
                     )
+        if entity == "complaints":
+            # A kit's complaint names each of its lots on a row of its own (J32): a row of the same complaint with
+            # another lot is that lot, not a duplicate. The same lot again, or a row without one, still is.
+            first, lots = complaint_lots.setdefault(row.get(key), (line, set()))
+            lot = row.get("lot_id") or ""
+            if line != first and (not lot or "" in lots or lot in lots):
+                report.add(line, key, f"Duplicate of row {first}.")
+            lots.add(lot)
+            continue
         if identity_columns:
             identity = tuple(row.get(column) for column in identity_columns)
         else:
@@ -1354,6 +1391,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
     evidence: list = []
     proposed: dict = {}  # complaint id -> (use environment, user type) as the file gives them
     changes: list[dict] = []  # each field a re-upload changes on a complaint already there (G20)
+    file_lots: dict[str, list[str]] = {}  # complaint id -> the lots its rows name, in file order (a kit's, J32)
     if entity in business_imports.TEMPLATES:
         created, updated = business_imports.write(
             entity, rows, db, tenant_id, lookup, lambda when: _stamp(now, when, source), _date, now, source
@@ -1369,6 +1407,8 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                     product_identifier=row["product_id"],
                     name=row["product_name"],
                     product_family=row.get("product_family") or None,
+                    device_category=product_facts.category_code(row.get("device_category")),
+                    **_single_use_values(row, None),
                     lifecycle_status="active",
                     source_identifier=row["product_id"],
                     **_stamp(now, None, source),
@@ -1380,6 +1420,11 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             elif product.source_system == source:
                 product.name = row["product_name"]
                 product.product_family = row.get("product_family") or product.product_family
+                product.device_category = (
+                    product_facts.category_code(row.get("device_category")) or product.device_category
+                )
+                for name, value in _single_use_values(row, product).items():
+                    setattr(product, name, value)
                 product.updated_at = now
             if not row.get("version"):
                 db.flush()
@@ -1419,6 +1464,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             built = _date(row["manufacture_date"]) if row.get("manufacture_date") else None
             site = lookup.site(row["site_id"]) if row.get("site_id") else None
             quantity = _count(row["quantity"]) if row.get("quantity") else None
+            expiry = _date(row["expiry_date"]).date() if row.get("expiry_date") else None
             lot = lookup.lot(row["lot_id"])
             if lot is None:
                 lot = LotBatch(
@@ -1429,6 +1475,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                     manufacturing_site_id=site.id if site else None,
                     status="active",
                     quantity=quantity,
+                    expiry_date=expiry,
                     source_identifier=row["lot_id"],
                     **_stamp(now, built, source),
                 )
@@ -1443,6 +1490,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                         "manufacturing_site_id": site.id if site else lot.manufacturing_site_id,
                         "effective_timestamp": built or lot.effective_timestamp,
                         "quantity": quantity if quantity is not None else lot.quantity,
+                        "expiry_date": expiry or lot.expiry_date,
                     },
                 )
                 if changed:
@@ -1451,6 +1499,13 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             db.flush()
             continue
         lot = lookup.lot(row["lot_id"]) if row.get("lot_id") else None
+        if row["complaint_id"] in file_lots:
+            # The complaint's next lot (a kit): its first row gave the complaint; this one adds only the lot.
+            if lot is not None and lot.lot_identifier not in file_lots[row["complaint_id"]]:
+                file_lots[row["complaint_id"]].append(lot.lot_identifier)
+            continue
+        if "lot_id" in row:
+            file_lots[row["complaint_id"]] = [lot.lot_identifier] if lot else []
         event = _date(row["event_date"]) if row.get("event_date") else None
         received = _date(row["received_date"]) if row.get("received_date") else None
         complaint = complaints.get(row["complaint_id"])
@@ -1474,6 +1529,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                 "tenant_id": tenant_id,
                 "complaint_identifier": row["complaint_id"],
                 "source_identifier": row["complaint_id"],
+                "other_lots": None,
                 **values,
                 **_stamp(now, received or event, source),
             }
@@ -1497,6 +1553,16 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
         evidence.append(_complaint_evidence(complaint, row, product, version, lot, source))
         if row.get("use_environment") or row.get("user_type"):
             proposed[row["complaint_id"]] = (row.get("use_environment"), row.get("user_type"))
+    for identifier, names in file_lots.items():
+        other = names[1:] or None
+        if identifier in new_complaints:
+            new_complaints[identifier]["other_lots"] = other
+        else:
+            found = _field_changes(complaints[identifier], {"other_lots": other}, identifier)
+            changes.extend(found)
+            complaints[identifier].other_lots = other
+            if found:
+                complaints[identifier].updated_at = now
     if evidence:
         from backend.app.db.bulk import insert_rows
         from retrieval.record_evidence import upsert_record_evidences
@@ -1667,6 +1733,16 @@ def _propose_classifications(db: Session, tenant_id, complaints: dict, proposed:
             )
         )
     db.flush()
+
+
+def _single_use_values(row: dict, product) -> dict:
+    """A products row's single-use flag and use period; a blank or absent column keeps the stored value."""
+    flag = FLAG_VALUES.get((row.get("single_use") or "").lower())
+    period = int(row["use_period_days"]) if row.get("use_period_days") else None
+    return {
+        "single_use": flag if flag is not None else getattr(product, "single_use", None),
+        "use_period_days": period if period is not None else getattr(product, "use_period_days", None),
+    }
 
 
 def _complaint_details(row: dict) -> dict:

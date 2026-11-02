@@ -372,13 +372,20 @@ def sample_removal_preview(
 ):
     """What removing the sample data would delete (backend/app/trial/sample_removal.py), and whether the viewer may
     do it (the person who started the trial)."""
-    from backend.app.trial import sample_removal
+    from backend.app.trial import sample_clock, sample_removal
 
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
+    request = team.trial_request(db, tenant_id)
+    dated = sample_clock.anchor_of(request)
     return {
         **sample_removal.preview(data, tenant_id),
         "is_owner": team.is_trial_owner(db, tenant_id, _current_user(db, ctx)),
+        # "Restart the sample story" (sample_clock.restart): the own records "also remove my practice work" removes,
+        # when the sample was last dated, and whether its clock has stopped because a person worked on it.
+        "own_records": sample_clock.own_records(data, tenant_id),
+        "sample_dated_at": dated.isoformat() if dated else None,
+        "clock_stopped": sample_clock.worked_on(data, tenant_id),
     }
 
 
@@ -434,6 +441,54 @@ def remove_sample_data(
     )
     db.commit()
     return {"status": "SAMPLE_REMOVED", "deleted": result["deleted"], "chapters_kept": before["acted"]}
+
+
+class SampleRestart(BaseModel):
+    confirm: bool = False
+    # "Also remove my practice work": the organization's own uploaded records and what was done with them.
+    own: bool = False
+
+
+@router.post("/trial/sample-data/restart")
+def restart_sample_story(
+    payload: SampleRestart,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """Restart the sample story: remove the sample and everything done with it, and seed it again dated now
+    (backend/app/trial/sample_clock.py); with ``own`` the organization's own uploads and what was done with them go
+    too. The trial owner only, after confirming; audited as TRIAL_SAMPLE_RESTARTED."""
+    from backend.app.trial import sample_clock
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    user = _current_user(db, ctx)
+    if not team.is_trial_owner(db, tenant_id, user):
+        raise HTTPException(
+            403,
+            detail={
+                "code": "TRIAL_OWNER_ONLY",
+                "message": "Only the person who started the trial can restart the story",
+            },
+        )
+    if not payload.confirm:
+        raise HTTPException(422, detail={"code": "CONFIRMATION_REQUIRED", "message": "Confirm the restart first"})
+    if team.trial_request(db, tenant_id) is None:
+        raise HTTPException(
+            404, detail={"code": "NOT_A_TRIAL_WORKSPACE", "message": "This workspace is not on the free trial"}
+        )
+    try:
+        return sample_clock.restart(db, data, tenant_id, user, own=payload.own, correlation_id=ctx.correlation_id)
+    except RuntimeError as exc:
+        data.rollback()
+        raise HTTPException(
+            409,
+            detail={
+                "code": "SAMPLE_RESTART_INCOMPLETE",
+                "message": "The sample story could not be restarted; nothing was changed",
+            },
+        ) from exc
 
 
 class TrialFocus(BaseModel):

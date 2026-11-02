@@ -4753,6 +4753,10 @@ div.uw-task-count:hover {
   content: "✓ ";
   color: var(--ac-good);
 }
+.uw-ov-stages li.stage-not_needed {
+  border-style: dashed;
+  background: var(--ac-ground, #f3f6fa);
+}
 .uw-ov-stages li.stage-current {
   border-color: var(--ac-navy);
   background: var(--ac-navy);

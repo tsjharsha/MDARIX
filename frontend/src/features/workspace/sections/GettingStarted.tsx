@@ -25,7 +25,7 @@ import { BookDemo, DEMO_REQUEST_PATH, type TrialDemoRequest } from "./BookDemo";
 import { TrialJourney } from "./TrialJourney";
 import { EndTrialPanel } from "./EndTrial";
 import { CitedFor } from "./CitedFor";
-import { RemoveSamplePanel } from "./RemoveSample";
+import { RemoveSamplePanel, RestartSamplePanel } from "./RemoveSample";
 import { TeamPanel } from "./TrialTeam";
 import { BESIDE_YOUR_QMS } from "../../help/besideYourQms";
 import { STORY_CHAPTERS, journeyProgress, type JourneyKey } from "../../help/trialGuide";
@@ -292,8 +292,9 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
               </strong>
               <p>
                 A reportable US or India conclusion drafts its Form FDA 3500A or MvPI worksheet in the authority's field
-                order. A colleague approves it; you enter it in the authority's route and record the submission and the
-                receipt. MDARIX never submits. The sample has a finished US report and an India report to correct.
+                order. A colleague approves it, told by a task in My Work; working alone in the trial, you approve your
+                own practice report. You enter it in the authority's route and record the submission and the receipt.
+                MDARIX never submits. The sample has a finished US report and an India report to correct.
               </p>
             </div>
             <div className="uw-story-partner-actions">
@@ -434,6 +435,17 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
               allowed={allowed}
               onOpen={(opens) => {
                 if (allowed(opens.section)) open(opens.section as WorkspaceSection, opens.tab);
+              }}
+            />
+          )}
+          {tab === "About the sample data" && hasSample && (
+            <RestartSamplePanel
+              onRestarted={(text) => {
+                notify(text);
+                status.reload();
+                story.reload();
+                insights.reload();
+                work.refreshProducts();
               }}
             />
           )}

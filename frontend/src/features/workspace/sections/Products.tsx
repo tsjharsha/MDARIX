@@ -54,6 +54,10 @@ export function ProductsSection({ tab }: { tab?: string }) {
                         <dd>{view.product.product_family ?? "—"}</dd>
                       </div>
                       <div>
+                        <dt>Device category</dt>
+                        <dd>{view.product.device_category_label ?? "Not set"}</dd>
+                      </div>
+                      <div>
                         <dt>Selected version</dt>
                         <dd>{view.selected_version?.version_identifier ?? "No version selected"}</dd>
                       </div>
@@ -153,11 +157,18 @@ export function ProductsSection({ tab }: { tab?: string }) {
                       caption="Lots"
                       idLabel="Lot ID"
                       rows={view.manufacturing.lots}
-                      columns={["lot_identifier", "site_identifier", "traceability_state", "manufactured_timestamp"]}
+                      columns={[
+                        "lot_identifier",
+                        "site_identifier",
+                        "traceability_state",
+                        "manufactured_timestamp",
+                        "expiry_date",
+                      ]}
                       labels={{
                         site_identifier: "Site",
                         traceability_state: "Traceability",
                         manufactured_timestamp: "Manufactured",
+                        expiry_date: "Expires",
                       }}
                       codes={["traceability_state"]}
                       empty={{ title: "No lots recorded", detail: "Lots appear once manufacturing data is connected." }}

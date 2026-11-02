@@ -37,7 +37,9 @@ Two refinements (md43):
 - A version with its own history and a version it replaced is compared with both, and the stronger comparison is
   reported, naming the other (``stronger``, J26).
 - A single-use or consumable product (``single_use``) is counted by calendar days: its units are used up, so the units
-  ever released are not the units in the field (J27).
+  ever released are not the units in the field (J27). 0.10.64: the product's own single-use field (else its device
+  category, product_facts.single_use) decides, and the words only when neither is set; with a use period each lot's
+  units count only that many days after its release (``unit_days(use_days=...)``).
 - The board (signals/insight.py) counts an event a person linked from several records once, at its earliest record
   (S2), and leaves complaints dated in the future out of both windows (S5).
 """
@@ -47,6 +49,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, replace
+from datetime import timedelta
 
 RECENT_DAYS = 30
 HISTORY_DAYS = 180
@@ -107,10 +110,11 @@ def poisson_tail(observed: int, expected: float) -> float:
     return max(0.0, min(1.0, 1.0 - math.exp(log_last + math.log(total))))
 
 
-def unit_days(lots, start, end) -> float | None:
+def unit_days(lots, start, end, use_days: int | None = None) -> float | None:
     """Units in the field times days over ``start``..``end`` (dates, both included): each lot counts from the day it
-    was released for its quantity. ``lots`` is ``[(released date, quantity)]``. None when there is no lot, a lot's
-    release or quantity is unknown, or no unit was in the field: the calendar is used then."""
+    was released for its quantity, and with ``use_days`` (a single-use product's use period) only for that many days.
+    ``lots`` is ``[(released date, quantity)]``. None when there is no lot, a lot's release or quantity is unknown, or
+    no unit was in the field: the calendar is used then."""
     if not lots or end < start:
         return None
     total = 0.0
@@ -118,9 +122,10 @@ def unit_days(lots, start, end) -> float | None:
         if released is None or quantity is None:
             return None
         first = max(start, released)
-        if first > end:
+        last = end if use_days is None else min(end, released + timedelta(days=use_days - 1))
+        if first > last:
             continue
-        total += quantity * ((end - first).days + 1)
+        total += quantity * ((last - first).days + 1)
     return total or None
 
 
@@ -148,6 +153,27 @@ SINGLE_USE_NOTE = (
 def single_use(*texts: str | None) -> bool:
     """Whether a product's name, family, GMDN term or description marks it single-use or consumable."""
     return any(SINGLE_USE_WORDS.search(str(text or "")) for text in texts)
+
+
+def use_note(days: int) -> str:
+    return (
+        f"Single-use product with a {days}-day use period: each lot's units count as in use for {days} days after "
+        "its release."
+    )
+
+
+def product_basis(product) -> tuple[bool, int | None]:
+    """(single-use, use period in days or None) of a product: its single-use field and use period, else its device
+    category, else its words (the fallback for a product whose category is not set)."""
+    from backend.app.product_facts import single_use as from_fields
+
+    if product is None:
+        return False, None
+    found = from_fields(product)
+    if found is None:
+        found = single_use(product.name, product.product_family, product.gmdn_term, product.description)
+    period = getattr(product, "use_period_days", None) if found else None
+    return found, period or None
 
 
 def _result(p_value: float) -> str:
