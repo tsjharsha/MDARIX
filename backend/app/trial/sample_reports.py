@@ -10,7 +10,7 @@
   sample author, and its MvPI worksheet (MDAE form, Version 1.2): approved, sent by e-mail, bounced. The obligation is
   back in draft, "correction required", with its original deadline, waiting for a correction and a new approval.
 - SAMPLE-RV-06 keeps waiting for the trial user: after its US conclusion is signed, its 3500A worksheet is drafted
-  from the case (the demo's path, with two trial users).
+  from the case; a colleague approves it or, working alone in the trial, the trial user (practice approval, 0.10.64).
 - India is enabled in the sample's reporting windows (the India MDR 2017 window, starter text) when the windows are
   still the sample's; an organization's own windows are never changed.
 

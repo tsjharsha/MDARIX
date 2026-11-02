@@ -160,8 +160,10 @@ def test_the_india_sample_drafts_an_mdae_v12_worksheet_in_field_order(trial):  #
         bind_tenant(db, trial["tenant_id"])
         obligation = db.get(ReportObligation, uuid.UUID(item["id"]))
         aware = db.get(Complaint, obligation.complaint_id).awareness_timestamp.date()
-        assert obligation.due_on == aware + timedelta(days=15)
-    assert detail["deadline"]["due_on"] == (aware + timedelta(days=15)).isoformat()
+        # India counts the awareness day as day 1 (0.10.63, the MVP's conservative rule): day 15 is awareness + 14.
+        assert obligation.due_on == aware + timedelta(days=14)
+    assert detail["deadline"]["due_on"] == (aware + timedelta(days=14)).isoformat()
+    assert detail["deadline"]["due_label"].endswith("23:59 IST") or detail["deadline"]["due_zone"] != "Asia/Kolkata"
     refused = trial["user"].post(
         f"{REPORTS}/{item['id']}/submissions",
         json={

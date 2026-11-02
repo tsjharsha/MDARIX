@@ -25,10 +25,10 @@ import { BookDemo, DEMO_REQUEST_PATH, type TrialDemoRequest } from "./BookDemo";
 import { TrialJourney } from "./TrialJourney";
 import { EndTrialPanel } from "./EndTrial";
 import { CitedFor } from "./CitedFor";
-import { RemoveSamplePanel } from "./RemoveSample";
+import { RemoveSamplePanel, RestartSamplePanel } from "./RemoveSample";
 import { TeamPanel } from "./TrialTeam";
 import { BESIDE_YOUR_QMS } from "../../help/besideYourQms";
-import { journeyProgress, type JourneyKey } from "../../help/trialGuide";
+import { STORY_CHAPTERS, journeyProgress, type JourneyKey } from "../../help/trialGuide";
 import { NEXT_STEPS_LINK, NEXT_STEPS_SECTION, NEXT_STEPS_SUMMARY } from "../../help/trialNextSteps";
 import { LOOK_AHEAD_SECTION, LOOK_AHEAD_SUMMARY, LOOK_AHEAD_TABS } from "../partyPreview";
 import { SampleDataPanel } from "./SampleData";
@@ -174,7 +174,8 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   };
   const chapters = story.data?.chapters ?? [];
   const acted = story.data?.acted ?? 0;
-  const total = story.data?.total ?? 9;
+  // While the story loads, the same count it will show (0.10.62 said 9 of a 10-chapter story).
+  const total = story.data?.total ?? STORY_CHAPTERS;
   const headline = storyHeadline(story.data, storyFailed);
   const next = chapters.find((chapter) => chapter.code === story.data?.next) ?? null;
   const talk = () => window.open("/contact", "_blank", "noopener");
@@ -291,8 +292,9 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
               </strong>
               <p>
                 A reportable US or India conclusion drafts its Form FDA 3500A or MvPI worksheet in the authority's field
-                order. A colleague approves it; you enter it in the authority's route and record the submission and the
-                receipt. MDARIX never submits. The sample has a finished US report and an India report to correct.
+                order. A colleague approves it, told by a task in My Work; working alone in the trial, you approve your
+                own practice report. You enter it in the authority's route and record the submission and the receipt.
+                MDARIX never submits. The sample has a finished US report and an India report to correct.
               </p>
             </div>
             <div className="uw-story-partner-actions">
@@ -402,10 +404,6 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
               </p>
               <ImportPanel
                 id="trial-import"
-                complaintsAlone
-                templates={trial?.templates ?? []}
-                basePath="/api/v1/trial/imports"
-                fileLimitBytes={trial?.limits?.file_bytes}
                 onReport={reports.show}
                 onImported={(result, entity) => {
                   reports.imported(result.import_ref);
@@ -433,6 +431,17 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
               allowed={allowed}
               onOpen={(opens) => {
                 if (allowed(opens.section)) open(opens.section as WorkspaceSection, opens.tab);
+              }}
+            />
+          )}
+          {tab === "About the sample data" && hasSample && (
+            <RestartSamplePanel
+              onRestarted={(text) => {
+                notify(text);
+                status.reload();
+                story.reload();
+                insights.reload();
+                work.refreshProducts();
               }}
             />
           )}

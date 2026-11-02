@@ -11,9 +11,12 @@ approved mappings of the complaint's problem code (T-G2a, ``regulatory_reference
 
 from __future__ import annotations
 
+import re
 import uuid
+
 from sqlalchemy.orm import Session
 
+from backend.app import product_facts
 from backend.app.authority_reports import forms
 from backend.app.reportability import markets
 
@@ -352,9 +355,72 @@ def _case(context):
 def _capas(context):
     if not context["capas"]:
         return None
-    text = "; ".join(f"{capa.capa_identifier}: {capa.title} ({capa.status})" for capa in context["capas"])
+    from backend.app.decision_followups.rules import capa_qms_words
+
+    text = "; ".join(
+        f"{capa.capa_identifier}: {capa.title} ({', '.join(filter(None, (capa.status, capa_qms_words(capa))))})"
+        for capa in context["capas"]
+    )
     case = context["case"]
     return text, _source("Capa", case.business_id or case.investigation_identifier, "The CAPAs of the case", case.id)
+
+
+# A version that reads as a software version number ("2.1", "v1.4.2", "1.4.2+build"); "Rev B" does not.
+_SOFTWARE_VERSION = re.compile(r"(?i)^v?\d+(\.\d+)+")
+
+
+def _software_version(context):
+    """A8 (J32): the complaint's product version, for a software product or a version that reads as a software
+    version number; a hardware revision is not a software version."""
+    product, version = context["product"], context["record"].get("version")
+    if not product or not version:
+        return None
+    if product.device_category == product_facts.SOFTWARE:
+        label = "The product version (a software product)"
+    elif _SOFTWARE_VERSION.match(version):
+        label = "The product version (a version number: check it is the software's)"
+    else:
+        return None
+    return version, _source("Product", f"{product.product_identifier} {version}", label, product.id)
+
+
+def _lots(context):
+    """The complaint's lot, and a kit's other lots after it (J32)."""
+    lot = context["lot"]
+    if lot is None:
+        return None
+    others = list(context["complaint"].other_lots or [])
+    label = "The complaint's lots (its first, then the others it names)" if others else "The complaint's lot"
+    return "; ".join([lot.lot_identifier, *others]), _source("Lot", lot.lot_identifier, label, lot.id)
+
+
+def _expiry(context):
+    lot = context["lot"]
+    if lot is None or lot.expiry_date is None:
+        return None
+    return lot.expiry_date.isoformat(), _source("Lot", lot.lot_identifier, "The lot's expiry date", lot.id)
+
+
+def _category(table: dict, label: str):
+    def read(context):
+        product = context["product"]
+        value = table.get(product.device_category) if product else None
+        return _product(context, value, label)
+
+    return read
+
+
+_IMPLANTABLE = {code: "Non-implantable device" for code in product_facts.CATEGORY_LABELS} | {
+    product_facts.IMPLANT: "Implantable device"
+}
+_USE = {product_facts.SINGLE_USE: "Single use", product_facts.REUSABLE: "Reusable"}
+
+
+def _single_use(context):
+    """US H5 "Labeled for single use?" from the product's single-use field."""
+    product = context["product"]
+    flag = getattr(product, "single_use", None) if product else None
+    return _product(context, None if flag is None else ("Yes" if flag else "No"), "The product's single-use field")
 
 
 def _immediate_action(context):
@@ -393,11 +459,12 @@ SOURCES = {
         else None,
         "The product identifier and version",
     ),
-    "lot": lambda c: (
-        (c["lot"].lot_identifier, _source("Lot", c["lot"].lot_identifier, "The complaint's lot", c["lot"].id))
-        if c["lot"]
-        else None
-    ),
+    "lot": _lots,
+    "lot_expiry": _expiry,
+    "software_version": _software_version,
+    "implantable": _category(_IMPLANTABLE, "The product's device category"),
+    "use": _category(_USE, "The product's device category"),
+    "single_use": _single_use,
     "serial": lambda c: (
         (c["complaint"].serial_number, _complaint(c, "The complaint's serial number"))
         if c["complaint"].serial_number

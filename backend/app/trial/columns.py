@@ -13,12 +13,27 @@ from __future__ import annotations
 import re
 
 _NOT_ALNUM = re.compile(r"[^a-z0-9]+")
+# What a header adds about how to fill it, not what it is: "(DD/MM/YYYY)", "(Y/N)", "Malfunction Y/N", "[days]".
+_HINTS = re.compile(r"\([^)]*\)|\[[^\]]*\]")
+_TRAILING_HINT = re.compile(r"(\b(y\s*/\s*n|yes\s*/\s*no)|\b(dd|mm|yyyy|yy)([/.-](dd|mm|yyyy|yy)){1,2})\s*$")
 
 
 def normalize(header: str) -> str:
-    """'Complaint No.' -> 'complaintno'; '#' reads as 'number' ('Lot #' -> 'lotnumber')."""
+    """'Complaint No.' -> 'complaintno'; '#' reads as 'number' ('Lot #' -> 'lotnumber'); a hint on how to fill the
+    column is left out ('Death (Y/N)' -> 'death', 'Event Date (DD/MM/YYYY)' -> 'eventdate', 'Malfunction Y/N')."""
     text = str(header or "").strip().lower().replace("#", " number ")
+    text = _TRAILING_HINT.sub(" ", _HINTS.sub(" ", text).strip())
     return _NOT_ALNUM.sub("", text)
+
+
+def date_order_hint(header: str) -> str | None:
+    """The order of day and month a header names ("Event Date (DD/MM/YYYY)" -> "DMY"), or None."""
+    text = str(header or "").lower()
+    if re.search(r"\bdd[/.-]mm\b", text):
+        return "DMY"
+    if re.search(r"\bmm[/.-]dd\b", text):
+        return "MDY"
+    return None
 
 
 # Names each template column goes by in exports, per template (the column's own name always matches too).
@@ -81,9 +96,36 @@ _COMPLAINT_SYNONYMS: dict[str, tuple[str, ...]] = {
         "model version",
         "hardware revision",
         "software version",
+        "sw version",
+        "sw rev",
+        "software revision",
+        "firmware version",
+        "fw version",
     ),
-    "lot_id": ("lot", "lot number", "lot no", "batch", "batch number", "batch no", "lot batch", "lot batch number"),
-    "event_date": ("event date", "date of event", "incident date", "occurrence date", "date of occurrence"),
+    "lot_id": (
+        "lot",
+        "lot number",
+        "lot no",
+        "batch",
+        "batch number",
+        "batch no",
+        "lot batch",
+        "lot batch number",
+        "lot batch no",
+        "batch lot",
+        "batch lot no",
+        "batch lot number",
+    ),
+    "event_date": (
+        "event date",
+        "date of event",
+        "incident date",
+        "date of incident",
+        "occurrence date",
+        "date of occurrence",
+        "failure date",
+        "date of failure",
+    ),
     "received_date": (
         "received date",
         "date received",
@@ -98,6 +140,15 @@ _COMPLAINT_SYNONYMS: dict[str, tuple[str, ...]] = {
         "date reported",
         "initiation date",
         "initiated date",
+        "date of complaint",
+        "complaint received date",
+        "complaint received on",
+        "received on",
+        "date of receipt",
+        "complaint registration date",
+        "registration date",
+        "date of registration",
+        "logged date",
     ),
     "status": ("status", "state", "record status", "complaint status", "workflow status", "current state"),
     "awareness_date": (
@@ -172,6 +223,9 @@ _SYNONYMS: dict[str, dict[str, tuple[str, ...]]] = {
             "effective date",
             "market release date",
         ),
+        "device_category": ("device category", "category", "device type", "product type", "device class type"),
+        "single_use": ("single use", "single use device", "labelled for single use", "labeled for single use"),
+        "use_period_days": ("use period days", "use period", "days in use", "in use days"),
     },
     "lots": {
         "lot_id": _COMPLAINT_SYNONYMS["lot_id"],
@@ -197,7 +251,13 @@ _SYNONYMS: dict[str, dict[str, tuple[str, ...]]] = {
             "quantity released",
             "released quantity",
             "units released",
+            "batch qty",
+            "lot qty",
+            "batch quantity",
+            "quantity manufactured",
+            "qty manufactured",
         ),
+        "expiry_date": ("expiry date", "expiration date", "exp date", "use by", "use by date", "shelf life date"),
     },
     "distribution": {
         "lot_id": _COMPLAINT_SYNONYMS["lot_id"],

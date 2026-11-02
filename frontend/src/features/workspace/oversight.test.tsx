@@ -106,10 +106,12 @@ describe("the oversight rules", () => {
   });
 
   it("says the time left in hours, then days", () => {
-    expect(hoursText(3.2)).toBe("3 h left");
-    expect(hoursText(-5)).toBe("overdue 5 h");
-    expect(hoursText(-72)).toBe("overdue 3 days");
-    expect(hoursText(0.1)).toBe("1 h left");
+    expect(hoursText({ hours_left: 3.2 })).toBe("3 h left");
+    expect(hoursText({ hours_left: -5 })).toBe("5 h overdue");
+    expect(hoursText({ hours_left: -72 })).toBe("3 days overdue");
+    expect(hoursText({ hours_left: 0.1 })).toBe("1 h left");
+    // J40: the state says overdue, so the text never reads "1 h left" beside "Overdue".
+    expect(hoursText({ hours_left: 0.4, state: "OVERDUE" })).toBe("Overdue");
   });
 
   it("shows escalations and overdue items one by one, and groups the ones due soon", () => {
@@ -163,7 +165,7 @@ describe("the reminders in My Work and the bell", () => {
   it("lists the escalation, groups the triage items and shows whom you cover for", () => {
     resources.data[ALERTS] = list;
     const html = render(<RemindersPanel />);
-    expect(html).toContain("2 items need you, 2 unread");
+    expect(html).toContain("2 reminders for you, 2 unread");
     expect(html).toContain("Escalated to you");
     expect(html).toContain("Nobody else can be reached");
     expect(html).toContain("1 due soon");
@@ -247,7 +249,7 @@ describe("the oversight view", () => {
     expect(html).toContain("Closed in the QMS before ready");
     expect(html).toContain("1 of 23 dated items");
     expect(html).toContain("Reply due from Reporter of SAMPLE-RV-08");
-    expect(html).toContain("overdue 2 days");
+    expect(html).toMatch(/\d+ (days?|h) overdue/);
     expect(html).toContain("Not ready to close");
     expect(html).toContain("3 open. Next: Sign the United States (FDA) market assessment");
     expect(html).toContain("invite a colleague");

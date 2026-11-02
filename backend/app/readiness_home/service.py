@@ -106,6 +106,14 @@ def today_utc() -> date:
     return datetime.now(timezone.utc).date()
 
 
+def organization_today(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -> date:
+    """Today on the organization's working calendar (its time zone), as its own due times end (0.10.63): 2 Nov in
+    India from 00:00 IST, where the UTC date still read 1 Nov until 05:30."""
+    from backend.app.oversight.service import calendar_of
+
+    return calendar_of(db, tenant_id).local_day(now or datetime.now(timezone.utc))
+
+
 def _midnight(day: date) -> datetime:
     return datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
 
@@ -206,7 +214,12 @@ def reporting_clocks(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
 
     from backend.app.reportability.assessments import disagreements
 
-    found = watch(db, None, tenant_id, show="open", page=1, page_size=10**6, today=today)
+    # Today is read as now, so a deadline that ended at 23:59 in its market's time zone is overdue here when it is on
+    # the watch (one deadline everywhere, 0.10.63); another day (an older read, a test) stays a day.
+    moment = datetime.now(timezone.utc)
+    found = watch(
+        db, None, tenant_id, show="open", page=1, page_size=10**6, today=moment if today == moment.date() else today
+    )
     summary = found["summary"]
     # The number: complaints awaiting a decision whose clock is overdue or due soon, or whose answers are missing.
     flagged = [item for item in found["items"] if item["state"] in ("OVERDUE", "DUE_SOON") or item["follow_ups"]]
@@ -472,7 +485,9 @@ def dispositions_due(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
     value = len(review) + len(late)
     return _check(
         "DISPOSITIONS_DUE",
-        "Complaints waiting for a disposition",
+        # What it counts (J19): complaints past the target without a disposition, and dispositions to review; the
+        # Dispositions board's "waiting" is every complaint without one, a larger number.
+        f"Dispositions past the {target}-day target or to review",
         value,
         CRITICAL if review else ATTENTION if late or escalated else CLEAR,
         f"{_n(len(late), 'complaint')} without a disposition past the {target}-day target; "
@@ -573,7 +588,7 @@ def readiness(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> d
     from backend.app.case_workflow.readiness import safely
     from backend.app.signals.insight import shared_trend_boards
 
-    today = today or today_utc()
+    today = today or organization_today(db, tenant_id)
     checks = []
     # The trend check and the risk file check read the same trend board: once (0.10.43).
     with shared_trend_boards():

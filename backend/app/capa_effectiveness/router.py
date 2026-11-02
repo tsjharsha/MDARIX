@@ -218,6 +218,7 @@ def plan_check(
 def ensure_reminder(db: Session, capa, check: CapaEffectivenessCheck, today: date, actor: str = "system"):
     """The check's reminder task for the quality reviewers, once its day is near (DUE_SOON_DAYS) or past. It is not
     tied to the case, so closing the case leaves it open. Does not commit; idempotent."""
+    from backend.app.oversight.service import calendar_of
     from backend.app.workflow import tasks as task_service
 
     if check.status != rules.PLANNED or (check.planned_on - today).days > rules.DUE_SOON_DAYS:
@@ -231,7 +232,7 @@ def ensure_reminder(db: Session, capa, check: CapaEffectivenessCheck, today: dat
         source_type=CAPA_SOURCE,
         source_id=capa.id,
         priority="HIGH" if check.planned_on < today else "MEDIUM",
-        due_at=datetime.combine(check.planned_on, datetime.max.time().replace(microsecond=0), tzinfo=timezone.utc),
+        due_at=calendar_of(db, capa.tenant_id).day_end(check.planned_on),
         created_by=actor,
         details={"capa_id": str(capa.id), "capa_business_id": ref, "check_id": str(check.id), "round": check.round},
     )

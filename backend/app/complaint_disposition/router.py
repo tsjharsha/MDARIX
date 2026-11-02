@@ -107,9 +107,11 @@ def _reportability(db: Session, tenant_id: uuid.UUID, complaint_id, today: date)
         complaint.status, complaint.complaint_type, second_look
     )
     windows = reporting.settings_of(db, tenant_id)["windows"]
-    aware = date.fromisoformat(seen["aware_date"]) if seen["aware_date"] else None
+    aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
     by_market = assessments.rows_by_complaint(db, tenant_id, [complaint_id]).get(complaint_id, {})
-    summary = assessments.markets_summary(record, windows, by_market, aware, today) if on_watch else []
+    summary = (
+        assessments.markets_summary(record, windows, by_market, aware, today, seen.get("org_zone")) if on_watch else []
+    )
     settled = (not on_watch) or assessments.settled(summary) or bool(seen.get("decided"))
     return {
         "on_watch": on_watch,

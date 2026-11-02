@@ -419,11 +419,15 @@ def fingerprint(complaint_id, items: list[dict]) -> str:
 
 
 def stage_line(found: dict, items: list[dict], row: EventClosure | None) -> list[dict]:
-    """Each stage with its state: done, open (work in it is not finished) or later. A summary, never a gate."""
+    """Each stage with its state: done, open (work in it is not finished), later, or not needed (no check of the stage
+    applies to this event: no case, no market clock; J29). A summary, never a gate."""
     results = {item["code"]: item["result"] for item in items}
 
     def done(*codes: str) -> bool:
         return all(results.get(code, NOT_REQUIRED) != BLOCKED for code in codes)
+
+    def needed(*codes: str) -> bool:
+        return any(results.get(code, NOT_REQUIRED) != NOT_REQUIRED for code in codes)
 
     complaint = found["complaint"]
     open_case = any(str(case.status or "").lower() == "open" for case in found["cases"])
@@ -437,12 +441,20 @@ def stage_line(found: dict, items: list[dict], row: EventClosure | None) -> list
         "READY": ready,
         "CLOSED": closed,
     }
-    first_open = next((code for code, _ in STAGES if not state[code]), None)
+    skipped = {
+        "TRIAGE": not needed("TRIAGE", "FIRST_CONTACT"),
+        "MARKETS": not needed("MARKETS", "OBLIGATIONS"),
+        "INVESTIGATION": not found["cases"],
+        "DECISION": not needed("DECISION"),
+    }
+    first_open = next((code for code, _ in STAGES if not state[code] and not skipped.get(code)), None)
     return [
         {
             "code": code,
             "label": label,
-            "state": "DONE"
+            "state": "NOT_NEEDED"
+            if skipped.get(code)
+            else "DONE"
             if state[code]
             else "CURRENT"
             if code == first_open

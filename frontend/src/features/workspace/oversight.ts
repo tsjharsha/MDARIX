@@ -2,6 +2,7 @@
 // pure rules the screens use. The server (/api/v1/oversight, backend/app/oversight) reads every dated item from its
 // own record; an alert never closes or changes the item.
 import type { Tone } from "../admin/console/dashboardModel";
+import { timeLeft, type DueLike } from "../../app/dates";
 
 export const OVERSIGHT = "/api/v1/oversight";
 export const ALERTS = `${OVERSIGHT}/alerts`;
@@ -25,6 +26,8 @@ export type Alert = {
   ref: string | null;
   owner: string | null;
   due_at: string;
+  /** "Sat 28 Nov 2026, 23:59 IST": a legal deadline in the time zone it ends in; anything else in the organization's. */
+  due_label?: string;
   state: ItemState;
   state_label: string;
   hours_left: number;
@@ -68,6 +71,8 @@ export type OversightItem = {
   queue: string | null;
   away: { backup: string } | null;
   due_at: string;
+  /** "Sat 28 Nov 2026, 23:59 IST": a legal deadline in the time zone it ends in; anything else in the organization's. */
+  due_label?: string;
   state: ItemState;
   state_label: string;
   hours_left: number;
@@ -164,7 +169,7 @@ export type EventView = {
     open_requests: number;
     next_action: { label: string; detail: string; opens: Opens } | null;
   };
-  stages: Array<{ code: string; label: string; state: "DONE" | "CURRENT" | "OPEN" | "LATER" }>;
+  stages: Array<{ code: string; label: string; state: "DONE" | "CURRENT" | "OPEN" | "LATER" | "NOT_NEEDED" }>;
   checklist: CheckItem[];
   blocked: number;
   state: EventState;
@@ -217,12 +222,8 @@ export const stateTone = (state: ItemState): Tone =>
 export const alertTone = (alert: Pick<Alert, "tier" | "state">): Tone =>
   alert.tier === "ESCALATION" ? "critical" : stateTone(alert.state);
 
-/** "3 h left", "2 days left", "overdue 5 h", "overdue 3 days". */
-export function hoursText(hours: number): string {
-  const size = Math.abs(hours);
-  const amount = size < 48 ? `${Math.max(1, Math.round(size))} h` : `${Math.round(size / 24)} days`;
-  return hours < 0 ? `overdue ${amount}` : `${amount} left`;
-}
+/** "3 h left", "2 days left", "5 h overdue": the app's one helper (app/dates.ts timeLeft), overdue from the state. */
+export const hoursText = (item: Pick<DueLike, "state" | "due_at" | "hours_left">) => timeLeft(item);
 
 /** Escalations and overdue items one by one; the items only due soon grouped by category, so a long triage list
  * reads as one line. */

@@ -80,8 +80,9 @@ def _group_key(grouping: str, row) -> tuple:
     return (row.product_id, row.product_version_id, None)
 
 
-def _counted(db: Session, tenant_id: uuid.UUID, since: date, product_id: uuid.UUID | None):
-    """Every complaint with a product since ``since``, except those dismissed on the second look."""
+def _counted(db: Session, tenant_id: uuid.UUID, since: date, today: date):
+    """Every complaint with a product from ``since`` to ``today`` (S5: a complaint dated in the future is in neither
+    window), except those dismissed on the second look."""
     query = (
         db.query(
             Complaint.id,
@@ -100,11 +101,10 @@ def _counted(db: Session, tenant_id: uuid.UUID, since: date, product_id: uuid.UU
             Complaint.tenant_id == tenant_id,
             Complaint.product_id.isnot(None),
             EVENT_AT >= _midnight(since),
+            EVENT_AT < _midnight(today + timedelta(days=1)),
             (ComplaintSecondLook.decision.is_(None)) | (ComplaintSecondLook.decision != "DISMISSED"),
         )
     )
-    if product_id is not None:
-        query = query.filter(Complaint.product_id == product_id)
     return query.limit(READ_LIMIT + 1).all()
 
 
@@ -239,7 +239,17 @@ def _scale(recent_units: float | None, baseline_units: float | None) -> float | 
 def _names(db: Session, tenant_id: uuid.UUID, product_ids, version_ids) -> tuple[dict, dict]:
     products = {
         row.id: row
-        for row in db.query(Product.id, Product.business_id, Product.name)
+        for row in db.query(
+            Product.id,
+            Product.business_id,
+            Product.name,
+            Product.product_family,
+            Product.gmdn_term,
+            Product.description,
+            Product.device_category,
+            Product.single_use,
+            Product.use_period_days,
+        )
         .filter(
             Product.tenant_id == tenant_id, Product.id.in_([item for item in product_ids if item] or [uuid.uuid4()])
         )
@@ -318,16 +328,24 @@ def trend_board(
 def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: uuid.UUID | None, today: date) -> dict:
     recent_start = today - timedelta(days=trend_rules.RECENT_DAYS - 1)
     since = recent_start - timedelta(days=trend_rules.HISTORY_DAYS)
-    rows = _counted(db, tenant_id, since, product_id)
+    # Every group of the organization is checked, whatever the product filter: the adjusted values allow for all the
+    # groups tested on the board (S4), so a product's row reads the same filtered or not.
+    rows = _counted(db, tenant_id, since, today)
     truncated = len(rows) > READ_LIMIT
     rows = rows[:READ_LIMIT]
-    groups: dict = defaultdict(lambda: {"recent": [], "history": []})
+    events = service.linked_events(db, tenant_id)
+    groups: dict = defaultdict(lambda: {"recent": [], "history": [], "listed": []})
     for row in rows:
         day = _day(row.event_at)
         if day is None:
             continue
         bucket = "recent" if day >= recent_start else "history"
-        groups[_group_key(grouping, row)][bucket].append(row)
+        key = _group_key(grouping, row)
+        if bucket == "recent":
+            groups[key]["listed"].append(row)
+        # S2: an event linked from several records counts once, by its earliest record; the others stay listed.
+        if events.get(row.id, row.id) == row.id:
+            groups[key][bucket].append(row)
     version_ids = {key[1] for key in groups}
     ages = _version_ages(db, tenant_id, version_ids, today)
     products, versions = _names(db, tenant_id, {key[0] for key in groups}, version_ids)
@@ -335,53 +353,84 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
     lots = _lot_releases(db, tenant_id, version_ids)
     previous = _previous_versions(db, tenant_id, version_ids)
     baselines: dict = {}
-    items = []
+    found = []
     for key, bucket in groups.items():
         product_ref, version_ref, problem = key
-        days_of_history = trend_rules.history_days(ages.get(version_ref))
+        age = ages.get(version_ref)
+        days_of_history = trend_rules.history_days(age)
+        # S3: a version younger than the recent window is expected only the days it has existed (release day included).
+        recent_days = trend_rules.RECENT_DAYS if age is None else min(trend_rules.RECENT_DAYS, age + 1)
         product = products.get(product_ref)
         version = versions.get(version_ref)
-        recent_units = trend_rules.unit_days(lots.get(version_ref), recent_start, today)
-        result = None
-        prior = previous.get(version_ref) if days_of_history < trend_rules.MIN_HISTORY_DAYS else None
+        # J27: a single-use product's units are used up, so the units ever released are not the units in the field.
+        disposable, use_days = trend_rules.product_basis(product)
+        # With a use period, a single-use product's units in the field are those still within it after release.
+        by_units = not disposable or use_days is not None
+        recent_units = trend_rules.unit_days(lots.get(version_ref), recent_start, today, use_days) if by_units else None
+        counted_by_use = disposable and use_days is not None and recent_units is not None
+        note = (
+            (trend_rules.use_note(use_days) if counted_by_use else trend_rules.SINGLE_USE_NOTE) if disposable else None
+        )
+        against_previous = None
+        prior = previous.get(version_ref)
         if prior:
-            # A new version: compared with the one it replaced, over the days before its release.
+            # The version it replaced, over the days before this version's release.
             window = min(trend_rules.HISTORY_DAYS, (prior["this_released"] - prior["released"]).days)
             if window >= trend_rules.MIN_HISTORY_DAYS:
                 start = prior["this_released"] - timedelta(days=window)
                 end = prior["this_released"] - timedelta(days=1)
                 if prior["id"] not in baselines:
-                    baselines[prior["id"]] = _version_rows(db, tenant_id, prior["id"], start, end)
+                    baselines[prior["id"]] = [
+                        row
+                        for row in _version_rows(db, tenant_id, prior["id"], start, end)
+                        if events.get(row.id, row.id) == row.id
+                    ]
                 baseline = [row for row in baselines[prior["id"]] if _group_key(grouping, row)[2] == problem]
-                result = trend_rules.check(
+                against_previous = trend_rules.check(
                     len(bucket["recent"]),
                     len(baseline),
                     window,
-                    scale=_scale(recent_units, trend_rules.unit_days(lots.get(prior["id"]), start, end)),
+                    scale=_scale(recent_units, trend_rules.unit_days(lots.get(prior["id"]), start, end, use_days)),
                     baseline=trend_rules.PREVIOUS_VERSION,
                     baseline_name=f"{product.name if product else 'Product'} {prior['name']}",
+                    recent_days=recent_days,
+                    basis_note=note,
                 )
-        if result is None:
-            history = [
-                row for row in bucket["history"] if _day(row.event_at) >= recent_start - timedelta(days=days_of_history)
-            ]
-            history_units = (
-                trend_rules.unit_days(
-                    lots.get(version_ref),
-                    recent_start - timedelta(days=days_of_history),
-                    recent_start - timedelta(days=1),
-                )
-                if days_of_history
-                else None
+        history = [
+            row for row in bucket["history"] if _day(row.event_at) >= recent_start - timedelta(days=days_of_history)
+        ]
+        history_units = (
+            trend_rules.unit_days(
+                lots.get(version_ref),
+                recent_start - timedelta(days=days_of_history),
+                recent_start - timedelta(days=1),
+                use_days,
             )
-            result = trend_rules.check(
-                len(bucket["recent"]), len(history), days_of_history, scale=_scale(recent_units, history_units)
-            )
+            if days_of_history and by_units
+            else None
+        )
+        own = trend_rules.check(
+            len(bucket["recent"]),
+            len(history),
+            days_of_history,
+            scale=_scale(recent_units, history_units),
+            recent_days=recent_days,
+            basis_note=note,
+        )
+        # J26: with both baselines, the stronger comparison, saying which.
+        found.append((key, bucket, product, version, trend_rules.stronger(own, against_previous)))
+    adjusted = trend_rules.adjust([entry[-1] for entry in found])
+    tested = sum(1 for result in adjusted if result.p_value is not None)
+    items = []
+    for (key, bucket, product, version, _), result in zip(found, adjusted):
+        product_ref, version_ref, problem = key
+        if product_id is not None and product_ref != product_id:
+            continue
         name = f"{product.name if product else 'Product'} {version.version_identifier if version else '(version not recorded)'}"
         if problem:
             label = "no problem code" if problem == logic.UNSPECIFIED_PROBLEM else problem.replace("_", " ").lower()
             name = f"{name} · {label}"
-        recent = sorted(bucket["recent"], key=lambda row: _day(row.event_at), reverse=True)
+        recent = sorted(bucket["listed"], key=lambda row: _day(row.event_at), reverse=True)
         items.append(
             {
                 "key": f"{product_ref}|{version_ref}|{problem or ''}",
@@ -402,21 +451,26 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
                 "problem": problem,
                 "name": name,
                 **result.as_dict(),
+                # Recent records not counted on their own: linked to an earlier record of the same event (S2).
+                "linked_records": len(bucket["listed"]) - len(bucket["recent"]),
                 "sentence": trend_rules.sentence(name, result),
                 "recent_complaints": [
                     {"id": str(row.id), "business_id": row.business_id} for row in recent[: CITED_MAX * 3]
                 ],
                 "open_signals": signals.get((product_ref, version_ref, problem), []),
+                "_counted": len(bucket["recent"]) + len(bucket["history"]),
             }
         )
     items.sort(
         key=lambda item: (
             trend_rules.RESULT_ORDER[item["result"]],
+            item["p_adjusted"] if item["p_adjusted"] is not None else 1.0,
             item["p_value"] if item["p_value"] is not None else 1.0,
             -item["recent"],
             item["name"],
         )
     )
+    counted = sum(item.pop("_counted") for item in items)
     results = Counter(item["result"] for item in items)
     return {
         "grouping": grouping,
@@ -426,20 +480,26 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
         "thresholds": {"significant": trend_rules.SIGNIFICANT_P, "elevated": trend_rules.ELEVATED_P},
         "summary": {
             "groups": len(items),
-            "complaints_counted": len(rows),
+            # The groups assessed across the whole board, which the adjusted chances allow for.
+            "groups_tested": tested,
+            "complaints_counted": counted,
+            "linked_records": sum(item["linked_records"] for item in items),
             **{code.lower(): results.get(code, 0) for code in trend_rules.RESULT_ORDER},
         },
         "truncated": truncated,
         "note": (
-            "A check beside the count rule, never a verdict: it compares each group's last 30 days with its own history, "
-            "or a new version with the version it replaced, and never raises a signal by itself. Where every lot has a "
-            "quantity, the comparison follows the units in the field; elsewhere it counts by calendar days, so a version "
-            "shipped in growing numbers can show a higher rate for that reason alone. Add lot quantities to your lot "
-            "import to count per unit."
+            "A check beside the count rule, never a verdict: it compares each group's last 30 days with its own "
+            "history and, for a version that replaced another, with that version too, and shows the stronger "
+            "comparison; it never raises a signal by itself. The result allows for the number of groups checked at "
+            "once (the adjusted chance), and an event linked from several records counts once. Where every lot has a "
+            "quantity, the comparison follows the units in the field; elsewhere, and for single-use or consumable "
+            "products, it counts by calendar days, so a version shipped in growing numbers can show a higher rate for "
+            "that reason alone. Add lot quantities to your lot import to count per unit."
         ),
         "basis": {
             "units": sum(1 for item in items if item["basis"] == trend_rules.UNITS),
-            "time": sum(1 for item in items if item["basis"] == trend_rules.TIME),
+            "time": sum(1 for item in items if item["basis"] == trend_rules.TIME and not item["basis_note"]),
+            "single_use": sum(1 for item in items if item["basis"] == trend_rules.TIME and item["basis_note"]),
         },
         "items": items,
     }
@@ -447,11 +507,12 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
 
 def trend_for_signal(db: Session, signal: Signal, today: date | None = None) -> dict | None:
     """The trend check of the signal's own group: its product version and problem, or the whole version when the
-    signal's complaints are about several problems (a signal raised by hand)."""
+    signal's complaints are about several problems (a signal raised by hand). Read from the organization's whole
+    board, so its adjusted value is the board's (S4)."""
     if signal.product_id is None:
         return None
     grouping = "problem" if signal.problem_key else "version"
-    board = trend_board(db, signal.tenant_id, grouping=grouping, product_id=signal.product_id, today=today)
+    board = trend_board(db, signal.tenant_id, grouping=grouping, today=today)
     key = f"{signal.product_id}|{signal.product_version_id}|{signal.problem_key or ''}"
     return next((item for item in board["items"] if item["key"] == key), None)
 

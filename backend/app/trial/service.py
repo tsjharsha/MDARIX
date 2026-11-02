@@ -35,12 +35,7 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.db.models.stage2 import OnboardingRequest, SubscriptionLifecycle
 from backend.app.trial.request_profile import describe as describe_profile
-from backend.app.trial.sample_data import (
-    SAMPLE_SOURCE,
-    seed_lot_quantities,
-    seed_sample_workspace,
-    seed_story_examples,
-)
+from backend.app.trial.sample_data import SAMPLE_SOURCE
 from backend.app.runtime_env import is_development
 
 FREE_TRIAL_PLAN = "FREE_TRIAL"
@@ -532,41 +527,20 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
                 updated_at=now,
             )
         )
-        sample = seed_sample_workspace(db, tenant.id, now)
-        # The rest of the story: hidden complaints, reporting clocks, CAPAs, the risk register and sample reporting
-        # windows, so Complaints, Records and Readiness show findings from the first minute.
-        sample["story"] = seed_story_examples(db, tenant.id, now)
-        # Units per sample lot (md43), so the trend check counts per device in the field.
-        sample["lot_quantities"] = seed_lot_quantities(db, tenant.id)
-        # The guided investigation arrives with its Decision Brief written by a sample author and submitted for quality
-        # review, so one trial user can review it and sign the decision (backend/app/trial/sample_decision.py).
-        from backend.app.trial.sample_decision import stage_sample_decision
+        # The working calendar's time zone from the sign-up country, before the sample is seeded, so its due times
+        # and legal deadlines read in the organization's time (India: Asia/Kolkata; J16). Settings changes it.
+        from backend.app.db.models.oversight import OversightSettings
+        from backend.app.oversight.rules import zone_for_country
 
-        sample["decision"] = stage_sample_decision(db, tenant.id, now)
-        # The sample answers of the per-market assessment: a signed EU/NI example and a pending US draft
-        # (backend/app/trial/sample_assessments.py).
-        from backend.app.trial.sample_assessments import stage_sample_assessments
-
-        sample["assessments"] = stage_sample_assessments(db, tenant.id, now)
-        # The routine complaints, their proposed classifications and a signed service-level example
-        # (backend/app/trial/sample_dispositions.py).
-        from backend.app.trial.sample_dispositions import seed_routine_examples
-
-        sample["routine"] = seed_routine_examples(db, tenant.id, now)
-        # The sample's import run with its data-quality report and set-aside rows, the products' UDI-DI and GMDN, and
-        # the IMDRF links of its problem codes (backend/app/trial/sample_imports.py). Last: it reads every complaint.
-        from backend.app.trial.sample_imports import stage_sample_import
-
-        sample["imports"] = stage_sample_import(db, tenant.id, now)
-        # The first contacts, the urgent intake and a finished triage record (backend/app/trial/sample_intake.py).
-        from backend.app.trial.sample_intake import stage_sample_intake
-
-        sample["intake"] = stage_sample_intake(db, tenant.id, now)
-        # The report worksheets: a finished US example, an India example with a rejected attempt, and India in the
-        # sample's reporting windows (backend/app/trial/sample_reports.py). After the import run: its counts stay.
-        from backend.app.trial.sample_reports import stage_sample_reports
-
-        sample["reports"] = stage_sample_reports(db, tenant.id, now)
+        db.add(
+            OversightSettings(
+                id=uuid.uuid4(),
+                tenant_id=tenant.id,
+                time_zone=zone_for_country((row.profile or {}).get("country")),
+                updated_at=now,
+            )
+        )
+        db.flush()
         user = AuthUser(
             id=uuid.uuid4(),
             tenant_id=tenant.id,
@@ -582,21 +556,11 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         )
         db.add(user)
         db.flush()
-        # The organization's own US guide version (published) and a draft whose test fails, and the communications
-        # log's examples, with the open request owned by the trial user (backend/app/trial/sample_guides.py).
-        from backend.app.trial.sample_guides import stage_sample_guides
+        # The whole sample story, dated from now (backend/app/trial/sample_clock.py); its clock is the trial request's.
+        from backend.app.trial import sample_clock
 
-        sample["guides"] = stage_sample_guides(db, tenant.id, now, owner_id=str(user.id))
-        # The sample author away with the trial user as backup, and two events the trial user owns (RV-08 not ready
-        # to close, RT-03 clear), backend/app/trial/sample_oversight.py.
-        from backend.app.trial.sample_oversight import stage_sample_oversight
-
-        sample["oversight"] = stage_sample_oversight(db, tenant.id, now, owner_id=str(user.id))
-        # Lot genealogy, three OrbitCare lots without complaints and the distribution, with its import run, for a case's
-        # Lot impact (backend/app/trial/sample_lot_impact.py). The trend's units in the field stay the same.
-        from backend.app.trial.sample_lot_impact import stage_sample_lot_impact
-
-        sample["lot_impact"] = stage_sample_lot_impact(db, tenant.id, now)
+        sample = sample_clock.seed_sample(db, tenant.id, now, owner_id=str(user.id))
+        row.profile = {**(row.profile or {}), sample_clock.ANCHOR: now.isoformat()}
         db.add(
             TenantMembership(
                 id=uuid.uuid4(),

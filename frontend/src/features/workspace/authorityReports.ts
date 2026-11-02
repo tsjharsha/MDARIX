@@ -3,6 +3,7 @@
 // drafts every field from the records and decides every step; these only shape what the person sees and what is
 // sent. MDARIX never submits: the person submits in the authority's route and records it here.
 import type { Tone } from "../admin/console/dashboardModel";
+import { deadlineLabel, timeLeft } from "../../app/dates";
 
 export const REPORTS = "/api/v1/reports";
 export const REPORTS_TAB = "Reports";
@@ -39,6 +40,8 @@ export type ReportListItem = {
   provisional: boolean;
   days_left: number | null;
   overdue: boolean;
+  due_at?: string | null;
+  due_label?: string | null;
   assessment: string | null;
   can_start: boolean;
   sample: boolean;
@@ -72,6 +75,30 @@ export type WorksheetField = {
 
 export type WorksheetSection = { code: string; title: string; note: string | null; fields: WorksheetField[] };
 
+/**
+ * Who approves a waiting snapshot or guide version, from the server before anyone types a password (J13): the form is
+ * shown only when ``may_approve``; ``same_person`` is the trial's practice approval of one's own work (working alone);
+ * ``message`` says why not and names the colleagues who may (``approvers``).
+ */
+export type ApprovalStanding = {
+  may_approve: boolean;
+  same_person: boolean;
+  approvers: string[];
+  message: string | null;
+  role?: string | null;
+};
+
+/** What the draft says before approval is asked: who gets the approval task in My Work. */
+export function askNote(standing: ApprovalStanding | null | undefined): string {
+  if (!standing) return "When ready, ask a colleague to approve the snapshot.";
+  const names = standing.approvers;
+  if (names.length)
+    return `When ready, ask for approval: ${names.join(", ")} ${names.length === 1 ? "gets" : "get"} a task in My Work.`;
+  if (standing.same_person)
+    return "When ready, ask for approval. In a pilot a colleague approves it; working alone in the trial, you approve your own practice report.";
+  return "When ready, ask for approval. Nobody else in your organization may approve it yet: an administrator gives a colleague the Regulatory Reviewer, Authorized Decision Maker or Leader role.";
+}
+
 export type Snapshot = {
   id: string;
   version: number;
@@ -83,6 +110,8 @@ export type Snapshot = {
   approved_by: string | null;
   approved_at: string | null;
   preparers: string[];
+  /** Approved by its preparer or the conclusion's signer: the trial's practice approval (T-B8). */
+  same_person?: boolean;
   sample: boolean;
 };
 
@@ -154,7 +183,7 @@ export type ReportDetail = {
   state_label: string;
   next_step: string;
   steps: { state: ObligationState; label: string }[];
-  deadline: { due_on: string | null; provisional: boolean; days_left: number | null; overdue: boolean };
+  deadline: DeadlineFields;
   assessment: {
     conclusion: string | null;
     report_type_label: string | null;
@@ -170,6 +199,7 @@ export type ReportDetail = {
   snapshots: Snapshot[];
   pending_snapshot: Snapshot | null;
   cannot_approve: string[];
+  approval?: ApprovalStanding | null;
   submissions: Submission[];
   request: { text: string; received_on: string } | null;
   parent_id: string | null;
@@ -238,21 +268,33 @@ export function stepIndex(state: ObligationState): number {
 /** The states in which the obligation's deadline is met (the server's rules.MET). */
 export const MET_STATES: readonly ObligationState[] = ["ACCEPTED", "SUBMITTED_NO_ACK", "FOLLOW_UP_DUE", "COMPLETE"];
 
-export function deadlineText(
-  item: { due_on: string | null; days_left: number | null; provisional: boolean },
-  state?: ObligationState,
-): string {
+/** A report's deadline on the wire (authority_reports/router.py ``due_fields``). */
+export type DeadlineFields = {
+  due_on: string | null;
+  provisional: boolean;
+  days_left: number | null;
+  overdue: boolean;
+  due_at?: string | null;
+  due_zone?: string | null;
+  due_label?: string | null;
+};
+
+/** "Deadline Sat 7 Nov 2026, 23:59 IST · 6 days left": the end with its time zone, and the app's one time-left text
+ * (app/dates.ts timeLeft), overdue from the server. */
+export function deadlineText(item: DeadlineFields, state?: ObligationState, now = new Date()): string {
   if (!item.due_on) return "No deadline yet";
-  if (state && MET_STATES.includes(state)) return `Deadline ${item.due_on}: met by the submission`;
-  const left =
-    item.days_left === null
-      ? ""
-      : item.days_left < 0
-        ? `, ${-item.days_left} days overdue`
-        : item.days_left === 0
-          ? ", due today"
-          : `, ${item.days_left} days left`;
-  return `${item.provisional ? "Provisional deadline" : "Deadline"} ${item.due_on}${left}`;
+  const when = deadlineLabel({ due_label: item.due_label, due_date: item.due_on });
+  if (state && MET_STATES.includes(state)) return `Deadline ${when}: met by the submission`;
+  const left = timeLeft(
+    {
+      due_at: item.due_at,
+      due_date: item.due_on,
+      days_left: item.days_left,
+      state: item.overdue ? "OVERDUE" : "RUNNING",
+    },
+    now,
+  );
+  return `${item.provisional ? "Provisional deadline" : "Deadline"} ${when}${left ? ` · ${left}` : ""}`;
 }
 
 /** The worksheet's summary line: how many fields come from records, were entered or confirmed, and are missing. */

@@ -100,6 +100,14 @@ def trial_reminders(db: Session, _state: dict) -> dict:
     return {"queued": queue_trial_reminders(db)}
 
 
+def trial_sample_clock(db: Session, _state: dict) -> dict:
+    """Keep every running trial's sample story current: its events move with the trial's clock until a person works on
+    it (backend/app/trial/sample_clock.py). Each trial is committed on its own."""
+    from backend.app.trial.sample_clock import run_for_all_trials
+
+    return run_for_all_trials(db)
+
+
 def embedding_catch_up(db: Session, _state: dict) -> dict:
     """Embed evidence that has none yet (records imported while the API restarted, or a failed background step).
     An organization whose import's embeddings are still queued or under way in the outbox worker is left to that job
@@ -337,6 +345,13 @@ JOBS: tuple[Job, ...] = (
         trial_retention,
         "Delete trial data 30 days after the trial ends (held while its move into the pilot is requested), and error "
         "reports sent before sign-in after 90 days",
+        PLATFORM_JOBS,
+    ),
+    Job(
+        "trial-sample-clock",
+        timedelta(hours=1),
+        trial_sample_clock,
+        "Keep each trial's sample story current: its dates move with the trial's clock until someone works on it",
         PLATFORM_JOBS,
     ),
     Job(

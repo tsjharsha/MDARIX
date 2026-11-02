@@ -64,7 +64,7 @@ def _n(count: int, noun: str, plural: str | None = None) -> str:
 
 def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAULT, today: date | None = None) -> dict:
     """Everything the summary shows, for ``period_days`` up to ``today`` (included)."""
-    today = today or service.today_utc()
+    today = today or service.organization_today(db, tenant_id)
     start = today - timedelta(days=period_days - 1)
     begin, end = _midnight(start), _midnight(today + timedelta(days=1))
     received = func.coalesce(Complaint.complaint_timestamp, Complaint.event_timestamp, Complaint.created_at)

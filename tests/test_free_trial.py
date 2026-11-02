@@ -20,6 +20,8 @@ from tests.conftest import authenticated_client
 from tests.signup_profile import PROFILE, PROFILE_LINES
 
 PASSWORD = "Trial password 2026!"
+# A complaints file without a date column, said so (0.10.65): each complaint is dated the day it is imported.
+NO_DATE = {"date_column": "none"}
 
 # Business tables a trial workspace writes to, children first. Other tests count rows in some of these across the
 # whole test database, so trial workspaces created here must not leave business data behind.
@@ -201,7 +203,7 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
         assert db.query(Product).filter(Product.tenant_id == tenant_id).count() == 3
         # 28 sample complaints, the 9 of the rest of the story (hidden complaints, reporting clocks), the 5 routine
         # complaints (backend/app/trial/sample_dispositions.py) and the India report example (sample_reports.py).
-        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 43
+        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 44  # 0.10.64: the flagship RV-11
     finally:
         db.close()
 
@@ -212,11 +214,11 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
     assert deleted - ends == timedelta(days=30)
     # The workspace dashboard reads the trial's own data, not another tenant's.
     counts = user.get("/api/v1/analytics/command-center").json()["counts"]
-    assert counts["products"] == 3 and counts["complaints"] == 43
+    assert counts["products"] == 3 and counts["complaints"] == 44
     insights = user.get("/api/v1/trial/insights").json()
     assert insights["scope"] == "sample data" and insights["findings"]
     # One request carries the whole panel: headline numbers, the complaints to filter and the questions answered.
-    assert insights["headline"]["total"] == 43 and len(insights["records"]) == 43
+    assert insights["headline"]["total"] == 44 and len(insights["records"]) == 44
     assert insights["questions"] and all(item["answer"]["summary"] for item in insights["questions"])
 
 
@@ -234,7 +236,7 @@ def test_every_sample_complaint_is_on_a_lot_of_its_version_made_before_the_event
             .filter(Complaint.tenant_id == uuid.UUID(approval["tenant_id"]))
             .all()
         )
-        assert len(rows) == 43
+        assert len(rows) == 44
         wrong = [
             (complaint.complaint_identifier, lot.lot_identifier)
             for complaint, lot in rows
@@ -254,7 +256,7 @@ def test_a_trial_shows_the_mvp_and_counts_the_sample_data_it_explains(monkeypatc
     assert user.get("/api/v1/session/context").json()["feature_set"] == "mvp"
     sample = user.get("/api/v1/trial/status").json()["sample"]
     # 18 lots: OrbitCare's three lots without complaints for Lot impact (backend/app/trial/sample_lot_impact.py).
-    assert sample == {"products": 3, "lots": 18, "complaints": 43, "investigations": 1, "capas": 2, "risks": 3}
+    assert sample == {"products": 3, "lots": 18, "complaints": 44, "investigations": 1, "capas": 2, "risks": 3}
     assert authenticated_client().get("/api/v1/session/context").json()["feature_set"] == "full"
 
 
@@ -377,7 +379,7 @@ def test_the_owner_removes_the_sample_data_and_keeps_their_own_and_their_progres
         "Complaint Number,Product Code,Product Name,Complaint Description,Lot #,Status\n"
         "OWN-0001,OWN-PUMP,Own Pump,Display flickers at start-up,OWN-LOT-1,Open\n"
     )
-    assert user.post("/api/v1/trial/imports/complaints", content=export).status_code == 200
+    assert user.post("/api/v1/trial/imports/complaints", params=NO_DATE, content=export).status_code == 200
     flagged = {
         item["complaint_identifier"]: item for item in user.get("/api/v1/complaints/second-look").json()["items"]
     }
@@ -389,7 +391,7 @@ def test_the_owner_removes_the_sample_data_and_keeps_their_own_and_their_progres
 
     preview = user.get("/api/v1/trial/sample-data/removal").json()
     assert preview["is_owner"] and preview["has_sample"]
-    assert preview["sample"]["products"] == 3 and preview["sample"]["complaints"] == 43
+    assert preview["sample"]["products"] == 3 and preview["sample"]["complaints"] == 44
     assert preview["work_on_sample"] >= 2 and preview["own_records_affected"] == 0
     assert user.post("/api/v1/trial/sample-data/removal", json={}).status_code == 422
     removed = user.post("/api/v1/trial/sample-data/removal", json={"confirm": True})
@@ -458,7 +460,7 @@ def test_csv_import_checks_everything_before_saving():
     # A column the template does not know (here a person's name) is left out, said back and never stored; personal
     # data in the columns that are read is refused, and nothing is saved.
     extra = "complaint_id,product_id,description,patient_name\nC-1,PUMP-1,Alarm,Jane\n"
-    report = user.post("/api/v1/trial/imports/complaints/check", content=extra).json()
+    report = user.post("/api/v1/trial/imports/complaints/check", params=NO_DATE, content=extra).json()
     assert report["ready"] and report["ignored_columns"] == ["patient_name"]
     assert "Jane" not in str(report["preview"])
     personal = (
@@ -466,10 +468,10 @@ def test_csv_import_checks_everything_before_saving():
         "C-1,PUMP-1,Reported by Dr. Smith on 555-123-4567\n"
         "C-2,NOPE,Alarm sounded\n"
     )
-    report = user.post("/api/v1/trial/imports/complaints/check", content=personal).json()
+    report = user.post("/api/v1/trial/imports/complaints/check", params=NO_DATE, content=personal).json()
     messages = " ".join(issue["message"] for issue in report["issues"])
     assert not report["ready"] and "personal data" in messages
-    rejected = user.post("/api/v1/trial/imports/complaints", content=personal)
+    rejected = user.post("/api/v1/trial/imports/complaints", params=NO_DATE, content=personal)
     assert rejected.status_code == 422
 
     good = (
@@ -999,7 +1001,7 @@ def test_the_story_is_added_once_and_the_refresh_leaves_a_trial_with_it_alone():
         windows = db.query(ReportabilitySettings).filter(ReportabilitySettings.tenant_id == tenant_id).one()
         # The FDA and EU windows, and India's (enabled by the sample's report examples, sample_reports.py).
         assert windows.updated_by == STORY_WINDOWS_BY and len(windows.windows) == 4
-        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 43
+        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 44  # 0.10.64: the flagship RV-11
     finally:
         db.close()
 

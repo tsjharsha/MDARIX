@@ -57,8 +57,10 @@ SAMPLE_MARKED = {
 }
 # History that stays: what happened is never rewritten.
 KEPT = frozenset({"audit_events", "event_outbox", "erasure_log", "tenants"})
-# The records an organization uploads itself (backend/app/trial/imports.py UPLOAD_SOURCE).
+# The records an organization uploads itself (backend/app/trial/imports.py UPLOAD_SOURCE), and their lineage and
+# set-aside rows: what "Restart the sample story" removes with "also remove my practice work" (sample_clock.py).
 OWN_SOURCES = ("TRIAL_UPLOAD", "CSV_IMPORT")
+OWN_MARKED = {"import_lineage": ("source", OWN_SOURCES), "import_quarantine_rows": ("source", OWN_SOURCES)}
 # The sample's records, as people name them, for the preview.
 SAMPLE_LABELS = {
     "products": "products",
@@ -120,9 +122,11 @@ def _ids(db: Session, sql: str, params: dict) -> set[uuid.UUID]:
     return {row[0] for row in db.execute(text(sql), params)}
 
 
-def plan(db: Session, tenant_id: uuid.UUID) -> dict:
+def plan(db: Session, tenant_id: uuid.UUID, *, sources: tuple = (SAMPLE_SOURCE,), marked: dict | None = None) -> dict:
     """Every row the removal deletes, by table (``rows``), and the rows without an ``id`` column that go with them
-    (``links``: table -> [(column, parent table)]). Reads only."""
+    (``links``: table -> [(column, parent table)]): the records of ``sources`` (the sample by default; the
+    organization's own uploads for ``OWN_SOURCES``) and everything that depends on them. Reads only."""
+    marked = SAMPLE_MARKED if marked is None else marked
     tables = set(_tenant_tables(db))
     columns = _columns(db)
     doomed: dict[str, set[uuid.UUID]] = defaultdict(set)
@@ -130,15 +134,15 @@ def plan(db: Session, tenant_id: uuid.UUID) -> dict:
         if {"source_system", "id"} <= columns[table]:
             doomed[table] |= _ids(
                 db,
-                f"SELECT id FROM {table} WHERE tenant_id = :tenant AND source_system = :sample",
-                {"tenant": tenant_id, "sample": SAMPLE_SOURCE},
+                f"SELECT id FROM {table} WHERE tenant_id = :tenant AND source_system = ANY(:sample)",
+                {"tenant": tenant_id, "sample": list(sources)},
             )
-    for table, (column, marker) in SAMPLE_MARKED.items():
+    for table, (column, marker) in marked.items():
         if table in tables:
             doomed[table] |= _ids(
                 db,
-                f"SELECT id FROM {table} WHERE tenant_id = :tenant AND {column} = :sample",
-                {"tenant": tenant_id, "sample": marker},
+                f"SELECT id FROM {table} WHERE tenant_id = :tenant AND {column} = ANY(:sample)",
+                {"tenant": tenant_id, "sample": list(marker) if isinstance(marker, tuple) else [marker]},
             )
     keys = [(child, column, parent) for child, column, parent in _foreign_keys(db) if child in tables]
     generic = [(table, column) for table, column in GENERIC_REFERENCES if table in tables and column in columns[table]]
@@ -222,11 +226,13 @@ def preview(db: Session, tenant_id: uuid.UUID) -> dict:
     return {"sample": sample, "work_on_sample": work, "own_records_affected": own, "has_sample": bool(sample)}
 
 
-def remove(db: Session, tenant_id: uuid.UUID, remembered: list[str]) -> dict:
+def remove(
+    db: Session, tenant_id: uuid.UUID, remembered: list[str], *, sources: tuple = (SAMPLE_SOURCE,), marked=None
+) -> dict:
     """Delete everything ``plan`` lists, child tables first; raises RuntimeError (after a rollback: nothing deleted)
     when rows would remain. Does not commit: the caller commits it with its audit record and the chapters it
     remembers (``remembered``, returned as given)."""
-    planned = plan(db, tenant_id)
+    planned = plan(db, tenant_id, sources=sources, marked=marked)
     remaining = dict(planned["rows"])
     link_tables = dict(planned["links"])
     deleted: dict[str, int] = {}

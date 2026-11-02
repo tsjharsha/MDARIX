@@ -398,6 +398,8 @@ def serialize_tasks(db: Session, control_db: Session, actor: Actor, rows: list[W
                     "label": f"{kind} {business_id}" if business_id else kind,
                 },
                 "investigation": cases.get(str(task.investigation_id)) if task.investigation_id else None,
+                # Only the complaint a task is about leaves the server (the screen it opens); other details stay.
+                "details": {"complaint_id": (task.details or {}).get("complaint_id")},
                 "assigned_role": task.assigned_role,
                 "assigned_role_label": role_label(task.assigned_role),
                 "assigned_user": (

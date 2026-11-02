@@ -51,6 +51,7 @@ import {
   type StepDestination,
 } from "../caseWorkflow";
 import { priorityRank } from "../tasks";
+import { capaQmsText } from "../effectiveness";
 
 const TABS = [
   "All investigations",
@@ -598,6 +599,12 @@ function Capas() {
             fields: ["investigation_business_id", "source_reference"],
             render: (row) =>
               referenceId(row, "investigation", caseName.get(String(row.investigation_id)), row.source_reference),
+          },
+          {
+            key: "qms",
+            label: "In your QMS",
+            fields: ["qms_reference"],
+            render: (row) => capaQmsText(row) ?? "From your QMS",
           },
           { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
           {

@@ -78,8 +78,8 @@ const QUESTION_LIST = [
       points: [
         "A detection rule opens a signal when enough complaints about the same problem arrive within a set number of days: 3 within 30 days unless you change it.",
         "The trend check compares each product version's last 30 days with its own history (up to 180 days, never before the version's release), grouped by version, by problem code or by complaint type.",
-        "Each row says Significant rise (a chance under 1% if nothing had changed), Higher than usual (under 5%), In line with history, or that there are too few complaints or too little history to assess.",
-        "When every lot has a quantity, the expected number follows the units in the field; without quantities the check counts by calendar days and says so. A version too young for its own history is compared with the version it replaced.",
+        "Each row says Significant rise (a chance under 1% if nothing had changed, allowing for the number of groups checked at once), Higher than usual (under 5%), In line with history, or that there are too few complaints or too little history to assess.",
+        "When every lot has a quantity, the expected number follows the units in the field; without quantities, and for single-use or consumable products, the check counts by calendar days and says so. A new version is compared with the version it replaced as well as with its own history, and the stronger comparison is shown. An event linked from several records counts once.",
         "The trend check is a check, never a verdict: it raises no signal on its own. A person raises a signal from a rising row and triages it.",
       ],
     },

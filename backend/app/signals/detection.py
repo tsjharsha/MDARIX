@@ -4,7 +4,9 @@ Complaints of the rule's window (event time, else received, else recorded, withi
 by product, version and problem (backend/app/signals/logic.py). For each group, complaints not yet linked to a signal
 about the same group are new: they are added to the group's open signal (a MONITOR signal goes back to TRIAGE with a
 new triage task), or, without an open signal, ``min_complaints`` new ones raise a signal with a triage task in the
-triage leads' queue. Monitored signals whose review date has come go back to TRIAGE too.
+triage leads' queue. Monitored signals whose review date has come go back to TRIAGE too. Complaints a person linked
+as one event count once, at the earliest record's date (every record is still linked as evidence); a complaint dated
+in the future is not counted until its day (0.10.63, S2 and S5).
 
 It is idempotent (a second run on the same data changes nothing) and serialized per organization by a transaction
 advisory lock, so the scheduler, an import and the API can run it at the same time. One transaction per organization:
@@ -158,16 +160,22 @@ def detect(
 def _threshold(db: Session, tenant, settings: dict, result: dict, *, apply, actor, actor_role, now, correlation_id):
     minimum, window = settings["min_complaints"], settings["window_days"]
     start = now - timedelta(days=window)
+    # A complaint dated in the future is not counted until its day comes (S5).
     facts = service.complaint_facts(
         service.complaint_facts_query(db, tenant).filter(
-            Complaint.product_id.isnot(None), service.COMPLAINT_EVENT_AT >= start
+            Complaint.product_id.isnot(None),
+            service.COMPLAINT_EVENT_AT >= start,
+            service.COMPLAINT_EVENT_AT <= now,
         )
     )
     if not facts:
         return
+    events = service.linked_events(db, tenant)
     plans = [
         plan
-        for plan in logic.plan_detection(facts, _linked_keys(db, tenant, start), _open_signals(db, tenant), minimum)
+        for plan in logic.plan_detection(
+            facts, _linked_keys(db, tenant, start), _open_signals(db, tenant), minimum, events
+        )
         if plan.action
     ]
     if not plans:
@@ -217,7 +225,11 @@ def _threshold(db: Session, tenant, settings: dict, result: dict, *, apply, acto
             continue
         product_id, version_id, key = plan.key
         title = logic.rule_title(
-            len(plan.new), key, products.get(str(product_id)), versions.get(str(version_id)), window
+            logic.new_events(plan.new, events),
+            key,
+            products.get(str(product_id)),
+            versions.get(str(version_id)),
+            window,
         )
         if not apply:
             result["created"].append(title)

@@ -114,6 +114,7 @@ def capa_log(db: Session, tenant_id: uuid.UUID, *, control_db=None, today: date,
     trial, MDARIX's effectiveness check; T-G35.2)."""
     from backend.app.capa_effectiveness import rules as check_rules
     from backend.app.capa_effectiveness.service import current_checks
+    from backend.app.decision_followups.rules import capa_qms_words
 
     capas = (
         db.query(Capa, Investigation.business_id, Investigation.investigation_identifier)
@@ -171,7 +172,9 @@ def capa_log(db: Session, tenant_id: uuid.UUID, *, control_db=None, today: date,
             sources.append(src("Case", capa.investigation_id, case_ref or case_identifier, capa.investigation_id))
         rows.append(
             row(
-                f"{capa.capa_identifier}: {capa.title}. From {'; '.join(came_from) or 'no source recorded'}. "
+                f"{capa.capa_identifier}: {capa.title}"
+                + (f" ({qms})" if (qms := capa_qms_words(capa)) else "")
+                + f". From {'; '.join(came_from) or 'no source recorded'}. "
                 f"Status {label(capa.status)}; due {day(capa.due_at) or 'not recorded'}; effectiveness: {effectiveness}.",
                 sources,
             )

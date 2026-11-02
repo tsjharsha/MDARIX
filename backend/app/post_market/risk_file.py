@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import uuid
 from collections import Counter, defaultdict
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from sqlalchemy import func
@@ -90,7 +90,10 @@ def state_of(*, matters: bool, reviewed: bool, overdue: int, open_count: int, ri
 
 def _facts(db: Session, tenant_id: uuid.UUID, start: date, today: date) -> dict:
     """Everything per product for the period: post-market data, risks, completed risk reviews, open follow-ups."""
+    from backend.app.oversight.service import calendar_of
     from backend.app.signals.insight import trend_board
+
+    day_end = calendar_of(db, tenant_id).day_end  # MDARIX's own due times end with the organization's day (J16)
 
     begin, end = _midnight(start), _midnight(today + timedelta(days=1))
     received = func.coalesce(Complaint.complaint_timestamp, Complaint.event_timestamp, Complaint.created_at)
@@ -158,7 +161,7 @@ def _facts(db: Session, tenant_id: uuid.UUID, start: date, today: date) -> dict:
         for key, finding in ((review.assessed or {}).get("findings") or {}).items():
             update = finding.get("risk_file_update")
             if update:
-                due = datetime.combine(date.fromisoformat(update["due_on"]), time.max, tzinfo=timezone.utc)
+                due = day_end(date.fromisoformat(update["due_on"]))
                 title = f"Risk file update: {finding.get('description') or finding.get('reason')}"
                 facts[product_id]["follow_ups"].append(
                     (

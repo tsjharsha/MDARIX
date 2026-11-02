@@ -44,7 +44,9 @@ CHAPTERS = (
         "Each market you report to asks its own seriousness and causation questions, with the regulation's clause "
         "beside each: death, each serious-injury criterion, caused or contributed, and a malfunction judged as if it "
         "recurred. The harm-severity scale shows each market's threshold, an Unknown keeps the market pending, and "
-        "you sign each market's conclusion after a short practice training on the questions.",
+        "you sign each market's conclusion after a short practice training on the questions. Try it on SAMPLE-RV-11: a "
+        "monitor reading SpO2 too high, nobody harmed, sent for service. Is it reportable, and by when, in the US and "
+        "India?",
         "Reports filed months late, or never evaluated, are a repeat finding in FDA inspections; seriousness judged "
         "without stated criteria is hard to defend.",
         {"section": "Complaints", "tab": "Reportability"},
@@ -395,7 +397,10 @@ def story(
     the workspace's "Chapter done" notice reads every half minute, at a fraction of the cost (0.10.43)."""
     from backend.app.readiness_home.service import readiness
 
-    today = today or datetime.now(timezone.utc).date()
+    if today is None:
+        from backend.app.readiness_home.service import organization_today
+
+        today = organization_today(db, tenant_id)
     checks = {}
     if with_findings:
         try:

@@ -10,8 +10,11 @@ function render(isTrial: boolean) {
   return renderToStaticMarkup(
     <WorkspaceContext.Provider value={api}>
       <ImportPanel
-        templates={[{ entity: "complaints", title: "Complaints", required: [], optional: [] } as never]}
-        basePath="/api/v1/trial/imports"
+        setup={{
+          row_limit: 5000,
+          file_limit_bytes: 2 * 1024 * 1024,
+          templates: [{ entity: "complaints", title: "Complaints", required: [], optional: [] } as never],
+        }}
         onImported={vi.fn()}
       />
     </WorkspaceContext.Provider>,

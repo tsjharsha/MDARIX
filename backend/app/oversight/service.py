@@ -8,7 +8,9 @@
   not started; the reportability decision tasks;
 - **Report obligations:** each obligation not yet met, with the deadline it was given;
 - **Communications:** each open request's reply due date (its owner's task);
-- **Guide approvals:** a guide version waiting for its second person, due at the end of the next working day;
+- **Approvals:** a report snapshot or guide version waiting for its second person: the approver's task (workflow/
+  approvals.py), due at the end of the next working day (a report's sooner deadline first); a guide version asked
+  before 0.10.64, without a task, from the version itself;
 - **CAPA:** the effectiveness check tasks, and the CAPAs imported from the QMS with a due date (on the view only:
   the QMS owns them, so they raise no alert);
 - every other open My Work task with a due date.
@@ -73,7 +75,7 @@ def settings_view(row: OversightSettings | None) -> dict:
             "updated_at": None,
         }
     return {
-        "time_zone": row.time_zone,
+        "time_zone": rules.canonical_zone(row.time_zone),
         "work_days": list(row.work_days or []),
         "holidays": list(row.holidays or []),
         "reminder_hours": row.reminder_hours,
@@ -186,11 +188,12 @@ def _item(
     }
 
 
-def _day_end_utc(day: date) -> datetime:
-    """The end of a legal deadline's day, as the report worksheets count it (authority_reports/rules.py)."""
-    from backend.app.authority_reports.rules import deadline_end
+def _legal_end(day: date, market: str | None, zone: str) -> datetime:
+    """The end of a legal deadline's day by its market's counting rule (reportability/deadlines.py), as every other
+    screen shows it."""
+    from backend.app.reportability.deadlines import end_of
 
-    return deadline_end(day)
+    return end_of(day, market, zone).at
 
 
 def _task_items(db: Session, tenant_id) -> list[dict]:
@@ -213,13 +216,14 @@ def _task_items(db: Session, tenant_id) -> list[dict]:
         complaint_id = details.get("complaint_id") or (
             task.source_entity_id if task.source_entity_type == "Complaint" else None
         )
-        opens = {"section": "My Work"}
+        # An approval task (workflow/approvals.py) names its own category and the screen it opens.
+        opens = details.get("opens") or {"section": "My Work"}
         if task.task_type == REPLY_TASK and complaint_id:
             opens = {"section": "Complaints", "tab": f"Communications?complaint={complaint_id}"}
         found.append(
             _item(
                 f"task:{task.id}",
-                TASK_CATEGORIES.get(task.task_type, "TASK"),
+                details.get("category") or TASK_CATEGORIES.get(task.task_type, "TASK"),
                 task.title,
                 task.due_at,
                 ref=details.get("complaint_business_id") or details.get("reference") or task.business_id,
@@ -259,14 +263,14 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
             )
         )
         # An urgent intake is not a complaint yet: its provisional deadline is on no other list.
-        if item["kind"] == intake.INTAKE and item["deadlines"]:
+        if item["kind"] == intake.INTAKE and item["deadlines"] and item["deadlines"][0]["due_at"]:
             first = item["deadlines"][0]
             found.append(
                 _item(
                     f"provisional:{item['key']}:{first['market']}",
                     "REPORTING",
                     f"Provisional {first['label']} deadline for {item['ref']} ({first['basis']})",
-                    _day_end_utc(date.fromisoformat(first["due_date"])),
+                    datetime.fromisoformat(first["due_at"]),
                     market=first["market"],
                     **common,
                 )
@@ -274,7 +278,7 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
     return found
 
 
-def _report_items(db: Session, tenant_id) -> list[dict]:
+def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
     from backend.app.authority_reports import forms
     from backend.app.authority_reports import rules as report_rules
     from backend.app.authority_reports.router import _candidates
@@ -293,7 +297,7 @@ def _report_items(db: Session, tenant_id) -> list[dict]:
                 f"obligation:{row.id}",
                 "OBLIGATION",
                 f"{form.title if form else 'Report'}: {report_rules.STATE_LABELS.get(row.state, row.state).lower()}",
-                _day_end_utc(row.due_on),
+                _legal_end(row.due_on, row.market, zone),
                 complaint_id=row.complaint_id,
                 owner_id=row.created_by,
                 market=row.market,
@@ -312,7 +316,7 @@ def _report_items(db: Session, tenant_id) -> list[dict]:
                 f"{label}: market assessment not signed, provisional deadline"
                 if pending
                 else f"{label}: reportable, the report is not started",
-                _day_end_utc(row.due_on),
+                _legal_end(row.due_on, row.market, zone),
                 complaint_id=row.complaint_id,
                 owner_id=row.signed_by or row.created_by,
                 market=row.market,
@@ -326,8 +330,19 @@ def _report_items(db: Session, tenant_id) -> list[dict]:
 
 
 def _guide_items(db: Session, tenant_id, calendar: rules.Calendar) -> list[dict]:
+    """A guide version waiting for approval with no approver's task (one asked before 0.10.64): the task stands for
+    it otherwise, so it shows once."""
     from backend.app.db.models.guides_communications import DecisionGuideVersion
+    from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
 
+    asked = {
+        row.source_entity_id
+        for row in db.query(WorkflowTask.source_entity_id).filter(
+            WorkflowTask.tenant_id == tenant_id,
+            WorkflowTask.source_entity_type == "DecisionGuideVersion",
+            WorkflowTask.status.in_(list(OPEN_TASK_STATUSES)),
+        )
+    }
     return [
         _item(
             f"guide:{row.id}",
@@ -341,18 +356,20 @@ def _guide_items(db: Session, tenant_id, calendar: rules.Calendar) -> list[dict]
         for row in db.query(DecisionGuideVersion).filter(
             DecisionGuideVersion.tenant_id == tenant_id, DecisionGuideVersion.state == "AWAITING_APPROVAL"
         )
+        if row.id not in asked
     ]
 
 
 def _capa_items(db: Session, tenant_id) -> list[dict]:
     from backend.app.db.models.foundation import Capa, Product
+    from backend.app.decision_followups.rules import capa_qms_words
 
     names = {row.id: row.name for row in db.query(Product.id, Product.name).filter(Product.tenant_id == tenant_id)}
     return [
         _item(
             f"capa:{row.id}",
             "CAPA",
-            f"CAPA {row.business_id or row.capa_identifier}: {row.title} (in your QMS)",
+            f"CAPA {row.business_id or row.capa_identifier}: {row.title} ({capa_qms_words(row) or 'in your QMS'})",
             row.due_at,
             ref=row.business_id or row.capa_identifier,
             queue="Your QMS",
@@ -397,7 +414,7 @@ def due_items(db: Session, control_db: Session | None, tenant_id, now: datetime 
     sources = (
         ("tasks", lambda: _task_items(db, tenant_id)),
         ("triage", lambda: _triage_items(db, control_db, tenant_id, now)),
-        ("reports", lambda: _report_items(db, tenant_id)),
+        ("reports", lambda: _report_items(db, tenant_id, calendar.zone)),
         ("guides", lambda: _guide_items(db, tenant_id, calendar)),
         ("capas", lambda: _capa_items(db, tenant_id)),
     )
@@ -411,6 +428,16 @@ def due_items(db: Session, control_db: Session | None, tenant_id, now: datetime 
     for item in items:
         if item["due_at"].tzinfo is None:
             item["due_at"] = item["due_at"].replace(tzinfo=timezone.utc)
+    # A reporting reminder task stands for a complaint's reporting clock, which a report or market item already shows:
+    # one line per complaint (J31; RV-07, RV-08 and RV-10 showed twice).
+    reported = {item["complaint_id"] for item in items if item["key"].startswith(("obligation:", "assessment:"))}
+    items = [
+        item
+        for item in items
+        if not (
+            item["key"].startswith("task:") and item["category"] == "REPORTING" and item["complaint_id"] in reported
+        )
+    ]
     _with_complaints(db, tenant_id, items)
     items.sort(key=lambda item: (item["due_at"], item["key"]))
     return items
@@ -426,6 +453,24 @@ def escalation_people(everyone: list[dict], role: str) -> list[str]:
     return [person["id"] for person in everyone if wanted in person["roles"]]
 
 
+def _trial_owner(control_db: Session | None, tenant_id) -> str | None:
+    """The id of the person who started the trial, or None (not a trial, or no control plane at hand)."""
+    if control_db is None:
+        return None
+    from backend.app.db.models.foundation import AuthUser
+    from backend.app.trial.team import trial_request
+
+    request = trial_request(control_db, tenant_id)
+    if request is None:
+        return None
+    found = (
+        control_db.query(AuthUser.id)
+        .filter(AuthUser.tenant_id == tenant_id, AuthUser.username == request.email.strip().lower())
+        .scalar()
+    )
+    return str(found) if found else None
+
+
 def sweep(db: Session, control_db: Session | None, tenant_id, now: datetime | None = None) -> dict:
     """Raise and resolve the organization's alerts (see the module docstring). Flushes; the caller commits."""
     from backend.app.enterprise_audit import make_audit_event
@@ -438,13 +483,20 @@ def sweep(db: Session, control_db: Session | None, tenant_id, now: datetime | No
     everyone = people(control_db, tenant_id)
     active = {person["id"] for person in everyone}
     escalating = escalation_people(everyone, view["escalation_role"])
+    # The sample story's escalations go to the person who started the trial, not to every Leader: an invited colleague
+    # does not inherit them (J2).
+    owner = _trial_owner(control_db, tenant_id)
     away = absences(db, tenant_id, today)
     wanted: dict[tuple, tuple[dict, str]] = {}
     for item in due_items(db, control_db, tenant_id, now):
         if not item["alerts"]:
             continue
         state = rules.state_of(item["due_at"], now, view["reminder_hours"])
-        for tier, person, reason in rules.recipients(item, state, active, away, escalating, today):
+        # shortcut: the sample's records are known by their SAMPLE- references; a source_system per item if that changes.
+        sample = owner is not None and (item["ref"] or "").startswith("SAMPLE-")
+        for tier, person, reason in rules.recipients(
+            item, state, active, away, [owner] if sample else escalating, today
+        ):
             wanted[(item["key"], tier, person)] = (item, reason)
     existing = {
         (alert.item_key, alert.tier, alert.recipient_id): alert

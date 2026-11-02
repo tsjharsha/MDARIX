@@ -8,8 +8,10 @@ The signing step creates them (backend/app/human_decision); this module lets peo
   and the person accepts its task (or takes it from the queue);
 - ``POST /api/v1/follow-ups/{id}/complete`` (the same people) with a note: DONE, its FOLLOW_UP task completes;
 - ``POST /api/v1/follow-ups/{id}/cancel`` (``investigation.assign``) with a reason: CANCELLED, its task is cancelled;
-- ``POST /api/v1/follow-ups/{id}/capa`` (``investigation.work``; CAPA_REQUIRED follow-ups, once): opens a CAPA
-  record (``capas``) for the case and links it.
+- ``POST /api/v1/follow-ups/{id}/capa`` (``investigation.work``; CAPA_REQUIRED follow-ups, once): records the CAPA to
+  raise in the QMS (``capas``, with its QMS reference when known) for the case and links it;
+- ``POST /api/v1/follow-ups/{id}/capa/qms-reference`` (``investigation.work``): the number the QMS gave that CAPA
+  (J22), set, changed or cleared.
 
 Completing the FOLLOW_UP task through My Work completes the follow-up too (``on_follow_up_task_completed``). Reading
 needs a signed-in session; everything is limited to the signed-in organization (another organization's follow-up is
@@ -101,7 +103,7 @@ def serialize(db: Session, control_db: Session | None, person: Person, rows: lis
 
     decisions = lookup(Decision, (Decision.business_id, Decision.outcome), (row.decision_id for row in rows))
     cases = lookup(Investigation, (Investigation.business_id,), (row.investigation_id for row in rows))
-    capas = lookup(Capa, (Capa.business_id, Capa.capa_identifier), (row.capa_id for row in rows))
+    capas = lookup(Capa, (Capa.business_id, Capa.capa_identifier, Capa.qms_reference), (row.capa_id for row in rows))
     people = common.names(
         control_db, tenant_id, [ref for row in rows for ref in (row.assignee_user_id, row.completed_by)]
     )
@@ -139,6 +141,7 @@ def serialize(db: Session, control_db: Session | None, person: Person, rows: lis
                         "id": str(row.capa_id),
                         "business_id": capa[1] if capa else None,
                         "capa_identifier": capa[2] if capa else None,
+                        "qms_reference": capa[3] if capa else None,
                     }
                     if row.capa_id
                     else None
@@ -477,6 +480,7 @@ def create_follow_up_capa(
         status=rules.CAPA_STATUS,
         opened_at=now,
         due_at=payload.due_at,
+        qms_reference=payload.qms_reference,
         source_timestamp=now,
         effective_timestamp=now,
         recorded_timestamp=now,
@@ -504,6 +508,55 @@ def create_follow_up_capa(
             capa_identifier=identifier,
             title=payload.title,
             due_at=common.iso(payload.due_at),
+            qms_reference=payload.qms_reference,
+        ),
+        now=now,
+    )
+    db.commit()
+    return _one(db, control_db, person, row)
+
+
+@router.post(
+    BASE + "/{follow_up_id}/capa/qms-reference",
+    dependencies=[Depends(require_permission(INVESTIGATION_WORK))],
+)
+def set_capa_qms_reference(
+    follow_up_id: uuid.UUID,
+    payload: rules.QmsReferencePayload,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The number the QMS gave the CAPA this follow-up recorded (J22): set, changed, or cleared with a blank. The
+    CAPA itself is raised and run in the QMS; MDARIX keeps its reference beside the decision."""
+    tenant_id = common.tenant_of(ctx)
+    person = current_person(control_db, ctx)
+    row = load(db, tenant_id, follow_up_id, lock=True)
+    capa = (
+        db.query(Capa).filter(Capa.tenant_id == tenant_id, Capa.id == row.capa_id).with_for_update().first()
+        if row.capa_id
+        else None
+    )
+    if capa is None:
+        raise common.error(409, "FOLLOW_UP_HAS_NO_CAPA", "Record the CAPA to raise in your QMS first")
+    before = capa.qms_reference
+    if before == payload.qms_reference:
+        return _one(db, control_db, person, row)
+    now = rules.now_utc()
+    capa.qms_reference = payload.qms_reference
+    capa.updated_at = now
+    common.audit(
+        db,
+        tenant_id=tenant_id,
+        actor_ref=person.user_id,
+        action="FOLLOW_UP_CAPA_QMS_REFERENCE_SET",
+        entity_type=rules.FOLLOW_UP_ENTITY,
+        entity_id=row.id,
+        correlation_id=ctx.correlation_id,
+        old_values={"qms_reference": before},
+        new_values={"qms_reference": payload.qms_reference},
+        details=_details(
+            row, person.role_for(INVESTIGATION_WORK), capa_id=str(capa.id), capa_identifier=capa.capa_identifier
         ),
         now=now,
     )

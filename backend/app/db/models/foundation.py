@@ -4,6 +4,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -149,6 +150,11 @@ class Product(TenantOwned, Base):
     udi_di: Mapped[str | None] = mapped_column(String(80))
     gmdn_code: Mapped[str | None] = mapped_column(String(10))
     gmdn_term: Mapped[str | None] = mapped_column(String(300))
+    # tr09: IMPLANT, SINGLE_USE, REUSABLE, SOFTWARE, IVD or KIT (backend/app/product_facts.py); null when not known.
+    device_category: Mapped[str | None] = mapped_column(String(40))
+    # tr09: a single-use product, and the days a unit stays in use after its lot's release (signals/trend_rules.py).
+    single_use: Mapped[bool | None] = mapped_column(Boolean)
+    use_period_days: Mapped[int | None] = mapped_column(Integer)
     __table_args__ = (
         UniqueConstraint("tenant_id", "product_identifier", name="uq_products_tenant_product_identifier"),
         UniqueConstraint("tenant_id", "id", name="uq_products_tenant_id_id"),
@@ -222,6 +228,8 @@ class LotBatch(TenantOwned, Base):
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="active")
     # md43: devices the lot released (the trend check's denominator, signals/trend_rules.py); null when not known.
     quantity: Mapped[int | None] = mapped_column(Integer)
+    # tr09: the lot's expiry (use-by) date, when it has one.
+    expiry_date = mapped_column(Date)
     __table_args__ = (
         ForeignKeyConstraint(
             ["tenant_id", "product_version_id"], ["product_versions.tenant_id", "product_versions.id"]
@@ -291,6 +299,8 @@ class Complaint(TenantOwned, Base):
     serious_injury: Mapped[bool | None] = mapped_column(Boolean)
     death: Mapped[bool | None] = mapped_column(Boolean)
     malfunction: Mapped[bool | None] = mapped_column(Boolean)
+    # tr09: the lot identifiers beyond lot_batch_id's of a complaint that names several (a kit's lots), in file order.
+    other_lots = mapped_column(JSONB)
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
         ForeignKeyConstraint(
@@ -346,6 +356,8 @@ class Capa(TenantOwned, Base):
     opened_at = tz()
     due_at = tz()
     effectiveness_check_at = tz()
+    # tr09: the number the customer's QMS gave a CAPA MDARIX recorded for raising there (J22); null until known.
+    qms_reference: Mapped[str | None] = mapped_column(String(120))
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),

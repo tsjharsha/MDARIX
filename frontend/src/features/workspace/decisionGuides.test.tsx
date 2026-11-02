@@ -51,6 +51,8 @@ const q = (id: string, extra = false): QuestionForm => ({
   clause: extra ? "" : "21 CFR 803.3",
   basis: extra ? [] : ["CFR803_3"],
   extra,
+  explanation: "",
+  examples: "",
 });
 
 const summary = { approved_by: null, published_at: null, sample: true };
@@ -107,6 +109,14 @@ const version = (patch: Partial<GuideVersion> = {}): GuideVersion =>
         expected: "NOT_REPORTABLE",
         expected_report_type: null,
       },
+      {
+        id: "T2",
+        name: "A death the device caused",
+        answers: { US1: "YES", US3: "YES" },
+        expected: "REPORTABLE",
+        expected_report_type: "US_30_DAY",
+        starter: true,
+      },
     ],
     test_results: {
       results: [
@@ -162,6 +172,12 @@ describe("decision guide rules", () => {
     expect(answersText({ answers: {} }, {})).toBe("none (all Unknown)");
     expect(questionMark({ starter: false, extra: true })).toMatch("does not change the conclusion");
     expect(saveBody([q("US1")], []).questions[0]).not.toHaveProperty("extra");
+  });
+
+  it("sends only the organization's own text for a core question: its wording is locked (0.10.64)", () => {
+    const body = saveBody([{ ...q("US1"), explanation: "Our SOP-1", examples: "A fall" }, q("X1", true)], []);
+    expect(body.questions[0]).toEqual({ id: "US1", explanation: "Our SOP-1", examples: "A fall" });
+    expect(body.questions[1]).toMatchObject({ id: "X1", text: "Question X1", clause: "" });
   });
 });
 
@@ -239,6 +255,29 @@ describe("the decision guide screens", () => {
     expect(html).toContain("the guide points to Pending information");
     expect(html).toContain("Question X1 has no regulation clause");
     expect(html).toContain("PDF for an audit");
+    // The core question's wording is shown, locked; only the explanation and examples are fields.
+    expect(html).toContain("The regulation&#x27;s wording: locked");
+    expect(html).toContain("Your explanation");
+    expect(html.match(/>\s*Definition\s*</g) ?? []).toHaveLength(1); // the extra question's only
+    expect(html).toContain("Test matrix: 2 worked complaints");
+    expect(html).toContain("MDARIX starter");
+    expect(html).toContain("To remove one of your worked complaints");
+  });
+
+  it("shows the matrix run again to the approver, and a changed answer blocks the approval", () => {
+    const waiting = { version: 5, state: "AWAITING_APPROVAL" as const, state_label: "Waiting", problems: [] };
+    resources.data["/api/v1/decision-guides/US/versions/5"] = version({ ...waiting, matrix_changed: [] });
+    expect(render(<GuideDrawer market="US" version={5} onClose={vi.fn()} />)).toContain(
+      "All 2 worked complaints still give the expected answer.",
+    );
+    resources.data["/api/v1/decision-guides/US/versions/5"] = version({
+      ...waiting,
+      matrix_changed: ["A death the device caused"],
+    });
+    const html = render(<GuideDrawer market="US" version={5} onClose={vi.fn()} />);
+    expect(html).toContain("1 of 2 worked complaints give a different answer now");
+    expect(html).toContain("A death the device caused");
+    expect(html).toMatch(/<button type="submit" class="ac-primary" disabled="">Approve and publish/);
   });
 
   it("names who may not approve, and shows a published version read-only with its approval", () => {
@@ -248,11 +287,20 @@ describe("the decision guide screens", () => {
       state_label: "Waiting for approval",
       problems: [],
       you_edited: true,
+      you_asked: true,
       requested_by: "Asha",
+      approval: {
+        may_approve: false,
+        same_person: false,
+        approvers: ["Rahul"],
+        message: "You edited this version. A colleague with regulatory approval rights approves this: Rahul.",
+      },
     });
-    expect(render(<GuideDrawer market="US" version={4} onClose={vi.fn()} />)).toContain(
-      "You edited it: a colleague approves it.",
-    );
+    // Who approves is said in place of the form, before any password (J13); its author may withdraw it.
+    const waiting = render(<GuideDrawer market="US" version={4} onClose={vi.fn()} />);
+    expect(waiting).toContain("A colleague with regulatory approval rights approves this: Rahul.");
+    expect(waiting).not.toContain("Your password");
+    expect(waiting).toContain("Withdraw it: back to draft");
     resources.data["/api/v1/decision-guides/US/versions/2"] = version({
       version: 2,
       code: "US-v2",

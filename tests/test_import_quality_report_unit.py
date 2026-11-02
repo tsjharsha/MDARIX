@@ -38,7 +38,8 @@ def test_products_have_no_changed_count():
 
 def test_a_row_with_extra_values_is_kept_with_its_problem_and_counted():
     raw = (
-        "complaint_id,product_id,description\nC-1,P-1,Alarm sounded\nC-2,P-1,Pump stopped, patient hurt\n\n"
+        "complaint_id,product_id,received_date,description\nC-1,P-1,2026-10-01,Alarm sounded\n"
+        "C-2,P-1,2026-10-01,Pump stopped, patient hurt\n\n"
     ).encode()
     report = imports._Report()
     rows = imports._parse("complaints", raw, report, imports.WORKSPACE_POLICY, "ISO")

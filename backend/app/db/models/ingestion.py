@@ -162,9 +162,11 @@ class ImportQuarantineRow(Base):
     created_at = tz(False)
     resolved_at = tz()
     resolved_by: Mapped[str | None] = mapped_column(String(120))
+    # Why a person dismissed it, masked (tr10, stage 4), or that a later import's row replaced it.
+    resolution_note: Mapped[str | None] = mapped_column(String(500))
 
     __table_args__ = (
-        CheckConstraint("status in ('OPEN','REPROCESSED')", name="import_quarantine_status_allowed"),
+        CheckConstraint("status in ('OPEN','REPROCESSED','DISMISSED')", name="import_quarantine_status_allowed"),
         Index("ix_import_quarantine_tenant_status", "tenant_id", "status"),
         Index("ix_import_quarantine_import", "import_ref"),
     )
