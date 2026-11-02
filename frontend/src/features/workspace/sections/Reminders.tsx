@@ -2,7 +2,7 @@ import { useState } from "react";
 import { BellRing, CalendarOff, ChevronRight } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { useNavigation, useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { placeOf } from "../../../app/linkTable";
 import {
   ALERTS,
@@ -34,6 +34,8 @@ function useOpen() {
  */
 export function RemindersPanel() {
   const data = useResource<AlertList>(ALERTS);
+  const { open } = useWorkspace();
+  const fresh = useNavigation() === "new";
   const go = useOpen();
   const [error, setError] = useState("");
   const list = data.data;
@@ -103,8 +105,27 @@ export function RemindersPanel() {
           ))}
         </ul>
       )}
-      {list && <AwayControl list={list} onChanged={data.reload} />}
+      {/* On the new navigation "I will be away" lives in Account, with its link here (7.2). */}
+      {list && !fresh && <AwayControl list={list} onChanged={data.reload} />}
+      {fresh && (
+        <p className="uw-rm-away-link">
+          <button type="button" className="ac-link" onClick={() => open("My Account", "Away")}>
+            I will be away
+          </button>{" "}
+          <span className="ac-muted">(in Account)</span>
+        </p>
+      )}
       <InlineError text={error} />
+    </Panel>
+  );
+}
+
+/** Account › Away on the new navigation: the person's own absence and the colleague who covers it. */
+export function AwayPanel() {
+  const data = useResource<AlertList>(ALERTS);
+  return (
+    <Panel eyebrow="Account" title="When you will be away" source={data}>
+      {data.data && <AwayControl list={data.data} onChanged={data.reload} />}
     </Panel>
   );
 }

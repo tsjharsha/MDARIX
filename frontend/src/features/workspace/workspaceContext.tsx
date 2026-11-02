@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { InvestigationSummary, Product, Product360, TemporalMode } from "../../app/types";
 import { featureSetOf, type FeatureSet } from "../../app/featureSet";
 import { tabParam, withTabParam } from "./workspaceAddress";
-import { tabParts } from "../../app/linkTable";
+import { tabParts, type Navigation } from "../../app/linkTable";
 import { requestJson } from "../../app/apiClient";
 import type { ResolvedCase } from "./savedContext";
 
@@ -32,7 +32,16 @@ export const WORKSPACE_SECTIONS = [
   "Look ahead",
   // From trial to pilot: shown only in free-trial workspaces, to everyone in one (sections/TrialNextSteps.tsx).
   "Next steps",
+  // The new navigation's own screens (0.10.68, tenants.navigation = new): the trends, the settings, the team and one
+  // complaint's page. An organization on the classic navigation never shows them (linkTable.json classicHomes).
+  "Trends",
+  "Settings",
+  "Team",
+  "Complaint",
 ] as const;
+
+/** Sections only the new navigation shows. */
+export const NEW_ONLY_SECTIONS: readonly string[] = ["Trends", "Settings", "Team", "Complaint"];
 
 /** Sections that exist only in a free-trial workspace. */
 export const TRIAL_ONLY_SECTIONS: readonly string[] = ["Getting started", "Look ahead", "Next steps"];
@@ -59,6 +68,11 @@ export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   "Share feedback": [],
   "Look ahead": [],
   "Next steps": [],
+  Trends: ["products"],
+  // Everyone reads the settings; each one says who may change it (sections/Settings.tsx).
+  Settings: [],
+  Team: [],
+  Complaint: ["products"],
 };
 
 export type SessionContext = {
@@ -85,6 +99,8 @@ export type SessionContext = {
   license?: { state?: string; effective?: boolean };
   /** full or mvp (backend/app/feature_set.py): under mvp the parked tabs and screens are hidden (featureSet.ts). */
   feature_set?: string;
+  /** classic or new (tenants.navigation, 0.10.67): the organization's menu (app/linkTable.ts). */
+  navigation?: string;
 };
 
 export type WorkContext = {
@@ -147,6 +163,8 @@ export type WorkspaceApi = {
   reportTab?: (tab: string, how?: "push" | "replace") => void;
   /** A free-trial workspace (its trial-only sections are shown; the Help menu offers Next steps). */
   isTrial?: boolean;
+  /** The organization's navigation in this workspace: new only under the MVP feature set (app/linkTable.ts). */
+  navigation?: Navigation;
 };
 
 export const WorkspaceContext = createContext<WorkspaceApi | null>(null);
@@ -233,6 +251,11 @@ export function useReportedTab<T extends string>(initial: T | (() => T)): [T, (n
       report?.(next);
     },
   ];
+}
+
+/** The workspace's navigation: classic outside the workspace. */
+export function useNavigation(): Navigation {
+  return useContext(WorkspaceContext)?.navigation ?? "classic";
 }
 
 /** Whether the workspace is a free trial (false outside the workspace). */

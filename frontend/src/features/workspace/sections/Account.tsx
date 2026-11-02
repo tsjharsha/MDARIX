@@ -9,23 +9,28 @@ import {
   TRIAL_ONLY_SECTIONS,
   WORKSPACE_SECTIONS,
   sectionAllowed,
+  useNavigation,
   useReportedTab,
   useWorkspace,
 } from "../workspaceContext";
+import { AwayPanel } from "./Reminders";
 import { hideUuid, safeText } from "../../../app/displayId";
 import { roleLabel, rolesSummary } from "../../../app/roles";
 import { PUBLISHED_CONTACT, useSiteInfo } from "../../../site/legal";
 
 const TABS = ["Profile", "Security", "Access"] as const;
-type Tab = (typeof TABS)[number];
+// The new navigation adds "I will be away" to Account (0.10.68).
+const NEW_TABS = [...TABS, "Away"] as const;
+type Tab = (typeof NEW_TABS)[number];
 
 export function AccountSection({ tab }: { tab?: string }) {
+  const tabs: readonly Tab[] = useNavigation() === "new" ? NEW_TABS : TABS;
   const [active, setActive] = useReportedTab<Tab>(
-    (TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "Profile",
+    (tabs as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "Profile",
   );
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Account sections">
+      <Tabs tabs={tabs} active={active} onChange={setActive} label="Account sections">
         {active === "Profile" && (
           <>
             <Profile />
@@ -34,6 +39,7 @@ export function AccountSection({ tab }: { tab?: string }) {
         )}
         {active === "Security" && <Security />}
         {active === "Access" && <Access />}
+        {active === "Away" && <AwayPanel />}
       </Tabs>
     </>
   );

@@ -74,6 +74,16 @@ import { parseRequestTab } from "../evidenceWorkflow";
 import { EvidenceRequestsPanel } from "./EvidenceRequests";
 import { RemindersPanel } from "./Reminders";
 import { useAiReady } from "../useAiStatus";
+import { ChevronRight } from "lucide-react";
+import { NEW_PLACES, placeOf } from "../../../app/linkTable";
+import { offeredTab } from "../../../app/featureSet";
+import { ViewChooser } from "./Views";
+import { FirstContact } from "./FirstContact";
+import { Dispositions } from "./Dispositions";
+import { OversightView } from "./Oversight";
+import { READINESS_PATH, checkStateOf, checkValue, type Readiness } from "../readiness";
+import { ALERTS, OVERSIGHT, type AlertList, type Oversight } from "../oversight";
+import type { WorkspaceSection } from "../workspaceContext";
 
 const PAGE_SIZE = 50;
 
@@ -151,6 +161,171 @@ export function MyWorkSection({ tab }: { tab?: string }) {
         {active === "My AI conversations" && <Conversations />}
       </Tabs>
     </>
+  );
+}
+
+const NEW_MY_WORK = NEW_PLACES["My Work"];
+type NewMyWorkTab = (typeof NEW_MY_WORK.tabs)[number];
+const TASK_VIEWS = NEW_MY_WORK.views?.["Tasks for me"] ?? [];
+const QUEUE_VIEWS = NEW_MY_WORK.views?.Queues ?? [];
+
+/**
+ * My work on the new navigation (0.10.68): the next step first, as the screen's main button; then the tasks for me
+ * (one list with views instead of seven tabs), approvals, evidence requests, the queues the roles work (calls to
+ * check, possible duplicates, complaints ready to close as routine) and, for managers, the team overview with the
+ * four inspection-readiness numbers. "I will be away" is in Account, linked from the reminders; My AI conversations
+ * stays hidden while AI is off.
+ */
+export function NewMyWorkSection({ tab }: { tab?: string }) {
+  const { work, open, notify, isTrial } = useWorkspace();
+  const aiOff = useAiReady() === false || !!isTrial;
+  const canSign = useCan("decision.sign");
+  const manager = useCan("quality.review");
+  const tabs = NEW_MY_WORK.tabs.filter(
+    (item) =>
+      (item !== "Approvals" || canSign) &&
+      (item !== "Team overview" || manager) &&
+      (item !== "My AI conversations" || !aiOff),
+  ) as NewMyWorkTab[];
+  const [active, setActive] = useReportedTab<NewMyWorkTab>(() => offeredTab(tab, tabs, "Tasks for me"));
+  const [view, setView] = useTabParam("view", "replace", null);
+  const [request] = useState(() => {
+    const target = parseRequestTab(tab?.replace(/^[^?]*/, "Evidence requests"));
+    return target.tab === "Evidence requests" ? target.request : null;
+  });
+  const [logging] = useState<"CONTACT" | "URGENT" | null>(() => {
+    const value = new URLSearchParams(tab?.split("?")[1] ?? "").get("log");
+    return value === "CONTACT" || value === "URGENT" ? value : null;
+  });
+  const summary = useResource<TaskSummary>("/api/v1/tasks/summary");
+  const counts = Object.fromEntries(
+    TASK_VIEWS.map((item) => [item, tabCount(item, summary.data)] as const).filter(([, count]) => count !== null),
+  );
+  const taskView = (TASK_VIEWS.includes(view ?? "") ? view : "Assigned to me") as string;
+  const queueView = (QUEUE_VIEWS.includes(view ?? "") ? view : QUEUE_VIEWS[0]) as string;
+  const openApproval = async (row: QueueRow) => {
+    if (!row.investigationId) return;
+    if (row.productId) work.setInvestigationId(row.investigationId, row.productId);
+    else if (!(row.caseId && (await chooseCase(work, row.caseId)))) {
+      notify(`${row.caseId ?? "This case"} could not be opened right now. Open it from Investigations.`, "critical");
+      return;
+    }
+    open("Investigations", "Decision");
+  };
+  return (
+    <>
+      <NextStep />
+      {manager && <TeamNumbers onOpen={() => setActive("Team overview")} />}
+      <Tabs tabs={tabs} active={active} onChange={setActive} label="My work sections">
+        {active === "Tasks for me" && (
+          <>
+            <RemindersPanel />
+            <ViewChooser
+              views={TASK_VIEWS}
+              active={taskView}
+              onChange={setView}
+              label="Which tasks"
+              labels={Object.fromEntries(
+                TASK_VIEWS.map((item) => [item, counts[item] ? `${item} · ${counts[item]}` : item]),
+              )}
+            >
+              <TaskInbox key={taskView} view={taskViewForTab(taskView) ?? "assigned"} summary={summary} />
+            </ViewChooser>
+          </>
+        )}
+        {active === "Approvals" && <ApprovalsPanel onOpen={openApproval} />}
+        {active === "Evidence requests" && (
+          <>
+            <EvidenceRequestsPanel investigationId={null} initialRequest={request} />
+            <EvidenceRequests />
+          </>
+        )}
+        {active === "Queues" && (
+          <ViewChooser views={QUEUE_VIEWS} active={queueView} onChange={setView} label="Which queue">
+            {queueView === "Calls to check" && <FirstContact part="calls" startLogging={logging} />}
+            {queueView === "Possible duplicates" && <FirstContact part="duplicates" />}
+            {queueView === "Ready to close as routine" && <Dispositions />}
+          </ViewChooser>
+        )}
+        {active === "Team overview" && <OversightView part="items" />}
+        {active === "My AI conversations" && <Conversations />}
+      </Tabs>
+    </>
+  );
+}
+
+/**
+ * The screen's main button names the next step (stage 7: a new user finds where to start within 10 seconds): the
+ * soonest task assigned to me, else my most urgent reminder, else the complaints to triage.
+ */
+export function NextStep() {
+  const { open } = useWorkspace();
+  const openTask = useOpenTask();
+  const tasks = useResource<TaskList>(taskListPath("assigned", 1, 1));
+  const alerts = useResource<AlertList>(ALERTS);
+  const task = (listOf(tasks.data?.items) as Task[])[0];
+  const alert = alerts.data?.items[0];
+  if (tasks.state === "loading" || alerts.state === "loading")
+    return (
+      <p className="uw-next-step ac-muted" role="status">
+        Finding your next step…
+      </p>
+    );
+  const go = task ? openTask(task) : null;
+  const next = task
+    ? { label: safeText(task.title) ?? "Your next task", run: go ?? (() => open("My Work")) }
+    : alert?.opens
+      ? {
+          label: alert.title,
+          run: () => {
+            const place = placeOf(alert.opens!);
+            open(place.section as WorkspaceSection, place.tab);
+          },
+        }
+      : { label: "Triage the new complaints", run: () => open("Complaints", "Triage") };
+  return (
+    <section className="uw-next-step" aria-label="Your next step">
+      <span className="ac-eyebrow">Your next step</span>
+      <button type="button" className="ac-primary" onClick={next.run}>
+        {next.label} <ChevronRight size={16} aria-hidden="true" />
+      </button>
+    </section>
+  );
+}
+
+/** Managers' four inspection-readiness numbers and the oversight summary, above My work's tabs (7.2). */
+function TeamNumbers({ onOpen }: { onOpen: () => void }) {
+  const { open } = useWorkspace();
+  const readiness = useResource<Readiness>(READINESS_PATH);
+  const oversight = useResource<Oversight>(OVERSIGHT);
+  const view = oversight.data;
+  return (
+    <div className="uw-team-numbers" aria-label="Your team at a glance">
+      {(readiness.data?.home ?? []).map((check) => (
+        <button
+          type="button"
+          key={check.code}
+          className={`uw-rd-tile tone-${checkStateOf(check.state).tone}`}
+          disabled={!check.opens}
+          onClick={() => {
+            if (!check.opens) return;
+            const place = placeOf(check.opens);
+            open(place.section as WorkspaceSection, place.tab);
+          }}
+        >
+          <span className="uw-rd-tile-head">{check.title}</span>
+          <strong className="uw-rd-value">{checkValue(check)}</strong>
+        </button>
+      ))}
+      <button type="button" className={`uw-rd-tile tone-${view?.overdue ? "critical" : "good"}`} onClick={onOpen}>
+        <span className="uw-rd-tile-head">Overdue, whole team</span>
+        <strong className="uw-rd-value">{view?.overdue ?? "…"}</strong>
+      </button>
+      <button type="button" className={`uw-rd-tile tone-${view?.due_soon ? "warning" : "good"}`} onClick={onOpen}>
+        <span className="uw-rd-tile-head">Due soon, whole team</span>
+        <strong className="uw-rd-value">{view?.due_soon ?? "…"}</strong>
+      </button>
+    </div>
   );
 }
 

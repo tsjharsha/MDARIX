@@ -27,7 +27,14 @@ export const VIDEOS_PATH = "/videos";
  * address, a "report a problem" form that reaches the MDARIX team (with an email fallback), and the security and
  * privacy pages. The support address comes from the server configuration (backend/app/site_info.py).
  */
-export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }) {
+export function HelpMenu({
+  onGettingStarted,
+  more = [],
+}: {
+  onGettingStarted?: () => void;
+  /** Screens the new navigation reaches from Help (0.10.68): Look ahead and Share feedback. */
+  more?: Array<{ label: string; detail: string; onSelect: () => void }>;
+}) {
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const info = useSiteInfo();
@@ -105,6 +112,23 @@ export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }
               </span>
             </a>
           </li>
+          {more.map((item) => (
+            <li key={item.label}>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  item.onSelect();
+                }}
+              >
+                <Signpost size={15} aria-hidden="true" />
+                <span className="help-menu-item">
+                  {item.label}
+                  <small>{item.detail}</small>
+                </span>
+              </button>
+            </li>
+          ))}
           {onNextSteps && (
             <li>
               <button

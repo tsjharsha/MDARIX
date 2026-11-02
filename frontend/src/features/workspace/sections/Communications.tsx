@@ -146,7 +146,8 @@ export function Communications({ complaintId }: { complaintId?: string | null })
         </p>
       )}
       {data && <Parties data={data} complaintId={complaintId ?? null} canRecord={canRecord} onDone={list.reload} />}
-      {data && <AttemptsSetting value={data.attempts_limit} onDone={list.reload} />}
+      {/* On the new navigation the setting is in Settings › Contact attempts, off this daily screen (7.7). */}
+      {data && workspace?.navigation !== "new" && <AttemptsSetting value={data.attempts_limit} onDone={list.reload} />}
       {open && (
         <EntryDrawer
           id={open}
@@ -424,11 +425,28 @@ function PartyForm({
   );
 }
 
-function AttemptsSetting({ value, onDone }: { value: number; onDone: () => void }) {
+export function AttemptsSetting({
+  value,
+  onDone,
+  readOnly = false,
+}: {
+  value: number;
+  onDone: () => void;
+  /** Settings shows the value to everyone (0.10.68); classic Communications only to those who may change it. */
+  readOnly?: boolean;
+}) {
   const canSet = useCan("quality.review") || useCan("regulatory.approve");
   const [count, setCount] = useState(String(value));
   const [error, setError] = useState("");
-  if (!canSet) return null;
+  if (!canSet && !readOnly) return null;
+  if (!canSet)
+    return (
+      <Panel eyebrow="Setting" title="Unanswered attempts before a request moves on">
+        <p>
+          A request moves to its next contact after <strong>{value}</strong> unanswered attempts.
+        </p>
+      </Panel>
+    );
   return (
     <Panel eyebrow="Setting" title="Unanswered attempts before a request moves on">
       <form

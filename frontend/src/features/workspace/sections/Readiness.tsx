@@ -66,7 +66,7 @@ export function ReadinessSection({ tab }: { tab?: string }) {
   );
 }
 
-function InspectionChecks() {
+export function InspectionChecks() {
   const { open } = useWorkspace();
   const data = useResource<Readiness>(READINESS_PATH, WHILE_FINDING_SIGNALS);
   const finding = !!data.data?.detection_pending;
@@ -194,7 +194,7 @@ export function CheckRow({ check, onOpen }: { check: ReadinessCheck; onOpen: () 
   );
 }
 
-function SummaryDownload() {
+export function SummaryDownload() {
   const canExport = useCan("data.export");
   const [days, setDays] = useState<number>(365);
   const [busy, setBusy] = useState<"pdf" | "pack" | null>(null);

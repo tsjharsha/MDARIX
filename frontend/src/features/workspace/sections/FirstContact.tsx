@@ -48,9 +48,19 @@ const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
  * check (complaint, service only, both or pending, by the starter guide's table), the follow-ups, the QMS-complaint
  * task and the QA review of every "service only"; and the possible duplicates across sources, to link or dismiss.
  */
-export function FirstContact({ onOpenTab }: { onOpenTab?: (tab: "Triage") => void }) {
+export function FirstContact({
+  onOpenTab,
+  part = "all",
+  startLogging = null,
+}: {
+  onOpenTab?: (tab: "Triage") => void;
+  /** The new navigation's queues (0.10.68): My work › Queues › Calls to check, or Possible duplicates. */
+  part?: "all" | "calls" | "duplicates";
+  /** A link's "Log a call" (Complaints' header action): the log opens at once. */
+  startLogging?: "CONTACT" | "URGENT" | null;
+}) {
   const [show, setShow] = useState<"all" | IntakeState>("all");
-  const [logging, setLogging] = useState<"CONTACT" | "URGENT" | null>(null);
+  const [logging, setLogging] = useState<"CONTACT" | "URGENT" | null>(startLogging);
   // The call or intake whose check is open is part of the address (First contact?check=<id>).
   const [open, setOpen] = useTabParam("check");
   const list = useResource<IntakeList>(`${INTAKE}?show=${show}`);
@@ -58,6 +68,7 @@ export function FirstContact({ onOpenTab }: { onOpenTab?: (tab: "Triage") => voi
   const canWrite = useCanTriage();
   const summary = list.data?.summary;
   const items = list.data?.items ?? [];
+  if (part === "duplicates") return <Duplicates onChanged={list.reload} />;
   return (
     <div className="ac-overview">
       <Hero
@@ -146,7 +157,7 @@ export function FirstContact({ onOpenTab }: { onOpenTab?: (tab: "Triage") => voi
           </p>
         )}
       </Panel>
-      <Duplicates onChanged={list.reload} />
+      {part === "all" && <Duplicates onChanged={list.reload} />}
       {logging && guide.data && (
         <LogDrawer
           kind={logging}

@@ -574,7 +574,7 @@ function caseIsClosed(row: Record<string, unknown> | null | undefined): boolean 
 }
 
 /** Corrective and preventive actions from the quality system, with the case they came from. */
-function Capas() {
+export function Capas() {
   const capas = useResource<any>("/api/v1/data-plane/capas");
   const cases = useResource<any>("/api/v1/data-plane/investigations?limit=500");
   const caseName = new Map(

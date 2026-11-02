@@ -22,7 +22,9 @@ import {
   ShieldAlert,
   Signpost,
   Telescope,
+  TrendingUp,
   Upload,
+  Users,
   UserRound,
   X,
 } from "lucide-react";
@@ -34,6 +36,7 @@ import { useFocusOnChange } from "../shared/focus";
 import { SessionTimeoutWarning, useIdleSignOut } from "../shared/SessionTimeout";
 import { SectionErrorBoundary } from "../../app/ErrorBoundary";
 import {
+  NEW_ONLY_SECTIONS,
   TRIAL_ONLY_SECTIONS,
   WORKSPACE_SECTIONS,
   WorkspaceContext,
@@ -48,14 +51,15 @@ import { DashboardSection } from "./sections/Dashboard";
 import { ReadinessSection } from "./sections/Readiness";
 import { AlertsBell } from "./sections/Reminders";
 import { ColumnScopeProvider } from "../tables/ColumnChooser";
-import { MyWorkSection } from "./sections/MyWork";
+import { MyWorkSection, NewMyWorkSection } from "./sections/MyWork";
+import { ComplaintViews } from "./sections/ComplaintViews";
 import { ProductsSection } from "./sections/Products";
 import { ComplaintsSection } from "./sections/Complaints";
 import { SignalsSection } from "./sections/Signals";
 import { InvestigationsSection } from "./sections/Investigations";
 import { EvidenceSection } from "./sections/Evidence";
 import { DecisionsSection } from "./sections/Decisions";
-import { RecordsSection } from "./sections/Records";
+import { NewRecordsSection, RecordsSection } from "./sections/Records";
 import { ChapterDone } from "./sections/ChapterDone";
 import type { StoryChapter } from "./trialStory";
 import { IntelligenceSection } from "./sections/Intelligence";
@@ -75,7 +79,11 @@ import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext
 import { signalFromSearch, signalLinkStart } from "./signals";
 import { zoneName } from "../../app/dates";
 import { PARKED_SECTIONS, featureSetOf, routeFor } from "../../app/featureSet";
-import { OLD_VIEWS, placeOf } from "../../app/linkTable";
+import { NEW_MENU, NEW_PLACES, OLD_VIEWS, navigationOf, placeLabel, placeOf } from "../../app/linkTable";
+import { TrendsSection } from "./sections/Trends";
+import { SettingsSection } from "./sections/Settings";
+import { TeamSection } from "./sections/Team";
+import { ComplaintPage } from "./sections/ComplaintPage";
 import { carryOverColumnChoices, columnScopeFor } from "../tables/columnViews";
 import {
   addressFor,
@@ -210,6 +218,55 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
     guide: NEXT_STEPS_SUMMARY,
     context: false,
   },
+  // The new navigation's own screens (0.10.68).
+  Trends: {
+    icon: TrendingUp,
+    description: "Is a product problem rising?",
+    guide:
+      "Each product version against its own history, and the trends to review. A trend is an observation, not a cause.",
+    context: true,
+  },
+  Settings: {
+    icon: Settings2,
+    description: "Rules, windows, guides, calendar",
+    guide:
+      "How MDARIX counts and checks for your organization. Each setting says who can change it; everyone can read it.",
+    context: false,
+  },
+  Team: {
+    icon: Users,
+    description: "Who works here",
+    guide: "The people in your organization and their roles.",
+    context: false,
+  },
+  Complaint: {
+    icon: ClipboardList,
+    description: "One complaint",
+    guide: "",
+    context: false,
+  },
+};
+
+/** The new navigation's menu lines and page purposes (0.10.68), where they differ from the classic ones. */
+const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: string }>> = {
+  "My Work": {
+    description: "What needs you today",
+    guide: "Your next step first, then your tasks, approvals, requests and the queues your roles work.",
+  },
+  Complaints: {
+    description: "Every complaint, in views",
+    guide:
+      "One list of complaints. Choose a view: to triage, due soon, past target, reporting and more. Each complaint opens its own page.",
+  },
+  Records: {
+    description: "Readiness, documents, audit trail",
+    guide:
+      "What you hand an inspector: inspection readiness, documents, decision and CAPA records, the audit trail and every export.",
+  },
+  "My Account": {
+    description: "Profile, security, away",
+    guide: "Your profile, sign-in security, the roles you hold, and when you will be away.",
+  },
 };
 
 /** Under the MVP feature set Records and My Work also hold what the parked sections did (app/featureSet.ts). */
@@ -226,8 +283,9 @@ const MVP_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
   },
 };
 
-/** A section's menu line and purpose under this feature set. */
-const navText = (section: WorkspaceSection, mvp: boolean) => (mvp && MVP_NAV[section]) || NAV[section];
+/** A section's menu line and purpose under this feature set and navigation. */
+const navText = (section: WorkspaceSection, mvp: boolean, fresh = false) =>
+  (fresh && NEW_NAV[section]) || (mvp && MVP_NAV[section]) || NAV[section];
 
 /** Former and current addresses (/app/<view>) map onto sections, so existing links and bookmarks keep working (the
  * old -> new link table, app/linkTable.json). */
@@ -251,6 +309,9 @@ export function UserWorkspace({
   // Under the MVP feature set a case's evidence is a step of the case page (app/featureSet.ts routeFor), and every
   // screen has its own address (workspaceAddress.ts).
   const featureSet = featureSetOf(session?.feature_set);
+  // The organization's navigation: the new one (stage 7) only under the MVP feature set, whose screens have addresses.
+  const navigation = featureSet === "mvp" ? navigationOf(session?.navigation) : "classic";
+  const fresh = navigation === "new";
   // The screen the address names (?section=, ?step=, ?tab=), under the MVP feature set only.
   const [addressed] = useState(() =>
     featureSet === "mvp"
@@ -258,13 +319,17 @@ export function UserWorkspace({
       : null,
   );
   const [start] = useState(() => {
-    const base = VIEW_TO_SECTION[initialView ?? "home"] ?? ["Dashboard"];
+    // The new navigation starts on My work, whose main button names the next step.
+    const base =
+      fresh && (initialView ?? "home") === "home"
+        ? (["My Work"] as [WorkspaceSection])
+        : (VIEW_TO_SECTION[initialView ?? "home"] ?? ["Dashboard"]);
     const [section, tab] = addressed
       ? [addressed.section, addressed.tab]
       : caseLink
         ? caseLinkStart(initialView, base)
         : signalLinkStart(initialView, base, signalLink);
-    const routed = routeFor(section, tab, featureSet);
+    const routed = routeFor(section, tab, featureSet, navigation);
     return [routed.section as WorkspaceSection, routed.tab] as const;
   });
   const [location, setLocation] = useState<{ section: WorkspaceSection; tab?: string; key: number }>({
@@ -309,13 +374,17 @@ export function UserWorkspace({
         (section) =>
           (!TRIAL_ONLY_SECTIONS.includes(section) || trial?.is_trial) &&
           !(featureSet === "mvp" && PARKED_SECTIONS.includes(section)) &&
+          (fresh ? !!NEW_PLACES[section] : !NEW_ONLY_SECTIONS.includes(section)) &&
           sectionAllowed(section, session?.allowed_menu, session?.business_permissions),
       ),
-    [session?.allowed_menu, session?.business_permissions, trial?.is_trial, featureSet],
+    [session?.allowed_menu, session?.business_permissions, trial?.is_trial, featureSet, fresh],
   );
+  // The new navigation's menu: the four main screens; Settings, Team and Account sit at the top right.
+  const menuSections = fresh ? visibleSections.filter((name) => NEW_MENU.main.includes(name)) : visibleSections;
+  const topSections = fresh ? visibleSections.filter((name) => NEW_MENU.top.includes(name)) : [];
   const open = useCallback(
     (section: WorkspaceSection, tab?: string) => {
-      const routed = routeFor(section, tab, featureSet);
+      const routed = routeFor(section, tab, featureSet, navigation);
       setLocation((current) => ({
         section: routed.section as WorkspaceSection,
         tab: routed.tab,
@@ -326,7 +395,7 @@ export function UserWorkspace({
       setMessage(null);
       window.scrollTo({ top: 0 });
     },
-    [setLocation, featureSet],
+    [setLocation, featureSet, navigation],
   );
   const notify = useCallback((text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone }), []);
   // A trial's next chapter, opened from the "chapter done" banner: its screen (and its case), else Getting started.
@@ -452,6 +521,7 @@ export function UserWorkspace({
     reportTab,
     shownTab: shown ?? location.tab,
     isTrial: !!trial?.is_trial,
+    navigation,
   };
   const { section, tab } = location;
 
@@ -520,7 +590,51 @@ export function UserWorkspace({
             )}
             <SwitchOrganization />
             <AlertsBell onOpen={() => open("My Work")} />
-            <HelpMenu onGettingStarted={trial?.is_trial ? () => open("Getting started", "Your data") : undefined} />
+            {/* The new navigation: Settings, Help, Team and Account at the top right (0.10.68). */}
+            {topSections
+              .filter((name) => name !== "My Account")
+              .map((name) => {
+                const { icon: Icon } = NAV[name];
+                return (
+                  <button
+                    type="button"
+                    key={name}
+                    className={section === name ? "ac-secondary selected" : "ac-secondary"}
+                    aria-current={section === name ? "page" : undefined}
+                    onClick={() => open(name)}
+                  >
+                    <Icon size={16} aria-hidden="true" />{" "}
+                    <span className="ac-hide-sm">{placeLabel(name, navigation)}</span>
+                  </button>
+                );
+              })}
+            <HelpMenu
+              onGettingStarted={trial?.is_trial ? () => open("Getting started", "Your data") : undefined}
+              more={
+                fresh
+                  ? [
+                      ...(trial?.is_trial
+                        ? [{ label: "Look ahead", detail: LOOK_AHEAD_SUBTITLE, onSelect: () => open("Look ahead") }]
+                        : []),
+                      {
+                        label: "Share feedback",
+                        detail: "Tell us what to improve",
+                        onSelect: () => open("Share feedback"),
+                      },
+                    ]
+                  : []
+              }
+            />
+            {topSections.includes("My Account") && (
+              <button
+                type="button"
+                className={section === "My Account" ? "ac-secondary selected" : "ac-secondary"}
+                aria-current={section === "My Account" ? "page" : undefined}
+                onClick={() => open("My Account")}
+              >
+                <UserRound size={16} aria-hidden="true" /> <span className="ac-hide-sm">Account</span>
+              </button>
+            )}
             <button type="button" className="ac-secondary" onClick={() => void signOut()} aria-label="Sign out">
               <LogOut size={16} /> <span className="ac-hide-sm">Sign out</span>
             </button>
@@ -530,9 +644,9 @@ export function UserWorkspace({
         <div className="ac-body">
           <nav className={`ac-nav ${menuOpen ? "open" : ""}`} aria-label="Workspace navigation">
             <p className="ac-nav-label">Workspace</p>
-            {visibleSections.map((name) => {
+            {menuSections.map((name) => {
               const { icon: Icon } = NAV[name];
-              const { description } = navText(name, featureSet === "mvp");
+              const { description } = navText(name, featureSet === "mvp", fresh);
               return (
                 <button
                   type="button"
@@ -543,7 +657,7 @@ export function UserWorkspace({
                 >
                   <Icon size={18} aria-hidden="true" />
                   <span>
-                    <strong>{name}</strong>
+                    <strong>{placeLabel(name, navigation)}</strong>
                     <small>{description}</small>
                   </span>
                 </button>
@@ -552,24 +666,35 @@ export function UserWorkspace({
             <p className="ca-nav-scope">You see only {tenantName}'s data.</p>
           </nav>
 
-          <main className="ac-main" id="app-main" tabIndex={-1} data-workspace-section={section}>
+          <main
+            className="ac-main"
+            id="app-main"
+            tabIndex={-1}
+            data-workspace-section={section}
+            data-navigation={navigation}
+          >
             {choosingStart ? (
               <p className="ac-empty" role="status">
                 Opening your workspace…
               </p>
             ) : (
               <>
-                <div className="ac-page-head">
-                  <div>
-                    <p className="ac-eyebrow">{tenantName}</p>
-                    <h1 ref={heading} tabIndex={-1}>
-                      {section}
-                    </h1>
-                    <p>{navText(section, featureSet === "mvp").guide}</p>
-                    <p className="ac-page-zone">Times are in {zoneName()}.</p>
+                {/* One complaint's page has its own header (sections/ComplaintPage.tsx). */}
+                {section !== "Complaint" && (
+                  <div className="ac-page-head">
+                    <div>
+                      <p className="ac-eyebrow">{tenantName}</p>
+                      <h1 ref={heading} tabIndex={-1}>
+                        {placeLabel(section, navigation)}
+                      </h1>
+                      <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
+                      <p className="ac-page-zone">Times are in {zoneName()}.</p>
+                    </div>
                   </div>
-                </div>
-                {NAV[section].context && <ContextBar />}
+                )}
+                {NAV[section].context && (!fresh || section === "Investigations" || section === "Trends") && (
+                  <ContextBar />
+                )}
                 {/* A colleague the owner invited is greeted by name on their first screens (UX-26). */}
                 {trial?.is_trial && <ColleagueWelcome me={trial.me} />}
                 {trial?.is_trial && section !== "Share feedback" && (
@@ -596,14 +721,16 @@ export function UserWorkspace({
                       {section === "Getting started" && <GettingStartedSection focus={tab} />}
                       {section === "Readiness" && <ReadinessSection tab={tab} />}
                       {section === "Dashboard" && <DashboardSection />}
-                      {section === "My Work" && <MyWorkSection tab={tab} />}
+                      {section === "My Work" && (fresh ? <NewMyWorkSection tab={tab} /> : <MyWorkSection tab={tab} />)}
                       {section === "Products" && <ProductsSection tab={tab} />}
-                      {section === "Complaints" && <ComplaintsSection tab={tab} />}
+                      {section === "Complaints" &&
+                        (fresh ? <ComplaintViews tab={tab} /> : <ComplaintsSection tab={tab} />)}
                       {section === "Signals" && <SignalsSection tab={tab} />}
                       {section === "Investigations" && <InvestigationsSection tab={tab} />}
                       {section === "Evidence" && <EvidenceSection tab={tab} />}
                       {section === "Decisions" && <DecisionsSection tab={tab} />}
-                      {section === "Records" && <RecordsSection tab={tab} />}
+                      {section === "Records" &&
+                        (fresh ? <NewRecordsSection tab={tab} /> : <RecordsSection tab={tab} />)}
                       {section === "Intelligence" && <IntelligenceSection tab={tab} />}
                       {section === "Trust & Audit" && <TrustSection tab={tab} />}
                       {section === "My Account" && <AccountSection tab={tab} />}
@@ -611,6 +738,10 @@ export function UserWorkspace({
                       {section === "Share feedback" && <FeedbackSection isTrial={!!trial?.is_trial} />}
                       {section === "Look ahead" && trial?.is_trial && <LookAheadSection focus={tab} />}
                       {section === "Next steps" && trial?.is_trial && <TrialNextStepsSection />}
+                      {section === "Trends" && <TrendsSection tab={tab} />}
+                      {section === "Settings" && <SettingsSection tab={tab} />}
+                      {section === "Team" && <TeamSection onAdminConsole={onAdminConsole} />}
+                      {section === "Complaint" && <ComplaintPage tab={tab} heading={heading} />}
                     </div>
                   </SectionErrorBoundary>
                 </ColumnScopeProvider>

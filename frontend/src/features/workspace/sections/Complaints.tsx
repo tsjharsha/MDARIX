@@ -181,8 +181,11 @@ function FirstContactCheckButton({ complaintId }: { complaintId: string }) {
 
 // The second look ----------------------------------------------------------------------------------------------------
 
-function SecondLook() {
-  const [state, setState] = useState<"open" | "decided">("open");
+export type SecondLookState = "open" | "decided" | "dismissed";
+
+/** The second look. A view of the new navigation fixes its list (`fixed`): Second look (open) or Dismissed. */
+export function SecondLook({ initial = "open", fixed = false }: { initial?: SecondLookState; fixed?: boolean } = {}) {
+  const [state, setState] = useState<SecondLookState>(initial);
   const [product, setProduct] = useState("");
   const [page, setPage] = useState(1);
   const [deciding, setDeciding] = useState<{ item: SecondLookItem; decision: "CONFIRMED" | "DISMISSED" } | null>(null);
@@ -190,7 +193,8 @@ function SecondLook() {
   const summary = list.data?.summary;
   const headline = secondLookHeadline(summary);
   const items = list.data?.items ?? [];
-  const choose = (next: "open" | "decided") => {
+  const choose = (next: SecondLookState) => {
+    if (fixed) return;
     setState(next);
     setPage(1);
   };
@@ -238,11 +242,17 @@ function SecondLook() {
       <div className="ac-grid uw-cr-split">
         <Panel
           eyebrow="Second look"
-          title={state === "open" ? "Records to review, most serious first" : "Decided records"}
+          title={
+            state === "open"
+              ? "Records to review, most serious first"
+              : state === "dismissed"
+                ? "Dismissed: not complaints, with a reason"
+                : "Decided records"
+          }
           source={list}
         >
           <div className="uw-cr-toolbar">
-            <div className="ca-chips" role="radiogroup" aria-label="Which records">
+            <div className="ca-chips" role="radiogroup" aria-label="Which records" hidden={fixed}>
               {(["open", "decided"] as const).map((value) => (
                 <button
                   type="button"
@@ -655,9 +665,10 @@ function DecisionDrawer({
 
 // The backlog board ------------------------------------------------------------------------------------------------
 
-function Backlog() {
+/** The backlog board. A view of the new navigation fixes its list (`fixed`): Due soon or Past target. */
+export function Backlog({ initial = "all", fixed = false }: { initial?: BacklogShow; fixed?: boolean } = {}) {
   const openInvestigation = useOpenInvestigation();
-  const [show, setShow] = useState<BacklogShow>("all");
+  const [show, setShow] = useState<BacklogShow>(initial);
   const [product, setProduct] = useState("");
   const [page, setPage] = useState(1);
   const list = useResource<BacklogList>(backlogPath(show, product, page));
@@ -665,6 +676,7 @@ function Backlog() {
   const target = summary?.target_days ?? 30;
   const headline = backlogHeadline(summary);
   const choose = (next: BacklogShow) => {
+    if (fixed) return;
     setShow(next);
     setPage(1);
   };
@@ -716,7 +728,7 @@ function Backlog() {
       <div className="ac-grid uw-cr-split">
         <Panel eyebrow="Backlog" title="Open complaints, oldest first" source={list}>
           <div className="uw-cr-toolbar">
-            <div className="ca-chips" role="radiogroup" aria-label="Which complaints">
+            <div className="ca-chips" role="radiogroup" aria-label="Which complaints" hidden={fixed}>
               {BACKLOG_SHOWS.map((option) => (
                 <button
                   type="button"
@@ -870,7 +882,7 @@ function AgeMeter({ item, target }: { item: BacklogItem; target: number }) {
 
 // Settings -----------------------------------------------------------------------------------------------------------
 
-function ReviewSettingsPanel() {
+export function ReviewSettingsPanel() {
   const settings = useResource<ReviewSettings>("/api/v1/complaints/review-settings");
   return (
     <Panel eyebrow="Complaints" title="Review settings" source={settings}>
