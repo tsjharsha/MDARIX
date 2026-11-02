@@ -19,13 +19,12 @@ export const SAMPLE_REMOVAL_PATH = "/api/v1/trial/sample-data/removal";
 export const SAMPLE_RESTART_PATH = "/api/v1/trial/sample-data/restart";
 
 /** What each restart choice removes, in plain words (exported for tests). */
-export function restartChoices(data: Pick<Preview, "sample" | "work_on_sample" | "own_records">): {
+export function restartChoices(data: Pick<Preview, "sample" | "own_records">): {
   story: string;
   own: string;
 } {
-  const work = data.work_on_sample ? `, and ${countOf(data.work_on_sample, "record")} of practice on them` : "";
   return {
-    story: `Removes the sample (${sampleSummary(data.sample)})${work}, then brings it back dated today. Your own uploads and what you did with them stay.`,
+    story: `Removes the sample (${sampleSummary(data.sample)}) and everything done on it, then brings it back dated today. Your own uploads and what you did with them stay.`,
     own: data.own_records
       ? `Also removes your own ${countOf(data.own_records, "uploaded record")} and everything you did with them.`
       : "You have not uploaded records of your own, so nothing more goes.",
