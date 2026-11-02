@@ -20,6 +20,7 @@ import { tabParts } from "../../../app/linkTable";
 import {
   WorkspaceContext,
   investigationRequestFor,
+  renamed,
   useCan,
   useCanRunAi,
   useOpenInvestigation,
@@ -109,7 +110,8 @@ export function ComplaintsSection({ tab }: { tab?: string }) {
   const report = workspace?.reportTab;
   // The tab it opens on is in the address from the start (a link that named another tab or none is replaced).
   useEffect(() => {
-    if (report && tabParts(workspace?.shownTab).name !== active) report(active, "replace");
+    if (report && tabParts(workspace?.shownTab).name !== active)
+      report(renamed(workspace?.shownTab, active), "replace");
   }, []);
   const openTab = (next: string) => {
     report?.(next);

@@ -207,6 +207,12 @@ export async function chooseCase(work: Pick<WorkContext, "setInvestigationId">, 
   }
 }
 
+/** The tab with another name, keeping what it carries (a link's ?signal= stays when the inbox is named). */
+export const renamed = (tab: string | undefined, name: string) => {
+  const query = tabParts(tab).query;
+  return query ? `${name}?${query}` : name;
+};
+
 /**
  * A section's tab, as useState, with each change reported for the screen's address (a new history entry). The tab it
  * opens on is said once too, replacing the address (so /app/my-work reads /app/my-work?tab=Assigned+to+me, and a
@@ -218,7 +224,7 @@ export function useReportedTab<T extends string>(initial: T | (() => T)): [T, (n
   const report = value?.reportTab;
   const shown = value?.shownTab;
   useEffect(() => {
-    if (report && tabParts(shown).name !== active) report(active, "replace");
+    if (report && tabParts(shown).name !== active) report(renamed(shown, active), "replace");
   }, []);
   return [
     active,
