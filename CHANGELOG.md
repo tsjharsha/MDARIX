@@ -39,7 +39,7 @@ then `--apply`) once after the upgrade: it rewords two kinds of older sample rec
   **harm** chip with a shape (◆ death or critical, ▲ serious, ○ no harm or a malfunction). Status is never colour
   alone; "serious" is amber, not red.
 - Triage cards lead with the triage target and the report deadline as chips; report cards and the report drawer show
-  their state and deadline as chips; My Work's Due column shows the chip and the date.
+  their state and deadline as chips; My Work's and Oversight's Due columns show the chip and the date.
 - A time no longer carries "GMT+5:30"; each workspace screen says "Times are in India Standard Time." once.
   Signatures and audit records keep their UTC time.
 
@@ -66,8 +66,9 @@ then `--apply`) once after the upgrade: it rewords two kinds of older sample rec
 - On a phone the section's tabs are one row that scrolls inside itself, the context bar is two columns and the count
   tiles are compact, so Triage's first card shows sooner. Quotes show three lines, not two cut at 34 characters.
 - Form fields on one grid line up; Getting started has one primary button (the next chapter), not ten.
-- No grid asks for more room than a phone has (a form grid's 220 px columns made Reporting windows, Evidence requests
-  and Trend check wider than the screen), and on a phone the M tile stands for the name in the top bar.
+- No page is wider than a phone: grids shrink to the screen, a fieldset no longer takes its longest line's width
+  (Reporting windows was 780 px wide at 390), a list that is not a card list keeps its own scroll box, and on a phone
+  the M tile stands for the name in the top bar.
 
 ### Changed: fewer words, said once (V5, V6)
 
