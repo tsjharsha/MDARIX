@@ -40,7 +40,7 @@ from backend.app.trial.service import (
     REQUEST_STATUSES,
     TRIAL_FILE_LIMIT_BYTES,
     TRIAL_ROW_LIMIT,
-    TRIAL_USER_LIMIT,
+    trial_user_cap,
     approve_request,
     decline_request,
     request_queue,
@@ -58,6 +58,12 @@ class DeclineRequest(BaseModel):
 class ColleagueInvite(BaseModel):
     email: str = Field(min_length=3, max_length=254)
     display_name: str = Field(min_length=1, max_length=120)
+    # The colleague's persona, which sets their real role (0.10.73); none named: the Quality Leader (Leader).
+    persona: str | None = Field(default=None, max_length=40)
+
+
+class ColleaguePersona(BaseModel):
+    persona: str = Field(min_length=1, max_length=40)
 
 
 # ------------------------------------------------------------------------------------------- Platform Admin queue
@@ -196,7 +202,7 @@ def trial_status(
         # extension and an open request to move the data into the MVP (backend/app/trial/retention.py).
         "data_deleted_at": retention.deletion_date(db, data, subscription, now).isoformat(),
         "days_left": max(0, int(-(-seconds_left // 86400))),
-        "limits": {"users": TRIAL_USER_LIMIT, "rows": TRIAL_ROW_LIMIT, "file_bytes": TRIAL_FILE_LIMIT_BYTES},
+        "limits": {"users": trial_user_cap(), "rows": TRIAL_ROW_LIMIT, "file_bytes": TRIAL_FILE_LIMIT_BYTES},
         "usage": {"users": int(users or 0), "rows": uploaded},
         # The sample dataset's records (Getting started explains what each part is for).
         "sample": sample,
@@ -1044,7 +1050,22 @@ def invite_trial_colleague(
 ):
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
-    return team.invite_colleague(db, tenant_id, _current_user(db, ctx), payload.email, payload.display_name)
+    return team.invite_colleague(
+        db, tenant_id, _current_user(db, ctx), payload.email, payload.display_name, payload.persona
+    )
+
+
+@router.post("/trial/team/{user_id}/persona")
+def change_trial_colleague_persona(
+    user_id: uuid.UUID,
+    payload: ColleaguePersona,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    """The trial owner gives a colleague another persona, and with it the persona's role (backend/app/trial/team.py)."""
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return team.change_colleague_persona(db, tenant_id, _current_user(db, ctx), user_id, payload.persona)
 
 
 @router.post("/trial/team/{user_id}/resend-invitation")

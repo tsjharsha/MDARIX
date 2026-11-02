@@ -34,7 +34,8 @@ as it stood, the day after its US report was accepted (0.10.70: it was signed ov
 0.10.66 (backend/app/trial/sample_words.py: the RV-08 request named the US questions by code; a follow-up task's
 title listed every question), and SAMPLE-RV-11's linked service work, in progress under its sample service ticket
 (0.10.71, ``seed_flagship_service``) where it has none, and 0.10.72's corrections (backend/app/trial/sample_0_10_72.py:
-SPO2_READING_HIGH's IMDRF Annex A term; the sample guide's example text, its approval re-recorded). The sample's dates themselves are brought to today by the
+SPO2_READING_HIGH's IMDRF Annex A term; the sample guide's example text, its approval re-recorded), and 0.10.73's
+Free Trial plan, whose "up to 3 users" and licensed-user limit read the trial's safety cap (``refresh_plan``). The sample's dates themselves are brought to today by the
 hourly "trial-sample-clock" job (backend/app/trial/sample_clock.py) while nobody has worked on the sample. Each trial
 is committed on its own, with an audit event.
 """
@@ -290,15 +291,34 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     return results
 
 
+def refresh_plan(db: Session, apply: bool) -> list[str]:
+    """0.10.73: the Free Trial plan's "up to 3 users" and its licensed-user limit of 3 read the trial's safety cap
+    (MDARIX_TRIAL_USER_CAP, default 50). Idempotent; committed with ``apply``."""
+    from backend.app.db.tenant_scope import bind_system
+    from backend.app.trial.service import refresh_plan_limits
+
+    bind_system(db, "refresh the free trial plan's user cap")
+    changes = refresh_plan_limits(db, apply)
+    if apply and changes:
+        db.commit()
+    return changes
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--apply", action="store_true", help="add the story (without it, only list what would change)")
     args = parser.parse_args()
     db = SessionLocal()
     try:
+        plan = refresh_plan(db, args.apply)
         results = refresh(db, args.apply)
     finally:
         db.close()
+    print(
+        f"Free Trial plan: {'changed' if args.apply else 'would change'} {'; '.join(plan)}"
+        if plan
+        else "Free Trial plan: already reads the user cap"
+    )
     for item in results:
         print(f"{item['tenant']:<40} {item['name'][:40]:<40} {item['result']}")
     if not results:

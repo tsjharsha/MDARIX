@@ -646,7 +646,9 @@ def _activate_and_sign_in(email: str, token: str) -> TestClient:
     return client
 
 
-def test_trial_owner_invites_colleagues_up_to_the_user_limit():
+def test_trial_owner_invites_colleagues_up_to_the_user_limit(monkeypatch):
+    # The cap is 50 (0.10.73); a cap of 3 here keeps the full-trial path quick to reach.
+    monkeypatch.setenv("MDARIX_TRIAL_USER_CAP", "3")
     owner, approval, owner_email = _approved_trial_client()
     assert owner.get("/api/v1/trial/status").json()["is_owner"] is True
 
@@ -655,7 +657,7 @@ def test_trial_owner_invites_colleagues_up_to_the_user_limit():
     assert invited.status_code == 200, invited.text
     second = f"colleague-{uuid.uuid4().hex[:8]}@example.invalid"
     assert owner.post("/api/v1/trial/team", json={"email": second, "display_name": "Robin QA"}).status_code == 200
-    # Three users is the limit, an existing account cannot be invited again, and bad input is refused.
+    # Three people is this trial's cap, an existing account cannot be invited again, and bad input is refused.
     full = owner.post("/api/v1/trial/team", json={"email": "extra@example.invalid", "display_name": "Extra"})
     assert full.status_code == 409 and full.json()["detail"]["code"] == "TRIAL_USER_LIMIT_REACHED"
     assert owner.post("/api/v1/trial/team", json={"email": owner_email, "display_name": "Me"}).status_code == 409
@@ -880,7 +882,9 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     assert "AI is off in the free trial" in chapters["INVESTIGATE_WITH_AI"]["promise"]
     assert chapters["RISK_FILE"]["finding"]["state"] == "CRITICAL"
     # The decision chapter opens the guided investigation's waiting brief.
-    assert chapters["DECIDE_AND_SIGN"]["opens"].items() >= {"section": "Investigations", "tab": "Decision Brief"}.items()
+    assert (
+        chapters["DECIDE_AND_SIGN"]["opens"].items() >= {"section": "Investigations", "tab": "Decision Brief"}.items()
+    )
     # The investigation chapter opens inside the guided investigation, on its case page, not on the list of cases.
     assert chapters["INVESTIGATE_WITH_AI"]["opens"].items() >= {"section": "Investigations", "tab": "Workspace"}.items()
     assert chapters["DECIDE_AND_SIGN"]["case"]["id"] and chapters["INVESTIGATE_WITH_AI"]["case"]

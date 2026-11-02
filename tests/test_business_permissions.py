@@ -47,6 +47,8 @@ EXEMPT = {
     ("POST", "/api/v1/trial/team/{user_id}/resend-invitation"): "trial owner only, checked in the route",
     ("POST", "/api/v1/trial/team/{user_id}/remove"): "trial owner only, own trial's people, checked in the route",
     ("POST", "/api/v1/trial/team/{user_id}/mfa-reset"): "trial owner only, own trial's people, checked in the route",
+    ("POST", "/api/v1/trial/team/{user_id}/persona"): "trial owner only, own trial's people (a colleague's persona "
+    "and with it their role, never the owner's own), checked in the route",
     (
         "POST",
         "/api/v1/trial/support-access/{grant_id}/approve",

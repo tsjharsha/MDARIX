@@ -809,6 +809,9 @@ class AuthUser(Base):
     mfa_recovery_hashes: Mapped[list | None] = mapped_column(JSONB)
     # md44: the person's email choices; {"weekly_readiness": false} stops the weekly readiness email.
     email_preferences: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
+    # tr13: the workspace persona ("Viewing as", access_control/personas.py WORKSPACE_PERSONAS); a view, never a
+    # permission. Empty: it follows the role.
+    view_persona: Mapped[str | None] = mapped_column(String(40))
     password_changed_at = tz(True)
     password_expires_at = tz(True)
     created_at = tz(False)

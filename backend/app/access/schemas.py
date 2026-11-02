@@ -9,6 +9,11 @@ class RoleSwitch(BaseModel):
     role: str
 
 
+class PersonaSwitch(BaseModel):
+    # A workspace persona's code (access_control/personas.py WORKSPACE_PERSONAS): what the trial owner views as.
+    persona: str = Field(min_length=1, max_length=40)
+
+
 class MembershipRequest(BaseModel):
     user_id: uuid.UUID
     is_default: bool = False
