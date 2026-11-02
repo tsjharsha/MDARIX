@@ -10,6 +10,126 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.76] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): part C4 of Release C, "New forms: EU MIR, Great Britain (MHRA) and
+Canada", built to the owner-approved design (its Decision trees and Reports). The three new forms are **starters, for
+your consultant to confirm**, on screen, in the PDF and here. They change organizations on the **new** navigation
+(`tenants.navigation = new`) only; the classic navigation, and every pilot on it today, keeps the US and India
+worksheets and its 0.10.58 report rules. MDARIX still never decides and never submits: a person signs each conclusion
+and each approval, and submits the report through the authority's own channel (EUDAMED or the national authority,
+MHRA's MORE portal, Health Canada).
+
+**Migration `tr15canadamarket`** (after `tr14reportcancelled`; `tr03pmssources` stays reserved). It is expand-only: the
+market check of `complaint_market_assessments` also allows `CA` (Canada). No stored row changes. On legacy dedicated
+organization databases, run `scripts/add_workflow_tables_to_legacy_planes.py` (new step tr15). The API and web images
+change. **Operators:** run `scripts/refresh_trial_story.py` (dry run first, then `--apply`) once after the upgrade: on
+the new navigation it creates the report of each signed reportable conclusion that has none, now for EU / NI, Great
+Britain and Canada too (`backend/app/trial/reports_0_10_75.py`). For the sample this is **SAMPLE-RV-07's EU MIR**
+(one per trial; a second run finds nothing). A trial approved after the upgrade gets it when its sample is staged.
+
+### Added: three forms, in the authority's own order (starters, for your consultant to confirm)
+
+| Market | Form | Source followed (read 3 Nov 2026) | Report types |
+|---|---|---|---|
+| EU / NI | EU Manufacturer Incident Report (MIR) | European Commission, MIR form for Serious Incidents (MDR/IVDR) v7.3.1, build SB-11154 (6 May 2026; mandatory from 1 May 2026), and its help text v7.3.1 | Initial · Follow up · Combined initial and final · Final (Reportable incident) · Final (Non-reportable incident) |
+| Great Britain | GB Manufacturer Incident Report (MHRA) | MHRA, GB MIR 7.2.1 (changelog 04/06/2025, its five GB schemas and help text), GB MIR and FSCA schema implementation guide (9 Jun 2025), Vigilance reporting requirements (5 Sep 2025) | the same five |
+| Canada | Health Canada mandatory medical device problem report | Mandatory Medical Device Problem Reporting Form for Industry, HC Pub. 110180 (April 2018); Incident reporting for medical devices: Guidance document (2021); SOR/98-282 ss. 59-61.1 (current to 2026-10-19) | Preliminary · Update · Final · Preliminary & Final |
+
+- Each form lists its sections and fields in the authority's numbering and order, its fixed lists (the report type,
+  the classification of the incident, the device's location, the reporter's role, Canada's device class…), and
+  **which fields are mandatory for which report type** (`Field.must_in`): for example the MIR's root cause, risk
+  assessment and Annex B, C, D and G codes only in a final report; Canada's preliminary report every section but E2
+  and E3, an update or final report only the starred fields (and E2, E3 in a final one). GB adds MHRA's own: the UK
+  Responsible Person, the UK approved body numbers, GMDN only, and a code from every IMDRF annex on every report; it
+  drops the EUDAMED numbers.
+- A run of address lines (street, number, PO box, city, postal code, contact names, e-mail, phone) is one field in
+  MDARIX. Patient and reporter fields keep their place and are never stored, as on the 3500A.
+- **The report type is a field**: a report starts as the form's first type (Initial; Preliminary); the person chooses
+  another, and the mandatory-fields meter follows it. A fixed list takes only one of its choices (422 `NOT_A_CHOICE`).
+- Pre-filled from the records where MDARIX holds the value: dates, description, device, lot, UDI-DI, GMDN, IMDRF codes
+  of your approved mapping, the classification of the incident from the signed conclusion's report type (2 days: a
+  serious public health threat; 10 days: death or an unanticipated serious deterioration; 15 days: all other), the
+  responsible parties and registrations of the market, and Canada's 10-day or 30-day classification.
+- They use C3's whole path: **created when a reportable conclusion is signed**, the meter, Send for approval blocked
+  until every mandatory field is filled, a second person's approval (or the practice label), **the PDF after approval
+  in the form's order**, cancelled by a later "not reportable". The PDF and the report page say "Starter form, for your
+  consultant to confirm" and the report's type.
+- The routes: EUDAMED or the national competent authority (EU / NI); MHRA's MORE portal (GB: MHRA accepts no other
+  route); Health Canada's Canada Vigilance by e-mail or fax.
+
+### Added: Canada's decision tree
+
+- A starter question set for **SOR/98-282 ss. 59-60** (`CA-starter-1`): sold in Canada; a failure, deterioration or
+  labelling inadequacy; death or serious deterioration, or could do so if it recurred; in Canada, or abroad for a
+  Class I device with corrective action intended or required. Report types: **10 days** (death or serious
+  deterioration), **30 days** (could if it recurred), **foreign: as soon as possible**. While question 3 is Unknown the
+  shorter 10 days applies (conservative). Calendar days, counted in your time zone, as the reporting windows already
+  in MDARIX do.
+- **Six worked complaints** in its test matrix: 6 of 6 pass. Intake's provisional clocks know Canada (10 or 30 days).
+- Canada is a market of the per-market assessment, shown where an organization has a Health Canada reporting window.
+- The EU / NI and GB trees were checked: unchanged, 5 of 5 worked complaints each pass.
+
+### Changed: Decision trees and Reports
+
+- **Decision trees shows every market's tree** (US MDR, EU / NI, Great Britain, India, Canada). A market outside the
+  organization's reporting windows says so: "Not in your reporting windows". Each tree says which report a reportable
+  outcome creates, and whether it is a starter form.
+- Reports' "Forms MDARIX prepares" lists the five forms, the three new ones marked "Starter, for your consultant to
+  confirm".
+- On the new navigation a reportable EU / NI, GB or Canada conclusion opens its report worksheet (the "record where
+  and when you reported" form stays on the classic navigation).
+
+### Fixed (C3 follow-ups)
+
+- "Waiting for my approval" listed the preparer's own report in a trial even when a colleague must approve it. It now
+  holds a report only for a person who may approve it (the same rule as the approve button).
+- An approval task about a report and Oversight's (and Home's) report deadline opened Complaints › Authority reports.
+  They open the report itself: its page on the new navigation, its panel on the classic one.
+
+### Sample numbers and labels that change
+
+No deadline, trend figure, signal or Readiness value changes. One sample record is added in each trial on the new
+navigation: SAMPLE-RV-07's EU MIR (its EU / NI conclusion was already signed reportable by the sample author).
+
+| Where | Before | After |
+|---|---|---|
+| Reports, SAMPLE-RV-07 (new) | no report; the market read "Worksheet comes later" | EU Manufacturer Incident Report (MIR) worksheet, a sample report prepared by the sample author: Created from the decision tree, **8 of 24** mandatory fields (16 to fill: the authority, the submission date, the next report's date, the submitter, the manufacturer's SRN and contact, the authorised representative, the risk class, the IMDRF Annex A, E and F codes, the device's location, the reporter's role, the preliminary results) |
+| Reports, Open reports (fresh trial) | 1 (SAMPLE-RV-10) | 2 (SAMPLE-RV-07, SAMPLE-RV-10) |
+| Home and Oversight, SAMPLE-RV-07's EU item | EU and Northern Ireland (EU MDR): reportable, the report is not started | EU Manufacturer Incident Report (MIR) worksheet: draft; it opens the report (same deadline, same owner) |
+| SAMPLE-RV-07's EU assessment (new navigation) | Filing reference and date | Open the report worksheet |
+| SAMPLE-RV-07's page, Related › Authority reports | — | EU and Northern Ireland (EU MDR) · EU Manufacturer Incident Report (MIR) worksheet · draft |
+| Decision trees, markets shown (sample) | US MDR, EU / NI, India | US MDR, EU / NI, Great Britain, India, Canada; Great Britain and Canada "Not in your reporting windows" |
+| Decision trees, each tree | — | "A reportable outcome creates the …" with "(starter, for your consultant to confirm)" for EU, GB, Canada |
+| Decision trees' footnote | … A reportable conclusion of the US or India creates its report. | … A reportable conclusion creates the market's report. |
+| Reports › Forms MDARIX prepares | United States, India ("In MDARIX today"); "EU and Northern Ireland, Great Britain: record where and when you reported…" | five forms, each with its title and edition; EU, GB, Canada "Starter, for your consultant to confirm" |
+| A report's highlights | — | "Initial report" (its type) and, for the new forms, "Starter form, for your consultant to confirm" |
+| Triage clocks with no reporting window | US, EU / NI, GB, India | the same and Canada (30 days unflagged, 10 flagged) |
+| Approval task for a report; Home and Oversight report items | open Complaints › Authority reports for the complaint | open the report itself |
+
+### Tests
+
+- pytest: `tests/test_release_c4_0_10_76.py` (new, 8): each form's order, report types, fixed lists and sources; the
+  mandatory fields per report type (EU MIR, GB MIR, Canada); the EU, GB and Canada trees' worked complaints and
+  Canada's conservative 10 days; SAMPLE-RV-07's EU MIR from staging through a type change, a refused choice, the meter's
+  block, the practice approval and the PDF in the form's section order with its starter line; a signed reportable
+  Canada conclusion creates the Health Canada report (Preliminary, "30-Day; Canadian"); every market's tree; the
+  classic navigation keeps US and India (409 `NO_WORKSHEET` for EU) and the refresh adds RV-07's report once (dry run,
+  idempotent); "Waiting for my approval" and the report links. Updated: `test_release_c3_0_10_75.py` (RV-07's own
+  creation audit), `test_intake_rules.py` (Canada's clock), `test_approval_told_api.py` (its two RV-06 tests failed on
+  0.10.75 already: C3's Send for approval waits for every mandatory field, so they fill them first; the bell line
+  opens the report).
+- Targeted pytest run (this release, C3, C2, C1, Releases A and B, authority reports API and rules, record facts,
+  business permissions, alembic drift, the migration chain, free trial, market assessments, decision guides, intake
+  rules, legal deadlines, link targets, approval told, Oversight, the flagship walk-through, standards, sample story
+  days, trial story reads): all pass after the updates above (first run 210 passed, 4 failed; the 4 rerun green).
+- vitest: `releaseC4076.test.tsx` (new, 4) and the files touched (releaseC3075, authorityReports, tasks, linkTable,
+  marketAssessment, reportingCapa, flagshipWalk, clickPaths, labels, tokens…): all pass. tsc, ruff and prettier clean.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.76-review` (`owner/`: the EU, GB and Canada trees, RV-07's EU
+  and RV-11's Canada paths, the Reports list and its forms, RV-07's EU MIR sent for approval, RV-11's Health Canada
+  report and its missing fields, RV-07's Related; `colleague/`: a locked Regulatory Leader's waiting list and the
+  EU MIR's approval; `approved/`: the EU MIR approved, PDF ready, and the forms card; `classic/`: unchanged).
+
 ## [0.10.75] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): part C3 of Release C, "Decision trees and Reports for the US and
