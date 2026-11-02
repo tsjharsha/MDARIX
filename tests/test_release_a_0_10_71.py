@@ -325,8 +325,9 @@ def test_the_refresh_links_the_flagship_service_once(trial):
 STORY = "/api/v1/trial/short-story"
 
 
-def _ask_the_hospital(user, complaint_id: str, owner: str) -> dict:
-    """Step 3 as the screen does it: the hospital as a party of the complaint, then the request with its owner."""
+def _ask_the_hospital(user, complaint_id: str, owner: str, subject: str | None = None, bind: bool = True) -> dict:
+    """Step 3 as the screen does it: the hospital as a party of the complaint, then the request with its owner, kept
+    with the story as its question (0.10.72, F2)."""
     from datetime import date, timedelta
 
     party = _ok(
@@ -341,7 +342,7 @@ def _ask_the_hospital(user, complaint_id: str, owner: str) -> dict:
     )
     from datetime import datetime, timezone
 
-    return _ok(
+    asked = _ok(
         user.post(
             "/api/v1/communications",
             json={
@@ -349,7 +350,7 @@ def _ask_the_hospital(user, complaint_id: str, owner: str) -> dict:
                 "party_id": party["id"],
                 "direction": "SENT",
                 "purpose": "INFORMATION_REQUEST",
-                "subject": "Did any treatment decision rely on the high SpO2 readings?",
+                "subject": subject or "Did any treatment decision rely on the high SpO2 readings?",
                 "channel": "EMAIL",
                 "occurred_at": datetime.now(timezone.utc).isoformat(),
                 "owner_id": owner,
@@ -357,6 +358,9 @@ def _ask_the_hospital(user, complaint_id: str, owner: str) -> dict:
             },
         )
     )
+    if bind:
+        _ok(user.post(f"{STORY}/marks", json={"step": "question", "request_id": asked["id"]}))
+    return asked
 
 
 @pytest.fixture(scope="module")

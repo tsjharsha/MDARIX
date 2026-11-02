@@ -218,6 +218,7 @@ function shortStory(current: number): ShortStory {
       asked:
         current > 2
           ? {
+              id: "q-1",
               subject: "Did any treatment decision rely on the high SpO2 readings?",
               owner_name: "Asha Quality",
               due_on: "2026-11-04",

@@ -437,7 +437,9 @@ def short_story(
 
 
 class ShortStoryMark(BaseModel):
-    step: str = Field(pattern="^(read|summary)$")
+    step: str = Field(pattern="^(read|question|summary)$")
+    # Step 3 (0.10.72, F2): the request that asks the consequence question, kept with the story.
+    request_id: uuid.UUID | None = None
 
 
 @router.post("/trial/short-story/marks")
@@ -459,6 +461,19 @@ def mark_short_story(
         raise HTTPException(
             404, detail={"code": "NO_SAMPLE_EVENT", "message": "The sample event is not in this workspace"}
         )
+    if payload.step == "question":
+        asked = story.asked_request(data, tenant_id, complaint, payload.request_id) if payload.request_id else None
+        if asked is None:
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "NOT_THE_QUESTION",
+                    "message": "Record the question to the hospital, with its owner and reply date, first.",
+                },
+            )
+        story.bind_question(request, complaint.id, asked.id)
+        db.commit()
+        return story.progress(data, db, tenant_id, me, request)
     if payload.step == "summary":
         current = story.progress(data, db, tenant_id, me, request)
         if not all(step["done"] for step in current["steps"][1:3]):

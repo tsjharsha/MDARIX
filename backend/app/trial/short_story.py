@@ -83,26 +83,102 @@ def record_mark(request, user_id: str, complaint_id, step: str, now: datetime) -
     request.profile = profile
 
 
-def _question(data: Session, tenant_id, complaint):
-    """The open question asked of the reporter's side: the latest request on the complaint with an owner and a reply
-    date, made in this trial (the sample's own requests do not count)."""
+# Step 3 is bound to the one request that asks the consequence question (0.10.72, F2): its ID is kept on the trial's
+# request when the screen records it. Before 0.10.72 any later request with an owner and a reply date counted (a
+# "When can the device be collected?" completed the step); a trial whose step 3 was recorded then is read by the
+# question's own default wording instead.
+QUESTION_KEY = "short_story_question"
+
+
+def _requests(data: Session, tenant_id, complaint):
+    """The requests sent on the complaint with an owner and a reply date, made in this trial (not the sample's)."""
     from backend.app.communications import rules
     from backend.app.db.models.guides_communications import CommunicationEntry
 
+    return data.query(CommunicationEntry).filter(
+        CommunicationEntry.tenant_id == tenant_id,
+        CommunicationEntry.complaint_id == complaint.id,
+        CommunicationEntry.direction == rules.SENT,
+        CommunicationEntry.purpose == rules.REQUEST,
+        CommunicationEntry.owner_id.is_not(None),
+        CommunicationEntry.reply_due_on.is_not(None),
+        CommunicationEntry.source_system.is_(None),
+    )
+
+
+def bound_question(request, complaint_id) -> str | None:
+    found = (request.profile or {}).get(QUESTION_KEY) or {} if request is not None else {}
+    return found.get("request_id") if found.get("complaint_id") == str(complaint_id) else None
+
+
+def bind_question(request, complaint_id, request_id) -> None:
+    """Keep the consequence request's ID on the trial's request (the caller holds the row and commits)."""
+    request.profile = {
+        **(request.profile or {}),
+        QUESTION_KEY: {"complaint_id": str(complaint_id), "request_id": str(request_id)},
+    }
+
+
+def asked_request(data: Session, tenant_id, complaint, request_id):
+    """The request ``request_id`` if it may stand as step 3's question on this complaint, else None."""
+    import uuid
+
+    from backend.app.db.models.guides_communications import CommunicationEntry
+
+    try:
+        wanted = uuid.UUID(str(request_id))
+    except ValueError:
+        return None
+    return _requests(data, tenant_id, complaint).filter(CommunicationEntry.id == wanted).first()
+
+
+def _question(data: Session, tenant_id, complaint, request=None):
+    """Step 3's request: the one bound to the story, else (a trial recorded before 0.10.72) the latest request in the
+    question's own default wording."""
+    from backend.app.db.models.guides_communications import CommunicationEntry
+
+    bound = bound_question(request, complaint.id)
+    if bound:
+        return asked_request(data, tenant_id, complaint, bound)
     return (
-        data.query(CommunicationEntry)
-        .filter(
-            CommunicationEntry.tenant_id == tenant_id,
-            CommunicationEntry.complaint_id == complaint.id,
-            CommunicationEntry.direction == rules.SENT,
-            CommunicationEntry.purpose == rules.REQUEST,
-            CommunicationEntry.owner_id.is_not(None),
-            CommunicationEntry.reply_due_on.is_not(None),
-            CommunicationEntry.source_system.is_(None),
-        )
+        _requests(data, tenant_id, complaint)
+        .filter(CommunicationEntry.subject.ilike(f"{QUESTION.rstrip('?').split(' (')[0]}%"))
         .order_by(CommunicationEntry.logged_at.desc())
         .first()
     )
+
+
+def consequence(data: Session, question) -> dict:
+    """What is known of the consequence, from the question's current state: unknown while it is open; the answer and
+    its date once answered, to reassess the markets with; closed without an answer, still unknown."""
+    from backend.app.communications import rules
+    from backend.app.db.models.guides_communications import CommunicationEntry
+
+    if question is None or question.status == rules.OPEN:
+        return {"state": "UNKNOWN", "text": CONSEQUENCE_UNKNOWN, "answer": None, "answered_on": None}
+    if question.status == rules.ANSWERED:
+        reply = (
+            data.query(CommunicationEntry)
+            .filter(CommunicationEntry.tenant_id == question.tenant_id, CommunicationEntry.in_reply_to == question.id)
+            .order_by(CommunicationEntry.occurred_at.desc())
+            .first()
+        )
+        answer = (reply.subject if reply is not None else None) or question.close_note or "Answered"
+        when = (reply.occurred_at if reply is not None else None) or question.closed_at
+        day = when.date().isoformat() if when is not None else None
+        return {
+            "state": "ANSWERED",
+            "text": f"The hospital answered{f' on {day}' if day else ''}: {answer}. Reassess each market's answers "
+            "with it.",
+            "answer": answer,
+            "answered_on": day,
+        }
+    return {
+        "state": "CLOSED",
+        "text": "Not known: the question was closed without an answer.",
+        "answer": None,
+        "answered_on": None,
+    }
 
 
 def _iso(value) -> str | None:
@@ -133,7 +209,8 @@ def progress(data: Session, control_db: Session, tenant_id, user_id: str, reques
     if complaint is None or request is None:
         return {"available": False}
     found = closure.facts(data, tenant_id, complaint)
-    triage, question = found["record"], _question(data, tenant_id, complaint)
+    triage, question = found["record"], _question(data, tenant_id, complaint, request)
+    known = consequence(data, question)
     done = steps_done(_marks(request, user_id, complaint.id), triage, complaint, question)
     current = next((index for index, (_, when) in enumerate(done) if when is None), len(done))
     view = event_view(data, control_db, tenant_id, complaint, str(user_id))
@@ -179,7 +256,10 @@ def progress(data: Session, control_db: Session, tenant_id, user_id: str, reques
             }
             if question is not None
             else None,
-            "consequence": CONSEQUENCE_UNKNOWN,
+            "consequence": known["text"],
+            "consequence_state": known["state"],
+            "answer": known["answer"],
+            "answered_on": known["answered_on"],
         },
         "service": view.get("service"),
         "markets": _markets(found, view, markets),

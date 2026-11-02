@@ -36,8 +36,19 @@ export type ShortStory = {
   question: {
     suggested: string;
     why: string;
-    asked: { subject: string; owner_name: string | null; due_on: string; status: string; logged_by: string } | null;
+    asked: {
+      id: string;
+      subject: string;
+      owner_name: string | null;
+      due_on: string;
+      status: string;
+      logged_by: string;
+    } | null;
+    /** From the bound question's state (0.10.72, F2): unknown while open, the answer and its date once answered. */
     consequence: string;
+    consequence_state?: "UNKNOWN" | "ANSWERED" | "CLOSED";
+    answer?: string | null;
+    answered_on?: string | null;
   };
   service: ServiceWork | null;
   markets: Array<{

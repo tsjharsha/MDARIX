@@ -162,3 +162,10 @@ describe("B3: the complaint page shows one action per row and does the triage it
     expect(page()).toContain("(shortStory.data?.current ?? 0) >= 3");
   });
 });
+
+describe("F2: step 3 is the consequence question the screen recorded", () => {
+  it("keeps the recorded request with the story, and reads the consequence as the server states it", () => {
+    expect(source("ShortStory")).toContain('{ step: "question", request_id: asked.id }');
+    expect(source("ShortStory")).not.toContain("consequence.toLowerCase()");
+  });
+});

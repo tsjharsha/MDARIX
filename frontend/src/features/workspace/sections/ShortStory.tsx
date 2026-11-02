@@ -276,7 +276,7 @@ export function OpenQuestion({ story, view, onSaved }: { story: ShortStory; view
           name: HOSPITAL,
           complaint_id: complaint,
         }));
-      await send("/api/v1/communications", "POST", {
+      const asked = await send<{ id: string }>("/api/v1/communications", "POST", {
         complaint_id: complaint,
         party_id: party.id,
         direction: "SENT",
@@ -287,6 +287,8 @@ export function OpenQuestion({ story, view, onSaved }: { story: ShortStory; view
         owner_id: owner,
         reply_due_on: due,
       });
+      // Step 3 is this request, kept with the story: a later, unrelated request never stands for it (0.10.72, F2).
+      await send(`${SHORT_STORY_PATH}/marks`, "POST", { step: "question", request_id: asked.id });
     });
   return (
     <div className="uw-short-body">
@@ -376,7 +378,8 @@ export function IntakeSummary({ story, onSaved }: { story: ShortStory; onSaved: 
             {asked
               ? `${asked.subject} Owner: ${asked.owner_name ?? "not named"}; reply due ${formatDate(asked.due_on)}.`
               : "Not asked yet."}{" "}
-            Consequence: {story.question.consequence.toLowerCase()}.
+            Consequence: {story.question.consequence}
+            {story.question.consequence.endsWith(".") ? "" : "."}
           </dd>
         </div>
         <div>

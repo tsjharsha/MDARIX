@@ -78,3 +78,114 @@ def test_b1_confirmed_corrected_and_entered_are_recorded():
     markets.mark_origins(answers, offered, {"US1"})
     assert markets.origins(answers) == {"US1": "CONFIRMED", "US4": "CORRECTED", "US2A": "ENTERED", "US3": "ENTERED"}
     assert answers["US4"]["suggested"] == "YES" and answers["US4"]["source"].startswith("From the complaint record")
+
+
+# ------------------------------------------------------------------------------------------- F2: step 3's question
+
+STORY = "/api/v1/trial/short-story"
+
+
+def _ok(response):
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+@pytest.fixture(scope="module")
+def story_trial():
+    from backend.app.db.session import SessionLocal
+    from backend.app.trial.retention import purge_trial
+    from tests.test_free_trial import _approved_trial_client
+
+    user, approval, _ = _approved_trial_client()
+    try:
+        yield user
+    finally:
+        import uuid
+
+        with SessionLocal() as db:
+            purge_trial(db, uuid.UUID(approval["tenant_id"]), "test:release-b-story-cleanup")
+
+
+def _request(user, complaint: str, party: str, owner: str, subject: str) -> dict:
+    from datetime import date, datetime, timedelta, timezone
+
+    return _ok(
+        user.post(
+            "/api/v1/communications",
+            json={
+                "complaint_id": complaint,
+                "party_id": party,
+                "direction": "SENT",
+                "purpose": "INFORMATION_REQUEST",
+                "subject": subject,
+                "channel": "EMAIL",
+                "occurred_at": (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(),
+                "owner_id": owner,
+                "reply_due_on": (date.today() + timedelta(days=2)).isoformat(),
+            },
+        )
+    )
+
+
+@pytest.mark.db
+def test_f2_step_3_is_the_consequence_question_and_the_summary_reads_its_state(story_trial):
+    from datetime import datetime, timezone
+
+    user = story_trial
+    complaint = _ok(user.get(STORY))["complaint"]["id"]
+    me = _ok(user.get("/api/v1/triage"))["people"][0]["id"]
+    _ok(
+        user.post(
+            f"/api/v1/triage/COMPLAINT/{complaint}/record",
+            json={"severity": "NEGLIGIBLE", "event_owner": me, "triage_owner": me, "immediate_action": "Out of use."},
+        )
+    )
+    event = _ok(user.get("/api/v1/oversight/events/SAMPLE-RV-11"))
+    _ok(
+        user.put(
+            f"/api/v1/oversight/events/{complaint}/service",
+            json={"reference": event["service"]["reference"], "status": "IN_PROGRESS", "owner_id": me},
+        )
+    )
+    assert _ok(user.get(STORY))["current"] == 2
+    party = _ok(
+        user.post(
+            "/api/v1/communications/parties",
+            json={"type": "HOSPITAL", "name": "Biomedical engineering (sample)", "complaint_id": complaint},
+        )
+    )["id"]
+
+    # 1. An unrelated request does not complete step 3 (before 0.10.72 it did: any request with an owner and a date).
+    _request(user, complaint, party, me, "When can the device be collected?")
+    assert _ok(user.get(STORY))["current"] == 2
+
+    # 2. The consequence question, kept with the story: step 3 done, the consequence unknown while it is open.
+    asked = _request(user, complaint, party, me, "Did any treatment decision rely on the high SpO2 readings?")
+    story = _ok(user.post(f"{STORY}/marks", json={"step": "question", "request_id": asked["id"]}))
+    assert story["current"] == 3 and story["question"]["asked"]["id"] == asked["id"]
+    assert (story["question"]["consequence_state"], story["question"]["consequence"]) == (
+        "UNKNOWN",
+        "Not known until the hospital answers",
+    )
+    # A later unrelated request changes nothing.
+    _request(user, complaint, party, me, "Please confirm the service address.")
+    assert _ok(user.get(STORY))["question"]["asked"]["id"] == asked["id"]
+
+    # 3. Answered: the summary shows the answer and its date, and asks to reassess.
+    _ok(
+        user.post(
+            f"/api/v1/communications/{asked['id']}/reply",
+            json={
+                "received_at": datetime.now(timezone.utc).isoformat(),
+                "channel": "EMAIL",
+                "summary": "No: oxygen was set from blood gases, not from the monitor",
+            },
+        )
+    )
+    question = _ok(user.get(STORY))["question"]
+    assert question["consequence_state"] == "ANSWERED"
+    assert question["answer"] == "No: oxygen was set from blood gases, not from the monitor"
+    assert question["answered_on"] and question["consequence"].startswith(
+        f"The hospital answered on {question['answered_on']}"
+    )
+    assert "Reassess" in question["consequence"]
