@@ -5995,3 +5995,8 @@ div.uw-task-count:hover {
 .uw-ma-suggested .ca-action-row {
   margin: 0;
 }
+/* A part revealed on request stays hidden until asked for (its own display rule would show it). */
+.uw-ma-evidence[hidden],
+.uw-ma-levels[hidden] {
+  display: none;
+}
