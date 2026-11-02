@@ -10,6 +10,143 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.74] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): part C2 of Release C, "List views and record pages", built to the
+owner-approved design (its Complaints list, complaint record, Investigations and Records). It changes organizations on
+the **new** navigation (`tenants.navigation = new`); the classic navigation keeps its screens. Pilots keep their
+permissions; a pilot's Records also leads with the person's latest signed record.
+
+**No migration.** The API and web images change. No operator step: `scripts/refresh_trial_story.py` has nothing new to
+do (the sample does not change).
+
+### Added: list views
+
+- Every tab that lists records has one **List view** choice, the persona's own views first (the approved design's list)
+  and every other view under **More views**: the persona narrows the first choice, never what the person may open.
+
+  | Persona | Its list views on Complaints |
+  |---|---|
+  | Admin | All open complaints · Due this week · Second look · Reporting · Waiting for the reporter |
+  | Quality Leader | All open complaints · Due this week · Past target · Second look |
+  | Regulatory Leader | Reportability: decision needed · Authority reports · Legal clocks this week |
+  | Complaint Handler | To triage · Calls to check · Second look · Waiting for the reporter |
+  | Decision Maker | Waiting for my approval · Signed this month |
+
+  A persona without a Complaints tab that reaches it by a link gets Admin's.
+- Seven views are filters of the one complaint list, read on the server from the same dated items, reportability
+  watch, open requests and signatures as the complaint page, Home and Oversight (`GET /api/v1/complaints?work=1&view=`:
+  `open`, `due-week`, `legal-week`, `reportability`, `waiting-reporter`, `my-approval`, `signed-month`; an unknown
+  view is refused, 422 `UNKNOWN_LIST_VIEW`). Each shows **six columns** (Urgency · What happened · Product, version,
+  lot · Markets · Owner · Stage), **one row action** (Open) and **cards on a phone**, most urgent first ("Signed this
+  month": newest first). Each says what it holds beside the choice.
+  - Due this week: a deadline or target in the next seven days, not yet overdue (as Home counts it).
+  - Legal clocks this week: a reporting deadline or report obligation in the next seven days, or already past.
+  - Reportability: decision needed: a market whose reportability a person must still decide (the watch).
+  - Waiting for the reporter: a question still open with the reporter or a partner.
+  - Waiting for my approval: an authority report sent for approval that the person did not prepare; in a trial, their
+    own too, as practice ("Practice approval: in a pilot a colleague approves this" stays at the approve button).
+  - Signed this month: a market conclusion, disposition, report approval or ready to close signed since the first of
+    the month in the organization's time zone.
+- Stage 7's work queues (To triage, Calls to check, Due soon, Past target, Second look, Reporting, Authority reports,
+  Communications, Investigations, Dismissed, All complaints) are views in the same choice and keep their own screens.
+  Every former address still lands (`linkTable.json`: Complaints' views are its tabs).
+- **Investigations** lists every investigation (Open investigations · Assigned to me · All investigations; Due ·
+  Investigation · Product · Priority · Owner · Stage; Open). It opens on the list when no investigation is open; an
+  investigation opens with "Investigations ›" to return. The Investigator, who has no Complaints tab, now reaches the
+  list from their own tab. The list has its own address (`/app/investigations?step=All+investigations`).
+
+### Changed: the record page
+
+- **One complaint's page** in the approved design's shape:
+  - "Complaints › SAMPLE-RV-11" to return to the list;
+  - a **highlights panel**: the reference, product and version, what happened, the chips (harm, each market's
+    deadline, its state), Owner, Markets, Lot and Also known as;
+  - the **path**: the stage line (Triage · Market assessment · Investigation · Decision · Ready to close · Closed in the
+    QMS) as chevrons, done, now, later or not needed;
+  - **Details · Related · Activity**:
+    - Details: what happened, harm, problem (with its IMDRF term), awareness, the status in the QMS and the service
+      work; then each step with who signs it (open ones first), the owner, and Ready to close. Ready to close is
+      revealed on request until it is the next step or signed, so the page has one main button;
+    - Related: communications, market assessments, service work, investigation, authority reports and decision records,
+      each in plain lines with one way to open it, then what was signed and its decision record (PDF);
+    - Activity: the complaint's own audit events, newest first, in plain words, who and when; the record's received
+      and awareness time last, marked "from the complaint record" (the sample was loaded without audit events).
+      `GET /api/v1/oversight/events/{ref}/activity`; nothing but the time, the words, the person and the reason
+      leaves the server.
+  - a **right rail**: Next step (one main button), Legal clocks (a lane per market, its deadline in its own time zone,
+    "Starter rules, for your consultant to confirm"), Who signs the next step (and "never the person who prepared it"
+    where it applies) and the Service work.
+  - Release A's short story and intake summary and Release B's inline triage are kept as they were.
+  - The former sections' addresses open the section that holds them now: Summary and Decisions & actions on Details,
+    Evidence on Related, History on Activity.
+- **One investigation** has the same shape: highlights (the question, its product, the state, priority and due chips,
+  Owner, Complaints in scope, Lots in scope, Blocking the decision), its four sections as the path with the next step's
+  button, and the state changes beside them.
+
+### Changed: Records
+
+- Records leads with **the latest record the person signed**, for every organization, pilots included
+  (`GET /api/v1/oversight/latest-signed`, from the signed approval records, not invalidated): what it is, when, the
+  record it belongs to, its decision record to download and its page to open. In a trial, before the person signs
+  anything, the short story's intake decision summary leads as before.
+- After the short story is finished, its bar reads **"Story finished"** with "Back to the stories" (it read "Off the
+  story's path" with "Resume SAMPLE-RV-11").
+
+### Added: search on a phone
+
+- At phone width the top bar shows a search icon that opens the same search (complaints, products, reports) as a bar
+  under the top bar.
+
+### Fixed
+
+- `releaseB072.test.tsx` F2 read the source with its line endings and failed on a Windows (CRLF) checkout: it reads
+  them as LF. No behaviour change.
+- Font sizes on the design system's scale (`tokens.test.ts` failed on 0.10.73's Home: 11, 17, 22, 24, 26 and 30 px).
+
+### Sample numbers and labels that change
+
+The sample data does not change. No deadline, trend figure, signal, Oversight count, bell, Readiness value or record
+count changes.
+
+| Where | Before | After |
+|---|---|---|
+| Complaints, first view (new navigation) | To triage, for everyone | the persona's first: Admin and Quality Leader "All open complaints", Regulatory Leader "Reportability: decision needed", Complaint Handler "To triage", Decision Maker "Waiting for my approval" |
+| Complaints, view chooser | a row of 9 view buttons | one "List view" choice, 18 views |
+| Complaint page sections | Summary · Evidence · Decisions & actions · History | Details · Related · Activity |
+| Complaint page header | "Needs attention · Owner · Due · Stage" and the next action button | highlights (Owner · Markets · Lot · Also known as), the path, and the rail's Next step |
+| Complaint page, the stage list | "Stage by stage", revealed on request | the path, always shown |
+| Complaint page, coding and record details | revealed on request | in Details |
+| Investigations tab, no investigation open | "No investigation open · Open the investigations" | the list of investigations |
+| Records, first card | the intake decision summary (trial, story finished) | the latest signed record, else the intake decision summary |
+| Complaints' guide line | Choose a view: to triage, due soon, past target, reporting and more. | Choose a list view: your own views come first. |
+| Investigations' guide line | One investigation in four sections: … | Every investigation in one list; each opens in four sections: … |
+| Complaint page, triage as the next step | between the header and the sections | first in Details, beside the rail |
+| Story bar after the short story, off its record | Off the story's path · Resume SAMPLE-RV-11 | Story finished · Back to the stories |
+
+### Tests
+
+- pytest: `tests/test_release_c2_0_10_74.py` (new, 6): for SAMPLE-RV-06, RV-08 and RV-11 the record page shows the
+  same deadline, owner, stage and next step as the list views, Home's Oversight items and Oversight's event row, and
+  Related's groups; each list view holds exactly the complaints its rule names, most urgent first, and an unknown view is
+  refused; signing puts the complaint in "Signed this month", its Activity (plain words, newest first, nothing more) and
+  the person's latest signed record; Activity and the latest record stay in their organization.
+- vitest: `releaseC2074.test.tsx` (new, 11): each persona's views match the approved design, nothing lost; Complaints
+  opens on the persona's first view; six columns, one action, the phone's card layout; the investigations list and its
+  views; the record page's highlights, path, sections and rail agree with the work line; former addresses; Related and
+  Activity; the investigation's highlights; Records' latest signed record (a pilot too); "Story finished"; the phone's
+  search; the list's own address. Updated: `app/linkTable.test.ts`, `releaseB072.test.tsx`.
+- Targeted pytest run (this release's tests, the complaint page and list, Oversight, business permissions, alembic drift,
+  the migration chain, link targets, Releases A, B and C1, the flagship walk-through, free trial): 114 passed, 2 failed.
+  Neither is this release's: `test_business_permissions.py::test_a_viewer_is_refused_on_every_guarded_route` fails the
+  same way on 0.10.73 (nine routes answer 404 instead of 403, `POST /api/v1/regulatory/draft` first), and
+  `test_complaint_page.py` (SAMPLE-RV-06) passed on its own rerun (a deadline crossing a state boundary during the
+  11-minute run). vitest for the files touched: 33 files, 248 passed; tsc, ruff and prettier clean.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.74-review` (`owner/`: each persona's Complaints, two list views,
+  SAMPLE-RV-11, RV-06 and RV-08, Related, Activity, the investigations list and page, Records, the phone's search;
+  `colleague/`: a locked Regulatory Leader; `signed/`: after a signed US conclusion, Records, Activity, Related and
+  "Signed this month"; `classic/`: unchanged).
+
 ## [0.10.73] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): part C1 of Release C, "The shell, personas and team", built to the

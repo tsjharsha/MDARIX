@@ -7282,7 +7282,7 @@ button.uw-org:hover {
     flex-basis: 100%;
   }
   .uw-lv {
-    flex: 1;
+    flex: 1 1 100%;
     min-width: 0;
   }
   .uw-lv select {
