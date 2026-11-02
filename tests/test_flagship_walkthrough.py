@@ -163,7 +163,7 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     me = _ok(user.get("/api/v1/triage"))["people"]
 
     # 1. Triage: the next action names this complaint's triage panel, which its page shows inline (0.10.72, B3).
-    assert label == "Complete the triage record (on the triage list)"
+    assert label == "Complete the triage record"  # 0.10.72: on the page, no longer "(on the triage list)"
     assert target["record"] == {"kind": "complaint", "id": complaint} and target["tab"] == "Triage"
     owner = next(person["id"] for person in me if person["name"] != "Rahul Colleague")
     _ok(

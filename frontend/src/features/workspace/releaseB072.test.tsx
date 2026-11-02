@@ -144,8 +144,8 @@ describe("B2: the investigation leads with what the decision rests on", () => {
 describe("B3: the complaint page shows one action per row and does the triage itself", () => {
   const page = () => source("ComplaintPage");
   it("puts Send to behind the row's More menu, one action per row", () => {
-    expect(page()).toMatch(/<details className="uw-row-more">[\s\S]*?<SendTo /);
-    expect(page()).not.toMatch(/\{item\.result === "BLOCKED" && <SendTo /);
+    // Send to renders inside the row's More menu, and only when a colleague may sign the step.
+    expect(page()).toMatch(/function SendTo[\s\S]*?if \(!canSend \|\| !others\.length\) return null;[\s\S]*?<details className="uw-row-more">/);
   });
   it("shows the triage panel on the page instead of a button to the triage list", () => {
     expect(page()).toContain("<InlineTriage complaintId={event.complaint_id}");

@@ -400,15 +400,7 @@ function CheckRow({
             {item.action ?? "Open"} <ChevronRight size={13} aria-hidden="true" />
           </button>
         )}
-        {item.result === "BLOCKED" && (
-          // One action per row (0.10.72, B3): "Send to" a colleague sits behind the row's More menu.
-          <details className="uw-row-more">
-            <summary aria-label={`More for ${item.label}`}>
-              <MoreHorizontal size={16} aria-hidden="true" />
-            </summary>
-            <SendTo view={view} code={item.code} onSent={() => onChanged(view)} />
-          </details>
-        )}
+        {item.result === "BLOCKED" && <SendTo view={view} code={item.code} onSent={() => onChanged(view)} />}
       </span>
     </li>
   );
@@ -442,49 +434,56 @@ function SendTo({ view, code, onSent }: { view: EventView; code: string; onSent:
   const others = (view.signers?.[code]?.people ?? []).filter((person) => person.id !== session?.user_id);
   if (!canSend || !others.length) return null;
   const hint = `send-hint-${code}`;
+  // One action per row (0.10.72, B3): "Send to" a colleague sits behind the row's More menu, shown only when a
+  // colleague may sign the step.
   return (
-    <span className="uw-cp-send">
-      <label className="ca-field">
-        <span className="sr-only">Send this step to</span>
-        <select value={to} onChange={(event) => setTo(event.target.value)} aria-describedby={hint}>
-          <option value="">Send to…</option>
-          {others.map((person) => (
-            <option key={person.id} value={person.id}>
-              {person.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button
-        type="button"
-        className="ac-secondary"
-        disabled={!to || busy}
-        aria-describedby={hint}
-        onClick={async () => {
-          setBusy(true);
-          setError("");
-          try {
-            const sent = await send<{ to: string }>(`${eventPath(view.event.complaint_id)}/send`, "POST", {
-              step: code,
-              to_user_id: to,
-            });
-            notify(`Sent to ${sent.to}: it is in their My work.`);
-            setTo("");
-            onSent();
-          } catch (reason) {
-            setError(errorText(reason, "The step was not sent."));
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <Send size={14} aria-hidden="true" /> Send
-      </button>
-      <small id={hint} className="sr-only">
-        {to ? "Sends this step to their My work." : "Choose a colleague who may sign this step first."}
-      </small>
-      <InlineError text={error} />
-    </span>
+    <details className="uw-row-more">
+      <summary aria-label="More: send this step to a colleague">
+        <MoreHorizontal size={16} aria-hidden="true" />
+      </summary>
+      <span className="uw-cp-send">
+        <label className="ca-field">
+          <span className="sr-only">Send this step to</span>
+          <select value={to} onChange={(event) => setTo(event.target.value)} aria-describedby={hint}>
+            <option value="">Send to…</option>
+            {others.map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          className="ac-secondary"
+          disabled={!to || busy}
+          aria-describedby={hint}
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            try {
+              const sent = await send<{ to: string }>(`${eventPath(view.event.complaint_id)}/send`, "POST", {
+                step: code,
+                to_user_id: to,
+              });
+              notify(`Sent to ${sent.to}: it is in their My work.`);
+              setTo("");
+              onSent();
+            } catch (reason) {
+              setError(errorText(reason, "The step was not sent."));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <Send size={14} aria-hidden="true" /> Send
+        </button>
+        <small id={hint} className="sr-only">
+          {to ? "Sends this step to their My work." : "Choose a colleague who may sign this step first."}
+        </small>
+        <InlineError text={error} />
+      </span>
+    </details>
   );
 }
 

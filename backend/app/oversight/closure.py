@@ -254,7 +254,7 @@ def checklist(found: dict) -> list[dict]:
     items = []
     # What to do next, one imperative per open item (the event summary's next action and the events list).
     actions: dict[str, str] = {
-        "TRIAGE": "Complete the triage record (on the triage list)",
+        "TRIAGE": "Complete the triage record",
         "FIRST_CONTACT": "Sign the first-contact check",
         "DECISION": "Sign the disposition",
         "TASKS": "Finish the open task in My Work",
