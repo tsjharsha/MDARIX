@@ -76,6 +76,9 @@ class Tenant(Base):
     legal_hold_reason: Mapped[str | None] = mapped_column(Text)
     legal_hold_set_at = tz()
     legal_hold_set_by: Mapped[str | None] = mapped_column(String(255))
+    # Which navigation the organization's workspace shows: classic (today's menu) or new (stage 7, built behind it).
+    # Set by a platform administrator in Tenant 360 (migration tr11navigation); the session context names it.
+    navigation: Mapped[str] = mapped_column(String(10), nullable=False, server_default="classic")
     application_version: Mapped[str | None] = mapped_column(String(80))
     schema_version: Mapped[str | None] = mapped_column(String(80))
     configuration_version: Mapped[str | None] = mapped_column(String(80))
@@ -98,6 +101,7 @@ class Tenant(Base):
             name="tenant_provisioning_status_allowed",
         ),
         CheckConstraint("tenant_type in ('STANDARD','ENTERPRISE','PRIVATE_DEPLOYMENT')", name="tenant_type_allowed"),
+        CheckConstraint("navigation in ('classic','new')", name="tenant_navigation_allowed"),
     )
 
 

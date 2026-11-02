@@ -2,8 +2,8 @@
 (signals), md29 (case scope and evidence review), md30 (intelligence judgements), md31 (intelligence values), md32 (reviews and the Decision Brief), md33 (the human decision), md40 (complaint review), md41 (reporting and CAPA), md42 (the case AI run), md43 (units per lot), md44 (email preferences, trial demo requests), tr01 (per-market assessments,
 complaint classifications, signer training), tr02 (complaint dispositions, the decision's root-cause attribution)
 tr04 to tr08 (the trial line's intake, reports, guides, oversight and lot impact tables) and tr09 (a CAPA's QMS
-reference, a lot's expiry date, a product's device category and a complaint's other lots) and tr10 (a set-aside import
-row dismissed with a reason).
+reference, a lot's expiry date, a product's device category and a complaint's other lots), tr10 (a set-aside import
+row dismissed with a reason) and tr11 (each organization's navigation, classic or new).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -226,6 +226,17 @@ STEPS = (
         done_sql=(
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
             "AND table_name = 'import_quarantine_rows' AND column_name = 'resolution_note')"
+        ),
+    ),
+    Step(
+        "tr11",
+        "tr11_trial_navigation.py",
+        "add_navigation",
+        (),
+        ("tenants",),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'tenants' AND column_name = 'navigation')"
         ),
     ),
 )
