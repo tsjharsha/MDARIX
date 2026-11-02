@@ -84,6 +84,8 @@ import { TrendsSection } from "./sections/Trends";
 import { SettingsSection } from "./sections/Settings";
 import { TeamSection } from "./sections/Team";
 import { ComplaintPage } from "./sections/ComplaintPage";
+import { StoryBar } from "./sections/Entrance";
+import { entranceSeen, savedStory, saveStory } from "./entrance";
 import { carryOverColumnChoices, columnScopeFor } from "../tables/columnViews";
 import {
   addressFor,
@@ -267,6 +269,15 @@ const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
     description: "Profile, security, away",
     guide: "Your profile, sign-in security, the roles you hold, and when you will be away.",
   },
+  "Getting started": {
+    description: "Five-minute stories on the sample",
+    guide: "Start with a short story on the sample's own records, or try it on your own export.",
+  },
+  Investigations: {
+    description: "One investigation, from its question to its decision",
+    guide:
+      "One investigation in four sections: its summary, its evidence, its decisions and actions, and its history. The main button names the next step.",
+  },
 };
 
 /** Under the MVP feature set Records and My Work also hold what the parked sections did (app/featureSet.ts). */
@@ -351,6 +362,12 @@ export function UserWorkspace({
     }
   });
   const [menuOpen, setMenuOpen] = useState(false);
+  // The five-minute story under way (stage 8, entrance.ts), kept for this browser tab.
+  const [story, setStory] = useState<string | null>(() => (fresh ? savedStory() : null));
+  const startStory = useCallback((key: string | null) => {
+    saveStory(key as Parameters<typeof saveStory>[0]);
+    setStory(key);
+  }, []);
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
   const [trial, setTrial] = useState<TrialStatus | null>(null);
   const [trialChecked, setTrialChecked] = useState(false);
@@ -435,9 +452,10 @@ export function UserWorkspace({
       notify(`${caseLink} could not be opened right now. Open it from Investigations.`, "critical");
   }, [caseLinkState]);
 
-  // A free-trial user starts on Getting started, unless they followed a link to a specific screen.
+  // A free-trial user starts on Getting started, unless they followed a link to a specific screen. On the new
+  // navigation that is the five-minute entrance the first time; a returning person starts on My work (stage 8).
   useEffect(() => {
-    if (trial?.is_trial && (initialView ?? "home") === "home" && !addressed)
+    if (trial?.is_trial && (initialView ?? "home") === "home" && !addressed && !(fresh && entranceSeen()))
       setLocation((current) => (current.key === 0 ? { ...current, section: "Getting started" } : current));
   }, [trial?.is_trial]);
 
@@ -526,6 +544,8 @@ export function UserWorkspace({
     shownTab: shown ?? location.tab,
     isTrial: !!trial?.is_trial,
     navigation,
+    story,
+    startStory,
   };
   const { section, tab } = location;
 
@@ -723,6 +743,7 @@ export function UserWorkspace({
                   <FeedbackPrompt onOpen={() => open("Share feedback")} />
                 )}
                 {trial?.is_trial && <ChapterDone refreshKey={location.key} onOpen={openChapter} />}
+                {fresh && trial?.is_trial && <StoryBar section={section} tab={shown ?? tab} />}
                 {message && (
                   <div className={`ac-message uw-notice tone-${message.tone}`} role="status">
                     {message.text}

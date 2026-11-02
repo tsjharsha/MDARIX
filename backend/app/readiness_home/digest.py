@@ -31,7 +31,7 @@ LOOP = (
     ("COMPLAINTS_PAST_TARGET", "Handled on time"),
     ("REPORTING_CLOCKS", "Reported in window"),
     ("HARM_CLOSED_WITHOUT_CASE", "Harm investigated"),
-    ("TRIAGE_OVERDUE", "Signals triaged"),
+    ("TRIAGE_OVERDUE", "Trends triaged"),
     ("TRENDS_WITHOUT_ACTION", "Trends acted on"),
     ("CAPA_EFFECTIVENESS", "CAPAs proven"),
     ("RISK_FILE_INPUT", "Risk file fed"),

@@ -288,6 +288,33 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
     return found
 
 
+def _watch_items(db: Session, control_db, tenant_id, now: datetime) -> list[dict]:
+    """The reportability watch's provisional clock of a market not assessed yet (SAMPLE-RV-06: FDA), so Oversight
+    says what Reporting and the complaint page say (stage 8; it listed a market's clock only once its assessment was
+    started)."""
+    from backend.app.reportability import markets
+    from backend.app.reportability import service as reportability
+
+    found = []
+    for item in reportability.watch(db, control_db, tenant_id, show="open", page_size=10_000, today=now)["items"]:
+        binding = item.get("binding")
+        if not binding or not binding.get("due_at"):
+            continue
+        market = binding.get("market")
+        found.append(
+            _item(
+                f"watch:{item['id']}:{market}",
+                "REPORTING",
+                f"{markets.MARKET_LABELS.get(market, market)}: not assessed yet, provisional deadline",
+                datetime.fromisoformat(binding["due_at"]),
+                complaint_id=item["id"],
+                market=market,
+                opens=links.target("Complaints", "Reportability", record=("complaint", item["id"])),
+            )
+        )
+    return found
+
+
 def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
     from backend.app.authority_reports import forms
     from backend.app.authority_reports import rules as report_rules
@@ -424,6 +451,7 @@ def due_items(db: Session, control_db: Session | None, tenant_id, now: datetime 
         ("tasks", lambda: _task_items(db, tenant_id)),
         ("triage", lambda: _triage_items(db, control_db, tenant_id, now)),
         ("reports", lambda: _report_items(db, tenant_id, calendar.zone)),
+        ("watch", lambda: _watch_items(db, control_db, tenant_id, now)),
         ("guides", lambda: _guide_items(db, tenant_id, calendar)),
         ("capas", lambda: _capa_items(db, tenant_id)),
     )
@@ -446,6 +474,17 @@ def due_items(db: Session, control_db: Session | None, tenant_id, now: datetime 
         if not (
             item["key"].startswith("task:") and item["category"] == "REPORTING" and item["complaint_id"] in reported
         )
+    ]
+    # The watch's provisional clock stands only for a market no assessment or report of the complaint dates yet.
+    dated = {
+        (item["complaint_id"], item["market"])
+        for item in items
+        if item["key"].startswith(("obligation:", "assessment:"))
+    }
+    items = [
+        item
+        for item in items
+        if not (item["key"].startswith("watch:") and (item["complaint_id"], item["market"]) in dated)
     ]
     _with_complaints(db, tenant_id, items)
     items.sort(key=lambda item: (item["due_at"], item["key"]))

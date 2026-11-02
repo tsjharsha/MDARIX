@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { WhyAsked } from "../../shared/Basis";
+import { DISPOSITION_WHY } from "../whyAsked";
 import { triggerLabel, versionWords } from "../../../app/labels";
 import { CheckCircle2, FileWarning, GitBranch, Inbox, Link2, ShieldAlert, Timer, Wrench } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
@@ -7,6 +9,7 @@ import { ImdrfCodes, RecordOrigin } from "./ImportReports";
 import { formatDay } from "../../../app/dates";
 import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import { countOf, DecideAndSign } from "./common";
+import { ComplaintNextStep } from "./ComplaintNextStep";
 import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
 import { TrainingPanel } from "./MarketAssessment";
 import { EscalateButton } from "./Triage";
@@ -250,6 +253,9 @@ export function DispositionDrawer({
           }}
           onTrained={screen.reload}
         />
+      )}
+      {screen.data && (
+        <ComplaintNextStep complaintId={complaintId} refreshKey={String(screen.data.current?.version ?? 0)} />
       )}
     </Drawer>
   );
@@ -724,6 +730,7 @@ function QuestionHead({ number, text, state }: { number: number; text: string; s
       <span className="uw-dp-number">{number}</span>
       <strong>{text}</strong>
       <ToneBadge tone={badge.tone} label={badge.label} />
+      <WhyAsked why={DISPOSITION_WHY[number]} />
     </div>
   );
 }

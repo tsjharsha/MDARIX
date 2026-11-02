@@ -1049,7 +1049,7 @@ export const platformCapabilityData: Record<
         text: "Carry provenance, scope, uncertainty, and human accountability from exploration into the decision package.",
       },
     ],
-    steps: ["Product", "Version", "Component", "Supplier", "Lot", "Signal", "Evidence", "Review"],
+    steps: ["Product", "Version", "Component", "Supplier", "Lot", "Trend", "Evidence", "Review"],
   },
   "product-version": {
     kicker: "Product version intelligence · controlled MedTech release history",
@@ -1103,7 +1103,7 @@ export const platformCapabilityData: Record<
         text: "Keep each event tied to its source, organization, product version and limitations before it informs a human decision.",
       },
     ],
-    steps: ["Effective", "Recorded", "Known", "Change", "Signal", "Evidence", "Review"],
+    steps: ["Effective", "Recorded", "Known", "Change", "Trend", "Evidence", "Review"],
   },
   "post-market-surveillance": {
     kicker: "Post-market surveillance",
@@ -1124,7 +1124,7 @@ export const platformCapabilityData: Record<
         text: "Link surveillance findings to investigations, risk review, CAPA, field action assessment, and human decisions.",
       },
     ],
-    steps: ["Field data", "Product context", "Signal", "Investigation", "Assessment", "Action"],
+    steps: ["Field data", "Product context", "Trend", "Investigation", "Assessment", "Action"],
   },
   "lifecycle-evidence-intelligence": {
     kicker: "Evidence intelligence",
@@ -1176,7 +1176,7 @@ export const investigationCapability = {
       text: "Assemble a versioned brief with provenance and limitations; authorized humans remain responsible for conclusions and approvals.",
     },
   ],
-  steps: ["Signal", "Scope", "Context", "Evidence", "Hypotheses", "Unknowns", "Review"],
+  steps: ["Trend", "Scope", "Context", "Evidence", "Hypotheses", "Unknowns", "Review"],
 };
 export const evidenceCapability = {
   kicker: "Evidence - connected MedTech intelligence",
@@ -1205,5 +1205,5 @@ export const evidenceCapability = {
       text: "Carry citations, source identifiers, limitations, and reviewer responsibility into the investigation brief and decision package.",
     },
   ],
-  steps: ["Sources", "Context", "Provenance", "Evidence", "Gaps", "Review", "Decision"],
+  steps: ["Sources", "Context", "Provenance", "Evidence", "Unknowns", "Review", "Decision"],
 };

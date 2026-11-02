@@ -80,7 +80,7 @@ export function trustExportName(caseLabel: string | null | undefined, format: Ex
     .trim()
     .replace(/[^A-Za-z0-9._-]+/g, "-")
     .replace(/^[-.]+|-+$/g, "");
-  return `${base || "case"}-audit-trail.${format}`;
+  return `${base || "investigation"}-audit-trail.${format}`;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1078,7 +1078,7 @@ export function auditChainView(chain: IntegrityResponse["audit_chain"] | unknown
     state: "unchecked",
     label: "Not checked",
     tone: "neutral",
-    detail: sentence(row.reason) ?? "The audit chain of this case was not checked.",
+    detail: sentence(row.reason) ?? "The audit chain of this investigation was not checked.",
   };
 }
 

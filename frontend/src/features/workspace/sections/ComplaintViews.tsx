@@ -65,7 +65,8 @@ export function ComplaintViews({ tab }: { tab?: string }) {
         {view === "Dismissed" && <SecondLook initial="dismissed" fixed />}
         {view === "Reporting" && (
           <>
-            {!complaint && <ReportabilityWatch onOpenTab={go} />}
+            {/* A market assessment's link (part=assess) opens the complaint's assessment; a report's link its reports. */}
+            {(!complaint || tabParam(carried, "part") === "assess") && <ReportabilityWatch onOpenTab={go} />}
             <Reports complaintId={complaint} />
           </>
         )}

@@ -19,10 +19,18 @@ import {
 import { displayId, referenceId } from "../../../app/displayId";
 import { InvestigationWorkspacePanel } from "../../investigator/InvestigationWorkspacePanel";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
-import { chooseCase, useCan, useFeatureSet, useWorkspace, type OpenInvestigationRequest } from "../workspaceContext";
+import {
+  chooseCase,
+  useCan,
+  useFeatureSet,
+  useNavigation,
+  useWorkspace,
+  type OpenInvestigationRequest,
+} from "../workspaceContext";
 import { tabsFor } from "../../../app/featureSet";
 import { tabParts } from "../../../app/linkTable";
 import { CaseEvidencePanel } from "./CaseEvidence";
+import { CaseSections } from "./CaseSections";
 import { AskMdarixPage } from "../../ask/AskMdarixPage";
 import { CaseRecordDownload } from "../../reports/CaseRecordDownload";
 import { trustTab } from "../caseAudit";
@@ -86,6 +94,31 @@ const CASE_PAGE_TABS = [
 type Tab = (typeof TABS)[number] | (typeof CASE_PAGE_TABS)[number];
 
 export function InvestigationsSection({ tab: requested }: { tab?: string }) {
+  // The new navigation (stage 8): one investigation in four sections; its list is Complaints › Investigations.
+  return useNavigation() === "new" ? <NewCaseSections tab={requested} /> : <ClassicInvestigations tab={requested} />;
+}
+
+function NewCaseSections({ tab }: { tab?: string }) {
+  const { work } = useWorkspace();
+  const [managing, setManaging] = useState<any | null>(null);
+  return (
+    <>
+      <CaseSections tab={tab} onManage={setManaging} onChanged={() => work.refreshInvestigations()} />
+      {managing && (
+        <ManageInvestigation
+          row={managing}
+          onClose={() => setManaging(null)}
+          onSaved={() => {
+            setManaging(null);
+            work.refreshInvestigations();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function ClassicInvestigations({ tab: requested }: { tab?: string }) {
   const { work, open, notify, reportStep, isTrial } = useWorkspace();
   // Under the MVP feature set the case story is parked and the decision is taken on this case's Decision tab
   // (featureSet.ts).

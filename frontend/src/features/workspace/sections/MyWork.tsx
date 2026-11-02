@@ -216,6 +216,14 @@ export function NewMyWorkSection({ tab }: { tab?: string }) {
   return (
     <>
       <NextStep />
+      {/* A returning trial user lands here; the five-minute stories are one click away (8.4). */}
+      {isTrial && (
+        <p className="uw-entrance-link">
+          <button type="button" className="ac-link" onClick={() => open("Getting started")}>
+            The five-minute stories: start one on the sample
+          </button>
+        </p>
+      )}
       {manager && <TeamNumbers onOpen={() => setActive("Team overview")} />}
       <Tabs tabs={tabs} active={active} onChange={setActive} label="My work sections">
         {active === "Tasks for me" && (
@@ -303,12 +311,29 @@ export function NextStep() {
 
 /** Managers' four inspection-readiness numbers and the oversight summary, above My work's tabs (7.2). */
 function TeamNumbers({ onOpen }: { onOpen: () => void }) {
-  const { open } = useWorkspace();
-  const readiness = useResource<Readiness>(READINESS_PATH);
   const oversight = useResource<Oversight>(OVERSIGHT);
   const view = oversight.data;
   return (
     <div className="uw-team-numbers" aria-label="Your team at a glance">
+      <ReadinessNumbers />
+      <button type="button" className={`uw-rd-tile tone-${view?.overdue ? "critical" : "good"}`} onClick={onOpen}>
+        <span className="uw-rd-tile-head">Overdue, whole team</span>
+        <strong className="uw-rd-value">{view?.overdue ?? "…"}</strong>
+      </button>
+      <button type="button" className={`uw-rd-tile tone-${view?.due_soon ? "warning" : "good"}`} onClick={onOpen}>
+        <span className="uw-rd-tile-head">Due soon, whole team</span>
+        <strong className="uw-rd-value">{view?.due_soon ?? "…"}</strong>
+      </button>
+    </div>
+  );
+}
+
+/** The four inspection-readiness numbers (Readiness's home checks), each opening its list: My work and the entrance. */
+export function ReadinessNumbers() {
+  const { open } = useWorkspace();
+  const readiness = useResource<Readiness>(READINESS_PATH);
+  return (
+    <>
       {(readiness.data?.home ?? []).map((check) => (
         <button
           type="button"
@@ -325,15 +350,7 @@ function TeamNumbers({ onOpen }: { onOpen: () => void }) {
           <strong className="uw-rd-value">{checkValue(check)}</strong>
         </button>
       ))}
-      <button type="button" className={`uw-rd-tile tone-${view?.overdue ? "critical" : "good"}`} onClick={onOpen}>
-        <span className="uw-rd-tile-head">Overdue, whole team</span>
-        <strong className="uw-rd-value">{view?.overdue ?? "…"}</strong>
-      </button>
-      <button type="button" className={`uw-rd-tile tone-${view?.due_soon ? "warning" : "good"}`} onClick={onOpen}>
-        <span className="uw-rd-tile-head">Due soon, whole team</span>
-        <strong className="uw-rd-value">{view?.due_soon ?? "…"}</strong>
-      </button>
-    </div>
+    </>
   );
 }
 

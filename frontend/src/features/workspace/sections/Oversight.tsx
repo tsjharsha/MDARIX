@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { placeOf } from "../../../app/linkTable";
 import { DeadlineChip } from "../../../app/chips";
-import { DecideAndSign } from "./common";
+import { DecideAndSign, shortPrint } from "./common";
 import { marketLabel } from "../../../app/labels";
 import { CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, send, useResource, type Column } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
-import { useCan, useTabParam, useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { useCan, useOpenTarget, useTabParam, useWorkspace } from "../workspaceContext";
 import {
   CHECK_TONES,
   EVENT_TONES,
@@ -29,14 +28,7 @@ import {
 } from "../oversight";
 import { InlineError, Why } from "./boardParts";
 
-function useOpen() {
-  const { open } = useWorkspace();
-  return (opens: Opens) => {
-    if (!opens) return;
-    const place = placeOf(opens);
-    open(place.section as WorkspaceSection, place.tab);
-  };
-}
+const useOpen = useOpenTarget;
 
 /**
  * The Quality and Regulatory Oversight view (T-G9), in Readiness: everything overdue or due soon across triage,
@@ -554,7 +546,14 @@ export function ReadyForm({ view, onChanged }: { view: EventView; onChanged: (vi
             </label>
           )}
           <div className="ca-form-grid">
-            <DecideAndSign />
+            <DecideAndSign
+              signs={`${view.event.ref} is ready to close in your QMS${view.blocked ? `, with ${view.blocked} ${view.blocked === 1 ? "item" : "items"} open` : ""}.`}
+              restsOn={[
+                `The checklist as it stands: ${view.checklist.filter((item) => item.result === "PASS").length} done, ${view.blocked} open.`,
+                (view.work?.markets ?? []).length ? `Markets: ${(view.work?.markets ?? []).join(", ")}.` : null,
+                `Decision record version ${view.decision_record.version}, fingerprint ${shortPrint(view.decision_record.sha256)}.`,
+              ]}
+            />
             <label className="ca-field">
               Your password
               <input
@@ -599,18 +598,25 @@ export function DecisionRecord({ view, onChanged }: { view: EventView; onChanged
   const action = useRun(onChanged, "The QMS reference was not recorded.");
   const record = view.decision_record;
   return (
-    <section className="ca-drawer-section" aria-label="Event decision record">
-      <h3>Event decision record</h3>
+    <section className="ca-drawer-section uw-receipt" aria-label="Event decision record">
+      {/* Wow screen 6: the decision record reads as a receipt: who signed what, when, and its fingerprint. */}
+      <header className="uw-receipt-head">
+        <h3>Decision record</h3>
+        <span>
+          {view.event.ref} · version {record.version}
+        </span>
+      </header>
       {record.entries.length ? (
-        <ol className="uw-ov-record">
+        <ol className="uw-ov-record uw-receipt-lines">
           {record.entries.map((entry, index) => (
             <li key={`${entry.kind}-${index}`}>
-              <span>
-                <strong>{entry.kind}</strong>: {entry.summary}
+              <span className="uw-receipt-line">
+                <strong>{entry.kind}</strong>
+                <span>{entry.summary}</span>
               </span>
               {entry.reason && <span className="ac-muted">Reason: {entry.reason}</span>}
               <small>
-                {entry.signer}, {formatDate(entry.signed_at)}. {entry.meaning}
+                Signed by {entry.signer}, {formatDate(entry.signed_at)}. {entry.meaning}
               </small>
             </li>
           ))}
@@ -618,7 +624,14 @@ export function DecisionRecord({ view, onChanged }: { view: EventView; onChanged
       ) : (
         <p className="ac-muted">No decision on this event is signed yet.</p>
       )}
-      <p className="ac-muted">SHA-256 of its content: {record.sha256.slice(0, 16)}…</p>
+      <p className="uw-receipt-total">
+        <span>
+          {record.entries.length} signed {record.entries.length === 1 ? "decision" : "decisions"}
+        </span>
+        <span>
+          Fingerprint (SHA-256) <code>{record.sha256.slice(0, 16)}…</code>
+        </span>
+      </p>
       <div className="ca-action-row">
         {canExport && (
           <button

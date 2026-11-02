@@ -81,9 +81,9 @@ def test_the_page_lists_my_work_and_oversight_show_the_same_deadline_owner_and_n
     # Oversight: its dated items for the complaint, and its event row.
     oversight = user.get("/api/v1/oversight", params={"show": "all"}).json()
     items = [item for item in oversight["items"] if item["complaint_id"] == complaint_id]
-    # Oversight lists a market's clock once its assessment is started; before that, the page and the list show the
-    # reportability watch's provisional clock (the Reporting view), the same due time.
-    listed_due = [item for item in work["due"] if not item["key"].startswith("watch:")]
+    # Oversight lists the reportability watch's provisional clock of a market not assessed yet too (0.10.69, pending
+    # the owner's approval): the page, the list and Oversight say the same dated items.
+    listed_due = work["due"]
     assert [item["due_at"] for item in items] == [item["due_at"] for item in listed_due]
     assert [item["title"] for item in items] == [item["title"] for item in listed_due]
     watch = user.get("/api/v1/complaints/reportability", params={"show": "all", "page_size": 200}).json()["items"]

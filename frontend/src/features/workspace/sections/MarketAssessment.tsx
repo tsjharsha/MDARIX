@@ -1,5 +1,7 @@
 import { useContext, useEffect, useId, useState } from "react";
 import { DecideAndSign } from "./common";
+import { ComplaintNextStep } from "./ComplaintNextStep";
+import { MARKET_QUESTION_WHY } from "../whyAsked";
 import { versionWords } from "../../../app/labels";
 import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
@@ -35,7 +37,7 @@ import {
   type Version,
 } from "../marketAssessment";
 import { InlineError } from "./boardParts";
-import { BasisChips } from "../../shared/Basis";
+import { WhyAsked, BasisChips } from "../../shared/Basis";
 
 /** Whether the signed-in role may save and sign an assessment (regulatory review or approval: the server's rule). */
 function useCanAssess() {
@@ -61,6 +63,7 @@ export function MarketAssessmentDrawer({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const { story } = useWorkspace();
   const detail = useResource<AssessmentDetail>(assessmentPath(complaint.id));
   const data = detail.data;
   const shown = data?.markets ?? [];
@@ -90,6 +93,15 @@ export function MarketAssessmentDrawer({
         >
           <MarketPanel key={active.market} detail={data} item={active} onSaved={reload} />
         </Tabs>
+      )}
+      {data && active && (
+        <ComplaintNextStep
+          complaintId={complaint.id}
+          refreshKey={shown.map((item) => `${item.current?.version ?? 0}.${item.draft?.version ?? 0}`).join()}
+          first={
+            alsoIndia(story, shown, active) ? { label: "Assess India (CDSCO) too", run: () => setMarket("IN") } : null
+          }
+        />
       )}
     </Drawer>
   );
@@ -250,6 +262,7 @@ export function MarketPanel({
         item={item}
         severity={detail.severity}
         severityLevel={detail.severity_level}
+        severitySource={detail.severity_source}
         form={form}
         setForm={setForm}
       />
@@ -336,7 +349,19 @@ export function MarketPanel({
             </label>
           )}
           <div className="ca-form-grid">
-            <DecideAndSign />
+            <DecideAndSign
+              signs={`${item.label}: ${sign.conclusion ? CONCLUSION_LABELS[sign.conclusion].toLowerCase() : "your conclusion"} for ${
+                detail.complaint.complaint_identifier ?? detail.complaint.business_id ?? "this complaint"
+              }${sign.conclusion === "REPORTABLE" && item.draft.report_type_label ? `, ${item.draft.report_type_label}` : ""}.`}
+              restsOn={[
+                `Your answers to ${Object.values(item.draft.answers).filter((entry) => entry.answer).length} of ${questions.length} questions, saved as draft version ${item.draft.version}.`,
+                `${item.question_set.title} (${versionWords(item.draft.question_set)}), its clauses locked.`,
+                item.draft.harm_level
+                  ? `Harm level ${item.draft.harm_level.toLowerCase()} on the harm-severity scale.`
+                  : null,
+                item.clock ? `The ${item.label} clock: due ${deadlineLabel(item.clock)}.` : null,
+              ]}
+            />
             <label className="ca-field">
               Your password
               <input
@@ -431,7 +456,7 @@ function QuestionRow({
         <p id={definitionId} className="ac-muted" hidden={!open}>
           {question.definition}
         </p>
-        {question.note && <p className="uw-hint">{question.note}</p>}
+        <WhyAsked why={{ why: question.note || MARKET_QUESTION_WHY, basis: [] }} clause={question.clause} />
         <OwnText question={question} />
         <div className="uw-ma-answers" role="radiogroup" aria-label={`Answer to ${question.id}`}>
           {ANSWERS.map((answer) => (
@@ -488,6 +513,7 @@ export function ScalePanel({
   item,
   severity,
   severityLevel,
+  severitySource,
   form,
   setForm,
 }: {
@@ -495,6 +521,7 @@ export function ScalePanel({
   item: MarketItem;
   severity: string | null;
   severityLevel: string | null;
+  severitySource?: string | null;
   form: AssessmentForm;
   setForm: (form: AssessmentForm) => void;
 }) {
@@ -523,7 +550,9 @@ export function ScalePanel({
         ))}
       </ol>
       <p className="uw-cr-meta">
-        Quality-system severity: {severity ? `"${severity}"` : "not recorded"} →{" "}
+        {severitySource === "The triage record"
+          ? "From the triage record: "
+          : `Quality-system severity: ${severity ? `"${severity}"` : "not recorded"} → `}
         {severityLevel ? <strong>{label(severityLevel).toLowerCase()}</strong> : "not mapped: choose a level"}
         {severityLevel &&
         thresholdRank >= 0 &&
@@ -766,5 +795,22 @@ export function OwnText({ question }: { question: Pick<Question, "explanation" |
         </p>
       )}
     </>
+  );
+}
+
+/**
+ * The flagship story asks "in the US and India?": once the market shown is signed, India comes next when it is
+ * enabled and not assessed yet. Outside that story the complaint's own next action leads.
+ */
+export function alsoIndia(
+  story: string | null | undefined,
+  shown: ReadonlyArray<Pick<MarketItem, "market" | "current">>,
+  active: Pick<MarketItem, "market" | "current">,
+): boolean {
+  return (
+    story === "reportable" &&
+    active.market !== "IN" &&
+    !!active.current &&
+    shown.some((item) => item.market === "IN" && !item.current)
   );
 }

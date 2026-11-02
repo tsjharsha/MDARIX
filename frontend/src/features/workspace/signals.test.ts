@@ -431,7 +431,7 @@ describe("triage actions", () => {
   });
 
   it("checks merges and added complaints", () => {
-    expect(mergeProblem([], "Same root cause found")).toMatch(/at least one signal/);
+    expect(mergeProblem([], "Same root cause found")).toMatch(/at least one trend/);
     expect(mergeProblem([UUID], "short")).toMatch(/at least 10/);
     expect(mergeProblem([UUID], "Same battery problem")).toBeNull();
     expect(addComplaintsProblem([], "Same battery problem")).toMatch(/at least one complaint/);
@@ -520,7 +520,7 @@ describe("detection rules", () => {
 
   it("says what the rule does", () => {
     expect(ruleSentence(rule)).toBe(
-      "Opens a signal when 3 or more complaints about the same product problem arrive within 30 days.",
+      "Opens a trend when 3 or more complaints about the same product problem arrive within 30 days.",
     );
     expect(ruleSentence({ min_complaints: 2, window_days: 1 })).toMatch(/within 1 day\./);
   });
@@ -552,12 +552,12 @@ describe("detection rules", () => {
       updated: ["SIG000007"],
       monitor_reopened: [],
     };
-    expect(runSummary(result)).toBe("Detection ran: 2 signals created, 1 updated, none reopened from monitoring.");
+    expect(runSummary(result)).toBe("Detection ran: 2 trends created, 1 updated, none reopened from monitoring.");
     expect(runIds(result.created)).toEqual({ count: 2, ids: ["SIG000031", "SIG000032"] });
     expect(runIds(3)).toEqual({ count: 3, ids: [] });
     expect(runIds([UUID])).toEqual({ count: 1, ids: [] });
     expect(runSummary({ created: [], updated: [], monitor_reopened: [] })).toBe(
-      "Detection ran: no new or changed signals.",
+      "Detection ran: no new or changed trends.",
     );
     expect(runSummary(null)).toBe("");
   });

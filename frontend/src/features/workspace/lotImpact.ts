@@ -116,7 +116,9 @@ export const KIND_GROUPS: readonly [FactorKind, string][] = [
 /** "NS-SL-2417: 5 lots, 2 of this case's" for the factor picker. */
 export function optionText(option: FactorOption): string {
   const lots = `${option.lots} ${option.lots === 1 ? "lot" : "lots"}`;
-  return option.case_lots ? `${option.label}: ${lots}, ${option.case_lots} of this case's` : `${option.label}: ${lots}`;
+  return option.case_lots
+    ? `${option.label}: ${lots}, ${option.case_lots} of this investigation's`
+    : `${option.label}: ${lots}`;
 }
 
 /** "US 230 · IN 112", or the empty text when nothing shipped. */

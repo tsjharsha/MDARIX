@@ -8,7 +8,7 @@ import { safeText } from "../../../app/displayId";
 import { downloadFile } from "../../reports/download";
 import { StatementKind } from "../../shared/StatementKind";
 import "../../shared/statement-kind.css";
-import { chooseCase, useCan, useWorkspace } from "../workspaceContext";
+import { chooseCase, useCan, usePanelState, useWorkspace } from "../workspaceContext";
 import {
   caseDecisionPath,
   decisionHistory,
@@ -115,15 +115,15 @@ function TrustExport({ investigationId, caseLabel }: { investigationId: string; 
       const name = await downloadFile(trustExportPath(investigationId, format), {
         fallbackName: trustExportName(caseLabel, format),
       });
-      setResult({ ok: true, text: `Case audit trail downloaded as ${name}.` });
+      setResult({ ok: true, text: `Investigation audit trail downloaded as ${name}.` });
     } catch (reason) {
-      setResult({ ok: false, text: describeError(reason, "The case audit trail could not be downloaded.") });
+      setResult({ ok: false, text: describeError(reason, "The investigation audit trail could not be downloaded.") });
     } finally {
       setBusy(null);
     }
   };
   return (
-    <div className="ta-export" role="group" aria-label="Export the case audit trail">
+    <div className="ta-export" role="group" aria-label="Export the investigation audit trail">
       <span>Export</span>
       {(["json", "csv"] as const).map((format) => (
         <button
@@ -132,7 +132,7 @@ function TrustExport({ investigationId, caseLabel }: { investigationId: string; 
           className="ac-secondary"
           disabled={busy !== null}
           onClick={() => void download(format)}
-          aria-label={`Export the case audit trail as ${format.toUpperCase()}`}
+          aria-label={`Export the investigation audit trail as ${format.toUpperCase()}`}
         >
           <Download size={14} aria-hidden="true" /> {busy === format ? "Preparing…" : format.toUpperCase()}
         </button>
@@ -210,13 +210,13 @@ export function CaseTimeline({
   return (
     <Panel
       eyebrow={caseLabel}
-      title={`Case timeline${total !== null ? ` · ${total}` : ""}`}
+      title={`Investigation timeline${total !== null ? ` · ${total}` : ""}`}
       source={timeline}
       action={<TrustExport investigationId={investigationId} caseLabel={caseLabel} />}
     >
       <p className="ac-note">
-        Every recorded step of this case, oldest first. Each event says who made it: a person, AI or MDARIX itself. AI
-        never decides or signs; people do.
+        Every recorded step of this investigation, oldest first. Each event says who made it: a person, AI or MDARIX
+        itself. AI never decides or signs; people do.
       </p>
       <div className="ca-chips ta-chips" role="group" aria-label="Event categories">
         <button
@@ -281,7 +281,7 @@ export function CaseTimeline({
         </p>
       )}
       {shown.length ? (
-        <ol className="ta-timeline" aria-label="Case events">
+        <ol className="ta-timeline" aria-label="Investigation events">
           {shown.map((event, index) => {
             const actor = eventActor(event);
             const object = eventObject(event);
@@ -338,7 +338,7 @@ export function CaseTimeline({
           detail={
             filtered
               ? "Change the filters or the search to see more."
-              : "Each step of the case (signals, scope, evidence, reviews, the brief and the decision) appears here."
+              : "Each step of the investigation (trends, scope, evidence, reviews, the brief and the decision) appears here."
           }
         />
       )}
@@ -456,10 +456,10 @@ export function CaseReplay({
   const data = path ? replay.data : null;
   return (
     <>
-      <Panel eyebrow={caseLabel} title="Replay the case at a moment">
+      <Panel eyebrow={caseLabel} title="Replay the investigation at a moment">
         <p className="ac-note">
-          See the case as it was known at a moment: the complaints, evidence, hypotheses, unknowns and reviews then, and
-          what arrived later. Nothing recorded is changed.
+          See the investigation as it was known at a moment: the complaints, evidence, hypotheses, unknowns and reviews
+          then, and what arrived later. Nothing recorded is changed.
         </p>
         <fieldset className="ta-replay-mode">
           <legend className="ca-sr-only">Moment to replay</legend>
@@ -502,7 +502,7 @@ export function CaseReplay({
           )}
         </fieldset>
         {decisionsKnown && !options.length && (
-          <p className="ac-muted">No decision has been signed on this case; choose a moment to replay.</p>
+          <p className="ac-muted">No decision has been signed on this investigation; choose a moment to replay.</p>
         )}
         {effectiveMode === "moment" && !asKnownAt && (
           <p className="ca-inline-error" role="alert">
@@ -704,8 +704,13 @@ const AI_ORIGIN = { origin: "AI", category: "AI" } as const;
 /** Every AI run on the case: what it was, which model and versions, its guardrails, and whether a person reviewed it. */
 export function CaseAiRuns({ investigationId, caseLabel }: { investigationId: string; caseLabel: string }) {
   const runs = useResource<AiRunsResponse>(trustPath(investigationId, "ai-runs"));
-  const [chosen, setChosen] = useState<AiRun | null>(null);
   const rows = listOf(runs.data?.items) as AiRun[];
+  // The open run has its own address (panel=ai-run:<id>), so Back closes it and a refresh reopens it.
+  const [chosen, setChosen] = usePanelState<AiRun>(
+    "ai-run",
+    (run) => String(run.business_id),
+    (id) => rows.find((run) => String(run.business_id) === id) ?? null,
+  );
   const counts = aiRunCountsText(runs.data?.counts);
   return (
     <>
@@ -720,8 +725,8 @@ export function CaseAiRuns({ investigationId, caseLabel }: { investigationId: st
           rows={rows}
           rowKey={(row, index) => `${safeText(row.business_id) ?? "run"}:${index}`}
           empty={{
-            title: "No AI runs on this case",
-            detail: "AI work on this case (with its model and checks) appears here.",
+            title: "No AI runs on this investigation",
+            detail: "AI work on this investigation (with its model and checks) appears here.",
           }}
           columns={[
             {
@@ -913,8 +918,8 @@ export function CaseIntegrity({
         action={integrity.data ? <ToneBadge tone={headline.tone} label={headline.label} /> : undefined}
       >
         <p className="ac-note">
-          MDARIX checks that each signature still matches the decision that was signed, that the case's audit events are
-          unchanged, and that each Decision Brief still matches its fingerprint.
+          MDARIX checks that each signature still matches the decision that was signed, that the investigation's audit
+          events are unchanged, and that each Decision Brief still matches its fingerprint.
         </p>
         <Table
           caption="Signature verification"
@@ -968,7 +973,7 @@ export function CaseIntegrity({
       </Panel>
       <Panel
         eyebrow="Audit chain"
-        title="Audit events of this case"
+        title="Audit events of this investigation"
         source={integrity}
         action={integrity.data ? <ToneBadge tone={chain.tone} label={chain.label} /> : undefined}
       >

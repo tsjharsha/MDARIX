@@ -750,8 +750,8 @@ export function briefTiles(summary: BriefSummary | null | undefined): BriefTile[
     { key: "under_review_by_me", label: "Under review by me", value: value("under_review_by_me") },
     { key: "returned_open", label: "Returned", value: value("returned_open") },
     { key: "resubmitted", label: "Resubmitted", value: value("resubmitted") },
-    { key: "blocked_cases", label: "Blocked cases", value: value("blocked_cases") },
-    { key: "overdue_cases", label: "Overdue cases", value: value("overdue_cases"), urgent: true },
+    { key: "blocked_cases", label: "Blocked investigations", value: value("blocked_cases") },
+    { key: "overdue_cases", label: "Overdue investigations", value: value("overdue_cases"), urgent: true },
   ];
 }
 

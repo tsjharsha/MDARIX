@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { DecideAndSign } from "./common";
+import { DecideAndSign, shortPrint } from "./common";
 import { ClipboardCheck, FileSignature, Gavel, Undo2 } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
@@ -7,7 +7,7 @@ import { Drawer, Table, errorText, formatDate, listOf, send, useResource } from 
 import { safeText } from "../../../app/displayId";
 import { WORKFLOW_ROLE_CODES, roleLabel } from "../../../app/roles";
 import { AiInterpretationNote, StatementKind } from "../../shared/StatementKind";
-import { useWorkspace, type SessionContext } from "../workspaceContext";
+import { usePanelFlag, usePanelState, useWorkspace, type SessionContext } from "../workspaceContext";
 import {
   aiDisclosure,
   briefLines,
@@ -100,9 +100,14 @@ export function CaseDecisionPanel({
   const brief = data?.brief ?? null;
   const actions = data?.actions ?? {};
   const [message, setMessage] = useState<{ text: string; tone: "critical" | "warning" } | null>(null);
-  const [recordId, setRecordId] = useState<string | null>(null);
+  // Each drawer has its own address (panel=<kind>:<id>), so Back closes it and a refresh reopens it.
+  const [recordId, setRecordId] = usePanelState<string>(
+    "decision-record",
+    (id) => id,
+    (id) => id,
+  );
   const [signedKey, setSignedKey] = useState(0);
-  const [returning, setReturning] = useState(false);
+  const [returning, setReturning] = usePanelFlag("return-brief");
   // Once a decision is signed, its summary above is what the case shows; a new decision is a deliberate second step.
   const [recordingNew, setRecordingNew] = useState(false);
   const current = data?.current_decision ?? null;
@@ -161,7 +166,7 @@ export function CaseDecisionPanel({
             )}
           </div>
         ) : (
-          <p className="ac-muted">No decision has been signed on this case yet.</p>
+          <p className="ac-muted">No decision has been signed on this investigation yet.</p>
         )}
         {!brief && (
           <Empty
@@ -184,7 +189,7 @@ export function CaseDecisionPanel({
       </Panel>
       {data && brief && <BriefForDecision brief={brief} reviewers={listOf(data.reviewers) as DecisionReviewer[]} />}
       {data && brief && actions.can_sign === true && current && !recordingNew && (
-        <Panel eyebrow="Your decision" title="This case is decided">
+        <Panel eyebrow="Your decision" title="This investigation is decided">
           <p className="ac-muted">
             The signed decision above stands. Record a new decision only if it must change: the new one supersedes{" "}
             {safeText(current.business_id) ?? "the current decision"}, and both stay on record.
@@ -249,9 +254,9 @@ export function CaseDecisionPanel({
           </div>
         </Panel>
       )}
-      <Panel eyebrow="History" title="Decisions on this case">
+      <Panel eyebrow="History" title="Decisions on this investigation">
         <Table
-          caption="Decisions on this case"
+          caption="Decisions on this investigation"
           rows={history}
           rowKey={(row) => row.key}
           empty={{
@@ -987,11 +992,13 @@ function SignDrawer({
           <strong>What your signature means: </strong>
           {meaning}
         </p>
-        <p className="ac-muted">
-          Your signature records who you are, the time, this meaning and a fingerprint of the brief version you
-          reviewed, so any later change is detected.
-        </p>
-        <DecideAndSign />
+        <DecideAndSign
+          signs={`The decision "${outcome}" on this investigation.`}
+          restsOn={[
+            `${briefLabel}, fingerprint ${shortPrint(context.briefContentHash)}: its evidence, unknowns and reviews as approved.`,
+            "Your signature records who you are, the time and this meaning, so any later change is detected.",
+          ]}
+        />
         <label className="ca-field">
           Your password
           <input

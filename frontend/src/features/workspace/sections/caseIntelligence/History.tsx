@@ -11,7 +11,9 @@ export function HistoryView({ investigationId, caseLabel }: { investigationId: s
   const total = (history.data as { total?: unknown } | null)?.total;
   return (
     <Panel eyebrow={caseLabel} title="Intelligence history" source={history}>
-      <p className="ac-note">Every judgement on this case's intelligence: what changed, why, by whom and when.</p>
+      <p className="ac-note">
+        Every judgement on this investigation's intelligence: what changed, why, by whom and when.
+      </p>
       {events.length ? (
         <>
           <ol className="ca-timeline uw-task-history">

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { InvestigationSummary, Product, Product360, TemporalMode } from "../../app/types";
 import { featureSetOf, type FeatureSet } from "../../app/featureSet";
 import { tabParam, withTabParam } from "./workspaceAddress";
-import { tabParts, type Navigation } from "../../app/linkTable";
+import { placeOf, tabParts, type Navigation, type Opens } from "../../app/linkTable";
 import { requestJson } from "../../app/apiClient";
 import type { ResolvedCase } from "./savedContext";
 
@@ -165,6 +165,9 @@ export type WorkspaceApi = {
   isTrial?: boolean;
   /** The organization's navigation in this workspace: new only under the MVP feature set (app/linkTable.ts). */
   navigation?: Navigation;
+  /** The five-minute story under way (entrance.ts), and starting or ending one (stage 8). */
+  story?: string | null;
+  startStory?: (key: string | null) => void;
 };
 
 export const WorkspaceContext = createContext<WorkspaceApi | null>(null);
@@ -191,6 +194,39 @@ export function useTabParam(
   if (!report) return [local, setLocal];
   const shown = value.shownTab;
   return [tabParam(shown, name), (next) => report(withTabParam(shown, name, next), how)];
+}
+
+/**
+ * A drawer with its own address (stage 8): `panel=<kind>:<key>` in the shown tab, so Back closes it and refresh, a new
+ * tab or a link reopens it. `encode` names the open item (its id, or "1" for a form with none); `decode` finds it again
+ * among what the screen has loaded (null until it has). One drawer is open at a time, so the kinds share `panel`.
+ */
+export function usePanelState<T>(
+  kind: string,
+  encode: (value: T) => string,
+  decode: (key: string) => T | null,
+): [T | null, (value: T | null) => void] {
+  const [panel, setPanel] = useTabParam("panel");
+  const prefix = `${kind}:`;
+  const value = panel?.startsWith(prefix) ? decode(panel.slice(prefix.length)) : null;
+  return [
+    value,
+    (next) => {
+      // Closing another kind's drawer is not this one's to do.
+      if (next !== null) setPanel(`${prefix}${encode(next)}`);
+      else if (panel?.startsWith(prefix)) setPanel(null);
+    },
+  ];
+}
+
+/** A drawer that opens without a record (a form to add one), with its own address: `panel=<kind>:1`. */
+export function usePanelFlag(kind: string): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = usePanelState<true>(
+    kind,
+    () => "1",
+    (key) => (key === "1" ? true : null),
+  );
+  return [!!open, (next) => setOpen(next ? true : null)];
 }
 
 /**
@@ -223,6 +259,25 @@ export async function chooseCase(work: Pick<WorkContext, "setInvestigationId">, 
   } catch {
     return false;
   }
+}
+
+/**
+ * Open what a server answer says a button opens (linkTable.ts placeOf). A target naming an investigation (an escalated
+ * complaint's decision) makes that investigation the context first, so the step opens on it, not on a list (8.7).
+ */
+export function useOpenTarget(): (opens: Opens | null | undefined) => void {
+  const { open, work, notify } = useWorkspace();
+  return (opens) => {
+    if (!opens) return;
+    const place = placeOf(opens);
+    const record = opens.target?.record;
+    if (record?.kind !== "case") return open(place.section as WorkspaceSection, place.tab);
+    void chooseCase(work, record.id).then((found) =>
+      found
+        ? open(place.section as WorkspaceSection, place.tab)
+        : notify(`${record.id} could not be opened right now. Open it from Investigations.`, "critical"),
+    );
+  };
 }
 
 /** The tab with another name, keeping what it carries (a link's ?signal= stays when the inbox is named). */

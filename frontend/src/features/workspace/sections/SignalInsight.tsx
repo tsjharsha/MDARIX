@@ -67,7 +67,7 @@ export function SignalInsightPanel({ signalId }: { signalId: string }) {
 /** The summary's sentences with the complaints each cites (exported for its unit test). */
 export function SummaryView({ summary }: { summary: SignalSummary }) {
   const note = aiSummaryNote(summary);
-  if (!summary.sentences.length) return <p className="ac-muted">The signal has no complaints to summarize.</p>;
+  if (!summary.sentences.length) return <p className="ac-muted">The trend has no complaints to summarize.</p>;
   return (
     <>
       {summary.author === "AI" && summary.ai?.label && (
@@ -105,7 +105,7 @@ export function SummaryView({ summary }: { summary: SignalSummary }) {
 
 /** The trend check of the signal's own version and problem (exported for its unit test). */
 export function TrendLine({ trend }: { trend: TrendItem | null }) {
-  if (!trend) return <p className="ac-muted">No trend check for this signal: it names no product.</p>;
+  if (!trend) return <p className="ac-muted">No trend check for this trend: it names no product.</p>;
   const result = trendResultOf(trend.result);
   return (
     <section className="ca-drawer-section uw-trend-line" aria-label="Trend check">

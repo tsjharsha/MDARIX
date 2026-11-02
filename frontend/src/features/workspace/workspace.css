@@ -5236,3 +5236,474 @@ div.uw-task-count:hover {
     display: flex;
   }
 }
+
+/* Stage 8: the investigation's one progress line over its four sections (CaseHeader.tsx CaseProgressLine). */
+.uw-case-progress {
+  display: grid;
+  gap: var(--ms-space-3);
+  margin: 0 0 var(--ms-space-4);
+  padding: var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+}
+.uw-case-progress ol {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ms-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: section;
+}
+.uw-case-progress li button {
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--ms-space-2) var(--ms-space-3);
+  border: 1px solid var(--ms-line);
+  border-top: 4px solid var(--ms-line);
+  border-radius: 6px;
+  background: var(--ms-surface);
+  color: var(--ms-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.uw-case-progress li button small {
+  color: var(--ms-muted);
+}
+.uw-case-progress li.state-done button {
+  border-top-color: var(--ms-good);
+}
+.uw-case-progress li.state-done strong::before {
+  content: "✓ ";
+  color: var(--ms-good);
+}
+.uw-case-progress li.state-current button {
+  border-color: var(--ms-navy);
+  border-top-color: var(--ms-navy);
+}
+.uw-case-progress > .ac-primary {
+  justify-self: start;
+}
+.uw-case-steps {
+  display: grid;
+  gap: var(--ms-space-2);
+  margin: 0 0 var(--ms-space-3);
+  padding: 0;
+  list-style: none;
+}
+.uw-case-steps li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--ms-space-2);
+  align-items: start;
+}
+.uw-case-steps small {
+  display: block;
+  color: var(--ms-muted);
+}
+@media (max-width: 640px) {
+  .uw-case-progress ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Stage 8: "Why am I asked?" under each question and step (shared/Basis.tsx WhyAsked). */
+.uw-why-asked {
+  display: block;
+  margin-top: var(--ms-space-1);
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+}
+.uw-why-asked strong {
+  color: var(--ms-ink);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-why-asked .uw-basis,
+.uw-why-asked .uw-basis-chip {
+  margin-left: var(--ms-space-1);
+}
+.uw-sign-summary {
+  display: grid;
+  gap: var(--ms-space-1);
+  margin: var(--ms-space-2) 0;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-left: 4px solid var(--ms-navy);
+  border-radius: 6px;
+  background: var(--ms-subtle);
+}
+.uw-sign-summary p,
+.uw-sign-summary ul {
+  margin: 0;
+}
+.uw-sign-summary ul {
+  padding-left: var(--ms-space-5);
+}
+.uw-sign-rests {
+  color: var(--ms-ink-2);
+  font-weight: var(--ms-fw-semibold);
+}
+
+/* Stage 8: the five-minute entrance (Entrance.tsx), its story bar, and "Explore all capabilities". */
+.uw-entrance {
+  display: grid;
+  gap: var(--ms-space-4);
+  margin: 0 0 var(--ms-space-5);
+}
+.uw-entrance header h2 {
+  margin: 0;
+  font-size: var(--ms-fs-24);
+}
+.uw-entrance header p {
+  margin: var(--ms-space-1) 0 0;
+}
+.uw-entrance-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--ms-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-entrance-tile button {
+  display: grid;
+  gap: var(--ms-space-2);
+  align-content: start;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  padding: var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-top: 4px solid var(--ms-teal);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+  box-shadow: var(--ms-shadow-1);
+  color: var(--ms-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.uw-entrance-tile button:hover,
+.uw-entrance-tile button:focus-visible {
+  border-color: var(--ms-teal);
+}
+.uw-entrance-tile svg {
+  color: var(--ms-teal-dark);
+}
+.uw-entrance-tile.is-own button {
+  border-top-color: var(--ms-line-strong);
+  background: var(--ms-subtle);
+}
+.uw-entrance-tile strong {
+  font-size: var(--ms-fs-16);
+}
+.uw-entrance-lede {
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-14);
+}
+.uw-entrance-time {
+  display: inline-flex;
+  gap: var(--ms-space-1);
+  align-items: center;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.uw-entrance-go {
+  display: inline-flex;
+  gap: var(--ms-space-1);
+  align-items: center;
+  align-self: end;
+  color: var(--ms-teal-dark);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-entrance-numbers h3 {
+  margin: 0 0 var(--ms-space-2);
+  font-size: var(--ms-fs-16);
+}
+.uw-explore {
+  margin: var(--ms-space-4) 0 0;
+}
+.uw-explore > summary {
+  min-height: 44px;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+  font-weight: var(--ms-fw-semibold);
+  cursor: pointer;
+}
+.uw-entrance-link {
+  margin: 0 0 var(--ms-space-3);
+}
+.uw-story-bar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-2) var(--ms-space-4);
+  align-items: center;
+  margin: 0 0 var(--ms-space-3);
+  padding: var(--ms-space-2) var(--ms-space-4);
+  border: 1px solid var(--ms-mint-line);
+  border-radius: var(--ms-radius);
+  background: var(--ms-mint);
+  color: var(--ms-ink);
+}
+.uw-story-title {
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-story-actions {
+  display: inline-flex;
+  gap: var(--ms-space-3);
+  margin-left: auto;
+}
+
+/* Stage 8: the wow screens' small charts (WowCharts.tsx). Numbers in words on every bar; a table view beside each. */
+.uw-wow {
+  display: grid;
+  gap: var(--ms-space-2);
+  margin: var(--ms-space-3) 0;
+}
+.uw-wow-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-2);
+  align-items: baseline;
+  justify-content: space-between;
+}
+.uw-wow-head h3 {
+  margin: 0;
+  font-size: var(--ms-fs-16);
+}
+.uw-wow-note {
+  margin: 0;
+  font-size: var(--ms-fs-12);
+}
+.uw-wow-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--ms-space-4);
+}
+.uw-wow-bars,
+.uw-wow-lanes {
+  display: grid;
+  gap: var(--ms-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-wow-bars li,
+.uw-wow-lanes li {
+  display: grid;
+  grid-template-columns: minmax(110px, 1.2fr) minmax(120px, 2fr) minmax(140px, 1.6fr);
+  gap: var(--ms-space-3);
+  align-items: center;
+  font-size: var(--ms-fs-14);
+}
+.uw-wow-label {
+  overflow-wrap: anywhere;
+  color: var(--ms-ink);
+}
+.uw-wow-flag {
+  color: var(--ms-crit);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-wow-track,
+.uw-wow-lane {
+  position: relative;
+  height: 14px;
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-ground);
+}
+.uw-wow-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-series);
+}
+.is-flag .uw-wow-bar {
+  background: var(--ms-series-dark);
+  background-image: repeating-linear-gradient(45deg, transparent 0 4px, rgba(255, 255, 255, 0.35) 4px 6px);
+}
+.uw-wow-ref,
+.uw-wow-today,
+.uw-wow-due {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 0;
+  border-left: 2px dashed var(--ms-ink);
+}
+.uw-wow-due {
+  border-left: 3px solid var(--ms-crit);
+}
+.uw-wow-today {
+  border-left: 2px solid var(--ms-navy);
+}
+.uw-wow-clock {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-warn-bg);
+  border: 1px solid var(--ms-warn-line);
+}
+.is-overdue .uw-wow-clock {
+  background: var(--ms-crit-bg);
+  border-color: var(--ms-crit-line);
+}
+.uw-wow-value small {
+  color: var(--ms-muted);
+}
+.uw-wow-legend {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12) !important;
+}
+.uw-wow-legend i {
+  display: inline-block;
+  width: 0;
+  height: 12px;
+  vertical-align: middle;
+}
+.uw-wow-key-today {
+  border-left: 2px solid var(--ms-navy);
+}
+.uw-wow-key-due {
+  border-left: 3px solid var(--ms-crit);
+}
+.uw-wow-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ms-fs-14);
+}
+.uw-wow-table th,
+.uw-wow-table td {
+  padding: var(--ms-space-2);
+  border-bottom: 1px solid var(--ms-line);
+  text-align: left;
+}
+.uw-wow-table thead th {
+  color: var(--ms-ink-2);
+  font-weight: var(--ms-fw-semibold);
+}
+@media (max-width: 640px) {
+  .uw-wow-bars li,
+  .uw-wow-lanes li {
+    grid-template-columns: 1fr;
+    gap: var(--ms-space-1);
+  }
+}
+
+/* Stage 8, wow screen 5: the worksheet's sticky meter of fields filled from your records. */
+.uw-rp-meter {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  gap: var(--ms-space-2);
+  margin: 0 0 var(--ms-space-3);
+  padding: var(--ms-space-3);
+  border: 1px solid var(--ms-mint-line);
+  border-radius: 6px;
+  background: var(--ms-mint);
+}
+.uw-rp-meter-bar {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-surface);
+  border: 1px solid var(--ms-line);
+}
+.uw-rp-meter-bar span {
+  background: var(--ms-teal);
+}
+.uw-rp-meter-bar span.is-entered {
+  background: var(--ms-series);
+}
+
+/* Stage 8, wow screen 6: the decision record as a receipt (Oversight.tsx DecisionRecord). */
+.uw-receipt {
+  max-width: 640px;
+  padding: var(--ms-space-4) var(--ms-space-5);
+  border: 1px solid var(--ms-line-strong);
+  border-top: 6px solid var(--ms-navy);
+  border-radius: 6px;
+  background: var(--ms-surface);
+  box-shadow: var(--ms-shadow-1);
+}
+.uw-receipt-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--ms-space-2);
+  padding-bottom: var(--ms-space-2);
+  border-bottom: 2px dashed var(--ms-line-strong);
+}
+.uw-receipt-head h3 {
+  margin: 0;
+}
+.uw-receipt-head span {
+  color: var(--ms-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.uw-receipt-lines li {
+  padding: var(--ms-space-2) 0;
+  border-bottom: 1px dotted var(--ms-line-strong);
+}
+.uw-receipt-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-1) var(--ms-space-3);
+  justify-content: space-between;
+}
+.uw-receipt-total {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-2);
+  justify-content: space-between;
+  margin: var(--ms-space-2) 0;
+  padding-top: var(--ms-space-2);
+  border-top: 2px dashed var(--ms-line-strong);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-receipt-total code {
+  font-weight: var(--ms-fw-regular);
+}
+.uw-wow-sub {
+  display: block;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+
+/* Stage 8 (8.7): the next step at the end of each step done on another screen (ComplaintNextStep.tsx). */
+.uw-next-after {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-2) var(--ms-space-4);
+  align-items: center;
+  margin: var(--ms-space-4) 0 0;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border: 1px solid var(--ms-mint-line);
+  border-radius: 6px;
+  background: var(--ms-mint);
+}
+.uw-next-after .ac-eyebrow {
+  flex-basis: 100%;
+  margin: 0;
+}
+/* The investigation's sections never widen the page on a phone: wide lists scroll inside their own box. */
+.uw-case-sections,
+.uw-case-sections .ca-section {
+  min-width: 0;
+  max-width: 100%;
+}
+.uw-case-part {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
