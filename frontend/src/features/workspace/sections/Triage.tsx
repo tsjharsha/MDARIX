@@ -50,10 +50,15 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const [openKey, setOpenKey] = useTabParam("item");
   // A complaint's page opens its triage item by the complaint (Triage?complaint=<id>, 0.10.68).
   const [complaint] = useTabParam("complaint");
+  // A story opens its record by the reference people read (Triage?ref=SAMPLE-URG-01, 0.10.71).
+  const [ref] = useTabParam("ref");
   const list = useResource<TriageList>(`${TRIAGE}?show=${show}`);
   const summary = list.data?.summary;
   const items = list.data?.items ?? [];
-  const wanted = openKey ?? (complaint ? `COMPLAINT:${complaint}` : null);
+  const wanted =
+    openKey ??
+    (complaint ? `COMPLAINT:${complaint}` : null) ??
+    (ref ? (items.find((item) => item.ref === ref || item.identifier === ref)?.key ?? null) : null);
   const open = wanted ? (items.find((item) => item.key === wanted) ?? null) : null;
   const setOpen = (item: TriageItem | null) => setOpenKey(item ? item.key : null);
   const overdue = items.filter((item) => item.triage_clock.state === "OVERDUE").length;

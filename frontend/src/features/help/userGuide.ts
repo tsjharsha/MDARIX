@@ -276,15 +276,15 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           "The quality loop MDARIX closes, chapter by chapter: what your records show in each, why inspectors care, and where to try it. Start on the sample data, then on your own export.",
         tasks: [
           {
-            title: "Pick a five-minute story (the new navigation)",
+            title: "Review the sample event (the new navigation)",
             steps: [
-              "On the new navigation a trial opens on four stories, each about five minutes: A complaint just arrived: what now?, Is a problem rising?, Is this reportable, and by when, in the US and India? and Try it on your own export.",
-              "Choose a story. It opens on the sample's own record, and a bar at the top shows the step you are on, with Back to the stories.",
-              "On each screen the main button is the next step; Why am I asked? under each question gives its reason and clause.",
-              "The ten chapters are under Explore all capabilities. Uploading your own export is optional and outside the count.",
+              "On the new navigation a trial opens on one sample event: A hospital asked for recalibration. Should Quality review this too? It shows the reporter's own words. Choose Review this sample event.",
+              "The short story has 4 steps on SAMPLE-RV-11: read the call, decide its route, name the open question, and the intake decision summary. A bar at the top shows the step you are on; it counts what you saved, not the screen you are on.",
+              "On each screen the main button is the next step; Why am I asked? under each question gives its reason and clause. After the summary, Continue the full evaluation leads to the markets, the report, the decision and ready to close.",
+              "The other stories are under More stories, and Restart the sample story under More. The ten chapters are under Explore all capabilities. Your own export is under Help, Try your own data.",
             ],
             result:
-              "After your first visit the trial opens on My work; The five-minute stories link there brings you back.",
+              "After your first visit the trial opens on My work, with Resume SAMPLE-RV-11 first while the short story is unfinished.",
           },
           {
             title: "Follow the story",

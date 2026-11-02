@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Activity, AlertTriangle, Plus, TrendingUp } from "lucide-react";
 import { Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Table, errorText, send, useResource } from "../../customer-admin/shared";
-import { sectionAllowed, useCan, useWorkspace } from "../workspaceContext";
+import { sectionAllowed, useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import {
   TREND_GROUPS,
   canRaiseFromTrend,
@@ -31,10 +31,16 @@ import { Bars, BarsTable, ChartOrTable, type BarRow } from "./WowCharts";
  * signal by itself; a triage lead raises one from a notable group in one click.
  */
 export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string) => void }) {
-  const { notify, open, session } = useWorkspace();
+  const { notify, open, session, work } = useWorkspace();
   const canTriage = useCan("signal.triage");
   const [group, setGroup] = useState<TrendGroup>("version");
   const [product, setProduct] = useState("");
+  // A story opens the trend check on its product, by the identifier people read (?product=SAMPLE-ORBIT-300, 0.10.71).
+  const [named] = useTabParam("product", "replace");
+  const namedId = named ? work?.products?.find((item) => item.product_identifier === named)?.id : undefined;
+  useEffect(() => {
+    if (namedId) setProduct(namedId);
+  }, [namedId]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const board = useResource<TrendBoard>(trendPath(group, product));

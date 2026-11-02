@@ -9,7 +9,7 @@ import { ComplaintPage } from "./sections/ComplaintPage";
 import { serviceText } from "./sections/ServiceWork";
 import { eventPath, type EventView } from "./oversight";
 
-// 0.10.71, Release A: the first five minutes.
+// 0.10.71, Release A of the Simplicity and WoW plan.
 
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("../customer-admin/shared", async (original) => ({

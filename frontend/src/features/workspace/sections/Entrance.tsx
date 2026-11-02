@@ -1,72 +1,95 @@
 import { useEffect } from "react";
-import { ArrowLeft, ChevronRight, Clock, FileSpreadsheet, Inbox, LineChart, Scale, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, Inbox, LineChart, Scale, X } from "lucide-react";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
-import { SCENARIOS, markEntranceSeen, onStoryRecord, storyStep, type Scenario, type StoryIds } from "../entrance";
+import {
+  FLAGSHIP,
+  MORE_STORIES,
+  SCENARIOS,
+  SHORT,
+  markEntranceSeen,
+  onStoryRecord,
+  storyStep,
+  type Scenario,
+  type StoryIds,
+} from "../entrance";
 import { useResource } from "../../customer-admin/shared";
 import { eventPath, type EventView } from "../oversight";
 import { dispositionPath } from "../disposition";
-import { ReadinessNumbers } from "./MyWork";
 import { RestartSamplePanel } from "./RemoveSample";
 
-const ICONS: Record<Scenario["key"], typeof Inbox> = {
+const ICONS: Partial<Record<Scenario["key"], typeof Inbox>> = {
   complaint: Inbox,
   rising: LineChart,
   reportable: Scale,
-  own: FileSpreadsheet,
 };
 
 /**
- * The five-minute entrance (stage 8, 8.4; wow screen 8): three stories on the sample and one on your own export,
- * each with its time; the four inspection-readiness numbers; "Restart the sample story". The ten chapters follow
- * under "Explore all capabilities" (GettingStarted.tsx). Seeing it once makes My work the start screen next time.
+ * The entrance (stage 8, 8.4; 0.10.71, A3): one event first, the short story on SAMPLE-RV-11, in the reporter's own
+ * words as the sample records them; the other stories under "More stories"; "Restart the sample story" under "More".
+ * Step counts only, no time claims. The inspection-readiness numbers are on the manager's My work, not here. The ten
+ * chapters follow under "Explore all capabilities" (GettingStarted.tsx). Seeing it once makes My work the start
+ * screen next time.
  */
 export function Entrance({ onRestarted }: { onRestarted: (text: string) => void }) {
   const { open, startStory } = useWorkspace();
   useEffect(markEntranceSeen, []);
+  const event = useResource<EventView>(eventPath(FLAGSHIP));
   const start = (scenario: Scenario) => {
     startStory?.(scenario.key);
     open(scenario.start.section as WorkspaceSection, scenario.start.tab);
   };
+  const words = event.data?.event.description;
   return (
     <section className="uw-entrance" aria-labelledby="entrance-title">
-      <header>
-        <h2 id="entrance-title">Pick a five-minute story</h2>
-        <p className="ac-muted">
-          Each story starts on the sample's own record and shows each step; leave it at any time.
-        </p>
-      </header>
-      <ul className="uw-entrance-tiles">
-        {/* Your own data is under Help › Try your own data, not on the entrance (0.10.71). */}
-        {SCENARIOS.filter((scenario) => scenario.key !== "own").map((scenario) => {
-          const Icon = ICONS[scenario.key];
-          return (
-            <li key={scenario.key} className={`uw-entrance-tile is-${scenario.key}`}>
-              <button type="button" onClick={() => start(scenario)} aria-describedby={`entrance-${scenario.key}`}>
-                <Icon size={22} aria-hidden="true" />
-                <strong>{scenario.title}</strong>
-                <span id={`entrance-${scenario.key}`} className="uw-entrance-lede">
-                  {scenario.lede}
-                </span>
-                <span className="uw-entrance-time">
-                  <Clock size={14} aria-hidden="true" /> About {scenario.minutes} minutes
-                  {scenario.key === "own" ? " · optional" : ` · ${scenario.steps.length} steps`}
-                </span>
-                <span className="uw-entrance-go">
-                  {scenario.key === "own" ? "Upload your export" : "Start"}{" "}
-                  <ChevronRight size={15} aria-hidden="true" />
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      <section aria-label="Inspection readiness" className="uw-entrance-numbers">
-        <h3>Inspection readiness on the sample</h3>
-        <div className="uw-team-numbers">
-          <ReadinessNumbers />
-        </div>
-      </section>
-      <RestartSamplePanel onRestarted={onRestarted} />
+      {event.state === "error" ? (
+        <header>
+          <h2 id="entrance-title">Your trial</h2>
+          <p className="ac-muted">The sample event is not in this workspace. Explore all capabilities below.</p>
+        </header>
+      ) : (
+        <article className="uw-entrance-event" aria-describedby="entrance-words">
+          <p className="ac-eyebrow">
+            Sample event · {FLAGSHIP} · {SHORT.steps.length} steps
+          </p>
+          <h2 id="entrance-title">{SHORT.title}</h2>
+          <blockquote id="entrance-words" className="uw-entrance-words">
+            {words ? `“${words}”` : "Reading the sample event…"}
+          </blockquote>
+          <div className="ca-action-row">
+            <button type="button" className="ac-primary" onClick={() => start(SHORT)} disabled={!words}>
+              Review this sample event <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          </div>
+          <p className="uw-entrance-tag">Fictional manufacturer · Sample data only</p>
+        </article>
+      )}
+      <details className="uw-entrance-more">
+        <summary>More stories</summary>
+        <ul className="uw-entrance-tiles">
+          {MORE_STORIES.map((scenario) => {
+            const Icon = ICONS[scenario.key] ?? Inbox;
+            return (
+              <li key={scenario.key} className={`uw-entrance-tile is-${scenario.key}`}>
+                <button type="button" onClick={() => start(scenario)} aria-describedby={`entrance-${scenario.key}`}>
+                  <Icon size={22} aria-hidden="true" />
+                  <strong>{scenario.title}</strong>
+                  <span id={`entrance-${scenario.key}`} className="uw-entrance-lede">
+                    {scenario.lede}
+                  </span>
+                  <span className="uw-entrance-time">{scenario.steps.length} steps</span>
+                  <span className="uw-entrance-go">
+                    Start <ChevronRight size={15} aria-hidden="true" />
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </details>
+      <details className="uw-entrance-more">
+        <summary>More</summary>
+        <RestartSamplePanel onRestarted={onRestarted} />
+      </details>
     </section>
   );
 }

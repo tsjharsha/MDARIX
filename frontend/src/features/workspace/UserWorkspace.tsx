@@ -270,8 +270,8 @@ const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
     guide: "Your profile, sign-in security, the roles you hold, and when you will be away.",
   },
   "Getting started": {
-    description: "Five-minute stories on the sample",
-    guide: "Start with a short story on the sample's own records, or try it on your own export.",
+    description: "The sample event and its stories",
+    guide: "Start with the sample event's short story; your own export is under Help, Try your own data.",
   },
   Investigations: {
     description: "One investigation, from its question to its decision",
@@ -362,7 +362,7 @@ export function UserWorkspace({
     }
   });
   const [menuOpen, setMenuOpen] = useState(false);
-  // The five-minute story under way (stage 8, entrance.ts), kept for this browser tab.
+  // The story under way (stage 8, entrance.ts), kept for this browser tab.
   const [story, setStory] = useState<string | null>(() => (fresh ? savedStory() : null));
   const startStory = useCallback((key: string | null) => {
     saveStory(key as Parameters<typeof saveStory>[0]);
@@ -453,7 +453,7 @@ export function UserWorkspace({
   }, [caseLinkState]);
 
   // A free-trial user starts on Getting started, unless they followed a link to a specific screen. On the new
-  // navigation that is the five-minute entrance the first time; a returning person starts on My work (stage 8).
+  // navigation that is the entrance the first time; a returning person starts on My work (stage 8).
   useEffect(() => {
     if (trial?.is_trial && (initialView ?? "home") === "home" && !addressed && !(fresh && entranceSeen()))
       setLocation((current) => (current.key === 0 ? { ...current, section: "Getting started" } : current));

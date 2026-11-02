@@ -531,7 +531,7 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
       </div>
     </div>
   );
-  // The new navigation (stage 8): the five-minute entrance first, the ten chapters under "Explore all capabilities".
+  // The new navigation (stage 8): the entrance first, the ten chapters under "Explore all capabilities".
   if (navigation !== "new") return body;
   return (
     <>

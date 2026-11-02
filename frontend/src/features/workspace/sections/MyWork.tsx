@@ -216,11 +216,11 @@ export function NewMyWorkSection({ tab }: { tab?: string }) {
   return (
     <>
       <NextStep />
-      {/* A returning trial user lands here; the five-minute stories are one click away (8.4). */}
+      {/* A returning trial user lands here; the sample event and its stories are one click away (8.4). */}
       {isTrial && (
         <p className="uw-entrance-link">
           <button type="button" className="ac-link" onClick={() => open("Getting started")}>
-            The five-minute stories: start one on the sample
+            The sample event and its stories
           </button>
         </p>
       )}
