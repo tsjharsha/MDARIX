@@ -9951,7 +9951,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   border-top: 1px solid var(--ms-mint);
 }
 .calm-attention > svg:first-child {
-  color: var(--ms-warn-bg);
+  color: var(--ms-warn-fill);
 }
 .calm-attention div {
   display: grid;

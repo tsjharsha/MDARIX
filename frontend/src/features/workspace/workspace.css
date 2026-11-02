@@ -1581,7 +1581,7 @@
   transition: color 0.12s;
 }
 .uw-fb-stars svg.is-on {
-  color: var(--ms-warn-bg);
+  color: var(--ms-warn-fill);
   fill: var(--ms-warn-line);
 }
 .uw-fb-stars label:has(input:focus-visible) svg,

@@ -3203,7 +3203,7 @@
   line-height: 1.6;
 }
 .ms-voice-rating {
-  color: var(--ms-warn-bg);
+  color: var(--ms-warn-fill);
   letter-spacing: 2px;
 }
 .ms-voice-rating span {

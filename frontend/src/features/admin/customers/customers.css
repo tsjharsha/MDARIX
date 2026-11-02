@@ -238,7 +238,7 @@
   gap: 4px;
 }
 .fb-stars svg {
-  color: var(--ms-warn-bg);
+  color: var(--ms-warn-fill);
   fill: var(--ms-warn-line);
 }
 .fb-detail {
