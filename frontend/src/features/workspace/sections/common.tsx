@@ -58,6 +58,14 @@ export function NeedsProduct({ children }: { children: (view: Product360) => Rea
   );
 }
 
+/** Said once, at each point where a person signs or submits (V5), instead of disclaimers across the screen. */
+export const DECIDE_AND_SIGN =
+  "You decide and sign. MDARIX prepared this from your records; it never decides or submits.";
+
+export function DecideAndSign() {
+  return <p className="ms-decide">{DECIDE_AND_SIGN}</p>;
+}
+
 /** A record's other ID, in its details only: the screen shows one (the customer's own reference, J18). */
 export function AlsoKnownAs({ id, shown }: { id?: string | null; shown?: string | null }) {
   if (!id || id === shown) return null;

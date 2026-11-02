@@ -205,10 +205,11 @@ def ensure_follow_up(db, tenant_id, event: IntakeEvent, answers: dict, suggestio
         asks = ["NO_DEFICIENCY"]
     if not asks:
         return
-    title = (
-        f"Follow up {event.reference} with the reporter: "
-        + ("ask whether any deficiency is alleged" if asks == ["NO_DEFICIENCY"] else "ask about ")
-        + ("" if asks == ["NO_DEFICIENCY"] else ", ".join(f"question {q[1:]}" for q in asks))
+    # A short title (V6); the questions it asks stay in the task's details.
+    title = f"Follow up {event.reference} with the reporter: " + (
+        "is a deficiency alleged?"
+        if asks == ["NO_DEFICIENCY"]
+        else f"{len(asks)} open question{'s' if len(asks) != 1 else ''}"
     )
     task = create_task(
         db,

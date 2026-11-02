@@ -11563,3 +11563,14 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .ac-table tbody td:first-child {
   white-space: nowrap;
 }
+/* "You decide and sign …": once, at each point where a person signs or submits (V5). */
+.ms-decide {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--ms-space-2) var(--ms-space-3);
+  border-left: 3px solid var(--ms-teal);
+  background: var(--ms-mint);
+  color: var(--ms-ink);
+  font-size: var(--ms-fs-14);
+  font-weight: 600;
+}

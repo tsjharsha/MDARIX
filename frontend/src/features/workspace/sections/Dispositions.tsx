@@ -6,7 +6,7 @@ import { Drawer, errorText, formatDate, send, useResource } from "../../customer
 import { ImdrfCodes, RecordOrigin } from "./ImportReports";
 import { formatDay } from "../../../app/dates";
 import { useCan, useWorkspace } from "../workspaceContext";
-import { countOf } from "./common";
+import { countOf, DecideAndSign } from "./common";
 import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
 import { TrainingPanel } from "./MarketAssessment";
 import { EscalateButton } from "./Triage";
@@ -303,7 +303,6 @@ export function DispositionPanel({
           {complaint.awareness_date ? ` · aware ${formatDay(complaint.awareness_date)}` : ""}
         </p>
         {complaint.description && <q className="uw-cr-text">{complaint.description}</q>}
-        {screen.practice_label && <p className="uw-ma-practice">{screen.practice_label}</p>}
         <ImdrfCodes problemCode={complaint.problem_code} />
         <RecordOrigin
           entity="complaints"
@@ -663,6 +662,7 @@ export function DispositionPanel({
                   </label>
                 )}
                 <div className="ca-form-grid">
+                  <DecideAndSign />
                   <label className="ca-field">
                     Your password
                     <input

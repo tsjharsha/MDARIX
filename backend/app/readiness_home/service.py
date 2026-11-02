@@ -630,7 +630,6 @@ def readiness(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> d
             "critical": states.count(CRITICAL),
             "not_set": states.count(NOT_SET),
         },
-        "note": "Read from your records as imported into MDARIX; rules only, no AI. A person decides what each finding "
-        "means.",
+        "note": "Read from your records as imported into MDARIX; rules only, no AI.",
         "basis_note": DISCLAIMER,
     }

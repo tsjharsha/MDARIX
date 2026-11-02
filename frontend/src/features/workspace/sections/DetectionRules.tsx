@@ -62,8 +62,7 @@ export function DetectionRules({ onOpenSignal }: { onOpenSignal: (reference: str
         }
       >
         <p className="ac-muted">
-          A rule opens a signal for people to triage; it never decides anything about the complaints. Detection also
-          runs on its own as complaints arrive.
+          A rule opens a signal for people to triage. Detection also runs on its own as complaints arrive.
         </p>
         {runError && (
           <p className="ca-inline-error" role="alert">

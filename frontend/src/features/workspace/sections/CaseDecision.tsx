@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { DecideAndSign } from "./common";
 import { ClipboardCheck, FileSignature, Gavel, Undo2 } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
@@ -990,6 +991,7 @@ function SignDrawer({
           Your signature records who you are, the time, this meaning and a fingerprint of the brief version you
           reviewed, so any later change is detected.
         </p>
+        <DecideAndSign />
         <label className="ca-field">
           Your password
           <input

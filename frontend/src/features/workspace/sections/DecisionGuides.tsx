@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DecideAndSign } from "./common";
 import { questionNumber } from "../../../app/labels";
 import {
   ArrowDown,
@@ -218,7 +219,6 @@ export function GuideDrawer({ market, version, onClose }: { market: string; vers
         <p className="uw-hint" role="note">
           {view.never_decides}
         </p>
-        {view.practice_label && <p className="ac-muted">{view.practice_label}</p>}
         <p className="ac-muted">{view.core_rule}</p>
         {view.matrix_rule && <p className="ac-muted">{view.matrix_rule}</p>}
         {view.change_reason && (
@@ -764,6 +764,7 @@ function Publish({
           </p>
           {view.approval?.same_person && <p className="ac-message tone-warning">{view.approval.message}</p>}
           <div className="ca-form-grid">
+            <DecideAndSign />
             <label className="ca-field">
               Your password
               <input

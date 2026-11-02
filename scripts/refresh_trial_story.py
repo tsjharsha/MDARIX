@@ -29,7 +29,9 @@ the trend's units in the field stay the same) unless they are there, and the sam
 single-use fields and the sample lots' expiry dates (``SAMPLE_PRODUCT_FACTS``, 0.10.64) where they are not set, and
 the flagship complaint SAMPLE-RV-11 and a calm day 0 (backend/app/trial/sample_calm.py: finished triage for what the
 story does not need open, the sample's first-contact tasks due two working days ahead, RV-09 signed ready to close, the
-absence to the trial's end) unless they are there (0.10.64). The sample's dates themselves are brought to today by the
+absence to the trial's end) unless they are there (0.10.64), and today's wording on sample records written before
+0.10.66 (backend/app/trial/sample_words.py: the RV-08 request named the US questions by code; a follow-up task's
+title listed every question). The sample's dates themselves are brought to today by the
 hourly "trial-sample-clock" job (backend/app/trial/sample_clock.py) while nobody has worked on the sample. Each trial
 is committed on its own, with an audit event.
 """
@@ -104,6 +106,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.trial.sample_oversight import has_sample_oversight, stage_sample_oversight
     from backend.app.trial.sample_lot_impact import has_sample_lot_impact, stage_sample_lot_impact
     from backend.app.trial.sample_reports import has_sample_reports, stage_sample_reports
+    from backend.app.trial.sample_words import reword_sample
 
     results = []
     for tenant_id, tenant_key, name in trials(db):
@@ -161,6 +164,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 is None
             )
             calm_missing = not has_calm_story(session, tenant_id)
+            old_words = reword_sample(session, tenant_id, apply=False)
             if not (
                 story_missing
                 or flagship_missing
@@ -177,6 +181,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or oversight_missing
                 or lot_impact_missing
                 or facts_missing
+                or old_words
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -201,6 +206,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                         if calm_missing
                         else []
                     ),
+                    *([f"today's wording on {old_words} sample records (0.10.66)"] if old_words else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -237,6 +243,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 # After the flagship and the intake: it finishes the triage the story does not need open.
                 added["calm"] = stage_calm_story(session, tenant_id, now)
                 _absence_to_trial_end(session, tenant_id)
+            if old_words:
+                added["reworded"] = reword_sample(session, tenant_id, apply=True)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,

@@ -6,7 +6,7 @@ import { Drawer, errorText, formatDate, send, useResource } from "../../customer
 import { downloadFile } from "../../reports/download";
 import { WorkspaceContext, useCan } from "../workspaceContext";
 import { communicationsTab } from "../communications";
-import { AlsoKnownAs, countOf } from "./common";
+import { AlsoKnownAs, countOf, DecideAndSign } from "./common";
 import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
 import {
@@ -95,7 +95,7 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
       >
         {list.data && (
           <p className="uw-ma-starter" role="note">
-            <Send size={15} aria-hidden="true" /> {list.data.never_submits}{" "}
+            <Send size={15} aria-hidden="true" /> Forms:{" "}
             {list.data.forms.map((form) => `${marketLabel(form.market)}: ${versionWords(form.version)}`).join("; ")}.
           </p>
         )}
@@ -204,7 +204,6 @@ export function ReportDrawer({
         <p className="uw-hint" role="note">
           <Send size={15} aria-hidden="true" /> {detail.never_submits}
         </p>
-        {detail.practice_label && <p className="ac-muted">{detail.practice_label}</p>}
         <ol className="uw-rp-steps" aria-label="Where this report is">
           {detail.steps.map((item, index) => (
             <li key={item.state} className={index < step ? "done" : index === step ? "current" : ""}>
@@ -378,6 +377,7 @@ function Approval({ detail, onChanged }: { detail: ReportDetail; onChanged: (det
         </p>
       )}
       <div className="ca-form-grid">
+        <DecideAndSign />
         <label className="ca-field">
           Your password
           <input
@@ -449,6 +449,7 @@ function RecordSubmission({ detail, onChanged }: { detail: ReportDetail; onChang
         <p className="ac-muted ca-wide">
           Enter the approved snapshot in the authority's route yourself, then record it here at once.
         </p>
+        <DecideAndSign />
         <label className="ca-field">
           Route
           <select value={form.route} onChange={(event) => set({ route: event.target.value })}>

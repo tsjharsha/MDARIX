@@ -5008,3 +5008,15 @@ div.uw-task-count:hover {
     display: none;
   }
 }
+.uw-sample-chip {
+  margin-left: var(--ms-space-2);
+  border-color: var(--ms-warn-line);
+  background: var(--ms-warn-bg);
+  color: var(--ms-warn);
+  font-size: var(--ms-fs-12);
+}
+@media (max-width: 640px) {
+  .uw-sample-chip {
+    display: none;
+  }
+}

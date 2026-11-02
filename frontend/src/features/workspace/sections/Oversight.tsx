@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DecideAndSign } from "./common";
 import { marketLabel } from "../../../app/labels";
 import { CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
@@ -98,7 +99,6 @@ export function OversightView({ initialEvent = null }: { initialEvent?: string |
             }}
           />
         )}
-        {view && <p className="ac-note">{view.never}</p>}
       </Panel>
       {view && <EventsPanel events={view.events} onOpen={setEvent} />}
       {view && <CalendarPanel settings={view.settings} onSaved={data.reload} />}
@@ -340,7 +340,6 @@ export function EventDrawer({
   const { event, summary } = view;
   return (
     <Drawer title={`Event ${event.ref}`} onClose={onClose}>
-      {view.practice_label && <p className="ac-muted">{view.practice_label}</p>}
       <section className="ca-drawer-section" aria-label="Event summary">
         <div className="uw-cr-head">
           <ToneBadge tone={EVENT_TONES[view.state]} label={view.state_label} />
@@ -520,6 +519,7 @@ function ReadyForm({ view, onChanged }: { view: EventView; onChanged: (view: Eve
             </label>
           )}
           <div className="ca-form-grid">
+            <DecideAndSign />
             <label className="ca-field">
               Your password
               <input

@@ -15,7 +15,7 @@ import {
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { useWorkspace } from "../workspaceContext";
-import { countOf } from "./common";
+import { countOf, DecideAndSign } from "./common";
 import { ChipFilter, Hero, InlineError } from "./boardParts";
 import { EscalateButton, useCanTriage } from "./Triage";
 import {
@@ -835,6 +835,7 @@ function SignForm({
         </label>
       )}
       <div className="ca-form-grid">
+        <DecideAndSign />
         <label className="ca-field">
           Your password
           <input
@@ -1006,6 +1007,7 @@ function ReviewForm({ item, onDone }: { item: IntakeItem; onDone: () => void }) 
         <input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
       </label>
       <div className="ca-form-grid">
+        <DecideAndSign />
         <label className="ca-field">
           Your password
           <input

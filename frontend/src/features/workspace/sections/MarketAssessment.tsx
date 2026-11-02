@@ -1,4 +1,5 @@
 import { useContext, useEffect, useId, useState } from "react";
+import { DecideAndSign } from "./common";
 import { versionWords } from "../../../app/labels";
 import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
@@ -108,7 +109,6 @@ function AssessmentIntro({ detail }: { detail: AssessmentDetail }) {
       <p className="uw-ma-starter" role="note">
         <FileWarning size={15} aria-hidden="true" /> {detail.starter_mark}
       </p>
-      {detail.practice_label && <p className="uw-ma-practice">{detail.practice_label}</p>}
       {legacy && (
         <div className="uw-cr-decision">
           <ToneBadge tone="neutral" label={legacy.note} />
@@ -336,6 +336,7 @@ export function MarketPanel({
             </label>
           )}
           <div className="ca-form-grid">
+            <DecideAndSign />
             <label className="ca-field">
               Your password
               <input
