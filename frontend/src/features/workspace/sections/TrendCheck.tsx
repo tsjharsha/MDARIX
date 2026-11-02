@@ -70,7 +70,12 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
         {perUnitHint(board.data) && (
           <div className="uw-trend-hint" role="note">
             <p>{perUnitHint(board.data)}</p>
-            {sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions) && (
+            {sectionAllowed(
+              "Import data",
+              session?.allowed_menu,
+              session?.business_permissions,
+              session?.sample_only,
+            ) && (
               <button type="button" className="ac-secondary" onClick={() => open("Import data")}>
                 Add lot quantities
               </button>

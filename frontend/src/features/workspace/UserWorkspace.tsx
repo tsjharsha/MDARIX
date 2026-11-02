@@ -392,9 +392,9 @@ export function UserWorkspace({
           (!TRIAL_ONLY_SECTIONS.includes(section) || trial?.is_trial) &&
           !(featureSet === "mvp" && PARKED_SECTIONS.includes(section)) &&
           (fresh ? !!NEW_PLACES[section] : !NEW_ONLY_SECTIONS.includes(section)) &&
-          sectionAllowed(section, session?.allowed_menu, session?.business_permissions),
+          sectionAllowed(section, session?.allowed_menu, session?.business_permissions, session?.sample_only),
       ),
-    [session?.allowed_menu, session?.business_permissions, trial?.is_trial, featureSet, fresh],
+    [session?.allowed_menu, session?.business_permissions, session?.sample_only, trial?.is_trial, featureSet, fresh],
   );
   // The new navigation's menu: the four main screens; Settings, Team and Account sit at the top right.
   const menuSections = fresh
@@ -425,7 +425,7 @@ export function UserWorkspace({
     if (
       chapter.code === "YOUR_DATA" ||
       section === "Getting started" ||
-      !sectionAllowed(section, session?.allowed_menu, session?.business_permissions)
+      !sectionAllowed(section, session?.allowed_menu, session?.business_permissions, session?.sample_only)
     )
       return open("Getting started");
     if (chapter.case) work.setInvestigationId(chapter.case.id, chapter.case.product_id);

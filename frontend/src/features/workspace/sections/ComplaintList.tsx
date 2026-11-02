@@ -5,7 +5,13 @@ import { SearchBox, Table, idColumn, listOf, sourceIdColumn, useResource } from 
 import { formatDay } from "../../../app/dates";
 import { sortParams, useServerSort } from "../../../app/tableSort";
 import { displayId } from "../../../app/displayId";
-import { investigationRequestFor, useOpenInvestigation, useTabFilters, useWorkspace } from "../workspaceContext";
+import {
+  investigationRequestFor,
+  sectionAllowed,
+  useOpenInvestigation,
+  useTabFilters,
+  useWorkspace,
+} from "../workspaceContext";
 import { StatusBadge, listTitle } from "./common";
 import { DeadlineChip, HarmChip } from "../../../app/chips";
 import { marketLabel } from "../../../app/labels";
@@ -50,7 +56,13 @@ export function ComplaintList({
   /** The new navigation's list (0.10.68): six columns, each complaint opening its own page. */
   work?: boolean;
 }) {
-  const { work, open } = useWorkspace();
+  const { work, open, session } = useWorkspace();
+  const canImport = sectionAllowed(
+    "Import data",
+    session?.allowed_menu,
+    session?.business_permissions,
+    session?.sample_only,
+  );
   const openInvestigation = useOpenInvestigation();
   const [filters, setFilters] = useState<ComplaintListFilters>(() => initialFilters ?? EMPTY_COMPLAINT_FILTERS);
   const [page, setPage] = useState(1);
@@ -96,11 +108,11 @@ export function ComplaintList({
             : {
                 title: "No complaints found",
                 detail: "Complaints arrive through imports.",
-                action: (
+                action: canImport ? (
                   <button type="button" className="ac-secondary" onClick={() => open("Import data")}>
                     Import your data
                   </button>
-                ),
+                ) : undefined,
               }
         }
         serverSort={{ sort, onSort, keys: COMPLAINT_SORTS }}

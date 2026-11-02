@@ -3,7 +3,7 @@ import { AlertTriangle, Boxes, Download, Factory, PackageCheck, Save, ShieldChec
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { sectionAllowed, useCan, useWorkspace } from "../workspaceContext";
 import { InlineError } from "./boardParts";
 import { countOf, DecideAndSign } from "./common";
 import { Bars, BarsTable, ChartOrTable, type BarRow } from "./WowCharts";
@@ -46,7 +46,7 @@ export function LotImpactPanel({
   /** Told when the list is kept or signed: each writes a new version of the case scope. */
   onChanged?: () => void;
 }) {
-  const { open, notify } = useWorkspace();
+  const { open, notify, session } = useWorkspace();
   const [preview, setPreview] = useState<Factor | null>(null);
   const screen = useResource<LotImpactView>(lotImpactPath(investigationId, preview));
   const view = screen.data;
@@ -137,9 +137,16 @@ export function LotImpactPanel({
         {!view.genealogy && (
           <p className="ac-note">
             No lot genealogy yet: import it (Import data, Lot genealogy) to compare lots by component lot or supplier.{" "}
-            <button type="button" className="ac-link" onClick={() => open("Import data")}>
-              Open Import data
-            </button>
+            {sectionAllowed(
+              "Import data",
+              session?.allowed_menu,
+              session?.business_permissions,
+              session?.sample_only,
+            ) && (
+              <button type="button" className="ac-link" onClick={() => open("Import data")}>
+                Open Import data
+              </button>
+            )}
           </p>
         )}
         {list ? (

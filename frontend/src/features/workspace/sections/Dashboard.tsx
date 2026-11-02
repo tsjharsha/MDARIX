@@ -130,7 +130,12 @@ export function DashboardSection() {
     attention: model.attention.length,
   });
   const failed = sources.find((resource) => resource.state === "error");
-  const canImport = sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions);
+  const canImport = sectionAllowed(
+    "Import data",
+    session?.allowed_menu,
+    session?.business_permissions,
+    session?.sample_only,
+  );
   const tone: Tone =
     status === "loading" || status === "empty"
       ? "neutral"
@@ -296,7 +301,9 @@ export function DashboardSection() {
         <PlatformPulse nodes={pulse} />
       </section>
 
-      {sectionAllowed("Readiness", session?.allowed_menu, session?.business_permissions) && <DashboardLoop />}
+      {sectionAllowed("Readiness", session?.allowed_menu, session?.business_permissions, session?.sample_only) && (
+        <DashboardLoop />
+      )}
 
       <nav className="ac-jump" aria-label="On this page">
         {[

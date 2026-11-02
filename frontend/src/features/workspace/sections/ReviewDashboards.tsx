@@ -32,7 +32,12 @@ export function ReviewsDashboardPanel() {
   const { session } = useWorkspace();
   const risk = useCan("risk.review");
   const regulatory = useCan("regulatory.review");
-  const allowed = sectionAllowed("Investigations", session?.allowed_menu, session?.business_permissions);
+  const allowed = sectionAllowed(
+    "Investigations",
+    session?.allowed_menu,
+    session?.business_permissions,
+    session?.sample_only,
+  );
   if ((!risk && !regulatory) || !allowed) return null;
   return <ReviewsDashboard />;
 }
@@ -144,7 +149,12 @@ function ReviewsDashboard() {
 export function QualityReviewDashboardPanel() {
   const { session } = useWorkspace();
   const canReview = useCan("quality.review");
-  const allowed = sectionAllowed("Investigations", session?.allowed_menu, session?.business_permissions);
+  const allowed = sectionAllowed(
+    "Investigations",
+    session?.allowed_menu,
+    session?.business_permissions,
+    session?.sample_only,
+  );
   if (!canReview || !allowed) return null;
   return <QualityReviewDashboard />;
 }

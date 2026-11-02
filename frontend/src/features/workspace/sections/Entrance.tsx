@@ -36,7 +36,8 @@ export function Entrance({ onRestarted }: { onRestarted: (text: string) => void 
         </p>
       </header>
       <ul className="uw-entrance-tiles">
-        {SCENARIOS.map((scenario) => {
+        {/* Your own data is under Help › Try your own data, not on the entrance (0.10.71). */}
+        {SCENARIOS.filter((scenario) => scenario.key !== "own").map((scenario) => {
           const Icon = ICONS[scenario.key];
           return (
             <li key={scenario.key} className={`uw-entrance-tile is-${scenario.key}`}>

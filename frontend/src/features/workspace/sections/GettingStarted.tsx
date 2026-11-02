@@ -30,6 +30,7 @@ import { RemoveSamplePanel, RestartSamplePanel } from "./RemoveSample";
 import { Entrance } from "./Entrance";
 import { TeamPanel } from "./TrialTeam";
 import { BESIDE_YOUR_QMS } from "../../help/besideYourQms";
+import { DISCUSS_PILOT } from "../../shared/HelpMenu";
 import { STORY_CHAPTERS, journeyProgress, type JourneyKey } from "../../help/trialGuide";
 import { NEXT_STEPS_LINK, NEXT_STEPS_SECTION, NEXT_STEPS_SUMMARY } from "../../help/trialNextSteps";
 import { LOOK_AHEAD_SECTION, LOOK_AHEAD_SUMMARY, LOOK_AHEAD_TABS } from "../partyPreview";
@@ -147,7 +148,12 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   const trial = status.data;
   const allowed = (section: string) =>
     section === "Getting started" ||
-    sectionAllowed(section as WorkspaceSection, session?.allowed_menu, session?.business_permissions);
+    sectionAllowed(
+      section as WorkspaceSection,
+      session?.allowed_menu,
+      session?.business_permissions,
+      session?.sample_only,
+    );
   const focusTab = trialTabFor(focus);
   const [tab, setTab] = useReportedTab<TrialTab>(focusTab ?? "Your data");
   const reports = useReportChoice(focus);
@@ -259,7 +265,11 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
 
       <CitedFor onSaved={story.reload} />
 
-      <TrialJourney steps={journey} source={story} onGo={goJourney} />
+      <TrialJourney
+        steps={session?.sample_only ? journey.filter((step) => step.key !== "own-data") : journey}
+        source={story}
+        onGo={goJourney}
+      />
 
       <div id="trial-story" className="uw-anchor" />
       <Panel
@@ -327,20 +337,22 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
           </div>
         )}
         <ol className="uw-trial-steps uw-story-steps">
-          {chapters.map((chapter) => (
-            <ChapterRow
-              key={chapter.code}
-              chapter={chapter}
-              isNext={chapter.code === story.data?.next}
-              allowed={allowed(chapter.opens.section)}
-              templates={
-                chapter.code === "YOUR_DATA"
-                  ? importTemplatesFor(trial?.templates ?? [], featureSetOf(session?.feature_set)).core
-                  : undefined
-              }
-              onOpen={() => go(chapter)}
-            />
-          ))}
+          {chapters
+            .filter((chapter) => !(session?.sample_only && chapter.code === "YOUR_DATA"))
+            .map((chapter) => (
+              <ChapterRow
+                key={chapter.code}
+                chapter={chapter}
+                isNext={chapter.code === story.data?.next}
+                allowed={allowed(chapter.opens.section)}
+                templates={
+                  chapter.code === "YOUR_DATA"
+                    ? importTemplatesFor(trial?.templates ?? [], featureSetOf(session?.feature_set)).core
+                    : undefined
+                }
+                onOpen={() => go(chapter)}
+              />
+            ))}
         </ol>
         {hasSample && (
           <div id="trial-look-ahead" className="uw-story-partner uw-anchor uw-look-ahead">
@@ -404,7 +416,8 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
 
       <div id="trial-tabs" className="uw-anchor uw-trial-tabs">
         <Tabs tabs={tabs} active={tabs.includes(tab) ? tab : tabs[0]} onChange={setTab} label="Your trial">
-          {tab === "Your data" && (
+          {tab === "Your data" && session?.sample_only && <DiscussPilot onOpen={() => open("Next steps")} />}
+          {tab === "Your data" && !session?.sample_only && (
             <>
               {hasSample && (own?.complaints ?? 0) > 0 && trial?.is_owner && (
                 <p className="uw-cited-line">
@@ -528,6 +541,23 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
         {body}
       </details>
     </>
+  );
+}
+
+/**
+ * A sample-only trial (an event or judge trial, 0.10.71) has no upload: it offers a pilot conversation instead
+ * (Next steps, from trial to pilot). The import routes refuse it as well (403 SAMPLE_ONLY_TRIAL).
+ */
+export function DiscussPilot({ onOpen }: { onOpen: () => void }) {
+  return (
+    <Panel eyebrow="Your data" title="This evaluation uses the sample only">
+      <p>To try your own data, discuss a pilot: MDARIX on your real complaints, in a database set up for you.</p>
+      <div className="ca-action-row">
+        <button type="button" className="ac-primary" onClick={onOpen}>
+          {DISCUSS_PILOT} <ChevronRight size={15} aria-hidden="true" />
+        </button>
+      </div>
+    </Panel>
   );
 }
 

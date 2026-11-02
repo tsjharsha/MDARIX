@@ -362,7 +362,8 @@ export function useOpenTask(): (task: Task) => (() => void) | null {
   const { session, work, open } = useWorkspace();
   return (task) => {
     const target = taskDestination(task);
-    if (!sectionAllowed(target.section, session?.allowed_menu, session?.business_permissions)) return null;
+    if (!sectionAllowed(target.section, session?.allowed_menu, session?.business_permissions, session?.sample_only))
+      return null;
     return () => {
       const kase = taskCase(task);
       if (kase) work.setInvestigationId(kase.investigationId, kase.productId);

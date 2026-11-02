@@ -36,7 +36,9 @@ describe("the five-minute entrance", () => {
         <Entrance onRestarted={() => undefined} />
       </WorkspaceContext.Provider>,
     );
-    expect(html.match(/About 5 minutes/g)).toHaveLength(4);
+    // 0.10.71 (A2): your own export is under Help › Try your own data, not a tile.
+    expect(html.match(/About 5 minutes/g)).toHaveLength(3);
+    expect(html).not.toContain("Upload your export");
     expect(html).toContain("Inspection readiness on the sample");
   });
 

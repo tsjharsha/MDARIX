@@ -46,7 +46,6 @@ from backend.app.trial.service import (
     resend_invitation,
     trial_subscription,
 )
-from backend.app.access.permissions import RECORDS_WRITE, require_permission
 
 router = APIRouter(prefix="/api/v1", tags=["Free trial"])
 
@@ -238,7 +237,7 @@ for _path, _handler in (
         _path,
         _handler,
         methods=["POST"],
-        dependencies=[Depends(require_permission(RECORDS_WRITE)), Depends(_trial_only)],
+        dependencies=[*data_import_router.IMPORTING, Depends(_trial_only)],
         name=f"trial_alias_{_handler.__name__}",
     )
 

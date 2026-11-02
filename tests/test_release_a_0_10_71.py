@@ -140,3 +140,107 @@ def test_an_organization_created_outside_the_trial_approval_stays_classic():
         db.rollback()
     # Not set in code: the column's default, classic, applies when it is written.
     assert tenant.navigation in (None, "classic")
+
+
+# ------------------------------------------------------------------------------------------- A2: sample-only trials
+
+IMPORT_PREFIXES = ("/api/v1/data/import", "/api/v1/trial/imports")
+# Not an import: a set-aside row dismissed with a reason brings nothing in (a sample row may be dismissed).
+NOT_IMPORTS = {("POST", "/api/v1/data/import/quarantine/{row_id}/dismiss")}
+
+
+def _import_routes():
+    from tests.route_inventory import api_routes
+
+    for path, route in api_routes(app):
+        if not path.startswith(IMPORT_PREFIXES):
+            continue
+        for method in sorted(route.methods & {"POST", "PUT", "PATCH", "DELETE"}):
+            if (method, path) not in NOT_IMPORTS:
+                yield method, path, route
+
+
+def _set_tenant(admin, tenant_id, **changes):
+    detail = _ok(admin.get(f"/api/v1/platform-admin/tenants/{tenant_id}"))
+    tenant = detail.get("tenant", detail)
+    return admin.patch(
+        f"/api/v1/platform-admin/tenants/{tenant_id}",
+        json={**changes, "reason": "Judge trial for the event (test)", "lock_version": tenant["lock_version"]},
+    )
+
+
+@pytest.fixture(scope="module")
+def trial():
+    from tests.test_free_trial import _approved_trial_client
+
+    user, approval, _ = _approved_trial_client()
+    try:
+        yield {"user": user, "tenant_id": approval["tenant_id"]}
+    finally:
+        _purge(approval["tenant_id"])
+
+
+def test_every_import_route_refuses_a_sample_only_trial():
+    from backend.app.data_import_router import refuse_sample_only
+
+    routes = list(_import_routes())
+    # The check, the import and a set-aside row's fix and re-process, and the trial's two aliases (distribution and
+    # every other template is an entity of the same routes).
+    assert {path for _, path, _ in routes} == {
+        "/api/v1/data/import/{entity}/check",
+        "/api/v1/data/import/{entity}",
+        "/api/v1/data/import/quarantine/{row_id}/reprocess",
+        "/api/v1/trial/imports/{entity}/check",
+        "/api/v1/trial/imports/{entity}",
+    }
+    for method, path, route in routes:
+        assert any(dep.dependency is refuse_sample_only for dep in route.dependencies), f"{method} {path}"
+
+
+def test_a_sample_only_trial_is_refused_in_plain_words_and_a_normal_trial_keeps_its_upload(trial):
+    from backend.app.data_import_router import SAMPLE_ONLY_MESSAGE
+
+    admin, user, tenant_id = authenticated_client(), trial["user"], trial["tenant_id"]
+    assert _ok(user.get("/api/v1/session/context"))["sample_only"] is False
+    csv = b"complaint_id,product_id,description\nOWN-1,SAMPLE-PULSE-410,Display flickers\n"
+    headers = {"Content-Type": "text/csv"}
+    # A normal trial checks its own file (whatever the check finds, it is not refused).
+    assert user.post("/api/v1/data/import/complaints/check", content=csv, headers=headers).status_code != 403
+    # The trial's own user may not set it; a platform administrator does, with a reason, audited.
+    assert user.patch(
+        f"/api/v1/platform-admin/tenants/{tenant_id}", json={"sample_only": True, "reason": "x" * 12, "lock_version": 1}
+    ).status_code in (401, 403)
+    changed = _set_tenant(admin, tenant_id, sample_only=True)
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["updated"] == {"sample_only": True} and changed.json()["tenant"]["sample_only"] is True
+    assert _ok(user.get("/api/v1/session/context"))["sample_only"] is True
+    try:
+        row = uuid.uuid4()
+        for path in (
+            "/api/v1/data/import/complaints/check",
+            "/api/v1/data/import/complaints",
+            "/api/v1/data/import/distribution",
+            "/api/v1/trial/imports/complaints/check",
+            "/api/v1/trial/imports/complaints",
+        ):
+            refused = user.post(path, content=csv, headers=headers)
+            assert refused.status_code == 403, (path, refused.text)
+            assert refused.json()["detail"] == {"code": "SAMPLE_ONLY_TRIAL", "message": SAMPLE_ONLY_MESSAGE}
+        refused = user.post(f"/api/v1/data/import/quarantine/{row}/reprocess", json={"row": {"description": "x"}})
+        assert refused.status_code == 403 and refused.json()["detail"]["code"] == "SAMPLE_ONLY_TRIAL"
+        # Reading the sample's data-quality reports stays open.
+        assert user.get("/api/v1/data/import/runs").status_code == 200
+        with SessionLocal() as db:
+            bind_system(db, "test: the change is audited")
+            from backend.app.db.models.foundation import AuditEvent
+
+            event = (
+                db.query(AuditEvent)
+                .filter(AuditEvent.entity_id == uuid.UUID(tenant_id), AuditEvent.action == "TENANT_UPDATED")
+                .order_by(AuditEvent.created_at.desc())
+                .first()
+            )
+            assert event.details["after"] == {"sample_only": True} and event.details["reason"]
+    finally:
+        assert _set_tenant(admin, tenant_id, sample_only=False).status_code == 200
+    assert user.post("/api/v1/data/import/complaints/check", content=csv, headers=headers).status_code != 403

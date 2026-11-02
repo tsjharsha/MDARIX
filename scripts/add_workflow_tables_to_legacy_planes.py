@@ -3,7 +3,8 @@
 complaint classifications, signer training), tr02 (complaint dispositions, the decision's root-cause attribution)
 tr04 to tr08 (the trial line's intake, reports, guides, oversight and lot impact tables) and tr09 (a CAPA's QMS
 reference, a lot's expiry date, a product's device category and a complaint's other lots), tr10 (a set-aside import
-row dismissed with a reason) and tr11 (each organization's navigation, classic or new).
+row dismissed with a reason), tr11 (each organization's navigation, classic or new) and tr12 (a sample-only trial,
+a complaint's linked service work).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -237,6 +238,17 @@ STEPS = (
         done_sql=(
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
             "AND table_name = 'tenants' AND column_name = 'navigation')"
+        ),
+    ),
+    Step(
+        "tr12",
+        "tr12_trial_sample_only_service.py",
+        "add_sample_only_and_service",
+        (),
+        ("tenants", "complaints"),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'complaints' AND column_name = 'service_status')"
         ),
     ),
 )

@@ -470,6 +470,8 @@ class TenantUpdateRequest(BaseModel):
     configuration_version: str | None = Field(default=None, max_length=80)
     # classic (today's menu) or new (stage 7's navigation), per organization (0.10.67).
     navigation: str | None = Field(default=None, pattern="^(classic|new)$")
+    # An evaluation on the sample only: no import, "Discuss a pilot" instead (0.10.71).
+    sample_only: bool | None = None
     reason: str = Field(min_length=10, max_length=1000)
     lock_version: int
 

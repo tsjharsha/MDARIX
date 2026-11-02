@@ -101,6 +101,8 @@ export type SessionContext = {
   feature_set?: string;
   /** classic or new (tenants.navigation, 0.10.67): the organization's menu (app/linkTable.ts). */
   navigation?: string;
+  /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
+  sample_only?: boolean;
 };
 
 export type WorkContext = {
@@ -391,7 +393,8 @@ export function useOpenInvestigation(): ((request: OpenInvestigationRequest) => 
   const canWrite = useCan("records.write");
   const session = value?.session;
   if (!value?.work?.requestOpenInvestigation || !canWrite) return null;
-  if (!sectionAllowed("Investigations", session?.allowed_menu, session?.business_permissions)) return null;
+  if (!sectionAllowed("Investigations", session?.allowed_menu, session?.business_permissions, session?.sample_only))
+    return null;
   return (request) => {
     value.work.requestOpenInvestigation(request);
     value.open("Investigations", "All investigations");
@@ -407,7 +410,10 @@ export function sectionAllowed(
   section: WorkspaceSection,
   allowedMenu: string[] | undefined,
   businessPermissions?: string[],
+  /** A sample-only trial (session `sample_only`, 0.10.71) imports nothing: the server refuses it too. */
+  sampleOnly?: boolean,
 ) {
+  if (sampleOnly && section === "Import data") return false;
   const keys = SECTION_MENU_KEYS[section];
   const permission = SECTION_PERMISSIONS[section];
   // A section that changes data is shown only when the server listed the permission (fail closed).

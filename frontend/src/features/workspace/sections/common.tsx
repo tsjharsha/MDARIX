@@ -23,7 +23,12 @@ export const countOf = (count: number, noun: string, plural = `${noun}s`) =>
 /** Render children only once the shared Product 360 context is available; otherwise say why not. */
 export function NeedsProduct({ children }: { children: (view: Product360) => ReactNode }) {
   const { work, session, open } = useWorkspace();
-  const canImport = sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions);
+  const canImport = sectionAllowed(
+    "Import data",
+    session?.allowed_menu,
+    session?.business_permissions,
+    session?.sample_only,
+  );
   if (work.view) return <>{children(work.view)}</>;
   if (work.state === "loading")
     return (
