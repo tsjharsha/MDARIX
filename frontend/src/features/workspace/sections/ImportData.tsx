@@ -788,7 +788,7 @@ function FilePreviewTable({ rows }: { rows: Record<string, string>[] }) {
   const { sorted, sort, toggle } = useSortedRows(rows, (row, key) => row[key]);
   return (
     <div className="ac-table-wrap">
-      <table className="ac-table">
+      <table className="ac-table ms-cards">
         <caption className="ca-sr-only">First rows of the file</caption>
         <thead>
           <tr>
@@ -801,7 +801,9 @@ function FilePreviewTable({ rows }: { rows: Record<string, string>[] }) {
           {sorted.map((row, index) => (
             <tr key={index}>
               {columns.map((column) => (
-                <td key={column}>{previewValue(row[column])}</td>
+                <td key={column} data-label={column}>
+                  {previewValue(row[column])}
+                </td>
               ))}
             </tr>
           ))}

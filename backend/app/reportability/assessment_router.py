@@ -38,6 +38,7 @@ from backend.app.request_context import AuthenticatedRequestContext, get_request
 from backend.app.signer_training import service as training
 from backend.app.signer_training.router import is_trial
 from backend.app.standards import STARTER_MARK
+from backend.app.business_ids import complaint_ref
 
 logger = logging.getLogger("mdarix.reportability.markets")
 router = APIRouter(prefix="/api/v1/complaints", tags=["Per-market assessment"])
@@ -339,7 +340,7 @@ def save_draft(
             entity_id=complaint_id,
             correlation_id=ctx.correlation_id,
             details={
-                "complaint": record["business_id"] or record["complaint_identifier"],
+                "complaint": complaint_ref(record),
                 "market": market,
                 "version": draft.version,
                 "question_set": question_set.version,
@@ -639,7 +640,7 @@ def record_filing(
             entity_id=complaint_id,
             correlation_id=ctx.correlation_id,
             details={
-                "complaint": record["business_id"] or record["complaint_identifier"],
+                "complaint": complaint_ref(record),
                 "market": market,
                 "version": current.version,
             },

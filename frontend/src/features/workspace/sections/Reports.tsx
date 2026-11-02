@@ -1,11 +1,13 @@
 import { useContext, useState } from "react";
+import { marketLabel, versionWords } from "../../../app/labels";
 import { CheckCircle2, ClipboardList, Download, FileText, Send, ShieldCheck, Undo2 } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
 import { WorkspaceContext, useCan } from "../workspaceContext";
 import { communicationsTab } from "../communications";
-import { countOf } from "./common";
+import { AlsoKnownAs, countOf, DecideAndSign } from "./common";
+import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
 import {
   OUTCOME_LABELS,
@@ -13,6 +15,7 @@ import {
   askNote,
   REPORTS,
   RESULT_LABELS,
+  deadlineDue,
   deadlineText,
   fieldTone,
   fileIn,
@@ -49,6 +52,7 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState("");
   const canWrite = useCanReport();
+  const workspace = useContext(WorkspaceContext);
   const items = list.data?.items ?? [];
   const waiting = items.filter(
     (item) => !["ACCEPTED", "COMPLETE", "SUBMITTED_NO_ACK", "FOLLOW_UP_DUE"].includes(item.state),
@@ -92,8 +96,8 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
       >
         {list.data && (
           <p className="uw-ma-starter" role="note">
-            <Send size={15} aria-hidden="true" /> {list.data.never_submits}{" "}
-            {list.data.forms.map((form) => `${form.market}: ${form.version}`).join("; ")}.
+            <Send size={15} aria-hidden="true" /> Forms:{" "}
+            {list.data.forms.map((form) => `${marketLabel(form.market)}: ${versionWords(form.version)}`).join("; ")}.
           </p>
         )}
         <InlineError text={error} />
@@ -112,7 +116,10 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
                       {item.kind === "RESPONSE" ? " · response to a request" : ""}
                       {item.sample ? " · sample" : ""}
                     </span>
-                    <ToneBadge tone={stateTone(item.state, item.overdue)} label={item.state_label} />
+                    <StateChip label={item.state_label} />
+                    {deadlineDue(item, item.state) && (
+                      <DeadlineChip item={deadlineDue(item, item.state)!} prefix="Report" />
+                    )}
                   </div>
                   <q className="uw-cr-text uw-cr-clip">{item.description}</q>
                   <p className="uw-cr-meta">
@@ -140,6 +147,17 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
           <Empty
             title="No report is owed yet"
             detail="A market assessed reportable, or pending information, lists its report here with its deadline."
+            action={
+              workspace && (
+                <button
+                  type="button"
+                  className="ac-secondary"
+                  onClick={() => workspace.open("Complaints", "Reportability")}
+                >
+                  Assess a complaint per market
+                </button>
+              )
+            }
           />
         )}
         {list.data && <p className="ac-muted">{list.data.starter_mark}</p>}
@@ -186,18 +204,18 @@ export function ReportDrawer({
   return (
     <Drawer title={`${detail.form.title}: ${detail.complaint.ref}`} onClose={onClose}>
       <div className="uw-dp uw-rp">
+        <AlsoKnownAs id={detail.complaint.business_id} shown={detail.complaint.ref} />
         <div className="uw-cr-decision">
-          <ToneBadge tone={stateTone(detail.state, detail.deadline.overdue)} label={detail.state_label} />
+          <StateChip label={detail.state_label} />
+          {deadlineDue(detail.deadline, detail.state) && (
+            <DeadlineChip item={deadlineDue(detail.deadline, detail.state)!} prefix="Report" />
+          )}
           <span className="uw-cr-meta">{deadlineText(detail.deadline, detail.state)}</span>
           <span className="uw-cr-meta">
-            {detail.form.version} · {detail.market_label}
+            {versionWords(detail.form.version)} · {detail.market_label}
             {detail.complaint.sample ? " · sample" : ""}
           </span>
         </div>
-        <p className="uw-hint" role="note">
-          <Send size={15} aria-hidden="true" /> {detail.never_submits}
-        </p>
-        {detail.practice_label && <p className="ac-muted">{detail.practice_label}</p>}
         <ol className="uw-rp-steps" aria-label="Where this report is">
           {detail.steps.map((item, index) => (
             <li key={item.state} className={index < step ? "done" : index === step ? "current" : ""}>
@@ -211,7 +229,7 @@ export function ReportDrawer({
           ))}
         </ol>
         <section className="ca-drawer-section" aria-label="Next step">
-          <h4>Next: {detail.next_step}</h4>
+          <h3>Next: {detail.next_step}</h3>
           {detail.request && (
             <p>
               <strong>The authority asked</strong> ({detail.request.received_on}): {detail.request.text}
@@ -225,7 +243,7 @@ export function ReportDrawer({
           {canWrite && <NextStep detail={detail} onChanged={changed} onOpen={onOpen} />}
         </section>
         <section className="ca-drawer-section" aria-label="The case behind it">
-          <h4>Drafted from</h4>
+          <h3>Drafted from</h3>
           <p className="uw-cr-meta">
             Complaint {detail.complaint.ref} ({detail.complaint.product_name ?? "no product"}{" "}
             {detail.complaint.version ?? ""}), aware {detail.complaint.aware_date ?? "—"}
@@ -242,7 +260,7 @@ export function ReportDrawer({
         <SubmissionRecord detail={detail} />
         {detail.responses.length > 0 && (
           <section className="ca-drawer-section" aria-label="Responses to requests">
-            <h4>Requests for information</h4>
+            <h3>Requests for information</h3>
             <ul>
               {detail.responses.map((row) => (
                 <li key={row.id}>
@@ -371,6 +389,7 @@ function Approval({ detail, onChanged }: { detail: ReportDetail; onChanged: (det
         </p>
       )}
       <div className="ca-form-grid">
+        <DecideAndSign />
         <label className="ca-field">
           Your password
           <input
@@ -442,6 +461,7 @@ function RecordSubmission({ detail, onChanged }: { detail: ReportDetail; onChang
         <p className="ac-muted ca-wide">
           Enter the approved snapshot in the authority's route yourself, then record it here at once.
         </p>
+        <DecideAndSign />
         <label className="ca-field">
           Route
           <select value={form.route} onChange={(event) => set({ route: event.target.value })}>
@@ -807,7 +827,7 @@ function Worksheet({
 }) {
   return (
     <section className="ca-drawer-section" aria-label="The worksheet">
-      <h4>The worksheet, in the authority's field order</h4>
+      <h3>The worksheet, in the authority's field order</h3>
       <p className="uw-cr-meta">{summaryLine(detail.counts)}</p>
       {detail.sections.map((section) => (
         <details key={section.code} className="uw-rp-section" open={section.fields.length > 0}>
@@ -927,7 +947,7 @@ function SubmissionRecord({ detail }: { detail: ReportDetail }) {
     });
   return (
     <section className="ca-drawer-section" aria-label="The complete submission record">
-      <h4>The complete submission record</h4>
+      <h3>The complete submission record</h3>
       <ul className="uw-rp-record">
         {detail.submissions.map((attempt) => (
           <li key={attempt.id}>

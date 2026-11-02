@@ -8,6 +8,7 @@ import {
   isDateOnly,
   localDay,
   timeLeft,
+  zoneName,
 } from "./dates";
 
 describe("dates", () => {
@@ -15,8 +16,11 @@ describe("dates", () => {
     expect(formatDay("2026-10-03T08:35:12Z")).toMatch(/Oct/);
   });
 
-  it("always states the time zone of a time", () => {
-    expect(formatDateTime("2026-10-03T08:35:12Z")).toMatch(/(GMT|UTC|[A-Z]{2,5})/);
+  it("shows a time without its zone; the screen names the zone once (V3)", () => {
+    expect(formatDateTime("2026-10-03T08:35:12Z")).not.toMatch(/GMT|UTC[+-]/);
+    expect(formatDateTime("2026-10-03T08:35:12Z")).toMatch(/2026/);
+    expect(zoneName().length).toBeGreaterThan(2);
+    expect(zoneName()).not.toMatch(/^GMT[+-]/);
   });
 
   it("gives the exact recorded UTC time for audit and signatures", () => {

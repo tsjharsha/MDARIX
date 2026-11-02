@@ -30,6 +30,7 @@ from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import require_any_permission
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.business_ids import complaint_ref
 
 router = APIRouter(prefix="/api/v1/complaints", tags=["Complaint review"])
 
@@ -200,7 +201,7 @@ def decide(
             correlation_id=ctx.correlation_id,
             reason=payload.reason,
             details={
-                "complaint": record["business_id"] or record["complaint_identifier"],
+                "complaint": complaint_ref(record),
                 "reasons": [item["code"] for item in shown.get("reasons", [])],
                 "signs": [item["code"] for item in shown.get("signs", [])],
             },

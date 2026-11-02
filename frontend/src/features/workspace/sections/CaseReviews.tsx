@@ -642,7 +642,7 @@ function CompleteForm({
           ) : (
             <p className="ac-muted">The context lists no risks to choose from.</p>
           )}
-          <h4>New failure mode or hazard, not in the risk file</h4>
+          <h3>New failure mode or hazard, not in the risk file</h3>
           {form.newHazards.map((hazard, index) => {
             const change = (patch: Partial<NewHazard>) =>
               set({ newHazards: form.newHazards.map((item, at) => (at === index ? { ...item, ...patch } : item)) });
@@ -818,9 +818,9 @@ function ReasonForm({
 function ItemList({ title, items, empty }: { title: string; items: ContextItem[]; empty: string }) {
   return (
     <div className="uw-related">
-      <h4>
+      <h3>
         {title} <span className="ac-tab-count">{items.length}</span>
-      </h4>
+      </h3>
       {items.length ? (
         <ul className="uw-intel-list">
           {items.map((item) => (
@@ -852,9 +852,9 @@ function RiskContextView({ context }: { context: unknown }) {
       <ItemList title="Risk controls" items={risk.controls} empty="No risk controls recorded." />
       <ItemList title="Failure modes" items={risk.failureModes} empty="No failure modes recorded." />
       <div className="uw-related">
-        <h4>
+        <h3>
           Hypotheses <span className="ac-tab-count">{risk.hypotheses.length}</span>
-        </h4>
+        </h3>
         {risk.hypotheses.length ? (
           <ul className="uw-intel-list">
             {risk.hypotheses.map((item) => (
@@ -905,7 +905,7 @@ function RegulatoryContextView({ context }: { context: unknown }) {
       <ReportingClocks context={context} />
       {regulatory.markets.length > 0 && (
         <div className="uw-related">
-          <h4>Complaints per market</h4>
+          <h3>Complaints per market</h3>
           <ul className="uw-intel-list">
             {regulatory.markets.map((item) => (
               <li key={item.market}>
@@ -966,7 +966,7 @@ export function ReportingClocks({ context }: { context: unknown }) {
   if (!clocks.length) return null;
   return (
     <div className="uw-related">
-      <h4>Reporting clocks (your organization&apos;s windows)</h4>
+      <h3>Reporting clocks (your organization&apos;s windows)</h3>
       <ul className="uw-intel-list">
         {clocks.map((item) => {
           const state = watchStateOf(item.state);

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
-import { titleCase, type Tone } from "../../admin/console/dashboardModel";
+import { Empty, Panel } from "../../admin/console/charts";
+import { titleCase } from "../../admin/console/dashboardModel";
+import { HarmChip, StateChip, type Harm } from "../../../app/chips";
 import { Table, formatDate, idColumn, type Column } from "../../customer-admin/shared";
 import { hideUuid, isUuid, safeText } from "../../../app/displayId";
 import { formatDay } from "../../../app/dates";
@@ -57,21 +58,33 @@ export function NeedsProduct({ children }: { children: (view: Product360) => Rea
   );
 }
 
-const STATUS_TONE: Record<string, Tone> = {
-  OPEN: "warning",
-  IN_PROGRESS: "warning",
-  CLOSED: "good",
-  RESOLVED: "good",
-  ACTIVE: "good",
-  RELEASED: "good",
-  APPROVED: "good",
-  REJECTED: "critical",
+/** Said once, at each point where a person signs or submits (V5), instead of disclaimers across the screen. */
+export const DECIDE_AND_SIGN =
+  "You decide and sign. MDARIX prepared this from your records; it never decides or submits.";
+
+export function DecideAndSign() {
+  return <p className="ms-decide">{DECIDE_AND_SIGN}</p>;
+}
+
+/** A record's other ID, in its details only: the screen shows one (the customer's own reference, J18). */
+export function AlsoKnownAs({ id, shown }: { id?: string | null; shown?: string | null }) {
+  if (!id || id === shown) return null;
+  return (
+    <p className="uw-cr-meta">
+      Also known as <span className="ms-id">{id}</span>
+    </p>
+  );
+}
+
+// Severities read as harm (an outlined chip with its shape); every other status is a neutral state (V1).
+const SEVERITY_HARM: Record<string, Harm> = {
   CRITICAL: "critical",
   HIGH: "serious",
   MAJOR: "serious",
-  MEDIUM: "warning",
-  MINOR: "neutral",
-  LOW: "neutral",
+  SERIOUS: "serious",
+  MEDIUM: "none",
+  MINOR: "none",
+  LOW: "none",
 };
 
 export function StatusBadge({ value }: { value: unknown }) {
@@ -80,7 +93,8 @@ export function StatusBadge({ value }: { value: unknown }) {
     .toUpperCase()
     .replace(/ /g, "_");
   if (!key) return <span className="ac-muted">—</span>;
-  return <ToneBadge tone={STATUS_TONE[key] ?? "neutral"} label={titleCase(key)} />;
+  const harm = SEVERITY_HARM[key];
+  return harm ? <HarmChip harm={harm} label={titleCase(key)} /> : <StateChip label={titleCase(key)} />;
 }
 
 const DATE_KEY = /(_at|_time|timestamp)$/;

@@ -70,6 +70,17 @@ FAILING_TEST = {
 }
 
 
+# The sample's open request to RV-08's reporter, in words (0.10.66, J18: it named the US questions by code).
+RV08_REQUEST = (
+    "Ask the reporter: the patient's outcome after the free flow (four US questions on harm are Unknown in the US "
+    "assessment)"
+)
+RV08_REQUEST_BEFORE = (
+    "Ask the reporter: the patient's outcome after the free flow (US2A, US2B, US2C and US3 are Unknown in the US "
+    "assessment)"
+)
+
+
 def has_sample_guides(db: Session, tenant_id) -> bool:
     from backend.app.db.models.guides_communications import DecisionGuideVersion
 
@@ -223,8 +234,7 @@ def _communications(db, tenant_id, complaints: dict, author: str, owner: str, no
             party=reporter,
             direction=rules.SENT,
             purpose=rules.REQUEST,
-            subject="Ask the reporter: the patient's outcome after the free flow (US2A, US2B, US2C and US3 are "
-            "Unknown in the US assessment)",
+            subject=RV08_REQUEST,
             channel="EMAIL",
             occurred_at=start,
             actor=author,

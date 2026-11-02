@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models.oversight import DueAlert, OversightSettings, UserAbsence
 from backend.app.oversight import rules
+from backend.app.standards import version_words
 
 logger = logging.getLogger("mdarix.oversight")
 ACTOR = "system:reminders"
@@ -347,7 +348,7 @@ def _guide_items(db: Session, tenant_id, calendar: rules.Calendar) -> list[dict]
         _item(
             f"guide:{row.id}",
             "GUIDE",
-            f"Approve decision guide version {row.code}: a second person approves it",
+            f"Approve the decision guide ({version_words(row.code)}): a second person approves it",
             calendar.working_day_end(row.requested_at or row.updated_at, 1),
             ref=row.code,
             queue="Approvers",

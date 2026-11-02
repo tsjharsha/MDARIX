@@ -178,7 +178,7 @@ def test_anyone_can_escalate_by_hand_from_any_queue(trial):  # TA-19.4
             json={"kind": "COMPLAINT", "id": complaint["id"], "reason": "The therapist called back about a patient."},
         )
     )
-    ref = complaint["business_id"] or complaint["complaint_identifier"]
+    ref = complaint["complaint_identifier"]  # a screen shows the customer's own reference (0.10.66, J18)
     item = _triage(user)[ref]
     assert any(flag["code"] == "MANUAL" for flag in item["flags"])
 

@@ -31,15 +31,15 @@
 }
 .mw-steps li {
   padding: 4px 10px;
-  border: 1px solid var(--ac-line, #d9e0e6);
-  border-radius: 999px;
-  color: var(--ac-muted, #5d6b78);
-  font-size: 12px;
+  border: 1px solid var(--ac-line, var(--ms-line));
+  border-radius: var(--ms-radius-pill);
+  color: var(--ac-muted, var(--ms-muted));
+  font-size: var(--ms-fs-12);
 }
 .mw-steps li.current {
-  border-color: var(--ac-teal, #0f766e);
-  background: var(--ac-teal-wash, #e8f5f3);
-  color: var(--ac-ink, #10202f);
+  border-color: var(--ac-teal, var(--ms-teal));
+  background: var(--ac-teal-wash, var(--ms-mint));
+  color: var(--ac-ink, var(--ms-ink));
   font-weight: 700;
 }
 .mw-actions {
@@ -65,22 +65,22 @@
   min-width: 0;
   height: 36px;
   padding: 0 8px;
-  border: 1px solid var(--ac-line, #d9e0e6);
-  border-radius: 6px;
-  background: var(--ac-surface, #fff);
-  color: var(--ac-ink, #10202f);
+  border: 1px solid var(--ac-line, var(--ms-line));
+  border-radius: var(--ms-radius-sm);
+  background: var(--ac-surface, var(--ms-surface));
+  color: var(--ac-ink, var(--ms-ink));
   text-overflow: ellipsis;
 }
 .mw-remove {
-  color: var(--ac-critical, #b42318) !important;
+  color: var(--ac-critical, var(--ms-crit)) !important;
 }
 .mw-result {
   display: grid;
   gap: 6px;
   padding: 10px 12px;
-  border: 1px solid var(--ac-line, #d9e0e6);
+  border: 1px solid var(--ac-line, var(--ms-line));
   border-left-width: 3px;
-  border-radius: 6px;
+  border-radius: var(--ms-radius-sm);
 }
 .mw-result strong {
   display: inline-flex;
@@ -88,10 +88,10 @@
   gap: 6px;
 }
 .mw-result.ready {
-  border-left-color: var(--ac-good, #1f7a4d);
+  border-left-color: var(--ac-good, var(--ms-good));
 }
 .mw-result.blocked {
-  border-left-color: var(--ac-critical, #b42318);
+  border-left-color: var(--ac-critical, var(--ms-crit));
 }
 .mw-result ul,
 .mw-result p {
@@ -108,8 +108,8 @@
 }
 
 .mw-filter {
-  border: 1px solid var(--ac-line, #d8e1e3);
-  border-radius: 8px;
+  border: 1px solid var(--ac-line, var(--ms-line));
+  border-radius: var(--ms-radius-md);
   padding: 10px 14px 4px;
   margin: 14px 0 0;
 }
@@ -120,9 +120,9 @@
 }
 
 .mw-standard {
-  border: 1px solid var(--ac-accent, #0b7470);
-  background: var(--ac-accent-soft, #e6f3f1);
-  border-radius: 8px;
+  border: 1px solid var(--ac-accent, var(--ms-teal));
+  background: var(--ac-accent-soft, var(--ms-mint));
+  border-radius: var(--ms-radius-md);
   padding: 10px 14px;
   margin-top: 12px;
   display: grid;

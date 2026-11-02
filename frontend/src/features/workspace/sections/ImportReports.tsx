@@ -269,7 +269,7 @@ function FieldChanges({ importRef }: { importRef: string }) {
       </h3>
       {items.length ? (
         <div className="ac-table-wrap">
-          <table className="ac-table">
+          <table className="ac-table ms-cards">
             <caption className="ca-sr-only">Fields this import changed</caption>
             <thead>
               <tr>
@@ -283,9 +283,9 @@ function FieldChanges({ importRef }: { importRef: string }) {
               {items.map((item, index) => (
                 <tr key={`${item.record_key}-${item.field}-${index}`}>
                   <td>{item.record_key}</td>
-                  <td>{item.field.replace(/_/g, " ")}</td>
-                  <td>{item.before ?? "—"}</td>
-                  <td>{item.after ?? "—"}</td>
+                  <td data-label="Field">{item.field.replace(/_/g, " ")}</td>
+                  <td data-label="Before">{item.before ?? "—"}</td>
+                  <td data-label="After">{item.after ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -360,7 +360,7 @@ function SetAsideRows({ source }: { source: ReturnType<typeof useResource<Quaran
           </p>
           {trial && <p className="ac-muted">{TRIAL_SET_ASIDE_NOTE}</p>}
           <div className="ac-table-wrap">
-            <table className="ac-table">
+            <table className="ac-table ms-cards">
               <caption className="ca-sr-only">Rows set aside, with their reasons</caption>
               <thead>
                 <tr>
@@ -407,7 +407,7 @@ function SetAsideRows({ source }: { source: ReturnType<typeof useResource<Quaran
                           </span>
                         )}
                       </td>
-                      <td>
+                      <td data-label="Reasons">
                         <ul className="uw-trial-issues">
                           {row.problems.map((problem) => (
                             <li key={problem}>{problem}</li>
@@ -415,12 +415,14 @@ function SetAsideRows({ source }: { source: ReturnType<typeof useResource<Quaran
                         </ul>
                       </td>
                       {columns.map((column) => (
-                        <td key={column}>{previewValue(row.row[column])}</td>
+                        <td key={column} data-label={column}>
+                          {previewValue(row.row[column])}
+                        </td>
                       ))}
                     </tr>
                     {acting?.id === row.id && (
                       <tr>
-                        <td colSpan={columns.length + 2}>
+                        <td colSpan={columns.length + 2} data-label="">
                           <SetAsideAction
                             row={row}
                             mode={acting.mode}

@@ -32,6 +32,7 @@ from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordF
 from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
 from backend.app.intake import rules
 from backend.app.reportability import markets
+from backend.app.business_ids import complaint_ref
 
 SOURCE_TYPE = "IntakeEvent"
 FOLLOW_UP, QMS, REVIEW = "FIRST_CONTACT_FOLLOW_UP", "QMS_COMPLAINT", "SERVICE_ONLY_REVIEW"
@@ -204,10 +205,11 @@ def ensure_follow_up(db, tenant_id, event: IntakeEvent, answers: dict, suggestio
         asks = ["NO_DEFICIENCY"]
     if not asks:
         return
-    title = (
-        f"Follow up {event.reference} with the reporter: "
-        + ("ask whether any deficiency is alleged" if asks == ["NO_DEFICIENCY"] else "ask about ")
-        + ("" if asks == ["NO_DEFICIENCY"] else ", ".join(f"question {q[1:]}" for q in asks))
+    # A short title (V6); the questions it asks stay in the task's details.
+    title = f"Follow up {event.reference} with the reporter: " + (
+        "is a deficiency alleged?"
+        if asks == ["NO_DEFICIENCY"]
+        else f"{len(asks)} open question{'s' if len(asks) != 1 else ''}"
     )
     task = create_task(
         db,
@@ -443,7 +445,8 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
         found[(COMPLAINT, complaint.id)] = {
             "kind": COMPLAINT,
             "id": complaint.id,
-            "ref": complaint.business_id or complaint.complaint_identifier,
+            "ref": complaint_ref(complaint),
+            "business_id": complaint.business_id,
             "identifier": complaint.complaint_identifier,
             "source": "Imported complaint",
             "country": complaint.country,
@@ -851,7 +854,7 @@ def _side(kind: str, row, products: dict) -> dict:
     return {
         "kind": COMPLAINT,
         "id": str(row.id),
-        "ref": row.business_id or row.complaint_identifier,
+        "ref": complaint_ref(row),
         "source": "Sample complaint" if row.source_system == "MDARIX_SAMPLE" else "Uploaded complaint",
         "product_name": products.get(row.product_id),
         "words": row.description,

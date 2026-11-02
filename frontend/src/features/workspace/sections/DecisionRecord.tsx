@@ -144,17 +144,17 @@ export function DecisionRecordDrawer({
             </dl>
             {safeText(decision.conditions) && (
               <>
-                <h4>Conditions</h4>
+                <h3>Conditions</h3>
                 <p className="uw-intel-statement">{decision.conditions}</p>
               </>
             )}
             {safeText(decision.rationale) && (
               <>
-                <h4>Rationale of the decision maker</h4>
+                <h3>Rationale of the decision maker</h3>
                 <p className="uw-intel-statement">{decision.rationale}</p>
               </>
             )}
-            <h4>Root-cause attribution</h4>
+            <h3>Root-cause attribution</h3>
             <p className="uw-intel-statement">
               {safeText(decision.root_cause_attribution_label) ??
                 safeText(decision.attribution_note) ??

@@ -450,7 +450,7 @@ export function QuestionItem({
         {answer.bars?.length ? <BarList colour="series" items={slices(answer.bars)} /> : null}
         {answer.table && answer.table.rows.length > 0 && (
           <div className="ac-table-wrap">
-            <table className="ac-table">
+            <table className="ac-table ms-cards">
               <thead>
                 <tr>
                   {answer.table.columns.map((column, index) => (
@@ -464,7 +464,11 @@ export function QuestionItem({
                 {answer.table.rows.map((row, index) => (
                   <tr key={index}>
                     {row.map((cell, column) => (
-                      <td key={column} className={numeric[column] ? "num" : undefined}>
+                      <td
+                        key={column}
+                        className={numeric[column] ? "num" : undefined}
+                        data-label={answer.table!.columns[column]}
+                      >
                         {typeof cell === "number" ? cell.toLocaleString() : cell}
                       </td>
                     ))}

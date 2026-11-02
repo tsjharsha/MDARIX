@@ -2,29 +2,29 @@
    Every hidden start state and every animation sits inside the no-preference media query, so with reduced motion
    (or before JavaScript) a scene is simply shown complete. */
 .sc {
-  --sc-ink: #10202f;
-  --sc-ink-2: #4a5d6e;
+  --sc-ink: var(--ms-ink);
+  --sc-ink-2: var(--ms-ink-2);
   /* Muted text keeps 4.5:1 on the stage's darkest tint (#e6f0f5). */
-  --sc-muted: #566878;
-  --sc-line: #d5e0e8;
-  --sc-panel: #ffffff;
+  --sc-muted: var(--ms-muted);
+  --sc-line: var(--ms-line);
+  --sc-panel: var(--ms-surface);
   /* An opaque fill close to the stage, behind see-through parts (a chip's tint). */
-  --sc-solid: #ffffff;
-  --sc-teal: #087b78;
-  --sc-teal-2: #0aa39d;
-  --sc-glow: #73d6cb;
-  --sc-blue: #3f8fd2;
-  --sc-amber: #d8961a;
-  --sc-amber-2: #f5c26b;
-  --sc-red: #d03b3b;
-  --sc-green: #12a150;
-  --sc-stage: linear-gradient(160deg, #ffffff 0%, #eef6f6 55%, #e6f0f5 100%);
+  --sc-solid: var(--ms-surface);
+  --sc-teal: var(--ms-teal);
+  --sc-teal-2: var(--ms-teal);
+  --sc-glow: var(--ms-teal-bright);
+  --sc-blue: var(--ms-info);
+  --sc-amber: var(--ms-warn-fill);
+  --sc-amber-2: var(--ms-warn-line);
+  --sc-red: var(--ms-crit);
+  --sc-green: var(--ms-good);
+  --sc-stage: linear-gradient(160deg, var(--ms-surface) 0%, var(--ms-ground) 55%, var(--ms-info-bg) 100%);
   /* Text in a colour: darker than the fill and stroke tokens, so it keeps 4.5:1 on the stage and on its own tints. */
-  --sc-teal-ink: #066663;
-  --sc-amber-ink: #8a5a00;
-  --sc-red-ink: #a92a2a;
-  --sc-blue-ink: #1d5f9e;
-  --sc-green-ink: #0b6b35;
+  --sc-teal-ink: var(--ms-teal-dark);
+  --sc-amber-ink: var(--ms-warn);
+  --sc-red-ink: var(--ms-crit);
+  --sc-blue-ink: var(--ms-info);
+  --sc-green-ink: var(--ms-good);
   position: absolute;
   inset: 0;
   display: grid;
@@ -33,30 +33,30 @@
   overflow: hidden;
 }
 .sc-dark {
-  --sc-ink: #ffffff;
+  --sc-ink: var(--ms-surface);
   --sc-ink-2: rgb(255 255 255 / 78%);
   --sc-muted: rgb(255 255 255 / 72%);
   --sc-line: rgb(255 255 255 / 16%);
   --sc-panel: rgb(255 255 255 / 7%);
-  --sc-solid: #12283b;
-  --sc-teal: #73d6cb;
-  --sc-teal-2: #4fb3d9;
-  --sc-amber: #f5c26b;
-  --sc-teal-ink: #9be6dd;
-  --sc-amber-ink: #ffd58f;
-  --sc-red-ink: #ff9a9a;
-  --sc-blue-ink: #8cc2f0;
-  --sc-green-ink: #5fd896;
+  --sc-solid: var(--ms-navy-deep);
+  --sc-teal: var(--ms-teal-bright);
+  --sc-teal-2: var(--ms-info-line);
+  --sc-amber: var(--ms-warn-line);
+  --sc-teal-ink: var(--ms-teal-bright);
+  --sc-amber-ink: var(--ms-warn-bg);
+  --sc-red-ink: var(--ms-crit-bg);
+  --sc-blue-ink: var(--ms-on-dark-muted);
+  --sc-green-ink: var(--ms-teal-bright);
   --sc-stage:
     radial-gradient(520px 260px at 12% 0%, rgb(29 106 106 / 75%) 0%, transparent 62%),
     radial-gradient(420px 240px at 95% 100%, rgb(201 133 0 / 16%) 0%, transparent 60%),
     linear-gradient(rgb(255 255 255 / 3.5%) 1px, transparent 1px) 0 0 / 100% 26px,
-    linear-gradient(90deg, rgb(255 255 255 / 3.5%) 1px, transparent 1px) 0 0 / 26px 100%, #0f2233;
+    linear-gradient(90deg, rgb(255 255 255 / 3.5%) 1px, transparent 1px) 0 0 / 26px 100%, var(--ms-navy-deep);
 }
 .sc svg {
   width: 100%;
   height: 100%;
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--ms-font);
 }
 /* Text takes the stage's ink unless it sets its own fill. */
 :where(.sc text:not([fill])) {
@@ -146,7 +146,7 @@
 }
 .sc-card-title {
   font-size: max(11px, var(--sc-floor, 0px));
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   fill: var(--sc-ink-2) !important;

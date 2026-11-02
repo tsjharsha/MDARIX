@@ -1,7 +1,8 @@
 /*
  * One way to show dates and times in the application. Days use the month's name ("3 Oct 2026"), so 03/10 and 10/03
- * can never be confused across countries; times always name their time zone, which matters for audit trails and
- * electronic signatures. The browser's language and time zone are used; ``formatUtc`` gives the server's UTC record.
+ * can never be confused across countries. A time is shown without its zone, and each screen names the zone once
+ * (``zoneName``, in the workspace's page head) instead of "GMT+5:30" on every timestamp (V3). The browser's language and
+ * time zone are used; ``formatUtc`` gives the server's UTC record, as audit trails and signatures keep it.
  */
 
 type DateInput = string | number | Date | null | undefined;
@@ -30,7 +31,7 @@ export function formatDay(value: DateInput, fallback = "—"): string {
   return date ? date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : fallback;
 }
 
-/** "3 Oct 2026, 14:05 GMT+5:30": date, time and the time zone it is in. */
+/** "3 Oct 2026, 14:05": date and time where the person is (the screen names the zone once, ``zoneName``). */
 export function formatDateTime(value: DateInput, fallback = "—"): string {
   const date = toDate(value);
   return date
@@ -40,12 +41,19 @@ export function formatDateTime(value: DateInput, fallback = "—"): string {
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
-        timeZoneName: "short",
       })
     : fallback;
 }
 
-/** "14:05:12 GMT+5:30" for events within the current screen (for example a connection check). */
+/** The reader's time zone in words ("India Standard Time"), said once per screen for the times on it. */
+export function zoneName(now = new Date()): string {
+  const part = new Intl.DateTimeFormat(undefined, { timeZoneName: "long" })
+    .formatToParts(now)
+    .find((item) => item.type === "timeZoneName");
+  return part?.value ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+/** "14:05:12" for events within the current screen (for example a connection check). */
 export function formatTime(value: DateInput, fallback = "—"): string {
   const date = toDate(value);
   return date
@@ -53,7 +61,6 @@ export function formatTime(value: DateInput, fallback = "—"): string {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
-        timeZoneName: "short",
       })
     : fallback;
 }

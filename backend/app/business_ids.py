@@ -51,3 +51,12 @@ def business_id_of(db: Session, model: Any, row_id: Any) -> str | None:
     if key is None:
         return None
     return business_id_map(db, model, [key]).get(str(key))
+
+
+def complaint_ref(complaint: Any) -> str | None:
+    """The one ID a screen shows for a complaint (J18, V2): the customer's own reference (``complaint_identifier``),
+    else its MDARIX ID. The other is shown only as "also known as" in the complaint's details. A complaint is an ORM
+    row or a mapping with both fields. Documents, exports and signed records keep the IDs they always named."""
+    if isinstance(complaint, dict):
+        return complaint.get("complaint_identifier") or complaint.get("business_id")
+    return complaint.complaint_identifier or complaint.business_id

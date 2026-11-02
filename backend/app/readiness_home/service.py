@@ -39,6 +39,8 @@ from backend.app.db.models.signals import InvestigationSignal, Signal
 from backend.app.signals.labels import AWAITING_TRIAGE
 from backend.app.signals.logic import display_title
 from backend.app.standards import DISCLAIMER, chips
+from backend.app.business_ids import complaint_ref
+from backend.app.reportability.markets import MARKET_LABELS
 
 LOOKBACK_DAYS = 365
 ITEMS_MAX = 8
@@ -204,7 +206,10 @@ def _disagreement_items(db: Session, tenant_id: uuid.UUID, rows, listed: set[str
         if row.complaint_id in refs and row.complaint_id not in seen:
             seen.add(row.complaint_id)
             found.append(
-                {"id": str(row.complaint_id), "ref": f"{refs[row.complaint_id]} ({row.market}: against the scale)"}
+                {
+                    "id": str(row.complaint_id),
+                    "ref": f"{refs[row.complaint_id]} ({MARKET_LABELS.get(row.market, row.market)}: against the scale)",
+                }
             )
     return found
 
@@ -354,7 +359,7 @@ def harm_closed_without_case(db: Session, tenant_id: uuid.UUID, today: date) -> 
         CRITICAL if closed else CLEAR,
         f"Closed in the last {LOOKBACK_DAYS} days, reporting a death or serious injury, in no case",
         {"section": "Complaints", "tab": "Reportability"},
-        [{"id": str(row.id), "ref": row.business_id or row.complaint_identifier, "label": row.name} for row in closed],
+        [{"id": str(row.id), "ref": complaint_ref(row), "label": row.name} for row in closed],
     )
 
 
@@ -454,7 +459,7 @@ def dispositions_due(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
     late = disposition.waiting_past_target(db, tenant_id, today, target)
     escalated = disposition.escalations(db, tenant_id, _midnight(today - timedelta(days=30)))
     refs = {
-        row.id: row.business_id or row.complaint_identifier
+        row.id: complaint_ref(row)
         for row in db.query(Complaint.id, Complaint.business_id, Complaint.complaint_identifier).filter(
             Complaint.tenant_id == tenant_id,
             Complaint.id.in_(
@@ -510,7 +515,7 @@ def recurring_service_level(db: Session, tenant_id: uuid.UUID, today: date) -> d
         len(found),
         ATTENTION if found else CLEAR,
         f"{RECURRING_COUNT} or more service-level resolutions on one product and problem code within {RECURRING_DAYS} "
-        "days that no open case covers (starter threshold); the next such complaint is escalated by RECURRENCE",
+        "days that no open case covers (starter threshold); the next such complaint is escalated by the recurrence trigger",
         {"section": "Signals", "tab": "By resolution"},
         [
             {
@@ -625,7 +630,6 @@ def readiness(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> d
             "critical": states.count(CRITICAL),
             "not_set": states.count(NOT_SET),
         },
-        "note": "Read from your records as imported into MDARIX; rules only, no AI. A person decides what each finding "
-        "means.",
+        "note": "Read from your records as imported into MDARIX; rules only, no AI.",
         "basis_note": DISCLAIMER,
     }

@@ -48,7 +48,7 @@ import {
   type RecordsTab,
   type SignForm,
 } from "../effectiveness";
-import { Embedded, StatusBadge } from "./common";
+import { Embedded, StatusBadge, DecideAndSign } from "./common";
 import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
 import { BasisLine, SignatureBasis } from "../../shared/Basis";
 import { RiskFileInput } from "./RiskFile";
@@ -525,6 +525,7 @@ export function CheckBody({ detail, onChanged }: { detail: CapaDetail; onChanged
             />
           </label>
           <div className="ca-form-grid">
+            <DecideAndSign />
             <label className="ca-field">
               Your password
               <input

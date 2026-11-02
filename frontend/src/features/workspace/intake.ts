@@ -177,6 +177,8 @@ export type TriageItem = {
   id: string;
   ref: string;
   identifier?: string | null;
+  /** The MDARIX ID, shown only as "also known as" in the drawer when `ref` is the customer's own. */
+  business_id?: string | null;
   source: string;
   intake_kind: string | null;
   product_name: string | null;

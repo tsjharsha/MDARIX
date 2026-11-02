@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { codeWords } from "../../../app/labels";
 import { AlertTriangle, Play } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
@@ -61,8 +62,7 @@ export function DetectionRules({ onOpenSignal }: { onOpenSignal: (reference: str
         }
       >
         <p className="ac-muted">
-          A rule opens a signal for people to triage; it never decides anything about the complaints. Detection also
-          runs on its own as complaints arrive.
+          A rule opens a signal for people to triage. Detection also runs on its own as complaints arrive.
         </p>
         {runError && (
           <p className="ca-inline-error" role="alert">
@@ -146,7 +146,7 @@ function RulePanel({ rule, canEdit, onSaved }: { rule: DetectionRule; canEdit: b
       <dl className="ca-facts">
         <div>
           <dt>Rule</dt>
-          <dd>{rule.rule_code}</dd>
+          <dd>{codeWords(rule.rule_code)}</dd>
         </div>
         <div>
           <dt>Version</dt>
