@@ -228,7 +228,7 @@ def test_each_product_shows_whether_its_field_data_reached_the_risk_file(org):
     readiness = {check["code"]: check for check in org["viewer"].get("/api/v1/readiness").json()["checks"]}
     risk_check = readiness["RISK_FILE_INPUT"]
     assert (risk_check["value"], risk_check["state"]) == (2, "CRITICAL")
-    assert risk_check["opens"] == {"section": "Records", "tab": "Risk file input"}
+    assert risk_check["opens"].items() >= {"section": "Records", "tab": "Risk file input"}.items()
     assert {entry["id"] for entry in risk_check["items"]} == {unreviewed, no_register}
 
 

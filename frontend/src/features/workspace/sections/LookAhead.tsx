@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { Eye, Send } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Tabs, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
+import { useReportedTab } from "../workspaceContext";
 import {
   LOOK_AHEAD_TABS,
   PREVIEW_PATHS,
@@ -20,7 +20,7 @@ import {
  * is nothing to send or change. Not a chapter: it counts for nothing in the story.
  */
 export function LookAheadSection({ focus }: { focus?: string }) {
-  const [tab, setTab] = useState<LookAheadTab>(lookAheadTab(focus));
+  const [tab, setTab] = useReportedTab<LookAheadTab>(lookAheadTab(focus));
   return (
     <Tabs tabs={LOOK_AHEAD_TABS} active={tab} onChange={setTab} label="Look ahead">
       {tab === "How a distributor reports" && <IntakePage />}

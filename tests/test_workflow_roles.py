@@ -226,8 +226,9 @@ def test_work_emails_open_the_case_when_they_know_it(outbox):
         "a@x.test", organization="Acme", reference="DEC000003", signed_by=None, decision="APPROVE", case="INV000147"
     )
     assert "https://app.example.com/app/investigations?case=INV000147" in outbox[0]["text"]
-    assert "https://app.example.com/app/decision?case=INV000147" in outbox[1]["text"]
-    assert "https://app.example.com/app/decision?case=INV000147" in outbox[2]["text"]
+    # The decision is the case page's Decision step (0.10.67; /app/decision?case= still opens it from older e-mails).
+    assert "https://app.example.com/app/investigations?case=INV000147&step=Decision" in outbox[1]["text"]
+    assert "https://app.example.com/app/investigations?case=INV000147&step=Decision" in outbox[2]["text"]
 
 
 def test_work_emails_without_a_case_keep_their_links(outbox):
@@ -235,7 +236,7 @@ def test_work_emails_without_a_case_keep_their_links(outbox):
     emailer.send_review_pending_notice("a@x.test", organization="Acme", reference="DEC1", submitted_by=None)
     emailer.send_signoff_completed_notice("a@x.test", organization="Acme", reference="DEC1", signed_by=None)
     assert "https://app.example.com/app/my-work" in outbox[0]["text"] and "?case=" not in outbox[0]["text"]
-    assert "https://app.example.com/app/decision" in outbox[1]["text"] and "?case=" not in outbox[1]["text"]
+    assert "https://app.example.com/app/my-work?tab=Approvals" in outbox[1]["text"] and "?case=" not in outbox[1]["text"]
     assert "https://app.example.com/app/investigations" in outbox[2]["text"] and "?case=" not in outbox[2]["text"]
 
 

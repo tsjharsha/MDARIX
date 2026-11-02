@@ -126,7 +126,13 @@ def test_the_overdue_request_is_in_my_work_readiness_and_the_case_brief(trial):
     assert checks["EXTERNAL_REQUESTS"]["state"] == "ATTENTION" and checks["EXTERNAL_REQUESTS"]["unresolved"] >= 1
 
 
-def test_a_request_moves_to_the_second_contact_and_ends_unresolved(trial):
+def test_a_request_moves_to_the_second_contact_and_ends_unresolved(trial, monkeypatch):
+    from backend.app.communications import service
+
+    # A fixed Thursday: on a real Monday "sent 2 days ago" is a Saturday, and as the weekend is not working time a
+    # log in Monday's first hour (New York, the trial's calendar) counts as within one working hour (in_mdarix True).
+    now = datetime(2026, 10, 29, 10, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(service, "now_utc", lambda: now)
     user, tenant_id = trial["user"], trial["tenant_id"]
     complaint = _complaint(tenant_id, "SAMPLE-RV-06")
     party = _ok(
@@ -142,7 +148,7 @@ def test_a_request_moves_to_the_second_contact_and_ends_unresolved(trial):
     )
     assert party["second"]["name"] == "Manager"
     me = _ok(user.get(LOG))["colleagues"][0]["id"]
-    sent = _now() - timedelta(days=2)
+    sent = now - timedelta(days=2)
     missing_owner = user.post(
         LOG,
         json={
@@ -189,7 +195,7 @@ def test_a_request_moves_to_the_second_contact_and_ends_unresolved(trial):
     assert entry["status"] == "UNRESOLVED" and "3 attempts" in entry["close_note"]
     refused = user.post(
         f"{LOG}/{entry['id']}/attempts",
-        json={"at": _now().isoformat(), "channel": "PHONE", "outcome": "NO_ANSWER"},
+        json={"at": now.isoformat(), "channel": "PHONE", "outcome": "NO_ANSWER"},
     )
     assert refused.status_code == 409
 

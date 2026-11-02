@@ -22,6 +22,7 @@ disposition, the case and its decision, the communications log, My Work), so the
 
 from __future__ import annotations
 
+from backend.app import links
 import hashlib
 import json
 import uuid
@@ -245,7 +246,7 @@ def checklist(found: dict) -> list[dict]:
     from backend.app.reportability.service import _record
 
     complaint = found["complaint"]
-    reports = {"section": "Complaints", "tab": f"Reports?complaint={complaint.id}"}
+    reports = links.target("Complaints", "Reports", record=("complaint", complaint.id))
     items = []
     # What to do next, one imperative per open item (the event summary's next action and the events list).
     actions: dict[str, str] = {
@@ -262,7 +263,7 @@ def checklist(found: dict) -> list[dict]:
                 "Triage is complete",
                 BLOCKED,
                 "On the triage list: its triage record is not complete",
-                {"section": "Complaints", "tab": "Triage"},
+                links.target("Complaints", "Triage"),
             )
         )
     elif record is None:
@@ -281,7 +282,7 @@ def checklist(found: dict) -> list[dict]:
                 "The first-contact check is signed",
                 BLOCKED,
                 "The check is not signed",
-                {"section": "Complaints", "tab": "First contact"},
+                links.target("Complaints", "First contact"),
             )
         )
     by_market = found["assessments"]
@@ -310,7 +311,7 @@ def checklist(found: dict) -> list[dict]:
             "; ".join(open_markets)
             if open_markets
             else (f"{_n(len(wanted), 'market')} signed" if wanted else "No market to assess"),
-            {"section": "Complaints", "tab": "Reportability"} if open_markets else None,
+            links.target("Complaints", "Reportability") if open_markets else None,
         )
     )
     started = {row.market for row in found["obligations"] if row.kind == "INITIAL"}
@@ -361,7 +362,7 @@ def checklist(found: dict) -> list[dict]:
                 "Escalated to a case: its investigation decision is not signed"
                 if escalated
                 else "No disposition or investigation decision is signed",
-                {"section": "Investigations"} if escalated else {"section": "Complaints", "tab": "Dispositions"},
+                links.target("Investigations") if escalated else links.target("Complaints", "Dispositions"),
             )
         )
     requests = found["requests"]
@@ -376,7 +377,7 @@ def checklist(found: dict) -> list[dict]:
             "Every information request is answered or closed",
             BLOCKED if requests else PASS,
             f"{_n(len(requests), 'request')} still open" if requests else "None open",
-            {"section": "Complaints", "tab": f"Communications?complaint={complaint.id}"} if requests else None,
+            links.target("Complaints", "Communications", record=("complaint", complaint.id)) if requests else None,
         )
     )
     tasks = [task for task in found["tasks"] if task.task_type != REPLY_TASK]
@@ -390,7 +391,7 @@ def checklist(found: dict) -> list[dict]:
             "; ".join(task.title for task in tasks[:3]) + (f" and {len(tasks) - 3} more" if len(tasks) > 3 else "")
             if tasks
             else "None open",
-            {"section": "My Work"} if tasks else None,
+            links.target("My Work") if tasks else None,
         )
     )
     capas = [row for row in found["capas"] if str(row.status or "").lower() not in CLOSED_STATUSES]
@@ -402,7 +403,7 @@ def checklist(found: dict) -> list[dict]:
                 INFO,
                 ", ".join(row.business_id or row.capa_identifier for row in capas)
                 + ": they may stay open and stay on the oversight view until they close in your QMS",
-                {"section": "Records", "tab": "Effectiveness checks"},
+                links.target("Records", "Effectiveness checks"),
             )
         )
     for item in items:

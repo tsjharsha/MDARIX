@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { useWorkspace } from "../workspaceContext";
+import { useTabParam, useWorkspace } from "../workspaceContext";
 import { countOf, DecideAndSign } from "./common";
 import { ChipFilter, Hero, InlineError } from "./boardParts";
 import { EscalateButton, useCanTriage } from "./Triage";
@@ -51,7 +51,8 @@ const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 export function FirstContact({ onOpenTab }: { onOpenTab?: (tab: "Triage") => void }) {
   const [show, setShow] = useState<"all" | IntakeState>("all");
   const [logging, setLogging] = useState<"CONTACT" | "URGENT" | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  // The call or intake whose check is open is part of the address (First contact?check=<id>).
+  const [open, setOpen] = useTabParam("check");
   const list = useResource<IntakeList>(`${INTAKE}?show=${show}`);
   const guide = useResource<Guide>(`${INTAKE}/guide`);
   const canWrite = useCanTriage();

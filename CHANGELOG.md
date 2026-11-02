@@ -10,6 +10,161 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.67] - 2026-11-02
+
+On the trial maintenance line (`release/0.10`): stage 6 of the quality plan, "Navigation foundation". Every screen,
+tab, record, open panel and filter now has its own address. Back, refresh, a new tab and signing in again keep the
+exact screen. One table maps every old address and section name to its place, and a test proves that every link MDARIX
+sends lands on a screen and tab that exist. Nothing on screen changes, except the browser's address and the links that
+were broken (below). No menu item, tab or test id changes.
+
+**Migration `tr11navigation`** (after `tr10setasidedismissed`; `tr03pmssources` stays reserved). It is expand-only:
+it adds one column with a default, `tenants.navigation`, set to `classic` or `new` (default `classic`). Every
+organization keeps today's menu. On legacy dedicated organization databases, run
+`scripts/add_workflow_tables_to_legacy_planes.py` (new step tr11). The API and web images change. The sample data does
+not change, so `scripts/refresh_trial_story.py` has nothing new to do.
+
+### Changed: one address for every view (6.1, 6.2)
+
+- An address names the screen and its tab, and the record, open panel or filter the tab shows, for example
+  `/app/complaints?tab=Reports&complaint=<id>&report=<id>` or `/app/signals?tab=Signal+inbox&priority=HIGH`. The case
+  page keeps `/app/investigations?case=INV000147&step=Decision`, now with what the step carries (a follow-up, a
+  review, a view).
+- **Opening a record or a panel adds a history entry, and changing a filter replaces it.** Back closes a panel
+  without reloading the screen. Refresh, a new tab and sign-in (`returnTo`) reopen the same panel. The panels with an
+  address are a triage item, a first-contact check, a disposition, a report, a communication, an Oversight event's
+  checklist, a signal, a task, an evidence request and a CAPA's check. The filters with an address are the complaint
+  list's and the signal inbox's. The same tab for a second record is now a different address.
+- **Every section has a path:** `/app/getting-started`, `/app/import-data`, `/app/account`, `/app/feedback` and
+  `/app/look-ahead`. An address with `?section=` (used until 0.10.66) still opens its screen and is rewritten to the
+  path. A `?signal=` link stays in the address; it used to be removed at start.
+- Under the hood there is one address module (`features/workspace/workspaceAddress.ts`). It replaces the separate
+  parsing in each screen, which each screen did for its own tab only.
+
+### Added: the old -> new link table (6.7)
+
+- `frontend/src/app/linkTable.json` holds the screens and their tabs, and where each kind of record opens. It also
+  maps every former address (`/app/decision`, `/app/risk-traceability`, `/app/audit` and the rest), former section
+  name (Dashboard, Products, Evidence, Decisions, Intelligence, Trust & Audit) and former tab name to its place. It is
+  applied when the workspace starts and on every navigation, and it is kept permanently, so e-mails already sent,
+  bookmarks, videos and guides keep working. At this stage the places are today's screens; stage 7 changes them.
+- `/app/story` now opens the case page. It opened the list of investigations, because its Story tab is parked.
+
+### Changed: the server sends places, not strings (6.6)
+
+- One server helper (`backend/app/links.py`) builds every server-sent target: Readiness checks, Oversight rows and
+  alerts, each event's checklist and next action, report and guide approval tasks, and the trial story's chapters.
+  Each target now carries a structured `opens.target` (`section`, `tab`, `record`, `panel`). It still carries the
+  `opens.section` and `opens.tab` fields that screens read until 0.10.66, so a tab left open across the upgrade keeps
+  working. One resolver in the app (`placeOf`) turns targets into places. Alerts raised before the upgrade still open.
+- E-mails use the same addresses (`links.app_path`).
+
+### Added: links to any record (6.5)
+
+- A case's audit trail opens a complaint (its Oversight checklist), a report, a communication, a CAPA (its check) and
+  a disposition. Opening any record from a case's timeline makes that case the context, even when the timeline shows
+  another case than the one open.
+
+### Fixed: links that went nowhere (6.4)
+
+- The "risk review requested" e-mail linked Risk & Traceability (`/app/risk-traceability`), a screen the MVP parks.
+  It now opens My Work, where the review task is.
+- The "decision waiting for your approval" e-mail said "Open Decisions" and linked `/app/decision`, a parked section.
+  It now says "Open the decision" and opens the case's Decision step (without a case: My Work › Approvals). The
+  "decision signed" e-mail opens the Decision step too.
+- The trial's support-access e-mail said "Open Getting started › Team" but opened `/app`, which lands on Your data. It
+  now opens `/app/getting-started?tab=Team`.
+- Investigations: a case of another product showed "Other product" and could not be opened. It now opens; its product
+  is looked up.
+- My Work › Approvals: a case of another product said "Choose … in the context bar above", but My Work has no context
+  bar. It now opens the case.
+- Records › Audit trail without a case said "Pick one in the context bar above", but Records has none. It now says
+  "Open one in Investigations, then its Record step's timeline", with an Open Investigations button. A case link that
+  cannot be opened now says "Open it from Investigations".
+- A link to a tab that carries a record (`Dispositions?complaint=…`) opened Triage. It now opens the named tab.
+
+### Added: the per-organization navigation switch (6.9)
+
+- `tenants.navigation` is `classic` (the default) or `new`. A platform administrator sets it with the Tenant 360 edit
+  (`PATCH /api/v1/platform-admin/tenants/{id}`, with a reason and the lock version; audited as `TENANT_UPDATED`); no
+  new route. A trial owner cannot set it: in the existing permission model, editing an organization's record is
+  platform-only. The session context names it (`navigation`). Nothing shows it yet; stage 7 builds behind it, demo
+  trial first.
+
+### Changed: saved column choices survive (6.8)
+
+- Each screen keeps its lists' column choices under a stable view id (`linkTable.json` "viewIds"), so a screen that
+  moves or is renamed in stage 7 keeps them. The choices kept under the section's name until 0.10.66 are carried
+  over once. If storage is unavailable, the lists show their default columns.
+
+### Inventory (6.3)
+
+`docs/architecture/MDARIX_LINK_INVENTORY.md` lists every link source with its code, count and test. It covers about
+41 server targets, 17 task types, 22 audit-trail record kinds, 58 literal `open()` calls, 11 tab builders, 60 "A › B"
+guide paths, 13 e-mail links, `returnTo`, 24 former addresses, 15 former section rules and 3 former tab names. It
+also notes the mvp-1.0 differences for the forward merge (`featureSet.ts`: `routeFor` now in `linkTable.ts` must use
+`usesMvpScreens`; the pilot feature set's Records tabs; `UserWorkspace.tsx`; `Investigations.tsx`). It lists the
+Playwright lines to update at stage 9 (5 specs); these were not run.
+
+### Sample numbers and labels that change
+
+No deadline, trend figure, signal, count or record changes. The labels below change, all where a link was broken:
+
+| Where | Before | After |
+|---|---|---|
+| The approval e-mail's button | "Open Decisions" | "Open the decision" |
+| The risk-review e-mail's button | "Open Risk & Traceability" | "Open My work" |
+| Investigations, a case of another product | "Other product" | "Open workspace" |
+| Records › Audit trail without a case | "… Pick one in the context bar above." | "… Open one in Investigations, then its Record step's timeline." (with a button) |
+| Records › Audit trail, a case opened from a decision | "The context bar above still shows another case." | "Opened from a decision: not the case you have open." |
+| A case link that cannot be opened | "Choose it in the context bar above." | "Open it from Investigations." |
+
+### Proof that nothing else changed
+
+- Every workspace section and tab, and the first panel of each, was shot at 1440 and 390 px on the same trial, with
+  the 0.10.66 screens and with 0.10.67 (128 images each). 115 are identical in every pixel. Twelve differ only by
+  animation frames (the readiness ring, the sample cards fading in) or a form's default "now" time. One difference is
+  the fix above: the sample's own investigation INV000001 read "Other product" in Investigations › All
+  investigations, and now reads "Open workspace". The screens are in `MDARIX-videos/site-0.10.67-review` (`before/`,
+  `after/`, `diff/`, `compare.json`).
+- A browser check (55 checks, all passed; `navigation-checks.json` there) covers three things:
+  - Old addresses: `?section=`, `/app/decision`, `/app/risk-traceability`, `/app/audit`, `/app/products`,
+    `/app/story` and `?signal=` each open their place.
+  - Tabs and filters: a tab change is a history entry; refresh keeps the tab; a filter replaces the address, and
+    refresh keeps it.
+  - Panels: for eight panels (triage item, disposition, report, communication, first-contact check, Oversight event,
+    CAPA check, task), opening gives the panel an address; refresh keeps it open; Back closes it on the same tab;
+    Forward opens it again; and a new tab opens the same panel.
+
+### Tests
+
+- pytest: `tests/test_link_targets.py` (new, 7 tests). The server's places equal the browser's table. Every target a
+  free trial receives (Readiness, Oversight, alerts, 44 events' checklists, the story) names an existing screen, tab
+  and record, and its older fields agree with it. Every e-mail sender is called, and each of its links opens an
+  existing screen and tab, never a parked one. The navigation setting is classic by default and only a platform
+  administrator can set it.
+- vitest: `app/linkTable.test.ts` (new, 13 tests). The places equal the tab constants. Every former address, section
+  and tab redirects, and every `?section=` address is read and rewritten. Every task type, audit-trail record, built
+  tab, literal `open()`, sample chapter and guide path lands on an existing tab, and the resolver reads both forms.
+  `workspaceAddress.test.ts` is rewritten: the scheme, and refresh and a new tab keep 15 kinds of panel and filter,
+  and Back. `tables/columnViews.test.ts` is new.
+- Updated on purpose: the e-mail tests (`test_notifications_delivery.py`, `test_workflow_roles.py`: the new
+  addresses), four tests that compared an "opens" dict whole (`test_free_trial.py`, `test_readiness_api.py`,
+  `test_qms_documents_api.py`, `test_risk_file_api.py`), and two vitest mocks that gain the new hooks.
+- **Stale tests, not defects** (each in its own commit):
+  - `test_communications_api::test_a_request_moves_to_the_second_contact_and_ends_unresolved`. On a Monday,
+    "sent 2 days ago" is a Saturday. The weekend is not working time, so in Monday's first hour in New York the log
+    counted as made within one working hour. Its clock is now frozen on a Thursday.
+  - `test_authority_reports_api::test_the_india_sample…`. It took the awareness day by its UTC date, but the product
+    counts from the earlier of the IST and New York days (as `deadlines.py` documents). It now reads the day by that
+    rule.
+  - `test_complaint_disposition_api::test_another_organization_cannot_read_dispositions…`. **No cross-organization
+    read:** the other organization gets 404, and the database's own isolation check passes. The test fails only when
+    run alone, because its chapter count needs the dispositions signed by the file's earlier tests. The whole file
+    passes, and it is left as is.
+  - `test_sample_story_days::test_the_flagship…`. It looked for the triage item by its MDARIX ID; since 0.10.66 the
+    item carries the complaint's own reference.
+
 ## [0.10.66] - 2026-11-02
 
 On the trial maintenance line (`release/0.10`): stage 5 of the quality plan, "Design system and accessibility". The

@@ -468,6 +468,8 @@ class TenantUpdateRequest(BaseModel):
     database_region: str | None = Field(default=None, max_length=80)
     storage_region: str | None = Field(default=None, max_length=80)
     configuration_version: str | None = Field(default=None, max_length=80)
+    # classic (today's menu) or new (stage 7's navigation), per organization (0.10.67).
+    navigation: str | None = Field(default=None, pattern="^(classic|new)$")
     reason: str = Field(min_length=10, max_length=1000)
     lock_version: int
 

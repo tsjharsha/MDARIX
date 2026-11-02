@@ -1,6 +1,10 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import type { InvestigationSummary, Product, Product360, TemporalMode } from "../../app/types";
 import { featureSetOf, type FeatureSet } from "../../app/featureSet";
+import { tabParam, withTabParam } from "./workspaceAddress";
+import { tabParts } from "../../app/linkTable";
+import { requestJson } from "../../app/apiClient";
+import type { ResolvedCase } from "./savedContext";
 
 export const WORKSPACE_SECTIONS = [
   // Shown only in free-trial workspaces (see UserWorkspace).
@@ -133,7 +137,14 @@ export type WorkspaceApi = {
   open: (section: WorkspaceSection, tab?: string) => void;
   notify: (text: string, tone?: "good" | "critical") => void;
   /** The case page reports the step it shows, for the screen's address (workspaceAddress.ts). */
-  reportStep?: (tab: string) => void;
+  reportStep?: (tab: string, how?: "push" | "replace") => void;
+  /** The tab the section shows now, with the record, panel and filters it carries (workspaceAddress.ts). */
+  shownTab?: string;
+  /**
+   * A section says which tab it shows now (and what it carries), for the screen's address: a new history entry, so
+   * Back returns to the previous tab or panel; `replace` (a filter changed) replaces the current entry instead.
+   */
+  reportTab?: (tab: string, how?: "push" | "replace") => void;
   /** A free-trial workspace (its trial-only sections are shown; the Help menu offers Next steps). */
   isTrial?: boolean;
 };
@@ -144,6 +155,84 @@ export function useWorkspace(): WorkspaceApi {
   const value = useContext(WorkspaceContext);
   if (!value) throw new Error("useWorkspace must be used inside the user workspace");
   return value;
+}
+
+/**
+ * One parameter of the shown tab's address: the record whose panel is open ("report"), or a filter. Setting it
+ * opens or closes the panel and gives the screen its address: opening a record pushes a history entry (Back closes
+ * it again); `replace` is for a filter. Outside the workspace it is plain state, starting at `initial`.
+ */
+export function useTabParam(
+  name: string,
+  how: "push" | "replace" = "push",
+  initial: string | null = null,
+): [string | null, (value: string | null) => void] {
+  const value = useContext(WorkspaceContext);
+  const [local, setLocal] = useState<string | null>(initial);
+  const report = value?.reportTab;
+  if (!report) return [local, setLocal];
+  const shown = value.shownTab;
+  return [tabParam(shown, name), (next) => report(withTabParam(shown, name, next), how)];
+}
+
+/**
+ * A filter's parameters in the shown tab's address (each set value; an empty one is left out), and a setter that
+ * replaces the current history entry: changing a filter is not a step Back walks through. Outside the workspace
+ * (or before a tab is shown) the setter does nothing and the component keeps its own state.
+ */
+export function useTabFilters(): (values: Record<string, string>) => void {
+  const value = useContext(WorkspaceContext);
+  return (values) => {
+    const report = value?.reportTab;
+    if (!report) return;
+    let tab = value.shownTab ?? "";
+    for (const [name, text] of Object.entries(values)) tab = withTabParam(tab, name, text.trim() || null);
+    report(tab, "replace");
+  };
+}
+
+/**
+ * Make a case of any product the current one: its product is looked up by the case's business ID (the same lookup a
+ * case link uses), then the context switches to both. False when the case cannot be found or opened.
+ */
+export async function chooseCase(work: Pick<WorkContext, "setInvestigationId">, caseRef: string): Promise<boolean> {
+  try {
+    const found = await requestJson<ResolvedCase>(
+      `/api/v1/workspace/context/resolve?investigation=${encodeURIComponent(caseRef)}`,
+    );
+    work.setInvestigationId(String(found.investigation_id), String(found.product_id));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The tab with another name, keeping what it carries (a link's ?signal= stays when the inbox is named). */
+export const renamed = (tab: string | undefined, name: string) => {
+  const query = tabParts(tab).query;
+  return query ? `${name}?${query}` : name;
+};
+
+/**
+ * A section's tab, as useState, with each change reported for the screen's address (a new history entry). The tab it
+ * opens on is said once too, replacing the address (so /app/my-work reads /app/my-work?tab=Assigned+to+me, and a
+ * former tab name the new one), unless the address already names it.
+ */
+export function useReportedTab<T extends string>(initial: T | (() => T)): [T, (next: T) => void] {
+  const [active, setActive] = useState<T>(initial);
+  const value = useContext(WorkspaceContext);
+  const report = value?.reportTab;
+  const shown = value?.shownTab;
+  useEffect(() => {
+    if (report && tabParts(shown).name !== active) report(renamed(shown, active), "replace");
+  }, []);
+  return [
+    active,
+    (next) => {
+      setActive(next);
+      report?.(next);
+    },
+  ];
 }
 
 /** Whether the workspace is a free trial (false outside the workspace). */

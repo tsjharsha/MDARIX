@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { placeOf } from "../../../app/linkTable";
 import {
   AlarmClock,
   Archive,
@@ -14,7 +15,7 @@ import { Panel, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { useResource } from "../../customer-admin/shared";
 import { describeError } from "../../../app/apiClient";
 import { downloadFile } from "../../reports/download";
-import { useCan, useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { useCan, useWorkspace, type WorkspaceSection, useReportedTab } from "../workspaceContext";
 import {
   READINESS_PATH,
   SUMMARY_PERIODS,
@@ -57,7 +58,7 @@ const TRENDS_CHECK = "TRENDS_WITHOUT_ACTION";
 export function ReadinessSection({ tab }: { tab?: string }) {
   // Readiness holds the inspection checks and, beside them, the oversight view (T-G9): one place for the head of QA.
   const [target] = useState(() => parseReadinessTab(tab));
-  const [active, setActive] = useState<ReadinessTab>(target.tab);
+  const [active, setActive] = useReportedTab<ReadinessTab>(target.tab);
   return (
     <Tabs tabs={READINESS_TABS} active={active} onChange={setActive} label="Readiness sections">
       {active === "Inspection checks" ? <InspectionChecks /> : <OversightView initialEvent={target.event} />}
@@ -71,7 +72,9 @@ function InspectionChecks() {
   const finding = !!data.data?.detection_pending;
   const headline = readinessHeadline(data.data);
   const go = (check: ReadinessCheck) => {
-    if (check.opens) open(check.opens.section as WorkspaceSection, check.opens.tab);
+    if (!check.opens) return;
+    const place = placeOf(check.opens);
+    open(place.section as WorkspaceSection, place.tab);
   };
   const others = (data.data?.checks ?? []).filter(
     (check) => !(data.data?.home ?? []).some((home) => home.code === check.code),
@@ -84,9 +87,11 @@ function InspectionChecks() {
         title={headline.title}
         detail={headline.detail}
         doneLabel="clear"
-        onOpen={(station) =>
-          station.opens && open(station.opens.section as WorkspaceSection, station.opens.tab ?? undefined)
-        }
+        onOpen={(station) => {
+          if (!station.opens) return;
+          const place = placeOf(station.opens);
+          open(place.section as WorkspaceSection, place.tab);
+        }}
       >
         <SummaryDownload />
         <button

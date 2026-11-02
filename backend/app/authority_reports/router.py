@@ -25,6 +25,7 @@ regulatory.approve. These routes serve a free trial and a pilot alike (T-B1).
 
 from __future__ import annotations
 
+from backend.app import links
 import base64
 import binascii
 import hashlib
@@ -812,7 +813,7 @@ def _approval_tasks(db, control_db, ctx, obligation: ReportObligation, snapshot:
             "obligation_id": str(obligation.id),
             "market": obligation.market,
             "category": "OBLIGATION",
-            "opens": {"section": "Complaints", "tab": f"Reports?complaint={obligation.complaint_id}"},
+            "opens": links.target("Complaints", "Reports", record=("complaint", obligation.complaint_id)),
         },
     )
 
