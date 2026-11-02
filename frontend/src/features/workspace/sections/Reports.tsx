@@ -6,6 +6,7 @@ import { downloadFile } from "../../reports/download";
 import { WorkspaceContext, useCan } from "../workspaceContext";
 import { communicationsTab } from "../communications";
 import { countOf } from "./common";
+import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
 import {
   OUTCOME_LABELS,
@@ -13,6 +14,7 @@ import {
   askNote,
   REPORTS,
   RESULT_LABELS,
+  deadlineDue,
   deadlineText,
   fieldTone,
   fileIn,
@@ -112,7 +114,10 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
                       {item.kind === "RESPONSE" ? " · response to a request" : ""}
                       {item.sample ? " · sample" : ""}
                     </span>
-                    <ToneBadge tone={stateTone(item.state, item.overdue)} label={item.state_label} />
+                    <StateChip label={item.state_label} />
+                    {deadlineDue(item, item.state) && (
+                      <DeadlineChip item={deadlineDue(item, item.state)!} prefix="Report" />
+                    )}
                   </div>
                   <q className="uw-cr-text uw-cr-clip">{item.description}</q>
                   <p className="uw-cr-meta">

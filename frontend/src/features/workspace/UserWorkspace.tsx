@@ -73,6 +73,7 @@ import { requestJson } from "../../app/apiClient";
 import { rolesSummary } from "../../app/roles";
 import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
 import { searchWithoutSignal, signalFromSearch, signalLinkStart } from "./signals";
+import { zoneName } from "../../app/dates";
 import { PARKED_SECTIONS, featureSetOf, routeFor } from "../../app/featureSet";
 import {
   addressFor,
@@ -541,6 +542,7 @@ export function UserWorkspace({
                       {section}
                     </h1>
                     <p>{navText(section, featureSet === "mvp").guide}</p>
+                    <p className="ac-page-zone">Times are in {zoneName()}.</p>
                   </div>
                 </div>
                 {NAV[section].context && <ContextBar />}

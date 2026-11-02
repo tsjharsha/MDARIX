@@ -2718,7 +2718,7 @@ div.uw-task-count:hover {
   border-color: transparent;
 }
 .uw-cr-chip.tone-serious {
-  background: var(--ms-crit-bg);
+  background: var(--ms-warn-bg);
   border-color: transparent;
 }
 .uw-cr-chip.tone-critical {
@@ -4934,4 +4934,21 @@ div.uw-task-count:hover {
 .uw-li-changed ul {
   margin: 6px 0;
   padding-left: 18px;
+}
+.uw-cr-due {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ms-space-2);
+  margin: 0;
+}
+.ac-page-head .ac-page-zone {
+  margin-top: var(--ms-space-1);
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.uw-due-cell {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ms-space-1) var(--ms-space-2);
 }

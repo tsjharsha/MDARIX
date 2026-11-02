@@ -1,3 +1,4 @@
+import { DeadlineChip } from "../../../app/chips";
 import { useEffect, useState } from "react";
 import { MessageSquareReply, Paperclip } from "lucide-react";
 import { ApiError, requestJson } from "../../../app/apiClient";
@@ -298,10 +299,15 @@ function QueueSummary({ summary }: { summary: TaskSummary | null }) {
 
 function DueCell({ task }: { task: Task }) {
   const state = dueState(task);
-  const text = dueText(task, formatDate);
-  if (state === "overdue") return <span className="uw-flag-critical">{text}</span>;
-  if (state === "due_soon") return <span className="uw-flag-warning">{text}</span>;
-  return <>{text}</>;
+  // An open task with a due time shows the one time-left chip (app/chips.tsx), its date beside it.
+  if (task.due_at && (state === "overdue" || state === "due_soon" || state === "due"))
+    return (
+      <span className="uw-due-cell">
+        <DeadlineChip item={{ due_at: task.due_at, state: state === "overdue" ? "OVERDUE" : "RUNNING" }} />
+        <span className="ac-muted">{formatDate(task.due_at)}</span>
+      </span>
+    );
+  return <>{dueText(task, formatDate)}</>;
 }
 
 function taskColumns(

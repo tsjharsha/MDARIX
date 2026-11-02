@@ -11507,3 +11507,55 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   background: var(--ms-crit-bg);
   color: var(--ms-crit);
 }
+
+/* The three kinds of label (app/chips.tsx): deadline, state, harm. Red only for overdue. */
+.ms-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ms-space-1);
+  padding: 2px 10px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-surface);
+  color: var(--ms-ink);
+  font-size: var(--ms-fs-14);
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.ms-chip-deadline.is-overdue {
+  border-color: var(--ms-crit-line);
+  background: var(--ms-crit-bg);
+  color: var(--ms-crit);
+}
+.ms-chip-deadline.is-soon {
+  border-color: var(--ms-warn-line);
+  background: var(--ms-warn-bg);
+  color: var(--ms-warn);
+}
+.ms-chip-deadline.is-later {
+  color: var(--ms-ink-2);
+}
+.ms-chip-state {
+  border-color: transparent;
+  background: var(--ms-ground);
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+}
+.ms-chip-harm {
+  border-color: var(--ms-line-control);
+  background: transparent;
+  font-size: var(--ms-fs-12);
+}
+.ms-chip-harm.is-critical {
+  border-color: var(--ms-crit);
+  color: var(--ms-crit);
+}
+.ms-chip-shape {
+  font-size: var(--ms-fs-12);
+  line-height: 1;
+}
+/* An ID never breaks at its hyphen (V2): SAMPLE-RV-08 stays on one line. */
+.ms-id {
+  white-space: nowrap;
+}

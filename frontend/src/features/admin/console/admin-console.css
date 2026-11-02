@@ -349,7 +349,7 @@
   color: var(--ms-warn);
 }
 .ac-tone-icon.tone-serious {
-  color: var(--ms-crit);
+  color: var(--ms-warn);
 }
 .ac-tone-icon.tone-critical {
   color: var(--ac-critical);
@@ -376,7 +376,7 @@
   background: var(--ms-warn-bg);
 }
 .ac-badge.tone-serious {
-  background: var(--ms-crit-bg);
+  background: var(--ms-warn-bg);
 }
 .ac-badge.tone-critical {
   background: var(--ms-crit-bg);
