@@ -10,6 +10,125 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.71] - 2026-11-02
+
+On the trial maintenance line (`release/0.10`): Release A of the owner-approved "Simplicity and WoW" plan, "The first
+five minutes": one event, one decision, one next action. Pilots are unchanged except the visible release number.
+
+**Migration `tr12sampleservice`** (after `tr11navigation`; `tr03pmssources` stays reserved). It is expand-only: it adds
+`tenants.sample_only` (default false) and four nullable columns on `complaints` for the linked service work
+(`service_reference`, `service_owner`, `service_status`, `service_status_at`). No existing row changes; the complaint
+columns go with the complaint, so retention, sample removal and the purge already take them. On legacy dedicated
+organization databases, run `scripts/add_workflow_tables_to_legacy_planes.py` (new step tr12). The API and web images
+change. **Operators:** run `scripts/refresh_trial_story.py` (dry run first, then `--apply`) once after the upgrade: it
+links SAMPLE-RV-11's service work in running trials.
+
+### Changed: a new trial starts on the new navigation (A1)
+
+- A free trial approved from now on is created on the new navigation (trial provisioning sets it; the column's default
+  stays classic). Every existing organization keeps its navigation; pilots are unchanged. Tenant 360 still switches
+  either way. A fresh sign-up (request, approval, activation e-mail, password, authenticator) lands on the new first
+  screen with nobody switching anything.
+
+### Added: sample-only trials (A2)
+
+- **Tenant 360 › Edit details › Sample only** (platform administrators, with a reason, audited as `TENANT_UPDATED`), for
+  an event or judge trial. While it is on, every route that brings records in answers **403 `SAMPLE_ONLY_TRIAL`**: "This
+  evaluation uses the sample only. To try your own data, discuss a pilot." (the check and the import, every template
+  including distribution, a set-aside row's fix and re-process, and the trial's `/trial/imports` aliases). The screens
+  hide every upload and import action (the entrance, the Complaints header, Getting started, Help, Settings › Import
+  templates) and offer **Discuss a pilot** (Next steps, from trial to pilot) instead.
+- A normal trial keeps its upload under **Help › Try your own data**, no longer on the entrance or the Complaints header.
+  A pilot keeps "Import your data" on the Complaints header.
+
+### Added: the release number (A7)
+
+- **Help › About** reads "MDARIX release v0.10.71". **`GET /health/version`** answers `{"release": "v0.10.71"}`, with no
+  session and nothing else, so anyone can confirm the deployed build. `/health/live` is unchanged.
+
+### Added: a complaint's linked service work (A5)
+
+- On a complaint: the service work's reference in your service system (free text, such as the service ticket ID), its
+  owner and its status (open, in progress, complete), with the date; audited as `COMPLAINT_SERVICE_RECORDED`. When the
+  service is complete the complaint's header reads **"Service complete · Quality assessment open"**, with the quality
+  owner and the next action. Completing the service never closes or advances the complaint, its market assessments or
+  its readiness. Not a service-ticket system: no scheduling, parts or technicians.
+
+### Changed: the first screen is one event (A3)
+
+- A trial on the new navigation opens on one card: **"A hospital asked for recalibration. Should Quality review this
+  too?"**, SAMPLE-RV-11's reporter words, **Review this sample event**, "Fictional manufacturer · Sample data only",
+  4 steps. The other stories are under **More stories**, "Restart the sample story" under **More**; the
+  inspection-readiness numbers left the entrance (they stay on the manager's My work).
+- **No time claims anywhere:** "About 5 minutes" and "five-minute" are gone, and the free trial user guide's step times
+  too, until stage 9 measures them. Step counts only.
+- Every story starts on a named record: "A complaint just arrived" on SAMPLE-URG-01's triage panel, "Is a problem
+  rising?" on the trend check for OrbitCare 300, the full evaluation on SAMPLE-RV-11's page.
+- A returning person with unfinished story work sees **"Resume SAMPLE-RV-11 · step N of 4"** first, on the entrance and
+  on My work.
+
+### Added: the short story, ending in the intake decision summary (A4)
+
+On SAMPLE-RV-11's page, four steps:
+
+| Step | Screen | Main button | The saved action that completes it |
+|---|---|---|---|
+| 1 Read the call | Complaint page: the reporter's words, the phrases that make it a possible complaint marked, the known facts | Decide the route | The person's mark "read" (or a later step done) |
+| 2 Decide the route | Complaint page: "Complaint, with linked service work", the fact it rests on, the complaint and service owners | Confirm the route | The triage record completed, and the service work's owner named |
+| 3 Name the open question | Complaint page: the one question to the hospital, owner, reply date | Record the question | A request in the communications log with owner and reply date |
+| 4 Intake decision summary | Complaint page: route, source fact, open question, service, "Market assessments (US, India): still open" with deadlines, who acts next, who prepared, may approve, approved; Print or save as PDF | Continue the full evaluation | The person's mark "summary", once steps 2 and 3 exist |
+
+- **Progress comes from saved actions, never the screen.** Steps 2 and 3 are the organization's records; steps 1 and 4
+  are the person's own marks, kept per person and organization on the server (the trial's request, tied to this
+  SAMPLE-RV-11, so "Restart the sample story" starts them again). Refresh, another device and "Resume SAMPLE-RV-11" all
+  return to the same step. New: `GET /api/v1/trial/short-story`, `POST /api/v1/trial/short-story/marks` (trial only).
+- The story bar reads "Step N of 4: …" from the server, or "Off the story's path" with **Resume SAMPLE-RV-11**.
+- "Unknown" stays unknown: the consequence reads "Not known until the hospital answers".
+
+### Changed: separation of duties, shown honestly (A6)
+
+- Where a solo trial owner approves their own practice work (a report snapshot, a decision guide version), the button
+  says **"Practice approval: in a pilot a colleague approves this."**
+- The intake decision summary and the complaint's decision record name **who prepared, who may approve and who
+  approved** (beside the record: its fingerprint is unchanged).
+
+### Sample numbers and labels that change
+
+No deadline, trend figure, signal, Oversight count, bell, Readiness value or record count changes.
+
+| Where | Before | After |
+|---|---|---|
+| A new trial's navigation | classic (switched in Tenant 360) | new |
+| SAMPLE-RV-11, service work | none | In progress since its awareness · SVC-24-1107 (sample service ticket) · owner not named yet |
+| Complaint page › Summary | (no line) | Service work: … or "No service work linked." |
+| Entrance heading | Pick a five-minute story | A hospital asked for recalibration. Should Quality review this too? |
+| Entrance tiles | 4 tiles, "About 5 minutes · 3/4/7 steps", own export "optional" | 1 event card (4 steps); More stories: 3 tiles, "3 steps", "4 steps", "7 steps"; no own-export tile |
+| Entrance readiness numbers | Inspection readiness on the sample (4 numbers) | not on the entrance |
+| Story 1 lede, start | An urgent call from a hospital…; the triage list | SAMPLE-URG-01, an urgent call from a hospital…; SAMPLE-URG-01's triage panel |
+| Story 2 start | Trend check | Trend check on OrbitCare 300 |
+| Story 3 lede | A PulseWatch 410 read SpO2 too high; nobody was harmed. Each market's questions, its clock and the report. | The full evaluation of SAMPLE-RV-11: each market's questions, its clock, the report, the decision and ready to close. |
+| My work link | The five-minute stories: start one on the sample | The sample event and its stories |
+| Menu line of Getting started | Five-minute stories on the sample | The sample event and its stories |
+| Help (trial, new navigation) | Getting started and import templates | Try your own data (sample-only: Discuss a pilot); About · MDARIX release v0.10.71 |
+| Complaints header (trial) | Log a call · Import your data | Log a call |
+| Free trial user guide steps | 3 minutes, 5 minutes, 2 minutes, 45 to 60 minutes, 30 minutes, 3 minutes, 2 minutes | no times |
+
+### Tests
+
+- pytest: `tests/test_release_a_0_10_71.py` (new, 11): a fresh sign-up through the public flow (activation e-mail from a
+  test mail sink, the authenticator) reaches the new navigation with no `TENANT_UPDATED`; existing organizations keep
+  theirs; every import route carries the refusal; a sample-only trial is refused in plain words and audited, a normal
+  one is not; completing the service leaves the complaint as it was; the refresh links RV-11's service once; the short
+  story walked by its saved actions; each person's own marks; the practice line; the decision record's people.
+  `test_business_permissions.py`: `/health/version` public and version only; the short story's marks a reviewed
+  exemption. `test_link_targets.py`: a new trial starts on the new navigation.
+- vitest: `releaseA071.test.tsx` (new), `entrance.test.tsx` (rewritten).
+- Targeted pytest run (this release's tests, business permissions, alembic drift, the migration chain, free trial,
+  the flagship walk-through, the complaint page, link targets, the sample story's days, oversight, the import paths,
+  the production smoke test, site info): 135 passed.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.71-review` (`walk1440/`, `walk390/`: the whole short story;
+  `screens/`, `sample/`, `signup/`: the fresh sign-up on the local stack).
+
 ## [0.10.70] - 2026-11-02
 
 On the trial maintenance line (`release/0.10`): "Polish before proof", the owner-approved round that fixes what stage 8
