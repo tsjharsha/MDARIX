@@ -783,8 +783,7 @@ export function Tabs<T extends string>({
   useEffect(() => {
     const row = list.current;
     const selected = row?.querySelector<HTMLElement>('[aria-selected="true"]');
-    if (row && selected && row.scrollWidth > row.clientWidth)
-      row.scrollLeft = Math.max(0, selected.offsetLeft - 16); // the row is positioned on phones
+    if (row && selected && row.scrollWidth > row.clientWidth) row.scrollLeft = Math.max(0, selected.offsetLeft - 16); // the row is positioned on phones
   }, [active]);
   return (
     <>

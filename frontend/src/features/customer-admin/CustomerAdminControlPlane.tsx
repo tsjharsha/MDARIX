@@ -192,12 +192,7 @@ export function CustomerAdminControlPlane({
             )}
             <SwitchOrganization />
             <HelpMenu />
-            <button
-              type="button"
-              className="ac-secondary"
-              onClick={() => void signOut()}
-              aria-label="Sign out"
-            >
+            <button type="button" className="ac-secondary" onClick={() => void signOut()} aria-label="Sign out">
               <LogOut size={16} /> <span className="ac-hide-sm">Sign out</span>
             </button>
           </div>
