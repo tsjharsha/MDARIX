@@ -7,6 +7,8 @@ import { StoryBar } from "./sections/Entrance";
 import { ProblemCode, problemCodeText } from "./sections/ProblemCode";
 import { attentionText } from "./sections/ComplaintPage";
 import { caseVersion, chosenInvestigation } from "./useWorkContext";
+import { CaseProgressLine } from "./sections/CaseHeader";
+import { Panel } from "../admin/console/charts";
 
 // 0.10.70, "Polish before proof": the stage 8 leftovers.
 
@@ -126,5 +128,21 @@ describe("items 9 and 10: the investigation's context comes from the record bein
     // A version the product does not have, or none recorded: the context keeps the product's own choice.
     expect(caseVersion({ ...flagshipCase, version_identifier: "Rev Z" }, ["Rev A", "Rev B"])).toBeNull();
     expect(caseVersion({ id: "x" }, ["Rev A"])).toBeNull();
+  });
+});
+
+describe("item 10: an investigation opened a moment ago never claims more than it has read", () => {
+  it("says it is reading its steps, not that every step is done", () => {
+    const html = renderToStaticMarkup(<CaseProgressLine steps={[]} onSection={vi.fn()} />);
+    expect(html).toContain("Reading where this investigation stands…");
+    expect(html).not.toContain("Every step is done");
+  });
+  it("a loading panel says it is reading: never an empty grey box", () => {
+    const html = renderToStaticMarkup(
+      <Panel title="Human decision" state="loading">
+        {null}
+      </Panel>,
+    );
+    expect(html).toContain("Reading…");
   });
 });
