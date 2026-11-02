@@ -21,6 +21,7 @@ import { GlobalSearch } from "./HybridShell";
 import { eventPath, type EventView } from "./oversight";
 import { SHORT_STORY_PATH, type ShortStory } from "./shortStory";
 import { Table } from "../customer-admin/shared";
+import { addressFor } from "./workspaceAddress";
 
 // 0.10.74, Release C part C2: list views and record pages (the approved design's viewComplaints, viewRecord,
 // viewInvestigations, viewRecords).
@@ -180,6 +181,10 @@ describe("list views: one choice, the persona's own first", () => {
     expect(html).toContain("OrbitCare 300");
     const labels = [...html.matchAll(/data-label="([^"]*)"/g)].map((match) => match[1]);
     expect(labels).toEqual(["Due", "Investigation", "Product", "Priority", "Owner", "Stage", ""]);
+    // The list has its own address (no case), so a refresh or Back reopens the list, not the last investigation.
+    expect(addressFor({ section: "Investigations", tab: "All investigations" })).toBe(
+      "/app/investigations?step=All+investigations",
+    );
   });
 });
 

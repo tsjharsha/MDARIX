@@ -220,7 +220,6 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
       </header>
       {/* The short story's step to do now (0.10.71, A4), from what was saved on this record. */}
       {storyShown && !summaryLeads && <ShortStoryPanel view={view} onChanged={changed} />}
-      {triageHere && <InlineTriage complaintId={event.complaint_id} onDone={() => resource.reload()} />}
       <div className="uw-rec">
         <section className="uw-card uw-rec-main" aria-label="The complaint's record">
           <div className="uw-subtabs" role="tablist" aria-label="Complaint sections">
@@ -241,6 +240,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           <div className="uw-rec-body" role="tabpanel" id="cp-panel" aria-labelledby={`cp-tab-${active}`}>
             {active === "Summary" && (
               <>
+                {/* Triage is done here when it is the next step (0.10.72, B3), first in Details beside the rail. */}
+                {triageHere && <InlineTriage complaintId={event.complaint_id} onDone={() => resource.reload()} />}
                 <dl className="uw-rec-facts">
                   <dt>What happened</dt>
                   <dd>{event.description || "No description recorded."}</dd>
@@ -307,6 +308,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
             choose("Summary");
             document.getElementById("cp-ready")?.scrollIntoView({ behavior: "smooth", block: "start" });
           }}
+          onShowTriage={active === "Summary" ? undefined : () => choose("Summary")}
           onChanged={changed}
         />
       </div>
@@ -389,10 +391,13 @@ function Rail({
   triageHere,
   storyShown,
   onStep,
+  onShowTriage,
   onChanged,
 }: {
   view: EventView;
   step: ReturnType<typeof nextStep>;
+  /** Opens Details, where the triage record is, when another section is shown. */
+  onShowTriage?: () => void;
   triageHere: boolean;
   storyShown: boolean;
   onStep: () => void;
@@ -413,7 +418,12 @@ function Rail({
         {triageHere ? (
           <>
             <b>{step?.label}</b>
-            <p className="ac-muted">The triage record is below the highlights.</p>
+            <p className="ac-muted">The triage record is first in Details.</p>
+            {onShowTriage && (
+              <button type="button" className="ac-secondary" onClick={onShowTriage}>
+                Show the triage record
+              </button>
+            )}
           </>
         ) : step ? (
           <>

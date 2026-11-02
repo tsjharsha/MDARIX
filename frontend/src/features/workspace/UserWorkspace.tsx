@@ -81,7 +81,7 @@ import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext
 import { signalFromSearch, signalLinkStart } from "./signals";
 import { zoneName } from "../../app/dates";
 import { PARKED_SECTIONS, featureSetOf, routeFor } from "../../app/featureSet";
-import { NEW_MENU, NEW_PLACES, OLD_VIEWS, navigationOf, placeLabel, placeOf } from "../../app/linkTable";
+import { NEW_MENU, NEW_PLACES, OLD_VIEWS, navigationOf, placeLabel, placeOf, tabParts } from "../../app/linkTable";
 import { TrendsSection } from "./sections/Trends";
 import { SettingsSection } from "./sections/Settings";
 import { TeamSection } from "./sections/Team";
@@ -284,8 +284,7 @@ const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
   },
   Complaints: {
     description: "Every complaint, in views",
-    guide:
-      "One list of complaints. Choose a view: to triage, due soon, past target, reporting and more. Each complaint opens its own page.",
+    guide: "One list of complaints. Choose a list view: your own views come first. Each complaint opens its own page.",
   },
   Records: {
     description: "Readiness, documents, audit trail",
@@ -303,7 +302,7 @@ const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
   Investigations: {
     description: "One investigation, from its question to its decision",
     guide:
-      "One investigation in four sections: its summary, its evidence, its decisions and actions, and its history. The main button names the next step.",
+      "Every investigation in one list; each opens in four sections: its summary, its evidence, its decisions and actions, and its history. The main button names the next step.",
   },
 };
 
@@ -505,8 +504,9 @@ export function UserWorkspace({
   const caseResolving = work.caseLink?.state === "resolving";
   useEffect(() => {
     if (featureSet !== "mvp" || caseResolving) return;
-    const onCasePage = location.section === "Investigations";
     const tab = shown ?? location.tab;
+    // The new navigation's list of investigations (0.10.74) names no case, so its address reopens the list.
+    const onCasePage = location.section === "Investigations" && !(fresh && tabParts(tab).name === "All investigations");
     const next = addressFor({ section: location.section, tab, caseRef: onCasePage ? caseRef : null });
     const { pathname, search, hash } = window.location;
     const state: WorkspaceHistoryState = {

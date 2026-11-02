@@ -6863,6 +6863,8 @@ button.uw-org:hover {
 /* The highlights panel: the record at a glance, with its path. */
 .uw-highlights {
   display: grid;
+  /* One column that never grows past the card: the path scrolls inside it on a phone. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   margin: 0 0 var(--ms-space-4);
   padding: 20px 22px;
@@ -6922,6 +6924,7 @@ button.uw-org:hover {
 .uw-path {
   display: flex;
   gap: 4px;
+  min-width: 0;
   margin: 0;
   padding: 4px 2px 2px;
   overflow-x: auto;
@@ -6929,6 +6932,8 @@ button.uw-org:hover {
   scrollbar-width: thin;
 }
 .uw-path li {
+  /* Its screen-reader text is positioned inside it, never past the page's edge. */
+  position: relative;
   display: inline-flex;
   flex: 1 0 auto;
   align-items: center;
@@ -7065,6 +7070,10 @@ button.uw-org:hover {
   padding-top: var(--ms-space-4);
   border-top: 1px solid var(--ms-line);
 }
+.uw-rec-body > .uw-rec-part:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
 .uw-rec-part > h2 {
   margin: 0;
   font-size: var(--ms-fs-16);
@@ -7130,6 +7139,9 @@ button.uw-org:hover {
   border: 0;
 }
 .uw-rail-service .uw-service h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0 0 6px;
   color: var(--ms-muted);
   font-size: var(--ms-fs-12);
@@ -7266,8 +7278,12 @@ button.uw-org:hover {
   .uw-related li .ac-secondary {
     justify-self: start;
   }
+  .uw-listbar {
+    flex-basis: 100%;
+  }
   .uw-lv {
     flex: 1;
+    min-width: 0;
   }
   .uw-lv select {
     flex: 1;

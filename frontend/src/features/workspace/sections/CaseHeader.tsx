@@ -366,7 +366,7 @@ function CaseHighlights({
   children: ReactNode;
 }) {
   const { work } = useWorkspace();
-  const product = work.products.find((item) => item.id === String(row.product_id ?? ""));
+  const product = work.products.find((item) => item.id === String(row.product_id ?? work.productId ?? ""));
   const scope = useResource<{
     current?: { included_complaints?: unknown[]; lots?: Array<{ lot_identifier?: string | null }> } | null;
   }>(row.id ? `/api/v1/investigations/${encodeURIComponent(String(row.id))}/scope` : null);

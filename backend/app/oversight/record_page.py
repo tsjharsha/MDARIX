@@ -25,6 +25,7 @@ ACTIVITY_LIMIT = 100
 
 # Plain words for the complaint's own audit events, where the code read as a sentence is not plain enough.
 TITLES = {
+    "COMPLAINT_MARKET_ASSESSMENT_STARTED": "Market assessment started",
     "COMPLAINT_MARKET_ASSESSMENT_SAVED": "Market assessment saved",
     "COMPLAINT_MARKET_CONCLUSION_SIGNED": "Market conclusion signed",
     "COMPLAINT_SERVICE_RECORDED": "Service work recorded",
