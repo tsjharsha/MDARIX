@@ -16,7 +16,7 @@
   padding: 10px 12px;
   border: 1px solid var(--ac-line);
   border-left: 3px solid var(--ac-teal);
-  border-radius: 6px;
+  border-radius: var(--ms-radius-sm);
   background: var(--ac-teal-wash);
   color: var(--ac-ink);
   line-height: 1.45;
@@ -72,7 +72,7 @@
 .ar-subhead {
   margin: 6px 0 0;
   color: var(--ac-muted);
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -91,10 +91,10 @@
 .ar-chips li {
   padding: 3px 9px;
   border: 1px solid var(--ac-line);
-  border-radius: 999px;
+  border-radius: var(--ms-radius-pill);
   background: var(--ac-teal-wash);
   color: var(--ac-ink);
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
 }
 .ar-chips-no li {
   background: var(--ac-surface);
@@ -133,7 +133,7 @@
   gap: 5px;
 }
 .ar-yes {
-  color: var(--ac-good, #1f7a4d);
+  color: var(--ac-good, var(--ms-good));
 }
 .ar-no {
   color: var(--ac-ink-2);
@@ -160,7 +160,7 @@
 }
 .ar-insert .ac-secondary {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
 }
 .ar-preview {
   display: grid;
@@ -169,8 +169,8 @@
   box-sizing: border-box;
   padding: 12px 14px;
   border: 1px solid var(--ac-line);
-  border-radius: 6px;
-  background: var(--ac-bg, #f6f8fa);
+  border-radius: var(--ms-radius-sm);
+  background: var(--ac-bg, var(--ms-subtle));
 }
 .ar-preview p {
   margin: 0;
@@ -185,20 +185,20 @@
   display: inline-block;
   min-width: 52px;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--ms-radius-sm);
   background: var(--ac-teal-wash);
   color: var(--ac-ink);
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
   font-weight: 700;
   text-align: center;
 }
 .ar-post,
 .ar-put,
 .ar-patch {
-  background: #fff4e5;
+  background: var(--ms-warn-bg);
 }
 .ar-delete {
-  background: #fdecea;
+  background: var(--ms-crit-bg);
 }
 @media (min-width: 1100px) {
   .ac-grid.two.ar-wide-right {
@@ -234,7 +234,7 @@
   gap: 2px;
   padding: 8px 10px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--ms-radius-sm);
   background: none;
   color: var(--ac-ink);
   text-align: left;
@@ -249,7 +249,7 @@
 }
 .ar-pick-list small {
   color: var(--ac-muted);
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
 }
 .ar-links {
   display: flex;
@@ -283,7 +283,7 @@
   padding: 10px 12px;
   border: 1px solid var(--ac-line);
   border-left-width: 3px;
-  border-radius: 6px;
+  border-radius: var(--ms-radius-sm);
 }
 .ar-result strong {
   display: inline-flex;
@@ -291,7 +291,7 @@
   gap: 6px;
 }
 .ar-result.pass {
-  border-left-color: var(--ac-good, #1f7a4d);
+  border-left-color: var(--ac-good, var(--ms-good));
 }
 .ar-result.blocked {
   border-left-color: var(--ac-critical);
@@ -315,9 +315,9 @@
 .ar-steps li {
   padding: 4px 10px;
   border: 1px solid var(--ac-line);
-  border-radius: 999px;
+  border-radius: var(--ms-radius-pill);
   color: var(--ac-muted);
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
 }
 .ar-steps li.current {
   border-color: var(--ac-teal);
@@ -352,7 +352,7 @@
   height: 36px;
   padding: 0 8px;
   border: 1px solid var(--ac-line);
-  border-radius: 6px;
+  border-radius: var(--ms-radius-sm);
   background: var(--ac-surface);
   color: var(--ac-ink);
   text-overflow: ellipsis;
@@ -379,11 +379,11 @@
 }
 .ar-pipeline small {
   color: var(--ac-muted);
-  font-size: 11px;
+  font-size: var(--ms-fs-12);
   font-weight: 700;
 }
 .ar-pipeline strong {
-  font-size: 24px;
+  font-size: var(--ms-fs-24);
 }
 @media (max-width: 900px) {
   .ar-pipeline {
@@ -414,7 +414,7 @@
   gap: 2px;
   padding: 8px 10px;
   border: 1px solid var(--ac-line);
-  border-radius: 6px;
+  border-radius: var(--ms-radius-sm);
 }
 .ar-permission-list li.not-granted {
   opacity: 0.62;
@@ -433,7 +433,7 @@
   padding: 10px 14px;
   border: 1px solid var(--ac-line);
   border-left: 3px solid var(--ac-teal);
-  border-radius: 6px;
+  border-radius: var(--ms-radius-sm);
   background: var(--ac-teal-wash);
 }
 .ar-step-guide p {
@@ -464,7 +464,7 @@
 .ar-chip-group-label {
   min-width: 128px;
   color: var(--ac-muted);
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -476,7 +476,7 @@
 }
 .ar-technical summary {
   color: var(--ac-muted);
-  font-size: 13px;
+  font-size: var(--ms-fs-14);
   cursor: pointer;
 }
 .ar-technical[open] summary {

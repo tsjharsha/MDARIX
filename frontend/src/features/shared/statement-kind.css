@@ -5,9 +5,9 @@
   display: inline-flex;
   align-items: stretch;
   overflow: hidden;
-  border: 1px solid #8a97a3;
-  border-radius: 6px;
-  font-size: 12px;
+  border: 1px solid var(--ms-line-control);
+  border-radius: var(--ms-radius-sm);
+  font-size: var(--ms-fs-12);
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
@@ -22,50 +22,50 @@
 }
 .sk-origin {
   border-left: 1px solid currentColor;
-  background: #ffffff;
-  color: #4a5d6e;
-  font-weight: 500;
+  background: var(--ms-surface);
+  color: var(--ms-ink-2);
+  font-weight: 600;
 }
 .sk-fact {
-  border-color: #1f6f43;
+  border-color: var(--ms-good);
 }
 .sk-fact .sk-kind {
-  background: #e3f3ea;
-  color: #14502f;
+  background: var(--ms-good-bg);
+  color: var(--ms-good);
 }
 .sk-source {
-  border-color: #2a5fa8;
+  border-color: var(--ms-info);
 }
 .sk-source .sk-kind {
-  background: #e4eefb;
-  color: #1d4378;
+  background: var(--ms-info-bg);
+  color: var(--ms-info);
 }
 .sk-derived {
-  border-color: #087b78;
+  border-color: var(--ms-teal);
   border-style: double;
   border-width: 3px;
 }
 .sk-derived .sk-kind {
-  background: #e3f2f1;
-  color: #065a58;
+  background: var(--ms-mint);
+  color: var(--ms-teal-dark);
 }
 .sk-ai {
-  border-color: #6b3fb5;
+  border-color: var(--ms-ai);
   border-style: dashed;
 }
 .sk-ai .sk-kind {
-  background: #f1eafb;
-  color: #4c2a86;
+  background: var(--ms-ai-bg);
+  color: var(--ms-ai);
   font-style: italic;
 }
 .sk-hypothesis {
-  border-color: #a46a00;
+  border-color: var(--ms-warn-fill);
   border-style: dotted;
   border-width: 2px;
 }
 .sk-hypothesis .sk-kind {
-  background: #fdf4dc;
-  color: #6e4700;
+  background: var(--ms-warn-bg);
+  color: var(--ms-warn);
 }
 .sk-note {
   display: flex;
@@ -74,23 +74,23 @@
   gap: 6px 10px;
   margin: 8px 0;
   padding: 8px 12px;
-  border: 1px dashed #6b3fb5;
-  border-radius: 8px;
-  background: #faf7fe;
-  color: #2d1e4a;
-  font-size: 13px;
+  border: 1px dashed var(--ms-ai);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-ground);
+  color: var(--ms-navy);
+  font-size: var(--ms-fs-14);
 }
 .sk-link {
   padding: 0;
   border: 0;
   background: none;
-  color: #087b78;
+  color: var(--ms-teal-dark);
   font: inherit;
   font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
 }
 .sk-link:focus-visible {
-  outline: 2px solid #087b78;
+  outline: 2px solid var(--ms-teal);
   outline-offset: 2px;
 }

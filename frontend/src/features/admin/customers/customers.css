@@ -1,7 +1,7 @@
 /* Customers & Tenants (platform administrator). Builds on the console tokens in ../console/admin-console.css. */
 .cc-area {
   /* The destructive-action colour of the customer-admin dialogs this area reuses. */
-  --ca-danger: #b42318;
+  --ca-danger: var(--ms-crit);
 }
 .cc-area,
 .cc-page {
@@ -25,7 +25,7 @@
 .cc-title h2 {
   margin: 2px 0 0;
   color: var(--ac-ink);
-  font-size: 22px;
+  font-size: var(--ms-fs-20);
 }
 .cc-title p {
   margin: 0;
@@ -56,7 +56,7 @@
   height: 36px;
   padding: 0 10px;
   border: 1px solid var(--ac-line);
-  border-radius: 6px;
+  border-radius: var(--ms-radius-sm);
   background: var(--ac-surface);
   color: var(--ac-ink);
 }
@@ -67,7 +67,7 @@
 }
 .cc-stack small {
   color: var(--ac-muted);
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
 }
 .cc-tenant-list {
   display: grid;
@@ -81,7 +81,7 @@
   gap: 10px;
   margin-top: 12px;
   color: var(--ac-muted);
-  font-size: 13px;
+  font-size: var(--ms-fs-14);
 }
 .cc-pager > span:first-child {
   margin-right: auto;
@@ -98,7 +98,7 @@
 }
 .cc-details dt {
   color: var(--ac-muted);
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
   font-weight: 600;
 }
 .cc-details dd {
@@ -166,7 +166,7 @@
   margin: 0 0 4px;
   padding: 0;
   color: var(--ac-navy);
-  font-size: 14px;
+  font-size: var(--ms-fs-14);
   font-weight: 700;
 }
 .cc-problems {
@@ -179,7 +179,7 @@
   align-items: center;
   gap: 4px;
   color: var(--ac-critical);
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
   font-weight: 600;
 }
 .cc-status-cell {
@@ -190,7 +190,7 @@
 .cc-hint {
   max-width: 320px;
   color: var(--ac-muted);
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
 }
 .cc-wizard {
   display: grid;
@@ -224,12 +224,12 @@
 }
 .fb-summary dt {
   color: var(--ac-muted);
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
 }
 .fb-summary dd {
   margin: 4px 0 0;
   color: var(--ac-navy);
-  font-size: 22px;
+  font-size: var(--ms-fs-20);
   font-weight: 700;
 }
 .fb-stars {
@@ -238,8 +238,8 @@
   gap: 4px;
 }
 .fb-stars svg {
-  color: #e8a300;
-  fill: #f7c948;
+  color: var(--ms-warn-bg);
+  fill: var(--ms-warn-line);
 }
 .fb-detail {
   margin-top: 14px;
@@ -265,7 +265,7 @@
 }
 .fb-detail dt {
   color: var(--ac-muted);
-  font-size: 13px;
+  font-size: var(--ms-fs-14);
 }
 .fb-detail dd {
   margin: 0;
@@ -295,7 +295,7 @@
   flex: 1 1 260px;
   min-width: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
 }
 
 /* New-customer wizard (CreateCustomer.tsx): numbered steps, one step's fields, then the review and the result. */
@@ -313,7 +313,7 @@
   margin: 0;
   padding: 8px 12px;
   border-left: 3px solid var(--ac-teal);
-  border-radius: 6px;
+  border-radius: var(--ms-radius-sm);
   background: var(--ac-teal-wash);
   color: var(--ac-ink-2);
 }
@@ -331,11 +331,11 @@
   gap: 7px;
   padding: 6px 12px 6px 6px;
   border: 1px solid var(--ac-line);
-  border-radius: 999px;
+  border-radius: var(--ms-radius-pill);
   background: var(--ac-surface);
   color: var(--ac-ink-2);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--ms-fs-14);
   cursor: pointer;
 }
 .cw-step:disabled {
@@ -351,7 +351,7 @@
   border-radius: 50%;
   background: var(--ac-track);
   color: var(--ac-ink-2);
-  font-size: 12px;
+  font-size: var(--ms-fs-12);
   font-weight: 700;
 }
 .cw-step.done .cw-step-number {
@@ -361,11 +361,11 @@
 .cw-step.current {
   border-color: var(--ac-navy);
   background: var(--ac-navy);
-  color: #ffffff;
+  color: var(--ms-surface);
   font-weight: 700;
 }
 .cw-step.current .cw-step-number {
-  background: #ffffff;
+  background: var(--ms-surface);
   color: var(--ac-navy);
 }
 .cw-step:focus-visible {
@@ -383,7 +383,7 @@
 .cw-panel h3 {
   margin: 0;
   color: var(--ac-ink);
-  font-size: 17px;
+  font-size: var(--ms-fs-16);
 }
 .cw-fields {
   display: grid;
@@ -444,7 +444,7 @@ dl.cw-review {
 }
 .cw-review-row dt {
   color: var(--ac-muted);
-  font-size: 13px;
+  font-size: var(--ms-fs-14);
   font-weight: 600;
 }
 .cw-review-row dd {
@@ -487,7 +487,7 @@ dl.cw-review {
   margin: 0;
   padding-left: 18px;
   color: var(--ac-ink-2);
-  font-size: 13px;
+  font-size: var(--ms-fs-14);
 }
 .cw-actions {
   display: flex;
@@ -518,7 +518,7 @@ dl.cw-review {
   gap: 8px;
   padding: 9px 12px;
   border: 1px solid var(--ac-line);
-  border-radius: 6px;
+  border-radius: var(--ms-radius-sm);
 }
 .cw-job li.done {
   border-color: transparent;
@@ -558,7 +558,7 @@ dl.cw-review {
 }
 .cc-trial-attention span {
   color: var(--ac-ink-2);
-  font-size: 13px;
+  font-size: var(--ms-fs-14);
 }
 .cc-trial-org {
   display: inline-flex;
@@ -580,7 +580,7 @@ dl.cw-review {
 .cc-trial-progress span {
   width: 12px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: var(--ms-radius-sm);
   background: var(--ac-track);
 }
 .cc-trial-progress span.is-on {

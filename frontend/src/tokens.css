@@ -1,0 +1,109 @@
+/*
+ * MDARIX design tokens: the one set of colours, type, spacing, radii and shadows used by the application and the
+ * website (V14, V15). Every other style sheet takes its values from here; tokens.test.ts checks that each text and
+ * control colour pair below meets WCAG 2.1 AA (4.5:1 for text, 3:1 for controls and marks).
+ *
+ * Colour roles:
+ *   text on light grounds:  ink, ink-2, muted, navy, teal-dark, crit, warn, good, info, ai
+ *   light grounds:          surface, subtle, ground, mint, crit-bg, warn-bg, good-bg, info-bg, ai-bg
+ *   text on dark grounds:   surface (white), on-dark-muted, teal-bright, mint
+ *   dark grounds:           navy (the app bar), navy-deep, ink
+ *   fills under white text: teal, teal-dark, crit, good, info, ai, navy, muted
+ *   controls and marks:     line-control (input and button edges), teal, warn-fill, crit, good, info
+ *   lines (decorative):     line, line-strong, mint-line, crit-line, warn-line, good-line, info-line, ai-line
+ * Red (crit) is only for overdue or critical; it is never decoration.
+ */
+
+/* Inter, self-hosted (SIL Open Font License 1.1: /fonts/Inter-OFL.txt). From the Inter 4.1 release, as the PDFs. */
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/Inter-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./assets/fonts/Inter-SemiBold.woff2") format("woff2");
+}
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/Inter-Bold.woff2") format("woff2");
+}
+
+:root {
+  --ms-font: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Type: six sizes, three weights. */
+  --ms-fs-12: 12px;
+  --ms-fs-14: 14px;
+  --ms-fs-16: 16px;
+  --ms-fs-20: 20px;
+  --ms-fs-24: 24px;
+  --ms-fs-32: 32px;
+  --ms-fw-regular: 400;
+  --ms-fw-semibold: 600;
+  --ms-fw-bold: 700;
+
+  /* Spacing, 4 to 48. */
+  --ms-space-1: 4px;
+  --ms-space-2: 8px;
+  --ms-space-3: 12px;
+  --ms-space-4: 16px;
+  --ms-space-5: 24px;
+  --ms-space-6: 32px;
+  --ms-space-7: 48px;
+
+  /* Radii and shadows. */
+  --ms-radius-sm: 6px;
+  --ms-radius-md: 10px;
+  --ms-radius: 14px;
+  --ms-radius-pill: 999px;
+  --ms-shadow-1: 0 1px 3px rgba(16, 32, 47, 0.08);
+  --ms-shadow-2: 0 12px 32px rgba(16, 32, 47, 0.16);
+
+  /* Neutrals. */
+  --ms-surface: #ffffff;
+  --ms-subtle: #f8fafc;
+  --ms-ground: #f3f6fa;
+  --ms-line: #dde5ec;
+  --ms-line-strong: #c7d0db;
+  --ms-line-control: #7b8b99;
+  --ms-muted: #5c6d7c;
+  --ms-ink-2: #4a5d6e;
+  --ms-ink: #10202f;
+  --ms-navy: #183249;
+  --ms-navy-deep: #0f2233;
+  --ms-on-dark-muted: #c5d3df;
+
+  /* Teal: the action colour. */
+  --ms-teal: #087b78;
+  --ms-teal-dark: #06625f;
+  --ms-teal-bright: #73d6cb;
+  --ms-mint: #e3f2f1;
+  --ms-mint-line: #b9dcd8;
+
+  /* States: text, ground and line of each. */
+  --ms-crit: #b42318;
+  --ms-crit-bg: #fdecec;
+  --ms-crit-line: #f0b8b3;
+  --ms-warn: #8a5a00;
+  --ms-warn-fill: #b07400;
+  --ms-warn-bg: #fff4dc;
+  --ms-warn-line: #ecc979;
+  --ms-good: #1f7a4d;
+  --ms-good-bg: #e7f5ec;
+  --ms-good-line: #a9d8bc;
+  --ms-info: #2a5f8a;
+  --ms-info-bg: #e8f1f8;
+  --ms-info-line: #b5cde3;
+  --ms-ai: #64558b;
+  --ms-ai-bg: #efedf6;
+  --ms-ai-line: #cfc8e3;
+}
