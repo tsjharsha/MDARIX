@@ -16,6 +16,8 @@ import { useResource } from "../../customer-admin/shared";
 import { eventPath, type EventView } from "../oversight";
 import { dispositionPath } from "../disposition";
 import { RestartSamplePanel } from "./RemoveSample";
+import { ResumeShortStory, useShortStory } from "./ShortStory";
+import { stepText } from "../shortStory";
 
 const ICONS: Partial<Record<Scenario["key"], typeof Inbox>> = {
   complaint: Inbox,
@@ -41,6 +43,8 @@ export function Entrance({ onRestarted }: { onRestarted: (text: string) => void 
   const words = event.data?.event.description;
   return (
     <section className="uw-entrance" aria-labelledby="entrance-title">
+      {/* Unfinished short-story work comes first (0.10.71, A3). */}
+      <ResumeShortStory />
       {event.state === "error" ? (
         <header>
           <h2 id="entrance-title">Your trial</h2>
@@ -127,30 +131,41 @@ function useStoryIds(scenario: Scenario | undefined, section: string): StoryIds 
 }
 
 /** The story bar (8.4): which story, which step, and the way back to the entrance; off the story's record, the way
- * back to the story (0.10.70: it kept counting steps on another complaint). */
+ * back to the story (0.10.70: it kept counting steps on another complaint). The short story's step is what was saved
+ * on SAMPLE-RV-11 (0.10.71, A4), never the screen on show. */
 export function StoryBar({ section, tab }: { section: string; tab?: string }) {
   const { story, startStory, open, work } = useWorkspace();
   const scenario = SCENARIOS.find((item) => item.key === story);
   const ids = useStoryIds(scenario, section);
+  const short = useShortStory(scenario?.key === "short");
   if (!scenario || section === "Getting started") return null;
   const place = { section, tab };
-  const step = onStoryRecord(scenario, place, ids, work?.investigationId) ? storyStep(scenario, place) : -1;
+  const onRecord = onStoryRecord(scenario, place, ids, work?.investigationId);
+  const isShort = scenario.key === "short";
+  const step = isShort
+    ? onRecord && section === "Complaint"
+      ? (short.data?.current ?? 0)
+      : -1
+    : onRecord
+      ? storyStep(scenario, place)
+      : -1;
+  const back = () => open(scenario.start.section as WorkspaceSection, scenario.start.tab);
   return (
     <nav className="uw-story-bar" aria-label="Your story">
       <span className="uw-story-title">{scenario.title}</span>
       <span className="uw-story-step" aria-live="polite">
-        {step >= 0
-          ? `Step ${step + 1} of ${scenario.steps.length}: ${scenario.steps[step].label}`
-          : "Off the story's path"}
+        {step < 0
+          ? "Off the story's path"
+          : isShort
+            ? short.data
+              ? stepText(short.data)
+              : "Reading your progress…"
+            : `Step ${step + 1} of ${scenario.steps.length}: ${scenario.steps[step].label}`}
       </span>
       <span className="uw-story-actions">
         {step < 0 && (
-          <button
-            type="button"
-            className="ac-link"
-            onClick={() => open(scenario.start.section as WorkspaceSection, scenario.start.tab)}
-          >
-            <ArrowLeft size={14} aria-hidden="true" /> Back to the story
+          <button type="button" className="ac-link" onClick={back}>
+            <ArrowLeft size={14} aria-hidden="true" /> {isShort ? `Resume ${FLAGSHIP}` : "Back to the story"}
           </button>
         )}
         <button type="button" className="ac-link" onClick={() => open("Getting started")}>

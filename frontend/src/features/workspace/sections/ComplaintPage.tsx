@@ -18,6 +18,8 @@ import { ChartOrTable, ClockLanes, type Lane } from "./WowCharts";
 import { WhyAsked } from "../../shared/Basis";
 import { COMPLAINT_STEP_WHY } from "../whyAsked";
 import { ServiceWork, serviceText } from "./ServiceWork";
+import { ShortStoryPanel } from "./ShortStory";
+import { FLAGSHIP } from "../entrance";
 
 export const COMPLAINT_SECTIONS = NEW_PLACES.Complaint.tabs;
 type ComplaintSection = (typeof COMPLAINT_SECTIONS)[number];
@@ -83,7 +85,7 @@ export function attentionText(blocked: Array<{ detail: string }>, hasStep: boole
  * investigation, the CAPA and ready to close), each saying who may sign it before the work starts.
  */
 export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObject<HTMLHeadingElement | null> }) {
-  const { open, reportTab, shownTab } = useWorkspace();
+  const { open, reportTab, shownTab, story } = useWorkspace();
   const ref = tabParam(tab, "ref") ?? "";
   const resource = useResource<EventView>(ref ? eventPath(ref) : null);
   const [shown, setShown] = useState<EventView | null>(null);
@@ -195,6 +197,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           )}
         </div>
       </header>
+      {/* The short story's step to do now (0.10.71, A4), from what was saved on this record. */}
+      {story === "short" && event.ref === FLAGSHIP && <ShortStoryPanel view={view} onChanged={changed} />}
       <Tabs tabs={COMPLAINT_SECTIONS} active={active} onChange={choose} label="Complaint sections">
         {active === "Summary" && (
           <>

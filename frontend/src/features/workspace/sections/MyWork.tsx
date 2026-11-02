@@ -1,3 +1,4 @@
+import { ResumeShortStory } from "./ShortStory";
 import { DeadlineChip } from "../../../app/chips";
 import { useEffect, useState } from "react";
 import { MessageSquareReply, Paperclip } from "lucide-react";
@@ -215,6 +216,8 @@ export function NewMyWorkSection({ tab }: { tab?: string }) {
   };
   return (
     <>
+      {/* Unfinished short-story work first (0.10.71, A3): "Resume SAMPLE-RV-11 · step N of 4". */}
+      <ResumeShortStory />
       <NextStep />
       {/* A returning trial user lands here; the sample event and its stories are one click away (8.4). */}
       {isTrial && (

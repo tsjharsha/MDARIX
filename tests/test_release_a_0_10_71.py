@@ -318,3 +318,148 @@ def test_the_refresh_links_the_flagship_service_once(trial):
             }
         )
         db.commit()
+
+
+# ------------------------------------------------------------------------------------------- A4: the short story
+
+STORY = "/api/v1/trial/short-story"
+
+
+def _ask_the_hospital(user, complaint_id: str, owner: str) -> dict:
+    """Step 3 as the screen does it: the hospital as a party of the complaint, then the request with its owner."""
+    from datetime import date, timedelta
+
+    party = _ok(
+        user.post(
+            "/api/v1/communications/parties",
+            json={
+                "type": "HOSPITAL",
+                "name": "Biomedical engineering, the reporting hospital (sample)",
+                "complaint_id": complaint_id,
+            },
+        )
+    )
+    from datetime import datetime, timezone
+
+    return _ok(
+        user.post(
+            "/api/v1/communications",
+            json={
+                "complaint_id": complaint_id,
+                "party_id": party["id"],
+                "direction": "SENT",
+                "purpose": "INFORMATION_REQUEST",
+                "subject": "Did any treatment decision rely on the high SpO2 readings?",
+                "channel": "EMAIL",
+                "occurred_at": datetime.now(timezone.utc).isoformat(),
+                "owner_id": owner,
+                "reply_due_on": (date.today() + timedelta(days=2)).isoformat(),
+            },
+        )
+    )
+
+
+@pytest.fixture(scope="module")
+def story_trial():
+    from tests.test_free_trial import _approved_trial_client
+    from tests.test_reporting_capa_api import _client
+
+    user, approval, _ = _approved_trial_client()
+    try:
+        yield {"user": user, "tenant_id": approval["tenant_id"], "colleague": _client(approval["tenant_id"], "LEADER")}
+    finally:
+        _purge(approval["tenant_id"])
+
+
+def test_the_short_story_counts_what_was_saved_not_the_screen(story_trial):
+    user = story_trial["user"]
+    story = _ok(user.get(STORY))
+    assert story["available"] and story["complaint"]["ref"] == "SAMPLE-RV-11"
+    assert [step["label"] for step in story["steps"]] == [
+        "Read the call",
+        "Decide the route",
+        "Name the open question",
+        "The intake decision summary",
+    ]
+    assert story["current"] == 0 and not story["started"] and not story["finished"]
+    # Step 1: the reporter's words with the phrases that make it a possible complaint, and the facts beside them.
+    assert [item["text"] for item in story["call"]["phrases"]] == [
+        "SpO2 read 4 to 6 points high",
+        "two patients",
+        "No harm was reported",
+        "sent for service",
+    ]
+    facts = {item["label"]: item["value"] for item in story["call"]["facts"]}
+    assert facts["Harm"] == "None reported" and facts["Malfunction"] == "Yes" and facts["Market"].startswith("United")
+    assert facts["Service"].startswith("In progress · SVC-24-1107")
+    # Opening a screen saves nothing: the summary cannot be marked before its steps.
+    assert user.post(f"{STORY}/marks", json={"step": "summary"}).status_code == 409
+    assert user.post(f"{STORY}/marks", json={"step": "elsewhere"}).status_code == 422
+    assert _ok(user.post(f"{STORY}/marks", json={"step": "read"}))["current"] == 1
+    # A refresh (or another device: a new client with the same session) reads the same step.
+    again = TestClient(app)
+    again.cookies.set("mdarix_session", user.cookies.get("mdarix_session"))
+    assert _ok(again.get(STORY))["current"] == 1
+
+    # Step 2: the route is the triage record and the service work, both with owners.
+    complaint = story["complaint"]["id"]
+    me = next(person["id"] for person in _ok(user.get("/api/v1/triage"))["people"] if person["name"] != "Colleague")
+    _ok(
+        user.post(
+            f"/api/v1/triage/COMPLAINT/{complaint}/record",
+            json={
+                "severity": "NEGLIGIBLE",
+                "event_owner": me,
+                "triage_owner": me,
+                "immediate_action": "Monitor out of use and sent for service (SVC-24-1107).",
+            },
+        )
+    )
+    assert _ok(user.get(STORY))["current"] == 1  # the service work has no owner yet
+    service = f"/api/v1/oversight/events/{complaint}/service"
+    _ok(
+        user.put(
+            service, json={"reference": "SVC-24-1107 (sample service ticket)", "status": "IN_PROGRESS", "owner_id": me}
+        )
+    )
+    story = _ok(user.get(STORY))
+    assert story["current"] == 2 and story["route"]["decision"] == "Complaint, with linked service work"
+    assert story["route"]["source_quote"] == "its SpO2 read 4 to 6 points high on two patients"
+
+    # Step 3: one follow-up, with owner and due date, in the communications log. The consequence stays unknown.
+    _ask_the_hospital(user, complaint, me)
+    story = _ok(user.get(STORY))
+    assert story["current"] == 3
+    assert story["question"]["asked"]["owner_name"] and story["question"]["asked"]["due_on"]
+    assert story["question"]["consequence"] == "Not known until the hospital answers"
+
+    # Step 4: the intake decision summary, seen: the story is finished.
+    story = _ok(user.post(f"{STORY}/marks", json={"step": "summary"}))
+    assert story["current"] == 4 and story["finished"]
+    markets = {row["market"]: row for row in story["markets"]}
+    assert set(markets) == {"US", "IN"} and all(row["open"] for row in markets.values())
+    assert markets["US"]["deadline"] and markets["US"]["state"] == "Not assessed yet: still open"
+    assert markets["IN"]["why"].startswith("Assessed because your procedure asks every market")
+    assert story["service"]["owner_name"] and story["next"]["action"] and story["next"]["who"]
+    # A6: who prepared, who may approve, who approved; alone in the trial it is practice approval.
+    people = story["people"]
+    assert people["prepared_by"] and people["approved_by"] == []
+    assert people["prepared_by"][0] in people["may_approve"]
+
+
+def test_each_person_has_their_own_marks_and_the_records_count_for_everyone(story_trial):
+    colleague = story_trial["colleague"]
+    story = _ok(colleague.get(STORY))
+    # The route and the question are the organization's records: done for the colleague too. The summary is theirs
+    # to see, and the call counts as read once the route is decided.
+    assert [step["done"] for step in story["steps"]] == [True, True, True, False]
+    assert story["current"] == 3 and story["started"] and not story["finished"]
+    # With a colleague who may sign the markets, nobody approves their own practice work.
+    assert story["people"]["practice"] is False and story["people"]["practice_note"] is None
+
+
+def test_working_alone_the_summary_says_the_approval_is_practice(trial):
+    """A6: a solo trial owner approves their own practice work; the summary says so, at the approval."""
+    people = _ok(trial["user"].get(STORY))["people"]
+    assert people["practice"] is True
+    assert people["practice_note"] == "Practice approval: in a pilot a colleague approves this."
