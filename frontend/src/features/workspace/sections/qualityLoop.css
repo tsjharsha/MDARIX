@@ -150,6 +150,14 @@
   font-size: var(--ms-fs-14);
   font-weight: 700;
 }
+.ql-mark {
+  fill: var(--ms-surface);
+  font-size: var(--ms-fs-12);
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--ms-navy-deep);
+  stroke-width: 3px;
+}
 .ql-center-value {
   fill: var(--ms-surface);
   font-size: var(--ms-fs-32);

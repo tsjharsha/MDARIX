@@ -269,6 +269,10 @@ const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
     description: "Profile, security, away",
     guide: "Your profile, sign-in security, the roles you hold, and when you will be away.",
   },
+  "Getting started": {
+    description: "Five-minute stories on the sample",
+    guide: "Start with a short story on the sample's own records, or try it on your own export.",
+  },
   Investigations: {
     description: "One investigation, from its question to its decision",
     guide:

@@ -112,6 +112,10 @@ export function QualityLoop({
                 <text className="ql-num" textAnchor="middle" dominantBaseline="central">
                   {station.number}
                 </text>
+                {/* Wow screen 7: the state as a mark too, never colour alone. */}
+                <text className="ql-mark" x={14} y={-13} textAnchor="middle" dominantBaseline="central">
+                  {station.done ? "✓" : alarm ? "×" : "!"}
+                </text>
               </g>
             );
           })}

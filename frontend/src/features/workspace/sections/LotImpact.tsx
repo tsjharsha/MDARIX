@@ -6,6 +6,7 @@ import { downloadFile } from "../../reports/download";
 import { useCan, useWorkspace } from "../workspaceContext";
 import { InlineError } from "./boardParts";
 import { countOf, DecideAndSign } from "./common";
+import { Bars, BarsTable, ChartOrTable, type BarRow } from "./WowCharts";
 import {
   KIND_GROUPS,
   LOT_IMPACT_ANCHOR,
@@ -277,6 +278,7 @@ function ImpactBody({
       <p className="uw-li-countries">
         <strong>Units shipped by country:</strong> {countriesText(totals.by_country, "no distribution imported")}
       </p>
+      <LotImpactCharts list={list} />
       {list.truncated && <p className="ac-note">Only the first 2,000 lots are listed.</p>}
       <LotGroup
         title="Lots with complaints"
@@ -575,5 +577,55 @@ function Downloads({
       </div>
       <InlineError text={error} />
     </Panel>
+  );
+}
+
+/**
+ * Lot impact as bars (wow screen 4): each lot's complaints per 1,000 units released, the lots with complaints flagged
+ * in words, and the units shipped to each country; each with its table view.
+ */
+export function LotImpactCharts({ list }: { list: ImpactList }) {
+  const lots: BarRow[] = list.lots
+    .filter((lot) => !lot.excluded)
+    .map((lot) => ({
+      key: lot.id,
+      label: lot.lot_identifier,
+      value: lot.per_1000 ?? 0,
+      valueText:
+        lot.per_1000 == null
+          ? `${countOf(lot.complaints, "complaint")}; units released not known`
+          : `${lot.per_1000.toLocaleString("en-US", { maximumFractionDigits: 1 })} per 1,000 units (${countOf(lot.complaints, "complaint")})`,
+      flag: lot.complaints ? "has complaints" : null,
+    }));
+  const countries: BarRow[] = list.totals.by_country.map((item) => ({
+    key: item.country,
+    label: item.country,
+    value: item.units,
+    valueText: `${item.units.toLocaleString("en-US")} units shipped`,
+  }));
+  return (
+    <div className="uw-wow-pair">
+      <ChartOrTable
+        title="Complaints per 1,000 units, lot by lot"
+        chart={<Bars rows={lots} label="Complaints per 1,000 units, lot by lot" />}
+        table={
+          <BarsTable
+            rows={lots}
+            caption="Complaints per 1,000 units, lot by lot"
+            columns={["Lot", "Complaints per 1,000 units"]}
+          />
+        }
+        note="A lot without complaints yet is built with the same factor: it may still be in the field."
+      />
+      {countries.length > 0 && (
+        <ChartOrTable
+          title="Units shipped, by country"
+          chart={<Bars rows={countries} label="Units shipped, by country" />}
+          table={
+            <BarsTable rows={countries} caption="Units shipped, by country" columns={["Country", "Units shipped"]} />
+          }
+        />
+      )}
+    </div>
   );
 }

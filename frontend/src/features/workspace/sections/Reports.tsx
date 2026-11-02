@@ -24,6 +24,8 @@ import {
   stepIndex,
   submissionBody,
   submissionProblem,
+  isMissing,
+  worksheetMeter,
   summaryLine,
   type ReportDetail,
   type ReportList,
@@ -837,32 +839,54 @@ function Worksheet({
   onChanged: (detail: ReportDetail) => void;
   canWrite: boolean;
 }) {
+  // Wow screen 5: a sticky meter of the fields filled from your records, and "show only missing".
+  const [onlyMissing, setOnlyMissing] = useState(false);
+  const meter = worksheetMeter(detail.sections);
+  const shown = (fields: WorksheetField[]) => (onlyMissing ? fields.filter(isMissing) : fields);
   return (
     <section className="ca-drawer-section" aria-label="The worksheet">
       <h3>The worksheet, in the authority's field order</h3>
+      <div className="uw-rp-meter" role="group" aria-label="How much of the worksheet your records filled">
+        <span className="uw-rp-meter-text">
+          <strong>
+            {meter.fromRecords} of {meter.total} fields filled from your records
+          </strong>
+          {meter.missing ? ` · ${meter.missing} still to enter before submission` : " · nothing missing"}
+        </span>
+        <span className="uw-rp-meter-bar" aria-hidden="true">
+          <span style={{ width: `${meter.total ? (100 * meter.fromRecords) / meter.total : 0}%` }} />
+          <span className="is-entered" style={{ width: `${meter.total ? (100 * meter.entered) / meter.total : 0}%` }} />
+        </span>
+        <label className="ca-check">
+          <input type="checkbox" checked={onlyMissing} onChange={(event) => setOnlyMissing(event.target.checked)} />
+          Show only missing
+        </label>
+      </div>
       <p className="uw-cr-meta">{summaryLine(detail.counts)}</p>
-      {detail.sections.map((section) => (
-        <details key={section.code} className="uw-rp-section" open={section.fields.length > 0}>
-          <summary>
-            {section.title}
-            {section.fields.length ? ` (${section.fields.length})` : ""}
-          </summary>
-          {section.note && <p className="ac-muted">{section.note}</p>}
-          {section.fields.length > 0 && (
-            <ul className="uw-rp-fields">
-              {section.fields.map((item) => (
-                <FieldRow
-                  key={item.id}
-                  detail={detail}
-                  item={item}
-                  onChanged={onChanged}
-                  canEdit={canWrite && detail.editable}
-                />
-              ))}
-            </ul>
-          )}
-        </details>
-      ))}
+      {detail.sections
+        .filter((section) => !onlyMissing || shown(section.fields).length > 0)
+        .map((section) => (
+          <details key={section.code} className="uw-rp-section" open={section.fields.length > 0}>
+            <summary>
+              {section.title}
+              {section.fields.length ? ` (${shown(section.fields).length})` : ""}
+            </summary>
+            {section.note && <p className="ac-muted">{section.note}</p>}
+            {section.fields.length > 0 && (
+              <ul className="uw-rp-fields">
+                {shown(section.fields).map((item) => (
+                  <FieldRow
+                    key={item.id}
+                    detail={detail}
+                    item={item}
+                    onChanged={onChanged}
+                    canEdit={canWrite && detail.editable}
+                  />
+                ))}
+              </ul>
+            )}
+          </details>
+        ))}
     </section>
   );
 }
@@ -892,7 +916,9 @@ function FieldRow({
       </div>
       <p className={item.value ? "uw-rp-value" : "uw-rp-value empty"}>{item.value ?? "—"}</p>
       <p className="uw-cr-meta">
-        {item.source ? `${item.source.label}${item.source.ref ? `: ${item.source.ref}` : ""}` : ""}
+        {item.source
+          ? `From ${item.source.label.replace(/^The /, "the ")}${item.source.ref ? `: ${item.source.ref}` : ""}`
+          : ""}
         {item.by
           ? `${item.source ? " · " : ""}${item.status === "CONFIRMED" ? "Confirmed" : "Entered"} by ${item.by} ${formatDate(item.at)}`
           : ""}

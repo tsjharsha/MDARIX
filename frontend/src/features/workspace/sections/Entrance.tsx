@@ -27,10 +27,9 @@ export function Entrance({ onRestarted }: { onRestarted: (text: string) => void 
   return (
     <section className="uw-entrance" aria-labelledby="entrance-title">
       <header>
-        <p className="ac-eyebrow">Your free trial</p>
         <h2 id="entrance-title">Pick a five-minute story</h2>
         <p className="ac-muted">
-          Each story starts on the sample's own record and shows you each step. You can leave it at any time.
+          Each story starts on the sample's own record and shows each step; leave it at any time.
         </p>
       </header>
       <ul className="uw-entrance-tiles">

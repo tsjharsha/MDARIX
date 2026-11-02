@@ -65,8 +65,9 @@ export function CaseSections({
     ["CLOSED", "CANCELLED"].includes(caseState(selected) ?? "") || /^closed$/i.test(String(selected?.status ?? ""));
   // The section is part of the screen's address; the first report keeps what the link carried.
   useEffect(() => {
-    const keep = !!requested && tabParts(requested).name === active;
-    reportStep?.(keep ? requested! : active, "replace");
+    // A link without a section ("?part=lot-impact") keeps what it carries on the section it opens.
+    const name = tabParts(requested).name;
+    reportStep?.(requested && (!name || name === active) ? renamed(requested, active) : active, "replace");
   }, []);
   const go = (next: CaseSection, nextPart?: string) => {
     setActive(next);

@@ -35,7 +35,7 @@ export const LOOP_ORDER: ReadonlyArray<{ code: string; label: string; caption: s
     label: "Harm investigated",
     caption: "Death or serious injury closed without an investigation",
   },
-  { code: "TRIAGE_OVERDUE", label: "Signals triaged", caption: "Signals waiting past their triage date" },
+  { code: "TRIAGE_OVERDUE", label: "Trends triaged", caption: "Trends waiting past their triage date" },
   { code: "TRENDS_WITHOUT_ACTION", label: "Trends acted on", caption: "Trends with no CAPA or risk review" },
   { code: "CAPA_EFFECTIVENESS", label: "CAPAs proven", caption: "CAPAs without a verified effect" },
   { code: "RISK_FILE_INPUT", label: "Risk file fed", caption: "Post-market data not yet in the risk file" },

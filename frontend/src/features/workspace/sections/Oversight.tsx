@@ -598,18 +598,25 @@ export function DecisionRecord({ view, onChanged }: { view: EventView; onChanged
   const action = useRun(onChanged, "The QMS reference was not recorded.");
   const record = view.decision_record;
   return (
-    <section className="ca-drawer-section" aria-label="Event decision record">
-      <h3>Event decision record</h3>
+    <section className="ca-drawer-section uw-receipt" aria-label="Event decision record">
+      {/* Wow screen 6: the decision record reads as a receipt: who signed what, when, and its fingerprint. */}
+      <header className="uw-receipt-head">
+        <h3>Decision record</h3>
+        <span>
+          {view.event.ref} · version {record.version}
+        </span>
+      </header>
       {record.entries.length ? (
-        <ol className="uw-ov-record">
+        <ol className="uw-ov-record uw-receipt-lines">
           {record.entries.map((entry, index) => (
             <li key={`${entry.kind}-${index}`}>
-              <span>
-                <strong>{entry.kind}</strong>: {entry.summary}
+              <span className="uw-receipt-line">
+                <strong>{entry.kind}</strong>
+                <span>{entry.summary}</span>
               </span>
               {entry.reason && <span className="ac-muted">Reason: {entry.reason}</span>}
               <small>
-                {entry.signer}, {formatDate(entry.signed_at)}. {entry.meaning}
+                Signed by {entry.signer}, {formatDate(entry.signed_at)}. {entry.meaning}
               </small>
             </li>
           ))}
@@ -617,7 +624,14 @@ export function DecisionRecord({ view, onChanged }: { view: EventView; onChanged
       ) : (
         <p className="ac-muted">No decision on this event is signed yet.</p>
       )}
-      <p className="ac-muted">SHA-256 of its content: {record.sha256.slice(0, 16)}…</p>
+      <p className="uw-receipt-total">
+        <span>
+          {record.entries.length} signed {record.entries.length === 1 ? "decision" : "decisions"}
+        </span>
+        <span>
+          Fingerprint (SHA-256) <code>{record.sha256.slice(0, 16)}…</code>
+        </span>
+      </p>
       <div className="ca-action-row">
         {canExport && (
           <button
