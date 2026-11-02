@@ -34,7 +34,7 @@ const TEXT = ["ink", "ink-2", "muted", "navy", "teal-dark", "crit", "warn", "goo
 const DARK_GROUNDS = ["navy", "navy-deep", "ink"];
 const TEXT_ON_DARK = ["surface", "on-dark-muted", "teal-bright", "mint"];
 const FILLS = ["teal", "teal-dark", "crit", "good", "info", "ai", "navy", "muted"];
-const CONTROLS = ["line-control", "teal", "warn-fill", "crit", "good", "info"];
+const CONTROLS = ["line-control", "teal", "warn-fill", "crit", "good", "info", "series"];
 
 const pairs = (fgs: string[], bgs: string[]) => fgs.flatMap((fg) => bgs.map((bg) => [fg, bg] as const));
 const failing = (list: ReadonlyArray<readonly [string, string]>, minimum: number) =>

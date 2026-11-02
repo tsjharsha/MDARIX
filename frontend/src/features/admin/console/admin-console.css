@@ -12,8 +12,8 @@
   --ac-line: var(--ms-line);
   --ac-grid: var(--ms-info-bg);
   --ac-axis: var(--ms-line-strong);
-  --ac-series: var(--ms-ai);
-  --ac-series-hover: var(--ms-ai);
+  --ac-series: var(--ms-series);
+  --ac-series-hover: var(--ms-series-dark);
   --ac-track: var(--ms-ground);
   --ac-good: var(--ms-good);
   --ac-warning: var(--ms-warn-fill);

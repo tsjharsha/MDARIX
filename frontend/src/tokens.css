@@ -9,7 +9,7 @@
  *   text on dark grounds:   surface (white), on-dark-muted, teal-bright, mint
  *   dark grounds:           navy (the app bar), navy-deep, ink
  *   fills under white text: teal, teal-dark, crit, good, info, ai, navy, muted
- *   controls and marks:     line-control (input and button edges), teal, warn-fill, crit, good, info
+ *   controls and marks:     line-control (input and button edges), teal, warn-fill, crit, good, info, series
  *   lines (decorative):     line, line-strong, mint-line, crit-line, warn-line, good-line, info-line, ai-line
  * Red (crit) is only for overdue or critical; it is never decoration.
  */
@@ -106,4 +106,8 @@
   --ms-ai: #64558b;
   --ms-ai-bg: #efedf6;
   --ms-ai-line: #cfc8e3;
+
+  /* Charts: the series colour (4.6:1 on white) and its hover. */
+  --ms-series: #2a78d6;
+  --ms-series-dark: #1c5cab;
 }

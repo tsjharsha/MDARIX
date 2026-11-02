@@ -12,7 +12,7 @@
   --av-for: var(--ac-good, var(--ms-good));
   --av-against: var(--ac-critical, var(--ms-crit));
   --av-warn: var(--ac-warning, var(--ms-warn-fill));
-  --av-info: var(--ac-series, var(--ms-ai));
+  --av-info: var(--ac-series, var(--ms-series));
   --av-radius: var(--ac-radius, 8px);
 }
 .av-summary {

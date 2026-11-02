@@ -500,7 +500,7 @@
 }
 .ms-line {
   fill: none;
-  stroke: var(--ms-ai);
+  stroke: var(--ms-series);
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -573,7 +573,7 @@
   background: var(--ms-crit);
 }
 .tag-lot {
-  background: var(--ms-ai);
+  background: var(--ms-series);
 }
 .tag-test {
   background: var(--ms-good);
@@ -609,7 +609,7 @@
   height: 100%;
 }
 .support {
-  background: var(--ms-ai);
+  background: var(--ms-series);
 }
 .contra {
   background: var(--ms-crit);
