@@ -885,6 +885,8 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     if found["record"] is not None:
         refs |= {found["record"].completed_by, found["record"].triage_owner}
     refs.add(complaint.service_owner)
+    refs |= {v.created_by for versions in found["assessments"].values() for v in versions}
+    refs |= {s.requested_by for s in found["snapshots"]}
     names = _names(control_db, tenant_id, refs)
     record = closure.decision_record(control_db, found, row, names)
     signed_print = row.content_fingerprint if row is not None else None
@@ -892,6 +894,7 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     work = complaint_work(db, control_db, tenant_id, [complaint])[str(complaint.id)]
     nearest = work["due"][0] if work["due"] else None
     state = _event_state(complaint, items, row)
+    signers = _signers(control_db, tenant_id, me, bool(found["cases"]))
     product = _products(db, tenant_id).get(complaint.product_id)
     version, lot = _version_and_lot(db, tenant_id, complaint)
     return {
@@ -956,7 +959,48 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
         # The owner, stage, next action and dated items the lists and My work show for it (0.10.68).
         "work": work,
         # Who may sign each step, before the work starts (7.8).
-        "signers": _signers(control_db, tenant_id, me, bool(found["cases"])),
+        "signers": signers,
+        # Who prepared, who may approve and who approved the decision record's work (0.10.71, A6); apart from the
+        # record so its fingerprint is unchanged.
+        "record_people": _record_people(found, row, names, signers, me, bool(_practice(control_db, tenant_id))),
+    }
+
+
+def _record_people(found: dict, row, names: dict, signers: dict, me: str, trial: bool) -> dict:
+    from backend.app.workflow.approvals import PRACTICE_APPROVAL
+
+    """Separation of duties, shown honestly (0.10.71, A6): who prepared the event's work (the triage record, the
+    market assessments, the reports asked for approval), who may approve it (the market conclusions and the reports)
+    and who approved (every signature). Working alone in a trial one person is all three: practice approval."""
+
+    def named(refs) -> list[str]:
+        found_names: list[str] = []
+        for ref in refs:
+            name = names.get(ref or "")
+            if ref and name and name not in found_names:
+                found_names.append(name)
+        return found_names
+
+    record = found["record"]
+    versions = [v for items in found["assessments"].values() for v in items]
+    prepared = named(
+        [record.completed_by if record is not None and record.completed_at else None]
+        + [v.created_by for v in versions]
+        + [s.requested_by for s in found["snapshots"]]
+    )
+    may = [p for code in ("MARKETS", "OBLIGATIONS") for p in (signers.get(code) or {}).get("people", [])]
+    approved = named(
+        [v.signed_by for v in versions if v.signed_at is not None]
+        + [s.approved_by for s in found["snapshots"] if s.approved_at is not None]
+        + [d.signed_by for d in found["dispositions"] if d.signed_at is not None]
+        + [row.signed_by if row is not None and row.signed_at else None]
+    )
+    alone = {p["id"] for p in may} == {me}
+    return {
+        "prepared_by": prepared,
+        "may_approve": list(dict.fromkeys(p["name"] for p in may)),
+        "approved_by": approved,
+        "practice_note": PRACTICE_APPROVAL if trial and alone else None,
     }
 
 

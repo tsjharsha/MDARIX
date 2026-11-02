@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import Complaint
 from backend.app.trial.sample_data import FLAGSHIP, SAMPLE_SOURCE
+from backend.app.workflow.approvals import PRACTICE_APPROVAL
 
 PROFILE_KEY = "short_story"
 STEPS = (
@@ -52,7 +53,6 @@ CONSEQUENCE_UNKNOWN = "Not known until the hospital answers"
 # The flagship asks "in the US and India?": the complaint's own market and India, where the organization enabled it.
 MARKETS = ("US", "IN")
 WHY_OTHER_MARKET = "Assessed because your procedure asks every market where this device is sold to be assessed."
-PRACTICE_APPROVAL = "Practice approval: in a pilot a colleague approves this."
 
 
 def flagship(data: Session, tenant_id) -> Complaint | None:

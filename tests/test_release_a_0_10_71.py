@@ -463,3 +463,18 @@ def test_working_alone_the_summary_says_the_approval_is_practice(trial):
     people = _ok(trial["user"].get(STORY))["people"]
     assert people["practice"] is True
     assert people["practice_note"] == "Practice approval: in a pilot a colleague approves this."
+
+
+def test_the_decision_record_shows_who_prepared_who_may_approve_and_who_approved(trial, story_trial):
+    """A6: the complaint page's decision record names the three; alone in a trial it says the approval is practice."""
+    from backend.app.workflow.approvals import PRACTICE_APPROVAL
+
+    solo = _ok(trial["user"].get(EVENT))["record_people"]
+    assert solo["practice_note"] == PRACTICE_APPROVAL and solo["may_approve"]
+    pair = _ok(story_trial["user"].get(EVENT))
+    people = pair["record_people"]
+    # The short story's triage record was completed by the owner: they prepared it; nobody approved anything yet.
+    assert people["prepared_by"] and people["approved_by"] == [] and people["practice_note"] is None
+    assert len(people["may_approve"]) == 2
+    # The record's own fingerprint is untouched by the names beside it.
+    assert set(pair["decision_record"]) == {"entries", "sha256", "version", "filed"}

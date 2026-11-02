@@ -5964,3 +5964,19 @@ div.uw-task-count:hover {
     display: none;
   }
 }
+
+/* 0.10.71 (A6): who prepared, who may approve and who approved, above the decision record's lines. */
+.uw-receipt-people {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--ms-space-2) var(--ms-space-4);
+  margin: 0 0 var(--ms-space-3);
+}
+.uw-receipt-people dt {
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-receipt-people dd {
+  margin: 0;
+}

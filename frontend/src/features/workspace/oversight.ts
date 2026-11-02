@@ -219,6 +219,8 @@ export type EventView = {
   signers?: Record<string, { people: Person[]; you: boolean; second_person: boolean }>;
   /** The linked service work (0.10.71, A5); it never closes or advances the complaint. */
   service?: ServiceWork | null;
+  /** Who prepared, who may approve and who approved the event's work (0.10.71, A6). */
+  record_people?: { prepared_by: string[]; may_approve: string[]; approved_by: string[]; practice_note: string | null };
 };
 
 export type ServiceStatus = "OPEN" | "IN_PROGRESS" | "COMPLETE";

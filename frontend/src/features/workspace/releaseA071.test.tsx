@@ -11,6 +11,8 @@ import { eventPath, type EventView } from "./oversight";
 import { SHORT_STORY_PATH, resumeText, stepText, type ShortStory } from "./shortStory";
 import { ResumeShortStory } from "./sections/ShortStory";
 import { StoryBar } from "./sections/Entrance";
+import { PracticeApproval } from "./sections/PracticeApproval";
+import { DecisionRecord } from "./sections/Oversight";
 
 // 0.10.71, Release A of the Simplicity and WoW plan.
 
@@ -335,5 +337,40 @@ describe("A4: the short story, from what was saved", () => {
     resources.data[SHORT_STORY_PATH] = shortStory(2);
     expect(render(<ResumeShortStory />, api())).toContain("Resume SAMPLE-RV-11 · step 3 of 4");
     expect(render(<ResumeShortStory />, api({ isTrial: false }))).not.toContain("Resume");
+  });
+});
+
+describe("A6: separation of duties, shown honestly", () => {
+  it("labels a solo trial owner's own approval at the button", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = (name: string) => readFileSync(new URL(`./sections/${name}.tsx`, import.meta.url), "utf8");
+    expect(renderToStaticMarkup(<PracticeApproval shown />)).toContain(
+      "Practice approval: in a pilot a colleague approves this.",
+    );
+    expect(renderToStaticMarkup(<PracticeApproval shown={false} />)).toBe("");
+    // Beside the approve button of a report snapshot and of a decision guide version (stage 3's practice exception).
+    expect(source("Reports")).toMatch(
+      /Approve the snapshot"\}\s*<\/button>\s*<PracticeApproval shown=\{standing\?\.same_person\} \/>/,
+    );
+    expect(source("DecisionGuides")).toMatch(
+      /Approve and publish"\}\s*<\/button>\s*<PracticeApproval shown=\{view\.approval\?\.same_person\} \/>/,
+    );
+  });
+
+  it("names who prepared, who may approve and who approved on the decision record", () => {
+    const view = {
+      ...rv11(),
+      record_people: {
+        prepared_by: ["Asha Quality"],
+        may_approve: ["Asha Quality"],
+        approved_by: [],
+        practice_note: "Practice approval: in a pilot a colleague approves this.",
+      },
+    } as EventView;
+    const html = render(<DecisionRecord view={view} onChanged={() => undefined} />, api());
+    expect(html).toContain("<dt>Prepared by</dt><dd>Asha Quality</dd>");
+    expect(html).toContain("<dt>May approve</dt><dd>Asha Quality</dd>");
+    expect(html).toContain("Nobody yet");
+    expect(html).toContain("Practice approval: in a pilot a colleague approves this.");
   });
 });
