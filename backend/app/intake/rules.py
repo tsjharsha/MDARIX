@@ -456,6 +456,12 @@ PROVISIONAL = {
         FLAGGED: (15, reporting.CALENDAR, "15 days (India MDR 2017 Rule 26)"),
         UNFLAGGED: (15, reporting.CALENDAR, "15 days (India MDR 2017 Rule 26; MvPI default)"),
     },
+    # Canada (0.10.76): no 2-day threat report; the shorter 10 days until the consultant confirms (starter).
+    markets.CA: {
+        THREAT: (10, reporting.CALENDAR, "10 days (SOR/98-282 s. 60(1)(a)(i))"),
+        FLAGGED: (10, reporting.CALENDAR, "10 days (SOR/98-282 s. 60(1)(a)(i))"),
+        UNFLAGGED: (30, reporting.CALENDAR, "30 days (SOR/98-282 s. 60(1)(a)(ii))"),
+    },
 }
 US_REMEDIAL = (5, reporting.WORK, "5 work days: remedial action may be needed (21 CFR 803.53)")
 # The EU clocks of an in-vitro diagnostic cite the IVDR (Regulation (EU) 2017/746, Art. 82): starter text, for the
