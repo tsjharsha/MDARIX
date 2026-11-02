@@ -270,7 +270,7 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
       <button
         type="button"
         className="uw-search-toggle"
-        aria-label="Search complaints, products and reports"
+        aria-label="Open the search"
         aria-expanded={phoneOpen}
         onClick={() => setPhoneOpen((value) => !value)}
       >
