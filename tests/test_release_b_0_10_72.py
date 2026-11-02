@@ -202,3 +202,55 @@ def test_b5_a_rising_group_names_its_lots_from_one_count(story_trial):
     assert rising[0]["lots"] == ["SAMPLE-ORBIT-300-LOT-003", "SAMPLE-ORBIT-300-LOT-004", "SAMPLE-ORBIT-300-LOT-005"]
     assert (rising[0]["recent"], round(rising[0]["ratio"], 1)) == (9, 9.3)
     assert board["summary"]["groups_tested"] == 2 and board["summary"]["groups"] == 6
+
+
+@pytest.mark.db
+def test_addendum_2_sample_only_chosen_on_the_approval_is_set_at_creation_and_audited():
+    import uuid
+
+    from fastapi.testclient import TestClient
+
+    from backend.app.db.models.foundation import AuditEvent, Tenant
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_system
+    from backend.app.main import app
+    from backend.app.trial.retention import purge_trial
+    from tests.conftest import authenticated_client
+    from tests.test_free_trial import PASSWORD, _activation_token, _request_id, _request_trial
+
+    admin = authenticated_client()
+    made = []
+    try:
+        for sample_only in (True, False):
+            email = _request_trial()
+            path = f"/api/v1/platform-admin/trial-requests/{_request_id(admin, email)}/approve"
+            body = _ok(admin.post(path, json={"sample_only": True}) if sample_only else admin.post(path))
+            made.append(uuid.UUID(body["tenant_id"]))
+            with SessionLocal() as db:
+                bind_system(db, "test: sample only on the approval")
+                assert db.get(Tenant, made[-1]).sample_only is sample_only
+                audit = (
+                    db.query(AuditEvent)
+                    .filter(AuditEvent.entity_id == made[-1], AuditEvent.action == "TRIAL_REQUEST_APPROVED")
+                    .one()
+                )
+                assert audit.details["sample_only"] is sample_only
+            if sample_only:
+                user = TestClient(app)
+                _ok(
+                    user.post(
+                        "/api/v1/auth/activate-account",
+                        json={"token": _activation_token(body, email), "password": PASSWORD},
+                    )
+                )
+                _ok(user.post("/api/v1/auth/signin", json={"email": email, "password": PASSWORD}))
+                refused = user.post(
+                    "/api/v1/data/import/complaints/check",
+                    content=b"complaint_id,description\nX-1,Test\n",
+                    headers={"Content-Type": "text/csv"},
+                )
+                assert refused.status_code == 403 and refused.json()["detail"]["code"] == "SAMPLE_ONLY_TRIAL"
+    finally:
+        with SessionLocal() as db:
+            for tenant_id in made:
+                purge_trial(db, tenant_id, "test:release-b-sample-only-cleanup")

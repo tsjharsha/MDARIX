@@ -145,7 +145,9 @@ describe("B3: the complaint page shows one action per row and does the triage it
   const page = () => source("ComplaintPage");
   it("puts Send to behind the row's More menu, one action per row", () => {
     // Send to renders inside the row's More menu, and only when a colleague may sign the step.
-    expect(page()).toMatch(/function SendTo[\s\S]*?if \(!canSend \|\| !others\.length\) return null;[\s\S]*?<details className="uw-row-more">/);
+    expect(page()).toMatch(
+      /function SendTo[\s\S]*?if \(!canSend \|\| !others\.length\) return null;[\s\S]*?<details className="uw-row-more">/,
+    );
   });
   it("shows the triage panel on the page instead of a button to the triage list", () => {
     expect(page()).toContain("<InlineTriage complaintId={event.complaint_id}");
@@ -168,5 +170,19 @@ describe("F2: step 3 is the consequence question the screen recorded", () => {
     expect(source("ShortStory")).toContain('{ step: "question", request_id: asked.id }');
     // The summary keeps the answer as written (an answer is never lower-cased).
     expect(source("ShortStory")).toContain("Consequence: {story.question.consequence}\n");
+  });
+});
+
+const adminSources = import.meta.glob(["../admin/TrialRequestsWorkspace.tsx"], {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+describe("Addendum 2: sample only, chosen on the approval", () => {
+  it("offers the choice in the approval dialog and sends it with the approval", () => {
+    const admin = adminSources["../admin/TrialRequestsWorkspace.tsx"] ?? "";
+    expect(admin).toContain("Sample only: no upload or import of the organization's own data");
+    expect(admin).toContain('act(confirming, "approve", { sample_only: sampleOnly })');
   });
 });

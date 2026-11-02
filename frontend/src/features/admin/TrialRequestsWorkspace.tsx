@@ -150,6 +150,8 @@ export function invitationProblem(row: Pick<TrialRequest, "status" | "owner_stat
 // Free-trial requests from the website. Approve creates the private 30-day trial workspace and sends the invitation.
 export function TrialRequestsWorkspace() {
   const [items, setItems] = useState<TrialRequest[]>([]);
+  // "Sample only" for an event or judge trial (0.10.72): set at creation, audited with the approval.
+  const [sampleOnly, setSampleOnly] = useState(false);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [listed, setListed] = useState({ page: 1, pages: 1, total: 0 });
   const [filter, setFilter] = useState("PENDING_REVIEW");
@@ -420,7 +422,10 @@ export function TrialRequestsWorkspace() {
                       <button
                         className="platform-admin-primary"
                         disabled={busy !== null}
-                        onClick={() => setConfirming(row)}
+                        onClick={() => {
+                          setSampleOnly(false);
+                          setConfirming(row);
+                        }}
                       >
                         <Check size={14} /> Approve
                       </button>
@@ -467,6 +472,10 @@ export function TrialRequestsWorkspace() {
               <li>the sample dataset</li>
               <li>an account for {confirming.email} and a one-time invitation valid for 48 hours</li>
             </ul>
+            <label className="trial-queue-check">
+              <input type="checkbox" checked={sampleOnly} onChange={(event) => setSampleOnly(event.target.checked)} />{" "}
+              Sample only: no upload or import of the organization's own data (an event or judge trial)
+            </label>
             <div className="trial-queue-dialog-actions">
               <button className="platform-admin-secondary" onClick={() => setConfirming(null)}>
                 Cancel
@@ -474,7 +483,7 @@ export function TrialRequestsWorkspace() {
               <button
                 className="platform-admin-primary"
                 disabled={busy !== null}
-                onClick={() => act(confirming, "approve")}
+                onClick={() => act(confirming, "approve", { sample_only: sampleOnly })}
               >
                 {busy ? "Creating workspace…" : "Approve and create workspace"}
               </button>

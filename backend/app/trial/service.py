@@ -455,7 +455,7 @@ def retry_invitation(db: Session, request_id) -> str:
     return delivery
 
 
-def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict:
+def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser, *, sample_only: bool = False) -> dict:
     now = datetime.now(timezone.utc)
     row = db.query(OnboardingRequest).filter(OnboardingRequest.id == request_id).with_for_update().first()
     if row is None:
@@ -473,6 +473,8 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         # A new free trial starts on the new navigation (0.10.71, A1), set here and not by the column's default, so
         # existing organizations and pilots keep theirs; Tenant 360 still switches it either way.
         tenant.navigation = "new"
+        # "Sample only" chosen on the approval (0.10.72): every import route refuses (refuse_sample_only).
+        tenant.sample_only = sample_only
         db.add(customer)
         db.add(tenant)
         db.flush()
@@ -594,6 +596,7 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
                     "trial_user_id": str(user.id),
                     "expires_at": subscription.expires_at.isoformat(),
                     "sample_data": sample,
+                    "sample_only": sample_only,
                 },
                 created_at=now,
             )

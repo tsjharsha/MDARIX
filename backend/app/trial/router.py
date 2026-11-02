@@ -85,11 +85,18 @@ def list_trial_requests(
     return request_queue(db, status=status, q=q, page=page, page_size=page_size, sort=sort, order=order)
 
 
+class ApproveRequest(BaseModel):
+    # An event or judge trial (0.10.72, Addendum 2): the sample only, set at creation and audited with the approval.
+    sample_only: bool = False
+
+
 @router.post("/platform-admin/trial-requests/{request_id}/approve")
-def approve_trial_request(request_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+def approve_trial_request(
+    request_id: uuid.UUID, request: Request, payload: ApproveRequest | None = None, db: Session = Depends(get_db)
+):
     admin = _require_platform_admin(request, db)
     # The approval also detects the sample's signals (service.approve_request).
-    return approve_request(db, request_id, admin)
+    return approve_request(db, request_id, admin, sample_only=bool(payload and payload.sample_only))
 
 
 @router.post("/platform-admin/trial-requests/{request_id}/decline")
