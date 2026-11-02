@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DeadlineChip } from "../../../app/chips";
 import { DecideAndSign } from "./common";
 import { marketLabel } from "../../../app/labels";
 import { CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide-react";
@@ -14,7 +15,6 @@ import {
   WEEKDAY_SHORT,
   eventPath,
   exportPath,
-  hoursText,
   oversightPath,
   readyProblem,
   stateTone,
@@ -158,9 +158,10 @@ function itemColumns(go: (opens: Opens) => void): Column<OversightItem>[] {
       key: "due_at",
       label: "Due",
       render: (row) => (
-        <span>
-          {row.due_label ?? formatDate(row.due_at)}
-          <small className="ac-muted uw-ov-left">{hoursText(row)}</small>
+        // The time left is the key fact, so it leads as the deadline chip; the end follows (V4).
+        <span className="uw-due-cell">
+          <DeadlineChip item={row} />
+          <span className="ac-muted">{row.due_label ?? formatDate(row.due_at)}</span>
         </span>
       ),
     },
