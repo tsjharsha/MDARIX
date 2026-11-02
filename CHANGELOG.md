@@ -33,6 +33,7 @@ change, so `scripts/refresh_trial_story.py` has nothing new to do.
   trail views. E-mails already sent, bookmarks and the sample story's links open the new place. An address of the
   new navigation opened by a classic organization opens the classic place.
 - New addresses: `/app/trends`, `/app/settings`, `/app/team`, and `/app/complaints/<ref>` for one complaint.
+- On a phone, Settings, Team and Account are in the menu, so the header fits at 390 px.
 
 ### Added: My work (7.2)
 
