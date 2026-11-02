@@ -6087,3 +6087,24 @@ section[aria-label="What blocks the decision"] h3 {
   border: 1px solid var(--ac-line);
   border-radius: var(--ms-radius-md);
 }
+
+/* 0.10.72 (B5): Trends lead with one sentence per rising group. */
+.uw-trend-lead {
+  margin: 12px 0;
+}
+.uw-trend-lead ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-trend-lead li {
+  padding: 12px 14px;
+  border: 1px solid var(--ac-line);
+  border-left: 3px solid var(--ms-critical, #b42318);
+  border-radius: var(--ms-radius-md);
+}
+.uw-trend-lead li p {
+  margin: 0 0 4px;
+}

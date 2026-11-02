@@ -40,7 +40,43 @@ export type TrendItem = {
   also_compared?: string | null;
   /** Recent records linked to an earlier record of the same event: listed, not counted again. */
   linked_records?: number;
+  /** The lots of the recent complaints (0.10.72). */
+  lots?: string[];
 };
+
+/** "003 and 004" from "SAMPLE-ORBIT-300-LOT-003", "SAMPLE-ORBIT-300-LOT-004": the part that differs (0.10.72). */
+export function lotsText(lots: readonly string[]): string {
+  if (lots.length < 2) return lots[0] ?? "";
+  let prefix = lots[0];
+  for (const lot of lots) while (!lot.startsWith(prefix)) prefix = prefix.slice(0, -1);
+  const cut = Math.max(prefix.lastIndexOf("-"), prefix.lastIndexOf(" ")) + 1;
+  const parts = lots.map((lot) => lot.slice(cut));
+  return parts.length === 2 ? parts.join(" and ") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/** One sentence per rising group (0.10.72, B5): "OrbitCare 300 Rev B: 9 complaints against 1.0 expected (9.3×),
+ * lots 003 and 004". */
+export function risingSentence(item: Pick<TrendItem, "name" | "recent" | "expected" | "ratio" | "lots">): string {
+  const ratio = typeof item.ratio === "number" ? ` (${item.ratio.toFixed(1)}×)` : "";
+  const lots = item.lots?.length ? `, ${item.lots.length === 1 ? "lot" : "lots"} ${lotsText(item.lots)}` : "";
+  return `${item.name}: ${grouped(item.recent)} complaints against ${grouped(item.expected, 1)} expected${ratio}${lots}`;
+}
+
+/** The comparison basis in one line, saying plainly when unit quantities are missing. */
+export function comparisonLine(
+  item: Pick<
+    TrendItem,
+    "baseline" | "baseline_name" | "history" | "history_days" | "also_compared" | "basis" | "basis_note"
+  >,
+): string {
+  const units =
+    item.basis === "UNITS"
+      ? "per unit in the field"
+      : item.basis_note
+        ? `compared by calendar days: ${item.basis_note}`
+        : "Units not imported: compared by calendar days";
+  return `Compared with ${trendBaselineText(item).replace(/^Own history/, "its own history")} · ${units}`;
+}
 
 export type TrendBoard = {
   grouping: TrendGroup;
@@ -165,7 +201,8 @@ export function trendHeadline(board: TrendBoard | null | undefined): { title: st
   const { significant, elevated, groups, complaints_counted, groups_tested, linked_records } = board.summary;
   const counted =
     `${grouped(complaints_counted)} complaints counted across ${grouped(groups)} groups, whatever their status.` +
-    (groups_tested && groups_tested > 1 ? ` Results allow for the ${grouped(groups_tested)} groups checked.` : "") +
+    // One word for one number (0.10.72): the groups assessed, as the tile beside it says.
+    (groups_tested && groups_tested > 1 ? ` Results allow for the ${grouped(groups_tested)} groups assessed.` : "") +
     (linked_records ? " An event linked from several records counts once." : "");
   if (significant)
     return {

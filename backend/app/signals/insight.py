@@ -459,8 +459,23 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
                 ],
                 "open_signals": signals.get((product_ref, version_ref, problem), []),
                 "_counted": len(bucket["recent"]) + len(bucket["history"]),
+                "_recent_ids": [row.id for row in bucket["recent"]],
             }
         )
+    # The lots of each group's recent complaints (0.10.72, B5: "lots 003-004" in the trend's sentence).
+    wanted = {complaint_id for item in items for complaint_id in item["_recent_ids"]}
+    lot_of = (
+        dict(
+            db.query(Complaint.id, LotBatch.lot_identifier)
+            .join(LotBatch, (LotBatch.tenant_id == Complaint.tenant_id) & (LotBatch.id == Complaint.lot_batch_id))
+            .filter(Complaint.tenant_id == tenant_id, Complaint.id.in_(wanted))
+            .all()
+        )
+        if wanted
+        else {}
+    )
+    for item in items:
+        item["lots"] = sorted({lot_of[key] for key in item.pop("_recent_ids") if key in lot_of})
     items.sort(
         key=lambda item: (
             trend_rules.RESULT_ORDER[item["result"]],

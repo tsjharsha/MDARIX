@@ -189,3 +189,16 @@ def test_f2_step_3_is_the_consequence_question_and_the_summary_reads_its_state(s
         f"The hospital answered on {question['answered_on']}"
     )
     assert "Reassess" in question["consequence"]
+
+
+@pytest.mark.db
+def test_b5_a_rising_group_names_its_lots_from_one_count(story_trial):
+    """B5: the lead sentence names the rising group's lots; the board's groups assessed is the one number the headline
+    and the tile both read (addendum: "2 groups checked" beside a tile of 6)."""
+    board = _ok(story_trial.get("/api/v1/triage/trends", params={"group": "version"}))
+    rising = [item for item in board["items"] if item["result"] == "SIGNIFICANT"]
+    assert [item["name"] for item in rising] == ["OrbitCare 300 Infusion Pump (Sample) Rev B"]
+    # The sample's nine recent Rev B complaints come from lots 003 and 004, and one from 005.
+    assert rising[0]["lots"] == ["SAMPLE-ORBIT-300-LOT-003", "SAMPLE-ORBIT-300-LOT-004", "SAMPLE-ORBIT-300-LOT-005"]
+    assert (rising[0]["recent"], round(rising[0]["ratio"], 1)) == (9, 9.3)
+    assert board["summary"]["groups_tested"] == 2 and board["summary"]["groups"] == 6

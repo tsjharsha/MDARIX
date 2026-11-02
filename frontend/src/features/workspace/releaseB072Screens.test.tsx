@@ -21,7 +21,7 @@ const { NewMyWorkSection } = await import("./sections/MyWork");
 const api = (permissions: string[] = ["quality.review", "signal.triage"]) =>
   ({
     session: { allowed_menu: ["home"], business_permissions: permissions },
-    work: {},
+    work: { products: [], investigations: [] },
     open: vi.fn(),
     notify: vi.fn(),
     navigation: "new",
@@ -96,5 +96,81 @@ describe("B4: My work leads with one item, and keeps every urgent obligation in 
     const html = render();
     expect(html).toContain("Resume SAMPLE-RV-11 · step 3 of 4");
     expect(html).toMatch(/class="ac-secondary"[^>]*>Reply due from Reporter of SAMPLE-RV-08/);
+  });
+});
+
+const { TrendCheck } = await import("./sections/TrendCheck");
+const { risingSentence, comparisonLine, trendPath } = await import("./signalAi");
+
+const ROW = {
+  key: "orbit|revb|",
+  product: { id: "p1", business_id: "PROD000001", name: "OrbitCare 300" },
+  product_version: { id: "v1", business_id: "VER000002", version_identifier: "Rev B" },
+  problem: null,
+  name: "OrbitCare 300 Rev B",
+  recent: 9,
+  recent_days: 30,
+  history: 6,
+  history_days: 180,
+  expected: 0.96,
+  p_value: 0.0001,
+  p_adjusted: 0.0002,
+  ratio: 9.3,
+  result: "SIGNIFICANT" as const,
+  label: "Significant rise",
+  sentence: "",
+  recent_complaints: [],
+  open_signals: [],
+  basis: "UNITS" as const,
+  baseline: "PREVIOUS_VERSION" as const,
+  baseline_name: "OrbitCare 300 Rev A",
+  lots: ["SAMPLE-ORBIT-300-LOT-003", "SAMPLE-ORBIT-300-LOT-004"],
+};
+
+describe("B5: Trends leads with one sentence per rising group", () => {
+  it("says the rise, its lots and the comparison basis, and says plainly when units are missing", () => {
+    expect(risingSentence(ROW)).toBe("OrbitCare 300 Rev B: 9 complaints against 1.0 expected (9.3×), lots 003 and 004");
+    expect(comparisonLine(ROW)).toBe(
+      "Compared with OrbitCare 300 Rev A: 6 in the 180 days before this version's release · per unit in the field",
+    );
+    expect(comparisonLine({ ...ROW, basis: "TIME", baseline: "OWN_HISTORY" })).toBe(
+      "Compared with its own history: 6 in 180 days · Units not imported: compared by calendar days",
+    );
+  });
+
+  it("shows the sentences first; statistics, every group, the grouping controls and the chart on request", () => {
+    resources.data = {
+      [trendPath("version", "")]: {
+        grouping: "version",
+        recent_days: 30,
+        history_days: 180,
+        min_complaints: 3,
+        summary: {
+          groups: 6,
+          groups_tested: 2,
+          complaints_counted: 44,
+          significant: 1,
+          elevated: 0,
+          too_few: 4,
+          short_history: 0,
+        },
+        items: [ROW, { ...ROW, key: "pulse", name: "PulseWatch 410 Rev A", result: "STEADY", lots: [] }],
+        note: "",
+        basis: { units: 2, time: 0, single_use: 0 },
+      },
+    };
+    const html = renderToStaticMarkup(
+      <WorkspaceContext.Provider value={api()}>
+        <TrendCheck onOpenSignal={() => undefined} />
+      </WorkspaceContext.Provider>,
+    );
+    const lead = html.indexOf("OrbitCare 300 Rev B: 9 complaints against 1.0 expected (9.3×), lots 003 and 004");
+    const revealed = html.indexOf("<summary>All groups, the method and the chart</summary>");
+    expect(lead).toBeGreaterThan(-1);
+    expect(revealed).toBeGreaterThan(lead);
+    // The steady group, the tiles and the grouping controls are inside the disclosure.
+    expect(html.indexOf("PulseWatch 410 Rev A")).toBeGreaterThan(revealed);
+    expect(html.indexOf("Groups checked")).toBeGreaterThan(revealed);
+    expect(html).toContain("Results allow for the 2 groups assessed.");
   });
 });
