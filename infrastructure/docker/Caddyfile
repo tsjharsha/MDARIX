@@ -16,7 +16,7 @@
 }
 
 (site_access_private) {
-	@needs_login not path /health/live /health/status
+	@needs_login not path /health/live /health/status /health/version
 	basic_auth @needs_login {
 		{$MDARIX_SITE_LOGIN_USER} {$MDARIX_SITE_LOGIN_HASH}
 	}
@@ -95,6 +95,11 @@ import www_redirect_{$MDARIX_WWW_REDIRECT:off}
 	}
 
 	handle /health/status {
+		reverse_proxy api:8000
+	}
+
+	# The deployed release, and nothing else (0.10.71): anyone can confirm which build is live.
+	handle /health/version {
 		reverse_proxy api:8000
 	}
 
