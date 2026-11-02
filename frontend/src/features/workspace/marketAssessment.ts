@@ -8,7 +8,7 @@ import { marketLabel, questionNumber } from "../../app/labels";
 
 export const ASSESSMENT_LIMITS = { reasonMin: 10, rationaleMax: 2000, referenceMax: 120 };
 
-export type Market = "US" | "EU_NI" | "GB" | "IN";
+export type Market = "US" | "EU_NI" | "GB" | "IN" | "CA";
 export type Answer = "YES" | "NO" | "UNKNOWN" | "NOT_APPLICABLE";
 export const ANSWERS: readonly Answer[] = ["YES", "NO", "UNKNOWN", "NOT_APPLICABLE"];
 export const ANSWER_LABELS: Record<Answer, string> = {
@@ -27,7 +27,13 @@ export const CONCLUSION_LABELS: Record<Suggestion, string> = {
   NOT_REPORTABLE: "Not reportable",
 };
 // The tab and chip names: the label map's words where the code would read as a code ("EU/NI", 0.10.72).
-export const MARKET_SHORT: Record<Market, string> = { US: "US", EU_NI: marketLabel("EU_NI"), GB: "GB", IN: "India" };
+export const MARKET_SHORT: Record<Market, string> = {
+  US: "US",
+  EU_NI: marketLabel("EU_NI"),
+  GB: "GB",
+  IN: "India",
+  CA: "Canada",
+};
 
 export type Question = {
   id: string;

@@ -8,7 +8,7 @@ import { ToneBadge } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { deadlineLabel, formatDay } from "../../../app/dates";
 import { WorkspaceContext, useCan, useWorkspace } from "../workspaceContext";
-import { WORKSHEET_MARKETS, reportsTab } from "../authorityReports";
+import { reportsTab, worksheetMarkets } from "../authorityReports";
 import { communicationsTab } from "../communications";
 import { recordName } from "../complaintReview";
 import { clockText } from "../reportability";
@@ -852,7 +852,7 @@ export function SignedVersion({
           </span>
         )}
       </div>
-      {conclusion === "REPORTABLE" && WORKSHEET_MARKETS.includes(version.market) && (
+      {conclusion === "REPORTABLE" && worksheetMarkets(workspace?.navigation).includes(version.market) && (
         <div className="ca-action-row">
           <button
             type="button"
@@ -870,29 +870,32 @@ export function SignedVersion({
           </p>
         </div>
       )}
-      {conclusion === "REPORTABLE" && !WORKSHEET_MARKETS.includes(version.market) && !version.filed_on && canDecide && (
-        <form className="ca-form-grid" onSubmit={record} aria-label="Filing reference and date">
-          <label className="ca-field">
-            Filing reference
-            <input
-              value={reference}
-              maxLength={ASSESSMENT_LIMITS.referenceMax}
-              placeholder="e.g. the MDR number"
-              onChange={(event) => setReference(event.target.value)}
-            />
-          </label>
-          <label className="ca-field">
-            Filed on
-            <input type="date" value={filedOn} onChange={(event) => setFiledOn(event.target.value)} />
-          </label>
-          <button type="submit" className="ac-secondary" disabled={!reference.trim() || !filedOn}>
-            Record the filing
-          </button>
-          <p className="ac-muted">
-            Empty until your organization reports to the authority itself: MDARIX submits nothing.
-          </p>
-        </form>
-      )}
+      {conclusion === "REPORTABLE" &&
+        !worksheetMarkets(workspace?.navigation).includes(version.market) &&
+        !version.filed_on &&
+        canDecide && (
+          <form className="ca-form-grid" onSubmit={record} aria-label="Filing reference and date">
+            <label className="ca-field">
+              Filing reference
+              <input
+                value={reference}
+                maxLength={ASSESSMENT_LIMITS.referenceMax}
+                placeholder="e.g. the MDR number"
+                onChange={(event) => setReference(event.target.value)}
+              />
+            </label>
+            <label className="ca-field">
+              Filed on
+              <input type="date" value={filedOn} onChange={(event) => setFiledOn(event.target.value)} />
+            </label>
+            <button type="submit" className="ac-secondary" disabled={!reference.trim() || !filedOn}>
+              Record the filing
+            </button>
+            <p className="ac-muted">
+              Empty until your organization reports to the authority itself: MDARIX submits nothing.
+            </p>
+          </form>
+        )}
       <InlineError text={error} />
     </section>
   );

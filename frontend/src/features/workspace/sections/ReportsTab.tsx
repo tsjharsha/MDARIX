@@ -215,15 +215,17 @@ function ReportListView({ onOpen }: { onOpen: (id: string) => void }) {
             {list.data.forms.map((form) => (
               <div key={form.market} className="uw-form-card">
                 <b>{marketLabel(form.market)}</b>
-                <span>{versionWords(form.version)}</span>
-                <ToneBadge tone="good" label="In MDARIX today" />
+                <span>{form.title.replace(/ worksheet$/, "")}</span>
+                <span className="ac-muted">{versionWords(form.version)}</span>
+                {form.starter ? (
+                  <ToneBadge tone="neutral" label="Starter, for your consultant to confirm" />
+                ) : (
+                  <ToneBadge tone="good" label="In MDARIX" />
+                )}
               </div>
             ))}
           </div>
-          <p className="ac-muted">
-            EU and Northern Ireland, Great Britain: record where and when you reported on the market's signed
-            conclusion. {list.data.starter_mark}
-          </p>
+          <p className="ac-muted">{list.data.starter_mark}</p>
         </section>
       )}
     </>
@@ -309,6 +311,8 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
           <div className="uw-cp-chips">
             {due && <DeadlineChip item={due} prefix="Due" />}
             <span className="ms-chip">{meter.text} fields</span>
+            {detail.form.report_kind && <span className="ms-chip">{detail.form.report_kind} report</span>}
+            {detail.form.starter && <span className="ms-chip">Starter form, for your consultant to confirm</span>}
             {(detail.state === "CORRECTION_REQUIRED" || detail.state === "CANCELLED") && (
               <StateChip label={detail.state_label} />
             )}

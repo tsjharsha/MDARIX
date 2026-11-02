@@ -16,6 +16,8 @@ export type TreeMarket = {
   enabled: boolean;
   tests: { passed: number; total: number; current: boolean };
   questions: { id: string; text: string; clause: string; extra: boolean }[];
+  /** The report a reportable outcome creates (0.10.76: the EU, GB and Canada forms are starters). */
+  form?: { title: string; starter: boolean } | null;
 };
 export type TreeNode = {
   id: string;
@@ -58,7 +60,13 @@ export const treePlace = (market: string, complaint: string) => ({
 });
 
 /** Each market's short name on its button (the approved design). */
-export const TREE_NAMES: Record<string, string> = { US: "US MDR", IN: "India", EU_NI: "EU / NI", GB: "Great Britain" };
+export const TREE_NAMES: Record<string, string> = {
+  US: "US MDR",
+  IN: "India",
+  EU_NI: "EU / NI",
+  GB: "Great Britain",
+  CA: "Canada",
+};
 
 /** The complaint a market's tree shows first: the one asked for, else the first walked through it (signed first). */
 export function chosenComplaint(trees: Trees | null, market: string, asked: string | null): string | null {
@@ -138,6 +146,15 @@ export function DecisionTreesSection() {
             <div>
               <p className="ac-eyebrow">{tree.version_label}</p>
               <h2>{tree.title}</h2>
+              {tree.form && (
+                <p className="ac-muted">
+                  A reportable outcome creates the {tree.form.title}
+                  {tree.form.starter ? " (starter, for your consultant to confirm)" : ""}.
+                </p>
+              )}
+              {!tree.enabled && (
+                <p className="ac-muted">Not in your reporting windows: add this market there to assess complaints.</p>
+              )}
             </div>
             <ToneBadge tone={tree.status === "APPROVED" ? "good" : "neutral"} label={tree.status_label} />
           </div>

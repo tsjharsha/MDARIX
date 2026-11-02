@@ -63,7 +63,7 @@ export type ReportListItem = {
 
 export type ReportList = {
   items: ReportListItem[];
-  forms: { market: string; title: string; version: string }[];
+  forms: { market: string; title: string; version: string; starter?: boolean }[];
   never_submits: string;
   starter_mark: string;
   practice_label: string | null;
@@ -82,6 +82,8 @@ export type WorksheetField = {
   personal: "PATIENT" | "REPORTER" | null;
   missing_class: string;
   editable?: boolean;
+  /** The form's fixed list for this field (0.10.76), as printed; absent: free text. */
+  options?: string[] | null;
   note: string | null;
   by: string | null;
   at: string | null;
@@ -192,6 +194,10 @@ export type ReportDetail = {
     authority: string;
     source_document: string;
     clauses: { id: string; short: string; title: string }[];
+    /** 0.10.76: a starter form (EU MIR, GB MIR, Health Canada), its report types and the one this report is. */
+    starter?: boolean;
+    report_types?: string[];
+    report_kind?: string | null;
   };
   routes: Route[];
   state: ObligationState;
@@ -246,14 +252,21 @@ export function parseReportsTab(tab: string | null | undefined): { isReports: bo
   return { isReports: true, complaintId: params.get("complaint") };
 }
 
-/** The markets with a worksheet in this release (the server's forms.BY_MARKET). */
+/** The markets with a worksheet (the server's forms.form_for): the classic navigation keeps the US and India; the
+ * new one adds EU / NI, Great Britain and Canada (0.10.76, starters for your consultant to confirm). */
 export const WORKSHEET_MARKETS = ["US", "IN"];
+export const NEW_WORKSHEET_MARKETS = [...WORKSHEET_MARKETS, "EU_NI", "GB", "CA"];
+export const worksheetMarkets = (navigation?: string | null): readonly string[] =>
+  navigation === "new" ? NEW_WORKSHEET_MARKETS : WORKSHEET_MARKETS;
 
-/** Whether a complaint's markets owe a report with a worksheet: a US or India market reportable, or pending. */
-export function owesWorksheet(markets: { market: string; state: string; suggested: string | null }[]): boolean {
+/** Whether a complaint's markets owe a report with a worksheet: a market with one reportable, or pending. */
+export function owesWorksheet(
+  markets: { market: string; state: string; suggested: string | null }[],
+  navigation?: string | null,
+): boolean {
   return markets.some(
     (item) =>
-      WORKSHEET_MARKETS.includes(item.market) &&
+      worksheetMarkets(navigation).includes(item.market) &&
       (item.state === "REPORTABLE" ||
         (item.state === "DRAFT" && (item.suggested === "REPORTABLE" || item.suggested === "PENDING_INFORMATION"))),
   );

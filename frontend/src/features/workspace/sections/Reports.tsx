@@ -1,5 +1,5 @@
 import { PracticeApproval } from "./PracticeApproval";
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { marketLabel, versionWords } from "../../../app/labels";
 import { CheckCircle2, ClipboardList, Download, FileText, Send, ShieldCheck, Undo2 } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
@@ -64,6 +64,10 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
   const fresh = useNavigation() === "new";
   const show = (id: string) =>
     fresh && workspace ? workspace.open(reportPlace(id).section, reportPlace(id).tab) : setOpen(id);
+  // A link to one report (an approval task, a Home item: 0.10.76) opens its own page on the new navigation.
+  useEffect(() => {
+    if (fresh && workspace && open) workspace.open(reportPlace(open).section, reportPlace(open).tab);
+  }, [fresh, workspace, open]);
   const items = list.data?.items ?? [];
   const waiting = items.filter(
     (item) => !["ACCEPTED", "COMPLETE", "SUBMITTED_NO_ACK", "FOLLOW_UP_DUE"].includes(item.state),
@@ -173,7 +177,7 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
         )}
         {list.data && <p className="ac-muted">{list.data.starter_mark}</p>}
       </Panel>
-      {open && (
+      {open && !fresh && (
         <ReportDrawer
           id={open}
           onOpen={setOpen}
@@ -991,11 +995,26 @@ export function FieldRow({
             if (await action.run(path, "PUT", { value })) setEditing(false);
           }}
         >
-          <input
-            aria-label={`${item.number} ${item.label}`.trim()}
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-          />
+          {item.options?.length ? (
+            <select
+              aria-label={`${item.number} ${item.label}`.trim()}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+            >
+              <option value="">Choose…</option>
+              {item.options.map((choice) => (
+                <option key={choice} value={choice}>
+                  {choice}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              aria-label={`${item.number} ${item.label}`.trim()}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+            />
+          )}
           <button type="submit" className="ac-secondary" disabled={action.busy || !value.trim()}>
             Save
           </button>
