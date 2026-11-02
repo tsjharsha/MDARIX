@@ -971,7 +971,7 @@ function FieldRow({
           }}
         >
           <input
-            aria-label={`${item.number} ${item.label}`}
+            aria-label={`${item.number} ${item.label}`.trim()}
             value={value}
             onChange={(event) => setValue(event.target.value)}
           />

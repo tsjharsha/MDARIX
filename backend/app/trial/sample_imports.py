@@ -70,6 +70,8 @@ SAMPLE_IMDRF_LINKS = {
     "UNDER_INFUSION_NO_ALARM": ("A14", "A16"),
     "FREE_FLOW_DOOR": ("A14",),
     "ALARM_VOLUME_LOW": ("A16",),
+    # SAMPLE-RV-11, the SpO2 read high (0.10.72): A0908 "Incorrect, Inadequate or Imprecise Result or Readings".
+    "SPO2_READING_HIGH": ("A0908",),
 }
 SAMPLE_REVIEWER = "system:trial-sample-reviewer"
 PROBLEM_CODES = "problem_code"

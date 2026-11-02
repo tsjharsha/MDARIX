@@ -254,3 +254,56 @@ def test_addendum_2_sample_only_chosen_on_the_approval_is_set_at_creation_and_au
         with SessionLocal() as db:
             for tenant_id in made:
                 purge_trial(db, tenant_id, "test:release-b-sample-only-cleanup")
+
+
+@pytest.mark.db
+def test_addenda_sample_corrections_new_trials_have_them_and_the_refresh_records_them_once(story_trial):
+    """A new trial maps SPO2_READING_HIGH to IMDRF A0908 and its guide's examples read without "Sample examples:";
+    a trial made before 0.10.72 is corrected by scripts/refresh_trial_story.py once (dry run first), the guide's
+    approval re-recorded on the new fingerprint."""
+    import uuid
+
+    from backend.app.db.models.foundation import SignedApprovalRecord
+    from backend.app.db.models.guides_communications import DecisionGuideVersion
+    from backend.app.db.models.regulatory_reference import ImdrfCodeMapping
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.decision_guides.router import _fingerprint
+    from backend.app.human_decision.rules import signature_hash
+    from backend.app.trial import sample_0_10_72
+
+    user = story_trial
+    tenant_id = uuid.UUID(_ok(user.get("/api/v1/session/context"))["tenant_id"])
+    # The flagship's code shows its IMDRF term, as the other sample codes do.
+    event = _ok(user.get("/api/v1/oversight/events/SAMPLE-RV-11"))
+    assert event["event"]["problem_code"] == "SPO2_READING_HIGH"
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        links = db.query(ImdrfCodeMapping).filter(
+            ImdrfCodeMapping.tenant_id == tenant_id, ImdrfCodeMapping.customer_code == "SPO2_READING_HIGH"
+        )
+        assert [row.imdrf_code for row in links] == ["A0908"]
+        assert sample_0_10_72.refresh(db, tenant_id, apply=False) == 0  # a new trial has them
+        # As a trial made before 0.10.72 had them: no link, and the old example text in the signed guide.
+        links.delete()
+        guide = (
+            db.query(DecisionGuideVersion)
+            .filter(DecisionGuideVersion.tenant_id == tenant_id, DecisionGuideVersion.content_fingerprint.is_not(None))
+            .one()
+        )
+        guide.questions = [
+            {**item, "examples": f"Sample examples: {item['examples']}"} if item.get("examples") else item
+            for item in guide.questions
+        ]
+        db.flush()
+        assert sample_0_10_72.refresh(db, tenant_id, apply=False) == 2
+        assert links.count() == 0  # the dry run changes nothing
+        assert sample_0_10_72.refresh(db, tenant_id, apply=True) == 2
+        assert sample_0_10_72.refresh(db, tenant_id, apply=True) == 0  # idempotent
+        assert [row.imdrf_code for row in links] == ["A0908"]
+        assert not any(str(item.get("examples") or "").startswith("Sample examples") for item in guide.questions)
+        record = db.get(SignedApprovalRecord, guide.signed_record_id)
+        fingerprint = _fingerprint(guide.market, guide.code, guide.questions, guide.test_cases or [])
+        assert guide.content_fingerprint == record.content_fingerprint == fingerprint
+        assert record.signature_hash == signature_hash(fingerprint, record.signer_user_id, guide.code)
+        db.commit()

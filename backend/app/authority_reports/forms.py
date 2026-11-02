@@ -89,7 +89,8 @@ FDA_3500A = Form(
         Section(
             "FRONT",
             "Front page",
-            (Field("MFR_REPORT", "Mfr report #", "Manufacturer report number", None, MUST),),
+            # No number of its own (0.10.72: it read "Mfr report # Manufacturer report number").
+            (Field("MFR_REPORT", "", "Manufacturer report number", None, MUST),),
             "The same number as G8.",
         ),
         Section(
@@ -327,7 +328,9 @@ MVPI_MDAE = Form(
                 Field("B1", "1", "Date of event / near miss incident", "event_date", INITIAL),
                 Field("B2", "2", "Type of event (adverse event, product problem)", "event_type", MUST),
                 Field(
-                    "B3", "3", "For implantable medical devices only: implanted and explanted dates",
+                    "B3",
+                    "3",
+                    "For implantable medical devices only: implanted and explanted dates",
                     note="Leave blank for a device that is not implanted.",
                 ),
                 Field("B4", "4", "Location of event", "in_location", INITIAL),
