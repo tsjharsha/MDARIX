@@ -42,7 +42,7 @@ LABELS = {
     SAFETY: "Safety issue",
     INJURY: "Injury",
     REPORTABLE: "Reportable outcome",
-    RECURRENCE: "Recurrence no case covers",
+    RECURRENCE: "Recurrence no investigation covers",
     NEW_FAILURE_MODE: "New failure mode",
 }
 DEFINITIONS = {
@@ -50,9 +50,9 @@ DEFINITIONS = {
     INJURY: "A serious injury is recorded Yes, or Unknown with a patient involved, or the harm level is at or above an "
     "enabled market's serious threshold.",
     REPORTABLE: 'A market is concluded reportable, US question 5 is Yes, or an earlier single decision says "reported".',
-    RECURRENCE: "An open signal, or two or more service-level resolutions in 30 days, on the same product and problem "
-    "code, and no open case covers it.",
-    NEW_FAILURE_MODE: "The problem code was never recorded before on this product, and no open case covers it.",
+    RECURRENCE: "An open trend, or two or more service-level resolutions in 30 days, on the same product and problem "
+    "code, and no open investigation covers it.",
+    NEW_FAILURE_MODE: "The problem code was never recorded before on this product, and no open investigation covers it.",
 }
 # A recurring service-level matter: this many service-level resolutions on one product and problem code within the
 # window (starter threshold, shown on screen).
@@ -237,8 +237,8 @@ def recurrence(db: Session, tenant_id: uuid.UUID, facts: Facts, today: date) -> 
                 "signal",
                 signal.complaint_count,
                 signal.business_id,
-                f"Open signal {signal.business_id} on {facts.product_name or 'this product'}, {code}: no open case "
-                "covers it",
+                f"Open trend {signal.business_id} on {facts.product_name or 'this product'}, {code}: no open "
+                "investigation covers it",
             )
         )
     resolved = service_level_resolutions(db, tenant_id, complaint.product_id, code, today, exclude=complaint.id)
@@ -251,7 +251,7 @@ def recurrence(db: Session, tenant_id: uuid.UUID, facts: Facts, today: date) -> 
                 len(resolved),
                 refs,
                 f"{len(resolved)} service-level resolutions on {facts.product_name or 'this product'}, {code}, in "
-                f"{RECURRING_DAYS} days ({refs}): no open case covers them",
+                f"{RECURRING_DAYS} days ({refs}): no open investigation covers them",
             )
         )
     return found
@@ -280,8 +280,8 @@ def new_failure_mode(db: Session, tenant_id: uuid.UUID, facts: Facts) -> list[di
             "problem_code",
             code,
             facts.ref,
-            f"Problem code {code} not recorded before on {facts.product_name or 'this product'}, and no open case "
-            "covers it",
+            f"Problem code {code} not recorded before on {facts.product_name or 'this product'}, and no open "
+            "investigation covers it",
         )
     ]
 
@@ -299,3 +299,9 @@ def evaluate(db: Session, tenant_id: uuid.UUID, facts: Facts, today: date) -> li
 
 def codes(met: list[dict]) -> list[str]:
     return [code for code in CODES if any(item["code"] == code for item in met)]
+
+
+def words(trigger_codes: list[str]) -> str:
+    """Trigger codes as a person reads them: ["REPORTABLE", "NEW_FAILURE_MODE"] -> "reportable outcome, new failure
+    mode" (no code on screen)."""
+    return ", ".join(LABELS.get(code, str(code).replace("_", " ")).lower() for code in trigger_codes)

@@ -406,7 +406,32 @@ class Product360Service:
                 "due_at": row["due_at"].isoformat() if row["due_at"] is not None else None,
                 "owner_ref": row["owner_ref"],
             }
+        for investigation_id, version in self.investigation_versions(conn, tenant_id, product_id).items():
+            result.setdefault(investigation_id, {})["version_identifier"] = version
         return result
+
+    def investigation_versions(self, conn, tenant_id: str, product_id: str) -> dict[str, str]:
+        """Each case's product version: the one most of its complaints carry (0.10.70). The workspace shows a case on its
+        own version, never on the version a record opened before it was on."""
+        rows = (
+            conn.execute(
+                text(
+                    "SELECT ic.investigation_id, pv.version_identifier, count(*) AS n FROM investigation_complaints ic "
+                    "JOIN complaints c ON c.tenant_id=ic.tenant_id AND c.id=ic.complaint_id "
+                    "JOIN product_versions pv ON pv.tenant_id=c.tenant_id AND pv.id=c.product_version_id "
+                    "WHERE ic.tenant_id=:tenant_id AND c.product_id=:product_id "
+                    "GROUP BY ic.investigation_id, pv.version_identifier "
+                    "ORDER BY ic.investigation_id, n DESC, pv.version_identifier"
+                ),
+                {"tenant_id": tenant_id, "product_id": product_id},
+            )
+            .mappings()
+            .all()
+        )
+        found: dict[str, str] = {}
+        for row in rows:
+            found.setdefault(str(row["investigation_id"]), row["version_identifier"])
+        return found
 
     def evidence(self, conn, tenant_id: str, investigations, as_of: datetime | None, mode: str):
         ids = [str(row["id"]) for row in investigations]

@@ -29,7 +29,7 @@ const TRIGGERS: Record<string, string> = {
   SAFETY: "Safety issue",
   INJURY: "Injury",
   REPORTABLE: "Reportable outcome",
-  RECURRENCE: "Recurrence no case covers",
+  RECURRENCE: "Recurrence no investigation covers",
   NEW_FAILURE_MODE: "New failure mode",
 };
 

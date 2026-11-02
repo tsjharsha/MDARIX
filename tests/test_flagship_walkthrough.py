@@ -16,6 +16,7 @@ prefilled value against its source.
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -50,7 +51,7 @@ WALK = [
     ("US report", "Complaints › Reporting, the report: the acceptance", "Record the evidence"),
     ("Disposition", "Next step", "Sign the disposition"),
     ("Disposition", "My work › Queues, the complaint's disposition", "Sign"),
-    ("Investigation", "Next step", "Sign the investigation decision on the case"),
+    ("Investigation", "Next step", "Sign the investigation's decision"),
     ("Investigation", "Investigation › Evidence (progress line: Next), the complaint's own record", "Record review"),
     ("Investigation", "Investigation › Decisions & actions (Next: Risk and regulatory review)", "Record outcome"),
     ("Investigation", "Investigation › Decisions & actions (Next: Investigation brief)", "Compose the brief"),
@@ -163,6 +164,8 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     assert india["evaluation"]["suggested"] == "NOT_REPORTABLE"
     reason = "No adverse event: nobody was harmed, a malfunction only."
     assert _sign(user, complaint, "IN", india, "NOT_REPORTABLE", password=PASSWORD, reason=reason).status_code == 200
+    # India is assessed, but the event's market stays the United States: the complaint's Markets field (0.10.70).
+    assert _ok(user.get(EVENT))["work"]["markets"] == ["US"]
 
     # 4. The US report: the worksheet opens on this complaint's reports; G8 is never typed twice.
     label, target, _ = _next(user)
@@ -226,23 +229,50 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     assert screen["classification"]["user_type"] == "HEALTHCARE_PROFESSIONAL"
     assert "report worksheet G2" in screen["classification"]["source_values"]["user_type"]
     assert "REPORTABLE" in screen["trigger_codes"]
+    # One word per thing (0.10.70): every trigger's fact and definition says "investigation", never "case".
+    for text in [item["fact"] for item in screen["triggers"]] + [
+        rule["definition"] for rule in screen["trigger_rules"]
+    ]:
+        assert not re.search(r"(cases?|signals?)", text), text
     rationale = "Reportable in the US: a product investigation of the reading error."
     disposition = _ok(sign_disposition(user, complaint, "ESCALATED_BY_TRIGGER", screen, rationale=rationale))
     case_id = disposition["current"]["investigation_id"]
 
     # 6. The investigation: the next step opens THIS investigation's decision (it opened the list before 0.10.69).
     label, target, _ = _next(user)
-    assert label == "Sign the investigation decision on the case"
+    assert label == "Sign the investigation's decision"
     assert target["record"] == {"kind": "case", "id": case_id} and target["tab"] == "Decision"
     resolved = _ok(user.get("/api/v1/workspace/context/resolve", params={"investigation": case_id}))
     assert resolved["investigation_id"] == case_id
     case = f"/api/v1/investigations/{case_id}"
     scope = _ok(user.get(f"{case}/scope"))["current"]
-    # The question in words: the complaint's own words and the trigger, no codes.
+    # The question in words: the complaint's own words and the triggers, no codes, no doubled "escalated" (0.10.70).
     assert (
         scope["question"].startswith("Biomedical engineering checked a monitor")
         and "REPORTABLE" not in scope["question"]
     )
+    assert "Escalated from complaint SAMPLE-RV-11 by the triggers reportable outcome, new failure mode." in (
+        " ".join(scope["question"].split())
+    )
+    assert "trigger met:" not in scope["question"]
+    # Items 9 and 10 (0.10.70): the product's investigation list, which the investigation page's context reads, holds
+    # this investigation with its question, owner, due date and its own version (Rev A, the flagship's), so the page
+    # never shows a previously opened version or the first investigation of the list.
+    listed = _ok(user.get(f"/api/v1/products/{resolved['product_id']}/investigations"))
+    row = next(item for item in listed if item["id"] == case_id)
+    assert row["investigation_question"] == scope["question"]
+    assert row["owner_ref"] and row["due_at"]
+    assert row["version_identifier"] == "Rev A"
+    orbit = _ok(user.get("/api/v1/workspace/context/resolve", params={"investigation": "SAMPLE-INV-001"}))
+    orbit_row = next(
+        item
+        for item in _ok(user.get(f"/api/v1/products/{orbit['product_id']}/investigations"))
+        if item["id"] == orbit["investigation_id"]
+    )
+    assert orbit_row["version_identifier"] == "Rev B"
+    # Readiness names the escalation's triggers in words, not codes (0.10.70).
+    due = {check["code"]: check for check in _ok(user.get("/api/v1/readiness"))["checks"]}["DISPOSITIONS_DUE"]
+    assert "Escalated: reportable outcome, new failure mode" in [item["label"] for item in due["items"]]
     # The complaint's own record is the first evidence: the person reviews it, nothing is typed again.
     (item,) = _ok(user.get(f"{case}/evidence-inventory"))["items"]
     assert item["evidence"]["source_reference"] == "Complaint SAMPLE-RV-11"
@@ -303,6 +333,61 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     assert label is None and view["state"] == "READY_TO_SIGN", view["checklist"]
     ready = _ok(user.post(f"/api/v1/oversight/events/{complaint}/ready", json={"password": PASSWORD, "reason": ""}))
     assert ready["ready"]["state"] == "READY"
+
+
+def test_a_finished_sample_event_asks_for_nothing_and_an_old_one_is_signed_again(trial):
+    """Item 4 (0.10.70): SAMPLE-RV-09, closed in the QMS after its ready to close was signed, asks for no next step;
+    its ready to close was signed over an empty checklist before (the root cause: the sample's seeding), so it read
+    "Sign the disposition" and "changed since signed". It is now signed with its checklist as it stood and its reason,
+    the day after its US report was accepted. A trial seeded before is signed again by the refresh, once."""
+    from backend.app.db.models.foundation import SignedApprovalRecord
+    from backend.app.db.models.oversight import EventClosure
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.oversight import closure
+    from backend.app.trial.sample_calm import RV09_REASON, _rv09, rerecord_rv09
+
+    user = trial["user"]
+    view = _ok(user.get("/api/v1/oversight/events/SAMPLE-RV-09"))
+    assert view["state"] == "CLOSED" and view["summary"]["next_action"] is None
+    assert not view["changed_since_signed"]
+    assert not [stage for stage in view["stages"] if stage["state"] == "CURRENT"]
+    assert (view["ready"]["state"], view["ready"]["reason"]) == ("READY_WITH_REASON", RV09_REASON)
+    entries = view["decision_record"]["entries"]
+    ready = next(entry for entry in entries if entry["kind"] == "Ready to close in the QMS")
+    assert all(entry["signed_at"] <= ready["signed_at"] for entry in entries if entry["kind"].startswith("Market"))
+    # The list and My work read the same next step: none.
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        complaint = _rv09(db, trial["tenant_id"])
+        row = db.query(EventClosure).filter(EventClosure.complaint_id == complaint.id).one()
+        # As seeded before 0.10.70: "checklist clear" over an empty checklist.
+        row.ready_state, row.ready_reason = "READY", None
+        row.content_fingerprint = closure.fingerprint(complaint.id, [])
+        row_id, record_id = row.id, row.signed_record_id
+        db.commit()
+    assert _ok(user.get("/api/v1/oversight/events/SAMPLE-RV-09"))["summary"]["next_action"]["label"] == (
+        "Sign the disposition"
+    )
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        assert rerecord_rv09(db, trial["tenant_id"]) == 1  # the dry run changes nothing
+        assert rerecord_rv09(db, trial["tenant_id"], apply=True) == 1
+        db.commit()
+        assert rerecord_rv09(db, trial["tenant_id"], apply=True) == 0
+        signed = db.get(SignedApprovalRecord, record_id)
+        assert signed.content_fingerprint == db.get(EventClosure, row_id).content_fingerprint
+    again = _ok(user.get("/api/v1/oversight/events/SAMPLE-RV-09"))
+    assert again["summary"]["next_action"] is None and not again["changed_since_signed"]
+
+
+def test_a_complaint_in_an_investigation_is_decided_there(trial):
+    """Item 8 (0.10.70): the OrbitCare complaints in SAMPLE-INV-001's scope read stage "Investigation" and asked "Sign
+    the disposition"; their next step is the investigation's decision, on that investigation."""
+    view = _ok(trial["user"].get("/api/v1/oversight/events/SAMPLE-ORBIT-300-CMP-007"))
+    action = view["summary"]["next_action"]
+    assert action["label"] == "Sign the investigation's decision"
+    assert action["opens"]["target"]["record"]["kind"] == "case"
+    assert next(stage for stage in view["stages"] if stage["state"] == "CURRENT")["code"] == "INVESTIGATION"
 
 
 @pytest.mark.unit

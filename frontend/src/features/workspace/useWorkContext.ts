@@ -16,6 +16,32 @@ const CONTEXT_PATH = "/api/v1/workspace/context";
 // Changes are saved once the person has stopped changing the context for a moment.
 const SAVE_DELAY_MS = 800;
 
+const listed = (items: InvestigationSummary[], id: string) => items.some((item) => String(item.id) === id);
+
+/**
+ * The investigation the context shows once its product's list is read (exported for its test): the one being opened
+ * (a link, a task, a next step, the saved context) when it is listed; null when it is not listed yet and the list was
+ * not read again for it (read again: it may have just been opened); else the one already shown when it is listed;
+ * else the product's first open one. Never the investigation of a record opened before, and never the first in the
+ * list in place of the one being opened.
+ */
+export const chosenInvestigation = (
+  items: InvestigationSummary[],
+  pending: string,
+  selected: string,
+  readAgain: boolean,
+): string | null => {
+  if (pending && listed(items, pending)) return pending;
+  if (pending && !readAgain) return null;
+  return preferredInvestigationId(items, selected);
+};
+
+/** The version an investigation is shown on: its own (the list's `version_identifier`) when the product has it. */
+export const caseVersion = (row: Record<string, unknown>, available: readonly string[] | undefined): string | null => {
+  const own = typeof row.version_identifier === "string" ? row.version_identifier : null;
+  return own && (available ?? []).includes(own) ? own : null;
+};
+
 // A product's default version: its latest.
 const defaultVersion = (products: Product[], productId: string) => {
   const available = products.find((product) => product.id === productId)?.available_versions ?? [];
@@ -47,6 +73,8 @@ export function useWorkContext(caseLink?: string | null): WorkContext {
   const pendingSelection = useRef("");
   // The saved version (by id), applied once the product's versions are known.
   const pendingVersionId = useRef<string | null>(null);
+  // The pending case the list was read again for, once.
+  const rereadFor = useRef("");
   const firstLoad = useRef(true);
   const [started, setStarted] = useState(false);
   const [caseLinkState, setCaseLinkState] = useState<CaseLinkState | null>(() =>
@@ -153,15 +181,17 @@ export function useWorkContext(caseLink?: string | null): WorkContext {
       .then((items) => {
         if (!current) return;
         const pending = pendingSelection.current;
+        // The investigation being opened is not in this read (it was asked for before the investigation existed):
+        // read once more rather than fall back to another one (0.10.70).
+        if (chosenInvestigation(items, pending, "", rereadFor.current === pending) === null) {
+          rereadFor.current = pending;
+          setInvestigationsVersion((value) => value + 1);
+          return;
+        }
         pendingSelection.current = "";
         setInvestigations(items);
         setInvestigationsProduct(productId);
-        setInvestigationId((selected) =>
-          preferredInvestigationId(
-            items,
-            pending && items.some((item) => String(item.id) === pending) ? pending : selected,
-          ),
-        );
+        setInvestigationId((selected) => chosenInvestigation(items, pending, selected, true) ?? "");
       })
       .catch(() => {
         if (!current) return;
@@ -172,6 +202,22 @@ export function useWorkContext(caseLink?: string | null): WorkContext {
       current = false;
     };
   }, [productId, investigationsVersion]);
+
+  // An investigation opened (from a link, a task, a next step, the saved context) shows its own version, the one its
+  // complaints carry, never the version a record opened before it was on (0.10.70: the flagship's Rev A investigation
+  // read "Rev B"). Once per investigation chosen, so the person may still change the version by hand.
+  const versionFor = useRef("");
+  useEffect(() => {
+    if (!investigationId || versionFor.current === investigationId || investigationsProduct !== productId) return;
+    const row = investigations.find((item) => String(item.id) === investigationId);
+    if (!row) return;
+    versionFor.current = investigationId;
+    const wanted = caseVersion(row, products.find((product) => product.id === productId)?.available_versions);
+    if (wanted && wanted !== version) {
+      pendingVersionId.current = null;
+      setVersion(wanted);
+    }
+  }, [investigationId, investigations, investigationsProduct, productId]);
 
   // Save the context in the background once it is settled: the start-up context applied, the product's data and its
   // investigation list read. A failed save is ignored; the next change saves again.

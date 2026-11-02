@@ -49,7 +49,7 @@ describe("the five-minute entrance", () => {
       for (const step of scenario.steps) {
         const place = NEW_PLACES[step.section];
         expect(place, step.label).toBeTruthy();
-        if (step.tab) expect(place.tabs, step.label).toContain(step.tab);
+        for (const tab of [step.tab ?? []].flat()) expect(place.tabs, step.label).toContain(tab);
       }
     }
     // The flagship opens on its own complaint page.

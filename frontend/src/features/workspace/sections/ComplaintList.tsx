@@ -9,7 +9,7 @@ import { investigationRequestFor, useOpenInvestigation, useTabFilters, useWorksp
 import { StatusBadge, listTitle } from "./common";
 import { DeadlineChip, HarmChip } from "../../../app/chips";
 import { marketLabel } from "../../../app/labels";
-import { ProblemCode, useImdrfLinks, type ImdrfLinks } from "./ProblemCode";
+import { ProblemCode, problemCodeText, useImdrfLinks, type ImdrfLinks } from "./ProblemCode";
 import { RowMenu } from "./RowMenu";
 import {
   EMPTY_COMPLAINT_FILTERS,
@@ -209,7 +209,7 @@ export function ComplaintFilterBar({
   const sources = sourceChoices(listOf(data?.sources), filters.source);
   // The IMDRF codes the problem codes map to (G2a, approved links only), shown in the problem-code choice.
   const problemCodes = listOf(data?.problem_codes) as string[];
-  const imdrf = useResource<{ links: Record<string, { code: string }[]> }>(
+  const imdrf = useResource<{ links: ImdrfLinks }>(
     problemCodes.length
       ? `/api/v1/regulatory-reference/imdrf/links?${new URLSearchParams(problemCodes.map((code) => ["code", code]))}`
       : null,
@@ -306,20 +306,12 @@ export function ComplaintFilterBar({
 }
 
 /**
- * A problem code with the IMDRF codes and terms it maps to: "PRESSURE_ALARM · IMDRF A16 Alarm problem" (exported for
- * its test). The customer's code stays as recorded.
+ * The problem-code choice's labels: "Protective Measures Problem (IMDRF A16) · your code PRESSURE_ALARM" (exported for
+ * its test). A code with no approved IMDRF link keeps its own text; the customer's code is never altered.
  */
-export function imdrfLabels(
-  codes: string[],
-  links: Record<string, { code: string; term?: string | null }[]> | undefined,
-): Record<string, string> {
+export function imdrfLabels(codes: string[], links: ImdrfLinks | undefined): Record<string, string> {
   return Object.fromEntries(
-    codes
-      .filter((code) => links?.[code]?.length)
-      .map((code) => [
-        code,
-        `${code} · IMDRF ${(links?.[code] ?? []).map((link) => (link.term ? `${link.code} ${link.term}` : link.code)).join(", ")}`,
-      ]),
+    codes.filter((code) => links?.[code]?.length).map((code) => [code, problemCodeText(code, links ?? {})]),
   );
 }
 

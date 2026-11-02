@@ -5,7 +5,7 @@ import { requestJson } from "../../../app/apiClient";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
 import { safeText } from "../../../app/displayId";
-import { WORKFLOW_ROLE_CODES, roleLabel } from "../../../app/roles";
+import { roleLabel, roleNote, WORKFLOW_ROLE_CODES } from "../../../app/roles";
 import { AiInterpretationNote, StatementKind } from "../../shared/StatementKind";
 import { usePanelFlag, usePanelState, useWorkspace, type SessionContext } from "../workspaceContext";
 import {
@@ -119,8 +119,8 @@ export function CaseDecisionPanel({
   return (
     <>
       <p className="ac-note">
-        MDARIX gathers what the case's records establish and what reviewers found. The decision is yours: the outcome,
-        the conditions and the rationale are written by you, and AI text is never the decision.
+        MDARIX gathers what the investigation's records establish and what reviewers found. The decision is yours: the
+        outcome, the conditions and the rationale are written by you, and AI text is never the decision.
       </p>
       <Panel
         eyebrow={safeText(data?.investigation?.business_id) ?? caseLabel}
@@ -142,7 +142,7 @@ export function CaseDecisionPanel({
               <strong>{safeText(current.business_id) ?? "Decision"}</strong> ·{" "}
               {outcomeLabel(current.outcome, current.outcome_label)}
               {safeText(current.signer_name) ? ` · signed by ${current.signer_name}` : ""}
-              {safeText(current.signer_role) ? ` (${roleLabel(current.signer_role)})` : ""}
+              {safeText(current.signer_role) ? roleNote(current.signer_role) : ""}
               {current.decided_at || current.signed_at
                 ? ` · ${formatDate(current.decided_at ?? current.signed_at)}`
                 : ""}
@@ -281,8 +281,7 @@ export function CaseDecisionPanel({
               key: "signer",
               label: "Signed by",
               sortValue: (row) => row.signer ?? "",
-              render: (row) =>
-                row.signer ? `${row.signer}${row.signerRole ? ` (${roleLabel(row.signerRole)})` : ""}` : "—",
+              render: (row) => (row.signer ? `${row.signer}${row.signerRole ? roleNote(row.signerRole) : ""}` : "—"),
             },
             {
               key: "decidedAt",
@@ -552,7 +551,7 @@ function BriefForDecision({ brief, reviewers }: { brief: DecisionBrief; reviewer
                   <small className="ac-muted">
                     {" "}
                     · {line.name ?? "—"}
-                    {line.role ? ` (${roleLabel(line.role)})` : ""}
+                    {line.role ? roleNote(line.role) : ""}
                     {line.at ? ` · ${formatDate(line.at)}` : ""}
                   </small>
                   {line.comment && <p className="uw-intel-statement">{line.comment}</p>}

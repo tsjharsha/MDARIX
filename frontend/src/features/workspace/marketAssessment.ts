@@ -4,6 +4,7 @@
 // checks only say early what it would refuse. A person answers and signs; MDARIX never answers and never submits.
 import type { Tone } from "../admin/console/dashboardModel";
 import { collapsed } from "./complaintReview";
+import { questionNumber } from "../../app/labels";
 
 export const ASSESSMENT_LIMITS = { reasonMin: 10, rationaleMax: 2000, referenceMax: 120 };
 
@@ -252,11 +253,11 @@ export function answersProblem(questions: Question[], form: AssessmentForm): str
   for (const question of questions) {
     if (question.extra) continue;
     const entry = form.answers[question.id];
-    if (!entry?.answer) return `Answer question ${question.id}`;
+    if (!entry?.answer) return `Answer question ${questionNumber(question.id)}`;
     if (collapsed(entry.rationale).length < ASSESSMENT_LIMITS.reasonMin)
       return question.id === "US5" && entry.answer === "NO"
-        ? "Question US5 is No: say why a recurrence would not be likely to cause harm"
-        : `Question ${question.id}: give the rationale in at least ${ASSESSMENT_LIMITS.reasonMin} characters`;
+        ? "Question 5 is No: say why a recurrence would not be likely to cause harm"
+        : `Question ${questionNumber(question.id)}: give the rationale in at least ${ASSESSMENT_LIMITS.reasonMin} characters`;
   }
   return null;
 }

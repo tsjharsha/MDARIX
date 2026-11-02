@@ -275,7 +275,13 @@ describe("the disposition screens", () => {
     );
     expect(html).toContain("Standard path");
     expect(html).toContain("BATTERY_SHUTDOWN not recorded before");
-    expect(html).toContain("Refused: a trigger is met");
+    expect(html).toContain("Closed: a trigger is met");
+    // 0.10.70: the trigger by its name, never its code; one word per thing.
+    expect(html).toContain(">New failure mode<");
+    expect(html).not.toContain(">NEW_FAILURE_MODE<");
+    expect(html).toContain("Why the investigation is needed");
+    expect(html).toContain("Escalate: open an investigation");
+    expect(html).not.toMatch(/(case|cases)/);
     expect(html).toContain("its market assessment is still due under Complaints › Reportability");
     expect(html).not.toContain("I have read the");
   });
@@ -306,7 +312,7 @@ describe("the disposition screens", () => {
     expect(routine).toContain("Routine path");
     // A known issue (an open case with the same product and problem code, or the same lot) links to that case.
     const known = render(<DispositionCard item={{ ...item, known_issue: ["CASE-1"] }} onOpen={vi.fn()} />);
-    expect(known).toContain("Link to the open case");
+    expect(known).toContain("Link to the open investigation");
     expect(known).toContain("Known issue");
     expect(known).not.toContain("Close on the routine path");
     expect(known).not.toContain("Routine path");
@@ -318,7 +324,7 @@ describe("the disposition screens", () => {
       />,
     );
     expect(triggered).toContain("Decide the disposition");
-    expect(triggered).not.toContain("Link to the open case");
+    expect(triggered).not.toContain("Link to the open investigation");
     expect(render(<DispositionCard item={{ ...item, disposition: signed }} onOpen={vi.fn()} />)).toContain(
       "Open the disposition",
     );

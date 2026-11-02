@@ -190,7 +190,14 @@ def evaluate(facts: dict) -> dict:
         elif unreviewed:
             result, rationale = "PENDING", f"{unreviewed} of {total} pieces of evidence are not reviewed yet"
         else:
-            result, rationale = "PASS", f"All {_plural(total, 'piece')} of evidence are reviewed"
+            result, rationale = (
+                "PASS",
+                (
+                    "The piece of evidence is reviewed"
+                    if total == 1
+                    else f"All {_plural(total, 'piece')} of evidence are reviewed"
+                ),
+            )
         checks["evidence_reviewed"] = _check("evidence_reviewed", check_labels["evidence_reviewed"], result, rationale)
 
     if analysis is None and not people_analysis:
@@ -217,7 +224,7 @@ def evaluate(facts: dict) -> dict:
             "PASS" if analysis else "PENDING",
             "An analysis has been run"
             if analysis
-            else "Run an analysis of the case, or record observations and hypotheses yourself",
+            else "Run an analysis of the investigation, or record observations and hypotheses yourself",
         )
 
     if hypotheses is None:
@@ -255,7 +262,11 @@ def evaluate(facts: dict) -> dict:
             )
         elif total:
             result = "PASS"
-            rationale = f"All {_plural(total, 'hypothesis', 'hypotheses')} with contradicting evidence are judged"
+            rationale = (
+                "The hypothesis with contradicting evidence is judged"
+                if total == 1
+                else f"All {_plural(total, 'hypothesis', 'hypotheses')} with contradicting evidence are judged"
+            )
         else:
             result, rationale = "PASS", "No hypothesis has contradicting evidence"
         checks["contradictions_documented"] = _check(

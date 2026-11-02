@@ -641,7 +641,7 @@ def trend(
         "attributions": rules.ATTRIBUTION_LABELS,
         "recurring": recurring(db, tenant_id, today_utc()),
         "recurring_rule": f"{triggers.RECURRING_COUNT} or more service-level resolutions on one product and problem "
-        f"code within {triggers.RECURRING_DAYS} days that no open case covers (starter threshold)",
+        f"code within {triggers.RECURRING_DAYS} days that no open investigation covers (starter threshold)",
     }
 
 

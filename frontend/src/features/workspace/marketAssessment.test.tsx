@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
-import { MarketPanel, SignedVersion, TrainingPanel } from "./sections/MarketAssessment";
+import { MarketPanel, SignedVersion, TrainingPanel, WHY_ASSESSED, otherMarketLine } from "./sections/MarketAssessment";
 import {
   EMPTY_SIGN,
   draftBody,
@@ -212,7 +212,7 @@ describe("the per-market assessment rules", () => {
       ...form,
       answers: { ...form.answers, US5: { answer: "NO" as const, rationale: "", evidence: [] } },
     };
-    expect(signProblem(QUESTIONS, noReason, reasoned, "NOT_REPORTABLE", null, true)).toContain("US5 is No");
+    expect(signProblem(QUESTIONS, noReason, reasoned, "NOT_REPORTABLE", null, true)).toContain("Question 5 is No");
     expect(signProblem(QUESTIONS, form, reasoned, "PENDING_INFORMATION", "Against the scale", true)).toContain(
       "written reason",
     );
@@ -237,13 +237,14 @@ describe("the per-market assessment rules", () => {
 describe("the assessment screen", () => {
   it("shows every question with its clause and the starter mark, the scale with its threshold, and the training", () => {
     const html = render(<MarketPanel detail={detail(item())} item={item()} onSaved={vi.fn()} />);
-    expect(html).toContain("US1.</strong> Did a death occur?");
+    expect(html).toContain("1.</strong> Did a death occur?");
+    expect(html).not.toContain("US1.");
     expect(html).toContain("21 CFR 803.50(a)(2)");
     expect(html.split("Starter text</span>").length - 1).toBe(QUESTIONS.length + 1);
     expect(html).toContain("Recurrence is presumed");
     expect(html).toContain("US serious injury threshold");
     expect(html).toContain("<strong>critical</strong>, at or above the US serious injury threshold");
-    expect(html).toContain("Before you sign: practice training on US-starter-1");
+    expect(html).toContain("Before you sign: practice training on MDARIX starter, version 1");
     expect(html).toContain("Trained colleagues who can sign instead: Rahul.");
     expect(html).toContain("Suggested: Pending information");
     expect(html).toContain("Save and sign");
@@ -268,7 +269,7 @@ describe("the assessment screen", () => {
     const pilot = { ...detail(item()), training_required: false, practice_label: null };
     const html = render(<MarketPanel detail={pilot} item={item()} onSaved={vi.fn()} />);
     expect(html).not.toContain("Before you sign");
-    expect(html).toContain("Training record on US-starter-1");
+    expect(html).toContain("Training record on MDARIX starter, version 1");
     expect(html).toContain("signing here does not wait for this one");
   });
 
@@ -306,6 +307,38 @@ describe("the assessment screen", () => {
     );
     expect(filed).toContain("MDR-1");
     expect(filed).not.toContain("Record the filing");
+    // 0.10.70: classic keeps the worksheet as the main button; on the new navigation the drawer's one main button is
+    // the complaint's next step, so the worksheet is secondary.
+    expect(html).toMatch(/class="ac-primary"[^>]*>.*Open the report worksheet/);
+    const fresh = renderToStaticMarkup(
+      <WorkspaceContext.Provider value={{ ...workspace(["regulatory.review"]), navigation: "new" }}>
+        <SignedVersion version={signed} complaintId="c1" onSaved={vi.fn()} />
+      </WorkspaceContext.Provider>,
+    );
+    expect(fresh).toMatch(/class="ac-secondary"[^>]*>.*Open the report worksheet/);
+    expect(fresh).not.toMatch(/class="ac-primary"/);
+  });
+
+  it("says why a market other than the event's own is assessed, as starter wording (0.10.70)", () => {
+    expect(otherMarketLine("Market conclusion, India (CDSCO)", "US")).toBe(true);
+    expect(otherMarketLine("Market conclusion, United States (FDA)", "US")).toBe(false);
+    expect(otherMarketLine("Disposition", "US")).toBe(false);
+    const india = render(
+      <MarketPanel
+        item={item({ market: "IN", label: "India (CDSCO)", preselected: false })}
+        detail={{
+          ...detail(item()),
+          markets: [item({ preselected: true }), item({ market: "IN", preselected: false })],
+        }}
+        onSaved={vi.fn()}
+      />,
+    );
+    expect(india).toContain(WHY_ASSESSED);
+    expect(india).toContain("Starter wording, for your consultant to confirm.");
+    const own = render(
+      <MarketPanel item={item({ preselected: true })} detail={detail(item({ preselected: true }))} onSaved={vi.fn()} />,
+    );
+    expect(own).not.toContain(WHY_ASSESSED);
   });
 
   it("names the document and version to acknowledge", () => {

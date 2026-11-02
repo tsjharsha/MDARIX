@@ -20,7 +20,7 @@ import {
 } from "../shared";
 import { downloadFile } from "../../reports/download";
 import { safeText } from "../../../app/displayId";
-import { roleLabel } from "../../../app/roles";
+import { roleLabel, roleNote } from "../../../app/roles";
 import { isCustomerAdminRole } from "../../../app/navigationPolicy";
 
 /** The answer to an invitation or re-invitation, as the administrator should read it. When the account exists but
@@ -693,7 +693,7 @@ function WorkflowRoles({ user, name }: { user: TenantUser; name: string }) {
       <h3>Workflow roles</h3>
       <p className="ac-muted">
         Additional roles route work (triage, investigations, reviews and decisions) to this person on top of their base
-        role{account ? ` (${roleLabel(account.code, account.label)})` : ""}.
+        role{account ? roleNote(account.code, account.label) : ""}.
       </p>
       {roles.state === "ready" ? (
         <ul className="ca-assignment-list">

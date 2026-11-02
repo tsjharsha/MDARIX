@@ -79,8 +79,9 @@ def iso(value: Any) -> str | None:
 
 
 def readable(code: str | None) -> str:
-    """``CASE_REVIEW_COMPLETED`` -> ``Case review completed``."""
-    words = str(code or "").replace("-", "_").strip("_").lower().split("_")
+    """``CASE_REVIEW_COMPLETED`` -> ``Case review completed``; a class name too: ``InvestigationScope`` ->
+    ``Investigation scope`` (0.10.70: it read "Investigationscope")."""
+    words = re.sub(r"(?<=[a-z])(?=[A-Z])", "_", str(code or "")).replace("-", "_").strip("_").lower().split("_")
     text = " ".join(word for word in words if word)
     return text[:1].upper() + text[1:] if text else ""
 

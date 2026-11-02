@@ -182,7 +182,7 @@ def complaints_past_target(db: Session, tenant_id: uuid.UUID, today: date) -> di
         past,
         # The number is what is past the target; complaints still inside it are no finding (named in the detail).
         CRITICAL if past else CLEAR,
-        f"{_n(summary['open_unlinked'], 'complaint')} open in no signal or case; {summary['due_soon']:,} due within a "
+        f"{_n(summary['open_unlinked'], 'complaint')} open in no trend or investigation; {summary['due_soon']:,} due within a "
         f"week; target {summary['target_days']} days",
         links.target("Complaints", "Backlog"),
         [{"id": item["id"], "ref": item["business_id"] or item["complaint_identifier"]} for item in found["items"]],
@@ -311,8 +311,8 @@ def trends_without_action(db: Session, tenant_id: uuid.UUID, today: date) -> dic
         "Trends without CAPA or risk review",
         value,
         CRITICAL if decided else ATTENTION if rising else CLEAR,
-        f"{_n(len(decided), 'decided signal')} with no CAPA and no risk review; "
-        f"{_n(len(rising), 'significant rise')} with no signal",
+        f"{_n(len(decided), 'decided trend')} with no CAPA and no risk review; "
+        f"{_n(len(rising), 'significant rise')} with no trend to review",
         links.target("Signals", "Trend check" if rising and not decided else "Signal inbox"),
         items,
         {"decided_without_action": len(decided), "rising_without_signal": len(rising)},
@@ -358,7 +358,7 @@ def harm_closed_without_case(db: Session, tenant_id: uuid.UUID, today: date) -> 
         "Harm complaints closed without an investigation",
         len(closed),
         CRITICAL if closed else CLEAR,
-        f"Closed in the last {LOOKBACK_DAYS} days, reporting a death or serious injury, in no case",
+        f"Closed in the last {LOOKBACK_DAYS} days, reporting a death or serious injury, in no investigation",
         links.target("Complaints", "Reportability"),
         [{"id": str(row.id), "ref": complaint_ref(row), "label": row.name} for row in closed],
     )
@@ -409,7 +409,7 @@ def triage_overdue(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
     rows = triage_overdue_rows(db, tenant_id)
     return _check(
         "TRIAGE_OVERDUE",
-        "Signals waiting past their triage date",
+        "Trends waiting past their triage date",
         len(rows),
         ATTENTION if rows else CLEAR,
         "New or in triage, past the due date their priority set",
@@ -453,6 +453,7 @@ def dispositions_due(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
     signing), and the escalations of the last 30 days, which every Leader sees here."""
     from backend.app.complaint_disposition import service as disposition
     from backend.app.complaint_disposition.triggers import codes
+    from backend.app.complaint_disposition.triggers import words as trigger_words
     from backend.app.complaint_review.service import settings_of
 
     target = settings_of(db, tenant_id)["backlog_target_days"]
@@ -472,7 +473,7 @@ def dispositions_due(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         {
             "id": item["id"],
             "ref": item["ref"],
-            "label": f"Disposition to review: {', '.join(item['triggers'])} met after signing",
+            "label": f"Disposition to review: {trigger_words(item['triggers'])} met after signing",
         }
         for item in review
     ]
@@ -484,7 +485,7 @@ def dispositions_due(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         {
             "id": str(row.complaint_id),
             "ref": refs.get(row.complaint_id),
-            "label": "Escalated: " + (", ".join(codes(row.triggers or [])) or "by choice"),
+            "label": "Escalated: " + (trigger_words(codes(row.triggers or [])) or "by choice"),
         }
         for row in escalated
     ]
@@ -498,7 +499,7 @@ def dispositions_due(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         CRITICAL if review else ATTENTION if late or escalated else CLEAR,
         f"{_n(len(late), 'complaint')} without a disposition past the {target}-day target; "
         f"{_n(len(review), 'disposition')} to review (a trigger met after signing); "
-        f"{_n(len(escalated), 'escalation')} to a case in the last 30 days",
+        f"{_n(len(escalated), 'escalation')} to an investigation in the last 30 days",
         links.target("Complaints", "Dispositions"),
         items,
         {"to_review": len(review), "past_target": len(late), "escalated": len(escalated)},
@@ -516,7 +517,7 @@ def recurring_service_level(db: Session, tenant_id: uuid.UUID, today: date) -> d
         len(found),
         ATTENTION if found else CLEAR,
         f"{RECURRING_COUNT} or more service-level resolutions on one product and problem code within {RECURRING_DAYS} "
-        "days that no open case covers (starter threshold); the next such complaint is escalated by the recurrence trigger",
+        "days that no open investigation covers (starter threshold); the next such complaint is escalated by the recurrence trigger",
         links.target("Signals", "By resolution"),
         [
             {

@@ -3,7 +3,7 @@ import { ChevronRight, ClipboardCheck, Play } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
 import { safeText } from "../../../app/displayId";
-import { roleLabel } from "../../../app/roles";
+import { roleNote } from "../../../app/roles";
 import { sectionAllowed, useCan, usePanelState, useWorkspace } from "../workspaceContext";
 import {
   CLOSURE_RESULT,
@@ -645,7 +645,7 @@ export function ImpactDrawer({
           {safeText(assessment.rationale) && <p className="uw-intel-statement">{assessment.rationale}</p>}
           <small className="ac-muted">
             {safeText(assessment.assessed_by_name) ?? "—"}
-            {safeText(assessment.assessed_role) ? ` (${roleLabel(assessment.assessed_role)})` : ""}
+            {safeText(assessment.assessed_role) ? roleNote(assessment.assessed_role) : ""}
             {assessment.assessed_at ? ` · ${formatDate(assessment.assessed_at)}` : ""}
           </small>
         </section>

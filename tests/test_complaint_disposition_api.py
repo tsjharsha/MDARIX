@@ -286,7 +286,7 @@ def test_a_source_value_off_the_list_stays_unknown_and_two_cable_closes_raise_th
     fact = screen["triggers"][0]
     assert fact["field"] == "service_level_resolutions" and fact["value"] == 2
     refused = _sign(user, third_id, "SERVICE_LEVEL", screen)
-    assert refused.status_code == 422 and "other branches are refused" in refused.json()["detail"]["message"]
+    assert refused.status_code == 422 and "other branches are closed" in refused.json()["detail"]["message"]
 
 
 def test_the_known_issue_joins_the_open_case_through_a_new_scope_version(trial):
@@ -355,7 +355,7 @@ def test_the_battery_shutdown_escalates_by_its_trigger_and_stays_on_the_watch(tr
     case = user.get(f"/api/v1/investigations/{current['investigation_id']}/scope").json()
     assert [item["id"] for item in case["current"]["included_complaints"]] == [rt05]
     due = _readiness(user)["DISPOSITIONS_DUE"]
-    assert due["escalated"] >= 1 and any("NEW_FAILURE_MODE" in item["label"] for item in due["items"])
+    assert due["escalated"] >= 1 and any("new failure mode" in item["label"] for item in due["items"])
 
 
 def test_a_trigger_met_since_the_screen_opened_refuses_the_signature_and_one_met_after_signing_is_listed(trial):

@@ -5707,3 +5707,41 @@ div.uw-task-count:hover {
   max-width: 100%;
   overflow-x: auto;
 }
+
+/* One main button on the new investigation page (0.10.70): the progress line's "Next" (and an open drawer's or form's
+   own submit). A section's other buttons ("Link evidence", "Compose the brief", "Start review") read as secondary. */
+.uw-case-sections
+  button.ac-primary[type="button"]:not(.uw-case-progress *):not(.ca-drawer-backdrop *):not(.uw-next-after *) {
+  border-color: var(--ac-line);
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+}
+.uw-case-sections
+  button.ac-primary[type="button"]:not(.uw-case-progress *):not(.ca-drawer-backdrop *):not(.uw-next-after *):hover {
+  border-color: var(--ac-teal);
+  background: var(--ac-surface);
+}
+
+/* The top bar on one line at a computer's width (0.10.70: the name and "Leader (Quality Manager)" took 4 lines):
+   the name and the role in a word side by side, the name cut with an ellipsis before anything wraps. */
+.ac-user > .uw-who {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+.uw-who strong {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.uw-sample-chip,
+.uw-trial-badge {
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .ac-user > .uw-who {
+    display: none;
+  }
+}

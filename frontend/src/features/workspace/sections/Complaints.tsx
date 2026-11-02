@@ -26,7 +26,7 @@ import {
   useOpenInvestigation,
   useWorkspace,
 } from "../workspaceContext";
-import { StatusBadge, countOf } from "./common";
+import { AlsoKnownAs, StatusBadge, countOf } from "./common";
 import { Hero, InlineError, Pager, ProductFilter } from "./boardParts";
 import { TrustBadge } from "./TrustBadge";
 import { ReportabilityWatch } from "./ReportabilityWatch";
@@ -41,6 +41,7 @@ import { DecisionGuides } from "./DecisionGuides";
 import { ReportingWindows } from "./ReportingWindows";
 import { Starters } from "./Starters";
 import { ComplaintList } from "./ComplaintList";
+import { ProblemCodeOf } from "./ProblemCode";
 import { COMPLAINT_LIST_TAB, parseComplaintListTab } from "../complaintList";
 import { SECOND_LOOK_STARTERS, STARTER_MIN_EXTRA, starterProblem } from "../starters";
 import {
@@ -329,6 +330,17 @@ function Highlighted({ text, words }: { text: string | null; words: readonly str
   return <>{parts.map((part, index) => (part.match ? <mark key={index}>{part.text}</mark> : part.text))}</>;
 }
 
+/** A sign in words: a problem code by its IMDRF term, with the customer's own code as its detail. */
+function SignText({ sign }: { sign: { code: string; label: string; value?: string | null } }) {
+  return sign.code === "PROBLEM_CODE" && sign.value ? (
+    <>
+      Problem: <ProblemCodeOf code={sign.value} />
+    </>
+  ) : (
+    <>{sign.label}</>
+  );
+}
+
 /** One flagged record: why, its signs, its words marked, and the decision (exported for its unit test). */
 export function SecondLookCard({
   item,
@@ -349,9 +361,6 @@ export function SecondLookCard({
       <div className="uw-cr-body">
         <div className="uw-cr-head">
           <strong className="uw-cr-id">{name}</strong>
-          {item.business_id && item.complaint_identifier && (
-            <span className="uw-cr-meta">Source ID {item.complaint_identifier}</span>
-          )}
           <span className="uw-cr-meta">
             {item.product_name ?? "No product"}
             {item.version ? ` · ${item.version}` : ""} · Received {formatDay(item.received_date)}
@@ -369,7 +378,7 @@ export function SecondLookCard({
           <ul className="uw-cr-chips" aria-label="Signs of a complaint">
             {item.signs.map((sign) => (
               <li key={sign.code} className={`uw-cr-chip tone-${signTone(sign.code)}`}>
-                <ToneIcon tone={signTone(sign.code)} size={13} /> {sign.label}
+                <ToneIcon tone={signTone(sign.code)} size={13} /> <SignText sign={sign} />
               </li>
             ))}
           </ul>
@@ -377,6 +386,7 @@ export function SecondLookCard({
         <p className="uw-cr-text">
           <Highlighted text={item.description} words={item.words} />
         </p>
+        <AlsoKnownAs id={item.business_id} shown={name} />
         <ExplainWithAi item={item} name={name} />
         {item.decision && decided && (
           <div className="uw-cr-decision">
@@ -534,7 +544,7 @@ function DecisionDrawer({
   const starters = SECOND_LOOK_STARTERS[decision];
   const problem = decisionProblem(reason) ?? starterProblem(reason, starters);
   const field = useRef<HTMLTextAreaElement>(null);
-  // The MDARIX ID with the source system's number beside it: "CMP000029 (SAMPLE-RV-01): it is a complaint" (DEV-008).
+  // The record's one ID: "SAMPLE-RV-01: it is a complaint".
   const name = recordName(item);
   const revising = !!item.decision;
   const request = investigationRequestFor(item);
@@ -603,7 +613,7 @@ function DecisionDrawer({
           <ul className="uw-cr-chips" aria-label="Why it is flagged">
             {[...item.reasons, ...item.signs].map((entry) => (
               <li key={entry.code} className="uw-cr-chip">
-                {entry.label}
+                <SignText sign={entry} />
               </li>
             ))}
           </ul>
@@ -696,7 +706,7 @@ export function Backlog({ initial = "all", fixed = false }: { initial?: BacklogS
       />
       <div className="uw-cr-stats">
         <StatTile
-          label="Open, in no signal or case"
+          label="Open, in no trend or investigation"
           value={summary ? summary.open_unlinked : null}
           detail="Waiting for triage"
           icon={<Inbox size={18} />}

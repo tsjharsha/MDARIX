@@ -245,7 +245,7 @@ def options(db: Session, tenant_id, product_id, scope_lots: list[str]) -> dict:
     if best is not None:
         suggestion = {
             **{key: best[key] for key in ("kind", "id", "lot", "label", "kind_label")},
-            "why": f"{best['case_lots']} of the case's {len(scope)} {'lot' if len(scope) == 1 else 'lots'} share it",
+            "why": f"{best['case_lots']} of the investigation's {len(scope)} {'lot' if len(scope) == 1 else 'lots'} share it",
         }
     return {"items": items, "suggestion": suggestion, "case_lots": len(scope), "genealogy": bool(genealogy)}
 

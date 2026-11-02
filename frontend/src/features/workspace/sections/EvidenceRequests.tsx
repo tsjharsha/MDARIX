@@ -15,7 +15,7 @@ import {
 } from "../../customer-admin/shared";
 import { displayId, safeText } from "../../../app/displayId";
 import { useServerSort } from "../../../app/tableSort";
-import { WORKFLOW_ROLE_CODES, roleLabel } from "../../../app/roles";
+import { roleLabel, roleNote, WORKFLOW_ROLE_CODES } from "../../../app/roles";
 import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import { localDay } from "../workspaceModel";
 import { unknownSetFrom } from "../../investigator/savedResults";
@@ -701,7 +701,7 @@ export function RequestDetailDrawer({
                     <strong>{requestEventText(event)}</strong>
                     <small className="ac-muted">
                       {safeText(event.actor_name) ?? "MDARIX"}
-                      {event.actor_role ? ` (${roleLabel(event.actor_role)})` : ""} · {formatDate(event.created_at)}
+                      {event.actor_role ? roleNote(event.actor_role) : ""} · {formatDate(event.created_at)}
                     </small>
                     {(safeText(event.reason) || safeText(event.note)) && <p>{event.reason ?? event.note}</p>}
                   </li>

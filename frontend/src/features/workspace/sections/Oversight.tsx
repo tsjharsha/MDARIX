@@ -2,6 +2,7 @@ import { useState } from "react";
 import { DeadlineChip } from "../../../app/chips";
 import { DecideAndSign, shortPrint } from "./common";
 import { marketLabel } from "../../../app/labels";
+import { WhyAssessed, otherMarketLine } from "./MarketAssessment";
 import { CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, send, useResource, type Column } from "../../customer-admin/shared";
@@ -615,6 +616,7 @@ export function DecisionRecord({ view, onChanged }: { view: EventView; onChanged
                 <span>{entry.summary}</span>
               </span>
               {entry.reason && <span className="ac-muted">Reason: {entry.reason}</span>}
+              {otherMarketLine(entry.kind, view.event.market) && <WhyAssessed />}
               <small>
                 Signed by {entry.signer}, {formatDate(entry.signed_at)}. {entry.meaning}
               </small>
