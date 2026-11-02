@@ -7,7 +7,8 @@ server-sent target and e-mail link from the same values.
   next action, the trial story's chapters) names an existing screen and tab; its record, where it names one, exists
   in the organization; and the fields screens read before 0.10.67 (section, tab) say the same.
 - Every e-mail's links open an existing screen and tab; none points to a parked or removed screen.
-- The navigation setting (task 6.9): classic by default, set by a platform administrator only, named by the session.
+- The navigation setting (task 6.9): classic by default, new for a new free trial (0.10.71), switched by a platform
+  administrator only, named by the session.
 """
 
 from __future__ import annotations
@@ -274,11 +275,12 @@ def test_every_e_mail_link_opens_an_existing_screen(outbox):
 
 
 @pytest.mark.db
-def test_the_navigation_is_classic_until_a_platform_administrator_sets_it(trial):
+def test_a_new_trial_starts_on_the_new_navigation_and_only_a_platform_administrator_switches_it(trial):
+    """0.10.71 (A1): a new free trial is created on the new navigation; Tenant 360 still switches it either way."""
     from tests.conftest import authenticated_client
 
     user, tenant_id = trial["user"], trial["tenant_id"]
-    assert user.get("/api/v1/session/context").json()["navigation"] == "classic"
+    assert user.get("/api/v1/session/context").json()["navigation"] == "new"
     admin = authenticated_client()
     path = f"/api/v1/platform-admin/tenants/{tenant_id}"
     with SessionLocal() as db:
@@ -290,14 +292,21 @@ def test_the_navigation_is_classic_until_a_platform_administrator_sets_it(trial)
     )
     # The trial's own user is no platform administrator: refused.
     assert user.patch(
-        path, json={"navigation": "new", "reason": "Demo trial first", "lock_version": lock}
+        path, json={"navigation": "classic", "reason": "Back to the old menu", "lock_version": lock}
     ).status_code in (
         401,
         403,
     )
     changed = admin.patch(
-        path, json={"navigation": "new", "reason": "Demo trial first (stage 7)", "lock_version": lock}
+        path, json={"navigation": "classic", "reason": "Back to the old menu for this trial", "lock_version": lock}
     )
     assert changed.status_code == 200, changed.text
-    assert changed.json()["updated"] == {"navigation": "new"} and changed.json()["tenant"]["navigation"] == "new"
+    assert (
+        changed.json()["updated"] == {"navigation": "classic"} and changed.json()["tenant"]["navigation"] == "classic"
+    )
+    assert user.get("/api/v1/session/context").json()["navigation"] == "classic"
+    changed = admin.patch(
+        path, json={"navigation": "new", "reason": "Demo trial first (stage 7)", "lock_version": lock + 1}
+    )
+    assert changed.status_code == 200, changed.text
     assert user.get("/api/v1/session/context").json()["navigation"] == "new"
