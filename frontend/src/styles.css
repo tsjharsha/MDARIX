@@ -10111,16 +10111,6 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   letter-spacing: -0.01em;
   text-decoration: none;
 }
-.auth-brand small {
-  margin-left: 6px;
-  padding-left: 12px;
-  border-left: 1px solid var(--auth-line);
-  color: var(--auth-ink-2);
-  font-size: var(--ms-fs-12);
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
 .auth-logo {
   display: inline-grid;
   place-items: center;
@@ -10822,9 +10812,6 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
     max-width: 460px;
     padding: 28px 22px;
   }
-  .auth-brand small {
-    display: none;
-  }
   .auth-page-foot {
     flex-direction: column;
     text-align: center;
@@ -11521,6 +11508,9 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   font-size: var(--ms-fs-14);
   font-weight: 600;
   line-height: 1.5;
+}
+/* A deadline is short and stays on one line; a state or harm chip wraps inside a narrow card. */
+.ms-chip-deadline {
   white-space: nowrap;
 }
 .ms-chip-deadline.is-overdue {

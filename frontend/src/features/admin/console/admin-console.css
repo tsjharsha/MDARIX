@@ -62,10 +62,26 @@
   color: var(--ms-surface);
 }
 .ac-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ms-space-2);
   font-size: var(--ms-fs-16);
   font-weight: 700;
   letter-spacing: 0.04em;
   white-space: nowrap;
+}
+/* The M tile, as on the website (H). */
+.ac-brand-tile {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-teal);
+  color: var(--ms-surface);
+  font-size: var(--ms-fs-14);
+  font-style: normal;
+  letter-spacing: 0;
 }
 .ac-brand span {
   margin-left: 10px;

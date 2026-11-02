@@ -221,16 +221,6 @@
   font-weight: 700;
   letter-spacing: 0.02em;
 }
-.ms-brand small {
-  margin-left: 2px;
-  padding-left: 10px;
-  border-left: 1px solid var(--ms-line);
-  color: var(--ms-muted);
-  font-size: var(--ms-fs-12);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
 .ms-logo {
   display: inline-grid;
   place-items: center;
@@ -2059,9 +2049,6 @@
     bottom: 0;
     grid-template-columns: minmax(0, 1fr);
     overflow-y: auto;
-  }
-  .ms-brand small {
-    display: none;
   }
 }
 @media (max-width: 640px) {

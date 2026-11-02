@@ -453,7 +453,12 @@ export function UserWorkspace({
           >
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <div className="ac-brand">MDARIX</div>
+          <div className="ac-brand">
+            <i className="ac-brand-tile" aria-hidden="true">
+              M
+            </i>
+            MDARIX
+          </div>
           <div className="uw-tenant" title="Every screen shows only this organization's data">
             <Building2 size={15} aria-hidden="true" />
             <span>{tenantName}</span>
@@ -498,12 +503,7 @@ export function UserWorkspace({
             <SwitchOrganization />
             <AlertsBell onOpen={() => open("My Work")} />
             <HelpMenu onGettingStarted={trial?.is_trial ? () => open("Getting started", "Your data") : undefined} />
-            <button
-              type="button"
-              className="ac-secondary"
-              onClick={() => void signOut()}
-              aria-label="Sign out"
-            >
+            <button type="button" className="ac-secondary" onClick={() => void signOut()} aria-label="Sign out">
               <LogOut size={16} /> <span className="ac-hide-sm">Sign out</span>
             </button>
           </div>
