@@ -14,7 +14,7 @@ const SOURCES = import.meta.glob("../**/*.tsx", { query: "?raw", import: "defaul
 
 describe("the catalog of standards", () => {
   it("is the backend's catalog (tests/test_standards_unit.py keeps the two identical)", () => {
-    expect(STANDARDS).toHaveLength(32);
+    expect(STANDARDS).toHaveLength(33);
     expect(STANDARDS.filter((standard) => standard.starter).map((standard) => standard.id)).toEqual([
       "ISO13485_6_2",
       "ISO13485_8_2_1",
@@ -22,6 +22,7 @@ describe("the catalog of standards", () => {
       "CFR803_3",
       "CFR803_19",
       "MDR_2",
+      "IVDR_82",
       "MDCG_2023_3",
       "IN_MDR",
     ]);
@@ -48,6 +49,7 @@ describe("the catalog of standards", () => {
     const references = Object.fromEntries(SAMPLE_PAINS.map((pain) => [pain.key, pain.reference]));
     expect(references).toEqual({
       routine: "ISO 13485 8.2.2",
+      flagship: "21 CFR 803",
       calls: "ISO 13485 8.2.1; ISO 13485 8.2.2",
       reports: "ISO 13485 8.2.3; 21 CFR 803.50; India MDR 2017 Rules 3, 26",
       "follow-through": "ISO 13485 8.2.2",
