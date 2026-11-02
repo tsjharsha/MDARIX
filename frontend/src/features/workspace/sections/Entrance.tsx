@@ -137,7 +137,8 @@ export function StoryBar({ section, tab }: { section: string; tab?: string }) {
   const { story, startStory, open, work } = useWorkspace();
   const scenario = SCENARIOS.find((item) => item.key === story);
   const ids = useStoryIds(scenario, section);
-  const short = useShortStory(scenario?.key === "short");
+  // The short story and the full evaluation of SAMPLE-RV-11 count their steps from saved records (0.10.71, 0.10.72).
+  const short = useShortStory(scenario?.key === "short" || scenario?.key === "reportable");
   if (!scenario || section === "Getting started") return null;
   const place = { section, tab };
   const onRecord = onStoryRecord(scenario, place, ids, work?.investigationId);
@@ -147,7 +148,9 @@ export function StoryBar({ section, tab }: { section: string; tab?: string }) {
       ? (short.data?.current ?? 0)
       : -1
     : onRecord
-      ? storyStep(scenario, place)
+      ? scenario.key === "reportable" && short.data?.full_evaluation
+        ? Math.min(short.data.full_evaluation.current, scenario.steps.length - 1)
+        : storyStep(scenario, place)
       : -1;
   const back = () => open(scenario.start.section as WorkspaceSection, scenario.start.tab);
   return (

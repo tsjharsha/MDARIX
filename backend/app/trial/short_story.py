@@ -268,8 +268,37 @@ def progress(data: Session, control_db: Session, tenant_id, user_id: str, reques
             "who": (view.get("work") or {}).get("owner_name") or event["owner_name"],
         },
         "people": _people(view, triage, question, found, names, str(user_id)),
+        "full_evaluation": full_evaluation(view, found),
         "practice_label": view.get("practice_label"),
     }
+
+
+# The full evaluation's steps (entrance.ts, scenario "reportable"), each done from SAMPLE-RV-11's own checklist and
+# records, never from the screen that is open (0.10.72, Addendum 2): as the short story counts its steps.
+FULL_STEPS = ("read", "triage", "markets", "report", "disposition", "decision", "ready")
+
+
+def full_evaluation(view: dict, found: dict) -> dict:
+    from backend.app.oversight import closure
+
+    results = {item["code"]: item["result"] for item in view["checklist"]}
+
+    def clear(code: str) -> bool:
+        return results.get(code, closure.NOT_REQUIRED) != closure.BLOCKED
+
+    triaged = clear("TRIAGE")
+    ready = (view.get("ready") or {}).get("state") in ("READY", "READY_WITH_REASON")
+    done = {
+        "read": triaged,
+        "triage": triaged,
+        "markets": triaged and clear("MARKETS"),
+        "report": triaged and clear("MARKETS") and clear("OBLIGATIONS"),
+        "disposition": found["disposition"] is not None or clear("DECISION"),
+        "decision": clear("DECISION"),
+        "ready": ready,
+    }
+    steps = [{"key": key, "done": bool(done[key])} for key in FULL_STEPS]
+    return {"steps": steps, "current": next((i for i, step in enumerate(steps) if not step["done"]), len(steps))}
 
 
 def _facts(event: dict, complaint, service: dict | None) -> list[dict]:

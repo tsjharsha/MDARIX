@@ -189,6 +189,10 @@ def test_f2_step_3_is_the_consequence_question_and_the_summary_reads_its_state(s
         f"The hospital answered on {question['answered_on']}"
     )
     assert "Reassess" in question["consequence"]
+    # Addendum 2: the full evaluation's progress comes from RV-11's checklist: triaged, its markets still open.
+    full = _ok(user.get(STORY))["full_evaluation"]
+    assert [step["done"] for step in full["steps"]] == [True, True, False, False, False, False, False]
+    assert full["current"] == 2
 
 
 @pytest.mark.db

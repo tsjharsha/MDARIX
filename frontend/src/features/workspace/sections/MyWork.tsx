@@ -286,7 +286,9 @@ export function UrgentTasks() {
   const openTask = useOpenTask();
   const overdue = useResource<TaskList>(taskListPath("overdue", 1, 20));
   const soon = useResource<TaskList>(taskListPath("due_soon", 1, 20));
-  const seen = new Set<string>();
+  // The lead (Your next step) is not listed again.
+  const lead = useResource<TaskList>(taskListPath("assigned", 1, 1));
+  const seen = new Set<string>((listOf(lead.data?.items) as Task[]).map((task) => task.id));
   const rows = [...(listOf(overdue.data?.items) as Task[]), ...(listOf(soon.data?.items) as Task[])].filter(
     (task) => !seen.has(task.id) && !!seen.add(task.id),
   );

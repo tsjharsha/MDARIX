@@ -51,6 +51,8 @@ export type ShortStory = {
     answered_on?: string | null;
   };
   service: ServiceWork | null;
+  /** The full evaluation's steps, each done from SAMPLE-RV-11's own checklist and records (0.10.72). */
+  full_evaluation?: { steps: Array<{ key: string; done: boolean }>; current: number };
   markets: Array<{
     market: string;
     label: string;

@@ -78,7 +78,8 @@ describe("B4: My work leads with one item, and keeps every urgent obligation in 
   it("lists every other urgent obligation with its deadline, never hidden", () => {
     seed(false);
     const html = render();
-    expect(html).toContain("Due soon or overdue · 2");
+    // The lead is not listed again: the other urgent task, with its deadline.
+    expect(html).toContain("Due soon or overdue · 1");
     expect(html).toContain("<strong>Approve snapshot 1 of the Form FDA 3500A</strong>");
     // Not inside a closed disclosure: the urgent list comes before "All my work".
     expect(html.indexOf("Due soon or overdue")).toBeLessThan(html.indexOf("All my work"));
