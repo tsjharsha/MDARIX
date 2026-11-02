@@ -180,9 +180,36 @@ const QUEUE_VIEWS = NEW_MY_WORK.views?.Queues ?? [];
  * stays hidden while AI is off.
  */
 export function NewMyWorkSection({ tab }: { tab?: string }) {
-  const { work, open, notify, isTrial, navigation } = useWorkspace();
+  const { open, isTrial, navigation } = useWorkspace();
   // While "Resume SAMPLE-RV-11" shows, it is the one main button; the next step is secondary (0.10.72, Addendum 2).
   const resuming = !!resumeText(useShortStory(!!isTrial && navigation === "new").data);
+  return (
+    <>
+      {/* Unfinished short-story work first (0.10.71, A3): "Resume SAMPLE-RV-11 · step N of 4". */}
+      <ResumeShortStory />
+      <NextStep secondary={resuming} />
+      {/* Every other urgent obligation stays visible below the lead, each with its deadline (0.10.72, B4). */}
+      <RemindersPanel />
+      <UrgentTasks />
+      {/* A returning trial user lands here; the sample event and its stories are one click away (8.4). */}
+      {isTrial && (
+        <p className="uw-entrance-link">
+          <button type="button" className="ac-link" onClick={() => open("Getting started")}>
+            The sample event and its stories
+          </button>
+        </p>
+      )}
+      <MyWorkMore tab={tab} />
+    </>
+  );
+}
+
+/**
+ * The rest of My work, revealed on request (0.10.72, B4): the team numbers and all my work (tasks, approvals,
+ * requests, queues, the team overview). Home shows it below its own lead (0.10.73, C1); a link to a part opens it.
+ */
+export function MyWorkMore({ tab }: { tab?: string }) {
+  const { work, open, notify, isTrial } = useWorkspace();
   const aiOff = useAiReady() === false || !!isTrial;
   const canSign = useCan("decision.sign");
   const manager = useCan("quality.review");
@@ -219,20 +246,6 @@ export function NewMyWorkSection({ tab }: { tab?: string }) {
   };
   return (
     <>
-      {/* Unfinished short-story work first (0.10.71, A3): "Resume SAMPLE-RV-11 · step N of 4". */}
-      <ResumeShortStory />
-      <NextStep secondary={resuming} />
-      {/* Every other urgent obligation stays visible below the lead, each with its deadline (0.10.72, B4). */}
-      <RemindersPanel />
-      <UrgentTasks />
-      {/* A returning trial user lands here; the sample event and its stories are one click away (8.4). */}
-      {isTrial && (
-        <p className="uw-entrance-link">
-          <button type="button" className="ac-link" onClick={() => open("Getting started")}>
-            The sample event and its stories
-          </button>
-        </p>
-      )}
       {/* Team numbers, completed work, the queues and the filters are revealed on request (0.10.72, B4); a link to a
           part of My work opens them. */}
       {manager && (

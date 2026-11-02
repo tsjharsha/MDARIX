@@ -8,8 +8,8 @@ describe("words that point somewhere", () => {
     expect(newPathText("Open Complaints › Reports and start the worksheet")).toBe(
       "Open Complaints › Reporting and start the worksheet",
     );
-    expect(newPathText("Readiness › Oversight shows it")).toBe("My work › Team overview shows it");
-    expect(newPathText("Complaints › First contact")).toBe("My work › Queues › Calls to check");
+    expect(newPathText("Readiness › Oversight shows it")).toBe("Home › Team overview shows it");
+    expect(newPathText("Complaints › First contact")).toBe("Home › Queues › Calls to check");
     expect(newPathText("Signals › Detection rules")).toBe("Settings › Trend rules");
     expect(newPathText("Getting started › Team")).toBe("Team");
     // Text without a screen path stays as written.

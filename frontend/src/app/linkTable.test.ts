@@ -349,14 +349,28 @@ describe("the new navigation (stage 7, 0.10.68)", () => {
     expect(NEW_PLACES.Settings.tabs).toEqual([...SETTINGS_TABS]);
     expect(NEW_PLACES.Complaint.tabs).toEqual([...COMPLAINT_SECTIONS]);
     expect(NEW_PLACES["My Work"].views?.["Tasks for me"]).toEqual(TASK_TABS.map((item) => item.tab));
-    // The menu: four main screens, and Settings, Team and Account at the top right (Help is the Help menu).
-    expect(NEW_MENU.main).toEqual(["My Work", "Complaints", "Trends", "Records"]);
-    expect(NEW_MENU.top).toEqual(["Settings", "Team", "My Account"]);
-    expect(NEW_MENU.main.map((name) => NEW_PLACES[name].label ?? name)).toEqual([
-      "My work",
+    // The tab bar (0.10.73, Release C part C1): eight destinations, My work as Home; each persona shows some of
+    // them. Settings and Account are in the avatar's menu (Help is the Help menu).
+    expect(NEW_MENU.main).toEqual([
+      "My Work",
       "Complaints",
+      "Decision trees",
+      "Reports",
+      "Investigations",
       "Trends",
       "Records",
+      "Team",
+    ]);
+    expect(NEW_MENU.top).toEqual(["Settings", "My Account"]);
+    expect(NEW_MENU.main.map((name) => NEW_PLACES[name].label ?? name)).toEqual([
+      "Home",
+      "Complaints",
+      "Decision trees",
+      "Reports",
+      "Investigations",
+      "Trends",
+      "Records",
+      "Team",
     ]);
     // My work has fewer tabs than the classic 10.
     expect(NEW_PLACES["My Work"].tabs.length).toBeLessThan(PLACES["My Work"].tabs.length);
