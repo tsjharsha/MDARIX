@@ -2802,12 +2802,13 @@ div.uw-task-count:hover {
   align-items: center;
   gap: 5px;
 }
+/* A quote reads as a line of text (V10): up to three lines, never cut at 34 characters. */
 .uw-cr-clip {
   display: -webkit-box;
-  max-width: 34ch;
+  max-width: 72ch;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
 }
 .uw-cr-age {
   display: grid;
@@ -4951,4 +4952,59 @@ div.uw-task-count:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--ms-space-1) var(--ms-space-2);
+}
+
+/* Phones (J20, V11): the section's tabs are one row that scrolls inside itself; the context bar is two columns; the
+   count tiles are compact, so a list's first card shows without a long scroll; controls are 44 px high. */
+@media (max-width: 640px) {
+  .ac-tabs[role="tablist"] {
+    position: relative;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: var(--ms-space-1);
+    scrollbar-width: thin;
+  }
+  .ac-tabs[role="tablist"] > button {
+    flex: 0 0 auto;
+    min-height: 44px;
+  }
+  .uw-context {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ms-space-2);
+    padding: var(--ms-space-2) var(--ms-space-3);
+  }
+  .uw-context label {
+    flex: none;
+  }
+  .uw-context select,
+  .uw-context input {
+    height: 44px;
+  }
+  .uw-context .uw-modes {
+    display: flex;
+    grid-column: 1 / -1;
+  }
+  .uw-modes button {
+    flex: 1 1 0;
+    height: 44px;
+  }
+  .uw-cr-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ms-space-2);
+  }
+  .uw-cr-stats .ac-stat {
+    min-height: 44px;
+    padding: var(--ms-space-2) var(--ms-space-3);
+  }
+  .uw-cr-stats .ac-stat-icon,
+  .uw-cr-stats .ac-stat-detail {
+    display: none;
+  }
+  .uw-cr-hero {
+    padding: var(--ms-space-3);
+  }
+  .uw-cr-hero .ac-hero-icon {
+    display: none;
+  }
 }

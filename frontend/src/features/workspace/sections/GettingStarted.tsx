@@ -618,7 +618,7 @@ export function ChapterRow({
       </div>
       <button
         type="button"
-        className={done ? "ac-secondary" : "ac-primary"}
+        className={isNext && !done ? "ac-primary" : "ac-secondary"}
         onClick={onOpen}
         disabled={!allowed}
         title={allowed ? undefined : "Your role does not include this screen"}

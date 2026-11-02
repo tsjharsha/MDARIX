@@ -166,10 +166,12 @@
   display: grid;
   gap: 12px;
 }
+/* Fields on one grid (V12): each row's inputs line up at the bottom whatever their labels' length. */
 .ca-form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
+  align-items: end;
+  gap: var(--ms-space-3) var(--ms-space-4);
 }
 .ca-field {
   display: grid;

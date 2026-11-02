@@ -907,7 +907,7 @@ export function ResolutionTrend() {
         </div>
         {data && data.items.length ? (
           <div className="uw-table-scroll">
-            <table className="ac-table">
+            <table className="ac-table ms-cards">
               <thead>
                 <tr>
                   <th scope="col">{GROUP_LABELS[data.group]}</th>
@@ -921,10 +921,10 @@ export function ResolutionTrend() {
                 {data.items.map((item) => (
                   <tr key={item.key.join("|")}>
                     <th scope="row">{item.key.map((part) => part.replace(/_/g, " ")).join(" · ")}</th>
-                    <td>{item.complaints}</td>
-                    <td>{item.service_level}</td>
-                    <td>{item.known_issue}</td>
-                    <td>{item.escalated}</td>
+                    <td data-label="Complaints">{item.complaints}</td>
+                    <td data-label="Service level">{item.service_level}</td>
+                    <td data-label="Known issue">{item.known_issue}</td>
+                    <td data-label="Escalated">{item.escalated}</td>
                   </tr>
                 ))}
               </tbody>

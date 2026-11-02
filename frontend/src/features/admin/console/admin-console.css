@@ -861,33 +861,37 @@ button.ac-stat:hover {
 }
 .ac-table th,
 .ac-table td {
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--ac-grid);
   text-align: left;
 }
-/* List headings: a dark navy row (the header bar's colour) with bold white text, white on navy is about 13:1.
-   Each heading sorts its list (app/tableSort.tsx). The colours have fallbacks for tables shown in dialogs. A heading
-   reads as written, in sentence case ("About the request"): the older global rule for th capitalizes every word. */
+.ac-table tbody tr {
+  height: 44px;
+}
+/* List headings (J20, V8): a light row, not the heavy navy bar; ink text at 600, a firm line below. Each heading sorts
+   its list (app/tableSort.tsx). A heading reads as written, in sentence case ("About the request"): the older global
+   rule for th capitalizes every word. */
 .ac-table th {
-  background: var(--ac-navy, var(--ms-navy));
-  border-bottom-color: var(--ac-navy, var(--ms-navy));
-  color: var(--ms-surface);
+  background: var(--ms-ground);
+  border-bottom: 1px solid var(--ms-line-strong);
+  color: var(--ms-ink-2);
   font-size: var(--ms-fs-12);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.01em;
   text-transform: none;
 }
 .ac-table thead th:first-child {
-  border-top-left-radius: var(--ms-radius-md);
+  border-top-left-radius: var(--ms-radius-sm);
 }
 .ac-table thead th:last-child {
-  border-top-right-radius: var(--ms-radius-md);
+  border-top-right-radius: var(--ms-radius-sm);
 }
 .table-sort {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin: -2px -4px;
+  min-height: 32px;
+  margin: -6px -4px;
   padding: 2px 4px;
   border: 0;
   border-radius: var(--ms-radius-sm);
@@ -902,10 +906,10 @@ th.num .table-sort {
   flex-direction: row-reverse;
 }
 .table-sort:hover {
-  background: rgb(255 255 255 / 14%);
+  background: var(--ms-line);
 }
 .table-sort:focus-visible {
-  outline: 2px solid var(--ms-surface);
+  outline: 2px solid var(--ms-teal-dark);
   outline-offset: 1px;
 }
 .table-sort-icon {
@@ -916,9 +920,80 @@ th.num .table-sort {
 .table-sort.active .table-sort-icon {
   opacity: 1;
 }
-/* The sorted column: the brand's light teal on navy (about 8:1), with its arrow fully shown. */
+/* The sorted column: dark teal on the light heading, with its arrow fully shown. */
 .table-sort.active {
-  color: var(--ms-teal-bright);
+  color: var(--ms-teal-dark);
+}
+/* Phones (J20, V11): at 640 px and below each row is a card: its first cell as the title, then each value under its
+   heading (data-label), the row's actions last; no sideways scroll and no word on a line of its own. */
+@media (max-width: 640px) {
+  .ac-table-wrap {
+    overflow-x: visible;
+  }
+  .ac-table.ms-cards,
+  .ac-table.ms-cards tbody,
+  .ac-table.ms-cards tr,
+  .ac-table.ms-cards td {
+    display: block;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+  .ac-table.ms-cards colgroup,
+  .ac-table.ms-cards thead {
+    display: none;
+  }
+  .ac-table.ms-cards tr {
+    height: auto;
+    margin-bottom: var(--ms-space-2);
+    padding: var(--ms-space-3);
+    border: 1px solid var(--ms-line);
+    border-radius: var(--ms-radius-md);
+    background: var(--ms-surface);
+  }
+  .ac-table.ms-cards td {
+    display: grid;
+    grid-template-columns: minmax(96px, 38%) minmax(0, 1fr);
+    gap: var(--ms-space-2);
+    padding: 4px 0;
+    border: 0;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .ac-table.ms-cards td::before {
+    content: attr(data-label);
+    color: var(--ms-muted);
+    font-size: var(--ms-fs-12);
+    font-weight: 600;
+  }
+  .ac-table.ms-cards th[scope="row"] {
+    display: block;
+    padding: 0 0 var(--ms-space-2);
+    border: 0;
+    background: none;
+    color: var(--ms-ink);
+    font-size: var(--ms-fs-16);
+  }
+  .ac-table.ms-cards td.num {
+    text-align: left;
+  }
+  .ac-table.ms-cards td:first-child {
+    display: block;
+    padding-bottom: var(--ms-space-2);
+    font-size: var(--ms-fs-16);
+    font-weight: 600;
+  }
+  .ac-table.ms-cards td:first-child::before,
+  .ac-table.ms-cards td[data-label=""]::before {
+    content: none;
+  }
+  .ac-table.ms-cards td[data-label=""] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ms-space-2);
+    padding-top: var(--ms-space-2);
+  }
 }
 .ac-table .num {
   font-variant-numeric: tabular-nums;
