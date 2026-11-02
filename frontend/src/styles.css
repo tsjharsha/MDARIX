@@ -11561,7 +11561,9 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 }
 @media (max-width: 640px) {
   .admin-console :is(.ac-primary, .ac-secondary, .ca-danger) {
+    height: auto;
     max-width: 100%;
+    padding-block: var(--ms-space-2);
     white-space: normal;
   }
 }
