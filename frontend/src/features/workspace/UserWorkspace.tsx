@@ -384,14 +384,17 @@ export function UserWorkspace({
     const tab = shown ?? location.tab;
     const next = addressFor({ section: location.section, tab, caseRef: onCasePage ? caseRef : null });
     const { pathname, search, hash } = window.location;
-    if (next !== `${pathname}${search}`) {
-      const state: WorkspaceHistoryState = {
-        mdarixWorkspace: true,
-        section: location.section,
-        tab,
-        caseId: work.investigationId || null,
-        productId: work.productId || null,
-      };
+    const state: WorkspaceHistoryState = {
+      mdarixWorkspace: true,
+      section: location.section,
+      tab,
+      caseId: work.investigationId || null,
+      productId: work.productId || null,
+    };
+    // An address opened as it is (a link, a refresh) already reads right, but its entry must still hold the screen,
+    // or Back to it would restore nothing (a panel opened after it stayed open).
+    if (next === `${pathname}${search}`) window.history.replaceState(state, "", `${next}${hash}`);
+    else {
       // A filter (or a tab said when a section opens) replaces this screen's own entry; the first address of a
       // newly opened screen is always a new entry, so Back returns to the screen before it.
       const replace =
