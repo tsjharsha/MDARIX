@@ -152,6 +152,63 @@ def _from_report(db: Session, tenant_id, complaint_id, view: dict) -> dict:
     return view
 
 
+def _complaint_as_evidence(db: Session, control_db: Session, ctx, case, complaint, ref: str, now: datetime) -> None:
+    """The escalated complaint's own record is the investigation's first evidence, linked for a person to review
+    (stage 8: the facts flow from the complaint into the investigation, not typed again)."""
+    from backend.app.db.models.foundation import Evidence, InvestigationEvidence
+    from backend.app.evidence_workflow.inventory import review_event
+    from backend.app.evidence_workflow.rules import UNREVIEWED
+    from backend.app.access.permissions import EVIDENCE_REVIEW
+
+    person = current_person(control_db, ctx)
+    evidence = Evidence(
+        id=uuid.uuid4(),
+        tenant_id=case.tenant_id,
+        evidence_identifier=f"{case.business_id or case.investigation_identifier}-{ref}"[:120],
+        investigation_id=case.id,
+        evidence_type="COMPLAINT_RECORD",
+        title=f"Complaint {ref}: {' '.join((complaint.description or '').split())}"[:255],
+        source_system="MDARIX",
+        source_identifier=ref,
+        source_reference=f"Complaint {ref}",
+        source_timestamp=complaint.awareness_timestamp,
+        effective_timestamp=complaint.awareness_timestamp,
+        recorded_timestamp=now,
+        ingestion_timestamp=now,
+        content=complaint.description,
+        fact_type="source_fact",
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(evidence)
+    db.flush()
+    db.add(
+        InvestigationEvidence(
+            id=uuid.uuid4(),
+            tenant_id=case.tenant_id,
+            investigation_id=case.id,
+            evidence_id=evidence.id,
+            relevance="The escalated complaint's own record",
+            created_at=now,
+            review_status=UNREVIEWED,
+            linked_by=person.user_id,
+        )
+    )
+    db.flush()
+    review_event(
+        db,
+        tenant_id=case.tenant_id,
+        case_id=case.id,
+        evidence_id=evidence.id,
+        event_type="LINKED",
+        actor=person,
+        permission=EVIDENCE_REVIEW,
+        to_status=UNREVIEWED,
+        reason="The escalated complaint's own record",
+        now=now,
+    )
+
+
 def screen(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today: date | None = None) -> dict:
     tenant_id = uuid.UUID(ctx.tenant_id)
     today = today or service.today_utc()
@@ -446,6 +503,7 @@ def sign_disposition(
             owner_ref=user[0] if user else None,
             actor_role=acting_role(control_db, tenant_id, ctx.user_id, INVESTIGATION_CREATE),
         )
+        _complaint_as_evidence(db, control_db, ctx, case, complaint, ref, now)
         opened = True
     elif branch == rules.KNOWN_ISSUE:
         case = (
