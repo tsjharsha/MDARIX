@@ -190,9 +190,7 @@ export function CaseHeader({
               </ul>
             </details>
           )}
-          <p className="ac-note">
-            Readiness shows what is in place and what is missing. It never decides the case: authorized people do.
-          </p>
+          <p className="ac-note">Readiness shows what is in place and what is missing.</p>
         </section>
       </Panel>
       {transition && (

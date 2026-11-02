@@ -183,9 +183,8 @@ export function ReportabilityWatch({ onOpenTab }: { onOpenTab: (tab: string) => 
         )}
         <Pager page={page} pages={list.data?.pages ?? 1} onPage={setPage} />
         <p className="ac-note">
-          The windows come from your procedure; MDARIX keeps the clock and never decides reportability or submits a
-          report. Windows that rest on a judgment (an FDA 5-work-day report, an EU serious public health threat) are
-          applied by your reviewer.
+          The windows come from your procedure; MDARIX keeps the clock. Windows that rest on a judgment (an FDA
+          5-work-day report, an EU serious public health threat) are applied by your reviewer.
         </p>
         <BasisNote />
       </Panel>

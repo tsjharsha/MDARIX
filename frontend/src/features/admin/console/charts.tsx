@@ -153,12 +153,14 @@ export function Unavailable({
   );
 }
 
-export function Empty({ title, detail }: { title: string; detail: string }) {
+/** Nothing to show, said plainly; with `action`, the one thing to do next (a button or link). */
+export function Empty({ title, detail, action }: { title: string; detail: string; action?: ReactNode }) {
   return (
     <div className="ac-empty">
       <CircleDashed size={20} aria-hidden="true" />
       <strong>{title}</strong>
       <span>{detail}</span>
+      {action && <div className="ac-empty-action">{action}</div>}
     </div>
   );
 }

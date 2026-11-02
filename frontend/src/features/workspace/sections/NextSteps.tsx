@@ -58,8 +58,8 @@ function NextSteps({ investigationId }: { investigationId: string }) {
   return (
     <Panel eyebrow="Next steps" title="What happens next with this case" source={options}>
       <p className="ac-muted">
-        Choose how the work moves on. A next step records your reason and routes the work; it never decides the case. A
-        decision on the case is prepared through the Decision Brief and made by authorized approvers.
+        Choose how the work moves on. A next step records your reason and routes the work. A decision on the case is
+        prepared through the Decision Brief.
       </p>
       {steps.length ? (
         <ul className="uw-list" aria-label="Next steps">

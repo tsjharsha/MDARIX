@@ -154,8 +154,8 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
           </span>
           <SwitchOrganization />
           <HelpMenu />
-          <button type="button" className="ac-secondary" onClick={signOut} aria-label="Sign out of MDARIX">
-            <LogOut size={16} /> <span className="ac-hide-sm">Logout</span>
+          <button type="button" className="ac-secondary" onClick={signOut} aria-label="Sign out">
+            <LogOut size={16} /> <span className="ac-hide-sm">Sign out</span>
           </button>
         </div>
       </header>

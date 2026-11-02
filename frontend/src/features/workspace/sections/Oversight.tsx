@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { DeadlineChip } from "../../../app/chips";
+import { DecideAndSign } from "./common";
+import { marketLabel } from "../../../app/labels";
 import { CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, send, useResource, type Column } from "../../customer-admin/shared";
@@ -12,7 +15,6 @@ import {
   WEEKDAY_SHORT,
   eventPath,
   exportPath,
-  hoursText,
   oversightPath,
   readyProblem,
   stateTone,
@@ -97,7 +99,6 @@ export function OversightView({ initialEvent = null }: { initialEvent?: string |
             }}
           />
         )}
-        {view && <p className="ac-note">{view.never}</p>}
       </Panel>
       {view && <EventsPanel events={view.events} onOpen={setEvent} />}
       {view && <CalendarPanel settings={view.settings} onSaved={data.reload} />}
@@ -142,7 +143,7 @@ function itemColumns(go: (opens: Opens) => void): Column<OversightItem>[] {
       ),
     },
     { key: "product", label: "Product", render: (row) => row.product ?? "—" },
-    { key: "market", label: "Market", render: (row) => row.market ?? "—" },
+    { key: "market", label: "Market", render: (row) => marketLabel(row.market) },
     {
       key: "owner",
       label: "Owner",
@@ -157,9 +158,10 @@ function itemColumns(go: (opens: Opens) => void): Column<OversightItem>[] {
       key: "due_at",
       label: "Due",
       render: (row) => (
-        <span>
-          {row.due_label ?? formatDate(row.due_at)}
-          <small className="ac-muted uw-ov-left">{hoursText(row)}</small>
+        // The time left is the key fact, so it leads as the deadline chip; the end follows (V4).
+        <span className="uw-due-cell">
+          <DeadlineChip item={row} />
+          <span className="ac-muted">{row.due_label ?? formatDate(row.due_at)}</span>
         </span>
       ),
     },
@@ -206,7 +208,9 @@ function FilterBar({
         <select value={filters.market} onChange={(e) => onChange({ ...filters, market: e.target.value })}>
           <option value="">Every market</option>
           {options.markets.map((code) => (
-            <option key={code}>{code}</option>
+            <option key={code} value={code}>
+              {marketLabel(code)}
+            </option>
           ))}
         </select>
       </label>
@@ -337,7 +341,6 @@ export function EventDrawer({
   const { event, summary } = view;
   return (
     <Drawer title={`Event ${event.ref}`} onClose={onClose}>
-      {view.practice_label && <p className="ac-muted">{view.practice_label}</p>}
       <section className="ca-drawer-section" aria-label="Event summary">
         <div className="uw-cr-head">
           <ToneBadge tone={EVENT_TONES[view.state]} label={view.state_label} />
@@ -346,7 +349,7 @@ export function EventDrawer({
           <dt>Product</dt>
           <dd>{event.product ?? "—"}</dd>
           <dt>Market</dt>
-          <dd>{event.market ?? "—"}</dd>
+          <dd>{marketLabel(event.market)}</dd>
           <dt>Awareness</dt>
           <dd>{formatDate(event.awareness_at)}</dd>
           <dt>Nearest deadline</dt>
@@ -371,7 +374,7 @@ export function EventDrawer({
         <OwnerPicker view={view} onChanged={changed} />
       </section>
       <section className="ca-drawer-section" aria-label="Stage">
-        <h4>Stage</h4>
+        <h3>Stage</h3>
         <ol className="uw-ov-stages">
           {view.stages.map((stage) => (
             <li key={stage.code} className={`stage-${stage.state.toLowerCase()}`}>
@@ -383,7 +386,7 @@ export function EventDrawer({
         <p className="ac-muted">A summary, not a gate: reporting, investigation and containment can run at once.</p>
       </section>
       <section className="ca-drawer-section" aria-label="Closure checklist">
-        <h4>Closure checklist</h4>
+        <h3>Closure checklist</h3>
         <ul className="uw-ov-checks">
           {view.checklist.map((item) => (
             <li key={item.code}>
@@ -484,7 +487,7 @@ function ReadyForm({ view, onChanged }: { view: EventView; onChanged: (view: Eve
   const signedNow = view.ready && !view.changed_since_signed;
   return (
     <section className="ca-drawer-section" aria-label="Ready to close">
-      <h4>Ready to close in the QMS</h4>
+      <h3>Ready to close in the QMS</h3>
       {view.ready && (
         <p className={view.ready.state === "READY" ? "tone-good" : "tone-warning"}>
           Signed by {view.ready.signed_by} {formatDate(view.ready.signed_at)} (version {view.ready.version})
@@ -517,6 +520,7 @@ function ReadyForm({ view, onChanged }: { view: EventView; onChanged: (view: Eve
             </label>
           )}
           <div className="ca-form-grid">
+            <DecideAndSign />
             <label className="ca-field">
               Your password
               <input
@@ -557,7 +561,7 @@ function DecisionRecord({ view, onChanged }: { view: EventView; onChanged: (view
   const record = view.decision_record;
   return (
     <section className="ca-drawer-section" aria-label="Event decision record">
-      <h4>Event decision record</h4>
+      <h3>Event decision record</h3>
       {record.entries.length ? (
         <ol className="uw-ov-record">
           {record.entries.map((entry, index) => (

@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { triggerLabel, versionWords } from "../../../app/labels";
 import { CheckCircle2, FileWarning, GitBranch, Inbox, Link2, ShieldAlert, Timer, Wrench } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { ImdrfCodes, RecordOrigin } from "./ImportReports";
 import { formatDay } from "../../../app/dates";
 import { useCan, useWorkspace } from "../workspaceContext";
-import { countOf } from "./common";
+import { countOf, DecideAndSign } from "./common";
 import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
 import { TrainingPanel } from "./MarketAssessment";
 import { EscalateButton } from "./Triage";
@@ -175,10 +176,7 @@ export function DispositionCard({ item, onOpen }: { item: BoardItem; onOpen: () 
           {signed ? (
             <ToneBadge tone={tone} label={signed.branch_label} />
           ) : item.triggers.length ? (
-            <ToneBadge
-              tone="critical"
-              label={`Trigger: ${item.triggers.join(", ").replace(/_/g, " ").toLowerCase()}`}
-            />
+            <ToneBadge tone="critical" label={`Trigger: ${item.triggers.map(triggerLabel).join(", ").toLowerCase()}`} />
           ) : known ? (
             <ToneBadge tone={BRANCH_TONES.KNOWN_ISSUE} label="Known issue" />
           ) : item.routine_offered ? (
@@ -305,7 +303,6 @@ export function DispositionPanel({
           {complaint.awareness_date ? ` · aware ${formatDay(complaint.awareness_date)}` : ""}
         </p>
         {complaint.description && <q className="uw-cr-text">{complaint.description}</q>}
-        {screen.practice_label && <p className="uw-ma-practice">{screen.practice_label}</p>}
         <ImdrfCodes problemCode={complaint.problem_code} />
         <RecordOrigin
           entity="complaints"
@@ -354,9 +351,9 @@ export function DispositionPanel({
           <section className={`ca-drawer-section uw-dp-path tone-${screen.routine.offered ? "good" : "warning"}`}>
             {screen.routine.offered ? (
               <>
-                <h4>
+                <h3>
                   <Timer size={15} aria-hidden="true" /> Routine path: one screen, one signature
-                </h4>
+                </h3>
                 <ul className="uw-dp-basis">
                   {screen.routine.markets.map((market) => (
                     <li key={market.market}>
@@ -367,7 +364,7 @@ export function DispositionPanel({
               </>
             ) : (
               <>
-                <h4>Standard path</h4>
+                <h3>Standard path</h3>
                 <ul className="uw-dp-basis">
                   {screen.routine.blocked.map((reason) => (
                     <li key={reason}>{reason}</li>
@@ -592,7 +589,7 @@ export function DispositionPanel({
             </ol>
 
             <section className="ca-drawer-section">
-              <h4>Classification for trends</h4>
+              <h3>Classification for trends</h3>
               <div className="ca-form-grid">
                 <ClassificationField
                   label="Use environment"
@@ -615,7 +612,7 @@ export function DispositionPanel({
                 {proposed.state === "CONFIRMED"
                   ? `Confirmed by ${proposed.confirmed_by}`
                   : "Proposed: your signature confirms it"}{" "}
-                · coding criteria {screen.coding_criteria.version} · Unknown is never guessed
+                · coding criteria, {versionWords(screen.coding_criteria.version)} · Unknown is never guessed
               </p>
               <details className="uw-dp-show">
                 <summary>Show the coding criteria</summary>
@@ -637,7 +634,7 @@ export function DispositionPanel({
               />
             )}
             <details className="uw-dp-show">
-              <summary>Show the disposition rules ({screen.disposition_rules.version})</summary>
+              <summary>Show the disposition rules ({versionWords(screen.disposition_rules.version)})</summary>
               <ol>
                 {screen.disposition_rules.rules.map((rule) => (
                   <li key={rule}>{rule}</li>
@@ -650,9 +647,9 @@ export function DispositionPanel({
 
             {canSign ? (
               <section className="ca-drawer-section uw-dp-sign">
-                <h4>
+                <h3>
                   <CheckCircle2 size={15} aria-hidden="true" /> One signature covers
-                </h4>
+                </h3>
                 <ul>
                   {covers(screen, form.branch).map((item) => (
                     <li key={item}>{item}</li>
@@ -665,6 +662,7 @@ export function DispositionPanel({
                   </label>
                 )}
                 <div className="ca-form-grid">
+                  <DecideAndSign />
                   <label className="ca-field">
                     Your password
                     <input
@@ -887,7 +885,7 @@ export function ResolutionTrend() {
                 (item) => `${item.product_name}, ${item.problem_code.replace(/_/g, " ").toLowerCase()}: ${item.count}`,
               )
               .join("; ")}
-            . The next such complaint is escalated by RECURRENCE until a case covers it.
+            . The next such complaint is escalated by the recurrence trigger until a case covers it.
           </span>
         </div>
       )}
@@ -909,7 +907,7 @@ export function ResolutionTrend() {
         </div>
         {data && data.items.length ? (
           <div className="uw-table-scroll">
-            <table className="ac-table">
+            <table className="ac-table ms-cards">
               <thead>
                 <tr>
                   <th scope="col">{GROUP_LABELS[data.group]}</th>
@@ -923,10 +921,10 @@ export function ResolutionTrend() {
                 {data.items.map((item) => (
                   <tr key={item.key.join("|")}>
                     <th scope="row">{item.key.map((part) => part.replace(/_/g, " ")).join(" · ")}</th>
-                    <td>{item.complaints}</td>
-                    <td>{item.service_level}</td>
-                    <td>{item.known_issue}</td>
-                    <td>{item.escalated}</td>
+                    <td data-label="Complaints">{item.complaints}</td>
+                    <td data-label="Service level">{item.service_level}</td>
+                    <td data-label="Known issue">{item.known_issue}</td>
+                    <td data-label="Escalated">{item.escalated}</td>
                   </tr>
                 ))}
               </tbody>

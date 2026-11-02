@@ -275,7 +275,8 @@ describe("the reports screens", () => {
     expect(html).toContain("OUTSIDE");
     expect(html).toContain("Approve the snapshot");
     expect(html).toContain("Not allowed to approve: Priya");
-    expect(html).toContain("MDARIX never submits");
+    // The drawer says it once, at the submission (DecideAndSign), not as a note at its top (0.10.66, V5).
+    expect(html).not.toContain("MDARIX never submits a report.");
     expect(html).toContain("PDF (working draft)");
   });
 

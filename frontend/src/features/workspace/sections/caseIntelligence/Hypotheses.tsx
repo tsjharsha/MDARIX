@@ -226,10 +226,10 @@ function HypothesisCard({
       <div className="uw-intel-evidence">
         {groups.map((group) => (
           <section key={group.relation} aria-label={`${group.label} evidence`}>
-            <h4>
+            <h3>
               <ToneBadge tone={group.tone} label={group.label} />{" "}
               <span className="ac-tab-count">{group.active.length}</span>
-            </h4>
+            </h3>
             {group.active.length ? (
               <ul>
                 {group.active.map((link) => (

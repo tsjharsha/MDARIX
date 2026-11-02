@@ -45,6 +45,7 @@ from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import require_any_permission
 from backend.app.oversight.service import calendar_of
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.business_ids import complaint_ref
 
 router = APIRouter(prefix="/api/v1/communications", tags=["Communications log"])
 
@@ -225,7 +226,7 @@ def _views(db, control_db, tenant_id, rows: list[CommunicationEntry], today: dat
         )
     }
     refs = {
-        row.id: row.business_id or row.complaint_identifier
+        row.id: complaint_ref(row)
         for row in db.query(Complaint.id, Complaint.business_id, Complaint.complaint_identifier).filter(
             Complaint.tenant_id == tenant_id,
             Complaint.id.in_({row.complaint_id for row in rows if row.complaint_id} or {None}),
@@ -318,7 +319,7 @@ def communications(
         "complaint": (
             {
                 "id": str(complaint.id),
-                "ref": complaint.business_id or complaint.complaint_identifier,
+                "ref": complaint_ref(complaint),
                 "identifier": complaint.complaint_identifier,
                 "description": complaint.description,
                 "sample": complaint.source_system is not None,

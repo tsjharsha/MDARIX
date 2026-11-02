@@ -73,7 +73,7 @@ export function AuthFrame({ mode, children }: { mode: string; children: ReactNod
           <span className="auth-logo" aria-hidden="true">
             M
           </span>
-          MDARIX<small>Product intelligence</small>
+          MDARIX
         </a>
         <a className="auth-back" href="/">
           Back to website

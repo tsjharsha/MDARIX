@@ -41,7 +41,7 @@ def test_filters_by_version_lot_problem_code_country_and_source():
         return response.json()
 
     every = listed()
-    assert every["total"] == 37
+    assert every["total"] == 44
     # The filters' choices: what the complaints record, each version named with its product.
     assert {"NFF", "FLOW_ZERO_READING"} <= set(every["problem_codes"])
     assert {"US", "Germany", "France"} <= set(every["countries"])
@@ -49,18 +49,22 @@ def test_filters_by_version_lot_problem_code_country_and_source():
     assert orbit_b["business_id"] and orbit_b["id"]
 
     by_version = listed(version=orbit_b["business_id"])
-    assert by_version["total"] == 17 and all(row["version"] == "Rev B" for row in by_version["items"])
-    assert listed(version=orbit_b["id"])["total"] == 17  # its id works too
+    assert by_version["total"] == 18 and all(row["version"] == "Rev B" for row in by_version["items"])
+    assert listed(version=orbit_b["id"])["total"] == 18  # its id works too
     by_lot = listed(lot="sample-orbit-300-lot-003")  # a lot number in any case
     assert by_lot["total"] == 9 and {row["lot"] for row in by_lot["items"]} == {"SAMPLE-ORBIT-300-LOT-003"}
     assert listed(problem_code="nff")["total"] == 3
-    assert {row["complaint_identifier"] for row in listed(country="Germany")["items"]} == {"SAMPLE-RV-02"}
+    assert {row["complaint_identifier"] for row in listed(country="Germany")["items"]} == {
+        "SAMPLE-RV-02",
+        "SAMPLE-RT-01",
+        "SAMPLE-RT-05",
+    }
     # Filters combine, and paging still counts what matched.
     combined = listed(version=orbit_b["business_id"], problem_code="NFF", country="US")
     assert {row["complaint_identifier"] for row in combined["items"]} == {"SAMPLE-RV-03"}
     paged = user.get("/api/v1/complaints", params={"version": orbit_b["business_id"], "page_size": 5}).json()
-    assert paged["total"] == 17 and len(paged["items"]) == 5 and paged["pages"] == 4
-    assert listed(source_system="MDARIX_SAMPLE")["total"] == 37 and listed(source_system="TRIAL_UPLOAD")["total"] == 0
+    assert paged["total"] == 18 and len(paged["items"]) == 5 and paged["pages"] == 4
+    assert listed(source_system="MDARIX_SAMPLE")["total"] == 44 and listed(source_system="TRIAL_UPLOAD")["total"] == 0
     # The sources the complaints come from, for "Only your imported data" and "Only the sample data" (DEV-017).
     assert every["sources"] == ["MDARIX_SAMPLE"]
     own = (
@@ -71,7 +75,7 @@ def test_filters_by_version_lot_problem_code_country_and_source():
     assert listed()["sources"] == ["MDARIX_SAMPLE", "TRIAL_UPLOAD"]
     imported = listed(source_system="TRIAL_UPLOAD")
     assert [row["complaint_identifier"] for row in imported["items"]] == ["VAL-CMP-001"]
-    assert listed(source_system="MDARIX_SAMPLE")["total"] == 37 and listed()["total"] == 38
+    assert listed(source_system="MDARIX_SAMPLE")["total"] == 44 and listed()["total"] == 45
 
     # Another organization's version or lot never matches there, and its list offers none of these.
     other = _client_with_role("VIEWER")

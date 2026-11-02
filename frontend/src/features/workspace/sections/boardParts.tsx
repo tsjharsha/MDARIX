@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { Tone } from "../../admin/console/dashboardModel";
 import { useWorkspace } from "../workspaceContext";
 import { formatCount } from "./common";
+import { nextTabIndex } from "../../shared/focus";
 
 /** The pieces the review boards share (Complaints, Records): the summary banner, filters and paging. */
 
@@ -53,14 +54,15 @@ export function Hero({
   children?: ReactNode;
 }) {
   return (
-    <section className={`ac-hero uw-cr-hero tone-${tone}`} aria-live="polite">
+    <section className={`ac-hero uw-cr-hero tone-${tone}`}>
       <div className="ac-hero-status">
         <span className="ac-hero-icon" aria-hidden="true">
           {icon}
         </span>
         <div>
           <p className="ac-eyebrow">{eyebrow}</p>
-          <h2>{title}</h2>
+          {/* Only the headline is announced when it changes, not the whole section again (G). */}
+          <h2 aria-live="polite">{title}</h2>
           <p>{detail}</p>
         </div>
       </div>
@@ -83,14 +85,27 @@ export function ChipFilter<T extends string>({
   counts?: Partial<Record<T, number | undefined>>;
   onChange: (value: T) => void;
 }) {
+  // A radio group is one Tab stop: the arrow keys (and Home, End) move the choice, as native radios do (G).
+  const current = Math.max(
+    0,
+    options.findIndex((option) => option.value === value),
+  );
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const next = nextTabIndex(event.key, current, options.length);
+    if (next === null) return;
+    event.preventDefault();
+    onChange(options[next].value);
+    (event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next] ?? null)?.focus();
+  };
   return (
-    <div className="ca-chips" role="radiogroup" aria-label={label}>
-      {options.map((option) => (
+    <div className="ca-chips" role="radiogroup" aria-label={label} onKeyDown={onKeyDown}>
+      {options.map((option, index) => (
         <button
           type="button"
           role="radio"
           key={option.value}
           aria-checked={value === option.value}
+          tabIndex={index === current ? 0 : -1}
           className={value === option.value ? "selected" : ""}
           onClick={() => onChange(option.value)}
         >

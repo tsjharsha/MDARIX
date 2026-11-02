@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { DecideAndSign } from "./common";
+import { questionNumber } from "../../../app/labels";
 import {
   ArrowDown,
   ArrowUp,
@@ -217,7 +219,6 @@ export function GuideDrawer({ market, version, onClose }: { market: string; vers
         <p className="uw-hint" role="note">
           {view.never_decides}
         </p>
-        {view.practice_label && <p className="ac-muted">{view.practice_label}</p>}
         <p className="ac-muted">{view.core_rule}</p>
         {view.matrix_rule && <p className="ac-muted">{view.matrix_rule}</p>}
         {view.change_reason && (
@@ -248,12 +249,12 @@ export function GuideDrawer({ market, version, onClose }: { market: string; vers
 function QuestionTable({ view }: { view: GuideVersion }) {
   return (
     <section className="ca-drawer-section" aria-label="Questions">
-      <h4>Questions ({view.question_set.questions.length})</h4>
+      <h3>Questions ({view.question_set.questions.length})</h3>
       <div className="uw-dg-scroll">
         <table className="uw-dg-table">
           <thead>
             <tr>
-              <th scope="col">ID</th>
+              <th scope="col">No.</th>
               <th scope="col">Question</th>
               <th scope="col">Clause</th>
               <th scope="col">Basis</th>
@@ -262,7 +263,7 @@ function QuestionTable({ view }: { view: GuideVersion }) {
           <tbody>
             {view.question_set.questions.map((question) => (
               <tr key={question.id} className={question.extra ? "uw-dg-extra" : ""}>
-                <th scope="row">{question.id}</th>
+                <th scope="row">{questionNumber(question.id)}</th>
                 <td>
                   <strong>{question.text}</strong>
                   {question.note && <p className="uw-hint">{question.note}</p>}
@@ -285,10 +286,10 @@ function TestTable({ view, tests }: { view: GuideVersion; tests: TestCase[] }) {
   const run = view.test_results;
   return (
     <section className="ca-drawer-section" aria-label="Test matrix">
-      <h4>
+      <h3>
         Test matrix: {tests.length} worked complaints
         {run ? ` · ${run.passed} passed, ${run.failed} failed` : " · not run yet"}
-      </h4>
+      </h3>
       {run && !run.current && <p className="uw-hint">Changed since the last run: run the test matrix again.</p>}
       {run?.run_at && (
         <p className="ac-muted">
@@ -348,7 +349,7 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
       }}
     >
       <section className="ca-drawer-section" aria-label="Questions">
-        <h4>Questions ({questions.length})</h4>
+        <h3>Questions ({questions.length})</h3>
         <p className="ac-muted">
           The questions that drive the conclusion keep the regulation's wording, definition and clause: add your
           explanation and examples beside them. Every extra question needs its regulation clause and its basis before
@@ -358,7 +359,7 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
           <table className="uw-dg-table uw-dg-edit">
             <thead>
               <tr>
-                <th scope="col">ID</th>
+                <th scope="col">No.</th>
                 <th scope="col">Wording</th>
                 <th scope="col">Clause</th>
                 <th scope="col">Basis</th>
@@ -371,7 +372,7 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
               {questions.map((question, index) => (
                 <tr key={`${question.id}-${index}`} className={question.extra ? "uw-dg-extra" : ""}>
                   <th scope="row">
-                    {question.id || "New"}
+                    {question.id ? questionNumber(question.id) : "New"}
                     <span className="uw-cr-meta uw-dg-kind">{question.extra ? "extra" : "core"}</span>
                   </th>
                   {question.extra ? (
@@ -598,7 +599,7 @@ function TestEditor({ view, onAdd }: { view: GuideVersion; onAdd: (test: TestCas
       <div className="ca-form-grid">
         {core.map((question) => (
           <label key={question.id} className="ca-field">
-            {question.id}
+            {questionNumber(question.id)}. {question.text}
             <select
               value={answers[question.id] ?? ""}
               onChange={(event) => setAnswers({ ...answers, [question.id]: event.target.value })}
@@ -678,9 +679,11 @@ function Publish({
   const [code, setCode] = useState("");
   const action = useRun(onChanged, "That step was not recorded.");
   const base = `${GUIDES}/${view.market}/versions/${view.version}`;
+  // Discarding a draft cannot be undone: it is confirmed here, beside the button, never on the first click (F).
+  const [discarding, setDiscarding] = useState(false);
   return (
     <section className="ca-drawer-section" aria-label="Publish">
-      <h4>Before it is used</h4>
+      <h3>Before it is used</h3>
       {view.problems.length ? (
         <ul className="uw-dg-problems" aria-label="What blocks publication">
           {view.problems.map((problem) => (
@@ -699,19 +702,47 @@ function Publish({
               type="button"
               className="ac-secondary"
               disabled={action.busy || !view.test_cases.length}
+              aria-describedby={view.test_cases.length ? undefined : "guide-tests-reason"}
               onClick={() => void action.run(`${base}/tests`, "POST")}
             >
               Run the test matrix
             </button>
+            {!view.test_cases.length && (
+              <span className="ms-reason" id="guide-tests-reason">
+                Add a worked complaint to the matrix first.
+              </span>
+            )}
             <button
               type="button"
               className="ac-link"
               disabled={action.busy}
-              onClick={() => void action.run(`${base}/discard`, "POST")}
+              aria-expanded={discarding}
+              onClick={() => setDiscarding(true)}
             >
               Discard this draft
             </button>
           </div>
+          {discarding && (
+            <div className="ms-confirm" role="group" aria-label="Discard this draft">
+              <p>
+                Discard version {view.version}? Its questions, wording and worked complaints are deleted. This cannot be
+                undone.
+              </p>
+              <div className="ca-action-row">
+                <button
+                  type="button"
+                  className="ca-danger"
+                  disabled={action.busy}
+                  onClick={() => void action.run(`${base}/discard`, "POST")}
+                >
+                  Discard the draft
+                </button>
+                <button type="button" className="ac-secondary" onClick={() => setDiscarding(false)}>
+                  Keep it
+                </button>
+              </div>
+            </div>
+          )}
           <label className="ca-field">
             What changed and why
             <textarea rows={2} value={reason} onChange={(event) => setReason(event.target.value)} />
@@ -763,6 +794,7 @@ function Publish({
           </p>
           {view.approval?.same_person && <p className="ac-message tone-warning">{view.approval.message}</p>}
           <div className="ca-form-grid">
+            <DecideAndSign />
             <label className="ca-field">
               Your password
               <input
@@ -807,7 +839,7 @@ function MatrixCheck({ view }: { view: GuideVersion }) {
   const rows = view.test_cases.length;
   return (
     <section className="ca-drawer-section" aria-label="Test matrix check">
-      <h4>Test matrix, run again now</h4>
+      <h3>Test matrix, run again now</h3>
       {changed.length ? (
         <>
           <p className="tone-critical">
@@ -837,7 +869,7 @@ function ApprovalRecord({ view }: { view: GuideVersion }) {
   if (!view.signature) return null;
   return (
     <section className="ca-drawer-section" aria-label="Approval">
-      <h4>Approval</h4>
+      <h3>Approval</h3>
       <p>
         Approved by <strong>{view.signature.signer_name}</strong> ({view.signature.signer_role}) on{" "}
         {formatDate(view.signature.signed_at)}.

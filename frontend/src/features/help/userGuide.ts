@@ -185,7 +185,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           {
             title: "Sign out, and how sessions end",
             steps: [
-              "Choose Logout at the top right to sign out.",
+              "Choose Sign out at the top right.",
               "MDARIX signs you out after 30 minutes without activity. Two minutes before, it asks: choose Stay signed in to continue.",
               "No session lasts longer than 12 hours, even when you are active. Sign in again to continue where you left off.",
             ],

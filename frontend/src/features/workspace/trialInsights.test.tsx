@@ -278,9 +278,12 @@ describe("Automatic insights: the panel", () => {
     expect(open).toContain('<th scope="col">Released</th><th scope="col" class="num">Complaints</th>');
     expect(open).toContain('<th scope="col" class="num">Per month</th><th scope="col">Top lots</th>');
     expect(open).toContain(
-      '<td>2 Aug 2026</td><td class="num">6</td><td class="num">2.0</td><td>L-3 (4), L-4 (2)</td>',
+      '<td data-label="Released">2 Aug 2026</td><td class="num" data-label="Complaints">6</td>' +
+        '<td class="num" data-label="Per month">2.0</td><td data-label="Top lots">L-3 (4), L-4 (2)</td>',
     );
-    expect(open).toContain('<td class="num">4</td><td class="num">—</td>');
+    expect(open).toContain(
+      '<td class="num" data-label="Complaints">4</td><td class="num" data-label="Per month">—</td>',
+    );
   });
 
   it("offers Ask MDARIX to look further only while AI answers", () => {
