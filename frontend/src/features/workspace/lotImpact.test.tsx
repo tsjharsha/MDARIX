@@ -105,7 +105,7 @@ const view = (over: Partial<LotImpactView> = {}): LotImpactView => ({
   practice_label: "Practice record: made in a free trial.",
   reason_min: 10,
   options: [option],
-  suggestion: { ...option, why: "2 of the case's 2 lots share it" },
+  suggestion: { ...option, why: "2 of the investigation's 2 lots share it" },
   case_lots: 2,
   genealogy: true,
   saved: null,

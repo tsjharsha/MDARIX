@@ -40,7 +40,8 @@ export const REVIEW_LIMITS = {
 export const PAGE_SIZE = 25;
 
 export type ReviewReason = { code: string; label: string; count?: number };
-export type ComplaintSign = { code: string; label: string };
+/** `value`: a problem code's own text (PROBLEM_CODE), shown with its IMDRF term (0.10.70). */
+export type ComplaintSign = { code: string; label: string; value?: string | null };
 export type SecondLookDecision = {
   decision: "CONFIRMED" | "DISMISSED" | string;
   reason: string;
@@ -301,21 +302,15 @@ export function decisionBody(decision: "CONFIRMED" | "DISMISSED", reason: string
 export const otherDecision = (decision: string | null | undefined): "CONFIRMED" | "DISMISSED" =>
   decision === "CONFIRMED" ? "DISMISSED" : "CONFIRMED";
 
-/** "Complaint ID" for a record: its MDARIX ID, else its number in the source system. */
-export const recordId = (record: Pick<ReviewRecord, "business_id" | "complaint_identifier">) =>
-  record.business_id || record.complaint_identifier || "Complaint";
-
 /**
- * A record as a drawer, a toast or a button names it: its MDARIX ID with its number in the source system beside it,
- * "CMP000029 (SAMPLE-RV-01)", so the complaint can be found in the export it came from (DEV-008); either alone when
- * it has only one.
+ * The one ID a complaint shows (stage 5, J18): the customer's own reference (SAMPLE-RV-01, the imported complaint
+ * number), else its MDARIX ID. The other ID is said only under "Also known as" (sections/common.tsx AlsoKnownAs).
  */
-export const recordName = (record: Pick<ReviewRecord, "business_id" | "complaint_identifier">) => {
-  const source = record.complaint_identifier?.trim();
-  return record.business_id && source && source !== record.business_id
-    ? `${record.business_id} (${source})`
-    : recordId(record);
-};
+export const recordId = (record: Pick<ReviewRecord, "business_id" | "complaint_identifier">) =>
+  record.complaint_identifier?.trim() || record.business_id || "Complaint";
+
+/** A record as a drawer, a toast or a button names it: the same one ID (0.10.70; it showed "CMP000029 (SAMPLE-RV-01)"). */
+export const recordName = recordId;
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

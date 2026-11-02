@@ -489,9 +489,12 @@ def sign_disposition(
         # typed twice); the person's reason follows.
         question = (
             f"{(complaint.description or '').strip()} Escalated from complaint {ref} "
-            f"({rules.BRANCH_LABELS[branch].lower()}"
-            + (f": {'; '.join(item['label'].lower() for item in met)}" if met else "")
-            + f"). {rationale}"
+            + (
+                f"by the trigger{'s' if len(triggers.codes(met)) > 1 else ''} {triggers.words(triggers.codes(met))}"
+                if met
+                else "by choice"
+            )
+            + f". {rationale}"
         ).strip()[:2000]
         case, _, _ = open_case(
             db,

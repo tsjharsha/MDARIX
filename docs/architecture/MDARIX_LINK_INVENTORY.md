@@ -147,7 +147,7 @@ These four files differ on mvp-1.0:
   record-observation, add-unknown, unknown-status, request-evidence, build-chain, chain-link, review, request-review,
   review-evidence, provenance, link-evidence-records, new-request, request, follow-up, impact, decision-record,
   return-brief, submit-brief, state-change, ai-run. Back closes one; refresh and a new tab reopen it.
-- **A server target names a case.** The checklist's "Sign the investigation decision on the case" carries
+- **A server target names a case.** The checklist's "Sign the investigation's decision" carries
   `record=("case", <id>)` on Investigations › Decision (`closure.py`); `useOpenTarget` makes that case the context
   first (`/workspace/context/resolve` now also takes an id). Test: `tests/test_flagship_walkthrough.py`.
 - **The entrance and its stories** (`features/workspace/entrance.ts`): each story starts on a place of the new

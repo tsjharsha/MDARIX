@@ -6,6 +6,7 @@ import { formatDateTime, formatDay, isDateOnly } from "../../../app/dates";
 import { useCan, useIsTrial } from "../workspaceContext";
 import { countOf, formatCount } from "./common";
 import { EscalateButton } from "./Triage";
+import { ProblemCodeOf } from "./ProblemCode";
 
 /*
  * What an Excel or CSV import did (0.10.56, the MVP's R14, R16 and R17 on the trial's import path): each run's
@@ -601,30 +602,12 @@ type ImdrfLink = { release: string; annex: string; code: string; term: string | 
 /** "A16 Protective measures problem": an IMDRF code and its term once the release is loaded (exported for its test). */
 export const imdrfText = (link: ImdrfLink) => (link.term ? `${link.code} ${link.term}` : link.code);
 
-/** The IMDRF codes a complaint's problem code maps to (approved links only), beside the problem code. */
+/** A complaint's problem code: its IMDRF term first, the customer's own code as the "your code" detail (0.10.70). */
 export function ImdrfCodes({ problemCode }: { problemCode: string | null }) {
-  const links = useResource<{ links: Record<string, ImdrfLink[]> }>(
-    problemCode ? `/api/v1/regulatory-reference/imdrf/links?${new URLSearchParams({ code: problemCode })}` : null,
-  );
   if (!problemCode) return null;
-  const found = links.data?.links[problemCode] ?? [];
   return (
     <p className="uw-imdrf">
-      Problem code <code>{problemCode}</code>
-      {found.length ? (
-        <>
-          {" "}
-          · IMDRF Annex {found[0].annex}:{" "}
-          {found.map((link, index) => (
-            <span key={`${link.annex}${link.code}`} title={`IMDRF release ${link.release}`}>
-              {index ? "; " : ""}
-              {imdrfText(link)}
-            </span>
-          ))}
-        </>
-      ) : links.data ? (
-        " · no IMDRF code mapped yet"
-      ) : null}
+      Problem: <ProblemCodeOf code={problemCode} />
     </p>
   );
 }

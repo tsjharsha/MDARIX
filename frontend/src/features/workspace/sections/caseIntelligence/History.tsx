@@ -2,7 +2,7 @@
 import { Empty, Panel } from "../../../admin/console/charts";
 import { formatDate, useResource } from "../../../customer-admin/shared";
 import { safeText } from "../../../../app/displayId";
-import { roleLabel } from "../../../../app/roles";
+import { roleNote } from "../../../../app/roles";
 import { historyEventText, historyEvents, intelligencePath } from "../../intelligence";
 
 export function HistoryView({ investigationId, caseLabel }: { investigationId: string; caseLabel: string }) {
@@ -22,7 +22,7 @@ export function HistoryView({ investigationId, caseLabel }: { investigationId: s
                 <strong>{historyEventText(event)}</strong>
                 <small className="ac-muted">
                   {safeText(event.actor_name) ?? "MDARIX"}
-                  {event.actor_role ? ` (${roleLabel(event.actor_role)})` : ""} · {formatDate(event.created_at)}
+                  {event.actor_role ? roleNote(event.actor_role) : ""} · {formatDate(event.created_at)}
                 </small>
                 {safeText(event.reason) && <p>{event.reason}</p>}
               </li>

@@ -74,7 +74,7 @@ import { LookAheadSection } from "./sections/LookAhead";
 import { LOOK_AHEAD_SUBTITLE, LOOK_AHEAD_SUMMARY } from "./partyPreview";
 import { NEXT_STEPS_SUBTITLE, NEXT_STEPS_SUMMARY } from "../help/trialNextSteps";
 import { requestJson } from "../../app/apiClient";
-import { rolesSummary } from "../../app/roles";
+import { rolesSummary, shortRoles } from "../../app/roles";
 import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
 import { signalFromSearch, signalLinkStart } from "./signals";
 import { zoneName } from "../../app/dates";
@@ -597,9 +597,10 @@ export function UserWorkspace({
             </span>
           )}
           <div className="ac-user">
-            <span>
+            {/* One line (0.10.70): the name and the role in a word; the whole role is the tooltip. */}
+            <span className="uw-who" title={`${session?.display_name ?? "User"}: ${rolesSummary(session)}`}>
               <strong>{session?.display_name ?? "User"}</strong>
-              <small>{rolesSummary(session)}</small>
+              <small>{shortRoles(session)}</small>
             </span>
             {onAdminConsole && (
               <button

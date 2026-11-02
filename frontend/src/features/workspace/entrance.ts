@@ -11,7 +11,8 @@ export type StoryStep = {
   /** The main button that does this step, as the screen names it (the walk-through test checks it exists). */
   button: string;
   section: string;
-  tab?: string;
+  /** The tab, or the tabs, the step is on. */
+  tab?: string | readonly string[];
   /** A parameter the place must carry (a report's panel), or must not. */
   has?: string;
   hasNot?: string;
@@ -25,6 +26,11 @@ export type Scenario = {
   /** Where the story starts, as a classic place: the table moves it (routeFor). */
   start: Place;
   steps: StoryStep[];
+  /**
+   * The story's own records (0.10.70): its complaint, by its reference, and its investigation, by its identifier or
+   * "escalated" (the one the complaint's disposition opens). A place showing another record is off the story's path.
+   */
+  record?: { complaint?: string; investigation?: string };
 };
 
 export const FLAGSHIP = "SAMPLE-RV-11";
@@ -53,6 +59,7 @@ export const SCENARIOS: readonly Scenario[] = [
     minutes: 5,
     lede: "OrbitCare 300 Rev B: complaints per unit against the earlier average, its investigation and the lots it touches.",
     start: { section: "Signals", tab: "Trend check" },
+    record: { investigation: "SAMPLE-INV-001" },
     steps: [
       { label: "See Rev B rise against the earlier average", button: "Open", section: "Trends", tab: "Trend check" },
       { label: "Open its trend", button: "Open an investigation", section: "Trends", tab: "Trends to review" },
@@ -72,6 +79,7 @@ export const SCENARIOS: readonly Scenario[] = [
     minutes: 5,
     lede: "A PulseWatch 410 read SpO2 too high; nobody was harmed. Each market's questions, its clock and the report.",
     start: { section: "Complaint", tab: `Summary?ref=${FLAGSHIP}` },
+    record: { complaint: FLAGSHIP, investigation: "escalated" },
     steps: [
       {
         label: "What happened, and each market's legal clock",
@@ -96,7 +104,13 @@ export const SCENARIOS: readonly Scenario[] = [
       },
       { label: "Sign the disposition", button: "Sign", section: "My Work", tab: "Queues" },
       { label: "The investigation's decision", button: "Sign decision", section: "Investigations" },
-      { label: "Ready to close", button: "Sign ready to close", section: "Complaint", tab: "Decisions & actions" },
+      // Once signed, its receipt is in History: still the story's last step.
+      {
+        label: "Ready to close",
+        button: "Sign ready to close",
+        section: "Complaint",
+        tab: ["Decisions & actions", "History"],
+      },
     ],
   },
   {
@@ -116,12 +130,43 @@ export function storyStep(scenario: Scenario, place: { section: string; tab?: st
   for (let index = scenario.steps.length - 1; index >= 0; index--) {
     const step = scenario.steps[index];
     if (step.section !== place.section) continue;
-    if (step.tab && step.tab !== (name || defaultTab(place.section))) continue;
+    if (step.tab && ![step.tab].flat().includes(name || defaultTab(place.section))) continue;
     if (step.has && !carried.has(step.has)) continue;
     if (step.hasNot && carried.has(step.hasNot)) continue;
     return index;
   }
   return -1;
+}
+
+/** What a story's records are, once read: its complaint's id and its investigation's id (null until there is one). */
+export type StoryIds = { complaintId?: string | null; caseId?: string | null };
+
+/**
+ * Whether the place shows the story's own record (0.10.70): a complaint page or a list's panel names a complaint by
+ * its reference (ref=) or its id (complaint=); an investigation's screen shows the investigation in the context. A
+ * record not yet read counts as the story's (no flicker); an "escalated" investigation that does not exist yet does
+ * not: an investigation shown before the flagship's disposition is another one.
+ */
+export function onStoryRecord(
+  scenario: Scenario,
+  place: { section: string; tab?: string },
+  ids: StoryIds,
+  investigationId?: string | null,
+): boolean {
+  const record = scenario.record;
+  if (!record) return true;
+  const carried = new URLSearchParams(tabParts(place.tab).query);
+  if (record.complaint) {
+    const ref = carried.get("ref");
+    const complaint = carried.get("complaint");
+    if (ref && ref !== record.complaint) return false;
+    if (complaint && ids.complaintId && complaint !== ids.complaintId) return false;
+  }
+  if (record.investigation && place.section === "Investigations") {
+    if (record.investigation === "escalated" && ids.caseId === null) return false;
+    if (ids.caseId && investigationId && investigationId !== ids.caseId) return false;
+  }
+  return true;
 }
 
 const defaultTab = (section: string) => (section === "Complaint" || section === "Investigations" ? "Summary" : "");

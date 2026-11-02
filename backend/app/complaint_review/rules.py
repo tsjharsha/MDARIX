@@ -257,7 +257,8 @@ def signs_of(record: dict, words: list[str] | tuple[str, ...]) -> tuple[list[dic
         signs.append({"code": "SEVERITY", "label": f"Severity: {str(record.get('severity')).strip()}"})
     code = str(record.get("problem_code") or "").strip()
     if code and not nff_family(code):
-        signs.append({"code": "PROBLEM_CODE", "label": f"Problem code: {code}"})
+        # The value lets the screen show the IMDRF term first and the customer's own code as its detail (0.10.70).
+        signs.append({"code": "PROBLEM_CODE", "label": f"Problem code: {code}", "value": code})
     found = matched_words(record.get("description"), words)
     if found:
         signs.append({"code": "WORDS", "label": "Mentions " + ", ".join(found[:6])})

@@ -148,11 +148,12 @@ def test_a_stage_never_needed_reads_not_needed():
         {"code": "DECISION", "result": closure.BLOCKED},
     ]
     stages = {stage["code"]: stage["state"] for stage in closure.stage_line(found, items, None)}
-    # 0.10.63 ticked the market assessment and the investigation as done although neither was ever needed (J29).
+    # 0.10.63 ticked the market assessment and the investigation as done although neither was ever needed (J29). Since
+    # 0.10.70 an investigation is "later" until the decision says whether one is needed (it read "not needed").
     assert stages == {
         "TRIAGE": "DONE",
         "MARKETS": "NOT_NEEDED",
-        "INVESTIGATION": "NOT_NEEDED",
+        "INVESTIGATION": "LATER",
         "DECISION": "CURRENT",
         "READY": "OPEN",
         "CLOSED": "LATER",

@@ -70,6 +70,25 @@ export function roleLabels(session: { roles?: RoleRef[] | null; active_role?: st
   return labels.filter((label, index) => labels.indexOf(label) === index);
 }
 
+/** A role after a name, in brackets that never nest (0.10.70): " (Leader, Quality Manager)", not " (Leader (Quality
+ * Manager))". */
+export function roleNote(code: unknown, label?: unknown): string {
+  const text = roleLabel(code, label).replace(/\s*\((.*)\)\s*$/, ", $1");
+  return text ? ` (${text})` : "";
+}
+
+/**
+ * The roles in a few words for the top bar's one line (0.10.70): each label without its bracketed detail, "Leader"
+ * for "Leader (Quality Manager)". The whole summary is the name's tooltip.
+ */
+export function shortRoles(
+  session: { roles?: RoleRef[] | null; active_role?: string | null } | null | undefined,
+  fallback = "No active role",
+): string {
+  const labels = roleLabels(session).map((label) => label.replace(/\s*\(.*\)\s*$/, "").trim() || label);
+  return labels.length ? labels.filter((label, index) => labels.indexOf(label) === index).join(" + ") : fallback;
+}
+
 /** "Quality Investigator + Risk Reviewer" for the header; `fallback` when the person has no role at all. */
 export function rolesSummary(
   session: { roles?: RoleRef[] | null; active_role?: string | null } | null | undefined,

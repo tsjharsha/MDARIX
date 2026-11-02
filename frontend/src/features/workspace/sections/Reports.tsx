@@ -4,7 +4,7 @@ import { CheckCircle2, ClipboardList, Download, FileText, Send, ShieldCheck, Und
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
-import { WorkspaceContext, useCan, useTabParam } from "../workspaceContext";
+import { WorkspaceContext, useCan, useNavigation, useTabParam } from "../workspaceContext";
 import { communicationsTab } from "../communications";
 import { AlsoKnownAs, countOf, DecideAndSign, shortPrint } from "./common";
 import { ComplaintNextStep } from "./ComplaintNextStep";
@@ -282,6 +282,7 @@ export function ReportDrawer({
         </p>
         <ComplaintNextStep
           complaintId={detail.complaint.id}
+          here="Reports"
           refreshKey={`${detail.state}.${detail.snapshots.length}.${detail.submissions.length}`}
         />
       </div>
@@ -711,6 +712,9 @@ function AfterAcceptance({
   const [note, setNote] = useState("");
   const [due, setDue] = useState("");
   const [request, setRequest] = useState({ text: "", received: "", due: "" });
+  // The obligation is met; completing it is optional. On the new navigation the drawer's one main button is the
+  // complaint's next step below (0.10.70).
+  const fresh = useNavigation() === "new";
   const action = useAction(onChanged, "That step was not recorded.");
   const base = `${REPORTS}/${detail.id}`;
   return (
@@ -722,7 +726,7 @@ function AfterAcceptance({
       <div className="ca-action-row">
         <button
           type="button"
-          className="ac-primary"
+          className={fresh ? "ac-secondary" : "ac-primary"}
           disabled={action.busy || note.trim().length < REASON_MIN}
           onClick={() => void action.run(`${base}/complete`, "POST", { reason: note })}
         >
@@ -922,7 +926,7 @@ function FieldRow({
       <p className={item.value ? "uw-rp-value" : "uw-rp-value empty"}>{item.value ?? "—"}</p>
       <p className="uw-cr-meta">
         {item.source
-          ? `From ${item.source.label.replace(/^The /, "the ")}${item.source.ref ? `: ${item.source.ref}` : ""}`
+          ? `From ${item.source.label.replace(/^(The|An|A) /, (word) => word.toLowerCase())}${item.source.ref ? `: ${item.source.ref}` : ""}`
           : ""}
         {item.by
           ? `${item.source ? " · " : ""}${item.status === "CONFIRMED" ? "Confirmed" : "Entered"} by ${item.by} ${formatDate(item.at)}`

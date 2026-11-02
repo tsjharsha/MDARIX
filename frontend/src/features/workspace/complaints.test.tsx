@@ -103,8 +103,10 @@ describe("the Complaints section", () => {
 describe("a second-look card", () => {
   it("shows why the record is flagged, its signs and the matched words marked", () => {
     const markup = render(<SecondLookCard item={item()} onDecide={vi.fn()} />, ["investigation.create"]);
-    expect(markup).toContain("CMP000012");
-    expect(markup).toContain("Source ID SRC-12");
+    // One ID (0.10.70): the customer's own reference; the MDARIX ID only under "Also known as".
+    expect(markup).toContain('<strong class="uw-cr-id">SRC-12</strong>');
+    expect(markup).toContain('Also known as <span class="ms-id">CMP000012</span>');
+    expect(markup).not.toContain("Source ID");
     expect(markup).toContain("Cancelled or rejected (status: Cancelled)");
     expect(markup).toContain("Patient involved");
     expect(markup).toContain("Patient was <mark>choking</mark> on the tube");

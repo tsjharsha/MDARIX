@@ -34,7 +34,7 @@ ESCALATED = (ESCALATED_BY_TRIGGER, ESCALATED_BY_CHOICE)
 RESOLVED = (SERVICE_LEVEL, KNOWN_ISSUE)
 BRANCH_LABELS = {
     ESCALATED_BY_TRIGGER: "Escalated: trigger met",
-    KNOWN_ISSUE: "Known issue, linked to an open case",
+    KNOWN_ISSUE: "Known issue, linked to an open investigation",
     SERVICE_LEVEL: "Resolved at service level",
     ESCALATED_BY_CHOICE: "Escalated by choice",
 }
@@ -163,16 +163,14 @@ def branch_problem(
     if branch not in BRANCHES:
         return "Choose how the complaint is resolved"
     if triggered and branch != ESCALATED_BY_TRIGGER:
-        return (
-            "An escalation trigger is met: the complaint is escalated and a case opens; the other branches are refused"
-        )
+        return "An escalation trigger is met: the complaint is escalated and an investigation opens; the other branches are closed"
     if not triggered and branch == ESCALATED_BY_TRIGGER:
         return "No escalation trigger is met: choose a known issue, service level, or escalate by choice"
     if branch == KNOWN_ISSUE and case_id not in candidates:
-        return "Choose one of the open cases that match this complaint"
+        return "Choose one of the open investigations that match this complaint"
     if branch in (ESCALATED_BY_TRIGGER, KNOWN_ISSUE, ESCALATED_BY_CHOICE) and len(rationale) < REASON_MIN:
         what = {
-            ESCALATED_BY_TRIGGER: "why the case is needed",
+            ESCALATED_BY_TRIGGER: "why the investigation is needed",
             KNOWN_ISSUE: "why it is the same issue",
             ESCALATED_BY_CHOICE: "why you escalate it",
         }[branch]
@@ -180,7 +178,9 @@ def branch_problem(
     if len(rationale) > TEXT_MAX:
         return f"Keep the rationale under {TEXT_MAX} characters"
     if branch in (SERVICE_LEVEL, ESCALATED_BY_CHOICE) and candidates and len(not_known_reason) < REASON_MIN:
-        return f"An open case matches: say in at least {REASON_MIN} characters why this is not that known issue"
+        return (
+            f"An open investigation matches: say in at least {REASON_MIN} characters why this is not that known issue"
+        )
     return None
 
 
@@ -194,14 +194,16 @@ def answers_of(branch: str, triggers: list[dict], candidates: list[str], rationa
     }
     if triggered:
         for key in ("KNOWN_ISSUE", "SERVICE_LEVEL", "CHOICE"):
-            answers[key] = {"answer": "REFUSED", "rationale": "Refused: a trigger is met"}
+            answers[key] = {"answer": "REFUSED", "rationale": "Closed: a trigger is met"}
         return answers
     if branch == KNOWN_ISSUE:
         answers["KNOWN_ISSUE"] = {"answer": "YES", "rationale": rationale}
         return answers
     answers["KNOWN_ISSUE"] = {
         "answer": "NO",
-        "rationale": not_known_reason if candidates else "No open case holds the same product and problem code or lot",
+        "rationale": not_known_reason
+        if candidates
+        else "No open investigation holds the same product and problem code or lot",
     }
     if branch == SERVICE_LEVEL:
         answers["SERVICE_LEVEL"] = {"answer": "YES", "rationale": "See the service-level record"}

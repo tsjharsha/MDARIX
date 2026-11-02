@@ -6,7 +6,7 @@ describe("names, not codes (J18)", () => {
     expect(marketLabel("EU_NI")).toBe("EU and Northern Ireland");
     expect(marketLabel("IN")).toBe("India");
     expect(triggerLabel("NEW_FAILURE_MODE")).toBe("New failure mode");
-    expect(triggerLabel("RECURRENCE")).toBe("Recurrence no case covers");
+    expect(triggerLabel("RECURRENCE")).toBe("Recurrence no investigation covers");
     expect(codeWords("COMPLAINT_THRESHOLD")).toBe("Complaint threshold");
     expect(versionWords("disposition-starter-1")).toBe("MDARIX starter, version 1");
     expect(versionWords("response-starter-1")).toBe("MDARIX starter, version 1");
