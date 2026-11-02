@@ -80,7 +80,7 @@ export function FirstContact({
             ? summary.all
               ? `${countOf(summary.all, "call")} and urgent intakes`
               : "No call logged yet"
-            : "Reading the calls…"
+            : "Calls and urgent intakes"
         }
         detail="A service call can hide a complaint. Log the caller's words, answer the ten questions, and the table gives complaint, service only, both or pending. A harm answer or a harm word goes to triage at once. Awareness is the time of the call."
       >

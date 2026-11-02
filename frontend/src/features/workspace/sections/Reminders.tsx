@@ -15,7 +15,7 @@ import {
   type AlertList,
   type Opens,
 } from "../oversight";
-import { InlineError } from "./boardParts";
+import { InlineError, Why } from "./boardParts";
 
 /** Opens where an alert's work is done (its own section and tab). */
 function useOpen() {
@@ -55,7 +55,7 @@ export function RemindersPanel() {
       eyebrow="Reminders and escalations"
       title={
         !list
-          ? "Reading your reminders…"
+          ? "Reminders and escalations for you"
           : count
             ? `${count} ${count === 1 ? "reminder" : "reminders"} for you${list.unread ? `, ${list.unread} unread` : ""}`
             : "Nothing due soon or overdue for you"
@@ -266,9 +266,10 @@ export function AwayControl({ list, onChanged }: { list: AlertList; onChanged: (
             backup gains no right to sign for you.
           </p>
           <div className="ca-action-row">
-            <button type="submit" className="ac-primary" disabled={busy || !!problem}>
+            <button type="submit" className="ac-primary" disabled={busy || !!problem} aria-describedby="away-why">
               {busy ? "Recording…" : "Record my absence"}
             </button>
+            <Why id="away-why" text={problem} />
             <button type="button" className="ac-link" onClick={() => setOpen(false)}>
               Cancel
             </button>

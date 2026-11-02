@@ -63,7 +63,7 @@ export function Communications({ complaintId }: { complaintId?: string | null })
               : counts.unresolved
                 ? `${countOf(counts.unresolved, "request")} unresolved after attempts`
                 : "No request waits for a reply"
-            : "Reading the log…"
+            : "The communications log"
         }
         detail="Every question to a reporter, distributor, hospital or service partner, with its owner, reply due date and every attempt. Send from your own mail or phone, then record it here."
       />

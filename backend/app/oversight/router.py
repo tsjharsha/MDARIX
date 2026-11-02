@@ -50,6 +50,7 @@ from backend.app.db.models.oversight import DueAlert, EventClosure, OversightSet
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import require_any_permission
+from backend.app import links
 from backend.app.oversight import closure, rules, service
 from backend.app.reportability.deadlines import due_label
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -352,8 +353,10 @@ def complaint_work(db, control_db, tenant_id, complaints: list) -> dict[str, dic
     if not complaints:
         return {}
     ids = {str(complaint.id) for complaint in complaints}
-    views, _ = _item_views(db, control_db, tenant_id, service.now_utc())
+    now = service.now_utc()
+    views, context = _item_views(db, control_db, tenant_id, now)
     due = [view for view in views if view["complaint_id"] in ids]
+    clocks = _watch_clocks(db, control_db, tenant_id, ids, now, context["settings"]["reminder_hours"])
     tasks = closure.open_tasks_by_complaint(db, tenant_id)
     triage = closure.open_on_triage(db, tenant_id)
     rows = {
@@ -375,6 +378,11 @@ def complaint_work(db, control_db, tenant_id, complaints: list) -> dict[str, dic
         key = str(complaint.id)
         item = found[key]
         mine = [view for view in due if view["complaint_id"] == key]
+        # A market not assessed yet runs the reportability watch's provisional clock, which Oversight does not list
+        # (it lists a market's clock once its assessment is started): shown here, so the page says what the watch says.
+        dated = {view["market"] for view in mine if view["category"] in ("REPORTING", "OBLIGATION")}
+        mine += [clock for clock in clocks.get(key, []) if clock["market"] not in dated]
+        mine.sort(key=lambda view: view["due_at"])
         own = markets.market_of(complaint.country)
         out[key] = {
             "owner_id": item["owner_id"],
@@ -403,6 +411,37 @@ def complaint_work(db, control_db, tenant_id, complaints: list) -> dict[str, dic
             ],
             "markets": sorted({view["market"] for view in mine if view["market"]} | ({own} if own else set())),
         }
+    return out
+
+
+def _watch_clocks(db, control_db, tenant_id, ids: set[str], now, reminder_hours: int) -> dict[str, list[dict]]:
+    """The reportability watch's running clock of each complaint (its binding deadline), as a dated item."""
+    from backend.app.reportability import markets
+    from backend.app.reportability import service as reportability
+
+    out: dict[str, list[dict]] = {}
+    for item in reportability.watch(db, control_db, tenant_id, show="open", page_size=10_000, today=now)["items"]:
+        binding = item.get("binding")
+        if str(item["id"]) not in ids or not binding or not binding.get("due_at"):
+            continue
+        due_at = datetime.fromisoformat(binding["due_at"])
+        market = binding.get("market")
+        state = rules.state_of(due_at, now, reminder_hours)
+        out.setdefault(str(item["id"]), []).append(
+            {
+                "key": f"watch:{item['id']}:{market}",
+                "category": "REPORTING",
+                "category_label": rules.CATEGORIES["REPORTING"],
+                "title": f"{markets.MARKET_LABELS.get(market, market)}: not assessed yet, provisional deadline",
+                "market": market,
+                "due_at": due_at.isoformat(),
+                "due_label": binding.get("due_label"),
+                "state": state,
+                "state_label": rules.STATE_LABELS[state],
+                "hours_left": rules.hours_left(due_at, now),
+                "opens": links.target("Complaints", "Reportability", record=("complaint", item["id"])),
+            }
+        )
     return out
 
 
@@ -838,10 +877,6 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     items = closure.checklist(found)
     blocked = [item for item in items if item["result"] == closure.BLOCKED]
     owner = closure.owner_of(row, found["record"])
-    now = service.now_utc()
-    due = [
-        item for item in service.due_items(db, control_db, tenant_id, now) if item["complaint_id"] == str(complaint.id)
-    ]
     refs = {owner, row.signed_by if row else None, row.filed_by if row else None}
     refs |= {e.signed_by for e in found["first_contact"]} | {d.signed_by for d in found["dispositions"]}
     refs |= {v.signed_by for versions in found["assessments"].values() for v in versions}
@@ -853,7 +888,8 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     record = closure.decision_record(control_db, found, row, names)
     signed_print = row.content_fingerprint if row is not None else None
     changed = bool(row and row.ready_state and signed_print != closure.fingerprint(complaint.id, items))
-    nearest = due[0] if due else None
+    work = complaint_work(db, control_db, tenant_id, [complaint])[str(complaint.id)]
+    nearest = work["due"][0] if work["due"] else None
     state = _event_state(complaint, items, row)
     product = _products(db, tenant_id).get(complaint.product_id)
     version, lot = _version_and_lot(db, tenant_id, complaint)
@@ -886,13 +922,8 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
             "sample": complaint.source_system is not None,
         },
         "summary": {
-            "nearest_deadline": {
-                "title": nearest["title"],
-                "due_at": nearest["due_at"].isoformat(),
-                "opens": nearest["opens"],
-            }
-            if nearest
-            else None,
+            # The nearest dated item, the reportability watch's provisional clock included (0.10.68).
+            "nearest_deadline": {key: nearest[key] for key in ("title", "due_at", "opens")} if nearest else None,
             "open_requests": len(found["requests"]),
             "next_action": {"label": blocked[0]["action"], "detail": blocked[0]["detail"], "opens": blocked[0]["opens"]}
             if blocked
@@ -920,7 +951,7 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
         "never_closes": closure.NEVER_CLOSES,
         "practice_label": _practice(control_db, tenant_id),
         # The owner, stage, next action and dated items the lists and My work show for it (0.10.68).
-        "work": complaint_work(db, control_db, tenant_id, [complaint])[str(complaint.id)],
+        "work": work,
         # Who may sign each step, before the work starts (7.8).
         "signers": _signers(control_db, tenant_id, me, bool(found["cases"])),
     }

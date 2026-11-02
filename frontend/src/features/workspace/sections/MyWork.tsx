@@ -74,6 +74,7 @@ import { parseRequestTab } from "../evidenceWorkflow";
 import { EvidenceRequestsPanel } from "./EvidenceRequests";
 import { RemindersPanel } from "./Reminders";
 import { useAiReady } from "../useAiStatus";
+import { Why } from "./boardParts";
 import { ChevronRight } from "lucide-react";
 import { NEW_PLACES, placeOf } from "../../../app/linkTable";
 import { offeredTab } from "../../../app/featureSet";
@@ -260,6 +261,7 @@ export function NewMyWorkSection({ tab }: { tab?: string }) {
  */
 export function NextStep() {
   const { open } = useWorkspace();
+  const canLog = useCan("signal.triage") || useCan("investigation.create") || useCan("quality.review");
   const openTask = useOpenTask();
   const tasks = useResource<TaskList>(taskListPath("assigned", 1, 1));
   const alerts = useResource<AlertList>(ALERTS);
@@ -289,6 +291,12 @@ export function NextStep() {
       <button type="button" className="ac-primary" onClick={next.run}>
         {next.label} <ChevronRight size={16} aria-hidden="true" />
       </button>
+      {/* A call that may be a complaint is logged from here (click path a: four clicks to a signed check). */}
+      {canLog && (
+        <button type="button" className="ac-secondary" onClick={() => open("Complaints", "First contact?log=CONTACT")}>
+          Log a call
+        </button>
+      )}
     </section>
   );
 }
@@ -381,6 +389,7 @@ function useTaskAction(onDone: () => void) {
 type DrawerState = { task: Task; mode: "details" | TaskActionKey };
 
 function TaskInbox({ view, summary }: { view: TaskView; summary: Resource<TaskSummary> }) {
+  const { open } = useWorkspace();
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -426,7 +435,26 @@ function TaskInbox({ view, summary }: { view: TaskView; summary: Resource<TaskSu
           caption={LIST_TITLES[view]}
           rows={rows}
           rowKey={(row) => String(row.id)}
-          empty={search ? { title: "No matching tasks", detail: "Change the search to see more." } : LIST_EMPTY[view]}
+          empty={
+            search
+              ? {
+                  title: "No matching tasks",
+                  detail: "Change the search to see more.",
+                  action: (
+                    <button type="button" className="ac-secondary" onClick={() => setQuery("")}>
+                      Clear the search
+                    </button>
+                  ),
+                }
+              : {
+                  ...LIST_EMPTY[view],
+                  action: (
+                    <button type="button" className="ac-secondary" onClick={() => open("Complaints", "Triage")}>
+                      See the complaints to triage
+                    </button>
+                  ),
+                }
+          }
           serverSort={{ sort, onSort, keys: TASK_SORTS }}
           columns={taskColumns(view, {
             busy: action.busy,
@@ -860,15 +888,20 @@ function TaskActionForm({
           onChange={(event) => setReason(event.target.value)}
         />
       </label>
-      {reason.trim() && problem && <p className="ac-muted">{problem}</p>}
       <p className="ac-muted">Recorded in the task's history and the audit trail.</p>
       <div className="ca-action-row">
         <button type="button" className="ac-secondary" onClick={onCancel} disabled={busy}>
           Back
         </button>
-        <button type="submit" className="ac-primary" disabled={busy || !!problem || missingTarget}>
+        <button
+          type="submit"
+          className="ac-primary"
+          disabled={busy || !!problem || missingTarget}
+          aria-describedby="task-action-why"
+        >
           {busy ? "Saving…" : copy.submit}
         </button>
+        <Why id="task-action-why" text={problem || (missingTarget && "Choose who takes the task first.")} />
       </div>
     </form>
   );
@@ -984,9 +1017,20 @@ function NewEvidenceRequest({ onSent }: { onSent: () => void }) {
             type="submit"
             className="ac-primary"
             disabled={busy || !form.supplier_id || !items.length || form.title.trim().length < 3}
+            aria-describedby="request-why"
           >
             {busy ? "Sending…" : "Send request"}
           </button>
+          <Why
+            id="request-why"
+            text={
+              !form.supplier_id
+                ? "Choose the supplier first."
+                : !items.length
+                  ? "Add at least one item to ask for."
+                  : form.title.trim().length < 3 && "Give the request a title (3 characters or more)."
+            }
+          />
         </div>
       </form>
     </Panel>
@@ -1211,9 +1255,15 @@ function SupplierReplies({
             </p>
           )}
           <div className="ca-action-row">
-            <button type="submit" className="ac-primary" disabled={busy || !note.trim() || !!fileProblem}>
+            <button
+              type="submit"
+              className="ac-primary"
+              disabled={busy || !note.trim() || !!fileProblem}
+              aria-describedby="reply-why"
+            >
               {busy ? "Recording…" : "Record reply"}
             </button>
+            <Why id="reply-why" text={!note.trim() && "Write the supplier's answer first."} />
           </div>
         </form>
       )}

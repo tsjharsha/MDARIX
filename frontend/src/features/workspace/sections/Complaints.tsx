@@ -204,7 +204,7 @@ export function SecondLook({ initial = "open", fixed = false }: { initial?: Seco
         tone={list.data ? headline.tone : "neutral"}
         icon={<ScanSearch size={28} />}
         eyebrow="Second look"
-        title={list.data ? headline.title : "Checking your records…"}
+        title={list.data ? headline.title : "Possible hidden complaints"}
         detail={
           list.data ? headline.detail : "Looking for complaints hidden as cancellations, inquiries or No Fault Found."
         }
@@ -691,7 +691,7 @@ export function Backlog({ initial = "all", fixed = false }: { initial?: BacklogS
         tone={list.data ? headline.tone : "neutral"}
         icon={<Hourglass size={28} />}
         eyebrow={`Backlog · ${target}-day target`}
-        title={list.data ? headline.title : "Reading your open complaints…"}
+        title={list.data ? headline.title : "Open complaints against your target"}
         detail={list.data ? headline.detail : "Open complaints in no signal and no case, against your target."}
       />
       <div className="uw-cr-stats">

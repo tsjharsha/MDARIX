@@ -27,7 +27,7 @@ import {
   type OversightItem,
   type OversightSettings,
 } from "../oversight";
-import { InlineError } from "./boardParts";
+import { InlineError, Why } from "./boardParts";
 
 function useOpen() {
   const { open } = useWorkspace();
@@ -106,7 +106,7 @@ export function OversightView({
         ))}
       <Panel
         eyebrow="Due and overdue"
-        title={view ? `${view.items.length} of ${view.total} dated items` : "Reading your records…"}
+        title={view ? `${view.items.length} of ${view.total} dated items` : "Dated items"}
         source={data}
         action={<ExportButton filters={filters} />}
       >
@@ -492,10 +492,17 @@ export function OwnerPicker({ view, onChanged }: { view: EventView; onChanged: (
             type="button"
             className="ac-secondary"
             disabled={action.busy || !owner || owner === view.event.owner_id}
+            aria-describedby="owner-why"
             onClick={() => void action.run(`${eventPath(view.event.complaint_id)}/owner`, "PUT", { owner_id: owner })}
           >
             Save owner
           </button>
+          <Why
+            id="owner-why"
+            text={
+              !owner ? "Choose a person first." : owner === view.event.owner_id ? "They are the owner already." : null
+            }
+          />
         </div>
       )}
       <InlineError text={action.error} />
@@ -568,11 +575,16 @@ export function ReadyForm({ view, onChanged }: { view: EventView; onChanged: (vi
             </label>
           </div>
           <div className="ca-action-row">
-            <button type="submit" className="ac-primary" disabled={action.busy || !password || !!problem}>
+            <button
+              type="submit"
+              className="ac-primary"
+              disabled={action.busy || !password || !!problem}
+              aria-describedby="ready-why"
+            >
               {action.busy ? "Signing…" : "Sign ready to close"}
             </button>
+            <Why id="ready-why" text={problem || (!password && "Enter your password to sign.")} />
           </div>
-          {problem && <p className="ac-muted">{problem}</p>}
         </form>
       )}
       <InlineError text={action.error} />
@@ -638,10 +650,15 @@ export function DecisionRecord({ view, onChanged }: { view: EventView; onChanged
               type="button"
               className="ac-secondary"
               disabled={action.busy || reference.trim().length < 3}
+              aria-describedby="filing-why"
               onClick={() => void action.run(`${eventPath(view.event.complaint_id)}/filing`, "PUT", { reference })}
             >
               Record the filing
             </button>
+            <Why
+              id="filing-why"
+              text={reference.trim().length < 3 && "Enter the QMS reference (3 characters or more) first."}
+            />
           </div>
         )
       )}
@@ -790,6 +807,7 @@ export function CalendarPanel({ settings, onSaved }: { settings: OversightSettin
                 type="button"
                 className="ac-secondary"
                 disabled={!holiday.date || shown.holidays.some((item) => item.date === holiday.date)}
+                aria-describedby="holiday-why"
                 onClick={() => {
                   edit({ holidays: [...shown.holidays, holiday].sort((a, b) => a.date.localeCompare(b.date)) });
                   setHoliday({ date: "", name: "" });
@@ -797,12 +815,27 @@ export function CalendarPanel({ settings, onSaved }: { settings: OversightSettin
               >
                 Add holiday
               </button>
+              <Why
+                id="holiday-why"
+                text={
+                  !holiday.date
+                    ? "Choose the date first."
+                    : shown.holidays.some((item) => item.date === holiday.date) && "That day is a holiday already."
+                }
+              />
             </div>
           </fieldset>
           <div className="ca-action-row">
-            <button type="button" className="ac-primary" disabled={busy || !draft} onClick={() => void save()}>
+            <button
+              type="button"
+              className="ac-primary"
+              disabled={busy || !draft}
+              aria-describedby="calendar-why"
+              onClick={() => void save()}
+            >
               {busy ? "Saving…" : "Save the calendar"}
             </button>
+            <Why id="calendar-why" text={!draft && "Change something first."} />
             {saved && <small className="ac-muted">{saved}</small>}
           </div>
           <InlineError text={error} />

@@ -105,6 +105,11 @@ export function InvestigationList() {
         empty={{
           title: "No investigations yet",
           detail: "Open one from a complaint's page or from a trend.",
+          action: (
+            <button type="button" className="ac-secondary" onClick={() => open("Signals", "Trend check")}>
+              See the trends
+            </button>
+          ),
         }}
         columns={[
           idColumn("Investigation", "investigation_identifier"),

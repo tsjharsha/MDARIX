@@ -380,8 +380,12 @@ export function UserWorkspace({
     [session?.allowed_menu, session?.business_permissions, trial?.is_trial, featureSet, fresh],
   );
   // The new navigation's menu: the four main screens; Settings, Team and Account sit at the top right.
-  const menuSections = fresh ? visibleSections.filter((name) => NEW_MENU.main.includes(name)) : visibleSections;
-  const topSections = fresh ? visibleSections.filter((name) => NEW_MENU.top.includes(name)) : [];
+  const menuSections = fresh
+    ? (NEW_MENU.main.filter((name) => visibleSections.includes(name as WorkspaceSection)) as WorkspaceSection[])
+    : visibleSections;
+  const topSections = fresh
+    ? (NEW_MENU.top.filter((name) => visibleSections.includes(name as WorkspaceSection)) as WorkspaceSection[])
+    : [];
   const open = useCallback(
     (section: WorkspaceSection, tab?: string) => {
       const routed = routeFor(section, tab, featureSet, navigation);

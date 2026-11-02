@@ -84,8 +84,24 @@ export function ComplaintList({
         rowKey={(row) => String(row.id)}
         empty={
           hasComplaintFilters(filters)
-            ? { title: "No complaints match these filters", detail: "Clear a filter to see more complaints." }
-            : { title: "No complaints found", detail: "Complaints arrive through connectors and imports." }
+            ? {
+                title: "No complaints match these filters",
+                detail: "Clear a filter to see more complaints.",
+                action: (
+                  <button type="button" className="ac-secondary" onClick={() => set(EMPTY_COMPLAINT_FILTERS)}>
+                    Clear the filters
+                  </button>
+                ),
+              }
+            : {
+                title: "No complaints found",
+                detail: "Complaints arrive through imports.",
+                action: (
+                  <button type="button" className="ac-secondary" onClick={() => open("Import data")}>
+                    Import your data
+                  </button>
+                ),
+              }
         }
         serverSort={{ sort, onSort, keys: COMPLAINT_SORTS }}
         columns={

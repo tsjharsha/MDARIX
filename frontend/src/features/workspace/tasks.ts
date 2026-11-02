@@ -256,7 +256,14 @@ export function taskDestination(
     return { section: "Readiness", tab: eventTab(complaint) };
   }
   // A reporting clock due soon or overdue opens the reportability watch; a CAPA's effectiveness check opens that CAPA.
-  if (type === "REPORTABILITY_DECISION") return { section: "Complaints", tab: "Reportability" };
+  if (type === "REPORTABILITY_DECISION") {
+    // Opens the complaint's market assessment at once (0.10.68: click path b).
+    const complaint = typeof task.details?.complaint_id === "string" ? task.details.complaint_id : null;
+    return {
+      section: "Complaints",
+      tab: complaint ? `Reportability?complaint=${encodeURIComponent(complaint)}` : "Reportability",
+    };
+  }
   // A call's follow-up, its QMS-complaint task and the QA review of a "service only" open the first contact (0.10.57).
   if (FIRST_CONTACT_TASKS.includes(type)) return { section: "Complaints", tab: "First contact" };
   // A reply due from an external contact opens the complaint's communications log (0.10.59).
