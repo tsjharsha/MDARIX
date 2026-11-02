@@ -109,7 +109,8 @@ guide's example text in running trials (below).
   composed before keep their stored content (versioned, hashed); the investigation's Summary reads them by the same rule.
 - **Dates:** "1 Nov 2026" and "1 Nov 2026, 22:54" whatever the browser's language, as stage 5's rule says (an en-US
   browser showed "Nov 1, 2026, 10:54 PM" beside "Tue 1 Dec 2026, 23:59 IST").
-- The organization's name in the top bar is in full from 1280 px.
+- The organization's name in the top bar is in full from 1280 px; from 1280 to 1599 px the top-right buttons (Settings,
+  Team, Account, Sign out) show their icons, their names kept as tooltips and for screen readers.
 - The market tab reads "EU and Northern Ireland" (the label map), not "EU/NI"; an extra question reads "Extra 1".
 - Sample wording: the guide's example for question 2c no longer starts "Sample examples:" ("Your examples: Sample
   examples: …"); the worksheet's front-page field reads "Manufacturer report number" ("Mfr report # Manufacturer report
