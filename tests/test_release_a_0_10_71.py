@@ -85,6 +85,8 @@ def test_a_fresh_signup_through_the_public_flow_lands_on_the_new_navigation(mail
         # 5. The first screen: the new navigation, a trial with the sample, and no administrator switched anything.
         context = _ok(user.get("/api/v1/session/context"))
         assert context["navigation"] == "new"
+        # 0.10.73 (C1): the owner opens on Admin's Home, the persona theirs to change.
+        assert (context["persona"], context["persona_locked"], context["persona_tabs"][0]) == ("admin", False, "home")
         status = _ok(user.get("/api/v1/trial/status"))
         assert status["is_trial"] and status["sample"]["complaints"] > 0
         with SessionLocal() as db:

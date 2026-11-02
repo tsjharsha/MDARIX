@@ -89,7 +89,7 @@ export function personaConfirmation(member: TeamMember, persona: TeamPersona, on
   const name = member.display_name || member.email;
   return {
     title: `Make ${name} a ${persona.label}?`,
-    body: `${name} then sees the ${persona.label}'s screens and signs as its role (${persona.sub.toLowerCase()}). Their earlier work stays as it was. Only you can change it again.`,
+    body: `${name} then sees the ${persona.label}'s screens and signs as its role: ${persona.sub}. Their earlier work stays as it was. Only you can change it again.`,
     confirmLabel: "Change the persona",
     done: `${name} is now a ${persona.label}.`,
     run: async () => {
@@ -344,8 +344,8 @@ export function TeamView({
               </button>
               {personas.length > 0 && (
                 <small id="uw-team-persona-hint" className="ac-muted uw-team-hint">
-                  {chosen ? `${chosen.label}: ${chosen.sub.toLowerCase()}. ` : ""}They see this persona's screens and
-                  sign as its role. Only you can change it.
+                  {chosen ? `${chosen.label}: ${chosen.sub}. ` : ""}They see this persona's screens and sign as its
+                  role. Only you can change it.
                 </small>
               )}
             </form>

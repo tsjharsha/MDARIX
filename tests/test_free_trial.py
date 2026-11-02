@@ -908,7 +908,7 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     assert overview.status_code == 200, overview.text
     item = next(entry for entry in overview.json()["items"] if entry["tenant_key"] == tenant_key)
     assert item["story"]["acted"] == ["HIDDEN_COMPLAINTS"] and item["story"]["total"] == 10
-    assert item["users"] == {"used": 1, "limit": 3} and item["days_left"] == 30 and item["state"] == "ACTIVE"
+    assert item["users"] == {"used": 1, "limit": 50} and item["days_left"] == 30 and item["state"] == "ACTIVE"
     assert item["story"]["last_activity"]
     summary = overview.json()["summary"]
     assert summary["active"] >= 1 and summary["acted"] >= 1 and summary["chapters"]["HIDDEN_COMPLAINTS"] >= 1

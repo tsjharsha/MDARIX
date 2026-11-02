@@ -10,6 +10,129 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.73] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): part C1 of Release C, "The shell, personas and team", built to the
+owner-approved design. Organizations on the **new** navigation (`tenants.navigation = new`, every trial approved since
+0.10.71) get a new shell: a top bar with **Viewing as [persona]**, and a tab bar showing only that persona's
+destinations. Organizations on the classic navigation keep their screens exactly as they were. Pilots keep their
+permissions; a pilot user's tabs follow their real role.
+
+**Migration `tr13viewpersona`** (after `tr12sampleservice`; `tr03pmssources` stays reserved). It is expand-only: one
+nullable column, `auth_users.view_persona`. No existing row changes. On legacy dedicated organization databases, run
+`scripts/add_workflow_tables_to_legacy_planes.py` (new step tr13). The API and web images change. **Operators:** run
+`scripts/refresh_trial_story.py` (dry run first, then `--apply`) once after the upgrade. It changes the Free Trial
+plan's description ("up to 3 users" to "up to 50 people") and its licensed-user limit (3 to 50). The sample data does
+not change. New setting: `MDARIX_TRIAL_USER_CAP` (default 50; `docs/runbooks/ENVIRONMENT_VARIABLES.md`).
+
+### Added: the shell on the new navigation
+
+- **Top bar:** the MDARIX tile, the organization (in a trial: "Free trial · N days left"; it opens Getting started),
+  **one search** across complaints, products and reports, **Viewing as [persona ▾]**, the bell, Help and the avatar.
+  The avatar's menu holds Account, Settings, the admin console (customer administrators), Switch organization and Sign
+  out. A phone shows the tile, the persona and the avatar; the tabs scroll sideways.
+- **Tab bar:** Home, Complaints, Decision trees, Reports, Investigations, Trends, Records and Team, each persona showing
+  its own (below). **My work is Home.** Decision trees (`/app/decision-trees`) and Reports (`/app/reports`) are new
+  places. Until part C3 they say where the work is today: the reportability guides, and Complaints › Reporting.
+  Reports says once that MDARIX prepares, gets approved and records, and never submits to an authority.
+- **Every old address still lands** (`linkTable.json`). An address of a tab the persona does not show still opens: the
+  persona narrows the bar, not what the server lets the person open. On the classic navigation, `/app/decision-trees`
+  opens Complaints › Decision guides and `/app/reports` opens Complaints › Reports.
+- A trial on the new navigation opens on **Home**, not on Getting started. The sample event card is on Admin's Home.
+  Getting started stays one click away (the trial pill, Help, "More stories").
+
+### Added: personas, "Viewing as"
+
+| Persona | Tabs | Role behind it |
+|---|---|---|
+| Admin | all eight | the trial owner (role Leader, unchanged) |
+| Quality Leader | Home, Complaints, Reports, Investigations, Trends, Records | Leader |
+| Regulatory Leader | Home, Complaints, Decision trees, Reports, Records | Regulatory Reviewer |
+| Complaint Handler | Home, Complaints | PMS / Signal Triage Lead |
+| Investigator | Home, Investigations, Trends | Quality Investigator |
+| Risk Reviewer | Home, Investigations, Records | Risk Reviewer |
+| Decision Maker | Home, Complaints, Reports, Records | Authorized Decision Maker (Approver) |
+| Executive | Home, Trends, Records | Viewer |
+
+- **The persona changes what a person sees, never what they may sign.** Every route keeps its guard, and the persona
+  never reaches the server as a permission. The menu says so: "Changes what you see, not what you may sign."
+- **The trial owner's choice is kept on the server** (`auth_users.view_persona`). Their next sign-in, on any device,
+  opens on it. `POST /api/v1/me/persona` (the trial owner only, audited as `PERSONA_VIEW_CHANGED`, with the role
+  unchanged). Anyone else is refused with **403 `PERSONA_LOCKED`**.
+- **An invited colleague's persona is their real role**, shown with a lock ("set by the trial owner"). A pilot user's
+  persona follows their role (a customer administrator's is Admin).
+- The session context gives `persona`, `persona_label`, `persona_locked`, `persona_tabs` and `persona_options`.
+- The Regulatory Leader is a Regulatory Reviewer. That role already holds `regulatory.approve`, so the authority
+  reports' DECIDERS rule (`require_any_permission(REGULATORY_REVIEW, REGULATORY_APPROVE)`) lets them approve. A report's
+  approval still needs a second person: never its preparer (`standing`, unchanged).
+
+### Added: Home per persona
+
+- **Overdue · Due this week · At risk**, counted from the organization's own dated items (`/api/v1/oversight`, the
+  persona's categories) and the trend check's rising groups.
+- **Your next actions**, most urgent first, each with its reason, its owner and its deadline, opening its record.
+- **One sentence per rising trend**, with its comparison basis.
+- The Regulatory Leader's **legal clocks**, each market's deadline in its own time zone with a lane. The Executive's
+  **readiness line** ("N of M inspection checks clear").
+- Admin's Home (and the Quality Leader's) keeps Release A's **one-event card** with Release B's title and the short
+  story's four steps, and "Resume SAMPLE-RV-11" while it is unfinished. All of My work (tasks, approvals, requests,
+  queues, the team overview) stays below, revealed on request.
+
+### Changed: the trial team
+
+- **The 3-user limit is gone.** A trial has a **safety cap of 50 people** (`MDARIX_TRIAL_USER_CAP`). When the cap is
+  reached, the owner is told so plainly: "Your trial has 50 people, its safety limit. Remove someone to invite
+  another, or write to MDARIX support to raise it." (409 `TRIAL_USER_LIMIT_REACHED`, as before.)
+- The invitation takes the colleague's name, work e-mail and **persona**, and **the persona sets the colleague's real
+  role** (until now every colleague was a Leader). Admin is the owner's own (422 `PERSONA_NOT_FOR_COLLEAGUE`). A call
+  with no persona keeps Leader, as before.
+- The list shows each person's persona, locked for colleagues. The owner changes a colleague's persona, and with it
+  their role, after a confirmation (`POST /api/v1/trial/team/{user_id}/persona`, owner only). Every assignment and
+  change is audited as `TRIAL_PERSONA_ASSIGNED`, with the persona and role before and after.
+- **Running trials:** colleagues invited before 0.10.73 keep the role Leader (the Quality Leader persona) until the
+  owner changes their persona. Trial owners keep Leader. Nobody is made a Customer Administrator.
+- Classic navigation: Getting started › Team offers the same persona choice, because the server gives the colleague
+  that persona's role on either navigation.
+
+### Sample numbers and labels that change
+
+The sample data does not change. No deadline, trend figure, signal, Oversight count, bell, Readiness value or record
+count changes.
+
+| Where | Before | After |
+|---|---|---|
+| First screen of a trial on the new navigation | Getting started (the entrance), then My work | Home (Admin's: the sample event card) |
+| Menu, new navigation | My work, Complaints, Trends, Records; Settings, Team, Account at the top right | tabs Home … Team per persona; Settings and Account in the avatar's menu |
+| Guide paths, new navigation | My work › Team overview | Home › Team overview |
+| Team panel's eyebrow | 2 of 3 users | 2 people · up to 50 |
+| Invite button | Invite colleague | Send the invitation |
+| Trial full | All 3 trial seats are in use… | Your trial has 50 people, its safety limit… |
+| Sign-up and sign-in pages | up to 3 users and 5,000 uploaded rows | your whole team (up to 50 people) and 5,000 uploaded rows |
+| Free Trial plan description | … up to 3 users. | … up to 50 people. |
+| Trial status `limits.users`, team `limit` | 3 | 50 |
+| Next steps, People | Up to 3 users | Up to 50 people, each with the persona you choose |
+
+### Tests
+
+- pytest: `tests/test_release_c1_0_10_73.py` (new, 8). The personas match the approved design, each persona is a real
+  role. A fresh owner opens on Admin and the choice persists across sign-in, with the role and permissions unchanged
+  and the change audited. A colleague's role follows the persona and they cannot change it (403), nor anyone's. A
+  colleague invited without a persona keeps Leader. The owner's market sign route answers the same under all eight
+  personas, and a View-only colleague is refused by the role until the owner gives them one that may sign. The 4th
+  person is invited, the cap holds at its setting and is said plainly. The plan's refresh is idempotent. A pilot user
+  is locked. Updated: `test_free_trial.py` and `test_trial_self_admin.py` (their full-trial paths use a cap of 3),
+  `test_release_a_0_10_71.py` (the fresh sign-up opens on Admin), `test_business_permissions.py` (the new team route
+  is a reviewed exemption), `test_free_trial.py`'s trials overview (a trial's user limit reads 50).
+- Targeted pytest run (this release's tests, business permissions, alembic drift, the migration chain, free trial, the
+  trial's self-administration, Releases A and B, link targets, e-mails): 109 passed. `scripts/refresh_trial_story.py`
+  dry run on the test database names the plan's description and both entitlements' limit (3 -> 50).
+- vitest: `releaseC1073.test.tsx` (new, 13). The tabs per persona, the shell for the owner and for a locked colleague,
+  the classic navigation unchanged, the fresh trial on Home, the old addresses on the new shell, the switch, Home's
+  rules, the team's persona. Updated: `app/linkTable.test.ts`, `app/newPathText.test.ts`, `app/clickPaths.test.ts`,
+  `help/UserGuidePage.test.tsx`, `help/TrialGuidePage.test.tsx`.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.73-review` (`owner/`: each persona's Home, the menus, search,
+  Team, Decision trees, Reports; `colleague/`; `classic/`).
+
 ## [0.10.72] - 2026-11-02
 
 On the trial maintenance line (`release/0.10`): Release B of the owner-approved "Simplicity and WoW" plan, "Show less,
