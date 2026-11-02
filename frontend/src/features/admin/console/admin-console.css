@@ -956,7 +956,7 @@ th.num .table-sort {
 /* Phones (J20, V11): at 640 px and below each row is a card: its first cell as the title, then each value under its
    heading (data-label), the row's actions last; no sideways scroll and no word on a line of its own. */
 @media (max-width: 640px) {
-  .ac-table-wrap {
+  .ac-table-wrap:has(> .ac-table.ms-cards) {
     overflow-x: visible;
   }
   .ac-table.ms-cards,

@@ -11606,3 +11606,8 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
     align-items: center;
   }
 }
+/* A fieldset is as wide as its longest line by default (min-inline-size: min-content): on a phone a long market list
+   in Reporting windows made the page wider than the screen. It shrinks with its panel instead. */
+fieldset {
+  min-inline-size: 0;
+}
