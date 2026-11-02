@@ -467,7 +467,7 @@ export function TrialRequestsWorkspace() {
             <h4 id="trial-approve-title">Approve a free trial for {confirming.organization}?</h4>
             <p>This creates, in one step:</p>
             <ul>
-              <li>a private trial workspace on the Free Trial plan (3 users, 5,000 uploaded rows)</li>
+              <li>a private trial workspace on the Free Trial plan (up to 50 people, 5,000 uploaded rows)</li>
               <li>a 30-day trial that closes automatically</li>
               <li>the sample dataset</li>
               <li>an account for {confirming.email} and a one-time invitation valid for 48 hours</li>

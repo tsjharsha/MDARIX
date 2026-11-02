@@ -28,7 +28,7 @@ export const STORY_CHAPTERS = 10;
 
 export const TRIAL_FACTS: readonly [string, string][] = [
   ["30 days", "free, no credit card"],
-  ["3 people", "you and two colleagues"],
+  ["Your team", "as many colleagues as you need, up to 50"],
   ["5,000 rows", "of your own data, 2 MB a file"],
   [`${STORY_CHAPTERS} chapters`, "a story on sample data, routine complaints first"],
 ];
@@ -69,8 +69,8 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     why: "Quality work is a team sport: a complaint handler and a regulatory colleague see the value from their own side.",
     actions: [
       "In Getting started, open the Team tab below the story.",
-      "Enter your colleague's name and work email, then choose Invite colleague.",
-      "Repeat for the second colleague. The trial has three seats: you and two others.",
+      "Enter your colleague's name and work email, choose their persona (it is their role), then choose Send the invitation.",
+      "Repeat for the second colleague: for example a Regulatory Leader, who may approve the reports you prepare.",
       "If an invitation is not found, choose Resend invitation beside the colleague's name.",
     ],
     result:

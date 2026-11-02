@@ -317,10 +317,10 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             who: "The person who started the trial.",
             steps: [
               "Open the Team tab.",
-              "Fill in Colleague's name and Work email and choose Invite colleague.",
+              "Fill in Colleague's name and Work email, choose their Persona and choose Send the invitation.",
               "For someone who has not activated yet, choose Resend invitation.",
             ],
-            result: "Invitation emailed. The link is valid for 48 hours. A trial includes up to 3 users.",
+            result: "Invitation emailed. The link is valid for 48 hours. A trial includes up to 50 people.",
           },
           {
             title: "Look after your trial team",
@@ -1346,10 +1346,10 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Invite colleagues to a free trial",
             who: "The person who started the trial.",
             steps: [
-              "Open Getting started › Team, fill in Colleague's name and Work email and choose Invite colleague.",
+              "Open Team, fill in Colleague's name and Work email, choose their Persona and choose Send the invitation.",
               "There, too, choose Remove from trial when someone leaves, Reset MFA when a colleague lost their authenticator, and decide on Support access.",
             ],
-            note: "A trial includes up to 3 users, each a Leader (Quality Manager). A removed colleague's seat is free again.",
+            note: "A trial includes up to 50 people. Each colleague's persona, chosen when you invite them, is their role: they see its screens and sign as it. A removed colleague's seat is free again.",
           },
           {
             title: "Manage people (customer administrators)",

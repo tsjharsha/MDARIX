@@ -307,8 +307,8 @@ export function SignupForm() {
       <span className="eyebrow">Request access</span>
       <h1>Start your free trial</h1>
       <p className="auth-lead">
-        30 days, up to 3 users and 5,000 uploaded rows, with sample data from day one and no credit card. AI is off
-        during the trial. You set your own password from the invitation email; {PASSWORD_PROMISE}
+        30 days, your whole team (up to 50 people) and 5,000 uploaded rows, with sample data from day one and no credit
+        card. AI is off during the trial. You set your own password from the invitation email; {PASSWORD_PROMISE}
       </p>
       <div className="su-mfa-note" role="note">
         <Smartphone size={20} aria-hidden="true" />

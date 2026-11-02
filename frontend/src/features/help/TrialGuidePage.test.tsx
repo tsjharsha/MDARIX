@@ -28,7 +28,7 @@ describe("free trial user guide", () => {
     for (const label of [
       "Start free trial",
       "Request free trial",
-      "Invite colleague",
+      "Send the invitation",
       "Resend invitation",
       "Check file",
       "Send feedback",

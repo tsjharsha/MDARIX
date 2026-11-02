@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Lock } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
 import { Panel } from "../../admin/console/charts";
 import { ConfirmDialog, send, useResource, type Confirmation, type Resource } from "../../customer-admin/shared";
@@ -15,7 +16,14 @@ export type TeamMember = {
   is_you: boolean;
   /** An invitation whose link no longer works: shown as Expired, with Resend invitation. */
   invitation_expired?: boolean;
+  /** The person's persona (0.10.73): a colleague's is their real role, set by the owner (locked to them). */
+  persona?: string;
+  persona_label?: string;
+  persona_locked?: boolean;
 };
+
+/** A persona the owner may give a colleague (access_control/personas.py COLLEAGUE_PERSONAS). */
+export type TeamPersona = { code: string; label: string; sub: string };
 export type Team = {
   can_invite: boolean;
   /** Remove colleagues, reset their MFA, decide on support access: the trial owner only. */
@@ -23,6 +31,7 @@ export type Team = {
   limit: number;
   seats_used: number;
   members: TeamMember[];
+  personas?: TeamPersona[];
 };
 
 export type MemberAction = "resend" | "mfa-reset" | "remove";
@@ -70,6 +79,21 @@ export function mfaResetConfirmation(member: TeamMember, onDone: () => void): Co
     done: `${name} sets up a new authenticator at their next sign-in.`,
     run: async (reason) => {
       await send(`${TEAM_PATH}/${member.id}/mfa-reset`, "POST", { reason });
+      onDone();
+    },
+  };
+}
+
+/** The confirmation for giving a colleague another persona, and with it its role (0.10.73). */
+export function personaConfirmation(member: TeamMember, persona: TeamPersona, onDone: () => void): Confirmation {
+  const name = member.display_name || member.email;
+  return {
+    title: `Make ${name} a ${persona.label}?`,
+    body: `${name} then sees the ${persona.label}'s screens and signs as its role (${persona.sub.toLowerCase()}). Their earlier work stays as it was. Only you can change it again.`,
+    confirmLabel: "Change the persona",
+    done: `${name} is now a ${persona.label}.`,
+    run: async () => {
+      await send(`${TEAM_PATH}/${member.id}/persona`, "POST", { persona: persona.code });
       onDone();
     },
   };
@@ -132,7 +156,7 @@ export function TeamPanel({ onChanged }: { onChanged: () => void }) {
         team={team}
         busy={busy}
         message={message}
-        onInvite={(email, name) => invite(TEAM_PATH, { email, display_name: name })}
+        onInvite={(email, name, persona) => invite(TEAM_PATH, { email, display_name: name, persona })}
         onResend={(member) => void invite(`${TEAM_PATH}/${member.id}/resend-invitation`)}
         onConfirm={(request) => {
           setMessage(null);
@@ -166,19 +190,34 @@ export function TeamView({
   team: Resource<Team>;
   busy: boolean;
   message: Message | null;
-  onInvite: (email: string, name: string) => Promise<boolean>;
+  onInvite: (email: string, name: string, persona: string) => Promise<boolean>;
   onResend: (member: TeamMember) => void;
   onConfirm: (request: Confirmation) => void;
   onChanged: () => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [persona, setPersona] = useState("quality");
   const data = team.data;
   const full = !!data && data.seats_used >= data.limit;
+  const personas = data?.personas ?? [];
+  const chosen = personas.find((item) => item.code === persona);
   return (
-    <Panel title="Your team" eyebrow={data ? `${data.seats_used} of ${data.limit} users` : "Team"} source={team}>
+    <Panel
+      title="Your trial team"
+      eyebrow={
+        data ? `${data.seats_used} ${data.seats_used === 1 ? "person" : "people"} · up to ${data.limit}` : "Team"
+      }
+      source={team}
+    >
       {data && (
         <>
+          {data.can_invite && (
+            <p className="ac-muted">
+              Invite as many colleagues as you need. You choose each person's persona, and it is their role: they see
+              its screens and sign as it. They cannot change it.
+            </p>
+          )}
           <ul className="uw-team">
             {data.members.map((member) => (
               <li key={member.id}>
@@ -190,9 +229,37 @@ export function TeamView({
                   </strong>
                   <small>{member.email}</small>
                 </div>
+                {member.persona_label && (
+                  <span
+                    className="ms-chip uw-team-persona"
+                    title={member.persona_locked ? "Set by the trial owner" : undefined}
+                  >
+                    {member.persona_label}
+                    {member.persona_locked && <Lock size={12} aria-label="set by the trial owner" />}
+                  </span>
+                )}
                 <span className={`uw-team-status ${member.status === "ACTIVE" ? "is-active" : ""}`}>
                   {memberStatus(member)}
                 </span>
+                {data.can_manage && !member.is_owner && personas.length > 0 && (
+                  <label className="uw-team-change">
+                    <span className="ca-sr-only">Persona of {member.display_name || member.email}</span>
+                    <select
+                      value={member.persona ?? ""}
+                      disabled={busy}
+                      onChange={(event) => {
+                        const next = personas.find((item) => item.code === event.target.value);
+                        if (next) onConfirm(personaConfirmation(member, next, onChanged));
+                      }}
+                    >
+                      {personas.map((item) => (
+                        <option key={item.code} value={item.code}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {memberActions(member, data).map((action) =>
                   action === "resend" ? (
                     <button
@@ -234,7 +301,7 @@ export function TeamView({
               className="uw-team-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                void onInvite(email.trim(), name.trim()).then((sent) => {
+                void onInvite(email.trim(), name.trim(), persona).then((sent) => {
                   if (!sent) return;
                   setName("");
                   setEmail("");
@@ -255,18 +322,38 @@ export function TeamView({
                   onChange={(event) => setEmail(event.target.value)}
                 />
               </label>
+              {personas.length > 0 && (
+                <label>
+                  Persona
+                  <select
+                    value={persona}
+                    onChange={(event) => setPersona(event.target.value)}
+                    aria-describedby="uw-team-persona-hint"
+                  >
+                    {personas.map((item) => (
+                      <option key={item.code} value={item.code}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                  <small id="uw-team-persona-hint" className="ac-muted">
+                    {chosen ? `${chosen.sub}. ` : ""}They see this persona's screens and sign as its role. Only you can
+                    change it.
+                  </small>
+                </label>
+              )}
               <button type="submit" className="ac-primary" disabled={busy}>
-                {busy ? "Sending…" : "Invite colleague"}
+                {busy ? "Sending…" : "Send the invitation"}
               </button>
             </form>
           )}
           {data.can_invite && full && (
-            <p className="uw-trial-note">
-              All {data.limit} trial seats are in use. Remove someone to free a seat, or{" "}
+            <p className="uw-trial-note" role="status">
+              Your trial has {data.limit} people, its safety limit. Remove someone to invite another, or{" "}
               <a href="/contact" target="_blank" rel="noopener">
                 contact us
               </a>{" "}
-              to add more people as a design partner.
+              to raise it.
             </p>
           )}
           {data.can_manage && (
