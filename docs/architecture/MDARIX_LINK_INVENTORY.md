@@ -132,3 +132,23 @@ These four files differ on mvp-1.0:
 - `Investigations.tsx` exports `Capas` (Records › CAPA records); mvp-1.0 changes the same file's tab line.
 - New task type `COMPLAINT_STEP` ("Send to" from the complaint page) and the route
   `POST /api/v1/oversight/events/{id}/send` (WRITERS).
+
+## Stage 8 (0.10.69): the investigation in four sections, drawers with addresses, the entrance
+
+- **The investigation's sections.** On the new navigation `newPlaces.Investigations.tabs` is Summary, Evidence,
+  Decisions & actions and History. `newHomes` maps every former tab to its section and part: Workspace -> Summary,
+  Scope -> Summary `part=scope`, Intelligence -> Evidence `part=intelligence` (its `view` kept), Ask MDARIX -> Evidence
+  `part=ask`, Reviews -> Decisions & actions `part=reviews` (its `review` kept), Decision Brief -> `part=brief`,
+  Decision -> `part=decision` (its `follow_up`/`assessment` kept), Record -> History. `classicHomes` opens Summary,
+  Decisions & actions and History on Workspace, Decision and Record. `newRecords.case` opens Summary. Tests:
+  `app/linkTable.test.ts` ("maps every former investigation tab"), `app/clickPaths.test.ts` (path f: 10 steps).
+- **Drawer addresses.** 24 investigation drawers carry `panel=<kind>:<key>` in the step's address
+  (`workspaceContext.tsx` `usePanelState`, `usePanelFlag`): add-hypothesis, judge, link-evidence, withdraw-link,
+  record-observation, add-unknown, unknown-status, request-evidence, build-chain, chain-link, review, request-review,
+  review-evidence, provenance, link-evidence-records, new-request, request, follow-up, impact, decision-record,
+  return-brief, submit-brief, state-change, ai-run. Back closes one; refresh and a new tab reopen it.
+- **A server target names a case.** The checklist's "Sign the investigation decision on the case" carries
+  `record=("case", <id>)` on Investigations › Decision (`closure.py`); `useOpenTarget` makes that case the context
+  first (`/workspace/context/resolve` now also takes an id). Test: `tests/test_flagship_walkthrough.py`.
+- **The entrance and its stories** (`features/workspace/entrance.ts`): each story starts on a place of the new
+  navigation and its steps are places too. Test: `entrance.test.tsx`, `flagshipWalk.test.ts`.
