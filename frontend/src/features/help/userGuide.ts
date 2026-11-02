@@ -276,6 +276,17 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           "The quality loop MDARIX closes, chapter by chapter: what your records show in each, why inspectors care, and where to try it. Start on the sample data, then on your own export.",
         tasks: [
           {
+            title: "Pick a five-minute story (the new navigation)",
+            steps: [
+              "On the new navigation a trial opens on four stories, each about five minutes: A complaint just arrived: what now?, Is a problem rising?, Is this reportable, and by when, in the US and India? and Try it on your own export.",
+              "Choose a story. It opens on the sample's own record, and a bar at the top shows the step you are on, with Back to the stories.",
+              "On each screen the main button is the next step; Why am I asked? under each question gives its reason and clause.",
+              "The ten chapters are under Explore all capabilities. Uploading your own export is optional and outside the count.",
+            ],
+            result:
+              "After your first visit the trial opens on My work; The five-minute stories link there brings you back.",
+          },
+          {
             title: "Follow the story",
             steps: [
               "The ring at the top shows how much of the loop you have tried. Its main button opens the next chapter.",
@@ -843,6 +854,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             steps: [
               "On Workspace, Where this investigation stands shows the steps: Overview, Scope, Evidence, Analysis, Hypotheses, Unknowns, Risk and regulatory review, Investigation brief, Human review and decision.",
               "Choose a step to go to it. The Readiness checklist (Show each check) lists what is in place and what is missing.",
+              "On the new navigation an investigation has four sections, Summary, Evidence, Decisions & actions and History, under one progress line; its main button names the next step.",
             ],
           },
           {

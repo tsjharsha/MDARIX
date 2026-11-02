@@ -49,7 +49,7 @@ const writtenCapabilities: Record<string, Omit<Capability, "slug" | "label" | "i
         text: "Hypotheses carry a review status. MDARIX does not declare a root cause; authorized people decide what is accepted.",
       },
     ],
-    steps: ["Signal", "Hypotheses", "Support", "Contradict", "Gaps", "Review"],
+    steps: ["Trend", "Hypotheses", "Support", "Contradict", "Unknowns", "Review"],
   },
   unknowns: {
     title: "See what the investigation still cannot establish.",
@@ -97,7 +97,7 @@ const writtenCapabilities: Record<string, Omit<Capability, "slug" | "label" | "i
         text: "Relate the chain to known hazards, failure modes and risk controls from the product risk file.",
       },
     ],
-    steps: ["Component", "Mechanism", "Failure mode", "Effect", "Evidence", "Gaps"],
+    steps: ["Component", "Mechanism", "Failure mode", "Effect", "Evidence", "Unknowns"],
   },
   counterfactual: {
     title: "Ask what would change if the facts were different.",
