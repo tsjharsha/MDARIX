@@ -111,6 +111,15 @@ CATALOG: tuple[Standard, ...] = (
         EUROPEAN_UNION,
     ),
     Standard("MDR_88", "EU MDR Art. 88", "Trend reporting", EUROPEAN_UNION),
+    # The IVDR's counterpart of MDR Art. 87 for in-vitro diagnostics (Regulation (EU) 2017/746); starter until the
+    # consultant confirms it (0.10.63).
+    Standard(
+        "IVDR_82",
+        "EU IVDR Art. 82",
+        "Reporting of serious incidents and field safety corrective actions (in-vitro diagnostics)",
+        EUROPEAN_UNION,
+        True,
+    ),
     Standard(
         "MDCG_2023_3",
         "MDCG 2023-3",

@@ -13,6 +13,7 @@ import secrets
 import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from datetime import time as clock_time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -153,7 +154,13 @@ def _product(tenant_id) -> str:
 
 def _complaint(tenant_id, product_id: str, *, aware_days_ago: int = 5, **fields) -> str:
     now = datetime.now(timezone.utc)
-    aware = now - timedelta(days=aware_days_ago)
+    # Noon UTC of that day: the same day in New York, Brussels, London and India, so a market's day count (0.10.63,
+    # awareness taken in the market's time zone) does not depend on the hour the suite runs.
+    aware = (
+        now
+        if not aware_days_ago
+        else datetime.combine((now - timedelta(days=aware_days_ago)).date(), clock_time(12), timezone.utc)
+    )
     with SessionLocal() as db:
         bind_tenant(db, tenant_id)
         row = Complaint(

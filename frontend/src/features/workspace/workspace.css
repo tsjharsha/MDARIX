@@ -4311,6 +4311,10 @@ div.uw-task-count:hover {
   border-collapse: collapse;
   font-size: 13px;
 }
+.uw-tr-role {
+  display: block;
+  margin-top: 2px;
+}
 .uw-tr-table th,
 .uw-tr-table td {
   padding: 6px 8px;

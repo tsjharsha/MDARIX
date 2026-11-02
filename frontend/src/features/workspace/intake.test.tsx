@@ -8,14 +8,18 @@ import {
   answerChoices,
   blankAnswers,
   daysEarlier,
-  daysText,
+  deadlineText,
   hoursText,
   linkBody,
   signProblem,
+  startingZone,
   unanswered,
+  zonedInput,
+  type Deadline,
   type Duplicate,
   type Guide,
 } from "./intake";
+import { timeLeft } from "../../app/dates";
 
 function workspace(permissions: string[]): WorkspaceApi {
   return {
@@ -71,13 +75,48 @@ describe("the first-contact helpers", () => {
     );
   });
 
+  it("enters a call's time on the wall clock of the time zone chosen for it (J28)", () => {
+    // 15:00 UTC is 09:00 in Chicago in November and 20:30 in India; the server converts the wall time in the zone.
+    const moment = new Date("2026-11-03T15:00:00Z");
+    expect(zonedInput(moment, "America/Chicago")).toBe("2026-11-03T09:00");
+    expect(zonedInput(moment, "Asia/Kolkata")).toBe("2026-11-03T20:30");
+    const guide = {
+      zones: ["UTC", "America/Chicago", "Asia/Kolkata"],
+      zone_aliases: { "Asia/Calcutta": "Asia/Kolkata" },
+    };
+    expect(startingZone(guide, "Asia/Calcutta")).toBe("Asia/Kolkata");
+    expect(startingZone(guide, "Mars/Olympus")).toBe("UTC");
+  });
+
   it("writes the clocks in plain words", () => {
-    expect(hoursText(4.2)).toBe("in 4 h");
-    expect(hoursText(-6)).toBe("6 h overdue");
-    expect(hoursText(-72)).toBe("3 days overdue");
-    expect(daysText(0)).toBe("due today");
-    expect(daysText(-1)).toBe("1 day overdue");
-    expect(daysText(3)).toBe("due in 3 days");
+    expect(hoursText({ hours_left: 4.2 })).toBe("4 h left");
+    expect(hoursText({ hours_left: -6 })).toBe("6 h overdue");
+    expect(hoursText({ hours_left: -72 })).toBe("3 days overdue");
+    // A legal deadline with its time zone, and the app's one time-left text (J40), overdue from the server's state.
+    const now = new Date("2026-11-01T12:00:00Z");
+    const india: Deadline = {
+      market: "IN",
+      label: "India (CDSCO)",
+      role: "OWN",
+      role_label: "The event's market",
+      own: true,
+      not_reportable: false,
+      tier: "FLAGGED",
+      tier_label: "Flagged",
+      days: 15,
+      day_basis: "CALENDAR",
+      basis: "15 days (India MDR 2017 Rule 26)",
+      due_date: "2026-11-07",
+      due_at: "2026-11-07T18:29:59+00:00",
+      due_zone: "Asia/Kolkata",
+      due_label: "Sat 7 Nov 2026, 23:59 IST",
+      days_left: 6,
+      state: "RUNNING",
+    };
+    expect(timeLeft(india, now)).toBe("6 days left");
+    expect(deadlineText(india)).toMatch(/^Sat 7 Nov 2026, 23:59 IST \(/);
+    expect(deadlineText({ ...india, not_reportable: true })).toBe("Concluded not reportable");
+    expect(timeLeft({ ...india, state: "OVERDUE" }, now)).toBe("Overdue");
     expect(daysEarlier("2026-11-19T10:00:00Z", "2026-11-11T10:00:00Z")).toBe(8);
     expect(daysEarlier(null, "2026-11-11T10:00:00Z")).toBe(0);
   });

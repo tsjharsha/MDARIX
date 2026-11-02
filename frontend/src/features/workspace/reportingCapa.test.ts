@@ -70,8 +70,8 @@ describe("the reportability watch", () => {
   });
 
   it("reads clocks as days left or overdue", () => {
-    expect(clockText({ days_left: 2 })).toBe("Due in 2 days");
-    expect(clockText({ days_left: 1 })).toBe("Due in 1 day");
+    expect(clockText({ days_left: 2 })).toBe("2 days left");
+    expect(clockText({ days_left: 1 })).toBe("1 day left");
     expect(clockText({ days_left: 0 })).toBe("Due today");
     expect(clockText({ days_left: -10 })).toBe("10 days overdue");
     expect(clockText(null)).toBe("No reporting window applies");
@@ -198,7 +198,7 @@ describe("CAPA effectiveness", () => {
   it("reads each state and its due day", () => {
     expect(stateOf("NOT_PLANNED")).toEqual({ label: "No check planned", tone: "serious" });
     expect(stateOf("EFFECTIVE").tone).toBe("good");
-    expect(dueText({ state: "DUE_SOON", days_left: 10 })).toBe("Due in 10 days");
+    expect(dueText({ state: "DUE_SOON", days_left: 10 })).toBe("10 days left");
     expect(dueText({ state: "OVERDUE", days_left: -3 })).toBe("3 days overdue");
     expect(dueText({ state: "DUE_SOON", days_left: 0 })).toBe("Due today");
     expect(dueText({ state: "NOT_PLANNED", days_left: null })).toBe("No check planned");
@@ -209,10 +209,10 @@ describe("CAPA effectiveness", () => {
     // 19 October in India), said 91.
     const justAfterMidnight = new Date(2026, 9, 20, 1, 5);
     const check = { state: "SCHEDULED" as const, days_left: 91, planned_on: "2027-01-18" };
-    expect(dueText(check, justAfterMidnight)).toBe("Due in 90 days");
+    expect(dueText(check, justAfterMidnight)).toBe("90 days left");
     expect(dueText({ ...check, planned_on: "2026-10-20" }, justAfterMidnight)).toBe("Due today");
     expect(dueText({ ...check, planned_on: "2026-10-17" }, justAfterMidnight)).toBe("3 days overdue");
-    expect(clockText({ days_left: 3, due_date: "2026-10-22" }, justAfterMidnight)).toBe("Due in 2 days");
+    expect(clockText({ days_left: 3, due_date: "2026-10-22" }, justAfterMidnight)).toBe("2 days left");
   });
 
   it("leads with overdue checks and CAPAs closed without one", () => {

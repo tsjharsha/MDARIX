@@ -608,7 +608,7 @@ export const capabilityStatus: {
 export const trialIncludes: string[] = [
   "30 days, free, with no credit card",
   "Up to 3 users and 5,000 uploaded rows",
-  "Sample data that tells the quality story in nine chapters",
+  "Sample data that tells the quality story in ten chapters",
   "Your own Excel or CSV exports, checked for problems and personal data before import",
   "Fourteen step-by-step videos",
   "AI is off during the trial: every step works by hand",

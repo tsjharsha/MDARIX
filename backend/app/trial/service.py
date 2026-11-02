@@ -532,6 +532,20 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
                 updated_at=now,
             )
         )
+        # The working calendar's time zone from the sign-up country, before the sample is seeded, so its due times
+        # and legal deadlines read in the organization's time (India: Asia/Kolkata; J16). Settings changes it.
+        from backend.app.db.models.oversight import OversightSettings
+        from backend.app.oversight.rules import zone_for_country
+
+        db.add(
+            OversightSettings(
+                id=uuid.uuid4(),
+                tenant_id=tenant.id,
+                time_zone=zone_for_country((row.profile or {}).get("country")),
+                updated_at=now,
+            )
+        )
+        db.flush()
         sample = seed_sample_workspace(db, tenant.id, now)
         # The rest of the story: hidden complaints, reporting clocks, CAPAs, the risk register and sample reporting
         # windows, so Complaints, Records and Readiness show findings from the first minute.

@@ -97,6 +97,9 @@ export type TrainingDocument = {
 export type MarketClock = {
   window: string;
   due_date: string;
+  due_at?: string;
+  due_zone?: string;
+  due_label?: string;
   days_left: number;
   state: "OVERDUE" | "DUE_SOON" | "RUNNING";
   source: "WINDOW" | "REGULATION";

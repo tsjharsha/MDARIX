@@ -12,9 +12,11 @@ FDA and EU windows that complaint fields can start (to check against the procedu
 a judgment (an FDA 5-work-day report, an EU serious public health threat) cannot be read from complaint fields and are
 left to the reviewer.
 
-A clock starts at the day the organization became aware of the complaint (the earliest of its awareness, received
-and recorded days, as the case's regulatory review reads it) and ends at that day plus the window's days: calendar days, or work days (Monday to Friday;
-public holidays are not known to MDARIX and are counted as work days, which only makes a due date earlier).
+A clock starts at the moment the organization became aware of the complaint (the earliest of its awareness, received
+and recorded times, as the case's regulatory review reads it) and ends by the market's counting rule
+(backend/app/reportability/deadlines.py, one computation for every screen): calendar days or work days (Monday to
+Friday; public holidays are not known to MDARIX and are counted as work days, which only makes a due date earlier),
+counted in the authority's and the organization's time zones, ending at whichever end of day comes first.
 
 Each template names its regulatory basis (``basis``: ids of the one catalog, backend/app/standards.py); a window made
 from a template keeps it, and the watch shows it beside the window's name. A window entered by hand has none.
@@ -24,8 +26,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime
 
+from backend.app.reportability import deadlines
+from backend.app.reportability.deadlines import add_work_days, soon_days  # noqa: F401 (callers read them here)
 from backend.app.standards import known
 
 DEATH, SERIOUS_INJURY, MALFUNCTION = "DEATH", "SERIOUS_INJURY", "MALFUNCTION"
@@ -304,35 +308,14 @@ def applies(window: dict, record: dict) -> bool:
     return bool(country) and country in {normalize(market) for market in window["markets"]}
 
 
-def add_work_days(start: date, days: int) -> date:
-    """``days`` work days (Monday to Friday) after ``start``."""
-    current = start
-    left = days
-    while left > 0:
-        current += timedelta(days=1)
-        if current.weekday() < 5:
-            left -= 1
-    return current
-
-
-def due_date(aware: date, window: dict) -> date:
-    if window["day_basis"] == WORK:
-        return add_work_days(aware, window["days"])
-    return aware + timedelta(days=window["days"])
-
-
-def soon_days(window_days: int) -> int:
-    """Days left at which a clock is "due soon": 5, or half a short window (at least 1)."""
-    return max(1, min(5, window_days // 2))
+def due_date(aware: date, window: dict, market: str | None = None) -> date:
+    """The latest day of ``window`` from an awareness day, by the market's counting rule (deadlines.py)."""
+    return deadlines.count(aware, window["days"], window["day_basis"], market, None).day
 
 
 def clock_state(due: date, today: date, window_days: int) -> str:
-    left = (due - today).days
-    if left < 0:
-        return OVERDUE
-    if left <= soon_days(window_days):
-        return DUE_SOON
-    return RUNNING
+    """A clock's state from its latest day and a day (deadlines.state reads the time of day too)."""
+    return deadlines.state(deadlines.end_of(due, None, None), today, window_days)
 
 
 @dataclass(frozen=True)
@@ -345,6 +328,10 @@ class Clock:
     days_left: int
     triggers: tuple[str, ...]
     basis: tuple[str, ...] = ()
+    due_at: str | None = None
+    due_zone: str | None = None
+    due_label: str | None = None
+    market: str | None = None
 
     def as_dict(self) -> dict:
         return {
@@ -352,6 +339,10 @@ class Clock:
             "days": self.days,
             "day_basis": self.day_basis,
             "due_date": self.due.isoformat(),
+            "due_at": self.due_at,
+            "due_zone": self.due_zone,
+            "due_label": self.due_label,
+            "market": self.market,
             "state": self.state,
             "days_left": self.days_left,
             "triggers": list(self.triggers),
@@ -359,29 +350,40 @@ class Clock:
         }
 
 
-def clocks(record: dict, windows: list[dict], aware: date | None, today: date) -> list[Clock]:
-    """The clocks the complaint's windows start, the earliest due date first; none without an awareness day."""
+def clocks(
+    record: dict, windows: list[dict], aware: datetime | date | None, now: datetime | date, org_zone: str | None = None
+) -> list[Clock]:
+    """The clocks the complaint's windows start, the earliest end first; none without awareness. Each counts by the
+    complaint's market (its country) and the organization's time zone (deadlines.py)."""
+    from backend.app.reportability.markets import market_of
+
     if aware is None:
         return []
     found = []
     reported = set(triggers_of(record))
+    market = market_of(record.get("country"))
     for window in windows:
         if not applies(window, record):
             continue
-        due = due_date(aware, window)
+        due = deadlines.count(aware, window["days"], window["day_basis"], market, org_zone)
+        seen = deadlines.view(due, now, window["days"])
         found.append(
             Clock(
                 name=window["name"],
                 days=window["days"],
                 day_basis=window["day_basis"],
-                due=due,
-                state=clock_state(due, today, window["days"]),
-                days_left=(due - today).days,
+                due=due.day,
+                state=seen["state"],
+                days_left=seen["days_left"],
                 triggers=tuple(code for code in window["triggers"] if code in reported),
                 basis=tuple(window.get("basis") or ()),
+                due_at=seen["due_at"],
+                due_zone=seen["due_zone"],
+                due_label=seen["due_label"],
+                market=market,
             )
         )
-    return sorted(found, key=lambda clock: (clock.due, clock.name))
+    return sorted(found, key=lambda clock: (clock.due_at or "", clock.name))
 
 
 def follow_ups(record: dict, windows: list[dict], aware_recorded: bool) -> list[dict]:

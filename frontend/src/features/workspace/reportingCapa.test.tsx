@@ -109,7 +109,7 @@ describe("a complaint on the reportability watch", () => {
   it("shows its clock, what it reports and the missing answers", () => {
     const markup = render(<WatchCard item={watchItem()} onDecide={vi.fn()} />, ["regulatory.review", "records.write"]);
     expect(markup).toContain("CMP000031");
-    expect(markup).toContain("Due in 2 days");
+    expect(markup).toContain("2 days left");
     expect(markup).toContain("FDA MDR (30 calendar days)");
     expect(markup).not.toContain("(30 calendar days) (30 calendar days)");
     expect(markup).toContain("Death");
@@ -117,7 +117,7 @@ describe("a complaint on the reportability watch", () => {
     expect(markup).toContain("whether anyone was seriously injured is not recorded");
     expect(markup).toContain("uw-cr-rail tone-warning");
     expect(markup).toContain("Assess per market");
-    expect(markup).toContain("US: draft (pending information) · Due in 2 days");
+    expect(markup).toContain("US: draft (pending information) · 2 days left");
     expect(markup).toContain("Open investigation");
   });
 
@@ -158,7 +158,7 @@ describe("a complaint on the reportability watch", () => {
     expect(markup).toContain("Rita Regulatory");
     expect(markup).toContain("Single decision, recorded before per-market assessment");
     expect(markup).toContain("Open the assessment");
-    expect(markup).not.toContain("Due in 2 days");
+    expect(markup).not.toContain("2 days left");
   });
 });
 
@@ -263,7 +263,7 @@ describe("CAPA effectiveness", () => {
         onOpen={vi.fn()}
       />,
     );
-    expect(markup).toContain("Due in 7 days");
+    expect(markup).toContain("7 days left");
     expect(markup).toContain("date from your quality system: confirm the plan");
   });
 

@@ -39,6 +39,21 @@ export const LOOP_ORDER: ReadonlyArray<{ code: string; label: string; caption: s
   { code: "TRENDS_WITHOUT_ACTION", label: "Trends acted on", caption: "Trends with no CAPA or risk review" },
   { code: "CAPA_EFFECTIVENESS", label: "CAPAs proven", caption: "CAPAs without a verified effect" },
   { code: "RISK_FILE_INPUT", label: "Risk file fed", caption: "Post-market data not yet in the risk file" },
+  {
+    code: "DISPOSITIONS_DUE",
+    label: "Dispositions on time",
+    caption: "Past the target without a disposition, or a disposition to review",
+  },
+  {
+    code: "RECURRING_SERVICE_LEVEL",
+    label: "Repeats spotted",
+    caption: "Service-level matters recurring on one product and problem",
+  },
+  {
+    code: "EXTERNAL_REQUESTS",
+    label: "Requests answered",
+    caption: "Requests to external contacts past their reply date",
+  },
 ];
 
 const stationOf = (check: ReadinessCheck, number: number, label: string, caption: string): LoopStation => {

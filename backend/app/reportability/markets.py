@@ -21,10 +21,10 @@ anything stored.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
-from datetime import date
 
-from backend.app.reportability import rules
+from backend.app.reportability import deadlines, rules
 from backend.app.standards import STARTER_MARK, version_words
 
 # The label every signed record and document made in a free trial carries (T-B5).
@@ -667,6 +667,16 @@ def market_of(country: object) -> str | None:
     return None
 
 
+# Words that mark an in-vitro diagnostic in a product's name, family, GMDN term or description: its EU clocks cite the
+# IVDR. shortcut: a word list, until products carry a device category (an owner decision, stage 4).
+IVD_WORDS = re.compile(r"(?i)\b(ivds?|in[- ]vitro|reagents?|assays?|test strips?|diagnostic kits?|rapid tests?)\b")
+
+
+def is_ivd(*texts) -> bool:
+    """Whether a product's words mark it as an in-vitro diagnostic (``IVD_WORDS``)."""
+    return any(IVD_WORDS.search(str(text or "")) for text in texts)
+
+
 def window_markets(window: dict) -> set[str]:
     """The markets a reporting window covers (a window without markets covers every market)."""
     if not window.get("markets"):
@@ -681,29 +691,36 @@ def enabled_markets(windows: list[dict]) -> list[str]:
     return [market for market in MARKETS if market in covered]
 
 
-def _clock(name: str, days: int, day_basis: str, aware: date, today: date, source: str) -> dict:
-    due = rules.due_date(aware, {"days": days, "day_basis": day_basis})
-    return {
-        "window": name,
-        "days": days,
-        "day_basis": day_basis,
-        "due_date": due.isoformat(),
-        "days_left": (due - today).days,
-        "state": rules.clock_state(due, today, days),
-        "source": source,
-    }
+def _clock(
+    name: str,
+    days: int,
+    day_basis: str,
+    aware,
+    now,
+    source: str,
+    market: str | None = None,
+    org_zone: str | None = None,
+) -> dict:
+    due = deadlines.count(aware, days, day_basis, market, org_zone)
+    return {"window": name, "days": days, "day_basis": day_basis, **deadlines.view(due, now, days), "source": source}
 
 
 def market_clock(
-    market: str, state: str | None, report_type: str | None, windows: list[dict], aware: date | None, today: date
+    market: str,
+    state: str | None,
+    report_type: str | None,
+    windows: list[dict],
+    aware,
+    now,
+    org_zone: str | None = None,
 ) -> dict | None:
-    """A market's clock. Reportable: the organization's window of the report type's period for that market, or the
-    regulation's period when none matches. Pending, or not yet assessed: the shortest window the organization set for
-    that market, still counting. Not reportable: none."""
+    """A market's clock, by its counting rule (deadlines.py). Reportable: the organization's window of the report
+    type's period for that market, or the regulation's period when none matches. Pending, or not yet assessed: the
+    shortest window the organization set for that market, still counting. Not reportable: none."""
     if aware is None or state == NOT_REPORTABLE:
         return None
     mine = [window for window in windows if market in window_markets(window)]
-    clocks = [_clock(w["name"], w["days"], w["day_basis"], aware, today, "WINDOW") for w in mine]
+    clocks = [_clock(w["name"], w["days"], w["day_basis"], aware, now, "WINDOW", market, org_zone) for w in mine]
     kind = REPORT_TYPES.get(report_type or "")
     if state == REPORTABLE and kind and kind.days:
         exact = [
@@ -712,9 +729,9 @@ def market_clock(
             if window["days"] == kind.days and window["day_basis"] == kind.day_basis
         ]
         if exact:
-            return min(exact, key=lambda clock: clock["due_date"])
-        return _clock(kind.label, kind.days, kind.day_basis, aware, today, "REGULATION")
-    return min(clocks, key=lambda clock: clock["due_date"]) if clocks else None
+            return min(exact, key=lambda clock: clock["due_at"])
+        return _clock(kind.label, kind.days, kind.day_basis, aware, now, "REGULATION", market, org_zone)
+    return min(clocks, key=lambda clock: clock["due_at"]) if clocks else None
 
 
 def signature_meaning(ref: str, market: str, version: str, conclusion: str) -> str:

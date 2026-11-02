@@ -282,7 +282,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Under Why it matters, small chips name the check's regulatory basis, for example ISO 13485 8.2.2 or 21 CFR 803.50; point at a chip for its title. MDARIX organizes the evidence these ask for; it does not certify compliance.",
               "Choose Open on a check to go to the screen where you act on it.",
             ],
-            note: "The eight checks: Complaints to recheck, Complaints past target, Reporting clocks, Trends without CAPA or risk review, Post-market data not in the risk file, Harm complaints closed without an investigation, CAPAs without a verified effect, Signals waiting past their triage date.",
+            note: "The eleven checks: Complaints to recheck, Complaints past target, Reporting clocks, Trends without CAPA or risk review, Post-market data not in the risk file, Harm complaints closed without an investigation, CAPAs without a verified effect, Signals waiting past their triage date, Dispositions past the target or to review, Recurring service-level matters, Requests to external contacts.",
           },
           {
             title: "Download the summary for management review or an inspector",
@@ -364,7 +364,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Triage an urgent intake or a flagged record",
             steps: [
               "Choose Urgent intake for a serious event: it is a complaint by definition and goes to triage at once. Leave awareness empty if nobody confirmed it: the clock runs from first knowledge or receipt, marked Awareness unresolved: deadline provisional.",
-              "Open Complaints › Triage. Each item shows why it is flagged, the triage target (24 hours from when it reached MDARIX) and each market's provisional deadline from awareness.",
+              "Open Complaints › Triage. Each item shows why it is flagged, the triage target (24 hours from when it reached MDARIX) and the event's own market's deadline first, with its time zone; the other markets show only if also reportable, and a signed market conclusion replaces its provisional deadline.",
               "Choose Triage: the severity, the event owner and the triage owner (a backup if you have a second person), the immediate action or why none is needed, and the awareness time confirmed.",
               "From any queue (Second look, Backlog, Dispositions, Reportability, rows set aside at import, First contact) choose Escalate to triage, with a reason, to send a record there by hand.",
             ],
@@ -643,7 +643,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Under Working calendar and escalation, choose your time zone and working days, add your holidays, and set how many hours before a due time reminders go and the role overdue items escalate to. Choose Save the calendar.",
             ],
             result:
-              "Your own due times (a follow-up at the end of the next working day, the one-working-hour rule of the communications log) count on this calendar. An authority's legal deadline keeps its own counting rule.",
+              "Your own due times (a follow-up at the end of the next working day, the one-working-hour rule of the communications log) count on this calendar and end with your day. An authority's legal deadline keeps its own counting rule: awareness taken in the authority's time zone (US Eastern, Brussels, UK or India time), the awareness day as day 1 for Great Britain and India, and the deadline ends at 23:59 in the authority's time zone or yours, whichever comes first. Starter rules, for your regulatory consultant to confirm.",
           },
         ],
       },
@@ -716,13 +716,13 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Trend check and detection rules",
         where: "Signals › Trend check and Signals › Detection rules",
         purpose:
-          "The trend check compares each version's last 30 days with its own history, counted per unit in the field where lot quantities exist. It is a check, never a verdict.",
+          "The trend check compares each version's last 30 days with its own history and, for a version that replaced another, with that version too (the stronger comparison is shown), counted per unit in the field where lot quantities exist (by calendar days for single-use products). An event linked from several records counts once. It is a check, never a verdict.",
         tasks: [
           {
             title: "Read the trend check",
             steps: [
               "Group By version, By problem code or By complaint type.",
-              "Each row's Result is Significant rise (chance under 1% if nothing changed), Higher than usual (under 5%), In line with history, Too few to assess or History too short.",
+              "Each row's Result is Significant rise (chance under 1% if nothing changed, allowing for the groups checked at once), Higher than usual (under 5%), In line with history, Too few to assess or History too short. Chance shows the adjusted value, with the group's own value beside it.",
               "On a rising row with no open signal, choose Raise a signal (PMS / Signal Triage Lead and Leader).",
             ],
             note: "The line under the table names the basis: ISO 13485 8.4 (analysis of data) and EU MDR Art. 88 (trend reporting).",

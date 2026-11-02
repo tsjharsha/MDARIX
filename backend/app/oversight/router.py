@@ -49,6 +49,7 @@ from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import require_any_permission
 from backend.app.oversight import closure, rules, service
+from backend.app.reportability.deadlines import due_label
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
 logger = logging.getLogger("mdarix.oversight")
@@ -72,6 +73,7 @@ CSV_FIELDS = (
     "owner",
     "queue",
     "due_at",
+    "due_label",
     "state",
     "hours_left",
     "escalated_to",
@@ -170,6 +172,9 @@ def _item_views(db, control_db, tenant_id, now: datetime) -> tuple[list[dict], d
                 "queue": item["queue"],
                 "away": {"backup": names.get(covering) or "A colleague"} if covering else None,
                 "due_at": item["due_at"].isoformat(),
+                # The due time in words with its time zone, as every other screen shows it (J16, J19: RV-08's report
+                # read 28 Nov on Reports and 29 Nov here, midnight UTC seen from India).
+                "due_label": due_label(item["due_at"], item["market"], calendar.zone),
                 "state": state,
                 "state_label": rules.STATE_LABELS[state],
                 "hours_left": rules.hours_left(item["due_at"], now),
@@ -388,6 +393,7 @@ def export(
                 "owner": item["owner"] or "",
                 "queue": item["queue"] or "",
                 "due_at": item["due_at"],
+                "due_label": item["due_label"],
                 "state": item["state_label"],
                 "hours_left": item["hours_left"],
                 "escalated_to": "; ".join(item["escalated_to"]),
@@ -446,6 +452,7 @@ def save_settings(
 ):
     tenant_id = _tenant(ctx)
     holidays = [{"date": item.date, "name": " ".join(item.name.split())} for item in payload.holidays]
+    payload.time_zone = rules.canonical_zone(payload.time_zone)
     problem = rules.calendar_problem(payload.time_zone, payload.work_days, holidays)
     if problem is None and payload.escalation_role not in ESCALATION_ROLES:
         problem = "Choose the escalation role from the list"
@@ -488,9 +495,10 @@ def save_settings(
 # --------------------------------------------------------------------------------------------- my alerts
 
 
-def _alert_view(alert: DueAlert, now: datetime, hours: int, names: dict) -> dict:
+def _alert_view(alert: DueAlert, now: datetime, hours: int, names: dict, zone: str = "UTC") -> dict:
     due = alert.due_at
     state = rules.state_of(due, now, hours)
+    legal = alert.category in ("REPORTING", "OBLIGATION")
     return {
         "id": str(alert.id),
         "tier": alert.tier,
@@ -503,6 +511,7 @@ def _alert_view(alert: DueAlert, now: datetime, hours: int, names: dict) -> dict
         "ref": alert.ref,
         "owner": names.get(alert.owner_id or "") if alert.owner_id else None,
         "due_at": due.isoformat(),
+        "due_label": due_label(due, None, zone, legal),
         "state": state,
         "state_label": rules.STATE_LABELS[state],
         "hours_left": rules.hours_left(due, now),
@@ -534,8 +543,9 @@ def my_alerts(
     names = _names(control_db, tenant_id, {row.owner_id for row in rows})
     # One line per item: its escalation stands for its reminder too (both are marked read together).
     by_item: dict[str, dict] = {}
+    zone = service.calendar_of(db, tenant_id).zone
     for row in rows:
-        view = _alert_view(row, now, hours, names)
+        view = _alert_view(row, now, hours, names, zone)
         kept = by_item.get(row.item_key)
         if kept is None:
             by_item[row.item_key] = {**view, "ids": [view["id"]]}

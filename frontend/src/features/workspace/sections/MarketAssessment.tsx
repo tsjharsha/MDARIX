@@ -2,7 +2,7 @@ import { useContext, useEffect, useId, useState } from "react";
 import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { formatDay } from "../../../app/dates";
+import { deadlineLabel, formatDay } from "../../../app/dates";
 import { WorkspaceContext, useCan, useWorkspace } from "../workspaceContext";
 import { WORKSHEET_MARKETS, reportsTab } from "../authorityReports";
 import { communicationsTab } from "../communications";
@@ -231,7 +231,7 @@ export function MarketPanel({
           <span
             className={`uw-rw-clock tone-${item.clock.state === "OVERDUE" ? "critical" : item.clock.state === "DUE_SOON" ? "warning" : "neutral"}`}
           >
-            <strong>{clockText(item.clock)}</strong> · due {formatDay(item.clock.due_date)} · {item.clock.window}
+            <strong>{clockText(item.clock)}</strong> · due {deadlineLabel(item.clock)} · {item.clock.window}
           </span>
         )}
       </header>

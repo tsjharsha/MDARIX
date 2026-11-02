@@ -50,7 +50,7 @@ export function RemindersPanel() {
         !list
           ? "Reading your reminders…"
           : count
-            ? `${count} ${count === 1 ? "item needs" : "items need"} you${list.unread ? `, ${list.unread} unread` : ""}`
+            ? `${count} ${count === 1 ? "reminder" : "reminders"} for you${list.unread ? `, ${list.unread} unread` : ""}`
             : "Nothing due soon or overdue for you"
       }
       source={data}
@@ -87,7 +87,9 @@ export function RemindersPanel() {
                   .map((item) => item.ref || item.title)
                   .join(", ")}
                 {group.items.length > 4 ? ` and ${group.items.length - 4} more` : ""}; the first{" "}
-                {hoursText(Math.min(...group.items.map((item) => item.hours_left)))}
+                {hoursText(
+                  group.items.reduce((soonest, item) => (item.hours_left < soonest.hours_left ? item : soonest)),
+                )}
               </span>
               <button type="button" className="ac-secondary" onClick={() => go(group.items[0].opens)}>
                 Open <ChevronRight size={14} aria-hidden="true" />
@@ -118,7 +120,7 @@ function AlertRow({ item, onOpen, onRead }: { item: Alert; onOpen: () => void; o
         </div>
         <p className="uw-cr-text">{item.title}</p>
         <p className="uw-cr-meta">
-          Due {formatDate(item.due_at)} ({hoursText(item.hours_left)}). {item.reason_label}.
+          Due {item.due_label ?? formatDate(item.due_at)} ({hoursText(item)}). {item.reason_label}.
           {item.owner && item.reason !== "OWNER" ? ` Owner: ${item.owner}.` : ""}
         </p>
       </div>

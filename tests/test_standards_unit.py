@@ -72,6 +72,12 @@ EXPECTED = [
         "European Union",
     ),
     ("MDR_88", "EU MDR Art. 88", "Trend reporting", "European Union"),
+    (
+        "IVDR_82",
+        "EU IVDR Art. 82",
+        "Reporting of serious incidents and field safety corrective actions (in-vitro diagnostics)",
+        "European Union",
+    ),
     ("MDCG_2023_3", "MDCG 2023-3", "Questions and answers on vigilance terms and concepts (EU MDR)", "European Union"),
     ("ISO14971_10", "ISO 14971 clause 10", "Production and post-production activities", "International"),
     ("IEC62304_9", "IEC 62304 clause 9", "Software problem resolution process", "International"),
@@ -95,6 +101,7 @@ STARTER = {
     "MDR_2",
     "MDCG_2023_3",
     "IN_MDR",
+    "IVDR_82",
 }
 DISCLAIMER = (
     "MDARIX organizes the evidence these ask for; it does not certify compliance. Your quality system and its "

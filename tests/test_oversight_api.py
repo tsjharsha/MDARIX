@@ -150,15 +150,26 @@ def test_the_sample_shows_an_escalation_a_reminder_and_an_away_colleague(trial):
 def test_the_working_calendar_is_set_by_quality_and_used_by_the_communications_log(trial):
     user = trial["user"]
     body = _ok(user.get(f"{VIEW}/settings"))
-    assert body["time_zone"] == "UTC" and body["work_days"] == [0, 1, 2, 3, 4] and "Asia/Kolkata" in body["zones"]
+    # The calendar starts in the sign-up country's time zone (the test sign-up says United States; 0.10.63, J16).
+    assert body["time_zone"] == "America/New_York" and body["work_days"] == [0, 1, 2, 3, 4]
+    # One name per zone: the current one, never an old alias beside it.
+    assert (
+        "Asia/Kolkata" in body["zones"] and "Asia/Calcutta" not in body["zones"] and "US/Eastern" not in body["zones"]
+    )
     wrong = user.put(f"{VIEW}/settings", json={**_settings(), "time_zone": "Mars/Olympus"})
     assert wrong.status_code == 422 and wrong.json()["detail"]["code"] == "SETTINGS_INVALID"
-    saved = _ok(user.put(f"{VIEW}/settings", json=_settings()))
+    # A browser's old name is stored under the current one.
+    saved = _ok(user.put(f"{VIEW}/settings", json={**_settings(), "time_zone": "Asia/Calcutta"}))
     assert saved["time_zone"] == "Asia/Kolkata" and saved["holidays"][0] == {"date": "2026-11-09", "name": "Diwali"}
     assert saved["reminder_hours"] == 48 and saved["escalation_role_label"]
     log = _ok(user.get("/api/v1/communications"))
     assert log["s4"]["in_mdarix"] >= 1  # still counted, now on the organization's calendar
-    _ok(user.put(f"{VIEW}/settings", json={**_settings(), "time_zone": "UTC", "holidays": [], "reminder_hours": 24}))
+    _ok(
+        user.put(
+            f"{VIEW}/settings",
+            json={**_settings(), "time_zone": "America/New_York", "holidays": [], "reminder_hours": 24},
+        )
+    )
 
 
 def _settings() -> dict:
@@ -173,7 +184,10 @@ def _settings() -> dict:
 
 def test_an_absence_sends_the_owners_alerts_to_the_backup(trial):
     user = trial["user"]
-    today = date.today()
+    # Today in the organization's time zone, as the server counts absences (the machine's own date read a day ahead
+    # in India before 05:30, and the test failed every night).
+    zone = _ok(user.get(f"{VIEW}/settings"))["time_zone"]
+    today = datetime.now(rules.zone_info(zone)).date()
     alone = user.post(
         f"{VIEW}/absences", json={"starts_on": today.isoformat(), "ends_on": today.isoformat(), "backup_id": "nobody"}
     )

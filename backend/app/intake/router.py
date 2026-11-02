@@ -169,7 +169,10 @@ class TriageIn(BaseModel):
 
 @router.get("/intake/guide")
 def guide():
-    """The starter first-contact guide (starter text, T-B6), its outcomes table and the starter word lists."""
+    """The starter first-contact guide (starter text, T-B6), its outcomes table, the starter word lists and the time
+    zones a call's times are entered in."""
+    from backend.app.oversight.rules import LEGACY_ZONES, zone_names
+
     return {
         "version": rules.GUIDE_VERSION,
         "questions": [
@@ -191,6 +194,9 @@ def guide():
         "harm_words": {"version": rules.HARM_WORDS_VERSION, "words": list(rules.HARM_WORDS)},
         "fault_words": {"version": rules.FAULT_WORDS_VERSION, "words": list(rules.FAULT_WORDS)},
         "levels": [{"code": level, "label": markets.LEVEL_LABELS[level]} for level in markets.LEVELS],
+        "zones": list(zone_names()),
+        # Old names a browser may report ("Asia/Calcutta"), each with its current one, so the form preselects it.
+        "zone_aliases": LEGACY_ZONES,
         "starter_mark": STARTER_MARK,
     }
 
@@ -528,6 +534,28 @@ def _choice(value: str, allowed, default: str | None = None) -> str | None:
     return code if code in allowed else default
 
 
+def _zone(value: str, fallback: str = "UTC") -> str:
+    """A call's time zone, by its current name, from the list (J28); refused when it is not a time zone."""
+    from backend.app.oversight.rules import canonical_zone, zone_names
+
+    zone = canonical_zone(rules.clean(value, 60)) or fallback
+    if zone not in zone_names():
+        raise _error(422, "TIME_ZONE_UNKNOWN", "Choose the call's time zone from the list")
+    return zone
+
+
+def _at(value: datetime | None, zone: str) -> datetime | None:
+    """A time as entered: a time without an offset is the wall-clock time in ``zone`` (Chicago 09:00 is 15:00 UTC in
+    November, J28); one with an offset is kept."""
+    from backend.app.oversight.rules import zone_info
+
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=zone_info(zone))
+    return rules.utc(value)
+
+
 def _resolve_lot(db, tenant_id, product_id, value: str):
     text = rules.clean(value, 120)
     if not text:
@@ -561,10 +589,11 @@ def log_intake(
         if product is None:
             raise _error(422, "PRODUCT_NOT_FOUND", "No such product in your organization")
     lot = _resolve_lot(db, tenant_id, payload.product_id, payload.lot)
-    received = rules.utc(payload.received_at) or now
+    zone = _zone(payload.received_zone)
+    received = _at(payload.received_at, zone) or now
     if received > now + _SKEW:
         raise _error(422, "TIME_IN_FUTURE", "The contact cannot be received in the future")
-    awareness = received if kind == "CONTACT" else rules.utc(payload.awareness_at)
+    awareness = received if kind == "CONTACT" else _at(payload.awareness_at, _zone(payload.awareness_zone, zone))
     event = IntakeEvent(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
@@ -581,18 +610,16 @@ def log_intake(
         requested=_choice(payload.requested, rules.REQUESTS, "NONE"),
         use_environment=_choice(payload.use_environment, coding.USE_ENVIRONMENT_LABELS, "UNKNOWN"),
         user_type=_choice(payload.user_type, coding.USER_TYPE_LABELS, "UNKNOWN"),
-        event_at=rules.utc(payload.event_at),
-        event_zone=rules.clean(payload.event_zone, 60) or None,
-        first_knowledge_at=rules.utc(payload.first_knowledge_at),
-        first_knowledge_zone=rules.clean(payload.first_knowledge_zone, 60) or None,
+        event_at=_at(payload.event_at, _zone(payload.event_zone, zone)),
+        event_zone=_zone(payload.event_zone, zone) if payload.event_at else None,
+        first_knowledge_at=_at(payload.first_knowledge_at, _zone(payload.first_knowledge_zone, zone)),
+        first_knowledge_zone=_zone(payload.first_knowledge_zone, zone) if payload.first_knowledge_at else None,
         first_knowledge_party=_choice(payload.first_knowledge_party, rules.FIRST_KNOWLEDGE_PARTIES),
         first_knowledge_basis=_choice(payload.first_knowledge_basis, rules.FIRST_KNOWLEDGE_BASES),
         received_at=received,
-        received_zone=rules.clean(payload.received_zone, 60) or "UTC",
+        received_zone=zone,
         awareness_at=awareness,
-        awareness_zone=(rules.clean(payload.awareness_zone, 60) or rules.clean(payload.received_zone, 60) or "UTC")
-        if awareness
-        else None,
+        awareness_zone=_zone(payload.awareness_zone, zone) if awareness else None,
         service_ticket=rules.clean(payload.service_ticket, 120) or None,
         created_by=str(ctx.user_id),
         created_at=now,

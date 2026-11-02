@@ -33,7 +33,7 @@ from backend.app.db.session import get_db
 from backend.app.decision_guides import service as guides
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import current_person, require_any_permission
-from backend.app.reportability import assessments, markets, rules, service
+from backend.app.reportability import assessments, deadlines, markets, rules, service
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.signer_training import service as training
 from backend.app.signer_training.router import is_trial
@@ -115,6 +115,28 @@ def _market(market: str) -> str:
     return code
 
 
+def _settle_provisional_reports(db: Session, tenant_id, complaint_id, market: str, signed, now) -> None:
+    """J14: a report started while the market was pending kept its provisional deadline; a signed reportable conclusion
+    now gives every open initial report of that market its category's deadline (never a reset of a set one)."""
+    from backend.app.authority_reports import rules as report_rules
+    from backend.app.db.models.authority_reports import ReportObligation
+
+    if signed.conclusion != markets.REPORTABLE or signed.due_on is None:
+        return
+    for obligation in db.query(ReportObligation).filter(
+        ReportObligation.tenant_id == tenant_id,
+        ReportObligation.complaint_id == complaint_id,
+        ReportObligation.market == market,
+        ReportObligation.kind == "INITIAL",
+        ReportObligation.due_provisional.is_(True),
+    ):
+        if obligation.state in report_rules.MET:
+            continue
+        obligation.due_on, obligation.due_provisional = signed.due_on, False
+        obligation.assessment_id, obligation.report_type = signed.id, signed.report_type
+        obligation.updated_at = now
+
+
 def _versions(db: Session, tenant_id, complaint_id, market: str, lock: bool = False):
     query = db.query(ComplaintMarketAssessment).filter(
         ComplaintMarketAssessment.tenant_id == tenant_id,
@@ -131,13 +153,16 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
     scale with the complaint's mapped level, the person's training on what a signature relies on, and any earlier
     single decision."""
     tenant_id = uuid.UUID(ctx.tenant_id)
-    today = today or service.today_utc()
+    today = deadlines.as_moment(today)
     complaint, record, seen, second_look = _found(db, tenant_id, complaint_id, today)
     windows = service.settings_of(db, tenant_id)["windows"]
     by_market = assessments.rows_by_complaint(db, tenant_id, [complaint_id]).get(complaint_id, {})
     enabled = markets.enabled_markets(windows)
-    aware = date.fromisoformat(seen["aware_date"]) if seen["aware_date"] else None
-    summary = {item["market"]: item for item in assessments.markets_summary(record, windows, by_market, aware, today)}
+    aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
+    summary = {
+        item["market"]: item
+        for item in assessments.markets_summary(record, windows, by_market, aware, today, seen.get("org_zone"))
+    }
     shown = [market for market in markets.MARKETS if market in enabled or market in by_market]
     refs = {row.signed_by for rows in by_market.values() for row in rows} | {
         row.created_by for rows in by_market.values() for row in rows
@@ -241,7 +266,7 @@ def save_draft(
     """Save the market's answers and harm level as a draft (no conclusion yet); returns the suggestion so far."""
     tenant_id = uuid.UUID(ctx.tenant_id)
     market = _market(market)
-    today = service.today_utc()
+    today = deadlines.as_moment(None)
     complaint, record, seen, second_look = _found(db, tenant_id, complaint_id, today)
     versions = _versions(db, tenant_id, complaint_id, market, lock=True)
     if not versions and not _on_watch(complaint, record, second_look):
@@ -271,8 +296,10 @@ def save_draft(
     if problem:
         raise _error(422, "ASSESSMENT_INVALID", problem)
     evaluation = markets.evaluate(market, clean["answers"])
-    aware = date.fromisoformat(seen["aware_date"]) if seen["aware_date"] else None
-    clock = markets.market_clock(market, evaluation["suggested"], evaluation["report_type"], windows, aware, today)
+    aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
+    clock = markets.market_clock(
+        market, evaluation["suggested"], evaluation["report_type"], windows, aware, today, seen.get("org_zone")
+    )
     now = datetime.now(timezone.utc)
     action = "COMPLAINT_MARKET_ASSESSMENT_SAVED"
     if draft is None:
@@ -346,7 +373,7 @@ def sign_conclusion(
 
     tenant_id = uuid.UUID(ctx.tenant_id)
     market = _market(market)
-    today = service.today_utc()
+    today = deadlines.as_moment(None)
     complaint, record, seen, _ = _found(db, tenant_id, complaint_id, today)
     ref = record["business_id"] or record["complaint_identifier"]
     versions = _versions(db, tenant_id, complaint_id, market)
@@ -427,8 +454,8 @@ def sign_conclusion(
     if not disagreement:
         draft.scale_disagreement_reason = None  # a reason typed for answers since changed is not part of the record
     windows = service.settings_of(db, tenant_id)["windows"]
-    aware = date.fromisoformat(seen["aware_date"]) if seen["aware_date"] else None
-    clock = markets.market_clock(market, conclusion, report_type, windows, aware, today)
+    aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
+    clock = markets.market_clock(market, conclusion, report_type, windows, aware, today, seen.get("org_zone"))
     material = {
         "complaint_id": str(complaint_id),
         "complaint": ref,
@@ -436,7 +463,11 @@ def sign_conclusion(
         "version": draft.version,
         "question_set": draft.question_set,
         "questions": {
-            question.id: {"text": question.text, "clause": question.clause, **({"extra": True} if question.extra else {})}
+            question.id: {
+                "text": question.text,
+                "clause": question.clause,
+                **({"extra": True} if question.extra else {}),
+            }
             for question in question_set.questions
         },
         "answers": answers,
@@ -451,6 +482,7 @@ def sign_conclusion(
         "override_reason": override_reason or None,
         "report_type": report_type,
         "due_on": clock["due_date"] if clock else None,
+        "due_label": clock["due_label"] if clock else None,
         "training": [document.as_dict() for document in needed if document not in untrained],
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,
@@ -512,6 +544,7 @@ def sign_conclusion(
     draft.due_on = date.fromisoformat(clock["due_date"]) if clock else None
     draft.signed_record_id, draft.content_fingerprint = record_row.id, content_fingerprint
     draft.signed_by, draft.signed_at, draft.updated_at = str(ctx.user_id), now, now
+    _settle_provisional_reports(db, tenant_id, complaint_id, market, draft, now)
     try:
         if db is control_db:
             control_db.commit()  # the shared plane: everything in one transaction
@@ -534,6 +567,7 @@ def sign_conclusion(
             assessments.rows_by_complaint(db, tenant_id, [complaint_id]).get(complaint_id, {}),
             aware,
             today,
+            seen.get("org_zone"),
         )
     ):
         from backend.app.reportability.router import _finish_reminders

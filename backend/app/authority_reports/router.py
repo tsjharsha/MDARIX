@@ -47,7 +47,7 @@ from backend.app.db.models.market_assessment import ComplaintMarketAssessment
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import current_person, require_any_permission
-from backend.app.reportability import assessments, markets, service
+from backend.app.reportability import assessments, deadlines, markets
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.standards import STARTER_MARK, chips
 
@@ -170,7 +170,7 @@ def _preparers(obligation: ReportObligation, extra: str | None = None) -> set[st
     return {ref for ref in found if ref}
 
 
-def _deadline(obligation: ReportObligation, context: dict, today: date) -> dict:
+def _deadline(obligation: ReportObligation, context: dict, today, org_zone: str | None = None) -> dict:
     """The obligation's deadline: the one it was given (a rejection never moves it); while it is provisional, the
     market assessment's current one."""
     due = obligation.due_on
@@ -180,11 +180,32 @@ def _deadline(obligation: ReportObligation, context: dict, today: date) -> dict:
         if row is not None and row.due_on is not None:
             due = row.due_on
             provisional = row.conclusion is None
+    return due_fields(due, obligation.market, org_zone, today, provisional, obligation.state in rules.MET)
+
+
+def due_fields(due: date | None, market: str, org_zone: str | None, now, provisional: bool, met: bool) -> dict:
+    """A report's deadline on the wire: its latest day, its end with the time zone, days left, and overdue (never
+    once met), counted by the market's rule (reportability/deadlines.py)."""
+    if due is None:
+        return {
+            "due_on": None,
+            "provisional": provisional,
+            "days_left": None,
+            "overdue": False,
+            **deadlines.end_fields(None, None, None),
+            "due_state": None,
+        }
+    found = deadlines.end_of(due, market, org_zone)
+    state = deadlines.state(found, now, 1)
     return {
-        "due_on": _iso(due),
+        "due_on": due.isoformat(),
         "provisional": provisional,
-        "days_left": (due - today).days if due else None,
-        "overdue": bool(due and due < today and obligation.state not in rules.MET),
+        "days_left": deadlines.days_left(found, now),
+        "overdue": state == deadlines.OVERDUE and not met,
+        "due_at": found.at.isoformat(),
+        "due_zone": found.zone,
+        "due_label": found.label,
+        "due_state": "MET" if met else state,
     }
 
 
@@ -242,7 +263,9 @@ def _evidence_view(row: ReportEvidence, names: dict) -> dict:
     }
 
 
-def _submission_view(row: ReportSubmission, evidence: list[ReportEvidence], names: dict, due_on) -> dict:
+def _submission_view(
+    row: ReportSubmission, evidence: list[ReportEvidence], names: dict, due_on, market=None, org_zone=None
+) -> dict:
     return {
         "id": str(row.id),
         "attempt": row.attempt,
@@ -255,7 +278,9 @@ def _submission_view(row: ReportSubmission, evidence: list[ReportEvidence], name
         "result": row.result,
         "result_at": _iso(row.result_at),
         "late": row.late,
-        "follow_up": rules.follow_up(row.submitted_at, due_on, row.route) if row.result == "PENDING" else None,
+        "follow_up": rules.follow_up(row.submitted_at, due_on, row.route, market, org_zone)
+        if row.result == "PENDING"
+        else None,
         "recorded_by": names.get(row.recorded_by) or "A colleague",
         "recorded_at": _iso(row.recorded_at),
         "evidence": [_evidence_view(item, names) for item in evidence],
@@ -280,7 +305,7 @@ def _refs(obligation, snapshots, submissions, evidence, context) -> set:
 
 def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
     tenant_id = obligation.tenant_id
-    today = service.today_utc()
+    today = deadlines.as_moment(None)
     form = _form(obligation)
     context = _context(db, control_db, obligation)
     snapshots = _snapshots(db, obligation)
@@ -288,7 +313,8 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
     evidence = _evidence(db, tenant_id, [row.id for row in submissions])
     names = _names(control_db, tenant_id, _refs(obligation, snapshots, submissions, evidence, context))
     sections = worksheet.build(form, context, obligation.entries or {}, names, obligation.request_text)
-    deadline = _deadline(obligation, context, today)
+    deadline_zone = deadlines.org_zone(db, tenant_id)
+    deadline = _deadline(obligation, context, today, deadline_zone)
     due = date.fromisoformat(deadline["due_on"]) if deadline["due_on"] else None
     pending = next((row for row in snapshots if row.state == "PENDING"), None)
     children = (
@@ -352,7 +378,10 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "snapshots": [_snapshot_view(row, names) for row in reversed(snapshots)],
         "pending_snapshot": _snapshot_view(pending, names) if pending else None,
         "cannot_approve": sorted({names.get(ref) or "A colleague" for ref in (*_preparers(obligation), signer) if ref}),
-        "submissions": [_submission_view(row, evidence.get(row.id, []), names, due) for row in reversed(submissions)],
+        "submissions": [
+            _submission_view(row, evidence.get(row.id, []), names, due, obligation.market, deadline_zone)
+            for row in reversed(submissions)
+        ],
         "request": (
             {"text": obligation.request_text, "received_on": _iso(obligation.request_received_on)}
             if obligation.kind == "RESPONSE"
@@ -413,7 +442,8 @@ def report_list(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     tenant_id = _tenant(ctx)
-    today = service.today_utc()
+    today = deadlines.as_moment(None)
+    org_zone = deadlines.org_zone(db, tenant_id)
     obligations_query = db.query(ReportObligation).filter(ReportObligation.tenant_id == tenant_id)
     if complaint_id:
         obligations_query = obligations_query.filter(ReportObligation.complaint_id == complaint_id)
@@ -460,10 +490,7 @@ def report_list(
                 "state": state,
                 "state_label": rules.STATE_LABELS[state] if not row.filed_on else f"Filed {row.filed_on.isoformat()}",
                 "next_step": rules.next_step(state),
-                "due_on": _iso(row.due_on),
-                "provisional": row.conclusion is None,
-                "days_left": (row.due_on - today).days if row.due_on else None,
-                "overdue": bool(row.due_on and row.due_on < today and not row.filed_on),
+                **due_fields(row.due_on, row.market, org_zone, today, row.conclusion is None, bool(row.filed_on)),
                 "assessment": markets.CONCLUSION_LABELS.get(row.conclusion or row.suggested_conclusion),
                 "can_start": bool(form) and not row.filed_on,
             }
@@ -483,15 +510,12 @@ def report_list(
                 "state": row.state,
                 "state_label": rules.STATE_LABELS[row.state],
                 "next_step": rules.next_step(row.state),
-                "due_on": _iso(due),
-                "provisional": row.due_provisional,
-                "days_left": (due - today).days if due else None,
-                "overdue": bool(due and due < today and row.state not in rules.MET),
+                **due_fields(due, row.market, org_zone, today, row.due_provisional, row.state in rules.MET),
                 "assessment": None,
                 "can_start": False,
             }
         )
-    items.sort(key=lambda item: (item["state"] in rules.MET, item["due_on"] or "9999", item["complaint_ref"] or ""))
+    items.sort(key=lambda item: (item["state"] in rules.MET, item["due_at"] or "9999", item["complaint_ref"] or ""))
     return {
         "items": items,
         "forms": [
@@ -933,7 +957,11 @@ def record_submission(
         differences=differences,
         authority_reference=reference,
         result="PENDING" if route_spec.acknowledgement_expected else "NO_ACK_EXPECTED",
-        late=bool(obligation.due_on and submitted_at > rules.deadline_end(obligation.due_on)),
+        late=bool(
+            obligation.due_on
+            and submitted_at
+            > rules.deadline_end(obligation.due_on, obligation.market, deadlines.org_zone(db, obligation.tenant_id))
+        ),
         recorded_by=actor,
         recorded_at=now,
         source_system=source_system,

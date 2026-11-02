@@ -235,23 +235,33 @@ def group(complaints: Iterable[ComplaintFacts]) -> dict[tuple, list[ComplaintFac
     return groups
 
 
+def new_events(rows: Iterable[ComplaintFacts], events: dict[uuid.UUID, uuid.UUID]) -> int:
+    """How many events ``rows`` hold: a complaint linked to others as one event counts only as the one that stands
+    for it (``events``), so an event whose earliest record is elsewhere or outside the window adds nothing."""
+    return sum(1 for row in rows if events.get(row.id, row.id) == row.id)
+
+
 def plan_detection(
     complaints: Iterable[ComplaintFacts],
     linked_keys: dict[uuid.UUID, set[tuple]],
     open_signals: dict[tuple, uuid.UUID],
     min_complaints: int,
+    events: dict[uuid.UUID, uuid.UUID] | None = None,
 ) -> list[GroupPlan]:
     """The threshold rule over the complaints of the window. A complaint is new to its group when it is not yet
     linked to a signal about the same (product, version, problem). New complaints of a group with an open signal
-    are added to it; otherwise a group with at least ``min_complaints`` new complaints raises a signal. Running it
+    are added to it; otherwise a group with at least ``min_complaints`` new events raises a signal. ``events``
+    (service.linked_events): complaints a person linked as one event, each mapped to the complaint that stands for
+    it; the event counts once, by that complaint (S2), and every record is still linked as evidence. Running it
     again on the same data plans nothing, which is what makes detection idempotent."""
     plans = []
+    events = events or {}
     for key, rows in sorted(group(complaints).items(), key=lambda item: tuple(str(part) for part in item[0])):
         new = [row for row in rows if key not in linked_keys.get(row.id, set())]
         plan = GroupPlan(key=key, complaints=rows, new=new)
         if new and key in open_signals:
             plan.action, plan.signal_id = "LINK", open_signals[key]
-        elif len(new) >= min_complaints:
+        elif new_events(new, events) >= min_complaints:
             plan.action = "CREATE"
         plans.append(plan)
     return plans
