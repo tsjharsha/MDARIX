@@ -515,6 +515,14 @@ def liveness() -> dict[str, str]:
     return {"status": "alive"}
 
 
+@app.get("/health/version")
+def deployed_version() -> dict[str, str]:
+    """The deployed release, so anyone can confirm the build (0.10.71, A7): unauthenticated, the version only."""
+    from backend.app.version import APP_VERSION
+
+    return {"release": f"v{APP_VERSION}"}
+
+
 @app.get("/health/ready")
 def readiness():
     """Ready for traffic: the database answers and its schema is the one this code was built for. Other parts

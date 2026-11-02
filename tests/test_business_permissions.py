@@ -308,3 +308,15 @@ def test_an_investigator_passes_the_permission_check():
     investigator = _client_with_role("Investigator")
     response = _call(investigator, "POST", "/api/v1/investigations/{investigation_id}/analysis")
     assert not (response.status_code == 403 and response.json()["detail"].get("code") == "PERMISSION_DENIED")
+
+
+def test_the_deployed_release_is_public_and_says_nothing_else():
+    """0.10.71 (A7): /health/version tells anyone which build is deployed, without a session, and names nothing but
+    the release (no host, database, commit, environment or component)."""
+    from backend.app.version import APP_VERSION
+
+    answer = TestClient(app).get("/health/version")
+    assert answer.status_code == 200
+    assert answer.json() == {"release": f"v{APP_VERSION}"}
+    # The liveness probe's answer is unchanged (the production smoke test reads it as it is).
+    assert TestClient(app).get("/health/live").json() == {"status": "alive"}

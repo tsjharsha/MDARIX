@@ -3,6 +3,7 @@ import {
   BookOpen,
   Bug,
   CircleHelp,
+  Info,
   LifeBuoy,
   ListChecks,
   NotebookText,
@@ -16,11 +17,15 @@ import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
 import { NEXT_STEPS_HELP, NEXT_STEPS_LINK } from "../help/trialNextSteps";
 import { WorkspaceContext } from "../workspace/workspaceContext";
 import { USER_GUIDE_PATH } from "../help/userGuide";
+import { BUILT_VERSION } from "./appVersion";
 
 /** Where a trial uploads its own export (0.10.71: not on the entrance or the Complaints header). */
 export const TRY_OWN_DATA = "Try your own data";
 /** What a sample-only trial offers instead of an upload: Next steps, from trial to pilot. */
 export const DISCUSS_PILOT = "Discuss a pilot";
+
+/** Help › About (0.10.71, A7): the release this screen runs; /health/version answers the same for the server. */
+export const releaseLine = (version: string) => (version ? `MDARIX release v${version}` : "MDARIX release not known");
 
 /** The website's video series (frontend/src/site/videos.tsx), opened beside the product. */
 export const VIDEOS_PATH = "/videos";
@@ -210,6 +215,13 @@ export function HelpMenu({
             <a href="/security" target="_blank" rel="noopener">
               <ShieldCheck size={15} aria-hidden="true" /> Security and privacy
             </a>
+          </li>
+          <li className="help-menu-about">
+            <Info size={15} aria-hidden="true" />
+            <span className="help-menu-item">
+              About
+              <small>{releaseLine(BUILT_VERSION)}</small>
+            </span>
           </li>
         </ul>
       )}

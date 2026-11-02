@@ -73,3 +73,12 @@ describe("A2: a sample-only trial cannot upload", () => {
     expect(html).not.toMatch(/upload|Check file/i);
   });
 });
+
+describe("A7: the visible release number", () => {
+  it("shows the release in Help › About", async () => {
+    const { releaseLine } = await import("../shared/HelpMenu");
+    expect(releaseLine("0.10.71")).toBe("MDARIX release v0.10.71");
+    expect(render(<HelpMenu defaultOpen />, api())).toContain("About");
+    expect(render(<HelpMenu defaultOpen />, api())).toMatch(/MDARIX release (v\d+\.\d+\.\d+|not known)/);
+  });
+});
