@@ -321,7 +321,7 @@ export function PublicMegaSite({ path }: { path: string }) {
           <span className="ms-logo" aria-hidden="true">
             M
           </span>
-          MDARIX<small>Product intelligence</small>
+          MDARIX
         </a>
         <button
           className="ms-menu-button"

@@ -583,7 +583,7 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
 function RelatedList({ title, rows, empty }: { title: string; rows: any[]; empty: string }) {
   return (
     <div className="uw-related">
-      <h4>{title}</h4>
+      <h3>{title}</h3>
       {rows.length ? (
         <ul className="uw-list">
           {rows.map((row, index) => {

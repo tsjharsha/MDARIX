@@ -9,14 +9,14 @@
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  font-size: 13px;
+  font-size: var(--ms-fs-14);
 }
 .tc-count {
   padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--ac-teal-wash, #e8f5f3);
-  color: var(--ac-ink-2, #33434f);
-  font-size: 11px;
+  border-radius: var(--ms-radius-pill);
+  background: var(--ac-teal-wash, var(--ms-mint));
+  color: var(--ac-ink-2, var(--ms-navy));
+  font-size: var(--ms-fs-12);
   font-weight: 700;
 }
 .tc-modal {
@@ -38,8 +38,8 @@
 }
 .tc-lists h3 {
   margin: 0;
-  color: var(--ac-muted, #5d6b78);
-  font-size: 12px;
+  color: var(--ac-muted, var(--ms-muted));
+  font-size: var(--ms-fs-12);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -49,10 +49,10 @@
   width: 100%;
   height: 34px;
   padding: 0 10px;
-  border: 1px solid var(--ac-line, #d9e0e6);
-  border-radius: 6px;
-  background: var(--ac-surface, #fff);
-  color: var(--ac-ink, #10202f);
+  border: 1px solid var(--ac-line, var(--ms-line));
+  border-radius: var(--ms-radius-sm);
+  background: var(--ac-surface, var(--ms-surface));
+  color: var(--ac-ink, var(--ms-ink));
 }
 .tc-list {
   display: grid;
@@ -70,9 +70,9 @@
   gap: 8px;
   min-height: 34px;
   padding: 2px 8px;
-  border: 1px solid var(--ac-line, #d9e0e6);
-  border-radius: 6px;
-  background: var(--ac-surface, #fff);
+  border: 1px solid var(--ac-line, var(--ms-line));
+  border-radius: var(--ms-radius-sm);
+  background: var(--ac-surface, var(--ms-surface));
 }
 .tc-list li > span:first-child {
   overflow: hidden;
@@ -82,7 +82,7 @@
 .tc-list li.tc-none {
   justify-content: center;
   border-style: dashed;
-  color: var(--ac-muted, #5d6b78);
+  color: var(--ac-muted, var(--ms-muted));
 }
 .tc-row-actions {
   display: inline-flex;
@@ -96,7 +96,7 @@
   opacity: 0.35;
 }
 .tc-remove {
-  color: var(--ac-critical, #b42318) !important;
+  color: var(--ac-critical, var(--ms-crit)) !important;
 }
 @media (max-width: 640px) {
   .tc-lists {
@@ -116,10 +116,10 @@
 }
 /* Where the dragged column will land: a light teal bar on the heading's left or right side. */
 .ac-table th.col-drop-before {
-  box-shadow: inset 3px 0 0 #73d6cb;
+  box-shadow: inset 3px 0 0 var(--ms-teal-bright);
 }
 .ac-table th.col-drop-after {
-  box-shadow: inset -3px 0 0 #73d6cb;
+  box-shadow: inset -3px 0 0 var(--ms-teal-bright);
 }
 .col-grip {
   position: absolute;
@@ -138,17 +138,17 @@
   bottom: 25%;
   right: 3px;
   width: 2px;
-  border-radius: 1px;
+  border-radius: var(--ms-radius-sm);
   background: rgb(255 255 255 / 28%);
 }
 .col-grip:hover::after,
 .col-grip:focus-visible::after {
   top: 10%;
   bottom: 10%;
-  background: #73d6cb;
+  background: var(--ms-teal-bright);
 }
 .col-grip:focus-visible {
-  outline: 2px solid #ffffff;
+  outline: 2px solid var(--ms-surface);
   outline-offset: -2px;
 }
 /* After a resize every column keeps the width set for it; long text wraps inside its column. */
@@ -185,7 +185,7 @@
   justify-content: flex-end;
   gap: 10px;
   margin-top: 10px;
-  color: var(--ac-ink-2, #33434f);
-  font-size: 13px;
+  color: var(--ac-ink-2, var(--ms-navy));
+  font-size: var(--ms-fs-14);
   font-variant-numeric: tabular-nums;
 }

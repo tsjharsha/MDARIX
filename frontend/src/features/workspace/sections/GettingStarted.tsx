@@ -294,7 +294,7 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
                 A reportable US or India conclusion drafts its Form FDA 3500A or MvPI worksheet in the authority's field
                 order. A colleague approves it, told by a task in My Work; working alone in the trial, you approve your
                 own practice report. You enter it in the authority's route and record the submission and the receipt.
-                MDARIX never submits. The sample has a finished US report and an India report to correct.
+                The sample has a finished US report and an India report to correct.
               </p>
             </div>
             <div className="uw-story-partner-actions">
@@ -618,13 +618,18 @@ export function ChapterRow({
       </div>
       <button
         type="button"
-        className={done ? "ac-secondary" : "ac-primary"}
+        className={isNext && !done ? "ac-primary" : "ac-secondary"}
         onClick={onOpen}
         disabled={!allowed}
-        title={allowed ? undefined : "Your role does not include this screen"}
+        aria-describedby={allowed ? undefined : `chapter-${chapter.code}-reason`}
       >
         {done ? "Open again" : (CHAPTER_ACTION[chapter.code] ?? "Open")}
       </button>
+      {!allowed && (
+        <p className="ms-reason" id={`chapter-${chapter.code}-reason`}>
+          Your role does not include this screen.
+        </p>
+      )}
       <span className="ca-sr-only">{done ? "Tried" : "Not tried yet"}</span>
     </li>
   );

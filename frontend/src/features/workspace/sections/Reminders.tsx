@@ -100,7 +100,6 @@ export function RemindersPanel() {
       )}
       {list && <AwayControl list={list} onChanged={data.reload} />}
       <InlineError text={error} />
-      {list && <p className="ac-note">{list.never}</p>}
     </Panel>
   );
 }

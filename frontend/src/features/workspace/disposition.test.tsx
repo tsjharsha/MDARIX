@@ -245,7 +245,9 @@ describe("the disposition screens", () => {
     expect(html).toContain("Source value: “Step-down unit” (not on the list)");
     expect(html).toContain("Show the coding criteria");
     expect(html).toContain("I have read the complaint disposition rules, MDARIX starter, version 1");
-    expect(html).toContain("Practice record");
+    // The practice note is one header chip now (0.10.66, V5), not a line on the screen; the sign form says it once.
+    expect(html).not.toContain("Practice record");
+    expect(html).toContain("You decide and sign. MDARIX prepared this from your records; it never decides or submits.");
   });
 
   it("refuses the other branches when a trigger is met, and says the market assessment is still due", () => {

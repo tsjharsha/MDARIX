@@ -10,6 +10,118 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.66] - 2026-11-02
+
+On the trial maintenance line (`release/0.10`): stage 5 of the quality plan, "Design system and accessibility". The
+application and the website share one set of design tokens and load the Inter font; deadlines, states and harm read
+as three kinds of label; screens name things instead of showing codes, and a complaint shows one ID; lists become
+cards on a phone; the "you decide and sign" line is said once, where a person signs; and the accessibility findings
+of the review are fixed. No menu, tab or list column changes.
+
+**No migration.** The API and web images change. **Operators:** run `scripts/refresh_trial_story.py` (dry run first,
+then `--apply`) once after the upgrade: it rewords two kinds of older sample record in running trials (below).
+
+### Changed: one style shared with the website (V14, V15)
+
+- `frontend/src/tokens.css` holds every colour, type size (12/14/16/20/24/32), weight (400/600/700), spacing step
+  (4 to 48), radius (6/10/14/999) and the two shadows. Every style sheet of the app and the website reads it: about
+  550 distinct colours, 77 font sizes, 32 radii and 72 shadows now name a token. The five `:root` blocks that
+  redefined names are gone. Muted text is #5c6d7c (it was 3.97:1 on the grey ground, now 4.93:1).
+- **Inter is self-hosted** (woff2, 400/600/700, from the Inter 4.1 release the PDFs use; its licence at
+  `/fonts/Inter-OFL.txt`). It was declared and never loaded, so Windows drew Segoe UI. No external font host.
+- The workspace's top bar shows the M tile, as the website does; the website and sign-in pages drop their second
+  tagline ("Product intelligence").
+
+### Changed: labels that mean one thing (V1-V4)
+
+- Three kinds of label: a **deadline** chip with an icon and words from the one time-left helper ("3 days left",
+  "Due today", "6 h left", "2 days overdue"; red only when overdue), a neutral **state** chip, and an outlined
+  **harm** chip with a shape (◆ death or critical, ▲ serious, ○ no harm or a malfunction). Status is never colour
+  alone; "serious" is amber, not red.
+- Triage cards lead with the triage target and the report deadline as chips; report cards and the report drawer show
+  their state and deadline as chips; My Work's and Oversight's Due columns show the chip and the date.
+- A time no longer carries "GMT+5:30"; each workspace screen says "Times are in India Standard Time." once.
+  Signatures and audit records keep their UTC time.
+
+### Changed: names, not codes; one ID per complaint (J18, V2)
+
+- One label map per kind of code (`app/labels.ts`): markets ("EU and Northern Ireland", not EU_NI), escalation
+  triggers ("New failure mode"), document versions ("MDARIX starter, version 1", "your version 2"), decision-guide
+  questions by number ("2a", not US2A), time zones, and any other code in words ("Complaint threshold"). Used on
+  Oversight, dispositions, detection rules, the market assessment, reports, decision guides and first contact.
+- Server texts: Readiness ("escalated by the recurrence trigger"; the market's name on "against the scale" items),
+  the approver's guide alert ("Approve the decision guide (your version 2)") and the management review summary's
+  escalations by trigger.
+- **A complaint shows one ID**: its own reference (SAMPLE-RV-08, or the imported complaint number) where it has one,
+  else its MDARIX ID; the triage and report drawers say "Also known as CMP000036". Documents, exports and signed
+  records keep the IDs they named; the complaint list keeps its two ID columns (columns change in stage 7). IDs do
+  not break at a hyphen.
+
+### Changed: tables, phones and forms (J20, V8, V10-V13)
+
+- List headings are a light row, not the navy bar; rows are 44 px high.
+- **At 640 px and below every list is a set of cards** (its first value as the title, each value under its heading,
+  the actions last), including the import's file preview and rows set aside: no sideways scroll, no word on a line
+  of its own.
+- On a phone the section's tabs are one row that scrolls inside itself, the context bar is two columns and the count
+  tiles are compact, so Triage's first card shows sooner. Quotes show three lines, not two cut at 34 characters.
+- Form fields on one grid line up; Getting started has one primary button (the next chapter), not ten.
+- No page is wider than a phone: panels, forms, fields and drawer sections are one column that shrinks with the
+  screen (an auto column grew to its widest line: Reporting windows was 780 px wide at 390), grids and selects never
+  ask for more room than there is, buttons wrap on a phone, a list that is not a card list keeps its own scroll box,
+  and on a phone the M tile stands for the name in the top bar.
+
+### Changed: fewer words, said once (V5, V6)
+
+- "You decide and sign. MDARIX prepared this from your records; it never decides or submits." is said once, beside
+  each place a person signs or records a submission; the disclaimers on the menu, page guides, heroes and notes are
+  gone.
+- A free trial shows one "Sample data" chip in the top bar ("Practice records" once the sample is removed) instead of
+  practice notes on seven screens; the PDFs keep their PRACTICE RECORD watermark.
+- Page guides are 25 words or fewer. A first contact's follow-up task says "Follow up SAMPLE-CALL-03 with the
+  reporter: 8 open questions"; a reply-due task says "Reply due from Reporter of SAMPLE-RV-08 (ward nurse,
+  fictional)" (it carried the MDARIX ID and the whole request). The questions and the request stay in the details.
+
+### Changed: states and accessibility
+
+- An empty list offers its next step (Triage: "Log a call or an urgent intake"; Reports: "Assess a complaint per
+  market"). A predictable refusal is said beside the disabled control and read with it (aria-describedby). The
+  notice after an action stays in view. "Discard this draft" asks for confirmation in the page.
+- The sign-out button reads and is named "Sign out" (it read "Logout" and was named "Sign out of MDARIX"); a hero
+  announces only its headline; chip filters are one Tab stop with arrow keys; touch targets are 44 px on phones and
+  touch screens; drawer headings go from h2 to h3, at weight 600.
+
+### Sample numbers and labels that change
+
+No deadline, trend figure, signal, count or record changes. Labels that change:
+
+- the sample's open request to SAMPLE-RV-08's reporter: "(US2A, US2B, US2C and US3 are Unknown in the US
+  assessment)" becomes "(four US questions on harm are Unknown in the US assessment)";
+- the first-contact follow-up tasks: "Follow up SAMPLE-CALL-03 with the reporter: ask about question 1, question 2,
+  ... question 9" becomes "Follow up SAMPLE-CALL-03 with the reporter: 8 open questions"; "ask whether any
+  deficiency is alleged" becomes "is a deficiency alleged?";
+- the reply-due task and reminder for RV-08: "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional) on
+  CMP000036: Ask the reporter: ..." becomes "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional)";
+- cards and drawers show SAMPLE-RV-08 (each complaint's own reference), not CMP000036, as the complaint's ID.
+
+`refresh_trial_story.py` rewords the first three in running trials, tasks and reminders already raised included
+(`backend/app/trial/sample_words.py`; idempotent).
+
+### Tests
+
+- vitest: `tokens.test.ts` (every text, ground, fill and control token pair meets WCAG 2.1 AA; one token file; the
+  type scale; Inter and its licence), `app/chips.test.tsx`, `app/labels.test.ts`, `test/noCodes.test.tsx` (the main
+  screens and two drawers rendered with the sample's recorded API answers show no code, question code or raw id),
+  `features/workspace/states.test.tsx`, `features/workspace/accessibility.test.tsx`.
+- `frontend/scripts/check-phone.mjs` (`npm run check:phone`): every workspace section and tab and the website's main
+  pages at 390 px; it fails on a page wider than the screen or a code on screen.
+- pytest: `tests/test_sample_words_0_10_66.py` (new). Updated on purpose: `test_intake_triage_api.py` (the triage
+  item by the complaint's own reference), `app/dates.test.ts` (no zone on a time), `disposition.test.tsx` (the
+  decide-and-sign line, no practice line), `trialInsights.test.tsx` (cells carry their heading).
+- Stale numbers, not defects: `test_complaint_list.py` (37 to 44 sample complaints, 17 to 18 on Rev B, three in
+  Germany), `test_lot_impact_api.py` (43 to 44 complaints with the flagship), `standards.test.tsx` (33 standards with
+  IVDR_82, and the flagship's pain).
+
 ## [0.10.65] - 2026-11-02
 
 On the trial maintenance line (`release/0.10`): stage 4 of the quality plan, "Your Excel just works". A realistic Indian

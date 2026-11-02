@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { AlertOctagon, CheckCircle2, Clock, FileWarning, Flag, Link2, Siren } from "lucide-react";
+import { CheckCircle2, Clock, FileWarning, Flag, Link2, Siren } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { useCan } from "../workspaceContext";
-import { countOf } from "./common";
+import { DeadlineChip, HarmChip, StateChip, type Harm } from "../../../app/chips";
+import { deadlineLabel } from "../../../app/dates";
+import { AlsoKnownAs, countOf } from "./common";
 import { ChipFilter, Hero, InlineError } from "./boardParts";
 import {
   INTAKE,
@@ -118,6 +120,13 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
           <Empty
             title={show === "open" ? "Nothing to triage" : "Nothing triaged yet"}
             detail="A flagged call, an urgent intake or a record that suggests harm appears here at once."
+            action={
+              onOpenTab && (
+                <button type="button" className="ac-secondary" onClick={() => onOpenTab("First contact")}>
+                  Log a call or an urgent intake
+                </button>
+              )
+            }
           />
         )}
         {list.data && (
@@ -141,6 +150,16 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
     </div>
   );
 }
+
+/** The harm a flag names, for its chip's shape; null for a flag that names no harm (an urgent intake, by hand). */
+const flagHarm = (code: string): Harm | null =>
+  code === "DEATH"
+    ? "critical"
+    : code === "SERIOUS_INJURY" || code === "HARM_LEVEL"
+      ? "serious"
+      : ["MALFUNCTION", "HARM_UNKNOWN", "HARM_WORDS"].includes(code)
+        ? "none"
+        : null;
 
 function TriageCard({
   item,
@@ -172,25 +191,29 @@ function TriageCard({
         {item.words && <q className="uw-cr-text uw-cr-clip">{item.words}</q>}
         <ul className="uw-cr-chips" aria-label="Why it is flagged">
           {item.flags.map((flag, index) => (
-            <li
-              key={`${flag.code}-${index}`}
-              className={`uw-cr-chip tone-${flag.code === "MANUAL" ? "warning" : "serious"}`}
-            >
-              <AlertOctagon size={13} aria-hidden="true" /> {flag.label}
+            <li key={`${flag.code}-${index}`}>
+              {flagHarm(flag.code) ? (
+                <HarmChip harm={flagHarm(flag.code)!} label={flag.label} />
+              ) : (
+                <StateChip label={flag.label} />
+              )}
             </li>
           ))}
         </ul>
+        <p className="uw-cr-due">
+          <DeadlineChip item={item.triage_clock} prefix="Triage" />
+          {first && !first.not_reportable && (
+            <DeadlineChip item={first} prefix={first.role === "SIGNED" ? "Report" : "Report, provisional"} />
+          )}
+        </p>
         <p className="uw-cr-meta">
-          <span className={`uw-clock tone-${clockTone(item.triage_clock.state)}`}>
-            Triage target {hoursText(item.triage_clock)}
-          </span>
-          {" · "}
           Aware {formatDate(item.awareness.at)} ({item.awareness.source_label}
           {item.awareness.linked_ref ? `: ${item.awareness.linked_ref}` : ""}) · reached MDARIX {item.delay.text} later
         </p>
         {first && (
           <p className="uw-cr-meta">
-            {first.role === "SIGNED" ? "Deadline" : "Provisional deadline"}: {first.label}, {deadlineText(first)}
+            {first.role === "SIGNED" ? "Deadline" : "Provisional deadline"}: {first.label},{" "}
+            {first.not_reportable ? "concluded not reportable" : deadlineLabel(first)}
             {item.deadlines.length > 1 && first.own ? " · other markets only if also reportable" : ""}
             {first.role === "OWN_NO_WINDOW" ? " · no reporting window for the event's own market" : ""}
             {first.role === "NO_COUNTRY" ? " · no country recorded" : ""}
@@ -298,6 +321,7 @@ function TriageDrawer({
   return (
     <Drawer title={`Triage ${item.ref}`} onClose={onClose}>
       <div className="uw-dp">
+        <AlsoKnownAs id={item.business_id} shown={item.ref} />
         {item.words && <q className="uw-cr-text">{item.words}</q>}
         {item.problems && item.problems.length > 0 && (
           <p className="uw-hint">
@@ -305,7 +329,7 @@ function TriageDrawer({
           </p>
         )}
         <section className="ca-drawer-section">
-          <h4>Why it is here</h4>
+          <h3>Why it is here</h3>
           <ul>
             {item.flags.map((flag, index) => (
               <li key={`${flag.code}-${index}`}>{flag.label}</li>
@@ -313,7 +337,7 @@ function TriageDrawer({
           </ul>
         </section>
         <section className="ca-drawer-section">
-          <h4>Two clocks</h4>
+          <h3>Two clocks</h3>
           <p>
             <strong>Triage target:</strong> {item.triage_clock.target_hours} hours from{" "}
             {formatDate(item.triage_clock.from)} (when it reached MDARIX or was reopened): due{" "}
@@ -368,9 +392,9 @@ function TriageDrawer({
         </section>
         {record?.completed_at ? (
           <section className="ca-drawer-section">
-            <h4>
+            <h3>
               <CheckCircle2 size={15} aria-hidden="true" /> Triage record
-            </h4>
+            </h3>
             <p>
               Severity {record.severity_label} · event owner {record.event_owner_name} · triage owner{" "}
               {record.triage_owner_name}
@@ -391,7 +415,7 @@ function TriageDrawer({
               if (!problem) void submit();
             }}
           >
-            <h4>The triage record</h4>
+            <h3>The triage record</h3>
             <div className="ca-form-grid">
               <label className="ca-field">
                 Severity (harm-severity scale)

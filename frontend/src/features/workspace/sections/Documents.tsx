@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DecideAndSign } from "./common";
 import { Download, FileCheck2, FileText, FileWarning, PenLine } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
@@ -50,7 +51,6 @@ export function DocumentsPanel({
         Generated from your records for a period and a cut-off. Every figure opens its records; the judgement sections
         are yours to write; a signed version is never edited and downloads as PDF and DOCX.
       </p>
-      {types.data?.practice_label && <p className="ac-note uw-doc-practice">{types.data.practice_label}</p>}
       <div className="uw-doc-types" role="tablist" aria-label="Documents">
         {(types.data?.templates ?? []).map((item) => (
           <button
@@ -235,7 +235,6 @@ function VersionHeader({ version }: { version: DocumentVersion }) {
         cut-off {formatDate(version.cut_off)}
       </p>
       <p className="uw-doc-clauses">{version.clauses.map(clauseText).join("; ")}</p>
-      {version.practice_label && <p className="ac-note">{version.practice_label}</p>}
       <p className="uw-ma-starter" role="note">
         <FileWarning size={15} aria-hidden="true" /> {version.starter_mark}
       </p>
@@ -391,12 +390,13 @@ function SignPart({ version, onChanged }: { version: DocumentVersion; onChanged:
   };
   return (
     <section className="ca-drawer-section uw-doc-sign">
-      <h4>Sign version {version.version}</h4>
+      <h3>Sign version {version.version}</h3>
       <p className="ac-muted">
         The signature covers the data sections as generated and the judgement sections as written. A signed version is
         never edited: generate again for a new version.
       </p>
       <div className="ca-form-grid">
+        <DecideAndSign />
         <label className="ca-field">
           Your password
           <input
@@ -448,7 +448,7 @@ function SignedPart({ version, onChanged }: { version: DocumentVersion; onChange
   };
   return (
     <section className="ca-drawer-section uw-doc-signed">
-      <h4>Signature</h4>
+      <h3>Signature</h3>
       <p>
         Signed by {signature.signer_name} ({signature.signer_role}), {formatDate(signature.signed_at)}.
       </p>

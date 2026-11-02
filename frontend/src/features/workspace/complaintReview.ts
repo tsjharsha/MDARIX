@@ -267,7 +267,7 @@ export function secondLookHeadline(summary: SecondLookSummary | null | undefined
     title: `${count(open, "record")} may be ${open === 1 ? "a hidden complaint" : "hidden complaints"}`,
     detail: harm
       ? `${count(harm, "record")} ${harm === 1 ? "reports" : "report"} a death or a serious injury. Start there: the list is most serious first.`
-      : "Each one shows why it was flagged. A person decides; MDARIX never changes the record in your system.",
+      : "Each one shows why it was flagged.",
     tone: harm ? "critical" : "warning",
   };
 }

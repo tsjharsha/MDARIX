@@ -73,6 +73,7 @@ import { requestJson } from "../../app/apiClient";
 import { rolesSummary } from "../../app/roles";
 import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
 import { searchWithoutSignal, signalFromSearch, signalLinkStart } from "./signals";
+import { zoneName } from "../../app/dates";
 import { PARKED_SECTIONS, featureSetOf, routeFor } from "../../app/featureSet";
 import {
   addressFor,
@@ -85,19 +86,23 @@ import {
  * Each section's menu entry: `description` is the short line under its name in the menu, `guide` the one-line purpose
  * under the page heading (what you do here, in plain words).
  */
+/** What the trial's records are (the server's PRACTICE_LABEL, backend/app/reportability/markets.py). */
+const TRIAL_DATA_NOTE =
+  "Practice record: made in a free trial with sample or de-identified data. Not your regulatory record. PDFs carry this as a watermark.";
+
 const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; guide: string; context: boolean }> = {
   "Getting started": {
     icon: Rocket,
     description: "Your free trial, as a story",
     guide:
-      "The quality loop MDARIX closes, chapter by chapter: what your records show in each, why inspectors care in 2026, and where to try it. Start with the sample data, then upload your own export.",
+      "Your trial as a story, chapter by chapter: what your records show and where to try it. Start with the sample data, then upload your own export.",
     context: false,
   },
   Readiness: {
     icon: ShieldAlert,
     description: "Inspection checks, oversight",
     guide:
-      "What an FDA investigator or a notified-body auditor would find in your complaints, reports, trends and CAPAs today, read from your own records; and, under Oversight, everything overdue or due soon with its owner, and each event's readiness to close. Every number opens the records behind it.",
+      "What an inspector or auditor would find in your records today and, under Oversight, what is overdue or due soon. Every number opens its records.",
     context: false,
   },
   Dashboard: {
@@ -122,49 +127,47 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
     icon: ClipboardList,
     description: "Triage, first contact, backlog",
     guide:
-      "Triage urgent events first, check each call for a hidden complaint, close routine complaints, and find complaints hidden as cancellations, inquiries or No Fault Found. A person decides; MDARIX never changes your records.",
+      "Triage urgent events first, check calls for hidden complaints, close routine complaints and find complaints hidden as cancellations, inquiries or No Fault Found.",
     context: false,
   },
   Signals: {
     icon: Radio,
     description: "Triage complaints and trends",
     guide:
-      "Review new signals, decide what each needs and follow complaint trends. Signals are recorded observations, not conclusions about cause.",
+      "Review new signals, decide what each needs and follow complaint trends. A signal is an observation, not a cause.",
     context: true,
   },
   Investigations: {
     icon: FileSearch,
     description: "Open and work your cases",
-    guide:
-      "Open a case and work through it step by step. MDARIX organizes evidence and possible explanations; it never concludes a root cause for you.",
+    guide: "Open a case and work through it step by step, with its evidence and possible explanations.",
     context: true,
   },
   Evidence: {
     icon: Search,
     description: "Case evidence and sources",
     guide:
-      "The evidence behind each case and where every record came from. Supporting, contradicting and missing evidence stay visible side by side.",
+      "The evidence behind each case and where each record came from: supporting, contradicting and missing, side by side.",
     context: true,
   },
   Decisions: {
     icon: Gavel,
     description: "Approve, sign and verify",
     guide:
-      "Review decision briefs, record and sign decisions, and verify signatures. Only people with approval authority can sign, and each signature is recorded with the exact content approved.",
+      "Review decision briefs, sign decisions and verify signatures. Each signature keeps the exact content approved.",
     context: true,
   },
   Records: {
     icon: BadgeCheck,
     description: "CAPA checks, risk file input",
     guide:
-      "What you hand an inspector or a management review: every CAPA's effectiveness check, planned with criteria and a date, reminded before the day, and signed with its result and the evidence seen; and whether each product's post-market data reached its risk file.",
+      "What you hand an inspector or a management review: each CAPA's effectiveness check, and whether post-market data reached the risk file.",
     context: false,
   },
   Intelligence: {
     icon: Bot,
     description: "Ask questions, regulatory, risk",
-    guide:
-      "Ask questions about your records and check regulatory and risk links. AI answers show their sources and limits and never make the decision for you.",
+    guide: "Ask questions about your records and check regulatory and risk links. Each answer shows its sources.",
     context: true,
   },
   "Trust & Audit": {
@@ -177,7 +180,7 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
     icon: Upload,
     description: "Bring in Excel or CSV files",
     guide:
-      "Bring records from your quality, product and supplier systems in as Excel or CSV files. Each file is checked in full before anything is saved; by default a file with any problem imports nothing, or you can import the rows that pass and get the others back to fix.",
+      "Bring in Excel or CSV files from your quality, product and supplier systems. Each file is checked in full before anything is saved.",
     context: false,
   },
   "My Account": {
@@ -211,12 +214,12 @@ const MVP_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
   "My Work": {
     description: "Your tasks, approvals and requests",
     guide:
-      "Everything waiting for you: tasks assigned to you, work your roles can pick up, decisions awaiting your signature and evidence requests.",
+      "Everything waiting for you: your tasks, work your roles can pick up, decisions to sign and evidence requests.",
   },
   Records: {
     description: "CAPA checks, risk file, audit trail",
     guide:
-      "What you hand an inspector or a management review: every CAPA's effectiveness check, signed with its result and the evidence seen; whether post-market data reached the risk file; the audit trail with each case's timeline; reports; and signature verification.",
+      "What you hand an inspector: CAPA effectiveness checks, risk file input, the audit trail, reports and signature verification.",
   },
 };
 
@@ -450,7 +453,12 @@ export function UserWorkspace({
           >
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
-          <div className="ac-brand">MDARIX</div>
+          <div className="ac-brand">
+            <i className="ac-brand-tile" aria-hidden="true">
+              M
+            </i>
+            <b className="ac-brand-word">MDARIX</b>
+          </div>
           <div className="uw-tenant" title="Every screen shows only this organization's data">
             <Building2 size={15} aria-hidden="true" />
             <span>{tenantName}</span>
@@ -469,6 +477,12 @@ export function UserWorkspace({
                 Trial · {trial.days_left}d
               </span>
             </button>
+          )}
+          {/* One label for the trial's data (V5), instead of practice notes on seven screens; PDFs carry a watermark. */}
+          {trial?.is_trial && (
+            <span className="ms-chip uw-sample-chip" title={TRIAL_DATA_NOTE}>
+              {(trial.sample?.complaints ?? 0) > 0 ? "Sample data" : "Practice records"}
+            </span>
           )}
           <div className="ac-user">
             <span>
@@ -489,13 +503,8 @@ export function UserWorkspace({
             <SwitchOrganization />
             <AlertsBell onOpen={() => open("My Work")} />
             <HelpMenu onGettingStarted={trial?.is_trial ? () => open("Getting started", "Your data") : undefined} />
-            <button
-              type="button"
-              className="ac-secondary"
-              onClick={() => void signOut()}
-              aria-label="Sign out of MDARIX"
-            >
-              <LogOut size={16} /> <span className="ac-hide-sm">Logout</span>
+            <button type="button" className="ac-secondary" onClick={() => void signOut()} aria-label="Sign out">
+              <LogOut size={16} /> <span className="ac-hide-sm">Sign out</span>
             </button>
           </div>
         </header>
@@ -522,9 +531,7 @@ export function UserWorkspace({
                 </button>
               );
             })}
-            <p className="ca-nav-scope">
-              Evidence before inference. Authorized humans decide. You see only {tenantName}'s data.
-            </p>
+            <p className="ca-nav-scope">You see only {tenantName}'s data.</p>
           </nav>
 
           <main className="ac-main" id="app-main" tabIndex={-1} data-workspace-section={section}>
@@ -541,6 +548,7 @@ export function UserWorkspace({
                       {section}
                     </h1>
                     <p>{navText(section, featureSet === "mvp").guide}</p>
+                    <p className="ac-page-zone">Times are in {zoneName()}.</p>
                   </div>
                 </div>
                 {NAV[section].context && <ContextBar />}
@@ -551,7 +559,7 @@ export function UserWorkspace({
                 )}
                 {trial?.is_trial && <ChapterDone refreshKey={location.key} onOpen={openChapter} />}
                 {message && (
-                  <div className={`ac-message tone-${message.tone}`} role="status">
+                  <div className={`ac-message uw-notice tone-${message.tone}`} role="status">
                     {message.text}
                     <button
                       type="button"

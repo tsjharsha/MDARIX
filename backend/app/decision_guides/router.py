@@ -57,10 +57,7 @@ MEDIA = {
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
 SAMPLE_NAMES = {"system:trial-sample": "MDARIX sample data"}
-NEVER_DECIDES = (
-    "A guide points to a conclusion; a person confirms or overrides it with a reason, and signs. MDARIX never decides "
-    "and never submits."
-)
+NEVER_DECIDES = "A guide points to a conclusion; a person confirms or overrides it with a reason, and signs."
 CORE_RULE = (
     "The questions that drive the conclusion keep the regulation's wording: the question, its definition and its clause "
     "are locked, and you add your own explanation and examples beside them. They cannot be removed, and their "

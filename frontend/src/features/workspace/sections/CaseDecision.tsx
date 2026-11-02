@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { DecideAndSign } from "./common";
 import { ClipboardCheck, FileSignature, Gavel, Undo2 } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
@@ -369,7 +370,7 @@ export function CaseDecisionPanel({
 function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
   return (
     <section className="uw-related" aria-label={title}>
-      <h4>
+      <h3>
         {title}
         {typeof count === "number" && (
           <>
@@ -377,7 +378,7 @@ function Section({ title, count, children }: { title: string; count?: number; ch
             <span className="ac-tab-count">{count}</span>
           </>
         )}
-      </h4>
+      </h3>
       {children}
     </section>
   );
@@ -990,6 +991,7 @@ function SignDrawer({
           Your signature records who you are, the time, this meaning and a fingerprint of the brief version you
           reviewed, so any later change is detected.
         </p>
+        <DecideAndSign />
         <label className="ca-field">
           Your password
           <input

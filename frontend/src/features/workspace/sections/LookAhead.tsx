@@ -229,7 +229,7 @@ export function RepresentativeBody({ data }: { data: RepresentativePreview }) {
           </div>
           <h3 className="uw-preview-heading">Every complaint on these products ({data.complaints.length})</h3>
           <div className="uw-table-scroll">
-            <table className="ac-table">
+            <table className="ac-table ms-cards">
               <thead>
                 <tr>
                   <th scope="col">Complaint</th>
@@ -245,14 +245,14 @@ export function RepresentativeBody({ data }: { data: RepresentativePreview }) {
                 {data.complaints.map((item) => (
                   <tr key={item.id}>
                     <td>{item.identifier}</td>
-                    <td>{item.product}</td>
-                    <td>{item.country ?? "—"}</td>
-                    <td>
+                    <td data-label="Product">{item.product}</td>
+                    <td data-label="Country">{item.country ?? "—"}</td>
+                    <td data-label="State">
                       <ToneBadge tone={statusTone(item.status)} label={item.state} />
                     </td>
-                    <td>{formatDay(item.received)}</td>
-                    <td>{formatDay(item.last_change)}</td>
-                    <td>
+                    <td data-label="Received">{formatDay(item.received)}</td>
+                    <td data-label="Last change">{formatDay(item.last_change)}</td>
+                    <td data-label="EU/NI assessment">
                       {item.eu_assessment.label}
                       {item.eu_assessment.date ? `, ${formatDay(item.eu_assessment.date)}` : ""}
                     </td>

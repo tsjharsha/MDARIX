@@ -3,7 +3,7 @@
 // drafts every field from the records and decides every step; these only shape what the person sees and what is
 // sent. MDARIX never submits: the person submits in the authority's route and records it here.
 import type { Tone } from "../admin/console/dashboardModel";
-import { deadlineLabel, timeLeft } from "../../app/dates";
+import { deadlineLabel, timeLeft, type DueLike } from "../../app/dates";
 
 export const REPORTS = "/api/v1/reports";
 export const REPORTS_TAB = "Reports";
@@ -161,6 +161,7 @@ export type ReportDetail = {
     id: string;
     ref: string;
     complaint_identifier: string;
+    business_id?: string | null;
     product_name: string | null;
     version: string | null;
     country: string | null;
@@ -278,6 +279,17 @@ export type DeadlineFields = {
   due_zone?: string | null;
   due_label?: string | null;
 };
+
+/** A report's deadline for its chip (app/chips.tsx DeadlineChip), or null once it is met or has no day yet. */
+export function deadlineDue(item: DeadlineFields, state?: ObligationState): DueLike | null {
+  if (!item.due_on || (state && MET_STATES.includes(state))) return null;
+  return {
+    due_at: item.due_at,
+    due_date: item.due_on,
+    days_left: item.days_left,
+    state: item.overdue ? "OVERDUE" : "RUNNING",
+  };
+}
 
 /** "Deadline Sat 7 Nov 2026, 23:59 IST · 6 days left": the end with its time zone, and the app's one time-left text
  * (app/dates.ts timeLeft), overdue from the server. */

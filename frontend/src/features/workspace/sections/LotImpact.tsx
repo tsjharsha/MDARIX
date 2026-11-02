@@ -5,7 +5,7 @@ import { errorText, formatDate, send, useResource } from "../../customer-admin/s
 import { downloadFile } from "../../reports/download";
 import { useCan, useWorkspace } from "../workspaceContext";
 import { InlineError } from "./boardParts";
-import { countOf } from "./common";
+import { countOf, DecideAndSign } from "./common";
 import {
   KIND_GROUPS,
   LOT_IMPACT_ANCHOR,
@@ -109,7 +109,6 @@ export function LotImpactPanel({
         <p className="uw-li-never">
           <ShieldCheck size={16} aria-hidden="true" /> {view.never_decides}
         </p>
-        {view.practice_label && <p className="ac-note">{view.practice_label}</p>}
         <label className="ca-field uw-li-factor">
           Suspect factor
           <select
@@ -511,6 +510,7 @@ function SignForm({
           records show it now. Your signature is not a field action: decide any field action in your QMS.
         </p>
         <div className="ca-form-grid">
+          <DecideAndSign />
           <label className="ca-field">
             Your password
             <input

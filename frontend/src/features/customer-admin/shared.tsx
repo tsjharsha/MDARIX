@@ -485,7 +485,7 @@ function PlainTable<T>({
         </div>
       )}
       <div className="ac-table-wrap">
-        <table className={`ac-table ${controls.tableClassName}`.trim()} style={controls.tableStyle}>
+        <table className={`ac-table ms-cards ${controls.tableClassName}`.trim()} style={controls.tableStyle}>
           <caption className="ca-sr-only">{caption}</caption>
           {controls.colgroup}
           <thead>
@@ -538,7 +538,7 @@ function PlainTable<T>({
             {visible.map((row, index) => (
               <tr key={rowKey(row, position.get(row) ?? index)}>
                 {shown.map((column) => (
-                  <td key={column.key} className={column.numeric ? "num" : undefined}>
+                  <td key={column.key} className={column.numeric ? "num" : undefined} data-label={column.label.trim()}>
                     {column.render(row)}
                   </td>
                 ))}
@@ -779,6 +779,12 @@ export function Tabs<T extends string>({
     onChange(tabs[next]);
     list.current?.querySelector<HTMLButtonElement>(`#${CSS.escape(tabId(tabs[next]))}`)?.focus();
   };
+  // On a phone the tabs are one row that scrolls sideways inside itself (J20): the selected one is kept in view.
+  useEffect(() => {
+    const row = list.current;
+    const selected = row?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (row && selected && row.scrollWidth > row.clientWidth) row.scrollLeft = Math.max(0, selected.offsetLeft - 16); // the row is positioned on phones
+  }, [active]);
   return (
     <>
       <div className="ac-tabs" role="tablist" aria-label={label} ref={list} onKeyDown={onKeyDown}>

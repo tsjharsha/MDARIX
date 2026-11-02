@@ -1,4 +1,6 @@
 import { useContext, useEffect, useId, useState } from "react";
+import { DecideAndSign } from "./common";
+import { versionWords } from "../../../app/labels";
 import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
@@ -107,7 +109,6 @@ function AssessmentIntro({ detail }: { detail: AssessmentDetail }) {
       <p className="uw-ma-starter" role="note">
         <FileWarning size={15} aria-hidden="true" /> {detail.starter_mark}
       </p>
-      {detail.practice_label && <p className="uw-ma-practice">{detail.practice_label}</p>}
       {legacy && (
         <div className="uw-cr-decision">
           <ToneBadge tone="neutral" label={legacy.note} />
@@ -223,7 +224,7 @@ export function MarketPanel({
       <header className="uw-ma-head">
         <h3>{item.question_set.title}</h3>
         <span className="uw-cr-meta">
-          Guide {item.question_set.version} · scale {detail.scale.version}
+          Guide: {versionWords(item.question_set.version)} · scale: {versionWords(detail.scale.version)}
           {item.preselected ? " · the event's market" : ""}
           {item.question_set_current === false ? " · started before your current guide version: it keeps this one" : ""}
         </span>
@@ -266,10 +267,10 @@ export function MarketPanel({
       </ol>
       {item.evaluation && (
         <section className="ca-drawer-section uw-ma-suggestion" aria-label="Suggested conclusion">
-          <h4>
+          <h3>
             Suggested: {CONCLUSION_LABELS[item.evaluation.suggested]}
             {item.draft?.report_type_label ? ` · ${item.draft.report_type_label}` : ""}
-          </h4>
+          </h3>
           <p className="ac-muted">
             From the answers as last saved. The suggestion never signs: you confirm or override it.
           </p>
@@ -335,6 +336,7 @@ export function MarketPanel({
             </label>
           )}
           <div className="ca-form-grid">
+            <DecideAndSign />
             <label className="ca-field">
               Your password
               <input
@@ -356,8 +358,9 @@ export function MarketPanel({
           </div>
           {problem && <p className="uw-hint">{problem}</p>}
           <p className="ac-muted">
-            Your signature covers every answer with its rationale and evidence, the harm level and scale version{" "}
-            {detail.scale.version}, and question set {item.question_set.version}. A change later is a new version.
+            Your signature covers every answer with its rationale and evidence, the harm level and the scale (
+            {versionWords(detail.scale.version)}), and the question set ({versionWords(item.question_set.version)}). A
+            change later is a new version.
           </p>
           <div className="ca-action-row">
             <button type="submit" className="ac-primary" disabled={busy || !!problem}>
@@ -499,10 +502,10 @@ export function ScalePanel({
   const thresholdRank = scale.levels.findIndex((level) => level.code === item.threshold.level);
   return (
     <section className="ca-drawer-section uw-ma-scale" aria-label="Harm-severity scale">
-      <h4>
-        <Gauge size={15} aria-hidden="true" /> Harm-severity scale {scale.version}{" "}
+      <h3>
+        <Gauge size={15} aria-hidden="true" /> Harm-severity scale, {versionWords(scale.version)}{" "}
         <span className="uw-ma-starter-chip">Starter text</span>
-      </h4>
+      </h3>
       <ol className="uw-ma-levels">
         {scale.levels.map((level, index) => (
           <li
@@ -607,11 +610,11 @@ export function TrainingPanel({
   };
   return (
     <section className="ca-drawer-section uw-ma-training" role="status">
-      <h4>
+      <h3>
         <BookOpenCheck size={15} aria-hidden="true" />{" "}
         {required ? "Before you sign: practice training on" : "Training record on"}{" "}
         {documents.map((document) => document.version).join(" and ")}
-      </h4>
+      </h3>
       <p className="ac-muted">
         ISO 13485 clause 6.2: whoever signs is trained on the current version of what the signature relies on. {note}{" "}
         {required
