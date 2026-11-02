@@ -87,7 +87,7 @@ describe("uploading a quality system's export as it comes", () => {
       />,
     );
     expect(html).toContain("Complaint Number → <code>complaint_id</code>");
-    expect(html).toContain("Left out, not stored:</b> Patient Name");
+    expect(html).toContain("Not used (not stored):</b> Patient Name");
     expect(html).toContain("Excel workbook");
     expect(renderToStaticMarkup(<HowItWasRead report={{}} />)).toBe("");
   });

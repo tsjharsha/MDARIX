@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, ListChecks, Upload } from "lucide-react";
 import { Empty, Panel, StatTile } from "../../admin/console/charts";
 import { errorText, send, useResource } from "../../customer-admin/shared";
-import { formatDateTime, formatDay } from "../../../app/dates";
+import { formatDateTime, formatDay, isDateOnly } from "../../../app/dates";
 import { useCan, useIsTrial } from "../workspaceContext";
 import { countOf, formatCount } from "./common";
 import { EscalateButton } from "./Triage";
@@ -13,6 +13,9 @@ import { EscalateButton } from "./Triage";
  * (personal details stored as placeholders), and, on a record, the import, file and row it came from. G2a's reference
  * data beside it: a complaint's IMDRF codes and a product's UDI-DI and GMDN.
  */
+
+/** A value as the review screens show it: every date in one format, "14 Aug 2026" (J42). */
+export const previewValue = (value: string | undefined) => (isDateOnly(value) ? formatDay(value) : value || "—");
 
 export const IMPORT_RUNS_PATH = "/api/v1/data/import/runs";
 /** Where the reports sit on a page, for the links after an import. */
@@ -28,6 +31,8 @@ export type QualityReport = {
   /** Rows of records already there, as the file has them (0.10.62; absent from older runs). */
   rows_unchanged?: number | null;
   balanced: boolean;
+  /** The file's columns MDARIX did not use, by their names in the file (0.10.65; absent from older runs). */
+  columns_not_used?: string[];
   /** A distribution file: the lots whose units shipped now exceed the units they released (flagged, not refused). */
   flags?: { lot_id: string; released: number; shipped: number; message: string }[];
 };
@@ -53,7 +58,7 @@ export type SetAsideRow = {
   suggests_harm: boolean;
   status: string;
 };
-type Quarantine = { counts: { open: number; reprocessed: number }; items: SetAsideRow[] };
+type Quarantine = { counts: { open: number; reprocessed: number; dismissed?: number }; items: SetAsideRow[] };
 
 const ENTITY_TITLE: Record<string, string> = { products: "Products", lots: "Lots", complaints: "Complaints" };
 /** "Complaints" for a template, else the template's own name with its first letter capital. */
@@ -90,9 +95,20 @@ export function runChecks(run: Pick<ImportRun, "report" | "masked_values">): Che
       label: "Rows that passed every check",
       ok: report.rows_quarantined === 0,
       detail: report.rows_quarantined
-        ? `${countOf(report.rows_quarantined, "row")} set aside with ${report.rows_quarantined === 1 ? "its reason" : "their reasons"}: fix them in your file and import it again.`
+        ? `${countOf(report.rows_quarantined, "row")} set aside with ${report.rows_quarantined === 1 ? "its reason" : "their reasons"}: fix each one below and process it again, or dismiss it with a reason.`
         : "No row was set aside.",
     },
+    ...(report.columns_not_used
+      ? [
+          {
+            label: "Columns not used",
+            ok: true,
+            detail: report.columns_not_used.length
+              ? `${report.columns_not_used.join(", ")}: not stored.`
+              : "Every column of the file was used.",
+          },
+        ]
+      : []),
     ...(report.flags
       ? [
           {
@@ -286,8 +302,26 @@ function FieldChanges({ importRef }: { importRef: string }) {
 export const TRIAL_SET_ASIDE_NOTE =
   "In a free trial, rows set aside on import are kept with personal details masked so you can review and fix them, and are deleted with the trial.";
 
+/** The columns a set-aside row's reasons name, which the fix form offers; every column of the row when they name
+ * none (exported for its test). */
+export function fixColumns(row: Pick<SetAsideRow, "row" | "problems">): string[] {
+  const named = [...new Set(row.problems.map((problem) => problem.split(":")[0].trim()))].filter(
+    (column) => column in row.row,
+  );
+  return named.length ? named : Object.keys(row.row);
+}
+
+/** "1 still open · 2 processed again · 1 dismissed", or "" before any row was closed (exported for its test). */
+export function asideCounts(counts: Quarantine["counts"] | undefined): string {
+  if (!counts || (!counts.reprocessed && !counts.dismissed)) return "";
+  return `${formatCount(counts.open)} still open · ${formatCount(counts.reprocessed)} processed again · ${formatCount(counts.dismissed ?? 0)} dismissed`;
+}
+
 function SetAsideRows({ source }: { source: ReturnType<typeof useResource<Quarantine>> }) {
   const trial = useIsTrial();
+  const canFix = useCan("records.write");
+  const [acting, setActing] = useState<{ id: string; mode: "fix" | "dismiss" } | null>(null);
+  const [done, setDone] = useState<string | null>(null);
   const rows = source.data?.items ?? [];
   if (source.state === "error")
     return <p className="ac-muted">{source.error ?? "The rows set aside could not be read."}</p>;
@@ -297,60 +331,202 @@ function SetAsideRows({ source }: { source: ReturnType<typeof useResource<Quaran
     (a, b) => Number(!a.endsWith("_id")) - Number(!b.endsWith("_id")) || a.localeCompare(b),
   );
   const reasons = reasonsByColumn(rows);
+  const counts = asideCounts(source.data.counts);
+  const finished = (text: string) => {
+    setActing(null);
+    setDone(text);
+    source.reload();
+  };
   return (
     <div className="uw-import-aside">
       <h3 className="uw-trial-subhead">
         <ListChecks size={15} aria-hidden="true" /> Rows set aside ({formatCount(rows.length)})
       </h3>
-      <p className="ac-muted">
-        Reasons: {reasons.map(([column, count]) => `${column} (${countOf(count, "row")})`).join(", ")}. Rows that
-        suggest harm come first. Personal details are kept only as placeholders such as [PERSON]. Fix these rows in your
-        file and import it again: rows already in are updated, not added twice.
-      </p>
-      {trial && <p className="ac-muted">{TRIAL_SET_ASIDE_NOTE}</p>}
-      <div className="ac-table-wrap">
-        <table className="ac-table">
-          <caption className="ca-sr-only">Rows set aside, with their reasons</caption>
-          <thead>
-            <tr>
-              <th scope="col">Row</th>
-              <th scope="col">Reasons</th>
-              {columns.map((column) => (
-                <th key={column} scope="col">
-                  {column}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  {row.line}
-                  {row.suggests_harm ? (
-                    <small className="uw-flag-critical" title={`Suggests harm: ${row.harm_words.join(", ")}`}>
-                      Suggests harm: on the triage list
-                    </small>
-                  ) : !row.entity || row.entity === "complaints" ? (
-                    <EscalateButton kind="QUARANTINE" id={row.id} label="Triage" />
-                  ) : null}
-                </td>
-                <td>
-                  <ul className="uw-trial-issues">
-                    {row.problems.map((problem) => (
-                      <li key={problem}>{problem}</li>
-                    ))}
-                  </ul>
-                </td>
-                {columns.map((column) => (
-                  <td key={column}>{row.row[column] || "—"}</td>
+      {done && (
+        <p className="uw-trial-message is-good" role="status">
+          {done}
+        </p>
+      )}
+      {counts && <p className="ac-muted">{counts}</p>}
+      {!rows.length ? (
+        <p className="ac-muted">Every row this import set aside has been processed again or dismissed.</p>
+      ) : (
+        <>
+          <p className="ac-muted">
+            Reasons: {reasons.map(([column, count]) => `${column} (${countOf(count, "row")})`).join(", ")}. Rows that
+            suggest harm come first. Personal details are kept only as placeholders such as [PERSON]. Fix a row here and
+            process it again, or dismiss it with a reason. A row also closes when its record comes in with a later
+            import of your fixed file.
+          </p>
+          {trial && <p className="ac-muted">{TRIAL_SET_ASIDE_NOTE}</p>}
+          <div className="ac-table-wrap">
+            <table className="ac-table">
+              <caption className="ca-sr-only">Rows set aside, with their reasons</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Row</th>
+                  <th scope="col">Reasons</th>
+                  {columns.map((column) => (
+                    <th key={column} scope="col">
+                      {column}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <Fragment key={row.id}>
+                    <tr>
+                      <td>
+                        {row.line}
+                        {row.suggests_harm ? (
+                          <small className="uw-flag-critical" title={`Suggests harm: ${row.harm_words.join(", ")}`}>
+                            Suggests harm: on the triage list
+                          </small>
+                        ) : !row.entity || row.entity === "complaints" ? (
+                          <EscalateButton kind="QUARANTINE" id={row.id} label="Triage" />
+                        ) : null}
+                        {canFix && (
+                          <span className="uw-aside-actions">
+                            <button
+                              type="button"
+                              className="ac-link"
+                              aria-expanded={acting?.id === row.id && acting.mode === "fix"}
+                              onClick={() => setActing({ id: row.id, mode: "fix" })}
+                            >
+                              Fix and process again
+                            </button>
+                            <button
+                              type="button"
+                              className="ac-link"
+                              aria-expanded={acting?.id === row.id && acting.mode === "dismiss"}
+                              onClick={() => setActing({ id: row.id, mode: "dismiss" })}
+                            >
+                              Dismiss
+                            </button>
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <ul className="uw-trial-issues">
+                          {row.problems.map((problem) => (
+                            <li key={problem}>{problem}</li>
+                          ))}
+                        </ul>
+                      </td>
+                      {columns.map((column) => (
+                        <td key={column}>{previewValue(row.row[column])}</td>
+                      ))}
+                    </tr>
+                    {acting?.id === row.id && (
+                      <tr>
+                        <td colSpan={columns.length + 2}>
+                          <SetAsideAction
+                            row={row}
+                            mode={acting.mode}
+                            onCancel={() => setActing(null)}
+                            onDone={finished}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+/** Fix the fields a set-aside row's reasons name and process it again through the same checks, or dismiss it with a
+ * reason (J11). What is still wrong is said beside the row, and the row stays set aside. */
+function SetAsideAction({
+  row,
+  mode,
+  onCancel,
+  onDone,
+}: {
+  row: SetAsideRow;
+  mode: "fix" | "dismiss";
+  onCancel: () => void;
+  onDone: (text: string) => void;
+}) {
+  const columns = fixColumns(row);
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(columns.map((column) => [column, row.row[column] ?? ""])),
+  );
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const label = row.row.complaint_id || row.row[Object.keys(row.row)[0]] || `Row ${row.line}`;
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (mode === "fix") {
+        await send(`/api/v1/data/import/quarantine/${row.id}/reprocess`, "POST", { row: values });
+        onDone(`Row ${row.line} (${label}) was processed again and is in your records.`);
+      } else {
+        await send(`/api/v1/data/import/quarantine/${row.id}/dismiss`, "POST", { reason });
+        onDone(`Row ${row.line} (${label}) was dismissed: ${reason.trim()}`);
+      }
+    } catch (failure) {
+      setError(errorText(failure, mode === "fix" ? "The row could not be processed again." : "Not dismissed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form
+      className="uw-import-fix"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit();
+      }}
+    >
+      {mode === "fix" ? (
+        <>
+          <p className="ac-muted">
+            Correct what the reasons name; the row's other values stay as stored (personal details as placeholders).
+          </p>
+          {columns.map((column) => (
+            <label key={column} className="ca-field">
+              {column}
+              <input
+                type={column.endsWith("_date") ? "date" : "text"}
+                value={values[column] ?? ""}
+                onChange={(event) => setValues({ ...values, [column]: event.target.value })}
+              />
+            </label>
+          ))}
+        </>
+      ) : (
+        <label className="ca-field">
+          Why is this row dismissed? (kept with the row; personal details are masked)
+          <textarea value={reason} rows={2} maxLength={500} onChange={(event) => setReason(event.target.value)} />
+        </label>
+      )}
+      {error && (
+        <p className="uw-trial-message is-bad" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="ca-action-row">
+        <button
+          type="submit"
+          className="ac-primary"
+          disabled={busy || (mode === "dismiss" && reason.trim().length < 3)}
+        >
+          {busy ? "Saving…" : mode === "fix" ? "Process again" : "Dismiss the row"}
+        </button>
+        <button type="button" className="ac-secondary" disabled={busy} onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 

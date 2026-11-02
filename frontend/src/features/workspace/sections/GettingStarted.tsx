@@ -404,10 +404,6 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
               </p>
               <ImportPanel
                 id="trial-import"
-                complaintsAlone
-                templates={trial?.templates ?? []}
-                basePath="/api/v1/trial/imports"
-                fileLimitBytes={trial?.limits?.file_bytes}
                 onReport={reports.show}
                 onImported={(result, entity) => {
                   reports.imported(result.import_ref);
