@@ -6058,3 +6058,32 @@ section[aria-label="What blocks the decision"] h3 {
   margin: 12px 0;
   font-weight: 600;
 }
+
+/* 0.10.72 (B4): My work leads with one item; every other urgent obligation stays visible with its deadline. */
+.uw-next-why {
+  flex-basis: 100%;
+  color: var(--ac-muted, inherit);
+}
+.uw-urgent {
+  margin: 12px 0;
+}
+.uw-urgent-title {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+.uw-urgent ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-urgent li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ms-radius-md);
+}

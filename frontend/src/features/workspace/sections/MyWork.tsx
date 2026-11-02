@@ -1,4 +1,5 @@
-import { ResumeShortStory } from "./ShortStory";
+import { ResumeShortStory, useShortStory } from "./ShortStory";
+import { resumeText } from "../shortStory";
 import { DeadlineChip } from "../../../app/chips";
 import { useEffect, useState } from "react";
 import { MessageSquareReply, Paperclip } from "lucide-react";
@@ -179,7 +180,9 @@ const QUEUE_VIEWS = NEW_MY_WORK.views?.Queues ?? [];
  * stays hidden while AI is off.
  */
 export function NewMyWorkSection({ tab }: { tab?: string }) {
-  const { work, open, notify, isTrial } = useWorkspace();
+  const { work, open, notify, isTrial, navigation } = useWorkspace();
+  // While "Resume SAMPLE-RV-11" shows, it is the one main button; the next step is secondary (0.10.72, Addendum 2).
+  const resuming = !!resumeText(useShortStory(!!isTrial && navigation === "new").data);
   const aiOff = useAiReady() === false || !!isTrial;
   const canSign = useCan("decision.sign");
   const manager = useCan("quality.review");
@@ -218,7 +221,10 @@ export function NewMyWorkSection({ tab }: { tab?: string }) {
     <>
       {/* Unfinished short-story work first (0.10.71, A3): "Resume SAMPLE-RV-11 · step N of 4". */}
       <ResumeShortStory />
-      <NextStep />
+      <NextStep secondary={resuming} />
+      {/* Every other urgent obligation stays visible below the lead, each with its deadline (0.10.72, B4). */}
+      <RemindersPanel />
+      <UrgentTasks />
       {/* A returning trial user lands here; the sample event and its stories are one click away (8.4). */}
       {isTrial && (
         <p className="uw-entrance-link">
@@ -227,42 +233,86 @@ export function NewMyWorkSection({ tab }: { tab?: string }) {
           </button>
         </p>
       )}
-      {manager && <TeamNumbers onOpen={() => setActive("Team overview")} />}
-      <Tabs tabs={tabs} active={active} onChange={setActive} label="My work sections">
-        {active === "Tasks for me" && (
-          <>
-            <RemindersPanel />
-            <ViewChooser
-              views={TASK_VIEWS}
-              active={taskView}
-              onChange={setView}
-              label="Which tasks"
-              labels={Object.fromEntries(
-                TASK_VIEWS.map((item) => [item, counts[item] ? `${item} · ${counts[item]}` : item]),
-              )}
-            >
-              <TaskInbox key={taskView} view={taskViewForTab(taskView) ?? "assigned"} summary={summary} />
+      {/* Team numbers, completed work, the queues and the filters are revealed on request (0.10.72, B4); a link to a
+          part of My work opens them. */}
+      {manager && (
+        <details className="uw-more">
+          <summary>Team numbers</summary>
+          <TeamNumbers onOpen={() => setActive("Team overview")} />
+        </details>
+      )}
+      <details className="uw-more uw-mw-all" open={!!tab && tab !== "Tasks for me"}>
+        <summary>All my work: tasks, approvals, requests and queues</summary>
+        <Tabs tabs={tabs} active={active} onChange={setActive} label="My work sections">
+          {active === "Tasks for me" && (
+            <>
+              <ViewChooser
+                views={TASK_VIEWS}
+                active={taskView}
+                onChange={setView}
+                label="Which tasks"
+                labels={Object.fromEntries(
+                  TASK_VIEWS.map((item) => [item, counts[item] ? `${item} · ${counts[item]}` : item]),
+                )}
+              >
+                <TaskInbox key={taskView} view={taskViewForTab(taskView) ?? "assigned"} summary={summary} />
+              </ViewChooser>
+            </>
+          )}
+          {active === "Approvals" && <ApprovalsPanel onOpen={openApproval} />}
+          {active === "Evidence requests" && (
+            <>
+              <EvidenceRequestsPanel investigationId={null} initialRequest={request} />
+              <EvidenceRequests />
+            </>
+          )}
+          {active === "Queues" && (
+            <ViewChooser views={QUEUE_VIEWS} active={queueView} onChange={setView} label="Which queue">
+              {queueView === "Calls to check" && <FirstContact part="calls" startLogging={logging} />}
+              {queueView === "Possible duplicates" && <FirstContact part="duplicates" />}
+              {queueView === "Ready to close as routine" && <Dispositions />}
             </ViewChooser>
-          </>
-        )}
-        {active === "Approvals" && <ApprovalsPanel onOpen={openApproval} />}
-        {active === "Evidence requests" && (
-          <>
-            <EvidenceRequestsPanel investigationId={null} initialRequest={request} />
-            <EvidenceRequests />
-          </>
-        )}
-        {active === "Queues" && (
-          <ViewChooser views={QUEUE_VIEWS} active={queueView} onChange={setView} label="Which queue">
-            {queueView === "Calls to check" && <FirstContact part="calls" startLogging={logging} />}
-            {queueView === "Possible duplicates" && <FirstContact part="duplicates" />}
-            {queueView === "Ready to close as routine" && <Dispositions />}
-          </ViewChooser>
-        )}
-        {active === "Team overview" && <OversightView part="items" />}
-        {active === "My AI conversations" && <Conversations />}
-      </Tabs>
+          )}
+          {active === "Team overview" && <OversightView part="items" />}
+          {active === "My AI conversations" && <Conversations />}
+        </Tabs>
+      </details>
     </>
+  );
+}
+
+/** The tasks overdue or due soon, each with its deadline and one action (0.10.72, B4): never hidden. */
+export function UrgentTasks() {
+  const openTask = useOpenTask();
+  const overdue = useResource<TaskList>(taskListPath("overdue", 1, 20));
+  const soon = useResource<TaskList>(taskListPath("due_soon", 1, 20));
+  const seen = new Set<string>();
+  const rows = [...(listOf(overdue.data?.items) as Task[]), ...(listOf(soon.data?.items) as Task[])].filter(
+    (task) => !seen.has(task.id) && !!seen.add(task.id),
+  );
+  if (!rows.length) return null;
+  return (
+    <section className="uw-urgent" aria-label="Due soon or overdue">
+      <h2 className="uw-urgent-title">Due soon or overdue · {rows.length}</h2>
+      <ul>
+        {rows.map((task) => {
+          const go = openTask(task);
+          return (
+            <li key={task.id}>
+              <span>
+                <strong>{safeText(task.title) ?? "A task"}</strong> · {dueText(task, formatDate)}
+                {task.assigned_user?.name ? ` · Owner: ${task.assigned_user.name}` : ""}
+              </span>
+              {go && (
+                <button type="button" className="ac-link" onClick={go}>
+                  Open
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -270,8 +320,8 @@ export function NewMyWorkSection({ tab }: { tab?: string }) {
  * The screen's main button names the next step (stage 7: a new user finds where to start within 10 seconds): the
  * soonest task assigned to me, else my most urgent reminder, else the complaints to triage.
  */
-export function NextStep() {
-  const { open } = useWorkspace();
+export function NextStep({ secondary = false }: { secondary?: boolean } = {}) {
+  const { open, navigation } = useWorkspace();
   const canLog = useCan("signal.triage") || useCan("investigation.create") || useCan("quality.review");
   const openTask = useOpenTask();
   const tasks = useResource<TaskList>(taskListPath("assigned", 1, 1));
@@ -285,6 +335,16 @@ export function NextStep() {
       </p>
     );
   const go = task ? openTask(task) : null;
+  // Why it needs attention, its owner and its deadline, under the lead (0.10.72, B4: new navigation).
+  const why = task
+    ? [
+        safeText(task.source?.label) ?? safeText(task.task_type_label),
+        dueText(task, formatDate),
+        task.assigned_user?.name ? `Owner: ${task.assigned_user.name}` : null,
+      ]
+    : alert
+      ? [alert.reason_label, alert.due_label ?? formatDate(alert.due_at), alert.owner ? `Owner: ${alert.owner}` : null]
+      : [];
   const next = task
     ? { label: safeText(task.title) ?? "Your next task", run: go ?? (() => open("My Work")) }
     : alert?.opens
@@ -299,9 +359,12 @@ export function NextStep() {
   return (
     <section className="uw-next-step" aria-label="Your next step">
       <span className="ac-eyebrow">Your next step</span>
-      <button type="button" className="ac-primary" onClick={next.run}>
+      <button type="button" className={secondary ? "ac-secondary" : "ac-primary"} onClick={next.run}>
         {next.label} <ChevronRight size={16} aria-hidden="true" />
       </button>
+      {navigation === "new" && why.some(Boolean) && (
+        <small className="uw-next-why">{why.filter(Boolean).join(" · ")}</small>
+      )}
       {/* A call that may be a complaint is logged from here (click path a: four clicks to a signed check). */}
       {canLog && (
         <button type="button" className="ac-secondary" onClick={() => open("Complaints", "First contact?log=CONTACT")}>
