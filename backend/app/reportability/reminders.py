@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
@@ -26,16 +26,11 @@ NEW_TASKS_PER_RUN = 50
 ACTOR = "system:scheduler"
 
 
-def _due_at(day: str) -> datetime:
-    return datetime.combine(date.fromisoformat(day), datetime.max.time().replace(microsecond=0), tzinfo=timezone.utc)
-
-
 def sweep_reportability(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> dict:
     """Create and settle the organization's reportability reminder tasks. Does not commit."""
     from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
     from backend.app.workflow import tasks as task_service
 
-    today = today or service.today_utc()
     watched = service.watch(db, None, tenant_id, show="open", page=1, page_size=10**6, today=today)["items"]
     waiting = {item["id"]: item for item in watched}
     open_tasks = (
@@ -78,18 +73,19 @@ def sweep_reportability(db: Session, tenant_id: uuid.UUID, today: date | None = 
                 db,
                 tenant_id,
                 task_type=REMINDER_TASK,
-                title=f"Reportability decision for {ref}: {'overdue since' if overdue else 'due'} {binding['due_date']}"
+                title=f"Reportability decision for {ref}: {'overdue since' if overdue else 'due'} {binding['due_label']}"
                 f" ({binding['window']})",
                 source_type=COMPLAINT_SOURCE,
                 source_id=uuid.UUID(item["id"]),
                 priority="CRITICAL" if overdue or item.get("death") else "HIGH",
-                due_at=_due_at(binding["due_date"]),
+                due_at=datetime.fromisoformat(binding["due_at"]),
                 created_by=ACTOR,
                 details={
                     "complaint_id": item["id"],
                     "complaint_business_id": ref,
                     "window": binding["window"],
                     "due_date": binding["due_date"],
+                    "due_label": binding["due_label"],
                 },
             )
         created += 1

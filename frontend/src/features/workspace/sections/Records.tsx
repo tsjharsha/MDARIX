@@ -27,6 +27,7 @@ import {
   boardHeadline,
   boardPath,
   capaPath,
+  capaQmsText,
   capaRef,
   dueText,
   parseRecordsTab,
@@ -203,6 +204,7 @@ export function CapaCard({ item, onOpen }: { item: CapaItem; onOpen: () => void 
           <span className="uw-cr-meta">
             {item.capa.product_name ?? "No product"}
             {item.capa.investigation?.business_id ? ` · case ${item.capa.investigation.business_id}` : ""}
+            {capaQmsText(item.capa) ? ` · ${capaQmsText(item.capa)}` : ""}
           </span>
           <ToneBadge tone={state.tone} label={state.label} />
           <StatusBadge value={item.capa.status} />

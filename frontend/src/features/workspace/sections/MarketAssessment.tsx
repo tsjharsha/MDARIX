@@ -2,7 +2,7 @@ import { useContext, useEffect, useId, useState } from "react";
 import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { formatDay } from "../../../app/dates";
+import { deadlineLabel, formatDay } from "../../../app/dates";
 import { WorkspaceContext, useCan, useWorkspace } from "../workspaceContext";
 import { WORKSHEET_MARKETS, reportsTab } from "../authorityReports";
 import { communicationsTab } from "../communications";
@@ -231,7 +231,7 @@ export function MarketPanel({
           <span
             className={`uw-rw-clock tone-${item.clock.state === "OVERDUE" ? "critical" : item.clock.state === "DUE_SOON" ? "warning" : "neutral"}`}
           >
-            <strong>{clockText(item.clock)}</strong> · due {formatDay(item.clock.due_date)} · {item.clock.window}
+            <strong>{clockText(item.clock)}</strong> · due {deadlineLabel(item.clock)} · {item.clock.window}
           </span>
         )}
       </header>
@@ -429,6 +429,7 @@ function QuestionRow({
           {question.definition}
         </p>
         {question.note && <p className="uw-hint">{question.note}</p>}
+        <OwnText question={question} />
         <div className="uw-ma-answers" role="radiogroup" aria-label={`Answer to ${question.id}`}>
           {ANSWERS.map((answer) => (
             <label key={answer} className="ca-check">
@@ -572,7 +573,7 @@ export function ScalePanel({
   );
 }
 
-/** The training on what a signature relies on: read each document, then "I have read version …". Required to sign in a
+/** The training on what a signature relies on: read each document, then "I have read …, MDARIX starter, version 1". Required to sign in a
  * free trial only (owner decision 6); elsewhere the record can be made but signing does not wait for it. */
 export function TrainingPanel({
   documents,
@@ -743,5 +744,24 @@ export function SignedVersion({
       )}
       <InlineError text={error} />
     </section>
+  );
+}
+
+/** The organization's explanation and examples beside a question's locked wording (its decision guide, 0.10.64). */
+export function OwnText({ question }: { question: Pick<Question, "explanation" | "examples"> }) {
+  if (!question.explanation && !question.examples) return null;
+  return (
+    <>
+      {question.explanation && (
+        <p className="uw-hint">
+          <strong>Your explanation:</strong> {question.explanation}
+        </p>
+      )}
+      {question.examples && (
+        <p className="uw-hint">
+          <strong>Your examples:</strong> {question.examples}
+        </p>
+      )}
+    </>
   );
 }

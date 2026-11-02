@@ -72,17 +72,22 @@ def test_a_missing_required_column_names_what_it_is_usually_called():
 
 def test_the_quality_systems_own_status_is_kept_for_the_second_look():
     report = imports._Report()
-    header = b"Complaint Number,Product Code,Complaint Description,Status\n"
+    header = b"Complaint Number,Product Code,Date Received,Complaint Description,Status\n"
     rows = imports._parse(
-        "complaints", header + b"C-1,P-1,Alarm,Closed - No Action\nC-2,P-1,Alarm,Void\n", report, imports.TRIAL_POLICY
+        "complaints",
+        header + b"C-1,P-1,2026-10-01,Alarm,Closed - No Action\nC-2,P-1,2026-10-01,Alarm,Void\n",
+        report,
+        imports.TRIAL_POLICY,
     )
     imports._check_values("complaints", rows, report)
     assert report.error_count == 0, report.issues
     assert [row["status"] for _, row in rows] == ["Closed - No Action", "Void"]
     too_long = imports._Report()
-    rows = imports._parse("complaints", header + b"C-3,P-1,Alarm," + b"x" * 41 + b"\n", too_long, imports.TRIAL_POLICY)
+    rows = imports._parse(
+        "complaints", header + b"C-3,P-1,2026-10-01,Alarm," + b"x" * 41 + b"\n", too_long, imports.TRIAL_POLICY
+    )
     imports._check_values("complaints", rows, too_long)
-    assert "under 40 characters" in too_long.issues[0]["message"]
+    assert "to 40 characters or fewer" in too_long.issues[0]["message"]
 
 
 # ------------------------------------------------------------------------------------------- Excel workbooks

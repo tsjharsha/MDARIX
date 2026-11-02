@@ -8,6 +8,7 @@ import { roleLabel } from "../../app/roles";
 import { dueAtFromDay } from "./caseWorkflow";
 import { textProblem } from "./intelligence";
 import { FOLLOW_UP_ACTION_LABELS, outcomeLabel, type FollowUpAction } from "./humanDecision";
+import { capaQmsText } from "./effectiveness";
 import { dueState } from "./tasks";
 
 const code = (value: unknown) =>
@@ -24,6 +25,7 @@ export type FollowUpActions = {
   can_complete?: boolean | null;
   can_cancel?: boolean | null;
   can_create_capa?: boolean | null;
+  can_set_qms_reference?: boolean | null;
 };
 
 export type FollowUp = {
@@ -41,7 +43,7 @@ export type FollowUp = {
   overdue?: boolean | null;
   decision?: { id?: string | null; business_id?: string | null; outcome?: string | null } | null;
   investigation?: { id?: string | null; business_id?: string | null; product_id?: string | null } | null;
-  capa?: { business_id?: string | null; capa_identifier?: string | null } | null;
+  capa?: { business_id?: string | null; capa_identifier?: string | null; qms_reference?: string | null } | null;
   completion_note?: string | null;
   completed_by_name?: string | null;
   completed_at?: string | null;
@@ -64,6 +66,10 @@ export type FollowUpActionKey = "start" | "complete" | "cancel" | "capa";
 
 export const followUpPath = (id: string, action?: FollowUpActionKey) =>
   `/api/v1/follow-ups/${encodeURIComponent(id)}${action ? `/${action}` : ""}`;
+
+/** Where the QMS reference of a follow-up's CAPA is set (J22). */
+export const followUpQmsReferencePath = (id: string) => `${followUpPath(id, "capa")}/qms-reference`;
+export const QMS_REFERENCE_MAX = 120;
 
 export function followUpListPath(box: "mine" | "all" = "mine", status = "", page = 1, pageSize = 20): string {
   const params = new URLSearchParams({ box });
@@ -118,7 +124,7 @@ export const FOLLOW_UP_ACTIONS_SHOWN: ReadonlyArray<{
 }> = [
   { key: "start", flag: "can_start", label: "Start", needsInput: false },
   { key: "complete", flag: "can_complete", label: "Complete", needsInput: true },
-  { key: "capa", flag: "can_create_capa", label: "Create CAPA", needsInput: true },
+  { key: "capa", flag: "can_create_capa", label: "Record the CAPA to raise in your QMS", needsInput: true },
   { key: "cancel", flag: "can_cancel", label: "Cancel", needsInput: true },
 ];
 
@@ -132,7 +138,7 @@ export const FOLLOW_UP_NOTE_MAX = 2000;
 export const CAPA_TITLE_MIN = 3;
 export const CAPA_TITLE_MAX = 300;
 
-export type FollowUpInput = { text: string; dueDay?: string };
+export type FollowUpInput = { text: string; dueDay?: string; qmsReference?: string };
 
 /** Why an action cannot be sent yet, or null: a note to complete, a reason to cancel, a title for the CAPA. */
 export function followUpActionProblem(key: FollowUpActionKey, input: FollowUpInput): string | null {
@@ -164,7 +170,8 @@ export function followUpActionBody(key: FollowUpActionKey, input: FollowUpInput)
       return { reason: text };
     case "capa": {
       const due = input.dueDay?.trim() ? dueAtFromDay(input.dueDay) : null;
-      return { title: text, ...(due ? { due_at: due } : {}) };
+      const qms = input.qmsReference?.trim();
+      return { title: text, ...(due ? { due_at: due } : {}), ...(qms ? { qms_reference: qms } : {}) };
     }
   }
 }
@@ -182,12 +189,17 @@ export function followUpDecisionText(item: Pick<FollowUp, "decision">): string {
   return [id, outcome].filter(Boolean).join(" · ") || "—";
 }
 
-/** The CAPA raised for a follow-up, by its business ID (and its number in the quality system), or null. */
+/**
+ * The CAPA recorded for a follow-up, by its business ID (and the number MDARIX gave it), then where it stands in your
+ * QMS: "CAPA000001 (CAPA-INV000001-1) · To raise in your QMS"; null when none was recorded.
+ */
 export function followUpCapaText(item: Pick<FollowUp, "capa">): string | null {
-  const id = safeText(item.capa?.business_id);
-  const source = safeText(item.capa?.capa_identifier);
-  if (id && source && source !== id) return `${id} (${source})`;
-  return id ?? source;
+  if (!item.capa) return null;
+  const id = safeText(item.capa.business_id);
+  const source = safeText(item.capa.capa_identifier);
+  const name = id && source && source !== id ? `${id} (${source})` : (id ?? source);
+  const qms = capaQmsText({ ...item.capa, source_system: "MDARIX" });
+  return name ? `${name} · ${qms}` : null;
 }
 
 /** The follow-up a tab or task names (by id or business ID) in a list, or null. */

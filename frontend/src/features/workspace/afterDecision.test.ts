@@ -12,6 +12,7 @@ import {
   followUpActions,
   followUpAssignee,
   followUpCapaText,
+  followUpQmsReferencePath,
   followUpCounts,
   followUpDecisionText,
   followUpListPath,
@@ -27,6 +28,7 @@ import {
   impactStatusView,
   impactTriggerLabel,
 } from "./afterDecision";
+import { capaQmsText } from "./effectiveness";
 
 const UUID = "0b6f8f9e-1111-4222-8333-444455556666";
 const NOTE = "Seal supplier changed and verified.";
@@ -98,10 +100,27 @@ describe("follow-up actions", () => {
       "DEC000004 · Accept the conclusion",
     );
     expect(followUpDecisionText({ decision: null })).toBe("—");
-    expect(followUpCapaText({ capa: { business_id: "CAPA000002", capa_identifier: "QMS-77" } })).toBe(
-      "CAPA000002 (QMS-77)",
+    expect(followUpCapaText({ capa: { business_id: "CAPA000002", capa_identifier: "CAPA-INV1-1" } })).toBe(
+      "CAPA000002 (CAPA-INV1-1) · To raise in your QMS",
     );
+    expect(
+      followUpCapaText({
+        capa: { business_id: "CAPA000002", capa_identifier: "CAPA-INV1-1", qms_reference: "QMS-77" },
+      }),
+    ).toBe("CAPA000002 (CAPA-INV1-1) · QMS reference QMS-77");
     expect(followUpCapaText({ capa: null })).toBeNull();
+  });
+
+  it("sends the CAPA's QMS reference when given (J22)", () => {
+    expect(followUpActionBody("capa", { text: "Fix seal", qmsReference: " CAPA-0450 " })).toEqual({
+      title: "Fix seal",
+      qms_reference: "CAPA-0450",
+    });
+    expect(followUpQmsReferencePath(UUID)).toBe(`/api/v1/follow-ups/${UUID}/capa/qms-reference`);
+    // Wherever the CAPA shows: the Records CAPA list and the effectiveness board read the same words.
+    expect(capaQmsText({ qms_reference: "CAPA-0450", source_system: "MDARIX" })).toBe("QMS reference CAPA-0450");
+    expect(capaQmsText({ qms_reference: null, source_system: "MDARIX" })).toBe("To raise in your QMS");
+    expect(capaQmsText({ source_system: "TRACKWISE" })).toBeNull();
   });
 
   it("finds the record a task names, by id or business ID", () => {

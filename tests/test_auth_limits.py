@@ -65,6 +65,43 @@ class _BrokenEngine:
         raise RuntimeError("counter store unavailable")
 
 
+def test_thirty_people_can_sign_up_from_one_venue_address_and_the_refusal_says_how_long(limits_on):
+    """J12: five sign-ups per network address per hour stopped a room on one Wi-Fi at the sixth person, with "wait a
+    few minutes" when the wait was up to an hour."""
+    assert rate_limit.LIMITS["signup:ip"].limit == 30
+    client = TestClient(app)
+    venue = "198.51.100.77"
+
+    def sign_up(n):
+        # An invalid email: refused (422) after it counts, so no request or trial is stored.
+        body = {"email": f"person-{n}-at-venue", "display_name": "Venue Person", "organization": "Venue"}
+        return client.post("/api/v1/auth/signup", json=body, headers={"X-Forwarded-For": venue})
+
+    assert {sign_up(n).status_code for n in range(30)} == {422}
+    refused = sign_up(31)
+    assert refused.status_code == 429
+    message = refused.json()["detail"]["message"]
+    assert message.startswith("Too many attempts. Please try again in ") and "few minutes" not in message
+    assert rate_limit.wait_words(int(refused.headers["Retry-After"])) in message
+
+
+def test_the_venue_limit_and_the_wait_read_as_set(monkeypatch):
+    monkeypatch.setenv("MDARIX_SIGNUP_PER_ADDRESS_PER_HOUR", "80")
+    assert rate_limit._count_from_env("MDARIX_SIGNUP_PER_ADDRESS_PER_HOUR", 30) == 80
+    for wrong in ("0", "-3", "many"):
+        monkeypatch.setenv("MDARIX_SIGNUP_PER_ADDRESS_PER_HOUR", wrong)
+        assert rate_limit._count_from_env("MDARIX_SIGNUP_PER_ADDRESS_PER_HOUR", 30) == 30
+    assert [rate_limit.wait_words(s) for s in (5, 60, 61, 720, 3599, 3600, 7200)] == [
+        "a minute",
+        "a minute",
+        "2 minutes",
+        "12 minutes",
+        "an hour",
+        "an hour",
+        "2 hours",
+    ]
+
+
 def test_authentication_limits_fail_closed_in_production_and_others_fail_open(monkeypatch):
     monkeypatch.setenv("MDARIX_RATE_LIMITS_ENABLED", "true")
     monkeypatch.setattr(db_session, "runtime_engine", _BrokenEngine())

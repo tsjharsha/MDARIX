@@ -146,7 +146,7 @@ def test_approval_needs_an_authenticator_code_when_signatures_require_mfa(monkey
     approver = role_client("APPROVER")[0]
     document_id = _in_review(author)
     refused = _approve(approver, document_id, password=PASSWORD)
-    assert refused.status_code == 403 and refused.json()["detail"]["code"] == "MFA_ENROLLMENT_REQUIRED"
+    assert refused.status_code == 403 and refused.json()["detail"]["code"] == "SIGNATURE_MFA_NOT_SET_UP"
 
 
 def test_an_administrator_cannot_approve_a_regulatory_document():

@@ -3,16 +3,19 @@ backend/app/reportability/markets.py: the one engine, never a second one.
 
 - Version 1 of each market's guide is MDARIX's starter (``US-starter-1`` ...), read-only. A customer version
   (``US-v2`` ...) starts as a copy of the current version.
-- In a customer version the **core questions** (the starter's) may be reworded and clarified: their text, definition,
-  help note, clause and basis. They cannot be removed or reordered, and the conclusion logic (``markets.evaluate``) stays
-  fixed, so a reworded guide still points to the same conclusion for the same answers. **Extra questions** (at most
-  ``EXTRA_MAX``) are the customer's own: recorded and printed with the answer, never required and never part of the
-  conclusion; they may be reordered.
+- In a customer version the **core questions** (the starter's) keep MDARIX's wording, locked (0.10.64, reversing the
+  rewording of 0.10.59): the question, the regulation's definition, MDARIX's note, the clause and the basis
+  (``LOCKED``). The customer adds their own **explanation** and **examples** beside it. A save that changes or blanks
+  locked text is refused; versions signed before stay as signed. Core questions cannot be removed or reordered, and the
+  conclusion logic (``markets.evaluate``) stays fixed. **Extra questions** (at most ``EXTRA_MAX``) are the customer's
+  own: recorded and printed with the answer, never required and never part of the conclusion; they may be reordered.
 - **Every question carries its regulation clause** (a reference text) **and its basis** in the standards catalog
   (backend/app/standards.py, the trial's source register); a version with a question lacking either cannot be published.
-- **Test cases:** a set of answers and the outcome they must point to (reportable, with its report type when given; not
-  reportable; pending information). A missing answer is Unknown, never No. Publication needs every test passing on the
-  version's current content; the results are kept with the version.
+- **The test matrix:** worked complaints, each a set of answers and the outcome the market's guide must point to
+  (reportable, with its report type when given; not reportable; pending information). A missing answer is Unknown, never
+  No. MDARIX's starter rows are in every version's matrix and cannot be removed or changed; the customer adds their own.
+  Sending for approval needs every row passing on the version's current content (the results are kept with the
+  version); approval runs the matrix again, and a row whose answer changed blocks it (``changed_rows``).
 
 MDARIX never decides: a guide points to a conclusion, and a person confirms or overrides it and signs.
 """
@@ -25,7 +28,10 @@ from backend.app import standards
 from backend.app.reportability import markets
 
 TEXT_MIN, TEXT_MAX = 5, 400
-DEFINITION_MAX, NOTE_MAX, CLAUSE_MAX = 2000, 600, 200
+DEFINITION_MAX, NOTE_MAX, CLAUSE_MAX, OWN_MAX = 2000, 600, 200, 1000
+# A core question's wording stays MDARIX's (0.10.64); the customer's own text goes in OWN.
+LOCKED = ("text", "definition", "note", "clause", "basis")
+OWN = ("explanation", "examples")
 EXTRA_MAX, TESTS_MAX, NAME_MAX = 10, 30, 160
 REASON_MIN = 10
 PREFIX = {markets.US: "US", markets.EU_NI: "EU", markets.GB: "GB", markets.IN: "IN"}
@@ -73,11 +79,39 @@ def question_dict(question: markets.Question) -> dict:
         "clause": question.clause,
         "basis": list(question.basis),
         "extra": question.extra,
+        "explanation": question.explanation,
+        "examples": question.examples,
     }
 
 
 def _is_starter_wording(item: dict, core: markets.Question) -> bool:
-    return question_dict(core) == {**item, "extra": False}
+    wording = question_dict(core)
+    return all(item.get(key) == wording[key] for key in LOCKED)
+
+
+def locked(item: dict, core: markets.Question) -> dict:
+    """A core question as a new version stores it: MDARIX's wording, with the item's own explanation and examples. A
+    help note of a version from before 0.10.64 that is not MDARIX's becomes the explanation, so it is not lost."""
+    note = item.get("note") or ""
+    explanation = item.get("explanation") or (note if note != (core.note or "") else "")
+    return {**question_dict(core), "explanation": explanation, "examples": item.get("examples") or ""}
+
+
+def relocked(market: str, questions: list[dict]) -> list[dict]:
+    """A copied version's questions with every core question locked (extra questions as they are)."""
+    core = {question.id: question for question in starter(market).questions}
+    return [locked(item, core[item["id"]]) if item["id"] in core else {**item} for item in questions]
+
+
+def wording_problems(market: str, questions: list[dict]) -> list[str]:
+    """Core questions of a version being prepared whose locked wording is not MDARIX's (a draft from before 0.10.64)."""
+    core = {question.id: question for question in starter(market).questions}
+    return [
+        f"Question {item['id']} was reworded before the wording was locked: save the draft to restore the regulation's"
+        " wording"
+        for item in questions
+        if item["id"] in core and not _is_starter_wording(item, core[item["id"]])
+    ]
 
 
 def build(market: str, code: str, items: list[dict], title: str | None = None) -> markets.QuestionSet:
@@ -98,6 +132,8 @@ def build(market: str, code: str, items: list[dict], title: str | None = None) -
                 note=item.get("note") or "",
                 starter=found is not None and _is_starter_wording(item, found),
                 extra=found is None,
+                explanation=item.get("explanation") or "",
+                examples=item.get("examples") or "",
             )
         )
     return markets.QuestionSet(market, code, title or base.title, tuple(questions), note=base.note, basis=base.basis)
@@ -108,12 +144,36 @@ def clean_questions(market: str, raw: list[dict]) -> tuple[list[dict] | None, st
     the extra questions in the order given (new ones get the next free ``X`` id)."""
     base = starter(market)
     core_ids = base.ids()
+    core = {question.id: question for question in base.questions}
     given: dict[str, dict] = {}
     extras: list[dict] = []
     for item in raw or []:
         if not isinstance(item, dict):
             return None, "Each question needs its text"
         question_id = str(item.get("id") or "").strip().upper()
+        own = {key: _clean(item.get(key), OWN_MAX + 1) for key in OWN}
+        for key in OWN:
+            if len(own[key]) > OWN_MAX:
+                return None, f"Question {question_id or 'new'}: keep your {key} to {OWN_MAX} characters"
+        if question_id in core_ids:
+            if question_id in given:
+                return None, f"Question {question_id} appears twice"
+            wording = question_dict(core[question_id])
+            for key in LOCKED:
+                # Server-enforced lock: a locked field may be left out (it stays MDARIX's) or sent unchanged.
+                value = item.get(key)
+                if value is None:
+                    continue
+                same = (
+                    standards.known(value) == wording[key] if key == "basis" else _clean(value, 10_000) == wording[key]
+                )
+                if not same:
+                    return None, (
+                        f"Question {question_id}: its wording, definition and clause are the regulation's and stay as "
+                        "MDARIX wrote them. Add your explanation or examples beside them"
+                    )
+            given[question_id] = {**wording, **own}
+            continue
         cleaned = {
             "id": question_id,
             "text": _clean(item.get("text"), TEXT_MAX + 1),
@@ -133,15 +193,10 @@ def clean_questions(market: str, raw: list[dict]) -> tuple[list[dict] | None, st
         ):
             if len(cleaned[key]) > limit:
                 return None, f"Question {label}: keep the {key} to {limit} characters"
-        if question_id in core_ids:
-            if question_id in given:
-                return None, f"Question {question_id} appears twice"
-            given[question_id] = {**cleaned, "extra": False}
-        else:
-            extras.append({**cleaned, "extra": True})
+        extras.append({**cleaned, "extra": True, **own})
     missing = [question_id for question_id in core_ids if question_id not in given]
     if missing:
-        return None, (f"Question {missing[0]} drives the conclusion: reword it, but it cannot be removed")
+        return None, f"Question {missing[0]} drives the conclusion: it cannot be removed"
     if len(extras) > EXTRA_MAX:
         return None, f"Add at most {EXTRA_MAX} extra questions"
     taken = {item["id"] for item in extras if _EXTRA_ID.match(item["id"])}
@@ -156,14 +211,41 @@ def clean_questions(market: str, raw: list[dict]) -> tuple[list[dict] | None, st
     return [given[question_id] for question_id in core_ids] + extras, None
 
 
+def _row_key(test: dict) -> tuple:
+    return (test["name"], tuple(sorted(test["answers"].items())), test["expected"], test.get("expected_report_type"))
+
+
+def is_starter_row(market: str, test: dict) -> bool:
+    """Whether a matrix row is one of MDARIX's starter worked complaints (compared by content, not by its id)."""
+    return _row_key(test) in {_row_key(row) for row in _clean_rows(market, STARTER_TESTS[market])[0]}
+
+
 def clean_tests(market: str, raw: list[dict]) -> tuple[list[dict] | None, str | None]:
-    """``(test cases as stored, None)`` or ``(None, why not)``. Answers name core questions only: extra questions never
-    drive a conclusion."""
+    """``(the test matrix as stored, None)`` or ``(None, why not)``: MDARIX's starter rows first, always (a starter row
+    left out or changed is put back), then the customer's own rows in the order given."""
+    found, problem = _clean_rows(market, raw)
+    if problem:
+        return None, problem
+    starters = _clean_rows(market, STARTER_TESTS[market])[0]
+    keys = {_row_key(row) for row in starters}
+    rows = [*starters, *(row for row in found if _row_key(row) not in keys)]
+    if len(rows) > TESTS_MAX:
+        return None, f"Keep the test matrix to {TESTS_MAX} worked complaints"
+    return [{**row, "id": f"T{index}"} for index, row in enumerate(rows, 1)], None
+
+
+def changed_rows(market: str, tests: list[dict]) -> list[dict]:
+    """The matrix run again now: the rows whose answer is no longer the expected one (an approval is blocked by any)."""
+    return [row for row in run(market, tests) if not row["passed"]]
+
+
+def _clean_rows(market: str, raw: list[dict]) -> tuple[list[dict] | None, str | None]:
+    """Answers name core questions only: extra questions never drive a conclusion."""
     core_ids = starter(market).ids()
     kinds = [kind for kind in markets.REPORT_TYPES if kind.startswith(PREFIX[market] + "_")]
     found: list[dict] = []
     if len(raw or []) > TESTS_MAX:
-        return None, f"Keep to {TESTS_MAX} test cases"
+        return None, f"Keep the test matrix to {TESTS_MAX} worked complaints"
     for index, item in enumerate(raw or [], 1):
         if not isinstance(item, dict):
             return None, f"Test {index}: give its answers and expected outcome"
@@ -220,20 +302,28 @@ def content(market: str, code: str, questions: list[dict], tests: list[dict]) ->
     return {"market": market, "code": code, "questions": questions, "test_cases": tests}
 
 
-def publish_problems(questions: list[dict], tests: list[dict], results: dict | None, fingerprint: str) -> list[str]:
+def publish_problems(
+    market: str, questions: list[dict], tests: list[dict], results: dict | None, fingerprint: str
+) -> list[str]:
     """Why the version cannot be published yet: every reason, in order (empty when it can be)."""
-    problems = []
+    problems = wording_problems(market, questions)
+    if tests and not all(any(_row_key(row) == _row_key(test) for test in tests) for row in starter_tests(market)):
+        problems.append(
+            "MDARIX's starter worked complaints belong in every test matrix: save the draft to restore them"
+        )
     for item in questions:
         if not item.get("clause"):
             problems.append(f"Question {item['id']} has no regulation clause")
         if not item.get("basis"):
             problems.append(f"Question {item['id']} has no basis from the standards catalog")
     if not tests:
-        problems.append("Add at least one test case")
+        problems.append("Add at least one worked complaint to the test matrix")
     elif not results or results.get("fingerprint") != fingerprint:
-        problems.append("Run the test cases on this version's current content")
+        problems.append("Run the test matrix on this version's current content")
     elif results.get("failed"):
-        problems.append(f"{results['failed']} of {len(results['results'])} test cases fail: fix them, then run again")
+        problems.append(
+            f"{results['failed']} of {len(results['results'])} worked complaints in the test matrix fail: fix them, then run again"
+        )
     return problems
 
 
@@ -249,7 +339,8 @@ def approver_problem(approver: str, role: str | None, editors: set[str]) -> str 
 
 def signature_meaning(code: str, title: str) -> str:
     return (
-        f"I approve {code} of the {title} for use: its questions, clauses and test results as shown. Assessments "
+        f"I approve {standards.version_words(code)} of the {title} for use: its questions, clauses and test results as shown. "
+        "Assessments "
         "started after publication use it. The guide points to a conclusion; a person concludes and signs."
     )
 

@@ -38,6 +38,9 @@ export type Question = {
   starter: boolean;
   /** The organization's own extra question (T-G15): recorded and printed, never required, never in the conclusion. */
   extra?: boolean;
+  /** The organization's explanation and examples beside the locked wording (0.10.64). */
+  explanation?: string | null;
+  examples?: string | null;
 };
 
 export type QuestionSet = {
@@ -97,6 +100,9 @@ export type TrainingDocument = {
 export type MarketClock = {
   window: string;
   due_date: string;
+  due_at?: string;
+  due_zone?: string;
+  due_label?: string;
   days_left: number;
   state: "OVERDUE" | "DUE_SOON" | "RUNNING";
   source: "WINDOW" | "REGULATION";

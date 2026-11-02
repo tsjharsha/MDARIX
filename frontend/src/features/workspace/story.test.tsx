@@ -59,7 +59,8 @@ const readiness: Readiness = {
 describe("the quality loop", () => {
   it("puts the inspection checks in the order a complaint travels, unknown ones last", () => {
     const stations = loopFromReadiness(readiness);
-    expect(stations.map((station) => station.key)).toEqual([...LOOP_ORDER.map((step) => step.code), "SOMETHING_NEW"]);
+    const present = LOOP_ORDER.map((step) => step.code).filter((code) => readiness.checks.some((c) => c.code === code));
+    expect(stations.map((station) => station.key)).toEqual([...present, "SOMETHING_NEW"]);
     expect(stations.map((station) => station.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(stations[0]).toMatchObject({ label: "Hidden complaints found", tone: "critical", value: 5, done: false });
     expect(stations[4]).toMatchObject({ key: "TRIAGE_OVERDUE", tone: "good", stateLabel: "Clear", done: true });
@@ -408,7 +409,7 @@ describe("booking a one-to-one demo from the trial", () => {
     expect(sampleFacts({ products: 3, capas: 0 })).toEqual(["3 devices"]);
     expect(sampleFacts(null)).toEqual([]);
     // Every pain opens a screen the MVP keeps, and names its requirement.
-    const kept = ["Readiness", "Complaints", "Signals", "Investigations", "Records"];
+    const kept = ["Readiness", "Complaints", "Signals", "Investigations", "Records", "Import data"];
     for (const pain of SAMPLE_PAINS) {
       expect(kept).toContain(pain.opens.section);
       expect(pain.requirement.length).toBeGreaterThan(20);

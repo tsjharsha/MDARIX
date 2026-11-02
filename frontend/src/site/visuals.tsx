@@ -215,12 +215,12 @@ function SourceFlowDiagram({ uid }: { uid: string }) {
 
 export function SourceFlow() {
   const uid = `flow-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  const label = "Your systems stay the record: eight customer systems flowing into MDARIX";
+  const label = "Eight customer systems flowing into MDARIX; your QMS keeps the complaint record";
   return (
     <section className="ms-section" aria-labelledby="source-flow-title">
       <Reveal className="ms-section-head">
         <span className="ms-eyebrow">Typical source systems</span>
-        <h2 id="source-flow-title">Your systems stay the record. MDARIX connects the story.</h2>
+        <h2 id="source-flow-title">Your QMS keeps the complaint record. MDARIX connects the story.</h2>
         <p>
           Each system keeps its data. Today MDARIX imports CSV exports from them; live connections are built in a pilot.
           Every record is checked and linked to versions, lots, components, suppliers, risks and evidence.
@@ -251,13 +251,13 @@ export function SourceFlow() {
 
 /* ---------------------------------------------------------------------------------- Reporting windows */
 
-// The four reporting templates of Complaints › Reporting windows, each with its basis from the standards catalog
+// The four markets of Complaints › Reporting windows and the market assessment, each with its basis from the standards catalog
 // (features/shared/standards.json, mirrored from backend/app/standards.py).
 const REPORTING = [
   { region: "United States", name: "FDA medical device reporting", basis: ["CFR803_50", "CFR803_53"] },
-  { region: "European Union", name: "EU MDR vigilance", basis: ["MDR_87"] },
+  { region: "EU and Northern Ireland", name: "EU MDR vigilance", basis: ["MDR_87"] },
   { region: "Great Britain", name: "UK medical devices vigilance", basis: ["UK_MDR"] },
-  { region: "Canada", name: "Mandatory problem reporting", basis: ["CA_MDR"] },
+  { region: "India", name: "Adverse event reporting (MvPI worksheet)", basis: ["IN_MDR"] },
 ];
 
 export function ReportingWindows() {
@@ -265,7 +265,7 @@ export function ReportingWindows() {
     <section className="ms-section" aria-labelledby="reporting-title">
       <Reveal className="ms-section-head">
         <span className="ms-eyebrow">Reporting windows</span>
-        <h2 id="reporting-title">FDA, EU MDR, UK and Canada reporting.</h2>
+        <h2 id="reporting-title">US, EU/NI, GB and India reporting.</h2>
         <p>
           Each window is counted from the day you became aware, and each reportability decision keeps its reason. People
           decide what is reportable; MDARIX never submits anything to a regulator.
@@ -286,7 +286,10 @@ export function ReportingWindows() {
           </Reveal>
         ))}
       </div>
-      <p className="ms-viz-caption">{BASIS_DISCLAIMER}</p>
+      <p className="ms-viz-caption">
+        Health Canada's reporting windows (SOR/98-282 ss. 59–61) are also offered as a template; Canada has no market
+        assessment or worksheet. {BASIS_DISCLAIMER}
+      </p>
     </section>
   );
 }

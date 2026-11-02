@@ -29,6 +29,46 @@ export type SamplePain = {
 
 export const SAMPLE_PAINS: readonly SamplePain[] = [
   {
+    key: "flagship",
+    title: "Is this reportable, and by when, in the US and India?",
+    inSample: [
+      "SAMPLE-RV-11: a PulseWatch 410 monitor read SpO2 4 to 6 points high against a reference oximeter. Nobody was harmed; the monitor is out of use and sent for service.",
+      "Triage it first (due within the day), then answer each market's questions: in the US a malfunction that could cause a serious injury if it happened again is a 30-day report; in India nobody was harmed, so there is no adverse event to report.",
+      "The US conclusion opens a case: record the service work or the CAPA to raise in your QMS, then sign ready to close.",
+    ],
+    requirement:
+      "A malfunction is reported to FDA within 30 calendar days when a recurrence would be likely to cause or contribute to a serious injury; India reports adverse events.",
+    reference: cite("21 CFR 803"),
+    opens: { section: "Complaints", tab: "Triage" },
+    action: "Start with triage",
+  },
+  {
+    key: "routine",
+    title: "Routine complaints that wait for a person",
+    inSample: [
+      "SAMPLE-RT-01 and RT-02: a filter re-seated on the phone and a frayed cable replaced, each ready to close at service level with one signature.",
+      "SAMPLE-RT-03: the same cable wear three weeks earlier, already closed: with RT-02, a recurring matter.",
+      "SAMPLE-RT-04: an alarm that belongs to the open investigation; SAMPLE-RT-05: a new failure mode, on the reportability watch.",
+    ],
+    requirement: "Every complaint is evaluated, and the decision not to investigate is recorded with its reason.",
+    reference: cite("ISO13485_8_2_2"),
+    opens: { section: "Complaints", tab: "Dispositions" },
+    action: "Open the dispositions",
+  },
+  {
+    key: "calls",
+    title: "Calls logged as they come in",
+    inSample: [
+      "SAMPLE-CALL-01 to 04: four calls to the service desk, from a question about the instructions to a monitor taken out of use.",
+      "SAMPLE-CALL-02 and SAMPLE-RT-05 are the same event, called in nine days before the formal complaint: a likely duplicate.",
+      "SAMPLE-URG-01: free flow at set-up and a patient moved to intensive care, logged as urgent before the awareness time is known.",
+    ],
+    requirement: "Feedback is gathered as it arrives, and a possible complaint is judged without delay.",
+    reference: cite("ISO13485_8_2_1", "ISO13485_8_2_2"),
+    opens: { section: "Complaints", tab: "First contact" },
+    action: "Open the first contacts",
+  },
+  {
     key: "hidden",
     title: "Complaints hidden in plain sight",
     inSample: [
@@ -108,6 +148,57 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
     action: "Open the effectiveness checks",
   },
   {
+    key: "reports",
+    title: "Report worksheets and what happened to each",
+    inSample: [
+      "SAMPLE-RV-09: a finished US example, its FDA 3500A worksheet approved by a second person and its submission recorded with FDA's acknowledgements.",
+      "SAMPLE-RV-10: an India report (MvPI worksheet) sent by e-mail and bounced, now waiting for a correction and a new approval.",
+      "The organization's own US guide (your version 2) in use, and a draft whose own test fails, so it cannot be published.",
+    ],
+    requirement: "Reports go to the authority on time, and what was sent, when and with what result is kept.",
+    reference: cite("ISO13485_8_2_3", "CFR803_50", "IN_MDR"),
+    opens: { section: "Complaints", tab: "Reports" },
+    action: "Open the reports",
+  },
+  {
+    key: "follow-through",
+    title: "Questions, owners and reminders",
+    inSample: [
+      "SAMPLE-RV-08: a question to the reporter for the patient's outcome, two attempts unanswered and the reply overdue.",
+      "SAMPLE-RV-01: a request to the hospital that stayed unanswered after three attempts to each contact.",
+      "The sample author is away until your trial ends, with you as the backup; SAMPLE-RV-08 and SAMPLE-RT-03 have you as their owner.",
+    ],
+    requirement: "Complaint handling keeps its records: who was asked what, when, and who answers for each event.",
+    reference: cite("ISO13485_8_2_2"),
+    opens: { section: "Complaints", tab: "Communications" },
+    action: "Open the communications log",
+  },
+  {
+    key: "lot-impact",
+    title: "Which other lots share the suspect part",
+    inSample: [
+      "OrbitCare 300 Rev B's pressure sensor came from one sensor lot in lots 003 and 004, the lots with most pressure-alarm complaints, and in three lots without complaints yet (006 to 008).",
+      "Where each lot went, with units still in stock; lot 008 has no distribution imported.",
+    ],
+    requirement:
+      "Corrective action is proportionate to the effects of the problem, including the product already in the field.",
+    reference: cite("ISO13485_8_5_2"),
+    opens: { section: "Investigations", tab: "Scope" },
+    action: "Open the case scope",
+  },
+  {
+    key: "imports",
+    title: "An import with rows set aside",
+    inSample: [
+      "Sample complaints export.xlsx: every row written or set aside, with its data-quality report.",
+      "SAMPLE-RJ-01 has no description; SAMPLE-RJ-02 named a caller and a phone number, kept only as placeholders, and suggests harm, so it reaches triage.",
+    ],
+    requirement: "Records are complete and legible, and personal data is kept only where it is needed.",
+    reference: cite("ISO13485_4_2_5"),
+    opens: { section: "Import data" },
+    action: "Open the import reports",
+  },
+  {
     key: "risk",
     title: "Post-market data that never reached the risk file",
     inSample: [
@@ -126,7 +217,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
 export const SAMPLE_MADE: readonly string[] = [
   "Synthetic: written for MDARIX. No real company, device, patient or person, and no personal data.",
   "Built from the pain points above: each part re-creates a finding quality teams and inspectors keep meeting, so what MDARIX shows on the sample is what it looks for in your own records.",
-  "Dated from the day your trial started, so reporting clocks, trends and due dates are live.",
+  "Its dates move with your trial, so reporting clocks, trends and due dates read the same on day 29 as on day 1. Once you work on it, its dates stay where you left them; restart the sample story (under About the sample data) to see it as on day one.",
   'Easy to tell apart: product, lot, complaint, investigation, CAPA and risk identifiers start with SAMPLE-, and product, supplier, evidence, CAPA and risk names end in "(Sample)".',
   "In your organization's workspace only. It does not count toward your upload limit; once your own data is in you can remove it (the trial owner, under About the sample data), and it is deleted with the trial's data in any case.",
 ];

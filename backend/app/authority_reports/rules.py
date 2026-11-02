@@ -6,7 +6,7 @@ MDARIX never submits: a person submits through the authority's route and records
 
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta
 
 DRAFT, CORRECTION, APPROVED = "DRAFT", "CORRECTION_REQUIRED", "APPROVED"
 PENDING, ACCEPTED, NO_ACK = "SUBMITTED_PENDING", "ACCEPTED", "SUBMITTED_NO_ACK"
@@ -99,19 +99,24 @@ def difference_problem(differences: list[dict], no_differences: bool) -> str | N
     return None
 
 
-def deadline_end(due_on: date) -> datetime:
-    # shortcut: the legal latest date ends at midnight UTC; the counting rule's own time zone (5.1a) comes with G25.
-    return datetime.combine(due_on + timedelta(days=1), time.min, tzinfo=timezone.utc)
+def deadline_end(due_on: date, market: str | None = None, org_zone: str | None = None) -> datetime:
+    """The end of the legal latest day, by the market's counting rule (reportability/deadlines.py): the earlier of its
+    end in the authority's time zone and in the organization's."""
+    from backend.app.reportability.deadlines import end_of
+
+    return end_of(due_on, market, org_zone).at
 
 
-def follow_up(submitted_at: datetime, due_on: date | None, route: str) -> dict:
+def follow_up(
+    submitted_at: datetime, due_on: date | None, route: str, market: str | None = None, org_zone: str | None = None
+) -> dict:
     """G2b's decision table, rows 1-4: when to check for acceptance after a submission at S, with D the end of the
     legal latest date. Row 1 ample time; 2 the wait would end inside the margin; 3 inside the margin with at least
     twice E left; 4 less than twice E left, or past D: act at once."""
     wait, earliest = WAIT.get(route, WAIT_DEFAULT), EARLIEST.get(route, EARLIEST_DEFAULT)
     if due_on is None:
         return {"row": 1, "at": (submitted_at + wait).isoformat(), "late": False}
-    end = deadline_end(due_on)
+    end = deadline_end(due_on, market, org_zone)
     late = submitted_at > end
     if not late and submitted_at + wait <= end - MARGIN:
         row, at = 1, submitted_at + wait

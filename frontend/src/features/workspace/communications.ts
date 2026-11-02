@@ -2,6 +2,7 @@
 // (/api/v1/communications, backend/app/communications) records every entry and attempt and applies the escalation rule;
 // these only shape what the person sees and what is sent. MDARIX sends nothing to an external contact.
 import type { Tone } from "../admin/console/dashboardModel";
+import { formatDay } from "../../app/dates";
 
 export const COMMUNICATIONS = "/api/v1/communications";
 export const COMMUNICATIONS_TAB = "Communications";
@@ -120,7 +121,10 @@ export function attemptsText(
 
 export function dueText(entry: Pick<Entry, "status" | "reply_due_on" | "overdue">): string {
   if (entry.status !== "OPEN" || !entry.reply_due_on) return "";
-  return entry.overdue ? `Reply overdue since ${entry.reply_due_on}` : `Reply due ${entry.reply_due_on}`;
+  // The reply's day on the organization's calendar (the server's), shown as a day: the same day the task names (J16).
+  return entry.overdue
+    ? `Reply was due ${formatDay(entry.reply_due_on)}: overdue`
+    : `Reply due ${formatDay(entry.reply_due_on)}`;
 }
 
 export function s4Text(s4: CommunicationList["s4"]): string {

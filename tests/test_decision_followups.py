@@ -38,7 +38,7 @@ from backend.app.db.models.stage3 import SupplierEvidenceRequest
 from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_tenant
-from backend.app.decision_followups import impact
+from backend.app.decision_followups import impact, rules
 from backend.app.main import app
 from backend.app.workflow import tasks as task_service
 
@@ -470,6 +470,7 @@ def test_starting_and_completing_a_follow_up_moves_its_task(org):
         "can_complete": False,
         "can_cancel": False,
         "can_create_capa": False,
+        "can_set_qms_reference": False,
     }
     assert second["id"] == risk_id and second["assignee"] is None and second["assigned_role"] == "INVESTIGATOR"
     assert second["assigned_role_label"]
@@ -629,6 +630,57 @@ def test_a_capa_follow_up_opens_one_capa_record(org):
     second = colleague.post(f"/api/v1/follow-ups/{second_id}/capa", json={"title": "Second corrective action"})
     assert second.status_code == 201, second.text
     assert second.json()["capa"]["capa_identifier"] == f"CAPA-{case['business_id']}-2"
+
+
+def test_a_recorded_capa_keeps_the_number_the_qms_gave_it(org):
+    """J22: the CAPA MDARIX records is raised in the QMS; its QMS reference is kept with it, given when it is
+    recorded or added later, and shown wherever the CAPA shows (the follow-up, the effectiveness board, the oversight
+    view, the report worksheet's remedial action)."""
+    tenant_id = org["tenant_id"]
+    investigator, investigator_id = org["investigator"]
+    regulatory, _ = org["regulatory"]
+    case = _open(investigator, org["seed"])
+    made = _decide(
+        tenant_id,
+        case["id"],
+        follow_ups=[
+            {"action_type": "CAPA_REQUIRED", "assignee": investigator_id},
+            {"action_type": "CAPA_REQUIRED", "assignee": investigator_id},
+        ],
+    )
+    first_id, second_id = made["follow_ups"]
+    bad = investigator.post(
+        f"/api/v1/follow-ups/{first_id}/capa", json={"title": "Fix the seal", "qms_reference": "=1+1"}
+    )
+    assert bad.status_code == 422
+    created = investigator.post(
+        f"/api/v1/follow-ups/{first_id}/capa", json={"title": "Fix the seal", "qms_reference": " CAPA-0450 "}
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["capa"]["qms_reference"] == "CAPA-0450"
+    assert created.json()["actions"]["can_set_qms_reference"] is True
+    assert _get(tenant_id, Capa, created.json()["capa"]["id"]).qms_reference == "CAPA-0450"
+
+    path = f"/api/v1/follow-ups/{second_id}/capa/qms-reference"
+    early = investigator.post(path, json={"qms_reference": "CAPA-0451"})
+    assert early.status_code == 409 and _code(early) == "FOLLOW_UP_HAS_NO_CAPA"
+    recorded = investigator.post(f"/api/v1/follow-ups/{second_id}/capa", json={"title": "Retrain the ward"})
+    assert recorded.json()["capa"]["qms_reference"] is None
+    assert regulatory.post(path, json={"qms_reference": "CAPA-0451"}).status_code == 403
+    saved = investigator.post(path, json={"qms_reference": "CAPA-0451"})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["capa"]["qms_reference"] == "CAPA-0451"
+    (audit,) = _audits(tenant_id, second_id, "FOLLOW_UP_CAPA_QMS_REFERENCE_SET")
+    assert audit.old_values == {"qms_reference": None} and audit.new_values == {"qms_reference": "CAPA-0451"}
+    cleared = investigator.post(path, json={"qms_reference": "  "})
+    assert cleared.status_code == 200 and cleared.json()["capa"]["qms_reference"] is None
+
+    capa = _get(tenant_id, Capa, recorded.json()["capa"]["id"])
+    assert rules.capa_qms_words(capa) == "to raise in your QMS"
+    capa.qms_reference = "CAPA-0451"
+    assert rules.capa_qms_words(capa) == "QMS reference CAPA-0451"
+    capa.qms_reference, capa.source_system = None, "TRACKWISE"
+    assert rules.capa_qms_words(capa) is None
 
 
 # ----------------------------------------------------------------------------------------------- late evidence

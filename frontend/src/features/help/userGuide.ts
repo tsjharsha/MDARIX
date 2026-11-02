@@ -44,6 +44,82 @@ export const ROLE_SUMMARY: readonly [string, string][] = [
   ["Customer Administrator", "Manages people and settings for the organization; never reviews or signs."],
 ];
 
+/** One device category of Help › What MDARIX covers (J32): what applies to it in the trial's markets. */
+export type CoverageRow = {
+  category: string;
+  clocks: string;
+  worksheets: string;
+  checks: string;
+  notYet: string;
+};
+
+/** The markets the coverage table speaks of: the trial's reporting markets. */
+export const COVERAGE_MARKETS =
+  "the United States (FDA), the EU and Northern Ireland (EU MDR), Great Britain (MHRA) and India (CDSCO)";
+
+/**
+ * What MDARIX covers, by device category, in the trial's markets: which reporting clocks, report worksheets and checks
+ * apply, and what is not covered yet. Starter text for your regulatory consultant to confirm, kept to what the trial
+ * does today (the device category is a product's field, from the products file).
+ */
+export const COVERAGE: readonly CoverageRow[] = [
+  {
+    category: "Implant",
+    clocks:
+      "Every market's clock, as for any device: US 30 calendar days or 5 work days; EU, NI and GB 2, 10 or 15 days; India 15 days.",
+    worksheets:
+      "US Form FDA 3500A and India MDAE. India's device category reads Implantable from the product. Implant and explant dates (US D6, India B3) are entered by hand.",
+    checks: "Trend per unit in the field when every lot has a quantity: an implanted unit counts as in use.",
+    notYet: "Implant and explant dates from your records; implant cards and registries.",
+  },
+  {
+    category: "Single-use",
+    clocks: "Every market's clock, as for any device.",
+    worksheets:
+      "US 3500A and India MDAE. India reads Single use and US H5 Labeled for single use from the product; the expiration date comes from the lot's expiry date. Reprocessing (US D7) is entered by hand.",
+    checks:
+      "Trend by calendar day: used-up units are not in the field. With a use period (products file, use_period_days), by the units released within it.",
+    notYet: "Reprocessed single-use devices; sterility and shelf-life checks beyond the lot's expiry date.",
+  },
+  {
+    category: "Reusable or capital equipment",
+    clocks: "Every market's clock, as for any device.",
+    worksheets:
+      "US 3500A and India MDAE. India reads Reusable from the product; serial number and lot come from the complaint. Installation, maintenance and calibration dates (India A12, A14, A15) are entered by hand.",
+    checks: "Trend per unit in the field when every lot has a quantity, else per calendar day.",
+    notYet: "An installed base by serial number; service, maintenance and calibration records.",
+  },
+  {
+    category: "Software",
+    clocks: "Every market's clock, as for any device.",
+    worksheets: "US 3500A and India MDAE. India's software version (A8) comes from the product version.",
+    checks: "Trend per version, each new version compared with the one it replaced.",
+    notYet:
+      "Cybersecurity reporting; the users of each version (without lot quantities the trend counts calendar days).",
+  },
+  {
+    category: "IVD (in-vitro diagnostic)",
+    clocks:
+      "US and India as for any device. The EU and NI clocks cite EU IVDR Art. 82 (starter) for a product of this category (without a category, when its name, family, GMDN term or description says IVD).",
+    worksheets: "US 3500A and India MDAE; India's IVD category field is not used yet.",
+    checks: "Trend by calendar day, as a consumable, unless the product is marked not single-use.",
+    notYet:
+      "The EU questions quote the MDR's definitions, not the IVDR's; IVDR trend reporting and performance follow-up; an EU worksheet.",
+  },
+  {
+    category: "Kit",
+    clocks: "Every market's clock, for the kit as one device.",
+    worksheets:
+      "US 3500A and India MDAE. A complaint may name each of the kit's lots on a row of its own in the file; the lot field lists them all.",
+    checks: "Trend by calendar day, as a consumable, unless the product is marked not single-use.",
+    notYet: "Each component's own reportability; lot impact reads the complaint's first lot only.",
+  },
+];
+
+/** Said once under the table: what no category has yet. */
+export const COVERAGE_NOTE =
+  "No category has an EU, NI or GB report worksheet yet: prepare those reports in the authority's own form. MDARIX never submits a report, and a person decides and signs every conclusion.";
+
 export const GUIDE_PARTS: readonly GuidePart[] = [
   {
     id: "basics",
@@ -282,7 +358,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Under Why it matters, small chips name the check's regulatory basis, for example ISO 13485 8.2.2 or 21 CFR 803.50; point at a chip for its title. MDARIX organizes the evidence these ask for; it does not certify compliance.",
               "Choose Open on a check to go to the screen where you act on it.",
             ],
-            note: "The eight checks: Complaints to recheck, Complaints past target, Reporting clocks, Trends without CAPA or risk review, Post-market data not in the risk file, Harm complaints closed without an investigation, CAPAs without a verified effect, Signals waiting past their triage date.",
+            note: "The eleven checks: Complaints to recheck, Complaints past target, Reporting clocks, Trends without CAPA or risk review, Post-market data not in the risk file, Harm complaints closed without an investigation, CAPAs without a verified effect, Signals waiting past their triage date, Dispositions past the target or to review, Recurring service-level matters, Requests to external contacts.",
           },
           {
             title: "Download the summary for management review or an inspector",
@@ -364,7 +440,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Triage an urgent intake or a flagged record",
             steps: [
               "Choose Urgent intake for a serious event: it is a complaint by definition and goes to triage at once. Leave awareness empty if nobody confirmed it: the clock runs from first knowledge or receipt, marked Awareness unresolved: deadline provisional.",
-              "Open Complaints › Triage. Each item shows why it is flagged, the triage target (24 hours from when it reached MDARIX) and each market's provisional deadline from awareness.",
+              "Open Complaints › Triage. Each item shows why it is flagged, the triage target (24 hours from when it reached MDARIX) and the event's own market's deadline first, with its time zone; the other markets show only if also reportable, and a signed market conclusion replaces its provisional deadline.",
               "Choose Triage: the severity, the event owner and the triage owner (a backup if you have a second person), the immediate action or why none is needed, and the awareness time confirmed.",
               "From any queue (Second look, Backlog, Dispositions, Reportability, rows set aside at import, First contact) choose Escalate to triage, with a reason, to send a record there by hand.",
             ],
@@ -397,7 +473,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Under question 3, Resolved at service level is chosen: fill in the troubleshooting, the correction, what was done, the result, the service ticket and why no investigation is needed (ISO 13485:2016 clause 8.2.2).",
               "Choose the Root-cause attribution: device-related, use-related, environment-related or undetermined (with a reason). Show definitions explains each.",
               "Check the classification for trends: Use environment and User type, proposed from your records. A value not on the list stays Unknown, with the source value shown; nothing is guessed. Show the coding criteria explains how to code.",
-              "The first time, record the practice training on the disposition rules and the coding criteria (I have read version ...).",
+              "The first time, record the practice training on the disposition rules and the coding criteria (I have read the complaint disposition rules, MDARIX starter, version 1).",
               "Enter Your password and the Authenticator code and choose Sign the disposition.",
             ],
             result:
@@ -492,7 +568,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             who: "Regulatory Reviewer, Authorized Decision Maker, Leader.",
             steps: [
               "On Complaints › Reportability, filter Needs a decision, Overdue, Due soon or Missing answers, and choose Assess per market on a card. The market of the event's country is shown first; open any other enabled market from its tab.",
-              "In a free trial, before your first signature, read the market's questions and the harm-severity scale and confirm I have read version … for each (a practice training acknowledgement). The screen names colleagues who already hold one.",
+              "In a free trial, before your first signature, read the market's questions and the harm-severity scale and confirm I have read …, MDARIX starter, version 1 for each (a practice training acknowledgement). The screen names colleagues who already hold one.",
               "Check the harm level: the complaint's severity from your quality system is mapped on the scale, with the market's serious threshold. Choose another level only with a reason.",
               "Answer each question Yes, No, Unknown or Not applicable, with a rationale and the evidence relied on. Each shows its clause and the Starter text mark; Show definition opens its full definition.",
               "Choose Save answers to see the suggestion: Reportable (with its report type), Pending information (an Unknown could make it reportable) or Not reportable.",
@@ -542,28 +618,28 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Decision guides: make each market's questions your own",
         where: "Complaints › Decision guides",
         purpose:
-          "Every market assessment asks its market's guide. Version 1 is MDARIX's starter. Your organization makes its own version: reword the questions, add your own, run the test cases, and have a colleague approve it. The guide points to a conclusion; a person decides and signs.",
+          "Every market assessment asks its market's guide. Version 1 is MDARIX's starter. Your organization makes its own version: the regulation's wording stays locked, and you add your explanation and examples beside it, your own questions and your worked complaints; then run the test matrix and have a colleague approve it. The guide points to a conclusion; a person decides and signs.",
         tasks: [
           {
             title: "Prepare a new version",
             who: "Anyone with regulatory review or approval rights.",
             steps: [
               "Open Complaints › Decision guides and choose Start a new version on the market. It is a copy of the version in use.",
-              "Reword any question, its definition, its help text and its clause. The questions that drive the conclusion cannot be removed, and their conclusion logic stays fixed.",
+              "The questions that drive the conclusion keep the regulation's wording: the question, its definition and its clause are locked. Write your explanation and examples beside each. These questions cannot be removed, and their conclusion logic stays fixed. A version approved before the lock stays as it was signed.",
               "Choose Add an extra question for what your procedure also asks (for example VMSR participation). It is recorded and printed with the answers; it never changes the conclusion and is never required.",
-              "Give every question its clause and choose its basis from the standards list. A version with a question missing either cannot be published.",
-              "Add test cases: a set of answers and the outcome the guide must point to. A question left blank is Unknown, never No. Choose Save the draft, then Run the test cases.",
+              "Give every extra question its clause and choose its basis from the standards list. A version with a question missing either cannot be published.",
+              "The test matrix holds worked complaints: the answers for a complaint and what the guide must point to in this market. MDARIX's starter worked complaints are in every version; choose Add a worked complaint for your own. A question left blank is Unknown, never No. Choose Save the draft, then Run the test matrix.",
             ],
             result:
-              "Before it is used lists what still blocks it: a missing clause or basis, tests not run on the current content, or a failing test.",
+              "Before it is used lists what still blocks it: a missing clause or basis, a matrix not run on the current content, or a worked complaint that fails. Only a version whose matrix passes can be sent for approval.",
           },
           {
             title: "Approve and publish it",
             who: "A colleague who did not edit the version; never an administrator.",
             steps: [
               "Write What changed and why, and choose Ask a colleague to approve it.",
-              "The colleague opens the version, reads it, enters their password and authenticator code and chooses Approve and publish.",
-              "Download the PDF or DOCX for an audit: every question with its clause, the test cases and their results, and the approval.",
+              "The colleague opens the version and reads it with Test matrix, run again now. If a worked complaint gives a different answer now, the version cannot be approved: its author changes it and sends it again. Otherwise the colleague enters their password and authenticator code and chooses Approve and publish.",
+              "Download the PDF or DOCX for an audit: every question with its clause, your explanation and examples, the test matrix and its results, and the approval.",
             ],
             result:
               "Assessments started from then on use the new version; ones in progress keep theirs. Each signed conclusion names the guide version, and what a signer must have read is the version in use.",
@@ -643,7 +719,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Under Working calendar and escalation, choose your time zone and working days, add your holidays, and set how many hours before a due time reminders go and the role overdue items escalate to. Choose Save the calendar.",
             ],
             result:
-              "Your own due times (a follow-up at the end of the next working day, the one-working-hour rule of the communications log) count on this calendar. An authority's legal deadline keeps its own counting rule.",
+              "Your own due times (a follow-up at the end of the next working day, the one-working-hour rule of the communications log) count on this calendar and end with your day. An authority's legal deadline keeps its own counting rule: awareness taken in the authority's time zone (US Eastern, Brussels, UK or India time), the awareness day as day 1 for Great Britain and India, and the deadline ends at 23:59 in the authority's time zone or yours, whichever comes first. Starter rules, for your regulatory consultant to confirm.",
           },
         ],
       },
@@ -716,13 +792,13 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Trend check and detection rules",
         where: "Signals › Trend check and Signals › Detection rules",
         purpose:
-          "The trend check compares each version's last 30 days with its own history, counted per unit in the field where lot quantities exist. It is a check, never a verdict.",
+          "The trend check compares each version's last 30 days with its own history and, for a version that replaced another, with that version too (the stronger comparison is shown), counted per unit in the field where lot quantities exist (by calendar days for single-use products). An event linked from several records counts once. It is a check, never a verdict.",
         tasks: [
           {
             title: "Read the trend check",
             steps: [
               "Group By version, By problem code or By complaint type.",
-              "Each row's Result is Significant rise (chance under 1% if nothing changed), Higher than usual (under 5%), In line with history, Too few to assess or History too short.",
+              "Each row's Result is Significant rise (chance under 1% if nothing changed, allowing for the groups checked at once), Higher than usual (under 5%), In line with history, Too few to assess or History too short. Chance shows the adjusted value, with the group's own value beside it.",
               "On a rising row with no open signal, choose Raise a signal (PMS / Signal Triage Lead and Leader).",
             ],
             note: "The line under the table names the basis: ISO 13485 8.4 (analysis of data) and EU MDR Art. 88 (trend reporting).",
@@ -1006,10 +1082,12 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Open the CAPA and carry out the follow-ups",
             steps: [
               "Under After the decision, Follow-ups lists each follow-up. Choose Act.",
-              "For CAPA required, choose Create CAPA, give the CAPA title (and optionally a due date) and choose Create CAPA.",
+              "For CAPA required, choose Record the CAPA to raise in your QMS, give the CAPA title (and optionally a due date and the QMS reference) and choose Record the CAPA. You raise and run the CAPA in your QMS.",
+              "Once your QMS has given the CAPA its number, open the follow-up again, enter it in QMS reference and choose Save QMS reference. The CAPA then reads QMS reference and that number wherever it shows.",
               "For the others, choose Start and later Complete with what was done.",
             ],
-            result: "The CAPA is raised and linked to the signed decision; it is listed on the CAPAs tab.",
+            result:
+              "The CAPA to raise is recorded and linked to the signed decision; it is listed on the CAPAs tab, marked To raise in your QMS until its QMS reference is saved.",
           },
           {
             title: "Not ready to decide",
@@ -1180,7 +1258,8 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
       {
         id: "import",
         title: "Import your data",
-        where: "Import data · Bring in CSV files (in a trial also Getting started › Your data)",
+        where:
+          "Import data · Bring in Excel or CSV files (in a trial also Getting started › Your data: the same upload)",
         purpose:
           "Bring in exports from your quality, product and supplier systems as they are. Every file is checked for problems and personal data before anything is saved.",
         tasks: [
@@ -1189,11 +1268,12 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             steps: [
               "Choose the data type, for example Complaints. The page lists the Required and Optional columns.",
               "Choose Download complaints.csv for the template, or use your own export.",
-              "Set Dates in the file, what to do with Rows with problems, and Personal details in the text (refuse them, or replace them with [PERSON], [PHONE] and similar).",
-              "Choose a file (Excel or CSV) and choose Check file. Nothing is saved yet.",
-              "Read how your columns were read and the preview. Fix any problems, or download the rows to fix.",
+              "Choose a file (Excel or CSV) as your system exports it, with its title rows and its own column names, and choose Check file. Nothing is saved yet.",
+              "Read how your file was read: the sheet (choose another if needed), the row with the column names, how each column was read and the columns not used. Dates in the file starts as From the file (else your usual order); Numbers in the file starts with your organization's usual format. Changing either checks the same file again.",
+              "If the file has no date column, choose which column holds the date each complaint was received.",
+              "Set what to do with Rows with problems, and Personal details in the text (refuse them, or replace them with [PERSON], [PHONE] and similar). Fix any problems, or download the rows to fix.",
               "Choose Import N rows.",
-              "Choose See its data-quality report: rows read, written and set aside, and the reason for each row set aside. Fix those rows in your file and import it again.",
+              "Choose See its data-quality report: rows read, new, updated and unchanged, set aside, and the columns not used. For each row set aside, choose Fix and process again (only the fields its reason names) or Dismiss with a reason. Importing the fixed file again also closes it.",
               "A distribution file (free trial) also reports any lot whose units shipped exceed its units released: check the file or the lot's quantity.",
             ],
             result:

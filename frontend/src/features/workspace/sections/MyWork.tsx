@@ -64,6 +64,7 @@ import { StatusBadge } from "./common";
 import { parseRequestTab } from "../evidenceWorkflow";
 import { EvidenceRequestsPanel } from "./EvidenceRequests";
 import { RemindersPanel } from "./Reminders";
+import { useAiReady } from "../useAiStatus";
 
 const PAGE_SIZE = 50;
 
@@ -95,7 +96,8 @@ const LIST_EMPTY: Record<TaskView, { title: string; detail: string }> = {
 type MyWorkView = MyWorkTab | typeof MY_WORK_APPROVALS_TAB;
 
 export function MyWorkSection({ tab }: { tab?: string }) {
-  const { work, open, notify } = useWorkspace();
+  const { work, open, notify, isTrial } = useWorkspace();
+  const aiOff = useAiReady() === false || !!isTrial;
   // Under the MVP feature set the Decisions section is parked: the decisions awaiting a signature are listed here, for
   // people who may sign, and each opens on its case's Decision step (app/featureSet.ts).
   const canSign = useCan("decision.sign");
@@ -109,7 +111,7 @@ export function MyWorkSection({ tab }: { tab?: string }) {
     return target.tab === "Evidence requests" ? target.request : null;
   });
   const summary = useResource<TaskSummary>("/api/v1/tasks/summary");
-  const taskTabs = myWorkTabs(summary.data, active);
+  const taskTabs = myWorkTabs(summary.data, active, aiOff);
   const tabs: MyWorkView[] = approvals ? [taskTabs[0], MY_WORK_APPROVALS_TAB, ...taskTabs.slice(1)] : taskTabs;
   const counts = Object.fromEntries(tabs.map((item) => [item, tabCount(item, summary.data)]));
   const view = taskViewForTab(active);
@@ -678,7 +680,7 @@ const EMPTY_REQUEST = { supplier_id: "", recipient: "", title: "", items: "" };
 
 /** Ask one of your suppliers for evidence by email: plain text, no links; the supplier answers through MDARIX. */
 function NewEvidenceRequest({ onSent }: { onSent: () => void }) {
-  const { work } = useWorkspace();
+  const { work, isTrial } = useWorkspace();
   const suppliers = useResource<any>("/api/v1/data-plane/suppliers");
   const [form, setForm] = useState({ ...EMPTY_REQUEST });
   const [busy, setBusy] = useState(false);
@@ -702,9 +704,11 @@ function NewEvidenceRequest({ onSent }: { onSent: () => void }) {
       setMessage({
         tone: "ok",
         text:
-          result.status === "SENT"
-            ? "Request sent to the supplier."
-            : "Request saved; the email will be sent when delivery is available.",
+          result.email_delivery === "NOT_SENT_IN_TRIAL"
+            ? "Request saved, not sent: the free trial sends no email to suppliers. Send it to the supplier yourself if you need the evidence."
+            : result.status === "SENT"
+              ? "Request sent to the supplier."
+              : "Request saved; the email will be sent when delivery is available.",
       });
       setForm({ ...EMPTY_REQUEST });
       onSent();
@@ -767,7 +771,7 @@ function NewEvidenceRequest({ onSent }: { onSent: () => void }) {
         </label>
         <p className="ac-muted">
           {work.investigationId ? "Linked to the investigation open in your workspace. " : ""}
-          The email carries this text only, without links. Requests are limited per person and per day.
+          {supplierRequestNote(isTrial)}
         </p>
         {!options.length && suppliers.state === "ready" && (
           <p className="ac-muted">No suppliers yet: load them from your ERP or supplier system first.</p>
@@ -825,10 +829,21 @@ export function repliesSummary(replies: SupplierReply[] | undefined, format: (va
   return `${list.length === 1 ? "1 reply" : `${list.length} replies`}, latest ${format(latest.recorded_at)}`;
 }
 
+/** What happens to a supplier request: a free trial saves it and e-mails nobody (0.10.62, J33); a pilot e-mails it. */
+export function supplierRequestNote(isTrial: boolean | undefined): string {
+  return isTrial
+    ? "In the free trial MDARIX saves the request here and e-mails nobody: send it to the supplier from your own mail."
+    : "The email carries this text only, without links. Requests are limited per person and per day.";
+}
+
+/** The date column of supplier requests: when a trial saved it, or when a pilot sent it. */
+export const supplierDateLabel = (isTrial: boolean | undefined) => (isTrial ? "Saved" : "Sent");
+
 export const REVIEW_NOTICE =
   "Replies are recorded for review. Supplier material is never accepted as evidence automatically: review it and add it to the investigation's evidence yourself.";
 
 function EvidenceRequests() {
+  const { isTrial } = useWorkspace();
   const requests = useResource<any>("/api/v1/stage3/supplier-evidence-requests");
   const canWrite = useCan("records.write");
   const [replying, setReplying] = useState<any | null>(null);
@@ -852,7 +867,7 @@ function EvidenceRequests() {
             },
             { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
             { key: "recipient", label: "To", render: (row) => row.recipient ?? "—" },
-            { key: "created", label: "Sent", render: (row) => formatDate(row.created_at) },
+            { key: "created", label: supplierDateLabel(isTrial), render: (row) => formatDate(row.created_at) },
             { key: "replies", label: "Replies", render: (row) => repliesSummary(row.replies, formatDate) },
             {
               key: "reply",

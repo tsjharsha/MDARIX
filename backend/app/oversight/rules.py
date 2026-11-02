@@ -76,9 +76,130 @@ def zone_info(name: str) -> tzinfo | None:
         return _bundled().get(name)
 
 
+# The old names the time zone database keeps as aliases, and browsers still report (Chrome in India says
+# "Asia/Calcutta"): each is shown and stored under its current name (J16). shortcut: the aliases people meet, not the
+# database's whole "backward" file; add one here when a browser reports another.
+LEGACY_ZONES = {
+    "Asia/Calcutta": "Asia/Kolkata",
+    "Asia/Katmandu": "Asia/Kathmandu",
+    "Asia/Saigon": "Asia/Ho_Chi_Minh",
+    "Asia/Rangoon": "Asia/Yangon",
+    "Asia/Dacca": "Asia/Dhaka",
+    "Asia/Thimbu": "Asia/Thimphu",
+    "Asia/Ulan_Bator": "Asia/Ulaanbaatar",
+    "Asia/Macao": "Asia/Macau",
+    "Asia/Ujung_Pandang": "Asia/Makassar",
+    "Asia/Ashkhabad": "Asia/Ashgabat",
+    "Asia/Chongqing": "Asia/Shanghai",
+    "Asia/Chungking": "Asia/Shanghai",
+    "Asia/Harbin": "Asia/Shanghai",
+    "Asia/Tel_Aviv": "Asia/Jerusalem",
+    "Asia/Istanbul": "Europe/Istanbul",
+    "Europe/Kiev": "Europe/Kyiv",
+    "Europe/Belfast": "Europe/London",
+    "America/Buenos_Aires": "America/Argentina/Buenos_Aires",
+    "America/Indianapolis": "America/Indiana/Indianapolis",
+    "America/Louisville": "America/Kentucky/Louisville",
+    "America/Godthab": "America/Nuuk",
+    "America/Montreal": "America/Toronto",
+    "Atlantic/Faeroe": "Atlantic/Faroe",
+    "Pacific/Truk": "Pacific/Chuuk",
+    "Pacific/Ponape": "Pacific/Pohnpei",
+    "Pacific/Enderbury": "Pacific/Kanton",
+    "Africa/Asmera": "Africa/Asmara",
+    "Australia/ACT": "Australia/Sydney",
+    "Australia/Canberra": "Australia/Sydney",
+    "Australia/NSW": "Australia/Sydney",
+    "Australia/North": "Australia/Darwin",
+    "Australia/Queensland": "Australia/Brisbane",
+    "Australia/South": "Australia/Adelaide",
+    "Australia/Tasmania": "Australia/Hobart",
+    "Australia/Victoria": "Australia/Melbourne",
+    "Australia/West": "Australia/Perth",
+    "Australia/LHI": "Australia/Lord_Howe",
+    "Australia/Yancowinna": "Australia/Broken_Hill",
+}
+# Regions of current names ("Area/Location"); names outside them (US/Eastern, Etc/GMT+5, GMT0, Navajo) are aliases.
+_AREAS = ("Africa", "America", "Antarctica", "Arctic", "Asia", "Atlantic", "Australia", "Europe", "Indian", "Pacific")
+
+
+def canonical_zone(name: str | None) -> str:
+    """A time zone's current name ("Asia/Calcutta" is "Asia/Kolkata"); the name as given otherwise."""
+    text = str(name or "").strip()
+    return LEGACY_ZONES.get(text, text)
+
+
 @cache
 def zone_names() -> tuple[str, ...]:
-    return tuple(sorted(available_timezones() or _bundled().zones))
+    """The time zones to choose from: current names only, UTC first (no alias beside its current name)."""
+    every = available_timezones() or _bundled().zones
+    current = {name for name in every if name.split("/", 1)[0] in _AREAS and "/" in name and name not in LEGACY_ZONES}
+    return ("UTC", *sorted(current))
+
+
+# The organization's time zone from its sign-up country, before the sample is seeded (J16). A country with several
+# time zones gets the one most of its people live in; the organization changes it in Settings.
+COUNTRY_ZONES = {
+    "india": "Asia/Kolkata",
+    "in": "Asia/Kolkata",
+    "united states": "America/New_York",
+    "united states of america": "America/New_York",
+    "usa": "America/New_York",
+    "us": "America/New_York",
+    "united kingdom": "Europe/London",
+    "uk": "Europe/London",
+    "great britain": "Europe/London",
+    "england": "Europe/London",
+    "scotland": "Europe/London",
+    "wales": "Europe/London",
+    "northern ireland": "Europe/London",
+    "ireland": "Europe/Dublin",
+    "germany": "Europe/Berlin",
+    "france": "Europe/Paris",
+    "netherlands": "Europe/Amsterdam",
+    "belgium": "Europe/Brussels",
+    "italy": "Europe/Rome",
+    "spain": "Europe/Madrid",
+    "portugal": "Europe/Lisbon",
+    "switzerland": "Europe/Zurich",
+    "austria": "Europe/Vienna",
+    "sweden": "Europe/Stockholm",
+    "denmark": "Europe/Copenhagen",
+    "norway": "Europe/Oslo",
+    "finland": "Europe/Helsinki",
+    "poland": "Europe/Warsaw",
+    "czechia": "Europe/Prague",
+    "czech republic": "Europe/Prague",
+    "greece": "Europe/Athens",
+    "israel": "Asia/Jerusalem",
+    "united arab emirates": "Asia/Dubai",
+    "uae": "Asia/Dubai",
+    "saudi arabia": "Asia/Riyadh",
+    "singapore": "Asia/Singapore",
+    "malaysia": "Asia/Kuala_Lumpur",
+    "japan": "Asia/Tokyo",
+    "south korea": "Asia/Seoul",
+    "korea": "Asia/Seoul",
+    "china": "Asia/Shanghai",
+    "taiwan": "Asia/Taipei",
+    "hong kong": "Asia/Hong_Kong",
+    "sri lanka": "Asia/Colombo",
+    "bangladesh": "Asia/Dhaka",
+    "nepal": "Asia/Kathmandu",
+    "pakistan": "Asia/Karachi",
+    "canada": "America/Toronto",
+    "australia": "Australia/Sydney",
+    "new zealand": "Pacific/Auckland",
+    "south africa": "Africa/Johannesburg",
+    "brazil": "America/Sao_Paulo",
+    "mexico": "America/Mexico_City",
+}
+
+
+def zone_for_country(country: str | None) -> str:
+    """The time zone a new organization starts with from its country (``COUNTRY_ZONES``), else UTC."""
+    key = " ".join(str(country or "").lower().replace(".", "").split())
+    return COUNTRY_ZONES.get(key, DEFAULT_ZONE)
 
 
 @dataclass(frozen=True)
@@ -136,7 +257,7 @@ class Calendar:
 
 def calendar_problem(zone: str, work_days: list[int], holidays: list[dict]) -> str | None:
     """Why the calendar cannot be saved, or None."""
-    if zone_info(zone) is None or (zone != "UTC" and zone not in zone_names()):
+    if zone_info(zone) is None or zone not in zone_names():
         return "Choose the time zone from the list"
     if not work_days or any(day not in range(7) for day in work_days) or len(set(work_days)) != len(work_days):
         return "Choose at least one working weekday"

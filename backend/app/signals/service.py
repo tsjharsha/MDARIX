@@ -205,6 +205,43 @@ def complaint_facts(query) -> list[logic.ComplaintFacts]:
     return [_facts(row) for row in query.all()]
 
 
+def linked_events(db: Session, tenant_id) -> dict[uuid.UUID, uuid.UUID]:
+    """S2: complaints a person linked as one event (``record_links`` LINKED, complaint to complaint; linked through
+    each other, so connected components), each mapped to the complaint that stands for the event: the one with the
+    earliest event date (then the lowest id). The count rule and the trend check count an event once, at that date;
+    every record stays listed as evidence. Complaints in no such link are not in the map."""
+    from backend.app.db.models.intake import RecordLink
+    from backend.app.intake.service import groups
+
+    links = (
+        db.query(RecordLink)
+        .filter(
+            RecordLink.tenant_id == as_uuid(tenant_id),
+            RecordLink.state == "LINKED",
+            RecordLink.left_kind == "COMPLAINT",
+            RecordLink.right_kind == "COMPLAINT",
+        )
+        .all()
+    )
+    if not links:
+        return {}
+    group = {rid: key for (_kind, rid), key in groups(links).items()}
+    when = dict(
+        db.query(Complaint.id, COMPLAINT_EVENT_AT)
+        .filter(Complaint.tenant_id == as_uuid(tenant_id), Complaint.id.in_(list(group)))
+        .all()
+    )
+    first: dict = {}
+    for rid, key in group.items():
+        if rid not in when:
+            continue
+        moment = when[rid]
+        rank = (moment is None, moment or datetime.max.replace(tzinfo=timezone.utc), str(rid))
+        if key not in first or rank < first[key][0]:
+            first[key] = (rank, rid)
+    return {rid: first[key][1] for rid, key in group.items() if rid in when and key in first}
+
+
 def signal_complaint_facts(db: Session, signal: Signal) -> list[logic.ComplaintFacts]:
     """The facts of the signal's complaints, read through its links (LINKED_COMPLAINT)."""
     return complaint_facts(

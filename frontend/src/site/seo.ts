@@ -39,7 +39,7 @@ export const PAGE_META = {
   "/platform/trust": {
     title: "Human review, audit trail and AI safeguards · MDARIX",
     description:
-      "Signed human review, an append-only audit trail and customer administration today. AI assurance comes in a pilot; AI is off in the trial.",
+      "Signed human review and an append-only audit trail today; customer administration in a pilot. AI assurance is planned, after evaluation; AI is off in the trial.",
   },
   "/roadmap": {
     title: "Roadmap: available today, in a pilot, planned · MDARIX",
@@ -62,7 +62,7 @@ export const PAGE_META = {
       "Investigation decisions signed by people, an audit trail, authenticator MFA, isolated customer data, and AI that cites evidence and stays off until validated.",
   },
   "/trust/regulations": {
-    title: "FDA, EU MDR, UK and Canada reporting and MedTech standards · MDARIX",
+    title: "US, EU/NI, GB and India reporting and MedTech standards · MDARIX",
     description:
       "MDR reporting windows, ISO 13485, QMSR, ISO 14971, IEC 62304 and Part 11: the evidence MDARIX organizes. MDARIX does not certify compliance.",
   },

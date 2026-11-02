@@ -55,7 +55,7 @@ export function heroHeadline(trend: Trend): HeroHeadline {
     direction === "new"
       ? `none before ${monthLabel(since)}`
       : direction === "up"
-        ? `up from ${rateText(earlier)} before · ${timesText(recent / earlier)}`
+        ? `up from ${rateText(earlier)} a month before · ${timesText(recent / earlier)} the earlier average`
         : direction === "down"
           ? recent === 0
             ? `down from ${rateText(earlier)} before · none since ${monthLabel(since)}`
@@ -215,11 +215,10 @@ export function bandLabel(direction: Direction | null, since: string, room: numb
   return textWidth(full, LABEL_SIZE) <= room ? full : `Since ${shortMonth(since)}`;
 }
 
-/** The peak callout: "Sep '26: 12 complaints · 4× the earlier average", or on a narrow chart "Sep '26: 12 · 4×". */
-export function peakText(month: string, count: number, earlier: number | null, compact: boolean): string {
-  const times = earlier ? timesText(count / earlier) : null;
-  if (compact) return `${shortMonth(month)}: ${count.toLocaleString()}${times ? ` · ${times}` : ""}`;
-  return `${shortMonth(month)}: ${complaints(count)}${times ? ` · ${times} the earlier average` : ""}`;
+/** The peak callout: "Sep '26: 12 complaints", or on a narrow chart "Sep '26: 12". No multiple: the headline's is
+ * the card's one (the last three months against the earlier average), so one rise never reads as two (J19). */
+export function peakText(month: string, count: number, compact: boolean): string {
+  return compact ? `${shortMonth(month)}: ${count.toLocaleString()}` : `${shortMonth(month)}: ${complaints(count)}`;
 }
 
 /** The chart for a given width in px: every position and label, computed once and drawn as is. */
@@ -317,11 +316,9 @@ export function heroGeometry(trend: Trend, width: number): HeroGeometry {
     // The latest month at the highest count: the most recent peak is the one to look at.
     const index = trend.months.map((item) => item.complaints).lastIndexOf(highest);
     const point = points[index];
-    const full = peakText(point.month, highest, trend.earlierAverage, false);
+    const full = peakText(point.month, highest, false);
     const text =
-      !compact && textWidth(full, CALLOUT_SIZE) + 24 <= width - 8
-        ? full
-        : peakText(point.month, highest, trend.earlierAverage, true);
+      !compact && textWidth(full, CALLOUT_SIZE) + 24 <= width - 8 ? full : peakText(point.month, highest, true);
     const boxWidth = textWidth(text, CALLOUT_SIZE) + 22;
     const x = Math.max(2, Math.min(point.x - boxWidth / 2, width - 2 - boxWidth));
     peak = {

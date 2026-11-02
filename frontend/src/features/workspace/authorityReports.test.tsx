@@ -1,8 +1,10 @@
+import { formatDay } from "../../app/dates";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import {
+  askNote,
   deadlineText,
   fieldTone,
   owesWorksheet,
@@ -172,9 +174,22 @@ describe("the report helpers", () => {
   });
 
   it("writes the deadline and the worksheet summary plainly", () => {
-    expect(deadlineText({ due_on: "2026-11-07", days_left: -2, provisional: true })).toBe(
-      "Provisional deadline 2026-11-07, 2 days overdue",
+    const ninth = new Date(2026, 10, 9, 10, 0);
+    expect(
+      deadlineText({ due_on: "2026-11-07", days_left: -2, provisional: true, overdue: true }, undefined, ninth),
+    ).toBe(`Provisional deadline ${formatDay("2026-11-07")} · 2 days overdue`);
+    const india = {
+      due_on: "2026-11-07",
+      days_left: 6,
+      provisional: false,
+      overdue: false,
+      due_at: "2026-11-07T18:29:59+00:00",
+      due_label: "Sat 7 Nov 2026, 23:59 IST",
+    };
+    expect(deadlineText(india, undefined, new Date("2026-11-01T12:00:00Z"))).toBe(
+      "Deadline Sat 7 Nov 2026, 23:59 IST · 6 days left",
     );
+    expect(deadlineText(india, "ACCEPTED")).toBe("Deadline Sat 7 Nov 2026, 23:59 IST: met by the submission");
     expect(summaryLine({ FROM_RECORD: 3, ENTERED: 1, MUST_HAVE: 2, OUTSIDE: 4 })).toBe(
       "4 filled · 2 must have before submission · 4 entered in the authority's route",
     );
@@ -235,7 +250,7 @@ describe("the reports screens", () => {
     const html = render(<Reports />);
     expect(html).toContain("Second-person approval");
     expect(html).toContain("Start the worksheet");
-    expect(html).toContain("Deadline 2026-11-07, 6 days left");
+    expect(html).toMatch(/Deadline [^<]*2026 · \d+ days? (left|overdue)/);
     expect(render(<Reports />, [])).not.toContain("Start the worksheet</button>");
   });
 
@@ -262,6 +277,45 @@ describe("the reports screens", () => {
     expect(html).toContain("Not allowed to approve: Priya");
     expect(html).toContain("MDARIX never submits");
     expect(html).toContain("PDF (working draft)");
+  });
+
+  it("tells who approves before any password: the names in place of the form, or the trial's practice note", () => {
+    const pending = {
+      id: "s1",
+      version: 1,
+      state: "PENDING" as const,
+      form_version: "x",
+      content_fingerprint: "abcdef0123456789",
+      requested_by: "Priya",
+      requested_at: "2026-11-01T10:00:00Z",
+      approved_by: null,
+      approved_at: null,
+      preparers: ["Priya"],
+      sample: false,
+    };
+    const colleague = "You prepared this worksheet. A colleague with regulatory approval rights approves this: Rahul.";
+    resources.data["/api/v1/reports/r1"] = detail("DRAFT", {
+      pending_snapshot: pending,
+      approval: { may_approve: false, same_person: false, approvers: ["Rahul"], message: colleague },
+    });
+    let html = render(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />);
+    expect(html).toContain(colleague);
+    expect(html).not.toContain("Your password");
+    const practice =
+      "In a pilot a colleague approves this; in the trial you may approve your own practice report as Leader.";
+    resources.data["/api/v1/reports/r1"] = detail("DRAFT", {
+      pending_snapshot: pending,
+      approval: { may_approve: true, same_person: true, approvers: [], message: practice },
+    });
+    html = render(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />);
+    expect(html).toContain(practice);
+    expect(html).toContain("Your password");
+    expect(askNote({ may_approve: false, same_person: false, approvers: ["Rahul"], message: "x" })).toBe(
+      "When ready, ask for approval: Rahul gets a task in My Work.",
+    );
+    expect(askNote({ may_approve: true, same_person: true, approvers: [], message: "x" })).toContain(
+      "working alone in the trial, you approve your own practice report",
+    );
   });
 
   it("offers to mark an approved snapshot as submitted", () => {

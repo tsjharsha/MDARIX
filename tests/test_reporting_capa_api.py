@@ -13,6 +13,7 @@ import secrets
 import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from datetime import time as clock_time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -153,7 +154,13 @@ def _product(tenant_id) -> str:
 
 def _complaint(tenant_id, product_id: str, *, aware_days_ago: int = 5, **fields) -> str:
     now = datetime.now(timezone.utc)
-    aware = now - timedelta(days=aware_days_ago)
+    # Noon UTC of that day: the same day in New York, Brussels, London and India, so a market's day count (0.10.63,
+    # awareness taken in the market's time zone) does not depend on the hour the suite runs.
+    aware = (
+        now
+        if not aware_days_ago
+        else datetime.combine((now - timedelta(days=aware_days_ago)).date(), clock_time(12), timezone.utc)
+    )
     with SessionLocal() as db:
         bind_tenant(db, tenant_id)
         row = Complaint(
@@ -539,7 +546,7 @@ def test_a_check_is_planned_reminded_signed_and_repeated_after_a_failure(org, mo
     monkeypatch.setenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "true")
     body = {"result": "EFFECTIVE", "summary": "No occlusion complaints since round two", "plan_version": 1}
     no_code = org["approver"].post(f"{url}/result", json={**body, "password": PASSWORD})
-    assert no_code.status_code == 403 and no_code.json()["detail"]["code"] == "MFA_ENROLLMENT_REQUIRED"
+    assert no_code.status_code == 403 and no_code.json()["detail"]["code"] == "SIGNATURE_MFA_NOT_SET_UP"
     secret = org["approver"].post("/api/v1/auth/mfa/enroll").json()["secret"]
     enrolled = org["approver"].post("/api/v1/auth/mfa/verify-enrollment", json={"code": totp.current_code(secret)})
     assert enrolled.status_code == 200, enrolled.text

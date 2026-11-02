@@ -152,6 +152,53 @@ def test_the_owner_removes_a_colleague_and_the_seat_is_free_again():
     assert first.old_values == {"status": "ACTIVE"} and first.new_values == {"status": "OFFBOARDED"}
 
 
+def test_each_invite_refusal_says_which_case_and_a_removed_colleague_can_return():
+    """J37: every refusal said "already has an MDARIX account"; a removed colleague could never be invited again; an
+    expired invitation still read "Invited"."""
+    owner, approval, owner_email, colleague, email = _trial_with_colleague()
+    pending = f"pending-{uuid.uuid4().hex[:8]}@example.invalid"
+    assert owner.post(TEAM, json={"email": pending, "display_name": "Robin QA"}).status_code == 200
+
+    def refusal(address):
+        response = owner.post(TEAM, json={"email": address, "display_name": "Someone"})
+        assert response.status_code == 409, response.text
+        return response.json()["detail"]["code"]
+
+    assert refusal(pending) == "INVITATION_PENDING"
+    assert refusal(email) == "ALREADY_ON_THE_TEAM"
+    _, _, elsewhere = _approved_trial_client()
+    assert refusal(elsewhere) == "ACCOUNT_IN_ANOTHER_ORGANIZATION"
+
+    # An invitation past its time reads as expired, and Resend sends a new one.
+    with SessionLocal() as db:
+        bind_system(db, "test: an invitation past its time")
+        from backend.app.db.models.stage2 import UserInvitation
+
+        db.query(UserInvitation).filter(UserInvitation.user_id == uuid.UUID(_member(owner, pending)["id"])).update(
+            {"expires_at": datetime.now(timezone.utc) - timedelta(minutes=1)}, synchronize_session=False
+        )
+        db.commit()
+    assert _member(owner, pending)["invitation_expired"] is True
+    assert _member(owner, email)["invitation_expired"] is False
+    resent = owner.post(f"{TEAM}/{_member(owner, pending)['id']}/resend-invitation")
+    assert resent.status_code == 200, resent.text
+    assert _member(owner, pending)["invitation_expired"] is False
+
+    # A removed colleague is invited again: the same account, signed in through the new invitation.
+    member = _member(owner, email)
+    assert owner.post(f"{TEAM}/{member['id']}/remove").status_code == 200
+    again = owner.post(TEAM, json={"email": email, "display_name": "Casey Review"})
+    assert again.status_code == 200, again.text
+    assert again.json()["id"] == member["id"] and _member(owner, email)["status"] == "INVITED"
+    returned = TestClient(app)
+    fresh = "A new trial password 2026!"  # the old one is in their password history
+    token = _activation_token(again.json(), email)
+    assert returned.post("/api/v1/auth/activate-account", json={"token": token, "password": fresh}).status_code == 200
+    assert returned.post("/api/v1/auth/signin", json={"email": email, "password": fresh}).status_code == 200
+    assert returned.get("/api/v1/trial/status").status_code == 200
+    assert _audit(approval["tenant_id"], "TRIAL_COLLEAGUE_INVITED")[-1].details["invited_again"] is True
+
+
 def test_the_owner_acts_only_on_people_of_their_own_trial():
     owner, _, _ = _approved_trial_client()
     other_owner, _, other_email = _approved_trial_client()

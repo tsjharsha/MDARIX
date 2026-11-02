@@ -20,7 +20,7 @@ or regulatory approval. These routes serve a free trial and a pilot alike (T-B1)
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -240,8 +240,15 @@ def _views(db, control_db, tenant_id, rows: list[CommunicationEntry], today: dat
     return [entry_view(row, parties.get(row.party_id), refs, names, today, limit, calendar) for row in rows]
 
 
-def _today() -> date:
-    return service.now_utc().date()
+def _calendar(db, tenant_id):
+    from backend.app.intake.service import calendar
+
+    return calendar(db, tenant_id)
+
+
+def _today(db, tenant_id) -> date:
+    """Today on the organization's calendar: a reply due today is not overdue until its day ends there (J16)."""
+    return _calendar(db, tenant_id).local_day(service.now_utc())
 
 
 def _entry(db, tenant_id, entry_id, *, lock: bool = False) -> CommunicationEntry:
@@ -262,7 +269,7 @@ def _detail(db, control_db, ctx, entry: CommunicationEntry) -> dict:
         .order_by(CommunicationEntry.occurred_at)
         .all()
     )
-    views = _views(db, control_db, tenant_id, [entry, *replies], _today())
+    views = _views(db, control_db, tenant_id, [entry, *replies], _today(db, tenant_id))
     return {**views[0], "replies": views[1:], "never_sends": rules.NEVER_SENDS}
 
 
@@ -291,7 +298,7 @@ def communications(
             raise _error(404, "COMPLAINT_NOT_FOUND", "No such complaint in your organization")
         query = query.filter(CommunicationEntry.complaint_id == complaint_id)
     rows = query.order_by(CommunicationEntry.occurred_at.desc()).limit(500).all()
-    today = _today()
+    today = _today(db, tenant_id)
     items = _views(db, control_db, tenant_id, rows, today)
     items.sort(key=lambda item: (not item["overdue"], item["status"] != rules.OPEN))
     parties = (
@@ -641,7 +648,8 @@ def update_entry(
         task = db.get(WorkflowTask, entry.task_id) if entry.task_id else None
         if task is not None and task.task_type == service.TASK_TYPE:
             task.assigned_user_id = uuid.UUID(owner)
-            task.due_at = datetime.combine(payload.reply_due_on, datetime.max.time(), tzinfo=timezone.utc)
+            # The end of the reply day on the organization's calendar, as every other MDARIX due time (J16).
+            task.due_at = _calendar(db, tenant_id).day_end(payload.reply_due_on)
     entry.evidence = _evidence(payload.evidence)
     entry.qms_reference = _text(payload.qms_reference, 120)
     entry.note = _text(payload.note, rules.NOTE_MAX)

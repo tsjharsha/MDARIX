@@ -44,7 +44,9 @@ CHAPTERS = (
         "Each market you report to asks its own seriousness and causation questions, with the regulation's clause "
         "beside each: death, each serious-injury criterion, caused or contributed, and a malfunction judged as if it "
         "recurred. The harm-severity scale shows each market's threshold, an Unknown keeps the market pending, and "
-        "you sign each market's conclusion after a short practice training on the questions.",
+        "you sign each market's conclusion after a short practice training on the questions. Try it on SAMPLE-RV-11: a "
+        "monitor reading SpO2 too high, nobody harmed, sent for service. Is it reportable, and by when, in the US and "
+        "India?",
         "Reports filed months late, or never evaluated, are a repeat finding in FDA inspections; seriousness judged "
         "without stated criteria is hard to defend.",
         {"section": "Complaints", "tab": "Reportability"},
@@ -81,11 +83,11 @@ CHAPTERS = (
     ),
     (
         "DECIDE_AND_SIGN",
-        "Decide, sign and open the CAPA",
+        "Decide, sign and record the CAPA to raise",
         "The sample case's Decision Brief is written and waiting for you: review it as the quality reviewer, accept "
         "it, then sign the decision with your password and authenticator code and its root-cause attribution "
-        "(device-, use- or environment-related, or undetermined with a reason); the CAPA opens from the signed "
-        "decision. The person who writes a brief never reviews or signs it, on every case.",
+        "(device-, use- or environment-related, or undetermined with a reason); then record the CAPA to raise in your "
+        "QMS from the signed decision. The person who writes a brief never reviews or signs it, on every case.",
         "Trends that never become a CAPA are among the findings FDA cites most often.",
         {"section": "Investigations", "tab": "Decision Brief"},
         None,
@@ -152,8 +154,7 @@ WITHOUT_AI = {
     "INVESTIGATE_WITH_AI": (
         "Investigate with evidence you can trace",
         "The case page brings the complaints, lots, changes and evidence together; ask MDARIX a question and the answer "
-        "cites the records it comes from; the investigator weighs each explanation. AI assistance joins when it is "
-        "switched on for your organization.",
+        "cites the records it comes from; the investigator weighs each explanation. AI is off in the free trial.",
         "Small teams with large backlogs; conclusions that cannot show their sources are not trusted.",
     )
 }
@@ -396,7 +397,10 @@ def story(
     the workspace's "Chapter done" notice reads every half minute, at a fraction of the cost (0.10.43)."""
     from backend.app.readiness_home.service import readiness
 
-    today = today or datetime.now(timezone.utc).date()
+    if today is None:
+        from backend.app.readiness_home.service import organization_today
+
+        today = organization_today(db, tenant_id)
     checks = {}
     if with_findings:
         try:

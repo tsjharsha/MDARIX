@@ -417,6 +417,7 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
             "ref": event.reference,
             "source": rules.KIND_LABELS[event.kind],
             "intake_kind": event.kind,
+            "country": event.country,
             "product_id": event.product_id,
             "product_name": products.get(event.product_id),
             "lot": lots.get(event.lot_batch_id),
@@ -445,6 +446,7 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
             "ref": complaint.business_id or complaint.complaint_identifier,
             "identifier": complaint.complaint_identifier,
             "source": "Imported complaint",
+            "country": complaint.country,
             "product_id": complaint.product_id,
             "product_name": products.get(complaint.product_id),
             "lot": lots.get(complaint.lot_batch_id),
@@ -483,6 +485,7 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
             "ref": str(values.get("complaint_id") or f"Row {row.line}"),
             "source": f"Set-aside import row (line {row.line})",
             "import_ref": str(row.import_ref),
+            "country": values.get("country") or None,
             "product_id": None,
             "product_name": values.get("product_id") or None,
             "lot": values.get("lot_id") or None,
@@ -528,6 +531,7 @@ def triage(
     links = links_of(db, tenant_id)
     group = groups(links)
     enabled = enabled_markets(db, tenant_id)
+    context = _deadline_context(db, tenant_id, found, now)
     by_group: dict = {}
     for key, subject in found.items():
         by_group.setdefault(group.get(key, key), []).append(key)
@@ -561,7 +565,7 @@ def triage(
         )
         if (show == "open" and done) or (show == "done" and not done):
             continue
-        items.append(_item(found, members, listed, records, conflict, enabled, names, now, today))
+        items.append(_item(found, members, listed, records, conflict, enabled, names, now, today, context))
     order = {rules.THREAT: 0, rules.FLAGGED: 1, rules.UNFLAGGED: 2}
     items.sort(key=lambda item: (order[item["tier"]], item["earliest_due"] or "9999", item["ref"]))
     return {
@@ -574,6 +578,35 @@ def triage(
         "starter_mark": _starter(),
         "now": now.isoformat(),
     }
+
+
+def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datetime) -> dict:
+    """What triage's deadlines need besides the records: the organization's time zone, each complaint's signed market
+    conclusions with their clocks (J3; None for "not reportable"), and the products' words (an IVD cites the IVDR)."""
+    from backend.app.reportability import assessments
+    from backend.app.reportability import service as reporting_service
+    from backend.app.reportability.deadlines import org_zone as zone_of
+
+    zone = zone_of(db, tenant_id)
+    windows = reporting_service.settings_of(db, tenant_id)["windows"]
+    complaint_ids = [key[1] for key in found if key[0] == COMPLAINT]
+    rows = assessments.rows_by_complaint(db, tenant_id, complaint_ids) if complaint_ids else {}
+    signed: dict = {}
+    for complaint_id, by_market in rows.items():
+        key = (COMPLAINT, complaint_id)
+        for market, versions in by_market.items():
+            current, _ = assessments.current_and_draft(versions)
+            if current is None or current.conclusion is None:
+                continue
+            clock = markets.market_clock(
+                market, current.conclusion, current.report_type, windows, found[key]["awareness"]["at"], now, zone
+            )
+            signed.setdefault(key, {})[market] = clock
+    products = {
+        row.id: markets.product_is_ivd(row)
+        for row in db.query(Product).filter(Product.tenant_id == tenant_id).limit(READ_LIMIT)
+    }
+    return {"org_zone": zone, "signed": signed, "products": products}
 
 
 def _starter() -> str:
@@ -595,7 +628,7 @@ def _summary(db, tenant_id, records, found, group, links) -> dict:
     }
 
 
-def _item(found, members, listed, records, conflict, enabled, names, now, today) -> dict:
+def _item(found, members, listed, records, conflict, enabled, names, now, today, context) -> dict:
     primary_key = next((key for key in listed if key[0] == INTAKE), None) or (listed or members)[0]
     primary = found[primary_key]
     member_records = {key: records.get(key) for key in members}
@@ -616,7 +649,22 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today)
             }
         )
     level = rules.tier(bool(flags), threat)
-    deadlines = rules.provisional_deadlines(awareness["at"], enabled, level, today, remedial)
+    countries = (markets.market_of(found[key].get("country")) for key in [primary_key, *members])
+    own = next((market for market in countries if market), None)
+    signed: dict = {}
+    for key in members:
+        signed = {**context["signed"].get(key, {}), **signed}
+    deadlines = rules.provisional_deadlines(
+        awareness["at"],
+        enabled,
+        level,
+        now,
+        remedial,
+        own=own,
+        signed=signed,
+        org_zone=context["org_zone"],
+        ivd=context["products"].get(primary.get("product_id"), False),
+    )
     record = member_records.get(primary_key)
     opened = rules.utc(record.opened_at) if record is not None else primary["available_at"]
     # A link that brought an earlier awareness reopens triage: its target counts from the link (G19's reopening).
@@ -657,7 +705,8 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today)
         "delay": rules.delay_text(awareness["at"], primary["available_at"]),
         "triage_clock": rules.triage_clock(opened, now, record.target_hours if record else rules.TRIAGE_TARGET_HOURS),
         "deadlines": deadlines,
-        "earliest_due": deadlines[0]["due_date"] if deadlines else None,
+        "own_market": own,
+        "earliest_due": deadlines[0]["due_at"] if deadlines else None,
         "conflict": [
             {
                 "link": str(link.id),

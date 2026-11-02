@@ -10,6 +10,7 @@ import { Hero, InlineError } from "./boardParts";
 import {
   OUTCOME_LABELS,
   REASON_MIN,
+  askNote,
   REPORTS,
   RESULT_LABELS,
   deadlineText,
@@ -300,8 +301,7 @@ function NextStep({
           <Approval detail={detail} onChanged={onChanged} />
         ) : (
           <p className="ac-muted">
-            Check each field. Missing fields never block a timely initial report. When ready, ask a colleague to approve
-            the snapshot: {detail.cannot_approve.join(", ") || "the preparer"} cannot.
+            Check each field. Missing fields never block a timely initial report. {askNote(detail.approval)}
           </p>
         )}
         <div className="ca-action-row">
@@ -332,6 +332,21 @@ function Approval({ detail, onChanged }: { detail: ReportDetail; onChanged: (det
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const action = useAction(onChanged, "The snapshot was not approved.");
+  const standing = detail.approval;
+  const waiting = (
+    <>
+      <strong>Snapshot {snapshot.version}</strong> frozen by {snapshot.requested_by} {formatDate(snapshot.requested_at)}
+      , waiting for a second person.
+    </>
+  );
+  // Who approves is told before any password: someone who may not approve never sees the form (J13).
+  if (standing && !standing.may_approve)
+    return (
+      <div className="uw-rp-approval" role="note" aria-label="Who approves the snapshot">
+        <p>{waiting}</p>
+        <p>{standing.message}</p>
+      </div>
+    );
   return (
     <form
       className="uw-rp-approval"
@@ -344,11 +359,17 @@ function Approval({ detail, onChanged }: { detail: ReportDetail; onChanged: (det
         });
       }}
     >
-      <p>
-        <strong>Snapshot {snapshot.version}</strong> frozen by {snapshot.requested_by}{" "}
-        {formatDate(snapshot.requested_at)}, waiting for a second person. Not allowed to approve:{" "}
-        {detail.cannot_approve.join(", ")} (the preparer and the signer of the market conclusion).
-      </p>
+      {standing?.same_person ? (
+        <>
+          <p>{waiting}</p>
+          <p className="ac-message tone-warning">{standing.message}</p>
+        </>
+      ) : (
+        <p>
+          {waiting} Not allowed to approve: {detail.cannot_approve.join(", ")} (the preparer and the signer of the
+          market conclusion).
+        </p>
+      )}
       <div className="ca-form-grid">
         <label className="ca-field">
           Your password
@@ -948,6 +969,7 @@ function SubmissionRecord({ detail }: { detail: ReportDetail }) {
             Snapshot {row.version} · {row.state.toLowerCase()} · frozen by {row.requested_by}{" "}
             {formatDate(row.requested_at)}
             {row.approved_by ? ` · approved by ${row.approved_by} ${formatDate(row.approved_at)}` : ""}
+            {row.same_person ? " · same person (trial practice)" : ""}
           </li>
         ))}
       </ul>

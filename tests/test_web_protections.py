@@ -57,7 +57,7 @@ def test_password_reset_answers_the_same_for_every_email(monkeypatch):
 
 def test_spreadsheet_formulas_are_refused_in_imports():
     user = _client_with_role("INVESTIGATOR")
-    csv = 'complaint_id,product_id,description\nF-1,P-1,"=HYPERLINK(""http://evil.example"",""x"")"\n'
+    csv = 'complaint_id,product_id,received_date,description\nF-1,P-1,2026-10-01,"=HYPERLINK(""http://evil.example"",""x"")"\n'
     checked = user.post("/api/v1/data/import/complaints/check", content=csv, headers={"Content-Type": "text/csv"})
     issues = checked.json().get("issues", [])
     assert any("formula" in issue["message"] for issue in issues), checked.text

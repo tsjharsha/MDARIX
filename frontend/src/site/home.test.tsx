@@ -12,13 +12,13 @@ import { SCENES } from "./scenes";
 describe("website home", () => {
   it("draws the quality loop in story order with illustrative values", () => {
     expect(SITE_LOOP.map((station) => station.key)).toEqual(LOOP_ORDER.map((step) => step.code));
-    expect(SITE_LOOP.filter((station) => station.done)).toHaveLength(2);
+    expect(SITE_LOOP.filter((station) => station.done)).toHaveLength(3);
   });
 
   it("says the loop is synthetic and leads to the free trial", () => {
     const html = renderToStaticMarkup(<HomePage />);
     expect(html).toContain("Illustrative · synthetic data");
-    expect(html).toContain("2 of 8 inspection checks clear");
+    expect(html).toContain("3 of 11 inspection checks clear");
     expect(html).toContain('href="/signup"');
     expect(html).toContain("Start free trial");
   });
@@ -45,9 +45,11 @@ describe("website home", () => {
   it("keeps one worked example and moves the roadmap and the regulations to their own pages", () => {
     const html = renderToStaticMarkup(<HomePage />);
     expect(html).toContain("Why did pressure-alarm complaints rise after OrbitCare 300 Rev B?");
-    expect(html).toContain("Your systems stay the record.");
+    expect(html).toContain("Your QMS keeps the complaint record.");
     // One line, linked to the Regulations page, instead of the standards section.
-    expect(html).toMatch(/href="\/trust\/regulations"[^>]*>Covers FDA, EU MDR, UK and Canada reporting/);
+    expect(html).toMatch(
+      /href="\/trust\/regulations"[^>]*>Covers reporting for the US, EU\/NI, GB and India \(MvPI worksheet\)/,
+    );
     expect(html).not.toContain("Built around the evidence regulators ask for.");
     expect(html).not.toContain("Know what is available today, and what comes next.");
     // The three overlapping story sections are one.

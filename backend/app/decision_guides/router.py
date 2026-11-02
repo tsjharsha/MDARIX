@@ -8,8 +8,9 @@
 - ``PUT /api/v1/decision-guides/{market}/versions/{version}``: save the draft's questions and test cases (a version
   waiting for approval returns to draft);
 - ``POST .../tests``: run the test cases against the fixed conclusion logic and keep the results with the version;
-- ``POST .../approval-request``, ``.../approve`` (a second person, with password and authenticator code; it publishes
-  the version) and ``.../discard``;
+- ``POST .../approval-request`` (each colleague who may approve gets a task in My Work, J13), ``.../withdraw`` (its
+  author takes it back to draft), ``.../approve`` (a second person, with password and authenticator code; it publishes
+  the version; working alone in a trial, one's own practice version, T-B8) and ``.../discard``;
 - ``GET .../guide.pdf`` and ``.docx``: the version for an audit.
 
 Reading is open to every signed-in member; changes need regulatory.review or regulatory.approve, and the export needs
@@ -38,9 +39,12 @@ from backend.app.db.session import get_db
 from backend.app.decision_guides import rules
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import current_person, require_any_permission
+from backend.app.oversight.service import calendar_of
 from backend.app.reportability import markets
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.standards import STARTER_MARK
+from backend.app.workflow import approvals
+from backend.app.workflow.tasks import run_hook
 
 logger = logging.getLogger("mdarix.decision_guides")
 router = APIRouter(prefix="/api/v1/decision-guides", tags=["Decision guides"])
@@ -58,8 +62,15 @@ NEVER_DECIDES = (
     "and never submits."
 )
 CORE_RULE = (
-    "The questions that drive the conclusion can be reworded and clarified, not removed, and their conclusion logic "
-    "stays fixed. Extra questions are recorded and printed with the answers; they never change the conclusion."
+    "The questions that drive the conclusion keep the regulation's wording: the question, its definition and its clause "
+    "are locked, and you add your own explanation and examples beside them. They cannot be removed, and their "
+    "conclusion logic stays fixed. Extra questions are recorded and printed with the answers; they never change the "
+    "conclusion."
+)
+MATRIX_RULE = (
+    "The test matrix: worked complaints with the answer this market's guide must point to. MDARIX's starter rows are in "
+    "every version; add your own. A version is sent for approval only when every row passes, and its approval runs the "
+    "matrix again: a changed answer blocks it."
 )
 SCALE_NOTE = "The harm-severity scale stays MDARIX's fixed starter scale in the trial (scale-starter-1)."
 
@@ -131,6 +142,37 @@ def _trial(control_db, tenant_id) -> bool:
     return is_trial(control_db, tenant_id)
 
 
+def standing(control_db, ctx, tenant_id, row: DecisionGuideVersion, trial: bool) -> dict:
+    """Whether this person may approve the waiting version, told before any password (J13, workflow/approvals.py):
+    never an editor of it or an administrator, except that working alone in a trial one may approve one's own practice
+    version ("same person", T-B8); the colleagues who may approve, by name."""
+    me = str(ctx.user_id)
+    person = current_person(control_db, ctx)
+    role = person.role_for(REGULATORY_APPROVE if person.holds(REGULATORY_APPROVE) else REGULATORY_REVIEW)
+    editors = set(row.editors or [])
+    if person.holds_any(*approvals.PERMISSIONS):
+        problem = rules.approver_problem(me, role, editors)
+        separation = problem is not None and (role or "").upper() not in rules.ADMINISTRATOR_ROLES
+    else:
+        problem, separation = approvals.NO_RIGHTS, False
+    others = [name for _, name in approvals.approvers(control_db, tenant_id, {*editors, me})]
+    return {**approvals.standing(problem, separation, others, trial, role, "guide version"), "role": role}
+
+
+def _end_tasks(db, tenant_id, row: DecisionGuideVersion, outcome: str, actor: str, approved: bool = False) -> None:
+    run_hook(
+        db,
+        "guide approval task",
+        approvals.finish,
+        tenant_id,
+        source_type=OBJECT_TYPE,
+        source_id=row.id,
+        outcome=outcome,
+        actor=actor,
+        approved=approved,
+    )
+
+
 # --------------------------------------------------------------------------------------------- views
 
 
@@ -151,7 +193,7 @@ def _starter_view(market: str, superseded: bool) -> dict:
         "starter": True,
         "based_on": None,
         "question_set": question_set.as_dict(),
-        "test_cases": tests,
+        "test_cases": [{**test, "starter": True} for test in tests],
         "test_results": {
             "fingerprint": fingerprint,
             "results": results,
@@ -162,6 +204,7 @@ def _starter_view(market: str, superseded: bool) -> dict:
             "run_by": "MDARIX",
         },
         "problems": [],
+        "matrix_changed": [],
         "change_reason": "MDARIX's starter guide, written from the regulation's definitions.",
         "editors": [],
         "requested_by": None,
@@ -192,7 +235,7 @@ def version_view(control_db, row: DecisionGuideVersion, names: dict, signature: 
         "starter": False,
         "based_on": row.based_on,
         "question_set": question_set.as_dict(),
-        "test_cases": row.test_cases or [],
+        "test_cases": [{**test, "starter": rules.is_starter_row(row.market, test)} for test in row.test_cases or []],
         "test_results": (
             {
                 **results,
@@ -202,8 +245,12 @@ def version_view(control_db, row: DecisionGuideVersion, names: dict, signature: 
             if results
             else None
         ),
-        "problems": rules.publish_problems(row.questions or [], row.test_cases or [], results, fingerprint)
+        "problems": rules.publish_problems(row.market, row.questions or [], row.test_cases or [], results, fingerprint)
         if row.state in rules.OPEN_STATES
+        else [],
+        # The matrix run again now, for the approver: any row listed blocks the approval.
+        "matrix_changed": [item["name"] for item in rules.changed_rows(row.market, row.test_cases or [])]
+        if row.state == rules.AWAITING
         else [],
         "change_reason": row.change_reason,
         "editors": [names.get(ref) or "A colleague" for ref in row.editors or []],
@@ -262,7 +309,10 @@ def detail(db, control_db, ctx, market: str, version: int) -> dict:
         view = version_view(control_db, row, names, _signature(control_db, tenant_id, row, names))
         me = str(ctx.user_id)
         view["you_edited"] = me in set(row.editors or [])
+        view["you_asked"] = row.state == rules.AWAITING and row.requested_by == me
     trial = _trial(control_db, tenant_id)
+    if version != 1 and row.state == rules.AWAITING:
+        view["approval"] = standing(control_db, ctx, tenant_id, row, trial)
     return {
         **view,
         "catalog": _catalog(),
@@ -274,6 +324,7 @@ def detail(db, control_db, ctx, market: str, version: int) -> dict:
             if code.startswith(rules.PREFIX[market] + "_")
         ],
         "core_rule": CORE_RULE,
+        "matrix_rule": MATRIX_RULE,
         "never_decides": NEVER_DECIDES,
         "scale_note": SCALE_NOTE,
         "starter_mark": STARTER_MARK,
@@ -358,7 +409,10 @@ def start_draft(db, tenant_id, market: str, actor: str, now: datetime, source_sy
         raise _error(409, "DRAFT_EXISTS", "A version of this guide is already being prepared: open it")
     published = next((row for row in rows if row.state == rules.PUBLISHED), None)
     if published is not None:
-        questions, tests, based_on = published.questions, published.test_cases, published.code
+        # A version signed before 0.10.64 may have reworded a core question: the copy takes MDARIX's wording back.
+        questions, based_on = rules.relocked(market, published.questions or []), published.code
+        tests, problem = rules.clean_tests(market, published.test_cases or [])
+        assert problem is None, problem
     else:
         base = rules.starter(market)
         questions = [rules.question_dict(question) for question in base.questions]
@@ -405,12 +459,15 @@ def create_draft(
 
 
 class QuestionIn(BaseModel):
+    # A core question's locked fields are left out (or sent unchanged); an extra question gives them all.
     id: str = Field(default="", max_length=10)
-    text: str = Field(max_length=rules.TEXT_MAX * 2)
-    definition: str | None = Field(default="", max_length=rules.DEFINITION_MAX * 2)
-    note: str | None = Field(default="", max_length=rules.NOTE_MAX * 2)
-    clause: str | None = Field(default="", max_length=rules.CLAUSE_MAX * 2)
-    basis: list[str] = Field(default_factory=list, max_length=10)
+    text: str | None = Field(default=None, max_length=rules.TEXT_MAX * 2)
+    definition: str | None = Field(default=None, max_length=rules.DEFINITION_MAX * 2)
+    note: str | None = Field(default=None, max_length=rules.NOTE_MAX * 2)
+    clause: str | None = Field(default=None, max_length=rules.CLAUSE_MAX * 2)
+    basis: list[str] | None = Field(default=None, max_length=10)
+    explanation: str | None = Field(default=None, max_length=rules.OWN_MAX * 2)
+    examples: str | None = Field(default=None, max_length=rules.OWN_MAX * 2)
 
 
 class TestIn(BaseModel):
@@ -469,6 +526,8 @@ def save_version(
         returned_to_draft=returned,
     )
     db.commit()
+    if returned:
+        _end_tasks(db, row.tenant_id, row, "Returned to draft", str(ctx.user_id))
     return detail(db, control_db, ctx, market, version)
 
 
@@ -501,7 +560,7 @@ def run_version_tests(
     if row.state not in rules.OPEN_STATES:
         raise _error(409, "NOT_A_DRAFT", "The tests of a published version were run before its approval")
     if not row.test_cases:
-        raise _error(422, "NO_TESTS", "Add at least one test case")
+        raise _error(422, "NO_TESTS", "Add at least one worked complaint to the test matrix")
     results = run_tests(db, row, str(ctx.user_id), _now())
     _audit(db, ctx, "DECISION_GUIDE_TESTS_RUN", row, market, passed=results["passed"], failed=results["failed"])
     db.commit()
@@ -515,7 +574,9 @@ class ApprovalRequest(BaseModel):
 def request_approval(db, row: DecisionGuideVersion, reason: str, actor: str, now: datetime) -> None:
     """Ask a second person to approve (shared with the sample). Refused while anything blocks publication."""
     fingerprint = _fingerprint(row.market, row.code, row.questions or [], row.test_cases or [])
-    problems = rules.publish_problems(row.questions or [], row.test_cases or [], row.test_results, fingerprint)
+    problems = rules.publish_problems(
+        row.market, row.questions or [], row.test_cases or [], row.test_results, fingerprint
+    )
     if problems:
         raise _error(409, "NOT_READY_TO_PUBLISH", problems[0], problems=problems)
     if len(reason) < rules.REASON_MIN:
@@ -540,9 +601,57 @@ def ask_for_approval(
     row = _row(db, _tenant(ctx), market, version, lock=True)
     if row.state != rules.DRAFT:
         raise _error(409, "NOT_A_DRAFT", "Only a draft is sent for approval")
-    request_approval(db, row, " ".join(payload.change_reason.split()), str(ctx.user_id), _now())
+    actor = str(ctx.user_id)
+    request_approval(db, row, " ".join(payload.change_reason.split()), actor, _now())
     _audit(db, ctx, "DECISION_GUIDE_APPROVAL_REQUESTED", row, market, fingerprint=row.content_fingerprint)
     db.commit()
+    tenant_id = row.tenant_id
+    run_hook(
+        db,
+        "guide approval task",
+        lambda session: approvals.ask(
+            session,
+            control_db,
+            tenant_id,
+            source_type=OBJECT_TYPE,
+            source_id=row.id,
+            title=f"Approve decision guide version {row.code}",
+            due_at=calendar_of(session, tenant_id).working_day_end(row.requested_at, 1),
+            excluded=set(row.editors or []),
+            requester=actor,
+            trial=_trial(control_db, tenant_id),
+            details={
+                "reference": row.code,
+                "market": market,
+                "category": "GUIDE",
+                "opens": {"section": "Complaints", "tab": "Decision guides"},
+            },
+        ),
+    )
+    return detail(db, control_db, ctx, market, version)
+
+
+@router.post("/{market}/versions/{version}/withdraw", dependencies=[DECIDERS])
+def withdraw(
+    market: str,
+    version: int,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Its author takes a version waiting for approval back to draft (J13): the approvers' tasks end."""
+    market = _market(market)
+    row = _row(db, _tenant(ctx), market, version, lock=True)
+    me = str(ctx.user_id)
+    if row.state != rules.AWAITING:
+        raise _error(409, "NOT_AWAITING_APPROVAL", "This version is not waiting for approval")
+    if row.requested_by != me:
+        raise _error(403, "NOT_THE_AUTHOR", "Only the person who sent it for approval withdraws it")
+    row.state, row.requested_by, row.requested_at, row.content_fingerprint = rules.DRAFT, None, None, None
+    row.updated_by, row.updated_at = me, _now()
+    _audit(db, ctx, "DECISION_GUIDE_APPROVAL_WITHDRAWN", row, market)
+    db.commit()
+    _end_tasks(db, row.tenant_id, row, "Withdrawn", me)
     return detail(db, control_db, ctx, market, version)
 
 
@@ -581,13 +690,25 @@ def approve(
     if row.state != rules.AWAITING:
         raise _error(409, "NOT_AWAITING_APPROVAL", "This version is not waiting for approval")
     me = str(ctx.user_id)
-    person = current_person(control_db, ctx)
-    role = person.role_for(REGULATORY_APPROVE if person.holds(REGULATORY_APPROVE) else REGULATORY_REVIEW)
-    problem = rules.approver_problem(me, role, set(row.editors or []))
-    if problem:
+    allowed = standing(control_db, ctx, tenant_id, row, _trial(control_db, tenant_id))
+    role, same_person = allowed["role"], allowed["same_person"]
+    if not allowed["may_approve"]:
+        problem = allowed["message"]
         _audit(db, ctx, "DECISION_GUIDE_APPROVAL_REFUSED", row, market, reason=problem)
         db.commit()
         raise _error(403, "SECOND_PERSON_REQUIRED", problem)
+    changed = rules.changed_rows(market, row.test_cases or [])
+    if changed:
+        names = [item["name"] for item in changed]
+        _audit(db, ctx, "DECISION_GUIDE_APPROVAL_REFUSED", row, market, reason="MATRIX_CHANGED", rows=names)
+        db.commit()
+        raise _error(
+            409,
+            "MATRIX_CHANGED",
+            f"The test matrix gives a different answer now for: {'; '.join(names)}. Its author changes the version and "
+            "sends it again",
+            rows=names,
+        )
 
     def refused(action: str) -> None:
         control_db.add(
@@ -620,7 +741,11 @@ def approve(
         object_version=row.code,
         decision_type=DECISION_TYPE,
         decision="APPROVED",
-        remarks=(row.change_reason or "")[:500] or None,
+        remarks=(
+            ("Same person (trial practice: edited and approved by one person). " if same_person else "")
+            + (row.change_reason or "")
+        )[:500]
+        or None,
         signer_user_id=me,
         signer_role=role or "UNKNOWN",
         signature_meaning=rules.signature_meaning(row.code, title),
@@ -644,6 +769,7 @@ def approve(
                 "version": row.code,
                 "signature_id": str(record.id),
                 "fingerprint": fingerprint,
+                "same_person": same_person,
             },
             created_at=now,
         )
@@ -658,6 +784,7 @@ def approve(
         except Exception:
             logger.exception("Signature %s was saved but guide version %s was not published", record.id, row.id)
             raise
+    _end_tasks(db, tenant_id, row, "Approved", me, approved=True)
     return detail(db, control_db, ctx, market, version)
 
 
@@ -676,6 +803,7 @@ def discard(
     row.state, row.updated_by, row.updated_at = rules.DISCARDED, str(ctx.user_id), _now()
     _audit(db, ctx, "DECISION_GUIDE_DRAFT_DISCARDED", row, market)
     db.commit()
+    _end_tasks(db, row.tenant_id, row, "Discarded", str(ctx.user_id))
     return detail(db, control_db, ctx, market, version)
 
 

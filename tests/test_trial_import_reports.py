@@ -37,11 +37,19 @@ def test_the_sample_shows_an_import_run_its_set_aside_rows_lineage_and_reference
     assert run["sample"] and run["file_name"] == "Sample complaints export.xlsx" and run["entity"] == "complaints"
     report = run["report"]
     total = _ok(user.get("/api/v1/complaints", params={"source_system": "MDARIX_SAMPLE"}))["total"]
-    assert report["rows_read"] == total + 2 and report["rows_accepted"] == total
+    # Every sample complaint came in with the export except SAMPLE-RV-10, the India hospital's report that arrives
+    # weeks later (sample_reports.py, 0.10.58, staged after the import run so its counts stay): it has no import.
+    assert report["rows_read"] == total - 1 + 2 and report["rows_accepted"] == total - 1
     assert report["rows_quarantined"] == 2 and report["balanced"] is True
+    india = _complaint(user, q="SAMPLE-RV-10")
+    assert india["complaint_identifier"] == "SAMPLE-RV-10"
+    assert _ok(user.get(f"/api/v1/data/import/origin/complaints/{india['id']}"))["imports"] == []
 
     detail = _ok(user.get(f"{RUNS}/{run['import_ref']}"))
-    assert detail["quarantine_now"] == {"open": 2, "reprocessed": 0} and detail["imported_by"] == "MDARIX sample author"
+    assert (
+        detail["quarantine_now"] == {"open": 2, "reprocessed": 0, "dismissed": 0}
+        and detail["imported_by"] == "MDARIX sample author"
+    )
 
     rows = _ok(user.get("/api/v1/data/import/quarantine", params={"import_ref": run["import_ref"]}))["items"]
     assert [row["row"]["complaint_id"] for row in rows] == ["SAMPLE-RJ-02", "SAMPLE-RJ-01"]  # harm first
@@ -85,7 +93,7 @@ def test_a_trial_import_is_governed_and_its_report_names_the_file():
     result = _ok(
         user.post(
             "/api/v1/trial/imports/complaints",
-            params={"on_problems": "skip", "file_name": "C:\\exports\\Own complaints.csv"},
+            params={"on_problems": "skip", "file_name": "C:\\exports\\Own complaints.csv", "date_column": "none"},
             content=csv,
             headers={"Content-Type": "text/csv"},
         )
@@ -97,7 +105,9 @@ def test_a_trial_import_is_governed_and_its_report_names_the_file():
         "rows_quarantined": 1,
         "rows_changed": 0,
         "rows_new": 2,
+        "rows_unchanged": 0,
         "balanced": True,
+        "columns_not_used": [],  # 0.10.65: every column of the file was used
     }
     newest = _ok(user.get(RUNS))["runs"][0]
     assert newest["import_ref"] == result["import_ref"] and newest["file_name"] == "Own complaints.csv"
@@ -129,5 +139,5 @@ def test_removing_the_sample_removes_its_import_run():
     assert preview["has_sample"]
     _ok(user.post("/api/v1/trial/sample-data/removal", json={"confirm": True}))
     assert _ok(user.get(RUNS))["runs"] == []
-    assert _ok(user.get("/api/v1/data/import/quarantine"))["counts"] == {"open": 0, "reprocessed": 0}
+    assert _ok(user.get("/api/v1/data/import/quarantine"))["counts"] == {"open": 0, "reprocessed": 0, "dismissed": 0}
     assert _ok(user.get("/api/v1/regulatory-reference/imdrf/links", params={"code": "PRESSURE_ALARM"}))["links"] == {}

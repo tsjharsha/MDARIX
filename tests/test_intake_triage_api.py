@@ -158,7 +158,8 @@ def test_without_awareness_the_clock_runs_from_first_knowledge(trial):  # TA-19.
 
 
 def test_the_quarantined_harm_row_is_on_the_triage_list(trial):  # TA-R14.2, TA-19.3
-    found = _triage(trial["user"])
+    # 0.10.64: the sample author has triaged it (a calm day 0), so it is listed with the finished ones.
+    found = _triage(trial["user"], "all")
     assert found["SAMPLE-RJ-02"]["kind"] == "QUARANTINE" and found["SAMPLE-RJ-02"]["problems"]
     assert "SAMPLE-RJ-01" not in found
     # Already-handled and routine sample complaints stay off it; flagged open ones are on it.
@@ -257,7 +258,7 @@ def _upload(user, csv: str) -> dict:
     return _ok(
         user.post(
             "/api/v1/trial/imports/complaints",
-            params={"on_problems": "skip", "file_name": "QMS export.csv"},
+            params={"on_problems": "skip", "file_name": "QMS export.csv", "date_column": "none"},
             content=csv,
             headers={"Content-Type": "text/csv"},
         )

@@ -7,6 +7,7 @@ problems, never stored) and ``personal_data=mask`` (personal data in free text i
 """
 
 import csv
+from datetime import date
 import io
 import uuid
 
@@ -66,9 +67,10 @@ def _complaints(product_id: str, *rows: tuple[str, str]) -> tuple[str, list[str]
     ids = [f"C-{product_id}-{index}" for index in range(len(rows))]
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\n")
-    writer.writerow(["complaint_id", "product_id", "description"])
+    # A complaints file gives each complaint's date (0.10.65: a file without a date column is not ready).
+    writer.writerow(["complaint_id", "product_id", "description", "received_date"])
     for identifier, (product, description) in zip(ids, rows):
-        writer.writerow([identifier, product, description])
+        writer.writerow([identifier, product, description, date.today().isoformat()])
     return out.getvalue(), ids
 
 
@@ -208,12 +210,13 @@ def test_refusing_flags_every_row_that_masking_would_change(investigator, produc
     assert not check["ready"] and check["rows_to_import"] == 0
     messages = {issue["row"]: issue["message"] for issue in check["issues"]}
     assert set(messages) == {5, 18, 34}, check["issues"]
+    # Each refusal quotes the words it found (0.10.62, J8).
     assert messages[5] == (
-        "This looks like it contains a person's name and a phone number. "
+        "This looks like it contains a person's name and a phone number (“Kavya Rao, +91 98450 12345”). "
         "Remove personal data and retry, or choose to mask it."
     )
-    assert messages[18].startswith("This looks like it contains a person's name and an email address.")
-    assert messages[34].startswith("This looks like it contains a person's name and a phone number.")
+    assert messages[18].startswith("This looks like it contains a person's name and an email address (“")
+    assert messages[34].startswith("This looks like it contains a person's name and a phone number (“")
     assert investigator.post(IMPORT, content=body).status_code == 422
     assert _stored(ids) == {}
 

@@ -4,6 +4,7 @@ from typing import Any
 from sqlalchemy import text
 
 from backend.app.db.session import engine
+from backend.app.product_facts import category_label
 from backend.app.product360.schemas import (
     Product360Response,
     ProductSummary,
@@ -199,7 +200,7 @@ class Product360Service:
             "no_root_cause_conclusion": True,
         }
         return Product360Response(
-            product=rowdict(product),
+            product={**rowdict(product), "device_category_label": category_label(product["device_category"])},
             selected_version=rowdict(selected) if selected else None,
             versions=[rowdict(v) for v in visible_versions],
             overview=overview,
@@ -315,6 +316,7 @@ class Product360Service:
             conn.execute(
                 text(
                     "SELECT l.id, l.business_id, l.lot_identifier, l.status, l.effective_timestamp AS manufactured_timestamp, "
+                    "l.expiry_date, "
                     "ms.site_identifier, ms.business_id AS site_business_id, ms.name AS site_name, "
                     "CASE WHEN l.source_identifier IN ('LOT-010','LOT-013','LOT-017') THEN 'PARTIAL' ELSE 'COMPLETE' END AS traceability_state "
                     "FROM lot_batches l LEFT JOIN manufacturing_sites ms ON ms.tenant_id=l.tenant_id AND ms.id=l.manufacturing_site_id "

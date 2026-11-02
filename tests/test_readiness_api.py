@@ -299,11 +299,12 @@ def test_the_summary_for_management_review(org, seeded):
     assert pdf.headers["content-type"] == "application/pdf"
     assert pdf.headers["content-disposition"].startswith('attachment; filename="mdarix-readiness-summary-')
     assert pdf.content.startswith(b"%PDF")
-    from reports.pdf import page_count
+    from reports.pdf import page_count, text_of
 
     assert page_count(pdf.content) >= 1
-    assert b"Readiness today" in pdf.content and b"Reporting to regulatory authorities" in pdf.content
-    assert b"8. Standards referenced" in pdf.content and b"it does not certify compliance" in pdf.content
+    shown = " ".join(text_of(pdf.content).split())
+    assert "Readiness today" in shown and "Reporting to regulatory authorities" in shown
+    assert "8. Standards referenced" in shown and "it does not certify compliance" in shown
     with SessionLocal() as db:
         bind_system(db, "test: read the audit trail")
         assert (
@@ -321,3 +322,14 @@ def test_another_organization_sees_none_of_this(org, seeded):
     assert checks["REPORTING_CLOCKS"]["state"] == "NOT_SET"
     assert checks["REPORTING_CLOCKS"]["opens"] == {"section": "Complaints", "tab": "Reporting windows"}
     assert org["other"].get("/api/v1/readiness/summary").json()["complaints"]["received"] == 0
+
+
+def test_an_empty_workspace_is_never_ready(org):
+    """J24: with no records every check read CLEAR, and the page said "Ready: every inspection check is clear"."""
+    body = org["other"].get("/api/v1/readiness").json()
+    assert body["summary"]["clear"] == 0 and body["summary"]["not_set"] == body["summary"]["checks"]
+    unread = [check for check in body["checks"] if check["code"] != "REPORTING_CLOCKS"]
+    assert unread and all(
+        (check["state"], check["value"], check["detail"]) == ("NOT_SET", None, "Not set: no records yet")
+        for check in unread
+    )

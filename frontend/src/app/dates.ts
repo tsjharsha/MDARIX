@@ -83,3 +83,49 @@ export function daysUntil(day: unknown, now = new Date()): number | null {
   // Rounded: a day across a daylight-saving change is 23 or 25 hours long.
   return Math.round((date.getTime() - today.getTime()) / 86_400_000);
 }
+
+/** What a due time or deadline needs for {@link timeLeft}: the server's state, and its end or its day. */
+export type DueLike = {
+  state?: string | null;
+  due_at?: string | null;
+  due_date?: string | null;
+  days_left?: number | null;
+  hours_left?: number | null;
+};
+
+const amount = (value: number, unit: "day" | "h") =>
+  unit === "h" ? `${value} h` : `${value} ${value === 1 ? "day" : "days"}`;
+
+/**
+ * The one way MDARIX says how much time is left (J40): "3 days left", "1 day left", "5 h left", "Due today",
+ * "2 days overdue", "3 h overdue". Overdue comes from the server's state when it gives one, so "1 h left" never stands
+ * beside "Overdue". From the end of the day (``due_at``) when there is one: whole days are the days to the deadline's
+ * own day in its time zone; the last day counts in hours. A calendar day without an end counts days where the person
+ * is.
+ */
+export function timeLeft(item: DueLike, now = new Date()): string {
+  const end = item.due_at ? Date.parse(item.due_at) : Number.NaN;
+  const ms = Number.isFinite(end)
+    ? end - now.getTime()
+    : typeof item.hours_left === "number"
+      ? item.hours_left * 3_600_000
+      : Number.NaN;
+  if (Number.isFinite(ms)) {
+    const overdue = item.state ? item.state === "OVERDUE" : ms <= 0;
+    if (overdue && ms > 0) return "Overdue";
+    if (!overdue && ms <= 0) return "Due now";
+    const hours = Math.abs(ms) / 3_600_000;
+    const text = hours < 24 ? amount(Math.max(1, Math.round(hours)), "h") : amount(Math.floor(hours / 24), "day");
+    return overdue ? `${text} overdue` : `${text} left`;
+  }
+  const days = daysUntil(item.due_date, now) ?? item.days_left;
+  if (typeof days !== "number") return "";
+  const overdue = item.state ? item.state === "OVERDUE" : days < 0;
+  if (overdue) return days < 0 ? `${amount(-days, "day")} overdue` : "Overdue";
+  if (days <= 0) return "Due today";
+  return `${amount(days, "day")} left`;
+}
+
+/** A legal deadline as the server writes it, with its time zone ("Mon 30 Nov 2026, 23:59 IST"); its day otherwise. */
+export const deadlineLabel = (item: { due_label?: string | null; due_date?: string | null } | null | undefined) =>
+  item?.due_label || formatDay(item?.due_date);

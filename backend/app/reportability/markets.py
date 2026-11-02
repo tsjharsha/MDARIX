@@ -21,11 +21,11 @@ anything stored.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
-from datetime import date
 
-from backend.app.reportability import rules
-from backend.app.standards import STARTER_MARK
+from backend.app.reportability import deadlines, rules
+from backend.app.standards import STARTER_MARK, version_words
 
 # The label every signed record and document made in a free trial carries (T-B5).
 PRACTICE_LABEL = "Practice record: made in a free trial with sample or de-identified data. Not your regulatory record."
@@ -97,10 +97,14 @@ class Question:
     # The answer says whether the harm reaches the market's "serious" threshold (checked against the scale).
     serious: bool = False
     note: str = ""
-    # False once a customer's guide version rewords it (T-G15); an extra question is the customer's own: recorded and
-    # printed with the answer, never part of the conclusion and never required.
+    # False when a customer's guide version of 0.10.59-0.10.63 reworded it (T-G15; locked from 0.10.64); an extra
+    # question is the customer's own: recorded and printed with the answer, never part of the conclusion and never
+    # required.
     starter: bool = True
     extra: bool = False
+    # The organization's own explanation and examples beside the locked wording (0.10.64).
+    explanation: str = ""
+    examples: str = ""
 
     def as_dict(self) -> dict:
         return {
@@ -113,6 +117,8 @@ class Question:
             "note": self.note or None,
             "starter": self.starter,
             "extra": self.extra,
+            "explanation": self.explanation or None,
+            "examples": self.examples or None,
         }
 
 
@@ -656,15 +662,54 @@ def conclusion_problem(suggested: str, conclusion: str, reason: str) -> str | No
 # --------------------------------------------------------------------------------------------- markets and clocks
 
 
-def market_of(country: object) -> str | None:
-    """The market of an event's country, or None."""
-    name = rules.normalize(country)
-    if not name:
-        return None
+def _market_of_one(name: str) -> str | None:
     for market in MARKETS:
         if name in {rules.normalize(item) for item in MARKET_COUNTRIES[market]}:
             return market
     return None
+
+
+def markets_of(country: object) -> list[str]:
+    """The markets of an event's country cell, in the order it names them: one country, or several separated by a
+    comma, semicolon, slash, "&" or "and" ("India, Germany": India's, then the EU's) (J41)."""
+    whole = _market_of_one(rules.normalize(country))
+    if whole:
+        return [whole]
+    found: list[str] = []
+    for part in rules.countries(country):
+        market = _market_of_one(rules.normalize(part))
+        if market and market not in found:
+            found.append(market)
+    return found
+
+
+def market_of(country: object) -> str | None:
+    """The market of an event's country, or None; of a cell naming several countries, the first one's (the event's own
+    market; ``markets_of`` gives them all)."""
+    name = rules.normalize(country)
+    if not name:
+        return None
+    return next(iter(markets_of(country)), None)
+
+
+# Words that mark an in-vitro diagnostic in a product's name, family, GMDN term or description: its EU clocks cite the
+# IVDR. shortcut: a word list, until products carry a device category (an owner decision, stage 4).
+IVD_WORDS = re.compile(r"(?i)\b(ivds?|in[- ]vitro|reagents?|assays?|test strips?|diagnostic kits?|rapid tests?)\b")
+
+
+def is_ivd(*texts) -> bool:
+    """Whether a product's words mark it as an in-vitro diagnostic (``IVD_WORDS``)."""
+    return any(IVD_WORDS.search(str(text or "")) for text in texts)
+
+
+def product_is_ivd(product) -> bool:
+    """Whether a product (a Product row, or None) is an in-vitro diagnostic, read the same way on the watch and in
+    triage: its device category when set (IVD or not), else the words of its name, family, GMDN term or description."""
+    if product is None:
+        return False
+    if getattr(product, "device_category", None):
+        return product.device_category == "IVD"
+    return is_ivd(product.name, product.product_family, product.gmdn_term, product.description)
 
 
 def window_markets(window: dict) -> set[str]:
@@ -681,29 +726,36 @@ def enabled_markets(windows: list[dict]) -> list[str]:
     return [market for market in MARKETS if market in covered]
 
 
-def _clock(name: str, days: int, day_basis: str, aware: date, today: date, source: str) -> dict:
-    due = rules.due_date(aware, {"days": days, "day_basis": day_basis})
-    return {
-        "window": name,
-        "days": days,
-        "day_basis": day_basis,
-        "due_date": due.isoformat(),
-        "days_left": (due - today).days,
-        "state": rules.clock_state(due, today, days),
-        "source": source,
-    }
+def _clock(
+    name: str,
+    days: int,
+    day_basis: str,
+    aware,
+    now,
+    source: str,
+    market: str | None = None,
+    org_zone: str | None = None,
+) -> dict:
+    due = deadlines.count(aware, days, day_basis, market, org_zone)
+    return {"window": name, "days": days, "day_basis": day_basis, **deadlines.view(due, now, days), "source": source}
 
 
 def market_clock(
-    market: str, state: str | None, report_type: str | None, windows: list[dict], aware: date | None, today: date
+    market: str,
+    state: str | None,
+    report_type: str | None,
+    windows: list[dict],
+    aware,
+    now,
+    org_zone: str | None = None,
 ) -> dict | None:
-    """A market's clock. Reportable: the organization's window of the report type's period for that market, or the
-    regulation's period when none matches. Pending, or not yet assessed: the shortest window the organization set for
-    that market, still counting. Not reportable: none."""
+    """A market's clock, by its counting rule (deadlines.py). Reportable: the organization's window of the report
+    type's period for that market, or the regulation's period when none matches. Pending, or not yet assessed: the
+    shortest window the organization set for that market, still counting. Not reportable: none."""
     if aware is None or state == NOT_REPORTABLE:
         return None
     mine = [window for window in windows if market in window_markets(window)]
-    clocks = [_clock(w["name"], w["days"], w["day_basis"], aware, today, "WINDOW") for w in mine]
+    clocks = [_clock(w["name"], w["days"], w["day_basis"], aware, now, "WINDOW", market, org_zone) for w in mine]
     kind = REPORT_TYPES.get(report_type or "")
     if state == REPORTABLE and kind and kind.days:
         exact = [
@@ -712,13 +764,13 @@ def market_clock(
             if window["days"] == kind.days and window["day_basis"] == kind.day_basis
         ]
         if exact:
-            return min(exact, key=lambda clock: clock["due_date"])
-        return _clock(kind.label, kind.days, kind.day_basis, aware, today, "REGULATION")
-    return min(clocks, key=lambda clock: clock["due_date"]) if clocks else None
+            return min(exact, key=lambda clock: clock["due_at"])
+        return _clock(kind.label, kind.days, kind.day_basis, aware, now, "REGULATION", market, org_zone)
+    return min(clocks, key=lambda clock: clock["due_at"]) if clocks else None
 
 
 def signature_meaning(ref: str, market: str, version: str, conclusion: str) -> str:
     return (
-        f"I have assessed {ref} for {MARKET_LABELS[market]} with question set {version} and the harm-severity scale "
-        f"{SCALE_VERSION}, and conclude: {CONCLUSION_LABELS[conclusion].lower()}."
+        f"I have assessed {ref} for {MARKET_LABELS[market]} with its questions, {version_words(version)}, and the "
+        f"harm-severity scale, {version_words(SCALE_VERSION)}, and conclude: {CONCLUSION_LABELS[conclusion].lower()}."
     )

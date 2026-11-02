@@ -79,7 +79,7 @@ const slices = (rows: Breakdown | undefined): Slice[] =>
 /** The quality work of the organization at a glance: what came in, what is open, what was decided, and what needs
  * attention. Every figure is read from the signed-in user's own tenant. */
 export function DashboardSection() {
-  const { session, work, open } = useWorkspace();
+  const { session, work, open, isTrial } = useWorkspace();
   const counts = useResource<any>("/api/v1/analytics/command-center");
   const signals = useResource<any>("/api/v1/analytics/signals");
   const investigations = useResource<any>("/api/v1/analytics/investigations");
@@ -274,7 +274,11 @@ export function DashboardSection() {
                     <Upload size={16} aria-hidden="true" /> Import CSV data
                   </button>
                 ) : (
-                  <p className="ac-note">Ask your administrator to connect your systems or import your data.</p>
+                  <p className="ac-note">
+                    {isTrial
+                      ? "Ask the person who started this trial to import your data."
+                      : "Ask your administrator to connect your systems or import your data."}
+                  </p>
                 ))}
               <button
                 type="button"

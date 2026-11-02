@@ -234,6 +234,24 @@ def test_detection_plan_creates_links_and_is_idempotent():
     assert not [plan for plan in logic.plan_detection(rows[:2], {}, {}, 3) if plan.action]
 
 
+def test_an_event_linked_from_several_records_counts_once_in_the_count_rule():
+    """S2: three records a person linked as one event, and one more complaint, are two events: below a threshold of
+    3. Every record is still in the plan, to be linked as evidence when the group raises or joins a signal."""
+    product, version = uuid.uuid4(), uuid.uuid4()
+    first, second, third, other = (_complaint(product, version, "A") for _ in range(4))
+    events = {first.id: first.id, second.id: first.id, third.id: first.id}
+    rows = [first, second, third, other]
+    assert logic.new_events(rows, events) == 2
+    assert not [plan for plan in logic.plan_detection(rows, {}, {}, 3, events) if plan.action]
+    # Before 0.10.63 the four records raised a signal.
+    assert [plan.action for plan in logic.plan_detection(rows, {}, {}, 3) if plan.action] == ["CREATE"]
+    # A third event raises it, and the signal links all five records.
+    plans = [plan for plan in logic.plan_detection([*rows, _complaint(product, version, "A")], {}, {}, 3, events)]
+    assert [(plan.action, len(plan.new)) for plan in plans] == [("CREATE", 5)]
+    # An event whose standing record is outside the window adds nothing.
+    assert logic.new_events([second, third], events) == 0
+
+
 def _refused(code, *args, **kwargs):
     with pytest.raises(SignalRuleError) as caught:
         logic.check_disposition(*args, today=TODAY, **kwargs)

@@ -16,6 +16,7 @@ import { Drawer, errorText, formatDate, send, useResource } from "../../customer
 import { downloadFile } from "../../reports/download";
 import { useCan } from "../workspaceContext";
 import { Hero, InlineError } from "./boardParts";
+import { OwnText } from "./MarketAssessment";
 import {
   GUIDES,
   NEW_EXTRA,
@@ -44,8 +45,9 @@ function useCanEdit() {
 
 /**
  * Complaints › Decision guides: each market's guide in versions. Version 1 is MDARIX's starter; the organization
- * makes its own from it, rewords the questions within the rules, adds its own, runs the test cases, and a second
- * person approves before the version is used. The guide points to a conclusion; a person decides and signs.
+ * makes its own from it: the regulation's wording stays locked and it adds its explanation and examples beside it, adds
+ * its own questions and worked complaints, runs the test matrix, and a second person approves before the version is
+ * used. The guide points to a conclusion; a person decides and signs.
  */
 export function DecisionGuides() {
   const list = useResource<GuideList>(GUIDES);
@@ -77,7 +79,7 @@ export function DecisionGuides() {
               : "MDARIX starter guides in use"
             : "Reading the guides…"
         }
-        detail="The questions every market assessment asks, with the regulation clause behind each. Make the guide your own: reword it, add your questions, test it, and have a colleague approve it."
+        detail="The questions every market assessment asks, with the regulation clause behind each. Make the guide your own: add your explanation and examples beside the regulation's wording, add your questions and worked complaints, test it, and have a colleague approve it."
       />
       <Panel eyebrow="Markets" title="Your guides and their versions" source={list}>
         {list.data && (
@@ -217,6 +219,7 @@ export function GuideDrawer({ market, version, onClose }: { market: string; vers
         </p>
         {view.practice_label && <p className="ac-muted">{view.practice_label}</p>}
         <p className="ac-muted">{view.core_rule}</p>
+        {view.matrix_rule && <p className="ac-muted">{view.matrix_rule}</p>}
         {view.change_reason && (
           <p>
             <strong>What changed and why:</strong> {view.change_reason}
@@ -231,6 +234,7 @@ export function GuideDrawer({ market, version, onClose }: { market: string; vers
             <TestTable view={view} tests={view.test_cases} />
           </>
         )}
+        {view.state === "AWAITING_APPROVAL" && <MatrixCheck view={view} />}
         {view.editable && <Publish view={view} onChanged={setShown} canEdit={canEdit} />}
         <ApprovalRecord view={view} />
         <p className="ac-muted">
@@ -262,6 +266,7 @@ function QuestionTable({ view }: { view: GuideVersion }) {
                 <td>
                   <strong>{question.text}</strong>
                   {question.note && <p className="uw-hint">{question.note}</p>}
+                  <OwnText question={question} />
                   <span className="uw-ma-starter-chip">{questionMark(question)}</span>
                 </td>
                 <td>{question.clause || <span className="tone-critical">No clause</span>}</td>
@@ -279,11 +284,12 @@ function TestTable({ view, tests }: { view: GuideVersion; tests: TestCase[] }) {
   const results = Object.fromEntries((view.test_results?.results ?? []).map((item) => [item.id, item]));
   const run = view.test_results;
   return (
-    <section className="ca-drawer-section" aria-label="Test cases">
+    <section className="ca-drawer-section" aria-label="Test matrix">
       <h4>
-        Test cases ({tests.length}){run ? ` · ${run.passed} passed, ${run.failed} failed` : " · not run yet"}
+        Test matrix: {tests.length} worked complaints
+        {run ? ` · ${run.passed} passed, ${run.failed} failed` : " · not run yet"}
       </h4>
-      {run && !run.current && <p className="uw-hint">Changed since the last run: run the test cases again.</p>}
+      {run && !run.current && <p className="uw-hint">Changed since the last run: run the test matrix again.</p>}
       {run?.run_at && (
         <p className="ac-muted">
           Run by {run.run_by} {formatDate(run.run_at)}.
@@ -303,7 +309,8 @@ function TestTable({ view, tests }: { view: GuideVersion; tests: TestCase[] }) {
                   )
                 ) : null}{" "}
                 {test.name}
-              </strong>
+              </strong>{" "}
+              <span className="uw-ma-starter-chip">{test.starter ? "MDARIX starter" : "Your worked complaint"}</span>
               <span className="uw-cr-meta">
                 Answers:{" "}
                 {answersText(
@@ -343,7 +350,9 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
       <section className="ca-drawer-section" aria-label="Questions">
         <h4>Questions ({questions.length})</h4>
         <p className="ac-muted">
-          Every question needs its regulation clause and its basis before the version can be published.
+          The questions that drive the conclusion keep the regulation's wording, definition and clause: add your
+          explanation and examples beside them. Every extra question needs its regulation clause and its basis before
+          the version can be published.
         </p>
         <div className="uw-dg-scroll">
           <table className="uw-dg-table uw-dg-edit">
@@ -365,51 +374,86 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
                     {question.id || "New"}
                     <span className="uw-cr-meta uw-dg-kind">{question.extra ? "extra" : "core"}</span>
                   </th>
-                  <td>
-                    <label className="ca-field">
-                      Question
-                      <textarea
-                        rows={2}
-                        value={question.text}
-                        onChange={(event) => set(index, { text: event.target.value })}
-                      />
-                    </label>
-                    <label className="ca-field">
-                      Definition
-                      <textarea
-                        rows={2}
-                        value={question.definition}
-                        onChange={(event) => set(index, { definition: event.target.value })}
-                      />
-                    </label>
-                    <label className="ca-field">
-                      Help text
-                      <textarea
-                        rows={2}
-                        value={question.note}
-                        onChange={(event) => set(index, { note: event.target.value })}
-                      />
-                    </label>
-                  </td>
-                  <td>
-                    <label className="ca-field">
-                      Clause
-                      <textarea
-                        rows={2}
-                        value={question.clause}
-                        onChange={(event) => set(index, { clause: event.target.value })}
-                      />
-                    </label>
-                    {!question.clause.trim() && <span className="tone-critical">No clause yet</span>}
-                  </td>
-                  <td>
-                    <BasisPicker
-                      catalog={view.catalog}
-                      value={question.basis}
-                      onChange={(basis) => set(index, { basis })}
-                      label={question.id || "new question"}
-                    />
-                  </td>
+                  {question.extra ? (
+                    <>
+                      <td>
+                        <label className="ca-field">
+                          Question
+                          <textarea
+                            rows={2}
+                            value={question.text}
+                            onChange={(event) => set(index, { text: event.target.value })}
+                          />
+                        </label>
+                        <label className="ca-field">
+                          Definition
+                          <textarea
+                            rows={2}
+                            value={question.definition}
+                            onChange={(event) => set(index, { definition: event.target.value })}
+                          />
+                        </label>
+                        <label className="ca-field">
+                          Help text
+                          <textarea
+                            rows={2}
+                            value={question.note}
+                            onChange={(event) => set(index, { note: event.target.value })}
+                          />
+                        </label>
+                      </td>
+                      <td>
+                        <label className="ca-field">
+                          Clause
+                          <textarea
+                            rows={2}
+                            value={question.clause}
+                            onChange={(event) => set(index, { clause: event.target.value })}
+                          />
+                        </label>
+                        {!question.clause.trim() && <span className="tone-critical">No clause yet</span>}
+                      </td>
+                      <td>
+                        <BasisPicker
+                          catalog={view.catalog}
+                          value={question.basis}
+                          onChange={(basis) => set(index, { basis })}
+                          label={question.id || "new question"}
+                        />
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td>
+                        <strong>{question.text}</strong>
+                        <p className="ac-muted">{question.definition}</p>
+                        {question.note && <p className="uw-hint">{question.note}</p>}
+                        <span className="uw-ma-starter-chip">The regulation's wording: locked</span>
+                        <label className="ca-field">
+                          Your explanation
+                          <textarea
+                            rows={2}
+                            value={question.explanation}
+                            onChange={(event) => set(index, { explanation: event.target.value })}
+                          />
+                        </label>
+                        <label className="ca-field">
+                          Your examples
+                          <textarea
+                            rows={2}
+                            value={question.examples}
+                            onChange={(event) => set(index, { examples: event.target.value })}
+                          />
+                        </label>
+                      </td>
+                      <td>{question.clause}</td>
+                      <td>
+                        {question.basis
+                          .map((id) => view.catalog.find((item) => item.id === id)?.short ?? id)
+                          .join(", ")}
+                      </td>
+                    </>
+                  )}
                   <td>
                     {question.extra && (
                       <div className="uw-dg-order">
@@ -455,19 +499,21 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
       </section>
       <TestTable view={view} tests={tests} />
       <TestEditor view={view} onAdd={(test) => setTests((current) => [...current, test])} />
-      {tests.length > 0 && (
+      {tests.some((test) => !test.starter) && (
         <p className="ac-muted">
-          To remove a test case:{" "}
-          {tests.map((test) => (
-            <button
-              key={test.id}
-              type="button"
-              className="ac-link"
-              onClick={() => setTests((current) => current.filter((item) => item !== test))}
-            >
-              {test.id}{" "}
-            </button>
-          ))}
+          To remove one of your worked complaints:{" "}
+          {tests
+            .filter((test) => !test.starter)
+            .map((test) => (
+              <button
+                key={test.id}
+                type="button"
+                className="ac-link"
+                onClick={() => setTests((current) => current.filter((item) => item !== test))}
+              >
+                {test.id}{" "}
+              </button>
+            ))}
         </p>
       )}
       <div className="ca-action-row">
@@ -534,14 +580,17 @@ function TestEditor({ view, onAdd }: { view: GuideVersion; onAdd: (test: TestCas
   if (!open)
     return (
       <button type="button" className="ac-secondary" onClick={() => setOpen(true)}>
-        <Plus size={15} aria-hidden="true" /> Add a test case
+        <Plus size={15} aria-hidden="true" /> Add a worked complaint
       </button>
     );
   const ready = name.trim().length >= 3 && expected;
   return (
     <fieldset className="ca-drawer-section uw-dg-test-editor">
-      <legend>New test case</legend>
-      <p className="ac-muted">A question left blank is Unknown in the test, never No.</p>
+      <legend>New worked complaint</legend>
+      <p className="ac-muted">
+        Name the complaint in a line, answer the questions as you would for it, and choose what the guide must point to.
+        A question left blank is Unknown, never No.
+      </p>
       <label className="ca-field">
         Name
         <input value={name} onChange={(event) => setName(event.target.value)} />
@@ -641,7 +690,7 @@ function Publish({
           ))}
         </ul>
       ) : (
-        <p className="tone-good">Every question has its clause and every test case passes.</p>
+        <p className="tone-good">Every question has its clause and every worked complaint in the matrix passes.</p>
       )}
       {canEdit && view.state === "DRAFT" && (
         <>
@@ -652,7 +701,7 @@ function Publish({
               disabled={action.busy || !view.test_cases.length}
               onClick={() => void action.run(`${base}/tests`, "POST")}
             >
-              Run the test cases
+              Run the test matrix
             </button>
             <button
               type="button"
@@ -679,7 +728,27 @@ function Publish({
           </div>
         </>
       )}
-      {canEdit && view.state === "AWAITING_APPROVAL" && (
+      {view.state === "AWAITING_APPROVAL" && view.approval && !view.approval.may_approve && (
+        <div className="uw-rp-approval" role="note" aria-label="Who approves the version">
+          <p>
+            <strong>{view.code}</strong> sent for approval by {view.requested_by} {formatDate(view.requested_at)}.
+          </p>
+          <p>{view.approval.message}</p>
+        </div>
+      )}
+      {canEdit && view.you_asked && (
+        <div className="ca-action-row">
+          <button
+            type="button"
+            className="ac-secondary"
+            disabled={action.busy}
+            onClick={() => void action.run(`${base}/withdraw`, "POST")}
+          >
+            Withdraw it: back to draft
+          </button>
+        </div>
+      )}
+      {canEdit && view.state === "AWAITING_APPROVAL" && view.approval?.may_approve !== false && (
         <form
           className="uw-rp-approval"
           aria-label="Approve the version"
@@ -691,8 +760,8 @@ function Publish({
           <p>
             <strong>{view.code}</strong> sent for approval by {view.requested_by} {formatDate(view.requested_at)}. Not
             allowed to approve: {view.editors.join(", ")} (who edited it) and administrators.
-            {view.you_edited ? " You edited it: a colleague approves it." : ""}
           </p>
+          {view.approval?.same_person && <p className="ac-message tone-warning">{view.approval.message}</p>}
           <div className="ca-form-grid">
             <label className="ca-field">
               Your password
@@ -717,13 +786,45 @@ function Publish({
             Your approval publishes this version: assessments started from now on use it; ones in progress keep theirs.
           </p>
           <div className="ca-action-row">
-            <button type="submit" className="ac-primary" disabled={action.busy || !password}>
+            <button
+              type="submit"
+              className="ac-primary"
+              disabled={action.busy || !password || !!view.matrix_changed?.length}
+            >
               {action.busy ? "Approving…" : "Approve and publish"}
             </button>
           </div>
         </form>
       )}
       <InlineError text={action.error} />
+    </section>
+  );
+}
+
+/** For the approver: the test matrix run again now. A worked complaint whose answer changed blocks the approval. */
+function MatrixCheck({ view }: { view: GuideVersion }) {
+  const changed = view.matrix_changed ?? [];
+  const rows = view.test_cases.length;
+  return (
+    <section className="ca-drawer-section" aria-label="Test matrix check">
+      <h4>Test matrix, run again now</h4>
+      {changed.length ? (
+        <>
+          <p className="tone-critical">
+            {changed.length} of {rows} worked complaints give a different answer now. This version cannot be approved:
+            its author changes it and sends it again.
+          </p>
+          <ul className="uw-dg-problems" aria-label="Worked complaints whose answer changed">
+            {changed.map((name) => (
+              <li key={name} className="tone-critical">
+                {name}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="tone-good">All {rows} worked complaints still give the expected answer.</p>
+      )}
     </section>
   );
 }

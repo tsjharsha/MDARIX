@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from backend.app import mfa
 from backend.app.access.permissions import INVESTIGATION_CREATE, QUALITY_REVIEW, SIGNAL_TRIAGE
 from backend.app.complaint_classification import rules as coding
 from backend.app.complaint_disposition import rules, service, triggers
@@ -106,9 +107,11 @@ def _reportability(db: Session, tenant_id: uuid.UUID, complaint_id, today: date)
         complaint.status, complaint.complaint_type, second_look
     )
     windows = reporting.settings_of(db, tenant_id)["windows"]
-    aware = date.fromisoformat(seen["aware_date"]) if seen["aware_date"] else None
+    aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
     by_market = assessments.rows_by_complaint(db, tenant_id, [complaint_id]).get(complaint_id, {})
-    summary = assessments.markets_summary(record, windows, by_market, aware, today) if on_watch else []
+    summary = (
+        assessments.markets_summary(record, windows, by_market, aware, today, seen.get("org_zone")) if on_watch else []
+    )
     settled = (not on_watch) or assessments.settled(summary) or bool(seen.get("decided"))
     return {
         "on_watch": on_watch,
@@ -182,6 +185,8 @@ def screen(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
         "training": training.status(db, tenant_id, ctx.user_id, needed),
         # The practice training before signing is a free trial's rule (T-G40P).
         "training_required": trial,
+        # The signature needs an authenticator code (verify_signing_credentials): the form asks for it before sending.
+        "code_required": mfa.signatures_require_mfa(),
         "trained_colleagues": [names.get(ref) or "A colleague" for ref in holders],
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,

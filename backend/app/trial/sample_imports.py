@@ -1,6 +1,7 @@
 """The sample's import run (T-SAM for 0.10.56): what a free trial's own Excel or CSV import shows, on the sample data.
 
-- **One import run**, "Sample complaints export.xlsx": every sample complaint is one of its rows (its lineage, R16:
+- **One import run**, "Sample complaints export.xlsx": every sample complaint staged before it is one of its rows
+  (SAMPLE-RV-10, the India hospital's later report, comes after it: sample_reports.py) (its lineage, R16:
   the run, the row and the mapping version), and two rows were set aside with their reasons (stored quarantine, R14),
   so its data-quality report (R17) reads, writes, sets aside and balances like any other run. Its audit record is
   ``TRIAL_DATA_IMPORTED`` marked ``sample`` and holds no created or updated counts, so nothing waits for signals
@@ -30,7 +31,7 @@ from backend.app.db.models.foundation import Complaint, Product
 from backend.app.db.models.ingestion import ImportLineage
 from backend.app.db.models.regulatory_reference import ImdrfCodeMapping
 from backend.app.enterprise_audit import make_audit_event
-from backend.app.trial.imports import TEMPLATES, _check_values, _mask, _personal_data, _Report, quality_report
+from backend.app.trial.imports import TEMPLATES, _check_values, _Report, quality_report, stored_value
 from backend.app.trial.sample_data import SAMPLE_SOURCE, STORY_WINDOWS_BY
 
 SAMPLE_FILE = "Sample complaints export.xlsx"
@@ -112,7 +113,7 @@ def stage_sample_import(db: Session, tenant_id, now: datetime) -> dict:
         db, tenant_id, import_ref, "complaints", TEMPLATES["complaints"]["required"], rows, version, SAMPLE_SOURCE
     )
     set_aside = _set_aside(len(rows) + 2)
-    import_quarantine.store(db, tenant_id, import_ref, "complaints", SAMPLE_SOURCE, set_aside, _personal_data, _mask)
+    import_quarantine.store(db, tenant_id, import_ref, "complaints", SAMPLE_SOURCE, set_aside, stored_value)
     for item in db.query(Product).filter(Product.tenant_id == tenant_id, Product.source_system == SAMPLE_SOURCE):
         if item.product_identifier in SAMPLE_IDENTITY:
             item.udi_di, item.gmdn_code, item.gmdn_term = SAMPLE_IDENTITY[item.product_identifier]

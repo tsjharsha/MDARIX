@@ -8,7 +8,8 @@ from datetime import date, datetime, timedelta, timezone
 from backend.app.authority_reports import forms, rules
 
 DUE = date(2026, 12, 4)
-END = datetime(2026, 12, 5, tzinfo=timezone.utc)
+# The end of the latest day: 23:59:59 in the counting time zone (UTC here: no market, no organization zone; 0.10.63).
+END = datetime(2026, 12, 4, 23, 59, 59, tzinfo=timezone.utc)
 
 
 def _row(left: timedelta) -> dict:

@@ -1,3 +1,4 @@
+import { deadlineLabel } from "../../../app/dates";
 import { useState } from "react";
 import { ClipboardCheck, Play, UserMinus, XCircle } from "lucide-react";
 import { ApiError } from "../../../app/apiClient";
@@ -987,7 +988,7 @@ export function ReportingClocks({ context }: { context: unknown }) {
               {item.binding && !item.decision && (
                 <small>
                   {" "}
-                  {item.binding.window} · due {item.binding.due_date}
+                  {item.binding.window} · due {deadlineLabel(item.binding)}
                 </small>
               )}
             </li>

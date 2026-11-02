@@ -15,8 +15,10 @@ code constants. The trial behaves as the MVP items (T-B11); it differs only wher
   receipt and the source date ("awareness unresolved: deadline provisional"); the time it reached MDARIX only when
   none exists.
 - **Provisional deadlines** (``provisional_deadlines``, MVP 5.1b): each market's shortest plausible category, from
-  awareness, in three tiers (possible serious public health threat, flagged, unflagged). Starter text until the
-  consultant confirms each cell: the shorter reading applies.
+  awareness, in three tiers (possible serious public health threat, flagged, unflagged), counted by the market's rule
+  (reportability/deadlines.py). The event's own market comes first; the other enabled markets only "if also
+  reportable"; a signed market conclusion replaces its market's provisional deadline (0.10.63, J3). Starter text until
+  the consultant confirms each cell: the shorter reading applies.
 - **The triage target**: 24 clock hours from availability in MDARIX (or the reopening), beside the regulatory clocks.
 - **Possible duplicates** (``duplicate_reasons``): the same product and lot or serial number; an event within
   ``DUPLICATE_DAYS``; and the same site (or country). Starter values, fixed in the trial.
@@ -27,10 +29,10 @@ MDARIX never answers a question, never signs and never submits a report.
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 from backend.app.complaint_review.rules import normalize
-from backend.app.reportability import markets
+from backend.app.reportability import deadlines, markets
 from backend.app.reportability import rules as reporting
 
 GUIDE_VERSION = "first-contact-starter-1"
@@ -456,40 +458,109 @@ PROVISIONAL = {
     },
 }
 US_REMEDIAL = (5, reporting.WORK, "5 work days: remedial action may be needed (21 CFR 803.53)")
+# The EU clocks of an in-vitro diagnostic cite the IVDR (Regulation (EU) 2017/746, Art. 82): starter text, for the
+# consultant to confirm (the MVP requirements give no IVDR article).
+IVDR_82 = "EU IVDR Art. 82, starter"
 
 
 def tier(flagged: bool, threat: bool) -> str:
     return THREAT if threat else FLAGGED if flagged else UNFLAGGED
 
 
+OWN, ALSO, SIGNED, NO_COUNTRY, NO_WINDOW = "OWN", "IF_ALSO", "SIGNED", "NO_COUNTRY", "OWN_NO_WINDOW"
+ROLE_LABELS = {
+    OWN: "The event's market",
+    ALSO: "If also reportable",
+    SIGNED: "Signed market conclusion",
+    NO_COUNTRY: "No country recorded: each enabled market",
+    NO_WINDOW: "No reporting window for the event's own market: each enabled market",
+}
+
+
 def provisional_deadlines(
-    aware: datetime, enabled: list[str], level: str, today: date, remedial: bool = False
+    aware: datetime,
+    enabled: list[str],
+    level: str,
+    today,
+    remedial: bool = False,
+    *,
+    own: str | None = None,
+    signed: dict | None = None,
+    org_zone: str | None = None,
+    ivd: bool = False,
 ) -> list[dict]:
-    """Each enabled market's provisional deadline in the shortest plausible category, counted from the awareness day
-    (MVP 5.1b; the day-counting of the reporting windows, reportability/rules.py)."""
-    day = utc(aware).date()
+    """Each enabled market's deadline for triage (MVP 5.1b; J3), counted by the market's rule (reportability/deadlines.py):
+    the event's own market (``own``, from its country) first; the other enabled markets after it, only "if also
+    reportable"; a market with a signed conclusion (``signed``: market -> its clock, or None when concluded not
+    reportable) shows that conclusion's deadline instead of the provisional one. ``ivd``: an in-vitro diagnostic,
+    whose EU clocks cite the IVDR (starter). ``today``: now (a day in older callers)."""
     found = []
-    for market in enabled or list(markets.MARKETS):
+    signed = signed or {}
+    listed = enabled or list(markets.MARKETS)
+    for market in listed:
+        role = (
+            SIGNED
+            if market in signed
+            else OWN
+            if market == own
+            else ALSO
+            if own in listed
+            else NO_WINDOW
+            if own
+            else NO_COUNTRY
+        )
+        if market in signed:
+            clock = signed[market]
+            found.append(
+                {
+                    "market": market,
+                    "label": markets.MARKET_LABELS[market],
+                    "role": role,
+                    "role_label": ROLE_LABELS[role],
+                    "own": market == own,
+                    "tier": level,
+                    "tier_label": "Concluded not reportable" if clock is None else "Signed: reportable",
+                    "not_reportable": clock is None,
+                    "days": clock["days"] if clock else None,
+                    "day_basis": clock["day_basis"] if clock else None,
+                    "basis": clock["window"] if clock else "Concluded not reportable (signed)",
+                    "conservative": False,
+                    **(
+                        {
+                            key: clock[key]
+                            for key in ("due_date", "due_at", "due_zone", "due_label", "days_left", "state")
+                        }
+                        if clock
+                        else {k: None for k in ("due_date", "due_at", "due_zone", "due_label", "days_left", "state")}
+                    ),
+                }
+            )
+            continue
         days, basis, label = PROVISIONAL[market][level]
         if market == markets.US and remedial and level == FLAGGED:
             days, basis, label = US_REMEDIAL
-        due = reporting.due_date(day, {"days": days, "day_basis": basis})
+        if ivd and market == markets.EU_NI:
+            label = label.replace("EU MDR Art. 87(4)", IVDR_82).replace("EU MDR Art. 87(5)", IVDR_82)
+            label = label.replace("EU MDR Art. 87(3)", IVDR_82)
+        due = deadlines.count(utc(aware), days, basis, market, org_zone)
         found.append(
             {
                 "market": market,
                 "label": markets.MARKET_LABELS[market],
+                "role": role,
+                "role_label": ROLE_LABELS[role],
+                "own": market == own,
                 "tier": level,
                 "tier_label": TIER_LABELS[level],
+                "not_reportable": False,
                 "days": days,
                 "day_basis": basis,
                 "basis": label,
-                "due_date": due.isoformat(),
-                "days_left": (due - today).days,
-                "state": reporting.clock_state(due, today, days),
+                **deadlines.view(due, today, days),
                 "conservative": True,
             }
         )
-    return sorted(found, key=lambda item: item["due_date"])
+    return sorted(found, key=lambda item: (not item["own"], item["not_reportable"], item["due_at"] or "9999"))
 
 
 def triage_clock(available: datetime, now: datetime, target_hours: int = TRIAGE_TARGET_HOURS) -> dict:

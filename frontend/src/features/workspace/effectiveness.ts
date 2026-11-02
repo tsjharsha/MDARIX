@@ -3,7 +3,7 @@
 // (/api/v1/capas/.../effectiveness, backend/app/capa_effectiveness) decides every action; a person signs the result.
 import type { Tone } from "../admin/console/dashboardModel";
 import { collapsed } from "./complaintReview";
-import { daysUntil } from "../../app/dates";
+import { timeLeft, type DueLike } from "../../app/dates";
 
 export const RECORDS_TABS = ["Effectiveness checks", "Risk file input"] as const;
 export type RecordsTab = (typeof RECORDS_TABS)[number];
@@ -49,6 +49,7 @@ export type CapaItem = {
     status: string | null;
     action_type: string | null;
     source_system: string | null;
+    qms_reference?: string | null;
     opened_on: string | null;
     due_on: string | null;
     closed: boolean;
@@ -141,8 +142,18 @@ const plural = (count: number, noun: string) => `${count.toLocaleString()} ${cou
 export const capaRef = (item: Pick<CapaItem, "capa">) => item.capa.business_id || item.capa.capa_identifier || "CAPA";
 
 /**
- * "Due in 10 days", "Due today", "3 days overdue", or what the state says. Counted from today where the person is, from
- * the check's day, so a 90-day check reads "Due in 90 days" just after midnight in India too (DEV-020); the server's
+ * Where a CAPA stands in your QMS (J22), wherever the CAPA shows: "QMS reference CAPA-0450" once known, "To raise in
+ * your QMS" for one MDARIX recorded without it yet, or null for a CAPA that came from your QMS (its ID is the QMS's).
+ */
+export function capaQmsText(capa: { qms_reference?: string | null; source_system?: string | null }): string | null {
+  const ref = capa.qms_reference?.trim();
+  if (ref) return `QMS reference ${ref}`;
+  return capa.source_system === "MDARIX" ? "To raise in your QMS" : null;
+}
+
+/**
+ * "10 days left", "Due today", "3 days overdue" (app/dates.ts timeLeft), or what the state says. Counted from today where the person is, from
+ * the check's day, so a 90-day check reads "90 days left" just after midnight in India too (DEV-020); the server's
  * count (from the UTC date) only when there is no day.
  */
 export function dueText(
@@ -150,10 +161,7 @@ export function dueText(
   now = new Date(),
 ): string {
   if (item.days_left === null) return stateOf(item.state).label;
-  const left = daysUntil(item.planned_on, now) ?? item.days_left;
-  if (left < 0) return `${plural(-left, "day")} overdue`;
-  if (left === 0) return "Due today";
-  return `Due in ${plural(left, "day")}`;
+  return timeLeft({ due_date: item.planned_on, days_left: item.days_left }, now);
 }
 
 export function boardHeadline(summary: BoardSummary | null | undefined): { title: string; detail: string; tone: Tone } {

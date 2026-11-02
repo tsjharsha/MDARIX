@@ -114,6 +114,24 @@ describe("step-by-step user guide", () => {
     expect(html).toContain("Save as PDF");
   });
 
+  it("says what MDARIX covers by device category, in Help, not in a new tab (J32)", () => {
+    const html = renderToStaticMarkup(<UserGuidePage />);
+    expect(html).toContain('href="#coverage"');
+    expect(html).toContain("What MDARIX covers");
+    for (const category of [
+      "Implant",
+      "Single-use",
+      "Reusable or capital equipment",
+      "Software",
+      "IVD (in-vitro diagnostic)",
+      "Kit",
+    ])
+      expect(html).toContain(`<h3>${category}</h3>`);
+    expect(html.split("Not covered yet").length - 1).toBe(6);
+    expect(html).toContain("EU IVDR Art. 82 (starter)");
+    expect(html).toContain("for your regulatory consultant to confirm");
+  });
+
   it("is told apart from the free trial user guide wherever both are offered", () => {
     const journey = renderToStaticMarkup(<TrialJourney steps={[]} source={{ state: "ready" }} onGo={() => {}} />);
     expect(journey).toContain(`href="${TRIAL_GUIDE_PATH}"`);

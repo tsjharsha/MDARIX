@@ -93,8 +93,8 @@ describe("approval", () => {
     for (const code of [
       "REAUTHENTICATION_REQUIRED",
       "INVALID_REAUTHENTICATION",
-      "MFA_ENROLLMENT_REQUIRED",
-      "MFA_REQUIRED",
+      "SIGNATURE_MFA_NOT_SET_UP",
+      "SIGNATURE_CODE_INVALID",
       "ADMINISTRATOR_CANNOT_SIGN",
       "SIGNATURE_TEMPORARILY_LOCKED",
     ]) {

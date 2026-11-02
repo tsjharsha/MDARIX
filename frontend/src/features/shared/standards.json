@@ -158,6 +158,13 @@
       "jurisdiction": "European Union"
     },
     {
+      "id": "IVDR_82",
+      "short": "EU IVDR Art. 82",
+      "title": "Reporting of serious incidents and field safety corrective actions (in-vitro diagnostics)",
+      "jurisdiction": "European Union",
+      "starter": true
+    },
+    {
       "id": "MDCG_2023_3",
       "short": "MDCG 2023-3",
       "title": "Questions and answers on vigilance terms and concepts (EU MDR)",

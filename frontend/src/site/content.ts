@@ -367,7 +367,7 @@ export const AVAILABILITY: readonly Availability[] = ["Available today", "In a p
  * Where each Platform capability stands, from the roadmap (capabilityStatus) and the product as it runs: a free trial
  * always gets the MVP's screens (backend/app/feature_set.py, app/featureSet.ts), and what the MVP parks (the Products
  * screen, the Decision Center, counterfactuals, AI assurance) runs on the full product, in a pilot. AI is off during
- * the trial, so every AI capability is "In a pilot". `note` says what the label means in the product today. Nothing
+ * the trial, so every AI capability is "Planned" (after evaluation). `note` says what the label means in the product today. Nothing
  * moves to "Available today" until it works in a trial workspace (WEB-14: the labels are the roadmap's three words).
  */
 export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; note: string }> = {
@@ -389,7 +389,7 @@ export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; not
   },
   "ask-mdarix": {
     status: "Available today",
-    note: "AI is off during the trial: Ask MDARIX answers from your records by its rules and says so. Answers written by AI come in a pilot, once AI is validated and switched on.",
+    note: "AI is off during the trial: Ask MDARIX answers from your records by its rules and says so. Answers written by AI are planned, after evaluation.",
   },
   investigation: {
     status: "Available today",
@@ -404,8 +404,8 @@ export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; not
     note: "Hypotheses, contradictions and open questions are written and judged by hand in a case's Intelligence tab.",
   },
   challenger: {
-    status: "In a pilot",
-    note: "AI is off during the trial. The AI challenge of a hypothesis is switched on in a pilot once it is validated.",
+    status: "Planned",
+    note: "Planned, after evaluation. AI is off during the trial; the AI challenge of a hypothesis is switched on only once it is evaluated.",
   },
   unknowns: {
     status: "Available today",
@@ -428,12 +428,12 @@ export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; not
     note: "A case's Decision Brief, versioned and reviewed before the decision is signed.",
   },
   "ai-assurance": {
-    status: "In a pilot",
-    note: "AI is off during the trial. Its assurance checks are validated in a pilot before AI is switched on.",
+    status: "Planned",
+    note: "Planned, after evaluation. AI is off during the trial; its assurance checks are evaluated before AI is switched on.",
   },
   "ai-provenance": {
-    status: "In a pilot",
-    note: "AI is off during the trial. Each AI output records its sources and model once AI is switched on in a pilot.",
+    status: "Planned",
+    note: "Planned, after evaluation. AI is off during the trial; each AI output will record its sources and model once AI is switched on.",
   },
   "human-review": {
     status: "Available today",
@@ -445,7 +445,7 @@ export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; not
   },
   "enterprise-administration": {
     status: "Available today",
-    note: "Users, roles, MFA and your own audit trail today. Connections and field mappings come in a pilot; single sign-on is planned.",
+    note: "Users, MFA and your own audit trail today; in the free trial everyone has the same role. Workflow roles, customer administration, connections and field mappings come in a pilot; single sign-on is planned.",
   },
 };
 
@@ -487,7 +487,7 @@ const PLATFORM_PAGE_DEFS: Record<
     path: "/platform/trust",
     name: "Trust",
     headline: "People decide, every step is recorded, and AI stays off until it is validated.",
-    copy: "Signed human review, a complete audit trail and customer administration today; the AI safeguards come in a pilot.",
+    copy: "Signed human review and a complete audit trail today; customer administration in a pilot; the AI safeguards are planned, after evaluation.",
     blurb: "Human review, audit trail and AI safeguards",
   },
 };

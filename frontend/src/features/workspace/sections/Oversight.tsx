@@ -158,8 +158,8 @@ function itemColumns(go: (opens: Opens) => void): Column<OversightItem>[] {
       label: "Due",
       render: (row) => (
         <span>
-          {formatDate(row.due_at)}
-          <small className="ac-muted uw-ov-left">{hoursText(row.hours_left)}</small>
+          {row.due_label ?? formatDate(row.due_at)}
+          <small className="ac-muted uw-ov-left">{hoursText(row)}</small>
         </span>
       ),
     },
@@ -376,6 +376,7 @@ export function EventDrawer({
           {view.stages.map((stage) => (
             <li key={stage.code} className={`stage-${stage.state.toLowerCase()}`}>
               {stage.label}
+              {stage.state === "NOT_NEEDED" && <span className="ac-muted">: not needed</span>}
             </li>
           ))}
         </ol>

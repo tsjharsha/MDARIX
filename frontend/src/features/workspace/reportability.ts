@@ -4,7 +4,7 @@
 // a person decides; MDARIX never submits a report.
 import type { Tone } from "../admin/console/dashboardModel";
 import { collapsed } from "./complaintReview";
-import { daysUntil } from "../../app/dates";
+import { timeLeft, type DueLike } from "../../app/dates";
 import type { MarketSummary } from "./marketAssessment";
 
 export const REPORT_LIMITS = {
@@ -56,6 +56,12 @@ export type Clock = {
   days: number;
   day_basis: DayBasis;
   due_date: string;
+  /** The end of the deadline (UTC), its time zone, and "Mon 30 Nov 2026, 23:59 IST" (reportability/deadlines.py). */
+  due_at?: string;
+  due_zone?: string;
+  due_label?: string;
+  /** The market whose counting rule the clock follows (its country's), when known. */
+  market?: string | null;
   state: "OVERDUE" | "DUE_SOON" | "RUNNING";
   days_left: number;
   triggers: Trigger[];
@@ -95,6 +101,8 @@ export type WatchItem = {
   death: boolean | null;
   malfunction: boolean | null;
   aware_date: string | null;
+  /** When the organization became aware (the day shown is the reader's, as on triage). */
+  aware_at?: string | null;
   aware_source: "AWARENESS_DATE" | "RECEIVED_DATE" | "RECORDED_DATE" | "LINKED_SOURCE" | null;
   days_since_aware: number | null;
   triggers: Trigger[];
@@ -171,16 +179,11 @@ export const WATCH_STATE: Record<WatchState, { label: string; tone: Tone }> = {
 export const watchStateOf = (state: string | null | undefined) =>
   WATCH_STATE[(state ?? "") as WatchState] ?? { label: "—", tone: "neutral" as Tone };
 
-/** "Due in 2 days", "Due today", "10 days overdue": from today where the person is to the due date (DEV-020). */
-export function clockText(
-  clock: (Pick<Clock, "days_left"> & Partial<Pick<Clock, "due_date">>) | null | undefined,
-  now = new Date(),
-): string {
+/** "2 days left", "5 h left", "10 days overdue": the app's one helper (app/dates.ts timeLeft), counted to the end of
+ * the deadline in its market's time zone, overdue from the clock's state. */
+export function clockText(clock: DueLike | null | undefined, now = new Date()): string {
   if (!clock) return "No reporting window applies";
-  const left = daysUntil(clock.due_date, now) ?? clock.days_left;
-  if (left < 0) return `${plural(-left, "day")} overdue`;
-  if (left === 0) return "Due today";
-  return `Due in ${plural(left, "day")}`;
+  return timeLeft(clock, now);
 }
 
 /** "30 calendar days", "5 work days". */

@@ -1,7 +1,7 @@
 """A guide version for an audit, as a PDF (reports/pdf.py, as the report worksheets) and a DOCX (python-docx), from the
 screen's view: the title block with the version and its state, every question with its definition, help note, clause
-and basis, the test cases with their expected and actual outcomes, and the approval manifestation (21 CFR 11.50: the
-printed name, the date and time, the meaning)."""
+and basis and the organization's explanation and examples, the test matrix with its expected and actual outcomes, and
+the approval manifestation (21 CFR 11.50: the printed name, the date and time, the meaning)."""
 
 from __future__ import annotations
 
@@ -34,7 +34,11 @@ def header_lines(view: dict, organization: str | None) -> list[str]:
 def _mark(question: dict) -> str:
     if question.get("extra"):
         return "Your extra question: recorded and printed with the answer; it never changes the conclusion."
-    return "Starter text." if question.get("starter") else "Your wording of a question that drives the conclusion."
+    return (
+        "Starter text: the regulation's wording, locked."
+        if question.get("starter")
+        else "Your wording of a question that drives the conclusion (a version from before the wording was locked)."
+    )
 
 
 def _answers(test: dict, labels: dict, order: list[str]) -> str:
@@ -65,6 +69,7 @@ def lines(view: dict) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = [
         (view["never_decides"], "body"),
         (view["core_rule"], "muted"),
+        *([(view["matrix_rule"], "muted")] if view.get("matrix_rule") else []),
         (view["scale_note"], "muted"),
         (view["starter_mark"], "muted"),
     ]
@@ -79,14 +84,18 @@ def lines(view: dict) -> list[tuple[str, str]]:
             out.append((f"    Definition: {question['definition']}", "muted"))
         if question.get("note"):
             out.append((f"    Help: {question['note']}", "muted"))
+        if question.get("explanation"):
+            out.append((f"    Our explanation: {question['explanation']}", "muted"))
+        if question.get("examples"):
+            out.append((f"    Our examples: {question['examples']}", "muted"))
         basis = ", ".join(question.get("basis") or []) or "none"
         out.append((f"    Clause: {question.get('clause') or 'none'}; basis: {basis}", "muted"))
         out.append((f"    {_mark(question)}", "muted"))
     results = {item["id"]: item for item in ((view.get("test_results") or {}).get("results") or [])}
     run = view.get("test_results") or {}
-    out += [("", "body"), ("Test cases", "heading")]
+    out += [("", "body"), ("Test matrix: worked complaints", "heading")]
     if run:
-        stale = "" if run.get("current", True) else " (run before the last change: run them again)"
+        stale = "" if run.get("current", True) else " (run before the last change: run the matrix again)"
         out.append(
             (
                 f"{run.get('passed', 0)} passed, {run.get('failed', 0)} failed; run {run.get('run_at') or '-'}{stale}",
@@ -95,7 +104,8 @@ def lines(view: dict) -> list[tuple[str, str]]:
         )
     for test in view.get("test_cases") or []:
         result = results.get(test["id"])
-        out.append((f"{test['id']}  {test['name']}", "body"))
+        mine = "" if test.get("starter") else " (your worked complaint)"
+        out.append((f"{test['id']}  {test['name']}{mine}", "body"))
         out.append((f"    Answers: {_answers(test, labels, [q['id'] for q in question_set['questions']])}", "muted"))
         out.append((f"    Expected: {_label(test['expected'])}{_kind(test.get('expected_report_type'))}", "muted"))
         if result:

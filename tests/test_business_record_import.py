@@ -98,16 +98,17 @@ def test_a_whole_product_story_imports_and_links_across_systems():
     _import(client, "component_suppliers", _csv("component_id,supplier_id", f"PS-{TAG},SUP-{TAG}"))
     genealogy = _csv("lot_id,component_id,component_lot_id", f"L-{TAG},PS-{TAG},KS-{TAG}")
     assert _import(client, "lot_genealogy", genealogy)["created"] == 1
-    assert _import(client, "lot_genealogy", genealogy)["updated"] == 1  # same row again: no duplicate
+    # The same row again: no duplicate, and nothing changed, so nothing counts as updated (0.10.62, J9).
+    assert _import(client, "lot_genealogy", genealogy)["updated"] == 0
 
     complaints = _import(
         client,
         "complaints",
         _csv(
             "complaint_id,product_id,description,version,lot_id,severity,country,problem_code,serial_number,"
-            "patient_involved,serious_injury,device_returned",
-            f"C1-{TAG},{P},Occlusion alarm with a clear line,Rev D,L-{TAG},Major,IE,ALM-OCC,SN-1,Y,N,Y",
-            f"C2-{TAG},{P},Alarm again during night infusion,Rev D,L-{TAG},Critical,DE,ALM-OCC,SN-2,Y,N,N",
+            "patient_involved,serious_injury,device_returned,received_date",
+            f"C1-{TAG},{P},Occlusion alarm with a clear line,Rev D,L-{TAG},Major,IE,ALM-OCC,SN-1,Y,N,Y,2026-10-01",
+            f"C2-{TAG},{P},Alarm again during night infusion,Rev D,L-{TAG},Critical,DE,ALM-OCC,SN-2,Y,N,N,2026-10-02",
         ),
     )
     assert complaints["created"] == 2
@@ -209,9 +210,11 @@ def test_a_record_that_refers_to_something_not_loaded_writes_nothing():
     assert client.post("/api/v1/data/import/bom", content=body).status_code == 422
     flags = client.post(
         "/api/v1/data/import/complaints/check",
-        content=_csv("complaint_id,product_id,description,death", f"CX-{TAG},{P}-X,Alarm,maybe"),
+        content=_csv(
+            "complaint_id,product_id,description,death,received_date", f"CX-{TAG},{P}-X,Alarm,maybe,2026-10-01"
+        ),
     ).json()
-    assert not flags["ready"] and flags["issues"][0]["message"] == "Use Y or N."
+    assert not flags["ready"] and flags["issues"][0]["message"].startswith("'maybe' is not a yes or no: use Y, N")
 
 
 def test_a_mapping_can_fill_any_record_and_keep_only_some_rows():

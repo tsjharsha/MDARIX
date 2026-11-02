@@ -211,7 +211,15 @@ def test_follow_up_actions_follow_status_role_and_kind():
         values.update(changes)
         return rules.follow_up_actions(**values)
 
-    assert actions() == {"can_start": True, "can_complete": True, "can_cancel": True, "can_create_capa": True}
+    assert actions() == {
+        "can_start": True,
+        "can_complete": True,
+        "can_cancel": True,
+        "can_create_capa": True,
+        "can_set_qms_reference": False,
+    }
+    assert actions(capa_id=uuid.uuid4())["can_set_qms_reference"] is True
+    assert actions(capa_id=uuid.uuid4(), can_work=False)["can_set_qms_reference"] is False
     in_progress = actions(status="IN_PROGRESS")
     assert not in_progress["can_start"] and in_progress["can_complete"] and in_progress["can_cancel"]
     for finished in ("DONE", "CANCELLED"):
@@ -227,6 +235,7 @@ def test_follow_up_actions_follow_status_role_and_kind():
         "can_complete": False,
         "can_cancel": True,
         "can_create_capa": True,
+        "can_set_qms_reference": False,
     }
     assert actions(can_assign=False)["can_cancel"] is False
 
