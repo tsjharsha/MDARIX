@@ -390,7 +390,7 @@ function SignPart({ version, onChanged }: { version: DocumentVersion; onChanged:
   };
   return (
     <section className="ca-drawer-section uw-doc-sign">
-      <h4>Sign version {version.version}</h4>
+      <h3>Sign version {version.version}</h3>
       <p className="ac-muted">
         The signature covers the data sections as generated and the judgement sections as written. A signed version is
         never edited: generate again for a new version.
@@ -448,7 +448,7 @@ function SignedPart({ version, onChanged }: { version: DocumentVersion; onChange
   };
   return (
     <section className="ca-drawer-section uw-doc-signed">
-      <h4>Signature</h4>
+      <h3>Signature</h3>
       <p>
         Signed by {signature.signer_name} ({signature.signer_role}), {formatDate(signature.signed_at)}.
       </p>

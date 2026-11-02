@@ -414,9 +414,12 @@
   padding-top: 14px;
   border-top: 1px solid var(--ac-line);
 }
-.ca-drawer-section h3 {
+/* Drawer headings: h2 for the drawer, h3 for its sections (no jump to h4), at 600 (V9). */
+.ca-drawer-section h3,
+.ca-drawer h3 {
   margin: 0;
   font-size: var(--ms-fs-14);
+  font-weight: 600;
   color: var(--ac-navy);
 }
 .ca-drawer-section p {

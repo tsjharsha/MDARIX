@@ -351,9 +351,9 @@ export function DispositionPanel({
           <section className={`ca-drawer-section uw-dp-path tone-${screen.routine.offered ? "good" : "warning"}`}>
             {screen.routine.offered ? (
               <>
-                <h4>
+                <h3>
                   <Timer size={15} aria-hidden="true" /> Routine path: one screen, one signature
-                </h4>
+                </h3>
                 <ul className="uw-dp-basis">
                   {screen.routine.markets.map((market) => (
                     <li key={market.market}>
@@ -364,7 +364,7 @@ export function DispositionPanel({
               </>
             ) : (
               <>
-                <h4>Standard path</h4>
+                <h3>Standard path</h3>
                 <ul className="uw-dp-basis">
                   {screen.routine.blocked.map((reason) => (
                     <li key={reason}>{reason}</li>
@@ -589,7 +589,7 @@ export function DispositionPanel({
             </ol>
 
             <section className="ca-drawer-section">
-              <h4>Classification for trends</h4>
+              <h3>Classification for trends</h3>
               <div className="ca-form-grid">
                 <ClassificationField
                   label="Use environment"
@@ -647,9 +647,9 @@ export function DispositionPanel({
 
             {canSign ? (
               <section className="ca-drawer-section uw-dp-sign">
-                <h4>
+                <h3>
                   <CheckCircle2 size={15} aria-hidden="true" /> One signature covers
-                </h4>
+                </h3>
                 <ul>
                   {covers(screen, form.branch).map((item) => (
                     <li key={item}>{item}</li>

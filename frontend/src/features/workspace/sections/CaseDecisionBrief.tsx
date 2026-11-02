@@ -315,10 +315,10 @@ export function CaseDecisionBriefPanel({
           <p className="ac-muted">{scorecardHeadline(groups)}</p>
           {groups.map((group) => (
             <section key={group.result} className="uw-related" aria-label={group.label}>
-              <h4>
+              <h3>
                 <ToneBadge tone={group.tone} label={group.label} />{" "}
                 <span className="ac-tab-count">{group.checks.length}</span>
-              </h4>
+              </h3>
               <ul className="uw-checklist">
                 {group.checks.map((check) => (
                   <li key={check.key}>
@@ -501,11 +501,11 @@ function NarrativePanel({
         </form>
       ) : (
         <div className="uw-related">
-          <h4>Problem statement</h4>
+          <h3>Problem statement</h3>
           <p className="uw-intel-statement">{safeText(narrative.problem_statement) ?? "Not written yet."}</p>
-          <h4>Proposed conclusion</h4>
+          <h3>Proposed conclusion</h3>
           <p className="uw-intel-statement">{safeText(narrative.proposed_conclusion) ?? "Not written yet."}</p>
-          <h4>Recommended actions</h4>
+          <h3>Recommended actions</h3>
           {actions.length ? (
             <ol className="uw-intel-list">
               {actions.map((item, index) => (
@@ -517,7 +517,7 @@ function NarrativePanel({
           )}
           {safeText(narrative.author_notes) && (
             <>
-              <h4>Notes for the reviewer</h4>
+              <h3>Notes for the reviewer</h3>
               <p className="uw-intel-statement">{narrative.author_notes}</p>
             </>
           )}
@@ -530,7 +530,7 @@ function NarrativePanel({
 function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
   return (
     <section className="uw-related" aria-label={title}>
-      <h4>
+      <h3>
         {title}
         {typeof count === "number" && (
           <>
@@ -538,7 +538,7 @@ function Section({ title, count, children }: { title: string; count?: number; ch
             <span className="ac-tab-count">{count}</span>
           </>
         )}
-      </h4>
+      </h3>
       {children}
     </section>
   );

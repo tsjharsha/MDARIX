@@ -493,7 +493,7 @@ export function EntryDrawer({ id, labels, onClose }: { id: string; labels?: Labe
           <Send size={15} aria-hidden="true" /> {entry.never_sends}
         </p>
         <section className="ca-drawer-section" aria-label="What it is about">
-          <h4>{entry.subject}</h4>
+          <h3>{entry.subject}</h3>
           <p className="uw-cr-meta">
             {entry.owner ? `Owner ${entry.owner}` : ""}
             {dueText(entry) ? ` · ${dueText(entry)}` : ""}
@@ -527,7 +527,7 @@ export function EntryDrawer({ id, labels, onClose }: { id: string; labels?: Labe
         </section>
         {entry.attempts.length > 0 && (
           <section className="ca-drawer-section" aria-label="Attempts">
-            <h4>Attempts ({entry.attempts.length})</h4>
+            <h3>Attempts ({entry.attempts.length})</h3>
             <div className="uw-dg-scroll">
               <table className="uw-dg-table">
                 <thead>
@@ -570,7 +570,7 @@ export function EntryDrawer({ id, labels, onClose }: { id: string; labels?: Labe
         )}
         {(entry.replies ?? []).map((reply) => (
           <section key={reply.id} className="ca-drawer-section" aria-label="Reply">
-            <h4>Reply received {formatDate(reply.occurred_at)}</h4>
+            <h3>Reply received {formatDate(reply.occurred_at)}</h3>
             <p>{reply.subject}</p>
             <p className="uw-cr-meta">
               {reply.channel_label}
@@ -608,7 +608,7 @@ function NextSteps({ entry, labels, onChanged }: { entry: Entry; labels: Labels;
   return (
     <>
       <section className="ca-drawer-section" aria-label="Record an attempt">
-        <h4>{entry.not_sent_yet ? "Record that you sent it" : "Record another attempt"}</h4>
+        <h3>{entry.not_sent_yet ? "Record that you sent it" : "Record another attempt"}</h3>
         <div className="ca-form-grid">
           <label className="ca-field">
             When
@@ -660,7 +660,7 @@ function NextSteps({ entry, labels, onChanged }: { entry: Entry; labels: Labels;
       </section>
       {!entry.not_sent_yet && (
         <section className="ca-drawer-section" aria-label="Record the reply">
-          <h4>Record the reply</h4>
+          <h3>Record the reply</h3>
           <div className="ca-form-grid">
             <label className="ca-field">
               Received at
@@ -718,7 +718,7 @@ function NextSteps({ entry, labels, onChanged }: { entry: Entry; labels: Labels;
         </section>
       )}
       <section className="ca-drawer-section" aria-label="Close the request">
-        <h4>Close the request</h4>
+        <h3>Close the request</h3>
         <div className="ca-form-grid">
           <label className="ca-field">
             How it ends

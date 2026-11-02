@@ -502,9 +502,9 @@ export function UserWorkspace({
               type="button"
               className="ac-secondary"
               onClick={() => void signOut()}
-              aria-label="Sign out of MDARIX"
+              aria-label="Sign out"
             >
-              <LogOut size={16} /> <span className="ac-hide-sm">Logout</span>
+              <LogOut size={16} /> <span className="ac-hide-sm">Sign out</span>
             </button>
           </div>
         </header>

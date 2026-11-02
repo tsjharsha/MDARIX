@@ -329,7 +329,7 @@ function TriageDrawer({
           </p>
         )}
         <section className="ca-drawer-section">
-          <h4>Why it is here</h4>
+          <h3>Why it is here</h3>
           <ul>
             {item.flags.map((flag, index) => (
               <li key={`${flag.code}-${index}`}>{flag.label}</li>
@@ -337,7 +337,7 @@ function TriageDrawer({
           </ul>
         </section>
         <section className="ca-drawer-section">
-          <h4>Two clocks</h4>
+          <h3>Two clocks</h3>
           <p>
             <strong>Triage target:</strong> {item.triage_clock.target_hours} hours from{" "}
             {formatDate(item.triage_clock.from)} (when it reached MDARIX or was reopened): due{" "}
@@ -392,9 +392,9 @@ function TriageDrawer({
         </section>
         {record?.completed_at ? (
           <section className="ca-drawer-section">
-            <h4>
+            <h3>
               <CheckCircle2 size={15} aria-hidden="true" /> Triage record
-            </h4>
+            </h3>
             <p>
               Severity {record.severity_label} · event owner {record.event_owner_name} · triage owner{" "}
               {record.triage_owner_name}
@@ -415,7 +415,7 @@ function TriageDrawer({
               if (!problem) void submit();
             }}
           >
-            <h4>The triage record</h4>
+            <h3>The triage record</h3>
             <div className="ca-form-grid">
               <label className="ca-field">
                 Severity (harm-severity scale)

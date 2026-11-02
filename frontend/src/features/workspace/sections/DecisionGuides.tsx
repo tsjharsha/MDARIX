@@ -249,7 +249,7 @@ export function GuideDrawer({ market, version, onClose }: { market: string; vers
 function QuestionTable({ view }: { view: GuideVersion }) {
   return (
     <section className="ca-drawer-section" aria-label="Questions">
-      <h4>Questions ({view.question_set.questions.length})</h4>
+      <h3>Questions ({view.question_set.questions.length})</h3>
       <div className="uw-dg-scroll">
         <table className="uw-dg-table">
           <thead>
@@ -286,10 +286,10 @@ function TestTable({ view, tests }: { view: GuideVersion; tests: TestCase[] }) {
   const run = view.test_results;
   return (
     <section className="ca-drawer-section" aria-label="Test matrix">
-      <h4>
+      <h3>
         Test matrix: {tests.length} worked complaints
         {run ? ` · ${run.passed} passed, ${run.failed} failed` : " · not run yet"}
-      </h4>
+      </h3>
       {run && !run.current && <p className="uw-hint">Changed since the last run: run the test matrix again.</p>}
       {run?.run_at && (
         <p className="ac-muted">
@@ -349,7 +349,7 @@ function Editor({ view, onChanged }: { view: GuideVersion; onChanged: (view: Gui
       }}
     >
       <section className="ca-drawer-section" aria-label="Questions">
-        <h4>Questions ({questions.length})</h4>
+        <h3>Questions ({questions.length})</h3>
         <p className="ac-muted">
           The questions that drive the conclusion keep the regulation's wording, definition and clause: add your
           explanation and examples beside them. Every extra question needs its regulation clause and its basis before
@@ -683,7 +683,7 @@ function Publish({
   const [discarding, setDiscarding] = useState(false);
   return (
     <section className="ca-drawer-section" aria-label="Publish">
-      <h4>Before it is used</h4>
+      <h3>Before it is used</h3>
       {view.problems.length ? (
         <ul className="uw-dg-problems" aria-label="What blocks publication">
           {view.problems.map((problem) => (
@@ -839,7 +839,7 @@ function MatrixCheck({ view }: { view: GuideVersion }) {
   const rows = view.test_cases.length;
   return (
     <section className="ca-drawer-section" aria-label="Test matrix check">
-      <h4>Test matrix, run again now</h4>
+      <h3>Test matrix, run again now</h3>
       {changed.length ? (
         <>
           <p className="tone-critical">
@@ -869,7 +869,7 @@ function ApprovalRecord({ view }: { view: GuideVersion }) {
   if (!view.signature) return null;
   return (
     <section className="ca-drawer-section" aria-label="Approval">
-      <h4>Approval</h4>
+      <h3>Approval</h3>
       <p>
         Approved by <strong>{view.signature.signer_name}</strong> ({view.signature.signer_role}) on{" "}
         {formatDate(view.signature.signed_at)}.

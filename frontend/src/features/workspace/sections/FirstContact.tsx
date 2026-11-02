@@ -394,7 +394,7 @@ function LogDrawer({
           </label>
         </div>
         <section className="ca-drawer-section">
-          <h4>Times ({zoneLabel(form.zone)})</h4>
+          <h3>Times ({zoneLabel(form.zone)})</h3>
           <div className="ca-form-grid">
             <label className="ca-field">
               {kind === "CONTACT" ? "Time of the call (awareness)" : "Received"}
@@ -464,7 +464,7 @@ function LogDrawer({
         </section>
         {kind === "CONTACT" && (
           <section className="ca-drawer-section">
-            <h4>The first-contact questions</h4>
+            <h3>The first-contact questions</h3>
             <p className="uw-hint">{guide.note}</p>
             <Questions guide={guide} answers={form.answers} onChange={(answers) => set({ answers })} />
             <label className="ca-field">
@@ -606,7 +606,7 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
           .join(" · ")}
       </p>
       <section className="ca-drawer-section">
-        <h4>Times</h4>
+        <h3>Times</h3>
         <ul>
           {(
             [
@@ -632,9 +632,9 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
       </section>
       {item.flags.length > 0 && (
         <section className="ca-drawer-section">
-          <h4>
+          <h3>
             <Siren size={15} aria-hidden="true" /> On the triage list now
-          </h4>
+          </h3>
           <ul className="uw-cr-chips">
             {item.flags.map((flag, index) => (
               <li key={`${flag.code}-${index}`} className="uw-cr-chip tone-serious">
@@ -647,7 +647,7 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
       )}
       {item.kind !== "URGENT" && (
         <section className="ca-drawer-section">
-          <h4>The first-contact check</h4>
+          <h3>The first-contact check</h3>
           {item.suggestion && (
             <p className="uw-fc-outcome">
               The table gives: <strong>{item.suggestion_label}</strong> (row {item.outcome_row}).
@@ -696,9 +696,9 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
       {followUp && canWrite && <FollowUp item={item} dueAt={followUp.due_at} onDone={onChanged} />}
       {item.qms_task && (
         <section className="ca-drawer-section">
-          <h4>
+          <h3>
             <Wrench size={15} aria-hidden="true" /> QMS complaint
-          </h4>
+          </h3>
           <p>
             {item.qms_task.label}
             {item.qms_ref ? `: ${item.qms_ref}` : ""}
@@ -731,9 +731,9 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
       {item.links && item.links.length > 0 && <Links links={item.links} onChanged={onChanged} />}
       {item.duplicates && item.duplicates.length > 0 && (
         <section className="ca-drawer-section">
-          <h4>
+          <h3>
             <Copy size={15} aria-hidden="true" /> Possible duplicate
-          </h4>
+          </h3>
           {item.duplicates.map((pair) => (
             <DuplicatePair key={`${pair.left.id}-${pair.right.id}`} pair={pair} onDone={onChanged} />
           ))}
@@ -793,9 +793,9 @@ function SignForm({
         }
       }}
     >
-      <h4>
+      <h3>
         <CheckCircle2 size={15} aria-hidden="true" /> Sign as the coordinator
-      </h4>
+      </h3>
       <label className="ca-field">
         Classification
         <select
@@ -881,9 +881,9 @@ function FollowUp({ item, dueAt, onDone }: { item: IntakeItem; dueAt: string | n
   const short = note.trim().length < REASON_MIN;
   return (
     <section className="ca-drawer-section">
-      <h4>
+      <h3>
         <Hourglass size={15} aria-hidden="true" /> Follow-up with the caller
-      </h4>
+      </h3>
       <p>
         Due {formatDate(dueAt)}. Ask about every Unknown and Not stated answer. The follow-up is a dated task on the
         check.
@@ -978,7 +978,7 @@ function ReviewForm({ item, onDone }: { item: IntakeItem; onDone: () => void }) 
         }
       }}
     >
-      <h4>QA review of "service only"</h4>
+      <h3>QA review of "service only"</h3>
       <p>
         Every service-only call is reviewed in the trial. Ideally by someone other than the signer; the record says if
         it is the same person.
@@ -1211,9 +1211,9 @@ function LinkRow({ link, onDone }: { link: DuplicateList["links"][number]; onDon
 function Links({ links, onChanged }: { links: NonNullable<IntakeItem["links"]>; onChanged: () => void }) {
   return (
     <section className="ca-drawer-section">
-      <h4>
+      <h3>
         <Link2 size={15} aria-hidden="true" /> Linked records
-      </h4>
+      </h3>
       <ul>
         {links.map((link) => (
           <LinkRow

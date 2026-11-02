@@ -267,10 +267,10 @@ export function MarketPanel({
       </ol>
       {item.evaluation && (
         <section className="ca-drawer-section uw-ma-suggestion" aria-label="Suggested conclusion">
-          <h4>
+          <h3>
             Suggested: {CONCLUSION_LABELS[item.evaluation.suggested]}
             {item.draft?.report_type_label ? ` · ${item.draft.report_type_label}` : ""}
-          </h4>
+          </h3>
           <p className="ac-muted">
             From the answers as last saved. The suggestion never signs: you confirm or override it.
           </p>
@@ -502,10 +502,10 @@ export function ScalePanel({
   const thresholdRank = scale.levels.findIndex((level) => level.code === item.threshold.level);
   return (
     <section className="ca-drawer-section uw-ma-scale" aria-label="Harm-severity scale">
-      <h4>
+      <h3>
         <Gauge size={15} aria-hidden="true" /> Harm-severity scale, {versionWords(scale.version)}{" "}
         <span className="uw-ma-starter-chip">Starter text</span>
-      </h4>
+      </h3>
       <ol className="uw-ma-levels">
         {scale.levels.map((level, index) => (
           <li
@@ -610,11 +610,11 @@ export function TrainingPanel({
   };
   return (
     <section className="ca-drawer-section uw-ma-training" role="status">
-      <h4>
+      <h3>
         <BookOpenCheck size={15} aria-hidden="true" />{" "}
         {required ? "Before you sign: practice training on" : "Training record on"}{" "}
         {documents.map((document) => document.version).join(" and ")}
-      </h4>
+      </h3>
       <p className="ac-muted">
         ISO 13485 clause 6.2: whoever signs is trained on the current version of what the signature relies on. {note}{" "}
         {required

@@ -229,7 +229,7 @@ export function ReportDrawer({
           ))}
         </ol>
         <section className="ca-drawer-section" aria-label="Next step">
-          <h4>Next: {detail.next_step}</h4>
+          <h3>Next: {detail.next_step}</h3>
           {detail.request && (
             <p>
               <strong>The authority asked</strong> ({detail.request.received_on}): {detail.request.text}
@@ -243,7 +243,7 @@ export function ReportDrawer({
           {canWrite && <NextStep detail={detail} onChanged={changed} onOpen={onOpen} />}
         </section>
         <section className="ca-drawer-section" aria-label="The case behind it">
-          <h4>Drafted from</h4>
+          <h3>Drafted from</h3>
           <p className="uw-cr-meta">
             Complaint {detail.complaint.ref} ({detail.complaint.product_name ?? "no product"}{" "}
             {detail.complaint.version ?? ""}), aware {detail.complaint.aware_date ?? "—"}
@@ -260,7 +260,7 @@ export function ReportDrawer({
         <SubmissionRecord detail={detail} />
         {detail.responses.length > 0 && (
           <section className="ca-drawer-section" aria-label="Responses to requests">
-            <h4>Requests for information</h4>
+            <h3>Requests for information</h3>
             <ul>
               {detail.responses.map((row) => (
                 <li key={row.id}>
@@ -827,7 +827,7 @@ function Worksheet({
 }) {
   return (
     <section className="ca-drawer-section" aria-label="The worksheet">
-      <h4>The worksheet, in the authority's field order</h4>
+      <h3>The worksheet, in the authority's field order</h3>
       <p className="uw-cr-meta">{summaryLine(detail.counts)}</p>
       {detail.sections.map((section) => (
         <details key={section.code} className="uw-rp-section" open={section.fields.length > 0}>
@@ -947,7 +947,7 @@ function SubmissionRecord({ detail }: { detail: ReportDetail }) {
     });
   return (
     <section className="ca-drawer-section" aria-label="The complete submission record">
-      <h4>The complete submission record</h4>
+      <h3>The complete submission record</h3>
       <ul className="uw-rp-record">
         {detail.submissions.map((attempt) => (
           <li key={attempt.id}>

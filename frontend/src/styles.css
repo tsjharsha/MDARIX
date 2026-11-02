@@ -11595,3 +11595,24 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   color: var(--ms-ink-2);
   font-size: var(--ms-fs-12);
 }
+/* Touch targets (G): on a phone or any touch screen every button, tab, chip and field is at least 44 px high. */
+@media (max-width: 640px), (pointer: coarse) {
+  .admin-console
+    :is(
+      button.ac-primary,
+      button.ac-secondary,
+      button.ac-link,
+      button.ca-danger,
+      .ca-chips button,
+      .ac-tabs button,
+      select,
+      input:not([type="checkbox"], [type="radio"]),
+      textarea
+    ) {
+    min-height: 44px;
+  }
+  .admin-console button.ac-link {
+    display: inline-flex;
+    align-items: center;
+  }
+}

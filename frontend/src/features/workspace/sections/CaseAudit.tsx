@@ -396,15 +396,15 @@ function KnownColumns({ title, value, noun }: { title: string; value: unknown; n
       <h3>{title}</h3>
       <div className="ta-replay-columns">
         <div>
-          <h4>
+          <h3>
             Known then <span className="ac-tab-count">{split.knownThen.length}</span>
-          </h4>
+          </h3>
           <ItemList items={split.knownThen} empty={`No ${noun} were known then.`} />
         </div>
         <div>
-          <h4>
+          <h3>
             Arrived later <span className="ac-tab-count">{split.arrivedLater.length}</span>
-          </h4>
+          </h3>
           <ItemList items={split.arrivedLater} empty={`No ${noun} arrived later.`} />
         </div>
       </div>

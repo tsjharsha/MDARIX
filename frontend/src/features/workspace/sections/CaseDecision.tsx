@@ -370,7 +370,7 @@ export function CaseDecisionPanel({
 function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
   return (
     <section className="uw-related" aria-label={title}>
-      <h4>
+      <h3>
         {title}
         {typeof count === "number" && (
           <>
@@ -378,7 +378,7 @@ function Section({ title, count, children }: { title: string; count?: number; ch
             <span className="ac-tab-count">{count}</span>
           </>
         )}
-      </h4>
+      </h3>
       {children}
     </section>
   );

@@ -373,7 +373,7 @@ export function EventDrawer({
         <OwnerPicker view={view} onChanged={changed} />
       </section>
       <section className="ca-drawer-section" aria-label="Stage">
-        <h4>Stage</h4>
+        <h3>Stage</h3>
         <ol className="uw-ov-stages">
           {view.stages.map((stage) => (
             <li key={stage.code} className={`stage-${stage.state.toLowerCase()}`}>
@@ -385,7 +385,7 @@ export function EventDrawer({
         <p className="ac-muted">A summary, not a gate: reporting, investigation and containment can run at once.</p>
       </section>
       <section className="ca-drawer-section" aria-label="Closure checklist">
-        <h4>Closure checklist</h4>
+        <h3>Closure checklist</h3>
         <ul className="uw-ov-checks">
           {view.checklist.map((item) => (
             <li key={item.code}>
@@ -486,7 +486,7 @@ function ReadyForm({ view, onChanged }: { view: EventView; onChanged: (view: Eve
   const signedNow = view.ready && !view.changed_since_signed;
   return (
     <section className="ca-drawer-section" aria-label="Ready to close">
-      <h4>Ready to close in the QMS</h4>
+      <h3>Ready to close in the QMS</h3>
       {view.ready && (
         <p className={view.ready.state === "READY" ? "tone-good" : "tone-warning"}>
           Signed by {view.ready.signed_by} {formatDate(view.ready.signed_at)} (version {view.ready.version})
@@ -560,7 +560,7 @@ function DecisionRecord({ view, onChanged }: { view: EventView; onChanged: (view
   const record = view.decision_record;
   return (
     <section className="ca-drawer-section" aria-label="Event decision record">
-      <h4>Event decision record</h4>
+      <h3>Event decision record</h3>
       {record.entries.length ? (
         <ol className="uw-ov-record">
           {record.entries.map((entry, index) => (
