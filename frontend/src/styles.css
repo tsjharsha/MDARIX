@@ -11574,3 +11574,24 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   font-size: var(--ms-fs-14);
   font-weight: 600;
 }
+/* A step that cannot be undone, confirmed in the page beside the button (F). */
+.ms-confirm {
+  display: grid;
+  gap: var(--ms-space-2);
+  padding: var(--ms-space-3);
+  border: 1px solid var(--ms-crit-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-crit-bg);
+}
+.ms-confirm p {
+  margin: 0;
+}
+.ac-empty-action {
+  margin-top: var(--ms-space-2);
+}
+/* A predictable refusal is said beside the control before the click (F), and read with it (aria-describedby). */
+.ms-reason {
+  margin: var(--ms-space-1) 0 0;
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+}

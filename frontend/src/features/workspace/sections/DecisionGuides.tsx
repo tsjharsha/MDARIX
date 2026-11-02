@@ -679,6 +679,8 @@ function Publish({
   const [code, setCode] = useState("");
   const action = useRun(onChanged, "That step was not recorded.");
   const base = `${GUIDES}/${view.market}/versions/${view.version}`;
+  // Discarding a draft cannot be undone: it is confirmed here, beside the button, never on the first click (F).
+  const [discarding, setDiscarding] = useState(false);
   return (
     <section className="ca-drawer-section" aria-label="Publish">
       <h4>Before it is used</h4>
@@ -700,19 +702,47 @@ function Publish({
               type="button"
               className="ac-secondary"
               disabled={action.busy || !view.test_cases.length}
+              aria-describedby={view.test_cases.length ? undefined : "guide-tests-reason"}
               onClick={() => void action.run(`${base}/tests`, "POST")}
             >
               Run the test matrix
             </button>
+            {!view.test_cases.length && (
+              <span className="ms-reason" id="guide-tests-reason">
+                Add a worked complaint to the matrix first.
+              </span>
+            )}
             <button
               type="button"
               className="ac-link"
               disabled={action.busy}
-              onClick={() => void action.run(`${base}/discard`, "POST")}
+              aria-expanded={discarding}
+              onClick={() => setDiscarding(true)}
             >
               Discard this draft
             </button>
           </div>
+          {discarding && (
+            <div className="ms-confirm" role="group" aria-label="Discard this draft">
+              <p>
+                Discard version {view.version}? Its questions, wording and worked complaints are deleted. This cannot be
+                undone.
+              </p>
+              <div className="ca-action-row">
+                <button
+                  type="button"
+                  className="ca-danger"
+                  disabled={action.busy}
+                  onClick={() => void action.run(`${base}/discard`, "POST")}
+                >
+                  Discard the draft
+                </button>
+                <button type="button" className="ac-secondary" onClick={() => setDiscarding(false)}>
+                  Keep it
+                </button>
+              </div>
+            </div>
+          )}
           <label className="ca-field">
             What changed and why
             <textarea rows={2} value={reason} onChange={(event) => setReason(event.target.value)} />

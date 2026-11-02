@@ -5020,3 +5020,11 @@ div.uw-task-count:hover {
     display: none;
   }
 }
+/* A notice after an action stays in view where the person is (F): it sticks to the top of the window while they work
+   further down the page, instead of appearing off screen above them. */
+.uw-notice {
+  position: sticky;
+  top: var(--ms-space-2);
+  z-index: 30;
+  box-shadow: var(--ms-shadow-2);
+}

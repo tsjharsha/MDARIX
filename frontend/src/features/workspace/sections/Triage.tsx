@@ -120,6 +120,13 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
           <Empty
             title={show === "open" ? "Nothing to triage" : "Nothing triaged yet"}
             detail="A flagged call, an urgent intake or a record that suggests harm appears here at once."
+            action={
+              onOpenTab && (
+                <button type="button" className="ac-secondary" onClick={() => onOpenTab("First contact")}>
+                  Log a call or an urgent intake
+                </button>
+              )
+            }
           />
         )}
         {list.data && (

@@ -559,7 +559,7 @@ export function UserWorkspace({
                 )}
                 {trial?.is_trial && <ChapterDone refreshKey={location.key} onOpen={openChapter} />}
                 {message && (
-                  <div className={`ac-message tone-${message.tone}`} role="status">
+                  <div className={`ac-message uw-notice tone-${message.tone}`} role="status">
                     {message.text}
                     <button
                       type="button"

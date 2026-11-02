@@ -52,6 +52,7 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState("");
   const canWrite = useCanReport();
+  const workspace = useContext(WorkspaceContext);
   const items = list.data?.items ?? [];
   const waiting = items.filter(
     (item) => !["ACCEPTED", "COMPLETE", "SUBMITTED_NO_ACK", "FOLLOW_UP_DUE"].includes(item.state),
@@ -146,6 +147,17 @@ export function Reports({ complaintId }: { complaintId?: string | null }) {
           <Empty
             title="No report is owed yet"
             detail="A market assessed reportable, or pending information, lists its report here with its deadline."
+            action={
+              workspace && (
+                <button
+                  type="button"
+                  className="ac-secondary"
+                  onClick={() => workspace.open("Complaints", "Reportability")}
+                >
+                  Assess a complaint per market
+                </button>
+              )
+            }
           />
         )}
         {list.data && <p className="ac-muted">{list.data.starter_mark}</p>}

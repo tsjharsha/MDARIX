@@ -621,10 +621,15 @@ export function ChapterRow({
         className={isNext && !done ? "ac-primary" : "ac-secondary"}
         onClick={onOpen}
         disabled={!allowed}
-        title={allowed ? undefined : "Your role does not include this screen"}
+        aria-describedby={allowed ? undefined : `chapter-${chapter.code}-reason`}
       >
         {done ? "Open again" : (CHAPTER_ACTION[chapter.code] ?? "Open")}
       </button>
+      {!allowed && (
+        <p className="ms-reason" id={`chapter-${chapter.code}-reason`}>
+          Your role does not include this screen.
+        </p>
+      )}
       <span className="ca-sr-only">{done ? "Tried" : "Not tried yet"}</span>
     </li>
   );
