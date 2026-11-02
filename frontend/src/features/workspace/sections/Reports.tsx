@@ -206,16 +206,16 @@ export function ReportDrawer({
       <div className="uw-dp uw-rp">
         <AlsoKnownAs id={detail.complaint.business_id} shown={detail.complaint.ref} />
         <div className="uw-cr-decision">
-          <ToneBadge tone={stateTone(detail.state, detail.deadline.overdue)} label={detail.state_label} />
+          <StateChip label={detail.state_label} />
+          {deadlineDue(detail.deadline, detail.state) && (
+            <DeadlineChip item={deadlineDue(detail.deadline, detail.state)!} prefix="Report" />
+          )}
           <span className="uw-cr-meta">{deadlineText(detail.deadline, detail.state)}</span>
           <span className="uw-cr-meta">
             {versionWords(detail.form.version)} · {detail.market_label}
             {detail.complaint.sample ? " · sample" : ""}
           </span>
         </div>
-        <p className="uw-hint" role="note">
-          <Send size={15} aria-hidden="true" /> {detail.never_submits}
-        </p>
         <ol className="uw-rp-steps" aria-label="Where this report is">
           {detail.steps.map((item, index) => (
             <li key={item.state} className={index < step ? "done" : index === step ? "current" : ""}>
