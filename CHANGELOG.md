@@ -10,6 +10,113 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.75] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): part C3 of Release C, "Decision trees and Reports for the US and
+India", built to the owner-approved design (its Decision trees, Reports and report page). It changes organizations on
+the **new** navigation (`tenants.navigation = new`); the classic navigation, and every pilot on it today, keeps its
+screens and its report rules. MDARIX still never decides and never submits: a person signs each conclusion and each
+approval, and submits the report through the authority's own channel.
+
+**Migration `tr14reportcancelled`** (after `tr13viewpersona`; `tr03pmssources` stays reserved). It is expand-only: the
+state check of `report_obligations` also allows `CANCELLED`. No stored row changes. On legacy dedicated organization
+databases, run `scripts/add_workflow_tables_to_legacy_planes.py` (new step tr14). The API and web images change.
+**Operators:** run `scripts/refresh_trial_story.py` (dry run first, then `--apply`) once after the upgrade: on the new
+navigation, each US or India conclusion signed reportable before the upgrade whose report was never started gets its
+report, as signing now does (`backend/app/trial/reports_0_10_75.py`). The sample's own reports fit the new status path
+as they are; nothing of the sample changes.
+
+### Added: Decision trees
+
+- **One tree per market** (US MDR, EU / NI, Great Britain, India: the markets the organization reports to), built from
+  the decision guides: the version in use (the organization's approved version, else MDARIX's starter, "for your
+  consultant to confirm"), its status (Approved or Starter), its **test matrix result** ("6 of 6 worked complaints
+  pass") and its questions in order, each with its clause.
+- **The path a complaint took:** each question with its answer (Yes, No, Unknown, Not applicable), its clause, then the
+  outcome: the signed conclusion with its report type and who signed it, or what the answers point to so far, "not
+  signed". The rail says what happens next and opens the report.
+- **A complaint's page opens its path:** Details has a "Decision path" line with one link per market
+  (`/app/decision-trees?market=US&complaint=<id>`).
+- `GET /api/v1/decision-trees` (`?complaint_id=` adds the paths). Read only, open to every member, as the guides and
+  assessments it reads.
+
+### Added: Reports, and a report created when its conclusion is signed
+
+- **Signing a market conclusion as reportable creates the market's report** (Form FDA 3500A for the US, the MvPI MDAE
+  form for India), pre-filled from the complaint, the product, the organization and the tree, in the same transaction
+  as the signature. **Only a signed conclusion**: saving answers creates nothing. **One report per market per
+  complaint**: signing reportable again keeps it.
+- **A later signed "not reportable" cancels a report not yet submitted** (a draft, a correction, or approved and not
+  submitted): its state is "Cancelled: not reportable", its reason kept on the report and in the audit trail
+  (`REPORT_CANCELLED`), its waiting approval tasks ended. It is never deleted; signing reportable again reopens it
+  (`REPORT_REOPENED_BY_CONCLUSION`). A submitted report stays as recorded.
+- **The status path:** Created from the decision tree · Mandatory fields complete · Sent for approval · Approved · PDF
+  ready · Submitted by you · Acknowledged, from the existing states, snapshots, approval, submissions and evidence.
+- **The mandatory-fields meter** comes from the form (its "must have before submission" fields, never a patient or
+  reporter field): 17 on the 3500A, 14 on the MDAE form. "Show only missing", and each field says where its value
+  comes from.
+- **Send for approval stays disabled until every mandatory field is filled**, with the reason beside it ("2 mandatory
+  fields missing"); the server refuses it too (422 `MANDATORY_FIELDS_MISSING`, naming the fields).
+- **The PDF after approval:** "Generate the PDF" appears once approved: the form's field order, with the approval on
+  its own last page (the existing worksheet export, stage 1's fonts). The server refuses a PDF or DOCX of a report not
+  approved (409 `APPROVE_FIRST`).
+- **The Reports tab:** List view (Open reports · Waiting for my approval · Submitted this month), six columns (Due ·
+  Report · Status · Mandatory fields · Market · Open), cards on a phone, and the forms MDARIX prepares. A report opens
+  on its own page in the record page's shape: the highlights (market, form, prepared by, due), the path, the form's
+  fields in order, and the rail: the next step (one main button), the approval (with "Practice approval: in a pilot a
+  colleague approves this" at its button when one approves alone), Generate the PDF, Who signs, and once "MDARIX never
+  submits to an authority" with each authority's channel.
+- On the new navigation, Complaints › Authority reports opens a report on that page and offers no working-draft
+  download; the complaint page's Related opens its report.
+
+### Fixed
+
+- `test_business_permissions.py::test_a_viewer_is_refused_on_every_guarded_route` was red only when the tests ran with
+  `MDARIX_FEATURE_SET=mvp`: the feature-set gate (since 13 Oct 2026) answers 404 for the parked routes before their
+  guard runs. No route answered 2xx to a Viewer. The test now checks the guards themselves (the gate has its own tests).
+- On a phone, a report's next step comes before its field list; on an approved report "Generate the PDF" is its one
+  main button.
+- On a phone, a list card's "What happened" (and an investigation's question) reads under its label at full width; it
+  was squeezed into the card's second column.
+- The complaint page's Related named a report by its form code ("FDA_3500A · draft"): it names the form.
+
+### Sample numbers and labels that change
+
+The sample data does not change. No deadline, trend figure, signal, Readiness value or record count changes.
+
+| Where | Before | After |
+|---|---|---|
+| Decision trees tab | "One decision tree per market" (where the questions are today) | each market's tree, version, status, test result and a complaint's path |
+| Reports tab | "Your reports are under Complaints › Reporting" | the list of reports with its three list views |
+| Sample US report, SAMPLE-RV-09 | Accepted | Acknowledged (status path), state Accepted |
+| Sample India report, SAMPLE-RV-10 | Draft: correction required | Mandatory fields complete (14 of 14), with "Draft: correction required" |
+| SAMPLE-RV-11's US report, once its US conclusion is signed reportable (new) | — | Created from the decision tree, 8 of 17 mandatory fields (9 to fill) |
+| Decision trees, the sample's US tree | — | Your version 2 · approved (the sample's own guide), 6 of 6 worked complaints pass; India: MDARIX starter, 3 of 3 |
+| After a reportable US/India conclusion is signed (new navigation) | Home and Oversight: "United States (FDA): reportable, the report is not started"; Reports: Not started | "Form FDA 3500A worksheet (eMDR): draft" (the report exists); the next step "Complete the United States (FDA) report (draft)" |
+| Complaint page, Related › Authority reports | United States (FDA) · FDA_3500A · draft | United States (FDA) · Form FDA 3500A worksheet (eMDR) · draft |
+| Complaint page, Details | — | Decision path: one link per market |
+| Decision trees guide line | One tree per market: the questions each complaint is walked through… | One tree per market. Each complaint is walked through it; a reportable outcome creates the report with its data. |
+| Reports guide line | Every authority report: its mandatory fields, its approval and its PDF. | Created automatically when a decision tree concludes "reportable". You complete, approve and generate the PDF; you submit it through the authority's own channel. |
+
+### Tests
+
+- pytest: `tests/test_release_c3_0_10_75.py` (new, 20): signing reportable creates exactly one report, pre-filled with
+  sources, and a draft creates none; Send for approval stays blocked until every mandatory field is filled; the PDF
+  only after approval, and alone in a trial the practice label shows; a colleague approves a report someone else
+  prepared (never the preparer); a "not reportable" re-sign cancels the unsubmitted report (approved, not submitted)
+  with its reason and audit, and reportable reopens it; the sample's reports fit the path; the classic navigation
+  keeps its rules and the refresh adds the report once (dry run, idempotent); the decision trees and a complaint's
+  path; every state's place on the path; the approval on its own last page. Updated:
+  `test_authority_reports_api.py` (its 0.10.58 lifecycle on the classic navigation),
+  `test_flagship_walkthrough.py` (the report is created on signing; still 21 main buttons, 44 actions),
+  `test_business_permissions.py` (the Viewer check).
+- vitest: `releaseC3075.test.tsx` (new, 11).
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.75-review` (`owner/`: the trees for the US, India and EU / NI
+  and SAMPLE-RV-11's path, the three report list views as Admin and as Regulatory Leader, the reports of RV-11
+  (created), RV-06 (sent for approval), RV-09 (acknowledged) and RV-10 (correction), RV-11's Decision path and
+  Related, the phone's complaint cards; `colleague/`: a locked Regulatory Leader's waiting list and approval;
+  `approved/`: RV-06 approved, PDF ready; `classic/`: unchanged).
+
 ## [0.10.74] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): part C2 of Release C, "List views and record pages", built to the
