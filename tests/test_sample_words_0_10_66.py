@@ -13,7 +13,8 @@ from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_tenant
 from backend.app.intake.service import FOLLOW_UP
 from backend.app.trial.sample_guides import RV08_REQUEST, RV08_REQUEST_BEFORE
-from backend.app.trial.sample_words import follow_up_title, reword_sample
+from backend.app.communications.service import TASK_TYPE as REPLY_DUE
+from backend.app.trial.sample_words import follow_up_title, new_reply_title, reword_sample
 
 
 @pytest.mark.unit
@@ -28,6 +29,12 @@ def test_an_old_follow_up_title_says_how_many_questions_are_open():
     )
     assert follow_up_title("Follow up X with the reporter: 2 open questions") is None
     assert "US2A" not in RV08_REQUEST and "US2A" in RV08_REQUEST_BEFORE
+    old = "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional) on CMP000036: Ask the reporter: (US2A)"
+    assert new_reply_title(old, "SAMPLE-RV-08") == "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional)"
+    assert new_reply_title("Reply due from Field Service Co on CMP000040: Ask for a report", "MSD/1") == (
+        "Reply due from Field Service Co on MSD/1"
+    )
+    assert new_reply_title("Reply due from Reporter of SAMPLE-RV-08", "SAMPLE-RV-08") is None
 
 
 @pytest.fixture(scope="module")
@@ -65,12 +72,22 @@ def test_a_new_trial_has_todays_words_and_a_running_one_is_reworded_once(trial):
         )
         entry.subject = RV08_REQUEST_BEFORE
         tasks[0].title = "Follow up SAMPLE-CALL-03 with the reporter: ask about question 1, question 2"
+        reply = (
+            db.query(WorkflowTask)
+            .filter(WorkflowTask.tenant_id == trial, WorkflowTask.task_type == REPLY_DUE)
+            .filter(WorkflowTask.title.like("Reply due from Reporter of SAMPLE-RV-08%"))
+            .one()
+        )
+        new_title = reply.title
+        assert ": " not in new_title and "CMP" not in new_title
+        reply.title = f"{new_title} on CMP000036: {RV08_REQUEST_BEFORE}"
         db.flush()
-        assert reword_sample(db, trial, apply=False) == 2
-        assert reword_sample(db, trial, apply=True) == 2
+        assert reword_sample(db, trial, apply=False) == 3
+        assert reword_sample(db, trial, apply=True) == 3
         db.flush()
         assert entry.subject == RV08_REQUEST
         assert tasks[0].title == "Follow up SAMPLE-CALL-03 with the reporter: 2 open questions"
+        assert reply.title == new_title
         assert reword_sample(db, trial, apply=False) == 0
         db.commit()
     finally:

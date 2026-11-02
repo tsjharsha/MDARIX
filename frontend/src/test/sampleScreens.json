@@ -2822,7 +2822,7 @@
         "ref": "SAMPLE-RV-08",
         "state": "OVERDUE",
         "state_label": "Overdue",
-        "title": "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional) on CMP000036: Ask the reporter: the patient's outcome after the free flow (four US questions on harm are Unknown in the US assessment)"
+        "title": "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional)"
       },
       {
         "alerts": true,
@@ -2977,7 +2977,7 @@
         "state_label": "Overdue",
         "tier": "ESCALATION",
         "tier_label": "Escalation",
-        "title": "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional) on CMP000036: Ask the reporter: the patient's outcome after the free flow (four US questions on harm are Unknown in the US assessment)"
+        "title": "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional)"
       },
       {
         "category": "TRIAGE",
@@ -4287,7 +4287,7 @@
         "status": "ASSIGNED",
         "task_type": "EXTERNAL_REPLY_DUE",
         "task_type_label": "Reply due from an external contact",
-        "title": "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional) on CMP000036: Ask the reporter: the patient's outcome after the free flow (four US questions on harm are Unknown in the US assessment)",
+        "title": "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional)",
         "updated_at": "2026-11-02T01:47:56.505045+00:00"
       }
     ],

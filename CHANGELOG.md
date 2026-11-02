@@ -77,7 +77,8 @@ then `--apply`) once after the upgrade: it rewords two kinds of older sample rec
 - A free trial shows one "Sample data" chip in the top bar ("Practice records" once the sample is removed) instead of
   practice notes on seven screens; the PDFs keep their PRACTICE RECORD watermark.
 - Page guides are 25 words or fewer. A first contact's follow-up task says "Follow up SAMPLE-CALL-03 with the
-  reporter: 8 open questions"; the questions stay in its details.
+  reporter: 8 open questions"; a reply-due task says "Reply due from Reporter of SAMPLE-RV-08 (ward nurse,
+  fictional)" (it carried the MDARIX ID and the whole request). The questions and the request stay in the details.
 
 ### Changed: states and accessibility
 
@@ -97,9 +98,12 @@ No deadline, trend figure, signal, count or record changes. Labels that change:
 - the first-contact follow-up tasks: "Follow up SAMPLE-CALL-03 with the reporter: ask about question 1, question 2,
   ... question 9" becomes "Follow up SAMPLE-CALL-03 with the reporter: 8 open questions"; "ask whether any
   deficiency is alleged" becomes "is a deficiency alleged?";
+- the reply-due task and reminder for RV-08: "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional) on
+  CMP000036: Ask the reporter: ..." becomes "Reply due from Reporter of SAMPLE-RV-08 (ward nurse, fictional)";
 - cards and drawers show SAMPLE-RV-08 (each complaint's own reference), not CMP000036, as the complaint's ID.
 
-`refresh_trial_story.py` rewords the first two in running trials (`backend/app/trial/sample_words.py`; idempotent).
+`refresh_trial_story.py` rewords the first three in running trials, tasks and reminders already raised included
+(`backend/app/trial/sample_words.py`; idempotent).
 
 ### Tests
 

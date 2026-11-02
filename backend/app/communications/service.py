@@ -54,7 +54,7 @@ def reporter_party(db: Session, tenant_id, complaint: Complaint, actor: str, now
     )
     if found is not None:
         return found
-    ref = complaint.business_id or complaint.complaint_identifier
+    ref = complaint_ref(complaint)
     kind = f" ({complaint.reporter_type})" if complaint.reporter_type else ""
     party = ExternalParty(
         id=uuid.uuid4(),
@@ -73,6 +73,11 @@ def reporter_party(db: Session, tenant_id, complaint: Complaint, actor: str, now
     return party
 
 
+def reply_title(party: str, ref: str | None) -> str:
+    """ "Reply due from Reporter of SAMPLE-RV-08", "Reply due from Field Service Co on MSD/CC/26/001"."""
+    return f"Reply due from {party}" + (f" on {ref}" if ref and ref not in party else "")
+
+
 def _task(db, tenant_id, entry: CommunicationEntry, party: ExternalParty, actor: str, ref: str | None):
     from backend.app.intake.service import _user_or_none, calendar, working_day_end
     from backend.app.workflow.tasks import create_task
@@ -83,13 +88,19 @@ def _task(db, tenant_id, entry: CommunicationEntry, party: ExternalParty, actor:
         db,
         tenant_id,
         task_type=TASK_TYPE,
-        title=f"Reply due from {party.name}" + (f" on {ref}" if ref else "") + f": {entry.subject}",
+        # A short title (V6): who owes the reply, and the complaint unless the contact's name says it already; the
+        # request itself stays in the entry and the task's details.
+        title=reply_title(party.name, ref),
         source_type=SOURCE_TYPE,
         source_id=entry.id,
         assigned_user_id=_user_or_none(entry.owner_id),
         due_at=due or working_day_end(entry.logged_at, 1, days),
         created_by=actor,
-        details={"complaint_id": str(entry.complaint_id) if entry.complaint_id else None, "reference": ref},
+        details={
+            "complaint_id": str(entry.complaint_id) if entry.complaint_id else None,
+            "reference": ref,
+            "subject": entry.subject,
+        },
     )
     entry.task_id = task.id
     return task
@@ -168,7 +179,7 @@ def record(
     db.add(entry)
     db.flush()
     if status == rules.OPEN and task_id is None:
-        ref = (complaint.business_id or complaint.complaint_identifier) if complaint is not None else None
+        ref = complaint_ref(complaint) if complaint is not None else None
         _task(db, tenant_id, entry, party, actor, ref)
         db.flush()
     return entry
