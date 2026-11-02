@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { WhyAsked } from "../../shared/Basis";
 import { TRIAGE_WHY } from "../whyAsked";
 import { CheckCircle2, Clock, FileWarning, Flag, Link2, Siren } from "lucide-react";
@@ -273,11 +273,14 @@ function TriageDrawer({
   people,
   onClose,
   onDone,
+  inline = false,
 }: {
   item: TriageItem;
   people: TriageList["people"];
   onClose: () => void;
   onDone: () => void;
+  /** On the complaint's own page (0.10.72, B3): a panel there, not a drawer over the triage list. */
+  inline?: boolean;
 }) {
   const guide = useResource<Guide>(`${INTAKE}/guide`);
   const canWrite = useCanTriage();
@@ -327,8 +330,8 @@ function TriageDrawer({
       });
       onDone();
       // The next step, always (stage 8): on the new navigation a triaged complaint opens its page, whose main button
-      // is its next action.
-      if (navigation === "new" && item.kind === "COMPLAINT")
+      // is its next action (done on that page already, it stays there).
+      if (navigation === "new" && item.kind === "COMPLAINT" && !inline)
         open("Complaint", `Summary?ref=${encodeURIComponent(item.ref)}`);
     } catch (reason) {
       setError(errorText(reason, "The triage record was not saved"));
@@ -336,8 +339,9 @@ function TriageDrawer({
       setBusy(false);
     }
   };
+  const Frame = inline ? InlineFrame : Drawer;
   return (
-    <Drawer title={`Triage ${item.ref}`} onClose={onClose}>
+    <Frame title={`Triage ${item.ref}`} onClose={onClose}>
       <div className="uw-dp">
         <AlsoKnownAs id={item.business_id} shown={item.ref} />
         {item.words && <q className="uw-cr-text">{item.words}</q>}
@@ -518,8 +522,25 @@ function TriageDrawer({
           </form>
         )}
       </div>
-    </Drawer>
+    </Frame>
   );
+}
+
+function InlineFrame({ title, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <section className="uw-cp-triage ac-panel" id="cp-triage" aria-labelledby="cp-triage-title">
+      <h2 id="cp-triage-title">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+/** The triage record on the complaint's own page (0.10.72, B3): its triage panel, saved there. */
+export function InlineTriage({ complaintId, onDone }: { complaintId: string; onDone: () => void }) {
+  const list = useResource<TriageList>(TRIAGE);
+  const item = list.data?.items.find((row) => row.kind === "COMPLAINT" && row.id === complaintId);
+  if (!list.data || !item) return null;
+  return <TriageDrawer item={item} people={list.data.people} onClose={() => undefined} onDone={onDone} inline />;
 }
 
 function PersonSelect({

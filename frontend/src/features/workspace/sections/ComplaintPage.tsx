@@ -1,5 +1,5 @@
 import { useEffect, useState, type RefObject } from "react";
-import { ChevronRight, History, Send } from "lucide-react";
+import { ChevronRight, History, MoreHorizontal, Send } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { DeadlineChip, HarmChip } from "../../../app/chips";
@@ -18,7 +18,8 @@ import { ChartOrTable, ClockLanes, type Lane } from "./WowCharts";
 import { WhyAsked } from "../../shared/Basis";
 import { COMPLAINT_STEP_WHY } from "../whyAsked";
 import { ServiceWork, serviceText } from "./ServiceWork";
-import { ShortStoryPanel } from "./ShortStory";
+import { ShortStoryPanel, useShortStory } from "./ShortStory";
+import { InlineTriage } from "./Triage";
 import { FLAGSHIP } from "../entrance";
 
 export const COMPLAINT_SECTIONS = NEW_PLACES.Complaint.tabs;
@@ -92,6 +93,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   const view = shown ?? resource.data;
   const [active, setActive] = useState<ComplaintSection>(() => offeredTab(tab, COMPLAINT_SECTIONS, "Summary"));
   const links = useImdrfLinks([view?.event.problem_code]);
+  const storyShown = story === "short" && view?.event.ref === FLAGSHIP;
+  const shortStory = useShortStory(storyShown);
   // A link by the complaint's id (stage 6's Oversight?event=<id>) is rewritten to the reference people read.
   const readable = view?.event.ref;
   useEffect(() => {
@@ -128,9 +131,19 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
   const nearest = work?.due[0] ?? null;
   const harm = event.harm ? HARM[event.harm] : null;
-  const storyShown = story === "short" && event.ref === FLAGSHIP;
-  return (
-    <div className="uw-cp">
+  // Triage is done here, on the page (0.10.72, B3): its panel replaces the button that opened the triage list. The
+  // short story records the triage in its own step 2.
+  const triageHere =
+    !storyShown && step?.opens?.target?.tab === "Triage" && step.opens.target.record?.id === event.complaint_id;
+  const openHere = (opens: Opens | null) =>
+    triageHere && opens?.target?.tab === "Triage"
+      ? document.getElementById("cp-triage")?.scrollIntoView({ behavior: "smooth", block: "start" })
+      : go(opens);
+  // Once the short story reaches its intake decision summary, the summary leads and the rest of the page folds under
+  // "The full complaint record" (0.10.72, Addendum 2).
+  const summaryLeads = storyShown && (shortStory.data?.current ?? 0) >= 3;
+  const record = (
+    <>
       <header className="uw-cp-head" aria-label="The complaint at a glance">
         <p className="ac-eyebrow">
           Complaint ·{" "}
@@ -180,7 +193,9 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           </div>
         </dl>
         <div className="ca-action-row">
-          {step ? (
+          {triageHere ? (
+            <p className="ac-muted">Next: the triage record, below.</p>
+          ) : step ? (
             <button
               type="button"
               // Ready to close is signed by the form in Decisions & actions: shown there, it is that form's button. While
@@ -202,37 +217,45 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
         </div>
       </header>
       {/* The short story's step to do now (0.10.71, A4), from what was saved on this record. */}
-      {storyShown && <ShortStoryPanel view={view} onChanged={changed} />}
+      {storyShown && !summaryLeads && <ShortStoryPanel view={view} onChanged={changed} />}
+      {triageHere && <InlineTriage complaintId={event.complaint_id} onDone={() => resource.reload()} />}
       <Tabs tabs={COMPLAINT_SECTIONS} active={active} onChange={choose} label="Complaint sections">
         {active === "Summary" && (
           <>
             <Panel eyebrow="Summary" title="What happened">
               <p>{event.description || "No description recorded."}</p>
               <dl className="uw-ov-summary">
-                <dt>Problem code</dt>
-                <dd>
-                  {event.problem_code ? <ProblemCode code={event.problem_code} links={links} /> : "None recorded"}
-                </dd>
                 <dt>Product, version, lot</dt>
                 <dd>{[event.product, event.version, event.lot].filter(Boolean).join(" · ") || "—"}</dd>
                 <dt>Markets</dt>
                 <dd>{(work?.markets ?? [event.market]).filter(Boolean).map(marketLabel).join(", ") || "—"}</dd>
-                <dt>Awareness</dt>
-                <dd>{formatDate(event.awareness_at)}</dd>
-                <dt>In your QMS</dt>
-                <dd>{event.status_in_qms}</dd>
                 <dt>Service work</dt>
                 <dd>{serviceText(view)}</dd>
-                {event.business_id && event.business_id !== event.ref && (
-                  <>
-                    <dt>Also known as</dt>
-                    <dd>{event.business_id}</dd>
-                  </>
-                )}
               </dl>
+              {/* The detailed coding and the record's own data, revealed on request (0.10.72, B3). */}
+              <details className="uw-more">
+                <summary>Coding and record details</summary>
+                <dl className="uw-ov-summary">
+                  <dt>Problem code</dt>
+                  <dd>
+                    {event.problem_code ? <ProblemCode code={event.problem_code} links={links} /> : "None recorded"}
+                  </dd>
+                  <dt>Awareness</dt>
+                  <dd>{formatDate(event.awareness_at)}</dd>
+                  <dt>In your QMS</dt>
+                  <dd>{event.status_in_qms}</dd>
+                  {event.business_id && event.business_id !== event.ref && (
+                    <>
+                      <dt>Also known as</dt>
+                      <dd>{event.business_id}</dd>
+                    </>
+                  )}
+                </dl>
+              </details>
             </Panel>
             <LegalClocks view={view} />
-            <Panel eyebrow="Summary" title="Stage">
+            <details className="uw-more">
+              <summary>Stage by stage</summary>
               <ol className="uw-ov-stages">
                 {view.stages.map((stage) => (
                   <li key={stage.code} className={`stage-${stage.state.toLowerCase()}`}>
@@ -244,12 +267,12 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
               <p className="ac-muted">
                 A summary, not a gate: reporting, investigation and containment can run at once.
               </p>
-            </Panel>
+            </details>
             <Panel eyebrow="Summary" title={blocked.length ? "What needs attention" : "Nothing needs attention"}>
               {blocked.length ? (
                 <ul className="uw-ov-checks">
                   {blocked.map((item) => (
-                    <CheckRow key={item.code} item={item} view={view} onOpen={go} onChanged={changed} />
+                    <CheckRow key={item.code} item={item} view={view} onOpen={openHere} onChanged={changed} />
                   ))}
                 </ul>
               ) : (
@@ -327,6 +350,25 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           </Panel>
         )}
       </Tabs>
+    </>
+  );
+  return (
+    <div className="uw-cp">
+      {summaryLeads ? (
+        <>
+          <p className="ac-eyebrow">Complaint</p>
+          <h1 ref={heading} tabIndex={-1} className="uw-cp-title">
+            {event.ref}
+          </h1>
+          <ShortStoryPanel view={view} onChanged={changed} />
+          <details className="uw-more uw-cp-full">
+            <summary>The full complaint record</summary>
+            {record}
+          </details>
+        </>
+      ) : (
+        record
+      )}
     </div>
   );
 }
@@ -358,7 +400,15 @@ function CheckRow({
             {item.action ?? "Open"} <ChevronRight size={13} aria-hidden="true" />
           </button>
         )}
-        {item.result === "BLOCKED" && <SendTo view={view} code={item.code} onSent={() => onChanged(view)} />}
+        {item.result === "BLOCKED" && (
+          // One action per row (0.10.72, B3): "Send to" a colleague sits behind the row's More menu.
+          <details className="uw-row-more">
+            <summary aria-label={`More for ${item.label}`}>
+              <MoreHorizontal size={16} aria-hidden="true" />
+            </summary>
+            <SendTo view={view} code={item.code} onSent={() => onChanged(view)} />
+          </details>
+        )}
       </span>
     </li>
   );

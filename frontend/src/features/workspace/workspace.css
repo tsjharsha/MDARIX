@@ -6025,3 +6025,36 @@ section[aria-label="What blocks the decision"] h3 {
 .uw-not-started {
   margin: 4px 0 8px;
 }
+
+/* 0.10.72 (B3): one action per row; "Send to" behind the row's More menu. */
+.uw-row-more {
+  position: relative;
+  display: inline-block;
+}
+.uw-row-more > summary {
+  display: inline-flex;
+  align-items: center;
+  min-width: 32px;
+  min-height: 32px;
+  justify-content: center;
+  border-radius: var(--ms-radius-md);
+  cursor: pointer;
+  list-style: none;
+}
+.uw-row-more > summary::-webkit-details-marker {
+  display: none;
+}
+.uw-row-more[open] > .uw-cp-send {
+  display: flex;
+  margin-top: 6px;
+}
+.uw-cp-triage {
+  margin: 12px 0;
+}
+.uw-cp-title {
+  margin: 0 0 8px;
+}
+.uw-cp-full > summary {
+  margin: 12px 0;
+  font-weight: 600;
+}

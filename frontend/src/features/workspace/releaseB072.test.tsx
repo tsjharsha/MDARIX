@@ -140,3 +140,25 @@ describe("B2: the investigation leads with what the decision rests on", () => {
     expect(html).not.toContain("Markets");
   });
 });
+
+describe("B3: the complaint page shows one action per row and does the triage itself", () => {
+  const page = () => source("ComplaintPage");
+  it("puts Send to behind the row's More menu, one action per row", () => {
+    expect(page()).toMatch(/<details className="uw-row-more">[\s\S]*?<SendTo /);
+    expect(page()).not.toMatch(/\{item\.result === "BLOCKED" && <SendTo /);
+  });
+  it("shows the triage panel on the page instead of a button to the triage list", () => {
+    expect(page()).toContain("<InlineTriage complaintId={event.complaint_id}");
+    expect(page()).toContain("{triageHere ? (");
+    // Saved on the page, it stays on the page.
+    expect(source("Triage")).toContain('item.kind === "COMPLAINT" && !inline');
+  });
+  it("reveals the coding, the record's data and the stage list on request", () => {
+    expect(page()).toContain("<summary>Coding and record details</summary>");
+    expect(page()).toContain("<summary>Stage by stage</summary>");
+  });
+  it("leads with the intake decision summary once step 4 is reached (Addendum 2)", () => {
+    expect(page()).toContain("<summary>The full complaint record</summary>");
+    expect(page()).toContain("(shortStory.data?.current ?? 0) >= 3");
+  });
+});

@@ -38,8 +38,8 @@ REPORTS = "/api/v1/reports"
 # (step, the screen it is done on, its main button) — the frontend's own labels (entrance.ts, the screens).
 WALK = [
     ("Entrance", "Getting started (the entrance)", "Is this reportable, and by when, in the US and India?"),
-    ("Triage", "Complaint page › Summary", "Complete the triage record (on the triage list)"),
-    ("Triage", "Complaints › To triage, the complaint's triage panel", "Save the triage record"),
+    # 0.10.72 (B3): the triage panel is on the complaint page itself; no button opens the triage list first.
+    ("Triage", "Complaint page › Summary, its triage panel", "Save the triage record"),
     ("US market", "Complaint page › Summary", "Assess the United States (FDA) market"),
     ("US market", "Complaints › Reporting, the US assessment", "Save and sign"),
     ("India market", "The same assessment's next step", "Assess India (CDSCO) too"),
@@ -162,7 +162,7 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     complaint = view["event"]["complaint_id"]
     me = _ok(user.get("/api/v1/triage"))["people"]
 
-    # 1. Triage: the main button opens this complaint's triage panel, not the list.
+    # 1. Triage: the next action names this complaint's triage panel, which its page shows inline (0.10.72, B3).
     assert label == "Complete the triage record (on the triage list)"
     assert target["record"] == {"kind": "complaint", "id": complaint} and target["tab"] == "Triage"
     owner = next(person["id"] for person in me if person["name"] != "Rahul Colleague")
@@ -399,7 +399,9 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     assert ready["ready"]["state"] == "READY"
     # The action count drops: the market answers took 23 actions instead of 32.
     assert actions == 23
-    assert len(WALK) + actions < ACTIONS_BEFORE, len(WALK) + actions
+    # 0.10.72: 21 main buttons (triage on the page) and 23 answer actions: 44 actions instead of 54.
+    assert (len(WALK), len(WALK) + actions) == (21, 44)
+    assert len(WALK) + actions < ACTIONS_BEFORE
 
 
 def test_a_finished_sample_event_asks_for_nothing_and_an_old_one_is_signed_again(trial):
