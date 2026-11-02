@@ -10,6 +10,169 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.72] - 2026-11-02
+
+On the trial maintenance line (`release/0.10`): Release B of the owner-approved "Simplicity and WoW" plan, "Show less,
+by default": one obvious next action on each screen, every consequential open obligation in sight, the rest revealed
+on request. No menu item or tab is added or moved. Organizations on the classic navigation keep their screens, except
+the plain fixes marked below. Pilots are otherwise unchanged.
+
+**No migration.** The API and web images change. **Operators:** run `scripts/refresh_trial_story.py` (dry run first,
+then `--apply`) once after the upgrade: it gives SAMPLE-RV-11's problem code its IMDRF term and corrects the sample
+guide's example text in running trials (below).
+
+### Changed: the market assessment asks only for judgement (B1) — for the consultant to confirm
+
+- The US and India assessments arrive with the **factual** answers the complaint record states, each with its source,
+  for the person to **Confirm** or **Correct it**: did a death occur, each serious-injury part (the record says no
+  serious injury), did the device malfunction; for India death and the serious criteria that mean a serious injury.
+  **Causation, recurrence ("what if it recurs"), remedial action, "unexpected", hospitalisation, congenital anomaly
+  and the market's conclusion are never pre-filled**, and the conclusion is no longer pre-selected: the suggestion is
+  marked beside it. A field the record leaves empty suggests nothing: Unknown is never read as No. A serious injury on
+  the record suggests no criterion (which one applies is a judgement). EU/NI and GB suggest nothing ("might have led
+  to" is a judgement). Starter rules, for the consultant to confirm.
+- Each answer keeps whether it was a **confirmed suggestion, a corrected suggestion or entered**, in the assessment's
+  answers (`origin`, the suggested answer and its source): on the signed record's content, on the signed version
+  ("Answers: 5 confirmed from the complaint record, 3 entered."), in the signature summary and in the audit trail
+  (`answer_origins` on `COMPLAINT_MARKET_ASSESSMENT_SAVED` and `COMPLAINT_MARKET_CONCLUSION_SIGNED`).
+- The training acknowledgements read in one line, "You have read: US guide v2, harm scale v1 · Read again", unless one
+  is missing. Definitions (with "Why am I asked?" and the organization's own explanation), the full harm scale and the
+  evidence ticks are behind **Show definition**, **Show scale** and **Show evidence**. The guide lock, the test matrix
+  and the signature summary are unchanged.
+
+### Changed: the investigation leads with what the decision rests on (B2)
+
+- Summary opens on the **leading explanation, the evidence for and against it, and what blocks the decision**, each
+  open item with its owner ("Investigation brief: waits for its quality review · Owner: A quality reviewer (not the
+  author)"). The scope versions and the lot impact are revealed on request.
+- One set of section controls: the progress line (the tabs repeated it).
+- The empty parts of Decisions & actions fold into one line, "Not started yet: …"; the next step, the part a link
+  asks for and a step that blocks the decision stay visible. An empty decision history, follow-ups and impact
+  assessments say nothing until the decision is signed.
+- The product, version, investigation and as-of selectors are behind **Change investigation** (on Trends: **Change
+  product or version**).
+
+### Changed: the complaint page (B3)
+
+- **Triage is done on the page:** when the triage record is the next step, its panel is on the complaint page and
+  stays there once saved. The next action reads "Complete the triage record" (it said "(on the triage list)").
+- One action per "What needs attention" row: **Send to** a colleague is behind the row's **⋯**, shown only when a
+  colleague may sign the step.
+- The problem coding, awareness, QMS status and MDARIX ID are behind **Coding and record details**; the stage list
+  behind **Stage by stage**. The legal clocks stay visible.
+
+### Changed: My work (B4)
+
+- **Your next step** says why it needs attention, its owner and its deadline. Below it, always visible: the reminders
+  and escalations, and **every task due soon or overdue** with its deadline and one Open.
+- Team numbers, and all my work (task views and filters, completed work, approvals, evidence requests, queues, team
+  overview) are revealed on request; a link to a part of My work opens them.
+
+### Changed: Trends (B5)
+
+- The trend check leads with **one sentence per rising group** ("OrbitCare 300 Infusion Pump (Sample) Rev B: 9
+  complaints against 1.0 expected (9.3×), lots 003, 004 and 005") and its comparison basis in one line, saying plainly
+  "Units not imported: compared by calendar days" where lot quantities are missing. The tiles, every group, the
+  grouping controls, the chart and the method are behind **All groups, the method and the chart**. The trend board
+  lists each group's recent lots (`lots`).
+
+### Changed: Records (B6)
+
+- Once the short story reaches its intake decision summary, Records opens on **the work you just finished**: the
+  intake decision summary of SAMPLE-RV-11, its decision record to **Download (PDF)**, and the summary to open and
+  print. Inspection readiness, documents, decision and CAPA records, the audit trail, signature verification and
+  exports are behind **All records**. With nothing just finished, Records opens as before.
+
+### Fixed: the short story's two correctness faults (F1, F2)
+
+- **F1:** "Confirm the route" saved the triage severity Negligible with no way to change it. Step 2 now shows "No harm
+  was reported" as the reporter's statement and "Effect on treatment: Unknown: asked of the hospital in step 3"; the
+  triage severity is an editable field with its proposal and basis, and nothing is saved until the person ticks "I
+  confirm the triage severity" (or chooses another level). The step lists exactly what the click records.
+- **F2:** step 3 took any later request with an owner and a reply date (a "When can the device be collected?" completed
+  it), and the summary always said "Not known until the hospital answers". Step 3 is now the request the screen
+  recorded, kept with the story (`POST /api/v1/trial/short-story/marks` `{"step": "question", "request_id": …}`, refused
+  `409 NOT_THE_QUESTION` otherwise; a trial recorded before 0.10.72 is read by the question's own wording). The
+  consequence follows that request: open, "Not known until the hospital answers"; answered, the answer and its date
+  with "Reassess each market's answers with it"; closed unanswered, still not known.
+
+### Fixed and added: the leftovers (addenda)
+
+- The investigation's scope names complaints and lots by **your references** (a long list reads "14 complaints ·
+  show") and hides empty lines (no more "None" under Markets, Failure modes, Period, Objectives). Plain fix: classic too.
+- **One number per thing:** the report list's "24 filled" beside a meter of "16 from your records" now both read "16
+  from your records · 8 entered"; the trend check's "the 2 groups checked" beside a "Groups checked 6" tile now says
+  "assessed".
+- **The same evidence listed twice**, and once as both supporting and contradicting, in a Decision Brief: the root
+  cause was the brief merging the case's own judgement with every hypothesis's links. A brief now lists the evidence
+  for and against the **leading** explanation, each piece once; an alternative's links stay on the alternative. Briefs
+  composed before keep their stored content (versioned, hashed); the investigation's Summary reads them by the same rule.
+- **Dates:** "1 Nov 2026" and "1 Nov 2026, 22:54" whatever the browser's language, as stage 5's rule says (an en-US
+  browser showed "Nov 1, 2026, 10:54 PM" beside "Tue 1 Dec 2026, 23:59 IST").
+- The organization's name in the top bar is in full from 1280 px.
+- The market tab reads "EU and Northern Ireland" (the label map), not "EU/NI"; an extra question reads "Extra 1".
+- Sample wording: the guide's example for question 2c no longer starts "Sample examples:" ("Your examples: Sample
+  examples: …"); the worksheet's front-page field reads "Manufacturer report number" ("Mfr report # Manufacturer report
+  number"). Running trials: through the refresh, the published guide version's approval re-recorded on its new
+  fingerprint. The sample's approved worksheet snapshots stay as frozen.
+- The first card reads "A hospital sent a monitor for service. Should Quality review this too?". The sample is
+  unchanged.
+- On My work, while "Resume SAMPLE-RV-11" shows, "Your next step" is a secondary button: one main button.
+- **Sample only on the approval:** the platform admin's approval dialog has a "Sample only" checkbox;
+  `POST /api/v1/platform-admin/trial-requests/{id}/approve` takes `{"sample_only": true}` (no body: as before). It
+  sets `tenants.sample_only` at creation; `TRIAL_REQUEST_APPROVED` records it.
+- SAMPLE-RV-11's problem code SPO2_READING_HIGH maps to IMDRF Annex A **A0908** "Incorrect, Inadequate or Imprecise
+  Result or Readings", the way the other sample codes are mapped (it showed raw).
+- Once the short story's intake decision summary is reached it leads the complaint page, and the rest folds under
+  **The full complaint record**.
+- "Continue the full evaluation" counts its progress from SAMPLE-RV-11's own checklist and records (the same server
+  response as the short story, `full_evaluation`), not from the screen that is open; off the record the bar still says
+  "Off the story's path".
+
+### The flagship walk-through
+
+From the entrance to ready to close: **54 actions before, 44 now** (each main button, each answer entered: choose it
+and type its rationale, two actions; each suggestion confirmed: one). 22 main buttons became 21 (triage on the
+page); the US and India answers took 32 actions and now take 23 (9 factual answers confirmed, 7 judgement answers
+entered).
+
+### Sample numbers and labels that change
+
+No deadline, trend figure, signal, Oversight count, bell, Readiness value or record count changes.
+
+| Where | Before | After |
+|---|---|---|
+| Entrance card | A hospital asked for recalibration. Should Quality review this too? | A hospital sent a monitor for service. Should Quality review this too? |
+| RV-11 market assessments | every answer empty | US 1, 2a, 2b, 2c, 4 and India 2a, 2b, 2d, 2f suggested from the record, to confirm |
+| RV-11 conclusion radio | pre-selected to the suggestion | not selected |
+| Market tab | EU/NI | EU and Northern Ireland |
+| Extra US question | 1. | Extra 1. |
+| RV-11 step 2 | Harm so far: Negligible: no harm was reported… | The reporter says "No harm was reported" · Effect on treatment: Unknown · Triage severity: Negligible (proposed, to confirm) |
+| RV-11 next action | Complete the triage record (on the triage list) | Complete the triage record |
+| RV-11 problem code | SPO2_READING_HIGH (raw) | mapped to A0908 |
+| Sample guide, 2c examples | Sample examples: a cut closed with sutures… | A cut closed with sutures… |
+| Worksheet front page | Mfr report # Manufacturer report number | Manufacturer report number |
+| Report list line | e.g. 24 filled | 16 from your records · 8 entered |
+| Trend check headline | Results allow for the 2 groups checked. | Results allow for the 2 groups assessed. |
+| Trend check lead | (none) | OrbitCare 300 Infusion Pump (Sample) Rev B: 9 complaints against 1.0 expected (9.3×), lots 003, 004 and 005 |
+| INV-001 scope | CMP000017, CMP000013, … (14 pills); LOT000003, LOT000004; None lines | 14 complaints · show (your references); SAMPLE-ORBIT-300-LOT-003, -004; no empty lines |
+| INV-001 brief (new trials) | supporting 4 entries (EVD000001, EVD000002 twice each), contradicting 1 (EVD000002) | supporting 2, contradicting 0 |
+| Dates (en-US browser) | Nov 1, 2026, 10:54 PM | 1 Nov 2026, 22:54 |
+
+### Tests
+
+- pytest: `tests/test_release_b_0_10_72.py` (new): the record's facts only, never a judgement question, never Unknown →
+  No, confirmed vs corrected recorded; F2 (an unrelated request, the question open, the question answered) and the
+  full evaluation's progress; the trend's lots and its one count; sample only on the approval; the sample corrections
+  and the refresh (dry run, apply, idempotent, the guide's approval re-recorded). `test_flagship_walkthrough.py`: the
+  walk with the record's suggestions confirmed, origins on the signed record and in the audit trail, the action count
+  (44, below 54). `test_decision_brief_unit.py`: evidence for and against the leading explanation, each once.
+- vitest: `releaseB072.test.tsx`, `releaseB072Screens.test.tsx` (new: each screen's default render, without its
+  revealed parts and with its required ones), `marketAssessment.test.tsx`, `releaseA071.test.tsx` (F1, the full
+  evaluation's bar), `app/dates.test.ts`, `scopeModel.test.ts`, `authorityReports.test.tsx`, `signalAi.test.tsx`,
+  `entrance.test.tsx`.
+- Screens at 1440 and 390, before and after, in `MDARIX-videos/site-0.10.72-review` (`before/`, `after/`).
+
 ## [0.10.71] - 2026-11-02
 
 On the trial maintenance line (`release/0.10`): Release A of the owner-approved "Simplicity and WoW" plan, "The first

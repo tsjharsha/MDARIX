@@ -173,7 +173,7 @@ def test_the_adjusted_value_allows_for_every_group_tested_at_once():
     assert adjusted[4] is checks[4] and adjusted[4].p_adjusted is None
     shown = first.as_dict()
     assert shown["p_value"] == round(checks[0].p_value, 4) and shown["p_adjusted"] == round(first.p_adjusted, 4)
-    assert "allowing for the 4 groups checked" in trend.sentence("Pump Rev B", first)
+    assert "allowing for the 4 groups assessed" in trend.sentence("Pump Rev B", first)
     # The textbook example: 0.01, 0.04, 0.03, 0.005 adjust to 0.02, 0.04, 0.04, 0.02.
     raw = [trend.Check(9, 1, 180, 1.0, p, 9.0, trend.STEADY) for p in (0.01, 0.04, 0.03, 0.005)]
     assert [item.p_adjusted for item in trend.adjust(raw)] == pytest.approx([0.02, 0.04, 0.04, 0.02])

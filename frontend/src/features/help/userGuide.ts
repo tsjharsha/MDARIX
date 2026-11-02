@@ -809,7 +809,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Read the trend check",
             steps: [
               "Group By version, By problem code or By complaint type.",
-              "Each row's Result is Significant rise (chance under 1% if nothing changed, allowing for the groups checked at once), Higher than usual (under 5%), In line with history, Too few to assess or History too short. Chance shows the adjusted value, with the group's own value beside it.",
+              "Each row's Result is Significant rise (chance under 1% if nothing changed, allowing for the groups assessed at once), Higher than usual (under 5%), In line with history, Too few to assess or History too short. Chance shows the adjusted value, with the group's own value beside it.",
               "On a rising row with no open trend, choose Raise a trend (PMS / Signal Triage Lead and Leader).",
             ],
             note: "The line under the table names the basis: ISO 13485 8.4 (analysis of data) and EU MDR Art. 88 (trend reporting).",
