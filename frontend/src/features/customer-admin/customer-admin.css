@@ -169,7 +169,7 @@
 /* Fields on one grid (V12): each row's inputs line up at the bottom whatever their labels' length. */
 .ca-form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   align-items: end;
   gap: var(--ms-space-3) var(--ms-space-4);
 }
@@ -287,7 +287,7 @@
 /* Facts, lists */
 .ca-facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
   gap: 10px 16px;
   margin: 0;
 }

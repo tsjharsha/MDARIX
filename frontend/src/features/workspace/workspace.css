@@ -183,7 +183,7 @@
 .uw-trial-stats {
   flex: 1 1 420px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
   gap: 12px;
 }
 .uw-trial-steps {
@@ -433,7 +433,7 @@
 }
 .uw-identity-form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: 8px 12px;
   margin-top: 10px;
 }
@@ -462,7 +462,7 @@
 }
 .uw-ins-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
   gap: 10px;
 }
 .uw-ins-stat .ac-stat-value {
@@ -1379,13 +1379,13 @@
 /* Regulatory copilot */
 .uw-embedded .regulatory-toolbar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
   align-items: end;
   gap: 12px;
 }
 .uw-embedded .regulatory-split {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 16px;
 }
 .uw-embedded .regulatory-split > .panel {
@@ -1490,7 +1490,7 @@
 }
 .uw-fb-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 14px;
 }
 .uw-fb-grid label,
@@ -1554,7 +1554,7 @@
 }
 .uw-fb-ratings {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 14px 24px;
   margin-bottom: 18px;
 }
@@ -2065,7 +2065,7 @@
    the AI status banner of the workspace, and the structured Ask answer. */
 .uw-intel-board {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 16px;
   align-items: start;
 }
@@ -2132,7 +2132,7 @@
 }
 .uw-intel-evidence {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 8px 14px;
 }
 .uw-intel-evidence h3 {
@@ -2274,7 +2274,7 @@
 }
 .uw-chain-legend {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 6px 14px;
   margin: 0 0 12px;
   padding: 0;
@@ -2362,7 +2362,7 @@
 /* Phase 5 reviews and Decision Brief: the review policy cards, count tiles that are not buttons. */
 .uw-review-policy {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 12px;
 }
 div.uw-task-count {
@@ -2557,7 +2557,7 @@ div.uw-task-count:hover {
 }
 .ta-replay-columns {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 12px 20px;
 }
 .ta-replay-columns h3 {
@@ -3367,7 +3367,7 @@ div.uw-task-count:hover {
 }
 .uw-demo-focus {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: 6px 12px;
   margin: 0;
   padding: 10px 12px;
@@ -3559,7 +3559,7 @@ div.uw-task-count:hover {
 }
 .uw-journey {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
   gap: 10px;
   margin: 4px 0 0;
   padding: 0;
@@ -4257,7 +4257,7 @@ div.uw-task-count:hover {
 }
 .uw-preview-panels {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: 12px;
   margin-bottom: 14px;
 }
@@ -4383,7 +4383,7 @@ div.uw-task-count:hover {
 }
 .uw-fc-pair {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 10px;
 }
 .uw-fc-pair > div {

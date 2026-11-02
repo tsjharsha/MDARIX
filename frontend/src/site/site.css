@@ -299,7 +299,7 @@
   left: 0;
   right: 0;
   display: grid;
-  grid-template-columns: 200px repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: 200px repeat(auto-fit, minmax(min(190px, 100%), 1fr));
   gap: 28px;
   padding: 28px max(24px, calc((100vw - 1280px) / 2)) 32px;
   border-bottom: 1px solid var(--ms-line);
@@ -822,7 +822,7 @@
   border-left: 4px solid var(--ms-teal);
 }
 .ms-scope-trial .ms-check-list {
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   margin-top: 6px;
 }
 .ms-scope-trial .ms-btn {
@@ -1937,7 +1937,7 @@
 }
 .ms-contact-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 16px;
   margin-top: 28px;
 }
@@ -3183,7 +3183,7 @@
 /* Customer voices: published trial quotes */
 .ms-voices {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: 20px;
 }
 .ms-voice {
@@ -3409,7 +3409,7 @@
 }
 .ms-platform-pager {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 18px;
 }
 .ms-platform-pager .ms-card {

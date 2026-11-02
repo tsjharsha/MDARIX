@@ -3913,7 +3913,7 @@ th {
 }
 .admin-alert-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 10px;
 }
 .admin-alert {
@@ -5833,7 +5833,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 }
 .platform-admin-summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
   gap: 12px;
 }
 .platform-admin-summary-grid > div {
@@ -9360,7 +9360,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 }
 .platform-admin-control-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
   gap: 12px;
 }
 .platform-admin-control-card {
@@ -10331,7 +10331,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 }
 .auth-page .auth-card .auth-checks {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
   gap: 8px 14px;
 }
 .auth-page .auth-card .auth-check {
