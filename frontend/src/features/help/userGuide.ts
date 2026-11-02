@@ -278,7 +278,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           {
             title: "Review the sample event (the new navigation)",
             steps: [
-              "On the new navigation a trial opens on one sample event: A hospital asked for recalibration. Should Quality review this too? It shows the reporter's own words. Choose Review this sample event.",
+              "On the new navigation a trial opens on one sample event: A hospital sent a monitor for service. Should Quality review this too? It shows the reporter's own words. Choose Review this sample event.",
               "The short story has 4 steps on SAMPLE-RV-11: read the call, decide its route, name the open question, and the intake decision summary. A bar at the top shows the step you are on; it counts what you saved, not the screen you are on.",
               "On each screen the main button is the next step; Why am I asked? under each question gives its reason and clause. After the summary, Continue the full evaluation leads to the markets, the report, the decision and ready to close.",
               "The other stories are under More stories, and Restart the sample story under More. The ten chapters are under Explore all capabilities. Your own export is under Help, Try your own data.",

@@ -38,7 +38,7 @@ const api = (story: string | null = null) =>
 describe("the entrance", () => {
   it("leads with one sample event in the reporter's words; the other stories and the restart under More", () => {
     expect(SCENARIOS.map((item) => item.title)).toEqual([
-      "A hospital asked for recalibration. Should Quality review this too?",
+      "A hospital sent a monitor for service. Should Quality review this too?",
       "A complaint just arrived: what now?",
       "Is a problem rising?",
       "Is this reportable, and by when, in the US and India?",
@@ -48,7 +48,7 @@ describe("the entrance", () => {
         <Entrance onRestarted={() => undefined} />
       </WorkspaceContext.Provider>,
     );
-    expect(html).toContain("A hospital asked for recalibration. Should Quality review this too?");
+    expect(html).toContain("A hospital sent a monitor for service. Should Quality review this too?");
     expect(html).toContain("its SpO2 read 4 to 6 points high on two patients. No harm was reported.");
     expect(html).toContain("Review this sample event");
     expect(html).toContain("Fictional manufacturer · Sample data only");
