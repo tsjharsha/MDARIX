@@ -463,9 +463,12 @@ const EMPTY_SUBMISSION: SubmissionForm = {
 export function RecordSubmission({
   detail,
   onChanged,
+  quiet = false,
 }: {
   detail: ReportDetail;
   onChanged: (detail: ReportDetail) => void;
+  /** Its button is secondary where the page's one main button is elsewhere (the report page's Generate the PDF). */
+  quiet?: boolean;
 }) {
   const [form, setForm] = useState<SubmissionForm>({
     ...EMPTY_SUBMISSION,
@@ -597,7 +600,7 @@ export function RecordSubmission({
         )}
         {problem && <p className="uw-hint ca-wide">{problem}</p>}
         <div className="ca-action-row ca-wide">
-          <button type="submit" className="ac-primary" disabled={action.busy || !!problem}>
+          <button type="submit" className={quiet ? "ac-secondary" : "ac-primary"} disabled={action.busy || !!problem}>
             <Send size={15} aria-hidden="true" /> {action.busy ? "Recording…" : "Mark as submitted"}
           </button>
         </div>

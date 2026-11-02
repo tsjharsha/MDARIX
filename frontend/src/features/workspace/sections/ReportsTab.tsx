@@ -262,7 +262,9 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
       ? `Cancelled: ${detail.cancelled_reason ?? "a later signed conclusion says not reportable"}`
       : detail.assessment?.conclusion === "REPORTABLE"
         ? `Created when the ${detail.market_label} conclusion was signed reportable${
-            detail.assessment.report_type_label ? `: ${detail.assessment.report_type_label.toLowerCase()}` : ""
+            detail.assessment.report_type_label
+              ? `: ${detail.assessment.report_type_label[0].toLowerCase()}${detail.assessment.report_type_label.slice(1)}`
+              : ""
           }.`
         : "Started while the market was still being assessed.";
   const pdf = async () => {
@@ -301,7 +303,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
               >
                 {ref}
               </button>
-              . {origin}
+              {`. ${origin}`}
             </p>
           </div>
           <div className="uw-cp-chips">
@@ -353,7 +355,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
             {write && detail.stage === "APPROVED" && (
               <section className="uw-rec-part" id="rp-submission" aria-label="Record the submission">
                 <h2>Record the submission</h2>
-                <RecordSubmission detail={detail} onChanged={changed} />
+                <RecordSubmission detail={detail} onChanged={changed} quiet />
               </section>
             )}
             {write && detail.stage === "SUBMITTED" && detail.submissions[0] && (

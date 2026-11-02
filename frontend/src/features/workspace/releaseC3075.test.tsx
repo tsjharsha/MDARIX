@@ -328,6 +328,8 @@ describe("a report's page: the record page's shape, the status path and the rail
     expect(html).toContain("Generate the PDF");
     expect(html).toContain("Approved: Rahul Colleague");
     expect(html).toContain("Record the submission");
+    // One main button: Generate the PDF; "Mark as submitted" is secondary on this page.
+    expect(html.match(/class="ac-primary"/g)?.length).toBe(1);
     // Without the export right, a colleague generates it.
     expect(render(<ReportsSection />, api("?report=r1", ["regulatory.review"]))).not.toContain("Generate the PDF");
   });

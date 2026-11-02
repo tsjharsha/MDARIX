@@ -177,7 +177,7 @@ export function DecisionTreesSection() {
                     </small>
                   </div>
                   <span className="uw-tans" aria-label={`Answer: ${node.answer_label}`}>
-                    {(node.answer && !ANSWERS.includes(node.answer as "YES") ? [node.answer, ...ANSWERS] : ANSWERS).map(
+                    {(node.answer && !ANSWERS.includes(node.answer as "YES") ? [...ANSWERS, node.answer] : ANSWERS).map(
                       (answer) => (
                         <span key={answer} className={`uw-pill${node.answer === answer ? " is-on" : ""}`}>
                           {answer === node.answer ? node.answer_label : answer === "YES" ? "Yes" : "No"}

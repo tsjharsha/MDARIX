@@ -7371,6 +7371,12 @@ button.uw-org:hover {
   border-radius: var(--ms-radius-md);
   background: var(--ms-subtle);
 }
+/* Below the two-column width the report's next step comes before its long field list. */
+@media (max-width: 980px) {
+  .uw-report-page .uw-rec > .uw-rail {
+    order: -1;
+  }
+}
 .uw-form-card > :last-child {
   justify-self: start;
 }
