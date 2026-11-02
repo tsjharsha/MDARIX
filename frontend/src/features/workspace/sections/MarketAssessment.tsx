@@ -251,6 +251,7 @@ export function MarketPanel({
         item={item}
         severity={detail.severity}
         severityLevel={detail.severity_level}
+        severitySource={detail.severity_source}
         form={form}
         setForm={setForm}
       />
@@ -501,6 +502,7 @@ export function ScalePanel({
   item,
   severity,
   severityLevel,
+  severitySource,
   form,
   setForm,
 }: {
@@ -508,6 +510,7 @@ export function ScalePanel({
   item: MarketItem;
   severity: string | null;
   severityLevel: string | null;
+  severitySource?: string | null;
   form: AssessmentForm;
   setForm: (form: AssessmentForm) => void;
 }) {
@@ -536,7 +539,9 @@ export function ScalePanel({
         ))}
       </ol>
       <p className="uw-cr-meta">
-        Quality-system severity: {severity ? `"${severity}"` : "not recorded"} →{" "}
+        {severitySource === "The triage record"
+          ? "From the triage record: "
+          : `Quality-system severity: ${severity ? `"${severity}"` : "not recorded"} → `}
         {severityLevel ? <strong>{label(severityLevel).toLowerCase()}</strong> : "not mapped: choose a level"}
         {severityLevel &&
         thresholdRank >= 0 &&

@@ -127,6 +127,31 @@ def _routine_markets(facts: dict) -> list[str]:
     return [market for market in markets.MARKETS if market in facts["enabled"]]
 
 
+# The worksheet's report source (Form FDA 3500A G2) and the classification's user type it maps to.
+_REPORT_SOURCE = {"health professional": "HEALTHCARE_PROFESSIONAL"}
+
+
+def _from_report(db: Session, tenant_id, complaint_id, view: dict) -> dict:
+    """With no classification yet, the user type a report worksheet already recorded (its report source, G2) is
+    proposed, with where it came from (stage 8: a fact the record holds is not asked again). A person confirms it."""
+    from backend.app.db.models.authority_reports import ReportObligation
+
+    if view["id"] is not None or view["user_type"] != coding.UNKNOWN:
+        return view
+    for row in db.query(ReportObligation.entries).filter(
+        ReportObligation.tenant_id == tenant_id, ReportObligation.complaint_id == complaint_id
+    ):
+        said = str(((row.entries or {}).get("G2") or {}).get("value") or "").strip()
+        code = _REPORT_SOURCE.get(said.lower())
+        if code:
+            return {
+                **view,
+                "user_type": code,
+                "source_values": {**view["source_values"], "user_type": f"{said} (report worksheet G2)"},
+            }
+    return view
+
+
 def screen(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today: date | None = None) -> dict:
     tenant_id = uuid.UUID(ctx.tenant_id)
     today = today or service.today_utc()
@@ -173,7 +198,7 @@ def screen(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
         ],
         "no_investigation_clause": rules.NO_INVESTIGATION_CLAUSE,
         "basis": chips(rules.CLAUSE_IDS),
-        "classification": service.classification_view(latest, names),
+        "classification": _from_report(db, tenant_id, complaint_id, service.classification_view(latest, names)),
         "classification_history": [service.classification_view(row, names) for row in reversed(classifications[:-1])],
         "use_environments": coding.USE_ENVIRONMENT_LABELS,
         "user_types": coding.USER_TYPE_LABELS,
@@ -403,11 +428,14 @@ def sign_disposition(
     opened = False
     if branch in rules.ESCALATED:
         user = control_db.query(AuthUser.username).filter(AuthUser.id == uuid.UUID(str(ctx.user_id))).first()
+        # The question carries what the complaint said and why it escalated, in words (stage 8: no codes, nothing
+        # typed twice); the person's reason follows.
         question = (
-            f"Escalated from complaint {ref} ({rules.BRANCH_LABELS[branch].lower()}"
-            + (f": {', '.join(triggers.codes(met))}" if met else "")
+            f"{(complaint.description or '').strip()} Escalated from complaint {ref} "
+            f"({rules.BRANCH_LABELS[branch].lower()}"
+            + (f": {'; '.join(item['label'].lower() for item in met)}" if met else "")
             + f"). {rationale}"
-        )[:2000]
+        ).strip()[:2000]
         case, _, _ = open_case(
             db,
             tenant_id,

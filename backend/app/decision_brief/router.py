@@ -426,13 +426,13 @@ def create_decision_brief(
     if payload.use_ai_draft:
         draft, source_ai_brief_id, actions = _ai_draft(db, case)
         narrative.update(draft)
-        # The brief writes itself first: the problem statement from the case's question, the recommended actions from
-        # the AI's possible next steps, each only where the author has written nothing. The proposed conclusion is
-        # always the author's own.
-        if not narrative["problem_statement"]:
-            narrative["problem_statement"] = rules.problem_statement_from(case.investigation_question)
+        # The recommended actions from the AI's possible next steps, only where the author has written nothing.
         if not narrative["recommended_actions"] and actions:
             narrative["recommended_actions"] = actions
+    # The problem statement starts as the investigation's question, with AI off too (stage 8: nothing typed twice);
+    # the author refines it. The proposed conclusion is always the author's own.
+    if not narrative["problem_statement"]:
+        narrative["problem_statement"] = rules.problem_statement_from(case.investigation_question)
     narrative = rules.with_contributor(narrative, person.user_id)
     now = states.now_utc()
     content, state = composer.compose(db, control_db, case, now=now, ai_draft_used=narrative["ai_draft_used"])
