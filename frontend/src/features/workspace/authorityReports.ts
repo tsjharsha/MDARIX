@@ -310,10 +310,21 @@ export function deadlineText(item: DeadlineFields, state?: ObligationState, now 
 }
 
 /** The worksheet's summary line: how many fields come from records, were entered or confirmed, and are missing. */
+/** One count per thing (0.10.72): "from your records" is the record's and the confirmed values, everywhere the
+ * worksheet says it (the list's line, the meter, the approval's summary); "entered" is what a person typed. */
+export const FROM_RECORDS = ["FROM_RECORD", "CONFIRMED"];
+export function filledCounts(counts: Record<string, number>): { fromRecords: number; entered: number } {
+  return {
+    fromRecords: FROM_RECORDS.reduce((sum, key) => sum + (counts[key] ?? 0), 0),
+    entered: counts.ENTERED ?? 0,
+  };
+}
+
 export function summaryLine(counts: Record<string, number>): string {
   const n = (key: string) => counts[key] ?? 0;
-  const filled = n("FROM_RECORD") + n("ENTERED") + n("CONFIRMED");
-  const parts = [`${filled} filled`];
+  const { fromRecords, entered } = filledCounts(counts);
+  const parts = [`${fromRecords} from your records`];
+  if (entered) parts.push(`${entered} entered`);
   if (n("MUST_HAVE")) parts.push(`${n("MUST_HAVE")} must have before submission`);
   const later = n("MAY_BE_UNKNOWN") + n("FOLLOW_UP");
   if (later) parts.push(`${later} may wait`);
@@ -398,7 +409,7 @@ export function worksheetMeter(sections: readonly WorksheetSection[]) {
   const count = (statuses: string[]) => fields.filter((field) => statuses.includes(field.status)).length;
   return {
     total: fields.length,
-    fromRecords: count(["FROM_RECORD", "CONFIRMED"]),
+    fromRecords: count(FROM_RECORDS),
     entered: count(["ENTERED"]),
     missing: fields.filter(isMissing).length,
   };

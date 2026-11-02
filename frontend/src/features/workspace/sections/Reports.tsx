@@ -28,6 +28,7 @@ import {
   submissionProblem,
   isMissing,
   worksheetMeter,
+  filledCounts,
   summaryLine,
   type ReportDetail,
   type ReportList,
@@ -402,7 +403,7 @@ function Approval({ detail, onChanged }: { detail: ReportDetail; onChanged: (det
         <DecideAndSign
           signs={`Approval of snapshot ${snapshot.version} of the ${detail.form.title} for ${detail.complaint.ref}, as frozen.`}
           restsOn={[
-            `${detail.counts.FROM_RECORD ?? 0} fields filled from your records, ${detail.counts.MUST_HAVE ?? 0} still to enter; fingerprint ${shortPrint(snapshot.content_fingerprint)}.`,
+            `${filledCounts(detail.counts).fromRecords} fields filled from your records, ${detail.counts.MUST_HAVE ?? 0} still to enter; fingerprint ${shortPrint(snapshot.content_fingerprint)}.`,
             detail.assessment
               ? `The ${detail.market_label} conclusion: ${String(detail.assessment.conclusion ?? "")
                   .toLowerCase()

@@ -191,7 +191,7 @@ describe("the report helpers", () => {
     );
     expect(deadlineText(india, "ACCEPTED")).toBe("Deadline Sat 7 Nov 2026, 23:59 IST: met by the submission");
     expect(summaryLine({ FROM_RECORD: 3, ENTERED: 1, MUST_HAVE: 2, OUTSIDE: 4 })).toBe(
-      "4 filled · 2 must have before submission · 4 entered in the authority's route",
+      "3 from your records · 1 entered · 2 must have before submission · 4 entered in the authority's route",
     );
   });
 

@@ -186,3 +186,20 @@ describe("Addendum 2: sample only, chosen on the approval", () => {
     expect(admin).toContain('act(confirming, "approve", { sample_only: sampleOnly })');
   });
 });
+
+describe("Addendum: one number per thing", () => {
+  it("counts the worksheet's fields from your records the same way on the list, the meter and the approval", async () => {
+    const { filledCounts, summaryLine, worksheetMeter } = await import("./authorityReports");
+    const counts = { FROM_RECORD: 14, CONFIRMED: 2, ENTERED: 8, MUST_HAVE: 3 };
+    const fields = Object.entries(counts).flatMap(([status, n]) =>
+      Array.from({ length: n }, (_, index) => ({ id: `${status}${index}`, status })),
+    );
+    const meter = worksheetMeter([{ code: "A", title: "A", fields } as never]);
+    expect(filledCounts(counts).fromRecords).toBe(16);
+    expect(meter.fromRecords).toBe(16);
+    expect(summaryLine(counts)).toMatch(/^16 from your records · 8 entered/);
+    // Before 0.10.72 the list said "24 filled" beside a meter of 16.
+    expect(summaryLine(counts)).not.toContain("24");
+    expect(source("Reports")).toContain("filledCounts(detail.counts).fromRecords");
+  });
+});
