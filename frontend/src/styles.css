@@ -11550,8 +11550,20 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   white-space: nowrap;
 }
 .uw-cr-id,
-.ac-table tbody td:first-child {
+.ac-table td[data-label$=" ID"],
+.ac-table td[data-label="ID"] {
   white-space: nowrap;
+}
+/* Nothing in a console is wider than its column: a select with a long option, a button with a long name (they wrap
+   on a phone). */
+.admin-console select {
+  max-width: 100%;
+}
+@media (max-width: 640px) {
+  .admin-console :is(.ac-primary, .ac-secondary, .ca-danger) {
+    max-width: 100%;
+    white-space: normal;
+  }
 }
 /* "You decide and sign …": once, at each point where a person signs or submits (V5). */
 .ms-decide {

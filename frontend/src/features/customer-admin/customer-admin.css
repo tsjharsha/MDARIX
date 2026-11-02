@@ -162,8 +162,10 @@
 }
 
 /* Forms */
+/* One column that shrinks with its panel (an auto column grew to the widest field, wider than a phone). */
 .ca-form {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 /* Fields on one grid (V12): each row's inputs line up at the bottom whatever their labels' length. */
@@ -175,6 +177,7 @@
 }
 .ca-field {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 5px;
   color: var(--ac-ink-2);
   font-weight: 600;
@@ -410,6 +413,7 @@
 }
 .ca-drawer-section {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   padding-top: 14px;
   border-top: 1px solid var(--ac-line);
