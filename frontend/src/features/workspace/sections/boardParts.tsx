@@ -119,6 +119,19 @@ export function ChipFilter<T extends string>({
   );
 }
 
+/**
+ * Why a control is disabled, beside it and before the click (0.10.68, stage 5's rule): the control names it with
+ * aria-describedby={id}. Nothing when the control is usable.
+ */
+export function Why({ id, text }: { id: string; text: string | null | false | undefined }) {
+  if (!text) return null;
+  return (
+    <small id={id} className="ac-muted uw-why">
+      {text}
+    </small>
+  );
+}
+
 export function InlineError({ text }: { text: string }) {
   if (!text) return null;
   return (

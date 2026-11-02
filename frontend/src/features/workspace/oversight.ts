@@ -164,6 +164,13 @@ export type EventView = {
     owner_name: string | null;
     owner_named: boolean;
     sample: boolean;
+    /** What happened, as the complaint records it (0.10.68: the complaint page's header). */
+    description?: string | null;
+    problem_code?: string | null;
+    version?: string | null;
+    lot?: string | null;
+    country?: string | null;
+    harm?: "DEATH" | "SERIOUS_INJURY" | "PATIENT_INVOLVED" | null;
   };
   summary: {
     nearest_deadline: { title: string; due_at: string; opens: Opens } | null;
@@ -188,6 +195,28 @@ export type EventView = {
   reason_min: number;
   never_closes: string;
   practice_label: string | null;
+  /** The owner, stage, next action and dated items the lists and My work show (0.10.68). */
+  work?: {
+    owner_name: string | null;
+    stage: string;
+    next: string | null;
+    due: Array<{
+      key: string;
+      category: string;
+      category_label: string;
+      title: string;
+      market: string | null;
+      due_at: string;
+      due_label?: string;
+      state: ItemState;
+      state_label: string;
+      hours_left: number;
+      opens: Opens;
+    }>;
+    markets: string[];
+  };
+  /** Who may sign each step, before the work starts (0.10.68, 7.8). */
+  signers?: Record<string, { people: Person[]; you: boolean; second_person: boolean }>;
 };
 
 export type Filters = { product: string; market: string; category: string; show: "attention" | "all" };

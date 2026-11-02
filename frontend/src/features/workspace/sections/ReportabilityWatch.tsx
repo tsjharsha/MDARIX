@@ -14,7 +14,7 @@ import {
 import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { formatDate, useResource } from "../../customer-admin/shared";
 import { deadlineLabel, formatDay } from "../../../app/dates";
-import { investigationRequestFor, useCan, useOpenInvestigation } from "../workspaceContext";
+import { investigationRequestFor, useCan, useOpenInvestigation, useTabParam } from "../workspaceContext";
 import { recordId } from "../complaintReview";
 import { owesWorksheet, reportsTab } from "../authorityReports";
 import {
@@ -53,8 +53,12 @@ export function ReportabilityWatch({ onOpenTab }: { onOpenTab: (tab: string) => 
   const [show, setShow] = useState<WatchShow>("open");
   const [product, setProduct] = useState("");
   const [page, setPage] = useState(1);
-  const [deciding, setDeciding] = useState<WatchItem | null>(null);
+  const [chosen, setDeciding] = useState<WatchItem | null>(null);
+  // A complaint's page or a reportability task opens that complaint's assessment (Reportability?complaint=<id>).
+  const [linked, setLinked] = useTabParam("complaint");
   const list = useResource<WatchList>(watchPath(show, product, page));
+  const fromLink = linked ? ((list.data?.items ?? []).find((item) => item.id === linked) ?? null) : null;
+  const deciding = chosen ?? fromLink;
   const summary = list.data?.summary;
   const headline = watchHeadline(summary);
   const items = list.data?.items ?? [];
@@ -189,7 +193,14 @@ export function ReportabilityWatch({ onOpenTab }: { onOpenTab: (tab: string) => 
         <BasisNote />
       </Panel>
       {deciding && (
-        <MarketAssessmentDrawer complaint={deciding} onClose={() => setDeciding(null)} onChanged={list.reload} />
+        <MarketAssessmentDrawer
+          complaint={deciding}
+          onClose={() => {
+            setDeciding(null);
+            if (linked) setLinked(null);
+          }}
+          onChanged={list.reload}
+        />
       )}
     </div>
   );

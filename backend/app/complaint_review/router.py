@@ -78,7 +78,7 @@ class SettingsRequest(BaseModel):
 
 @router.get("/second-look")
 def second_look(
-    state: str = Query("open", pattern="^(open|decided)$"),
+    state: str = Query("open", pattern="^(open|decided|dismissed)$"),
     product_id: uuid.UUID | None = None,
     page: int = Query(1, ge=1, le=10000),
     page_size: int = Query(25, ge=1, le=200),

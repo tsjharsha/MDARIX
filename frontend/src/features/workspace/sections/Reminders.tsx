@@ -2,7 +2,7 @@ import { useState } from "react";
 import { BellRing, CalendarOff, ChevronRight } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { useNavigation, useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { placeOf } from "../../../app/linkTable";
 import {
   ALERTS,
@@ -15,7 +15,7 @@ import {
   type AlertList,
   type Opens,
 } from "../oversight";
-import { InlineError } from "./boardParts";
+import { InlineError, Why } from "./boardParts";
 
 /** Opens where an alert's work is done (its own section and tab). */
 function useOpen() {
@@ -34,6 +34,8 @@ function useOpen() {
  */
 export function RemindersPanel() {
   const data = useResource<AlertList>(ALERTS);
+  const { open } = useWorkspace();
+  const fresh = useNavigation() === "new";
   const go = useOpen();
   const [error, setError] = useState("");
   const list = data.data;
@@ -53,7 +55,7 @@ export function RemindersPanel() {
       eyebrow="Reminders and escalations"
       title={
         !list
-          ? "Reading your reminders…"
+          ? "Reminders and escalations for you"
           : count
             ? `${count} ${count === 1 ? "reminder" : "reminders"} for you${list.unread ? `, ${list.unread} unread` : ""}`
             : "Nothing due soon or overdue for you"
@@ -103,8 +105,27 @@ export function RemindersPanel() {
           ))}
         </ul>
       )}
-      {list && <AwayControl list={list} onChanged={data.reload} />}
+      {/* On the new navigation "I will be away" lives in Account, with its link here (7.2). */}
+      {list && !fresh && <AwayControl list={list} onChanged={data.reload} />}
+      {fresh && (
+        <p className="uw-rm-away-link">
+          <button type="button" className="ac-link" onClick={() => open("My Account", "Away")}>
+            I will be away
+          </button>{" "}
+          <span className="ac-muted">(in Account)</span>
+        </p>
+      )}
       <InlineError text={error} />
+    </Panel>
+  );
+}
+
+/** Account › Away on the new navigation: the person's own absence and the colleague who covers it. */
+export function AwayPanel() {
+  const data = useResource<AlertList>(ALERTS);
+  return (
+    <Panel eyebrow="Account" title="When you will be away" source={data}>
+      {data.data && <AwayControl list={data.data} onChanged={data.reload} />}
     </Panel>
   );
 }
@@ -245,9 +266,10 @@ export function AwayControl({ list, onChanged }: { list: AlertList; onChanged: (
             backup gains no right to sign for you.
           </p>
           <div className="ca-action-row">
-            <button type="submit" className="ac-primary" disabled={busy || !!problem}>
+            <button type="submit" className="ac-primary" disabled={busy || !!problem} aria-describedby="away-why">
               {busy ? "Recording…" : "Record my absence"}
             </button>
+            <Why id="away-why" text={problem} />
             <button type="button" className="ac-link" onClick={() => setOpen(false)}>
               Cancel
             </button>

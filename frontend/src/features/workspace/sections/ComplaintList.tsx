@@ -7,6 +7,10 @@ import { sortParams, useServerSort } from "../../../app/tableSort";
 import { displayId } from "../../../app/displayId";
 import { investigationRequestFor, useOpenInvestigation, useTabFilters, useWorkspace } from "../workspaceContext";
 import { StatusBadge, listTitle } from "./common";
+import { DeadlineChip, HarmChip } from "../../../app/chips";
+import { marketLabel } from "../../../app/labels";
+import { ProblemCode, useImdrfLinks, type ImdrfLinks } from "./ProblemCode";
+import { RowMenu } from "./RowMenu";
 import {
   EMPTY_COMPLAINT_FILTERS,
   complaintFilterValues,
@@ -39,16 +43,20 @@ const COMPLAINT_SORTS = [
 export function ComplaintList({
   eyebrow = "Signals",
   initialFilters,
+  work: sixColumns = false,
 }: {
   eyebrow?: string;
   initialFilters?: ComplaintListFilters;
+  /** The new navigation's list (0.10.68): six columns, each complaint opening its own page. */
+  work?: boolean;
 }) {
-  const { work } = useWorkspace();
+  const { work, open } = useWorkspace();
   const openInvestigation = useOpenInvestigation();
   const [filters, setFilters] = useState<ComplaintListFilters>(() => initialFilters ?? EMPTY_COMPLAINT_FILTERS);
   const [page, setPage] = useState(1);
   const { sort, onSort } = useServerSort(() => setPage(1));
-  const list = useResource<any>(complaintListPath(filters, page, sortParams(sort)));
+  const list = useResource<any>(`${complaintListPath(filters, page, sortParams(sort))}${sixColumns ? "&work=1" : ""}`);
+  const links = useImdrfLinks(sixColumns ? listOf(list.data?.items).map((row: any) => row.problem_code) : []);
   const pages = list.data?.pages ?? 1;
   // The filters are part of the address (Complaint list?country=US): a change replaces it, so refresh keeps them.
   const keepFilters = useTabFilters();
@@ -76,70 +84,95 @@ export function ComplaintList({
         rowKey={(row) => String(row.id)}
         empty={
           hasComplaintFilters(filters)
-            ? { title: "No complaints match these filters", detail: "Clear a filter to see more complaints." }
-            : { title: "No complaints found", detail: "Complaints arrive through connectors and imports." }
+            ? {
+                title: "No complaints match these filters",
+                detail: "Clear a filter to see more complaints.",
+                action: (
+                  <button type="button" className="ac-secondary" onClick={() => set(EMPTY_COMPLAINT_FILTERS)}>
+                    Clear the filters
+                  </button>
+                ),
+              }
+            : {
+                title: "No complaints found",
+                detail: "Complaints arrive through imports.",
+                action: (
+                  <button type="button" className="ac-secondary" onClick={() => open("Import data")}>
+                    Import your data
+                  </button>
+                ),
+              }
         }
         serverSort={{ sort, onSort, keys: COMPLAINT_SORTS }}
-        columns={[
-          idColumn("Complaint ID", "complaint_identifier"),
-          sourceIdColumn("complaint_identifier"),
-          {
-            key: "product",
-            label: "Product",
-            fields: ["product_name", "product_identifier", "version"],
-            render: (row) => `${row.product_name}${row.version ? ` · ${row.version}` : ""}`,
-          },
-          { key: "description", label: "Description", render: (row) => row.description ?? "—" },
-          {
-            key: "received",
-            label: "Received",
-            fields: ["received_date"],
-            render: (row) => formatDay(row.received_date ?? row.event_date),
-          },
-          {
-            key: "severity",
-            label: "Severity",
-            fields: ["severity", "patient_involved", "serious_injury", "death"],
-            render: (row) => (
-              <span className="ca-person">
-                <span>{row.severity ? titleCase(String(row.severity)) : "—"}</span>
-                {(row.death || row.serious_injury) && (
-                  <small className="uw-flag-critical">Serious injury or death</small>
-                )}
-                {!row.death && !row.serious_injury && row.patient_involved && <small>Patient involved</small>}
-              </span>
-            ),
-          },
-          { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
-          {
-            key: "cases",
-            label: "Investigations",
-            numeric: true,
-            fields: ["investigations"],
-            render: (row) => row.investigations,
-          },
-          ...(openInvestigation
-            ? [
+        columns={
+          sixColumns
+            ? workColumns(
+                links,
+                (row) =>
+                  open("Complaint", `Summary?${new URLSearchParams({ ref: row.complaint_identifier ?? row.id })}`),
+                openInvestigation,
+              )
+            : [
+                idColumn("Complaint ID", "complaint_identifier"),
+                sourceIdColumn("complaint_identifier"),
                 {
-                  key: "open-investigation",
-                  label: "",
-                  render: (row: any) => {
-                    const request = investigationRequestFor(row);
-                    return request ? (
-                      <button
-                        type="button"
-                        className="ac-link"
-                        aria-label={`Open an investigation for ${displayId(row, "complaint_identifier", "this complaint")}`}
-                        onClick={() => openInvestigation(request)}
-                      >
-                        Open investigation
-                      </button>
-                    ) : null;
-                  },
+                  key: "product",
+                  label: "Product",
+                  fields: ["product_name", "product_identifier", "version"],
+                  render: (row) => `${row.product_name}${row.version ? ` · ${row.version}` : ""}`,
                 },
+                { key: "description", label: "Description", render: (row) => row.description ?? "—" },
+                {
+                  key: "received",
+                  label: "Received",
+                  fields: ["received_date"],
+                  render: (row) => formatDay(row.received_date ?? row.event_date),
+                },
+                {
+                  key: "severity",
+                  label: "Severity",
+                  fields: ["severity", "patient_involved", "serious_injury", "death"],
+                  render: (row) => (
+                    <span className="ca-person">
+                      <span>{row.severity ? titleCase(String(row.severity)) : "—"}</span>
+                      {(row.death || row.serious_injury) && (
+                        <small className="uw-flag-critical">Serious injury or death</small>
+                      )}
+                      {!row.death && !row.serious_injury && row.patient_involved && <small>Patient involved</small>}
+                    </span>
+                  ),
+                },
+                { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
+                {
+                  key: "cases",
+                  label: "Investigations",
+                  numeric: true,
+                  fields: ["investigations"],
+                  render: (row) => row.investigations,
+                },
+                ...(openInvestigation
+                  ? [
+                      {
+                        key: "open-investigation",
+                        label: "",
+                        render: (row: any) => {
+                          const request = investigationRequestFor(row);
+                          return request ? (
+                            <button
+                              type="button"
+                              className="ac-link"
+                              aria-label={`Open an investigation for ${displayId(row, "complaint_identifier", "this complaint")}`}
+                              onClick={() => openInvestigation(request)}
+                            >
+                              Open investigation
+                            </button>
+                          ) : null;
+                        },
+                      },
+                    ]
+                  : []),
               ]
-            : []),
-        ]}
+        }
       />
       {pages > 1 && (
         <div className="ca-action-row">
@@ -272,17 +305,124 @@ export function ComplaintFilterBar({
   );
 }
 
-/** A filter over the values the complaints record; a value from a link that the list does not offer stays chosen. */
-/** A problem code with the IMDRF codes it maps to: "PRESSURE_ALARM · IMDRF A16" (exported for its test). */
+/**
+ * A problem code with the IMDRF codes and terms it maps to: "PRESSURE_ALARM · IMDRF A16 Alarm problem" (exported for
+ * its test). The customer's code stays as recorded.
+ */
 export function imdrfLabels(
   codes: string[],
-  links: Record<string, { code: string }[]> | undefined,
+  links: Record<string, { code: string; term?: string | null }[]> | undefined,
 ): Record<string, string> {
   return Object.fromEntries(
     codes
       .filter((code) => links?.[code]?.length)
-      .map((code) => [code, `${code} · IMDRF ${(links?.[code] ?? []).map((link) => link.code).join(", ")}`]),
+      .map((code) => [
+        code,
+        `${code} · IMDRF ${(links?.[code] ?? []).map((link) => (link.term ? `${link.code} ${link.term}` : link.code)).join(", ")}`,
+      ]),
   );
+}
+
+/** One deadline or target of a complaint (backend/app/oversight/router.py complaint_work). */
+type WorkDue = {
+  key: string;
+  title: string;
+  market: string | null;
+  due_at: string;
+  due_label?: string;
+  state: string;
+  hours_left: number;
+};
+
+/** What the new navigation's list shows of a complaint's work, as its page shows it. */
+export type ComplaintWork = {
+  owner_name: string | null;
+  stage: string;
+  next: string | null;
+  due: WorkDue[];
+  markets: string[];
+};
+
+const harmOf = (row: any) =>
+  row.death
+    ? ({ harm: "critical", label: "Death" } as const)
+    : row.serious_injury
+      ? ({ harm: "serious", label: "Serious injury" } as const)
+      : null;
+
+/**
+ * The six columns of the new navigation's lists (7.5): Urgency · What happened · Product, version, lot · Markets ·
+ * Owner · Stage. What happened opens the complaint's page; one visible action (Open) and the rest under ⋯.
+ */
+export function workColumns(
+  links: ImdrfLinks,
+  onOpen: (row: any) => void,
+  openInvestigation: ReturnType<typeof useOpenInvestigation>,
+) {
+  const work = (row: any): ComplaintWork | null => row.work ?? null;
+  return [
+    {
+      key: "urgency",
+      label: "Urgency",
+      render: (row: any) => {
+        const nearest = work(row)?.due[0];
+        const harm = harmOf(row);
+        return (
+          <span className="uw-urgency">
+            {nearest ? <DeadlineChip item={nearest} /> : <span className="ac-muted">No deadline</span>}
+            {harm && <HarmChip harm={harm.harm} label={harm.label} />}
+          </span>
+        );
+      },
+    },
+    {
+      key: "what",
+      label: "What happened",
+      render: (row: any) => (
+        <span className="uw-what">
+          <button type="button" className="ac-link" onClick={() => onOpen(row)}>
+            <strong>{row.complaint_identifier ?? row.business_id}</strong>
+          </button>{" "}
+          <span className="uw-what-text">{row.description ?? "No description recorded"}</span>
+          <ProblemCode code={row.problem_code} links={links} />
+        </span>
+      ),
+    },
+    {
+      key: "product",
+      label: "Product, version, lot",
+      render: (row: any) =>
+        [row.product_name, row.version, row.lot ? `Lot ${row.lot}` : null].filter(Boolean).join(" · ") || "—",
+    },
+    {
+      key: "markets",
+      label: "Markets",
+      render: (row: any) => (work(row)?.markets ?? []).map(marketLabel).join(", ") || "—",
+    },
+    { key: "owner", label: "Owner", render: (row: any) => work(row)?.owner_name ?? "Not named" },
+    { key: "stage", label: "Stage", render: (row: any) => work(row)?.stage ?? "—" },
+    {
+      key: "open",
+      label: "",
+      render: (row: any) => {
+        const request = openInvestigation ? investigationRequestFor(row) : null;
+        const ref = row.complaint_identifier ?? row.business_id ?? "this complaint";
+        return (
+          <span className="uw-row-actions">
+            <button type="button" className="ac-secondary" aria-label={`Open ${ref}`} onClick={() => onOpen(row)}>
+              Open
+            </button>
+            {request && openInvestigation && (
+              <RowMenu
+                label={`More for ${ref}`}
+                items={[{ label: "Open an investigation", onSelect: () => openInvestigation(request) }]}
+              />
+            )}
+          </span>
+        );
+      },
+    },
+  ];
 }
 
 function FacetSelect({

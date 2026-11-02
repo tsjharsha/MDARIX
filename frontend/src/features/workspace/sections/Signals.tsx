@@ -78,7 +78,7 @@ export function SignalsSection({ tab }: { tab?: string }) {
   );
 }
 
-function Trends() {
+export function Trends() {
   const signals = useResource<any>("/api/v1/analytics/signals");
   const rows = listOf(signals.data?.signals);
   const model = useMemo(() => {

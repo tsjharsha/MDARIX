@@ -148,7 +148,7 @@ describe("the first-contact helpers", () => {
 
 describe("the triage and first-contact screens", () => {
   it("open while reading, and offer the entry points to people who may write", () => {
-    expect(render(<Triage onOpenTab={vi.fn()} />)).toContain("Reading the triage list");
+    expect(render(<Triage onOpenTab={vi.fn()} />)).toContain("The triage list");
     const writer = render(<FirstContact />, ["signal.triage"]);
     expect(writer).toContain("Log a call");
     expect(writer).toContain("Urgent intake");

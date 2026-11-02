@@ -46,10 +46,13 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const [show, setShow] = useState<"open" | "done">("open");
   // The item whose panel is open is part of the address (Triage?item=<key>): Back closes it, refresh keeps it.
   const [openKey, setOpenKey] = useTabParam("item");
+  // A complaint's page opens its triage item by the complaint (Triage?complaint=<id>, 0.10.68).
+  const [complaint] = useTabParam("complaint");
   const list = useResource<TriageList>(`${TRIAGE}?show=${show}`);
   const summary = list.data?.summary;
   const items = list.data?.items ?? [];
-  const open = openKey ? (items.find((item) => item.key === openKey) ?? null) : null;
+  const wanted = openKey ?? (complaint ? `COMPLAINT:${complaint}` : null);
+  const open = wanted ? (items.find((item) => item.key === wanted) ?? null) : null;
   const setOpen = (item: TriageItem | null) => setOpenKey(item ? item.key : null);
   const overdue = items.filter((item) => item.triage_clock.state === "OVERDUE").length;
   return (
@@ -63,7 +66,7 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
             ? summary.open
               ? `${countOf(summary.open, "event")} to triage`
               : "Nothing waits for triage"
-            : "Reading the triage list…"
+            : "The triage list"
         }
         detail="Urgent intakes, flagged calls and records that suggest harm come here first, set-aside import rows included. Regulatory clocks count from awareness, not from when a record reached MDARIX."
       >

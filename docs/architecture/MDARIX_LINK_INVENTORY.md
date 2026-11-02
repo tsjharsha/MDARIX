@@ -106,3 +106,29 @@ These four files differ on mvp-1.0:
 | `e2e/trial-journey.spec.ts` | 124, 133, 330–337, 421, 471, 512, 575–587, 609 | `/app` start and the Getting started, Complaints and case-page tab selectors (stage 7 moves the tabs). |
 | `e2e/pilot-features.spec.ts` | 62–76 | Risk & traceability, Traceability and Reports tabs. |
 | `e2e/deep-crawl.spec.ts` | 90, 132 | Its start-address comparison: the address now gains `?tab=`, so the crawl reopens the start page before each step. |
+
+## Stage 7 (0.10.68): the new navigation
+
+- **Where the new places are.** `linkTable.json` `newPlaces` (screens, tabs and My work's views), `newMenu`,
+  `newRecords` (a complaint opens `/app/complaints/<ref>`), `newHomes` (every classic screen and tab, the nested ones
+  included, and its new home; a row may keep the link's parameters, rename one: `event` -> `ref`, or add the view a
+  former tab is now) and `classicHomes` (an address of the new navigation opened on the classic one). `routeFor`
+  takes the organization's navigation (`tenants.navigation`, session `navigation`); classic organizations route as
+  in 0.10.67. Tests: `app/linkTable.test.ts` (both navigations), `app/clickPaths.test.ts` (paths a-m),
+  `app/newPathText.test.ts` (the guide's paths), `tests/test_complaint_page.py`.
+- **Server targets open records.** The complaint checklist (`closure.py`) and Oversight rows (`oversight/service.py`)
+  name the complaint, the communication or the CAPA, not only the list.
+- **Code names classic places.** Screens call `open()` with classic names wherever one exists ("Complaints",
+  "Triage"); the table moves them. A place only the new navigation has (Queues, Team overview, Account › Away) is
+  opened only from new-navigation screens; the test checks it there.
+
+### For the forward merge (stage 7)
+
+- `UserWorkspace.tsx` picks the new screens with `fresh` (new navigation under `featureSet === "mvp"`); on mvp-1.0
+  this becomes `usesMvpScreens(featureSet)`, so a pilot can be switched too.
+- The pilot feature set parks CAPA effectiveness checks: `newPlaces.Records.tabs` lists "Effectiveness checks" and
+  "CAPA records"; for a pilot, `NewRecordsSection` must drop the first (as `mvpRecordsTabs` does) and the `capa`
+  record must open on "CAPA records".
+- `Investigations.tsx` exports `Capas` (Records › CAPA records); mvp-1.0 changes the same file's tab line.
+- New task type `COMPLAINT_STEP` ("Send to" from the complaint page) and the route
+  `POST /api/v1/oversight/events/{id}/send` (WRITERS).

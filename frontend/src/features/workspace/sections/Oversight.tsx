@@ -27,7 +27,7 @@ import {
   type OversightItem,
   type OversightSettings,
 } from "../oversight";
-import { InlineError } from "./boardParts";
+import { InlineError, Why } from "./boardParts";
 
 function useOpen() {
   const { open } = useWorkspace();
@@ -44,16 +44,36 @@ function useOpen() {
  * escalated to; the events and whether each is ready to close (T-G28); who is away; the working calendar. Filters by
  * product, market and category; the list downloads as CSV for the monthly product review.
  */
-export function OversightView({ initialEvent = null }: { initialEvent?: string | null }) {
+export function OversightView({
+  initialEvent = null,
+  part = "all",
+}: {
+  initialEvent?: string | null;
+  /** The new navigation (0.10.68): My work › Team overview shows the dated items alone; the events are Records ›
+   * Decision records, the calendar is in Settings and each event is the complaint's own page. */
+  part?: "all" | "items" | "events";
+}) {
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const data = useResource<Oversight>(oversightPath(filters));
   // The event whose checklist is open is part of the address (Oversight?event=<complaint id>).
   const [event, setEvent] = useTabParam("event", "push", initialEvent);
   const view = data.data;
   const go = useOpen();
+  const { open } = useWorkspace();
+  if (part === "events")
+    return view ? (
+      <EventsPanel
+        events={view.events}
+        onOpen={(id) => open("Complaint", `Summary?${new URLSearchParams({ ref: id })}`)}
+      />
+    ) : (
+      <Panel eyebrow="Decision records" title="Every complaint MDARIX has worked on" source={data}>
+        {null}
+      </Panel>
+    );
   return (
     <div className="uw-ov">
-      <div className="uw-rd-home uw-ov-tiles" aria-label="At a glance">
+      <div className="uw-rd-home uw-ov-tiles" aria-label="At a glance" hidden={part !== "all"}>
         <Tile label="Overdue" value={view?.overdue} tone={view?.overdue ? "critical" : "good"} />
         <Tile label="Due soon" value={view?.due_soon} tone={view?.due_soon ? "warning" : "good"} />
         <Tile
@@ -72,20 +92,21 @@ export function OversightView({ initialEvent = null }: { initialEvent?: string |
           tone={view?.event_counts.CLOSED_BEFORE_READY ? "critical" : "good"}
         />
       </div>
-      {view?.staffing && (
+      {part === "all" && view?.staffing && (
         <p className="uw-ov-warning tone-warning" role="status">
           <Users size={15} aria-hidden="true" /> {view.staffing}
         </p>
       )}
-      {view?.away.map((item) => (
-        <p key={item.id} className="uw-rm-cover">
-          <CalendarClock size={15} aria-hidden="true" /> <strong>{item.user_name}</strong> is away until{" "}
-          {formatDate(item.ends_on)}; {item.backup_name} receives their reminders and escalations.
-        </p>
-      ))}
+      {part === "all" &&
+        view?.away.map((item) => (
+          <p key={item.id} className="uw-rm-cover">
+            <CalendarClock size={15} aria-hidden="true" /> <strong>{item.user_name}</strong> is away until{" "}
+            {formatDate(item.ends_on)}; {item.backup_name} receives their reminders and escalations.
+          </p>
+        ))}
       <Panel
         eyebrow="Due and overdue"
-        title={view ? `${view.items.length} of ${view.total} dated items` : "Reading your records…"}
+        title={view ? `${view.items.length} of ${view.total} dated items` : "Dated items"}
         source={data}
         action={<ExportButton filters={filters} />}
       >
@@ -106,8 +127,8 @@ export function OversightView({ initialEvent = null }: { initialEvent?: string |
           />
         )}
       </Panel>
-      {view && <EventsPanel events={view.events} onOpen={setEvent} />}
-      {view && <CalendarPanel settings={view.settings} onSaved={data.reload} />}
+      {part === "all" && view && <EventsPanel events={view.events} onOpen={setEvent} />}
+      {part === "all" && view && <CalendarPanel settings={view.settings} onSaved={data.reload} />}
       {event && <EventDrawer complaintId={event} onClose={() => setEvent(null)} onChanged={data.reload} />}
     </div>
   );
@@ -245,7 +266,7 @@ function FilterBar({
   );
 }
 
-function ExportButton({ filters }: { filters: Filters }) {
+export function ExportButton({ filters }: { filters: Filters }) {
   const canExport = useCan("data.export");
   const [error, setError] = useState("");
   if (!canExport) return null;
@@ -402,7 +423,7 @@ export function EventDrawer({
               </span>
               {item.opens && item.result !== "PASS" && (
                 <button type="button" className="ac-link" onClick={() => go(item.opens)}>
-                  Resolve <ChevronRight size={13} aria-hidden="true" />
+                  {item.action ?? "Open"} <ChevronRight size={13} aria-hidden="true" />
                 </button>
               )}
             </li>
@@ -440,7 +461,7 @@ function useRun(onChanged: (view: EventView) => void, failure: string) {
   return { busy, error, run };
 }
 
-function OwnerPicker({ view, onChanged }: { view: EventView; onChanged: (view: EventView) => void }) {
+export function OwnerPicker({ view, onChanged }: { view: EventView; onChanged: (view: EventView) => void }) {
   const triage = useCan("signal.triage");
   const work = useCan("investigation.work");
   const quality = useCan("quality.review");
@@ -471,10 +492,17 @@ function OwnerPicker({ view, onChanged }: { view: EventView; onChanged: (view: E
             type="button"
             className="ac-secondary"
             disabled={action.busy || !owner || owner === view.event.owner_id}
+            aria-describedby="owner-why"
             onClick={() => void action.run(`${eventPath(view.event.complaint_id)}/owner`, "PUT", { owner_id: owner })}
           >
             Save owner
           </button>
+          <Why
+            id="owner-why"
+            text={
+              !owner ? "Choose a person first." : owner === view.event.owner_id ? "They are the owner already." : null
+            }
+          />
         </div>
       )}
       <InlineError text={action.error} />
@@ -482,7 +510,7 @@ function OwnerPicker({ view, onChanged }: { view: EventView; onChanged: (view: E
   );
 }
 
-function ReadyForm({ view, onChanged }: { view: EventView; onChanged: (view: EventView) => void }) {
+export function ReadyForm({ view, onChanged }: { view: EventView; onChanged: (view: EventView) => void }) {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [reason, setReason] = useState("");
@@ -547,11 +575,16 @@ function ReadyForm({ view, onChanged }: { view: EventView; onChanged: (view: Eve
             </label>
           </div>
           <div className="ca-action-row">
-            <button type="submit" className="ac-primary" disabled={action.busy || !password || !!problem}>
+            <button
+              type="submit"
+              className="ac-primary"
+              disabled={action.busy || !password || !!problem}
+              aria-describedby="ready-why"
+            >
               {action.busy ? "Signing…" : "Sign ready to close"}
             </button>
+            <Why id="ready-why" text={problem || (!password && "Enter your password to sign.")} />
           </div>
-          {problem && <p className="ac-muted">{problem}</p>}
         </form>
       )}
       <InlineError text={action.error} />
@@ -559,7 +592,7 @@ function ReadyForm({ view, onChanged }: { view: EventView; onChanged: (view: Eve
   );
 }
 
-function DecisionRecord({ view, onChanged }: { view: EventView; onChanged: (view: EventView) => void }) {
+export function DecisionRecord({ view, onChanged }: { view: EventView; onChanged: (view: EventView) => void }) {
   const canExport = useCan("data.export");
   const [reference, setReference] = useState("");
   const [error, setError] = useState("");
@@ -617,10 +650,15 @@ function DecisionRecord({ view, onChanged }: { view: EventView; onChanged: (view
               type="button"
               className="ac-secondary"
               disabled={action.busy || reference.trim().length < 3}
+              aria-describedby="filing-why"
               onClick={() => void action.run(`${eventPath(view.event.complaint_id)}/filing`, "PUT", { reference })}
             >
               Record the filing
             </button>
+            <Why
+              id="filing-why"
+              text={reference.trim().length < 3 && "Enter the QMS reference (3 characters or more) first."}
+            />
           </div>
         )
       )}
@@ -630,7 +668,7 @@ function DecisionRecord({ view, onChanged }: { view: EventView; onChanged: (view
 }
 
 /** The working calendar and the simple escalation rule; quality review or regulatory approval changes them. */
-function CalendarPanel({ settings, onSaved }: { settings: OversightSettings; onSaved: () => void }) {
+export function CalendarPanel({ settings, onSaved }: { settings: OversightSettings; onSaved: () => void }) {
   const quality = useCan("quality.review");
   const approve = useCan("regulatory.approve");
   const canSet = quality || approve;
@@ -769,6 +807,7 @@ function CalendarPanel({ settings, onSaved }: { settings: OversightSettings; onS
                 type="button"
                 className="ac-secondary"
                 disabled={!holiday.date || shown.holidays.some((item) => item.date === holiday.date)}
+                aria-describedby="holiday-why"
                 onClick={() => {
                   edit({ holidays: [...shown.holidays, holiday].sort((a, b) => a.date.localeCompare(b.date)) });
                   setHoliday({ date: "", name: "" });
@@ -776,12 +815,27 @@ function CalendarPanel({ settings, onSaved }: { settings: OversightSettings; onS
               >
                 Add holiday
               </button>
+              <Why
+                id="holiday-why"
+                text={
+                  !holiday.date
+                    ? "Choose the date first."
+                    : shown.holidays.some((item) => item.date === holiday.date) && "That day is a holiday already."
+                }
+              />
             </div>
           </fieldset>
           <div className="ca-action-row">
-            <button type="button" className="ac-primary" disabled={busy || !draft} onClick={() => void save()}>
+            <button
+              type="button"
+              className="ac-primary"
+              disabled={busy || !draft}
+              aria-describedby="calendar-why"
+              onClick={() => void save()}
+            >
               {busy ? "Saving…" : "Save the calendar"}
             </button>
+            <Why id="calendar-why" text={!draft && "Change something first."} />
             {saved && <small className="ac-muted">{saved}</small>}
           </div>
           <InlineError text={error} />
