@@ -10,6 +10,129 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.65] - 2026-11-02
+
+On the trial maintenance line (`release/0.10`): stage 4 of the quality plan, "Your Excel just works". A realistic Indian
+complaint register imports on the first try with no edits to the file: a title row above the column names, the data on
+a second sheet behind a hidden one, DD/MM/YYYY dates, "1,25,000", "Death (Y/N)" columns, a kit with two lots and
+"India, Germany" in one cell. Every column the file holds is either used or named as not used. Getting started and
+Import data share one upload screen and one server path, and a row set aside can be fixed or dismissed on screen.
+
+**Migration `tr10setasidedismissed`** (after `tr09recordfacts`; `tr03pmssources` stays reserved), expand-only: the
+status check of `import_quarantine_rows` also allows `DISMISSED` (no row changes), and one nullable column,
+`import_quarantine_rows.resolution_note`. Legacy dedicated organization databases: run
+`scripts/add_workflow_tables_to_legacy_planes.py` (new step tr10). The API and web images change. No sample data
+changes, so `scripts/refresh_trial_story.py` has nothing new to do.
+
+### Changed: one upload path (IA, "two uploaders")
+
+- **Getting started › Your data and Import data show the same upload panel** and post to the same route,
+  `/api/v1/data/import/{entity}` (and `/check`), with the same limits (a trial: 5,000 rows and 2 MB a file, shown on
+  both), checks, set-aside rows and data-quality report. The panel reads its templates and limits itself from
+  `GET /api/v1/data/import/templates`, which now also says the organization's usual date order and number format
+  (`usual`).
+- **`/api/v1/trial/imports/{entity}` and `/check` stay as thin aliases** of the same handlers (still answering only a
+  free trial, 404 elsewhere), because the tests, the validation package (Document 1, FT-09-005; its evidence JSON) and
+  older links still call them. No screen calls them any more.
+- The audit records are unchanged: `TRIAL_DATA_IMPORTED` in a trial (written with the data, in one transaction, as its
+  own route did), `DATA_IMPORTED` elsewhere. **A pilot's import behaves as before**, apart from the shared checks below.
+
+### Changed: the file is understood (J4, J5, J6, J41, J42)
+
+- **Dates.** "Dates in the file" starts at **From the file, else DD/MM/YYYY** (the organization's usual order): a
+  column name such as "Event Date (DD/MM/YYYY)", or a date such as 14/03/2026 that can only be day first, decides; when nothing in the file tells, the organization's
+  usual order is used and said back (DD/MM/YYYY everywhere but the United States, from the time zone in Settings).
+  "14-Mar-2026", "Mar 14, 2026", two-digit years, a time after the date and Excel day numbers (46095) are read too;
+  a workbook in the 1904 date system reads the right day (it was about four years out). The API's own default stays
+  `date_format=ISO`; `AUTO` is new.
+- **Impossible dates are refused in words:** "'03/04/2062' reads as 3 Apr 2062, a day still to come. Check the year,
+  and the order of day and month." and "'03/04/1926' reads as 3 Apr 1926, before 1970: too early for a device in use
+  today." A planned date (an expiry, a due date, a release date) may lie ahead.
+- **Changing a choice checks the same file again** (dates, numbers, sheet, date column, rows with problems, personal
+  details, the template), without picking the file again; and the same file can be picked again after it is fixed.
+  Before, changing "Dates in the file" cleared the file while the button still showed it, and picking the same file
+  again did nothing.
+- **Column names below a title.** MDARIX finds the row with the column names among the first 20 rows ("The column names
+  are on row 3: the rows above them are not data"); the row numbers it gives are the file's own. A CSV's separator is
+  read from that row.
+- **Workbook sheets.** A workbook is read from the visible sheet whose column names fit the template best (a hidden sheet
+  is never read unless named); the check says which sheet was read, lists the others and offers "Sheet to read". A
+  lots file from a register's "Batch Register" sheet is read from that sheet.
+- **Header variants:** "Date of Complaint", "Complaint Received Date", "Received On", "Date of Receipt" -> received
+  date; "Event Date (DD/MM/YYYY)", "Date of Incident" -> event date; "SW Version", "Firmware Version" -> version;
+  "Batch/Lot No." -> lot; "Death (Y/N)", "Serious Injury (Y/N)", "Malfunction Y/N" -> the harm and outcome fields;
+  "Batch Qty" -> a lot's quantity. A hint in brackets or a trailing "Y/N" or "DD/MM/YYYY" is not part of the name.
+  Yes/no columns take Y, N, Yes, No, 1, 0 or blank; "NA", "-" and "Unknown" read as not known (never as No).
+- **Columns not used are named, never dropped silently:** the check lists "Not used (not stored): Sr. No., Complaint
+  Received Date (the same as Date of Complaint)", and the run's data-quality report keeps the list (new
+  `quality_report.columns_not_used`; Checks: "Columns not used").
+- **A complaints file without an event or received date column is not ready.** The check asks "Which column holds the
+  date each complaint was received?" with the file's unused columns, or "None: date each complaint the day it is
+  imported" (said back as a note). Before, every complaint was dated the import day, which read as a sudden rise. New
+  query parameter `date_column` (a header, or `none`).
+- **Numbers:** "1,25,000" and "1,250" are 125000 and 1250; "1250,00" and "1.250,00" are 1250, never 125,000. "Numbers in
+  the file" (`number_format`: GROUP, the default, or DECIMAL_COMMA) decides only "1,250" and "1.250"; a value the other
+  choice would read whole is refused with that choice named ("If it means 1,250, choose 'Numbers in the file:
+  1.250,00'"). It starts at the organization's usual format (1.250,00 for most of Europe).
+- **A software version such as "1.4.2+build" is accepted** (a "+" was refused).
+- **"India, Germany" in one country cell is two markets:** India's (the event's own market, first) and the EU's; both
+  are assessed and preselected, and a reporting window for either covers it. One country stays one ("United States").
+- **Text without a byte-order mark** is read as UTF-8, else as Windows text: this already worked (the register's finding
+  was the download), and is now tested with the register: "Cathéter" stays "Cathéter". **The rows-to-fix download now starts with a byte-order mark**, so Excel
+  shows "Cathéter", not "CathÃ©ter" (J42).
+- **The review shows every date in one format** ("14 Aug 2026"), in the check's preview and the rows set aside.
+- **A kit's later lot needs no description of its own** (the complaint's first row gave it); stage 3's fix keeps it as
+  the complaint's next lot.
+
+### Changed: set-aside rows fixed on screen (J11)
+
+- In the data-quality report, each row set aside has **Fix and process again**: the fields its reasons name (every field
+  when they name none), the other values as stored, personal details still as placeholders. It goes through the same
+  checks; what is still wrong is said beside the row ("Still not right, so the row stays set aside. ...") and the row
+  stays open. **Dismiss** asks why (kept with the row, personal details masked, audited as
+  `QUARANTINE_ROW_DISMISSED`); a dismissed row leaves the open rows and Triage. The report says "N still open · N
+  processed again · N dismissed".
+- **Importing the fixed file again closes the old set-aside row** (as processed again), so it no longer stays open and
+  on Triage; if the new import sets the same record aside again, the newer row replaces the older one (dismissed, "Set
+  aside again by a later import"). Only rows of the organization's own imports, never the sample's. The import's audit
+  record lists them (`set_aside_closed`).
+- API: new `POST /api/v1/data/import/quarantine/{id}/dismiss` (`reason`, 3 to 500 characters; records.write);
+  `POST .../reprocess` takes only the corrected columns (a column the row does not have is refused, 422);
+  `GET /api/v1/data/import/quarantine?status=DISMISSED`; every count adds `dismissed`; a row adds `resolution_note`.
+
+### Changed: clear words (D)
+
+- Each problem names its row (the file's own row number), the file's own column name ("Row 5 · Death (Y/N)"), the
+  value and what to do: "'Maybe' is not a yes or no: use Y, N, Yes, No, 1 or 0, or leave it blank (or NA) when it is
+  not known." (it read "Use Y or N."); an identifier or version names its value. The data-quality report reads new /
+  updated / unchanged, set aside, and the columns not used.
+- The user guide's "Import a file" says the same.
+
+### Sample numbers and labels that change
+
+None. The sample's import run and its two set-aside rows are seeded as before, with the same reasons; no deadline,
+trend figure, signal, count or label of the sample changes. (A trial's own import report gains the "Columns not used"
+line; the sample's run, recorded before, shows none.)
+
+### Tests
+
+- `tests/test_indian_register_import.py` (new, 13): the synthetic register in `tests/fixtures/indian_register` (an
+  `.xlsx` with a hidden first sheet, the complaints on sheet 2 below a title and a blank row, and a batch sheet; the same
+  as Windows-1252 and UTF-8 CSV files without a byte-order mark; its generator `make_register.py`) is read field by
+  field from both; the sheet said and chosen; Indian numbers; impossible dates; the date order; a 1904 workbook and
+  Excel day numbers; the date column asked; header variants and yes/no words; "1.4.2+build" and two markets; then end
+  to end as an Indian trial through the one path (every field of every complaint, the lots' quantities and expiry, both
+  markets preselected, the same CSV through the trial's alias changing nothing, the report's columns not used), and
+  set-aside rows fixed, refused again, dismissed with a masked reason, closed by a re-import and off Triage, audited.
+- Updated for the date column (a complaints file now gives one, or `date_column=none` where the test is about a file
+  without dates) and the clearer yes/no message: `test_data_import_options.py`, `test_business_record_import.py`,
+  `test_complaint_list.py`, `test_data_import_path.py`, `test_import_reupload.py`, `test_web_protections.py`,
+  `test_import_quality_report_unit.py`, `test_import_real_exports_unit.py`, `test_free_trial.py` and others listed in the
+  commit.
+- vitest `ImportExcel.test.tsx` (new): the one path and its choices, the panel's starting choices, problems named by the
+  file's column, "Not used", the sheet and date-column questions, dates in one format, the fix form's fields, the
+  counts, the report's "Columns not used"; `importPrivacy.test.tsx` and `importExport.test.tsx` updated.
+
 ## [0.10.64] - 2026-11-02
 
 On the trial maintenance line (`release/0.10`): stage 3 of the quality plan, "A sample that tells one story". A trial
