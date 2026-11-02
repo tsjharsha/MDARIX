@@ -106,6 +106,14 @@ def today_utc() -> date:
     return datetime.now(timezone.utc).date()
 
 
+def organization_today(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -> date:
+    """Today on the organization's working calendar (its time zone), as its own due times end (0.10.63): 2 Nov in
+    India from 00:00 IST, where the UTC date still read 1 Nov until 05:30."""
+    from backend.app.oversight.service import calendar_of
+
+    return calendar_of(db, tenant_id).local_day(now or datetime.now(timezone.utc))
+
+
 def _midnight(day: date) -> datetime:
     return datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
 
@@ -580,7 +588,7 @@ def readiness(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> d
     from backend.app.case_workflow.readiness import safely
     from backend.app.signals.insight import shared_trend_boards
 
-    today = today or today_utc()
+    today = today or organization_today(db, tenant_id)
     checks = []
     # The trend check and the risk file check read the same trend board: once (0.10.43).
     with shared_trend_boards():

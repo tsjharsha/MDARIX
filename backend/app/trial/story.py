@@ -397,7 +397,10 @@ def story(
     the workspace's "Chapter done" notice reads every half minute, at a fraction of the cost (0.10.43)."""
     from backend.app.readiness_home.service import readiness
 
-    today = today or datetime.now(timezone.utc).date()
+    if today is None:
+        from backend.app.readiness_home.service import organization_today
+
+        today = organization_today(db, tenant_id)
     checks = {}
     if with_findings:
         try:

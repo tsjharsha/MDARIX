@@ -169,12 +169,12 @@ def queue_for_tenant(control_db: Session, data_db: Session, tenant_id: uuid.UUID
     """Queue this week's digest for one organization (control-plane session; the caller commits). False when it was
     already queued this week."""
     from backend.app.db.models.stage2 import OutboxEvent
-    from backend.app.readiness_home.service import readiness
+    from backend.app.readiness_home.service import organization_today, readiness
 
     week = iso_week(now.date())
     if _already_queued(control_db, tenant_id, week):
         return False
-    found = readiness(data_db, tenant_id, now.date())
+    found = readiness(data_db, tenant_id, organization_today(data_db, tenant_id, now))
     content = compose(found, _previous_snapshot(control_db, tenant_id, week))
     control_db.add(
         OutboxEvent(
