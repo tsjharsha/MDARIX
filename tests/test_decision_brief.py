@@ -442,9 +442,7 @@ def test_composing_editing_and_refreshing_a_draft(org):
     assert content["unavailable"] == []
     # The problem statement starts as the investigation's question, AI off too (0.10.69: nothing typed twice).
     assert body["narrative"]["problem_statement"] == " ".join(QUESTION.split())
-    assert body["narrative"]["contributor_names"] == [
-        "Investigator Brief"
-    ]
+    assert body["narrative"]["contributor_names"] == ["Investigator Brief"]
 
     again = client.post(base, json={})
     assert again.status_code == 409 and _code(again) == "BRIEF_ALREADY_OPEN"
