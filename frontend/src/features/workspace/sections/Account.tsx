@@ -5,7 +5,13 @@ import { TwoFactorPanel } from "../../shared/TwoFactorSettings";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
 import { signOut } from "../../shared/session";
-import { TRIAL_ONLY_SECTIONS, WORKSPACE_SECTIONS, sectionAllowed, useWorkspace } from "../workspaceContext";
+import {
+  TRIAL_ONLY_SECTIONS,
+  WORKSPACE_SECTIONS,
+  sectionAllowed,
+  useReportedTab,
+  useWorkspace,
+} from "../workspaceContext";
 import { hideUuid, safeText } from "../../../app/displayId";
 import { roleLabel, rolesSummary } from "../../../app/roles";
 import { PUBLISHED_CONTACT, useSiteInfo } from "../../../site/legal";
@@ -14,7 +20,9 @@ const TABS = ["Profile", "Security", "Access"] as const;
 type Tab = (typeof TABS)[number];
 
 export function AccountSection({ tab }: { tab?: string }) {
-  const [active, setActive] = useState<Tab>((TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "Profile");
+  const [active, setActive] = useReportedTab<Tab>(
+    (TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "Profile",
+  );
   return (
     <>
       <Tabs tabs={TABS} active={active} onChange={setActive} label="Account sections">

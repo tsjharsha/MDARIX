@@ -51,6 +51,10 @@ function filterParams(filters: Partial<ComplaintListFilters>, params = new URLSe
   return params;
 }
 
+/** Every filter as its tab parameter (an empty one as ""), for the screen's address. */
+export const complaintFilterValues = (filters: ComplaintListFilters): Record<string, string> =>
+  Object.fromEntries(PARAMS.map(([key, name]) => [name, filters[key] ?? ""]));
+
 /** The list's request: a page, the column sort and every filter set. */
 export function complaintListPath(
   filters: ComplaintListFilters,

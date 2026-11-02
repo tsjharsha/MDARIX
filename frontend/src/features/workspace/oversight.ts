@@ -2,6 +2,7 @@
 // pure rules the screens use. The server (/api/v1/oversight, backend/app/oversight) reads every dated item from its
 // own record; an alert never closes or changes the item.
 import type { Tone } from "../admin/console/dashboardModel";
+import type { Opens as LinkOpens } from "../../app/linkTable";
 import { timeLeft, type DueLike } from "../../app/dates";
 
 export const OVERSIGHT = "/api/v1/oversight";
@@ -11,7 +12,7 @@ export const READINESS_TABS = ["Inspection checks", OVERSIGHT_TAB] as const;
 export type ReadinessTab = (typeof READINESS_TABS)[number];
 
 export type ItemState = "OVERDUE" | "DUE_SOON" | "LATER";
-export type Opens = { section: string; tab?: string } | null;
+export type Opens = LinkOpens | null;
 
 export type Alert = {
   id: string;

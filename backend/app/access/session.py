@@ -289,6 +289,8 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         # full or mvp (backend/app/feature_set.py): under mvp the interface hides the parked areas; a free trial
         # always shows the MVP.
         "feature_set": for_tenant(db, user.tenant_id),
+        # classic or new (tenants.navigation, set in Tenant 360): the workspace's navigation; nothing shows it yet.
+        "navigation": (tenant.navigation if tenant is not None else None) or "classic",
         # A cell's licence: VALID, GRACE, EXPIRED (read-only), SUSPENDED, or NONE outside a cell.
         "licence": licence_state(db, user.tenant_id),
     }

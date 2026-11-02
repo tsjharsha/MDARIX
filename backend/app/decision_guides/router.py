@@ -20,6 +20,7 @@ pilot alike (T-B1).
 
 from __future__ import annotations
 
+from backend.app import links
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -621,7 +622,7 @@ def ask_for_approval(
                 "reference": row.code,
                 "market": market,
                 "category": "GUIDE",
-                "opens": {"section": "Complaints", "tab": "Decision guides"},
+                "opens": links.target("Complaints", "Decision guides"),
             },
         ),
     )

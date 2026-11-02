@@ -1,0 +1,179 @@
+{
+  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. Stage 7 changes the right-hand sides.",
+  "places": {
+    "Getting started": {
+      "path": "/app/getting-started",
+      "tabs": ["Your data", "Team", "About the sample data", "Your trial"]
+    },
+    "Readiness": { "path": "/app/readiness", "tabs": ["Inspection checks", "Oversight"] },
+    "My Work": {
+      "path": "/app/my-work",
+      "tabs": [
+        "Assigned to me",
+        "Approvals",
+        "Role queues",
+        "Waiting",
+        "Returned to me",
+        "Due soon",
+        "Overdue",
+        "Completed",
+        "Evidence requests",
+        "My AI conversations"
+      ]
+    },
+    "Complaints": {
+      "path": "/app/complaints",
+      "tabs": [
+        "Triage",
+        "First contact",
+        "Dispositions",
+        "Second look",
+        "Backlog",
+        "Reportability",
+        "Reports",
+        "Communications",
+        "Complaint list",
+        "Review settings",
+        "Reporting windows",
+        "Decision guides"
+      ]
+    },
+    "Signals": {
+      "path": "/app/signals",
+      "tabs": [
+        "Signal inbox",
+        "Product complaints",
+        "Complaint list",
+        "Recent complaints",
+        "Trends",
+        "Trend check",
+        "By resolution",
+        "Detection rules"
+      ]
+    },
+    "Investigations": {
+      "path": "/app/investigations",
+      "tabs": [
+        "All investigations",
+        "Workspace",
+        "Evidence",
+        "Intelligence",
+        "Ask MDARIX",
+        "Scope",
+        "Reviews",
+        "Decision Brief",
+        "Decision",
+        "Record",
+        "CAPAs"
+      ]
+    },
+    "Records": {
+      "path": "/app/records",
+      "tabs": ["Effectiveness checks", "Risk file input", "Audit trail", "Reports", "Verify a signature"]
+    },
+    "Import data": { "path": "/app/import-data", "tabs": [] },
+    "My Account": { "path": "/app/account", "tabs": ["Profile", "Security", "Access"] },
+    "Share feedback": { "path": "/app/feedback", "tabs": [] },
+    "Look ahead": {
+      "path": "/app/look-ahead",
+      "tabs": ["How a distributor reports", "As your distributor sees it", "As your authorised representative sees it"]
+    },
+    "Next steps": { "path": "/app/next-steps", "tabs": [] }
+  },
+  "records": {
+    "complaint": { "section": "Readiness", "tab": "Oversight", "param": "event" },
+    "report": { "section": "Complaints", "tab": "Reports", "param": "report" },
+    "communication": { "section": "Complaints", "tab": "Communications", "param": "communication" },
+    "disposition": { "section": "Complaints", "tab": "Dispositions", "param": "complaint" },
+    "capa": { "section": "Records", "tab": "Effectiveness checks", "param": "capa" },
+    "case": { "section": "Investigations", "tab": "Workspace", "param": "case" },
+    "signal": { "section": "Signals", "tab": "Signal inbox", "param": "signal" },
+    "request": { "section": "My Work", "tab": "Evidence requests", "param": "request" }
+  },
+  "oldViews": {
+    "home": ["Dashboard"],
+    "readiness": ["Readiness"],
+    "my-work": ["My Work"],
+    "products": ["Products"],
+    "complaints": ["Complaints"],
+    "signals": ["Signals"],
+    "story": ["Investigations", "Story"],
+    "persona": ["Dashboard"],
+    "ask": ["Intelligence", "Ask MDARIX"],
+    "investigations": ["Investigations"],
+    "evidence": ["Evidence"],
+    "decision": ["Decisions"],
+    "records": ["Records"],
+    "assurance": ["Trust & Audit", "AI assurance"],
+    "audit": ["Trust & Audit", "Audit trail"],
+    "regulatory-copilot": ["Intelligence", "Regulatory copilot"],
+    "risk-traceability": ["Intelligence", "Risk & traceability"],
+    "signature-verification": ["Decisions", "Verify a signature"],
+    "next-steps": ["Next steps"],
+    "getting-started": ["Getting started"],
+    "import-data": ["Import data"],
+    "account": ["My Account"],
+    "feedback": ["Share feedback"],
+    "look-ahead": ["Look ahead"]
+  },
+  "oldSections": [
+    { "section": "Dashboard", "to": { "section": "Readiness" } },
+    { "section": "Products", "to": { "section": "Readiness" } },
+    {
+      "section": "Evidence",
+      "tab": "Requests",
+      "to": { "section": "My Work", "tab": "Evidence requests" },
+      "keep": "query"
+    },
+    { "section": "Evidence", "to": { "section": "Investigations", "tab": "Evidence" } },
+    { "section": "Decisions", "tab": "Approvals", "to": { "section": "My Work", "tab": "Approvals" } },
+    {
+      "section": "Decisions",
+      "tab": "Verify a signature",
+      "to": { "section": "Records", "tab": "Verify a signature" }
+    },
+    {
+      "section": "Decisions",
+      "tab": "Decision",
+      "to": { "section": "Investigations", "tab": "Decision" },
+      "keep": "query"
+    },
+    { "section": "Decisions", "to": { "section": "Investigations", "tab": "Decision" } },
+    { "section": "Intelligence", "tab": "Reports", "to": { "section": "Records", "tab": "Reports" } },
+    {
+      "section": "Intelligence",
+      "tab": "Risk & traceability",
+      "to": { "section": "Investigations", "tab": "Reviews" }
+    },
+    { "section": "Intelligence", "tab": "Regulatory copilot", "to": { "section": "Investigations", "tab": "Reviews" } },
+    { "section": "Intelligence", "to": { "section": "Investigations", "tab": "Ask MDARIX" } },
+    { "section": "Trust & Audit", "tab": "", "to": { "section": "Records", "tab": "Audit trail" } },
+    { "section": "Trust & Audit", "tab": "AI assurance", "to": { "section": "Records", "tab": "Audit trail" } },
+    { "section": "Trust & Audit", "to": { "section": "Records", "tab": "Audit trail" }, "keep": "view" }
+  ],
+  "viewIds": {
+    "Getting started": "getting-started",
+    "Readiness": "readiness",
+    "Dashboard": "dashboard",
+    "My Work": "my-work",
+    "Products": "products",
+    "Complaints": "complaints",
+    "Signals": "signals",
+    "Investigations": "investigations",
+    "Evidence": "evidence",
+    "Decisions": "decisions",
+    "Records": "records",
+    "Intelligence": "intelligence",
+    "Trust & Audit": "trust-audit",
+    "Import data": "import-data",
+    "My Account": "account",
+    "Share feedback": "feedback",
+    "Look ahead": "look-ahead",
+    "Next steps": "next-steps"
+  },
+  "oldTabs": {
+    "Signals": { "All signals": "Recent complaints" },
+    "My Work": { "Needs an owner": "Role queues" },
+    "Investigations": { "Story": "Workspace" }
+  }
+}

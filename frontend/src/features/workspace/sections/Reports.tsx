@@ -4,7 +4,7 @@ import { CheckCircle2, ClipboardList, Download, FileText, Send, ShieldCheck, Und
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
-import { WorkspaceContext, useCan } from "../workspaceContext";
+import { WorkspaceContext, useCan, useTabParam } from "../workspaceContext";
 import { communicationsTab } from "../communications";
 import { AlsoKnownAs, countOf, DecideAndSign } from "./common";
 import { DeadlineChip, StateChip } from "../../../app/chips";
@@ -49,7 +49,8 @@ const PATH = ["Triage", "Market assessment", "Worksheet", "Second-person approva
  */
 export function Reports({ complaintId }: { complaintId?: string | null }) {
   const list = useResource<ReportList>(complaintId ? `${REPORTS}?complaint_id=${complaintId}` : REPORTS);
-  const [open, setOpen] = useState<string | null>(null);
+  // The report whose panel is open is part of the address (Reports?report=<id>): Back closes it, refresh keeps it.
+  const [open, setOpen] = useTabParam("report");
   const [error, setError] = useState("");
   const canWrite = useCanReport();
   const workspace = useContext(WorkspaceContext);

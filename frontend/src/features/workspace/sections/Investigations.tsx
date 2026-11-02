@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../../app/apiClient";
 import { FilePlus2 } from "lucide-react";
 import { Empty, Panel } from "../../admin/console/charts";
@@ -19,8 +19,9 @@ import {
 import { displayId, referenceId } from "../../../app/displayId";
 import { InvestigationWorkspacePanel } from "../../investigator/InvestigationWorkspacePanel";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
-import { useCan, useFeatureSet, useWorkspace, type OpenInvestigationRequest } from "../workspaceContext";
+import { chooseCase, useCan, useFeatureSet, useWorkspace, type OpenInvestigationRequest } from "../workspaceContext";
 import { tabsFor } from "../../../app/featureSet";
+import { tabParts } from "../../../app/linkTable";
 import { CaseEvidencePanel } from "./CaseEvidence";
 import { AskMdarixPage } from "../../ask/AskMdarixPage";
 import { CaseRecordDownload } from "../../reports/CaseRecordDownload";
@@ -85,7 +86,7 @@ const CASE_PAGE_TABS = [
 type Tab = (typeof TABS)[number] | (typeof CASE_PAGE_TABS)[number];
 
 export function InvestigationsSection({ tab: requested }: { tab?: string }) {
-  const { work, open, reportStep, isTrial } = useWorkspace();
+  const { work, open, notify, reportStep, isTrial } = useWorkspace();
   // Under the MVP feature set the case story is parked and the decision is taken on this case's Decision tab
   // (featureSet.ts).
   const featureSet = useFeatureSet();
@@ -137,8 +138,13 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
     setStarting(true);
   }, [pending]);
   // The step shown is part of the screen's address (workspaceAddress.ts).
+  // The first report keeps what the link carried (a follow-up, a review, a view), so a refresh opens it again.
+  const firstReport = useRef(true);
   useEffect(() => {
-    reportStep?.(active);
+    const first = firstReport.current;
+    const keep = first && !!requested && tabParts(requested).name === active;
+    firstReport.current = false;
+    reportStep?.(keep ? requested : active, first ? "replace" : "push");
   }, [active]);
   const [managing, setManaging] = useState<any | null>(null);
   const all = useResource<any>("/api/v1/analytics/investigations");
@@ -148,6 +154,12 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
       work.setInvestigationId(id);
       setActive("Workspace");
     }
+  };
+  const openAnyCase = async (row: { id: unknown; business_id?: string | null }) => {
+    const id = String(row.id);
+    if (work.investigations.some((item) => String(item.id) === id)) return openCase(id);
+    if (row.business_id && (await chooseCase(work, row.business_id))) setActive("Workspace");
+    else notify(`${row.business_id ?? "This case"} could not be opened right now.`, "critical");
   };
   // A step of the case stepper: a tab here, a part of the workspace panel, or another section.
   const goToStep = (destination: StepDestination) => {
@@ -257,16 +269,12 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
                 {
                   key: "open",
                   label: "",
-                  render: (row) =>
-                    work.investigations.some((item) => String(item.id) === String(row.id)) ? (
-                      <button type="button" className="ac-link" onClick={() => openCase(String(row.id))}>
-                        Open workspace
-                      </button>
-                    ) : (
-                      <span className="ac-muted" title="Choose its product in the context bar to open it">
-                        Other product
-                      </span>
-                    ),
+                  // A case of another product opens too: its product is looked up and becomes the context's.
+                  render: (row) => (
+                    <button type="button" className="ac-link" onClick={() => void openAnyCase(row)}>
+                      Open workspace
+                    </button>
+                  ),
                 },
               ]}
             />

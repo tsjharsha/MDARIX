@@ -3,7 +3,7 @@ import { Mail, MessagesSquare, PhoneCall, Plus, Send } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { nowLocal } from "../authorityReports";
-import { WorkspaceContext, useCan } from "../workspaceContext";
+import { WorkspaceContext, useCan, useTabParam } from "../workspaceContext";
 import { countOf } from "./common";
 import { Hero, InlineError } from "./boardParts";
 import {
@@ -44,7 +44,8 @@ function useCanRecord() {
 export function Communications({ complaintId }: { complaintId?: string | null }) {
   const path = complaintId ? `${COMMUNICATIONS}?complaint_id=${complaintId}` : COMMUNICATIONS;
   const list = useResource<CommunicationList>(path);
-  const [open, setOpen] = useState<string | null>(null);
+  // The entry whose panel is open is part of the address (Communications?communication=<id>).
+  const [open, setOpen] = useTabParam("communication");
   const canRecord = useCanRecord();
   const workspace = useContext(WorkspaceContext);
   const data = list.data;

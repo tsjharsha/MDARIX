@@ -156,10 +156,17 @@ def test_the_india_sample_drafts_an_mdae_v12_worksheet_in_field_order(trial):  #
     assert detail["state"] == "CORRECTION_REQUIRED"
     (attempt,) = detail["submissions"]
     assert attempt["result"] == "REJECTED" and [row["kind"] for row in attempt["evidence"]][-1] == "BOUNCE"
+    from backend.app.oversight.rules import zone_info
+    from backend.app.reportability.deadlines import org_zone
+
     with SessionLocal() as db:
         bind_tenant(db, trial["tenant_id"])
         obligation = db.get(ReportObligation, uuid.UUID(item["id"]))
-        aware = db.get(Complaint, obligation.complaint_id).awareness_timestamp.date()
+        stamp = db.get(Complaint, obligation.complaint_id).awareness_timestamp
+        # The awareness day is the earlier of its day in IST and in the organization's zone (deadlines.py), not its
+        # UTC day: a sample seeded before 05:00 UTC falls on the day before in New York, the trial's zone.
+        zones = ("Asia/Kolkata", org_zone(db, trial["tenant_id"]))
+        aware = min(stamp.astimezone(zone_info(zone)).date() for zone in zones)
         # India counts the awareness day as day 1 (0.10.63, the MVP's conservative rule): day 15 is awareness + 14.
         assert obligation.due_on == aware + timedelta(days=14)
     assert detail["deadline"]["due_on"] == (aware + timedelta(days=14)).isoformat()

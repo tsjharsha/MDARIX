@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { placeOf } from "../../../app/linkTable";
 import { DeadlineChip } from "../../../app/chips";
 import { DecideAndSign } from "./common";
 import { marketLabel } from "../../../app/labels";
@@ -6,7 +7,7 @@ import { CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, send, useResource, type Column } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
-import { useCan, useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { useCan, useTabParam, useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import {
   CHECK_TONES,
   EVENT_TONES,
@@ -30,7 +31,11 @@ import { InlineError } from "./boardParts";
 
 function useOpen() {
   const { open } = useWorkspace();
-  return (opens: Opens) => opens && open(opens.section as WorkspaceSection, opens.tab);
+  return (opens: Opens) => {
+    if (!opens) return;
+    const place = placeOf(opens);
+    open(place.section as WorkspaceSection, place.tab);
+  };
 }
 
 /**
@@ -42,7 +47,8 @@ function useOpen() {
 export function OversightView({ initialEvent = null }: { initialEvent?: string | null }) {
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const data = useResource<Oversight>(oversightPath(filters));
-  const [event, setEvent] = useState<string | null>(initialEvent);
+  // The event whose checklist is open is part of the address (Oversight?event=<complaint id>).
+  const [event, setEvent] = useTabParam("event", "push", initialEvent);
   const view = data.data;
   const go = useOpen();
   return (

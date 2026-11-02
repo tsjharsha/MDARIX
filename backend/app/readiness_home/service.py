@@ -25,6 +25,7 @@ Nothing here changes a record. Every count is of the organization's records as i
 
 from __future__ import annotations
 
+from backend.app import links
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
@@ -163,7 +164,7 @@ def complaints_to_recheck(db: Session, tenant_id: uuid.UUID, today: date) -> dic
         count,
         CRITICAL if harm else ATTENTION if count else CLEAR,
         detail,
-        {"section": "Complaints", "tab": "Second look"},
+        links.target("Complaints", "Second look"),
         [{"id": item["id"], "ref": item["business_id"] or item["complaint_identifier"]} for item in found["items"]],
         {"harm": harm},
     )
@@ -183,7 +184,7 @@ def complaints_past_target(db: Session, tenant_id: uuid.UUID, today: date) -> di
         CRITICAL if past else CLEAR,
         f"{_n(summary['open_unlinked'], 'complaint')} open in no signal or case; {summary['due_soon']:,} due within a "
         f"week; target {summary['target_days']} days",
-        {"section": "Complaints", "tab": "Backlog"},
+        links.target("Complaints", "Backlog"),
         [{"id": item["id"], "ref": item["business_id"] or item["complaint_identifier"]} for item in found["items"]],
         {"open_unlinked": summary["open_unlinked"], "oldest_days": summary["oldest_days"]},
     )
@@ -254,7 +255,7 @@ def reporting_clocks(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         len(flagged) + len(against_scale),
         state,
         detail,
-        {"section": "Complaints", "tab": "Reportability" if summary["configured"] else "Reporting windows"},
+        links.target("Complaints", "Reportability" if summary["configured"] else "Reporting windows"),
         [{"id": item["id"], "ref": item["business_id"] or item["complaint_identifier"]} for item in flagged]
         + against_scale,
         {
@@ -312,7 +313,7 @@ def trends_without_action(db: Session, tenant_id: uuid.UUID, today: date) -> dic
         CRITICAL if decided else ATTENTION if rising else CLEAR,
         f"{_n(len(decided), 'decided signal')} with no CAPA and no risk review; "
         f"{_n(len(rising), 'significant rise')} with no signal",
-        {"section": "Signals", "tab": "Trend check" if rising and not decided else "Signal inbox"},
+        links.target("Signals", "Trend check" if rising and not decided else "Signal inbox"),
         items,
         {"decided_without_action": len(decided), "rising_without_signal": len(rising)},
     )
@@ -358,7 +359,7 @@ def harm_closed_without_case(db: Session, tenant_id: uuid.UUID, today: date) -> 
         len(closed),
         CRITICAL if closed else CLEAR,
         f"Closed in the last {LOOKBACK_DAYS} days, reporting a death or serious injury, in no case",
-        {"section": "Complaints", "tab": "Reportability"},
+        links.target("Complaints", "Reportability"),
         [{"id": str(row.id), "ref": complaint_ref(row), "label": row.name} for row in closed],
     )
 
@@ -378,7 +379,7 @@ def capa_effectiveness(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         CRITICAL if (summary["closed_without_check"] or summary["overdue"]) else ATTENTION if value else CLEAR,
         f"{summary['closed_without_check']:,} closed without a check, {_n(summary['overdue'], 'check')} overdue, "
         f"{summary['not_planned']:,} with no check planned",
-        {"section": "Records", "tab": "Effectiveness checks"},
+        links.target("Records", "Effectiveness checks"),
         [
             {"id": item["capa"]["id"], "ref": item["capa"]["business_id"] or item["capa"]["capa_identifier"]}
             for item in found["items"]
@@ -412,7 +413,7 @@ def triage_overdue(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         len(rows),
         ATTENTION if rows else CLEAR,
         "New or in triage, past the due date their priority set",
-        {"section": "Signals", "tab": "Signal inbox"},
+        links.target("Signals", "Signal inbox"),
         [{"id": str(row.id), "ref": row.business_id, "label": signal_title(row)} for row in rows],
     )
 
@@ -438,7 +439,7 @@ def risk_file_input(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         f"{_n(summary['not_reviewed'], 'product')} with harm, malfunctions or rising trends and no risk review in the "
         f"last year; {summary['reassessment_overdue']} with risk reassessments overdue, "
         f"{summary['reassessment_open']} open; {summary['no_risk_register']} with no risks in MDARIX",
-        {"section": "Records", "tab": "Risk file input"},
+        links.target("Records", "Risk file input"),
         [
             {"id": item["product"]["id"], "ref": item["product"]["business_id"], "label": item["product"]["name"]}
             for item in flagged
@@ -498,7 +499,7 @@ def dispositions_due(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         f"{_n(len(late), 'complaint')} without a disposition past the {target}-day target; "
         f"{_n(len(review), 'disposition')} to review (a trigger met after signing); "
         f"{_n(len(escalated), 'escalation')} to a case in the last 30 days",
-        {"section": "Complaints", "tab": "Dispositions"},
+        links.target("Complaints", "Dispositions"),
         items,
         {"to_review": len(review), "past_target": len(late), "escalated": len(escalated)},
     )
@@ -516,7 +517,7 @@ def recurring_service_level(db: Session, tenant_id: uuid.UUID, today: date) -> d
         ATTENTION if found else CLEAR,
         f"{RECURRING_COUNT} or more service-level resolutions on one product and problem code within {RECURRING_DAYS} "
         "days that no open case covers (starter threshold); the next such complaint is escalated by the recurrence trigger",
-        {"section": "Signals", "tab": "By resolution"},
+        links.target("Signals", "By resolution"),
         [
             {
                 "id": item["product_id"],
@@ -541,7 +542,7 @@ def external_requests(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         ATTENTION if found["overdue"] else CLEAR,
         f"{_n(found['open'], 'open request')}, {found['overdue']:,} past the reply due date; "
         f"{_n(found['unresolved'], 'request')} unresolved after attempts",
-        {"section": "Complaints", "tab": "Communications"},
+        links.target("Complaints", "Communications"),
         [
             {
                 "id": item["complaint_id"] or item["id"],

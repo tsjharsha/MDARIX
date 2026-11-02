@@ -17,7 +17,7 @@ import { DecisionRecordDrawer } from "./DecisionRecord";
 type Tab = TrustTab;
 
 export function TrustSection({ tab }: { tab?: string }) {
-  const { work } = useWorkspace();
+  const { work, open } = useWorkspace();
   const [requested] = useState(() => parseTrustTab(tab));
   // A case opened from a decision, which the context bar may not hold (another product).
   const [opened, setOpened] = useState<{ id: string; label: string | null } | null>(() =>
@@ -35,7 +35,9 @@ export function TrustSection({ tab }: { tab?: string }) {
   const caseLabel =
     (selected ? displayId(selected, "investigation_identifier", "") : "") || opened?.label || "Selected investigation";
   // Under the MVP feature set AI assurance is parked (featureSet.ts); a link to it opens the default tab instead.
-  const tabs = tabsFor("Trust & Audit", TRUST_TABS, useFeatureSet());
+  const featureSet = useFeatureSet();
+  const mvp = featureSet === "mvp";
+  const tabs = tabsFor("Trust & Audit", TRUST_TABS, featureSet);
   const requestedTab = requested.tab && tabs.includes(requested.tab) ? requested.tab : null;
   // Without a tab asked for, a chosen case opens on its timeline; otherwise AI assurance as before (Audit trail
   // where AI assurance is parked).
@@ -49,14 +51,28 @@ export function TrustSection({ tab }: { tab?: string }) {
       <Tabs tabs={tabs} active={active} onChange={setChosen} label="Trust and audit sections">
         {caseTab && opened && opened.id !== work.investigationId && (
           <p className="ac-note" role="status">
-            Opened from a decision. The context bar above still shows another case.
+            {mvp
+              ? "Opened from a decision: not the case you have open."
+              : "Opened from a decision. The context bar above still shows another case."}
           </p>
         )}
         {caseTab && !caseId && (
           <Panel title="No investigation selected">
+            {/* Under the MVP this is Records › Audit trail, which has no context bar: the case is chosen on its page. */}
             <Empty
               title="Choose an investigation"
-              detail="The case timeline, replay, AI runs and integrity checks belong to an investigation. Pick one in the context bar above."
+              detail={
+                mvp
+                  ? "The case timeline, replay, AI runs and integrity checks belong to an investigation. Open one in Investigations, then its Record step's timeline."
+                  : "The case timeline, replay, AI runs and integrity checks belong to an investigation. Pick one in the context bar above."
+              }
+              action={
+                mvp ? (
+                  <button type="button" className="ac-secondary" onClick={() => open("Investigations")}>
+                    Open Investigations
+                  </button>
+                ) : undefined
+              }
             />
           </Panel>
         )}
