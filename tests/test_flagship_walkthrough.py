@@ -44,11 +44,12 @@ WALK = [
     ("US market", "Complaints › Reporting, the US assessment", "Save and sign"),
     ("India market", "The same assessment's next step", "Assess India (CDSCO) too"),
     ("India market", "Complaints › Reporting, the India assessment", "Save and sign"),
-    ("US report", "Next step", "Start the United States (FDA) report"),
-    ("US report", "Complaints › Reporting, the worksheet (show only missing)", "Ask for approval"),
+    # 0.10.75 (C3): signing the US conclusion reportable created the report; the next step opens it on its own page.
+    ("US report", "Next step", "Complete the United States (FDA) report (draft)"),
+    ("US report", "Reports › the report (show only missing)", "Send for approval"),
     ("US report", "The approver's My work (the trial owner alone: the same screen)", "Approve"),
-    ("US report", "Complaints › Reporting, the report", "Mark as submitted"),
-    ("US report", "Complaints › Reporting, the report: the acceptance", "Record the evidence"),
+    ("US report", "Reports › the report", "Mark as submitted"),
+    ("US report", "Reports › the report: the acknowledgement", "Record the evidence"),
     ("Disposition", "Next step", "Sign the disposition"),
     ("Disposition", "My work › Queues, the complaint's disposition", "Sign"),
     ("Investigation", "Next step", "Sign the investigation's decision"),
@@ -231,11 +232,13 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     # India is assessed, but the event's market stays the United States: the complaint's Markets field (0.10.70).
     assert _ok(user.get(EVENT))["work"]["markets"] == ["US"]
 
-    # 4. The US report: the worksheet opens on this complaint's reports; G8 is never typed twice.
+    # 4. The US report, created when the US conclusion was signed reportable (0.10.75, C3): the next step opens it;
+    # G8 is never typed twice.
     label, target, _ = _next(user)
-    assert label == "Start the United States (FDA) report"
+    assert label == "Complete the United States (FDA) report (draft)"
     assert target["record"]["id"] == complaint and target["tab"] == "Reports"
-    report = _ok(user.post(REPORTS, json={"complaint_id": complaint, "market": "US"}))
+    (started,) = [item for item in _ok(user.get(REPORTS, params={"complaint_id": complaint}))["items"] if item["id"]]
+    report = _ok(user.get(f"{REPORTS}/{started['id']}"))
     missing = [f["id"] for s in report["sections"] for f in s["fields"] if f["status"] == "MUST_HAVE"]
     assert "G8" in missing  # until the front page's number is entered
     values = {"MFR_REPORT": "1234567-2026-00011", "G2": "Health professional"}

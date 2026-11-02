@@ -308,7 +308,10 @@ export type ReportView = keyof typeof REPORT_VIEWS;
 export const REPORT_VIEW_NAMES = Object.keys(REPORT_VIEWS) as ReportView[];
 
 /** Where one report opens on the new navigation: the Reports tab, the report named in its address. */
-export const reportPlace = (id: string) => ({ section: "Reports" as const, tab: `?${new URLSearchParams({ report: id })}` });
+export const reportPlace = (id: string) => ({
+  section: "Reports" as const,
+  tab: `?${new URLSearchParams({ report: id })}`,
+});
 
 /** The reports of a list view: started reports only (a market not yet concluded is not a report). */
 export function reportsInView(items: readonly ReportListItem[], view: ReportView): ReportListItem[] {
