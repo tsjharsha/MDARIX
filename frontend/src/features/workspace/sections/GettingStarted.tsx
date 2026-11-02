@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Tabs, errorText, send, useResource, whenNoLongerPending } from "../../customer-admin/shared";
-import { sectionAllowed, useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { sectionAllowed, useWorkspace, type WorkspaceSection, useReportedTab } from "../workspaceContext";
+import { placeOf } from "../../../app/linkTable";
 import { ImportPanel, templateSummary, useReportChoice, type ImportResult, type ImportTemplate } from "./ImportData";
 import { IMPORT_REPORTS_ID, ImportReportsPanel } from "./ImportReports";
 import { formatDay } from "../../../app/dates";
@@ -81,7 +82,8 @@ export const ownInsights = (insights: Pick<Insights, "source_system"> | null | u
 export const TRIAL_TABS = ["Your data", "Team", "About the sample data", "Your trial"] as const;
 export type TrialTab = (typeof TRIAL_TABS)[number];
 /** The tab below the story that a link names, if it names one. */
-export const trialTabFor = (name?: string): TrialTab | undefined => TRIAL_TABS.find((tab) => tab === name);
+export const trialTabFor = (name?: string): TrialTab | undefined =>
+  TRIAL_TABS.find((tab) => tab === (name ?? "").split("?")[0]);
 
 /**
  * Getting started: the free trial as a story. The quality loop MDARIX closes, chapter by chapter, each with what the
@@ -146,7 +148,7 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
     section === "Getting started" ||
     sectionAllowed(section as WorkspaceSection, session?.allowed_menu, session?.business_permissions);
   const focusTab = trialTabFor(focus);
-  const [tab, setTab] = useState<TrialTab>(focusTab ?? "Your data");
+  const [tab, setTab] = useReportedTab<TrialTab>(focusTab ?? "Your data");
   const reports = useReportChoice(focus);
   // A tab below the story, opened and brought into view.
   const showTab = (name: TrialTab) => {
@@ -170,7 +172,8 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
     if (known) work.setInvestigationId(known.id, known.product_id);
     // Without its case (closed, or the sample data removed), a case chapter opens the list of investigations.
     const inCase = known || chapter.opens.section !== "Investigations";
-    open(chapter.opens.section as WorkspaceSection, inCase ? (chapter.opens.tab ?? undefined) : undefined);
+    const place = placeOf(chapter.opens);
+    open(place.section as WorkspaceSection, inCase ? place.tab : undefined);
   };
   const chapters = story.data?.chapters ?? [];
   const acted = story.data?.acted ?? 0;

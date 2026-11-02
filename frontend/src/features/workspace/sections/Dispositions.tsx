@@ -5,7 +5,7 @@ import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { ImdrfCodes, RecordOrigin } from "./ImportReports";
 import { formatDay } from "../../../app/dates";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import { countOf, DecideAndSign } from "./common";
 import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
 import { TrainingPanel } from "./MarketAssessment";
@@ -52,10 +52,13 @@ const SHOWS = [
 export function Dispositions() {
   const [show, setShow] = useState<"waiting" | "signed">("waiting");
   const [page, setPage] = useState(1);
-  const [open, setOpen] = useState<BoardItem | null>(null);
+  // The complaint whose disposition is open is part of the address (Dispositions?complaint=<id>).
+  const [openId, setOpenId] = useTabParam("complaint");
   const list = useResource<DispositionBoard>(boardPath(show, page));
   const summary = list.data?.summary;
   const items = list.data?.items ?? [];
+  const open = openId ? (items.find((item) => item.id === openId) ?? { id: openId, ref: "Complaint" }) : null;
+  const setOpen = (item: BoardItem | null) => setOpenId(item ? item.id : null);
   const choose = (next: "waiting" | "signed") => {
     setShow(next);
     setPage(1);
@@ -307,7 +310,7 @@ export function DispositionPanel({
         <RecordOrigin
           entity="complaints"
           recordId={complaint.id}
-          onOpenReport={(importRef) => open("Import data", `report=${importRef}`)}
+          onOpenReport={(importRef) => open("Import data", `?${new URLSearchParams({ report: importRef })}`)}
         />
       </section>
 

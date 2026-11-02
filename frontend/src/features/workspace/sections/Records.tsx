@@ -13,7 +13,7 @@ import {
 import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { formatDay, localDay } from "../../../app/dates";
-import { sectionAllowed, useCan, useFeatureSet, useWorkspace } from "../workspaceContext";
+import { sectionAllowed, useCan, useFeatureSet, useReportedTab, useTabParam, useWorkspace } from "../workspaceContext";
 import { MVP_RECORDS_TABS, recordsAuditView, type MvpRecordsTab } from "../../../app/featureSet";
 import { ReportsPanel } from "../../reports/ReportsPanel";
 import { SignatureVerificationWorkspace } from "../../signature/SignatureVerificationWorkspace";
@@ -80,7 +80,7 @@ export function RecordsSection({ tab }: { tab?: string }) {
     : RECORDS_TABS;
   const requested = (tab ?? "").split("?")[0];
   const [documentLink] = useState(() => parseDocumentLink(tab));
-  const [active, setActive] = useState<RecordsTab | MvpRecordsTab>(() =>
+  const [active, setActive] = useReportedTab<RecordsTab | MvpRecordsTab>(() =>
     (tabs as readonly string[]).includes(requested) ? (requested as MvpRecordsTab) : target.tab,
   );
   return (
@@ -106,7 +106,8 @@ export function RecordsSection({ tab }: { tab?: string }) {
 function EffectivenessBoard({ initialCapa }: { initialCapa: string | null }) {
   const [show, setShow] = useState<BoardShow>("attention");
   const [page, setPage] = useState(1);
-  const [open, setOpen] = useState<string | null>(initialCapa);
+  // The CAPA whose check is open is part of the address (Effectiveness checks?capa=<id>).
+  const [open, setOpen] = useTabParam("capa", "push", initialCapa);
   const board = useResource<Board>(boardPath(show, page));
   const summary = board.data?.summary;
   const headline = boardHeadline(summary);

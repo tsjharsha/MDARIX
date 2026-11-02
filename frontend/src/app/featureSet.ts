@@ -1,5 +1,6 @@
 import type { AppView } from "./router";
 import { DEMO_REQUESTS_OFFERED } from "../site/offer";
+import { tabParts } from "./linkTable";
 
 /**
  * Which features the server offers (session context `feature_set`, backend/app/feature_set.py): everything as built
@@ -60,8 +61,8 @@ export const MVP_RECORDS_TABS = [
 ] as const;
 export type MvpRecordsTab = (typeof MVP_RECORDS_TABS)[number];
 
-/** My Work's approvals tab under the MVP (the queue of decisions awaiting a signature, for people who may sign). */
-export const MY_WORK_APPROVALS_TAB = "Approvals";
+// Where a link goes (the old -> new link table, linkTable.ts), and the approvals tab it names.
+export { MY_WORK_APPROVALS_TAB, routeFor } from "./linkTable";
 
 /**
  * Customer administration sections the MVP parks: the source-system connections and their sync runs (nothing should
@@ -136,13 +137,6 @@ export function importTemplatesFor<T extends { entity: string }>(
   };
 }
 
-/** A tab's name and what it carries after "?" (a case, a request, a view). */
-function tabParts(tab: string | undefined): { name: string; query: string } {
-  const text = tab ?? "";
-  const mark = text.indexOf("?");
-  return mark < 0 ? { name: text, query: "" } : { name: text.slice(0, mark), query: text.slice(mark + 1) };
-}
-
 /** Tabs the MVP parks, by workspace section. */
 export const PARKED_TABS: Readonly<Record<string, readonly string[]>> = {
   Investigations: ["Story"],
@@ -166,52 +160,6 @@ export function tabsFor<T extends string>(section: string, tabs: readonly T[], f
   return tabs.filter((tab) => !parked.includes(tab));
 }
 
-/**
- * Where a workspace link goes under this feature set. Under `mvp` every link into a parked section (a task, a case
- * step, an old bookmark, a story chapter) opens the screen that now holds that work, so nothing is a dead end:
- * - Dashboard and Products: Readiness, the home.
- * - Evidence: a case's evidence is a step of the case page; evidence requests are in My Work.
- * - Decisions: a decision is the case page's Decision step; approvals are in My Work; signature verification is in
- *   Records.
- * - Intelligence: Ask MDARIX is a step of the case page (it answers without a case too); risk and regulatory reviews
- *   are the case's Reviews step; reports are in Records.
- * - Trust & Audit: Records › Audit trail, with the case timeline, replay, AI runs, integrity and the audit trail.
- */
-export function routeFor(
-  section: string,
-  tab: string | undefined,
-  featureSet: FeatureSet,
-): { section: string; tab: string | undefined } {
-  if (featureSet !== "mvp") return { section, tab };
-  const { name, query } = tabParts(tab);
-  // Readiness is the MVP's home: links to the Dashboard and the parked Products section open it.
-  if (section === "Dashboard" || section === "Products") return { section: "Readiness", tab: undefined };
-  if (section === "Evidence") {
-    if (name === "Requests")
-      return { section: "My Work", tab: query ? `Evidence requests?${query}` : "Evidence requests" };
-    return { section: "Investigations", tab: "Evidence" };
-  }
-  if (section === "Decisions") {
-    if (name === MY_WORK_APPROVALS_TAB) return { section: "My Work", tab: MY_WORK_APPROVALS_TAB };
-    if (name === "Verify a signature") return { section: "Records", tab: "Verify a signature" };
-    // The decision of a case (with a follow-up or assessment to open); the legacy Decision center is parked.
-    if (name === "Decision") return { section: "Investigations", tab };
-    return { section: "Investigations", tab: "Decision" };
-  }
-  if (section === "Intelligence") {
-    if (name === "Reports") return { section: "Records", tab: "Reports" };
-    if (name === "Risk & traceability" || name === "Regulatory copilot")
-      return { section: "Investigations", tab: "Reviews" };
-    return { section: "Investigations", tab: "Ask MDARIX" };
-  }
-  if (section === "Trust & Audit") {
-    // AI assurance is parked; every other view keeps its case and label (see recordsAuditView).
-    if (!name || name === "AI assurance") return { section: "Records", tab: "Audit trail" };
-    return { section: "Records", tab: `Audit trail?${new URLSearchParams({ view: tab ?? "" })}` };
-  }
-  return { section, tab };
-}
-
 /** The Trust & Audit view a Records › Audit trail tab carries ("Audit trail?view=Case timeline?case=…"), or null. */
 export function recordsAuditView(tab: string | undefined): string | null {
   const { name, query } = tabParts(tab);
@@ -222,6 +170,8 @@ export function recordsAuditView(tab: string | undefined): string | null {
 
 /** The requested tab when the section offers it, else the fallback when offered, else the first tab. */
 export function offeredTab<T extends string>(requested: string | null | undefined, tabs: readonly T[], fallback: T): T {
-  if (requested && (tabs as readonly string[]).includes(requested)) return requested as T;
+  // A tab may carry a record, panel or filter after "?" (Dispositions?complaint=<id>): its name chooses the tab.
+  const name = tabParts(requested).name;
+  if (name && (tabs as readonly string[]).includes(name)) return name as T;
   return tabs.includes(fallback) ? fallback : tabs[0];
 }

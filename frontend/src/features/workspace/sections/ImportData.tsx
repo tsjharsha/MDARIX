@@ -735,8 +735,12 @@ export function HowItWasRead({
   );
 }
 
-/** The import run a link names (``report=<import_ref>``, from a record's origin), if any. */
-export const reportFocus = (focus?: string) => (focus?.startsWith("report=") ? focus.slice("report=".length) : null);
+/** The import run a link names ("?report=<import_ref>", or before 0.10.67 "report=<import_ref>"), if any. */
+export const reportFocus = (focus?: string) => {
+  const text = focus ?? "";
+  const query = text.startsWith("report=") ? text : text.includes("?") ? text.slice(text.indexOf("?") + 1) : "";
+  return new URLSearchParams(query).get("report")?.trim() || null;
+};
 
 /** Shows one import's data-quality report: chosen and scrolled to (Getting started › Your data, Import data). */
 export function useReportChoice(focus?: string) {

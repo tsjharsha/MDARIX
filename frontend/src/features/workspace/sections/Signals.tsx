@@ -1,12 +1,12 @@
-import { useMemo, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import { ResolutionTrend } from "./Dispositions";
 import { BarList, ColumnChart, Panel } from "../../admin/console/charts";
 import { chartWindowEnd, dailyCounts, titleCase, type Slice } from "../../admin/console/dashboardModel";
 import { Tabs, listOf, useResource } from "../../customer-admin/shared";
-import { useCan } from "../workspaceContext";
+import { WorkspaceContext, useCan, useReportedTab } from "../workspaceContext";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
 import { Embedded, NeedsProduct, RecordTable } from "./common";
-import { SIGNALS_TABS, parseSignalsTab, type SignalsTab } from "../signals";
+import { SIGNALS_TABS, parseSignalsTab, signalsTab, type SignalsTab } from "../signals";
 import { SignalInbox } from "./SignalInbox";
 import { DetectionRules } from "./DetectionRules";
 import { TrendCheck } from "./TrendCheck";
@@ -20,15 +20,17 @@ export function SignalsSection({ tab }: { tab?: string }) {
   const canTriage = useCan("signal.triage");
   const tabs = SIGNALS_TABS.filter((item) => item !== "Detection rules" || canTriage);
   const [target, setTarget] = useState(() => parseSignalsTab(tab));
+  const report = useContext(WorkspaceContext)?.reportTab;
   // Each new target (from a link, a task, the rules' run result) opens the inbox afresh with it.
   const [targetKey, setTargetKey] = useState(0);
-  const [active, setActive] = useState<SignalsTab>(() =>
+  const [active, setActive] = useReportedTab<SignalsTab>(() =>
     (tabs as readonly string[]).includes(target.tab) ? target.tab : "Signal inbox",
   );
   const openSignal = (signal: string) => {
     setTarget({ ...parseSignalsTab("Signal inbox"), signal });
     setTargetKey((value) => value + 1);
     setActive("Signal inbox");
+    report?.(signalsTab({ signal }));
   };
   return (
     <>
