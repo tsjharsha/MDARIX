@@ -195,7 +195,7 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
                 "market": market,
                 "label": markets.MARKET_LABELS[market],
                 "enabled": market in enabled,
-                "preselected": market == markets.market_of(record.get("country")),
+                "preselected": market in markets.markets_of(record.get("country")),
                 "required": market in summary,
                 "question_set": question_set.as_dict(),
                 "question_set_current": question_set.version == codes[market],

@@ -1,8 +1,8 @@
 """Free-trial API: the Platform Admin request queue, and the trial workspace's status, templates, import and insights.
 
 Trial endpoints take the tenant only from the signed-in session and refuse tenants that are not on the Free Trial
-plan. Every organization (trial or not) imports through /api/v1/data/import (backend/app/data_import_router.py);
-the trial routes here keep the trial's own limits and the Getting started page. Inviting colleagues is a trial
+plan. Every organization (trial or not) imports through /api/v1/data/import (backend/app/data_import_router.py),
+Getting started too; the trial's /trial/imports routes here are thin aliases of it (stage 4). Inviting colleagues is a trial
 feature too: in a paying organization its Customer Administrators invite users (/api/v1/admin/identity/users), and a
 converted trial's owner becomes one (backend/app/access/platform_subscriptions.py). With no admin console in a trial,
 its owner also removes colleagues, resets their MFA and decides on support access (/trial/team, /trial/support-access).
@@ -13,9 +13,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
-from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -23,7 +22,6 @@ from sqlalchemy.orm import Session
 from backend.app.access.authz import _require_platform_admin
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import (
-    AuditEvent,
     AuthUser,
     Capa,
     Complaint,
@@ -33,7 +31,7 @@ from backend.app.db.models.foundation import (
     Risk,
 )
 from backend.app.db.session import get_db
-from backend.app import support_access_api
+from backend.app import data_import_router, support_access_api
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.trial import imports, retention, team
 from backend.app.trial.sample_data import SAMPLE_SOURCE
@@ -224,96 +222,25 @@ def trial_template(
     )
 
 
-async def _body(request: Request) -> bytes:
-    return await imports.read_upload(request, TRIAL_FILE_LIMIT_BYTES, "Files can be up to 2 MB during the free trial")
+def _trial_only(ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)):
+    """The trial's old import routes answer only a free trial, as they did."""
+    _require_trial(db, ctx)
 
 
-def _trial_import_and_audit(
-    db,
-    data,
-    ctx,
-    tenant_id,
-    entity: str,
-    raw: bytes,
-    date_format: str = "ISO",
-    options: tuple[bool, bool] = (False, False),
-    file_name: str | None = None,
-) -> dict:
-    """The trial import (all or nothing, unless problem rows are set aside) with its audit record (runs in the thread
-    pool). ``options`` is (skip_problem_rows, mask_personal_data); ``file_name`` is recorded for the run report."""
-    try:
-        result = imports.import_file(data, tenant_id, entity, raw, imports.TRIAL_POLICY, date_format, *options)
-        db.add(
-            AuditEvent(
-                id=uuid.uuid4(),
-                tenant_id=tenant_id,
-                actor_ref=str(ctx.user_id),
-                action="TRIAL_DATA_IMPORTED",
-                entity_type="TrialImport",
-                # Counts only: the rejects file holds the uploader's own rows, personal data included.
-                details={
-                    **{k: v for k, v in result.items() if k != "rejects_csv"},
-                    "file_name": imports.file_label(file_name),
-                },
-                created_at=datetime.now(timezone.utc),
-            )
-        )
-        data.commit()
-        if db is not data:
-            db.commit()
-    except HTTPException:
-        data.rollback()
-        raise
-    except Exception as exc:
-        data.rollback()
-        raise HTTPException(
-            500, detail={"code": "TRIAL_IMPORT_FAILED", "message": "The import failed; nothing was saved"}
-        ) from exc
-    return result
-
-
-@router.post("/trial/imports/{entity}/check", dependencies=[Depends(require_permission(RECORDS_WRITE))])
-async def check_trial_import(
-    entity: str,
-    request: Request,
-    date_format: str = Query(default="ISO", max_length=8),
-    on_problems: str = Query(default="refuse", max_length=8),
-    personal_data: str = Query(default="refuse", max_length=8),
-    ctx: AuthenticatedRequestContext = Depends(get_request_context),
-    db: Session = Depends(get_db),
-    data: Session = Depends(get_data_plane_db),
+# Thin aliases of the one upload path (backend/app/data_import_router.py, stage 4): the same handlers, so the same
+# limits, checks, quarantine, audit record and data-quality report. Kept because the tests, the validation package's
+# scripts and older links still post here; every screen posts to /api/v1/data/import.
+for _path, _handler in (
+    ("/trial/imports/{entity}/check", data_import_router.check_import),
+    ("/trial/imports/{entity}", data_import_router.run_import),
 ):
-    order = imports.date_format_or_422(date_format)
-    options = imports.import_options(on_problems, personal_data)
-    await run_in_threadpool(_require_trial, db, ctx)
-    raw = await _body(request)
-    return await run_in_threadpool(
-        imports.check_file, data, uuid.UUID(str(ctx.tenant_id)), entity, raw, imports.TRIAL_POLICY, order, *options
+    router.add_api_route(
+        _path,
+        _handler,
+        methods=["POST"],
+        dependencies=[Depends(require_permission(RECORDS_WRITE)), Depends(_trial_only)],
+        name=f"trial_alias_{_handler.__name__}",
     )
-
-
-@router.post("/trial/imports/{entity}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
-async def run_trial_import(
-    entity: str,
-    request: Request,
-    background: BackgroundTasks,
-    date_format: str = Query(default="ISO", max_length=8),
-    on_problems: str = Query(default="refuse", max_length=8),
-    personal_data: str = Query(default="refuse", max_length=8),
-    file_name: str | None = Query(default=None, max_length=255),
-    ctx: AuthenticatedRequestContext = Depends(get_request_context),
-    db: Session = Depends(get_db),
-    data: Session = Depends(get_data_plane_db),
-):
-    order = imports.date_format_or_422(date_format)
-    options = imports.import_options(on_problems, personal_data)
-    await run_in_threadpool(_require_trial, db, ctx)
-    tenant_id = uuid.UUID(str(ctx.tenant_id))
-    raw = await _body(request)
-    result = await run_in_threadpool(
-        _trial_import_and_audit, db, data, ctx, tenant_id, entity, raw, order, options, file_name
-    )
-    return imports.after_import(background, tenant_id, result, source="trial import")
 
 
 @router.get("/trial/insights")

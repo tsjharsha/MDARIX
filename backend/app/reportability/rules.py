@@ -232,6 +232,19 @@ def normalize(value: object) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+_COUNTRY_SEPARATORS = re.compile(r"\s*(?:[,;/&|]|\band\b)\s*", re.I)
+
+
+def countries(value: object) -> list[str]:
+    """The countries a country cell names: "India, Germany" -> ["India", "Germany"]; one country stays one ("United
+    States", "Bosnia and Herzegovina" is read whole when it is a known name: ``applies`` and markets_of try the whole
+    cell first)."""
+    text = str(value or "").strip()
+    if not text:
+        return []
+    return [part for part in _COUNTRY_SEPARATORS.split(text) if part.strip()]
+
+
 def _clean_text(value: object) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()
 
@@ -304,8 +317,12 @@ def applies(window: dict, record: dict) -> bool:
         return False
     if not window["markets"]:
         return True
+    names = {normalize(market) for market in window["markets"]}
     country = normalize(record.get("country"))
-    return bool(country) and country in {normalize(market) for market in window["markets"]}
+    # A cell naming several countries ("India, Germany") is covered when one of them is (J41).
+    return bool(country) and (
+        country in names or any(normalize(part) in names for part in countries(record.get("country")))
+    )
 
 
 def due_date(aware: date, window: dict, market: str | None = None) -> date:

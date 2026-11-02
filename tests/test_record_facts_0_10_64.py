@@ -102,7 +102,7 @@ def test_the_worksheets_fill_the_software_version_expiry_and_category_from_the_r
 
 def _check(csv_text: str) -> imports._Report:
     report = imports._Report()
-    rows = imports._parse("complaints", csv_text.encode(), report)
+    rows = imports._parse("complaints", csv_text.encode(), report, reading=imports.FileReading(date_column="none"))
     imports._check_values("complaints", rows, report)
     return report
 
@@ -189,7 +189,12 @@ def test_products_and_lots_files_bring_the_category_and_expiry(trial):
     user = trial["user"]
 
     def upload(entity, text):
-        return user.post(f"/api/v1/trial/imports/{entity}", content=text, headers={"Content-Type": "text/csv"})
+        return user.post(
+            f"/api/v1/trial/imports/{entity}",
+            params={"date_column": "none"},
+            content=text,
+            headers={"Content-Type": "text/csv"},
+        )
 
     tag = uuid.uuid4().hex[:6].upper()
     refused = upload("products", f"product_id,product_name,device_category\nRF-{tag},Glucose Strips,Sterile\n")

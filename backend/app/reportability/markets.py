@@ -662,15 +662,34 @@ def conclusion_problem(suggested: str, conclusion: str, reason: str) -> str | No
 # --------------------------------------------------------------------------------------------- markets and clocks
 
 
-def market_of(country: object) -> str | None:
-    """The market of an event's country, or None."""
-    name = rules.normalize(country)
-    if not name:
-        return None
+def _market_of_one(name: str) -> str | None:
     for market in MARKETS:
         if name in {rules.normalize(item) for item in MARKET_COUNTRIES[market]}:
             return market
     return None
+
+
+def markets_of(country: object) -> list[str]:
+    """The markets of an event's country cell, in the order it names them: one country, or several separated by a
+    comma, semicolon, slash, "&" or "and" ("India, Germany": India's, then the EU's) (J41)."""
+    whole = _market_of_one(rules.normalize(country))
+    if whole:
+        return [whole]
+    found: list[str] = []
+    for part in rules.countries(country):
+        market = _market_of_one(rules.normalize(part))
+        if market and market not in found:
+            found.append(market)
+    return found
+
+
+def market_of(country: object) -> str | None:
+    """The market of an event's country, or None; of a cell naming several countries, the first one's (the event's own
+    market; ``markets_of`` gives them all)."""
+    name = rules.normalize(country)
+    if not name:
+        return None
+    return next(iter(markets_of(country)), None)
 
 
 # Words that mark an in-vitro diagnostic in a product's name, family, GMDN term or description: its EU clocks cite the

@@ -109,9 +109,9 @@ def market_state(versions: list[ComplaintMarketAssessment]) -> dict:
 
 
 def required_markets(country: object, enabled: list[str], assessed) -> list[str]:
-    """The markets a complaint must be assessed for: its event's market (when enabled) and every one assessed."""
-    pre = markets.market_of(country)
-    wanted = {*assessed, *([pre] if pre in enabled else [])}
+    """The markets a complaint must be assessed for: its event's markets (when enabled; a cell may name several
+    countries, "India, Germany") and every one assessed."""
+    wanted = {*assessed, *(market for market in markets.markets_of(country) if market in enabled)}
     return [market for market in markets.MARKETS if market in wanted]
 
 
@@ -120,7 +120,7 @@ def markets_summary(
 ) -> list[dict]:
     """Each market the complaint must be assessed for, with its state and its clock (for the watch)."""
     enabled = markets.enabled_markets(windows)
-    pre = markets.market_of(record.get("country"))
+    pre = markets.markets_of(record.get("country"))
     found = []
     for market in required_markets(record.get("country"), enabled, versions_by_market):
         seen = market_state(versions_by_market.get(market, []))
@@ -136,7 +136,7 @@ def markets_summary(
             {
                 "market": market,
                 "label": markets.MARKET_LABELS[market],
-                "preselected": market == pre,
+                "preselected": market in pre,
                 "enabled": market in enabled,
                 **seen,
                 "report_type_label": kind.label if kind else None,

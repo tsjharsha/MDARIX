@@ -1,7 +1,9 @@
 """Stored quarantine (R14): the rows a workspace import sets aside are kept, with their reasons, until a person
 corrects them and they are imported again.
 
-A free trial stores them too (0.10.56) and deletes them with the trial. Every free-text value of a stored row is masked
+A free trial stores them too (0.10.56) and deletes them with the trial. A row is corrected on screen and processed
+again, or dismissed with a reason; it also closes when a later import brings its record in, and is replaced when a
+later import sets the same record aside again (stage 4, J11). Every free-text value of a stored row is masked
 (trial/imports.py stored_value), never kept as sent, and a reason never quotes the words a check found; a corrected row
 goes through the same checked import as any other row. A row whose text
 suggests harm carries its harm words, so it reaches triage while still quarantined (A2).
@@ -22,6 +24,11 @@ from backend.app.db.models.ingestion import ImportQuarantineRow
 
 OPEN = "OPEN"
 REPROCESSED = "REPROCESSED"
+DISMISSED = "DISMISSED"
+STATUSES = (OPEN, REPROCESSED, DISMISSED)
+REASON_MIN, REASON_MAX = 3, 500
+# What a row replaced by a later import's set-aside row says (it is dismissed, not lost: the newer row holds it).
+REPLACED_NOTE = "Set aside again by a later import: the newer row replaces this one."
 
 # Words that suggest harm to a person: the one starter harm-word list of triage (intake/rules.py, G19), a directly
 # negated mention ("no harm") left out. Failures alone are not harm.
@@ -92,6 +99,7 @@ def _view(item: ImportQuarantineRow) -> dict:
         "status": item.status,
         "created_at": item.created_at.isoformat(),
         "resolved_at": item.resolved_at.isoformat() if item.resolved_at else None,
+        "resolution_note": item.resolution_note,
     }
 
 
@@ -114,15 +122,18 @@ def listing(db: Session, tenant_id, status: str = OPEN, import_ref: uuid.UUID | 
         .limit(500)
         .all()
     )
+    return {"counts": _counts(counts), "items": [_view(item) for item in items]}
+
+
+def _counts(by_status: dict) -> dict:
     return {
-        "counts": {"open": counts.get(OPEN, 0), "reprocessed": counts.get(REPROCESSED, 0)},
-        "items": [_view(item) for item in items],
+        "open": by_status.get(OPEN, 0),
+        "reprocessed": by_status.get(REPROCESSED, 0),
+        "dismissed": by_status.get(DISMISSED, 0),
     }
 
 
-def reprocess(db: Session, tenant_id, row_id: uuid.UUID, corrected: dict, import_records, policy, actor: str) -> dict:
-    """Import the corrected row through the same checks as any import; the stored row is closed only if it passes
-    (a failing check answers 422 with its problems and leaves the row open)."""
+def _open_row(db: Session, tenant_id, row_id: uuid.UUID) -> ImportQuarantineRow:
     item = (
         db.query(ImportQuarantineRow)
         .filter(ImportQuarantineRow.tenant_id == tenant_id, ImportQuarantineRow.id == row_id)
@@ -133,9 +144,100 @@ def reprocess(db: Session, tenant_id, row_id: uuid.UUID, corrected: dict, import
         raise HTTPException(404, detail={"code": "QUARANTINE_ROW_NOT_FOUND", "message": "No such quarantined row"})
     if item.status != OPEN:
         raise HTTPException(
-            409, detail={"code": "QUARANTINE_ROW_CLOSED", "message": "This row was already re-processed"}
+            409,
+            detail={
+                "code": "QUARANTINE_ROW_CLOSED",
+                "message": "This row was already processed again"
+                if item.status == REPROCESSED
+                else "This row was already dismissed",
+            },
         )
-    result = import_records(db, tenant_id, item.entity, [corrected], policy)
+    return item
+
+
+def corrected_row(item: ImportQuarantineRow, changes: dict) -> dict:
+    """The row to process again: as stored (personal details masked), with the person's corrections over it. Only the
+    row's own columns may be corrected; a column it does not have is refused."""
+    stored = {column: str(value or "") for column, value in (item.row or {}).items()}
+    unknown = sorted(set(changes) - set(stored))
+    if unknown:
+        raise HTTPException(
+            422,
+            detail={
+                "code": "QUARANTINE_COLUMN_UNKNOWN",
+                "message": f"This row has no column '{unknown[0]}'. Correct only the row's own columns.",
+            },
+        )
+    return {**stored, **{column: str(value or "").strip() for column, value in changes.items()}}
+
+
+def dismiss(db: Session, tenant_id, row_id: uuid.UUID, reason: str, actor: str, stored_value) -> dict:
+    """Dismiss a set-aside row with a reason (a test row, a record already in the QMS...): it leaves the open list and
+    Triage. The reason is kept with personal details masked (``stored_value``, the import's own masking)."""
+    reason = " ".join(str(reason or "").split())
+    if not REASON_MIN <= len(reason) <= REASON_MAX:
+        raise HTTPException(
+            422,
+            detail={
+                "code": "QUARANTINE_REASON_REQUIRED",
+                "message": f"Say in {REASON_MIN} to {REASON_MAX} characters why this row is dismissed.",
+            },
+        )
+    item = _open_row(db, tenant_id, row_id)
+    item.status = DISMISSED
+    item.resolution_note = stored_value("reason", reason)
+    item.resolved_at = datetime.now(timezone.utc)
+    item.resolved_by = actor
+    return _view(item)
+
+
+def close_fixed(
+    db: Session, tenant_id, entity: str, key: str, written: set, again: set, actor: str, source: str
+) -> list[str]:
+    """Earlier imports' open set-aside rows of ``entity`` whose record (its ``key`` column) this import wrote close as
+    processed again, so a fixed row does not stay open and on Triage (J11); those whose record this import set aside
+    again are replaced by the newer row; only rows of the same ``source`` (an organization's own imports, never the
+    sample's). Returns the closed rows' ids (for the import's audit record)."""
+    wanted = {value for value in (written | again) if value}
+    if not wanted:
+        return []
+    now = datetime.now(timezone.utc)
+    closed = []
+    rows = db.query(ImportQuarantineRow).filter(
+        ImportQuarantineRow.tenant_id == tenant_id,
+        ImportQuarantineRow.entity == entity,
+        ImportQuarantineRow.source == source,
+        ImportQuarantineRow.status == OPEN,
+        ImportQuarantineRow.row[key].astext.in_(sorted(wanted)),
+    )
+    for item in rows.with_for_update():
+        value = (item.row or {}).get(key)
+        if value in written:
+            item.status = REPROCESSED
+        else:
+            item.status, item.resolution_note = DISMISSED, REPLACED_NOTE
+        item.resolved_at, item.resolved_by = now, actor
+        closed.append(str(item.id))
+    return closed
+
+
+def reprocess(db: Session, tenant_id, row_id: uuid.UUID, corrected: dict, import_records, policy, actor: str) -> dict:
+    """Import the corrected row through the same checks as any import; the stored row is closed only if it passes
+    (a failing check answers 422 with its problems and leaves the row open)."""
+    item = _open_row(db, tenant_id, row_id)
+    corrected = corrected_row(item, corrected)
+    try:
+        result = import_records(db, tenant_id, item.entity, [corrected], policy)
+    except HTTPException as exc:
+        # What is still wrong, in the answer's own words, so the screen can say it beside the row (D).
+        detail = exc.detail if isinstance(exc.detail, dict) else {}
+        issues = (detail.get("report") or {}).get("issues") or []
+        if not issues:
+            raise
+        words = "; ".join(f"{i['column']}: {i['message']}" if i.get("column") else i["message"] for i in issues[:5])
+        raise HTTPException(
+            exc.status_code, detail={**detail, "message": f"Still not right, so the row stays set aside. {words}"}
+        ) from exc
     from backend.app import import_lineage
     from backend.app.trial.imports import TEMPLATES
 
@@ -164,4 +266,4 @@ def counts(db: Session, tenant_id, import_ref: uuid.UUID) -> dict:
         .group_by(ImportQuarantineRow.status)
         .all()
     )
-    return {"open": rows.get(OPEN, 0), "reprocessed": rows.get(REPROCESSED, 0)}
+    return _counts(rows)

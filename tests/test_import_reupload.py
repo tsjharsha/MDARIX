@@ -56,7 +56,8 @@ def test_a_reupload_sets_only_its_columns_and_counts_only_real_changes():
         "RU-1,RU-PUMP,Reupload Pump,Alarm at start-up; the line was clear\n"
         "RU-2,RU-PUMP,Reupload Pump,Door latch loose\n"
     )
-    result = _upload(user, edited)
+    # A re-upload without any date column, said so (0.10.65: "none" dates nothing; the stored dates stay).
+    result = _upload(user, edited, date_column="none")
     assert result["updated"] == 1 and result["quality_report"]["rows_changed"] == 1
     assert result["quality_report"]["rows_unchanged"] == 1
     complaint, lot = _stored("RU-1")
@@ -67,7 +68,7 @@ def test_a_reupload_sets_only_its_columns_and_counts_only_real_changes():
     assert complaint.description == "Alarm at start-up; the line was clear"
 
     blank_status = "complaint_id,product_id,product_name,description,status\nRU-1,RU-PUMP,Reupload Pump,Alarm at start-up; the line was clear,\n"
-    assert _upload(user, blank_status)["updated"] == 0
+    assert _upload(user, blank_status, date_column="none")["updated"] == 0
     assert _stored("RU-1")[0].status == "closed - no action"
 
 
@@ -75,7 +76,7 @@ def test_a_value_longer_than_its_column_is_refused_by_the_check():
     user, _, _ = _approved_trial_client()
     long = "x" * 41
     csv = f"complaint_id,product_id,product_name,description,severity\nRL-{uuid.uuid4().hex[:6]},RL-PUMP,Long Pump,Alarm,{long}\n"
-    refused = user.post(UPLOAD, content=csv, headers={"Content-Type": "text/csv"})
+    refused = user.post(UPLOAD, params={"date_column": "none"}, content=csv, headers={"Content-Type": "text/csv"})
     assert refused.status_code == 422, refused.text  # 0.10.61: "ready", then 500 "The import failed"
     issues = refused.json()["detail"]["report"]["issues"]
     assert [(issue["column"], issue["message"]) for issue in issues] == [

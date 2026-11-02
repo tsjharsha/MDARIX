@@ -258,7 +258,7 @@ def _upload(user, csv: str) -> dict:
     return _ok(
         user.post(
             "/api/v1/trial/imports/complaints",
-            params={"on_problems": "skip", "file_name": "QMS export.csv"},
+            params={"on_problems": "skip", "file_name": "QMS export.csv", "date_column": "none"},
             content=csv,
             headers={"Content-Type": "text/csv"},
         )
