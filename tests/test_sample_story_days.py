@@ -168,7 +168,8 @@ def test_the_flagship_is_reportable_in_the_us_in_30_days_and_not_in_india(trial)
         for item in _ok(user.get("/api/v1/complaints/reportability?show=all&page_size=100"))["items"]
         if item["complaint_identifier"] == "SAMPLE-RV-11"
     )
-    triage = next(item for item in _ok(user.get("/api/v1/triage"))["items"] if item["ref"] == flagship["business_id"])
+    # A triage item names the complaint by its own reference since 0.10.66 (one ID per complaint), not its MDARIX ID.
+    triage = next(item for item in _ok(user.get("/api/v1/triage"))["items"] if item["ref"] == "SAMPLE-RV-11")
     roles = {deadline["market"]: deadline["role"] for deadline in triage["deadlines"]}
     assert roles["US"] == "OWN" and roles["IN"] == "IF_ALSO"
     complaint = flagship["id"]
