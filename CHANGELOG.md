@@ -10,6 +10,116 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.68] - 2026-11-02
+
+On the trial maintenance line (`release/0.10`): stage 7 of the quality plan, "New navigation and the complaint page".
+An organization switched to the new navigation sees four main screens, **My work, Complaints, Trends, Records**, with
+**Settings, Help, Team and Account** at the top right, and one page per complaint. Every other organization keeps
+today's menu: the default stays **classic**. A platform administrator switches an organization in Tenant 360.
+
+No migration (stage 6's `tr11navigation` holds the setting). The API and web images change. The sample data does not
+change, so `scripts/refresh_trial_story.py` has nothing new to do.
+
+### Added: the navigation switch in Tenant 360
+
+- Tenant 360 › Edit details offers **Navigation: Classic / New**, through the same edit as the other details, with a
+  reason and the lock version, audited as `TENANT_UPDATED`. Platform administrators only. The overview shows it.
+
+### Added: the new navigation (7.1)
+
+- **Menu:** My work, Complaints, Trends, Records. **Top right:** Settings, Help, Team, Account. Getting started
+  stays for trials (the trial badge and Help); Look ahead and Share feedback are in Help.
+- **Every old place has a home** (`linkTable.json` `newHomes`): today's 12 menu items, 58 tabs and the nested audit
+  trail views. E-mails already sent, bookmarks and the sample story's links open the new place. An address of the
+  new navigation opened by a classic organization opens the classic place.
+- New addresses: `/app/trends`, `/app/settings`, `/app/team`, and `/app/complaints/<ref>` for one complaint.
+
+### Added: My work (7.2)
+
+- The **next step** first, as the screen's main button: the soonest task assigned to you, else your most urgent
+  reminder, else the complaints to triage. "Log a call" sits beside it.
+- **Tasks for me** (one list with views: assigned to me, role queues, waiting, returned, due soon, overdue,
+  completed), **Approvals**, **Evidence requests**, **Queues** (calls to check, possible duplicates, ready to close as
+  routine) and, for managers, **Team overview** (everything overdue or due soon, with its owner). Managers see the four
+  inspection-readiness numbers and the team's overdue and due-soon counts above. Five tabs instead of ten; My AI
+  conversations stays hidden while AI is off.
+- **"I will be away"** is in Account › Away, linked from the reminders.
+
+### Added: Complaints as one list with views (7.3, 7.5)
+
+- Views: **To triage, Due soon, Past target, Second look, Reporting, Communications, Investigations, Dismissed** and
+  **All complaints** (an extra view: the list itself, with its filters). Reporting is the one home of the
+  reportability decisions and the authority reports. Due soon and Past target are the complaints against your
+  target (the former Backlog). Dismissed lists the records decided as not complaints. A phone shows the views as one
+  "View" choice.
+- **Import your data** and **Log a call** are actions on the list's header; the templates are in Settings.
+- **All complaints** has six columns: Urgency · What happened · Product, version, lot · Markets · Owner · Stage. A
+  complaint opens its page; one visible action (Open) and the rest under ⋯. Cards at phone width.
+- Each customer problem code shows its **IMDRF term** beside it, as recorded (`SPO2_DROPOUT_HARM` stays): the list,
+  the complaint page, the problem-code filter.
+
+### Added: one page per complaint, `/app/complaints/<ref>` (7.4, 7.8)
+
+- The Oversight event checklist, promoted to a page and opened by the reference people read (the customer's own,
+  else its MDARIX ID). Stage 6's addresses by id redirect to it.
+- **Header:** what happened, what needs attention, owner, due (a deadline chip per market), stage, and one main
+  button: the next action.
+- **Sections:** Summary (what happened, the stage line, what needs attention) · Evidence (first contact, open
+  questions, the communications log, the authority reports) · Decisions & actions (triage, market assessments,
+  reports, disposition or decision, CAPA, owner, ready to close) · History (the signed decision record, the filing,
+  the audit trail).
+- **Who signs, before the work starts:** each step names the colleagues who may sign it (an authority report: never
+  the person who prepared it). **Send to** puts the step in that colleague's My work as a task; only a colleague who
+  may sign the step can receive it. Separation of duties is unchanged.
+- Each step opens on its record, not on a list: the complaint's triage item, its market assessment, its disposition,
+  its CAPA's check. A reminder of a reply due opens the request itself.
+- The page also shows the **reportability watch's provisional deadline** of a market not assessed yet (SAMPLE-RV-06:
+  FDA, Sun 8 Nov). Oversight lists a market's clock only once its assessment is started (an owner decision below).
+
+### Added: Trends, Records, Settings and Team (7.6, 7.7)
+
+- **Trends:** opens on the trend check; then the trends to review, complaints over time and by resolution; an
+  Investigations button.
+- **Records:** inspection readiness, documents, decision records, CAPA records, effectiveness checks, risk file
+  input, the audit trail, verify a signature, and **Exports** (every export in one place).
+- **Settings:** complaint review rules, reporting windows, reportability guides, working calendar, trend rules,
+  contact attempts and import templates. Each says **who can change it**; others read it. On the new navigation the
+  working calendar and the contact-attempts setting are no longer on daily screens.
+- **Team:** a trial invites and manages colleagues here. In a pilot it says the team is managed in the admin console,
+  and opens it for an administrator.
+
+### Changed for everyone (classic too)
+
+- Words: "Open case" is "Open an investigation" (Signals and the user guide). The event checklist's "Resolve" names
+  the step's action ("Assess the United States (FDA) market").
+- States: a disabled action says why beside it (`aria-describedby`): naming the event owner, signing ready to close,
+  recording the filing, adding a holiday, saving the calendar, a task action, a supplier request, a reply, recording
+  an absence. Empty task and complaint lists name their next action. Lists no longer say "Reading…" in their heading
+  while their skeleton also says it is loading.
+- The user guide opened from Help on the new navigation names the new places ("Complaints › Reporting").
+
+### Sample numbers and labels that change
+
+No deadline, trend figure, signal, count or record changes. Oversight's counts are unchanged.
+
+| Where | Before | After |
+|---|---|---|
+| Signals, a signal's button | Open case / Open case with options… | Open an investigation / Open an investigation with options… |
+| Dispositions, a known issue | Open case with the same problem or lot | Open investigation with the same problem or lot |
+| Event checklist, an open item's button | Resolve | the step's action, e.g. "Assess the United States (FDA) market" |
+| Triage, First contact, Second look, Backlog, Reports, Communications, Reminders, Oversight while loading | "Reading the triage list…" and the like | the list's name ("The triage list") |
+| Problem-code filter | PRESSURE_ALARM · IMDRF A16 | PRESSURE_ALARM · IMDRF A16 Protective Measures Problem |
+
+### Tests
+
+- pytest: `tests/test_complaint_page.py` (new, 8): by reference, by id, another organization 404; SAMPLE-RV-06, -08,
+  -11 show the same deadline, owner, stage and next action on the page, the list, Oversight and the reminders;
+  SAMPLE-URG-01 (a call, not yet a complaint, so no page) has one triage target everywhere; who signs and Send to;
+  Dismissed. `test_workflow_tasks_unit.py`: the new task type `COMPLAINT_STEP`.
+- vitest: `app/linkTable.test.ts` (both navigations; every old place has a new home; the complaint address; no
+  setting on a daily screen), `app/clickPaths.test.ts` (paths a–m), `app/newPathText.test.ts`,
+  `workspace/nextStep.test.tsx` (the first screen's main button names the next action), Tenant 360's model test.
+
 ## [0.10.67] - 2026-11-02
 
 On the trial maintenance line (`release/0.10`): stage 6 of the quality plan, "Navigation foundation". Every screen,
