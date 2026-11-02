@@ -98,6 +98,7 @@ export function MarketAssessmentDrawer({
         <ComplaintNextStep
           complaintId={complaint.id}
           here="Reportability"
+          pending={!active.current}
           refreshKey={shown.map((item) => `${item.current?.version ?? 0}.${item.draft?.version ?? 0}`).join()}
           first={
             alsoIndia(story, shown, active) ? { label: "Assess India (CDSCO) too", run: () => setMarket("IN") } : null

@@ -20,6 +20,7 @@ export function ComplaintNextStep({
   refreshKey,
   first,
   here,
+  pending = false,
 }: {
   complaintId: string;
   /** Changes when the step was saved or signed here, so the next action is read again. */
@@ -28,6 +29,8 @@ export function ComplaintNextStep({
   /** The tab this screen is (Reportability, Dispositions, Reports): a next step done here is said, not a second main
    * button beside the screen's own (0.10.70: one main button per drawer). */
   here?: string;
+  /** This screen's own step is still to sign: its form keeps the main button and the next step is secondary. */
+  pending?: boolean;
 }) {
   const { navigation, open } = useWorkspace();
   const go = useOpenTarget();
@@ -51,7 +54,7 @@ export function ComplaintNextStep({
       {onThisScreen ? (
         <span className="ac-muted">{step.label}: here, above.</span>
       ) : main ? (
-        <button type="button" className="ac-primary" onClick={main.run}>
+        <button type="button" className={pending ? "ac-secondary" : "ac-primary"} onClick={main.run}>
           {main.label} <ChevronRight size={15} aria-hidden="true" />
         </button>
       ) : (

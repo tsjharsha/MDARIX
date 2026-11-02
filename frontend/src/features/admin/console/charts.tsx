@@ -93,7 +93,12 @@ export function Panel({
         </div>
         {action}
       </header>
-      {shown.state === "loading" && <div className="ac-skeleton" aria-label={`Loading ${title}`} />}
+      {/* Never an empty grey box (0.10.70): the placeholder says what it does. */}
+      {shown.state === "loading" && (
+        <div className="ac-skeleton" aria-label={`Loading ${title}`}>
+          <span className="ac-skeleton-text">Reading…</span>
+        </div>
+      )}
       {shown.state === "forbidden" &&
         (shown.code === "TRIAL_ENDED" ? (
           <div className="ac-empty">

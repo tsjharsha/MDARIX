@@ -259,6 +259,7 @@ export function DispositionDrawer({
         <ComplaintNextStep
           complaintId={complaintId}
           here="Dispositions"
+          pending={!screen.data.current}
           refreshKey={String(screen.data.current?.version ?? 0)}
         />
       )}

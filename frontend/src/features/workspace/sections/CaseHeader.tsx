@@ -160,7 +160,7 @@ export function CaseHeader({
           </div>
         )}
       </Panel>
-      {onSection ? <CaseProgressLine steps={steps} onSection={onSection} /> : null}
+      {onSection ? <CaseProgressLine steps={readiness.data ? steps : []} onSection={onSection} /> : null}
       <Collapsed when={!!onSection} summary="Each step and the readiness checklist">
         <Panel
           eyebrow="Investigation progress"
@@ -334,6 +334,16 @@ export function CaseProgressLine({
   steps: ReturnType<typeof caseSteps>;
   onSection: (section: CaseSection, part?: string) => void;
 }) {
+  // Its steps not read yet: say so (0.10.70: with none read, every section read "Done" and "Every step is done: the
+  // decision is signed" on an investigation opened a moment ago).
+  if (!steps.length)
+    return (
+      <nav className="uw-case-progress" aria-label="Where this investigation stands">
+        <p className="ac-muted" role="status">
+          Reading where this investigation stands…
+        </p>
+      </nav>
+    );
   const progress = caseProgress(steps);
   const next = nextCaseStep(steps);
   return (

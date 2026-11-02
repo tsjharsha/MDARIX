@@ -171,7 +171,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           {step ? (
             <button
               type="button"
-              className="ac-primary"
+              // Ready to close is signed by the form in Decisions & actions: shown there, it is that form's button.
+              className={!step.opens && active === "Decisions & actions" ? "ac-secondary" : "ac-primary"}
               onClick={() => (step.opens ? go(step.opens) : choose("Decisions & actions"))}
             >
               {step.label} <ChevronRight size={15} aria-hidden="true" />
