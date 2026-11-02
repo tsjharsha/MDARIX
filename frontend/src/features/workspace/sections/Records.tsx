@@ -60,7 +60,9 @@ import { offeredTab } from "../../../app/featureSet";
 import { InspectionChecks, SummaryDownload } from "./Readiness";
 import { ExportButton, OversightView } from "./Oversight";
 import { Capas } from "./Investigations";
-import { NO_FILTERS } from "../oversight";
+import { NO_FILTERS, eventPath } from "../oversight";
+import { useShortStory } from "./ShortStory";
+import { downloadFile } from "../../reports/download";
 
 const NEW_RECORDS_TABS = NEW_PLACES.Records.tabs;
 type NewRecordsTab = (typeof NEW_RECORDS_TABS)[number];
@@ -84,7 +86,10 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
   const [auditView] = useState(() => recordsAuditView(tab));
   const [documents] = useState(() => parseDocumentLink(tab?.replace(/^[^?]*/, "Reports")));
   const [active, setActive] = useReportedTab<NewRecordsTab>(() => offeredTab(tab, tabs, "Inspection readiness"));
-  return (
+  const { isTrial } = useWorkspace();
+  const story = useShortStory(!!isTrial);
+  const finished = story.data?.available && story.data.steps[3]?.done ? story.data.complaint : null;
+  const all = (
     <Tabs tabs={tabs} active={active} onChange={setActive} label="Record sections">
       {active === "Inspection readiness" && <InspectionChecks />}
       {active === "Documents" && (
@@ -105,6 +110,63 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
       )}
       {active === "Exports" && <Exports />}
     </Tabs>
+  );
+  // The record of the work just finished leads, with its Download; every other record sits behind "All records"
+  // (0.10.72, B6). With nothing just finished, Records opens as before.
+  if (!finished) return all;
+  return (
+    <>
+      <LatestRecord complaintId={finished.id} reference={finished.ref} />
+      <details className="uw-more" open={!!tab}>
+        <summary>
+          All records: inspection readiness, documents, decision records, audit trail, signatures, exports
+        </summary>
+        {all}
+      </details>
+    </>
+  );
+}
+
+/** The intake decision summary just finished on the sample event: its record to download, or to open and print. */
+export function LatestRecord({ complaintId, reference }: { complaintId: string; reference: string }) {
+  const { open, startStory } = useWorkspace();
+  const canExport = useCan("data.export");
+  const [error, setError] = useState("");
+  return (
+    <Panel eyebrow="The work you just finished" title={`Intake decision summary · ${reference}`}>
+      <p className="ac-muted">
+        The route, the fact it rests on, the open question, the service work, the market assessments still open with
+        their deadlines, and who prepared, may approve and approved. Its decision record lists what was signed, with its
+        fingerprint.
+      </p>
+      <div className="ca-action-row">
+        {canExport && (
+          <button
+            type="button"
+            className="ac-primary"
+            onClick={() =>
+              void downloadFile(`${eventPath(complaintId)}/decision-record.pdf`, {
+                fallbackName: `mdarix-event-record-${reference}.pdf`,
+              }).catch((reason) => setError(errorText(reason, "The record could not be downloaded.")))
+            }
+          >
+            Download the decision record (PDF)
+          </button>
+        )}
+        <button
+          type="button"
+          className={canExport ? "ac-secondary" : "ac-primary"}
+          onClick={() => {
+            // The summary leads the complaint's page while the short story is on.
+            startStory?.("short");
+            open("Complaint", `Summary?ref=${encodeURIComponent(reference)}`);
+          }}
+        >
+          Open the summary to print
+        </button>
+      </div>
+      <InlineError text={error} />
+    </Panel>
   );
 }
 

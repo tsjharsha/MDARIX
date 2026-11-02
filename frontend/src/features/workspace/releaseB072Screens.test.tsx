@@ -174,3 +174,45 @@ describe("B5: Trends leads with one sentence per rising group", () => {
     expect(html).toContain("Results allow for the 2 groups assessed.");
   });
 });
+
+const { NewRecordsSection } = await import("./sections/Records");
+
+describe("B6: Records leads with the record of the work just finished", () => {
+  const records = (done: boolean) => {
+    resources.data = {
+      [SHORT_STORY_PATH]: {
+        available: true,
+        current: done ? 4 : 2,
+        finished: done,
+        started: true,
+        complaint: { id: "c1", ref: "SAMPLE-RV-11" },
+        steps: [1, 2, 3, 4].map((n) => ({ key: `s${n}`, label: `Step ${n}`, done: done || n < 3, done_at: null })),
+      },
+    };
+    return renderToStaticMarkup(
+      <WorkspaceContext.Provider
+        value={
+          {
+            ...api(["data.export"]),
+            session: { allowed_menu: ["home"], business_permissions: ["data.export"] },
+          } as never
+        }
+      >
+        <NewRecordsSection />
+      </WorkspaceContext.Provider>,
+    );
+  };
+  it("leads with the intake decision summary and its Download; every other record behind All records", () => {
+    const html = records(true);
+    const lead = html.indexOf("Intake decision summary · SAMPLE-RV-11");
+    expect(lead).toBeGreaterThan(-1);
+    expect(html).toContain("Download the decision record (PDF)");
+    expect(html.indexOf("<summary>All records: ")).toBeGreaterThan(lead);
+    expect(html.indexOf("Inspection readiness")).toBeGreaterThan(html.indexOf("<summary>All records: "));
+  });
+  it("opens as before while nothing is finished", () => {
+    const html = records(false);
+    expect(html).not.toContain("The work you just finished");
+    expect(html).not.toContain("<summary>All records: ");
+  });
+});
