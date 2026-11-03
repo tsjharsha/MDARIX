@@ -278,10 +278,11 @@ describe("a report's page: the record page's shape, the status path and the rail
     );
     for (const label of RSTAGES) expect(html).toContain(label);
     expect(html).toContain("22 of 24 mandatory fields");
-    expect(html).toContain("Show only missing");
-    expect(html).toContain("Fill the 2 missing mandatory fields");
+    // 0.10.83 (D2.7): what is missing comes first, grouped by who knows it; the count is said once.
+    expect(html).toContain("1 thing to give (1 field)");
+    expect(html).toContain("Give what is missing");
     expect(html).toMatch(/<button type="button" class="ac-secondary" disabled="" aria-describedby="rp-why-send">/);
-    expect(html).toContain('id="rp-why-send">2 mandatory fields missing');
+    expect(html).toContain('id="rp-why-send">Send for approval opens when every mandatory field is filled.');
     expect(html).not.toContain("Generate the PDF");
     // Each field says where its value comes from.
     expect(html).toContain("From the complaint record");

@@ -662,3 +662,60 @@
     text-decoration: none;
   }
 }
+
+/* The report page's body (D2.7): what is missing, by who knows it; the full report folds away meanwhile. */
+.rp-main {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.rp-give {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border-top: 4px solid var(--ms-warn-fill, var(--ms-warn));
+}
+.rp-give-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+.rp-give-head h2 {
+  margin: 0;
+  font-size: var(--ms-fs-20);
+}
+.rp-give-group h3 {
+  margin: 0 0 6px;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.rp-once .uw-rp-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rp-fold > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.rp-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.rp-once input {
+  flex: 1 1 160px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--ms-line-control);
+  border-radius: var(--ms-radius-sm);
+  font: inherit;
+}
+/* In the list of what is missing, every row is missing: no badge or empty value repeats it. */
+.rp-give .uw-rp-field-head .ac-badge.tone-critical,
+.rp-give .uw-rp-value.empty {
+  display: none;
+}

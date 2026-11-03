@@ -145,3 +145,52 @@ def test_each_markets_tree_names_its_form_and_where_foreign_reporting_may_also_a
     }
     assert trees["US"]["foreign"].startswith("FDA reporting can cover events outside the US")
     assert all(tree["foreign"] for tree in trees.values())
+
+
+# --------------------------------------------------------------------------------------------- D2.7
+
+
+@pytest.mark.unit
+def test_each_report_field_says_who_knows_it_and_whether_it_is_entered_once():
+    from backend.app.authority_reports import worksheet
+
+    assert worksheet.scope_of("us_product_code") == worksheet.PRODUCT and worksheet.once_of("us_product_code")
+    assert worksheet.scope_of("us_manufacturer") == worksheet.ORGANIZATION and worksheet.once_of("us_manufacturer")
+    assert worksheet.scope_of("lot") == worksheet.EVENT and not worksheet.once_of("lot")
+    # A brand name comes from the product's own name: the product's, but never typed here.
+    assert worksheet.scope_of("brand_name") == worksheet.PRODUCT and not worksheet.once_of("brand_name")
+
+
+@pytest.mark.db
+def test_a_products_fact_is_entered_once_and_reused_on_every_report_of_that_product():
+    from tests.test_free_trial import _approved_trial_client
+    from tests.test_release_c3_0_10_75 import REPORTS, _flagship, _purge, _reports, _sign_us
+    import uuid as _uuid
+
+    user, approval, _ = _approved_trial_client()
+    try:
+        complaint = _flagship(user)
+        assert _sign_us(user, complaint, "REPORTABLE").status_code == 200
+        (report,) = _reports(user, complaint)
+        detail = user.get(f"{REPORTS}/{report['id']}").json()
+        fields = {item["id"]: item for section in detail["sections"] for item in section["fields"]}
+        assert {item["scope"] for item in fields.values()} == {"PRODUCT", "ORGANIZATION", "EVENT"}
+        once = [fields[key] for key in detail["mandatory"]["missing"] if fields[key]["once"]]
+        assert once, [(key, fields[key]["label"]) for key in detail["mandatory"]["missing"]]
+        values = {item["id"]: "Sample value 1" for item in once if item["once_key"] != "US_REGISTRATION"}
+        pair = [item["id"] for item in once if item["once_key"] == "US_REGISTRATION"]
+        refused = user.put(f"{REPORTS}/{report['id']}/once", json={"values": {"B5": "x"}})
+        assert refused.status_code == 422 and refused.json()["detail"]["code"] == "NOT_ENTERED_ONCE"
+        if pair:
+            half = user.put(f"{REPORTS}/{report['id']}/once", json={"values": {pair[0]: "DQA"}})
+            assert half.status_code == 422, half.text
+        saved = user.put(f"{REPORTS}/{report['id']}/once", json={"values": values})
+        assert saved.status_code == 200, saved.text
+        after = {item["id"]: item for section in saved.json()["sections"] for item in section["fields"]}
+        for field_id in values:
+            assert after[field_id]["value"] and after[field_id]["status"] == "FROM_RECORD", after[field_id]
+        # Never overwritten from a report: the product holds it now.
+        again = user.put(f"{REPORTS}/{report['id']}/once", json={"values": values})
+        assert again.status_code in (409, 422), again.text
+    finally:
+        _purge(_uuid.UUID(approval["tenant_id"]))

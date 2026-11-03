@@ -8,6 +8,9 @@ import { DecisionTreesSection } from "./sections/DecisionTrees";
 import { firstComplaint, groupClause } from "./sections/TreeAnswer";
 import { conclusionOf, signItems } from "./sections/TreeSign";
 import { guideChanges } from "./sections/TreeEdit";
+import { thingsToGive } from "./sections/ReportBody";
+import { ReportsSection } from "./sections/ReportsTab";
+import type { ReportDetail, WorksheetField } from "./authorityReports";
 import { GUIDES, type GuideVersion } from "./decisionGuides";
 import {
   foldedRuns,
@@ -559,5 +562,127 @@ describe("D2.6: Edit this tree on the same tab", () => {
       "Q1 · your explanation",
       "Extra question · added, never changes the conclusion",
     ]);
+  });
+});
+
+const wf = (id: string, number: string, label: string, over: Partial<WorksheetField> = {}): WorksheetField => ({
+  id,
+  number,
+  label,
+  value: null,
+  status: "MUST_HAVE",
+  status_label: "Missing: must have before submission",
+  source: null,
+  personal: null,
+  missing_class: "MUST_HAVE",
+  editable: true,
+  note: null,
+  by: null,
+  at: null,
+  scope: "EVENT",
+  once: false,
+  ...over,
+});
+
+const REPORT = {
+  id: "r1",
+  kind: "INITIAL",
+  complaint: {
+    id: "c-rv11",
+    ref: "SAMPLE-RV-11",
+    complaint_identifier: "SAMPLE-RV-11",
+    product_name: "PulseWatch 410",
+    version: "Rev A",
+    country: "US",
+    description: "",
+    aware_date: null,
+    sample: true,
+  },
+  market: "US",
+  market_label: "United States (FDA)",
+  form: {
+    code: "FDA_3500A",
+    title: "Form FDA 3500A worksheet (eMDR)",
+    version: "09/2025",
+    authority: "FDA",
+    source_document: "",
+    clauses: [{ id: "CFR803_50", short: "21 CFR 803.50", title: "" }],
+  },
+  routes: [],
+  state: "DRAFT",
+  state_label: "Draft",
+  next_step: "",
+  steps: [],
+  stage: "CREATED",
+  stage_label: "Created from the decision tree",
+  stages: [],
+  mandatory: { total: 19, filled: 15, missing: ["D2A", "G4", "D3", "B4"] },
+  preparers: ["Asha Menon"],
+  deadline: {},
+  assessment: null,
+  case: null,
+  sections: [
+    {
+      code: "D",
+      title: "D. Suspect medical device",
+      note: null,
+      fields: [
+        wf("D1", "D1", "Brand name", { status: "FROM_RECORD", value: "PulseWatch 410", scope: "PRODUCT" }),
+        wf("D2A", "D2a", "Procode", { scope: "PRODUCT", once: true, once_key: "US_REGISTRATION" }),
+        wf("D3", "D3", "Manufacturer name", { scope: "ORGANIZATION", once: true, once_key: "D3" }),
+      ],
+    },
+    {
+      code: "G",
+      title: "G. Manufacturer",
+      note: null,
+      fields: [wf("G4", "G4", "PMA/510(k) #", { scope: "PRODUCT", once: true, once_key: "US_REGISTRATION" })],
+    },
+    { code: "B", title: "B. Event", note: null, fields: [wf("B4", "B4", "Date of this report", { kind: "DATE" })] },
+  ],
+  counts: {},
+  status_labels: {},
+  editable: true,
+  snapshots: [],
+  pending_snapshot: null,
+  cannot_approve: [],
+  approval: { may_approve: false, same_person: false, approvers: ["Rahul Iyer"], message: null },
+  submissions: [],
+  request: null,
+  parent_id: null,
+  responses: [],
+  note: null,
+  follow_up_due_on: null,
+  starter_mark: "",
+  practice_label: null,
+  never_submits: "",
+  sample: true,
+} as unknown as ReportDetail;
+
+describe("D2.7: the report page body", () => {
+  it("counts the things to give and their fields, grouped by who knows them; a registration's two fields are one", () => {
+    const give = thingsToGive(REPORT);
+    expect([give.things, give.fields]).toEqual([3, 4]);
+    expect(give.groups.map((group) => group.title)).toEqual([
+      "Your product · enter once",
+      "Your organization · enter once",
+      "This event",
+    ]);
+    expect(give.groups[0].things[0].map((item) => item.id)).toEqual(["D2A", "G4"]);
+  });
+
+  it("asks each thing once, names its form box and rule, and folds the full report while anything is missing", () => {
+    resources.data = { [`/api/v1/reports/r1`]: REPORT };
+    const html = render(<ReportsSection />, api(undefined, "regulatory", "?report=r1"));
+    expect(html).toContain("3 things to give (4 fields)");
+    expect(html).toContain("Form FDA 3500A (eMDR) · 21 CFR 803.50");
+    expect(html).toContain("D2a · G4");
+    expect(html).toContain("Save for PulseWatch 410");
+    expect(html).toContain("Entered once for PulseWatch 410: used on every report for that product.");
+    expect(html).toContain("Save for your organization");
+    expect(html).toMatch(/<details class="uw-card uw-rec-main rp-fold" aria-label="The form&#x27;s fields"><summary/);
+    expect(html).toContain("The report, in the form&#x27;s order");
+    // The field count appears once.
+    expect(html.split("of 19 mandatory").length - 1).toBe(1);
   });
 });
