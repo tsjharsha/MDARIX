@@ -447,7 +447,9 @@ def _with_complaints(db: Session, tenant_id, items: list[dict]) -> None:
             continue
         item["ref"] = row.complaint_identifier
         item["product"] = item["product"] or names.get(row.product_id)
-        item["market"] = item["market"] or markets.market_of(row.country)
+        # A complaint that needs a fact runs no market's real clock yet (0.10.81, ":facts"): it names none.
+        if not item["key"].endswith(":facts"):
+            item["market"] = item["market"] or markets.market_of(row.country)
 
 
 def due_items(db: Session, control_db: Session | None, tenant_id, now: datetime | None = None) -> list[dict]:

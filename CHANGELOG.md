@@ -110,7 +110,7 @@ history's 180 days, so F8 does not move them).
 
 ### Tests
 
-- pytest `tests/test_release_0_10_81.py` (new, 14), `tests/test_market_assessment_rules.py` (F2),
+- pytest `tests/test_release_0_10_81.py` (new, 15), `tests/test_market_assessment_rules.py` (F2),
   `tests/test_signal_trend_rules.py` (F8); updated: `test_release_c3_0_10_75.py`, `test_release_c4_0_10_76.py`,
   `test_release_c5_0_10_77.py`, `test_approval_told_api.py` (fields filled by kind: `tests/report_fill.py`),
   `test_free_trial.py` (8 windows), `test_trial_import_reports.py` (row flags).

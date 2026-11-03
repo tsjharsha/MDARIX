@@ -186,7 +186,14 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
               <DeadlineChip
                 key={item.key}
                 item={item}
-                prefix={LEGAL.includes(item.category) && item.market ? marketLabel(item.market) : item.category_label}
+                prefix={
+                  // A clock waiting for the country or the awareness date is never shown as a real deadline (0.10.81).
+                  item.key.endsWith(":facts")
+                    ? `${item.category_label}, provisional`
+                    : LEGAL.includes(item.category) && item.market
+                      ? marketLabel(item.market)
+                      : item.category_label
+                }
               />
             ))}
             <ToneBadge tone={EVENT_TONES[view.state]} label={view.state_label} />

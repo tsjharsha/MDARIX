@@ -383,7 +383,8 @@ def complaint_work(db, control_db, tenant_id, complaints: list) -> dict[str, dic
         # A market not assessed yet runs the reportability watch's provisional clock, which Oversight does not list
         # (it lists a market's clock once its assessment is started): shown here, so the page says what the watch says.
         dated = {view["market"] for view in mine if view["category"] in ("REPORTING", "OBLIGATION")}
-        mine += [clock for clock in clocks.get(key, []) if clock["market"] not in dated]
+        listed = {view["key"] for view in mine}
+        mine += [clock for clock in clocks.get(key, []) if clock["market"] not in dated and clock["key"] not in listed]
         mine.sort(key=lambda view: view["due_at"])
         own = markets.market_of(complaint.country)
         out[key] = {
@@ -419,7 +420,7 @@ def complaint_work(db, control_db, tenant_id, complaints: list) -> dict[str, dic
 def _watch_clocks(db, control_db, tenant_id, ids: set[str] | None, now, reminder_hours: int) -> dict[str, list[dict]]:
     """The reportability watch's running clock of each complaint (its binding deadline), as a dated item (``ids``:
     these complaints only; None: every one)."""
-    from backend.app.reportability import markets
+    from backend.app.reportability import facts, markets
     from backend.app.reportability import service as reportability
 
     out: dict[str, list[dict]] = {}
@@ -428,14 +429,19 @@ def _watch_clocks(db, control_db, tenant_id, ids: set[str] | None, now, reminder
         if (ids is not None and str(item["id"]) not in ids) or not binding or not binding.get("due_at"):
             continue
         due_at = datetime.fromisoformat(binding["due_at"])
-        market = binding.get("market")
+        needs = item.get("needs") or []
+        # A complaint that needs its country or awareness date has no market's real clock yet (0.10.81, F3, F4): one
+        # provisional line that says what to enter, as Home's (oversight/service.py _watch_items).
+        market = None if needs else binding.get("market")
         state = rules.state_of(due_at, now, reminder_hours)
         out.setdefault(str(item["id"]), []).append(
             {
-                "key": f"watch:{item['id']}:{market}",
+                "key": f"watch:{item['id']}:{'facts' if needs else market}",
                 "category": "REPORTING",
                 "category_label": rules.CATEGORIES["REPORTING"],
-                "title": f"{markets.MARKET_LABELS.get(market, market)}: not assessed yet, provisional deadline",
+                "title": f"Enter {facts.labels(needs)}: needed for the reporting clocks (provisional deadline)"
+                if needs
+                else f"{markets.MARKET_LABELS.get(market, market)}: not assessed yet, provisional deadline",
                 "market": market,
                 "due_at": due_at.isoformat(),
                 "due_label": binding.get("due_label"),

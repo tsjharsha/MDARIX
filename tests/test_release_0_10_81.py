@@ -15,6 +15,7 @@
 - The refresh (open_deadlines.py) lists and updates the open reports and draft assessments the fixed rules change.
 - Navigation M6: an imported record is never marked sample.
 - Navigation M7: the complaint page's report step opens the report page.
+- F4 (page): a complaint without its awareness date shows one provisional reporting line, never a market deadline.
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -504,3 +505,17 @@ def test_navigation_m7_the_complete_the_report_step_opens_the_report_page(trial)
     event = _ok(user.get(f"/api/v1/oversight/events/{ref}"))
     (step,) = [item for item in event["checklist"] if item["code"] == "OBLIGATIONS"]
     assert step["result"] == "BLOCKED" and step["opens"]["target"]["record"] == {"kind": "report", "id": report["id"]}
+
+
+def test_f4_the_complaint_page_shows_no_market_deadline_for_a_complaint_without_its_awareness_date(trial):
+    user = trial["user"]
+    _import(
+        user,
+        "complaint_id,product_id,description,event_date,received_date,awareness_date,country,patient_involved,"
+        "serious_injury,death,malfunction\n"
+        "F4-2,F4-PUMP,Patient died; reported to us in August.,,,,US,Y,N,Y,Y\n",
+    )
+    due = _ok(user.get("/api/v1/oversight/events/F4-2"))["work"]["due"]
+    reporting = [item for item in due if item["category"] == "REPORTING"]
+    assert len(reporting) == 1 and reporting[0]["market"] is None and reporting[0]["key"].endswith(":facts")
+    assert reporting[0]["title"].startswith("Enter the awareness date")
