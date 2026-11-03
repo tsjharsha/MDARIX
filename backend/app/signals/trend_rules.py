@@ -130,10 +130,12 @@ def unit_days(lots, start, end, use_days: int | None = None) -> float | None:
 
 
 def history_days(version_age_days: int | None) -> int:
-    """How many days before the recent window count as history: up to HISTORY_DAYS, never before the release."""
+    """How many days before the recent window count as history: up to HISTORY_DAYS, never before the release. The
+    release day is day 0 of the age and is history too (0.10.81, F8: it was left out), as the recent window counts it
+    (S3: ``age + 1``)."""
     if version_age_days is None:
         return HISTORY_DAYS
-    return max(0, min(HISTORY_DAYS, version_age_days - RECENT_DAYS))
+    return max(0, min(HISTORY_DAYS, version_age_days + 1 - RECENT_DAYS))
 
 
 # Words that mark a single-use or consumable product (its name, family, GMDN term or description): its units are used
