@@ -10,6 +10,58 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.86] - 2026-11-04
+
+On the trial maintenance line (`release/0.10`): a reliability release from an external code review of 0.10.84. No
+migration. The API, worker and scheduler images change, and the web image (the communications log's pages, the
+Platform Admin retention lines). Operator steps: the scheduler runs one new job, `signature-settlement`; CI prepares
+the pinned embedding model before the tests (`scripts/prepare_embedding_cache.py`).
+
+### Fixed: nothing open falls behind a list's limit
+
+- **The communications log shows every overdue and open request, however old.** It read the newest 500 entries and
+  then put overdue ones first, so in a longer log an old overdue request vanished from the screen and from the counts.
+  The log is now ordered overdue, open, then the rest in the database, one page at a time ("Entries 1–200 of 512",
+  Newer and Older), and its open, overdue, unresolved and S4 numbers count the whole log.
+- **The same fix where something waiting could be cut off:** the first-contact list (calls waiting to be signed, pending
+  or waiting for QA review), the complaints waiting for a disposition, the dated reports and CAPAs on Due dates, and on
+  the Platform Admin side pending early-exit requests and open pilot requests.
+
+### Fixed: the row allowance holds when two imports run at once
+
+- Two imports at the same moment could each count the same rows left and together go past the free trial's 5,000
+  rows. Imports into one organization now take turns for the allowance; other organizations never wait.
+
+### Fixed: one deletion date everywhere
+
+- The trial status (Getting started), the trial-ended page, the trial e-mails, the Platform Admin trials overview, the
+  trial requests queue and the pilot requests now give the same date: 30 days after the trial (or its grace
+  extension) ends, later while a request to move the data is open. Before, the requests queue ignored grace and holds
+  and the trial-ended page ignored the hold.
+- **Under a legal hold no date is given** ("no date while a legal hold applies"); nothing is deleted until the hold is
+  lifted. The deletion job checks each trial again just before deleting it.
+
+### Fixed: signing on a dedicated data plane cannot leave half a signature
+
+- When an organization's records are in their own database, a signature could be saved without the record it signs
+  (or "signed" written in the audit trail) if the second save failed. Signing now saves the record first with a
+  receipt, then completes the signature; an interrupted signing is completed, or undone with
+  `SIGNATURE_ABANDONED` in the audit trail, by the new `signature-settlement` job (every 10 minutes) or the next read.
+  A signature being completed is never shown as valid. Retrying the same decision returns the decision already
+  signed, after the password and code are checked again. Organizations on the shared plane are unchanged.
+
+### Fixed: the sample
+
+- The sample hospital request's late call now counts as recorded outside MDARIX on every weekday (on some days it
+  counted as inside, and the log showed no late message). New trials only.
+
+### Tests and checks
+
+- `unit` tests need no database (`MDARIX_TEST_NO_DATABASE=1 pytest -m unit`), and no test is both `unit` and `db`.
+- The local embedding model is never downloaded at run time; tests that need it are marked `model` and skip, saying
+  why, without it (`MDARIX_REQUIRE_LOCAL_MODEL=1` makes them required, as in CI).
+- `ruff check`, `ruff format --check`, `prettier --check` and the frontend lint pass on the whole repository.
+
 ## [0.10.84] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): the fixes from the independent rating of rounds D1 (0.10.82) and D2
