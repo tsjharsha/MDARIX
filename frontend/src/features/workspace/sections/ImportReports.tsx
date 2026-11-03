@@ -1103,9 +1103,11 @@ export function ResponsibleParties() {
         </p>
       )}
       {canEdit && !adding && (
-        <button type="button" className="ac-secondary" onClick={() => setAdding(true)}>
-          Set a responsible party
-        </button>
+        <div className="ca-action-row">
+          <button type="button" className="ac-secondary" onClick={() => setAdding(true)}>
+            Set a responsible party
+          </button>
+        </div>
       )}
       {adding && (
         <form className="uw-identity-form" onSubmit={save}>
