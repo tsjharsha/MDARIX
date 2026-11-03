@@ -325,6 +325,18 @@ const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
   },
 };
 
+/** The new navigation's page headings (0.10.82, U-15, the approved design): the question each page answers. */
+export const NEW_HEADS: Partial<Record<WorkspaceSection, string>> = {
+  Complaints: "What needs you first?",
+  "Decision trees": "Is it reportable, and by when?",
+  Reports: "Which authority reports are due?",
+  Investigations: "Why is it happening?",
+  Trends: "Is a product problem rising?",
+  Records: "What did you finish last?",
+  Team: "Who works on your trial?",
+  "Import your data": "Bring your own complaints in",
+};
+
 /** Under the MVP feature set Records and My Work also hold what the parked sections did (app/featureSet.ts). */
 const MVP_NAV: Partial<Record<WorkspaceSection, { description: string; guide: string }>> = {
   "My Work": {
@@ -921,18 +933,31 @@ export function UserWorkspace({
             ) : (
               <>
                 {/* One complaint's page has its own header (sections/ComplaintPage.tsx); so has Home (0.10.73). */}
-                {section !== "Complaint" && !(fresh && section === "My Work") && (
-                  <div className="ac-page-head">
-                    <div>
-                      <p className="ac-eyebrow">{tenantName}</p>
-                      <h1 ref={heading} tabIndex={-1}>
-                        {placeLabel(section, navigation)}
-                      </h1>
-                      <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
-                      <p className="ac-page-zone">Times are in {zoneName()}.</p>
+                {section !== "Complaint" &&
+                  !(fresh && (section === "My Work" || (section === "Getting started" && trial?.is_trial))) && (
+                    <div className="ac-page-head">
+                      {fresh ? (
+                        // The new navigation (0.10.82, U-15): the section as eyebrow, the question as heading; the
+                        // time zone is said once, in Home's date line (every deadline names its own zone).
+                        <div>
+                          <p className="ac-eyebrow">{placeLabel(section, navigation)}</p>
+                          <h1 ref={heading} tabIndex={-1}>
+                            {NEW_HEADS[section] ?? placeLabel(section, navigation)}
+                          </h1>
+                          <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="ac-eyebrow">{tenantName}</p>
+                          <h1 ref={heading} tabIndex={-1}>
+                            {placeLabel(section, navigation)}
+                          </h1>
+                          <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
+                          <p className="ac-page-zone">Times are in {zoneName()}.</p>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  )}
                 {NAV[section].context &&
                   (!fresh || section === "Investigations" || section === "Trends") &&
                   (navigation === "new" ? (
@@ -970,7 +995,7 @@ export function UserWorkspace({
                 <ColumnScopeProvider key={location.key} scope={columnScopeFor(section)}>
                   <SectionErrorBoundary name={section} resetKey={location.key}>
                     <div className="ca-section">
-                      {section === "Getting started" && <GettingStartedSection focus={tab} />}
+                      {section === "Getting started" && <GettingStartedSection focus={tab} heading={heading} />}
                       {section === "Readiness" && <ReadinessSection tab={tab} />}
                       {section === "Dashboard" && <DashboardSection />}
                       {section === "My Work" &&

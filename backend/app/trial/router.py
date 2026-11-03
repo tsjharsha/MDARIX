@@ -505,6 +505,54 @@ def mark_short_story(
     return story.progress(data, db, tenant_id, me, request)
 
 
+# ------------------------------------------------------------------------- One story, ten steps (0.10.82, D1)
+
+
+@router.get("/trial/one-story")
+def one_story(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The ten-step story for this person, on the sample and on the trial's own most urgent imported complaint, each
+    step done from what was saved on the record (backend/app/trial/one_story.py)."""
+    from backend.app.trial import one_story as story
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    request = team.trial_request(db, tenant_id)
+    if request is None:
+        return {"sample": None, "yours": None}
+    return story.progress(data, db, ctx, tenant_id, request)
+
+
+class OneStoryMark(BaseModel):
+    run: str = Field(pattern="^(sample|yours)$")
+    step: str = Field(pattern="^(call|form|records|trends)$")
+
+
+@router.post("/trial/one-story/marks")
+def mark_one_story(
+    payload: OneStoryMark,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The person opened a step's screen from the story (the call, the report, Records, Trends): their own mark, kept
+    on the trial's request. No business record changes."""
+    from backend.app.trial import one_story as story
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    request = db.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).with_for_update().first()
+    complaint = story.subject(data, db, tenant_id, payload.run)
+    if request is None or complaint is None:
+        raise HTTPException(404, detail={"code": "NO_STORY_COMPLAINT", "message": "This story has no complaint yet"})
+    story.record_mark(request, str(ctx.user_id), payload.run, complaint.id, payload.step, datetime.now(timezone.utc))
+    db.commit()
+    return story.progress(data, db, ctx, tenant_id, request)
+
+
 class TrialFocus(BaseModel):
     """What the organization was cited for (backend/app/trial/citations.py codes)."""
 

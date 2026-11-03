@@ -1,0 +1,128 @@
+// 0.10.82, round D1 "One story" of the approved redesign: what shows on screen.
+import { renderToStaticMarkup } from "react-dom/server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
+import { runOf, shownRun, stepBlocker, stepPlace, type OneStory, type StoryRun } from "./oneStory";
+import { StoryView } from "./sections/OneStory";
+import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
+import type { TrendItem } from "./signalAi";
+
+const LABELS = ["The call", "Triage", "Tree", "Reportable?", "Form", "Fill", "Approval", "Submit", "Records", "Trends"];
+export const runAt = (run: "sample" | "yours", current: number, extra: Partial<StoryRun> = {}): StoryRun => ({
+  run,
+  complaint: {
+    id: `${run}-id`,
+    ref: run === "sample" ? "SAMPLE-RV-11" : "OS-1002",
+    description: run === "sample" ? "Its SpO2 read 4 to 6 points high." : "The casing burned the child's hand.",
+    product_id: run === "sample" ? "pulse" : "neb",
+    serious_injury: run === "yours",
+    death: false,
+  },
+  market: run === "sample" ? "US" : null,
+  market_label: run === "sample" ? "United States (FDA)" : null,
+  conclusion: null,
+  report_id: null,
+  report_stage: null,
+  needs: [],
+  steps: LABELS.map((label, index) => ({ key: label, label, done: index < current, skipped: false })),
+  current,
+  finished: current >= 10,
+  ...extra,
+});
+
+export const workspace = (extra: Partial<WorkspaceApi> = {}) =>
+  ({
+    session: { business_permissions: [], persona: "admin", current_tenant: { tenant_name: "Test" } },
+    persona: "admin",
+    open: vi.fn(),
+    notify: vi.fn(),
+    work: {},
+    dataSource: SAMPLE_SOURCE,
+    ...extra,
+  }) as unknown as WorkspaceApi;
+
+const stubWindow = () =>
+  vi.stubGlobal("window", {
+    location: { pathname: "/app/getting-started", search: "", hash: "", origin: "https://mdarix.test" },
+    localStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+    sessionStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+  });
+
+const trend = (name: string, product: string, recent: number, expected: number, result: string) =>
+  ({ key: name, name, product: { id: product }, recent, expected, ratio: recent / expected, result }) as TrendItem;
+
+describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
+  beforeEach(stubWindow);
+  afterEach(() => vi.unstubAllGlobals());
+  const view = (story: OneStory, extra: Partial<WorkspaceApi> = {}, trends: TrendItem[] = []) =>
+    renderToStaticMarkup(
+      <WorkspaceContext.Provider value={workspace(extra)}>
+        <StoryView story={story} trends={trends} />
+      </WorkspaceContext.Provider>,
+    );
+
+  it("has one hero, one ten-step rail with its Sample label and one main button", () => {
+    const html = view({ sample: runAt("sample", 2), yours: null });
+    expect(html.match(/<h1/g)).toHaveLength(1);
+    expect(html).toContain("One complaint, from the first call to the signed report");
+    expect(html.match(/class="uw-os-step/g)).toHaveLength(10);
+    expect(html).toContain(">Sample<");
+    expect(html).toContain("2 of 10 done");
+    // The step card is the next step from the saved record, and has exactly one main button.
+    expect(html).toContain("Step 3 of 10 · SAMPLE-RV-11");
+    expect(html.match(/ac-primary/g)).toHaveLength(1);
+    expect(html).toContain("Open the decision tree");
+    // One-word labels on the rail.
+    for (const label of LABELS) expect(html).toContain(`>${label.replace("?", "?")}<`);
+  });
+
+  it("after the sample's tenth step offers the same ten steps on your data", () => {
+    const html = view({ sample: runAt("sample", 10), yours: runAt("yours", 0) });
+    expect(html).toContain("The sample story is complete");
+    expect(html).toContain("Do the same with your data");
+    // The data switch on Your data shows that run, its label and its most urgent complaint.
+    const yours = view({ sample: runAt("sample", 10), yours: runAt("yours", 0) }, { dataSource: IMPORTED_SOURCE });
+    expect(yours).toContain(">Your data<");
+    expect(yours).toContain("Your most urgent complaint: OS-1002");
+  });
+
+  it("says which fact the import lacks, and opens the complaint page where it is asked", () => {
+    const run = runAt("yours", 2, {
+      needs: [{ fact: "COUNTRY", label: "Incident country", message: "", rule: "" }],
+    });
+    expect(stepBlocker(run, 2)).toContain("no incident country for OS-1002");
+    expect(stepPlace(run, 2)).toEqual({ section: "Complaint", tab: "Summary?ref=OS-1002" });
+    const html = view({ sample: null, yours: run });
+    expect(html).toContain("The complaint page asks for it");
+    expect(html).toContain("Open OS-1002");
+  });
+
+  it("opens each step's real screen with the record in place", () => {
+    const run = runAt("sample", 4, { report_id: "r1" });
+    expect(stepPlace(run, 0).tab).toBe("Summary?ref=SAMPLE-RV-11");
+    expect(stepPlace(run, 2)).toEqual({ section: "Decision trees", tab: "?market=US&complaint=sample-id" });
+    expect(stepPlace(run, 5)).toEqual({ section: "Reports", tab: "?report=r1" });
+    expect(stepPlace(run, 8)).toEqual({ section: "Records" });
+    expect(stepPlace(run, 9).tab).toBe("Trend check?product=SAMPLE-ORBIT-300");
+    // Before the report exists, its steps open the tree, where signing "reportable" creates it.
+    expect(stepPlace(runAt("sample", 4), 5).section).toBe("Decision trees");
+  });
+
+  it("ends the sample on the OrbitCare rise, with the story's own product shown first", () => {
+    const html = view({ sample: runAt("sample", 9), yours: null }, {}, [
+      trend("OrbitCare 300 Rev B", "orbit", 9, 0.97, "SIGNIFICANT"),
+      trend("PulseWatch 410 Rev A", "pulse", 1, 1.2, "STEADY"),
+    ]);
+    expect(html.indexOf("PulseWatch 410 Rev A")).toBeLessThan(html.lastIndexOf("OrbitCare 300 Rev B"));
+    expect(html).toContain("OrbitCare 300 Rev B · 9.3×");
+    expect(html).toContain("Open the OrbitCare 300 trend");
+  });
+
+  it("finds the story's run by its complaint, and shows the sample unless Your data is chosen", () => {
+    const story = { sample: runAt("sample", 1), yours: runAt("yours", 0) };
+    expect(runOf(story, "OS-1002")?.run).toBe("yours");
+    expect(runOf(story, "SAMPLE-RV-07")).toBeNull();
+    expect(shownRun(story, SAMPLE_SOURCE)?.run).toBe("sample");
+    expect(shownRun({ sample: null, yours: story.yours }, SAMPLE_SOURCE)?.run).toBe("yours");
+  });
+});

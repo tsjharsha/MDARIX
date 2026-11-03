@@ -7688,3 +7688,373 @@ button.uw-org:hover {
 .uw-facts > button {
   justify-self: start;
 }
+
+/* ---------------------------------------------------------------- One story, ten steps (0.10.82, round D1) */
+/* Getting started's hero (the approved mock-up's .shero): navy, one h1, one rail of ten chevrons, one step card. */
+.uw-os {
+  display: grid;
+  gap: var(--ms-space-4);
+  padding: 28px 30px 24px;
+  border-radius: var(--ms-radius);
+  background:
+    radial-gradient(1200px 400px at 85% -10%, rgba(47, 179, 173, 0.35), transparent 60%),
+    linear-gradient(150deg, var(--ms-navy) 0%, #21405c 100%);
+  color: #eaf1f7;
+  box-shadow: var(--ms-shadow-2);
+  overflow: hidden;
+}
+.uw-os .ac-eyebrow {
+  margin: 0;
+  color: #7fd6d1;
+}
+.uw-os-head {
+  display: grid;
+  gap: var(--ms-space-2);
+}
+.uw-os-head h1 {
+  margin: 0;
+  max-width: 24ch;
+  color: #fff;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.uw-os-head p,
+.uw-os-lead {
+  margin: 0;
+  max-width: 64ch;
+  color: var(--ms-on-dark-muted);
+  font-size: var(--ms-fs-16);
+}
+.uw-os-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ms-space-2);
+  margin: 0 0 -6px;
+  color: var(--ms-on-dark-muted);
+  font-size: var(--ms-fs-14);
+}
+.ms-chip.is-sample {
+  border-color: #f2c46d;
+  background: #f2c46d;
+  color: #3b2a08;
+  font-size: var(--ms-fs-12);
+}
+.ms-chip.is-yours {
+  border-color: #73d6cb;
+  background: #73d6cb;
+  color: #06201f;
+  font-size: var(--ms-fs-12);
+}
+.ms-chip.is-soon {
+  border-color: var(--ms-warn-line);
+  background: var(--ms-warn-bg);
+  color: var(--ms-warn);
+  font-size: var(--ms-fs-12);
+}
+.ms-chip.is-good {
+  border-color: var(--ms-good-line);
+  background: var(--ms-good-bg);
+  color: var(--ms-good);
+}
+.ms-chip.is-current {
+  border-color: var(--ms-teal);
+  background: var(--ms-mint);
+  color: var(--ms-teal-dark);
+}
+.uw-os-rail {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px;
+}
+.uw-os-step {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 10px 8px 10px 22px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--ms-on-dark-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+}
+.uw-os-step:first-child {
+  padding-left: 12px;
+  border-radius: 999px 0 0 999px;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+}
+.uw-os-step:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+}
+.uw-os-step.is-done {
+  background: rgba(76, 199, 193, 0.22);
+  color: #c8f0ed;
+}
+.uw-os-step.is-now {
+  background: #2fb3ad;
+  color: #06201f;
+}
+.uw-os-step.is-sel {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+}
+.uw-os-step.is-skip {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+.uw-os-k {
+  display: inline-flex;
+  margin-right: 5px;
+  font-weight: 800;
+}
+.uw-os-t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.uw-os-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: center;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.uw-os-main {
+  display: grid;
+  gap: var(--ms-space-3);
+  align-content: start;
+}
+.uw-os-main h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1.2;
+}
+.uw-os-main .uw-os-lead {
+  color: #eaf1f7;
+}
+.uw-os-state {
+  justify-self: start;
+}
+.uw-os-differ {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--ms-radius-md);
+  background: rgba(255, 255, 255, 0.08);
+  color: #eaf1f7;
+  font-size: var(--ms-fs-14);
+}
+.uw-os .ac-primary.uw-os-go {
+  border-color: #2fb3ad;
+  background: #2fb3ad;
+  color: #06201f;
+}
+.uw-os .ac-primary.uw-os-go:hover {
+  background: #4cc7c1;
+}
+.uw-os .ac-link {
+  color: #7fd6d1;
+}
+.uw-os-mini {
+  overflow: hidden;
+  border: 1px solid var(--ms-line);
+  border-radius: 12px;
+  background: var(--ms-surface);
+  color: var(--ms-ink);
+  box-shadow: var(--ms-shadow-2);
+}
+.uw-os-mini .ac-eyebrow {
+  color: var(--ms-teal-dark);
+}
+.uw-os-mini-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px;
+  background: var(--ms-navy);
+  color: var(--ms-on-dark-muted);
+  font-size: 11px;
+}
+.uw-os-mini-bar i {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+}
+.uw-os-mini-bar span {
+  margin-left: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.uw-os-mini-body {
+  display: grid;
+  gap: var(--ms-space-2);
+  padding: 14px;
+  font-size: var(--ms-fs-14);
+}
+.uw-os-quote {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--ms-mint-line);
+  background: var(--ms-subtle);
+  font-size: var(--ms-fs-14);
+  line-height: 1.5;
+}
+.uw-os-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.uw-os-lines,
+.uw-os-path {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-os-lines li::before {
+  content: "· ";
+  color: var(--ms-teal);
+  font-weight: 800;
+}
+.uw-os-path li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ms-muted);
+}
+.uw-os-path li.is-done {
+  color: var(--ms-good);
+}
+.uw-os-path li.is-now {
+  color: var(--ms-ink);
+  font-weight: 700;
+}
+.uw-os-outcome {
+  justify-self: start;
+  padding: 8px 12px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-subtle);
+  font-weight: 700;
+}
+.uw-os-outcome.is-signed {
+  border-color: var(--ms-teal);
+  background: var(--ms-mint);
+  color: var(--ms-teal-dark);
+}
+.uw-os-trend {
+  display: grid;
+  gap: 6px;
+}
+.uw-os-trend + .uw-os-trend {
+  padding-top: 10px;
+  border-top: 1px solid var(--ms-line);
+}
+/* Observed against expected, as bars (the story's finale and Home's trend card). */
+.uw-bars {
+  display: grid;
+  gap: 6px;
+}
+.uw-bar-row {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr) 44px;
+  gap: 10px;
+  align-items: center;
+  font-size: var(--ms-fs-12);
+}
+.uw-bar-row > b {
+  text-align: right;
+}
+.uw-bar-track {
+  overflow: hidden;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--ms-ground);
+}
+.uw-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ms-teal);
+}
+.uw-bar-fill.is-over {
+  background: var(--ms-crit);
+}
+.uw-bar-fill.is-muted {
+  background: var(--ms-line-control);
+}
+.uw-num {
+  font-variant-numeric: tabular-nums;
+}
+.uw-os-more {
+  margin-top: var(--ms-space-4);
+}
+/* The story on the story's own record: one slim pill, never a second progress panel (D1.5). */
+.uw-story-pill {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  border: 1px solid var(--ms-line);
+  border-radius: 999px;
+  background: var(--ms-surface);
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+}
+.uw-story-pill .ac-link {
+  padding: 2px 8px;
+}
+@media (max-width: 720px) {
+  .uw-os {
+    padding: 22px 18px 18px;
+  }
+  .uw-os-head h1 {
+    font-size: 23px;
+  }
+  .uw-os-head p {
+    display: none;
+  }
+  .uw-os-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ms-space-4);
+  }
+  .uw-os-main h2 {
+    font-size: 20px;
+  }
+  .uw-os .ac-primary.uw-os-go {
+    justify-content: center;
+    width: 100%;
+  }
+  .uw-os-rail {
+    gap: 3px;
+  }
+  .uw-os-step,
+  .uw-os-step:first-child {
+    justify-content: center;
+    min-height: 30px;
+    padding: 0;
+    border-radius: 999px;
+    clip-path: none;
+  }
+  .uw-os-t {
+    display: none;
+  }
+  .uw-os-k {
+    margin: 0;
+  }
+}
