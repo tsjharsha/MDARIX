@@ -95,7 +95,24 @@ npm.cmd --prefix frontend run build
 
 Markers are assigned automatically in `tests/conftest.py`: `unit` (no database),
 `db` (control-plane test database) and `dataplane` (also needs the four tenant
-databases; excluded by default).
+databases; excluded by default). A test is never `unit` and `db` at once. Prove the
+unit selection needs no database (every connection goes to a closed port):
+
+```powershell
+$env:MDARIX_TEST_NO_DATABASE = "1"; .\.venv\Scripts\python.exe -m pytest -m unit
+```
+
+Tests that need the local embedding model are also marked `model`. Nothing downloads
+the model at run time: it loads from a prepared cache (`MDARIX_EMBEDDING_CACHE_DIR`,
+default `.model-cache`). A worktree without one uses the main checkout's
+`.model-cache` automatically. Prepare a cache once, pinned and checksum-checked, with
+`python scripts/prepare_embedding_cache.py` (`--check` only verifies). Without the
+model the `model` tests skip and say why; the model-enabled qualification gate makes
+them required:
+
+```powershell
+$env:MDARIX_REQUIRE_LOCAL_MODEL = "1"; .\.venv\Scripts\python.exe -m pytest -m model
+```
 
 ## Conventions
 

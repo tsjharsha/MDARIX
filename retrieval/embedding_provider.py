@@ -115,6 +115,8 @@ class LocalModelEmbeddingProvider:
                     raise EmbeddingUnavailable("fastembed is not installed") from exc
                 cache_dir = os.environ.get("MDARIX_EMBEDDING_CACHE_DIR") or str(DEFAULT_CACHE_DIR)
                 try:
+                    # Offline, from the prepared cache only: no server or developer machine downloads model weights at
+                    # run time (DEV-02, 0.10.86), where they could be swapped or blocked.
                     cls._model = TextEmbedding(
                         LOCAL_EMBEDDING_MODEL,
                         cache_dir=cache_dir,
@@ -122,22 +124,7 @@ class LocalModelEmbeddingProvider:
                         threads=LOCAL_EMBEDDING_THREADS,
                     )
                 except Exception as missing:
-                    from backend.app.runtime_env import is_production_like
-
-                    if is_production_like():
-                        # The image carries the model, pinned and checked (Dockerfile.api, config_check): a server
-                        # never fetches model weights from the internet, where they could be swapped.
-                        raise EmbeddingUnavailable(
-                            f"Local embedding model is not in {cache_dir}; a staging or production server never "
-                            "downloads it (the image carries it)"
-                        ) from missing
-                    # First use on this machine: download once into the cache, then it works offline.
-                    try:
-                        cls._model = TextEmbedding(
-                            LOCAL_EMBEDDING_MODEL, cache_dir=cache_dir, threads=LOCAL_EMBEDDING_THREADS
-                        )
-                    except Exception as exc:
-                        raise EmbeddingUnavailable(f"Local embedding model could not be loaded: {exc}") from exc
+                    raise EmbeddingUnavailable(model_missing_message(cache_dir)) from missing
         return cls._model
 
     @staticmethod
@@ -160,7 +147,20 @@ EmbeddingProvider = DeterministicEmbeddingProvider | LocalModelEmbeddingProvider
 
 # SHA-256 of model_optimized.onnx at the pinned revision of Qdrant/bge-small-en-v1.5-onnx-Q (Dockerfile.api,
 # EMBEDDING_REVISION). Change both together, and re-index evidence when the weights change.
+LOCAL_EMBEDDING_REPO = "Qdrant/bge-small-en-v1.5-onnx-Q"
+LOCAL_EMBEDDING_REVISION = "aa8f8b060edb00e03bfdd08813a2949946c8ba55"
 LOCAL_EMBEDDING_MODEL_SHA256 = "51f1bd0addd6e859e42c2c8021a5e5461385bb676a649f4b269aa445449f2431"
+
+
+def model_missing_message(cache_dir: str) -> str:
+    """What to do when the pinned model is not in the cache: semantic search is unavailable meanwhile, and evidence
+    search answers from structured matches and says so (retrieval/service.py)."""
+    return (
+        f"The local embedding model is not in {cache_dir}: semantic search is unavailable and evidence search uses "
+        "structured matches only. Servers carry the model in their image (Dockerfile.api). On a developer machine, "
+        "set MDARIX_EMBEDDING_CACHE_DIR to a prepared cache (a worktree can share the main checkout's .model-cache), "
+        "or prepare one once with: python scripts/prepare_embedding_cache.py"
+    )
 
 
 def local_model_problem(cache_dir: str | None = None) -> str | None:

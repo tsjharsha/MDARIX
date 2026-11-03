@@ -4,15 +4,52 @@
   never writes into the demo database (``mdarix_r1``). CI and any caller that
   exports ``POSTGRES_DB`` explicitly keep their own value. This must run before
   any backend module is imported, because the engine is created at import time.
-- Every test is marked ``unit``, ``db`` or ``dataplane`` (see ``pytest.ini``).
+- Every test is marked ``unit``, ``db`` or ``dataplane`` (see ``pytest.ini``), never ``unit`` and ``db`` together:
+  ``unit`` means no database (``MDARIX_TEST_NO_DATABASE=1 pytest -m unit`` proves it). A module is a database module
+  when it is listed in DB_MODULES (with the golden dataset) or DB_WITHOUT_GOLDEN, or marks itself ``db``; a test in a
+  module of mixed tests marks itself.
+- Tests that need the local embedding model are marked ``model``: they skip, saying why, when the pinned model is not
+  in the prepared cache, and fail instead with MDARIX_REQUIRE_LOCAL_MODEL=1 (the model-enabled qualification gate).
 - Database tests get the synthetic AcmeCare golden dataset loaded on demand, so
   they no longer depend on alphabetical file order.
 - Legacy protected-route modules get an authenticated session cookie.
 """
 
 import os
+import subprocess
+from pathlib import Path
 
 os.environ.setdefault("POSTGRES_DB", "mdarix_r1_test")
+# The unit selection runs with no database at all: MDARIX_TEST_NO_DATABASE=1 points every connection at a closed port,
+# so a test marked unit that reaches the database fails at once instead of passing on a developer's machine.
+if os.environ.get("MDARIX_TEST_NO_DATABASE") == "1":
+    os.environ["POSTGRES_HOST"], os.environ["POSTGRES_PORT"] = "127.0.0.1", "1"
+# Never download model weights from a test (DEV-02): the local embedding model loads from a prepared cache only.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+
+
+def _prepared_model_cache() -> str | None:
+    """A worktree without its own prepared model cache uses the main checkout's (``git rev-parse --git-common-dir``)
+    instead of downloading one (scripts/prepare_embedding_cache.py prepares a cache once)."""
+    here = Path(__file__).resolve().parents[1]
+
+    def ready(folder: Path) -> bool:
+        return any(folder.glob("models--*/snapshots/*/model_optimized.onnx"))
+
+    if ready(here / ".model-cache"):
+        return None
+    try:
+        common = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"], cwd=here, capture_output=True, text=True, timeout=10
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+    shared = (here / common).resolve().parent / ".model-cache" if common else None
+    return str(shared) if shared is not None and ready(shared) else None
+
+
+if "MDARIX_EMBEDDING_CACHE_DIR" not in os.environ and (_shared_cache := _prepared_model_cache()):
+    os.environ["MDARIX_EMBEDDING_CACHE_DIR"] = _shared_cache
 # The application fails safe to production when MDARIX_ENV is unset; the suite exercises development behaviour.
 os.environ.setdefault("MDARIX_ENV", "development")
 # Existing retrieval tests pin the word-hash embedding; tests of the local language model choose it explicitly.
@@ -201,22 +238,50 @@ DB_MODULES = {
     # A free trial's owner removes colleagues, resets their MFA and decides on support access; MDARIX resets a trial
     # user's MFA without a grant.
     "test_trial_self_admin",
+    # The local embedding model on the golden evidence (indexing, semantic search) and the real-pipeline evaluation:
+    # their model tests are marked ``model`` too (DEV-02).
+    "test_local_embeddings",
+    "test_real_evaluation",
 }
+# Modules whose tests use the database without the golden dataset (classified from a run with no database, 0.10.86):
+# filled in below.
+DB_WITHOUT_GOLDEN: set[str] = set()
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}
 
 
+def _model_skip():
+    """The skip of the model tests when the pinned local model is not prepared (None when it is, or when it must be)."""
+    from retrieval.embedding_provider import local_model_problem
+
+    if os.environ.get("MDARIX_REQUIRE_LOCAL_MODEL") == "1":
+        return None
+    problem = local_model_problem()
+    return (
+        pytest.mark.skip(reason=f"{problem} (prepare it: python scripts/prepare_embedding_cache.py)")
+        if problem
+        else None
+    )
+
+
 def pytest_collection_modifyitems(config, items):
+    model_skip = _model_skip() if any(item.get_closest_marker("model") for item in items) else None
     for item in items:
+        if model_skip is not None and item.get_closest_marker("model") is not None:
+            item.add_marker(model_skip)
         module = item.module.__name__.split(".")[-1]
         if module in DATAPLANE_MODULES:
             item.add_marker(pytest.mark.db)
             item.add_marker(pytest.mark.dataplane)
             item.fixturenames.insert(0, "golden_dataset")
-        elif module in DB_MODULES:
+        elif module in DB_WITHOUT_GOLDEN and item.get_closest_marker("unit") is None:
+            item.add_marker(pytest.mark.db)
+        elif module in DB_MODULES and item.get_closest_marker("unit") is None:
+            # A test that marks itself unit in a database module needs no database, nor the golden data.
             item.add_marker(pytest.mark.db)
             item.fixturenames.insert(0, "golden_dataset")
-        else:
+        elif item.get_closest_marker("db") is None and item.get_closest_marker("dataplane") is None:
+            # A module (or test) that marks itself db/dataplane is never also unit: "unit" means no database.
             item.add_marker(pytest.mark.unit)
 
 
