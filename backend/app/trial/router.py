@@ -517,8 +517,8 @@ def one_story(
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
-    """The ten-step story for this person, on the sample and on the trial's own most urgent imported complaint, each
-    step done from what was saved on the record (backend/app/trial/one_story.py)."""
+    """The ten-step story, on the sample and on the trial's own most urgent imported complaint, each step done from
+    what was saved on the record; one story for the whole team (backend/app/trial/one_story.py)."""
     from backend.app.trial import one_story as story
 
     _require_trial(db, ctx)
@@ -541,8 +541,8 @@ def mark_one_story(
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
-    """The person opened a step's screen from the story (the call, the report, Records, Trends): their own mark, kept
-    on the trial's request. No business record changes."""
+    """The person opened a step's screen from the story (the call, the report, Records, Trends): kept on the trial's
+    request under their name, and counted for the whole team. No business record changes."""
     from backend.app.trial import one_story as story
 
     _require_trial(db, ctx)

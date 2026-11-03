@@ -39,7 +39,7 @@ export type StoryRun = {
 export type OneStory = { sample: StoryRun | null; yours: StoryRun | null };
 
 export const STORY_STEPS = 10;
-/** The steps whose tick is the person's own mark: it is saved when the step's screen is opened from the story. */
+/** The steps ticked when someone opens the step's screen from the story: it counts for the whole team (0.10.84, M6). */
 const MARKED: Record<number, string> = { 0: "call", 4: "form", 8: "records", 9: "trends" };
 
 /** The story, read again after every saved change (0.10.84, M1): saving the triage moves the pill and Next step on. */

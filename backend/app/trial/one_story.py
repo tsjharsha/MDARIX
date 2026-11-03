@@ -15,8 +15,10 @@ the record in place, and each tick is read from the saved record, never from the
 9. records: the person opened Records once the submission (or the "not reportable" conclusion) is recorded;
 10. trends: the person opened Trends.
 
-The marks (steps 1, 5, 9 and 10) are the person's own, kept on the trial's request (``profile["one_story"]``, keyed by
-the person and the run, tied to the complaint's id so "Restart the sample story" starts them again). A step the
+The story is the team's, as the record is (0.10.84, M6): every colleague reads the same step. The marks (steps 1, 5, 9
+and 10) are kept on the trial's request (``profile["one_story"]``, keyed by the person who opened the step and the run,
+tied to the complaint's id so "Restart the sample story" starts them again), and a step any colleague opened counts for
+everyone, from the earliest time it was opened. A step the
 complaint cannot take yet because the import lacks a fact says so (``needs``); the ask itself stays on the step's own
 screen (the complaint page, 0.10.81).
 """
@@ -91,8 +93,22 @@ def subject(data: Session, control_db: Session, tenant_id, run: str) -> Complain
 
 
 def _marks(request, user_id: str, run: str, complaint_id) -> dict:
+    """One person's own marks on the run's complaint."""
     mine = (((request.profile or {}).get(PROFILE_KEY) or {}).get(str(user_id)) or {}).get(run) or {}
     return mine if mine.get("complaint_id") == str(complaint_id) else {}
+
+
+def team_marks(request, run: str, complaint_id) -> dict:
+    """Every colleague's marks on the run's complaint, merged: a step anyone opened, at the earliest time it was."""
+    found: dict = {}
+    for person in ((request.profile or {}).get(PROFILE_KEY) or {}).values():
+        mine = (person or {}).get(run) or {}
+        if mine.get("complaint_id") != str(complaint_id):
+            continue
+        for step in MARKS:
+            if mine.get(step) and (not found.get(step) or mine[step] < found[step]):
+                found[step] = mine[step]
+    return found
 
 
 def record_mark(request, user_id: str, run: str, complaint_id, step: str, now: datetime) -> None:
@@ -161,7 +177,7 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
         None,
     )
     stage = _list_paths(data, control_db, ctx, tenant_id, [report])[report.id]["stage"] if report else None
-    done = steps_done(_marks(request, str(ctx.user_id), run, complaint.id), triaged, versions, stage)
+    done = steps_done(team_marks(request, run, complaint.id), triaged, versions, stage)
     current = next((index for index, value in enumerate(done) if value is False), len(done))
     signed = next((v for v in reversed(versions) if v.signed_at is not None and v.superseded_by is None), None)
     return {

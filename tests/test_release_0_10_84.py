@@ -100,3 +100,37 @@ def test_home_can_tell_the_samples_trends_and_lists_from_your_data(fic):
     board = _ok(user.get("/api/v1/triage/trends", params={"group": "version"}))["items"]
     assert board and all(row["product"]["identifier"] for row in board)
     assert any(row["product"]["identifier"] == "SAMPLE-ORBIT-300" for row in board)
+
+
+def test_the_story_is_the_teams_one_step_for_every_colleague():
+    """M6: Rahul's banner said "Step 5 of 10: Form" while the shared record was at the approval step, because opening
+    the report was Asha's own mark. The story is the team's: a step any colleague opened counts for everyone."""
+    from fastapi.testclient import TestClient
+
+    from backend.app.main import app
+    from tests.test_free_trial import PASSWORD, _activation_token
+
+    owner, approval, _ = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    try:
+        mail = f"m6-{uuid.uuid4().hex[:6]}@example.invalid"
+        invited = _ok(
+            owner.post(
+                "/api/v1/trial/team", json={"email": mail, "display_name": "Rahul Iyer", "persona": "regulatory"}
+            )
+        )
+        colleague = TestClient(app)
+        _ok(
+            colleague.post(
+                "/api/v1/auth/activate-account", json={"token": _activation_token(invited, mail), "password": PASSWORD}
+            )
+        )
+        _ok(colleague.post("/api/v1/auth/signin", json={"email": mail, "password": PASSWORD}))
+        _ok(owner.post(f"{STORY}/marks", json={"run": "sample", "step": "call"}))
+        _ok(colleague.post(f"{STORY}/marks", json={"run": "sample", "step": "trends"}))
+        mine, theirs = _ok(owner.get(STORY))["sample"], _ok(colleague.get(STORY))["sample"]
+        done = lambda run: [step["key"] for step in run["steps"] if step["done"]]  # noqa: E731
+        assert done(mine) == done(theirs) == ["call", "trends"]
+        assert mine["current"] == theirs["current"] == 1
+    finally:
+        _purge(tenant_id)
