@@ -8,7 +8,15 @@ import { useCan, useFeatureSet, useIsTrial, useWorkspace } from "../workspaceCon
 import { TRIAL_SET_ASIDE_NOTE } from "./ImportReports";
 import { importTemplatesFor } from "../../../app/featureSet";
 import { countOf, formatCount } from "./common";
-import { IMPORT_REPORTS_ID, ImportReportsPanel, ProductIdentityPanel, previewValue } from "./ImportReports";
+import { formatDay } from "../../../app/dates";
+import {
+  IMPORT_REPORTS_ID,
+  IMPORT_RUNS_PATH,
+  ImportReportsPanel,
+  ProductIdentityPanel,
+  previewValue,
+  type ImportRun,
+} from "./ImportReports";
 
 /*
  * Excel and CSV import into the organization's own records: one upload panel and one server path
@@ -296,6 +304,7 @@ export function ImportPanel({
   onReport,
   setup: given,
   reportSecondary = false,
+  detect = false,
 }: {
   /** After an import: what it imported, and of which template. */
   onImported: (result: ImportResult, entity: string) => void;
@@ -306,6 +315,8 @@ export function ImportPanel({
   setup?: ImportSetup;
   /** The page's main button is elsewhere (Import your data's "See your complaints", 0.10.80). */
   reportSecondary?: boolean;
+  /** One drop zone that detects the object, and the loading checklist (the new navigation's Import page, D1.10). */
+  detect?: boolean;
 }) {
   const fetched = useResource<ImportSetup>(given ? null : `${IMPORT_PATH}/templates`);
   const setup = given ?? fetched.data;
@@ -323,9 +334,87 @@ export function ImportPanel({
       eyebrow={eyebrow}
       onReport={onReport}
       reportSecondary={reportSecondary}
+      detect={detect}
     />
   );
 }
+
+/** What each core object unlocks, in loading order (0.10.82, D1.10, the approved design's Import page). */
+export const UNLOCKS: Readonly<Record<string, string>> = {
+  products: "Versions for trends and the forms' device fields",
+  lots: "Per-unit trends and lot impact",
+  distribution: "Where each lot went: which customers to tell",
+  complaints: "The story, triage, the decision trees and the reports",
+  investigations: "Open questions and their evidence",
+  capas: "Corrective actions and effectiveness checks",
+  risks: "The risk file input from complaints",
+};
+
+/** Each object's latest import, from the import runs (the newest first): what the checklist shows as loaded. */
+export function loadedObjects(runs: readonly Pick<ImportRun, "entity" | "imported_at" | "report">[]) {
+  const found: Record<string, { at: string; rows: number }> = {};
+  for (const run of runs)
+    if (!found[run.entity] && !(run as { sample?: boolean }).sample)
+      found[run.entity] = { at: run.imported_at, rows: run.report?.rows_accepted ?? 0 };
+  return found;
+}
+
+/** The objects to load, in loading order: the core ones with what each unlocks and whether it is in, the rest folded. */
+export function LoadChecklist({
+  core,
+  more,
+  runs,
+}: {
+  core: readonly ImportTemplate[];
+  more: readonly ImportTemplate[];
+  runs: readonly ImportRun[];
+}) {
+  const loaded = loadedObjects(runs);
+  const row = (item: ImportTemplate) => {
+    const got = loaded[item.entity];
+    return (
+      <li key={item.entity} className={got ? "is-loaded" : undefined}>
+        <span className="uw-load-mark" aria-hidden="true">
+          {got ? <CheckCircle2 size={16} /> : null}
+        </span>
+        <span>
+          <b>{item.title}</b>{" "}
+          <small className="ac-muted">
+            ·{" "}
+            {got
+              ? `${countOf(got.rows, "row")} loaded ${formatDay(got.at)}`
+              : (UNLOCKS[item.entity] ?? "For deeper investigations")}
+          </small>
+          <span className="sr-only">{got ? ": loaded" : ": not loaded yet"}</span>
+        </span>
+      </li>
+    );
+  };
+  return (
+    <div className="uw-load">
+      <h2>What you can load · in loading order</h2>
+      <ol className="uw-load-list">{core.map(row)}</ol>
+      {more.length > 0 && (
+        <details className="uw-more">
+          <summary>More objects ({more.length})</summary>
+          <ol className="uw-load-list">{more.map(row)}</ol>
+        </details>
+      )}
+      <p className="ac-muted">
+        A complaints export alone is enough to start: the products and lots it names are created. Load products and lots
+        too for versions and per-unit trends.
+      </p>
+    </div>
+  );
+}
+
+type Detected = {
+  entity: string | null;
+  title?: string;
+  complete?: boolean;
+  columns_matched?: number;
+  message?: string;
+};
 
 function ImportForm({
   setup,
@@ -334,6 +423,7 @@ function ImportForm({
   eyebrow,
   onReport,
   reportSecondary,
+  detect = false,
 }: {
   setup: ImportSetup;
   onImported: (result: ImportResult, entity: string) => void;
@@ -341,6 +431,7 @@ function ImportForm({
   eyebrow: string;
   onReport?: (importRef: string) => void;
   reportSecondary: boolean;
+  detect?: boolean;
 }) {
   const templates = setup.templates;
   // Where a complaints export alone is enough (a free trial), the panel opens on it, until the person chooses another.
@@ -369,6 +460,30 @@ function ImportForm({
   // Whether this file was checked: a new choice about it then checks the same file again, without picking it again.
   const [checked, setChecked] = useState(false);
   const template = templates.find((item) => item.entity === entity) ?? templates[0];
+  // One drop zone (D1.10): the object a file is, read from its column names; the person can name another.
+  const [detected, setDetected] = useState<Detected | null>(null);
+  const runs = useResource<{ runs: ImportRun[] }>(detect ? IMPORT_RUNS_PATH : null);
+  const choose = (picked: File | null) => {
+    setFile(picked);
+    setReport(null);
+    setMessage(null);
+    setSheet(null);
+    setDateColumn(null);
+    setChecked(false);
+    setDetected(null);
+    if (!detect || !picked) return;
+    void requestJson<Detected>(`${IMPORT_PATH}/detect`, {
+      method: "POST",
+      body: picked,
+      headers: { "Content-Type": isWorkbook(picked) ? XLSX_TYPE : "text/csv" },
+      timeoutMs: IMPORT_TIMEOUT_MS,
+    })
+      .then((found) => {
+        setDetected(found);
+        if (found.entity && templates.some((item) => item.entity === found.entity)) setEntity(found.entity);
+      })
+      .catch((error) => setDetected({ entity: null, message: checkFailureText(error) }));
+  };
   const limit = setup.file_limit_bytes;
   const choices: FileChoices = { sheet, numberFormat, dateColumn };
 
@@ -449,37 +564,102 @@ function ImportForm({
           <h2 id={`${id}-title`}>Upload your export</h2>
         </div>
       </header>
-      <p className="uw-trial-note">
-        Upload the export as it comes from your quality system, as an Excel workbook or a CSV file: MDARIX finds the
-        column names (below a title too), reads them (Complaint No., Date of Complaint, Batch/Lot No. and the like) and
-        lists the columns it does not use, without storing them.{" "}
-        {complaintsAlone
-          ? "A complaints export alone is enough to start: the products and lots it names are added. Load products and lots too for versions and per-unit trends."
-          : "Load products first, then lots, then complaints, then the others that refer to them."}{" "}
-        By default a file with any problem imports nothing; below you can choose to import the rows that pass and get
-        the others back, and to replace personal details instead of refusing them.
-      </p>
+      {detect && (
+        <>
+          <div
+            className="uw-drop"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              choose(event.dataTransfer.files?.[0] ?? null);
+            }}
+          >
+            <b>{file ? file.name : "Drop any template file here"}</b>
+            <span className="ac-muted">
+              MDARIX detects which of the {templates.length} objects it is, checks every row, and shows what is missing
+              before anything is imported. Excel or CSV, as it comes from your quality system.
+            </span>
+            <span className="ca-action-row">
+              <label className={file ? "ac-secondary" : "ac-primary"}>
+                <Upload size={15} aria-hidden="true" /> {file ? "Choose another file" : "Choose a file"}
+                <input
+                  type="file"
+                  className="sr-only"
+                  accept={`.xlsx,.csv,.txt,text/csv,${XLSX_TYPE}`}
+                  aria-label="Choose a file (Excel or CSV)"
+                  onChange={(event) => {
+                    choose(event.target.files?.[0] ?? null);
+                    // The same file can be chosen again after it is fixed: the input forgets it (J4).
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+              {template && (
+                <a className="ac-link" href={template.download} download>
+                  <Download size={15} aria-hidden="true" /> Download the {template.title.toLowerCase()} template
+                </a>
+              )}
+            </span>
+            {file && detected && (
+              <p className={`uw-drop-read${detected.entity ? "" : " is-bad"}`} role="status">
+                {detected.entity
+                  ? `Read as ${detected.title}: ${countOf(detected.columns_matched ?? 0, "column")} match its template${detected.complete ? "" : ", some required ones are missing"}.`
+                  : (detected.message ?? "No template matches this file.")}{" "}
+                <label className="uw-drop-pick">
+                  Not right? It is
+                  <select
+                    value={template?.entity}
+                    disabled={busy}
+                    onChange={(event) => chooseTemplate(event.target.value)}
+                  >
+                    {[...core, ...more].map((item) => (
+                      <option key={item.entity} value={item.entity}>
+                        {item.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </p>
+            )}
+          </div>
+          {!file && <LoadChecklist core={core} more={more} runs={runs.data?.runs ?? []} />}
+        </>
+      )}
+      {!detect && (
+        <p className="uw-trial-note">
+          Upload the export as it comes from your quality system, as an Excel workbook or a CSV file: MDARIX finds the
+          column names (below a title too), reads them (Complaint No., Date of Complaint, Batch/Lot No. and the like)
+          and lists the columns it does not use, without storing them.{" "}
+          {complaintsAlone
+            ? "A complaints export alone is enough to start: the products and lots it names are added. Load products and lots too for versions and per-unit trends."
+            : "Load products first, then lots, then complaints, then the others that refer to them."}{" "}
+          By default a file with any problem imports nothing; below you can choose to import the rows that pass and get
+          the others back, and to replace personal details instead of refusing them.
+        </p>
+      )}
       {setup.row_limit ? (
         <p className="uw-trial-note">
           Up to {formatCount(setup.row_limit)} rows and {readableSize(setup.file_limit_bytes)} per file.
         </p>
       ) : null}
-      {trial && <p className="uw-trial-note">{TRIAL_SET_ASIDE_NOTE}</p>}
-      <div className="ac-tabs uw-import-templates" role="group" aria-label="Template">
-        {shown.map((item, index) => (
-          <button
-            key={item.entity}
-            type="button"
-            aria-pressed={template?.entity === item.entity}
-            className={template?.entity === item.entity ? "selected" : ""}
-            disabled={busy}
-            onClick={() => chooseTemplate(item.entity)}
-          >
-            {index + 1}. {item.title}
-          </button>
-        ))}
-      </div>
-      {more.length > 0 && (
+      {trial && (!detect || file) && <p className="uw-trial-note">{TRIAL_SET_ASIDE_NOTE}</p>}
+      {!detect && (
+        <div className="ac-tabs uw-import-templates" role="group" aria-label="Template">
+          {shown.map((item, index) => (
+            <button
+              key={item.entity}
+              type="button"
+              aria-pressed={template?.entity === item.entity}
+              className={template?.entity === item.entity ? "selected" : ""}
+              disabled={busy}
+              onClick={() => chooseTemplate(item.entity)}
+            >
+              {index + 1}. {item.title}
+            </button>
+          ))}
+        </div>
+      )}
+      {!detect && more.length > 0 && (
         <button
           type="button"
           className="ac-link uw-import-more"
@@ -496,7 +676,7 @@ function ImportForm({
             : `Show ${more.length} more data types for deeper investigations (components, suppliers, changes…)`}
         </button>
       )}
-      {template && (
+      {template && (!detect || file) && (
         <div className="uw-trial-template">
           <div>
             <strong>Required:</strong> {template.required.join(", ")}
@@ -508,86 +688,90 @@ function ImportForm({
           </a>
         </div>
       )}
-      {template && <ColumnGuide template={template} />}
-      <div className="uw-trial-upload">
-        <label className="ca-field uw-import-dates">
-          Dates in the file
-          <select
-            value={dateFormat}
-            disabled={busy}
-            onChange={(event) => setDateFormat(event.target.value as DateFormat)}
-          >
-            {dateFormatChoices(setup.usual?.date_order).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="ca-field uw-import-dates">
-          Numbers in the file
-          <select
-            value={numberFormat}
-            disabled={busy}
-            onChange={(event) => setNumberFormat(event.target.value as NumberFormat)}
-          >
-            {NUMBER_FORMATS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="ca-field uw-import-dates">
-          Rows with problems
-          <select
-            value={options.skipProblems ? "skip" : "refuse"}
-            disabled={busy}
-            onChange={(event) => setOptions({ ...options, skipProblems: event.target.value === "skip" })}
-          >
-            <option value="refuse">Import nothing until the file is fixed</option>
-            <option value="skip">Import the rows that pass; set the rest aside to fix</option>
-          </select>
-        </label>
-        <label className="ca-field uw-import-dates">
-          Personal details in the text
-          <select
-            value={options.maskPersonal ? "mask" : "refuse"}
-            disabled={busy}
-            onChange={(event) => setOptions({ ...options, maskPersonal: event.target.value === "mask" })}
-          >
-            <option value="refuse">Refuse them: I remove them first</option>
-            <option value="mask">Replace them with [PERSON], [PHONE] and similar</option>
-          </select>
-        </label>
-        <label className="ac-secondary">
-          <Upload size={15} aria-hidden="true" /> {file ? file.name : "Choose a file (Excel or CSV)"}
-          <input
-            type="file"
-            accept={`.xlsx,.csv,.txt,text/csv,${XLSX_TYPE}`}
-            aria-label={`Choose a ${template?.entity ?? "data"} file (Excel or CSV)`}
-            onChange={(event) => {
-              setFile(event.target.files?.[0] ?? null);
-              setReport(null);
-              setMessage(null);
-              setSheet(null);
-              setDateColumn(null);
-              setChecked(false);
-              // The same file can be chosen again after it is fixed: the input forgets it (J4).
-              event.target.value = "";
-            }}
-          />
-        </label>
-        {canImport ? (
-          <button type="button" className="ac-primary" disabled={!file || busy} onClick={check}>
-            {busy && !report ? "Checking…" : "Check file"}
-          </button>
-        ) : (
-          <p className="ac-muted" role="note">
-            View only: your role cannot import data.
-          </p>
-        )}
-      </div>
+      {template && !detect && <ColumnGuide template={template} />}
+      {(!detect || file) && (
+        <div className="uw-trial-upload">
+          <label className="ca-field uw-import-dates">
+            Dates in the file
+            <select
+              value={dateFormat}
+              disabled={busy}
+              onChange={(event) => setDateFormat(event.target.value as DateFormat)}
+            >
+              {dateFormatChoices(setup.usual?.date_order).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ca-field uw-import-dates">
+            Numbers in the file
+            <select
+              value={numberFormat}
+              disabled={busy}
+              onChange={(event) => setNumberFormat(event.target.value as NumberFormat)}
+            >
+              {NUMBER_FORMATS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ca-field uw-import-dates">
+            Rows with problems
+            <select
+              value={options.skipProblems ? "skip" : "refuse"}
+              disabled={busy}
+              onChange={(event) => setOptions({ ...options, skipProblems: event.target.value === "skip" })}
+            >
+              <option value="refuse">Import nothing until the file is fixed</option>
+              <option value="skip">Import the rows that pass; set the rest aside to fix</option>
+            </select>
+          </label>
+          <label className="ca-field uw-import-dates">
+            Personal details in the text
+            <select
+              value={options.maskPersonal ? "mask" : "refuse"}
+              disabled={busy}
+              onChange={(event) => setOptions({ ...options, maskPersonal: event.target.value === "mask" })}
+            >
+              <option value="refuse">Refuse them: I remove them first</option>
+              <option value="mask">Replace them with [PERSON], [PHONE] and similar</option>
+            </select>
+          </label>
+          {!detect && (
+            <label className="ac-secondary">
+              <Upload size={15} aria-hidden="true" /> {file ? file.name : "Choose a file (Excel or CSV)"}
+              <input
+                type="file"
+                accept={`.xlsx,.csv,.txt,text/csv,${XLSX_TYPE}`}
+                aria-label={`Choose a ${template?.entity ?? "data"} file (Excel or CSV)`}
+                onChange={(event) => {
+                  setFile(event.target.files?.[0] ?? null);
+                  setReport(null);
+                  setMessage(null);
+                  setSheet(null);
+                  setDateColumn(null);
+                  setChecked(false);
+                  // The same file can be chosen again after it is fixed: the input forgets it (J4).
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          )}
+          {canImport ? (
+            <button type="button" className="ac-primary" disabled={!file || busy} onClick={check}>
+              {busy && !report ? "Checking…" : "Check file"}
+            </button>
+          ) : (
+            <p className="ac-muted" role="note">
+              View only: your role cannot import data.
+            </p>
+          )}
+        </div>
+      )}
       {message && (
         <p className={`uw-trial-message is-${message.tone}`} role="status">
           {message.text}

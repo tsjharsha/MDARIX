@@ -798,6 +798,39 @@ def header_index(entity: str, table: list[list[str]]) -> int:
     return best
 
 
+def detect(raw: bytes, policy: "ImportPolicy" = None) -> dict:
+    """Which template a file is (0.10.82, D1.10: one drop zone for every object): of the templates offered, the one
+    whose column names the file's header row fits best, every required column first, then the most columns named,
+    then the largest share of the template's columns. ``entity`` is None when no template's column is named.
+    shortcut: a workbook's sheet is chosen as for a complaints file; a workbook with one object per sheet is read on
+    its best sheet for complaints, so the person picks the object when it is another."""
+    policy = policy or TRIAL_POLICY
+    report = _Report()
+    table = _table(raw, report, policy, "complaints")
+    if table is None:
+        return {"entity": None, "message": report.issues[0]["message"] if report.issues else "The file cannot be read."}
+    head = [cells for cells in table[:HEADER_SEARCH_ROWS] if any(str(cell).strip() for cell in cells)]
+    scored = []
+    for entity, spec in TEMPLATES.items():
+        if not offered(entity, policy):
+            continue
+        allowed = spec["required"] + spec["optional"]
+        complete, named = max((_header_score(entity, cells, allowed) for cells in head), default=(False, 0))
+        scored.append(((complete, named, named / len(allowed)), entity))
+    (complete, named, _), entity = max(scored, default=((False, 0, 0), None))
+    if not named:
+        return {
+            "entity": None,
+            "message": "No column of this file matches a template. Download a template to see the columns.",
+        }
+    return {
+        "entity": entity,
+        "title": TEMPLATES[entity]["title"],
+        "complete": complete,
+        "columns_matched": named,
+    }
+
+
 def _choose_sheet(book, entity: str, reading: FileReading, report: "_Report"):
     """The sheet to read: the one named, else of the visible sheets with a value the one whose column names fit the
     template best, the first on a tie (J6; a hidden sheet is never chosen unnamed). What was read, and what else is
@@ -1736,6 +1769,9 @@ def complaint_flags(rows, report: _Report) -> list[dict]:
             flag("No awareness or received date: the reporting clock stays provisional until the date is entered.")
         if row.get("awareness_date") and row.get("event_date") and row["awareness_date"] < row["event_date"]:
             flag("The awareness date is before the event date: check both.")
+        if harm and not said("death") and said("serious_injury") is None:
+            # Never pre-filled (0.10.82, D1.10): the tree asks it as a judgement.
+            flag("Serious injury left blank: asked at the decision tree, never filled in for you.")
         if (said("death") or said("serious_injury")) and said("patient_involved") is False:
             flag("A death or serious injury, but no patient involved: check both columns.")
     return found

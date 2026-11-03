@@ -6,6 +6,8 @@ import { runOf, shownRun, stepBlocker, stepPlace, type OneStory, type StoryRun }
 import { StoryView } from "./sections/OneStory";
 import { HomeSection } from "./sections/Home";
 import { TeamView, personaConfirmation } from "./sections/TrialTeam";
+import { LoadChecklist, loadedObjects, type ImportTemplate } from "./sections/ImportData";
+import type { ImportRun } from "./sections/ImportReports";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import type { TrendItem } from "./signalAi";
 
@@ -209,5 +211,44 @@ describe("Team: several personas per invited colleague (D1.9)", () => {
     const confirm = personaConfirmation(rahul, [personas[1], personas[2]], () => undefined);
     expect(confirm.title).toBe("Make Rahul Iyer a Regulatory Leader + Decision Maker?");
     expect(confirm.body).toContain("Nobody approves what they prepared themselves.");
+  });
+});
+
+describe("Import your data: one drop zone and the loading checklist (D1.10)", () => {
+  const entities = [
+    "products",
+    "lots",
+    "distribution",
+    "complaints",
+    "investigations",
+    "capas",
+    "risks",
+    ...Array.from({ length: 11 }, (_, index) => `extra${index}`),
+  ];
+  const templates = entities.map((entity) => ({
+    entity,
+    title: entity,
+    required: [],
+    optional: [],
+    help: {},
+    download: "",
+  })) as unknown as ImportTemplate[];
+
+  it("lists the 7 core objects in loading order, what each unlocks and whether it is loaded, the 11 others folded", () => {
+    const runs = [
+      { entity: "complaints", imported_at: "2026-11-02T06:10:00Z", report: { rows_accepted: 4 } },
+      { entity: "complaints", imported_at: "2026-11-01T06:10:00Z", report: { rows_accepted: 9 } },
+    ] as unknown as ImportRun[];
+    const html = renderToStaticMarkup(
+      <LoadChecklist core={templates.slice(0, 7)} more={templates.slice(7)} runs={runs} />,
+    );
+    expect(html.indexOf(">products<")).toBeLessThan(html.indexOf(">lots<"));
+    expect(html.indexOf(">lots<")).toBeLessThan(html.indexOf(">complaints<"));
+    expect(html).toContain("Per-unit trends and lot impact");
+    // The newest import of an object is the one shown.
+    expect(html).toContain("4 rows loaded");
+    expect(html.match(/is-loaded/g)).toHaveLength(1);
+    expect(html).toContain("More objects (11)");
+    expect(loadedObjects(runs).complaints.rows).toBe(4);
   });
 });

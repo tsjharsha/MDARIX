@@ -8194,3 +8194,72 @@ details.uw-team-change > summary {
 details.uw-team-change[open] {
   flex-basis: 100%;
 }
+/* Import your data (0.10.82, D1.10): one drop zone that detects the object, then the loading checklist. */
+.uw-drop {
+  display: grid;
+  justify-items: center;
+  gap: var(--ms-space-2);
+  padding: 28px 20px;
+  border: 2px dashed var(--ms-mint-line);
+  border-radius: var(--ms-radius);
+  background: var(--ms-subtle);
+  text-align: center;
+}
+.uw-drop > b {
+  font-size: var(--ms-fs-16);
+}
+.uw-drop .ca-action-row {
+  justify-content: center;
+}
+.uw-drop-read {
+  margin: 0;
+  color: var(--ms-good);
+  font-weight: 600;
+}
+.uw-drop-read.is-bad {
+  color: var(--ms-warn);
+}
+.uw-drop-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+  color: var(--ms-ink-2);
+  font-weight: 400;
+}
+.uw-load {
+  display: grid;
+  gap: var(--ms-space-2);
+  margin-top: var(--ms-space-4);
+}
+.uw-load h2 {
+  margin: 0;
+  font-size: var(--ms-fs-16);
+}
+.uw-load-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: load;
+}
+.uw-load-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  counter-increment: load;
+}
+.uw-load-mark {
+  display: inline-flex;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 1px solid var(--ms-line-control);
+  border-radius: 50%;
+  color: var(--ms-good);
+}
+.uw-load-list li.is-loaded .uw-load-mark {
+  border-color: transparent;
+}

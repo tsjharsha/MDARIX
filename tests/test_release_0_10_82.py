@@ -243,3 +243,22 @@ def test_a_colleague_holds_several_personas_switches_between_them_and_never_appr
         assert refused.status_code == 403
     finally:
         _purge(tenant_id)
+
+
+def test_one_drop_zone_detects_which_object_a_file_is_and_flags_what_it_did_not_give(trial):
+    """D1.10: the detect read names the template a file fits (any of the 18 objects), and the check flags every fact
+    the file leaves out, a blank serious-injury flag included, so it never reads as nothing missing."""
+    user = trial["user"]
+    detect = "/api/v1/data/import/detect"
+    assert _ok(user.post(detect, content=CSV.encode()))["entity"] == "complaints"
+    products = "product_id,product_name,version,product_family\nOS-NEB,BreezeMist 50,Rev B,Nebulisers\n"
+    assert _ok(user.post(detect, content=products.encode()))["entity"] == "products"
+    titled = "Batch register exported 2 Nov\n\nlot_id,product_id,version,manufacture_date,quantity\nL1,OS-NEB,Rev B,2026-01-01,10\n"
+    assert _ok(user.post(detect, content=titled.encode()))["entity"] == "lots"
+    assert _ok(user.post(detect, content=b"colour,size\nred,big\n"))["entity"] is None
+    checked = _ok(user.post("/api/v1/data/import/complaints/check", content=CSV.encode()))
+    flags = [flag["message"] for flag in checked["row_flags"] if flag["complaint_id"] == "OS-1002"]
+    assert any("No country" in text for text in flags) and any("awareness" in text for text in flags)
+    blank = CSV.replace("Y,Y,N,Y\n", "Y,,N,Y\n")
+    flagged = _ok(user.post("/api/v1/data/import/complaints/check", content=blank.encode()))["row_flags"]
+    assert any(flag["message"].startswith("Serious injury left blank") for flag in flagged)
