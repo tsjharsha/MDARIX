@@ -174,23 +174,30 @@ def list_complaints(
             )
         )
     default = [RECEIVED_AT.desc().nullslast()]
+    reads = None
     if view:
         from backend.app.oversight import closure
-        from backend.app.oversight.router import DATED, LIST_VIEWS, list_view
+        from backend.app.oversight import service as oversight
+        from backend.app.oversight.router import LIST_VIEWS, dated_reads, list_view, urgency
 
         if view not in LIST_VIEWS:
             raise HTTPException(status_code=422, detail={"code": "UNKNOWN_LIST_VIEW", "message": "No such list view"})
+        # The dates every view, its order and its work columns read, read once (0.10.85, D3.13).
+        reads = dated_reads(db, control_db, tenant_id, oversight.now_utc())
+        places = urgency(reads)
         if view == "open":
             query = query.filter(
                 or_(Complaint.status.is_(None), func.lower(Complaint.status).notin_(closure.CLOSED_STATUSES))
             )
-            # The most urgent first (0.10.82, U-08): overdue, then the nearest clock; the undated after, newest first.
-            moments = list_view(db, control_db, tenant_id, DATED, str(ctx.user_id))
+            ranked = list(places)
         else:
-            moments = list_view(db, control_db, tenant_id, view, str(ctx.user_id))
+            moments = list_view(db, control_db, tenant_id, view, str(ctx.user_id), reads)
             query = query.filter(Complaint.id.in_([uuid.UUID(key) for key in moments] or [None]))
-        # Most urgent first (the newest signature first for "signed-month"); undated after the dated ones.
-        ranked = sorted(moments, key=lambda key: moments[key] or "~", reverse=view == "signed-month")
+            # The view's own moment breaks a tie (the newest signature first for "signed-month").
+            ranked = sorted(moments, key=lambda key: moments[key] or "~", reverse=view == "signed-month")
+        # Every view, the most urgent first (0.10.85, D3.1): overdue, then the nearest legal deadline, then the
+        # nearest other date; the undated after, newest first.
+        ranked.sort(key=lambda key: places.get(key, (2, "~", "~")))
         if ranked:
             rank = case({uuid.UUID(key): index for index, key in enumerate(ranked)}, value=Complaint.id)
             default = [rank.asc().nullslast(), *default]
@@ -202,7 +209,7 @@ def list_complaints(
     if work:
         from backend.app.oversight.router import complaint_work
 
-        worked = complaint_work(db, control_db, tenant_id, [complaint for complaint, *_ in rows])
+        worked = complaint_work(db, control_db, tenant_id, [complaint for complaint, *_ in rows], reads)
     else:
         worked = {}
     linked = (

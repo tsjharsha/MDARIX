@@ -356,6 +356,12 @@ type TableProps<T> = {
   pageSize?: number;
   /** What one row is, for the page summary ("120 users"). */
   pageNoun?: string;
+  /** The whole row opens its record (0.10.85, D3.1); its own link stays the row's one action for the keyboard. */
+  onRowClick?: (row: T) => void;
+  /** The column choice sits under one "More" (0.10.85, U-23), not beside the list's title. */
+  chooserUnderMore?: boolean;
+  /** A class of its own on the table (a list's card shape on a phone). */
+  className?: string;
 };
 
 /**
@@ -374,6 +380,7 @@ function ChoosableTable<T>({
   rowKey,
   caption,
   scope,
+  chooserUnderMore = false,
   ...paging
 }: TableProps<T> & { scope: string }) {
   const id = `${scope}:${caption}`;
@@ -416,19 +423,29 @@ function ChoosableTable<T>({
     setSaved(next);
     saveSelection(id, next);
   };
+  const chooser = (
+    <ColumnChooser
+      caption={caption}
+      options={options}
+      selection={selection}
+      defaults={defaults}
+      resized={Boolean(layout.widths && Object.keys(layout.widths).length)}
+      onChange={(next) => {
+        choose(next);
+        if (next === null) commit({});
+      }}
+    />
+  );
   return (
     <>
-      <ColumnChooser
-        caption={caption}
-        options={options}
-        selection={selection}
-        defaults={defaults}
-        resized={Boolean(layout.widths && Object.keys(layout.widths).length)}
-        onChange={(next) => {
-          choose(next);
-          if (next === null) commit({});
-        }}
-      />
+      {chooserUnderMore ? (
+        <details className="tc-more">
+          <summary>More</summary>
+          {chooser}
+        </details>
+      ) : (
+        chooser
+      )}
       {/* Dragging a heading reorders the shown fields, the same order the chooser keeps. */}
       <PlainTable
         {...paging}
@@ -455,6 +472,8 @@ function PlainTable<T>({
   serverSort,
   pageSize,
   pageNoun = "row",
+  onRowClick,
+  className,
 }: TableProps<T> & { layoutId?: string; onReorder?: (keys: string[]) => void }) {
   const named = columns.filter((column) => column.label.trim());
   const pinned = columns.filter((column) => !column.label.trim());
@@ -499,7 +518,10 @@ function PlainTable<T>({
         </div>
       )}
       <div className="ac-table-wrap">
-        <table className={`ac-table ms-cards ${controls.tableClassName}`.trim()} style={controls.tableStyle}>
+        <table
+          className={`ac-table ms-cards ${controls.tableClassName} ${className ?? ""}`.trim()}
+          style={controls.tableStyle}
+        >
           <caption className="ca-sr-only">{caption}</caption>
           {controls.colgroup}
           <thead>
@@ -550,7 +572,19 @@ function PlainTable<T>({
           </thead>
           <tbody>
             {visible.map((row, index) => (
-              <tr key={rowKey(row, position.get(row) ?? index)}>
+              <tr
+                key={rowKey(row, position.get(row) ?? index)}
+                className={onRowClick ? "is-clickable" : undefined}
+                onClick={
+                  onRowClick
+                    ? (event) => {
+                        // A control inside the row keeps its own click.
+                        if (!(event.target as HTMLElement).closest("button, a, input, select, summary, label"))
+                          onRowClick(row);
+                      }
+                    : undefined
+                }
+              >
                 {shown.map((column) => (
                   <td key={column.key} className={column.numeric ? "num" : undefined} data-label={column.label.trim()}>
                     {column.render(row)}

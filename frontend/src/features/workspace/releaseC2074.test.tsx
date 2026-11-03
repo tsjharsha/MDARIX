@@ -139,17 +139,24 @@ describe("list views: one choice, the persona's own first", () => {
         rows={[row]}
         rowKey={(item) => String(item.id)}
         empty={{ title: "", detail: "" }}
-        columns={workColumns({}, () => undefined, null)}
+        columns={workColumns({}, () => undefined)}
       />,
     );
     // The design system's card layout at phone width (admin-console.css .ac-table.ms-cards, ≤640 px).
     expect(html).toContain('class="ac-table ms-cards');
     const labels = [...html.matchAll(/data-label="([^"]*)"/g)].map((match) => match[1]);
-    expect(labels).toEqual(["Urgency", "What happened", "Product, version, lot", "Markets", "Owner", "Stage", ""]);
-    expect(html.match(/<button[^>]*class="ac-secondary"/g)?.length).toBe(1);
-    expect(html).toContain(">Open<");
+    // 0.10.85, D3.1: the legal clock and the incident country; the reference is the row's one action.
+    expect(labels).toEqual([
+      "Legal clock",
+      "What happened",
+      "Product, version, lot",
+      "Incident country",
+      "Owner",
+      "Stage",
+    ]);
+    expect(html.match(/<tbody>.*<\/tbody>/s)![0].match(/<button/g)?.length).toBe(1);
     expect(html).toContain("Asha Quality");
-    expect(html).toContain("OrbitCare 300 · Rev B · Lot LOT-004");
+    expect(html).toContain('OrbitCare 300 · Rev B<span class="uw-lot"> · Lot LOT-004</span>');
   });
 
   it("lists every investigation in the Investigations tab, open ones first, with the same six-column shape", () => {

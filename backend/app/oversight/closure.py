@@ -156,10 +156,15 @@ def open_on_triage(db: Session, tenant_id) -> set[str]:
 
 
 def facts(
-    db: Session, tenant_id, complaint, tasks: dict[str, list] | None = None, triage: set[str] | None = None
+    db: Session,
+    tenant_id,
+    complaint,
+    tasks: dict[str, list] | None = None,
+    triage: set[str] | None = None,
+    enabled: list[str] | None = None,
 ) -> dict:
     """Everything the checklist, the stage line and the decision record read, in one place (``tasks``: the open
-    tasks by complaint, when already read)."""
+    tasks by complaint, ``enabled``: the organization's markets, when already read for a whole list)."""
     from backend.app.communications.service import open_requests
     from backend.app.db.models.authority_reports import ReportObligation, ReportSnapshot
     from backend.app.db.models.complaint_disposition import ComplaintDisposition
@@ -216,7 +221,7 @@ def facts(
         "intakes": intakes,
         "first_contact": checks,
         "assessments": rows_by_complaint(db, tenant_id, [complaint.id]).get(complaint.id, {}),
-        "enabled": enabled_markets(db, tenant_id),
+        "enabled": enabled if enabled is not None else enabled_markets(db, tenant_id),
         "obligations": obligations,
         "snapshots": snapshots,
         "dispositions": dispositions,
@@ -506,10 +511,13 @@ def stage_line(found: dict, items: list[dict], row: EventClosure | None) -> list
         if settled(complaint, items, row)
         else next((code for code, _ in STAGES if not state[code] and not skipped.get(code) and code not in later), None)
     )
+    # Once every market's conclusion is signed and a report is still to file, the stage reads "Report" (0.10.85, D3.2;
+    # U-13: the list's Stage read "Market assessment" beside a signed conclusion).
+    reporting = done("MARKETS") and not done("OBLIGATIONS")
     return [
         {
             "code": code,
-            "label": label,
+            "label": "Report" if code == "MARKETS" and reporting else label,
             "state": "LATER"
             if code in later
             else "NOT_NEEDED"

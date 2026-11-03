@@ -7515,6 +7515,70 @@ button.uw-org:hover {
   }
 }
 
+/* 0.10.85, D3.1: the complaint list. The whole row opens the record; the column choice sits under one "More"; on a
+   phone each complaint is a short card: the clock, the reference and what happened in two lines, then one line of
+   product, country and stage (half the height of 0.10.84's labelled cards). */
+.ac-table tr.is-clickable {
+  cursor: pointer;
+}
+.ac-table tr.is-clickable:hover td {
+  background: var(--ms-surface-2, #f4f8f8);
+}
+.tc-more {
+  display: flex;
+  justify-content: flex-end;
+}
+.tc-more > summary {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--ms-line-control);
+  border-radius: var(--ms-radius-md);
+  color: var(--ms-ink);
+  font-weight: var(--ms-fw-semibold);
+  cursor: pointer;
+}
+.tc-more[open] > summary {
+  margin-right: var(--ms-space-2);
+}
+.uw-imdrf {
+  color: var(--ms-ink-2);
+}
+@media (max-width: 640px) {
+  .ac-table.uw-clist tr {
+    padding: 10px 12px;
+  }
+  .ac-table.uw-clist td,
+  .ac-table.uw-clist td:first-child {
+    display: block;
+    padding: 1px 0;
+    font-size: var(--ms-fs-14);
+    font-weight: 400;
+  }
+  .ac-table.uw-clist td::before,
+  .ac-table.uw-clist td[data-label="Owner"] {
+    display: none;
+  }
+  .ac-table.uw-clist td[data-label="Product, version, lot"],
+  .ac-table.uw-clist td[data-label="Incident country"],
+  .ac-table.uw-clist td[data-label="Stage"] {
+    display: inline;
+    color: var(--ms-ink-2);
+  }
+  .ac-table.uw-clist td[data-label="Incident country"]::after,
+  .ac-table.uw-clist td[data-label="Product, version, lot"]::after {
+    content: " · ";
+  }
+  .ac-table.uw-clist .uw-lot {
+    display: none;
+  }
+  .ac-table.uw-clist .uw-what-text {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
 /* The phone's search: an icon that opens the same search as a bar under the top bar. */
 .uw-search-toggle {
   display: none;
