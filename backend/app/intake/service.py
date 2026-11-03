@@ -564,8 +564,14 @@ def triage(
     return found
 
 
-def _triage(db: Session, control_db: Session | None, tenant_id: uuid.UUID, show: str, now: datetime | None) -> dict:
+def _triage(
+    db: Session, control_db: Session | None, tenant_id: uuid.UUID, show: str, now: datetime | date | None
+) -> dict:
     now = now or now_utc()
+    if not isinstance(now, datetime):
+        # A day (the readiness checks' watch passes one): read at its noon UTC. It raised AttributeError before, and
+        # Records' "Reported in window" check read nothing (seen in 0.10.85's speed measurements).
+        now = datetime(now.year, now.month, now.day, 12, tzinfo=timezone.utc)
     today = now.date()
     records = triage_records(db, tenant_id)
     found = subjects(db, tenant_id, records, now)

@@ -170,3 +170,18 @@ def test_every_step_label_is_one_word():
 
     assert [label for _, label in STEPS if len(label.split()) != 1] == []
     assert [label for _, label in STAGES if len(label.split()) != 1] == []
+
+
+def test_the_triage_list_reads_for_a_day_as_well_as_a_moment(trial):
+    """The readiness checks' watch passes a day: the triage list raised AttributeError ('date' has no 'date'), and the
+    "Reported in window" check read nothing."""
+    from datetime import date
+
+    from backend.app.db.session import SessionLocal
+    from backend.app.intake import service
+
+    db = SessionLocal()
+    try:
+        assert service.triage(db, None, trial["tenant_id"], "all", date.today())["items"] is not None
+    finally:
+        db.close()
