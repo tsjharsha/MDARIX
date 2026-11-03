@@ -129,11 +129,11 @@ def test_f5_a_great_britain_or_canada_complaint_gets_its_assessment_and_clock_an
         assert len(row.windows) == 8  # a new trial has every market's
         row.windows = [rules.clean_window(rules.TEMPLATES[index]) for index in old]
         db.commit()
-        dry = open_deadlines.refresh(db, tenant_id, apply=False)
-        assert len(dry) == 1 and "MHRA" in dry[0] and "Health Canada" in dry[0]
-        assert open_deadlines.refresh(db, tenant_id, apply=True)[0].startswith("added")
+        (dry,) = [line for line in open_deadlines.refresh(db, tenant_id, apply=False) if "reporting windows" in line]
+        assert "MHRA" in dry and "Health Canada" in dry
+        assert any(line.startswith("added") for line in open_deadlines.refresh(db, tenant_id, apply=True))
         db.commit()
-        assert open_deadlines.refresh(db, tenant_id, apply=False) == []
+        assert not [line for line in open_deadlines.refresh(db, tenant_id, apply=False) if "would" in line]
     _import(
         user,
         "complaint_id,product_id,description,event_date,received_date,awareness_date,country,patient_involved,"
@@ -475,7 +475,8 @@ def test_the_refresh_lists_and_updates_open_reports_and_drafts_the_fixed_rules_c
         refreshed = open_deadlines.refresh(db, tenant_id, apply=True)
         db.commit()
         print("APPLY:", *refreshed, sep="\n  ")
-        assert open_deadlines.refresh(db, tenant_id, apply=False) == []
+        # A second run changes nothing (what it lists for a person, it lists again).
+        assert not [line for line in open_deadlines.refresh(db, tenant_id, apply=False) if "would" in line]
     detail = _ok(user.get(f"{REPORTS}/{report['id']}"))
     assert (detail["report_type"], detail["deadline"]["due_on"]) == ("US_5_WORK_DAY", signed["due_on"])
     assert _audit(tenant_id, "COMPLAINT_MARKET_ASSESSMENT_RECOMPUTED")

@@ -169,7 +169,8 @@ def test_each_invite_refusal_says_which_case_and_a_removed_colleague_can_return(
     assert refusal(pending) == "INVITATION_PENDING"
     assert refusal(email) == "ALREADY_ON_THE_TEAM"
     _, _, elsewhere = _approved_trial_client()
-    assert refusal(elsewhere) == "ACCOUNT_IN_ANOTHER_ORGANIZATION"
+    # 0.10.81 (security F1): one neutral answer, never "an account in another organization".
+    assert refusal(elsewhere) == "CANNOT_INVITE"
 
     # An invitation past its time reads as expired, and Resend sends a new one.
     with SessionLocal() as db:
