@@ -471,13 +471,6 @@ def _mir_classification(context):
     return value, _assessment(context, "The signed conclusion's report type")
 
 
-def _conclusion_date(context):
-    row = _signed(context)
-    if row is None or row.signed_at is None:
-        return None
-    return row.signed_at.date().isoformat(), _assessment(context, "The day the reportable conclusion was signed")
-
-
 def _ca_classification(context):
     """Canada B1 from the signed conclusion's report type."""
     row = _signed(context)
@@ -643,7 +636,6 @@ SOURCES = {
     "immediate_action": _immediate_action,
     "request": lambda c: None,  # a response obligation's request is set by build()
     # 0.10.76 (C4): the EU, GB and Canada forms.
-    "conclusion_date": _conclusion_date,
     "mir_classification": _mir_classification,
     "ca_classification": _ca_classification,
     "consequences": _consequences,
@@ -669,7 +661,6 @@ SOURCES = {
     "incident_country": lambda c: (
         (c["record"]["country"], _complaint(c, "The complaint's event country")) if c["record"].get("country") else None
     ),
-    "mir_location": _returned("Manufacturer"),
     "ca_available": _returned("Returned to Manufacturer/Importer"),
     "mir_operator": _user_type(
         {

@@ -740,7 +740,16 @@ def _mir_incident(market: str) -> tuple[Section, ...]:
                     note="GB: A27 when no code fits (MHRA)." if gb else "",
                 ),
                 Field("3_2B", "3.2b", "Number of patients involved"),
-                Field("3_2C", "3.2c", "Current location of the device", "mir_location", MUST, options=_MIR_LOCATIONS),
+                # 0.10.81 (F12): never guessed from "device returned" (it may be with a distributor or the facility).
+                Field(
+                    "3_2C",
+                    "3.2c",
+                    "Current location of the device",
+                    None,
+                    MUST,
+                    options=_MIR_LOCATIONS,
+                    note="Where the device is now.",
+                ),
                 Field(
                     "3_2D",
                     "3.2d",
@@ -1037,9 +1046,11 @@ EU_MIR = Form(
                     "1_2D",
                     "1.2d",
                     "Manufacturer awareness date of reportability",
-                    "conclusion_date",
+                    None,
                     INITIAL,
                     must_in=_NOT_NON,
+                    # 0.10.81 (F12): not the signing day; the MIR help text (7.3.1) asks for this date.
+                    note="The date you received the information that showed the incident is reportable.",
                 ),
                 Field("1_2E", "1.2e", "Type of report", "report_type", MUST, options=MIR_TYPES),
                 Field(

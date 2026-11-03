@@ -6,6 +6,7 @@
 - F3, F4, F9: a missing country or awareness date is asked for, provisional, and blocks signing; contradictory
   import rows are flagged.
 - F6: report fields take dates and codes only; a bad stored value is flagged.
+- F12: the EU and GB MIR forms never pre-fill 1.2d or 3.2c.
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -266,3 +267,14 @@ def test_f6_report_fields_take_dates_and_codes_only_and_a_bad_stored_value_is_fl
     detail = _ok(user.put(f"{path}/B4", json={"value": "2026-11-03"}))
     assert "B4" not in detail["mandatory"]["missing"]
     assert _ok(user.put(f"{path}/D2A", json={"value": "frn"}))["sections"]
+
+
+def test_f12_the_mir_forms_never_pre_fill_the_reportability_date_or_the_device_location(trial):
+    user = trial["user"]
+    (eu,) = [item for item in _ok(user.get(REPORTS))["items"] if item["complaint_ref"] == "SAMPLE-RV-07" and item["id"]]
+    detail = _ok(user.get(f"{REPORTS}/{eu['id']}"))
+    fields = {item["id"]: item for section in detail["sections"] for item in section["fields"]}
+    # 1.2d is the day the information showing reportability arrived, not the signing day; 3.2c is where it is now.
+    assert fields["1_2D"]["value"] is None and fields["1_2D"]["source"] is None and fields["1_2D"]["note"]
+    assert fields["3_2C"]["value"] is None and fields["3_2C"]["status"] == "MUST_HAVE"
+    assert "3_2C" in detail["mandatory"]["missing"]
