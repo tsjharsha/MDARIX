@@ -10,6 +10,57 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.82] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): round D1, "One story", of the approved redesign, for trials on the
+new navigation. The classic navigation is unchanged. No migration. No sample record, deadline or count changes. The
+API and web images change. No operator step: `refresh_trial_story.py` has nothing new to do.
+
+### Changed: Getting started tells one story
+
+- **One complaint, from the first call to the signed report.** Getting started opens on one hero and one rail of ten
+  steps: the call, triage, the decision tree, reportable or not, the form for the country, fill what is missing,
+  approval, PDF and submission, Records and Trends. Each step has one main button that opens the real screen with the
+  record in place. A step is ticked from what was saved on the record (new read: `GET /api/v1/trial/one-story`);
+  opening the call, the report, Records or Trends from the story is the person's own mark
+  (`POST /api/v1/trial/one-story/marks`, kept on the trial's request, no business record changes).
+- **The sample first, then your data.** The sample walks SAMPLE-RV-11. After step 10, "Do the same with your data"
+  runs the same ten steps on the trial's own most urgent imported complaint: the most serious harm, then the shortest
+  clock. Where the file lacks a fact, the step says so and the complaint page asks for it. The sample's last step shows
+  the monitor's own trend, then the OrbitCare 300 Rev B rise.
+- **Everything else folds under "More ways to explore"**: the shorter stories, the ten chapters, the trial journey,
+  the sample data and your trial.
+
+### Changed: the record pages, Home, Team and Import (new navigation)
+
+- **One Next step, one progress indicator.** On the story's own complaint the rail's Next step is the story's step,
+  and the story is a slim "Story · Step N of 10 · Back" pill. The complaint and report pages show one status line,
+  "Stage 2 of 6 · …", in place of the chevrons; on the complaint page its steps are links (Market assessment opens the
+  tree, Report the report).
+- **The complaint page:** harm in words ("No harm reported", "Serious injury", "Not known yet"), with patient
+  involvement on its own line; checklist lines name the step and its state, never a goal beside a state that denies it;
+  each missing fact is asked once, in Details ("Asked below" elsewhere); one clock line in the header ("Shortest
+  possible: 8 days left · due Mon 9 Nov").
+- **Home, every persona:** a slim "Continue the story" banner on the sample; on your data, the most urgent complaint
+  and what the file did not say; "Story complete" once done. The tiles say "Reading…" while loading and each opens the
+  list it counts. Overdue is now the complaint list view "Overdue" (`GET /api/v1/complaints?view=overdue`), so the tile
+  and the list are one number. The trend card draws observed and expected as bars.
+- **All open complaints** lists the most urgent first: overdue, then the nearest clock, the undated last.
+- **Team: several personas per colleague.** The owner ticks one or more personas (`personas` on
+  `POST /api/v1/trial/team` and `POST /api/v1/trial/team/{id}/persona`). The first persona's role is the account role,
+  the others additional roles, so the rights add up; nobody approves what they prepared. The colleague switches
+  "Viewing as" between their own personas only; with one, it stays locked. Audited as TRIAL_PERSONA_ASSIGNED with the
+  personas before and after. Pilot users keep their role's one persona.
+- **Import your data:** one drop zone that detects which of the 18 objects a file is
+  (`POST /api/v1/data/import/detect`, nothing saved), "Choose a file" as the main button, and the 7 core objects in
+  loading order with what each unlocks and whether it is loaded ("More objects (11)" folded). A blank serious-injury
+  cell is flagged in the rows to check: it is asked at the decision tree, never filled in.
+- **Smaller fixes:** page heads name the section and the page's question, with the time zone once, on Home (U-15);
+  the trend sentence names its 30-day window and an investigation's scope says it counts every linked complaint; a
+  call's reference (SAMPLE-URG-01) opens as "a call, not a complaint yet", search finds calls, and Home's next action
+  opens its triage card; on a phone the tab bar shows that more tabs exist; one avatar on the top bar; the colleague
+  welcome links Getting started.
+
 ## [0.10.81] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): the Critical, High and Medium findings of the functional review of
