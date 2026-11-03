@@ -134,3 +134,32 @@ def test_the_story_is_the_teams_one_step_for_every_colleague():
         assert mine["current"] == theirs["current"] == 1
     finally:
         _purge(tenant_id)
+
+
+def test_every_deadline_a_person_reads_is_in_the_organizations_time_zone(fic):
+    """The same clock read "EST" on the complaint page and "GMT" in its triage table. Every deadline label is now
+    written in the organization's time zone (Settings' working calendar), whichever market's it is."""
+    from backend.app.db.session import SessionLocal
+    from backend.app.reportability import deadlines
+
+    user, complaint_id = fic["user"], fic["complaint_id"]
+    db = SessionLocal()
+    try:
+        zone = deadlines.org_zone(db, fic["tenant_id"])
+    finally:
+        db.close()
+    row = _triage_row(user, complaint_id)
+    event = _ok(user.get("/api/v1/oversight/events/FIC-2001"))
+    labels = [d["due_label"] for d in row["deadlines"] if d["due_label"]] + [
+        item["due_label"] for item in event["work"]["due"]
+    ]
+    from datetime import datetime
+
+    for deadline in [d for d in row["deadlines"] if d["due_at"]]:
+        at = datetime.fromisoformat(deadline["due_at"])
+        assert deadline["due_label"] == deadlines.moment_label(at, zone)
+    suffixes = {label.rsplit(" ", 1)[1] for label in labels}
+    assert len(suffixes) == 1, labels
+    (header,) = [item for item in event["work"]["due"] if item["key"].endswith(":facts")]
+    earliest = min((d for d in row["deadlines"] if d["due_at"]), key=lambda d: d["due_at"])
+    assert header["due_label"] == earliest["due_label"]

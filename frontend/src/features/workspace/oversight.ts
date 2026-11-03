@@ -28,7 +28,7 @@ export type Alert = {
   ref: string | null;
   owner: string | null;
   due_at: string;
-  /** "Sat 28 Nov 2026, 23:59 IST": a legal deadline in the time zone it ends in; anything else in the organization's. */
+  /** "Sat 28 Nov 2026, 23:59 IST": in the organization's time zone, like every deadline (0.10.84). */
   due_label?: string;
   state: ItemState;
   state_label: string;
@@ -73,7 +73,7 @@ export type OversightItem = {
   queue: string | null;
   away: { backup: string } | null;
   due_at: string;
-  /** "Sat 28 Nov 2026, 23:59 IST": a legal deadline in the time zone it ends in; anything else in the organization's. */
+  /** "Sat 28 Nov 2026, 23:59 IST": in the organization's time zone, like every deadline (0.10.84). */
   due_label?: string;
   state: ItemState;
   state_label: string;

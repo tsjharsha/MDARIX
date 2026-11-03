@@ -180,7 +180,14 @@ def test_the_india_sample_drafts_an_mdae_v12_worksheet_in_field_order(trial):  #
         # India counts the awareness day as day 1 (0.10.63, the MVP's conservative rule): day 15 is awareness + 14.
         assert obligation.due_on == aware + timedelta(days=14)
     assert detail["deadline"]["due_on"] == (aware + timedelta(days=14)).isoformat()
-    assert detail["deadline"]["due_label"].endswith("23:59 IST") or detail["deadline"]["due_zone"] != "Asia/Kolkata"
+    # 0.10.84: the label is in the organization's time zone, whichever market's deadline it is.
+    from backend.app.reportability import deadlines
+
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        assert detail["deadline"]["due_label"] == deadlines.moment_label(
+            datetime.fromisoformat(detail["deadline"]["due_at"]), org_zone(db, trial["tenant_id"])
+        )
     refused = trial["user"].post(
         f"{REPORTS}/{item['id']}/submissions",
         json={
