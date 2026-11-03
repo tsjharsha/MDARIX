@@ -40,7 +40,12 @@ API and web images change. No operator step: `refresh_trial_story.py` has nothin
 - **The complaint page:** harm in words ("No harm reported", "Serious injury", "Not known yet"), with patient
   involvement on its own line; checklist lines name the step and its state, never a goal beside a state that denies it;
   each missing fact is asked once, in Details ("Asked below" elsewhere); one clock line in the header ("Shortest
-  possible: 8 days left · due Mon 9 Nov").
+  possible: 5 days left · due Sun 8 Nov").
+- **"Shortest possible" is the true shortest deadline** (trials and pilots). While a complaint waits for its country or
+  awareness date, its provisional clock is now the earliest per-market deadline its triage table shows, on the
+  complaint page, Home, the story's hero and the reportability watch: one calculation. It read a later reporting
+  window's date before (an imported serious injury with no country: Mon 9 Nov on the page, Sun 8 Nov for Great Britain
+  in its own triage table).
 - **Home, every persona:** a slim "Continue the story" banner on the sample; on your data, the most urgent complaint
   and what the file did not say; "Story complete" once done. The tiles say "Reading…" while loading and each opens the
   list it counts. Overdue is now the complaint list view "Overdue" (`GET /api/v1/complaints?view=overdue`), so the tile

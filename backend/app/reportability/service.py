@@ -339,6 +339,7 @@ def watch(
     names = people(control_db, tenant_id, (row.decided_by for row in decisions.values()))
     assessed = assessments.rows_by_complaint(db, tenant_id, ids)
     items = []
+    shortest = None
     for complaint, record in candidates:
         seen = assess(
             complaint,
@@ -356,6 +357,12 @@ def watch(
             record, windows, assessed.get(complaint.id, {}), aware, today, org_zone
         )
         seen["binding"] = binding_of(seen["binding"], seen["markets"])
+        if seen["needs"] and seen["binding"]:
+            # Waiting for its country or awareness date, the clock is the shortest possible: the earliest of the
+            # per-market deadlines the triage table shows, one calculation for every screen (0.10.82).
+            if shortest is None:
+                shortest = triage_shortest(db, control_db, tenant_id, today)
+            seen["binding"] = shortest_binding(seen["binding"], shortest.get(str(complaint.id)))
         # Settled by an earlier single decision, by its case's completed regulatory review, or by every market's
         # signed conclusion (reportable ones with their filing recorded).
         is_decided = decided is not None or seen["settled_by_case"] or assessments.settled(seen["markets"])
@@ -511,6 +518,39 @@ def clocks_for(
         )
     order = {state: index for state, index in rules.STATE_ORDER.items()}
     return sorted(found, key=lambda item: (order.get(item["state"], 9), (item["binding"] or {}).get("due_at") or ""))
+
+
+def triage_shortest(db: Session, control_db, tenant_id: uuid.UUID, now) -> dict[str, dict]:
+    """Each complaint's earliest per-market deadline as triage counts it (intake/rules.py provisional_deadlines, each
+    market's conservative category), by the complaint's id: what "shortest possible" means on every screen.
+    shortcut: reads the whole triage list once per watch read; fine for a trial's or pilot's hundreds of open events,
+    read only the complaints asked for if a watch ever holds thousands."""
+    from backend.app.intake import service as intake
+
+    found: dict[str, dict] = {}
+    for item in intake.triage(db, control_db, tenant_id, "all", deadlines.as_moment(now))["items"]:
+        dated = [deadline for deadline in item["deadlines"] if deadline.get("due_at")]
+        if not dated:
+            continue
+        first = min(dated, key=lambda deadline: deadline["due_at"])
+        for key in item["members"]:
+            kind, record_id = key.split(":", 1)
+            if kind == intake.COMPLAINT:
+                found[record_id] = first
+    return found
+
+
+def shortest_binding(binding: dict, triage_first: dict | None) -> dict:
+    """A provisional binding clock read as triage's earliest deadline (its day, time, zone and state), the rest kept;
+    as it was when triage has no deadline for the complaint."""
+    if not triage_first:
+        return binding
+    keys = ("due_date", "due_at", "due_zone", "due_label", "days_left", "state")
+    return {
+        **binding,
+        **{key: triage_first[key] for key in keys if key in triage_first},
+        "window": triage_first["basis"],
+    }
 
 
 def binding_of(window_clock: dict | None, market_items: list[dict]) -> dict | None:

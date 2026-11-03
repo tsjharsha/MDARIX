@@ -273,3 +273,27 @@ def test_a_call_not_yet_a_complaint_opens_its_own_triage_card_from_home(trial):
         call["opens"]["tab"] == f"Triage?intake={call['opens']['target']['record']['id']}" for call in calls
     )
     assert all(call["title"].startswith("Triage not done yet (") for call in calls)
+
+
+def test_the_shortest_possible_clock_is_the_earliest_deadline_the_triage_table_shows():
+    """A complaint waiting for its country and awareness date: the complaint page's one clock line, Home's next action
+    and the story's hero all read "shortest possible" from one calculation, the earliest per-market deadline of its
+    triage table (GB's 10 days counted from the awareness day), never a later window's (0.10.82)."""
+    user, approval, _ = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    try:
+        _ok(user.post("/api/v1/data/import/complaints?file_name=own.csv", content=CSV.encode()))
+        event = _ok(user.get("/api/v1/oversight/events/OS-1002"))
+        complaint_id = event["event"]["complaint_id"]
+        (header,) = [item for item in event["work"]["due"] if item["key"].endswith(":facts")]
+        triage = _ok(user.get("/api/v1/triage", params={"show": "all"}))["items"]
+        (row,) = [item for item in triage if f"COMPLAINT:{complaint_id}" in item["members"]]
+        earliest = min((deadline for deadline in row["deadlines"] if deadline["due_at"]), key=lambda d: d["due_at"])
+        # The same moment and day; each screen writes the time in its own zone (the organization's or the market's).
+        assert header["due_at"] == earliest["due_at"]
+        assert header["due_label"].split(",")[0] == earliest["due_label"].split(",")[0]
+        home = _ok(user.get("/api/v1/oversight", params={"show": "all"}))["items"]
+        (line,) = [item for item in home if item["key"] == f"watch:{complaint_id}:facts"]
+        assert line["due_at"] == earliest["due_at"]
+    finally:
+        _purge(tenant_id)
