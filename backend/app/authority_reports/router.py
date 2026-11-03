@@ -674,7 +674,8 @@ def _list_paths(db, control_db, ctx, tenant_id, obligations: list[ReportObligati
             for name, holds in (
                 ("open", row.state not in rules.CLOSED),
                 ("my-approval", mine),
-                ("submitted-month", row.id in latest and latest[row.id] >= month),
+                # Submitted, and still so: a report sent back for correction is not (0.10.81).
+                ("submitted-month", row.state in rules.SUBMITTED and row.id in latest and latest[row.id] >= month),
             )
             if holds
         ]

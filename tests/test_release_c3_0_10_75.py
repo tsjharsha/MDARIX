@@ -263,8 +263,13 @@ def test_the_sample_reports_fit_the_status_path(trial):
     us, india = items["SAMPLE-RV-09"], items["SAMPLE-RV-10"]
     assert (us["state"], us["stage"], us["stage_label"]) == ("ACCEPTED", "ACKNOWLEDGED", "Acknowledged")
     assert us["views"] == [] or us["views"] == ["submitted-month"]
-    assert (india["state"], india["stage"]) == ("CORRECTION_REQUIRED", "COMPLETE")
-    assert india["mandatory"]["filled"] == india["mandatory"]["total"] and "open" in india["views"]
+    # 0.10.81: sent back for correction, it is neither complete nor submitted this month.
+    assert (india["state"], india["stage"], india["stage_label"]) == (
+        "CORRECTION_REQUIRED",
+        "CREATED",
+        "Draft: correction required",
+    )
+    assert india["mandatory"]["filled"] == india["mandatory"]["total"] and india["views"] == ["open"]
 
 
 def test_the_classic_navigation_keeps_its_rules_and_the_refresh_adds_the_report_once():
@@ -339,7 +344,8 @@ def test_the_decision_trees_show_each_market_and_the_path_a_complaint_took(trial
         ("DRAFT", 3, False, "CREATED"),
         ("DRAFT", 0, False, "COMPLETE"),
         ("DRAFT", 0, True, "APPROVAL"),
-        ("CORRECTION_REQUIRED", 0, False, "COMPLETE"),
+        ("CORRECTION_REQUIRED", 0, False, "CREATED"),
+        ("CORRECTION_REQUIRED", 0, True, "APPROVAL"),
         ("APPROVED", 0, False, "APPROVED"),
         ("SUBMITTED_PENDING", 0, False, "SUBMITTED"),
         ("SUBMITTED_NO_ACK", 0, False, "SUBMITTED"),
