@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Lock } from "lucide-react";
+import { Lock, Pencil } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
 import { Panel } from "../../admin/console/charts";
 import { ConfirmDialog, send, useResource, type Confirmation, type Resource } from "../../customer-admin/shared";
@@ -166,9 +166,13 @@ function ChangePersonas({
   const same = picked.map((item) => item.code).join() === held.join();
   return (
     <details className="uw-team-change">
+      {/* A control the owner changes: its own word, never the lock that means "set for you" (0.10.84, L2). */}
       <summary>
-        <Lock size={13} aria-hidden="true" /> {personaList(member.personas?.length ? member.personas : picked)}
-        <span className="ca-sr-only"> · change the personas of {member.display_name || member.email}</span>
+        {personaList(member.personas?.length ? member.personas : picked)} ·{" "}
+        <span className="ac-link">
+          <Pencil size={13} aria-hidden="true" /> Change
+        </span>
+        <span className="ca-sr-only"> the personas of {member.display_name || member.email}</span>
       </summary>
       <PersonaTicks personas={personas} chosen={chosen} onChange={setChosen} legend="Personas" disabled={busy} />
       <button

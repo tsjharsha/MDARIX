@@ -14,6 +14,7 @@ import { ONE_STORY_PATH, stepPlace, type StoryRun } from "./oneStory";
 import { NewRecordsSection } from "./sections/Records";
 import { awarenessInput } from "./intake";
 import { loadedObjects } from "./sections/ImportData";
+import { TeamView, type Team } from "./sections/TrialTeam";
 import { eventPath } from "./oversight";
 import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 import { rv11 } from "../../test/rv11";
@@ -379,5 +380,45 @@ describe("L1: Import's checklist counts what a complaints file created", () => {
     const loaded = loadedObjects(runs);
     expect(loaded.complaints.rows).toBe(4);
     expect(loaded.products.rows).toBe(1);
+  });
+});
+
+describe("L2: the control that changes a colleague's personas says Change, not a lock", () => {
+  it("shows the owner a Change control, and keeps the lock for what is set for you", () => {
+    const team = {
+      can_invite: true,
+      can_manage: true,
+      limit: 50,
+      seats_used: 2,
+      members: [
+        {
+          id: "u2",
+          display_name: "Rahul Iyer",
+          email: "rahul@example.invalid",
+          status: "ACTIVE",
+          is_owner: false,
+          is_you: false,
+          persona: "regulatory",
+          persona_label: "Regulatory Leader",
+          persona_locked: false,
+          personas: [{ code: "regulatory", label: "Regulatory Leader" }],
+        },
+      ],
+      personas: [{ code: "regulatory", label: "Regulatory Leader", sub: "Reports" }],
+    } as unknown as Team;
+    const html = renderToStaticMarkup(
+      <TeamView
+        team={{ state: "ready", data: team, reload: () => undefined }}
+        busy={false}
+        message={null}
+        onInvite={async () => true}
+        onResend={() => undefined}
+        onConfirm={() => undefined}
+        onChanged={() => undefined}
+      />,
+    );
+    const summary = html.slice(html.indexOf('class="uw-team-change"'), html.indexOf("</summary>"));
+    expect(summary).toContain("Change");
+    expect(summary).not.toContain("lucide-lock");
   });
 });

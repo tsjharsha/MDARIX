@@ -272,8 +272,8 @@ describe("the team: a persona per invitation", () => {
       />,
     );
     expect(seen).toContain('aria-label="set by the trial owner"');
-    expect(seen).not.toContain("change the personas of Rahul Colleague");
-    expect(markup).toContain("change the personas of Rahul Colleague");
+    expect(seen).not.toContain("the personas of Rahul Colleague");
+    expect(markup).toContain("the personas of Rahul Colleague");
     const confirm = personaConfirmation(team.members[1], [team.personas![5]], () => undefined);
     expect(confirm.title).toBe("Make Rahul Colleague a Decision Maker?");
     expect(confirm.body).toContain("signs as its role");
