@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { formatDay, localDay } from "../../../app/dates";
+import { formatDateTime, formatDay, localDay } from "../../../app/dates";
 import {
   chooseCase,
   sectionAllowed,
@@ -149,6 +149,9 @@ export type SignedRecord = {
   signed_at: string | null;
   signed_by: string | null;
   meaning: string | null;
+  /** 0.10.83 (D2.8): the moment, and the meaning in a few words (21 CFR 11.50). */
+  signed_at_time?: string | null;
+  meaning_label?: string | null;
   complaint: { id: string; ref: string } | null;
   investigation: { id: string; ref: string } | null;
 };
@@ -175,8 +178,9 @@ export function LatestSigned({ record }: { record: SignedRecord }) {
   return (
     <Panel eyebrow="Your latest signed record" title={reference ? `${record.what} · ${reference}` : record.what}>
       <p className="ac-muted">
-        Signed {formatDate(record.signed_at)}
-        {record.signed_by ? ` by ${record.signed_by}` : ""}. Ready to hand to a colleague or an inspector.
+        {record.signed_by ?? "Signed"} ·{" "}
+        {record.signed_at_time ? formatDateTime(record.signed_at_time) : formatDate(record.signed_at)}
+        {record.meaning_label ? ` · ${record.meaning_label}` : ""}. Ready to hand to a colleague or an inspector.
       </p>
       <div className="ca-action-row">
         {canExport && record.complaint && (

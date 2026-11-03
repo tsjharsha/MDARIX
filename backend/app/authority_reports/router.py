@@ -435,7 +435,12 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "status_labels": worksheet.STATUS_LABELS,
         "editable": obligation.state in rules.EDITABLE,
         "snapshots": [_snapshot_view(row, names) for row in reversed(snapshots)],
-        "pending_snapshot": _snapshot_view(pending, names) if pending else None,
+        # The approver reads the values as frozen, in the form's order, with each value's source (0.10.83, D2.8).
+        "pending_snapshot": {**_snapshot_view(pending, names), "sections": (pending.fields or {}).get("sections")}
+        if pending
+        else None,
+        # Every signature on the report: who, when and what it means (21 CFR 11.50; 0.10.83, D2.8).
+        "signatures": signatures(context, pending or approved, names),
         "cannot_approve": sorted({names.get(ref) or "A colleague" for ref in (*_preparers(obligation), signer) if ref}),
         # Who approves, before anyone types a password: for the waiting snapshot, else for the one this person asks.
         "approval": standing(
@@ -1045,6 +1050,95 @@ def set_field(
     return detail(db, control_db, ctx, obligation)
 
 
+class OnceRequest(BaseModel):
+    # A product's or the organization's facts, by field id (the US product code and its 510(k) number go together).
+    values: dict[str, str] = Field(max_length=10)
+
+
+_PARTY_MARKET = {"US": "US", "EU_NI": "EU", "GB": "GB", "IN": "IN", "CA": "CA"}
+_US_TYPES = (("DEN", "DE_NOVO"), ("P", "PMA"), ("K", "510K"))
+
+
+@router.put("/{obligation_id}/once", dependencies=[DECIDERS])
+def enter_once(
+    obligation_id: uuid.UUID,
+    payload: OnceRequest,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Enter a product's or the organization's fact once, for every report (0.10.83, D2.7; usability U-10): it is saved
+    on the product (its identity or its registration) or as the market's responsible party, with an audit record,
+    and every report of that product reads it from there. A fact the product already holds is never overwritten."""
+    from backend.app import regulatory_reference as reference
+
+    tenant_id = _tenant(ctx)
+    obligation = _obligation(db, tenant_id, obligation_id, lock=True)
+    if obligation.state not in rules.EDITABLE:
+        raise _error(409, "NOT_A_DRAFT", "Only a draft is changed: reopen it first")
+    fields = {item.id: item for item in _form(obligation).fields()}
+    values = {key: _text(value, 200) for key, value in payload.values.items() if _text(value, 200)}
+    if not values:
+        raise _error(422, "NOTHING_TO_SAVE", "Enter the value")
+    sources = {}
+    for field_id in values:
+        field = fields.get(field_id)
+        if field is None or not worksheet.once_of(field.source):
+            raise _error(422, "NOT_ENTERED_ONCE", f"Field {field_id} is entered on this report, not once")
+        sources[field.source] = values[field_id]
+    context = _context(db, control_db, obligation)
+    product = context["product"]
+    market = _PARTY_MARKET.get(obligation.market, obligation.market)
+    done: list[dict] = []
+    identity = {worksheet.ONCE_IDENTITY[key]: value for key, value in sources.items() if key in worksheet.ONCE_IDENTITY}
+    registration = {
+        worksheet.ONCE_REGISTRATION[key][1]: value
+        for key, value in sources.items()
+        if key in worksheet.ONCE_REGISTRATION
+    }
+    parties = {worksheet.ONCE_PARTY[key]: value for key, value in sources.items() if key in worksheet.ONCE_PARTY}
+    if (identity or registration) and product is None:
+        raise _error(409, "NO_PRODUCT", "This complaint names no product: enter the value on this report")
+    if identity:
+        held = {column: getattr(product, column) for column in reference.IDENTITY_COLUMNS}
+        clash = [column for column, value in identity.items() if held.get(column) and held[column] != value]
+        if clash:
+            raise _error(409, "PRODUCT_HOLDS_A_VALUE", "The product already holds this value: change it in Products")
+        reference.set_identity(db, tenant_id, product.id, {**held, **identity}, control_db)
+        done.append({"product": product.product_identifier, **identity})
+    if registration:
+        number = registration.get("registration_number")
+        kind = {"IN": "CDSCO_LICENCE", "GB": "UKCA", "CA": "MDL"}.get(market)
+        if market == "US":
+            if not (number and registration.get("product_code")):
+                raise _error(422, "BOTH_NEEDED", "Give both the FDA product code and the 510(k), PMA or De Novo number")
+            kind = next((code for prefix, code in _US_TYPES if number.upper().startswith(prefix)), "EXEMPT")
+        reference.add_registration(
+            db, tenant_id, product.id, {"market": market, "registration_type": kind, **registration}, control_db
+        )
+        done.append(
+            {"product": product.product_identifier, "market": market, "registration_type": kind, **registration}
+        )
+    for role, organisation in parties.items():
+        held = next(
+            (
+                item
+                for item in reference.responsible_parties(db, tenant_id)
+                if item["market"] == market and item["role"] == role
+            ),
+            None,
+        )
+        if held is not None:
+            raise _error(
+                409, "PARTY_EXISTS", "Your organization's details for this market are set: change them in Settings"
+            )
+        reference.set_party(db, tenant_id, {"market": market, "role": role, "organisation": organisation})
+        done.append({"market": market, "role": role, "organisation": organisation})
+    _audit(db, ctx, "REPORT_FACT_ENTERED_ONCE", obligation, None, {"saved": done}, fields=sorted(values))
+    db.commit()
+    return detail(db, control_db, ctx, obligation)
+
+
 def _entry_values(field_id: str, entry: dict | None) -> dict:
     """A worksheet entry as the audit keeps it: its value, codes and whether it was a confirmation."""
     entry = entry or {}
@@ -1185,7 +1279,8 @@ def _approval_tasks(db, control_db, ctx, obligation: ReportObligation, snapshot:
         obligation.tenant_id,
         source_type=OBJECT_TYPE,
         source_id=snapshot.id,
-        title=f"Approve snapshot {snapshot.version} of the {_form(obligation).title} for {ref}",
+        # One task per approver, in plain words (0.10.83, D2.8; usability U-09): no "snapshot", the customer's reference.
+        title=_task_title(db, control_db, obligation, snapshot),
         due_at=due,
         excluded={*(snapshot.preparers or []), (snapshot.fields or {}).get("conclusion_signer")},
         requester=actor,
@@ -1201,6 +1296,15 @@ def _approval_tasks(db, control_db, ctx, obligation: ReportObligation, snapshot:
     )
 
 
+def _task_title(db, control_db, obligation: ReportObligation, snapshot: ReportSnapshot) -> str:
+    """ "Approve the India report for SAMPLE-RV-10 (prepared by Asha Quality)"."""
+    complaint = db.get(Complaint, obligation.complaint_id)
+    ref = complaint_ref(complaint) if complaint is not None else (snapshot.fields or {}).get("complaint")
+    market = markets.MARKET_LABELS.get(obligation.market, obligation.market).split(" (")[0]
+    preparer = _names(control_db, obligation.tenant_id, [snapshot.requested_by]).get(snapshot.requested_by)
+    return f"Approve the {market} report for {ref}" + (f" (prepared by {preparer})" if preparer else "")
+
+
 class ApproveRequest(BaseModel):
     password: str = Field(min_length=1, max_length=128)
     mfa_code: str | None = Field(default=None, max_length=12)
@@ -1208,9 +1312,46 @@ class ApproveRequest(BaseModel):
 
 def signature_meaning(form_title: str, version: int, ref: str) -> str:
     return (
-        f"I approve snapshot {version} of the {form_title} for {ref} as the content to submit. MDARIX does not "
-        "submit it."
+        f"I approve version {version} of the {form_title.replace(' worksheet', '')} for {ref} as the content to "
+        "submit. MDARIX does not submit it."
     )
+
+
+def signatures(context: dict, snapshot: ReportSnapshot | None, names: dict) -> list[dict]:
+    """The report's signatures in order, each with the signer's full name, the moment and its meaning: the market
+    conclusion it rests on, the preparation sent for approval, and the approval (a practice approval says so)."""
+    found = []
+    current = context["current"]
+    if current is not None and current.signed_at:
+        found.append(
+            {
+                "name": names.get(current.signed_by) or "A colleague",
+                "at": _iso(current.signed_at),
+                "meaning": f"signed {markets.CONCLUSION_LABELS.get(current.conclusion, '').lower()}",
+            }
+        )
+    if snapshot is not None:
+        found.append(
+            {
+                "name": names.get(snapshot.requested_by) or "A colleague",
+                "at": _iso(snapshot.requested_at),
+                "meaning": "prepared",
+            }
+        )
+        if snapshot.approved_by:
+            practice = snapshot.approved_by in (snapshot.preparers or []) or snapshot.approved_by == (
+                snapshot.fields or {}
+            ).get("conclusion_signer")
+            found.append(
+                {
+                    "name": names.get(snapshot.approved_by) or "A colleague",
+                    "at": _iso(snapshot.approved_at),
+                    "meaning": "practice approval (the preparer, working alone in the trial)"
+                    if practice
+                    else "approved for submission",
+                }
+            )
+    return found
 
 
 @router.post("/{obligation_id}/snapshots/{snapshot_id}/approve", dependencies=[DECIDERS])

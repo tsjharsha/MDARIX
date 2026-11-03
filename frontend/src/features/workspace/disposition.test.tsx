@@ -98,7 +98,7 @@ const screen = (overrides: Partial<DispositionScreen> = {}): DispositionScreen =
   ],
   training_required: true,
   trained_colleagues: [],
-  starter_mark: "Starter text — awaiting regulatory confirmation: check it against your own procedure.",
+  starter_mark: "Starter, for your consultant to confirm.",
   practice_label:
     "Practice record: made in a free trial with sample or de-identified data. Not your regulatory record.",
   ...overrides,

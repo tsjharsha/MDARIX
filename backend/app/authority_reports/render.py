@@ -69,12 +69,34 @@ def _sources(view: dict) -> dict[str, list[str]]:
     return dict(sorted(found.items()))
 
 
+def _moment(value: str | None) -> str:
+    """ "2 Nov 2026, 09:02 UTC": a signature's moment as printed (21 CFR 11.50)."""
+    from datetime import datetime, timezone
+
+    if not value:
+        return "-"
+    at = datetime.fromisoformat(value).astimezone(timezone.utc)
+    return f"{at.day} {at:%b %Y, %H:%M} UTC"
+
+
 def manifestation(view: dict) -> list[str]:
     signature = view.get("signature")
     if not signature:
         return ["Not approved: a working draft or a snapshot waiting for approval is not the content to submit."]
+    snapshot = view.get("snapshot") or {}
+    others = [
+        f"{item['name']} · {_moment(item['at'])} · meaning: {item['meaning']}"
+        for item in view.get("signatures") or []
+        if not item["meaning"].startswith(("approved", "practice"))
+    ]
     return [
-        f"Approved by {signature['signer_name']} ({signature['signer_role']}) on {signature['signed_at']}.",
+        *others,
+        f"Approved by {signature['signer_name']} ({signature['signer_role']}) · {_moment(signature['signed_at'])} · "
+        + (
+            "meaning: practice approval (the preparer, working alone in the trial)"
+            if snapshot.get("same_person")
+            else "meaning: approved for submission"
+        ),
         f"Meaning: {signature['meaning']}",
         f"Signature record: {signature['record_business_id'] or signature['record_id']}.",
         f"Content checksum (SHA-256 of the snapshot): {signature['content_fingerprint']}",

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, FileText, Send } from "lucide-react";
+import { FileText, Send } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Table, errorText, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
@@ -13,7 +13,6 @@ import {
   askNote,
   deadlineDue,
   deadlineText,
-  isMissing,
   reportPlace,
   reportsInView,
   type Mandatory,
@@ -38,6 +37,8 @@ import {
   useCanReport,
 } from "./Reports";
 import { ListViewPicker } from "./Views";
+import { STARTER_LABEL } from "../../shared/standards";
+import { ApprovingDoc, ThingsToGive, signatureLine } from "./ReportBody";
 
 /** What MDARIX does with an authority report, said once where it matters (Release C guardrail 3). */
 export const NEVER_SUBMITS =
@@ -61,8 +62,9 @@ export function reportNext(detail: Pick<ReportDetail, "stage" | "state" | "manda
   const correction = detail.state === "CORRECTION_REQUIRED" ? " A correction is required after a rejection." : "";
   switch (detail.stage) {
     case "CREATED":
+      // The count is said once, on the page (0.10.83, D2.7).
       return {
-        title: `Fill the ${missing} missing mandatory field${missing === 1 ? "" : "s"}`,
+        title: missing ? "Give what is missing" : "Ready for approval",
         detail: `Send for approval opens when every mandatory field is filled.${correction}`,
       };
     case "COMPLETE":
@@ -222,7 +224,7 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
                 <span>{form.title.replace(/ worksheet$/, "")}</span>
                 <span className="ac-muted">{versionWords(form.version)}</span>
                 {form.starter ? (
-                  <ToneBadge tone="neutral" label="Starter, for your consultant to confirm" />
+                  <ToneBadge tone="neutral" label={STARTER_LABEL} />
                 ) : (
                   <ToneBadge tone="good" label="In MDARIX today" />
                 )}
@@ -243,7 +245,6 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   const storyRun = runOfReport(useOneStory(!!isTrial).data, id);
   const resource = useResource<ReportDetail>(`${REPORTS}/${id}`);
   const [shown, setShown] = useState<ReportDetail | null>(null);
-  const [onlyMissing, setOnlyMissing] = useState(false);
   const canWrite = useCanReport();
   const canExport = useCan("data.export");
   const detail = shown?.id === id ? shown : resource.data;
@@ -286,6 +287,11 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
     }
   };
   const write = canWrite && detail.state !== "CANCELLED";
+  const approving = canWrite && detail.stage === "APPROVAL" && !!detail.approval?.may_approve;
+  const approvedBy =
+    detail.stage === "APPROVED"
+      ? (detail.signatures ?? []).find((item) => /^(approved|practice)/.test(item.meaning))
+      : undefined;
   return (
     <div className="uw-cp uw-report-page">
       <div className="uw-topline">
@@ -353,73 +359,79 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
         )}
       </header>
       <div className="uw-rec">
-        <section className="uw-card uw-rec-main" aria-label="The form's fields">
-          <div className="uw-card-head">
-            <h2>Form fields, in the form's order</h2>
-            <label className="ca-check">
-              <input type="checkbox" checked={onlyMissing} onChange={(event) => setOnlyMissing(event.target.checked)} />{" "}
-              Show only missing
-            </label>
-          </div>
-          <div className="uw-rp-meterbar">
-            <span className="uw-meter is-big" aria-hidden="true">
-              <i style={{ width: `${meter.share}%` }} />
-            </span>
-            <span>
-              <strong>{meter.text} fields filled</strong> · each field says where its value comes from
-            </span>
-          </div>
-          <div className="uw-rec-body">
-            {write && detail.stage === "APPROVED" && (
-              <section className="uw-rec-part" id="rp-submission" aria-label="Record the submission">
-                <h2>Record the submission</h2>
-                <RecordSubmission detail={detail} onChanged={changed} quiet />
+        <div className="rp-main">
+          {/* 0.10.83 (D2.7): what is missing first, grouped by who knows it; the full report folds away meanwhile. */}
+          {write && <ThingsToGive detail={detail} onChanged={changed} canEdit={write} />}
+          {/* 0.10.83 (D2.8): the approver reads what they approve, then approves below it. */}
+          {approving && (
+            <>
+              <ApprovingDoc detail={detail} />
+              <section className="uw-card uw-card-pad" aria-label="Approve">
+                <Approval detail={detail} onChanged={changed} />
               </section>
-            )}
-            {write && detail.stage === "SUBMITTED" && detail.submissions[0] && (
-              <section className="uw-rec-part" aria-label="Record the acknowledgement">
-                <h2>Record the acknowledgement</h2>
-                <RecordEvidence detail={detail} attempt={detail.submissions[0]} onChanged={changed} />
-              </section>
-            )}
-            {write && detail.stage === "ACKNOWLEDGED" && detail.state !== "COMPLETE" && (
-              <section className="uw-rec-part" aria-label="After acknowledgement">
-                <h2>After acknowledgement</h2>
-                <AfterAcceptance
-                  detail={detail}
-                  onChanged={changed}
-                  onOpen={(other) => open(reportPlace(other).section, reportPlace(other).tab)}
-                />
-              </section>
-            )}
-            {detail.sections
-              .filter((section) => section.fields.length && (!onlyMissing || section.fields.some(isMissing)))
-              .map((section) => (
-                <section key={section.code} className="uw-rec-part" aria-label={section.title}>
-                  <h2>{section.title}</h2>
-                  {section.note && <p className="ac-muted">{section.note}</p>}
-                  <ul className="uw-rp-fields">
-                    {(onlyMissing ? section.fields.filter(isMissing) : section.fields).map((item) => (
-                      <FieldRow
-                        key={item.id}
-                        detail={detail}
-                        item={item}
-                        onChanged={changed}
-                        canEdit={write && detail.editable}
-                      />
-                    ))}
-                  </ul>
+            </>
+          )}
+          <details
+            className="uw-card uw-rec-main rp-fold"
+            open={!approving && (!missing || !write)}
+            hidden={approving}
+            aria-label="The form's fields"
+          >
+            <summary className="uw-card-head">
+              <h2>The report, in the form's order</h2>
+              <span className="ac-muted">
+                {missing && write ? "Show" : "Each field says where its value comes from"}
+              </span>
+            </summary>
+            <div className="uw-rec-body">
+              {write && detail.stage === "APPROVED" && (
+                <section className="uw-rec-part" id="rp-submission" aria-label="Record the submission">
+                  <h2>Record the submission</h2>
+                  <RecordSubmission detail={detail} onChanged={changed} quiet />
                 </section>
-              ))}
-            {onlyMissing && missing === 0 && (
-              <p className="ac-muted">Nothing missing: every mandatory field is filled.</p>
-            )}
-            <SubmissionRecord detail={detail} />
-            <p className="ac-note">
-              {detail.starter_mark} Field order: {detail.form.source_document}.
-            </p>
-          </div>
-        </section>
+              )}
+              {write && detail.stage === "SUBMITTED" && detail.submissions[0] && (
+                <section className="uw-rec-part" aria-label="Record the acknowledgement">
+                  <h2>Record the acknowledgement</h2>
+                  <RecordEvidence detail={detail} attempt={detail.submissions[0]} onChanged={changed} />
+                </section>
+              )}
+              {write && detail.stage === "ACKNOWLEDGED" && detail.state !== "COMPLETE" && (
+                <section className="uw-rec-part" aria-label="After acknowledgement">
+                  <h2>After acknowledgement</h2>
+                  <AfterAcceptance
+                    detail={detail}
+                    onChanged={changed}
+                    onOpen={(other) => open(reportPlace(other).section, reportPlace(other).tab)}
+                  />
+                </section>
+              )}
+              {detail.sections
+                .filter((section) => section.fields.length)
+                .map((section) => (
+                  <section key={section.code} className="uw-rec-part" aria-label={section.title}>
+                    <h2>{section.title}</h2>
+                    {section.note && <p className="ac-muted">{section.note}</p>}
+                    <ul className="uw-rp-fields">
+                      {section.fields.map((item) => (
+                        <FieldRow
+                          key={item.id}
+                          detail={detail}
+                          item={item}
+                          onChanged={changed}
+                          canEdit={write && detail.editable}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              <SubmissionRecord detail={detail} />
+              <p className="ac-note">
+                {detail.starter_mark} Field order: {detail.form.source_document}.
+              </p>
+            </div>
+          </details>
+        </div>
         <aside className="uw-rail" aria-label="What to do next">
           <section className="uw-card uw-card-pad uw-rail-next">
             <h2>Next step</h2>
@@ -427,14 +439,11 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
             <p className="ac-muted">{next.detail}</p>
             {write && detail.stage === "CREATED" && (
               <>
-                <button type="button" className="ac-primary" onClick={() => setOnlyMissing(true)}>
-                  Show the missing fields <ChevronRight size={15} aria-hidden="true" />
-                </button>
                 <button type="button" className="ac-secondary" disabled aria-describedby="rp-why-send">
                   <Send size={15} aria-hidden="true" /> Send for approval
                 </button>
-                <p className="ac-muted" id="rp-why-send">
-                  {missing} mandatory field{missing === 1 ? "" : "s"} missing
+                <p className="sr-only" id="rp-why-send">
+                  Send for approval opens when every mandatory field is filled.
                 </p>
               </>
             )}
@@ -451,7 +460,14 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                 </button>
               </>
             )}
-            {canWrite && detail.stage === "APPROVAL" && <Approval detail={detail} onChanged={changed} />}
+            {canWrite &&
+              detail.stage === "APPROVAL" &&
+              (approving ? (
+                <p className="ac-muted">Read every value under “What you are approving”, then approve below it.</p>
+              ) : (
+                <Approval detail={detail} onChanged={changed} />
+              ))}
+            {approvedBy && <p className="dt-success">✓ {signatureLine(approvedBy)}</p>}
             {detail.stage === "APPROVED" && approved && (
               <>
                 {canExport ? (
@@ -479,21 +495,25 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
           </section>
           <section className="uw-card uw-card-pad uw-rail-signs" aria-label="Who signs">
             <h2>Who signs</h2>
-            <ul className="uw-rail-signers">
-              {(detail.preparers ?? []).map((person) => (
-                <li key={`p-${person}`} className="ms-chip">
-                  Prepared: {person}
-                </li>
+            <ul className="rp-signatures">
+              {(detail.signatures ?? []).map((item) => (
+                <li key={`${item.meaning}-${item.at}`}>{signatureLine(item)}</li>
               ))}
-              {approved?.approved_by ? (
-                <li className="ms-chip">Approved: {approved.approved_by}</li>
-              ) : (
-                (detail.approval?.approvers ?? []).map((person) => (
-                  <li key={`a-${person}`} className="ms-chip">
-                    May approve: {person}
+            </ul>
+            <ul className="uw-rail-signers">
+              {!detail.signatures?.length &&
+                (detail.preparers ?? []).map((person) => (
+                  <li key={`p-${person}`} className="ms-chip">
+                    Prepared: {person}
                   </li>
-                ))
-              )}
+                ))}
+              {approved?.approved_by
+                ? !detail.signatures?.length && <li className="ms-chip">Approved: {approved.approved_by}</li>
+                : (detail.approval?.approvers ?? []).map((person) => (
+                    <li key={`a-${person}`} className="ms-chip">
+                      May approve: {person}
+                    </li>
+                  ))}
             </ul>
             <p className="ac-note">Never the person who prepared it, nor the signer of the conclusion behind it.</p>
             <p className="uw-never-submits">{NEVER_SUBMITS}</p>

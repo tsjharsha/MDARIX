@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { EscalateButton } from "./Triage";
 import {
   AlarmClock,
@@ -14,7 +14,15 @@ import {
 import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { formatDate, useResource } from "../../customer-admin/shared";
 import { deadlineLabel, formatDay } from "../../../app/dates";
-import { investigationRequestFor, useCan, useNavigation, useOpenInvestigation, useTabParam } from "../workspaceContext";
+import {
+  WorkspaceContext,
+  investigationRequestFor,
+  useCan,
+  useNavigation,
+  useOpenInvestigation,
+  useTabParam,
+} from "../workspaceContext";
+import { treePlace } from "../decisionTrees";
 import { recordId } from "../complaintReview";
 import { owesWorksheet, reportsTab } from "../authorityReports";
 import {
@@ -58,7 +66,16 @@ export function ReportabilityWatch({ onOpenTab }: { onOpenTab: (tab: string) => 
   const [linked, setLinked] = useTabParam("complaint");
   const list = useResource<WatchList>(watchPath(show, product, page));
   const fromLink = linked ? ((list.data?.items ?? []).find((item) => item.id === linked) ?? null) : null;
-  const deciding = chosen ?? fromLink;
+  // 0.10.83 (D2.3): on the new navigation a complaint is answered on its market's tree; the drawer's address (a
+  // complaint's page, a reportability task) still works and opens the tree.
+  const workspace = useContext(WorkspaceContext);
+  const toTree = useNavigation() === "new";
+  useEffect(() => {
+    if (!toTree || !linked || !workspace) return;
+    const place = treePlace(null, linked);
+    workspace.open(place.section, place.tab);
+  }, [toTree, linked, workspace]);
+  const deciding = toTree ? null : (chosen ?? fromLink);
   const summary = list.data?.summary;
   const headline = watchHeadline(summary);
   const items = list.data?.items ?? [];
@@ -174,7 +191,11 @@ export function ReportabilityWatch({ onOpenTab }: { onOpenTab: (tab: string) => 
               <WatchCard
                 key={item.id}
                 item={item}
-                onDecide={() => setDeciding(item)}
+                onDecide={() => {
+                  if (!toTree) return setDeciding(item);
+                  const place = treePlace(null, item.id);
+                  workspace?.open(place.section, place.tab);
+                }}
                 onReports={() => onOpenTab(reportsTab(item.id))}
               />
             ))}

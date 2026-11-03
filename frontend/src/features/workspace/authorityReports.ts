@@ -97,6 +97,11 @@ export type WorksheetField = {
    * not fit it (flagged, counted as missing, never deleted). */
   kind?: string;
   problem?: string | null;
+  /** 0.10.83 (D2.7): who knows it (the product, the organization, or this event), and whether it is entered once
+   * for every report (``once_key`` groups fields entered together). */
+  scope?: "PRODUCT" | "ORGANIZATION" | "EVENT";
+  once?: boolean;
+  once_key?: string;
 };
 
 export type WorksheetSection = { code: string; title: string; note: string | null; fields: WorksheetField[] };
@@ -237,7 +242,9 @@ export type ReportDetail = {
   status_labels: Record<string, string>;
   editable: boolean;
   snapshots: Snapshot[];
-  pending_snapshot: Snapshot | null;
+  pending_snapshot: (Snapshot & { sections?: WorksheetSection[] | null }) | null;
+  /** 0.10.83 (D2.8): every signature on the report, with the signer's full name, the moment and its meaning. */
+  signatures?: { name: string; at: string | null; meaning: string }[];
   cannot_approve: string[];
   approval?: ApprovalStanding | null;
   submissions: Submission[];

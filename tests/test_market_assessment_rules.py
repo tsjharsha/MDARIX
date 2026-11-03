@@ -31,7 +31,7 @@ def test_every_question_shows_its_definition_its_clause_and_the_starter_mark():
     for question_set in markets.QUESTION_SETS.values():
         shown = question_set.as_dict()
         assert shown["starter_mark"] == standards.STARTER_MARK
-        assert "awaiting regulatory confirmation" in shown["starter_mark"]
+        assert shown["starter_mark"] == "Starter, for your consultant to confirm."
         for question in shown["questions"]:
             assert question["clause"] and question["definition"] and question["starter"] is True
             assert all(code in standards.BY_ID for code in question["basis"])
@@ -171,7 +171,7 @@ def test_markets_from_countries_and_windows_and_their_clocks():
     assert pending["days"] == 10  # the shortest window of the market, still counting
     assert markets.market_clock(markets.EU_NI, markets.NOT_REPORTABLE, None, [eu15], aware, today) is None
     india = next(item for item in watch_rules.TEMPLATES if item["name"].startswith("India"))
-    assert "Starter text" in india["note"] and india["basis"] == ["IN_MDR"]
+    assert "Starter, for your consultant to confirm" in india["note"] and india["basis"] == ["IN_MDR"]
 
 
 def test_classification_codes_list_labels_and_keeps_any_other_source_value_as_unknown():
