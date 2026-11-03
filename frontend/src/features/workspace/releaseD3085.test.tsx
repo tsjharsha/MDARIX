@@ -8,6 +8,8 @@ import { deadlineLabel, formatDateTime, formatDay, setDisplayZone, zoneName, zon
 import userWorkspace from "./UserWorkspace.tsx?raw";
 import hybridShell from "./HybridShell.tsx?raw";
 import { recordHits } from "./HybridShell";
+import { itemsText } from "./readiness";
+import { versionWords } from "../../app/labels";
 import home from "./sections/Home.tsx?raw";
 
 const stubWindow = () =>
@@ -224,5 +226,20 @@ describe("D3.11 search finds every record", () => {
     ]);
     expect(go).toHaveBeenCalledWith({ section: "Trends", tab: "Trends to review?signal=SIG000001" });
     expect(hybridShell).toContain("/api/v1/triage/signals?q=${term}&page_size=5");
+  });
+});
+
+describe("D3.12 no internal id or code where a name exists", () => {
+  it("names a readiness item by its name, never its MDARIX ID, and versions in words", () => {
+    expect(
+      itemsText({
+        items: [
+          { ref: "PROD000002", label: "PulseWatch 410 Patient Monitor (Sample)" },
+          { ref: "SAMPLE-RV-09", label: "PulseWatch 410 Patient Monitor (Sample)" },
+        ],
+        value: 2,
+      } as never),
+    ).toBe("PulseWatch 410 Patient Monitor (Sample), SAMPLE-RV-09");
+    expect(versionWords("US-v2")).toBe("your version 2");
   });
 });

@@ -50,6 +50,7 @@ import {
   type TriageSummary,
 } from "../signals";
 import { StatusBadge, formatCount, listTitle } from "./common";
+import { problemCodeParts, useImdrfLinks, type ImdrfLinks } from "./ProblemCode";
 import { SignalDetailView, SignalDue, SignalPriorityCell, SignalStatusBadge } from "./SignalDetail";
 
 /** The inbox's line while an import's signals are being found. */
@@ -123,7 +124,9 @@ export function SignalInbox({
   };
   // The server filters (overdue signals included) and sorts every page; the rows are one page, already in order.
   const rows = listOf(list.data?.items) as SignalSummary[];
-  const columns = signalColumns(setSelected);
+  // The problem as its IMDRF term on the new navigation (0.10.85, D3.12; U-16), the customer's code otherwise.
+  const links = useImdrfLinks(fresh ? rows.map((row) => row.problem_key) : []);
+  const columns = signalColumns(setSelected, links);
   const tableSort = signalTableSort(filters);
   const headingSort = filters.order ? columns.find((column) => column.key === filters.sort) : undefined;
   const total = list.data?.total ?? rows.length;
@@ -354,7 +357,7 @@ export function SignalInbox({
   );
 }
 
-function signalColumns(onOpen: (reference: string) => void): Column<SignalSummary>[] {
+function signalColumns(onOpen: (reference: string) => void, links: ImdrfLinks = {}): Column<SignalSummary>[] {
   const reference = (row: SignalSummary) => safeText(row.business_id) ?? String(row.id);
   return [
     {
@@ -393,7 +396,8 @@ function signalColumns(onOpen: (reference: string) => void): Column<SignalSummar
         row.problem_key === "UNSPECIFIED" ? (
           <span className="ac-muted">Not specified</span>
         ) : (
-          (safeText(row.problem_key) ?? <span className="ac-muted">—</span>)
+          (problemCodeParts(String(row.problem_key ?? ""), links).term ??
+          safeText(row.problem_key) ?? <span className="ac-muted">—</span>)
         ),
     },
     {

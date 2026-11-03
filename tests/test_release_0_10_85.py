@@ -89,3 +89,16 @@ def test_search_finds_a_complaint_by_any_part_of_its_reference_and_the_customers
     assert [item["complaint_identifier"] for item in by_ref] == ["SAMPLE-RV-11"]
     by_ticket = _ok(user.get(LIST, params={"q": "svc-24-1107"}))["items"]
     assert "SAMPLE-RV-11" in [item["complaint_identifier"] for item in by_ticket]
+
+
+def test_records_name_complaints_and_investigations_by_the_customers_reference(trial):
+    """D3.12: Records' readiness lists named complaints "CMP000029"; the customer's own reference reads now; the
+    trial's scale note says its version in words."""
+    import re
+
+    from backend.app.decision_guides.router import SCALE_NOTE
+
+    checks = _ok(trial["user"].get("/api/v1/readiness"))["checks"]
+    refs = [item.get("ref") for check in checks for item in check.get("items", []) if item.get("ref")]
+    assert refs and not [ref for ref in refs if re.fullmatch(r"(CMP|INV)\d{6}", ref)]
+    assert "scale-starter-1" not in SCALE_NOTE
