@@ -92,6 +92,8 @@ import { ReportsSection } from "./sections/ReportsTab";
 import {
   AvatarMenu,
   GlobalSearch,
+  ImportOwnData,
+  importOwnDataAction,
   PERSONA_TABS,
   PersonaSwitch,
   TabBar,
@@ -604,6 +606,8 @@ export function UserWorkspace({
     personaTabs,
   };
   const { section, tab } = location;
+  // "Import your data" beside the Sample data label, and in the avatar menu on a phone (0.10.79).
+  const importOwn = importOwnDataAction(!!trial?.is_trial, session, open);
 
   return (
     <WorkspaceContext.Provider value={api}>
@@ -641,6 +645,7 @@ export function UserWorkspace({
                   {(trial.sample?.complaints ?? 0) > 0 ? "Sample data" : "Practice records"}
                 </span>
               )}
+              {importOwn && <ImportOwnData onOpen={importOwn} />}
               <GlobalSearch open={open} />
               <PersonaSwitch
                 persona={persona}
@@ -677,6 +682,7 @@ export function UserWorkspace({
                 open={open}
                 onAdminConsole={onAdminConsole}
                 showSettings={visibleSections.includes("Settings")}
+                onImport={importOwn}
               />
             </header>
             <TabBar tabs={tabs} current={tabOfSection(section)} open={open} />

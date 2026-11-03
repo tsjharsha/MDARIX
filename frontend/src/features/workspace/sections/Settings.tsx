@@ -14,7 +14,7 @@ import { DetectionRules } from "./DetectionRules";
 import { AttemptsSetting } from "./Communications";
 import { IMPORT_PATH, type ImportSetup } from "./ImportData";
 import { WhoCanChange } from "./Views";
-import { ProductIdentityPanel, ResponsibleParties } from "./ImportReports";
+import { PRODUCT_EDITORS, ProductIdentityPanel, ResponsibleParties } from "./ImportReports";
 
 export const SETTINGS_TABS = NEW_PLACES.Settings.tabs;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
@@ -28,7 +28,7 @@ export const SETTING_PERMISSIONS: Record<SettingsTab, readonly BusinessPermissio
   "Trend rules": ["signal.triage"],
   "Contact attempts": ["quality.review", "regulatory.approve"],
   "Import templates": ["records.write"],
-  Products: ["records.write"],
+  Products: PRODUCT_EDITORS,
 };
 
 /**

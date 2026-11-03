@@ -420,7 +420,7 @@ const TENANT_DETAILS: Array<[string, string]> = [
   ["Backup region", "backup_region"],
 ];
 
-function TenantOverview({ tenant, onEdit }: { tenant: any; onEdit: () => void }) {
+export function TenantOverview({ tenant, onEdit }: { tenant: any; onEdit: () => void }) {
   return (
     <Panel
       eyebrow="Workspace"
@@ -441,6 +441,9 @@ function TenantOverview({ tenant, onEdit }: { tenant: any; onEdit: () => void })
                 : (key === "tenant_type" || key === "navigation") && tenant[key]
                   ? titleCase(tenant[key])
                   : tenant[key] || "—"}
+              {key === "navigation" && (
+                <small className="ac-muted cc-detail-note">“Viewing as” personas need New.</small>
+              )}
             </dd>
           </div>
         ))}

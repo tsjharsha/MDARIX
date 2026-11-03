@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, FileSpreadsheet, ListChecks, Upload } from
 import { Empty, Panel, StatTile } from "../../admin/console/charts";
 import { errorText, send, useResource } from "../../customer-admin/shared";
 import { formatDateTime, formatDay, isDateOnly } from "../../../app/dates";
-import { useCan, useIsTrial } from "../workspaceContext";
+import { useCan, useIsTrial, type BusinessPermission } from "../workspaceContext";
 import { countOf, formatCount } from "./common";
 import { marketLabel } from "../../../app/labels";
 import { EscalateButton } from "./Triage";
@@ -711,7 +711,7 @@ export function registrationText(item: Registration): string {
 }
 
 /** Products with their regulatory identity (G2a; 0.10.77 adds the Basic UDI-DI, the EMDN code and each market's
- * registration with its risk class), set here by people who may change records. */
+ * registration with its risk class), set here by people who may change records and by the Regulatory Leader. */
 export function ProductIdentityPanel({
   products,
   onOpenReport,
@@ -736,6 +736,15 @@ export function ProductIdentityPanel({
   );
 }
 
+/** Who changes a product's identity, its registrations and the responsible parties: whoever changes records, and the
+ * Regulatory Leader (regulatory.review, 0.10.79). The server checks the same (regulatory_reference_router.py). */
+export const PRODUCT_EDITORS: readonly BusinessPermission[] = ["records.write", "regulatory.review"];
+function useCanEditProducts() {
+  const write = useCan("records.write");
+  const review = useCan("regulatory.review");
+  return write || review;
+}
+
 const IDENTITY_FIELDS = [
   ["udi_di", "UDI-DI", 80],
   ["basic_udi_di", "Basic UDI-DI (EU)", 120],
@@ -752,7 +761,7 @@ function ProductIdentity({
   product: { id: string; name: string; product_identifier: string };
   onOpenReport?: (importRef: string) => void;
 }) {
-  const canEdit = useCan("records.write");
+  const canEdit = useCanEditProducts();
   const path = `/api/v1/regulatory-reference/products/${encodeURIComponent(product.id)}`;
   const profile = useResource<ProductProfile>(path);
   const [editing, setEditing] = useState(false);
@@ -1048,7 +1057,7 @@ const ROLE_LABELS: Record<string, string> = {
 /** The organization's responsible party per market and role, with its SRN (0.10.77): the reports' manufacturer,
  * authorised representative and importer fields. */
 export function ResponsibleParties() {
-  const canEdit = useCan("records.write");
+  const canEdit = useCanEditProducts();
   const list = useResource<{ parties: Party[] }>("/api/v1/regulatory-reference/responsible-parties");
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({
