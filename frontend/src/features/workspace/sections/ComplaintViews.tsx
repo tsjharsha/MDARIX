@@ -52,6 +52,9 @@ export function ComplaintViews({ tab }: { tab?: string }) {
   const canImport = canImportOwnData(session);
   const canLog = useCan("signal.triage") || useCan("investigation.create") || useCan("quality.review");
   const complaint = tabParam(carried, "complaint");
+  // "Log a call" opens in place (0.10.85, D3.10): the Calls to check view, with the log open beside it. It opened
+  // Home › Queues before (U-21).
+  const [logged, setLogged] = useState(0);
   const server = SERVER_VIEWS[view];
   return (
     <>
@@ -68,7 +71,10 @@ export function ComplaintViews({ tab }: { tab?: string }) {
           <button
             type="button"
             className="ac-secondary"
-            onClick={() => open("Complaints", "First contact?log=CONTACT")}
+            onClick={() => {
+              setView("Calls to check");
+              setLogged((count) => count + 1);
+            }}
           >
             <PhoneCall size={15} aria-hidden="true" /> Log a call
           </button>
@@ -81,7 +87,7 @@ export function ComplaintViews({ tab }: { tab?: string }) {
       </div>
       {server && <ComplaintList key={view} eyebrow="Complaints" view={{ name: view, code: server.code }} />}
       {view === "To triage" && <Triage onOpenTab={go} />}
-      {view === "Calls to check" && <FirstContact part="calls" />}
+      {view === "Calls to check" && <FirstContact key={logged} part="calls" startLogging={logged ? "CONTACT" : null} />}
       {view === "Due soon" && <Backlog initial="due_soon" fixed />}
       {view === "Past target" && <Backlog initial="past_target" fixed />}
       {view === "Second look" && <SecondLook initial="open" fixed />}

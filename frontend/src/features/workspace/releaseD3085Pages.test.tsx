@@ -9,6 +9,8 @@ import { eventPath } from "./oversight";
 import { rv11 } from "../../test/rv11";
 import { NewRecordsSection } from "./sections/Records";
 import { InvestigationList } from "./sections/ComplaintViews";
+import complaintViews from "./sections/ComplaintViews.tsx?raw";
+import { FirstContact, wallClockText } from "./sections/FirstContact";
 import { TrendHeroes } from "./sections/TrendCheck";
 import { SignalInbox } from "./sections/SignalInbox";
 import { DEFAULT_SIGNAL_FILTERS } from "./signals";
@@ -256,5 +258,37 @@ describe("D3.9 investigations", () => {
     expect(render(<InvestigationList />, api({ dataSource: SAMPLE_SOURCE }))).toContain(
       "Why did pressure alarms rise?",
     );
+  });
+});
+
+describe("D3.10 Log a call opens in place, shorter, in the product's date format", () => {
+  it("stays on Complaints: the Calls to check view with the log open", () => {
+    expect(complaintViews).toContain('setView("Calls to check");');
+    expect(complaintViews).not.toContain('open("Complaints", "First contact?log=CONTACT")');
+  });
+  it("asks the call's essentials first, folds the rest, and reads the time back as 3 Nov 2026, 21:50", () => {
+    resources.data["/api/v1/intake"] = { summary: { all: 0, to_sign: 0, pending: 0, review: 0 }, items: [] };
+    resources.data["/api/v1/intake/guide"] = {
+      version: "1",
+      questions: [{ id: "q1", text: "Was anyone hurt?", not_stated: true, free_text: false }],
+      answers: [{ code: "YES", label: "Yes" }],
+      note: "",
+      outcomes: [],
+      table: [],
+      requests: [{ code: "NONE", label: "Nothing" }],
+      use_environments: [{ code: "UNKNOWN", label: "Not known" }],
+      user_types: [{ code: "UNKNOWN", label: "Not known" }],
+      harm_words: { version: "1", words: [] },
+      fault_words: { version: "1", words: [] },
+      levels: [],
+      zones: ["Asia/Kolkata"],
+    };
+    const html = render(<FirstContact part="calls" startLogging="CONTACT" />);
+    const shortForm = html.slice(html.indexOf("The caller&#x27;s words"), html.indexOf("More about the call"));
+    for (const field of ["Product", "Lot", "What was asked for", "Country"]) expect(shortForm).toContain(field);
+    expect(shortForm).not.toContain("Serial number");
+    expect(html).toContain("<summary>More about the call (optional)</summary>");
+    expect(html).toContain("<summary>The ten first-contact questions (now, or at the check)</summary>");
+    expect(wallClockText("2026-11-03T21:50")).toBe("Reads: 3 Nov 2026, 21:50");
   });
 });
