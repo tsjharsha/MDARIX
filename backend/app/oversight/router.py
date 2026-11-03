@@ -46,6 +46,7 @@ from backend.app.access.permissions import (
     require_permission,
 )
 from backend.app.complaint_review.service import people as names_of
+from backend.app import signing_commit
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import Complaint, SignedApprovalRecord
 from backend.app.db.models.oversight import DueAlert, EventClosure, OversightSettings, UserAbsence
@@ -1466,15 +1467,7 @@ def sign_ready(
     row.ready_reason, row.checklist, row.content_fingerprint = reason or None, items, print_
     row.signed_record_id, row.signed_by, row.signed_at, row.updated_at = record.id, me, now, now
     row.qms_filing_ref = row.filed_by = row.filed_at = None  # a new version is filed again
-    if db is control_db:
-        control_db.commit()
-    else:
-        control_db.commit()
-        try:
-            db.commit()
-        except Exception:
-            logger.exception("Signature %s was saved but event %s was not marked ready", record.id, complaint.id)
-            raise
+    signing_commit.commit(db, control_db, "event closure")
     return event_view(db, control_db, tenant_id, complaint, me)
 
 

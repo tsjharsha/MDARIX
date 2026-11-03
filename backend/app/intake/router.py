@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 from backend.app.trial.sample_source import is_sample
 from backend.app.access.permissions import INVESTIGATION_CREATE, QUALITY_REVIEW, SIGNAL_TRIAGE
 from backend.app.complaint_classification import rules as coding
+from backend.app import signing_commit
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.complaint_review import ComplaintSecondLook
 from backend.app.db.models.foundation import Complaint, LotBatch, Product, SignedApprovalRecord
@@ -806,11 +807,7 @@ def _signature(control_db, ctx, tenant_id, check_id, version, decision, remarks,
 
 
 def _commit(db, control_db) -> None:
-    if db is control_db:
-        control_db.commit()
-    else:
-        control_db.commit()
-        db.commit()
+    signing_commit.commit(db, control_db, "first-contact check")
 
 
 def _after_classification(db, tenant_id, event, check, previous, actor, now) -> None:

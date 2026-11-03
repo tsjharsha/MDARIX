@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session
 from backend.app import standards
 from backend.app.access.permissions import DATA_EXPORT, REGULATORY_APPROVE, REGULATORY_REVIEW, require_permission
 from backend.app.complaint_review.service import people
+from backend.app import signing_commit
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import SignedApprovalRecord
 from backend.app.db.models.guides_communications import DecisionGuideVersion
@@ -775,15 +776,7 @@ def approve(
         )
     )
     publish(db, row, me, record.id, now)
-    if db is control_db:
-        control_db.commit()
-    else:
-        control_db.commit()
-        try:
-            db.commit()
-        except Exception:
-            logger.exception("Signature %s was saved but guide version %s was not published", record.id, row.id)
-            raise
+    signing_commit.commit(db, control_db, "guide version")
     _end_tasks(db, tenant_id, row, "Approved", me, approved=True)
     return detail(db, control_db, ctx, market, version)
 

@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.access.permissions import REGULATORY_APPROVE, REGULATORY_REVIEW
 from backend.app.complaint_review.service import people
+from backend.app import signing_commit
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import SignedApprovalRecord
 from backend.app.db.models.market_assessment import ComplaintMarketAssessment
@@ -596,16 +597,7 @@ def sign_conclusion(
         else []
     )
     try:
-        if db is control_db:
-            control_db.commit()  # the shared plane: everything in one transaction
-        else:
-            # A dedicated plane: the signature and its audit trail first (as decision signing does), then the record.
-            control_db.commit()
-            try:
-                db.commit()
-            except Exception:
-                logger.exception("Signature %s was saved but its market conclusion %s was not", record_row.id, draft_id)
-                raise
+        signing_commit.commit(db, control_db, "market conclusion")
     except IntegrityError as exc:
         db.rollback()
         control_db.rollback()
