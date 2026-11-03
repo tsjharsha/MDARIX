@@ -1427,7 +1427,7 @@ export function CompanyPage() {
             ))}
           </ol>
           <p className="ms-trial-steps-note">
-            30 days · up to 3 users · 5,000 uploaded rows. Want live connections to your QMS, PLM or ERP? Ask about
+            30 days · up to 50 people · 5,000 uploaded rows. Want live connections to your QMS, PLM or ERP? Ask about
             becoming a design partner.
           </p>
           <div className="ms-cta-row">

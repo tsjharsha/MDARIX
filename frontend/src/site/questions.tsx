@@ -397,7 +397,7 @@ function TrialBox() {
   return (
     <aside className="ms-question-trial" aria-label="Free trial">
       <strong>Try it on your own data</strong>
-      <p>A free 30-day trial for up to 3 users, with sample data first and then your own exports. No credit card.</p>
+      <p>A free 30-day trial for up to 50 people, with sample data first and then your own exports. No credit card.</p>
       <a className="ms-btn ms-btn-primary" href="/signup">
         Start free trial <ArrowRight size={16} aria-hidden="true" />
       </a>

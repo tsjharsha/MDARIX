@@ -153,7 +153,7 @@ describe("the questions and answers", () => {
     // The agreement says the same.
     for (const fact of [
       "**Length:** 30 days",
-      "**Users:** up to 3 people",
+      "**Users:** up to 50 people",
       "**Data:** up to 5,000 uploaded rows",
       "approved automatically, usually within minutes, up to a daily limit",
       "so is a request from a personal email address",

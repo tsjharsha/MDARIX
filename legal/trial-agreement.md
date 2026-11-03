@@ -2,7 +2,7 @@
 
 **Product validation phase.** MDARIX is in a product validation phase. It is operated by its founder, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial. Once the company is registered, this agreement will be updated with the company's details and we will tell you by email.
 
-Last updated: 23 October 2026
+Last updated: 3 November 2026
 
 This agreement applies when the founder of MDARIX, operating it ("MDARIX", "we", "us"), gives your organization a free trial of the MDARIX product investigation platform (the "Service"). Our [Terms of service](/terms) and [Privacy policy](/privacy) also apply to the trial. Where they conflict with this agreement, this agreement prevails for the trial.
 
@@ -19,7 +19,7 @@ This agreement applies when the founder of MDARIX, operating it ("MDARIX", "we",
 ## 2. What the trial includes
 
 - **Length:** 30 days from the start of the trial.
-- **Users:** up to 3 people from your organization.
+- **Users:** up to 50 people from your organization.
 - **Data:** up to 5,000 uploaded rows.
 - **Sample data:** the workspace starts with sample data so you can explore the Service straight away.
 - **Price:** the trial is free of charge, and no payment details are needed.
