@@ -143,9 +143,7 @@ def set_party(
     return result
 
 
-@router.delete(
-    "/responsible-parties/{party_id}", status_code=204, dependencies=[IDENTITY_EDITORS]
-)
+@router.delete("/responsible-parties/{party_id}", status_code=204, dependencies=[IDENTITY_EDITORS])
 def remove_party(
     party_id: uuid.UUID,
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
