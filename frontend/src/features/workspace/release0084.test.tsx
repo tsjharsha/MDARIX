@@ -170,3 +170,20 @@ describe("M1: the story is read again after every saved change", () => {
     }
   });
 });
+
+describe("M2: a complaint waiting for its country never says 'No market to assess'", () => {
+  it("says the decision path waits for the incident country", () => {
+    const view = rv11();
+    view.event.ref = "FIC-2001";
+    view.event.market = null;
+    view.work!.markets = [];
+    view.event.needs = [
+      { fact: "COUNTRY", label: "Incident country", given: null, message: "Not in your file.", rule: "Every market" },
+    ];
+    resources.data[ONE_STORY_PATH] = { sample: null, yours: null };
+    resources.data[eventPath("FIC-2001")] = view;
+    const html = render(<ComplaintPage tab="Summary?ref=FIC-2001" />);
+    expect(html).not.toContain("No market to assess");
+    expect(html).toContain("Waits for the incident country, asked above");
+  });
+});

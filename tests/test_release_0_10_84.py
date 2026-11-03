@@ -66,3 +66,13 @@ def test_once_the_country_is_known_the_header_clock_is_that_markets_deadline(fic
     assert (line["market"], line["due_at"]) == ("US", us["due_at"])
     # Not the shortest of every market any more (Great Britain's 10 days): the US clock is later.
     assert header["due_at"] > min(d["due_at"] for d in _triage_row(user, complaint_id)["deadlines"] if d["due_at"])
+
+
+def test_a_complaint_waiting_for_its_country_never_says_no_market_to_assess(fic):
+    """M2: FIC-2001's page asked for the country while its details said "Decision path: No market to assess"."""
+    import json
+
+    event = _ok(fic["user"].get("/api/v1/oversight/events/FIC-2001"))
+    assert "No market to assess" not in json.dumps(event)
+    (group,) = [group for group in event["related"] if group["key"] == "assessments"]
+    assert group["lines"] == ["Waits for the incident country, asked on the complaint's page"]

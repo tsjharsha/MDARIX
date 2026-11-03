@@ -391,7 +391,9 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                             </button>
                           </span>
                         ))
-                      : "No market to assess"}
+                      : needed("COUNTRY")
+                        ? "Waits for the incident country, asked above"
+                        : "None of your reporting markets applies"}
                     <small>Each market's tree: the question, the answer, the clause and the outcome.</small>
                   </dd>
                   <dt>Awareness</dt>

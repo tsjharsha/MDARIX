@@ -127,7 +127,7 @@ def related(db, found: dict, complaint, names: dict[str, str], service: dict | N
             "key": "assessments",
             "label": "Market assessments",
             "count": len(assessments),
-            "lines": assessments or ["No market to assess"],
+            "lines": assessments or [_no_market(complaint)],
         },
         {
             "key": "service",
@@ -168,6 +168,17 @@ def related(db, found: dict, complaint, names: dict[str, str], service: dict | N
             "lines": decisions or ["Nothing signed yet: the event decision record lists each signature once made"],
         },
     ]
+
+
+def _no_market(complaint) -> str:
+    """Why no market is listed: the incident country is still asked (0.10.84, M2), or none of the markets applies."""
+    from backend.app.reportability import facts
+    from backend.app.reportability import service as reporting_service
+
+    needs = facts.of_complaint(complaint, reporting_service._record(complaint, None, None))
+    if any(need["fact"] == "COUNTRY" for need in needs):
+        return "Waits for the incident country, asked on the complaint's page"
+    return "None of your reporting markets applies"
 
 
 def _related_ids(found: dict, complaint) -> list[uuid.UUID]:
