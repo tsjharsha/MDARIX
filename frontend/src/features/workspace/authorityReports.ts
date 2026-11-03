@@ -373,7 +373,7 @@ export function deadlineText(item: DeadlineFields, state?: ObligationState, now 
   if (!item.due_on) return "No deadline yet";
   const when = deadlineLabel({ due_label: item.due_label, due_date: item.due_on });
   if (state && MET_STATES.includes(state)) return `Deadline ${when}: met by the submission`;
-  if (state === "CANCELLED") return "No deadline: not reportable";
+  if (state === "CANCELLED") return "Cancelled: not reportable";
   const left = timeLeft(
     {
       due_at: item.due_at,

@@ -214,12 +214,18 @@ def _deadline(obligation: ReportObligation, context: dict, today, org_zone: str 
         if row is not None and row.due_on is not None:
             due = row.due_on
             provisional = row.conclusion is None
-    return due_fields(due, obligation.market, org_zone, today, provisional, obligation.state in rules.CLOSED)
+    return due_fields(
+        due, obligation.market, org_zone, today, provisional, obligation.state in rules.MET, obligation.state
+    )
 
 
-def due_fields(due: date | None, market: str, org_zone: str | None, now, provisional: bool, met: bool) -> dict:
+def due_fields(
+    due: date | None, market: str, org_zone: str | None, now, provisional: bool, met: bool, state: str | None = None
+) -> dict:
     """A report's deadline on the wire: its latest day, its end with the time zone, days left, and overdue (never
-    once met), counted by the market's rule (reportability/deadlines.py)."""
+    once met, never once cancelled), counted by the market's rule (reportability/deadlines.py). A cancelled report's
+    deadline state is CANCELLED (0.10.81, F11: it read MET)."""
+    cancelled = state == rules.CANCELLED
     if due is None:
         return {
             "due_on": None,
@@ -230,16 +236,16 @@ def due_fields(due: date | None, market: str, org_zone: str | None, now, provisi
             "due_state": None,
         }
     found = deadlines.end_of(due, market, org_zone)
-    state = deadlines.state(found, now, 1)
+    clock = deadlines.state(found, now, 1)
     return {
         "due_on": due.isoformat(),
         "provisional": provisional,
         "days_left": deadlines.days_left(found, now),
-        "overdue": state == deadlines.OVERDUE and not met,
+        "overdue": clock == deadlines.OVERDUE and not met and not cancelled,
         "due_at": found.at.isoformat(),
         "due_zone": found.zone,
         "due_label": found.label,
-        "due_state": "MET" if met else state,
+        "due_state": rules.CANCELLED if cancelled else "MET" if met else clock,
     }
 
 
@@ -581,7 +587,7 @@ def report_list(
                 "state": row.state,
                 "state_label": rules.STATE_LABELS[row.state],
                 "next_step": rules.next_step(row.state),
-                **due_fields(due, row.market, org_zone, today, row.due_provisional, row.state in rules.CLOSED),
+                **due_fields(due, row.market, org_zone, today, row.due_provisional, row.state in rules.MET, row.state),
                 "assessment": None,
                 "can_start": False,
                 **paths[row.id],
@@ -790,9 +796,20 @@ def follow_conclusion(db, ctx, tenant_id, complaint_id, market: str, signed, now
                 db, ctx, "REPORT_CREATED_FROM_CONCLUSION", obligation, form=obligation.form_code, version=signed.version
             )
         elif existing.state == rules.CANCELLED:
+            # The cancellation's note leaves the report and stays in the audit trail (0.10.81, F11).
+            old = {"state": existing.state, "note": existing.note}
             existing.state, existing.assessment_id, existing.report_type = rules.DRAFT, signed.id, signed.report_type
             existing.due_on, existing.due_provisional, existing.updated_at = signed.due_on, False, now
-            _audit(db, ctx, "REPORT_REOPENED_BY_CONCLUSION", existing, version=signed.version)
+            existing.note = None
+            _audit(
+                db,
+                ctx,
+                "REPORT_REOPENED_BY_CONCLUSION",
+                existing,
+                old,
+                {"state": rules.DRAFT, "note": None},
+                version=signed.version,
+            )
         return []
     if signed.conclusion != markets.NOT_REPORTABLE or existing is None or existing.state not in rules.CANCELLABLE:
         return []

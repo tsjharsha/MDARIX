@@ -8,6 +8,7 @@
 - F6: report fields take dates and codes only; a bad stored value is flagged.
 - F12: the EU and GB MIR forms never pre-fill 1.2d or 3.2c.
 - F7: report fields, product identity, registrations and responsible parties are audited before and after.
+- F11: a cancelled report reads Cancelled, not MET; a reopened one drops its cancellation note (kept in the audit).
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -327,3 +328,33 @@ def test_f7_report_fields_product_identity_registrations_and_parties_are_audited
     assert user.delete(f"{reference}/responsible-parties/{party['id']}").status_code == 204
     (gone,) = _audit(tenant_id, "RESPONSIBLE_PARTY_REMOVED")[-1:]
     assert gone.old_values["organisation"] == "F7 Devices"
+
+
+def test_f11_a_cancelled_report_reads_cancelled_and_a_reopened_one_drops_its_cancellation_note(trial):
+    from backend.app.db.models.authority_reports import ReportObligation
+    from backend.app.db.tenant_scope import bind_tenant
+
+    user, complaint, tenant_id = trial["user"], trial["complaint"], trial["tenant_id"]
+    _sign_us(user, complaint, "NO")  # its report, whichever tests ran before
+    (report,) = _reports(user, complaint)
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        db.get(ReportObligation, uuid.UUID(report["id"])).state = "DRAFT"
+        db.commit()
+    detail = _ok(user.get(f"/api/v1/complaints/{complaint}/market-assessments"))
+    answers, _ = _answers_from_record(detail, "US", FLAGSHIP_US)
+    answers["US5"] = {**answers["US5"], "answer": "NO", "rationale": "Test: the reading error cannot recur unseen."}
+    saved = _save(user, complaint, "US", answers, harm_level=detail["severity_level"])
+    _ok(_sign(user, complaint, "US", saved, "NOT_REPORTABLE", password=PASSWORD))
+    cancelled = _ok(user.get(f"{REPORTS}/{report['id']}"))
+    assert cancelled["state"] == "CANCELLED" and cancelled["deadline"]["due_state"] == "CANCELLED"
+    assert not cancelled["deadline"]["overdue"]
+    listed = next(item for item in _reports(user, complaint) if item["id"] == report["id"])
+    assert listed["due_state"] == "CANCELLED"
+    note = cancelled["note"]
+    assert "says not reportable" in note
+    _sign_us(user, complaint, "NO")
+    reopened = _ok(user.get(f"{REPORTS}/{report['id']}"))
+    assert reopened["state"] == "DRAFT" and reopened["note"] is None and reopened["cancelled_reason"] is None
+    (event,) = _audit(tenant_id, "REPORT_REOPENED_BY_CONCLUSION")[-1:]
+    assert event.old_values == {"state": "CANCELLED", "note": note} and event.new_values["note"] is None
