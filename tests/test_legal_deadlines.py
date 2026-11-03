@@ -23,7 +23,8 @@ def test_india_counts_the_awareness_day_as_day_1_and_ends_in_india_time():
     found = deadlines.count(aware, 15, rules.CALENDAR, "IN", "UTC")
     assert found.day == date(2026, 11, 7) and found.zone == "Asia/Kolkata"
     assert found.at == datetime(2026, 11, 7, 18, 29, 59, tzinfo=UTC)
-    assert found.label == "Sat 7 Nov 2026, 23:59 IST"
+    # 0.10.84: the label is in the organization's time zone (here UTC), the moment India's 23:59.
+    assert found.label == "Sat 7 Nov 2026, 18:29 UTC"
 
 
 def test_the_requirements_example_awareness_in_the_uk_evening_is_the_next_day_in_india():
@@ -56,7 +57,9 @@ def test_the_authority_zone_binds_when_its_day_ends_before_the_organizations():
     aware = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
     found = deadlines.count(aware, 15, rules.CALENDAR, "EU_NI", "America/New_York")
     assert found.day == date(2026, 3, 25) and found.zone == "Europe/Brussels"
-    assert found.at == datetime(2026, 3, 25, 22, 59, 59, tzinfo=UTC) and found.label == "Wed 25 Mar 2026, 23:59 CET"
+    assert found.at == datetime(2026, 3, 25, 22, 59, 59, tzinfo=UTC)
+    # 0.10.84: read in the organization's time zone, New York's daylight time.
+    assert found.label == "Wed 25 Mar 2026, 18:59 EDT"
 
 
 def test_great_britain_counts_day_1_across_the_start_of_british_summer_time():
@@ -64,7 +67,7 @@ def test_great_britain_counts_day_1_across_the_start_of_british_summer_time():
     # 7 Apr, ending at 23:59 BST (22:59 UTC).
     aware = datetime(2026, 3, 29, 0, 30, tzinfo=UTC)
     found = deadlines.count(aware, 10, rules.CALENDAR, "GB", "UTC")
-    assert found.day == date(2026, 4, 7) and found.label == "Tue 7 Apr 2026, 23:59 BST"
+    assert found.day == date(2026, 4, 7) and found.label == "Tue 7 Apr 2026, 22:59 UTC"
     assert found.at == datetime(2026, 4, 7, 22, 59, 59, tzinfo=UTC)
 
 
@@ -105,5 +108,5 @@ def test_the_watch_clock_and_triage_count_the_same_way():
     now = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
     (clock,) = rules.clocks({"country": "India", "death": True}, [rules.clean_window(window)], aware, now, "UTC")
     triage = intake_rules.provisional_deadlines(aware, ["IN"], intake_rules.FLAGGED, now, own="IN", org_zone="UTC")[0]
-    assert clock.due_label == triage["due_label"] == "Sat 7 Nov 2026, 23:59 IST"
+    assert clock.due_label == triage["due_label"] == "Sat 7 Nov 2026, 18:29 UTC"
     assert clock.days_left == triage["days_left"] == 6

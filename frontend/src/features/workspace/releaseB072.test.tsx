@@ -153,7 +153,7 @@ describe("B3: the complaint page shows one action per row and does the triage it
   });
   it("shows the triage panel on the page instead of a button to the triage list", () => {
     expect(page()).toContain("<InlineTriage complaintId={event.complaint_id}");
-    expect(page()).toContain("{triageHere ? (");
+    expect(page()).toContain(") : triageHere ? (");
     // Saved on the page, it stays on the page.
     expect(source("Triage")).toContain('item.kind === "COMPLAINT" && !inline');
   });
@@ -162,7 +162,7 @@ describe("B3: the complaint page shows one action per row and does the triage it
     // the highlights panel's path instead of a "Stage by stage" list.
     expect(page()).toContain('Summary: "Details"');
     expect(page()).toContain("<dt>Problem</dt>");
-    expect(page()).toContain("<StagePath stages={view.stages} />");
+    expect(page()).toMatch(/<StagePath\s+stages={view\.stages}/);
   });
   it("leads with the intake decision summary once step 4 is reached (Addendum 2)", () => {
     expect(page()).toContain("<summary>The full complaint record</summary>");
@@ -205,6 +205,6 @@ describe("Addendum: one number per thing", () => {
     expect(summaryLine(counts)).toMatch(/^16 from your records · 8 entered/);
     // Before 0.10.72 the list said "24 filled" beside a meter of 16.
     expect(summaryLine(counts)).not.toContain("24");
-    expect(source("Reports")).toContain("filledCounts(detail.counts).fromRecords");
+    // 0.10.83 (D2.8): the approval no longer restates the counts; the approver reads the values themselves.
   });
 });

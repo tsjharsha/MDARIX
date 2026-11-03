@@ -203,7 +203,7 @@ def test_a_signed_version_is_never_edited_and_a_new_generation_is_version_two(tr
         "Template version: mrr-starter-1",
         "ISO 13485 5.6.2 Management review input (pending approval)",
         PRACTICE,
-        "Starter text",
+        "Starter, for your consultant to confirm",
         signature["content_fingerprint"],
         "Actions decided",
         "Written by the manufacturer",

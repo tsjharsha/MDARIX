@@ -316,6 +316,22 @@ export const toLocalInput = (iso: string | null) => {
 };
 export const fromLocalInput = (value: string) => (value ? new Date(value).toISOString() : null);
 
+/**
+ * The triage record's awareness field (0.10.84, M7). A day given without a time stays a day: a date field, saved as
+ * the server keeps such a day (12:00 UTC), never a time nobody recorded ("05:30 PM" where it is 12:00 UTC). An awareness
+ * later than the earliest known is ``later``, so its reason is asked before saving, not after a refusal.
+ */
+export function awarenessInput(awareness: Pick<TriageItem["awareness"], "at" | "date_only">) {
+  const day = !!awareness.date_only;
+  const initial = day ? (awareness.at ?? "").slice(0, 10) : toLocalInput(awareness.at);
+  const moment = (value: string) => (!value ? null : day ? `${value}T12:00:00.000Z` : fromLocalInput(value));
+  const later = (value: string) => {
+    const at = moment(value);
+    return !!at && !!awareness.at && Date.parse(at) > Date.parse(awareness.at);
+  };
+  return { type: day ? ("date" as const) : ("datetime-local" as const), day, initial, moment, later };
+}
+
 /** "2026-11-02T09:00": the wall clock in ``zone`` at ``now``, for a datetime-local input (J28). */
 export function zonedInput(now: Date, zone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {

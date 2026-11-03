@@ -154,12 +154,19 @@ describe("3. Import your data: its own page, /app/import", () => {
     expect(html).not.toMatch(/<details[^>]*open/);
   });
 
-  it("once the organization's complaints are in, offers one main button to them", () => {
+  it("once the organization's complaints are in, offers them, with Choose a file the one main button (0.10.82)", () => {
     reads.data[STATUS] = status(37, 4);
+    reads.data["/api/v1/data/import/templates"] = {
+      row_limit: 5000,
+      file_limit_bytes: 1_000_000,
+      creates_references: true,
+      templates: [{ entity: "complaints", title: "Complaints", required: [], optional: [], download: "" }],
+    };
     const chooseDataSource = vi.fn();
     const open = vi.fn();
     const html = render(<ImportYourDataSection />, api({ chooseDataSource, open }));
     expect(html.match(/class="ac-primary"/g)).toHaveLength(1);
+    expect(html).toMatch(/<label class="ac-primary">.*Choose a file/);
     expect(html).toContain("See your complaints");
     expect(html).toContain("4 complaints of your own");
     expect(YOUR_COMPLAINTS_TAB).toBe(`All complaints?source_system=${IMPORTED_SOURCE}`);

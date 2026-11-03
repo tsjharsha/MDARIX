@@ -42,7 +42,14 @@ function wasDismissed(key: string): boolean {
  * A one-time greeting for a colleague the trial owner invited, at the top of their first screens: who invited them
  * and where to begin. Closed for good with "Got it" (UX-26).
  */
-export function ColleagueWelcome({ me }: { me: TrialPerson | null | undefined }) {
+export function ColleagueWelcome({
+  me,
+  onStart,
+}: {
+  me: TrialPerson | null | undefined;
+  /** Opens Getting started (0.10.82, U-21: the greeting named it with no link). */
+  onStart?: () => void;
+}) {
   const key = `${DISMISSED_KEY}:${me?.organization ?? ""}`;
   const [dismissed, setDismissed] = useState(() => wasDismissed(key));
   if (!showWelcome(me, dismissed)) return null;
@@ -60,8 +67,13 @@ export function ColleagueWelcome({ me }: { me: TrialPerson | null | undefined })
       <div>
         <strong>{welcomeText(me)}</strong>
         <p>
-          Welcome to MDARIX. Getting started walks through the trial chapter by chapter, and you work on the same
-          records as your colleagues. Begin with the chapter it suggests, or with any chapter that matches your work.
+          Welcome to MDARIX. You work on the same records as your colleagues. Your next actions are on Home; Getting
+          started follows one complaint from the first call to the signed report, in ten steps.{" "}
+          {onStart && (
+            <button type="button" className="ac-link" onClick={onStart}>
+              Open Getting started
+            </button>
+          )}
         </p>
       </div>
       <button type="button" className="ac-secondary" onClick={close}>

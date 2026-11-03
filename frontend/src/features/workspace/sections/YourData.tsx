@@ -29,8 +29,11 @@ export function YourData({
   onImported,
   before,
   reportSecondary = false,
+  detect = false,
 }: {
   focus?: string;
+  /** One drop zone that detects the object (the new navigation's Import page, 0.10.82 D1.10). */
+  detect?: boolean;
   /** The page's main button is elsewhere (Import your data's "See your complaints"). */
   reportSecondary?: boolean;
   /** After an import, what else the screen reads again (Getting started: its story). */
@@ -66,6 +69,7 @@ export function YourData({
         id="trial-import"
         onReport={reports.show}
         reportSecondary={reportSecondary}
+        detect={detect}
         onImported={(result, entity) => {
           reports.imported(result.import_ref);
           if (newComplaints(entity, result) > 0) setOwnImported(true);
@@ -114,7 +118,8 @@ export function ImportYourDataSection({ focus }: { focus?: string }) {
             {hasSample ? " The sample stays beside them: the top bar shows one or the other." : ""}
           </p>
           <div className="ca-action-row">
-            <button type="button" className="ac-primary" onClick={seeYours}>
+            {/* "Choose a file" is the page's main button (0.10.82, D1.10). */}
+            <button type="button" className="ac-secondary" onClick={seeYours}>
               See your complaints <ChevronRight size={15} aria-hidden="true" />
             </button>
           </div>
@@ -122,7 +127,8 @@ export function ImportYourDataSection({ focus }: { focus?: string }) {
       )}
       <YourData
         focus={focus}
-        reportSecondary={own > 0}
+        detect
+        reportSecondary
         onImported={() => {
           status.reload();
           refreshTrial?.();

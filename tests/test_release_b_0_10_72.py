@@ -23,21 +23,14 @@ def test_b1_prefills_only_the_facts_the_record_states():
             "source": "From the complaint record: no death was reported",
             "evidence": "Patient outcome fields",
         },
-        **{
-            key: {
-                "answer": "NO",
-                "source": "From the complaint record: no serious injury was reported",
-                "evidence": "Patient outcome fields",
-            }
-            for key in ("US2A", "US2B", "US2C")
-        },
         "US4": {
             "answer": "YES",
             "source": "From the complaint record: a malfunction was reported",
             "evidence": "Malfunction field",
         },
     }
-    assert sorted(markets.suggestions(markets.IN_SET, RV11)) == ["IN2A", "IN2B", "IN2D", "IN2F"]
+    # 0.10.83 (D2): serious injury is a judgement, never pre-filled (US2A-C; India's IN2B, IN2D, IN2F alike).
+    assert sorted(markets.suggestions(markets.IN_SET, RV11)) == ["IN2A"]
     # EU/NI and GB ask "might it have led to": a judgement, so nothing is suggested there.
     assert markets.suggestions(markets.EU_SET, RV11) == {} and markets.suggestions(markets.GB_SET, RV11) == {}
 

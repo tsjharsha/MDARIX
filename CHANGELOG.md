@@ -10,6 +10,177 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.84] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): the fixes from the independent rating of rounds D1 (0.10.82) and D2
+(0.10.83), on the combined build. No migration. The API and web images change. No operator step: no sample record,
+count or deadline moment changes, and `refresh_trial_story.py` has nothing new to do.
+
+### Fixed: one legal deadline, everywhere
+
+- **Legal clocks show legal deadlines only.** An approval task's due date was read as a market's legal clock on the
+  Regulatory Leader's Home ("United States · SAMPLE-RV-11 · Due Wed 4 Nov"; the deadline is Wed 2 Dec), in the Your
+  data hero ("Its clock ends Wed 4 Nov") and in the complaint page's clock line. A task is never a legal clock now.
+- **Once the incident country is known, the header shows that market's clock.** FIC-2001, imported with no country,
+  kept "Shortest possible: … Mon 9 Nov" (Great Britain's) after its country was entered as the United States, while
+  its triage table gave the US 30 days. The complaint page, Home and the story's hero now read the US date from the
+  same triage calculation: "United States, provisional: … due …" while the awareness date is still asked (0.10.81's
+  rule stays: a clock counted without the awareness date is never a market's firm deadline). "Shortest possible" only
+  while the country is missing.
+- **Every deadline a person reads is in the organization's time zone** (its working calendar in Settings), whichever
+  market's it is. One clock read EST on the complaint page and GMT in its triage table. The moment, the latest day and
+  the counting rules are unchanged. An organization in India keeps reading "23:59 IST"; an organization elsewhere reads
+  the authority's end of day in its own time (an EU deadline for a New York organization: "18:59 EDT", not "23:59 CET").
+
+### Fixed: the story
+
+- **The story moves on after a save, with no reload.** After saving the triage, the "Step 2 of 10" pill and the rail's
+  Next step stayed stale until a reload. Every saved change now reads the story again.
+- **Step 3 opens the story complaint's own tree** with its questions, on the sample and on your data (checked on the
+  combined build: D2 had already fixed it).
+- **Step 9 opens the finished record in Records**: "The record you just finished", with the signed conclusion and
+  who signed it (the conclusion's line now names its signer, on the complaint's Related tab too), the authority report,
+  its approval and the decision record PDF. **Your data's step 10 opens your own product's trend**, not
+  the sample's OrbitCare rise.
+- **The story is the team's.** One step for every colleague, read from the shared record; a step any colleague opened
+  from the story (the call, the report, Records, Trends) counts for everyone. A colleague's banner no longer says "Step
+  5 of 10: Form" while the shared report waits for approval.
+- **The finale says the trend check's own verdict with its numbers**: "PulseWatch 410 Rev A: in line with history · 3
+  against 1.0 expected (3.0× expected) · p 0.076: within chance, not a rise", never "in line" alone beside 3 against
+  0.99. Once the story is done, its preview is the finale; the last button offers a pilot once a colleague has joined.
+
+### Fixed: Home, the complaint page, Import and Team
+
+- **Home follows the Sample · Your data switch**: on Your data its Overdue and Due this week tiles, its next actions
+  and its rising trends are your data's only (the sample's SAMPLE-RV-08 and OrbitCare were counted before), and the
+  complaint its hero names is always in "Your next actions", first among those due at the same time. Each trend row
+  now names its product's own identifier (`product.identifier` on `GET /api/v1/triage/trends`).
+- **A complaint waiting for its country** says "Waits for the incident country" in its decision path and its market
+  assessments, never "No market to assess"; while a clock waits for a fact, the rail no longer says "No legal clock
+  running" for the market the header names.
+- **A day-only awareness stays a date** in the triage form ("31 Oct 2026, time not recorded" offered "05:30 PM"), and a
+  later awareness asks "Why is it later than the earliest known?" before saving, not after a refused save.
+- **Import's checklist** shows what was just loaded at once, products a complaints file created included (the run's
+  data-quality report keeps `also_created`).
+- **Team**: the owner's control to change a colleague's personas says "Change", not a lock.
+- **Smaller fixes**: Home's At risk tile and trend card open the trend check, where their count is; step 6 no longer
+  promises "Most fields arrive filled"; on a phone the complaint header's clock chip wraps inside its card, and the
+  privacy notice sits above a side drawer; the search's `aria-controls` names its results only while they are shown,
+  and the cited line's link reaches 4.5:1 contrast; Getting started's type sizes are the scale's.
+
+### Changed: the decision tree and the report page (D2's misses)
+
+- **The tree while answering**: the Answer · Edit switch sits on the market row, the page head is shorter, the starter
+  mark is said once, and the line under Sign gives the worked complaints only. Sign now ends about 95 px above the
+  bottom of a 1440×900 screen on every market's tree, India included (it ended 28 px above).
+- **The report header's starter chip** reads "Starter, for your consultant to confirm", the one starter wording, and
+  its approval reasons say "You prepared this report: a second person must approve it", never "snapshot".
+
+## [0.10.83] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): round D2 "Decide and report" of the approved redesign, on the new
+navigation. No migration. The API and web images change. No operator step: nothing stored is rewritten (signed
+records keep their words).
+
+### Changed: the decision tree is the questionnaire
+
+- **Answer on the Decision trees tab.** Pick a complaint, then answer each question of its market's tree in place: Yes,
+  No, Unknown or Not applicable. The complaints still to assess are listed, not only those already walked. The
+  Complaints › Reporting side panel's address opens the tree.
+- **Facts arrive as one line to confirm; judgements are never pre-filled.** "Serious injury" (21 CFR 803.3(w), and
+  India's serious criteria alike) is now a judgement, with the record's words beside it.
+- **Questions earlier answers make unnecessary fold into one grey line** saying why, and are not required to sign.
+- **The outcome updates as you answer**: Reportable with its type, rule and due date, Not reportable, or Pending
+  information, with "Why" chips. On a phone a sticky outcome bar below the first question carries Sign.
+- **Signing takes about four actions**: the outcome and Sign in one card, "Follow the outcome" by default (an
+  override needs a reason), a one-line reason for each judgement and each fact changed from the record shown as a short
+  checklist, the training confirmation as one line under the password. After signing, each answer reads as text with
+  its reason, with who signed, when and what it means. The real role decides who signs, never the persona.
+- **The form for the incident's country** is named beside the outcome (US 3500A, India MDAE, EU/NI MIR, GB MHRA MIR,
+  the Health Canada report) and opens once signed. Where another market's reporting may also apply, an advice-only
+  flag, starter; it creates no second report.
+- **Edit this tree on the same tab**: questions as read-only rows with a pencil, the regulation's text and clause
+  locked, extra questions that never change the conclusion, one button to test against the worked complaints and send
+  for approval, and an approver who sees only what changed, with password and authenticator code. Settings ›
+  Reportability guides still works.
+
+### Changed: the report and its approval
+
+- **"N things to give (M fields)"**, grouped by who knows them: your product (enter once), your organization (enter
+  once), this event. A product's or the organization's fact entered once on a report is saved on the product or as the
+  market's responsible party and reused on every report for that product; it never overwrites a value already held.
+  The full report folds away while anything is missing, and the field count is said once.
+- **Approval in plain words**: "Approve the India report for SAMPLE-RV-10. Prepared by Asha. You confirm with your
+  password." The approver reads "What you are approving", the values as frozen in the form's order with their sources,
+  above the password and Approve; a success panel follows. The approval task reads the same way. No "snapshot",
+  "fingerprint" or "checksum" on these screens (the PDF keeps the checksum).
+- **Every signature shows the signer's full name, date and time, and its meaning** (signed reportable, prepared,
+  approved for submission, or practice approval) on the report, the PDF and Records (21 CFR 11.50). A new approval's
+  meaning says "version", not "snapshot".
+
+### Fixed
+
+- **One starter wording, on starter content only**: "Starter, for your consultant to confirm". An approved guide of your
+  own is no longer marked "Starter text" in the assessment.
+- Report field sources name the complaint by your reference and the market in words ("SAMPLE-RV-07 EU and Northern
+  Ireland (EU MDR) v1 (signed)", not "CMP000035 EU_NI v1"); the tree's version line reads "approved 30 Oct 2026".
+
+## [0.10.82] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): round D1, "One story", of the approved redesign, for trials on the
+new navigation. The classic navigation is unchanged. No migration. No sample record, deadline or count changes. The
+API and web images change. No operator step: `refresh_trial_story.py` has nothing new to do.
+
+### Changed: Getting started tells one story
+
+- **One complaint, from the first call to the signed report.** Getting started opens on one hero and one rail of ten
+  steps: the call, triage, the decision tree, reportable or not, the form for the country, fill what is missing,
+  approval, PDF and submission, Records and Trends. Each step has one main button that opens the real screen with the
+  record in place. A step is ticked from what was saved on the record (new read: `GET /api/v1/trial/one-story`);
+  opening the call, the report, Records or Trends from the story is the person's own mark
+  (`POST /api/v1/trial/one-story/marks`, kept on the trial's request, no business record changes).
+- **The sample first, then your data.** The sample walks SAMPLE-RV-11. After step 10, "Do the same with your data"
+  runs the same ten steps on the trial's own most urgent imported complaint: the most serious harm, then the shortest
+  clock. Where the file lacks a fact, the step says so and the complaint page asks for it. The sample's last step shows
+  the monitor's own trend, then the OrbitCare 300 Rev B rise.
+- **Everything else folds under "More ways to explore"**: the shorter stories, the ten chapters, the trial journey,
+  the sample data and your trial.
+
+### Changed: the record pages, Home, Team and Import (new navigation)
+
+- **One Next step, one progress indicator.** On the story's own complaint the rail's Next step is the story's step,
+  and the story is a slim "Story · Step N of 10 · Back" pill. The complaint and report pages show one status line,
+  "Stage 2 of 6 · …", in place of the chevrons; on the complaint page its steps are links (Market assessment opens the
+  tree, Report the report).
+- **The complaint page:** harm in words ("No harm reported", "Serious injury", "Not known yet"), with patient
+  involvement on its own line; checklist lines name the step and its state, never a goal beside a state that denies it;
+  each missing fact is asked once, in Details ("Asked below" elsewhere); one clock line in the header ("Shortest
+  possible: 5 days left · due Sun 8 Nov").
+- **"Shortest possible" is the true shortest deadline** (trials and pilots). While a complaint waits for its country or
+  awareness date, its provisional clock is now the earliest per-market deadline its triage table shows, on the
+  complaint page, Home, the story's hero and the reportability watch: one calculation. It read a later reporting
+  window's date before (an imported serious injury with no country: Mon 9 Nov on the page, Sun 8 Nov for Great Britain
+  in its own triage table).
+- **Home, every persona:** a slim "Continue the story" banner on the sample; on your data, the most urgent complaint
+  and what the file did not say; "Story complete" once done. The tiles say "Reading…" while loading and each opens the
+  list it counts. Overdue is now the complaint list view "Overdue" (`GET /api/v1/complaints?view=overdue`), so the tile
+  and the list are one number. The trend card draws observed and expected as bars.
+- **All open complaints** lists the most urgent first: overdue, then the nearest clock, the undated last.
+- **Team: several personas per colleague.** The owner ticks one or more personas (`personas` on
+  `POST /api/v1/trial/team` and `POST /api/v1/trial/team/{id}/persona`). The first persona's role is the account role,
+  the others additional roles, so the rights add up; nobody approves what they prepared. The colleague switches
+  "Viewing as" between their own personas only; with one, it stays locked. Audited as TRIAL_PERSONA_ASSIGNED with the
+  personas before and after. Pilot users keep their role's one persona.
+- **Import your data:** one drop zone that detects which of the 18 objects a file is
+  (`POST /api/v1/data/import/detect`, nothing saved), "Choose a file" as the main button, and the 7 core objects in
+  loading order with what each unlocks and whether it is loaded ("More objects (11)" folded). A blank serious-injury
+  cell is flagged in the rows to check: it is asked at the decision tree, never filled in.
+- **Smaller fixes:** page heads name the section and the page's question, with the time zone once, on Home (U-15);
+  the trend sentence names its 30-day window and an investigation's scope says it counts every linked complaint; a
+  call's reference (SAMPLE-URG-01) opens as "a call, not a complaint yet", search finds calls, and Home's next action
+  opens its triage card; on a phone the tab bar shows that more tabs exist; one avatar on the top bar; the colleague
+  welcome links Getting started.
+
 ## [0.10.81] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): the Critical, High and Medium findings of the functional review of

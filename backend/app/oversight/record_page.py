@@ -92,7 +92,11 @@ def related(db, found: dict, complaint, names: dict[str, str], service: dict | N
         current, draft = current_and_draft(found["assessments"].get(market, []))
         if current is not None:
             text = market_rules.CONCLUSION_LABELS.get(current.conclusion, current.conclusion)
-            assessments.append(f"{label.get(market, market)}: {text}, signed {current.signed_at.date().isoformat()}")
+            # Who signed it, as every signature says (0.10.84: Records' finished record names the signer).
+            who = names.get(current.signed_by or "") or "a colleague"
+            assessments.append(
+                f"{label.get(market, market)}: {text}, signed {current.signed_at.date().isoformat()} by {who}"
+            )
         elif draft is not None:
             assessments.append(f"{label.get(market, market)}: started, not signed")
         else:
@@ -127,7 +131,7 @@ def related(db, found: dict, complaint, names: dict[str, str], service: dict | N
             "key": "assessments",
             "label": "Market assessments",
             "count": len(assessments),
-            "lines": assessments or ["No market to assess"],
+            "lines": assessments or [_no_market(complaint)],
         },
         {
             "key": "service",
@@ -168,6 +172,17 @@ def related(db, found: dict, complaint, names: dict[str, str], service: dict | N
             "lines": decisions or ["Nothing signed yet: the event decision record lists each signature once made"],
         },
     ]
+
+
+def _no_market(complaint) -> str:
+    """Why no market is listed: the incident country is still asked (0.10.84, M2), or none of the markets applies."""
+    from backend.app.reportability import facts
+    from backend.app.reportability import service as reporting_service
+
+    needs = facts.of_complaint(complaint, reporting_service._record(complaint, None, None))
+    if any(need["fact"] == "COUNTRY" for need in needs):
+        return "Waits for the incident country, asked on the complaint's page"
+    return "None of your reporting markets applies"
 
 
 def _related_ids(found: dict, complaint) -> list[uuid.UUID]:
@@ -237,6 +252,15 @@ def activity(db, found: dict, complaint, names_of) -> dict:
     return {"items": items + start, "more": len(rows) > ACTIVITY_LIMIT}
 
 
+def _meaning_label(row) -> str:
+    """A signature's meaning in a few words: "approved for submission", "signed reportable", or "signed"."""
+    if row.object_type == "ReportSnapshot":
+        return "approved for submission"
+    if row.object_type == "ComplaintMarketAssessment":
+        return "signed reportable" if row.decision == "REPORTABLE" else "signed not reportable"
+    return "signed"
+
+
 def latest_signed(db, tenant_id, me: str, names_of) -> dict | None:
     """The newest record this person signed in this organization, with what it is and where it opens."""
     from backend.app.db.models.authority_reports import ReportObligation, ReportSnapshot
@@ -296,6 +320,9 @@ def latest_signed(db, tenant_id, me: str, names_of) -> dict | None:
         "signed_at": _day(row.signed_at),
         "signed_by": names_of({me}).get(me),
         "meaning": row.signature_meaning,
+        # The moment and the meaning in a few words, as every signature shows them (21 CFR 11.50; 0.10.83, D2.8).
+        "signed_at_time": row.signed_at.isoformat() if row.signed_at else None,
+        "meaning_label": _meaning_label(row),
         "complaint": {"id": str(complaint.id), "ref": complaint.complaint_identifier or complaint.business_id}
         if complaint is not None
         else None,

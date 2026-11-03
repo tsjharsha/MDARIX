@@ -7,7 +7,11 @@
 
 /** The complaint list views the server filters (backend/app/oversight/router.py LIST_VIEWS), with what each holds. */
 export const SERVER_VIEWS: Readonly<Record<string, { code: string; detail: string }>> = {
-  "All open complaints": { code: "open", detail: "Every complaint not closed in your QMS, newest first." },
+  "All open complaints": {
+    code: "open",
+    detail: "Every complaint not closed in your QMS, the most urgent first: overdue, then the nearest clock.",
+  },
+  Overdue: { code: "overdue", detail: "A deadline or target already past, the longest overdue first." },
   "Due this week": { code: "due-week", detail: "A deadline or target in the next seven days, soonest first." },
   "Legal clocks this week": {
     code: "legal-week",

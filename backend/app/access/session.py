@@ -325,23 +325,46 @@ def persona_of(db: Session, user, owner: bool) -> str:
         chosen = None
     if owner:
         return chosen.code if chosen else "admin"
-    role = normalize_role(role_of_user(db, user))
-    if chosen is not None and chosen.code != "admin" and chosen.role == role:
+    mine = colleague_personas(db, user)
+    if chosen is not None and chosen.code in mine:
         return chosen.code
-    return persona_for_role(role)
+    return mine[0]
+
+
+def colleague_personas(db: Session, user) -> list[str]:
+    """Anyone but the trial owner: the persona of their account role and, in a trial (0.10.82, D1.9), one for each
+    further role the owner gave them (user_additional_roles), in the catalog's order. A pilot user keeps their role's
+    one persona, as before."""
+    from access_control.personas import COLLEAGUE_PERSONAS
+    from backend.app.db.models.workflow import UserAdditionalRole
+    from backend.app.trial.service import trial_subscription
+
+    own = persona_for_role(normalize_role(role_of_user(db, user)))
+    if own == "admin" or trial_subscription(db, user.tenant_id) is None:
+        return [own]
+    held = {own}
+    for (code,) in db.query(UserAdditionalRole.role_code).filter(
+        UserAdditionalRole.tenant_id == user.tenant_id,
+        UserAdditionalRole.user_id == user.id,
+        UserAdditionalRole.status == "ACTIVE",
+    ):
+        held.add(persona_for_role(normalize_role(code)))
+    return [code for code in COLLEAGUE_PERSONAS if code in held]
 
 
 def persona_state(db: Session, user) -> dict:
     owner = owns_trial(db, user)
     persona = workspace_persona(persona_of(db, user, owner))
+    # A colleague switches between their own personas only; with one, it is locked as before (0.10.82, D1.9).
+    mine = None if owner else colleague_personas(db, user)
+    options = WORKSPACE_PERSONAS if mine is None else [workspace_persona(code) for code in mine]
     return {
         "persona": persona.code,
         "persona_label": persona.label,
-        "persona_locked": not owner,
+        "persona_locked": mine is not None and len(mine) < 2,
         "persona_tabs": list(persona.tabs),
         "persona_options": [
-            {"code": item.code, "label": item.label, "sub": item.sub, "tabs": list(item.tabs)}
-            for item in WORKSPACE_PERSONAS
+            {"code": item.code, "label": item.label, "sub": item.sub, "tabs": list(item.tabs)} for item in options
         ],
     }
 
@@ -354,19 +377,22 @@ def switch_persona(payload: PersonaSwitch, http_request: Request, db: Session = 
     from backend.app.enterprise_audit import make_audit_event
 
     user = _authenticated_user(http_request, db)
-    if not owns_trial(db, user):
+    owner = owns_trial(db, user)
+    # A colleague the owner gave several personas switches between those (0.10.82, D1.9); one persona stays locked.
+    mine = [] if owner else colleague_personas(db, user)
+    if not owner and (len(mine) < 2 or str(payload.persona or "").strip().lower() not in mine):
         raise HTTPException(
             403,
             detail={
                 "code": "PERSONA_LOCKED",
-                "message": "Your persona is your role, set by the trial owner. Ask them to change it.",
+                "message": "Your personas are your roles, set by the trial owner. Ask them to change them.",
             },
         )
     try:
         persona = workspace_persona(payload.persona)
     except ValueError:
         raise HTTPException(422, detail={"code": "UNKNOWN_PERSONA", "message": "Choose one of the personas listed"})
-    before = persona_of(db, user, True)
+    before = persona_of(db, user, owner)
     if before != persona.code:
         now = datetime.now(timezone.utc)
         user.view_persona = persona.code

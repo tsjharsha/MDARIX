@@ -179,6 +179,19 @@ def _import_and_audit(
     return result
 
 
+@router.post("/detect", dependencies=IMPORTING)
+async def detect_import(
+    request: Request,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    """Which of the templates a file is (0.10.82, D1.10): one drop zone for every object. Reads the file's column names
+    only; nothing is checked or saved here (the check and the import follow, for the template named)."""
+    policy = await run_in_threadpool(_policy, db, ctx)
+    raw = await _body(request, policy)
+    return await run_in_threadpool(imports.detect, raw, policy)
+
+
 @router.post("/{entity}/check", dependencies=IMPORTING)
 async def check_import(
     entity: str,

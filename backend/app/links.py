@@ -42,6 +42,8 @@ RECORDS = {
     "case": ("Investigations", "Workspace", "case"),
     "signal": ("Signals", "Signal inbox", "signal"),
     "request": ("My Work", "Evidence requests", "request"),
+    # A call not yet a complaint (0.10.82, navigation M5): its own card on the triage list.
+    "intake": ("Complaints", "Triage", "intake"),
 }
 
 

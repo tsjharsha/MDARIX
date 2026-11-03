@@ -17,10 +17,9 @@ import {
   clockTone,
   daysEarlier,
   deadlineText,
-  fromLocalInput,
+  awarenessInput,
   hoursText,
   tierTone,
-  toLocalInput,
   type Guide,
   type TriageItem,
   type TriageList,
@@ -53,6 +52,8 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const [complaint] = useTabParam("complaint");
   // A story opens its record by the reference people read (Triage?ref=SAMPLE-URG-01, 0.10.71).
   const [ref] = useTabParam("ref");
+  // A call's next action on Home opens its own card (Triage?intake=<id>, 0.10.82, navigation M5).
+  const [intake] = useTabParam("intake");
   const { reportTab, shownTab } = useWorkspace();
   const list = useResource<TriageList>(`${TRIAGE}?show=${show}`);
   const summary = list.data?.summary;
@@ -60,6 +61,7 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const wanted =
     openKey ??
     (complaint ? `COMPLAINT:${complaint}` : null) ??
+    (intake ? `INTAKE:${intake}` : null) ??
     (ref ? (items.find((item) => item.ref === ref || item.identifier === ref)?.key ?? null) : null);
   const open = wanted ? (items.find((item) => item.key === wanted) ?? null) : null;
   const setOpen = (item: TriageItem | null) => {
@@ -67,7 +69,7 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
     // Closing clears every parameter that opens the panel, in one address change: complaint= or ref= left behind
     // would open it again at once (0.10.79).
     reportTab(
-      ["item", "complaint", "ref"].reduce((tab, name) => withTabParam(tab, name, null), shownTab),
+      ["item", "complaint", "ref", "intake"].reduce((tab, name) => withTabParam(tab, name, null), shownTab),
       "push",
     );
   };
@@ -296,6 +298,7 @@ function TriageDrawer({
   const canWrite = useCanTriage();
   const { navigation, open } = useWorkspace();
   const record = item.record;
+  const awareField = awarenessInput(item.awareness);
   const [form, setForm] = useState<RecordForm>({
     severity: record?.severity ?? "",
     threat: record?.public_health_threat ?? false,
@@ -305,13 +308,14 @@ function TriageDrawer({
     backup: "",
     action: record?.immediate_action ?? "",
     noAction: record?.no_action_reason ?? "",
-    aware: toLocalInput(item.awareness.at),
+    aware: awareField.initial,
     awareNote: "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const set = (patch: Partial<RecordForm>) => setForm((current) => ({ ...current, ...patch }));
   const needsAwareness = item.awareness.unresolved || item.conflict.length > 0;
+  const laterAware = awareField.later(form.aware);
   const problem = !form.severity
     ? "Assess the severity"
     : !form.eventOwner || !form.triageOwner
@@ -320,7 +324,9 @@ function TriageDrawer({
         ? `Record the immediate action, or why none is needed (at least ${REASON_MIN} characters)`
         : needsAwareness && !form.aware
           ? "Confirm the awareness time"
-          : null;
+          : laterAware && form.awareNote.trim().length < REASON_MIN
+            ? `Say why the awareness is later than the earliest known (at least ${REASON_MIN} characters)`
+            : null;
   const submit = async () => {
     setBusy(true);
     setError("");
@@ -335,7 +341,7 @@ function TriageDrawer({
         immediate_action: form.action,
         no_action_reason: form.noAction,
         awareness_confirmed_at:
-          needsAwareness || form.aware !== toLocalInput(item.awareness.at) ? fromLocalInput(form.aware) : null,
+          needsAwareness || form.aware !== awareField.initial ? awareField.moment(form.aware) : null,
         awareness_note: form.awareNote,
       });
       onDone();
@@ -509,18 +515,22 @@ function TriageDrawer({
             </label>
             <div className="ca-form-grid">
               <label className="ca-field">
-                Awareness time {needsAwareness ? "(confirm it)" : ""}
+                {awareField.day ? "Awareness date (time not recorded)" : "Awareness time"}{" "}
+                {needsAwareness ? "(confirm it)" : ""}
                 <WhyAsked why={TRIAGE_WHY.awareness} />
                 <input
-                  type="datetime-local"
+                  type={awareField.type}
                   value={form.aware}
                   onChange={(event) => set({ aware: event.target.value })}
                 />
               </label>
-              <label className="ca-field">
-                Why, if later than the earliest known
-                <input value={form.awareNote} onChange={(event) => set({ awareNote: event.target.value })} />
-              </label>
+              {/* Asked as soon as it is needed (0.10.84, M7), never after a refused save. */}
+              {laterAware && (
+                <label className="ca-field">
+                  Why is it later than the earliest known? Who knew, and for whom
+                  <input value={form.awareNote} onChange={(event) => set({ awareNote: event.target.value })} />
+                </label>
+              )}
             </div>
             {problem && <p className="uw-hint">{problem}</p>}
             <div className="ca-action-row">

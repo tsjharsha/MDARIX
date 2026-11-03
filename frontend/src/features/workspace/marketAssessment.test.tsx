@@ -29,7 +29,7 @@ function workspace(permissions: string[]): WorkspaceApi {
 const render = (node: ReactNode, permissions: string[] = ["regulatory.review"]) =>
   renderToStaticMarkup(<WorkspaceContext.Provider value={workspace(permissions)}>{node}</WorkspaceContext.Provider>);
 
-const STARTER = "Starter text — awaiting regulatory confirmation: check it against your own procedure.";
+const STARTER = "Starter, for your consultant to confirm.";
 const question = (id: string, text: string, clause: string, extra: Partial<Question> = {}): Question => ({
   id,
   text,
@@ -241,7 +241,7 @@ describe("the assessment screen", () => {
     expect(html).toContain("1.</strong> Did a death occur?");
     expect(html).not.toContain("US1.");
     expect(html).toContain("21 CFR 803.50(a)(2)");
-    expect(html.split("Starter text</span>").length - 1).toBe(QUESTIONS.length + 1);
+    expect(html.split("Starter, for your consultant to confirm</span>").length - 1).toBe(QUESTIONS.length + 1);
     expect(html).toContain("Recurrence is presumed");
     expect(html).toContain("US serious injury threshold");
     expect(html).toContain("<strong>critical</strong>, at or above the US serious injury threshold");
@@ -390,7 +390,7 @@ describe("the assessment screen", () => {
       />,
     );
     expect(india).toContain(WHY_ASSESSED);
-    expect(india).toContain("Starter wording, for your consultant to confirm.");
+    expect(india).toContain("Starter, for your consultant to confirm.");
     const own = render(
       <MarketPanel item={item({ preselected: true })} detail={detail(item({ preselected: true }))} onSaved={vi.fn()} />,
     );

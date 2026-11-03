@@ -65,18 +65,20 @@ def test_triage_shows_the_events_own_market_first_and_a_signed_conclusion_instea
     complaints = _ok(trial["user"].get(f"{WATCH}?show=all&page_size=100"))["items"]
     ref = {item["complaint_identifier"]: item["business_id"] for item in complaints}
     # SAMPLE-RV-06 (US): the FDA deadline comes first; the EU and India deadlines only if also reportable.
-    rv06 = items[ref["SAMPLE-RV-06"]]["deadlines"]
+    # Triage lists each complaint by its own reference (the business id before 0.10.81).
+    rv06 = items["SAMPLE-RV-06"]["deadlines"]
     assert (rv06[0]["market"], rv06[0]["role"]) == ("US", "OWN")
     assert {item["role"] for item in rv06[1:]} == {"IF_ALSO"}
     # SAMPLE-RV-07 (France, EU concluded reportable, 15 days): the signed deadline, as the watch and Reports show it.
-    rv07 = items[ref["SAMPLE-RV-07"]]["deadlines"][0]
+    rv07 = items["SAMPLE-RV-07"]["deadlines"][0]
     watched = next(item for item in complaints if item["complaint_identifier"] == "SAMPLE-RV-07")
     assert rv07["market"] == "EU_NI" and rv07["role"] == "SIGNED" and rv07["days"] == 15
-    assert rv07["due_label"] == watched["binding"]["due_label"] and rv07["due_label"].endswith(" CET")
+    # 0.10.84: in the organization's time zone, as every deadline label (it read Brussels' CET before).
+    assert rv07["due_label"] == watched["binding"]["due_label"]
     report = next(
         item
         for item in _ok(trial["user"].get("/api/v1/reports"))["items"]
-        if item["complaint_ref"] == ref["SAMPLE-RV-07"]
+        if item["complaint_ref"] in ("SAMPLE-RV-07", ref["SAMPLE-RV-07"])
     )
     assert report["due_label"] == rv07["due_label"] and report["days_left"] == rv07["days_left"]
 
