@@ -62,6 +62,12 @@ change below is read from the records as they are).
   what MDARIX does for a QA/RA team. The report's steps read one word each (Created · Complete · Approval · Approved ·
   Submitted · Acknowledged); the story's first step reads "Call"; one date-field width.
 
+### Fixed: Records' readiness
+
+- **"Reported in window" reads the shortest clock again.** Its watch passed a day where the triage list expects a
+  moment; the read failed (logged, swallowed) since 0.10.82, so the check counted without it. On a fresh local trial
+  the check reads 5 items needing attention where it read 4.
+
 ### Changed: speed
 
 - The complaint list's work columns and the events list read each kind of record once per page (about a dozen queries
