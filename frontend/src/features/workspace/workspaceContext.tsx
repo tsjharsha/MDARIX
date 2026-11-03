@@ -429,6 +429,16 @@ export const SECTION_PERMISSIONS: Partial<Record<WorkspaceSection, BusinessPermi
   "Import data": "records.write",
 };
 
+/** Whether this person may bring in their own data (0.10.79): the organization imports (not a sample-only trial) and
+ * they may change records; the Import data screen's own rule. The server checks again on every import. */
+export const canImportOwnData = (session: SessionContext | null | undefined) =>
+  sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions, session?.sample_only);
+
+/** Where "Import your data" opens: in a trial, the trial import Help › Try your own data opens (Getting started › Your
+ * data); elsewhere the Import data screen. */
+export const openImport = (open: (section: WorkspaceSection, tab?: string) => void, isTrial: boolean) =>
+  isTrial ? open("Getting started", "Your data") : open("Import data");
+
 export function sectionAllowed(
   section: WorkspaceSection,
   allowedMenu: string[] | undefined,

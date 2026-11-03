@@ -89,9 +89,16 @@ def test_the_sample_links_are_imdrfs_own_codes_and_terms_word_for_word():
         "A140502": "Free or Unrestricted Flow",
         "A160103": "Low Audible Alarm",
         "A090807": "High Readings",
+        # 0.10.79: the two sample codes that had no link.
+        "A090808": "Low Readings",
+        "A090811": "Unable to Obtain Readings",
     }
     levels = {code: (len(code) - 1) // 2 for code in terms}
-    assert levels == {"A1601": 2, "A1407": 2, "A160102": 3, "A140502": 3, "A160103": 3, "A090807": 3}
+    assert levels == {"A1601": 2, "A1407": 2, "A160102": 3, "A140502": 3, "A160103": 3, "A090807": 3, "A090808": 3,
+                      "A090811": 3}  # fmt: skip
+    assert SAMPLE_IMDRF_LINKS["FLOW_ZERO_READING"] == ("A090808",)  # RV-07: the flow sensor showed zero flow
+    assert SAMPLE_IMDRF_LINKS["SPO2_DROPOUT_HARM"] == ("A090811",)  # RV-01: the SpO2 reading dropped out
+    assert "NFF" not in SAMPLE_IMDRF_LINKS
     # The links before 0.10.77 exist too, as written: the level-1 headings and A0908 (level 2).
     assert {annex_a[old]["term"] for _, old in EARLIER_IMDRF_LINKS} == {
         "Infusion or Flow Problem",
@@ -255,9 +262,9 @@ def test_nothing_is_filed_unconfirmed_and_one_choice_fills_fda_and_imdrf(trial):
     with SessionLocal() as db:
         states = [
             row.details.get("code_state")
-            for row in db.query(AuditEvent).filter(
-                AuditEvent.tenant_id == trial["tenant_id"], AuditEvent.action == "REPORT_FIELD_SET"
-            )
+            for row in db.query(AuditEvent)
+            .filter(AuditEvent.tenant_id == trial["tenant_id"], AuditEvent.action == "REPORT_FIELD_SET")
+            .order_by(AuditEvent.created_at)  # 0.10.79: in the order they were set (it read them unordered)
             if (row.details or {}).get("field") == "H6_PROBLEM"
         ]
     assert states == ["CONFIRMED", "CHANGED", "CONFIRMED"]
@@ -365,7 +372,7 @@ def test_a_running_trial_is_re_recorded_once():
             assert rv09.entries["H6_PROBLEM"]["value"] == "A160103 Low Audible Alarm (FDA 1016)"
             # As a trial made before 0.10.77 had them: the 2025 links, no code entries on RV-09's 3500A.
             back = {new: old for (_, old), new in EARLIER_IMDRF_LINKS.items()}
-            rows = db.query(ImdrfCodeMapping).filter_by(tenant_id=tenant_id).all()
+            rows = [row for row in db.query(ImdrfCodeMapping).filter_by(tenant_id=tenant_id) if row.imdrf_code in back]
             for row in rows:
                 row.release, row.imdrf_code = "2025", back[row.imdrf_code]
             rv09.entries = {key: value for key, value in rv09.entries.items() if not key.startswith("H6_") or

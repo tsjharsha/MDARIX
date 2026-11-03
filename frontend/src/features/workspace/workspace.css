@@ -431,6 +431,11 @@
   justify-content: space-between;
   align-items: flex-start;
 }
+/* Edit keeps its word on a phone (0.10.79: it broke into "E di t" under the row's overflow-wrap). */
+.uw-identity-head > button {
+  flex-shrink: 0;
+  overflow-wrap: normal;
+}
 .uw-identity-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
@@ -7596,5 +7601,20 @@ button.uw-org:hover {
   .uw-lv select {
     flex: 1;
     min-width: 0;
+  }
+}
+/* "Import your data" beside the Sample data label (0.10.79); where the label is hidden, it is in the avatar menu. */
+.uw-top-import {
+  flex: none;
+}
+.uw-avatar-import {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .uw-top-import {
+    display: none;
+  }
+  .uw-pop-option.uw-avatar-import {
+    display: flex;
   }
 }

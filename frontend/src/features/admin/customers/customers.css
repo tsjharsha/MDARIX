@@ -106,6 +106,9 @@
   color: var(--ac-ink);
   overflow-wrap: anywhere;
 }
+.cc-detail-note {
+  display: block;
+}
 .cc-two-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
