@@ -180,7 +180,7 @@ export function PersonaSwitch({
 
 type Hit = {
   key: string;
-  kind: "Complaint" | "Call" | "Product" | "Report";
+  kind: "Complaint" | "Call" | "Product" | "Report" | "Investigation" | "Trend";
   title: string;
   detail: string;
   go: () => void;
@@ -224,7 +224,9 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
         requestJson<any>("/api/v1/reports").catch(() => null),
         // Calls not yet a complaint (SAMPLE-URG-01) are found too, and open their triage card (0.10.82, U-20).
         requestJson<any>("/api/v1/triage").catch(() => null),
-      ]).then(([complaints, records, reports, triage]) => {
+        // Trends to review by any part of their title or reference (0.10.85, D3.11).
+        requestJson<any>(`/api/v1/triage/signals?q=${term}&page_size=5`).catch(() => null),
+      ]).then(([complaints, records, reports, triage, trends]) => {
         if (!live) return;
         const found: Hit[] = [];
         for (const row of (complaints?.items ?? complaints?.complaints ?? []) as any[]) {
@@ -249,6 +251,7 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
             }),
           });
         }
+        found.push(...recordHits(records?.records ?? [], trends?.items ?? [], go));
         const needle = q.toLowerCase();
         for (const row of ((triage?.items ?? []) as any[])
           .filter(
@@ -607,6 +610,41 @@ export function TabBar({
       )}
     </nav>
   );
+}
+
+/**
+ * The top bar's investigation and trend hits (0.10.85, D3.11): an investigation by any part of its reference or
+ * question (from the record search), opening its page; a trend to review by its title or reference.
+ */
+export function recordHits(
+  records: any[],
+  trends: any[],
+  go: (place: { section: string; tab?: string }) => () => void,
+): Hit[] {
+  const cases = records
+    .filter((item) => item.record_type === "investigation")
+    .slice(0, 3)
+    .map((row) => {
+      const ref = String(row.investigation_identifier ?? row.business_id ?? "");
+      return {
+        key: `i-${row.id}`,
+        kind: "Investigation" as const,
+        title: ref,
+        detail: String(row.investigation_question ?? "").slice(0, 90),
+        go: () => window.location.assign(`/app/investigations?${new URLSearchParams({ case: ref })}`),
+      };
+    });
+  const raised = trends.slice(0, 5).map((row) => {
+    const ref = String(row.business_id ?? row.id);
+    return {
+      key: `s-${row.id}`,
+      kind: "Trend" as const,
+      title: String(row.title ?? ref),
+      detail: ref,
+      go: go({ section: "Trends", tab: `Trends to review?${new URLSearchParams({ signal: ref })}` }),
+    };
+  });
+  return [...cases, ...raised];
 }
 
 /** The top bar's report hits (0.10.81, navigation M2): only started reports, which have a page; a report not started

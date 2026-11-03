@@ -7,6 +7,7 @@ import { workColumns } from "./sections/ComplaintList";
 import { deadlineLabel, formatDateTime, formatDay, setDisplayZone, zoneName, zoneless } from "../../app/dates";
 import userWorkspace from "./UserWorkspace.tsx?raw";
 import hybridShell from "./HybridShell.tsx?raw";
+import { recordHits } from "./HybridShell";
 import home from "./sections/Home.tsx?raw";
 
 const stubWindow = () =>
@@ -198,5 +199,30 @@ describe("D3.8 accessibility on the new navigation", () => {
     expect(read("./sections/TreeEdit.tsx")).toContain('title={!password ? "Enter your password first" : undefined}');
     expect(read("./sections/Reports.tsx")).toContain("title={problem || undefined}");
     expect(read("./sections/Triage.tsx")).toContain("title={problem || undefined}");
+  });
+});
+
+describe("D3.11 search finds every record", () => {
+  it("finds an investigation by its reference or question and a trend by its title, each opening its page", () => {
+    const go = vi.fn((place: { section: string; tab?: string }) => () => place);
+    const hits = recordHits(
+      [
+        { record_type: "product", id: "p", name: "OrbitCare 300" },
+        {
+          record_type: "investigation",
+          id: "i",
+          investigation_identifier: "SAMPLE-INV-001",
+          investigation_question: "Why did pressure alarms rise?",
+        },
+      ],
+      [{ id: "s", business_id: "SIG000001", title: "6 complaints: pressure alarm on OrbitCare 300" }],
+      go,
+    );
+    expect(hits.map((hit) => [hit.kind, hit.title])).toEqual([
+      ["Investigation", "SAMPLE-INV-001"],
+      ["Trend", "6 complaints: pressure alarm on OrbitCare 300"],
+    ]);
+    expect(go).toHaveBeenCalledWith({ section: "Trends", tab: "Trends to review?signal=SIG000001" });
+    expect(hybridShell).toContain("/api/v1/triage/signals?q=${term}&page_size=5");
   });
 });

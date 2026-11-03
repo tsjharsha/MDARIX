@@ -79,3 +79,13 @@ def test_a_complaint_with_every_market_signed_needs_no_decision_and_its_stage_is
         for item in _ok(user.get(LIST, params={"view": "open", "work": "true"}))["items"]
     }
     assert rows["SAMPLE-RV-07"]["work"]["stage"] == "Report"
+
+
+def test_search_finds_a_complaint_by_any_part_of_its_reference_and_the_customers_own_ids(trial):
+    """D3.11, U-20: any part of the reference ("RV-11"), and the customer's own service ticket, serial number or UDI
+    for the same complaint."""
+    user = trial["user"]
+    by_ref = _ok(user.get(LIST, params={"q": "RV-11"}))["items"]
+    assert [item["complaint_identifier"] for item in by_ref] == ["SAMPLE-RV-11"]
+    by_ticket = _ok(user.get(LIST, params={"q": "svc-24-1107"}))["items"]
+    assert "SAMPLE-RV-11" in [item["complaint_identifier"] for item in by_ticket]

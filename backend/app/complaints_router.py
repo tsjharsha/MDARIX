@@ -171,6 +171,11 @@ def list_complaints(
                 func.lower(Complaint.complaint_identifier).like(pattern, escape="\\"),
                 func.lower(Complaint.business_id).like(pattern, escape="\\"),
                 func.lower(Complaint.description).like(pattern, escape="\\"),
+                # The customer's own references for the same complaint (0.10.85, D3.11): its service ticket, serial
+                # number and UDI.
+                func.lower(Complaint.service_reference).like(pattern, escape="\\"),
+                func.lower(Complaint.serial_number).like(pattern, escape="\\"),
+                func.lower(Complaint.udi).like(pattern, escape="\\"),
             )
         )
     default = [RECEIVED_AT.desc().nullslast()]
