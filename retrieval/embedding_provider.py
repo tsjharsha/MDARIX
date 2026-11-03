@@ -157,7 +157,8 @@ def model_missing_message(cache_dir: str) -> str:
     search answers from structured matches and says so (retrieval/service.py)."""
     return (
         f"The local embedding model is not in {cache_dir}: semantic search is unavailable and evidence search uses "
-        "structured matches only. Servers carry the model in their image (Dockerfile.api). On a developer machine, "
+        "structured matches only. MDARIX never downloads model weights at run time: servers carry the pinned model "
+        "in their image (Dockerfile.api). On a developer machine, "
         "set MDARIX_EMBEDDING_CACHE_DIR to a prepared cache (a worktree can share the main checkout's .model-cache), "
         "or prepare one once with: python scripts/prepare_embedding_cache.py"
     )

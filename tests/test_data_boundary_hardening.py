@@ -84,6 +84,7 @@ def test_error_reports_keep_the_shape_of_an_error_and_nothing_a_record_could_be_
     assert error["stacktrace"]["frames"] == [{"filename": "a.py", "function": "f", "lineno": 3}]
 
 
+@pytest.mark.db
 def test_a_failing_statement_on_a_tenant_database_does_not_repeat_its_values(test_plane):
     factory = data_plane.session_factory(test_plane, PLANE_REF)
     with factory() as db, pytest.raises(DBAPIError) as failure:
@@ -154,6 +155,7 @@ def test_the_configuration_check_requires_the_pinned_embedding_model(monkeypatch
     assert _embedding_model_problem() is None
 
 
-@pytest.mark.skipif(not embedding.DEFAULT_CACHE_DIR.is_dir(), reason="the local model is not downloaded here")
+@pytest.mark.model
 def test_the_downloaded_model_is_the_pinned_one():
-    assert embedding.local_model_problem(str(embedding.DEFAULT_CACHE_DIR)) is None
+    # The prepared cache (MDARIX_EMBEDDING_CACHE_DIR, or the main checkout's for a worktree: tests/conftest.py).
+    assert embedding.local_model_problem() is None
