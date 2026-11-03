@@ -18,7 +18,7 @@ import { CaseHeader } from "./sections/CaseHeader";
 import { LatestSigned, NewRecordsSection } from "./sections/Records";
 import { StoryBar } from "./sections/Entrance";
 import { GlobalSearch } from "./HybridShell";
-import { eventPath, type EventView } from "./oversight";
+import { eventPath } from "./oversight";
 import { SHORT_STORY_PATH, type ShortStory } from "./shortStory";
 import { Table } from "../customer-admin/shared";
 import { addressFor } from "./workspaceAddress";
