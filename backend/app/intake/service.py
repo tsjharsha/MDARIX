@@ -17,10 +17,11 @@ changes an imported complaint.
 
 from __future__ import annotations
 
+import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import or_
+from sqlalchemy import event as sa_event, or_
 from sqlalchemy.orm import Session
 
 from backend.app.trial.sample_source import is_sample
@@ -535,10 +536,35 @@ def triage_records(db: Session, tenant_id: uuid.UUID) -> dict[tuple, TriageRecor
     }
 
 
+# The triage list read once per request (0.10.85, D3.13): one page read it up to seven times (the watch, the list's
+# checklists, the story). A read is kept on the database session for a few seconds and dropped on any write, so a
+# change in the same request is read fresh. Callers only read it.
+_MEMO, _MEMO_SECONDS = "intake.triage", 5.0
+
+
+@sa_event.listens_for(Session, "after_flush")
+@sa_event.listens_for(Session, "after_rollback")
+def _forget_triage(session, *_) -> None:
+    session.info.pop(_MEMO, None)
+
+
 def triage(
     db: Session, control_db: Session | None, tenant_id: uuid.UUID, show: str = "open", now: datetime | None = None
 ) -> dict:
     """The triage list: one item per event (linked records together), the open ones most urgent first."""
+    # A moment given is kept to the minute: the watch passes its own "now", microseconds apart within one request.
+    minute = now.replace(second=0, microsecond=0) if isinstance(now, datetime) else now
+    key = (str(tenant_id), show, control_db is not None, minute)
+    memo = db.info.setdefault(_MEMO, {})
+    kept = memo.get(key)
+    if kept and time.monotonic() - kept[0] < _MEMO_SECONDS:
+        return kept[1]
+    found = _triage(db, control_db, tenant_id, show, now)
+    memo[key] = (time.monotonic(), found)
+    return found
+
+
+def _triage(db: Session, control_db: Session | None, tenant_id: uuid.UUID, show: str, now: datetime | None) -> dict:
     now = now or now_utc()
     today = now.date()
     records = triage_records(db, tenant_id)

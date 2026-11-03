@@ -228,8 +228,7 @@ def _events(db, control_db, tenant_id) -> list[dict]:
     }
     if not ids:
         return []
-    # shortcut: each event's checklist is read one by one (a few queries each), capped at EVENTS_MAX; batch the reads
-    # when an organization works on more events at once.
+    # Capped at EVENTS_MAX; each kind of record is read once for them all (0.10.85, D3.13).
     complaints = (
         db.query(Complaint)
         .filter(Complaint.tenant_id == tenant_id, Complaint.id.in_(list(ids)))
@@ -241,10 +240,8 @@ def _events(db, control_db, tenant_id) -> list[dict]:
     triage = closure.open_on_triage(db, tenant_id)
     rows = {row.complaint_id: row for row in db.query(EventClosure).filter(EventClosure.tenant_id == tenant_id)}
     products = _products(db, tenant_id)
-    found = []
-    for complaint in complaints:
-        facts = closure.facts(db, tenant_id, complaint, tasks, triage)
-        found.append(_event_summary(complaint, facts, rows.get(complaint.id), products))
+    facts = closure.facts_many(db, tenant_id, complaints, tasks, triage)
+    found = [_event_summary(c, facts[str(c.id)], rows.get(c.id), products) for c in complaints]
     refs = {item["owner_id"] for item in found}
     names = _names(control_db, tenant_id, refs)
     for item in found:
@@ -405,15 +402,9 @@ def complaint_work(db, control_db, tenant_id, complaints: list, reads=None) -> d
         )
     }
     products = _products(db, tenant_id)
-    # shortcut: each complaint's checklist is read one by one (a few queries each) for one page of a list; batch the
-    # reads if a page ever holds more than the list's 200.
-    from backend.app.intake.service import enabled_markets
-
-    enabled = enabled_markets(db, tenant_id)
-    found = {
-        str(c.id): _event_summary(c, closure.facts(db, tenant_id, c, tasks, triage, enabled), rows.get(c.id), products)
-        for c in complaints
-    }
+    # Each kind of record is read once for the page (0.10.85, D3.13; it was a dozen queries per complaint).
+    facts = closure.facts_many(db, tenant_id, complaints, tasks, triage)
+    found = {str(c.id): _event_summary(c, facts[str(c.id)], rows.get(c.id), products) for c in complaints}
     names = _names(control_db, tenant_id, {item["owner_id"] for item in found.values()})
     out = {}
     for complaint in complaints:

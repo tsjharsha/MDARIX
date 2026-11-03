@@ -102,3 +102,62 @@ def test_records_name_complaints_and_investigations_by_the_customers_reference(t
     refs = [item.get("ref") for check in checks for item in check.get("items", []) if item.get("ref")]
     assert refs and not [ref for ref in refs if re.fullmatch(r"(CMP|INV)\d{6}", ref)]
     assert "scale-starter-1" not in SCALE_NOTE
+
+
+def test_a_list_page_reads_each_kind_of_record_once_with_the_same_values(trial):
+    """D3.13: complaint_work and the events list read the checklist facts of a page at once (facts_many); the values
+    are those of the one-complaint read, for every complaint of the trial."""
+    from backend.app.db.models.foundation import Complaint
+    from backend.app.db.session import SessionLocal
+    from backend.app.oversight import closure
+
+    db = SessionLocal()
+    try:
+        complaints = db.query(Complaint).filter(Complaint.tenant_id == trial["tenant_id"]).all()
+        many = closure.facts_many(db, trial["tenant_id"], complaints)
+        assert len(many) == len(complaints) > 20
+        for complaint in complaints:
+            one = closure.facts(db, trial["tenant_id"], complaint)
+            batch = many[str(complaint.id)]
+            assert closure.checklist(batch) == closure.checklist(one), complaint.complaint_identifier
+            assert closure.stage_line(batch, closure.checklist(batch), None) == closure.stage_line(
+                one, closure.checklist(one), None
+            )
+            for key in ("intakes", "obligations", "snapshots", "dispositions", "decisions", "requests", "capas"):
+                assert {getattr(row, "id", row) for row in batch[key]} == {getattr(row, "id", row) for row in one[key]}
+            assert {case.id for case in batch["cases"]} == {case.id for case in one["cases"]}
+    finally:
+        db.close()
+
+
+def test_the_removal_preview_asks_the_database_a_few_times_not_once_per_table_and_key(trial):
+    """D3.13: Getting started and Import read the sample removal's preview (2 to 13 s on a busy local stack); its plan
+    asked about 300 queries. The same rows now come from a few UNION ALL rounds."""
+    from sqlalchemy import event
+
+    from backend.app.db.session import SessionLocal
+    from backend.app.trial import sample_removal
+
+    db = SessionLocal()
+    seen = []
+    listener = lambda *args: seen.append(1)  # noqa: E731
+    event.listen(db.get_bind(), "before_cursor_execute", listener)
+    try:
+        planned = sample_removal.plan(db, trial["tenant_id"])
+        assert planned["rows"]["complaints"]
+        assert len(seen) < 40, len(seen)
+    finally:
+        event.remove(db.get_bind(), "before_cursor_execute", listener)
+        db.close()
+
+
+def test_one_request_reads_the_triage_list_once_per_kind(trial, monkeypatch):
+    """D3.13: one list page read the whole triage list up to seven times (the watch, every complaint's checklist, the
+    story); it is kept on the request's session for a few seconds and dropped on any write."""
+    from backend.app.intake import service
+
+    calls = []
+    real = service._triage
+    monkeypatch.setattr(service, "_triage", lambda *args, **kwargs: calls.append(1) or real(*args, **kwargs))
+    _ok(trial["user"].get(LIST, params={"view": "open", "work": "true", "page_size": 50}))
+    assert 0 < len(calls) <= 3, len(calls)
