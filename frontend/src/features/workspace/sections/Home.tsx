@@ -22,6 +22,7 @@ import {
 } from "../home";
 import { ResumeShortStory } from "./ShortStory";
 import { MyWorkMore } from "./MyWork";
+import { RemindersPanel } from "./Reminders";
 
 /**
  * Home (0.10.73, Release C part C1; My work's place on the new navigation): what needs attention within the first
@@ -162,6 +163,10 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
         </div>
       </div>
 
+      {/* The bell's reminders and escalations, read and cleared here on the new navigation (0.10.81, H1). */}
+      <div id="home-reminders">
+        <RemindersPanel />
+      </div>
       <MyWorkMore tab={tab} />
     </div>
   );

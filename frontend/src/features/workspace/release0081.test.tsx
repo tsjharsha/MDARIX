@@ -1,9 +1,12 @@
 // 0.10.81: the functional, usability, security and navigation reviews' findings that show on screen.
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { awarenessText, formatDay } from "../../app/dates";
 import { reportHits } from "./HybridShell";
 import { HomeSection, LegalClocks } from "./sections/Home";
+import { AlertsBell } from "./sections/Reminders";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 
 const workspace = (persona = "admin") =>
@@ -60,5 +63,35 @@ describe("search's report hits (navigation M2)", () => {
       { id: "r2", complaint_ref: "SAMPLE-RV-09", form_title: "Form FDA 3500A worksheet (eMDR)" },
     ];
     expect(reportHits(items, "nav-0002").map((item) => item.id)).toEqual(["r1"]);
+  });
+});
+
+describe("the bell on the new navigation (navigation H1)", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", {
+      location: { pathname: "/app/my-work", search: "", hash: "", origin: "https://mdarix.test" },
+      localStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+      sessionStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("opens Home, which holds the reminders and escalations", () => {
+    const home = renderToStaticMarkup(
+      <WorkspaceContext.Provider value={workspace()}>
+        <HomeSection heading={{ current: null }} />
+      </WorkspaceContext.Provider>,
+    );
+    expect(home).toContain('id="home-reminders"');
+    expect(home).toContain("Reminders and escalations");
+    expect(renderToStaticMarkup(<AlertsBell place="Home" onOpen={() => undefined} />)).toContain(
+      "Reminders and escalations: open Home",
+    );
+  });
+
+  it("stays in the top bar on a phone", () => {
+    const css = readFileSync(resolve(__dirname, "workspace.css"), "utf8");
+    const phone = css.slice(css.indexOf("@media (max-width: 640px) {\n  /* The bell stays"));
+    expect(phone.slice(0, phone.indexOf("}"))).not.toContain(".uw-top-bell");
   });
 });

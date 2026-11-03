@@ -693,7 +693,14 @@ export function UserWorkspace({
                 onChoose={(code) => void choosePersona(code)}
               />
               <span className="uw-top-bell">
-                <AlertsBell onOpen={() => open("My Work")} />
+                {/* Home holds the reminders on the new navigation (0.10.81, H1): opened there, at them. */}
+                <AlertsBell
+                  place="Home"
+                  onOpen={() => {
+                    open("My Work");
+                    window.setTimeout(() => document.getElementById("home-reminders")?.scrollIntoView(), 300);
+                  }}
+                />
               </span>
               <HelpMenu
                 // Try your own data opens the import page (0.10.80); HelpMenu offers it to whoever may import.

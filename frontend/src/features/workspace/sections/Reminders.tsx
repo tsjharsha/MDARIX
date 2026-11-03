@@ -282,14 +282,15 @@ export function AwayControl({ list, onChanged }: { list: AlertList; onChanged: (
   );
 }
 
-/** The header's bell: how many reminders and escalations are unread; opens My Work. */
-export function AlertsBell({ onOpen }: { onOpen: () => void }) {
+/** The header's bell: how many reminders and escalations are unread; opens where they are read (``place``: My Work,
+ * or Home on the new navigation, 0.10.81). */
+export function AlertsBell({ onOpen, place = "My Work" }: { onOpen: () => void; place?: string }) {
   const data = useResource<AlertList>(ALERTS);
   const unread = data.data?.unread ?? 0;
   const escalations = data.data?.escalations ?? 0;
   const label = unread
-    ? `${unread} unread reminders${escalations ? `, ${escalations} escalated to you` : ""}: open My Work`
-    : "Reminders and escalations: open My Work";
+    ? `${unread} unread reminders${escalations ? `, ${escalations} escalated to you` : ""}: open ${place}`
+    : `Reminders and escalations: open ${place}`;
   return (
     <button type="button" className="ac-secondary uw-rm-bell" onClick={onOpen} aria-label={label} title={label}>
       <BellRing size={16} aria-hidden="true" />

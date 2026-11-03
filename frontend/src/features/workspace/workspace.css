@@ -6797,9 +6797,9 @@ button.uw-org:hover {
   }
 }
 @media (max-width: 640px) {
+  /* The bell stays on a phone (0.10.81, H1): its count is the only way to the reminders there. */
   .uw-org,
   .uw-search,
-  .uw-top-bell,
   .uw-persona-btn .uw-persona-hint {
     display: none;
   }
