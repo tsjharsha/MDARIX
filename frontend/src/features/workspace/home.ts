@@ -62,10 +62,15 @@ export function nextActions(items: readonly OversightItem[], limit = 5): Oversig
     .slice(0, limit);
 }
 
+/** A real legal deadline: a market's reporting clock or report obligation, never a workflow task filed under that
+ * category (an approval task's due date is the organization's own target, 0.10.84, H1). */
+export const isLegalDeadline = (item: Pick<OversightItem, "key" | "category">) =>
+  (item.category === "REPORTING" || item.category === "OBLIGATION") && !item.key.startsWith("task:");
+
 /** The legal clocks: reporting deadlines and report obligations of a market, soonest first. */
 export function legalClocks(items: readonly OversightItem[], limit = 4): OversightItem[] {
   return nextActions(
-    items.filter((item) => !!item.market && (item.category === "REPORTING" || item.category === "OBLIGATION")),
+    items.filter((item) => !!item.market && isLegalDeadline(item)),
     limit,
   );
 }
