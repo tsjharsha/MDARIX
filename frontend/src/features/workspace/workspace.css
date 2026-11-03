@@ -7706,6 +7706,19 @@ button.uw-org:hover {
   color: var(--ms-ink-2);
 }
 
+/* 0.10.85, D3.6: the organization's time zone, named once in the complaint page's top line. */
+.uw-topline-end {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+.uw-topline-end .ac-page-zone {
+  margin: 0;
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+}
+
 /* The phone's search: an icon that opens the same search as a bar under the top bar. */
 .uw-search-toggle {
   display: none;

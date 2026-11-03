@@ -32,7 +32,7 @@ import { TRIAGE, type TriageList } from "../intake";
 import { treePlace } from "./DecisionTrees";
 import { FLAGSHIP } from "../entrance";
 import { requestJson } from "../../../app/apiClient";
-import { awarenessText } from "../../../app/dates";
+import { awarenessText, zoneName, zoneless } from "../../../app/dates";
 import { ReportingFacts } from "./ReportingFacts";
 import { StoryPill } from "./OneStory";
 import { dueDay } from "./Home";
@@ -240,7 +240,11 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           <span aria-hidden="true">›</span>
           <span>{event.ref}</span>
         </nav>
-        {storyRun && <StoryPill run={storyRun} />}
+        <span className="uw-topline-end">
+          {/* The organization's time zone, named once for the page (0.10.85, D3.6). */}
+          <span className="ac-page-zone">Times in {zoneName()}</span>
+          {storyRun && <StoryPill run={storyRun} />}
+        </span>
       </div>
       <header className="uw-card uw-highlights" aria-label="The complaint at a glance">
         <div className="uw-hl-top">
@@ -1009,7 +1013,7 @@ export function legalLanes(view: Pick<EventView, "event" | "work">): Lane[] {
       from: view.event.awareness_at ?? item.due_at,
       to: item.due_at,
       note: item.title,
-      dueText: `Due ${item.due_label ?? formatDate(item.due_at)}`,
+      dueText: `Due ${item.due_label ? zoneless(item.due_label) : formatDate(item.due_at)}`,
       stateText:
         item.state === "OVERDUE"
           ? "Overdue"

@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Table } from "../customer-admin/shared";
 import { ColumnScopeProvider } from "../tables/ColumnChooser";
 import { workColumns } from "./sections/ComplaintList";
+import { deadlineLabel, formatDateTime, formatDay, setDisplayZone, zoneName, zoneless } from "../../app/dates";
+import userWorkspace from "./UserWorkspace.tsx?raw";
 
 const stubWindow = () =>
   vi.stubGlobal("window", {
@@ -130,5 +132,27 @@ describe("D3.1 an overdue target beside the legal clock", () => {
     const html = renderToStaticMarkup(<>{workColumns({}, () => undefined)[0].render(row)}</>);
     expect(html).toMatch(/\d+ days left/);
     expect(html).toMatch(/Reply due: 2 days overdue/);
+  });
+});
+
+describe("D3.6 the organization's time zone, named once", () => {
+  afterEach(() => setDisplayZone(null));
+  it("reads every time in the organization's zone and drops the zone from each deadline label", () => {
+    setDisplayZone("America/New_York");
+    // 09:00 UTC is 04:00 in New York (EST, November), whatever the browser's zone.
+    expect(formatDateTime("2026-11-20T09:00:00Z")).toBe("20 Nov 2026, 04:00");
+    expect(zoneName(new Date("2026-11-20T09:00:00Z"))).toBe("Eastern Standard Time");
+    expect(deadlineLabel({ due_label: "Mon 30 Nov 2026, 23:59 EST" })).toBe("Mon 30 Nov 2026, 23:59");
+    expect(zoneless("Wed 2 Dec 2026, 23:59 GMT+5:30")).toBe("Wed 2 Dec 2026, 23:59");
+    // A calendar date stays its day.
+    expect(formatDay("2026-11-20")).toBe("20 Nov 2026");
+  });
+  it("keeps the label's zone where the page does not name one (the classic navigation)", () => {
+    setDisplayZone(null);
+    expect(deadlineLabel({ due_label: "Mon 30 Nov 2026, 23:59 IST" })).toBe("Mon 30 Nov 2026, 23:59 IST");
+  });
+  it("names the zone in every new-navigation page head", () => {
+    expect(userWorkspace).toContain("Times are in {zoneName()}, your organization's time zone.");
+    expect(userWorkspace).toContain('"/api/v1/oversight/settings"');
   });
 });

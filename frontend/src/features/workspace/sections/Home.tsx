@@ -1,7 +1,7 @@
 import type { RefObject } from "react";
 import { ChevronRight } from "lucide-react";
 import { DeadlineChip } from "../../../app/chips";
-import { formatDateTime, formatDay, zoneName } from "../../../app/dates";
+import { formatDateTime, formatDay, zoneName, zoneless } from "../../../app/dates";
 import { marketLabel } from "../../../app/labels";
 import { placeOf } from "../../../app/linkTable";
 import { useResource, type Resource } from "../../customer-admin/shared";
@@ -156,7 +156,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
                         </b>
                         <small>
                           {item.category_label} · {item.owner ? `Owner: ${item.owner}` : "No owner yet"} · Due{" "}
-                          {item.due_label ?? formatDateTime(item.due_at)}
+                          {item.due_label ? zoneless(item.due_label) : formatDateTime(item.due_at)}
                         </small>
                       </span>
                       <ChevronRight size={16} aria-hidden="true" />
@@ -400,7 +400,9 @@ export function LegalClocks({
                 >
                   <i style={{ width: `${laneShare(item)}%` }} />
                 </span>
-                <small className="ac-muted">Due {item.due_label ?? formatDateTime(item.due_at)}</small>
+                <small className="ac-muted">
+                  Due {item.due_label ? zoneless(item.due_label) : formatDateTime(item.due_at)}
+                </small>
               </button>
             </li>
           ))}
