@@ -291,7 +291,8 @@ describe("the record page: highlights, path, Details · Related · Activity, and
         onChanged={() => undefined}
       />,
     );
-    expect(html).toContain("Investigation · OrbitCare 300");
+    // 0.10.85, D3.9: the reference beside the product; the question is the heading.
+    expect(html).toContain("Investigation · INV000001 · OrbitCare 300");
     expect(html).toContain("INV000001");
     for (const field of ["Owner", "Complaints in scope", "Lots in scope", "Blocking the decision"])
       expect(html).toContain(`<dt>${field}</dt>`);

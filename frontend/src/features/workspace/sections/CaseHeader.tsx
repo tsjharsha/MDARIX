@@ -2,7 +2,8 @@ import { useState, type ReactNode } from "react";
 import { Boxes, CalendarClock, ChevronRight, Pause, Play, XCircle } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { displayId, safeText } from "../../../app/displayId";
+import { displayId, safeText, sourceId } from "../../../app/displayId";
+import { lotsText } from "../signalAi";
 import { useCan, usePanelState, useWorkspace } from "../workspaceContext";
 import {
   CHECK_RESULT,
@@ -372,7 +373,10 @@ function CaseHighlights({
   }>(row.id ? `/api/v1/investigations/${encodeURIComponent(String(row.id))}/scope` : null);
   const complaints = scope.data?.current?.included_complaints?.length;
   const lotNames = (scope.data?.current?.lots ?? []).map((lot) => lot.lot_identifier).filter(Boolean);
-  const lots = lotNames.length > 3 ? `${lotNames.length} lots` : lotNames.join(" · ");
+  // The part of each lot that differs ("003 · 004", not "SAMPLE-ORBIT-300-LOT-003 · ..."), the full ones in the
+  // tooltip (0.10.85, D3.9).
+  const lots =
+    lotNames.length > 3 ? `${lotNames.length} lots` : lotsText(lotNames as string[]).replace(/ and /g, " · ");
   const blocking = readinessChecks(readiness).filter(
     (check) => (check.result === "BLOCKED" || check.result === "PENDING") && check.key !== "decision",
   );
@@ -380,9 +384,12 @@ function CaseHighlights({
     <header className="uw-card uw-highlights" aria-label="The investigation at a glance">
       <div className="uw-hl-top">
         <div className="uw-hl-title">
-          <p className="ac-eyebrow">Investigation · {product?.name ?? "product not recorded"}</p>
-          <h2>{label}</h2>
-          <p className="uw-cp-what">{safeText(row.investigation_question) ?? "No question recorded."}</p>
+          {/* The question is the investigation's name; its reference is the customer's own (0.10.85, D3.9, D3.12). */}
+          <p className="ac-eyebrow">
+            Investigation · {sourceId(row, "investigation_identifier") ?? label} ·{" "}
+            {product?.name ?? "product not recorded"}
+          </p>
+          <h2 className="uw-case-question">{safeText(row.investigation_question) ?? "No question recorded."}</h2>
         </div>
         <div className="uw-cp-chips">
           <CaseStateBadge row={row} />
@@ -407,7 +414,9 @@ function CaseHighlights({
         </div>
         <div>
           <dt>Lots in scope</dt>
-          <dd className="uw-mono">{lots || "—"}</dd>
+          <dd className="uw-mono" title={lotNames.join(", ")}>
+            {lots || "—"}
+          </dd>
         </div>
         <div>
           <dt>Blocking the decision</dt>

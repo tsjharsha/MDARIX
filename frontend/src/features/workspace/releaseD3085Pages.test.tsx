@@ -8,6 +8,7 @@ import { ONE_STORY_PATH, type StoryRun } from "./oneStory";
 import { eventPath } from "./oversight";
 import { rv11 } from "../../test/rv11";
 import { NewRecordsSection } from "./sections/Records";
+import { InvestigationList } from "./sections/ComplaintViews";
 import { TrendHeroes } from "./sections/TrendCheck";
 import { SignalInbox } from "./sections/SignalInbox";
 import { DEFAULT_SIGNAL_FILTERS } from "./signals";
@@ -230,5 +231,30 @@ describe("D3.5 Trends in plain words, with a hero", () => {
     expect(html).not.toContain("Signal inbox");
     expect(html).not.toContain("Suggested by AI");
     expect(html.indexOf("OrbitCare 300 Rev B: pressure alarms")).toBeLessThan(html.indexOf("SIG000001"));
+  });
+});
+
+describe("D3.9 investigations", () => {
+  const cases = {
+    records: [
+      {
+        id: "i1",
+        business_id: "INV000001",
+        investigation_identifier: "SAMPLE-INV-001",
+        investigation_question: "Why did pressure alarms rise?",
+        status: "open",
+        product_id: "p",
+      },
+    ],
+  };
+  it("on your data lists none of the sample's, and offers to open one from the trend", () => {
+    resources.data["/api/v1/data-plane/investigations"] = cases;
+    const html = render(<InvestigationList />, api({ dataSource: IMPORTED_SOURCE }));
+    expect(html).not.toContain("SAMPLE-INV-001");
+    expect(html).toContain("No investigation on your data yet");
+    expect(html).toMatch(/class="ac-primary"[^>]*>Open one from the trend/);
+    expect(render(<InvestigationList />, api({ dataSource: SAMPLE_SOURCE }))).toContain(
+      "Why did pressure alarms rise?",
+    );
   });
 });

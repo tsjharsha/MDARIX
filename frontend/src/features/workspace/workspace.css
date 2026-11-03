@@ -7769,6 +7769,13 @@ main[data-navigation="new"] small {
   border: 0;
 }
 
+/* 0.10.85, D3.9: the investigation's question is its heading, at the record pages' size. */
+.uw-highlights .uw-case-question {
+  margin: 6px 0 0;
+  font-size: var(--ms-fs-20, 20px);
+  line-height: 1.35;
+}
+
 /* The phone's search: an icon that opens the same search as a bar under the top bar. */
 .uw-search-toggle {
   display: none;
