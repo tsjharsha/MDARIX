@@ -84,7 +84,7 @@ export function SignalInbox({
   initialSignal: string | null;
   onSignalClosed?: () => void;
 }) {
-  const { work } = useWorkspace();
+  const { work, dataSource } = useWorkspace();
   const canTriage = useCan("signal.triage");
   const [filters, setFilters] = useState<SignalFilters>(initialFilters);
   const [query, setQuery] = useState(initialFilters.q);
@@ -106,10 +106,14 @@ export function SignalInbox({
     return () => window.clearTimeout(timer);
   }, [query]);
   // Opened right after an import, its signals may still be being found: the list is read again until they are.
-  const list = useResource<SignalList>(signalListPath(filters, page, PAGE_SIZE), {
-    refreshWhile: (data) => !!data.detection_pending,
-    statusPath: DETECTION_STATUS_PATH,
-  });
+  // The top bar's "Sample data · Your data" (0.10.80) decides the data while a trial has both; else the inbox's own.
+  const list = useResource<SignalList>(
+    signalListPath({ ...filters, source: dataSource || filters.source }, page, PAGE_SIZE),
+    {
+      refreshWhile: (data) => !!data.detection_pending,
+      statusPath: DETECTION_STATUS_PATH,
+    },
+  );
   const finding = !!list.data?.detection_pending;
   const change = (next: Partial<SignalFilters>) => {
     setFilters((current) => ({ ...current, ...next }));
@@ -125,7 +129,7 @@ export function SignalInbox({
   const pages = Math.max(1, Math.ceil(total / (list.data?.page_size || PAGE_SIZE)));
   const chips = statusChips(list.data?.counts_by_status, filters.status);
   // While the sample data is there (a free trial): All data, only your imported data, only the sample data.
-  const sources = sourceChoices(listOf(list.data?.sources) as string[], filters.source);
+  const sources = dataSource ? [] : sourceChoices(listOf(list.data?.sources) as string[], filters.source);
 
   if (selected)
     return (

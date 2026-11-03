@@ -17,8 +17,7 @@ import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Tabs, errorText, send, useResource, whenNoLongerPending } from "../../customer-admin/shared";
 import { sectionAllowed, useWorkspace, type WorkspaceSection, useReportedTab } from "../workspaceContext";
 import { placeOf } from "../../../app/linkTable";
-import { ImportPanel, templateSummary, useReportChoice, type ImportResult, type ImportTemplate } from "./ImportData";
-import { IMPORT_REPORTS_ID, ImportReportsPanel } from "./ImportReports";
+import { templateSummary, type ImportResult, type ImportTemplate } from "./ImportData";
 import { formatDay } from "../../../app/dates";
 import { countOf } from "./common";
 import { QualityLoop } from "./QualityLoop";
@@ -35,7 +34,7 @@ import { STORY_CHAPTERS, journeyProgress, type JourneyKey } from "../../help/tri
 import { NEXT_STEPS_LINK, NEXT_STEPS_SECTION, NEXT_STEPS_SUMMARY } from "../../help/trialNextSteps";
 import { LOOK_AHEAD_SECTION, LOOK_AHEAD_SUMMARY, LOOK_AHEAD_TABS } from "../partyPreview";
 import { SampleDataPanel } from "./SampleData";
-import { InsightsPanel } from "./TrialInsights";
+import { YourData } from "./YourData";
 import type { Insights } from "../trialInsights";
 import { IMPORTED_SOURCE } from "../complaintList";
 import { featureSetOf, importTemplatesFor } from "../../../app/featureSet";
@@ -94,16 +93,8 @@ export const trialTabFor = (name?: string): TrialTab | undefined =>
  * is the progress MDARIX sees (/api/v1/trial/story).
  */
 export function GettingStartedSection({ focus }: { focus?: string } = {}) {
-  const { open, work, session, notify, navigation } = useWorkspace();
+  const { open, work, session, notify, navigation, refreshTrial } = useWorkspace();
   const status = useResource<TrialStatus>("/api/v1/trial/status");
-  // Complaints imported on this page: until the insights are read from them (a busy server takes a while, and the
-  // first read may time out), the panel says it is reading them and reads again, rather than showing the sample's
-  // figures as if they were current (item 9).
-  const [ownImported, setOwnImported] = useState(false);
-  const insights = useResource<Insights>("/api/v1/trial/insights", {
-    refreshWhile: (data) => ownImported && !ownInsights(data),
-  });
-  const readingImported = ownImported && insights.state !== "error" && !ownInsights(insights.data);
   // Right after an import its signals are still being found: the story is read again until they are. A reload that
   // fails for a moment (the server busy with the import's follow-up work) is asked again, so the page never stays on
   // the story from before the import (``retry``).
@@ -156,12 +147,13 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
     );
   const focusTab = trialTabFor(focus);
   const [tab, setTab] = useReportedTab<TrialTab>(focusTab ?? "Your data");
-  const reports = useReportChoice(focus);
   // A tab below the story, opened and brought into view.
   const showTab = (name: TrialTab) => {
     setTab(name);
     window.setTimeout(() => scrollTo("trial-tabs"), 0);
   };
+  // On the new navigation the upload is its own page, Import your data (0.10.80); a tab here on the classic one.
+  const ownImport = () => (navigation === "new" ? open("Import your data") : showTab("Your data"));
   // Opened on one of those tabs (Help, "Getting started and import templates"): brought into view once the story
   // above it has loaded, so the scroll lands on the tab and not where it was while the page was still filling in.
   const focused = useRef(false);
@@ -172,7 +164,7 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
     scrollTo("trial-tabs");
   }, [focusTab, loaded]);
   const go = (chapter: Pick<StoryChapter, "code" | "opens"> & Partial<Pick<StoryChapter, "case">>) => {
-    if (chapter.code === "YOUR_DATA" || chapter.opens.section === "Getting started") return showTab("Your data");
+    if (chapter.code === "YOUR_DATA" || chapter.opens.section === "Getting started") return ownImport();
     if (!allowed(chapter.opens.section)) return;
     // A chapter about the guided investigation opens that case, whatever the context bar holds.
     const known = chapter.case ?? chapters.find((item) => item.code === chapter.code)?.case;
@@ -206,7 +198,7 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   const goJourney = (key: JourneyKey) => {
     if (key === "team") return navigation === "new" ? open("Team") : showTab("Team");
     if (key === "sample") return scrollTo("trial-story");
-    if (key === "own-data") return showTab("Your data");
+    if (key === "own-data") return ownImport();
     if (key === "feedback") return open("Share feedback");
     if (key === "demo") return scrollTo("trial-demo");
   };
@@ -214,10 +206,14 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   // Rated during this visit: the rating stays on screen with its thank-you and "tell us more", though the feedback
   // reloaded after it now holds a submission.
   const [ratedNow, setRatedNow] = useState(false);
-  // On the new navigation the team is its own screen, Team (0.10.68).
+  // On the new navigation the team is its own screen, Team (0.10.68), and the upload its own page (0.10.80).
   const tabs = TRIAL_TABS.filter(
-    (item) => (item !== "About the sample data" || hasSample) && (item !== "Team" || navigation !== "new"),
+    (item) =>
+      (item !== "About the sample data" || hasSample) &&
+      ((item !== "Team" && item !== "Your data") || navigation !== "new"),
   );
+  // The tab shown: the one chosen, else the first there is (on the new navigation a link may still name Your data).
+  const shownTab = tabs.includes(tab) ? tab : tabs[0];
 
   if (status.state === "ready" && trial && !trial.is_trial)
     return <Empty title="Not a trial workspace" detail="Getting started is shown during a free trial." />;
@@ -226,8 +222,8 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
     notify(text);
     status.reload();
     story.reload();
-    insights.reload();
     work.refreshProducts();
+    refreshTrial?.();
   };
   const body = (
     <div className="ac-overview uw-trial">
@@ -348,6 +344,7 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
                 chapter={chapter}
                 isNext={chapter.code === story.data?.next}
                 allowed={allowed(chapter.opens.section)}
+                importHere={navigation !== "new"}
                 templates={
                   chapter.code === "YOUR_DATA"
                     ? importTemplatesFor(trial?.templates ?? [], featureSetOf(session?.feature_set)).core
@@ -418,52 +415,33 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
       </Panel>
 
       <div id="trial-tabs" className="uw-anchor uw-trial-tabs">
-        <Tabs tabs={tabs} active={tabs.includes(tab) ? tab : tabs[0]} onChange={setTab} label="Your trial">
-          {tab === "Your data" && session?.sample_only && <DiscussPilot onOpen={() => open("Next steps")} />}
-          {tab === "Your data" && !session?.sample_only && (
-            <>
-              {hasSample && (own?.complaints ?? 0) > 0 && trial?.is_owner && (
-                <p className="uw-cited-line">
-                  Your own data is in. Remove the sample so every screen shows only your records.{" "}
-                  <button type="button" className="ac-link" onClick={() => setTab("About the sample data")}>
-                    Remove the sample data
-                  </button>
-                </p>
-              )}
-              <p className="uw-cited-line">
-                Each import has a data-quality report: rows read, written and set aside, and why.{" "}
-                <button
-                  type="button"
-                  className="ac-link"
-                  onClick={() => document.getElementById(IMPORT_REPORTS_ID)?.scrollIntoView({ behavior: "smooth" })}
-                >
-                  See the data-quality reports
-                </button>
-              </p>
-              <ImportPanel
-                id="trial-import"
-                onReport={reports.show}
-                onImported={(result, entity) => {
-                  reports.imported(result.import_ref);
-                  if (newComplaints(entity, result) > 0) setOwnImported(true);
-                  status.reload();
-                  insights.reload();
-                  // Its signals being found: the story is read once they are in (``awaitingSignals``).
-                  if (result.signals === "FINDING") setAfterImport("waiting");
-                  else story.reload();
-                  work.refreshProducts();
-                }}
-              />
-              <ImportReportsPanel
-                selected={reports.selected}
-                onSelect={reports.setSelected}
-                refreshKey={reports.refreshKey}
-              />
-              <InsightsPanel insights={insights.data} source={insights} reading={readingImported} />
-            </>
+        <Tabs tabs={tabs} active={shownTab} onChange={setTab} label="Your trial">
+          {shownTab === "Your data" && session?.sample_only && <DiscussPilot onOpen={() => open("Next steps")} />}
+          {shownTab === "Your data" && !session?.sample_only && (
+            <YourData
+              focus={focus}
+              before={
+                hasSample &&
+                (own?.complaints ?? 0) > 0 &&
+                trial?.is_owner && (
+                  <p className="uw-cited-line">
+                    Your own data is in. Remove the sample so every screen shows only your records.{" "}
+                    <button type="button" className="ac-link" onClick={() => setTab("About the sample data")}>
+                      Remove the sample data
+                    </button>
+                  </p>
+                )
+              }
+              onImported={(result: ImportResult) => {
+                status.reload();
+                // Its signals being found: the story is read once they are in (``awaitingSignals``).
+                if (result.signals === "FINDING") setAfterImport("waiting");
+                else story.reload();
+              }}
+            />
           )}
-          {tab === "Team" && <TeamPanel onChanged={status.reload} />}
-          {tab === "About the sample data" && hasSample && (
+          {shownTab === "Team" && <TeamPanel onChanged={status.reload} />}
+          {shownTab === "About the sample data" && hasSample && (
             <SampleDataPanel
               counts={trial?.sample}
               allowed={allowed}
@@ -472,30 +450,29 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
               }}
             />
           )}
-          {tab === "About the sample data" && hasSample && (
+          {shownTab === "About the sample data" && hasSample && (
             <RestartSamplePanel
               onRestarted={(text) => {
                 notify(text);
                 status.reload();
                 story.reload();
-                insights.reload();
                 work.refreshProducts();
               }}
             />
           )}
-          {tab === "About the sample data" && hasSample && (
+          {shownTab === "About the sample data" && hasSample && (
             <RemoveSamplePanel
               onRemoved={(text) => {
                 notify(text);
-                setTab("Your data");
+                if (navigation !== "new") setTab("Your data");
                 status.reload();
                 story.reload();
-                insights.reload();
                 work.refreshProducts();
+                refreshTrial?.();
               }}
             />
           )}
-          {tab === "Your trial" && (
+          {shownTab === "Your trial" && (
             <>
               <Panel title="Your free trial" eyebrow="Dates and limits" source={status}>
                 <div className="uw-trial-stats">
@@ -540,7 +517,10 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
     <>
       <Entrance onRestarted={restarted} />
       <details className="uw-explore" open={!!focusTab}>
-        <summary>Explore all capabilities: the ten chapters, your own data and your trial</summary>
+        <summary>
+          Explore all capabilities:{" "}
+          {hasSample ? "the ten chapters, the sample data and your trial" : "the ten chapters and your trial"}
+        </summary>
         {body}
       </details>
     </>
@@ -637,12 +617,15 @@ export function ChapterRow({
   isNext,
   allowed,
   templates,
+  importHere = true,
   onOpen,
 }: {
   chapter: StoryChapter;
   isNext: boolean;
   allowed: boolean;
   templates?: ImportTemplate[];
+  /** The upload is a tab below (classic), not its own page, Import your data (new navigation, 0.10.80). */
+  importHere?: boolean;
   onOpen: () => void;
 }) {
   const done = chapter.acted.done;
@@ -675,7 +658,9 @@ export function ChapterRow({
           <summary>What MDARIX does here, and why it matters</summary>
           <p>{chapter.promise}</p>
           {templates?.length ? (
-            <p className="uw-story-templates">Data: {templateSummary(templates)}, under Your data below.</p>
+            <p className="uw-story-templates">
+              Data: {templateSummary(templates)}, {importHere ? "under Your data below" : "on Import your data"}.
+            </p>
           ) : null}
           <p className="uw-story-pain">
             <b>Why it matters:</b> {chapter.pain}

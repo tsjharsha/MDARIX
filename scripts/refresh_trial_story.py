@@ -42,7 +42,10 @@ from 0.10.76 the same step covers EU / NI, Great Britain and Canada, so SAMPLE-R
 EU MIR worksheet, once, and 0.10.77's code corrections (backend/app/trial/sample_0_10_77.py: the sample's IMDRF links
 re-recorded to IMDRF Release 2026's most specific terms; the code fields of the sample's frozen reports recorded as
 confirmed by the sample author, with the values they were approved with), and 0.10.79's two new sample links
-(backend/app/trial/sample_0_10_79.py: FLOW_ZERO_READING and SPO2_DROPOUT_HARM, which had none). The sample's dates themselves are brought to today by the
+(backend/app/trial/sample_0_10_79.py: FLOW_ZERO_READING and SPO2_DROPOUT_HARM, which had none), and, in every trial
+with or without its sample, 0.10.81's deadline rules (backend/app/trial/open_deadlines.py: every market's starter
+reporting windows; the open reports and draft assessments whose report type or due date the fixed rules change; the
+signed conclusions they would change, listed for a person to sign again). The sample's dates themselves are brought to today by the
 hourly "trial-sample-clock" job (backend/app/trial/sample_clock.py) while nobody has worked on the sample. Each trial
 is committed on its own, with an audit event.
 """
@@ -94,7 +97,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.db.models.foundation import LotBatch, Product, ProductVersion
     from sqlalchemy import or_
     from backend.app.signals.hooks import seed_demo_signals
-    from backend.app.trial import reports_0_10_75, sample_0_10_72, sample_0_10_77, sample_0_10_79
+    from backend.app.trial import open_deadlines, reports_0_10_75, sample_0_10_72, sample_0_10_77, sample_0_10_79
     from backend.app.trial.sample_calm import has_calm_story, rerecord_rv09, stage_calm_story
     from backend.app.trial.sample_clock import _absence_to_trial_end
     from backend.app.trial.sample_data import (
@@ -125,6 +128,12 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     for tenant_id, tenant_key, name in trials(db):
         with Session(bind=db.get_bind(), autoflush=False) as session:
             bind_tenant(session, tenant_id)
+            # 0.10.81: every trial, sample or not (backend/app/trial/open_deadlines.py).
+            fixes = open_deadlines.refresh(session, tenant_id, apply)
+            if fixes:
+                results.append({"tenant": tenant_key, "name": name, "result": "; ".join(fixes)})
+                if apply:
+                    session.commit()
             if not has_sample_data(session, tenant_id):
                 results.append({"tenant": tenant_key, "name": name, "result": "no sample data (left as it is)"})
                 continue

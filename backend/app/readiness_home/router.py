@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
+from backend.app.downloads import attachment
 from backend.app.access.permissions import DATA_EXPORT, require_permission
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.session import get_db
@@ -93,7 +94,7 @@ def readiness_summary_pdf(
     return Response(
         content,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"},
+        headers={"Content-Disposition": attachment(f"{filename}"), "Cache-Control": "no-store"},
     )
 
 
@@ -136,5 +137,5 @@ def readiness_inspection_pack(
     return Response(
         content,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"},
+        headers={"Content-Disposition": attachment(f"{filename}"), "Cache-Control": "no-store"},
     )

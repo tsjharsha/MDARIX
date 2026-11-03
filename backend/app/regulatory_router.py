@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.downloads import attachment
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.session import get_db
 from backend.app.db.models.regulatory import RegulatoryDocument, RegulatoryDocumentVersion
@@ -516,7 +517,7 @@ def download_estar_preparation(
         content=package["content"],
         media_type=package["content_type"],
         headers={
-            "Content-Disposition": f'attachment; filename="{package["filename"]}"',
+            "Content-Disposition": attachment(f"{package['filename']}"),
             "X-MDARIX-XML-Validation": "passed",
             "X-MDARIX-Human-Review": "required",
         },

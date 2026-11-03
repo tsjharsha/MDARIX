@@ -34,7 +34,7 @@ from backend.app.db.models.foundation import (
     Supplier,
 )
 
-SAMPLE_SOURCE = "MDARIX_SAMPLE"
+from backend.app.trial.sample_source import SAMPLE_SOURCE  # noqa: E402 (one definition; re-exported)
 
 # (identifier, name, family, symptom, complaint pattern, problem code). The pattern lists days-ago for each complaint:
 # OrbitCare complaints cluster after the day-75 Rev B release; the others stay flat. With the story complaints
@@ -251,9 +251,9 @@ _STORY_RISKS = [
     ("SAMPLE-RSK-02", "SAMPLE-ORBIT-300", "Missed true occlusion leads to under-infusion."),
     ("SAMPLE-RSK-03", "SAMPLE-VENTRA-250", "Wrong flow reading delays detection of hypoventilation."),
 ]
-# The FDA and EU reporting-window templates (reportability/rules.py), as a sample procedure would state them; a trial
-# organization that set its own windows keeps them.
-_STORY_WINDOW_TEMPLATES = (0, 1, 2)
+# Every market's reporting-window templates (reportability/rules.py), as a sample procedure would state them, so a
+# complaint from any of the five markets gets its assessment and clock (0.10.81, F5; until then the FDA and EU ones,
+# and India's from sample_reports.py). A trial organization that set its own windows keeps them.
 STORY_WINDOWS_BY = "system:trial-sample"
 
 
@@ -818,13 +818,13 @@ def seed_story_examples(db: Session, tenant_id, now: datetime | None = None) -> 
         db.add(
             ReportabilitySettings(
                 tenant_id=tenant_id,
-                windows=[clean_window(TEMPLATES[index]) for index in _STORY_WINDOW_TEMPLATES],
+                windows=[clean_window(template) for template in TEMPLATES],
                 lookback_days=365,
                 version=1,
                 updated_by=STORY_WINDOWS_BY,
                 updated_at=now,
             )
         )
-        counts["reporting_windows"] = len(_STORY_WINDOW_TEMPLATES)
+        counts["reporting_windows"] = len(TEMPLATES)
     db.flush()
     return {"created": True, **counts}

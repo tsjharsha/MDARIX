@@ -15,6 +15,7 @@ from auth.emailer import (
     send_activation_email,
 )
 from auth.service import _hash
+from backend.app.downloads import attachment
 from backend.app.customer_admin_continuity import (
     replacement_action,
     validate_support_window,
@@ -1033,7 +1034,7 @@ def list_platform_tenants(
         return Response(
             content=content,
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=mdarix-tenants.csv"},
+            headers={"Content-Disposition": attachment("mdarix-tenants.csv")},
         )
     return {
         "items": payload,

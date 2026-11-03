@@ -31,8 +31,9 @@ def _tenant(ctx: AuthenticatedRequestContext) -> uuid.UUID:
     return uuid.UUID(str(ctx.tenant_id))
 
 
-def _commit(data: Session, db: Session, ctx, action: str, details: dict) -> None:
-    """Save the change, then its audit record (identifiers only; the values are the organization's records)."""
+def _commit(data: Session, db: Session, ctx, action: str, details: dict, old: dict | None = None, new=None) -> None:
+    """Save the change, then its audit record with the values before and after (0.10.81, F7: they fill the authority
+    forms, and 21 CFR 11.10(e) asks that a change never obscures what was recorded before)."""
     try:
         data.commit()
     except Exception:
@@ -46,6 +47,8 @@ def _commit(data: Session, db: Session, ctx, action: str, details: dict) -> None
             action=action,
             entity_type="RegulatoryReference",
             details=details,
+            old_values=old,
+            new_values=new,
             created_at=datetime.now(timezone.utc),
         )
     )
@@ -78,9 +81,25 @@ def set_identity(
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
+    before = _run(data, lambda: _identity(data, _tenant(ctx), product_id))
     result = _run(data, lambda: reference.set_identity(data, _tenant(ctx), product_id, payload, db))
-    _commit(data, db, ctx, "PRODUCT_IDENTITY_SET", {"product_id": str(product_id)})
+    after = _identity(data, _tenant(ctx), product_id)
+    changed = [column for column in after if after[column] != before[column]]
+    _commit(
+        data,
+        db,
+        ctx,
+        "PRODUCT_IDENTITY_SET",
+        {"product_id": str(product_id)},
+        {column: before[column] for column in changed},
+        {column: after[column] for column in changed},
+    )
     return result
+
+
+def _identity(data: Session, tenant_id, product_id: uuid.UUID) -> dict:
+    product = reference._product(data, tenant_id, product_id)
+    return {column: getattr(product, column) for column in reference.IDENTITY_COLUMNS}
 
 
 @router.post("/products/{product_id}/registrations", dependencies=[IDENTITY_EDITORS])
@@ -92,7 +111,15 @@ def add_registration(
     data: Session = Depends(get_data_plane_db),
 ):
     result = _run(data, lambda: reference.add_registration(data, _tenant(ctx), product_id, payload, db))
-    _commit(data, db, ctx, "PRODUCT_REGISTRATION_ADDED", {"product_id": str(product_id), "registration": result["id"]})
+    _commit(
+        data,
+        db,
+        ctx,
+        "PRODUCT_REGISTRATION_ADDED",
+        {"product_id": str(product_id), "registration": result["id"]},
+        None,
+        result,
+    )
     return result
 
 
@@ -108,6 +135,7 @@ def remove_registration(
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
+    before = reference.registration_view(data, _tenant(ctx), product_id, registration_id)
     _run(data, lambda: reference.remove_registration(data, _tenant(ctx), product_id, registration_id))
     _commit(
         data,
@@ -115,6 +143,8 @@ def remove_registration(
         ctx,
         "PRODUCT_REGISTRATION_REMOVED",
         {"product_id": str(product_id), "registration": str(registration_id)},
+        before,
+        None,
     )
 
 
@@ -132,13 +162,17 @@ def set_party(
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
+    before = {party["id"]: party for party in reference.responsible_parties(data, _tenant(ctx))}
     result = _run(data, lambda: reference.set_party(data, _tenant(ctx), payload))
+    old = before.get(result["id"])
     _commit(
         data,
         db,
         ctx,
         "RESPONSIBLE_PARTY_SET",
         {"party": result["id"], "market": result["market"], "role": result["role"]},
+        old,
+        result,
     )
     return result
 
@@ -150,8 +184,9 @@ def remove_party(
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
+    before = {party["id"]: party for party in reference.responsible_parties(data, _tenant(ctx))}.get(str(party_id))
     _run(data, lambda: reference.remove_party(data, _tenant(ctx), party_id))
-    _commit(data, db, ctx, "RESPONSIBLE_PARTY_REMOVED", {"party": str(party_id)})
+    _commit(data, db, ctx, "RESPONSIBLE_PARTY_REMOVED", {"party": str(party_id)}, before, None)
 
 
 @router.get("/imdrf/releases")

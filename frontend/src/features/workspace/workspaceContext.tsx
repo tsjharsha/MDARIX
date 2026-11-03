@@ -41,6 +41,8 @@ export const WORKSPACE_SECTIONS = [
   // Release C's tabs on the new navigation (0.10.73): one decision tree per market, and the authority reports.
   "Decision trees",
   "Reports",
+  // A trial's own import on the new navigation (0.10.80): its own page, /app/import.
+  "Import your data",
 ] as const;
 
 /** Sections only the new navigation shows. */
@@ -51,10 +53,16 @@ export const NEW_ONLY_SECTIONS: readonly string[] = [
   "Complaint",
   "Decision trees",
   "Reports",
+  "Import your data",
 ];
 
 /** Sections that exist only in a free-trial workspace. */
-export const TRIAL_ONLY_SECTIONS: readonly string[] = ["Getting started", "Look ahead", "Next steps"];
+export const TRIAL_ONLY_SECTIONS: readonly string[] = [
+  "Getting started",
+  "Look ahead",
+  "Next steps",
+  "Import your data",
+];
 
 export type WorkspaceSection = (typeof WORKSPACE_SECTIONS)[number];
 
@@ -85,6 +93,8 @@ export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   Complaint: ["products"],
   "Decision trees": ["products"],
   Reports: ["products"],
+  // Open to every trial person: the page itself says "not available" to whoever may not import (canImportOwnData).
+  "Import your data": [],
 };
 
 export type SessionContext = {
@@ -193,6 +203,12 @@ export type WorkspaceApi = {
   persona?: string;
   personaLabel?: string;
   personaTabs?: readonly string[];
+  /** The trial's data shown (0.10.80): the sample's or the imported data's source, while both exist; else none. */
+  dataSource?: string;
+  /** Show the sample (SAMPLE_SOURCE) or the imported data (IMPORTED_SOURCE); remembered per person. */
+  chooseDataSource?: (source: string) => void;
+  /** Read the trial status again (the top bar's labels): after an import or the sample removed. */
+  refreshTrial?: () => void;
 };
 
 export const WorkspaceContext = createContext<WorkspaceApi | null>(null);
@@ -434,10 +450,10 @@ export const SECTION_PERMISSIONS: Partial<Record<WorkspaceSection, BusinessPermi
 export const canImportOwnData = (session: SessionContext | null | undefined) =>
   sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions, session?.sample_only);
 
-/** Where "Import your data" opens: in a trial, the trial import Help › Try your own data opens (Getting started › Your
- * data); elsewhere the Import data screen. */
+/** Where "Import your data" opens: in a trial, its own page (0.10.80; on the classic navigation the link table opens
+ * Getting started › Your data); elsewhere the Import data screen. */
 export const openImport = (open: (section: WorkspaceSection, tab?: string) => void, isTrial: boolean) =>
-  isTrial ? open("Getting started", "Your data") : open("Import data");
+  isTrial ? open("Import your data") : open("Import data");
 
 export function sectionAllowed(
   section: WorkspaceSection,

@@ -421,6 +421,7 @@ AWARENESS_LABELS = {
     "CONTACT": "the time of the contact",
     "FIRST_KNOWLEDGE": "first knowledge",
     "RECEIVED": "receipt",
+    "EVENT_DATE": "the event date (no awareness or received date)",
     "SOURCE_DATE": "the source record's date",
     "AVAILABLE": "the time it reached MDARIX",
     "LINKED": "an earlier linked source",

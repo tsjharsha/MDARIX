@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from backend.app.downloads import attachment
 from backend.app.access.permissions import DATA_EXPORT, RECORDS_WRITE, require_permission
 from backend.app.csv_safe import safe_cell
 from backend.app.db.data_plane import get_data_plane_db
@@ -167,7 +168,7 @@ def export_risk_register(
     return Response(
         content=out.getvalue(),
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="mdarix-risk-register-{now:%Y-%m-%d}.csv"'},
+        headers={"Content-Disposition": attachment(f"mdarix-risk-register-{now:%Y-%m-%d}.csv")},
     )
 
 

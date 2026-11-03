@@ -83,7 +83,31 @@ type CheckReport = {
   date_format_used?: string;
   needs_date_column?: boolean;
   date_column_choices?: string[];
+  /** 0.10.81: accepted complaint rows that contradict themselves or lack a fact a reporting step needs. */
+  row_flags?: RowFlag[];
 };
+export type RowFlag = { row: number; complaint_id: string | null; message: string };
+
+/** Rows that import but are flagged: what MDARIX will ask for, or what to check. */
+export function RowFlags({ flags }: { flags: RowFlag[] | undefined }) {
+  if (!flags?.length) return null;
+  return (
+    <>
+      <p className="uw-trial-message">
+        {countOf(flags.length, "row note")}: these rows import; MDARIX asks for a missing country or awareness date at
+        the step that needs it.
+      </p>
+      <ul className="uw-trial-issues">
+        {flags.map((flag, index) => (
+          <li key={index}>
+            Row {flag.row}
+            {flag.complaint_id ? ` (${flag.complaint_id})` : ""}: {flag.message}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
 const CREATES: [string, string, string][] = [
   ["products", "product", "products"],
@@ -271,6 +295,7 @@ export function ImportPanel({
   eyebrow = "Bring your own data",
   onReport,
   setup: given,
+  reportSecondary = false,
 }: {
   /** After an import: what it imported, and of which template. */
   onImported: (result: ImportResult, entity: string) => void;
@@ -279,6 +304,8 @@ export function ImportPanel({
   /** Opens the data-quality report of the import just done (shown below the panel). */
   onReport?: (importRef: string) => void;
   setup?: ImportSetup;
+  /** The page's main button is elsewhere (Import your data's "See your complaints", 0.10.80). */
+  reportSecondary?: boolean;
 }) {
   const fetched = useResource<ImportSetup>(given ? null : `${IMPORT_PATH}/templates`);
   const setup = given ?? fetched.data;
@@ -288,7 +315,16 @@ export function ImportPanel({
         {null}
       </Panel>
     );
-  return <ImportForm setup={setup} onImported={onImported} id={id} eyebrow={eyebrow} onReport={onReport} />;
+  return (
+    <ImportForm
+      setup={setup}
+      onImported={onImported}
+      id={id}
+      eyebrow={eyebrow}
+      onReport={onReport}
+      reportSecondary={reportSecondary}
+    />
+  );
 }
 
 function ImportForm({
@@ -297,12 +333,14 @@ function ImportForm({
   id,
   eyebrow,
   onReport,
+  reportSecondary,
 }: {
   setup: ImportSetup;
   onImported: (result: ImportResult, entity: string) => void;
   id: string;
   eyebrow: string;
   onReport?: (importRef: string) => void;
+  reportSecondary: boolean;
 }) {
   const templates = setup.templates;
   // Where a complaints export alone is enough (a free trial), the panel opens on it, until the person chooses another.
@@ -558,7 +596,11 @@ function ImportForm({
       {(rejects || (lastRun && onReport)) && !report && (
         <div className="ca-action-row">
           {lastRun && onReport && (
-            <button type="button" className="ac-primary" onClick={() => onReport(lastRun)}>
+            <button
+              type="button"
+              className={reportSecondary ? "ac-secondary" : "ac-primary"}
+              onClick={() => onReport(lastRun)}
+            >
               <CheckCircle2 size={15} aria-hidden="true" /> See its data-quality report
             </button>
           )}
@@ -589,6 +631,7 @@ function ImportForm({
               <p className="uw-trial-message is-good">
                 <CheckCircle2 size={16} aria-hidden="true" /> {readyText(report)}
               </p>
+              <RowFlags flags={report.row_flags} />
               {!!report.rejected_rows && (
                 <>
                   <p className="uw-trial-message is-bad">
