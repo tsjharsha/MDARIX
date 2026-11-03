@@ -35,6 +35,15 @@ export function formatDay(value: DateInput, fallback = "—"): string {
   return date ? date.toLocaleDateString(DAY_FIRST, { day: "numeric", month: "short", year: "numeric" }) : fallback;
 }
 
+/** An awareness as it was given (0.10.81, U-06): a day without a time reads "29 Oct 2026, time not recorded" (the
+ * server keeps such a day at 12:00 UTC, so its UTC day is the day given); a moment reads with its time. */
+export function awarenessText(value: string | null | undefined, dateOnly?: boolean | null): string {
+  if (!value) return "—";
+  if (!dateOnly) return formatDateTime(value);
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+  return `${formatDay(new Date(year, month - 1, day))}, time not recorded`;
+}
+
 /** "3 Oct 2026, 14:05": date and time where the person is (the screen names the zone once, ``zoneName``). */
 export function formatDateTime(value: DateInput, fallback = "—"): string {
   const date = toDate(value);

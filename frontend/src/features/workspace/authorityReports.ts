@@ -93,6 +93,10 @@ export type WorksheetField = {
   suggestion?: string | null;
   /** What the mapping suggested before the person changed it. */
   suggested?: string | null;
+  /** 0.10.81: what the field takes (TEXT, DATE, DATE_RANGE, IMDRF_CODE, LIST_CODE), and why a value typed before does
+   * not fit it (flagged, counted as missing, never deleted). */
+  kind?: string;
+  problem?: string | null;
 };
 
 export type WorksheetSection = { code: string; title: string; note: string | null; fields: WorksheetField[] };
@@ -217,6 +221,8 @@ export type ReportDetail = {
   approved_snapshot?: Snapshot | null;
   preparers?: string[];
   cancelled_reason?: string | null;
+  /** 0.10.81: a submitted report whose market's later signed conclusion says otherwise: what to consider. */
+  conclusion_changed?: string | null;
   deadline: DeadlineFields;
   assessment: {
     conclusion: string | null;
@@ -367,7 +373,7 @@ export function deadlineText(item: DeadlineFields, state?: ObligationState, now 
   if (!item.due_on) return "No deadline yet";
   const when = deadlineLabel({ due_label: item.due_label, due_date: item.due_on });
   if (state && MET_STATES.includes(state)) return `Deadline ${when}: met by the submission`;
-  if (state === "CANCELLED") return "No deadline: not reportable";
+  if (state === "CANCELLED") return "Cancelled: not reportable";
   const left = timeLeft(
     {
       due_at: item.due_at,

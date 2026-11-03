@@ -20,6 +20,8 @@ pilot alike (T-B1).
 
 from __future__ import annotations
 
+from backend.app.trial.sample_source import is_sample
+from backend.app.downloads import attachment
 from backend.app import links
 import logging
 import uuid
@@ -260,7 +262,7 @@ def version_view(control_db, row: DecisionGuideVersion, names: dict, signature: 
         "published_at": _iso(row.published_at),
         "superseded_at": _iso(row.superseded_at),
         "editable": row.state in rules.OPEN_STATES,
-        "sample": row.source_system is not None,
+        "sample": is_sample(row.source_system),
     }
 
 
@@ -834,5 +836,5 @@ def export(
     return Response(
         content=body,
         media_type=MEDIA[kind],
-        headers={"Content-Disposition": f'attachment; filename="mdarix-guide-{view["code"]}.{kind}"'},
+        headers={"Content-Disposition": attachment(f"mdarix-guide-{view['code']}.{kind}")},
     )

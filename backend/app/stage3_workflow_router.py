@@ -16,6 +16,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.routing import APIRoute
+from backend.app.downloads import attachment
 from backend.app.business_ids import business_id_map
 from backend.app.request_body import WEBHOOK_LIMIT_BYTES, read_limited
 from pydantic import BaseModel, Field, field_validator
@@ -1027,7 +1028,7 @@ def download_supplier_attachment(
     return Response(
         content=content,
         media_type=attachment.content_type,
-        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
+        headers={"Content-Disposition": attachment(f"{safe_name}")},
     )
 
 
@@ -1116,7 +1117,7 @@ def _file_response(content, media_type: str, filename: str) -> Response:
         content=content,
         media_type=media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": attachment(f"{filename}"),
             "X-MDARIX-Human-Review": "required",
         },
     )
@@ -1265,7 +1266,7 @@ def compliance_report(
     return Response(
         content=result["content"],
         media_type=result["content_type"],
-        headers={"Content-Disposition": f'attachment; filename="mdarix-compliance-report-{ctx.tenant_id}.{extension}"'},
+        headers={"Content-Disposition": attachment(f"mdarix-compliance-report-{ctx.tenant_id}.{extension}")},
     )
 
 
@@ -1418,5 +1419,5 @@ def download_report(
     return Response(
         content=content,
         media_type=job["content_type"],
-        headers={"Content-Disposition": f'attachment; filename="mdarix-report-{job_id}.{job["format"].lower()}"'},
+        headers={"Content-Disposition": attachment(f"mdarix-report-{job_id}.{job['format'].lower()}")},
     )

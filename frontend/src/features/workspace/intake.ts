@@ -194,6 +194,8 @@ export type TriageItem = {
   linked: { kind: string; id: string; ref: string }[];
   awareness: {
     at: string;
+    /** 0.10.81 (U-06): a day given without a time, shown as a date. */
+    date_only?: boolean;
     source: string;
     source_label: string;
     linked_ref: string | null;

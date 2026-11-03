@@ -32,6 +32,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.trial.sample_source import is_sample
 from backend.app.access.permissions import INVESTIGATION_CREATE, QUALITY_REVIEW, SIGNAL_TRIAGE
 from backend.app.complaint_classification import rules as coding
 from backend.app.db.data_plane import get_data_plane_db
@@ -260,7 +261,7 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
         "flagged": bool(flags),
         "qms_ref": event.qms_ref,
         "service_ticket": event.service_ticket,
-        "sample": event.source_system is not None,
+        "sample": is_sample(event.source_system),
         "created_by": name(event.created_by),
         "created_at": event.created_at.isoformat(),
         "version": latest.version if latest else 0,
@@ -1629,6 +1630,20 @@ def complete_triage(
             record.awareness_confirmed_at = confirmed
             record.awareness_note = rules.clean(payload.awareness_note) or None
         record.completed_by, record.completed_at, record.updated_at = str(ctx.user_id), now, now
+        if confirmed is not None and member_kind == service.COMPLAINT:
+            # A complaint with no awareness or received date keeps the confirmed time as its awareness, so the
+            # watch and the market assessment count from it and do not ask again (0.10.81, F4).
+            complaint = (
+                db.query(Complaint)
+                .filter(Complaint.tenant_id == tenant_id, Complaint.id == uuid.UUID(member_id))
+                .one_or_none()
+            )
+            if (
+                complaint is not None
+                and complaint.awareness_timestamp is None
+                and complaint.complaint_timestamp is None
+            ):
+                complaint.awareness_timestamp, complaint.updated_at = confirmed, now
     db.flush()
     db.add(
         make_audit_event(

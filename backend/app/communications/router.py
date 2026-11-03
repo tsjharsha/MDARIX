@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import false
 from sqlalchemy.orm import Session
 
+from backend.app.trial.sample_source import is_sample
 from backend.app.access.permissions import (
     EVIDENCE_REQUEST,
     INVESTIGATION_WORK,
@@ -121,7 +122,7 @@ def party_view(party: ExternalParty) -> dict:
         "primary": {"name": party.primary_name, "details": party.primary_details},
         "second": {"name": party.second_name, "details": party.second_details} if service.has_second(party) else None,
         "note": party.note,
-        "sample": party.source_system is not None,
+        "sample": is_sample(party.source_system),
     }
 
 
@@ -214,7 +215,7 @@ def entry_view(
         "closed_at": _iso(entry.closed_at),
         "closed_by": names.get(entry.closed_by) if entry.closed_by else None,
         "close_note": entry.close_note,
-        "sample": entry.source_system is not None,
+        "sample": is_sample(entry.source_system),
     }
 
 
@@ -322,7 +323,7 @@ def communications(
                 "ref": complaint_ref(complaint),
                 "identifier": complaint.complaint_identifier,
                 "description": complaint.description,
-                "sample": complaint.source_system is not None,
+                "sample": is_sample(complaint.source_system),
             }
             if complaint is not None
             else None

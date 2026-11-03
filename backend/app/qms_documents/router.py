@@ -25,6 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.downloads import attachment
 from backend.app.access.permissions import DATA_EXPORT, QUALITY_REVIEW, require_permission
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import Change, Investigation, SignedApprovalRecord
@@ -431,5 +432,5 @@ def download_document(
     return Response(
         content=body,
         media_type=MEDIA[kind],
-        headers={"Content-Disposition": f'attachment; filename="{stem}.{kind}"'},
+        headers={"Content-Disposition": attachment(f"{stem}.{kind}")},
     )

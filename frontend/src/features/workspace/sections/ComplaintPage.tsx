@@ -31,6 +31,9 @@ import { ShortStoryPanel, useShortStory } from "./ShortStory";
 import { InlineTriage } from "./Triage";
 import { treePlace } from "./DecisionTrees";
 import { FLAGSHIP } from "../entrance";
+import { requestJson } from "../../../app/apiClient";
+import { awarenessText } from "../../../app/dates";
+import { ReportingFacts } from "./ReportingFacts";
 
 const HARM = {
   DEATH: { harm: "critical", label: "Death" },
@@ -183,7 +186,14 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
               <DeadlineChip
                 key={item.key}
                 item={item}
-                prefix={LEGAL.includes(item.category) && item.market ? marketLabel(item.market) : item.category_label}
+                prefix={
+                  // A clock waiting for the country or the awareness date is never shown as a real deadline (0.10.81).
+                  item.key.endsWith(":facts")
+                    ? "Provisional deadline"
+                    : LEGAL.includes(item.category) && item.market
+                      ? marketLabel(item.market)
+                      : item.category_label
+                }
               />
             ))}
             <ToneBadge tone={EVENT_TONES[view.state]} label={view.state_label} />
@@ -275,7 +285,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                   </dd>
                   <dt>Awareness</dt>
                   <dd>
-                    {formatDate(event.awareness_at)}
+                    {awarenessText(event.awareness_at, event.awareness_date_only)}
                     <small>The legal clocks count from here.</small>
                   </dd>
                   <dt>In your QMS</dt>
@@ -471,6 +481,11 @@ function Rail({
       </section>
       <section className="uw-card uw-card-pad uw-rail-clocks" aria-label="Legal clocks">
         <h2>Legal clocks</h2>
+        <ReportingFacts
+          complaintId={view.event.complaint_id}
+          needs={view.event.needs}
+          onSaved={() => void requestJson<EventView>(eventPath(view.event.ref)).then(onChanged)}
+        />
         {lanes.map((lane) => (
           <div key={lane.key} className="uw-rail-clock">
             <div className="uw-home-clock-line">
@@ -488,7 +503,9 @@ function Rail({
           </div>
         ))}
         {without.length > 0 && <p className="ac-muted">No legal clock running: {without.join(", ")}.</p>}
-        {!lanes.length && !without.length && <p className="ac-muted">No market to report to.</p>}
+        {!lanes.length && !without.length && !view.event.needs?.length && (
+          <p className="ac-muted">No market to report to.</p>
+        )}
         <p className="ac-note">Each clock counts from awareness. Starter rules, for your consultant to confirm.</p>
       </section>
       <section className="uw-card uw-card-pad uw-rail-signs" aria-label="Who signs">

@@ -22,6 +22,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from tests.report_fill import fill
+
 from backend.app.db.session import SessionLocal
 from backend.app.oversight.rules import zone_info
 from tests.test_free_trial import PASSWORD, _approved_trial_client
@@ -240,14 +242,18 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     # G8 is never typed twice.
     label, target, _ = _next(user)
     assert label == "Complete the United States (FDA) report (draft)"
-    assert target["record"]["id"] == complaint and target["tab"] == "Reports"
     (started,) = [item for item in _ok(user.get(REPORTS, params={"complaint_id": complaint}))["items"] if item["id"]]
+    # 0.10.81 (navigation M7): the step opens the report's own page.
+    assert target["record"] == {"kind": "report", "id": started["id"]} and target["tab"] == "Reports"
     report = _ok(user.get(f"{REPORTS}/{started['id']}"))
     missing = [f["id"] for s in report["sections"] for f in s["fields"] if f["status"] == "MUST_HAVE"]
     assert "G8" in missing  # until the front page's number is entered
     values = {"MFR_REPORT": "1234567-2026-00011", "G2": "Health professional"}
     for field in [item for item in missing if item != "G8"]:
-        report = _ok(user.put(f"{REPORTS}/{report['id']}/fields/{field}", json={"value": values.get(field, "Entered")}))
+        if field in values:
+            report = _ok(user.put(f"{REPORTS}/{report['id']}/fields/{field}", json={"value": values[field]}))
+        else:
+            report = fill(user, REPORTS, report["id"], [field])  # 0.10.81 (F6): a date takes a date, a code a code
     # 0.10.77: the device problem code is suggested from the approved mapping (with its FDA code) and confirmed.
     (problem,) = [f for s in report["sections"] for f in s["fields"] if f["status"] == "SUGGESTED"]
     assert (problem["id"], problem["suggestion"]) == ("H6_PROBLEM", "A090807 High Readings (FDA 2459)")

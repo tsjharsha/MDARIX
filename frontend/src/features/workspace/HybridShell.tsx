@@ -5,7 +5,7 @@ import { recordPlace } from "../../app/linkTable";
 import { shortRoles } from "../../app/roles";
 import { signOut } from "../shared/session";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
-import { complaintListTab } from "./complaintList";
+import { IMPORTED_SOURCE, SAMPLE_SOURCE, complaintListTab } from "./complaintList";
 import { canImportOwnData, type SessionContext, type WorkspaceSection } from "./workspaceContext";
 
 /*
@@ -20,6 +20,8 @@ export type PersonaOption = { code: string; label: string; sub: string; tabs: st
 
 /** Each tab of the bar: its name and the screen it opens (My work is Home). */
 export const PERSONA_TABS: Record<string, { label: string; section: WorkspaceSection }> = {
+  // A trial's guide, left of Home, for every persona (0.10.80; trialTabs). Never a persona's own tab.
+  start: { label: "Getting started", section: "Getting started" },
   home: { label: "Home", section: "My Work" },
   complaints: { label: "Complaints", section: "Complaints" },
   trees: { label: "Decision trees", section: "Decision trees" },
@@ -39,6 +41,10 @@ export const tabOfSection = (section: string): string | null =>
 /** The persona's tabs the server lets this person open, in the bar's order. */
 export const visibleTabs = (tabs: readonly string[], allowed: readonly string[]): string[] =>
   Object.keys(PERSONA_TABS).filter((key) => tabs.includes(key) && allowed.includes(PERSONA_TABS[key].section));
+
+/** A trial's tabs: Getting started first, whatever the persona (0.10.80); a pilot's are the persona's. */
+export const trialTabs = (tabs: readonly string[], isTrial: boolean): readonly string[] =>
+  isTrial ? ["start", ...tabs] : tabs;
 
 /** Each persona's mark: two letters on its own colour (the design system's fills under white text). */
 const PERSONA_COLOR: Record<string, string> = {
@@ -233,13 +239,7 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
           });
         }
         const needle = q.toLowerCase();
-        for (const row of ((reports?.items ?? reports?.reports ?? []) as any[])
-          .filter((item) =>
-            [item.complaint_ref, item.complaint, item.form_title, item.title, item.market_label]
-              .filter(Boolean)
-              .some((value: unknown) => String(value).toLowerCase().includes(needle)),
-          )
-          .slice(0, 5)) {
+        for (const row of reportHits(reports?.items ?? reports?.reports ?? [], needle)) {
           found.push({
             key: `r-${row.id}`,
             kind: "Report",
@@ -313,12 +313,65 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
 }
 
 /** "Import your data" beside the trial's Sample data label (0.10.79): only in a trial whose organization imports, for a
- * person who may change records; it opens the trial import Help › Try your own data opens. */
+ * person who may change records; it opens the trial's import page (0.10.80), as Help › Try your own data does. */
 export const importOwnDataAction = (
   isTrial: boolean,
   session: SessionContext | null | undefined,
   open: (section: WorkspaceSection, tab?: string) => void,
-) => (isTrial && canImportOwnData(session) ? () => open("Getting started", "Your data") : undefined);
+) => (isTrial && canImportOwnData(session) ? () => open("Import your data") : undefined);
+
+/** What the top bar says about a trial's data (0.10.80): the sample alone ("Sample data"), the sample and the imported
+ * data side by side (a choice), or nothing once the sample is removed. Read from the server's trial status. */
+export function trialDataBar(trial: { sample?: { complaints?: number }; own_data?: { complaints?: number } } | null) {
+  const sample = (trial?.sample?.complaints ?? 0) > 0;
+  const own = (trial?.own_data?.complaints ?? 0) > 0;
+  return sample && own ? "choice" : sample ? "sample" : "none";
+}
+
+/** Where a person's data choice is kept: this browser, per organization and person (a view, never a record). */
+const dataChoiceKey = (session: SessionContext | null | undefined) =>
+  `mdarix.dataShown.${session?.current_tenant?.tenant_id ?? ""}.${session?.user_id ?? ""}`;
+
+/** The data a person chose to see: the sample (the default) or their imported data. */
+export function readDataChoice(session: SessionContext | null | undefined): string {
+  try {
+    return window.localStorage.getItem(dataChoiceKey(session)) === IMPORTED_SOURCE ? IMPORTED_SOURCE : SAMPLE_SOURCE;
+  } catch {
+    return SAMPLE_SOURCE; // No storage in this browser: the default.
+  }
+}
+
+export function saveDataChoice(session: SessionContext | null | undefined, source: string) {
+  try {
+    window.localStorage.setItem(dataChoiceKey(session), source);
+  } catch {
+    // No storage in this browser: the choice holds until the page is reloaded.
+  }
+}
+
+const DATA_CHOICES = [
+  { source: SAMPLE_SOURCE, label: "Sample data" },
+  { source: IMPORTED_SOURCE, label: "Your data" },
+] as const;
+
+/** "Sample data · Your data": which of the trial's data the lists and insights show, while both exist (0.10.80). */
+export function DataChoice({ source, onChoose }: { source: string; onChoose: (source: string) => void }) {
+  return (
+    <div className="uw-data-choice uw-top-sample" role="group" aria-label="Data shown">
+      {DATA_CHOICES.map((item) => (
+        <button
+          key={item.source}
+          type="button"
+          aria-pressed={source === item.source}
+          className={source === item.source ? "is-on" : undefined}
+          onClick={() => source !== item.source && onChoose(item.source)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function ImportOwnData({ onOpen }: { onOpen: () => void }) {
   return (
@@ -336,6 +389,7 @@ export function AvatarMenu({
   onAdminConsole,
   showSettings,
   onImport,
+  data,
   defaultOpen = false,
 }: {
   session: SessionContext | null;
@@ -345,6 +399,8 @@ export function AvatarMenu({
   showSettings: boolean;
   /** "Import your data", for the phone, where the top bar hides it (0.10.79). */
   onImport?: () => void;
+  /** "Sample data · Your data", for the phone, where the top bar hides it (0.10.80). */
+  data?: { source: string; onChoose: (source: string) => void };
   /** Tests only: render the menu open. */
   defaultOpen?: boolean;
 }) {
@@ -396,6 +452,27 @@ export function AvatarMenu({
             >
               <Upload size={16} aria-hidden="true" /> <span>Import your data</span>
             </button>
+          )}
+          {data && (
+            <div className="uw-avatar-data" role="group" aria-label="Data shown">
+              <p className="uw-pop-title">Data shown</p>
+              {DATA_CHOICES.map((item) => (
+                <button
+                  key={item.source}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={data.source === item.source}
+                  className="uw-pop-option"
+                  onClick={() => {
+                    setShown(false);
+                    if (data.source !== item.source) data.onChoose(item.source);
+                  }}
+                >
+                  <span>{item.label}</span>
+                  {data.source === item.source && <Check size={15} aria-hidden="true" />}
+                </button>
+              ))}
+            </div>
           )}
           {showSettings && (
             <button
@@ -458,4 +535,17 @@ export function TabBar({
       </div>
     </nav>
   );
+}
+
+/** The top bar's report hits (0.10.81, navigation M2): only started reports, which have a page; a report not started
+ * yet (no id) is found through its complaint. */
+export function reportHits(items: any[], needle: string): any[] {
+  return items
+    .filter((item) => item.id)
+    .filter((item) =>
+      [item.complaint_ref, item.complaint, item.form_title, item.title, item.market_label]
+        .filter(Boolean)
+        .some((value: unknown) => String(value).toLowerCase().includes(needle)),
+    )
+    .slice(0, 5);
 }

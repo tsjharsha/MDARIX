@@ -23,6 +23,7 @@ sweeps their organization when the last sweep is older than five minutes. Nothin
 
 from __future__ import annotations
 
+from backend.app.trial.sample_source import is_sample
 from backend.app import links
 import logging
 import uuid
@@ -120,7 +121,7 @@ def absences(db: Session, tenant_id, today: date | None = None) -> list[dict]:
             "starts_on": row.starts_on,
             "ends_on": row.ends_on,
             "note": row.note,
-            "sample": row.source_system is not None,
+            "sample": is_sample(row.source_system),
         }
         for row in query.order_by(UserAbsence.starts_on).limit(READ_LIMIT)
     ]
@@ -295,20 +296,26 @@ def _watch_items(db: Session, control_db, tenant_id, now: datetime) -> list[dict
     from backend.app.reportability import markets
     from backend.app.reportability import service as reportability
 
+    from backend.app.reportability import facts
+
     found = []
     for item in reportability.watch(db, control_db, tenant_id, show="open", page_size=10_000, today=now)["items"]:
         binding = item.get("binding")
         if not binding or not binding.get("due_at"):
             continue
         market = binding.get("market")
+        needs = item.get("needs") or []
         found.append(
             _item(
-                f"watch:{item['id']}:{market}",
+                # A complaint that needs a fact is one line, kept beside its markets' own (0.10.81, F3, F4).
+                f"watch:{item['id']}:{'facts' if needs else market}",
                 "REPORTING",
-                f"{markets.MARKET_LABELS.get(market, market)}: not assessed yet, provisional deadline",
+                f"Enter {facts.labels(needs)}: needed for the reporting clocks (provisional deadline)"
+                if needs
+                else f"{markets.MARKET_LABELS.get(market, market)}: not assessed yet, provisional deadline",
                 datetime.fromisoformat(binding["due_at"]),
                 complaint_id=item["id"],
-                market=market,
+                market=None if needs else market,
                 opens=links.target("Complaints", "Reportability", record=("complaint", item["id"])),
             )
         )
@@ -440,7 +447,9 @@ def _with_complaints(db: Session, tenant_id, items: list[dict]) -> None:
             continue
         item["ref"] = row.complaint_identifier
         item["product"] = item["product"] or names.get(row.product_id)
-        item["market"] = item["market"] or markets.market_of(row.country)
+        # A complaint that needs a fact runs no market's real clock yet (0.10.81, ":facts"): it names none.
+        if not item["key"].endswith(":facts"):
+            item["market"] = item["market"] or markets.market_of(row.country)
 
 
 def due_items(db: Session, control_db: Session | None, tenant_id, now: datetime | None = None) -> list[dict]:

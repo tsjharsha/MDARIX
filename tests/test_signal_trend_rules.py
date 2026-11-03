@@ -31,7 +31,10 @@ def test_the_poisson_tail_is_bounded():
 def test_history_never_reaches_before_the_release():
     assert trend.history_days(None) == 180
     assert trend.history_days(1000) == 180
-    assert trend.history_days(120) == 90
+    # 0.10.81 (F8): the release day (age 0) is history too: 120 days old leaves 121 days, 30 of them recent.
+    assert trend.history_days(120) == 91
+    assert trend.history_days(93) == 64  # the review's ClearSat 9: 2 Aug to 4 Oct
+    assert trend.history_days(29) == 0 and trend.history_days(30) == 1
     assert trend.history_days(20) == 0
 
 

@@ -91,12 +91,12 @@ export function reportNext(detail: Pick<ReportDetail, "stage" | "state" | "manda
  * record page's shape (highlights, the status path, the form's fields, and the rail of what to do next). Its address:
  * /app/reports?view=<view>, /app/reports?report=<id>.
  */
-export function ReportsSection() {
+export function ReportsSection({ complaintId }: { complaintId?: string | null } = {}) {
   const [reportId, setReport] = useTabParam("report");
   return reportId ? (
     <ReportPage id={reportId} onBack={() => setReport(null)} />
   ) : (
-    <ReportListView onOpen={(id) => setReport(id)} />
+    <ReportListView onOpen={(id) => setReport(id)} complaintId={complaintId} />
   );
 }
 
@@ -115,12 +115,14 @@ const EMPTY: Record<ReportView, { title: string; detail: string }> = {
   },
 };
 
-function ReportListView({ onOpen }: { onOpen: (id: string) => void }) {
+function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void; complaintId?: string | null }) {
   const { open } = useWorkspace();
   const [code, setCode] = useTabParam("view", "replace");
   const view = REPORT_VIEW_NAMES.find((name) => REPORT_VIEWS[name].code === code) ?? "Open reports";
   const list = useResource<ReportList>(REPORTS);
-  const rows = list.data ? reportsInView(list.data.items, view) : [];
+  // One complaint's reports when the list is opened from it (Complaints › Reporting, Authority reports).
+  const items = (list.data?.items ?? []).filter((row) => !complaintId || row.complaint_id === complaintId);
+  const rows = list.data ? reportsInView(items, view) : [];
   const name = (row: ReportListItem) => `${row.form_title ?? "Report"} for ${row.complaint_ref}`;
   return (
     <>
@@ -337,6 +339,11 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
           </div>
         </dl>
         {detail.stages && detail.stage && <StagePath stages={detail.stages} />}
+        {detail.conclusion_changed && (
+          <p className="ac-message tone-warning" role="status">
+            {detail.conclusion_changed}
+          </p>
+        )}
       </header>
       <div className="uw-rec">
         <section className="uw-card uw-rec-main" aria-label="The form's fields">

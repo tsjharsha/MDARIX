@@ -26,6 +26,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.downloads import attachment
 from backend.app.access.permissions import (
     DATA_EXPORT,
     DECISION_SIGN,
@@ -504,5 +505,5 @@ def export_lot_impact(
     return Response(
         content=body,
         media_type=MEDIA[kind],
-        headers={"Content-Disposition": f'attachment; filename="mdarix-lot-impact-{ref}.{kind}"'},
+        headers={"Content-Disposition": attachment(f"mdarix-lot-impact-{ref}.{kind}")},
     )

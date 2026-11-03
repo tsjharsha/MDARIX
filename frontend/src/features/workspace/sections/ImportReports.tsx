@@ -37,6 +37,8 @@ export type QualityReport = {
   columns_not_used?: string[];
   /** A distribution file: the lots whose units shipped now exceed the units they released (flagged, not refused). */
   flags?: { lot_id: string; released: number; shipped: number; message: string }[];
+  /** A complaints file (0.10.81): accepted rows that contradict themselves or lack a fact a reporting step needs. */
+  row_flags?: { row: number; complaint_id: string | null; message: string }[];
 };
 export type ImportRun = {
   import_ref: string;
@@ -119,6 +121,21 @@ export function runChecks(run: Pick<ImportRun, "report" | "masked_values">): Che
             detail: report.flags.length
               ? `${countOf(report.flags.length, "lot")} shipped more units than released: ${report.flags.map((flag) => flag.message).join(" ")}`
               : "No lot shipped more units than it released.",
+          },
+        ]
+      : []),
+    ...(report.row_flags
+      ? [
+          {
+            label: "Rows to check",
+            ok: report.row_flags.length === 0,
+            detail: report.row_flags.length
+              ? report.row_flags
+                  .map(
+                    (flag) => `Row ${flag.row}${flag.complaint_id ? ` (${flag.complaint_id})` : ""}: ${flag.message}`,
+                  )
+                  .join(" ")
+              : "No row contradicts itself or lacks a country or awareness date.",
           },
         ]
       : []),

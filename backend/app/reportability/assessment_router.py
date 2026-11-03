@@ -33,7 +33,7 @@ from backend.app.db.session import get_db
 from backend.app.decision_guides import service as guides
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import current_person, require_any_permission
-from backend.app.reportability import assessments, deadlines, markets, rules, service
+from backend.app.reportability import assessments, deadlines, facts, markets, rules, service
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.signer_training import service as training
 from backend.app.signer_training.router import is_trial
@@ -86,6 +86,11 @@ class SignRequest(BaseModel):
     mfa_code: str | None = Field(default=None, max_length=12)
 
 
+class FactsRequest(BaseModel):
+    country: str | None = Field(default=None, max_length=rules.MARKET_MAX_LENGTH)
+    awareness_date: date | None = None
+
+
 class FilingRequest(BaseModel):
     filing_reference: str = Field(max_length=rules.REFERENCE_MAX * 2)
     filed_on: date
@@ -118,26 +123,28 @@ def _market(market: str) -> str:
     return code
 
 
-def _settle_provisional_reports(db: Session, tenant_id, complaint_id, market: str, signed, now) -> None:
-    """J14: a report started while the market was pending kept its provisional deadline; a signed reportable conclusion
-    now gives every open initial report of that market its category's deadline (never a reset of a set one)."""
-    from backend.app.authority_reports import rules as report_rules
+def _settle_open_reports(db: Session, ctx, tenant_id, complaint_id, market: str, signed, now) -> list:
+    """J14 and 0.10.81 (F1): a signed reportable conclusion gives every open initial report of its market its report
+    type, due date and provisional flag (authority_reports/router.py ``follow_signed``); a submitted one is flagged,
+    never changed. Returns the pending snapshots whose approval tasks end."""
+    from backend.app.authority_reports import router as reports
     from backend.app.db.models.authority_reports import ReportObligation
 
-    if signed.conclusion != markets.REPORTABLE or signed.due_on is None:
-        return
-    for obligation in db.query(ReportObligation).filter(
-        ReportObligation.tenant_id == tenant_id,
-        ReportObligation.complaint_id == complaint_id,
-        ReportObligation.market == market,
-        ReportObligation.kind == "INITIAL",
-        ReportObligation.due_provisional.is_(True),
+    if signed.conclusion != markets.REPORTABLE:
+        return []
+    ended = []
+    for obligation in (
+        db.query(ReportObligation)
+        .filter(
+            ReportObligation.tenant_id == tenant_id,
+            ReportObligation.complaint_id == complaint_id,
+            ReportObligation.market == market,
+            ReportObligation.kind == "INITIAL",
+        )
+        .with_for_update()
     ):
-        if obligation.state in report_rules.MET:
-            continue
-        obligation.due_on, obligation.due_provisional = signed.due_on, False
-        obligation.assessment_id, obligation.report_type = signed.id, signed.report_type
-        obligation.updated_at = now
+        ended += reports.follow_signed(db, ctx, obligation, signed, now)
+    return ended
 
 
 def _versions(db: Session, tenant_id, complaint_id, market: str, lock: bool = False):
@@ -398,6 +405,15 @@ def sign_conclusion(
     today = deadlines.as_moment(None)
     complaint, record, seen, _ = _found(db, tenant_id, complaint_id, today)
     ref = record["business_id"] or record["complaint_identifier"]
+    if seen["needs"]:
+        # Never signed on a guessed fact (0.10.81, F3, F4): the country or the awareness date first.
+        raise _error(
+            409,
+            "FACT_NEEDED",
+            f"Enter {facts.labels(seen['needs'])} before signing: "
+            + " ".join(item["message"] for item in seen["needs"]),
+            needs=seen["needs"],
+        )
     versions = _versions(db, tenant_id, complaint_id, market)
     draft = next((row for row in versions if row.conclusion is None), None)
     if draft is None:
@@ -567,7 +583,7 @@ def sign_conclusion(
     draft.due_on = date.fromisoformat(clock["due_date"]) if clock else None
     draft.signed_record_id, draft.content_fingerprint = record_row.id, content_fingerprint
     draft.signed_by, draft.signed_at, draft.updated_at = str(ctx.user_id), now, now
-    _settle_provisional_reports(db, tenant_id, complaint_id, market, draft, now)
+    retyped = _settle_open_reports(db, ctx, tenant_id, complaint_id, market, draft, now)
     # 0.10.75 (C3), the new navigation: the signed conclusion creates the market's report, or cancels an unsubmitted
     # one when it says not reportable, in this same transaction. Never on a draft (saving answers never comes here).
     from backend.app.authority_reports import router as reports
@@ -593,6 +609,9 @@ def sign_conclusion(
         control_db.rollback()
         raise _error(409, "SIGNED_MEANWHILE", "This market was signed a moment ago; reload to see it") from exc
     reports.end_cancelled_approvals(db, ctx, tenant_id, ended)
+    reports.end_cancelled_approvals(
+        db, ctx, tenant_id, retyped, "Replaced: the signed conclusion changed the report type"
+    )
     if assessments.settled(
         assessments.markets_summary(
             record,
@@ -607,6 +626,82 @@ def sign_conclusion(
 
         _finish_reminders(db, tenant_id, complaint_id, "MARKETS_CONCLUDED", ctx)
     return detail(db, control_db, ctx, complaint_id, today)
+
+
+@router.put("/{complaint_id}/reporting-facts", dependencies=[DECIDERS])
+def set_reporting_facts(
+    complaint_id: uuid.UUID,
+    payload: FactsRequest,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Enter a fact the reporting steps need and the record does not give (0.10.81, facts.py): the incident country (a
+    country by name or ISO code) or the awareness date (a day, kept as a day). Audited with before and after."""
+    from datetime import time
+
+    from backend.app.db.models.foundation import Complaint
+
+    tenant_id = uuid.UUID(ctx.tenant_id)
+    complaint = (
+        db.query(Complaint)
+        .filter(Complaint.tenant_id == tenant_id, Complaint.id == complaint_id)
+        .with_for_update()
+        .one_or_none()
+    )
+    if complaint is None:
+        raise _error(404, "COMPLAINT_NOT_FOUND", "No such complaint in your organization")
+    old: dict = {}
+    new: dict = {}
+    if payload.country is not None:
+        country = _collapse(payload.country)
+        if not facts.country_known(country):
+            raise _error(
+                422,
+                "COUNTRY_UNKNOWN",
+                "Enter the country by name or by its two-letter ISO code, for example India, IN, Germany or GB",
+            )
+        if country != complaint.country:
+            old["country"], new["country"] = complaint.country, country
+            complaint.country = country
+    if payload.awareness_date is not None:
+        if payload.awareness_date > service.today_utc():
+            raise _error(422, "AWARENESS_IN_FUTURE", "The awareness date cannot be in the future")
+        event = service._day(complaint.event_timestamp)
+        if event is not None and payload.awareness_date < event:
+            raise _error(
+                422,
+                "AWARENESS_BEFORE_EVENT",
+                f"The awareness date cannot be before the event ({event.isoformat()}): check both dates",
+            )
+        # A day without a time, kept as the import keeps one (12:00 UTC: the same day in every market's time zone).
+        moment = datetime.combine(payload.awareness_date, time(12), timezone.utc)
+        if moment != complaint.awareness_timestamp:
+            old["awareness_date"] = (
+                service._day(complaint.awareness_timestamp).isoformat() if complaint.awareness_timestamp else None
+            )
+            new["awareness_date"] = payload.awareness_date.isoformat()
+            complaint.awareness_timestamp = moment
+    if not new:
+        raise _error(422, "NOTHING_TO_CHANGE", "Enter the country or the awareness date")
+    now = datetime.now(timezone.utc)
+    complaint.updated_at = now
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=ctx.user_id,
+            action="COMPLAINT_REPORTING_FACTS_SET",
+            entity_type="Complaint",
+            entity_id=complaint_id,
+            correlation_id=ctx.correlation_id,
+            details={"complaint": complaint_ref(complaint), "fields": sorted(new)},
+            old_values=old,
+            new_values=new,
+            created_at=now,
+        )
+    )
+    db.commit()
+    return detail(db, control_db, ctx, complaint_id)
 
 
 @router.post("/{complaint_id}/market-assessments/{market}/filing", dependencies=[DECIDERS])

@@ -513,6 +513,18 @@ def _suggestion(reportable: bool | None) -> str:
     return {True: REPORTABLE, None: PENDING, False: NOT_REPORTABLE}[reportable]
 
 
+MDCG = "MDCG 2023-3"
+
+
+def _shorter(question: str, shorter: str, longer: str, cite: str | None = None) -> str:
+    """The note of an Unknown that keeps the shorter report (0.10.81): which answer would lengthen it."""
+    why = f" ({cite}: report within the period even when uncertain)" if cite else ""
+    return (
+        f"{question} is Unknown: until it is answered, {shorter} applies{why}. A No can lengthen it to {longer}. "
+        "Starter rule, for your consultant to confirm."
+    )
+
+
 def evaluate(market: str, answers: dict) -> dict:
     """The suggested conclusion of a market's answers, the report type, and the notes that explain it.
     ``report_type`` is set when the suggestion is reportable; ``report_type_if_reportable`` is the type a person who
@@ -525,23 +537,34 @@ def evaluate(market: str, answers: dict) -> dict:
         malfunction = _all(v("US4"), v("US5"))
         reportable = _any(harm, malfunction)
         five_day = v("US6")
-        kind = "US_5_WORK_DAY" if five_day else "US_30_DAY"
+        # Unknown takes the shortest category the facts do not yet exclude (0.10.81, starter).
+        kind = "US_30_DAY" if five_day is False else "US_5_WORK_DAY"
         if reportable and five_day is None:
-            notes.append("Question 6 is Unknown: a Yes makes it the 5-work-day report (803.53).")
+            notes.append(_shorter("Question 6", "the 5-work-day report (21 CFR 803.53)", "30 days (21 CFR 803.50)"))
         elif reportable and five_day is False:
             notes.append("Question 6 is No, so not the 5-work-day report (803.53).")
     elif market in (EU_NI, GB):
         p = "EU" if market == EU_NI else "GB"
         limbs = [v(f"{p}3{letter}") for letter in "ABCDEF"]
         reportable = _all(v(f"{p}1"), _any(v(f"{p}2"), *limbs, v(f"{p}4")), v(f"{p}5"))
-        if v(f"{p}4"):
+        # Unknown takes the shortest category the facts do not yet exclude (MDCG 2023-3: report within the period
+        # even when uncertain; 0.10.81, starter).
+        threat, death, unanticipated = v(f"{p}4"), v(f"{p}2"), v(f"{p}6")
+        deterioration = _any(*limbs)
+        if threat is not False:
             kind = f"{p}_2_DAY"
-        elif v(f"{p}2") or (_any(*limbs) and v(f"{p}6")):
+            if reportable and threat is None:
+                notes.append(
+                    _shorter("Question 4 (serious public health threat)", "the 2-day report", "10 or 15 days", MDCG)
+                )
+        elif death is not False or (deterioration is not False and unanticipated is not False):
             kind = f"{p}_10_DAY"
+            if reportable and death is None:
+                notes.append(_shorter("Question 2 (death)", "the 10-day report", "15 days", MDCG))
+            elif reportable and not death and unanticipated is None:
+                notes.append(_shorter("Question 6 (unanticipated)", "the 10-day report", "15 days", MDCG))
         else:
             kind = f"{p}_15_DAY"
-            if reportable and _any(*limbs) and v(f"{p}6") is None:
-                notes.append("Question 6 is Unknown: an unanticipated serious deterioration is the 10-day report.")
     elif market == IN:
         reportable = _all(v("IN1"), _any(*(v(f"IN2{letter}") for letter in "ABCDEF")))
         kind = "IN_SERIOUS_ADVERSE_EVENT"

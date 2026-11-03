@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import and_, false, func, or_, select
 from sqlalchemy.orm import Session
 
+from backend.app.downloads import attachment
 from backend.app.customer_lifecycle import (
     CUSTOMER_STATUS_SOURCES,
     build_customer_tenant,
@@ -547,7 +548,7 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
         return Response(
             content=stream.getvalue(),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=mdarix-customers.csv"},
+            headers={"Content-Disposition": attachment("mdarix-customers.csv")},
         )
     return {
         "items": payload,

@@ -86,6 +86,7 @@ export const WORKSPACE_VIEWS: readonly AppView[] = [
   "team",
   "decision-trees",
   "reports",
+  "import",
 ];
 
 /** A customer administrator manages their organization and, in the same account, may switch into the workspace

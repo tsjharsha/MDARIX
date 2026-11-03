@@ -90,6 +90,9 @@ def stage(state: str, missing: int, pending: bool) -> str | None:
     for approval. None for a cancelled report (off the path). A draft after a rejection is back at its first stages."""
     if state == CANCELLED:
         return None
+    if state == CORRECTION:
+        # Sent back for correction: neither complete nor submitted, until it is approved again (0.10.81).
+        return "APPROVAL" if pending else "CREATED"
     if state in EDITABLE:
         return "APPROVAL" if pending else "CREATED" if missing else "COMPLETE"
     if state == APPROVED:
@@ -107,7 +110,7 @@ def stage_view(state: str, missing: int, pending: bool) -> dict:
     # Acknowledged is the last stage: once there, it is done too.
     return {
         "stage": now,
-        "stage_label": STAGE_LABELS[now] if now else STATE_LABELS[state],
+        "stage_label": STAGE_LABELS[now] if now and state != CORRECTION else STATE_LABELS[state],
         "stages": [
             {
                 "code": code,

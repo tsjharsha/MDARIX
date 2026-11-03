@@ -18,6 +18,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import exists, func
 from sqlalchemy.orm import Session
 
+from backend.app.trial.sample_source import is_sample
 from backend.app.complaint_classification import rules as coding
 from backend.app.complaint_disposition import rules, triggers
 from backend.app.complaint_review import rules as review_rules
@@ -116,7 +117,7 @@ def classification_view(row: ComplaintClassification | None, names: dict[str, st
         "confirmed_by": (names.get(row.confirmed_by) or "A colleague") if row.confirmed_by else None,
         "confirmed_at": _iso(row.confirmed_at),
         "change_reason": row.change_reason,
-        "sample": row.source_system is not None,
+        "sample": is_sample(row.source_system),
     }
 
 
@@ -142,7 +143,7 @@ def disposition_view(row: ComplaintDisposition, names: dict[str, str], case_refs
         "signed_by": names.get(row.signed_by) or "A colleague",
         "signed_at": _iso(row.signed_at),
         "superseded": row.superseded_by is not None,
-        "sample": row.source_system is not None,
+        "sample": is_sample(row.source_system),
     }
 
 

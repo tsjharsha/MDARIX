@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
+from backend.app.downloads import attachment
 from backend.app.access.permissions import DATA_EXPORT, require_permission
 from backend.app.case_audit import rules, service
 from backend.app.db.data_plane import get_data_plane_db
@@ -198,7 +199,7 @@ def case_audit_export(
         content=content,
         media_type=media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{name}-audit.{fmt}"',
+            "Content-Disposition": attachment(f"{name}-audit.{fmt}"),
             "X-Content-SHA256": digest,
             "Cache-Control": "no-store",
         },

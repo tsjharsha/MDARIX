@@ -91,16 +91,22 @@ import { DecisionTreesSection } from "./sections/DecisionTrees";
 import { ReportsSection } from "./sections/ReportsTab";
 import {
   AvatarMenu,
+  DataChoice,
   GlobalSearch,
   ImportOwnData,
   importOwnDataAction,
   PERSONA_TABS,
   PersonaSwitch,
   TabBar,
+  readDataChoice,
+  saveDataChoice,
   tabOfSection,
+  trialDataBar,
+  trialTabs,
   visibleTabs,
   type PersonaOption,
 } from "./HybridShell";
+import { ImportYourDataSection } from "./sections/YourData";
 import { StoryBar } from "./sections/Entrance";
 import { savedStory, saveStory } from "./entrance";
 import { carryOverColumnChoices, columnScopeFor } from "../tables/columnViews";
@@ -279,6 +285,14 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
       'Created automatically when a decision tree concludes "reportable". You complete, approve and generate the PDF; you submit it through the authority\'s own channel.',
     context: false,
   },
+  // A trial's own import on the new navigation (0.10.80).
+  "Import your data": {
+    icon: Upload,
+    description: "Bring in your complaints export",
+    guide:
+      "Upload your export in the template's columns. Each file is checked in full before anything is saved, and each import has a data-quality report. The sample stays until you remove it.",
+    context: false,
+  },
 };
 
 /** The new navigation's menu lines and page purposes (0.10.68), where they differ from the classic ones. */
@@ -412,12 +426,30 @@ export function UserWorkspace({
   const heading = useRef<HTMLHeadingElement>(null);
   useFocusOnChange(heading, location.key);
 
-  useEffect(() => {
+  // Read again after an import or the sample removed, so the top bar's data labels follow the server (0.10.80).
+  const refreshTrial = useCallback(() => {
     requestJson<TrialStatus>("/api/v1/trial/status")
       .then(setTrial)
-      .catch(() => setTrial(null))
+      // A read again that fails keeps what the bar showed.
+      .catch(() => setTrial((current) => current))
       .finally(() => setTrialChecked(true));
   }, []);
+  useEffect(refreshTrial, []);
+  // "Sample data · Your data" (0.10.80): while a trial on the new navigation has both, which one the lists and the
+  // insights show; the sample by default, remembered per person in this browser.
+  const [dataChoice, setDataChoice] = useState(() => readDataChoice(session));
+  const dataBar = fresh && trial?.is_trial ? trialDataBar(trial) : "none";
+  const dataSource = dataBar === "choice" ? dataChoice : "";
+  const chooseDataSource = useCallback(
+    (source: string) => {
+      saveDataChoice(session, source);
+      setDataChoice(source);
+      // The screen opens again on the chosen data, as it stands (its address), so no list shows the other data while
+      // it reads the new one.
+      setLocation((current) => ({ ...current, tab: shownRef.current.tab, key: current.key + 1 }));
+    },
+    [session],
+  );
   // The default start screen waits for the trial status: a trial starts on Getting started, so showing the usual first
   // screen meanwhile made it flash before Getting started.
   const choosingStart = !trialChecked && (initialView ?? "home") === "home" && !addressed;
@@ -459,6 +491,8 @@ export function UserWorkspace({
   // A trial's next chapter, opened from the "chapter done" banner: its screen (and its case), else Getting started.
   const openChapter = (chapter: StoryChapter) => {
     const section = chapter.opens.section as WorkspaceSection;
+    // On the new navigation the own-data chapter opens its page, Import your data (0.10.80).
+    if (chapter.code === "YOUR_DATA" && fresh) return open("Import your data");
     if (
       chapter.code === "YOUR_DATA" ||
       section === "Getting started" ||
@@ -573,7 +607,7 @@ export function UserWorkspace({
   }, [visibleSections, location.section, trialChecked]);
 
   const tenantName = session?.current_tenant?.tenant_name ?? "Your organization";
-  const tabs = visibleTabs(personaTabs, visibleSections);
+  const tabs = visibleTabs(trialTabs(personaTabs, !!trial?.is_trial), visibleSections);
   const choosePersona = async (code: string) => {
     try {
       const state = await requestJson<{ persona: string; persona_tabs: string[] }>("/api/v1/me/persona", {
@@ -583,7 +617,7 @@ export function UserWorkspace({
       setPersona(state.persona);
       const label = personaOptions.find((item) => item.code === state.persona)?.label ?? state.persona;
       const current = tabOfSection(location.section);
-      if (current && !state.persona_tabs.includes(current)) open("My Work");
+      if (current && current !== "start" && !state.persona_tabs.includes(current)) open("My Work");
       notify(`Viewing as ${label}. Saved for your next sign-in.`);
     } catch (error) {
       notify(error instanceof Error ? error.message : "Your view could not be changed.", "critical");
@@ -604,6 +638,9 @@ export function UserWorkspace({
     persona,
     personaLabel: personaOption?.label ?? session?.persona_label,
     personaTabs,
+    dataSource,
+    chooseDataSource,
+    refreshTrial,
   };
   const { section, tab } = location;
   // "Import your data" beside the Sample data label, and in the avatar menu on a phone (0.10.79).
@@ -639,12 +676,14 @@ export function UserWorkspace({
                   {tenantName}
                 </span>
               )}
-              {/* One label for the trial's data (V5), as on the classic bar; PDFs carry a watermark. */}
-              {trial?.is_trial && (
+              {/* The trial's data (0.10.80): the sample's label, the choice beside the imported data, or nothing once the
+                  sample is removed; PDFs carry the practice watermark either way. */}
+              {dataBar === "sample" && (
                 <span className="ms-chip uw-sample-chip uw-top-sample" title={TRIAL_DATA_NOTE}>
-                  {(trial.sample?.complaints ?? 0) > 0 ? "Sample data" : "Practice records"}
+                  Sample data
                 </span>
               )}
+              {dataBar === "choice" && <DataChoice source={dataSource} onChoose={chooseDataSource} />}
               {importOwn && <ImportOwnData onOpen={importOwn} />}
               <GlobalSearch open={open} />
               <PersonaSwitch
@@ -654,10 +693,18 @@ export function UserWorkspace({
                 onChoose={(code) => void choosePersona(code)}
               />
               <span className="uw-top-bell">
-                <AlertsBell onOpen={() => open("My Work")} />
+                {/* Home holds the reminders on the new navigation (0.10.81, H1): opened there, at them. */}
+                <AlertsBell
+                  place="Home"
+                  onOpen={() => {
+                    open("My Work");
+                    window.setTimeout(() => document.getElementById("home-reminders")?.scrollIntoView(), 300);
+                  }}
+                />
               </span>
               <HelpMenu
-                onGettingStarted={trial?.is_trial ? () => open("Getting started", "Your data") : undefined}
+                // Try your own data opens the import page (0.10.80); HelpMenu offers it to whoever may import.
+                onGettingStarted={trial?.is_trial ? () => open("Import your data") : undefined}
                 more={[
                   ...(trial?.is_trial
                     ? [
@@ -683,6 +730,7 @@ export function UserWorkspace({
                 onAdminConsole={onAdminConsole}
                 showSettings={visibleSections.includes("Settings")}
                 onImport={importOwn}
+                data={dataBar === "choice" ? { source: dataSource, onChoose: chooseDataSource } : undefined}
               />
             </header>
             <TabBar tabs={tabs} current={tabOfSection(section)} open={open} />
@@ -949,6 +997,7 @@ export function UserWorkspace({
                       {section === "Complaint" && <ComplaintPage tab={tab} heading={heading} />}
                       {section === "Decision trees" && <DecisionTreesSection />}
                       {section === "Reports" && <ReportsSection />}
+                      {section === "Import your data" && <ImportYourDataSection focus={tab} />}
                     </div>
                   </SectionErrorBoundary>
                 </ColumnScopeProvider>

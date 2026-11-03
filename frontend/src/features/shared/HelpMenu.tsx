@@ -15,7 +15,7 @@ import { useSiteInfo } from "../../site/legal";
 import { ReportProblemDialog } from "./ReportProblem";
 import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
 import { NEXT_STEPS_HELP, NEXT_STEPS_LINK } from "../help/trialNextSteps";
-import { WorkspaceContext } from "../workspace/workspaceContext";
+import { WorkspaceContext, canImportOwnData } from "../workspace/workspaceContext";
 import { USER_GUIDE_PATH } from "../help/userGuide";
 import { BUILT_VERSION } from "./appVersion";
 
@@ -56,6 +56,8 @@ export function HelpMenu({
   const onNextSteps = workspace?.isTrial ? () => workspace.open("Next steps") : undefined;
   // A sample-only trial (0.10.71) offers "Discuss a pilot" where a trial offers its own data.
   const sampleOnly = !!workspace?.session?.sample_only;
+  // On the new navigation "Try your own data" opens the import page: only for people who may import (0.10.80).
+  const tryOwnData = !sampleOnly && (workspace?.navigation !== "new" || canImportOwnData(workspace?.session));
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -85,7 +87,7 @@ export function HelpMenu({
       </button>
       {open && (
         <ul id="help-menu-list" className="help-menu-list" aria-label="Help">
-          {onGettingStarted && !sampleOnly && (
+          {onGettingStarted && tryOwnData && (
             <li>
               <button
                 type="button"
