@@ -7667,3 +7667,24 @@ button.uw-org:hover {
     display: block;
   }
 }
+
+/* A fact the reporting steps need, asked for in place (0.10.81): the field takes the box's width. */
+.uw-facts {
+  display: grid;
+  gap: var(--ms-space-2);
+}
+.uw-facts p {
+  margin: 0;
+}
+.uw-facts label {
+  display: grid;
+  gap: 4px;
+  font-weight: 600;
+}
+.uw-facts input {
+  width: 100%;
+  min-width: 0;
+}
+.uw-facts > button {
+  justify-self: start;
+}

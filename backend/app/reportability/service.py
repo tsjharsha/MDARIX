@@ -203,7 +203,8 @@ def assess(
         # until the country is entered (as triage counts a record with no country).
         clock_list = sorted(
             (
-                clock
+                # Not that market's clock: the complaint has none yet (no "Great Britain" on its page, 0.10.81).
+                replace(clock, market=None)
                 for market in markets.enabled_markets(windows)
                 for clock in rules.clocks(
                     {**record, "country": markets.MARKET_COUNTRIES[market][0]}, windows, aware, today, org_zone
