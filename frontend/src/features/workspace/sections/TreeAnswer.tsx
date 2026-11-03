@@ -28,7 +28,7 @@ import {
 import { ReportingFacts } from "./ReportingFacts";
 import { InlineError } from "./boardParts";
 import { TREE_NAMES, type TreeMarket, type TreePath, type Trees } from "../decisionTrees";
-import { SignCard } from "./TreeSign";
+import { FormCard, SignCard } from "./TreeSign";
 import "./decide.css";
 
 /** Whether the signed-in person's real role may answer and sign (regulatory review or approval), never the persona. */
@@ -137,6 +137,7 @@ export function TreeAnswer({ trees }: { trees: Trees }) {
           detail={data}
           item={item}
           tree={trees.markets.find((tree) => tree.market === item.market) ?? null}
+          trees={trees.markets}
           path={paths.data?.paths?.[item.market] ?? null}
           onSigned={reload}
         />
@@ -153,12 +154,14 @@ export function MarketTree({
   detail,
   item,
   tree,
+  trees,
   path,
   onSigned,
 }: {
   detail: AssessmentDetail;
   item: MarketItem;
   tree: TreeMarket | null;
+  trees: TreeMarket[];
   path: TreePath | null;
   onSigned: () => void;
 }) {
@@ -325,6 +328,15 @@ export function MarketTree({
             onSigned();
           }}
           flat={flat}
+        />
+        <FormCard
+          item={latest}
+          tree={tree}
+          trees={trees}
+          outcome={outcome}
+          signed={signed}
+          path={path}
+          enabled={detail.enabled_markets}
         />
       </aside>
     </div>

@@ -41,6 +41,17 @@ NEVER_DECIDES = (
     "reportable conclusion creates the market's report."
 )
 
+# 0.10.83 (D2.5): where reporting to another market may also apply for an incident elsewhere, advice only. Starter text,
+# for the consultant to confirm; it never creates a second report.
+FOREIGN = {
+    markets.US: "FDA reporting can cover events outside the US for a device also marketed in the US (21 CFR 803).",
+    markets.EU_NI: "EU MDR Art. 87(1)(b): a field safety corrective action taken outside the EU, for a device also on "
+    "the EU market.",
+    markets.GB: "MHRA guidance: check it for incidents outside Great Britain.",
+    markets.IN: "CDSCO's MvPI guidance: check it for events outside India.",
+    markets.CA: "SOR/98-282 s. 61.1: foreign risk notification when you, or a regulator abroad, take corrective action.",
+}
+
 
 def _tree(market: str, row: DecisionGuideVersion | None, names: dict) -> dict:
     """A market's tree from the guide version in use: an approved version of the organization, else the starter."""
@@ -74,6 +85,7 @@ def _tree(market: str, row: DecisionGuideVersion | None, names: dict) -> dict:
             if market in forms.BY_MARKET
             else None
         ),
+        "foreign": FOREIGN[market],
     }
 
 

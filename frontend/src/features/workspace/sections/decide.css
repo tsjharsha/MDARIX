@@ -72,6 +72,45 @@
   font-size: var(--ms-fs-14);
 }
 
+/* The form card (D2.5). */
+.dt-form {
+  display: grid;
+  gap: 8px;
+}
+.dt-form h2 {
+  margin: 0;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.dt-form p {
+  margin: 0;
+}
+.dt-form-name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+}
+.dt-form .ac-primary {
+  justify-self: start;
+}
+.dt-flag {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--ms-info-line);
+  border-radius: var(--ms-radius-sm);
+  background: var(--ms-info-bg);
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+}
+.dt-flag .dt-tag {
+  justify-self: start;
+}
+
 .dt-answer {
   display: grid;
   gap: var(--ms-space-3);

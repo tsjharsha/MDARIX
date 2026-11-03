@@ -128,3 +128,20 @@ def test_the_tree_lists_complaints_still_to_assess_and_signs_without_folded_ques
         "US3": "Not asked: no death and no serious injury",
         "US6": "Not needed: not reportable on the answers above",
     }
+
+
+# --------------------------------------------------------------------------------------------- D2.5
+
+
+@pytest.mark.db
+def test_each_markets_tree_names_its_form_and_where_foreign_reporting_may_also_apply(org):  # noqa: F811
+    trees = {tree["market"]: tree for tree in org["regulatory"].get("/api/v1/decision-trees").json()["markets"]}
+    assert {market: tree["form"]["title"] for market, tree in trees.items()} == {
+        "US": "Form FDA 3500A worksheet (eMDR)",
+        "EU_NI": "EU Manufacturer Incident Report (MIR) worksheet",
+        "GB": "Great Britain Manufacturer Incident Report (MHRA, GB MIR) worksheet",
+        "IN": "MvPI Medical Device Adverse Event Reporting Form worksheet",
+        "CA": "Health Canada mandatory medical device problem report worksheet",
+    }
+    assert trees["US"]["foreign"].startswith("FDA reporting can cover events outside the US")
+    assert all(tree["foreign"] for tree in trees.values())

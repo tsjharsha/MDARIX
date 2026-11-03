@@ -15,6 +15,8 @@ export type TreeMarket = {
   questions: { id: string; text: string; clause: string; extra: boolean }[];
   /** The report a reportable outcome creates (0.10.76: the EU, GB and Canada forms are starters). */
   form?: { title: string; starter: boolean } | null;
+  /** 0.10.83 (D2.5): where this market's reporting may also apply to an incident elsewhere; advice only, starter. */
+  foreign?: string;
 };
 export type TreeNode = {
   id: string;

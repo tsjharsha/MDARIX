@@ -199,6 +199,7 @@ const TREES: Trees = {
       tests: { passed: 8, total: 8, current: true },
       questions: [],
       form: { title: "MvPI Medical Device Adverse Event Reporting Form worksheet", starter: false },
+      foreign: "CDSCO's MvPI guidance: check it for events outside India.",
     },
   ],
   complaints: [
@@ -404,5 +405,44 @@ describe("D2.4: signing in about four actions", () => {
     expect(signItems({ ...base, choice: "override", overrideReason: "no" }).map((entry) => entry.text)).toContain(
       "Your reason for overriding the outcome",
     );
+  });
+});
+
+describe("D2.5: the form for the incident's country", () => {
+  it("names the form a reportable outcome creates, and flags where another market may also apply, as advice", () => {
+    const html = show(READY);
+    expect(html).toContain("The form for this incident&#x27;s country");
+    expect(html).toContain("<b>Form FDA 3500A (eMDR)</b>");
+    expect(html).toContain("Created when you sign reportable");
+    expect(html).toContain(
+      "<b>May also apply</b><span>CDSCO&#x27;s MvPI guidance: check it for events outside India.</span>",
+    );
+    expect(html).toContain("Starter, for your consultant to confirm · no second report is created");
+  });
+
+  it("opens the report once signed, and says no report when not reportable", () => {
+    const current = draft(ANSWERED, {
+      conclusion: "REPORTABLE",
+      signed_by: "Asha Menon",
+      signed_at: "2026-11-02T09:02:00Z",
+    });
+    resources.data = {
+      "/api/v1/decision-trees": TREES,
+      "/api/v1/decision-trees?complaint_id=c-rv11": {
+        ...TREES,
+        paths: {
+          US: { market: "US", label: "", nodes: [], outcome: {}, report: { id: "r1", state: "DRAFT" }, has_form: true },
+        },
+      },
+      "/api/v1/complaints/c-rv11/market-assessments": detailOf(usItem({ current, draft: null })),
+    };
+    expect(render(<DecisionTreesSection />)).toContain("Open the report");
+    const not = usItem({
+      draft: draft(ANSWERED),
+      evaluation: { suggested: "NOT_REPORTABLE", report_type: null, notes: [], not_asked: FOLDED },
+    });
+    const html = show(not);
+    expect(html).toContain("No report for United States (FDA).");
+    expect(html).not.toContain("May also apply");
   });
 });

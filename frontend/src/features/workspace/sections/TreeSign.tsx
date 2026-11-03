@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { PenLine } from "lucide-react";
+import { ChevronRight, PenLine } from "lucide-react";
 import { deadlineLabel, formatDateTime, timeLeft } from "../../../app/dates";
 import { errorText, send } from "../../customer-admin/shared";
 import { collapsed } from "../complaintReview";
 import { useWorkspace } from "../workspaceContext";
+import { reportPlace } from "../authorityReports";
 import {
   ASSESSMENT_LIMITS,
   CONCLUSION_LABELS,
@@ -328,6 +329,82 @@ export function SignCard({
           </p>
           <InlineError text={error} />
         </form>
+      )}
+    </section>
+  );
+}
+
+/** "Form FDA 3500A worksheet (eMDR)" -> "Form FDA 3500A (eMDR)": the form's name as people say it. */
+export const formName = (title: string) => title.replace(" worksheet", "");
+
+/**
+ * The form for the incident's country (0.10.83, D2.5): a reportable outcome names the form signing creates (US 3500A,
+ * India MDAE, EU/NI MIR, GB MHRA MIR, the Health Canada report), then opens it. Where another market's reporting may
+ * also apply to an incident outside it, an advice-only flag: it creates no second report.
+ */
+export function FormCard({
+  item,
+  tree,
+  trees,
+  outcome,
+  signed,
+  path,
+  enabled,
+}: {
+  item: MarketItem;
+  tree: TreeMarket | null;
+  trees: TreeMarket[];
+  outcome: Suggestion | null;
+  signed: boolean;
+  path: TreePath | null;
+  enabled: string[];
+}) {
+  const { open } = useWorkspace();
+  if (!tree?.form || !outcome) return null;
+  const incident = item.preselected;
+  const others = incident
+    ? trees.filter((other) => other.market !== item.market && enabled.includes(other.market))
+    : [];
+  const report = signed ? path?.report : null;
+  return (
+    <section className="uw-card uw-card-pad dt-form" aria-label="The form">
+      <h2>{incident ? "The form for this incident's country" : "The form for this market"}</h2>
+      {outcome === "NOT_REPORTABLE" ? (
+        <p className="ac-muted">No report for {item.label}.</p>
+      ) : (
+        <>
+          <p className="dt-form-name">
+            <b>{formName(tree.form.title)}</b>
+            {tree.form.starter && <span className="dt-tag">Starter, for your consultant to confirm</span>}
+          </p>
+          {report ? (
+            <button
+              type="button"
+              className="ac-primary"
+              onClick={() => {
+                const place = reportPlace(report.id);
+                open(place.section, place.tab);
+              }}
+            >
+              Open the report <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          ) : (
+            <p className="ac-muted">
+              {signed
+                ? "Record where and when you reported on the signed conclusion."
+                : "Created when you sign reportable, with the fields your records already hold."}
+            </p>
+          )}
+          {outcome === "REPORTABLE" && others.length > 0 && (
+            <div className="dt-flag" role="note">
+              <b>May also apply</b>
+              {others.map((other) => (
+                <span key={other.market}>{other.foreign}</span>
+              ))}
+              <span className="dt-tag">Starter, for your consultant to confirm · no second report is created</span>
+            </div>
+          )}
+        </>
       )}
     </section>
   );
