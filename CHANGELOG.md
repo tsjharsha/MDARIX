@@ -10,6 +10,143 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.77] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): part C5 of Release C, "Codes", built to the owner-approved design (the
+report page's code fields). Codes change organizations on the **new** navigation (`tenants.navigation = new`); the
+classic navigation, and every pilot on it today, keeps its 0.10.58 report rules (a mapped code there is still "From
+record"). MDARIX never decides and never submits: the code the approved mapping suggests is confirmed or changed by the
+regulatory manager, and nothing reaches a form or a PDF unconfirmed.
+
+**Migration `tr16codelists`** (after `tr15canadamarket`; `tr03pmssources` stays reserved). It is expand-only:
+`imdrf_codes.status` and `status_note`; two shared reference tables, `reference_codes` and `code_list_files` (the
+runtime role only reads them); `products.basic_udi_di` and `emdn_code`; `product_registrations.risk_class`;
+`market_responsible_parties.srn`. No stored row changes. On legacy dedicated organization databases, run
+`scripts/add_workflow_tables_to_legacy_planes.py` (new step tr16). The API and web images change, and the image now
+carries the published code lists in `data/code_lists`.
+
+**Operators, in this order, each dry run first** (the code lists need the owner's explicit OK for production):
+
+1. `docker compose -f docker-compose.prod.yml run --rm migrate python scripts/load_code_lists.py` (dry run: checks
+   every file against `data/code_lists/manifest.json` and says what it would load), then the same with `--apply`. It
+   runs as the database owner. A second run loads nothing.
+2. `scripts/refresh_trial_story.py` (dry run), then `--apply`: re-records each running trial's sample IMDRF links to
+   Release 2026 and records SAMPLE-RV-09's frozen 3500A codes as confirmed (`backend/app/trial/sample_0_10_77.py`).
+   Idempotent.
+
+### Added: the published code lists
+
+Loaded only from the publishers' own files, byte for byte (`data/code_lists`, SHA-256 in `manifest.json`), by
+`scripts/load_code_lists.py`. Each file is checked whole before anything loads (its SHA-256, its columns, every code
+present and unique, every parent in the file) and a malformed file is refused. Nothing is ever deleted: a file that
+leaves out a loaded code is refused; a new version loads beside the old one, so old reports keep their codes.
+
+| List | Source | Version and date | Rows |
+|---|---|---|---|
+| IMDRF adverse event terminology, Annexes A-G | IMDRF, "Terminologies for Categorized Adverse Event Reporting (AER)" (imdrf.org), `imdrf-tech-ae-terminologies-n43-ReleaseNumber2026-Annexes-revisedJune.xlsx` | Release Number 2026; annexes approved January 2026; workbook revised June 2026 | A 491, B 34, C 160, D 45, E 812, F 82, G 307 (1,931; 15 retired, 31 headings "Not selectable") |
+| FDA CDRH adverse event codes, with FDA's IMDRF code per row (FDA's FDA-IMDRF mapping) | NCI EVS `FDA-CDRH_NCIt_Terminology_Subsets.txt`, the file FDA's "MDR Adverse Event Codes" page points to | NCIt 26.08e, posted 2 Sep 2026 | 1,885: device problem 487, clinical 784, health impact 81, component 299, type of investigation 31, findings 160, conclusion 43; every one maps to a code of IMDRF Release 2026 |
+| FDA product codes (product classification) | accessdata.fda.gov `foiclass.zip` | 2 Nov 2026 | 7,098 |
+| EMDN | European Commission, `EMDN v2026_EN.xlsx` (health.ec.europa.eu, "Download EMDN") | v.2026, file dated 25 Sep 2026 | 8,516 |
+
+- Annex E lists 202 terms a second time under another heading with the same code; each code is kept once, at its own
+  heading (the one its code starts with), which carries IMDRF's latest wording.
+- **GMDN is licensed and never loaded**: each product keeps the organization's own GMDN code.
+- **ISO 3166 country codes were already in MDARIX** (the imports' 249 alpha-2 codes): not loaded again.
+
+### Added: codes on reports (new navigation)
+
+- A code the approved mapping supplies is **"Suggested from your approved mapping"**: it counts as missing in the
+  mandatory-fields meter, Send for approval stays blocked, and it is **never frozen into a snapshot**, so it never
+  reaches the form or the PDF, until the regulatory manager **confirms** it or **changes** it. The report records
+  which (Confirmed, Changed from the suggestion, or Entered), what was suggested, who and when; the audit event names
+  the codes.
+- **The code picker**: search an annex by word (code, term or definition), or browse it heading by heading; each code
+  shows its definition and its FDA code. Retired codes are not offered, and IMDRF's "Not selectable" headings cannot be
+  chosen; a report that already holds a retired code keeps it.
+- **One choice fills both**: on the FDA's form every IMDRF code carries its FDA code from FDA's published mapping, for
+  example "A090807 High Readings (FDA 2459)".
+- **Required codes per form and report type** (starter, for your consultant to confirm): an initial 3500A needs the
+  device problem and both health effect codes (H6) and, as before, the conclusion code; the EU MIR needs Annex A, E and
+  F on every report and B, C, D and G in a final one; the GB MIR a code from every annex. The MvPI MDAE and Health
+  Canada's form have no code fields.
+- Device problem codes come from the problem-code mapping. Health effect codes are suggested where an approved mapping
+  of the assessment's harm code exists (none in the sample).
+
+### Added: Settings › Products
+
+- Each product's UDI-DI, **Basic UDI-DI**, GMDN code and term (your own), **EMDN code** (checked against the loaded
+  EMDN, its term shown); its **registrations per market**: the FDA product code (checked against FDA's
+  classification, its device name shown) with the 510(k), PMA or De Novo number, the notified or approved body and its
+  number, the Health Canada licence, the CDSCO licence, and the **risk class** in that market (US I-III; EU, NI and GB
+  I, IIa, IIb, III and IVD A-D; Canada I-IV; India A-D; starter, for your consultant to confirm).
+- The organization's **responsible parties** per market and role, with their **SRN**.
+- They fill the forms: the EU MIR's manufacturer SRN (1.3.2b), Basic UDI-DI (2.1c), nomenclature (2.2a/b: EMDN where
+  set, else GMDN), notified body number (2.3p) and risk class (2.4); GB's risk class; the MDAE's device class (A1);
+  Health Canada's device classification (C4 i).
+
+### Changed: the sample's codes (checked against IMDRF's own Release 2026 file)
+
+The addendum's check, against `imdrf-tech-ae-terminologies-n43-ReleaseNumber2026-Annexes-revisedJune.xlsx` (Release
+Number 2026): all four earlier links exist with their terms word for word, but each was a broad heading where the file
+holds the exact term, so each sample code now links to the most specific term that says what its complaint says, of
+release 2026 (sample mappings, still approved by the sample reviewer; `sample_imports.SAMPLE_IMDRF_LINKS`):
+
+| Sample problem code | Before (release 2025) | After (release 2026) |
+|---|---|---|
+| PRESSURE_ALARM | A16 Protective Measures Problem (level 1) | A1601 Device Alarm System (level 2) |
+| UNDER_INFUSION_NO_ALARM | A14 Infusion or Flow Problem; A16 Protective Measures Problem (level 1) | A1407 Insufficient Flow or Under Infusion (level 2); A160102 No Audible Alarm (level 3) |
+| FREE_FLOW_DOOR | A14 Infusion or Flow Problem (level 1) | A140502 Free or Unrestricted Flow (level 3) |
+| ALARM_VOLUME_LOW | A16 Protective Measures Problem (level 1) | A160103 Low Audible Alarm (level 3) |
+| SPO2_READING_HIGH (SAMPLE-RV-11) | A0908 Incorrect, Inadequate or Imprecise Result or Readings (level 2) | A090807 High Readings (level 3) |
+
+FLOW_ZERO_READING (RV-07), SPO2_DROPOUT_HARM (RV-01) and NFF keep no link, as before. SAMPLE-RV-09's accepted 3500A
+keeps the code it was approved with (A16), recorded as confirmed by the sample author; a new trial's RV-09 holds
+A160103, confirmed by the sample author before its snapshot.
+
+### Fixed
+
+- The trend sentence counts each lot: "lots 003 (4), 004 (4), 005 (1)" (it read "lots 003, 004 and 005").
+
+### Sample numbers and labels that change
+
+No deadline, signal, Readiness value or record count changes.
+
+| Where | Before | After |
+|---|---|---|
+| SAMPLE-RV-11's US report, once its US conclusion is signed reportable | 8 of 17 mandatory fields (9 to fill); H6 device problem code "A0908 …" from record | 7 of 19 (12 to fill): H6 "Suggested: A090807 High Readings (FDA 2459)", waiting to be confirmed; the two health effect codes now mandatory |
+| SAMPLE-RV-09's 3500A (acknowledged) | 17 of 17 | 19 of 19 (H6 clinical and impact "Entered in eSubmitter from the IMDRF Annex E/F release (sample)", as its conclusion code; H6 problem "Confirmed") |
+| SAMPLE-RV-07's EU MIR, SAMPLE-RV-10's MDAE | 8 of 24; 14 of 14 | unchanged |
+| Problem code beside a complaint (Complaints, the complaint page) | PRESSURE_ALARM: A16 Protective Measures Problem; RV-11: A0908 …; RV-06: A14 …, A16 …; RV-08: A14 …; RV-09: A16 … | A1601 Device Alarm System; A090807 High Readings; A1407 Insufficient Flow or Under Infusion, A160102 No Audible Alarm; A140502 Free or Unrestricted Flow; A160103 Low Audible Alarm |
+| Trend sentence (Home, Trends) | OrbitCare 300 Infusion Pump (Sample) Rev B: 9 complaints … lots 003, 004 and 005 | … lots 003 (3), 004 (4), 005 (2) |
+| 3500A section H note | H6 codes come from your approved IMDRF mappings of the complaint's problem code (Records > Reference data). | H6 codes are suggested from your approved IMDRF mappings of the complaint's problem code; you confirm or change each one in the code picker (IMDRF and FDA codes). |
+| A code field's status (new navigation) | From record | Suggested from your approved mapping · Confirmed · Changed from the suggestion · Entered by a person |
+| Settings tabs | 7 | 8: Products |
+
+### Tests
+
+- pytest: `tests/test_release_c5_0_10_77.py` (new, 11): the four published files parse and a malformed file is refused
+  (another SHA-256, a wrong header, a bad or misplaced code, a duplicate, a zip without foiclass.txt); the sample links
+  are Release 2026's codes and terms word for word, at their levels; a suggestion counts as missing and is never frozen;
+  the loaders load once and never delete (a second run finds 0 new, 0 changed; a file leaving out a loaded code is
+  refused); the picker searches by word, browses the annex and leaves out retired codes; nothing is filed unconfirmed,
+  one choice fills FDA and IMDRF, the approved PDF holds the confirmed code and the audit says confirmed, changed,
+  confirmed; a retired code stays on its report and cannot be chosen again; the required codes per report type hold
+  approval (EU MIR final: B, C, D); product identity is checked against the lists and fills the EU MIR; the trend
+  counts each lot; a running trial is re-recorded once (dry run, idempotent; 0.10.72's step does not add A0908 back).
+  Updated: `test_flagship_walkthrough.py` (it confirms the suggested code; still 21 main buttons, 44 actions),
+  `test_authority_reports_api.py`, `test_trial_import_reports.py`, `test_release_b_0_10_72.py` (the new links).
+- Targeted pytest run (this release, C1 to C4, Releases A and B, business permissions, alembic drift, the migration
+  chain, free trial, authority reports API, approval told, the flagship walk-through, import reports, regulatory
+  reference, import governance, record facts, trial story reads, sample story days, workspace trends): 181 passed.
+- vitest: `releaseC5077.test.tsx` (new, 6) and the files touched (releaseC2-C4, releaseB072, releaseA071,
+  ImportReports, authorityReports, linkTable, labels, tokens…): 13 files, 133 passed. tsc, ruff and prettier clean.
+- The loader, locally only: dry run, `--apply`, and a second dry run (0 new, 0 changed) on the test database.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.77-review` (`owner/`: Home's trend with lot counts, RV-11's
+  3500A with the suggested code, only missing, the picker browsing and searching, the code confirmed, RV-07's EU MIR
+  codes, RV-09's acknowledged 3500A, Settings › Products and adding a registration, RV-11's problem code; `colleague/`:
+  a locked Regulatory Leader sees "Confirmed by Asha Quality" and chooses a health effect code in Annex E, and Settings ›
+  Products read only; `classic/`: unchanged).
+
 ## [0.10.76] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): part C4 of Release C, "New forms: EU MIR, Great Britain (MHRA) and
