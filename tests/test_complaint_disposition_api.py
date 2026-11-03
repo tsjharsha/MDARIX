@@ -117,8 +117,9 @@ def test_the_routine_complaint_closes_at_service_level_on_one_screen_with_one_si
     user, rt01 = trial["user"], trial["ids"]["SAMPLE-RT-01"]
     screen = user.get(_url(rt01)).json()
     assert screen["routine"]["offered"] is True and screen["trigger_codes"] == []
-    # The sample's enabled markets: the FDA and EU windows, and India's (enabled with the report examples, 0.10.58).
-    assert [item["market"] for item in screen["routine"]["markets"]] == ["US", "EU_NI", "IN"]
+    # The sample's enabled markets: the FDA and EU windows, India's (with the report examples, 0.10.58), Great
+    # Britain's and Canada's (0.10.76, C4).
+    assert [item["market"] for item in screen["routine"]["markets"]] == ["US", "EU_NI", "GB", "IN", "CA"]
     assert screen["reportability"]["on_watch"] is False and screen["candidates"] == []
     proposed = screen["classification"]
     assert proposed["state"] == "PROPOSED" and proposed["use_environment"] == "INTENSIVE_CARE_UNIT"
@@ -178,10 +179,9 @@ def test_the_routine_complaint_closes_at_service_level_on_one_screen_with_one_si
             .order_by(ComplaintMarketAssessment.market)
             .all()
         )
+        # One routine conclusion for each of the five enabled markets, under the one signature (ordered by code).
         assert [(row.market, row.question_set, row.conclusion) for row in markets] == [
-            ("EU_NI", "ROUTINE-BASIS", "NOT_REPORTABLE"),
-            ("IN", "ROUTINE-BASIS", "NOT_REPORTABLE"),
-            ("US", "ROUTINE-BASIS", "NOT_REPORTABLE"),
+            (market, "ROUTINE-BASIS", "NOT_REPORTABLE") for market in ("CA", "EU_NI", "GB", "IN", "US")
         ]
         assert {row.signed_record_id for row in markets} == {record.id}
         bind_system(db, "test: the audit trail")
@@ -194,7 +194,7 @@ def test_the_routine_complaint_closes_at_service_level_on_one_screen_with_one_si
         assert (
             len(actions) == 1
             and actions[0]["version"] == 1
-            and actions[0]["market_conclusions"] == ["US", "EU_NI", "IN"]
+            and actions[0]["market_conclusions"] == ["US", "EU_NI", "GB", "IN", "CA"]
         )
 
     # A signed disposition is never edited: a change is version 2, with its reason, and version 1 stays visible.
