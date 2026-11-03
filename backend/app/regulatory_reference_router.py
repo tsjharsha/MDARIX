@@ -1,6 +1,7 @@
 """Regulatory reference data (G2a): product registrations, responsible parties, IMDRF codes and the organization's
-code mappings (backend/app/regulatory_reference.py). Changes need records.write; deciding a mapping needs
-regulatory.approve and a different person from the one who proposed it. Every change is audited."""
+code mappings (backend/app/regulatory_reference.py). Changes need records.write; a product's identity, its
+registrations and the responsible parties also regulatory.review (0.10.79: the Regulatory Leader keeps them). Deciding
+a mapping needs regulatory.approve and a different person from the one who proposed it. Every change is audited."""
 
 from __future__ import annotations
 
@@ -11,13 +12,17 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.app import regulatory_reference as reference
-from backend.app.access.permissions import RECORDS_WRITE, REGULATORY_APPROVE, require_permission
+from backend.app.access.permissions import RECORDS_WRITE, REGULATORY_APPROVE, REGULATORY_REVIEW, require_permission
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import AuditEvent
 from backend.app.db.session import get_db
+from backend.app.evidence_workflow.people import require_any_permission
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
 router = APIRouter(prefix="/api/v1/regulatory-reference", tags=["Regulatory reference"])
+# Who changes a product's identity, its registrations and the responsible parties: whoever changes records, and the
+# regulatory reviewer (the Regulatory Leader, 0.10.79). Nothing else is granted.
+IDENTITY_EDITORS = Depends(require_any_permission(RECORDS_WRITE, REGULATORY_REVIEW))
 # The code system of a complaint's own problem code (complaints.problem_code), as its IMDRF mappings name it.
 PROBLEM_CODES = "problem_code"
 
@@ -65,7 +70,7 @@ def product_profile(
     return reference.product_profile(data, _tenant(ctx), product_id, db)
 
 
-@router.put("/products/{product_id}/identity", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+@router.put("/products/{product_id}/identity", dependencies=[IDENTITY_EDITORS])
 def set_identity(
     product_id: uuid.UUID,
     payload: dict = Body(...),
@@ -78,7 +83,7 @@ def set_identity(
     return result
 
 
-@router.post("/products/{product_id}/registrations", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+@router.post("/products/{product_id}/registrations", dependencies=[IDENTITY_EDITORS])
 def add_registration(
     product_id: uuid.UUID,
     payload: dict = Body(...),
@@ -94,7 +99,7 @@ def add_registration(
 @router.delete(
     "/products/{product_id}/registrations/{registration_id}",
     status_code=204,
-    dependencies=[Depends(require_permission(RECORDS_WRITE))],
+    dependencies=[IDENTITY_EDITORS],
 )
 def remove_registration(
     product_id: uuid.UUID,
@@ -120,7 +125,7 @@ def responsible_parties(
     return {"parties": reference.responsible_parties(data, _tenant(ctx))}
 
 
-@router.put("/responsible-parties", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+@router.put("/responsible-parties", dependencies=[IDENTITY_EDITORS])
 def set_party(
     payload: dict = Body(...),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
@@ -139,7 +144,7 @@ def set_party(
 
 
 @router.delete(
-    "/responsible-parties/{party_id}", status_code=204, dependencies=[Depends(require_permission(RECORDS_WRITE))]
+    "/responsible-parties/{party_id}", status_code=204, dependencies=[IDENTITY_EDITORS]
 )
 def remove_party(
     party_id: uuid.UUID,
