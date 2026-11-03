@@ -300,7 +300,12 @@ function Access() {
           {WORKSPACE_SECTIONS.filter(
             (section) => section !== "My Account" && !TRIAL_ONLY_SECTIONS.includes(section),
           ).map((section) => {
-            const allowed = sectionAllowed(section, session?.allowed_menu, session?.business_permissions);
+            const allowed = sectionAllowed(
+              section,
+              session?.allowed_menu,
+              session?.business_permissions,
+              session?.sample_only,
+            );
             return (
               <li key={section} className={allowed ? "" : "ac-muted"}>
                 <CheckCircle2

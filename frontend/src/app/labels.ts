@@ -18,6 +18,9 @@ const MARKETS: Record<string, string> = {
   EU: "European Union",
   GB: "Great Britain",
   IN: "India",
+  CA: "Canada",
+  NI: "Northern Ireland",
+  AU: "Australia",
 };
 
 /** A market by its name: "EU_NI" -> "EU and Northern Ireland". */
@@ -48,8 +51,10 @@ export const versionWords = (code: string | null | undefined): string => {
   return own ? `your version ${own[1]}` : value || "—";
 };
 
-/** A decision guide question's number without its market's code: "US2A" -> "2a", "EU_NI3" -> "3". */
-export const questionNumber = (id: string): string => id.replace(/^[A-Z_]*?(?=\d)/, "").toLowerCase() || id;
+/** A decision guide question's number without its market's code: "US2A" -> "2a", "EU_NI3" -> "3"; an extra question
+ * "X1" -> "Extra 1" (never "1", the same as question 1). */
+export const questionNumber = (id: string): string =>
+  /^X\d+$/.test(id) ? `Extra ${id.slice(1)}` : id.replace(/^[A-Z_]*?(?=\d)/, "").toLowerCase() || id;
 
 /** A time zone as a person reads it: "Asia/Kolkata" -> "Asia / Kolkata"; the old name Asia/Calcutta reads the same. */
 export const zoneLabel = (zone: string): string =>

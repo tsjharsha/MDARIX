@@ -68,7 +68,8 @@ export function addressFor(location: { section: string; tab?: string; caseRef?: 
   if (!own) params.set("section", location.section);
   if (location.section === "Investigations") {
     if (location.caseRef) params.set("case", location.caseRef);
-    if (name && name !== "All investigations") params.set("step", name);
+    // The list (classic: with its case kept; the new navigation, 0.10.74: no case) is named when no case is.
+    if (name && (name !== "All investigations" || !location.caseRef)) params.set("step", name);
   } else if (name) params.set("tab", name);
   for (const [key, value] of new URLSearchParams(query)) if (!RESERVED.includes(key)) params.append(key, value);
   const text = params.toString();

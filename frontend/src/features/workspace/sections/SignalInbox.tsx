@@ -670,7 +670,7 @@ export const FINDING_SIGNALS_TRIAGE = `${FINDING_SIGNALS_NOW} The counts update 
 export function SignalTriagePanel() {
   const { session, open } = useWorkspace();
   const canTriage = useCan("signal.triage");
-  const allowed = sectionAllowed("Signals", session?.allowed_menu, session?.business_permissions);
+  const allowed = sectionAllowed("Signals", session?.allowed_menu, session?.business_permissions, session?.sample_only);
   if (!canTriage || !allowed) return null;
   return <SignalTriageSummary onOpen={(tab) => open("Signals", tab)} />;
 }

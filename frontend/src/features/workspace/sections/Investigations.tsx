@@ -29,6 +29,7 @@ import {
 } from "../workspaceContext";
 import { tabsFor } from "../../../app/featureSet";
 import { tabParts } from "../../../app/linkTable";
+import { InvestigationList } from "./ComplaintViews";
 import { CaseEvidencePanel } from "./CaseEvidence";
 import { CaseSections } from "./CaseSections";
 import { AskMdarixPage } from "../../ask/AskMdarixPage";
@@ -94,15 +95,27 @@ const CASE_PAGE_TABS = [
 type Tab = (typeof TABS)[number] | (typeof CASE_PAGE_TABS)[number];
 
 export function InvestigationsSection({ tab: requested }: { tab?: string }) {
-  // The new navigation (stage 8): one investigation in four sections; its list is Complaints › Investigations.
+  // The new navigation (stage 8): one investigation in four sections; its list (0.10.74) is the tab's own.
   return useNavigation() === "new" ? <NewCaseSections tab={requested} /> : <ClassicInvestigations tab={requested} />;
 }
 
 function NewCaseSections({ tab }: { tab?: string }) {
-  const { work } = useWorkspace();
+  const { work, open } = useWorkspace();
   const [managing, setManaging] = useState<any | null>(null);
+  // The tab lists every investigation (0.10.74, C2) when asked to, or when none is open; one opens its page.
+  const listing =
+    tabParts(tab).name === "All investigations" || (!work.investigationId && work.caseLink?.state !== "resolving");
+  if (listing) return <InvestigationList />;
+  const selected = work.investigations.find((item) => String(item.id) === work.investigationId);
   return (
     <>
+      <nav className="uw-crumbs" aria-label="Where you are">
+        <button type="button" className="ac-link" onClick={() => open("Investigations", "All investigations")}>
+          Investigations
+        </button>
+        <span aria-hidden="true">›</span>
+        <span>{selected ? displayId(selected, "investigation_identifier") : "Investigation"}</span>
+      </nav>
       <CaseSections tab={tab} onManage={setManaging} onChanged={() => work.refreshInvestigations()} />
       {managing && (
         <ManageInvestigation

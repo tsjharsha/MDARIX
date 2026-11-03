@@ -202,7 +202,8 @@ describe("the click paths a–m on the new navigation (stages 7 and 8)", () => {
 
   it("starts on the menu's own screens", () => {
     expect(NEW_MENU.main).toContain("Trends");
-    expect(NEW_MENU.top).toContain("Team");
+    // Team is a tab of the bar since 0.10.73 (Admin's only); Settings and Account are in the avatar's menu.
+    expect(NEW_MENU.main).toContain("Team");
   });
 
   it("opens a reportability task on the complaint's market assessment (path b)", () => {

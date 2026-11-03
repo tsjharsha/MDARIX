@@ -38,17 +38,18 @@ REPORTS = "/api/v1/reports"
 # (step, the screen it is done on, its main button) — the frontend's own labels (entrance.ts, the screens).
 WALK = [
     ("Entrance", "Getting started (the entrance)", "Is this reportable, and by when, in the US and India?"),
-    ("Triage", "Complaint page › Summary", "Complete the triage record (on the triage list)"),
-    ("Triage", "Complaints › To triage, the complaint's triage panel", "Save the triage record"),
+    # 0.10.72 (B3): the triage panel is on the complaint page itself; no button opens the triage list first.
+    ("Triage", "Complaint page › Summary, its triage panel", "Save the triage record"),
     ("US market", "Complaint page › Summary", "Assess the United States (FDA) market"),
     ("US market", "Complaints › Reporting, the US assessment", "Save and sign"),
     ("India market", "The same assessment's next step", "Assess India (CDSCO) too"),
     ("India market", "Complaints › Reporting, the India assessment", "Save and sign"),
-    ("US report", "Next step", "Start the United States (FDA) report"),
-    ("US report", "Complaints › Reporting, the worksheet (show only missing)", "Ask for approval"),
+    # 0.10.75 (C3): signing the US conclusion reportable created the report; the next step opens it on its own page.
+    ("US report", "Next step", "Complete the United States (FDA) report (draft)"),
+    ("US report", "Reports › the report (show only missing)", "Send for approval"),
     ("US report", "The approver's My work (the trial owner alone: the same screen)", "Approve"),
-    ("US report", "Complaints › Reporting, the report", "Mark as submitted"),
-    ("US report", "Complaints › Reporting, the report: the acceptance", "Record the evidence"),
+    ("US report", "Reports › the report", "Mark as submitted"),
+    ("US report", "Reports › the report: the acknowledgement", "Record the evidence"),
     ("Disposition", "Next step", "Sign the disposition"),
     ("Disposition", "My work › Queues, the complaint's disposition", "Sign"),
     ("Investigation", "Next step", "Sign the investigation's decision"),
@@ -68,7 +69,18 @@ FIELDS = [
     ("flagship", "Immediate action", "Triage", "entered"),
     ("flagship", "Awareness time", "Triage", "prefilled: the complaint's awareness"),
     ("flagship", "Harm level (US, India)", "Market assessment", "prefilled: the triage record's severity"),
-    ("flagship", "Answers to each market's questions", "Market assessment", "entered: the market's own questions"),
+    (
+        "flagship",
+        "Factual answers (death, serious injury, malfunction)",
+        "Market assessment",
+        "prefilled: the complaint record's fields, each confirmed by the person (0.10.72)",
+    ),
+    (
+        "flagship",
+        "Judgement answers (causation, recurrence, remedial action, unexpected) and the conclusion",
+        "Market assessment",
+        "entered: the person's judgement, never prefilled",
+    ),
     ("flagship", "Worksheet fields from the record", "Report worksheet", "prefilled: complaint, product, assessment"),
     ("flagship", "Manufacturer report number (front page)", "Report worksheet", "entered"),
     ("flagship", "G8 manufacturer report number", "Report worksheet", "prefilled: the worksheet's front page"),
@@ -92,6 +104,34 @@ FIELDS = [
 ]
 
 
+# The walk's action count (0.10.72, Release B): each main button, each answer the person enters (choose it and type its
+# rationale: two actions) and each suggestion from the record they confirm (one action). 0.10.71: 22 buttons and 16
+# entered answers, 54 actions.
+ACTIONS_BEFORE = 54
+
+
+def _answers_from_record(detail: dict, market: str, wanted: dict) -> tuple[dict, int]:
+    """The market's answers as the person gives them: the record's suggestions confirmed (each must be the walk's own
+    answer), the rest entered with a rationale. Returns the answers and the actions they took."""
+    item = _market(detail, market)
+    suggested, answers, actions = item["suggestions"], {}, 0
+    for question, answer in wanted.items():
+        offer = suggested.get(question)
+        if offer:
+            assert offer["answer"] == answer, (question, offer)
+            answers[question] = {
+                "answer": answer,
+                "rationale": offer["source"],
+                "evidence": [offer["evidence"]],
+                "confirmed": True,
+            }
+            actions += 1
+        else:
+            answers.update(_answers(**{question: answer}))
+            actions += 2
+    return answers, actions
+
+
 def _ok(response, status: int = 200):
     assert response.status_code == status, response.text
     return response.json()
@@ -100,6 +140,10 @@ def _ok(response, status: int = 200):
 @pytest.fixture(scope="module")
 def trial():
     from backend.app.trial.retention import purge_trial
+
+    from tests.code_lists import ensure_loaded
+
+    ensure_loaded()  # the IMDRF terms and FDA's codes (0.10.77)
 
     user, approval, _ = _approved_trial_client()
     tenant_id = uuid.UUID(approval["tenant_id"])
@@ -123,8 +167,8 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     complaint = view["event"]["complaint_id"]
     me = _ok(user.get("/api/v1/triage"))["people"]
 
-    # 1. Triage: the main button opens this complaint's triage panel, not the list.
-    assert label == "Complete the triage record (on the triage list)"
+    # 1. Triage: the next action names this complaint's triage panel, which its page shows inline (0.10.72, B3).
+    assert label == "Complete the triage record"  # 0.10.72: on the page, no longer "(on the triage list)"
     assert target["record"] == {"kind": "complaint", "id": complaint} and target["tab"] == "Triage"
     owner = next(person["id"] for person in me if person["name"] != "Rahul Colleague")
     _ok(
@@ -146,7 +190,10 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     detail = _ok(user.get(f"/api/v1/complaints/{complaint}/market-assessments"))
     assert (detail["severity_level"], detail["severity_source"]) == ("NEGLIGIBLE", "The triage record")
     _acknowledge(user, "US")
-    us = _save(user, complaint, "US", _answers(**FLAGSHIP_US), harm_level=detail["severity_level"])
+    # The factual questions arrive from the complaint record; causation, recurrence and remedial action never do.
+    assert sorted(_market(detail, "US")["suggestions"]) == ["US1", "US2A", "US2B", "US2C", "US4"]
+    answers, actions = _answers_from_record(detail, "US", FLAGSHIP_US)
+    us = _save(user, complaint, "US", answers, harm_level=detail["severity_level"])
     assert us["evaluation"]["report_type"] == "US_30_DAY"
     assert _sign(user, complaint, "US", us, "REPORTABLE", password=PASSWORD).status_code == 200
     from backend.app.db.models.foundation import Complaint
@@ -159,24 +206,52 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     assert signed["due_on"] == (aware.astimezone(zone_info("America/New_York")).date() + timedelta(days=30)).isoformat()
 
     # 3. India, the story's second market (the assessment's next step, "Assess India (CDSCO) too"): not reportable.
+    origins = {key: entry["origin"] for key, entry in signed["answers"].items()}
+    assert origins == {
+        **dict.fromkeys(["US1", "US2A", "US2B", "US2C", "US4"], "CONFIRMED"),
+        **dict.fromkeys(["US3", "US5", "US6"], "ENTERED"),
+    }
+    # The audit trail keeps the same origins (0.10.72, B1).
+    from backend.app.db.models.foundation import AuditEvent
+    from backend.app.db.tenant_scope import bind_system
+
+    with SessionLocal() as db:
+        bind_system(db, "test: the signed assessment's audit")
+        audit = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.tenant_id == trial["tenant_id"], AuditEvent.action == "COMPLAINT_MARKET_CONCLUSION_SIGNED"
+            )
+            .one()
+        )
+        assert audit.details["answer_origins"] == origins
     _acknowledge(user, "IN")
-    india = _save(user, complaint, "IN", _answers(**FLAGSHIP_IN), harm_level=detail["severity_level"])
+    assert sorted(_market(detail, "IN")["suggestions"]) == ["IN2A", "IN2B", "IN2D", "IN2F"]
+    answers, more = _answers_from_record(detail, "IN", FLAGSHIP_IN)
+    actions += more
+    india = _save(user, complaint, "IN", answers, harm_level=detail["severity_level"])
     assert india["evaluation"]["suggested"] == "NOT_REPORTABLE"
     reason = "No adverse event: nobody was harmed, a malfunction only."
     assert _sign(user, complaint, "IN", india, "NOT_REPORTABLE", password=PASSWORD, reason=reason).status_code == 200
     # India is assessed, but the event's market stays the United States: the complaint's Markets field (0.10.70).
     assert _ok(user.get(EVENT))["work"]["markets"] == ["US"]
 
-    # 4. The US report: the worksheet opens on this complaint's reports; G8 is never typed twice.
+    # 4. The US report, created when the US conclusion was signed reportable (0.10.75, C3): the next step opens it;
+    # G8 is never typed twice.
     label, target, _ = _next(user)
-    assert label == "Start the United States (FDA) report"
+    assert label == "Complete the United States (FDA) report (draft)"
     assert target["record"]["id"] == complaint and target["tab"] == "Reports"
-    report = _ok(user.post(REPORTS, json={"complaint_id": complaint, "market": "US"}))
+    (started,) = [item for item in _ok(user.get(REPORTS, params={"complaint_id": complaint}))["items"] if item["id"]]
+    report = _ok(user.get(f"{REPORTS}/{started['id']}"))
     missing = [f["id"] for s in report["sections"] for f in s["fields"] if f["status"] == "MUST_HAVE"]
     assert "G8" in missing  # until the front page's number is entered
     values = {"MFR_REPORT": "1234567-2026-00011", "G2": "Health professional"}
     for field in [item for item in missing if item != "G8"]:
         report = _ok(user.put(f"{REPORTS}/{report['id']}/fields/{field}", json={"value": values.get(field, "Entered")}))
+    # 0.10.77: the device problem code is suggested from the approved mapping (with its FDA code) and confirmed.
+    (problem,) = [f for s in report["sections"] for f in s["fields"] if f["status"] == "SUGGESTED"]
+    assert (problem["id"], problem["suggestion"]) == ("H6_PROBLEM", "A090807 High Readings (FDA 2459)")
+    report = _ok(user.put(f"{REPORTS}/{report['id']}/fields/H6_PROBLEM", json={"confirmed": True}))
     g8 = next(f for s in report["sections"] for f in s["fields"] if f["id"] == "G8")
     assert (g8["value"], g8["status"], g8["source"]["label"]) == (
         "1234567-2026-00011",
@@ -333,6 +408,11 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     assert label is None and view["state"] == "READY_TO_SIGN", view["checklist"]
     ready = _ok(user.post(f"/api/v1/oversight/events/{complaint}/ready", json={"password": PASSWORD, "reason": ""}))
     assert ready["ready"]["state"] == "READY"
+    # The action count drops: the market answers took 23 actions instead of 32.
+    assert actions == 23
+    # 0.10.72: 21 main buttons (triage on the page) and 23 answer actions: 44 actions instead of 54.
+    assert (len(WALK), len(WALK) + actions) == (21, 44)
+    assert len(WALK) + actions < ACTIONS_BEFORE
 
 
 def test_a_finished_sample_event_asks_for_nothing_and_an_old_one_is_signed_again(trial):

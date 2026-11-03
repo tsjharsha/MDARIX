@@ -191,6 +191,8 @@ def test_the_embedding_model_is_pinned_to_a_commit():
 def test_caddy_keeps_readiness_internal_and_publishes_the_status():
     assert "@internal_health path /health /health/ready" in CADDYFILE
     assert "handle /health/status {" in CADDYFILE
+    # The release number is public (0.10.71): without this route the website answers /health/version with its 404.
+    assert "handle /health/version {" in CADDYFILE
     assert 'header >Cache-Control "no-store"' in CADDYFILE
     assert 'Cross-Origin-Resource-Policy "same-origin"' in CADDYFILE
     # Single-use tokens in links and search terms never reach the access log: the query string is dropped whole.
@@ -252,7 +254,7 @@ def test_caddy_is_public_without_www_unless_told_otherwise():
 
 def test_a_private_site_asks_for_the_login_everywhere_but_the_monitors():
     private = re.search(r"\(site_access_private\) \{(.*?)\n\}", CADDYFILE, re.S).group(1)
-    assert "@needs_login not path /health/live /health/status" in private
+    assert "@needs_login not path /health/live /health/status /health/version" in private
     assert "basic_auth @needs_login {" in private
     assert "{$MDARIX_SITE_LOGIN_USER} {$MDARIX_SITE_LOGIN_HASH}" in private
     redirect = re.search(r"\(www_redirect_on\) \{(.*?)\n\}", CADDYFILE, re.S).group(1)

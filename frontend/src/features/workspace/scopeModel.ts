@@ -237,8 +237,9 @@ function merged(options: ScopeOption[]): ScopeOption[] {
 }
 
 const versionLabel = (row: Row) => text(row.version_identifier) ?? text(row.business_id) ?? "Version";
-const complaintLabel = (row: Row) => text(row.business_id) ?? text(row.complaint_identifier) ?? "Complaint";
-const lotLabel = (row: Row) => text(row.business_id) ?? text(row.lot_identifier) ?? "Lot";
+// The customer's own reference first (0.10.72): "SAMPLE-ORBIT-300-CMP-007", never only the MDARIX ID.
+const complaintLabel = (row: Row) => text(row.complaint_identifier) ?? text(row.business_id) ?? "Complaint";
+const lotLabel = (row: Row) => text(row.lot_identifier) ?? text(row.business_id) ?? "Lot";
 const failureModeLabel = (row: Row) =>
   text(row.business_id) ?? text(row.failure_mode_identifier) ?? text(row.name) ?? "";
 

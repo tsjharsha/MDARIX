@@ -326,7 +326,7 @@ def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
     obligations = db.query(ReportObligation).filter(ReportObligation.tenant_id == tenant_id).limit(READ_LIMIT).all()
     started = {(row.complaint_id, row.market) for row in obligations if row.kind == "INITIAL"}
     for row in obligations:
-        if row.due_on is None or row.state in report_rules.MET:
+        if row.due_on is None or row.state in report_rules.CLOSED:
             continue
         form = forms.FORMS.get(row.form_code)
         found.append(
@@ -338,7 +338,8 @@ def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
                 complaint_id=row.complaint_id,
                 owner_id=row.created_by,
                 market=row.market,
-                opens=links.target("Complaints", "Reports", record=("complaint", row.complaint_id)),
+                # The report itself (0.10.76): its page on the new navigation, its panel on the classic one.
+                opens=links.target("Complaints", "Reports", record=("report", row.id)),
             )
         )
     for row in _candidates(db, tenant_id):

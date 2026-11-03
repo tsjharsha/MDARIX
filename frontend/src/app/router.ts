@@ -26,6 +26,8 @@ export type AppView =
   | "trends"
   | "settings"
   | "team"
+  | "decision-trees"
+  | "reports"
   | "customer-admin"
   | "admin"
   | "admin-stage2"
@@ -98,6 +100,9 @@ export const APP_ROUTES: Record<AppView, string> = {
   trends: "/app/trends",
   settings: "/app/settings",
   team: "/app/team",
+  // The new navigation's tabs of Release C (0.10.73): one tree per market, and the authority reports.
+  "decision-trees": "/app/decision-trees",
+  reports: "/app/reports",
   "customer-admin": "/app/customer-admin",
   admin: "/app/admin",
   "admin-stage2": "/app/admin/stage2",

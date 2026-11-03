@@ -123,7 +123,7 @@ describe("the trend check", () => {
     expect(trendHeadline(board({})).title).toBe("No version is rising against its own history");
     expect(trendHeadline(board({})).detail).toContain("120 complaints counted across 4 groups, whatever their status.");
     expect(trendHeadline(board({ groups_tested: 3, linked_records: 2 })).detail).toContain(
-      "Results allow for the 3 groups checked. An event linked from several records counts once.",
+      "Results allow for the 3 groups assessed. An event linked from several records counts once.",
     );
     expect(trendHeadline(board({ groups_tested: 1 })).detail).not.toContain("allow for");
   });

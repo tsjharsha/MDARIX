@@ -738,7 +738,7 @@ def trial_overview(
     from backend.app.trial import citations
     from backend.app.trial import retention
     from backend.app.trial.mvp_request import data_move
-    from backend.app.trial.service import TRIAL_ROW_LIMIT, TRIAL_USER_LIMIT
+    from backend.app.trial.service import TRIAL_ROW_LIMIT, trial_user_cap
 
     ai_on_server = bool(_models_in_use())
     now = now or datetime.now(timezone.utc)
@@ -794,7 +794,7 @@ def trial_overview(
                 "retention": kept,
                 "state": "ENDED" if ended else "ENDING_SOON" if seconds_left <= 7 * 86400 else "ACTIVE",
                 "days_left": 0 if ended else max(0, int(-(-seconds_left // 86400))),
-                "users": {"used": 0, "limit": TRIAL_USER_LIMIT},
+                "users": {"used": 0, "limit": trial_user_cap()},
                 # The owner's latest removals, withdrawn invitations and MFA resets (filled in for the trials shown).
                 "team_changes": [],
                 "rows": {"used": 0, "limit": TRIAL_ROW_LIMIT},

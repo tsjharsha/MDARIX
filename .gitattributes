@@ -29,3 +29,6 @@ Dockerfile* text eol=lf
 infrastructure/docker/** text eol=lf
 infrastructure/staging/** text eol=lf
 docker-compose*.yml text eol=lf
+# The published code lists (0.10.77) stay byte-identical to the publishers' files: their SHA-256 is in the manifest.
+data/code_lists/** -text
+data/code_lists/manifest.json text eol=lf

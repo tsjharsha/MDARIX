@@ -51,7 +51,7 @@ from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import require_any_permission
 from backend.app import links
-from backend.app.oversight import closure, rules, service
+from backend.app.oversight import closure, record_page, rules, service, service_work
 from backend.app.reportability.deadlines import due_label
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
@@ -414,15 +414,16 @@ def complaint_work(db, control_db, tenant_id, complaints: list) -> dict[str, dic
     return out
 
 
-def _watch_clocks(db, control_db, tenant_id, ids: set[str], now, reminder_hours: int) -> dict[str, list[dict]]:
-    """The reportability watch's running clock of each complaint (its binding deadline), as a dated item."""
+def _watch_clocks(db, control_db, tenant_id, ids: set[str] | None, now, reminder_hours: int) -> dict[str, list[dict]]:
+    """The reportability watch's running clock of each complaint (its binding deadline), as a dated item (``ids``:
+    these complaints only; None: every one)."""
     from backend.app.reportability import markets
     from backend.app.reportability import service as reportability
 
     out: dict[str, list[dict]] = {}
     for item in reportability.watch(db, control_db, tenant_id, show="open", page_size=10_000, today=now)["items"]:
         binding = item.get("binding")
-        if str(item["id"]) not in ids or not binding or not binding.get("due_at"):
+        if (ids is not None and str(item["id"]) not in ids) or not binding or not binding.get("due_at"):
             continue
         due_at = datetime.fromisoformat(binding["due_at"])
         market = binding.get("market")
@@ -443,6 +444,90 @@ def _watch_clocks(db, control_db, tenant_id, ids: set[str], now, reminder_hours:
             }
         )
     return out
+
+
+# The list views of the new navigation (0.10.74, Release C part C2): each a filter of the one complaint list, read from
+# the same dated items, watch, requests and signatures as the complaint page, Home and Oversight. "open" is filtered by
+# the list itself (the complaint's status in the QMS).
+LIST_VIEWS = ("open", "due-week", "legal-week", "reportability", "waiting-reporter", "my-approval", "signed-month")
+WEEK_HOURS = 7 * 24
+
+
+def list_view(db, control_db, tenant_id, view: str, me: str) -> dict[str, str]:
+    """The complaints of a list view (``view`` other than "open"), each with the moment it is ordered by: its nearest
+    deadline (soonest first), or, for "signed-month", its latest signature (newest first)."""
+    from backend.app.communications.service import open_requests
+    from backend.app.db.models.authority_reports import ReportObligation, ReportSnapshot
+    from backend.app.db.models.complaint_disposition import ComplaintDisposition
+    from backend.app.db.models.market_assessment import ComplaintMarketAssessment
+    from backend.app.reportability import service as reportability
+
+    now = service.now_utc()
+    found: dict[str, str] = {}
+
+    def keep(complaint_id, moment) -> None:
+        key, at = str(complaint_id), moment.isoformat() if hasattr(moment, "isoformat") else str(moment or "")
+        if key not in found or (at and (not found[key] or at < found[key])):
+            found[key] = at
+
+    if view in ("due-week", "legal-week"):
+        views, context = _item_views(db, control_db, tenant_id, now)
+        items = [item for item in views if item["complaint_id"]]
+        # The watch's provisional clock of a market not assessed yet, as the complaint page lists it (complaint_work).
+        dated = {
+            (item["complaint_id"], item["market"]) for item in items if item["category"] in ("REPORTING", "OBLIGATION")
+        }
+        for key, clocks in _watch_clocks(
+            db, control_db, tenant_id, None, now, context["settings"]["reminder_hours"]
+        ).items():
+            items += [{**clock, "complaint_id": key} for clock in clocks if (key, clock["market"]) not in dated]
+        for item in items:
+            soon = item["hours_left"] <= WEEK_HOURS
+            if view == "due-week" and soon and item["state"] != rules.OVERDUE:
+                keep(item["complaint_id"], item["due_at"])
+            elif view == "legal-week" and soon and item["category"] in ("REPORTING", "OBLIGATION"):
+                keep(item["complaint_id"], item["due_at"])
+    elif view == "reportability":
+        for item in reportability.watch(db, control_db, tenant_id, show="open", page_size=10_000, today=now)["items"]:
+            keep(item["id"], (item.get("binding") or {}).get("due_at") or "")
+    elif view == "waiting-reporter":
+        for row in open_requests(db, tenant_id):
+            if row.complaint_id:
+                keep(row.complaint_id, row.reply_due_on or "")
+    elif view == "my-approval":
+        # A report snapshot waiting for approval that this person did not prepare; in a trial the owner may approve
+        # their own as practice ("Practice approval: in a pilot a colleague approves this").
+        practice = _trial(control_db, tenant_id)
+        for snapshot, complaint_id in (
+            db.query(ReportSnapshot, ReportObligation.complaint_id)
+            .join(ReportObligation, ReportObligation.id == ReportSnapshot.obligation_id)
+            .filter(ReportSnapshot.tenant_id == tenant_id, ReportSnapshot.state == "PENDING")
+        ):
+            if practice or snapshot.requested_by != me:
+                keep(complaint_id, snapshot.requested_at)
+    elif view == "signed-month":
+        zone = service.calendar_from(service.settings_view(service.settings_row(db, tenant_id))).tz
+        local = now.astimezone(zone)
+        start = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        signed = [
+            db.query(ComplaintMarketAssessment.complaint_id, ComplaintMarketAssessment.signed_at).filter(
+                ComplaintMarketAssessment.tenant_id == tenant_id, ComplaintMarketAssessment.signed_at >= start
+            ),
+            db.query(ComplaintDisposition.complaint_id, ComplaintDisposition.signed_at).filter(
+                ComplaintDisposition.tenant_id == tenant_id, ComplaintDisposition.signed_at >= start
+            ),
+            db.query(EventClosure.complaint_id, EventClosure.signed_at).filter(
+                EventClosure.tenant_id == tenant_id, EventClosure.signed_at >= start
+            ),
+            db.query(ReportObligation.complaint_id, ReportSnapshot.approved_at)
+            .join(ReportObligation, ReportObligation.id == ReportSnapshot.obligation_id)
+            .filter(ReportSnapshot.tenant_id == tenant_id, ReportSnapshot.approved_at >= start),
+        ]
+        for query in signed:
+            for complaint_id, at in query:
+                key = str(complaint_id)
+                found[key] = max(found.get(key, ""), at.isoformat())
+    return found
 
 
 def _staffing(everyone: list[dict], role: str) -> str | None:
@@ -884,6 +969,9 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     refs |= {d.authorized_by_ref for d in found["decisions"]}
     if found["record"] is not None:
         refs |= {found["record"].completed_by, found["record"].triage_owner}
+    refs.add(complaint.service_owner)
+    refs |= {v.created_by for versions in found["assessments"].values() for v in versions}
+    refs |= {s.requested_by for s in found["snapshots"]}
     names = _names(control_db, tenant_id, refs)
     record = closure.decision_record(control_db, found, row, names)
     signed_print = row.content_fingerprint if row is not None else None
@@ -891,6 +979,7 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     work = complaint_work(db, control_db, tenant_id, [complaint])[str(complaint.id)]
     nearest = work["due"][0] if work["due"] else None
     state = _event_state(complaint, items, row)
+    signers = _signers(control_db, tenant_id, me, bool(found["cases"]))
     product = _products(db, tenant_id).get(complaint.product_id)
     version, lot = _version_and_lot(db, tenant_id, complaint)
     return {
@@ -945,6 +1034,8 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
         if row is not None and row.ready_state
         else None,
         "decision_record": record,
+        # The linked service work (0.10.71, A5): its reference, owner and status; it never moves the complaint.
+        "service": service_work.view(complaint, names),
         "you_are_owner": owner == me,
         "people": [{"id": p["id"], "name": p["name"]} for p in service.people(control_db, tenant_id)],
         "reason_min": closure.REASON_MIN,
@@ -953,7 +1044,52 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
         # The owner, stage, next action and dated items the lists and My work show for it (0.10.68).
         "work": work,
         # Who may sign each step, before the work starts (7.8).
-        "signers": _signers(control_db, tenant_id, me, bool(found["cases"])),
+        "signers": signers,
+        # Who prepared, who may approve and who approved the decision record's work (0.10.71, A6); apart from the
+        # record so its fingerprint is unchanged.
+        "record_people": _record_people(found, row, names, signers, me, bool(_practice(control_db, tenant_id))),
+        # The page's Related (0.10.74, C2): the records linked to the complaint, in plain lines.
+        "related": record_page.related(
+            db, found, complaint, names, service_work.view(complaint, names), work["markets"]
+        ),
+    }
+
+
+def _record_people(found: dict, row, names: dict, signers: dict, me: str, trial: bool) -> dict:
+    from backend.app.workflow.approvals import PRACTICE_APPROVAL
+
+    """Separation of duties, shown honestly (0.10.71, A6): who prepared the event's work (the triage record, the
+    market assessments, the reports asked for approval), who may approve it (the market conclusions and the reports)
+    and who approved (every signature). Working alone in a trial one person is all three: practice approval."""
+
+    def named(refs) -> list[str]:
+        found_names: list[str] = []
+        for ref in refs:
+            name = names.get(ref or "")
+            if ref and name and name not in found_names:
+                found_names.append(name)
+        return found_names
+
+    record = found["record"]
+    versions = [v for items in found["assessments"].values() for v in items]
+    prepared = named(
+        [record.completed_by if record is not None and record.completed_at else None]
+        + [v.created_by for v in versions]
+        + [s.requested_by for s in found["snapshots"]]
+    )
+    may = [p for code in ("MARKETS", "OBLIGATIONS") for p in (signers.get(code) or {}).get("people", [])]
+    approved = named(
+        [v.signed_by for v in versions if v.signed_at is not None]
+        + [s.approved_by for s in found["snapshots"] if s.approved_at is not None]
+        + [d.signed_by for d in found["dispositions"] if d.signed_at is not None]
+        + [row.signed_by if row is not None and row.signed_at else None]
+    )
+    alone = {p["id"] for p in may} == {me}
+    return {
+        "prepared_by": prepared,
+        "may_approve": list(dict.fromkeys(p["name"] for p in may)),
+        "approved_by": approved,
+        "practice_note": PRACTICE_APPROVAL if trial and alone else None,
     }
 
 
@@ -981,6 +1117,33 @@ def _practice(control_db, tenant_id) -> str | None:
     from backend.app.reportability import markets
 
     return markets.PRACTICE_LABEL if _trial(control_db, tenant_id) else None
+
+
+@router.get("/latest-signed")
+def latest_signed(
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The newest record the signed-in person signed in this organization (Records leads with it, 0.10.74), or
+    ``{"record": null}``."""
+    tenant_id = _tenant(ctx)
+    me = str(ctx.user_id)
+    return {"record": record_page.latest_signed(db, tenant_id, me, lambda refs: _names(control_db, tenant_id, refs))}
+
+
+@router.get("/events/{complaint_id}/activity")
+def event_activity(
+    complaint_id: str,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The complaint page's Activity (0.10.74): the complaint's own audit events, newest first, in plain words."""
+    tenant_id = _tenant(ctx)
+    complaint = _complaint(db, tenant_id, complaint_id)
+    found = closure.facts(db, tenant_id, complaint)
+    return record_page.activity(db, found, complaint, lambda refs: _names(control_db, tenant_id, refs))
 
 
 @router.get("/events/{complaint_id}")
@@ -1040,6 +1203,51 @@ def send_step(
     _audit(db, ctx, "COMPLAINT_STEP_SENT", "Complaint", complaint.id, step=body.step, to=person["id"])
     db.commit()
     return {"task_id": str(task.id), "to": person["name"], "title": task.title}
+
+
+class ServiceBody(BaseModel):
+    reference: str = Field(max_length=service_work.REFERENCE_MAX * 2)
+    status: str = Field(max_length=20)
+    owner_id: str | None = Field(default=None, max_length=64)
+
+
+@router.put("/events/{complaint_id}/service", dependencies=[WRITERS])
+def record_service(
+    complaint_id: uuid.UUID,
+    body: ServiceBody,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The complaint's linked service work (0.10.71, A5): its reference in the customer's service system, its owner and
+    status, dated now. It changes nothing else: the complaint, its assessments and its checklist stay as they are."""
+    tenant_id = _tenant(ctx)
+    complaint = _complaint(db, tenant_id, complaint_id)
+    reference, status = " ".join(body.reference.split()), body.status.strip().upper()
+    owner = (body.owner_id or "").strip() or None
+    people = {item["id"] for item in service.people(control_db, tenant_id)}
+    problem = service_work.problem(reference, status, owner, people)
+    if problem:
+        raise _error(422, "SERVICE_INVALID", problem)
+    before = {
+        "reference": complaint.service_reference,
+        "status": complaint.service_status,
+        "owner": complaint.service_owner,
+    }
+    complaint.service_reference, complaint.service_owner = reference, owner
+    if status != complaint.service_status or complaint.service_status_at is None:
+        complaint.service_status, complaint.service_status_at = status, service.now_utc()
+    _audit(
+        db,
+        ctx,
+        "COMPLAINT_SERVICE_RECORDED",
+        "Complaint",
+        complaint.id,
+        before=before,
+        after={"reference": reference, "status": status, "owner": owner},
+    )
+    db.commit()
+    return event_view(db, control_db, tenant_id, complaint, str(ctx.user_id))
 
 
 STEP_TITLES = {

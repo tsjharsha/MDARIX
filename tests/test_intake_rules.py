@@ -122,7 +122,8 @@ def test_provisional_deadlines_by_tier():
     remedial = rules.provisional_deadlines(NOW, ["US"], rules.FLAGGED, today, remedial=True)
     assert remedial[0]["days"] == 5 and remedial[0]["day_basis"] == "WORK"
     unflagged = {d["market"]: d["days"] for d in rules.provisional_deadlines(NOW, [], rules.UNFLAGGED, today)}
-    assert unflagged == {"US": 30, "EU_NI": 15, "GB": 15, "IN": 15}
+    # Canada (0.10.76): 30 days for an incident that could cause serious deterioration if it recurred.
+    assert unflagged == {"US": 30, "EU_NI": 15, "GB": 15, "IN": 15, "CA": 30}
 
 
 def test_both_clocks_and_the_delay():

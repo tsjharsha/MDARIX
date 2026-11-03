@@ -176,7 +176,7 @@ function OpenScene() {
         <Field x={308} y={190} w={204} label="Work email *" value="you@company.com" />
         <Button x={308} y={240} w={204} text="Request free trial" />
         <text x="410" y="290" fontSize="9" textAnchor="middle" fill={C.muted}>
-          30 days · 3 users · no credit card
+          30 days · your team · no credit card
         </text>
       </g>
       <Pointer x={146} y={188} />
@@ -279,7 +279,7 @@ function TeamScene() {
   return (
     <Frame
       address="mdarix.com/app · Getting started"
-      label="Your team: enter a colleague's name and work email, then Invite colleague, twice"
+      label="Your team: enter a colleague's name and work email, choose their persona, then Send the invitation, twice"
     >
       <rect x="24" y="52" width="512" height="262" rx="12" fill={C.surface} stroke={C.line} />
       <text x="44" y="78" fontSize="9" fontWeight="700" fill={C.teal} letterSpacing="1">
@@ -330,7 +330,7 @@ function TeamScene() {
       <line x1="306" y1="70" x2="306" y2="296" stroke={C.line} />
       <Field x={326} y={96} w={190} label="Colleague's name" value="Colleague 2" />
       <Field x={326} y={140} w={190} label="Work email" value="colleague@company.com" />
-      <Button x={326} y={188} w={190} text="Invite colleague" focus />
+      <Button x={326} y={188} w={190} text="Send the invitation" focus />
       <text x="326" y="246" fontSize="9.5" fill={C.muted}>
         They set their own password from the
       </text>

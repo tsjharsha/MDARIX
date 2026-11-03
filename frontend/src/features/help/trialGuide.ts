@@ -12,7 +12,6 @@ export type GuideStep = {
   key: JourneyKey;
   title: string;
   /** About how long the step takes. */
-  time: string;
   /** Why this step, in one sentence. */
   why: string;
   /** What to do, in order. */
@@ -29,7 +28,7 @@ export const STORY_CHAPTERS = 10;
 
 export const TRIAL_FACTS: readonly [string, string][] = [
   ["30 days", "free, no credit card"],
-  ["3 people", "you and two colleagues"],
+  ["Your team", "as many colleagues as you need, up to 50"],
   ["5,000 rows", "of your own data, 2 MB a file"],
   [`${STORY_CHAPTERS} chapters`, "a story on sample data, routine complaints first"],
 ];
@@ -38,7 +37,6 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
   {
     key: "open",
     title: "Open MDARIX and request your trial",
-    time: "3 minutes",
     why: "Your request tells us your devices and markets, so your workspace starts ready for you.",
     actions: [
       "Before you start, have an authenticator app on your phone (Microsoft Authenticator, Google Authenticator, 1Password or similar): every account uses two-factor sign-in (MFA), set up at your first sign-in.",
@@ -54,7 +52,6 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
   {
     key: "sign-in",
     title: "Activate your account and sign in",
-    time: "5 minutes",
     why: "Your password is yours alone: MDARIX stores only a salted hash of it, so no one at MDARIX can read it, and it never sends one.",
     actions: [
       "Open the invitation email and choose the activation link (valid for 48 hours).",
@@ -69,12 +66,11 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
   {
     key: "team",
     title: "Invite two colleagues",
-    time: "2 minutes",
     why: "Quality work is a team sport: a complaint handler and a regulatory colleague see the value from their own side.",
     actions: [
       "In Getting started, open the Team tab below the story.",
-      "Enter your colleague's name and work email, then choose Invite colleague.",
-      "Repeat for the second colleague. The trial has three seats: you and two others.",
+      "Enter your colleague's name and work email, choose their persona (it is their role), then choose Send the invitation.",
+      "Repeat for the second colleague: for example a Regulatory Leader, who may approve the reports you prepare.",
       "If an invitation is not found, choose Resend invitation beside the colleague's name.",
     ],
     result:
@@ -84,7 +80,6 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
   {
     key: "sample",
     title: "Experience MDARIX on the sample data",
-    time: "45 to 60 minutes",
     why: "The sample is a fictional manufacturer built from the pain points inspectors keep finding, so every screen has something to show from the first minute.",
     actions: [
       "At the top of Getting started, tick what FDA, a notified body or your own audit cited you for: the story starts with those chapters.",
@@ -106,7 +101,6 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
   {
     key: "own-data",
     title: "Upload your own data",
-    time: "30 minutes",
     why: "The same checks then run on your records, and that is where MDARIX shows what it would find in your own quality system.",
     actions: [
       "Open Import data (or the Your data tab in Getting started): it opens on Complaints.",
@@ -122,7 +116,6 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
   {
     key: "feedback",
     title: "Share your feedback",
-    time: "3 minutes",
     why: "Your feedback decides what we build next, and it is read by the people who build MDARIX.",
     actions: [
       "Open Share feedback in the menu (MDARIX also invites you from day 3, or once you have uploaded your own data).",
@@ -135,7 +128,6 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
   {
     key: "demo",
     title: "Book your one-to-one demo",
-    time: "2 minutes",
     why: "In a one-to-one session the MDARIX team walks through what your trial found and how a pilot on your live data would run.",
     actions: [
       "In Getting started, choose Book a one-to-one demo, under the story's chapters.",

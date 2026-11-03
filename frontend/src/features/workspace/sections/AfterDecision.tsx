@@ -753,7 +753,12 @@ export function ClosureCriteria({ check, state }: { check: ClosureCheck | null; 
 export function AfterDecisionDashboardPanel() {
   const { session } = useWorkspace();
   const canWork = useCan("investigation.work");
-  const allowed = sectionAllowed("Investigations", session?.allowed_menu, session?.business_permissions);
+  const allowed = sectionAllowed(
+    "Investigations",
+    session?.allowed_menu,
+    session?.business_permissions,
+    session?.sample_only,
+  );
   if (!canWork || !allowed) return null;
   return <AfterDecisionDashboard />;
 }

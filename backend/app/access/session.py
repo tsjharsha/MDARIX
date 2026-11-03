@@ -6,7 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from access_control.personas import get_persona
+from access_control.personas import (
+    WORKSPACE_PERSONAS,
+    get_persona,
+    persona_for_role,
+    workspace_persona,
+)
 from access_control.policy import PermissionSet, Role, User, effective_permissions
 from backend.app.db.models.customer_lifecycle import Customer
 from backend.app.db.models.foundation import (
@@ -22,7 +27,7 @@ from backend.app.db.models.foundation import (
     TenantPlanAssignment,
 )
 from backend.app.db.session import get_db
-from backend.app.access.schemas import RoleSwitch
+from backend.app.access.schemas import PersonaSwitch, RoleSwitch
 from backend.app.access.authz import _authenticated_user, _is_customer_admin, _is_platform_admin
 from backend.app.access.permissions import normalize_role, permissions_for_roles, role_of_user, roles_of_user
 from backend.app.cell_link import licence_state
@@ -291,9 +296,97 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         "feature_set": for_tenant(db, user.tenant_id),
         # classic or new (tenants.navigation, set in Tenant 360): the workspace's navigation; nothing shows it yet.
         "navigation": (tenant.navigation if tenant is not None else None) or "classic",
+        # An evaluation on the sample only (tenants.sample_only, 0.10.71): the screens hide every upload and import
+        # action and offer "Discuss a pilot"; the import routes refuse it (403 SAMPLE_ONLY_TRIAL).
+        "sample_only": bool(tenant.sample_only) if tenant is not None else False,
         # A cell's licence: VALID, GRACE, EXPIRED (read-only), SUSPENDED, or NONE outside a cell.
         "licence": licence_state(db, user.tenant_id),
+        # "Viewing as" (0.10.73, C1): the persona the workspace opens on, whether the person may change it (the trial
+        # owner only), its tabs, and every persona's label and tabs for the switch. A view, never a permission.
+        **persona_state(db, user),
     }
+
+
+def owns_trial(db: Session, user) -> bool:
+    """The person who started this free trial, while it is one (a pilot's people get their real role's screens)."""
+    from backend.app.trial.service import trial_subscription
+    from backend.app.trial.team import is_trial_owner
+
+    return trial_subscription(db, user.tenant_id) is not None and is_trial_owner(db, user.tenant_id, user)
+
+
+def persona_of(db: Session, user, owner: bool) -> str:
+    """The trial owner's chosen persona (Admin until they choose); anyone else's is their real role's: the persona the
+    owner gave a colleague while it still matches the colleague's role, else the role's own."""
+    chosen = None
+    try:
+        chosen = workspace_persona(user.view_persona) if user.view_persona else None
+    except ValueError:
+        chosen = None
+    if owner:
+        return chosen.code if chosen else "admin"
+    role = normalize_role(role_of_user(db, user))
+    if chosen is not None and chosen.code != "admin" and chosen.role == role:
+        return chosen.code
+    return persona_for_role(role)
+
+
+def persona_state(db: Session, user) -> dict:
+    owner = owns_trial(db, user)
+    persona = workspace_persona(persona_of(db, user, owner))
+    return {
+        "persona": persona.code,
+        "persona_label": persona.label,
+        "persona_locked": not owner,
+        "persona_tabs": list(persona.tabs),
+        "persona_options": [
+            {"code": item.code, "label": item.label, "sub": item.sub, "tabs": list(item.tabs)}
+            for item in WORKSPACE_PERSONAS
+        ],
+    }
+
+
+@router.post("/me/persona")
+def switch_persona(payload: PersonaSwitch, http_request: Request, db: Session = Depends(get_db)):
+    """The trial owner views MDARIX as another persona; it is kept for their next sign-in. It changes what they see,
+    never what they may sign: their role, and every route's guard, stay as they are. Anyone else's persona is their
+    real role (403 PERSONA_LOCKED): an invited colleague's is set by the trial owner, a pilot user's by their role."""
+    from backend.app.enterprise_audit import make_audit_event
+
+    user = _authenticated_user(http_request, db)
+    if not owns_trial(db, user):
+        raise HTTPException(
+            403,
+            detail={
+                "code": "PERSONA_LOCKED",
+                "message": "Your persona is your role, set by the trial owner. Ask them to change it.",
+            },
+        )
+    try:
+        persona = workspace_persona(payload.persona)
+    except ValueError:
+        raise HTTPException(422, detail={"code": "UNKNOWN_PERSONA", "message": "Choose one of the personas listed"})
+    before = persona_of(db, user, True)
+    if before != persona.code:
+        now = datetime.now(timezone.utc)
+        user.view_persona = persona.code
+        user.updated_at = now
+        db.add(
+            make_audit_event(
+                tenant_id=user.tenant_id,
+                actor_ref=str(user.id),
+                action="PERSONA_VIEW_CHANGED",
+                entity_type="AuthUser",
+                entity_id=user.id,
+                details={"persona": persona.code, "previous_persona": before, "role": user.role, "role_changed": False},
+                old_values={"view_persona": before},
+                new_values={"view_persona": persona.code},
+                request=http_request,
+                created_at=now,
+            )
+        )
+        db.commit()
+    return persona_state(db, user)
 
 
 @router.post("/me/active-role")

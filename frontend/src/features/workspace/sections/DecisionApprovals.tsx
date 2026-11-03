@@ -242,7 +242,12 @@ export function ApprovalsPanel({ onOpen }: { onOpen: (row: QueueRow) => void }) 
 export function DecisionsDashboardPanel() {
   const { session } = useWorkspace();
   const canSign = useCan("decision.sign");
-  const allowed = sectionAllowed("Decisions", session?.allowed_menu, session?.business_permissions);
+  const allowed = sectionAllowed(
+    "Decisions",
+    session?.allowed_menu,
+    session?.business_permissions,
+    session?.sample_only,
+  );
   if (!canSign || !allowed) return null;
   return <DecisionsDashboard />;
 }

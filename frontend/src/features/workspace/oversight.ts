@@ -217,7 +217,48 @@ export type EventView = {
   };
   /** Who may sign each step, before the work starts (0.10.68, 7.8). */
   signers?: Record<string, { people: Person[]; you: boolean; second_person: boolean }>;
+  /** The linked service work (0.10.71, A5); it never closes or advances the complaint. */
+  service?: ServiceWork | null;
+  /** Who prepared, who may approve and who approved the event's work (0.10.71, A6). */
+  record_people?: { prepared_by: string[]; may_approve: string[]; approved_by: string[]; practice_note: string | null };
+  /** The records linked to the complaint, for the page's Related (0.10.74, C2). */
+  related?: RelatedGroup[];
 };
+
+/** One kind of record linked to a complaint, in plain lines (backend/app/oversight/record_page.py related). */
+export type RelatedGroup = {
+  key: "communications" | "assessments" | "service" | "investigations" | "reports" | "decisions";
+  label: string;
+  count: number;
+  lines: string[];
+  items?: Array<{ id: string; ref: string }>;
+};
+
+/** One line of a complaint's Activity: its own audit event, or (from_record) the record's own received time. */
+export type ActivityItem = {
+  at: string | null;
+  title: string;
+  who: string | null;
+  reason: string | null;
+  from_record?: boolean;
+};
+
+export type ServiceStatus = "OPEN" | "IN_PROGRESS" | "COMPLETE";
+export type ServiceWork = {
+  reference: string;
+  owner_id: string | null;
+  owner_name: string | null;
+  status: ServiceStatus;
+  status_label: string;
+  status_at: string | null;
+  /** "Service complete · Quality assessment open" once complete. */
+  header: string | null;
+};
+export const SERVICE_STATUSES: Array<[ServiceStatus, string]> = [
+  ["OPEN", "Open"],
+  ["IN_PROGRESS", "In progress"],
+  ["COMPLETE", "Complete"],
+];
 
 export type Filters = { product: string; market: string; category: string; show: "attention" | "all" };
 export const NO_FILTERS: Filters = { product: "", market: "", category: "", show: "attention" };

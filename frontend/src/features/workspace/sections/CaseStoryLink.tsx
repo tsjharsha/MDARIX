@@ -23,7 +23,8 @@ export function CaseStoryLink({
   const id = typeof investigationId === "string" ? investigationId.trim() : "";
   if (!workspace || !id) return null;
   const { session, work, open } = workspace;
-  if (!sectionAllowed("Trust & Audit", session?.allowed_menu, session?.business_permissions)) return null;
+  if (!sectionAllowed("Trust & Audit", session?.allowed_menu, session?.business_permissions, session?.sample_only))
+    return null;
   const go = () => {
     if (id !== work.investigationId && work.investigations.some((item) => String(item.id) === id))
       work.setInvestigationId(id);

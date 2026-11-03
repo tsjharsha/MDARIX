@@ -14,7 +14,7 @@ import {
 import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { formatDate, useResource } from "../../customer-admin/shared";
 import { deadlineLabel, formatDay } from "../../../app/dates";
-import { investigationRequestFor, useCan, useOpenInvestigation, useTabParam } from "../workspaceContext";
+import { investigationRequestFor, useCan, useNavigation, useOpenInvestigation, useTabParam } from "../workspaceContext";
 import { recordId } from "../complaintReview";
 import { owesWorksheet, reportsTab } from "../authorityReports";
 import {
@@ -218,6 +218,7 @@ export function WatchCard({
 }) {
   const canDecide = useCanDecide();
   const openInvestigation = useOpenInvestigation();
+  const navigation = useNavigation();
   const state = watchStateOf(item.state);
   const request = investigationRequestFor(item);
   const name = recordId(item);
@@ -335,7 +336,7 @@ export function WatchCard({
             {item.state === "DECIDED" ? "Open the assessment" : "Assess per market"}
           </button>
         )}
-        {onReports && owesWorksheet(item.markets) && (
+        {onReports && owesWorksheet(item.markets, navigation) && (
           <button type="button" className="ac-secondary" onClick={onReports} aria-label={`${name}: report worksheets`}>
             <ClipboardList size={15} aria-hidden="true" /> Report worksheet
           </button>

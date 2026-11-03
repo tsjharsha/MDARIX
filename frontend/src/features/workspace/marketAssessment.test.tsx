@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { questionNumber } from "../../app/labels";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { MarketPanel, SignedVersion, TrainingPanel, WHY_ASSESSED, otherMarketLine } from "./sections/MarketAssessment";
 import {
@@ -185,7 +186,7 @@ describe("the per-market assessment rules", () => {
     });
     expect(marketChip({ ...base, state: "REPORTABLE", suggested: null, filed: true }).tone).toBe("good");
     expect(marketChip({ ...base, market: "EU_NI", state: "NOT_STARTED", suggested: null, filed: false }).label).toBe(
-      "EU/NI: not assessed",
+      "EU and Northern Ireland: not assessed",
     );
   });
 
@@ -257,12 +258,67 @@ describe("the assessment screen", () => {
     expect(toggles).toHaveLength(QUESTIONS.length);
     expect(toggles[0]).toContain('aria-expanded="false"');
     const controls = /aria-controls="([^"]+)"/.exec(toggles[0] ?? "")?.[1];
-    expect(html).toContain(`<p id="${controls}" class="ac-muted" hidden="">Definition of US1</p>`);
+    expect(html).toContain(`<div id="${controls}" hidden=""><p class="ac-muted">Definition of US1</p>`);
     expect(html.split("Show definition").length - 1).toBe(QUESTIONS.length);
     // Read-only: the answers are disabled, the toggle is not.
     const readOnly = render(<MarketPanel detail={detail(item())} item={item()} onSaved={vi.fn()} />, []);
     expect(readOnly).toMatch(/<input type="radio" disabled=""/);
     expect(readOnly).not.toMatch(/uw-ma-definition-toggle"[^>]*disabled/);
+  });
+
+  it("shows only the judgement questions to answer; the record's facts wait for Confirm (0.10.72, B1)", () => {
+    const facts = item({
+      draft: version({ answers: {} }),
+      evaluation: { suggested: "REPORTABLE", report_type: "US_30_DAY", notes: [] },
+      suggestions: {
+        US1: {
+          answer: "NO",
+          source: "From the complaint record: no death was reported",
+          evidence: "Patient outcome fields",
+        },
+      },
+      training: [{ ...item().training[0], state: "CURRENT", held_version: "US-starter-1" }],
+    });
+    const html = render(<MarketPanel detail={detail(facts)} item={facts} onSaved={vi.fn()} />);
+    // The fact: suggested with its source and a Confirm, no radios for it; the judgement question: radios.
+    expect(html).toContain("<strong>Suggested: No</strong> · From the complaint record: no death was reported");
+    expect(html).toContain(">Confirm</button>");
+    expect(html).not.toContain('name="answer-US1"');
+    expect(html).toContain('name="answer-US5"');
+    // Revealed on request: the full scale, the evidence ticks, the definitions.
+    expect(html).toMatch(/<ol id="[^"]+" class="uw-ma-levels" hidden="">/);
+    expect(html).toMatch(/class="uw-ma-evidence" aria-label="Evidence relied on" hidden=""/);
+    expect(html).toContain("Show scale");
+    // Training read: one line.
+    expect(html).toContain("You have read: US guide v1 · ");
+    expect(questionNumber("X1")).toBe("Extra 1");
+    expect(questionNumber("US2A")).toBe("2a");
+    expect(html).not.toContain("Before you sign");
+    // The conclusion is never pre-selected, even with a suggestion.
+    expect(html).not.toMatch(/name="conclusion-US" checked=""/);
+    expect(html).toContain("Reportable (the suggestion)");
+  });
+
+  it("records a confirmed answer as confirmed, and shows how the signed answers came", () => {
+    const body = draftBody({
+      answers: { US1: { answer: "NO", rationale: "From the complaint record", evidence: [], origin: "CONFIRMED" } },
+      harm: { level: "", term: "", reason: "" },
+      disagreementReason: "",
+    });
+    expect(body.answers.US1.confirmed).toBe(true);
+    const signed = version({
+      conclusion: "REPORTABLE",
+      signed_by: "Asha",
+      signed_at: "2026-11-02T10:00:00+00:00",
+      answers: {
+        US1: { answer: "NO", rationale: "From the complaint record", evidence: [], origin: "CONFIRMED" },
+        US4: { answer: "NO", rationale: "Checked: in specification.", evidence: [], origin: "CORRECTED" },
+        US5: { answer: "YES", rationale: "Wrong reading.", evidence: [], origin: "ENTERED" },
+      },
+    });
+    expect(render(<SignedVersion version={signed} complaintId="c1" onSaved={vi.fn()} />)).toContain(
+      "Answers: 1 confirmed from the complaint record, 1 corrected from the record&#x27;s suggestion, 1 entered.",
+    );
   });
 
   it("lets a non-trial organization sign without the practice training, and still record it", () => {

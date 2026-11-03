@@ -167,7 +167,12 @@ function SignalBody({
 }) {
   const { session, work, open, notify } = useWorkspace();
   const canCreateCase = useCan("investigation.create");
-  const casesAllowed = sectionAllowed("Investigations", session?.allowed_menu, session?.business_permissions);
+  const casesAllowed = sectionAllowed(
+    "Investigations",
+    session?.allowed_menu,
+    session?.business_permissions,
+    session?.sample_only,
+  );
   const [mode, setMode] = useState<ActionMode | null>(null);
   const [starting, setStarting] = useState(false);
   const [created, setCreated] = useState<CreatedCase | null>(null);
