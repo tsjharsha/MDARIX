@@ -316,7 +316,9 @@ export function HomeStory({ story }: { story: Resource<OneStory> }) {
         <h2 id="home-story-title">
           {run.complaint.ref} is {harm}
           {country ? ` in ${country}` : " with no incident country"}.
-          {clock ? ` Its ${clock.key.endsWith(":facts") && !clock.market ? "shortest possible " : ""}clock ends ${dueDay(clock)}.` : ""}
+          {clock
+            ? ` Its ${clock.key.endsWith(":facts") && !clock.market ? "shortest possible " : ""}clock ends ${dueDay(clock)}.`
+            : ""}
         </h2>
         {run.complaint.description && (
           <blockquote className="uw-entrance-words">“{run.complaint.description}”</blockquote>

@@ -87,7 +87,6 @@ export const headline = (text: string | null | undefined, max = 140) => {
   return words.length > max ? `${words.slice(0, max - 1).trimEnd()}…` : words;
 };
 
-
 /** One chip per market's legal deadline, then one per kind of the organization's own target (a triage target, a
  * reply due), each the nearest. */
 export function deadlineChips(due: NonNullable<EventView["work"]>["due"]) {
@@ -599,9 +598,7 @@ function Rail({
 }) {
   const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
   const lanes = legalLanes(view);
-  const clocked = new Set(
-    (view.work?.due ?? []).filter((item) => isLegalDeadline(item)).map((item) => item.market),
-  );
+  const clocked = new Set((view.work?.due ?? []).filter((item) => isLegalDeadline(item)).map((item) => item.market));
   const without = (view.work?.markets ?? []).filter((market) => !clocked.has(market)).map(marketLabel);
   const code = blocked[0]?.code ?? "READY";
   const signers = view.signers?.[code];

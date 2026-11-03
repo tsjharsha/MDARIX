@@ -383,7 +383,11 @@ def test_an_export_carries_the_form_version_the_starter_mark_and_the_practice_la
     docx = user.get(f"{REPORTS}/{finished['id']}/worksheet.docx")
     assert docx.status_code == 200
     text = "\n".join(paragraph.text for paragraph in Document(io.BytesIO(docx.content)).paragraphs)
-    assert "Form FDA 3500A (09/2025)" in text and "Starter, for your consultant to confirm" in text and "Practice record" in text
+    assert (
+        "Form FDA 3500A (09/2025)" in text
+        and "Starter, for your consultant to confirm" in text
+        and "Practice record" in text
+    )
     assert "MDARIX NEVER SUBMITS" in text
 
 

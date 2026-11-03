@@ -4,14 +4,7 @@ import { useResource } from "../../customer-admin/shared";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { IMPORTED_SOURCE } from "../complaintList";
 import { TEAM_PATH } from "./TrialTeam";
-import {
-  chanceText,
-  trendCountText,
-  trendPath,
-  trendResultLabel,
-  type TrendBoard,
-  type TrendItem,
-} from "../signalAi";
+import { chanceText, trendCountText, trendPath, trendResultLabel, type TrendBoard, type TrendItem } from "../signalAi";
 import {
   STORY_STEPS,
   openStep,
