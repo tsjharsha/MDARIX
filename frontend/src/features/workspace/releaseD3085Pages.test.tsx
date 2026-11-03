@@ -1,0 +1,98 @@
+// 0.10.85, round D3 "Polish to 9.5": the record pages, rendered from the server's answers.
+import { renderToStaticMarkup } from "react-dom/server";
+import type { ReactNode } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
+import { ComplaintPage } from "./sections/ComplaintPage";
+import { ONE_STORY_PATH, type StoryRun } from "./oneStory";
+import { eventPath } from "./oversight";
+import { rv11 } from "../../test/rv11";
+
+const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
+vi.mock("../customer-admin/shared", async (original) => ({
+  ...(await original<typeof import("../customer-admin/shared")>()),
+  useResource: (path: string | null) => {
+    const value = (path && resources.data[path.split("?")[0]]) ?? null;
+    return { state: "ready", data: value, reload: () => undefined };
+  },
+}));
+
+beforeEach(() => {
+  resources.data = {};
+});
+
+const api = (overrides: Partial<WorkspaceApi> = {}) =>
+  ({
+    session: { user_id: "u1", business_permissions: ["records.write", "signal.triage"] },
+    work: { products: [], investigations: [] },
+    open: vi.fn(),
+    notify: vi.fn(),
+    navigation: "new",
+    isTrial: true,
+    persona: "admin",
+    ...overrides,
+  }) as unknown as WorkspaceApi;
+
+const render = (node: ReactNode, value: WorkspaceApi = api()) =>
+  renderToStaticMarkup(<WorkspaceContext.Provider value={value}>{node}</WorkspaceContext.Provider>);
+
+const LABELS = ["The call", "Triage", "Tree", "Decide", "Form", "Fill", "Approval", "Submit", "Records", "Trends"];
+const run = (current: number): StoryRun => ({
+  run: "sample",
+  complaint: {
+    id: "c-rv11",
+    ref: "SAMPLE-RV-11",
+    description: "",
+    product_id: "p",
+    serious_injury: false,
+    death: false,
+  },
+  market: "US",
+  market_label: "United States (FDA)",
+  conclusion: null,
+  report_id: null,
+  report_stage: null,
+  needs: [],
+  steps: LABELS.map((label, index) => ({ key: label, label, done: index < current, skipped: false })),
+  current,
+  finished: current >= 10,
+});
+
+describe("D3.3 the complaint page is a record with a hero", () => {
+  it("leads with the reporter's words, the harm, one clock line and one Next step; the rest folds", () => {
+    resources.data[eventPath("SAMPLE-RV-11")] = rv11();
+    const html = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />);
+    const hero = html.slice(html.indexOf('class="uw-card uw-highlights"'), html.indexOf("</header>"));
+    expect(hero).toMatch(/<blockquote>“Biomedical engineering/);
+    expect(hero).toContain("No harm reported");
+    expect(hero.match(/ms-chip-deadline/g)).toHaveLength(1);
+    expect(hero).toContain('aria-label="Next step"');
+    // One main button on the page, in the hero.
+    expect(html.match(/class="ac-primary"/g)).toHaveLength(1);
+    expect(hero).toContain('class="ac-primary"');
+    // The checklist, who signs and the service work fold; the words are not said twice.
+    expect(html).toMatch(/<details class="uw-rec-part uw-cp-fold"><summary><h2>Each step, and who signs it/);
+    expect(html).toMatch(/<details class="uw-card uw-card-pad uw-rail-signs uw-cp-fold"/);
+    expect(html).not.toContain("<dt>What happened</dt>");
+    expect(html).not.toContain("Also known as");
+  });
+
+  it("folds the triage form while the story is on another step", () => {
+    const view = rv11();
+    // Triage is the record's next step.
+    view.summary.next_action = {
+      label: "Complete the triage record",
+      detail: "",
+      opens: {
+        label: "",
+        target: { section: "Complaints", tab: "Triage", record: { type: "complaint", id: view.event.complaint_id } },
+      },
+    } as any;
+    resources.data[eventPath("SAMPLE-RV-11")] = view;
+    resources.data[ONE_STORY_PATH] = { sample: run(0), yours: null };
+    const folded = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />);
+    expect(folded).toContain("<summary>Triage record: not complete yet</summary>");
+    resources.data[ONE_STORY_PATH] = { sample: run(1), yours: null };
+    expect(render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />)).not.toContain("Triage record: not complete yet");
+  });
+});

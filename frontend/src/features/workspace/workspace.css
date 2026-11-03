@@ -7579,6 +7579,85 @@ button.uw-org:hover {
   }
 }
 
+/* 0.10.85, D3.3: the complaint page as a record with a hero: the reporter's words beside the one Next step; the
+   checklist, who signs and the service work fold (open at desktop width, folded on a phone). */
+.uw-cp-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+  gap: var(--ms-space-4);
+  align-items: start;
+  margin-top: var(--ms-space-3);
+}
+.uw-cp-words {
+  margin: 0;
+}
+.uw-cp-words blockquote {
+  margin: 0;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border-left: 4px solid var(--ms-teal);
+  border-radius: 0 var(--ms-radius-md) var(--ms-radius-md) 0;
+  background: var(--ms-surface-2, #f4f8f8);
+  color: var(--ms-ink);
+  font-size: var(--ms-fs-18, 18px);
+  line-height: 1.5;
+}
+.uw-cp-words figcaption {
+  margin-top: 6px;
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+}
+.uw-cp-next {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-surface);
+}
+.uw-cp-next h2 {
+  margin: 0;
+  color: var(--ms-teal-dark);
+  font-size: var(--ms-fs-12);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.uw-cp-next p {
+  margin: 0;
+}
+.uw-cp-fold > summary {
+  display: list-item;
+  min-height: 44px;
+  padding: 10px 0;
+  cursor: pointer;
+}
+.uw-cp-fold > summary h2 {
+  display: inline;
+  margin: 0;
+}
+.uw-cp-fold > summary > .ac-muted {
+  display: block;
+  margin-top: 4px;
+}
+.uw-rec-part.uw-cp-fold > summary h2 {
+  font-size: var(--ms-fs-16);
+}
+.uw-cp-fold > summary::marker {
+  color: var(--ms-teal-dark);
+}
+@media (max-width: 760px) {
+  .uw-cp-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .uw-cp-next .ac-primary {
+    justify-self: stretch;
+    justify-content: center;
+  }
+  .uw-cp-words blockquote {
+    font-size: var(--ms-fs-16);
+  }
+}
+
 /* The phone's search: an icon that opens the same search as a bar under the top bar. */
 .uw-search-toggle {
   display: none;

@@ -71,7 +71,7 @@ describe("every record page: one Next step, which is the story's, and one progre
     const html = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />);
     expect(html).toContain('class="uw-story-pill"');
     expect(html).toContain("Step 3 of 10");
-    const rail = html.slice(html.indexOf('aria-label="What to do next"'));
+    const rail = html.slice(html.indexOf('aria-label="Next step"'));
     expect(rail).toContain("Story step 3: the decision tree");
     expect(rail).toContain("Open the tree");
     // One main button on the page, and one progress indicator: the status line, no chevron path.
@@ -88,7 +88,7 @@ describe("every record page: one Next step, which is the story's, and one progre
     };
     const html = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />);
     expect(html).not.toContain("uw-story-pill");
-    expect(html.slice(html.indexOf('aria-label="What to do next"'))).toContain(
+    expect(html.slice(html.indexOf('aria-label="Next step"'))).toContain(
       "<b>Assess the United States (FDA) market</b>",
     );
   });
@@ -203,7 +203,7 @@ describe("the complaint page (D1.7, D1.8)", () => {
     expect(html.match(/Awareness date needed\./g)).toHaveLength(1);
     expect(html).toContain("Incident country asked below");
     expect(html).toContain("Asked below");
-    expect(html).toContain("Asked above");
+    // 0.10.85, D3.3: Details no longer repeats the awareness row the header shows.
   });
 
   it("shows one clock line: whose clock, the time left and the day it ends", () => {

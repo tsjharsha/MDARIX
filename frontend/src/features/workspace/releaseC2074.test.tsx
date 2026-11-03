@@ -210,8 +210,9 @@ describe("the record page: highlights, path, Details · Related · Activity, and
     expect(html).toContain("Complaint · PulseWatch 410 Patient Monitor (Sample) · Rev A");
     expect(html).toContain("<h1");
     expect(html).toContain("SAMPLE-PULSE-410-LOT-002");
-    expect(html).toContain("CMP000038");
-    for (const field of ["Owner", "Markets", "Lot", "Also known as"]) expect(html).toContain(`<dt>${field}</dt>`);
+    // 0.10.85, D3.12: no internal id where the record has a name.
+    expect(html).not.toContain("CMP000038");
+    for (const field of ["Owner", "Markets", "Lot"]) expect(html).toContain(`<dt>${field}</dt>`);
     // The path: each stage as a chevron, the current one marked.
     expect(html).toMatch(/<li class="is-done"[^>]*>.*Triage/);
     expect(html).toMatch(/<li class="is-now" aria-current="step">.*Market assessment/);
@@ -221,7 +222,7 @@ describe("the record page: highlights, path, Details · Related · Activity, and
     expect(html).toContain(">Related<");
     expect(html).toContain(">Activity<");
     // The rail: the next step is the list's and Oversight's next action, one main button.
-    const rail = html.slice(html.indexOf('aria-label="What to do next"'));
+    const rail = html.slice(html.indexOf('aria-label="Next step"'));
     expect(rail).toContain("<b>Assess the United States (FDA) market</b>");
     expect(html.match(/class="ac-primary"/g)?.length).toBe(1);
     // Legal clocks: the work line's nearest deadline, as the list's urgency reads it.
