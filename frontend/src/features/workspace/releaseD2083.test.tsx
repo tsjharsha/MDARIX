@@ -22,6 +22,7 @@ import {
   treeAnswers,
   treeFormOf,
   whyChips,
+  shownOutcome,
   type TreeForm,
 } from "./treeAnswer";
 import type { AssessmentDetail, MarketItem, Question } from "./marketAssessment";
@@ -782,5 +783,17 @@ describe("D2.9: the starter mark only on starter content, in one wording", () =>
     const approved = usItem();
     approved.question_set = { ...approved.question_set, version: "US-v2" };
     expect(show(approved)).not.toContain(STARTER_LABEL);
+  });
+});
+
+describe("D2.3: pending information only once everything is answered", () => {
+  it("says not decided yet while questions are open, and pending once only an Unknown remains", () => {
+    const groups = groupQuestions(US_QUESTIONS);
+    const item = usItem();
+    const some = { answers: { US1: "NO", US5: "UNKNOWN" } as TreeForm["answers"], reasons: {} };
+    expect(shownOutcome("PENDING_INFORMATION", groups, item, some, {})).toBeNull();
+    const all = treeFormOf(usItem({ draft: draft({ ...ANSWERED, US3: "NO", US5: "UNKNOWN" }) }), groups);
+    expect(shownOutcome("PENDING_INFORMATION", groups, item, all, {})).toBe("PENDING_INFORMATION");
+    expect(shownOutcome("REPORTABLE", groups, item, some, {})).toBe("REPORTABLE");
   });
 });

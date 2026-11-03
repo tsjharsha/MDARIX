@@ -14,6 +14,7 @@ import {
   type Suggestion,
 } from "../marketAssessment";
 import {
+  shownOutcome,
   foldedRuns,
   groupQuestions,
   criterion,
@@ -237,9 +238,7 @@ export function MarketTree({
 
   const outcome: Suggestion | null = signed
     ? (latest.current?.conclusion ?? null)
-    : latest.draft
-      ? (latest.evaluation?.suggested ?? null)
-      : null;
+    : shownOutcome(latest.draft ? (latest.evaluation?.suggested ?? null) : null, groups, latest, form, folded);
   const chips = whyChips(item.question_set.questions, form, folded, outcome);
   const runs = foldedRuns(item.question_set.questions, folded);
   const flat = item.question_set.questions;

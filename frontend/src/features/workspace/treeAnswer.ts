@@ -205,3 +205,23 @@ export const runLabel = (ids: string[]) =>
   ids.length === 1
     ? `Q${questionNumber(ids[0])}`
     : `Q${questionNumber(ids[0])}–Q${questionNumber(ids[ids.length - 1])}`;
+
+/** The outcome the card shows: "pending information" only once every question is answered and an Unknown remains;
+ * while questions are still open it is not decided yet (0.10.83, D2.3). */
+export function shownOutcome(
+  suggested: Suggestion | null,
+  groups: QuestionGroup[],
+  item: MarketItem,
+  form: TreeForm,
+  folded: Record<string, string>,
+): Suggestion | null {
+  if (suggested !== "PENDING_INFORMATION") return suggested;
+  const open = groups
+    .flatMap((group) => group.questions)
+    .some((question) => {
+      if (question.extra) return false;
+      const state = questionState(question, item, form, folded);
+      return !state.folded && !state.answer;
+    });
+  return open ? null : suggested;
+}
