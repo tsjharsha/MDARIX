@@ -806,3 +806,34 @@ export function summaryCase(row: Record<string, unknown> | null | undefined, ind
     blocking,
   };
 }
+
+/**
+ * The evidence for and against the leading explanation, each piece once (0.10.72). The server composes it so from
+ * 0.10.72; a brief composed before then also listed every other hypothesis's links, so the same rule reads it here:
+ * only the case's own judgement and the leading hypothesis's links, one entry per evidence (the link says why).
+ */
+export function forAndAgainst(content: Record<string, unknown> | null | undefined): {
+  leading: string | null;
+  supporting: BriefLine[];
+  contradicting: BriefLine[];
+} {
+  const lead = record(content?.leading_hypothesis);
+  const leadId = safeText(lead?.business_id);
+  const seen = new Map<string, { side: "for" | "against"; row: Record<string, unknown> }>();
+  for (const [side, value] of [
+    ["for", content?.supporting_evidence],
+    ["against", content?.contradicting_evidence],
+  ] as const) {
+    for (const row of Array.isArray(value) ? (value as Record<string, unknown>[]) : []) {
+      const hypothesis = safeText(row.hypothesis_business_id);
+      if (hypothesis && leadId && hypothesis !== leadId) continue;
+      const key = safeText(row.evidence_business_id) ?? safeText(row.title) ?? "";
+      const had = seen.get(key);
+      if (had && (had.row.source === "HYPOTHESIS" || row.source !== "HYPOTHESIS")) continue;
+      seen.set(key, { side, row });
+    }
+  }
+  const lines = (side: "for" | "against") =>
+    briefLines([...seen.values()].filter((item) => item.side === side).map((item) => item.row));
+  return { leading: safeText(lead?.statement), supporting: lines("for"), contradicting: lines("against") };
+}

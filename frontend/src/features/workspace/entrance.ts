@@ -1,10 +1,11 @@
 import { tabParts, type Place } from "../../app/linkTable";
 
 /**
- * The five-minute entrance (quality plan stage 8, 8.4): a trial on the new navigation starts with three stories on the
- * sample, and one on the person's own export. Each tile opens its story on the right record; a story bar then shows
- * the step and the way back. Steps are places of the new navigation (linkTable.json newPlaces); the bar shows the last
- * step whose place is on screen.
+ * The entrance (quality plan stage 8, 8.4; 0.10.71, Release A, the first screens): a trial on the new navigation
+ * leads with one event, the short story on SAMPLE-RV-11, and keeps the other stories under "More stories". Each story
+ * opens on its own named record, never a queue. Steps are places of the new navigation (linkTable.json newPlaces);
+ * the short story's progress comes from what was saved on its record (the server's /api/v1/trial/short-story), the
+ * others' bar shows the last step whose place is on screen. No time claims: step counts only, until they are measured.
  */
 export type StoryStep = {
   label: string;
@@ -19,11 +20,10 @@ export type StoryStep = {
 };
 
 export type Scenario = {
-  key: "complaint" | "rising" | "reportable" | "own";
+  key: "short" | "complaint" | "rising" | "reportable";
   title: string;
-  minutes: number;
   lede: string;
-  /** Where the story starts, as a classic place: the table moves it (routeFor). */
+  /** Where the story starts, as a classic place: the table moves it (routeFor). Always a named record. */
   start: Place;
   steps: StoryStep[];
   /**
@@ -35,16 +35,37 @@ export type Scenario = {
 
 export const FLAGSHIP = "SAMPLE-RV-11";
 
+/** The short story (0.10.71, A4): four steps on SAMPLE-RV-11, ending in the intake decision summary. */
+export const SHORT: Scenario = {
+  key: "short",
+  title: "A hospital sent a monitor for service. Should Quality review this too?",
+  lede: "Read the call, decide its route, name the open question and see the intake decision summary.",
+  start: { section: "Complaint", tab: `Summary?ref=${FLAGSHIP}` },
+  record: { complaint: FLAGSHIP },
+  steps: [
+    { label: "Read the call", button: "Decide the route", section: "Complaint", tab: "Summary" },
+    { label: "Decide the route", button: "Confirm the route", section: "Complaint", tab: "Summary" },
+    { label: "Name the open question", button: "Record the question", section: "Complaint", tab: "Summary" },
+    {
+      label: "The intake decision summary",
+      button: "Continue the full evaluation",
+      section: "Complaint",
+      tab: "Summary",
+    },
+  ],
+};
+
+/** The other stories, under "More stories". The flagship's full evaluation follows the short story's summary. */
 export const SCENARIOS: readonly Scenario[] = [
+  SHORT,
   {
     key: "complaint",
     title: "A complaint just arrived: what now?",
-    minutes: 5,
-    lede: "An urgent call from a hospital: check whether it is a complaint, triage it and see its next step.",
-    start: { section: "Complaints", tab: "Triage" },
+    lede: "SAMPLE-URG-01, an urgent call from a hospital: check whether it is a complaint, triage it and see its next step.",
+    start: { section: "Complaints", tab: "Triage?ref=SAMPLE-URG-01" },
     steps: [
       {
-        label: "The triage list: what arrived, and its clock",
+        label: "The urgent call on the triage list, and its clock",
         button: "Open",
         section: "Complaints",
         tab: "To triage",
@@ -56,9 +77,8 @@ export const SCENARIOS: readonly Scenario[] = [
   {
     key: "rising",
     title: "Is a problem rising?",
-    minutes: 5,
     lede: "OrbitCare 300 Rev B: complaints per unit against the earlier average, its investigation and the lots it touches.",
-    start: { section: "Signals", tab: "Trend check" },
+    start: { section: "Signals", tab: "Trend check?product=SAMPLE-ORBIT-300" },
     record: { investigation: "SAMPLE-INV-001" },
     steps: [
       { label: "See Rev B rise against the earlier average", button: "Open", section: "Trends", tab: "Trend check" },
@@ -76,8 +96,7 @@ export const SCENARIOS: readonly Scenario[] = [
   {
     key: "reportable",
     title: "Is this reportable, and by when, in the US and India?",
-    minutes: 5,
-    lede: "A PulseWatch 410 read SpO2 too high; nobody was harmed. Each market's questions, its clock and the report.",
+    lede: "The full evaluation of SAMPLE-RV-11: each market's questions, its clock, the report, the decision and ready to close.",
     start: { section: "Complaint", tab: `Summary?ref=${FLAGSHIP}` },
     record: { complaint: FLAGSHIP, investigation: "escalated" },
     steps: [
@@ -113,15 +132,10 @@ export const SCENARIOS: readonly Scenario[] = [
       },
     ],
   },
-  {
-    key: "own",
-    title: "Try it on your own export",
-    minutes: 5,
-    lede: "Upload your complaints export as it comes from your QMS (Excel or CSV). Optional: the sample stays until you remove it.",
-    start: { section: "Import data" },
-    steps: [{ label: "Upload your export and check it", button: "Check file", section: "Import data" }],
-  },
 ];
+
+/** The stories under "More stories" (every one but the short story the entrance leads with). */
+export const MORE_STORIES = SCENARIOS.filter((item) => item.key !== "short");
 
 /** The step of a story the place on screen is (the last that fits), or -1 when the place is off the story's path. */
 export function storyStep(scenario: Scenario, place: { section: string; tab?: string }): number {

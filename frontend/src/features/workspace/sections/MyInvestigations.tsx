@@ -10,7 +10,12 @@ import { CaseDue, CasePriority, CaseStateBadge } from "./CaseHeader";
 export function MyInvestigationsPanel() {
   const { session } = useWorkspace();
   const canWork = useCan("investigation.work");
-  const allowed = sectionAllowed("Investigations", session?.allowed_menu, session?.business_permissions);
+  const allowed = sectionAllowed(
+    "Investigations",
+    session?.allowed_menu,
+    session?.business_permissions,
+    session?.sample_only,
+  );
   if (!canWork || !allowed) return null;
   return <MyInvestigations />;
 }
@@ -22,7 +27,7 @@ function MyInvestigations() {
   const tiles = myCaseTiles(summary.data);
   const cases = rankMyCases(summary.data?.cases).slice(0, 8);
   const can = (section: WorkspaceSection) =>
-    sectionAllowed(section, session?.allowed_menu, session?.business_permissions);
+    sectionAllowed(section, session?.allowed_menu, session?.business_permissions, session?.sample_only);
   // A role that may not read the summary simply does not see the panel.
   if (summary.state === "forbidden") return null;
   const go = (row: MyCase, section: WorkspaceSection, tab: string) => () => {

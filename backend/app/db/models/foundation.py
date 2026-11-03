@@ -79,6 +79,9 @@ class Tenant(Base):
     # Which navigation the organization's workspace shows: classic (today's menu) or new (stage 7, built behind it).
     # Set by a platform administrator in Tenant 360 (migration tr11navigation); the session context names it.
     navigation: Mapped[str] = mapped_column(String(10), nullable=False, server_default="classic")
+    # An evaluation on the sample only (an event or judge trial, 0.10.71, tr12): every import route refuses it and the
+    # screens offer "Discuss a pilot" instead of an upload. Set by a platform administrator in Tenant 360.
+    sample_only: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     application_version: Mapped[str | None] = mapped_column(String(80))
     schema_version: Mapped[str | None] = mapped_column(String(80))
     configuration_version: Mapped[str | None] = mapped_column(String(80))
@@ -154,6 +157,9 @@ class Product(TenantOwned, Base):
     udi_di: Mapped[str | None] = mapped_column(String(80))
     gmdn_code: Mapped[str | None] = mapped_column(String(10))
     gmdn_term: Mapped[str | None] = mapped_column(String(300))
+    # tr16: the Basic UDI-DI (EU) and the EMDN code; GMDN stays the organization's own code (GMDN is licensed).
+    basic_udi_di: Mapped[str | None] = mapped_column(String(120))
+    emdn_code: Mapped[str | None] = mapped_column(String(30))
     # tr09: IMPLANT, SINGLE_USE, REUSABLE, SOFTWARE, IVD or KIT (backend/app/product_facts.py); null when not known.
     device_category: Mapped[str | None] = mapped_column(String(40))
     # tr09: a single-use product, and the days a unit stays in use after its lot's release (signals/trend_rules.py).
@@ -305,7 +311,17 @@ class Complaint(TenantOwned, Base):
     malfunction: Mapped[bool | None] = mapped_column(Boolean)
     # tr09: the lot identifiers beyond lot_batch_id's of a complaint that names several (a kit's lots), in file order.
     other_lots = mapped_column(JSONB)
+    # tr12 (0.10.71): the service work linked to the complaint: the customer's service ticket (free text), its owner,
+    # its status (OPEN, IN_PROGRESS, COMPLETE) and when that was recorded. It never closes or advances the complaint.
+    service_reference: Mapped[str | None] = mapped_column(String(120))
+    service_owner: Mapped[str | None] = mapped_column(String(255))
+    service_status: Mapped[str | None] = mapped_column(String(20))
+    service_status_at = tz()
     __table_args__ = (
+        CheckConstraint(
+            "service_status IS NULL OR service_status IN ('OPEN','IN_PROGRESS','COMPLETE')",
+            name="complaint_service_status_known",
+        ),
         ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
         ForeignKeyConstraint(
             ["tenant_id", "product_version_id"], ["product_versions.tenant_id", "product_versions.id"]
@@ -796,6 +812,9 @@ class AuthUser(Base):
     mfa_recovery_hashes: Mapped[list | None] = mapped_column(JSONB)
     # md44: the person's email choices; {"weekly_readiness": false} stops the weekly readiness email.
     email_preferences: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
+    # tr13: the workspace persona ("Viewing as", access_control/personas.py WORKSPACE_PERSONAS); a view, never a
+    # permission. Empty: it follows the role.
+    view_persona: Mapped[str | None] = mapped_column(String(40))
     password_changed_at = tz(True)
     password_expires_at = tz(True)
     created_at = tz(False)

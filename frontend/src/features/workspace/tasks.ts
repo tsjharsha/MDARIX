@@ -277,6 +277,9 @@ export function taskDestination(
   }
   // A report snapshot or guide version waiting for approval opens its screen, where the approver approves (J13).
   if (sourceKind(task) === "REPORTSNAPSHOT") {
+    // The report itself (0.10.76): its panel on the classic navigation, its own page on the new one.
+    const report = typeof task.details?.obligation_id === "string" ? task.details.obligation_id : null;
+    if (report) return { section: "Complaints", tab: `Reports?${new URLSearchParams({ report })}` };
     const complaint = typeof task.details?.complaint_id === "string" ? task.details.complaint_id : undefined;
     return { section: "Complaints", tab: reportsTab(complaint) };
   }

@@ -27,6 +27,8 @@ PERMISSIONS = (REGULATORY_REVIEW, REGULATORY_APPROVE)
 RIGHTS = "regulatory approval rights"
 TASK_TYPE = "REGULATORY_REVIEW"
 NO_RIGHTS = "Your role does not approve this"
+# Said at the button wherever a person working alone in a trial approves their own practice work (0.10.71, A6).
+PRACTICE_APPROVAL = "Practice approval: in a pilot a colleague approves this."
 NOBODY = (
     "nobody else in your organization holds them yet: an administrator gives a colleague the Regulatory Reviewer, "
     "Authorized Decision Maker or Leader role"

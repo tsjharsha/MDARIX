@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, CheckCircle2, Clock3, Download, Info, Lightbulb, Signpost } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, Download, Info, Lightbulb, Signpost } from "lucide-react";
 import { BESIDE_YOUR_QMS, PMS_FRAMING } from "./besideYourQms";
 import { AFTER_THE_TRIAL, GUIDE_STEPS, TRIAL_FACTS } from "./trialGuide";
 import {
@@ -103,9 +103,6 @@ export function TrialGuidePage() {
               <div className="tg-step-text">
                 <p className="tg-step-number">
                   Step {index + 1} of {GUIDE_STEPS.length}
-                  <span>
-                    <Clock3 size={13} aria-hidden="true" /> {step.time}
-                  </span>
                 </p>
                 <h2 id={`step-${index + 1}-title`}>{step.title}</h2>
                 <p className="tg-why">{step.why}</p>

@@ -32,7 +32,16 @@ story does not need open, the sample's first-contact tasks due two working days 
 absence to the trial's end) unless they are there (0.10.64), RV-09's ready to close signed again with its checklist
 as it stood, the day after its US report was accepted (0.10.70: it was signed over an empty checklist), and today's wording on sample records written before
 0.10.66 (backend/app/trial/sample_words.py: the RV-08 request named the US questions by code; a follow-up task's
-title listed every question). The sample's dates themselves are brought to today by the
+title listed every question), and SAMPLE-RV-11's linked service work, in progress under its sample service ticket
+(0.10.71, ``seed_flagship_service``) where it has none, and 0.10.72's corrections (backend/app/trial/sample_0_10_72.py:
+SPO2_READING_HIGH's IMDRF Annex A term; the sample guide's example text, its approval re-recorded), and 0.10.73's
+Free Trial plan, whose "up to 3 users" and licensed-user limit read the trial's safety cap (``refresh_plan``), and
+0.10.75's reports: on the new navigation, the report of each US or India conclusion signed reportable before the
+upgrade that has none (backend/app/trial/reports_0_10_75.py; the sample's own reports fit the status path as they are);
+from 0.10.76 the same step covers EU / NI, Great Britain and Canada, so SAMPLE-RV-07's signed EU conclusion gets its
+EU MIR worksheet, once, and 0.10.77's code corrections (backend/app/trial/sample_0_10_77.py: the sample's IMDRF links
+re-recorded to IMDRF Release 2026's most specific terms; the code fields of the sample's frozen reports recorded as
+confirmed by the sample author, with the values they were approved with). The sample's dates themselves are brought to today by the
 hourly "trial-sample-clock" job (backend/app/trial/sample_clock.py) while nobody has worked on the sample. Each trial
 is committed on its own, with an audit event.
 """
@@ -84,6 +93,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.db.models.foundation import LotBatch, Product, ProductVersion
     from sqlalchemy import or_
     from backend.app.signals.hooks import seed_demo_signals
+    from backend.app.trial import reports_0_10_75, sample_0_10_72, sample_0_10_77
     from backend.app.trial.sample_calm import has_calm_story, rerecord_rv09, stage_calm_story
     from backend.app.trial.sample_clock import _absence_to_trial_end
     from backend.app.trial.sample_data import (
@@ -93,6 +103,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
         has_sample_data,
         has_story_examples,
         seed_flagship,
+        seed_flagship_service,
         seed_lot_quantities,
         seed_product_facts,
         seed_story_examples,
@@ -168,6 +179,14 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             old_words = reword_sample(session, tenant_id, apply=False)
             # RV-09 signed ready to close over an empty checklist before 0.10.70 (sample_calm.py).
             rv09_unrecorded = not calm_missing and rerecord_rv09(session, tenant_id, apply=False)
+            # SAMPLE-RV-11's linked service work (0.10.71, A5).
+            service_missing = not flagship_missing and seed_flagship_service(session, tenant_id, apply=False)
+            # 0.10.72: SPO2_READING_HIGH's IMDRF term and the sample guide's example text.
+            corrections = sample_0_10_72.refresh(session, tenant_id, apply=False)
+            # 0.10.75: on the new navigation, the report of a reportable conclusion signed before the upgrade.
+            reports_owed = reports_0_10_75.refresh(session, tenant_id, apply=False)
+            # 0.10.77: the sample's IMDRF links (Release 2026) and its frozen reports' confirmed codes.
+            codes_owed = sample_0_10_77.refresh(session, tenant_id, apply=False)
             if not (
                 story_missing
                 or flagship_missing
@@ -186,6 +205,10 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or facts_missing
                 or old_words
                 or rv09_unrecorded
+                or service_missing
+                or corrections
+                or reports_owed
+                or codes_owed
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -212,6 +235,22 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     ),
                     *([f"today's wording on {old_words} sample records (0.10.66)"] if old_words else []),
                     *(["RV-09's ready to close with its checklist as it stood (0.10.70)"] if rv09_unrecorded else []),
+                    *(["SAMPLE-RV-11's service work, in progress (0.10.71)"] if service_missing else []),
+                    *(
+                        [f"{corrections} sample corrections (0.10.72: an IMDRF term, the guide's example text)"]
+                        if corrections
+                        else []
+                    ),
+                    *(
+                        [f"{reports_owed} authority reports of conclusions signed reportable (0.10.75)"]
+                        if reports_owed
+                        else []
+                    ),
+                    *(
+                        [f"{codes_owed} sample code corrections (0.10.77: IMDRF Release 2026 links, confirmed codes)"]
+                        if codes_owed
+                        else []
+                    ),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -252,6 +291,15 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["reworded"] = reword_sample(session, tenant_id, apply=True)
             if rv09_unrecorded:
                 added["rv09_rerecorded"] = rerecord_rv09(session, tenant_id, apply=True, now=now)
+            if service_missing:
+                added["flagship_service"] = seed_flagship_service(session, tenant_id, apply=True)
+            if corrections:
+                added["corrections_0_10_72"] = sample_0_10_72.refresh(session, tenant_id, apply=True, now=now)
+            if reports_owed:
+                added["reports_0_10_75"] = reports_0_10_75.refresh(session, tenant_id, apply=True, now=now)
+            if codes_owed:
+                # After the reports: a report the step above creates is a draft, never frozen.
+                added["codes_0_10_77"] = sample_0_10_77.refresh(session, tenant_id, apply=True, now=now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,
@@ -270,15 +318,34 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     return results
 
 
+def refresh_plan(db: Session, apply: bool) -> list[str]:
+    """0.10.73: the Free Trial plan's "up to 3 users" and its licensed-user limit of 3 read the trial's safety cap
+    (MDARIX_TRIAL_USER_CAP, default 50). Idempotent; committed with ``apply``."""
+    from backend.app.db.tenant_scope import bind_system
+    from backend.app.trial.service import refresh_plan_limits
+
+    bind_system(db, "refresh the free trial plan's user cap")
+    changes = refresh_plan_limits(db, apply)
+    if apply and changes:
+        db.commit()
+    return changes
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--apply", action="store_true", help="add the story (without it, only list what would change)")
     args = parser.parse_args()
     db = SessionLocal()
     try:
+        plan = refresh_plan(db, args.apply)
         results = refresh(db, args.apply)
     finally:
         db.close()
+    print(
+        f"Free Trial plan: {'changed' if args.apply else 'would change'} {'; '.join(plan)}"
+        if plan
+        else "Free Trial plan: already reads the user cap"
+    )
     for item in results:
         print(f"{item['tenant']:<40} {item['name'][:40]:<40} {item['result']}")
     if not results:

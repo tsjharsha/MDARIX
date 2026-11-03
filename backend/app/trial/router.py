@@ -30,6 +30,7 @@ from backend.app.db.models.foundation import (
     Product,
     Risk,
 )
+from backend.app.db.models.stage2 import OnboardingRequest
 from backend.app.db.session import get_db
 from backend.app import data_import_router, support_access_api
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -39,14 +40,13 @@ from backend.app.trial.service import (
     REQUEST_STATUSES,
     TRIAL_FILE_LIMIT_BYTES,
     TRIAL_ROW_LIMIT,
-    TRIAL_USER_LIMIT,
+    trial_user_cap,
     approve_request,
     decline_request,
     request_queue,
     resend_invitation,
     trial_subscription,
 )
-from backend.app.access.permissions import RECORDS_WRITE, require_permission
 
 router = APIRouter(prefix="/api/v1", tags=["Free trial"])
 
@@ -58,6 +58,12 @@ class DeclineRequest(BaseModel):
 class ColleagueInvite(BaseModel):
     email: str = Field(min_length=3, max_length=254)
     display_name: str = Field(min_length=1, max_length=120)
+    # The colleague's persona, which sets their real role (0.10.73); none named: the Quality Leader (Leader).
+    persona: str | None = Field(default=None, max_length=40)
+
+
+class ColleaguePersona(BaseModel):
+    persona: str = Field(min_length=1, max_length=40)
 
 
 # ------------------------------------------------------------------------------------------- Platform Admin queue
@@ -85,11 +91,18 @@ def list_trial_requests(
     return request_queue(db, status=status, q=q, page=page, page_size=page_size, sort=sort, order=order)
 
 
+class ApproveRequest(BaseModel):
+    # An event or judge trial (0.10.72, Addendum 2): the sample only, set at creation and audited with the approval.
+    sample_only: bool = False
+
+
 @router.post("/platform-admin/trial-requests/{request_id}/approve")
-def approve_trial_request(request_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+def approve_trial_request(
+    request_id: uuid.UUID, request: Request, payload: ApproveRequest | None = None, db: Session = Depends(get_db)
+):
     admin = _require_platform_admin(request, db)
     # The approval also detects the sample's signals (service.approve_request).
-    return approve_request(db, request_id, admin)
+    return approve_request(db, request_id, admin, sample_only=bool(payload and payload.sample_only))
 
 
 @router.post("/platform-admin/trial-requests/{request_id}/decline")
@@ -189,7 +202,7 @@ def trial_status(
         # extension and an open request to move the data into the MVP (backend/app/trial/retention.py).
         "data_deleted_at": retention.deletion_date(db, data, subscription, now).isoformat(),
         "days_left": max(0, int(-(-seconds_left // 86400))),
-        "limits": {"users": TRIAL_USER_LIMIT, "rows": TRIAL_ROW_LIMIT, "file_bytes": TRIAL_FILE_LIMIT_BYTES},
+        "limits": {"users": trial_user_cap(), "rows": TRIAL_ROW_LIMIT, "file_bytes": TRIAL_FILE_LIMIT_BYTES},
         "usage": {"users": int(users or 0), "rows": uploaded},
         # The sample dataset's records (Getting started explains what each part is for).
         "sample": sample,
@@ -238,7 +251,7 @@ for _path, _handler in (
         _path,
         _handler,
         methods=["POST"],
-        dependencies=[Depends(require_permission(RECORDS_WRITE)), Depends(_trial_only)],
+        dependencies=[*data_import_router.IMPORTING, Depends(_trial_only)],
         name=f"trial_alias_{_handler.__name__}",
     )
 
@@ -416,6 +429,77 @@ def restart_sample_story(
                 "message": "The sample story could not be restarted; nothing was changed",
             },
         ) from exc
+
+
+# ------------------------------------------------------------------------------------------- The short story (A4)
+
+
+@router.get("/trial/short-story")
+def short_story(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The short story on SAMPLE-RV-11 for this person (0.10.71, A4): its four steps, done from what was saved on the
+    record, and what the screens show at each (backend/app/trial/short_story.py)."""
+    from backend.app.trial import short_story as story
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return story.progress(data, db, tenant_id, str(ctx.user_id), team.trial_request(db, tenant_id))
+
+
+class ShortStoryMark(BaseModel):
+    step: str = Field(pattern="^(read|question|summary)$")
+    # Step 3 (0.10.72, F2): the request that asks the consequence question, kept with the story.
+    request_id: uuid.UUID | None = None
+
+
+@router.post("/trial/short-story/marks")
+def mark_short_story(
+    payload: ShortStoryMark,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The person's own marks (0.10.71, A4): the call read, and the intake decision summary seen once the route and the
+    open question are recorded. Kept per person on the trial's request; no business record changes."""
+    from backend.app.trial import short_story as story
+
+    _require_trial(db, ctx)
+    tenant_id, me = uuid.UUID(str(ctx.tenant_id)), str(ctx.user_id)
+    request = db.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).with_for_update().first()
+    complaint = story.flagship(data, tenant_id)
+    if request is None or complaint is None:
+        raise HTTPException(
+            404, detail={"code": "NO_SAMPLE_EVENT", "message": "The sample event is not in this workspace"}
+        )
+    if payload.step == "question":
+        asked = story.asked_request(data, tenant_id, complaint, payload.request_id) if payload.request_id else None
+        if asked is None:
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "NOT_THE_QUESTION",
+                    "message": "Record the question to the hospital, with its owner and reply date, first.",
+                },
+            )
+        story.bind_question(request, complaint.id, asked.id)
+        db.commit()
+        return story.progress(data, db, tenant_id, me, request)
+    if payload.step == "summary":
+        current = story.progress(data, db, tenant_id, me, request)
+        if not all(step["done"] for step in current["steps"][1:3]):
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "SUMMARY_NOT_READY",
+                    "message": "Decide the route and name the open question first: the summary rests on them.",
+                },
+            )
+    story.record_mark(request, me, complaint.id, payload.step, story.now_utc())
+    db.commit()
+    return story.progress(data, db, tenant_id, me, request)
 
 
 class TrialFocus(BaseModel):
@@ -966,7 +1050,22 @@ def invite_trial_colleague(
 ):
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
-    return team.invite_colleague(db, tenant_id, _current_user(db, ctx), payload.email, payload.display_name)
+    return team.invite_colleague(
+        db, tenant_id, _current_user(db, ctx), payload.email, payload.display_name, payload.persona
+    )
+
+
+@router.post("/trial/team/{user_id}/persona")
+def change_trial_colleague_persona(
+    user_id: uuid.UUID,
+    payload: ColleaguePersona,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    """The trial owner gives a colleague another persona, and with it the persona's role (backend/app/trial/team.py)."""
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return team.change_colleague_persona(db, tenant_id, _current_user(db, ctx), user_id, payload.persona)
 
 
 @router.post("/trial/team/{user_id}/resend-invitation")

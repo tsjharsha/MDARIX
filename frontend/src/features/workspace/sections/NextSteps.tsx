@@ -47,7 +47,12 @@ function NextSteps({ investigationId }: { investigationId: string }) {
   const [chosen, setChosen] = useState<NextStepOption | null>(null);
   if (options.state === "forbidden") return null;
   const steps = nextStepOptions(options.data);
-  const canOpenInvestigations = sectionAllowed("Investigations", session?.allowed_menu, session?.business_permissions);
+  const canOpenInvestigations = sectionAllowed(
+    "Investigations",
+    session?.allowed_menu,
+    session?.business_permissions,
+    session?.sample_only,
+  );
   const choose = (step: NextStepOption) => {
     if (nextStepForm(step.action) === "brief") {
       open("Investigations", BRIEF_TAB);

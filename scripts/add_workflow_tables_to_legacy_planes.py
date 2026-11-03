@@ -3,7 +3,9 @@
 complaint classifications, signer training), tr02 (complaint dispositions, the decision's root-cause attribution)
 tr04 to tr08 (the trial line's intake, reports, guides, oversight and lot impact tables) and tr09 (a CAPA's QMS
 reference, a lot's expiry date, a product's device category and a complaint's other lots), tr10 (a set-aside import
-row dismissed with a reason) and tr11 (each organization's navigation, classic or new).
+row dismissed with a reason), tr11 (each organization's navigation, classic or new) and tr12 (a sample-only trial,
+a complaint's linked service work) tr13 (each person's workspace persona), tr14 (a cancelled authority report), tr15 (a Canada assessment) and tr16 (a product's Basic UDI-DI and EMDN code, a
+registration's risk class, a responsible party's SRN).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -237,6 +239,61 @@ STEPS = (
         done_sql=(
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
             "AND table_name = 'tenants' AND column_name = 'navigation')"
+        ),
+    ),
+    Step(
+        "tr12",
+        "tr12_trial_sample_only_service.py",
+        "add_sample_only_and_service",
+        (),
+        ("tenants", "complaints"),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'complaints' AND column_name = 'service_status')"
+        ),
+    ),
+    Step(
+        "tr13",
+        "tr13_trial_view_persona.py",
+        "add_view_persona",
+        (),
+        ("auth_users",),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'auth_users' AND column_name = 'view_persona')"
+        ),
+    ),
+    Step(
+        "tr14",
+        "tr14_trial_report_cancelled.py",
+        "allow_cancelled_reports",
+        (),
+        ("report_obligations",),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_report_obligations_state_known' "
+            "AND pg_get_constraintdef(oid) LIKE '%CANCELLED%')"
+        ),
+    ),
+    Step(
+        "tr15",
+        "tr15_trial_canada_market.py",
+        "allow_canada_assessments",
+        (),
+        ("complaint_market_assessments",),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_complaint_market_assessments_market_known' "
+            "AND pg_get_constraintdef(oid) LIKE '%''CA''%')"
+        ),
+    ),
+    Step(
+        "tr16",
+        "tr16_trial_code_lists.py",
+        "add_identity_columns",
+        (),
+        ("products", "product_registrations", "market_responsible_parties"),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'market_responsible_parties' AND column_name = 'srn')"
         ),
     ),
 )

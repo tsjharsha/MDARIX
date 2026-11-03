@@ -459,8 +459,26 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
                 ],
                 "open_signals": signals.get((product_ref, version_ref, problem), []),
                 "_counted": len(bucket["recent"]) + len(bucket["history"]),
+                "_recent_ids": [row.id for row in bucket["recent"]],
             }
         )
+    # The lots of each group's recent complaints (0.10.72, B5: "lots 003-004" in the trend's sentence).
+    wanted = {complaint_id for item in items for complaint_id in item["_recent_ids"]}
+    lot_of = (
+        dict(
+            db.query(Complaint.id, LotBatch.lot_identifier)
+            .join(LotBatch, (LotBatch.tenant_id == Complaint.tenant_id) & (LotBatch.id == Complaint.lot_batch_id))
+            .filter(Complaint.tenant_id == tenant_id, Complaint.id.in_(wanted))
+            .all()
+        )
+        if wanted
+        else {}
+    )
+    for item in items:
+        named = [lot_of[key] for key in item.pop("_recent_ids") if key in lot_of]
+        item["lots"] = sorted(set(named))
+        # How many of the recent complaints each lot has (0.10.77: "003 (4), 004 (4), 005 (1)").
+        item["lot_counts"] = {lot: named.count(lot) for lot in item["lots"]}
     items.sort(
         key=lambda item: (
             trend_rules.RESULT_ORDER[item["result"]],
@@ -490,7 +508,7 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
         "note": (
             "A check beside the count rule, never a verdict: it compares each group's last 30 days with its own "
             "history and, for a version that replaced another, with that version too, and shows the stronger "
-            "comparison; it never raises a trend to review by itself. The result allows for the number of groups checked at "
+            "comparison; it never raises a trend to review by itself. The result allows for the number of groups assessed at "
             "once (the adjusted chance), and an event linked from several records counts once. Where every lot has a "
             "quantity, the comparison follows the units in the field; elsewhere, and for single-use or consumable "
             "products, it counts by calendar days, so a version shipped in growing numbers can show a higher rate for "

@@ -5,6 +5,7 @@ import { errorText, send, useResource } from "../../customer-admin/shared";
 import { formatDateTime, formatDay, isDateOnly } from "../../../app/dates";
 import { useCan, useIsTrial } from "../workspaceContext";
 import { countOf, formatCount } from "./common";
+import { marketLabel } from "../../../app/labels";
 import { EscalateButton } from "./Triage";
 import { ProblemCodeOf } from "./ProblemCode";
 
@@ -612,11 +613,27 @@ export function ImdrfCodes({ problemCode }: { problemCode: string | null }) {
   );
 }
 
+type Registration = {
+  id: string;
+  market: string;
+  registration_type: string;
+  registration_number: string;
+  product_code: string | null;
+  product_code_name?: string | null;
+  body_name: string | null;
+  body_number: string | null;
+  risk_class: string | null;
+};
+
 type ProductProfile = {
   product_id: string;
   udi_di: string | null;
+  basic_udi_di?: string | null;
   gmdn_code: string | null;
   gmdn_term: string | null;
+  emdn_code?: string | null;
+  emdn_term?: string | null;
+  registrations?: Registration[];
 };
 
 /** "UDI-DI 04000000030010 · GMDN 13215 General-purpose infusion pump", or what is missing (exported for its test). A
@@ -631,16 +648,81 @@ export function identityText(profile: Pick<ProductProfile, "udi_di" | "gmdn_code
   return `${udi} · ${gmdn}`;
 }
 
-/** Products with their regulatory identity (G2a): UDI-DI and GMDN, set here by people who may change records. */
+/** The EU identity line (0.10.77): "Basic UDI-DI … · EMDN Z12030101 Infusion pumps", or "" when neither is set. */
+export function euIdentityText(profile: Pick<ProductProfile, "basic_udi_di" | "emdn_code" | "emdn_term">) {
+  return [
+    profile.basic_udi_di ? `Basic UDI-DI ${profile.basic_udi_di}` : "",
+    profile.emdn_code ? `EMDN ${[profile.emdn_code, profile.emdn_term].filter(Boolean).join(" ")}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** The registration kinds and risk classes each market knows (as the server checks them, regulatory_reference.py;
+ * the classes are a starter, for your consultant to confirm). */
+export const REGISTRATION_TYPES: Record<string, readonly string[]> = {
+  US: ["510K", "PMA", "DE_NOVO", "EXEMPT"],
+  EU: ["CE"],
+  NI: ["CE", "UKNI"],
+  GB: ["UKCA", "CE"],
+  CA: ["MDL"],
+  IN: ["CDSCO_LICENCE"],
+  AU: ["ARTG"],
+};
+const EU_CLASSES = ["I", "IIa", "IIb", "III", "A", "B", "C", "D"];
+export const RISK_CLASSES: Record<string, readonly string[]> = {
+  US: ["I", "II", "III"],
+  EU: EU_CLASSES,
+  NI: EU_CLASSES,
+  GB: EU_CLASSES,
+  CA: ["I", "II", "III", "IV"],
+  IN: ["A", "B", "C", "D"],
+};
+const TYPE_LABELS: Record<string, string> = {
+  "510K": "510(k)",
+  PMA: "PMA",
+  DE_NOVO: "De Novo",
+  EXEMPT: "Exempt",
+  CE: "CE mark",
+  UKNI: "UKNI mark",
+  UKCA: "UKCA mark",
+  MDL: "Medical device licence",
+  CDSCO_LICENCE: "CDSCO licence",
+  ARTG: "ARTG entry",
+};
+const NUMBER_LABELS: Record<string, string> = {
+  US: "510(k), PMA or De Novo number",
+  CA: "Licence number",
+  IN: "CDSCO licence number",
+};
+
+/** "US · 510(k) K123456 · FDA product code FRN (Pump, infusion) · Class II" (exported for its test). */
+export function registrationText(item: Registration): string {
+  return [
+    `${item.market} · ${TYPE_LABELS[item.registration_type] ?? item.registration_type} ${item.registration_number}`,
+    item.product_code
+      ? `FDA product code ${item.product_code}${item.product_code_name ? ` (${item.product_code_name})` : ""}`
+      : "",
+    item.body_number ? `${item.market === "GB" ? "Approved" : "Notified"} body ${item.body_number}` : "",
+    item.risk_class ? `Class ${item.risk_class}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** Products with their regulatory identity (G2a; 0.10.77 adds the Basic UDI-DI, the EMDN code and each market's
+ * registration with its risk class), set here by people who may change records. */
 export function ProductIdentityPanel({
   products,
   onOpenReport,
+  title = "Products: UDI-DI and GMDN",
 }: {
   products: { id: string; name: string; product_identifier: string }[];
   onOpenReport?: (importRef: string) => void;
+  title?: string;
 }) {
   return (
-    <Panel title="Products: UDI-DI and GMDN" eyebrow="Regulatory identity" id="product-identity">
+    <Panel title={title} eyebrow="Regulatory identity" id="product-identity">
       {products.length ? (
         <ul className="uw-identity-list">
           {products.slice(0, 20).map((product) => (
@@ -654,6 +736,15 @@ export function ProductIdentityPanel({
   );
 }
 
+const IDENTITY_FIELDS = [
+  ["udi_di", "UDI-DI", 80],
+  ["basic_udi_di", "Basic UDI-DI (EU)", 120],
+  ["gmdn_code", "GMDN code (5 digits, your own)", 10],
+  ["gmdn_term", "GMDN term", 300],
+  ["emdn_code", "EMDN code", 30],
+] as const;
+type IdentityForm = Record<(typeof IDENTITY_FIELDS)[number][0], string>;
+
 function ProductIdentity({
   product,
   onOpenReport,
@@ -662,33 +753,50 @@ function ProductIdentity({
   onOpenReport?: (importRef: string) => void;
 }) {
   const canEdit = useCan("records.write");
-  const profile = useResource<ProductProfile>(
-    `/api/v1/regulatory-reference/products/${encodeURIComponent(product.id)}`,
-  );
+  const path = `/api/v1/regulatory-reference/products/${encodeURIComponent(product.id)}`;
+  const profile = useResource<ProductProfile>(path);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ udi_di: "", gmdn_code: "", gmdn_term: "" });
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState<IdentityForm>({
+    udi_di: "",
+    basic_udi_di: "",
+    gmdn_code: "",
+    gmdn_term: "",
+    emdn_code: "",
+  });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const start = () => {
     const data = profile.data;
-    setForm({ udi_di: data?.udi_di ?? "", gmdn_code: data?.gmdn_code ?? "", gmdn_term: data?.gmdn_term ?? "" });
+    setForm({
+      udi_di: data?.udi_di ?? "",
+      basic_udi_di: data?.basic_udi_di ?? "",
+      gmdn_code: data?.gmdn_code ?? "",
+      gmdn_term: data?.gmdn_term ?? "",
+      emdn_code: data?.emdn_code ?? "",
+    });
     setError("");
     setEditing(true);
   };
-  const save = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const run = async (call: () => Promise<unknown>, fallback: string) => {
     setBusy(true);
     setError("");
     try {
-      await send(`/api/v1/regulatory-reference/products/${encodeURIComponent(product.id)}/identity`, "PUT", form);
-      setEditing(false);
+      await call();
       profile.reload();
+      return true;
     } catch (failure) {
-      setError(errorText(failure, "The identity was not saved."));
+      setError(errorText(failure, fallback));
+      return false;
     } finally {
       setBusy(false);
     }
   };
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (await run(() => send(`${path}/identity`, "PUT", form), "The identity was not saved.")) setEditing(false);
+  };
+  const eu = profile.data ? euIdentityText(profile.data) : "";
   return (
     <li>
       <div className="uw-identity-head">
@@ -700,6 +808,12 @@ function ProductIdentity({
             : profile.state === "error"
               ? "Could not be read."
               : "Reading…"}
+          {eu && (
+            <>
+              <br />
+              {eu}
+            </>
+          )}
         </span>
         {canEdit && profile.data && !editing && (
           <button type="button" className="ac-secondary" onClick={start}>
@@ -709,27 +823,21 @@ function ProductIdentity({
       </div>
       {editing && (
         <form className="uw-identity-form" onSubmit={save}>
-          <label className="ca-field">
-            UDI-DI
-            <input value={form.udi_di} maxLength={80} onChange={(e) => setForm({ ...form, udi_di: e.target.value })} />
-          </label>
-          <label className="ca-field">
-            GMDN code (5 digits)
-            <input
-              value={form.gmdn_code}
-              maxLength={10}
-              inputMode="numeric"
-              onChange={(e) => setForm({ ...form, gmdn_code: e.target.value })}
-            />
-          </label>
-          <label className="ca-field">
-            GMDN term
-            <input
-              value={form.gmdn_term}
-              maxLength={300}
-              onChange={(e) => setForm({ ...form, gmdn_term: e.target.value })}
-            />
-          </label>
+          {IDENTITY_FIELDS.map(([key, label, max]) => (
+            <label key={key} className="ca-field">
+              {label}
+              <input
+                value={form[key]}
+                maxLength={max}
+                inputMode={key === "gmdn_code" ? "numeric" : undefined}
+                onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+              />
+            </label>
+          ))}
+          <p className="ac-muted">
+            GMDN is licensed: MDARIX keeps your own code. The EMDN code is checked against the European Commission's
+            list.
+          </p>
           <div className="ca-action-row">
             <button type="submit" className="ac-primary" disabled={busy}>
               {busy ? "Saving…" : "Save"}
@@ -738,14 +846,313 @@ function ProductIdentity({
               Cancel
             </button>
           </div>
-          {error && (
-            <p className="uw-trial-message is-bad" role="alert">
-              {error}
+        </form>
+      )}
+      {profile.data && (
+        <div className="uw-identity-regs">
+          <strong>Registrations</strong>
+          {profile.data.registrations?.length ? (
+            <ul>
+              {profile.data.registrations.map((item) => (
+                <li key={item.id}>
+                  <span>{registrationText(item)}</span>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="ac-link"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(() => send(`${path}/registrations/${item.id}`, "DELETE"), "It was not removed.")
+                      }
+                    >
+                      Remove
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="ac-muted">
+              None yet: each market's registration, its FDA product code or notified body, and its risk class fill the
+              report forms.
             </p>
           )}
-        </form>
+          {canEdit && !adding && (
+            <button type="button" className="ac-link" onClick={() => setAdding(true)}>
+              Add a registration
+            </button>
+          )}
+          {adding && (
+            <RegistrationForm
+              busy={busy}
+              onCancel={() => setAdding(false)}
+              onSave={async (body) => {
+                if (await run(() => send(`${path}/registrations`, "POST", body), "The registration was not added."))
+                  setAdding(false);
+              }}
+            />
+          )}
+        </div>
+      )}
+      {error && (
+        <p className="uw-trial-message is-bad" role="alert">
+          {error}
+        </p>
       )}
       <RecordOrigin entity="products" recordId={product.id} onOpenReport={onOpenReport} />
     </li>
+  );
+}
+
+function RegistrationForm({
+  busy,
+  onSave,
+  onCancel,
+}: {
+  busy: boolean;
+  onSave: (body: Record<string, string>) => void;
+  onCancel: () => void;
+}) {
+  const [market, setMarket] = useState("US");
+  const [form, setForm] = useState({
+    registration_type: "510K",
+    registration_number: "",
+    product_code: "",
+    body_name: "",
+    body_number: "",
+    risk_class: "",
+  });
+  const classes = RISK_CLASSES[market] ?? [];
+  const body = market === "EU" || market === "NI" || market === "GB";
+  return (
+    <form
+      className="uw-identity-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave({ market, ...form });
+      }}
+    >
+      <label className="ca-field">
+        Market
+        <select
+          value={market}
+          onChange={(event) => {
+            setMarket(event.target.value);
+            setForm({ ...form, registration_type: REGISTRATION_TYPES[event.target.value][0], risk_class: "" });
+          }}
+        >
+          {Object.keys(REGISTRATION_TYPES).map((item) => (
+            <option key={item} value={item}>
+              {marketLabel(item)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="ca-field">
+        Kind
+        <select
+          value={form.registration_type}
+          onChange={(event) => setForm({ ...form, registration_type: event.target.value })}
+        >
+          {REGISTRATION_TYPES[market].map((item) => (
+            <option key={item} value={item}>
+              {TYPE_LABELS[item] ?? item}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="ca-field">
+        {NUMBER_LABELS[market] ?? "Registration or certificate number"}
+        <input
+          value={form.registration_number}
+          maxLength={120}
+          onChange={(event) => setForm({ ...form, registration_number: event.target.value })}
+        />
+      </label>
+      {market === "US" && (
+        <label className="ca-field">
+          FDA product code (3 letters)
+          <input
+            value={form.product_code}
+            maxLength={3}
+            onChange={(event) => setForm({ ...form, product_code: event.target.value })}
+          />
+        </label>
+      )}
+      {body && (
+        <>
+          <label className="ca-field">
+            {market === "GB" ? "Approved body" : "Notified body"}
+            <input
+              value={form.body_name}
+              maxLength={200}
+              onChange={(event) => setForm({ ...form, body_name: event.target.value })}
+            />
+          </label>
+          <label className="ca-field">
+            {market === "GB" ? "Approved body number" : "Notified body number"}
+            <input
+              value={form.body_number}
+              maxLength={20}
+              onChange={(event) => setForm({ ...form, body_number: event.target.value })}
+            />
+          </label>
+        </>
+      )}
+      {classes.length > 0 && (
+        <label className="ca-field">
+          Risk class in this market
+          <select value={form.risk_class} onChange={(event) => setForm({ ...form, risk_class: event.target.value })}>
+            <option value="">Not set</option>
+            {classes.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <p className="ac-muted">Risk classes: starter list, for your consultant to confirm.</p>
+      <div className="ca-action-row">
+        <button type="submit" className="ac-primary" disabled={busy || !form.registration_number.trim()}>
+          Add
+        </button>
+        <button type="button" className="ac-secondary" disabled={busy} onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+type Party = {
+  id: string;
+  market: string;
+  role: string;
+  organisation: string;
+  address: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  srn: string | null;
+};
+const ROLE_LABELS: Record<string, string> = {
+  MANUFACTURER: "Manufacturer",
+  IMPORTER: "Importer",
+  AUTHORISED_REPRESENTATIVE: "Authorised representative",
+  UK_RESPONSIBLE_PERSON: "UK Responsible Person",
+  SPONSOR: "Sponsor",
+  LICENCE_HOLDER: "Licence holder",
+};
+
+/** The organization's responsible party per market and role, with its SRN (0.10.77): the reports' manufacturer,
+ * authorised representative and importer fields. */
+export function ResponsibleParties() {
+  const canEdit = useCan("records.write");
+  const list = useResource<{ parties: Party[] }>("/api/v1/regulatory-reference/responsible-parties");
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({
+    market: "EU",
+    role: "MANUFACTURER",
+    organisation: "",
+    srn: "",
+    address: "",
+    contact_name: "",
+    contact_email: "",
+    contact_phone: "",
+  });
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await send("/api/v1/regulatory-reference/responsible-parties", "PUT", form);
+      setAdding(false);
+      list.reload();
+    } catch (failure) {
+      setError(errorText(failure, "The responsible party was not saved."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const field = (key: keyof typeof form, label: string, max: number) => (
+    <label className="ca-field">
+      {label}
+      <input value={form[key]} maxLength={max} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
+    </label>
+  );
+  return (
+    <Panel title="Responsible parties and SRN" eyebrow="Your organization" source={list}>
+      {list.data?.parties.length ? (
+        <ul className="uw-identity-list">
+          {list.data.parties.map((item) => (
+            <li key={item.id}>
+              <strong>
+                {marketLabel(item.market)} · {ROLE_LABELS[item.role] ?? item.role}
+              </strong>{" "}
+              {item.organisation}
+              {item.srn ? ` · SRN ${item.srn}` : ""}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="ac-muted">
+          None yet. The manufacturer and, outside the EU, the authorised representative fill the EU report's 1.3.
+        </p>
+      )}
+      {canEdit && !adding && (
+        <div className="ca-action-row">
+          <button type="button" className="ac-secondary" onClick={() => setAdding(true)}>
+            Set a responsible party
+          </button>
+        </div>
+      )}
+      {adding && (
+        <form className="uw-identity-form" onSubmit={save}>
+          <label className="ca-field">
+            Market
+            <select value={form.market} onChange={(e) => setForm({ ...form, market: e.target.value })}>
+              {Object.keys(REGISTRATION_TYPES).map((item) => (
+                <option key={item} value={item}>
+                  {marketLabel(item)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ca-field">
+            Role
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+              {Object.entries(ROLE_LABELS).map(([code, label]) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {field("organisation", "Organization", 200)}
+          {field("srn", "Single registration number (SRN, EUDAMED)", 40)}
+          {field("address", "Address", 2000)}
+          {field("contact_name", "Contact", 200)}
+          {field("contact_email", "Contact e-mail", 254)}
+          {field("contact_phone", "Contact phone", 40)}
+          <p className="ac-muted">Setting a market and role again replaces it.</p>
+          <div className="ca-action-row">
+            <button type="submit" className="ac-primary" disabled={busy || !form.organisation.trim()}>
+              Save
+            </button>
+            <button type="button" className="ac-secondary" disabled={busy} onClick={() => setAdding(false)}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+      {error && (
+        <p className="uw-trial-message is-bad" role="alert">
+          {error}
+        </p>
+      )}
+    </Panel>
   );
 }

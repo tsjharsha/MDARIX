@@ -9,7 +9,19 @@ import { Entrance, StoryBar } from "./sections/Entrance";
 
 vi.mock("../customer-admin/shared", async (original) => ({
   ...(await original<typeof import("../customer-admin/shared")>()),
-  useResource: () => ({ state: "ready", data: { home: [], has_sample: false }, reload: () => undefined }),
+  useResource: (path: string | null) => ({
+    state: "ready",
+    data:
+      path && path.includes("/oversight/events/")
+        ? {
+            event: {
+              description:
+                "Biomedical engineering checked a monitor against a reference oximeter: its SpO2 read 4 to 6 points high on two patients. No harm was reported. The monitor is out of use and sent for service.",
+            },
+          }
+        : { home: [], has_sample: false },
+    reload: () => undefined,
+  }),
 }));
 
 const api = (story: string | null = null) =>
@@ -23,29 +35,44 @@ const api = (story: string | null = null) =>
     startStory: vi.fn(),
   }) as unknown as WorkspaceApi;
 
-describe("the five-minute entrance", () => {
-  it("offers the three owner-approved stories and your own export, each about five minutes", () => {
+describe("the entrance", () => {
+  it("leads with one sample event in the reporter's words; the other stories and the restart under More", () => {
     expect(SCENARIOS.map((item) => item.title)).toEqual([
+      "A hospital sent a monitor for service. Should Quality review this too?",
       "A complaint just arrived: what now?",
       "Is a problem rising?",
       "Is this reportable, and by when, in the US and India?",
-      "Try it on your own export",
     ]);
     const html = renderToStaticMarkup(
       <WorkspaceContext.Provider value={api()}>
         <Entrance onRestarted={() => undefined} />
       </WorkspaceContext.Provider>,
     );
-    expect(html.match(/About 5 minutes/g)).toHaveLength(4);
-    expect(html).toContain("Inspection readiness on the sample");
+    expect(html).toContain("A hospital sent a monitor for service. Should Quality review this too?");
+    expect(html).toContain("its SpO2 read 4 to 6 points high on two patients. No harm was reported.");
+    expect(html).toContain("Review this sample event");
+    expect(html).toContain("Fictional manufacturer · Sample data only");
+    expect(html).toContain("Sample event · SAMPLE-RV-11 · 4 steps");
+    // The event comes first, then More stories, then More (with the restart).
+    expect(html.indexOf("Review this sample event")).toBeLessThan(html.indexOf("More stories"));
+    expect(html.indexOf("More stories")).toBeLessThan(html.indexOf("<summary>More</summary>"));
+    // 0.10.71 (A2): your own export is under Help › Try your own data, not a tile.
+    expect(html).not.toContain("Upload your export");
+    // No time claims; step counts only. The readiness numbers are on the manager's My work.
+    expect(html).not.toMatch(/minute/i);
+    expect(html).toContain("3 steps");
+    expect(html).toContain("7 steps");
+    expect(html).not.toContain("Inspection readiness");
   });
 
   it("starts each story on its record, and every step is a place of the new navigation", () => {
     for (const scenario of SCENARIOS) {
       const start = routeFor(scenario.start.section, scenario.start.tab, "mvp", "new");
       expect(NEW_PLACES[start.section], scenario.key).toBeTruthy();
-      // The story's first step is where its tile lands.
-      expect(storyStep(scenario, start), scenario.key).toBe(0);
+      // The story's first step is where its tile lands, on a named record (never a queue).
+      // (The short story's step is what was saved on its record, not the place: shortStory.test.)
+      if (scenario.key !== "short") expect(storyStep(scenario, start), scenario.key).toBe(0);
+      expect(scenario.start.tab ?? "", scenario.key).toMatch(/\?(ref|product)=SAMPLE-/);
       for (const step of scenario.steps) {
         const place = NEW_PLACES[step.section];
         expect(place, step.label).toBeTruthy();

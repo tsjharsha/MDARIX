@@ -4,7 +4,7 @@ import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { SearchBox, Table, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { safeText } from "../../../app/displayId";
 import { roleLabel } from "../../../app/roles";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { useCan, useNavigation, useWorkspace } from "../workspaceContext";
 import {
   CHANGE_REASON_MAX,
   EXCLUSION_REASON_MAX,
@@ -47,6 +47,7 @@ export function CaseScopePanel({
   onChanged?: () => void;
 }) {
   const canEdit = useCan("investigation.work");
+  const navigation = useNavigation();
   const scope = useResource<CaseScope>(scopePath(investigationId));
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState<ScopeSaveResult | null>(null);
@@ -103,7 +104,16 @@ export function CaseScopePanel({
           }}
         />
       )}
-      {versions.length > 0 && <ScopeHistory investigationId={investigationId} versions={versions} />}
+      {versions.length > 0 &&
+        (navigation === "new" ? (
+          // Prior versions are revealed on request on the new navigation (0.10.72, B2).
+          <details className="uw-more">
+            <summary>Scope versions ({versions.length})</summary>
+            <ScopeHistory investigationId={investigationId} versions={versions} />
+          </details>
+        ) : (
+          <ScopeHistory investigationId={investigationId} versions={versions} />
+        ))}
     </>
   );
 }
@@ -132,10 +142,15 @@ function SaveOutcome({ result }: { result: ScopeSaveResult }) {
   );
 }
 
+/** More than this many complaints read as "14 complaints · show". */
+const LONG_LIST = 5;
+
 /** The scope as it stands: each part with its items, and why it last changed. */
-function ScopeView({ scope }: { scope: ScopeVersion }) {
+export function ScopeView({ scope }: { scope: ScopeVersion }) {
   // Lots left out exist only where a lot impact list left one out (a free trial): no empty line elsewhere.
-  const parts = scopeParts(scope).filter((part) => part.key !== "lots_left_out" || part.items.length > 0);
+  // An empty part says nothing (0.10.72: "None" under Markets, Failure modes, Period, Objectives); the question
+  // always shows.
+  const parts = scopeParts(scope).filter((part) => part.key === "question" || part.items.length > 0);
   return (
     <>
       <dl className="ca-facts uw-scope-facts">
@@ -147,6 +162,18 @@ function ScopeView({ scope }: { scope: ScopeVersion }) {
                 <span className="ac-muted">None</span>
               ) : part.key === "question" || part.key === "objectives" || part.key === "period" ? (
                 part.items[0]
+              ) : part.items.length > LONG_LIST ? (
+                <details className="uw-more">
+                  <summary>
+                    {part.items.length} {part.key === "included" || part.key === "excluded" ? "complaints" : "items"} ·
+                    show
+                  </summary>
+                  <ul className="ca-pill-list">
+                    {part.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </details>
               ) : (
                 <ul className="ca-pill-list">
                   {part.items.map((item) => (

@@ -6,7 +6,8 @@ and T-G2c of the trial, MVP G2b and G2c).
   (reportable, or pending with a provisional deadline), keeps the deadline it was given (a rejection never moves it),
   and holds the worksheet's entries made by a person (``entries``: value or confirmation, who and when; values from the
   records are read again each time, never stored as typed). ``state`` is G2b's: DRAFT, CORRECTION_REQUIRED (a draft
-  after a rejection), APPROVED, SUBMITTED_PENDING, ACCEPTED, SUBMITTED_NO_ACK, FOLLOW_UP_DUE, COMPLETE.
+  after a rejection), APPROVED, SUBMITTED_PENDING, ACCEPTED, SUBMITTED_NO_ACK, FOLLOW_UP_DUE, COMPLETE,
+  and CANCELLED (tr14: a later signed conclusion said not reportable).
 - ``report_snapshots``: the worksheet frozen for approval, in versions; approved by a second person with password and
   authenticator code (a signed approval record). Never edited after approval.
 - ``report_submissions``: each attempt as the person records it after submitting outside MDARIX: the route, the
@@ -67,6 +68,8 @@ OBLIGATION_STATES = (
     "SUBMITTED_NO_ACK",
     "FOLLOW_UP_DUE",
     "COMPLETE",
+    # tr14 (0.10.75): a report not yet submitted, cancelled by a later signed "not reportable" conclusion.
+    "CANCELLED",
 )
 SNAPSHOT_STATES = ("PENDING", "APPROVED", "SUPERSEDED")
 SUBMISSION_RESULTS = ("PENDING", "ACCEPTED", "REJECTED", "NO_ACK_EXPECTED")

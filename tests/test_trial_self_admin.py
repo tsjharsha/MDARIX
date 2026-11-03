@@ -98,7 +98,9 @@ def _trial_with_colleague():
     return owner, approval, owner_email, colleague, email
 
 
-def test_the_owner_removes_a_colleague_and_the_seat_is_free_again():
+def test_the_owner_removes_a_colleague_and_the_seat_is_free_again(monkeypatch):
+    # The cap is 50 (0.10.73); a cap of 3 here keeps the full-trial path quick to reach.
+    monkeypatch.setenv("MDARIX_TRIAL_USER_CAP", "3")
     owner, approval, owner_email, colleague, email = _trial_with_colleague()
     tenant_id = approval["tenant_id"]
     pending = f"pending-{uuid.uuid4().hex[:8]}@example.invalid"

@@ -276,15 +276,15 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           "The quality loop MDARIX closes, chapter by chapter: what your records show in each, why inspectors care, and where to try it. Start on the sample data, then on your own export.",
         tasks: [
           {
-            title: "Pick a five-minute story (the new navigation)",
+            title: "Review the sample event (the new navigation)",
             steps: [
-              "On the new navigation a trial opens on four stories, each about five minutes: A complaint just arrived: what now?, Is a problem rising?, Is this reportable, and by when, in the US and India? and Try it on your own export.",
-              "Choose a story. It opens on the sample's own record, and a bar at the top shows the step you are on, with Back to the stories.",
-              "On each screen the main button is the next step; Why am I asked? under each question gives its reason and clause.",
-              "The ten chapters are under Explore all capabilities. Uploading your own export is optional and outside the count.",
+              "On the new navigation a trial opens on one sample event: A hospital sent a monitor for service. Should Quality review this too? It shows the reporter's own words. Choose Review this sample event.",
+              "The short story has 4 steps on SAMPLE-RV-11: read the call, decide its route, name the open question, and the intake decision summary. A bar at the top shows the step you are on; it counts what you saved, not the screen you are on.",
+              "On each screen the main button is the next step; Why am I asked? under each question gives its reason and clause. After the summary, Continue the full evaluation leads to the markets, the report, the decision and ready to close.",
+              "The other stories are under More stories, and Restart the sample story under More. The ten chapters are under Explore all capabilities. Your own export is under Help, Try your own data.",
             ],
             result:
-              "After your first visit the trial opens on My work; The five-minute stories link there brings you back.",
+              "After your first visit the trial opens on My work, with Resume SAMPLE-RV-11 first while the short story is unfinished.",
           },
           {
             title: "Follow the story",
@@ -317,10 +317,10 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             who: "The person who started the trial.",
             steps: [
               "Open the Team tab.",
-              "Fill in Colleague's name and Work email and choose Invite colleague.",
+              "Fill in Colleague's name and Work email, choose their Persona and choose Send the invitation.",
               "For someone who has not activated yet, choose Resend invitation.",
             ],
-            result: "Invitation emailed. The link is valid for 48 hours. A trial includes up to 3 users.",
+            result: "Invitation emailed. The link is valid for 48 hours. A trial includes up to 50 people.",
           },
           {
             title: "Look after your trial team",
@@ -809,7 +809,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Read the trend check",
             steps: [
               "Group By version, By problem code or By complaint type.",
-              "Each row's Result is Significant rise (chance under 1% if nothing changed, allowing for the groups checked at once), Higher than usual (under 5%), In line with history, Too few to assess or History too short. Chance shows the adjusted value, with the group's own value beside it.",
+              "Each row's Result is Significant rise (chance under 1% if nothing changed, allowing for the groups assessed at once), Higher than usual (under 5%), In line with history, Too few to assess or History too short. Chance shows the adjusted value, with the group's own value beside it.",
               "On a rising row with no open trend, choose Raise a trend (PMS / Signal Triage Lead and Leader).",
             ],
             note: "The line under the table names the basis: ISO 13485 8.4 (analysis of data) and EU MDR Art. 88 (trend reporting).",
@@ -1346,10 +1346,10 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Invite colleagues to a free trial",
             who: "The person who started the trial.",
             steps: [
-              "Open Getting started › Team, fill in Colleague's name and Work email and choose Invite colleague.",
+              "Open Team, fill in Colleague's name and Work email, choose their Persona and choose Send the invitation.",
               "There, too, choose Remove from trial when someone leaves, Reset MFA when a colleague lost their authenticator, and decide on Support access.",
             ],
-            note: "A trial includes up to 3 users, each a Leader (Quality Manager). A removed colleague's seat is free again.",
+            note: "A trial includes up to 50 people. Each colleague's persona, chosen when you invite them, is their role: they see its screens and sign as it. A removed colleague's seat is free again.",
           },
           {
             title: "Manage people (customer administrators)",

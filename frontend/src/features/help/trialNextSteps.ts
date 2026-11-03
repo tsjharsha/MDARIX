@@ -51,7 +51,7 @@ export const TRIAL_TO_MVP: readonly TrialToMvpChange[] = [
   },
   {
     aspect: "People",
-    trial: "Up to 3 users",
+    trial: "Up to 50 people, each with the persona you choose",
     mvp: "Your team, each with a workflow role, plus a new role: the Customer Administrator",
   },
   {

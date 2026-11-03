@@ -118,8 +118,9 @@ def test_the_sample_publishes_us_v2_and_holds_a_v3_draft_whose_test_fails(trial)
     # The organization's help text sits beside MDARIX's locked wording (0.10.64), part (c) also with its examples.
     us2a = next(q for q in v2["question_set"]["questions"] if q["id"] == "US2A")
     assert us2a["starter"] is True and us2a["explanation"].startswith("Our procedure (sample QP-08)")
+    # 0.10.72: the examples no longer start "Sample examples:" (the screen reads "Your examples: …" before them).
     assert next(q for q in v2["question_set"]["questions"] if q["id"] == "US2C")["examples"].startswith(
-        "Sample examples"
+        "A cut closed with sutures"
     )
     assert v2["signature"]["meaning"].startswith("I approve your version 2 of the")
     assert v2["test_results"]["failed"] == 0 and v2["test_results"]["current"]

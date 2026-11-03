@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PhoneCall, Upload } from "lucide-react";
 import { Panel } from "../../admin/console/charts";
-import { Table, idColumn, listOf, useResource } from "../../customer-admin/shared";
+import { Table, listOf, useResource } from "../../customer-admin/shared";
 import { displayId } from "../../../app/displayId";
 import { NEW_PLACES } from "../../../app/linkTable";
 import { offeredTab } from "../../../app/featureSet";
@@ -9,39 +9,61 @@ import { chooseCase, sectionAllowed, useCan, useReportedTab, useWorkspace } from
 import { tabParam } from "../workspaceAddress";
 import { renamed } from "../workspaceContext";
 import { parseComplaintListTab } from "../complaintList";
-import { StatusBadge } from "./common";
+import { listTitle } from "./common";
 import { Triage } from "./Triage";
 import { ReportabilityWatch } from "./ReportabilityWatch";
 import { Reports } from "./Reports";
 import { Communications } from "./Communications";
 import { ComplaintList } from "./ComplaintList";
 import { Backlog, SecondLook } from "./Complaints";
-import { ViewChooser } from "./Views";
+import { ListViewPicker } from "./Views";
+import { FirstContact } from "./FirstContact";
+import {
+  COMPLAINT_LIST_VIEWS,
+  INVESTIGATION_VIEWS,
+  SERVER_VIEWS,
+  inInvestigationView,
+  listViewsFor,
+  type InvestigationView,
+} from "../listViews";
+import { CaseDue, CasePriority, CaseStateBadge, ownerText } from "./CaseHeader";
 
-/** The views of the one complaint list (linkTable.json newPlaces): the same complaints, filtered (7.3). */
+/** The views of the one complaint list (linkTable.json newPlaces): the same complaints, filtered (7.3; 0.10.74). */
 export const COMPLAINT_VIEWS = NEW_PLACES.Complaints.tabs;
-export type ComplaintView = (typeof COMPLAINT_VIEWS)[number];
 
 /**
- * Complaints on the new navigation (0.10.68): one list of complaints with views, not 12 tabs. "To triage" first;
- * "Due soon" and "Past target" against the organization's target; "Second look" and "Dismissed" for possible hidden
- * complaints; "Reporting", the one home of the reportability decisions and the authority reports; "Communications";
- * "Investigations"; and "All complaints", the list itself (an extra view: the unfiltered list, with its own filters).
- * "Import your data" and "Log a call" are actions on the list's header. Each complaint opens its own page.
+ * Complaints on the new navigation: one list of complaints with list views, not 12 tabs (0.10.68). From 0.10.74
+ * (Release C part C2) one "List view" choice holds them, the persona's own views first (listViews.ts): the views the
+ * server filters show six columns (Urgency, What happened, Product · version · lot, Markets, Owner, Stage) and one row
+ * action, cards on a phone; stage 7's work queues keep their own screens. "Log a call" and, outside a trial, "Import
+ * your data" are actions on the list's header. Each complaint opens its own page.
  */
 export function ComplaintViews({ tab }: { tab?: string }) {
-  const { open, session } = useWorkspace();
+  const { open, session, isTrial, persona, personaLabel } = useWorkspace();
   const [carried] = useState(() => tab);
-  const [view, setView] = useReportedTab<ComplaintView>(() => offeredTab(tab, COMPLAINT_VIEWS, "To triage"));
+  const { mine, more } = listViewsFor(persona);
+  const [view, setView] = useReportedTab<string>(() => offeredTab(tab, COMPLAINT_LIST_VIEWS, mine[0]));
   // The screens these views came from still name their former tabs (Triage's "Open the reporting clock"): the link
   // table opens each one's new home.
   const go = (classic: string) => open("Complaints", classic);
-  const canImport = sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions);
+  // A trial's own data is under Help › Try your own data (0.10.71), not on the list's header; a pilot keeps it here.
+  const canImport =
+    !isTrial &&
+    sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions, session?.sample_only);
   const canLog = useCan("signal.triage") || useCan("investigation.create") || useCan("quality.review");
   const complaint = tabParam(carried, "complaint");
+  const server = SERVER_VIEWS[view];
   return (
     <>
       <div className="ca-action-row uw-list-actions">
+        <ListViewPicker
+          mine={mine}
+          more={more}
+          active={view}
+          onChange={setView}
+          forLabel={personaLabel ?? undefined}
+          detail={server?.detail ?? QUEUE_DETAIL[view]}
+        />
         {canLog && (
           <button
             type="button"
@@ -57,85 +79,131 @@ export function ComplaintViews({ tab }: { tab?: string }) {
           </button>
         )}
       </div>
-      <ViewChooser views={COMPLAINT_VIEWS} active={view} onChange={setView} label="Complaint views">
-        {view === "To triage" && <Triage onOpenTab={go} />}
-        {view === "Due soon" && <Backlog initial="due_soon" fixed />}
-        {view === "Past target" && <Backlog initial="past_target" fixed />}
-        {view === "Second look" && <SecondLook initial="open" fixed />}
-        {view === "Dismissed" && <SecondLook initial="dismissed" fixed />}
-        {view === "Reporting" && (
-          <>
-            {/* A market assessment's link (part=assess) opens the complaint's assessment; a report's link its reports. */}
-            {(!complaint || tabParam(carried, "part") === "assess") && <ReportabilityWatch onOpenTab={go} />}
-            <Reports complaintId={complaint} />
-          </>
-        )}
-        {view === "Communications" && <Communications key={complaint ?? "all"} complaintId={complaint} />}
-        {view === "Investigations" && <InvestigationList />}
-        {view === "All complaints" && (
-          <ComplaintList
-            eyebrow="Complaints"
-            initialFilters={parseComplaintListTab(renamed(carried, "Complaint list")).filters}
-            work
-          />
-        )}
-      </ViewChooser>
+      {server && <ComplaintList key={view} eyebrow="Complaints" view={{ name: view, code: server.code }} />}
+      {view === "To triage" && <Triage onOpenTab={go} />}
+      {view === "Calls to check" && <FirstContact part="calls" />}
+      {view === "Due soon" && <Backlog initial="due_soon" fixed />}
+      {view === "Past target" && <Backlog initial="past_target" fixed />}
+      {view === "Second look" && <SecondLook initial="open" fixed />}
+      {view === "Dismissed" && <SecondLook initial="dismissed" fixed />}
+      {view === "Reporting" && (
+        <>
+          {/* A market assessment's link (part=assess) opens the complaint's assessment; a report's link its reports. */}
+          {(!complaint || tabParam(carried, "part") === "assess") && <ReportabilityWatch onOpenTab={go} />}
+          <Reports complaintId={complaint} />
+        </>
+      )}
+      {view === "Authority reports" && <Reports complaintId={complaint} />}
+      {view === "Communications" && <Communications key={complaint ?? "all"} complaintId={complaint} />}
+      {view === "Investigations" && <InvestigationList />}
+      {view === "All complaints" && (
+        <ComplaintList
+          eyebrow="Complaints"
+          initialFilters={parseComplaintListTab(renamed(carried, "Complaint list")).filters}
+          work
+        />
+      )}
     </>
   );
 }
 
+/** What each work queue holds, beside the List view choice. */
+const QUEUE_DETAIL: Record<string, string> = {
+  "To triage": "Urgent intakes, flagged calls and records that suggest harm, most urgent first.",
+  "Calls to check": "Calls logged that may be complaints: the first-contact check.",
+  "Due soon": "Open complaints within a week of your target.",
+  "Past target": "Open complaints older than your target.",
+  "Second look": "Records that may be hidden complaints, to confirm or dismiss.",
+  Reporting: "Reportability decisions and authority reports.",
+  "Authority reports": "Every authority report, with its fields, approval and submission.",
+  Communications: "Every message and request with reporters and partners.",
+  Investigations: "Every investigation, across products.",
+  Dismissed: "Records decided as not complaints, with the reason.",
+  "All complaints": "Every complaint, with filters by product, version, lot, problem code, country and status.",
+};
+
 /**
- * Every investigation in the organization, across products (the view Complaints › Investigations, also opened from
- * Trends): a row opens the case page on its own product.
+ * Every investigation in the organization, across products (the Investigations tab's list, 0.10.74; also the view
+ * Complaints › Investigations): a "List view" (open, assigned to me, all) and six columns, Due · Investigation ·
+ * Product · Priority · Owner · Stage, with one action; a row opens the investigation's page on its own product.
  */
 export function InvestigationList() {
-  const { work, open, notify } = useWorkspace();
+  const { work, open, notify, session } = useWorkspace();
   const cases = useResource<any>("/api/v1/data-plane/investigations?limit=500");
+  const [view, setView] = useState<InvestigationView>("Open investigations");
+  const productName = (id: unknown) => work.products.find((item) => item.id === String(id ?? ""))?.name ?? "—";
   const openCase = async (row: any) => {
     const ref = displayId(row, "investigation_identifier");
     if (await chooseCase(work, String(row.business_id ?? row.investigation_identifier ?? row.id)))
-      open("Investigations", "Workspace");
+      open("Investigations", "Summary");
     else notify(`${ref} could not be opened right now.`, "critical");
   };
+  const rows = listOf(cases.data?.records).filter((row: any) => inInvestigationView(row, view, session?.user_id));
   return (
-    <Panel eyebrow="Complaints" title="Investigations" source={cases}>
-      <Table
-        caption="Investigations"
-        rows={listOf(cases.data?.records)}
-        rowKey={(row) => String(row.id)}
-        empty={{
-          title: "No investigations yet",
-          detail: "Open one from a complaint's page or from a trend.",
-          action: (
-            <button type="button" className="ac-secondary" onClick={() => open("Signals", "Trend check")}>
-              See the trends
-            </button>
-          ),
-        }}
-        columns={[
-          idColumn("Investigation", "investigation_identifier"),
-          {
-            key: "question",
-            label: "Question",
-            render: (row) => row.investigation_question ?? "—",
-          },
-          { key: "status", label: "Status", render: (row) => <StatusBadge value={row.workflow_state ?? row.status} /> },
-          {
-            key: "open",
-            label: "",
-            render: (row) => (
-              <button
-                type="button"
-                className="ac-secondary"
-                aria-label={`Open ${displayId(row, "investigation_identifier")}`}
-                onClick={() => void openCase(row)}
-              >
-                Open
+    <>
+      <div className="ca-action-row uw-list-actions">
+        <ListViewPicker
+          mine={INVESTIGATION_VIEWS}
+          active={view}
+          onChange={(next) => setView(next as InvestigationView)}
+          detail={
+            view === "Assigned to me"
+              ? "Open investigations you own."
+              : view === "Open investigations"
+                ? "Every investigation not closed or cancelled, across products."
+                : "Every investigation, closed ones too."
+          }
+        />
+      </div>
+      <Panel eyebrow="Investigations" title={listTitle(view, cases.data ? rows.length : undefined)} source={cases}>
+        <Table
+          caption={view}
+          rows={rows}
+          rowKey={(row) => String(row.id)}
+          empty={{
+            title: view === "All investigations" ? "No investigations yet" : "Nothing in this view",
+            detail: "An investigation opens from a complaint's page or from a trend.",
+            action: (
+              <button type="button" className="ac-secondary" onClick={() => open("Trends", "Trend check")}>
+                See the trends
               </button>
             ),
-          },
-        ]}
-      />
-    </Panel>
+          }}
+          columns={[
+            { key: "due", label: "Due", render: (row) => <CaseDue row={row} /> },
+            {
+              key: "question",
+              label: "Investigation",
+              render: (row) => (
+                <span className="uw-what">
+                  <button type="button" className="ac-link" onClick={() => void openCase(row)}>
+                    <strong>{displayId(row, "investigation_identifier")}</strong>
+                  </button>{" "}
+                  <span className="uw-what-text">{row.investigation_question ?? "No question recorded"}</span>
+                </span>
+              ),
+            },
+            { key: "product", label: "Product", render: (row) => productName(row.product_id) },
+            { key: "priority", label: "Priority", render: (row) => <CasePriority priority={row.priority} /> },
+            { key: "owner", label: "Owner", render: (row) => ownerText(row) },
+            { key: "status", label: "Stage", render: (row) => <CaseStateBadge row={row} /> },
+            {
+              key: "open",
+              label: "",
+              render: (row) => (
+                <button
+                  type="button"
+                  className="ac-secondary"
+                  aria-label={`Open ${displayId(row, "investigation_identifier")}`}
+                  onClick={() => void openCase(row)}
+                >
+                  Open
+                </button>
+              ),
+            },
+          ]}
+        />
+      </Panel>
+    </>
   );
 }

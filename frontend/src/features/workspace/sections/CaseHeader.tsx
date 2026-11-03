@@ -58,7 +58,7 @@ export function CaseDue({ row }: { row: CaseWorkflowFields }) {
 }
 
 /** Who owns the case, when the response names them (never a UUID). */
-const ownerText = (row: Record<string, unknown> | null | undefined) =>
+export const ownerText = (row: Record<string, unknown> | null | undefined) =>
   safeText(row?.owner_name) ?? safeText(row?.owner_display_name) ?? safeText(row?.owner_ref) ?? "No owner recorded";
 
 /**
@@ -106,61 +106,98 @@ export function CaseHeader({
   const label = displayId(current, "investigation_identifier", "Investigation");
   return (
     <>
-      <Panel eyebrow={onSection ? "Investigation" : "Case"} title={label} action={<CaseStateBadge row={current} />}>
-        <p className="uw-case-question">{safeText(current.investigation_question) ?? "No question recorded."}</p>
-        <dl className="ca-facts">
-          <div>
-            <dt>Priority</dt>
-            <dd>
-              <CasePriority priority={current.priority} />
-            </dd>
-          </div>
-          <div>
-            <dt>Due</dt>
-            <dd>
-              <CaseDue row={current} />
-            </dd>
-          </div>
-          <div>
-            <dt>Owner</dt>
-            <dd>{ownerText(current)}</dd>
-          </div>
-        </dl>
-        {onLotImpact && (
-          <p className="uw-li-entry">
-            <button type="button" className="ac-secondary" onClick={onLotImpact}>
-              <Boxes size={15} aria-hidden="true" /> Lot impact: which other lots share the suspect part
-            </button>
-          </p>
-        )}
-        {(transitions.length > 0 || onManage) && (
-          <div className="ca-action-row">
-            {transitions.map((item) => (
-              <button
-                type="button"
-                key={`${item.to}:${item.label}`}
-                className={item.danger || onSection ? "ac-secondary" : "ac-primary"}
-                onClick={() => setTransition(item)}
-              >
-                {item.to === "ON_HOLD" ? (
-                  <Pause size={15} aria-hidden="true" />
-                ) : item.to === "CANCELLED" ? (
-                  <XCircle size={15} aria-hidden="true" />
-                ) : (
-                  <Play size={15} aria-hidden="true" />
-                )}{" "}
-                {item.label}
+      {onSection ? (
+        // The record page's highlights (0.10.74, Release C part C2): the reference, its product, the question, the
+        // chips (state, priority, due), the owner, the complaints and lots in scope and what blocks the decision.
+        <CaseHighlights
+          row={current}
+          label={label}
+          readiness={readiness.data}
+          actions={
+            (transitions.length > 0 || onManage || onLotImpact) && (
+              <div className="ca-action-row">
+                {transitions.map((item) => (
+                  <button
+                    type="button"
+                    key={`${item.to}:${item.label}`}
+                    className="ac-secondary"
+                    onClick={() => setTransition(item)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+                {onManage && (
+                  <button type="button" className="ac-secondary" onClick={onManage}>
+                    <CalendarClock size={15} aria-hidden="true" /> Priority and due date
+                  </button>
+                )}
+                {onLotImpact && (
+                  <button type="button" className="ac-secondary" onClick={onLotImpact}>
+                    <Boxes size={15} aria-hidden="true" /> Lot impact
+                  </button>
+                )}
+              </div>
+            )
+          }
+        >
+          <CaseProgressLine steps={readiness.data ? steps : []} onSection={onSection} />
+        </CaseHighlights>
+      ) : (
+        <Panel eyebrow="Case" title={label} action={<CaseStateBadge row={current} />}>
+          <p className="uw-case-question">{safeText(current.investigation_question) ?? "No question recorded."}</p>
+          <dl className="ca-facts">
+            <div>
+              <dt>Priority</dt>
+              <dd>
+                <CasePriority priority={current.priority} />
+              </dd>
+            </div>
+            <div>
+              <dt>Due</dt>
+              <dd>
+                <CaseDue row={current} />
+              </dd>
+            </div>
+            <div>
+              <dt>Owner</dt>
+              <dd>{ownerText(current)}</dd>
+            </div>
+          </dl>
+          {onLotImpact && (
+            <p className="uw-li-entry">
+              <button type="button" className="ac-secondary" onClick={onLotImpact}>
+                <Boxes size={15} aria-hidden="true" /> Lot impact: which other lots share the suspect part
               </button>
-            ))}
-            {onManage && (
-              <button type="button" className="ac-secondary" onClick={onManage}>
-                <CalendarClock size={15} aria-hidden="true" /> Priority and due date
-              </button>
-            )}
-          </div>
-        )}
-      </Panel>
-      {onSection ? <CaseProgressLine steps={readiness.data ? steps : []} onSection={onSection} /> : null}
+            </p>
+          )}
+          {(transitions.length > 0 || onManage) && (
+            <div className="ca-action-row">
+              {transitions.map((item) => (
+                <button
+                  type="button"
+                  key={`${item.to}:${item.label}`}
+                  className={item.danger ? "ac-secondary" : "ac-primary"}
+                  onClick={() => setTransition(item)}
+                >
+                  {item.to === "ON_HOLD" ? (
+                    <Pause size={15} aria-hidden="true" />
+                  ) : item.to === "CANCELLED" ? (
+                    <XCircle size={15} aria-hidden="true" />
+                  ) : (
+                    <Play size={15} aria-hidden="true" />
+                  )}{" "}
+                  {item.label}
+                </button>
+              ))}
+              {onManage && (
+                <button type="button" className="ac-secondary" onClick={onManage}>
+                  <CalendarClock size={15} aria-hidden="true" /> Priority and due date
+                </button>
+              )}
+            </div>
+          )}
+        </Panel>
+      )}
       <Collapsed when={!!onSection} summary="Each step and the readiness checklist">
         <Panel
           eyebrow="Investigation progress"
@@ -311,6 +348,71 @@ function TransitionDrawer({
         </div>
       </form>
     </Drawer>
+  );
+}
+
+/** The investigation's highlights on the new navigation: one card with its facts, its actions and its path. */
+function CaseHighlights({
+  row,
+  label,
+  readiness,
+  actions,
+  children,
+}: {
+  row: Record<string, any>;
+  label: string;
+  readiness: CaseReadiness | null | undefined;
+  actions: ReactNode;
+  children: ReactNode;
+}) {
+  const { work } = useWorkspace();
+  const product = work.products.find((item) => item.id === String(row.product_id ?? work.productId ?? ""));
+  const scope = useResource<{
+    current?: { included_complaints?: unknown[]; lots?: Array<{ lot_identifier?: string | null }> } | null;
+  }>(row.id ? `/api/v1/investigations/${encodeURIComponent(String(row.id))}/scope` : null);
+  const complaints = scope.data?.current?.included_complaints?.length;
+  const lotNames = (scope.data?.current?.lots ?? []).map((lot) => lot.lot_identifier).filter(Boolean);
+  const lots = lotNames.length > 3 ? `${lotNames.length} lots` : lotNames.join(" · ");
+  const blocking = readinessChecks(readiness).filter(
+    (check) => (check.result === "BLOCKED" || check.result === "PENDING") && check.key !== "decision",
+  );
+  return (
+    <header className="uw-card uw-highlights" aria-label="The investigation at a glance">
+      <div className="uw-hl-top">
+        <div className="uw-hl-title">
+          <p className="ac-eyebrow">Investigation · {product?.name ?? "product not recorded"}</p>
+          <h2>{label}</h2>
+          <p className="uw-cp-what">{safeText(row.investigation_question) ?? "No question recorded."}</p>
+        </div>
+        <div className="uw-cp-chips">
+          <CaseStateBadge row={row} />
+          {row.priority && <CasePriority priority={row.priority} />}
+          <span className="ms-chip">
+            <CaseDue row={row} />
+          </span>
+        </div>
+      </div>
+      <dl className="uw-hl-fields">
+        <div>
+          <dt>Owner</dt>
+          <dd>{ownerText(row)}</dd>
+        </div>
+        <div>
+          <dt>Complaints in scope</dt>
+          <dd>{complaints ?? "—"}</dd>
+        </div>
+        <div>
+          <dt>Lots in scope</dt>
+          <dd className="uw-mono">{lots || "—"}</dd>
+        </div>
+        <div>
+          <dt>Blocking the decision</dt>
+          <dd>{readiness ? (blocking.length ? blocking[0].label : "Nothing") : "…"}</dd>
+        </div>
+      </dl>
+      {actions}
+      {children}
+    </header>
   );
 }
 

@@ -108,7 +108,12 @@ function NoRisks() {
   const workspace = useContext(WorkspaceContext);
   const canImport =
     !!workspace &&
-    sectionAllowed("Import data", workspace.session?.allowed_menu, workspace.session?.business_permissions);
+    sectionAllowed(
+      "Import data",
+      workspace.session?.allowed_menu,
+      workspace.session?.business_permissions,
+      workspace.session?.sample_only,
+    );
   return (
     <>
       <Empty
@@ -588,7 +593,12 @@ function ImportHint() {
   const workspace = useContext(WorkspaceContext);
   const canImport =
     !!workspace &&
-    sectionAllowed("Import data", workspace.session?.allowed_menu, workspace.session?.business_permissions);
+    sectionAllowed(
+      "Import data",
+      workspace.session?.allowed_menu,
+      workspace.session?.business_permissions,
+      workspace.session?.sample_only,
+    );
   return (
     <p className="ac-note">
       Links come from your quality system. Add them there and import the records again

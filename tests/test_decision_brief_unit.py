@@ -418,6 +418,38 @@ def test_supporting_and_contradicting_evidence_of_the_case_and_its_hypotheses():
     assert [item["evidence_business_id"] for item in contradicting] == ["EVD000002"]
 
 
+def test_evidence_for_and_against_the_leading_explanation_lists_each_piece_once():
+    """0.10.72 (addendum): the sample brief listed EVD000001 and EVD000002 twice under supporting (the case's judgement
+    and the leading hypothesis's link) and EVD000002 also under contradicting (its link to the alternative). Root
+    cause: every hypothesis's links were merged into one list beside the case's own. Now: for and against the leading
+    explanation, one entry per evidence; an alternative's links stay on the alternative."""
+    from backend.app.decision_brief import compose
+
+    rows = [
+        {"business_id": "EVD000002", "title": "Inspection", "relationship": "SUPPORTING", "review_status": "ACCEPTED"},
+        {"business_id": "EVD000001", "title": "Change", "relationship": "SUPPORTING", "review_status": "ACCEPTED"},
+        {"business_id": "EVD000003", "title": "Trend", "relationship": "CONTEXTUAL", "review_status": "ACCEPTED"},
+    ]
+    link = lambda relation, evidence, hypothesis: {  # noqa: E731
+        "relation": relation,
+        "evidence_business_id": evidence,
+        "title": evidence,
+        "hypothesis_business_id": hypothesis,
+        "rationale": f"{hypothesis} {relation}",
+        "linked_by": "HUMAN",
+    }
+    links = [
+        link("support", "EVD000001", "HYP000001"),
+        link("support", "EVD000002", "HYP000001"),
+        link("contradict", "EVD000002", "HYP000002"),
+        link("contradict", "EVD000003", "HYP000002"),
+    ]
+    supporting, contradicting = compose.evidence_for_and_against(rows, links, "HYP000001")
+    assert [item["evidence_business_id"] for item in supporting] == ["EVD000002", "EVD000001"]
+    assert all(item["hypothesis_business_id"] == "HYP000001" for item in supporting)
+    assert contradicting == []
+
+
 # ---------------------------------------------------------------------------------------------------- routes
 
 

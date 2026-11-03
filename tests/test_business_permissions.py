@@ -37,6 +37,8 @@ EXEMPT = {
     ("POST", "/api/v1/investigations/decisions/{decision_id}/reviews"): "approval authority + segregation of duties",
     ("POST", "/api/v1/regulatory/documents/{document_id}/status"): "checked in the route: approval permission + SoD",
     ("PUT", "/api/v1/workspace/context"): "the user's own workspace preferences",
+    ("POST", "/api/v1/trial/short-story/marks"): "the person's own progress in the trial's short story (the call "
+    "read, the summary seen; 0.10.71): no business record changes, trial only",
     ("POST", "/api/v1/signer-training/{document_code}/acknowledge"): "the person's own record of reading a document "
     "(T-G40P): every signed-in member acknowledges for themselves, nobody for another",
     ("POST", "/api/v1/workspace/context/reset"): "the user's own workspace preferences",
@@ -45,6 +47,8 @@ EXEMPT = {
     ("POST", "/api/v1/trial/team/{user_id}/resend-invitation"): "trial owner only, checked in the route",
     ("POST", "/api/v1/trial/team/{user_id}/remove"): "trial owner only, own trial's people, checked in the route",
     ("POST", "/api/v1/trial/team/{user_id}/mfa-reset"): "trial owner only, own trial's people, checked in the route",
+    ("POST", "/api/v1/trial/team/{user_id}/persona"): "trial owner only, own trial's people (a colleague's persona "
+    "and with it their role, never the owner's own), checked in the route",
     (
         "POST",
         "/api/v1/trial/support-access/{grant_id}/approve",
@@ -167,6 +171,7 @@ EXEMPT_BUT_SIGNED_IN = {
     ("POST", "/api/v1/support/problems"),
     ("POST", "/api/v1/investigations/{investigation_id}/decision/sign"),
     ("POST", "/api/v1/signer-training/{document_code}/acknowledge"),
+    ("POST", "/api/v1/trial/short-story/marks"),
 }
 
 
@@ -290,7 +295,10 @@ def test_role_permissions(role, allowed):
     assert permissions_for_role(role) == allowed
 
 
-def test_a_viewer_is_refused_on_every_guarded_route():
+def test_a_viewer_is_refused_on_every_guarded_route(monkeypatch):
+    # Under MDARIX_FEATURE_SET=mvp the feature-set gate answers 404 for parked routes before their guard runs (its own
+    # tests: test_feature_set.py). This test checks the guards themselves, so it serves every route.
+    monkeypatch.setenv("MDARIX_FEATURE_SET", "full")
     viewer = _client_with_role("Viewer")
     allowed = []
     for method, path, route in _business_actions():
@@ -308,3 +316,15 @@ def test_an_investigator_passes_the_permission_check():
     investigator = _client_with_role("Investigator")
     response = _call(investigator, "POST", "/api/v1/investigations/{investigation_id}/analysis")
     assert not (response.status_code == 403 and response.json()["detail"].get("code") == "PERMISSION_DENIED")
+
+
+def test_the_deployed_release_is_public_and_says_nothing_else():
+    """0.10.71 (A7): /health/version tells anyone which build is deployed, without a session, and names nothing but
+    the release (no host, database, commit, environment or component)."""
+    from backend.app.version import APP_VERSION
+
+    answer = TestClient(app).get("/health/version")
+    assert answer.status_code == 200
+    assert answer.json() == {"release": f"v{APP_VERSION}"}
+    # The liveness probe's answer is unchanged (the production smoke test reads it as it is).
+    assert TestClient(app).get("/health/live").json() == {"status": "alive"}

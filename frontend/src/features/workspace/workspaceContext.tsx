@@ -38,10 +38,20 @@ export const WORKSPACE_SECTIONS = [
   "Settings",
   "Team",
   "Complaint",
+  // Release C's tabs on the new navigation (0.10.73): one decision tree per market, and the authority reports.
+  "Decision trees",
+  "Reports",
 ] as const;
 
 /** Sections only the new navigation shows. */
-export const NEW_ONLY_SECTIONS: readonly string[] = ["Trends", "Settings", "Team", "Complaint"];
+export const NEW_ONLY_SECTIONS: readonly string[] = [
+  "Trends",
+  "Settings",
+  "Team",
+  "Complaint",
+  "Decision trees",
+  "Reports",
+];
 
 /** Sections that exist only in a free-trial workspace. */
 export const TRIAL_ONLY_SECTIONS: readonly string[] = ["Getting started", "Look ahead", "Next steps"];
@@ -73,6 +83,8 @@ export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   Settings: [],
   Team: [],
   Complaint: ["products"],
+  "Decision trees": ["products"],
+  Reports: ["products"],
 };
 
 export type SessionContext = {
@@ -101,6 +113,15 @@ export type SessionContext = {
   feature_set?: string;
   /** classic or new (tenants.navigation, 0.10.67): the organization's menu (app/linkTable.ts). */
   navigation?: string;
+  /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
+  sample_only?: boolean;
+  /** "Viewing as" (0.10.73): the persona the workspace opens on, whether only the server's role sets it (anyone but
+   * the trial owner), its tabs, and every persona for the switch (access_control/personas.py). */
+  persona?: string;
+  persona_label?: string;
+  persona_locked?: boolean;
+  persona_tabs?: string[];
+  persona_options?: Array<{ code: string; label: string; sub: string; tabs: string[] }>;
 };
 
 export type WorkContext = {
@@ -165,9 +186,13 @@ export type WorkspaceApi = {
   isTrial?: boolean;
   /** The organization's navigation in this workspace: new only under the MVP feature set (app/linkTable.ts). */
   navigation?: Navigation;
-  /** The five-minute story under way (entrance.ts), and starting or ending one (stage 8). */
+  /** The story under way (entrance.ts), and starting or ending one (stage 8). */
   story?: string | null;
   startStory?: (key: string | null) => void;
+  /** "Viewing as" on the new navigation (0.10.73, C1): the persona's code, label and tabs. A view, never a permission. */
+  persona?: string;
+  personaLabel?: string;
+  personaTabs?: readonly string[];
 };
 
 export const WorkspaceContext = createContext<WorkspaceApi | null>(null);
@@ -391,7 +416,8 @@ export function useOpenInvestigation(): ((request: OpenInvestigationRequest) => 
   const canWrite = useCan("records.write");
   const session = value?.session;
   if (!value?.work?.requestOpenInvestigation || !canWrite) return null;
-  if (!sectionAllowed("Investigations", session?.allowed_menu, session?.business_permissions)) return null;
+  if (!sectionAllowed("Investigations", session?.allowed_menu, session?.business_permissions, session?.sample_only))
+    return null;
   return (request) => {
     value.work.requestOpenInvestigation(request);
     value.open("Investigations", "All investigations");
@@ -407,7 +433,10 @@ export function sectionAllowed(
   section: WorkspaceSection,
   allowedMenu: string[] | undefined,
   businessPermissions?: string[],
+  /** A sample-only trial (session `sample_only`, 0.10.71) imports nothing: the server refuses it too. */
+  sampleOnly?: boolean,
 ) {
+  if (sampleOnly && section === "Import data") return false;
   const keys = SECTION_MENU_KEYS[section];
   const permission = SECTION_PERMISSIONS[section];
   // A section that changes data is shown only when the server listed the permission (fail closed).

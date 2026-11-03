@@ -6,7 +6,9 @@ Every upload screen posts here, Getting started in a free trial as Import data e
 validated import is backend/app/trial/imports.py: the whole file is checked first and nothing is written unless every
 row passes, or the uploader chose to set problem rows aside. It needs only the permission to change records.
 Free-trial workspaces keep their row and file limits (TRIAL_POLICY); other workspaces use the workspace policy. Each
-import is audited (TRIAL_DATA_IMPORTED in a trial, DATA_IMPORTED elsewhere, as before).
+import is audited (TRIAL_DATA_IMPORTED in a trial, DATA_IMPORTED elsewhere, as before). A sample-only trial
+(tenants.sample_only, 0.10.71) imports nothing: every route that brings records in (the check, the import, a set-aside
+row's fix and re-process; the trial's aliases too) answers 403 SAMPLE_ONLY_TRIAL (``refuse_sample_only``).
 
 The file is sent as bytes, either as the raw body (``text/csv``) or as the ``file`` field of a multipart form.
 ``date_format`` is ISO (the default), DMY, MDY or AUTO (found from the file, else the organization's usual order);
@@ -28,7 +30,7 @@ from sqlalchemy.orm import Session
 from backend.app import import_lineage, import_quarantine
 from backend.app.access.permissions import RECORDS_WRITE, require_permission
 from backend.app.db.data_plane import get_data_plane_db
-from backend.app.db.models.foundation import AuditEvent
+from backend.app.db.models.foundation import AuditEvent, Tenant
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.business_ids import as_uuid
@@ -37,6 +39,21 @@ from backend.app.trial import imports
 from backend.app.trial.service import trial_subscription
 
 router = APIRouter(prefix="/api/v1/data/import", tags=["Data import"])
+
+SAMPLE_ONLY_TRIAL = "SAMPLE_ONLY_TRIAL"
+SAMPLE_ONLY_MESSAGE = "This evaluation uses the sample only. To try your own data, discuss a pilot."
+
+
+def refuse_sample_only(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)
+) -> None:
+    """A sample-only trial (an event or judge trial, set in Tenant 360) brings no records in: 403, in plain words."""
+    if db.query(Tenant.sample_only).filter(Tenant.id == uuid.UUID(str(ctx.tenant_id))).scalar():
+        raise HTTPException(403, detail={"code": SAMPLE_ONLY_TRIAL, "message": SAMPLE_ONLY_MESSAGE})
+
+
+# Every route that brings records in: the permission to change records, and never in a sample-only trial.
+IMPORTING = [Depends(require_permission(RECORDS_WRITE)), Depends(refuse_sample_only)]
 
 
 def _policy(db: Session, ctx: AuthenticatedRequestContext) -> imports.ImportPolicy:
@@ -161,7 +178,7 @@ def _import_and_audit(
     return result
 
 
-@router.post("/{entity}/check", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+@router.post("/{entity}/check", dependencies=IMPORTING)
 async def check_import(
     entity: str,
     request: Request,
@@ -187,7 +204,7 @@ async def check_import(
     )
 
 
-@router.post("/{entity}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+@router.post("/{entity}", dependencies=IMPORTING)
 async def run_import(
     entity: str,
     request: Request,
@@ -227,7 +244,7 @@ def quarantine_list(
     return import_quarantine.listing(data, uuid.UUID(str(ctx.tenant_id)), status, import_ref)
 
 
-@router.post("/quarantine/{row_id}/reprocess", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+@router.post("/quarantine/{row_id}/reprocess", dependencies=IMPORTING)
 def quarantine_reprocess(
     row_id: uuid.UUID,
     corrected: dict[str, str] = Body(..., embed=True, alias="row"),

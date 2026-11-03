@@ -5,7 +5,13 @@ import { SearchBox, Table, idColumn, listOf, sourceIdColumn, useResource } from 
 import { formatDay } from "../../../app/dates";
 import { sortParams, useServerSort } from "../../../app/tableSort";
 import { displayId } from "../../../app/displayId";
-import { investigationRequestFor, useOpenInvestigation, useTabFilters, useWorkspace } from "../workspaceContext";
+import {
+  investigationRequestFor,
+  sectionAllowed,
+  useOpenInvestigation,
+  useTabFilters,
+  useWorkspace,
+} from "../workspaceContext";
 import { StatusBadge, listTitle } from "./common";
 import { DeadlineChip, HarmChip } from "../../../app/chips";
 import { marketLabel } from "../../../app/labels";
@@ -44,19 +50,32 @@ export function ComplaintList({
   eyebrow = "Signals",
   initialFilters,
   work: sixColumns = false,
+  view,
 }: {
   eyebrow?: string;
   initialFilters?: ComplaintListFilters;
   /** The new navigation's list (0.10.68): six columns, each complaint opening its own page. */
   work?: boolean;
+  /** A list view the server filters (0.10.74, C2: listViews.ts SERVER_VIEWS): its name and code; no filter bar. */
+  view?: { name: string; code: string };
 }) {
-  const { work, open } = useWorkspace();
+  const { work, open, session } = useWorkspace();
+  const canImport = sectionAllowed(
+    "Import data",
+    session?.allowed_menu,
+    session?.business_permissions,
+    session?.sample_only,
+  );
   const openInvestigation = useOpenInvestigation();
   const [filters, setFilters] = useState<ComplaintListFilters>(() => initialFilters ?? EMPTY_COMPLAINT_FILTERS);
   const [page, setPage] = useState(1);
   const { sort, onSort } = useServerSort(() => setPage(1));
-  const list = useResource<any>(`${complaintListPath(filters, page, sortParams(sort))}${sixColumns ? "&work=1" : ""}`);
-  const links = useImdrfLinks(sixColumns ? listOf(list.data?.items).map((row: any) => row.problem_code) : []);
+  const list = useResource<any>(
+    `${complaintListPath(filters, page, sortParams(sort))}${sixColumns || view ? "&work=1" : ""}${
+      view ? `&view=${encodeURIComponent(view.code)}` : ""
+    }`,
+  );
+  const links = useImdrfLinks(sixColumns || view ? listOf(list.data?.items).map((row: any) => row.problem_code) : []);
   const pages = list.data?.pages ?? 1;
   // The filters are part of the address (Complaint list?country=US): a change replaces it, so refresh keeps them.
   const keepFilters = useTabFilters();
@@ -69,43 +88,47 @@ export function ComplaintList({
   return (
     // Named like the other lists, "Complaint list · 4,993": the count after "Complaints in your organization" read as a
     // stray "· 4993" (0.10.43), and it is the count of the filters chosen, not of the whole organization.
-    <Panel eyebrow={eyebrow} title={listTitle("Complaint list", list.data?.total)} source={list}>
-      <ComplaintFilterBar
-        // A new lot filter (cleared, or from a link) starts the lot field afresh.
-        key={filters.lot}
-        filters={filters}
-        data={list.data}
-        products={work.products}
-        onChange={set}
-      />
+    <Panel eyebrow={eyebrow} title={listTitle(view?.name ?? "Complaint list", list.data?.total)} source={list}>
+      {!view && (
+        <ComplaintFilterBar
+          // A new lot filter (cleared, or from a link) starts the lot field afresh.
+          key={filters.lot}
+          filters={filters}
+          data={list.data}
+          products={work.products}
+          onChange={set}
+        />
+      )}
       <Table
-        caption="Complaint list"
+        caption={view?.name ?? "Complaint list"}
         rows={listOf(list.data?.items)}
         rowKey={(row) => String(row.id)}
         empty={
-          hasComplaintFilters(filters)
-            ? {
-                title: "No complaints match these filters",
-                detail: "Clear a filter to see more complaints.",
-                action: (
-                  <button type="button" className="ac-secondary" onClick={() => set(EMPTY_COMPLAINT_FILTERS)}>
-                    Clear the filters
-                  </button>
-                ),
-              }
-            : {
-                title: "No complaints found",
-                detail: "Complaints arrive through imports.",
-                action: (
-                  <button type="button" className="ac-secondary" onClick={() => open("Import data")}>
-                    Import your data
-                  </button>
-                ),
-              }
+          view
+            ? { title: "Nothing in this view", detail: "No complaint matches it today. Choose another list view." }
+            : hasComplaintFilters(filters)
+              ? {
+                  title: "No complaints match these filters",
+                  detail: "Clear a filter to see more complaints.",
+                  action: (
+                    <button type="button" className="ac-secondary" onClick={() => set(EMPTY_COMPLAINT_FILTERS)}>
+                      Clear the filters
+                    </button>
+                  ),
+                }
+              : {
+                  title: "No complaints found",
+                  detail: "Complaints arrive through imports.",
+                  action: canImport ? (
+                    <button type="button" className="ac-secondary" onClick={() => open("Import data")}>
+                      Import your data
+                    </button>
+                  ) : undefined,
+                }
         }
         serverSort={{ sort, onSort, keys: COMPLAINT_SORTS }}
         columns={
-          sixColumns
+          sixColumns || view
             ? workColumns(
                 links,
                 (row) =>

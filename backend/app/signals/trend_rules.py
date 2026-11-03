@@ -315,7 +315,7 @@ def _p(value: float) -> str:
 def _chance(item: Check) -> str:
     text = f"chance of at least this many if nothing changed: {_p(item.p_value)}"
     if item.groups_tested > 1 and item.p_adjusted is not None:
-        text += f" ({_p(item.p_adjusted)} allowing for the {item.groups_tested} groups checked)"
+        text += f" ({_p(item.p_adjusted)} allowing for the {item.groups_tested} groups assessed)"
     return text
 
 

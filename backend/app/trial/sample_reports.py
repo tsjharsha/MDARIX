@@ -80,6 +80,9 @@ US_ENTRIES = {
     "G4": "SAMPLE-510K-0001 (sample)",
     "G8": "SAMPLE-0000000-2026-00001 (sample)",
     "H6_CONCLUSIONS": "Entered in eSubmitter from the IMDRF Annex D release (sample)",
+    # 0.10.77: an initial 3500A needs both health effect codes on the new navigation (forms.CODES_REQUIRED).
+    "H6_CLINICAL": "Entered in eSubmitter from the IMDRF Annex E release (sample)",
+    "H6_IMPACT": "Entered in eSubmitter from the IMDRF Annex F release (sample)",
 }
 IN_ENTRIES = {
     "P1": "{submitted}",
@@ -342,7 +345,7 @@ def stage_sample_reports(
 ) -> dict:
     """Add the sample's report examples (see the module docstring). ``{"created": False, ...}`` when the sample
     story's complaints are missing or the examples are there already."""
-    from backend.app.authority_reports import router
+    from backend.app.authority_reports import forms, router, worksheet
     from backend.app.db.models.foundation import Complaint
     from backend.app.reportability import markets
     from backend.app.trial.sample_decision import sample_author
@@ -385,6 +388,14 @@ def stage_sample_reports(
         )
         us = router.start(db, tenant_id, us_complaint.id, markets.US, author_id, signed_at, SAMPLE_SOURCE)
         us.entries = _entries(US_ENTRIES, author_id, submitted - timedelta(hours=3))
+        # The sample author confirmed the device problem code the approved mapping suggests (0.10.77).
+        us.entries = worksheet.confirm_suggestions(
+            forms.FDA_3500A,
+            router._context(db, control_db, us),
+            us.entries,
+            author_id,
+            (submitted - timedelta(hours=3)).isoformat(),
+        )
         snapshot = router.request_snapshot(db, control_db, us, author_id, submitted - timedelta(hours=2), SAMPLE_SOURCE)
         _approve(db, us, snapshot, approver_id, submitted - timedelta(hours=1))
         attempt = router.record_submission(
