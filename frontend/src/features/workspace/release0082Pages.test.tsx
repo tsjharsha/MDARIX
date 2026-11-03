@@ -215,7 +215,8 @@ describe("the complaint page (D1.7, D1.8)", () => {
         work: {
           ...view.work!,
           due: [
-            { ...due, key: "watch:x:facts", due_label: "Thu 5 Nov 2026, 23:59 IST", hours_left: 72 },
+            // Waiting for the country: no market yet (0.10.84, H3: with a country, the market names the clock).
+            { ...due, key: "watch:x:facts", market: null, due_label: "Thu 5 Nov 2026, 23:59 IST", hours_left: 72 },
             { ...due, key: "triage", category: "TRIAGE", category_label: "Triage target", hours_left: 5 },
           ],
         },
