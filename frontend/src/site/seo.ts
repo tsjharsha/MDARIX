@@ -114,7 +114,7 @@ export const PAGE_META = {
   "/questions/try-complaint-trending-on-your-own-data": {
     title: "Can I try complaint trending on my own data without a demo call? · MDARIX",
     description:
-      "Yes: a free 30-day trial for up to 3 users and 5,000 uploaded rows, sample data first, then your own complaint exports. No demo call, no credit card.",
+      "Yes: a free 30-day trial for up to 50 people and 5,000 uploaded rows, sample data first, then your own complaint exports. No demo call, no credit card.",
   },
   "/questions/does-mdarix-replace-our-qms": {
     title: "Does MDARIX replace our QMS or complaint software? · MDARIX",
@@ -133,7 +133,7 @@ export const PAGE_META = {
   "/trial-agreement": {
     title: "Free trial agreement · MDARIX",
     description:
-      "The terms of the MDARIX 30-day free trial: up to 3 users and 5,000 uploaded rows, no credit card, and what happens to your data when it ends.",
+      "The terms of the MDARIX 30-day free trial: up to 50 people and 5,000 uploaded rows, no credit card, and what happens to your data when it ends.",
   },
   "/security": {
     title: "Security · MDARIX",
@@ -151,7 +151,7 @@ export const PAGE_META = {
   "/signup": {
     title: "Start your free 30-day trial · MDARIX",
     description:
-      "Try MDARIX free for 30 days with up to 3 users: sample data on day one, then your own complaint exports. No credit card.",
+      "Try MDARIX free for 30 days with up to 50 people: sample data on day one, then your own complaint exports. No credit card.",
   },
 } satisfies Record<string, PageMeta>;
 

@@ -607,7 +607,7 @@ export const capabilityStatus: {
 // What the free trial gives a team, in the words of the trial agreement (legal/trial-agreement.md).
 export const trialIncludes: string[] = [
   "30 days, free, with no credit card",
-  "Up to 3 users and 5,000 uploaded rows",
+  "Up to 50 people and 5,000 uploaded rows",
   "Sample data that tells the quality story in ten chapters",
   "Your own Excel or CSV exports, checked for problems and personal data before import",
   "Fourteen step-by-step videos",
