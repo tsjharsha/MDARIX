@@ -83,7 +83,31 @@ type CheckReport = {
   date_format_used?: string;
   needs_date_column?: boolean;
   date_column_choices?: string[];
+  /** 0.10.81: accepted complaint rows that contradict themselves or lack a fact a reporting step needs. */
+  row_flags?: RowFlag[];
 };
+export type RowFlag = { row: number; complaint_id: string | null; message: string };
+
+/** Rows that import but are flagged: what MDARIX will ask for, or what to check. */
+export function RowFlags({ flags }: { flags: RowFlag[] | undefined }) {
+  if (!flags?.length) return null;
+  return (
+    <>
+      <p className="uw-trial-message">
+        {countOf(flags.length, "row note")}: these rows import; MDARIX asks for a missing country or awareness date at
+        the step that needs it.
+      </p>
+      <ul className="uw-trial-issues">
+        {flags.map((flag, index) => (
+          <li key={index}>
+            Row {flag.row}
+            {flag.complaint_id ? ` (${flag.complaint_id})` : ""}: {flag.message}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
 
 const CREATES: [string, string, string][] = [
   ["products", "product", "products"],
@@ -607,6 +631,7 @@ function ImportForm({
               <p className="uw-trial-message is-good">
                 <CheckCircle2 size={16} aria-hidden="true" /> {readyText(report)}
               </p>
+              <RowFlags flags={report.row_flags} />
               {!!report.rejected_rows && (
                 <>
                   <p className="uw-trial-message is-bad">

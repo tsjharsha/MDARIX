@@ -1,3 +1,4 @@
+import type { FactNeed } from "./sections/ReportingFacts";
 // Pure rules for the per-market seriousness and causation assessment (Complaints › Reportability): what the screen
 // reads (/api/v1/complaints/{id}/market-assessments, backend/app/reportability/assessment_router.py), what a draft and
 // a signature send, and when they may be sent. The server decides the suggestion and refuses what it must; these
@@ -187,6 +188,8 @@ export type AssessmentDetail = {
     description: string | null;
     severity: string | null;
     aware_date: string | null;
+    /** 0.10.81: the facts a reporting step needs and the record does not give; no conclusion is signed without them. */
+    needs?: FactNeed[];
   };
   on_watch: boolean;
   enabled_markets: Market[];

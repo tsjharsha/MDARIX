@@ -955,7 +955,8 @@ def _complaint(db, tenant_id, complaint_id) -> Complaint:
 
 
 def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict:
-    from backend.app.reportability import markets
+    from backend.app.reportability import facts, markets
+    from backend.app.reportability import service as reporting_service
 
     found = closure.facts(db, tenant_id, complaint)
     row = closure.closure_row(db, tenant_id, complaint.id)
@@ -1004,6 +1005,8 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
             else None,
             "market": markets.market_of(complaint.country),
             "awareness_at": _iso(complaint.awareness_timestamp),
+            # The facts a reporting step needs and the record does not give (0.10.81, reportability/facts.py).
+            "needs": facts.of_complaint(complaint, reporting_service._record(complaint, None, None)),
             "status_in_qms": complaint.status,
             "owner_id": owner,
             "owner_name": names.get(owner or "") if owner else None,

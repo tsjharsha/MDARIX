@@ -19,7 +19,7 @@ from backend.app.db.models.complaint_review import ComplaintSecondLook
 from backend.app.db.models.foundation import Complaint, Investigation, InvestigationComplaint, Product, ProductVersion
 from backend.app.db.models.reportability import ComplaintReportability, ReportabilitySettings
 from backend.app.db.models.reviews import CaseReview
-from backend.app.reportability import assessments, deadlines, markets, rules
+from backend.app.reportability import assessments, deadlines, facts, markets, rules
 
 # When the organization became aware, for the database's first filter (rules then take the earliest of the three).
 AWARE_AT = func.coalesce(Complaint.awareness_timestamp, Complaint.complaint_timestamp, Complaint.recorded_timestamp)
@@ -73,7 +73,7 @@ def awareness(complaint: Complaint, linked: datetime | None = None) -> tuple[dat
     the earliest awareness among the sources a person linked to this complaint (G20, intake/service.py), which then
     counts too. The market's counting rule takes its day in each time zone (deadlines.py). With neither an awareness
     nor a received date, the event date counts too (``EVENT_DATE``, 0.10.81: the earliest the record has, never
-    called "received"); the clock is then provisional."""
+    called "received"); the clock is then provisional until the awareness date is entered (facts.py)."""
     unknown = complaint.awareness_timestamp is None and complaint.complaint_timestamp is None
     moments = [
         (_moment(complaint.awareness_timestamp), "AWARENESS_DATE"),
@@ -196,7 +196,23 @@ def assess(
     callers); ``org_zone``: the organization's time zone (deadlines.py); ``ivd``: the product is an in-vitro diagnostic
     (``markets.product_is_ivd``; None: read from the product name alone)."""
     aware, source = awareness(complaint, linked)
-    clock_list = rules.clocks(record, windows, aware, today, org_zone)
+    given = complaint.awareness_timestamp is not None or complaint.complaint_timestamp is not None
+    needs = facts.needed(record, given or linked is not None)
+    if any(item["fact"] == facts.COUNTRY for item in needs):
+        # No country, or none MDARIX knows (F3): every enabled market's clocks, the shortest binding, provisional
+        # until the country is entered (as triage counts a record with no country).
+        clock_list = sorted(
+            (
+                clock
+                for market in markets.enabled_markets(windows)
+                for clock in rules.clocks(
+                    {**record, "country": markets.MARKET_COUNTRIES[market][0]}, windows, aware, today, org_zone
+                )
+            ),
+            key=lambda clock: (clock.due_at or "", clock.name),
+        )
+    else:
+        clock_list = rules.clocks(record, windows, aware, today, org_zone)
     if markets.is_ivd(record.get("product_name")) if ivd is None else ivd:
         # An in-vitro diagnostic's EU clocks cite the IVDR (starter), not the MDR.
         clock_list = [
@@ -215,6 +231,10 @@ def assess(
         "clocks": [clock.as_dict() for clock in clock_list],
         "binding": clock_list[0].as_dict() if clock_list else None,
         "follow_ups": rules.follow_ups(record, windows, complaint.awareness_timestamp is not None),
+        # The facts a reporting step needs and the record does not give (facts.py): the clocks are provisional, and
+        # no market conclusion is signed, until they are entered.
+        "needs": needs,
+        "provisional": bool(needs),
         "case": case,
         "settled_by_case": settled,
         "in_review": in_review,
@@ -370,6 +390,7 @@ def watch(
         "in_review": sum(1 for item in undecided if item["in_review"]),
         "follow_up": sum(1 for item in undecided if item["follow_ups"]),
         "no_window": sum(1 for item in undecided if item["state"] == rules.NO_WINDOW),
+        "needs_facts": sum(1 for item in undecided if item["needs"]),
         "decided": len(decided_items),
         "decided_in_window": sum(1 for row in decided_rows if row["on_time"] is True),
         "decided_late": sum(1 for row in decided_rows if row["on_time"] is False),

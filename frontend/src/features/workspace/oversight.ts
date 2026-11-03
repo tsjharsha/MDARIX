@@ -1,3 +1,4 @@
+import type { FactNeed } from "./sections/ReportingFacts";
 // Reminders and escalation (T-G25), the oversight view (T-G9) and the event's closure (T-G28): types, paths and the
 // pure rules the screens use. The server (/api/v1/oversight, backend/app/oversight) reads every dated item from its
 // own record; an alert never closes or changes the item.
@@ -159,6 +160,8 @@ export type EventView = {
     product: string | null;
     market: string | null;
     awareness_at: string | null;
+    /** 0.10.81: the facts a reporting step needs and the record does not give (asked for on the page). */
+    needs?: FactNeed[];
     status_in_qms: string;
     owner_id: string | null;
     owner_name: string | null;

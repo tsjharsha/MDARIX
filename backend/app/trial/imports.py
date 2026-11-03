@@ -862,6 +862,7 @@ def _table(
     if text is None:
         return None
     report.epoch = EXCEL_EPOCH
+    report.delimited = True
     return list(csv.reader(io.StringIO(text, newline=""), delimiter=_delimiter(text)))
 
 
@@ -952,6 +953,10 @@ class _Report:
         # A complaints file without a date column: the columns the uploader may choose for it (J5).
         self.needs_date_column = False
         self.date_candidates: list[str] = []
+        # Rows with fewer cells than the header has columns: (cells, columns), flagged, never refused (0.10.81, F9).
+        self.short_rows: dict[int, tuple[int, int]] = {}
+        # Delimited text (a workbook's rows may stop at their last filled cell, so only text rows are short).
+        self.delimited = False
 
     def add(self, row: int | None, column: str | None, message: str) -> None:
         self.error_count += 1
@@ -1068,6 +1073,8 @@ def _parse(
         if any(cell.strip() for cell in cells[len(fields) :]):
             # Kept with its problem, so it is set aside (and quarantined, counted) rather than lost.
             report.add(line_number, None, "This row has more values than the header has columns.")
+        elif report.delimited and len(cells) < len(fields):
+            report.short_rows[line_number] = (len(cells), len(fields))
         row = {
             column: (cells[i].strip() if i < len(cells) else "")
             for i, column in enumerate(fields)
@@ -1678,6 +1685,8 @@ def _check_rows(
         "number_format": report.numbers,
         "needs_date_column": report.needs_date_column,
         "date_column_choices": report.date_candidates,
+        # Accepted complaint rows that contradict themselves or lack a fact a reporting step needs (0.10.81).
+        "row_flags": complaint_flags(kept, report) if entity == "complaints" else [],
     }
     if skip_problem_rows and rejected and not report.file_problems:
         result["rejects_csv"] = _rejects_csv(rows, report)
@@ -1695,6 +1704,41 @@ def _stamp(now: datetime, row_date: datetime | None = None, source: str = UPLOAD
         "created_at": now,
         "updated_at": now,
     }
+
+
+def complaint_flags(rows, report: _Report) -> list[dict]:
+    """Complaint rows that are accepted but contradict themselves or lack a fact a reporting step needs (0.10.81, the
+    functional review's F3, F4 and F9): flagged in the check and the run's data-quality report, never refused. The
+    product asks for a missing country or awareness date at the step that needs it (reportability/facts.py)."""
+    from backend.app.reportability import facts
+
+    found: list[dict] = []
+    for line, row in rows:
+        if line in report.row_problems:
+            continue
+
+        def flag(message: str) -> None:
+            found.append({"row": line, "complaint_id": row.get("complaint_id"), "message": message})
+
+        def said(column: str) -> bool | None:
+            return FLAG_VALUES.get((row.get(column) or "").lower())
+
+        harm = any(said(column) for column in ("death", "serious_injury", "malfunction"))
+        if line in report.short_rows:
+            cells, columns = report.short_rows[line]
+            flag(f"Has {cells} of the header's {columns} columns: the others are read as blank.")
+        country = row.get("country") or ""
+        if country and not facts.country_known(country):
+            flag(f'"{country}" is not a country MDARIX knows: the country will be asked for before reporting.')
+        elif harm and not country:
+            flag("No country: it decides which market's reporting rules apply, so it will be asked for.")
+        if harm and not row.get("awareness_date") and not row.get("received_date"):
+            flag("No awareness or received date: the reporting clock stays provisional until the date is entered.")
+        if row.get("awareness_date") and row.get("event_date") and row["awareness_date"] < row["event_date"]:
+            flag("The awareness date is before the event date: check both.")
+        if (said("death") or said("serious_injury")) and said("patient_involved") is False:
+            flag("A death or serious injury, but no patient involved: check both columns.")
+    return found
 
 
 def import_file(
@@ -1763,6 +1807,8 @@ def import_file(
                 not_used=not_used_columns(report),
             ),
         )
+        if entity == "complaints":
+            result["quality_report"]["row_flags"] = report["row_flags"]
         if entity == "distribution":
             # Units shipped beyond the units a lot released are flagged, never refused (T-G5).
             result["quality_report"]["flags"] = business_imports.distribution_flags(

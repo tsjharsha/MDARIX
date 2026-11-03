@@ -245,6 +245,7 @@ def checklist(found: dict) -> list[dict]:
     from backend.app.authority_reports import rules as report_rules
     from backend.app.communications.service import TASK_TYPE as REPLY_TASK
     from backend.app.reportability import markets
+    from backend.app.reportability import facts
     from backend.app.reportability import rules as reporting_rules
     from backend.app.reportability.assessments import current_and_draft, required_markets
     from backend.app.reportability.service import _record
@@ -296,6 +297,11 @@ def checklist(found: dict) -> list[dict]:
     watched = reporting_rules.watched(_record(complaint, None, None))
     wanted = required_markets(complaint.country, found["enabled"] if watched else [], by_market)
     open_markets = []
+    # A fact the step needs and the record does not give (0.10.81, F3, F4, U-01): asked for here, never "not needed".
+    needs = facts.of_complaint(complaint, _record(complaint, None, None)) if watched else []
+    if needs:
+        open_markets.append(f"Enter {facts.labels(needs)}: the reporting clocks and markets depend on it")
+        actions["MARKETS"] = f"Enter {facts.labels(needs)}"
     for market in wanted:
         current, draft = current_and_draft(by_market.get(market, []))
         label = markets.MARKET_LABELS.get(market, market)

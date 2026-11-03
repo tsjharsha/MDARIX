@@ -3,6 +3,8 @@
 - F1: re-signing a market conclusion with another report type moves the open report with it (type, due date,
   provisional flag), audited; a submitted report is never changed, only flagged.
 - F10: an imported blank received date stays blank; the clock counts from the event date, named so.
+- F3, F4, F9: a missing country or awareness date is asked for, provisional, and blocks signing; contradictory
+  import rows are flagged.
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -156,3 +158,76 @@ def test_f10_a_blank_received_date_stays_blank_and_the_event_date_is_named_as_su
     # Still the conservative start (the event day), but named as the event date, never "received".
     assert (item["aware_source"], item["aware_date"]) == ("EVENT_DATE", "2026-10-20")
     assert item["received_date"] is None
+
+
+FACTS_CSV = (
+    "complaint_id,product_id,description,event_date,received_date,awareness_date,country,patient_involved,"
+    "serious_injury,death,malfunction\n"
+    "F3-1,F3-PUMP,Patient died; pump free-flowed.,2026-10-01,2026-10-02,2026-10-02,,Y,N,Y,Y\n"
+    "F3-2,F3-PUMP,Patient died; pump free-flowed.,2026-10-01,2026-10-02,2026-10-02,Atlantis,Y,N,Y,Y\n"
+    "F4-1,F3-PUMP,Patient died in Ohio; pump free-flowed. Reported to us in August.,,,,US,Y,N,Y,Y\n"
+    "F9-1,F3-PUMP,Alarm failed.,2026-10-26,,2026-09-01,US,N,N,N,Y\n"
+    "F9-2,F3-PUMP,Patient injured.,2026-10-20,2026-10-21,2026-10-21,US,N,Y,N,Y\n"
+    "F9-3,F3-PUMP,Short row\n"
+)
+
+
+def _facts(user, complaint_id: str, **body):
+    return user.put(f"/api/v1/complaints/{complaint_id}/reporting-facts", json=body)
+
+
+def test_f3_f4_f9_a_missing_country_or_awareness_date_is_asked_for_and_blocks_signing(trial):
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    check = _ok(user.post("/api/v1/trial/imports/complaints/check", params={"on_problems": "skip"}, content=FACTS_CSV))
+    flags = {flag["complaint_id"] or flag["row"]: flag["message"] for flag in check["row_flags"]}
+    # F9: flagged in the check, never refused.
+    assert "No country" in flags["F3-1"] and '"Atlantis" is not a country' in flags["F3-2"]
+    assert "No awareness or received date" in flags["F4-1"]
+    assert "before the event date" in flags["F9-1"] and "no patient involved" in flags["F9-2"]
+    assert "Has 3 of the header's 11 columns" in flags["F9-3"]
+    imported = _import(user, FACTS_CSV)
+    assert imported["quality_report"]["row_flags"] == check["row_flags"]
+
+    for identifier in ("F3-1", "F3-2"):
+        item = _watch(user, identifier)
+        # F3: asked for, with every market's provisional clock meanwhile (never "No window applies").
+        assert [need["fact"] for need in item["needs"]] == ["COUNTRY"] and item["provisional"]
+        assert item["state"] != "NO_WINDOW" and item["clocks"]
+    late = _watch(user, "F4-1")
+    # F4: the import time is never a real deadline: provisional, and the awareness date is asked for.
+    assert [need["fact"] for need in late["needs"]] == ["AWARENESS_DATE"] and late["provisional"]
+    assert late["aware_source"] == "RECORDED_DATE"
+
+    # Home (Oversight) shows it as needing the fact; its checklist asks instead of "No market to assess" (U-01).
+    items = _ok(user.get("/api/v1/oversight", params={"show": "all"}))["items"]
+    needing = {item["key"]: item["title"] for item in items if item["key"].endswith(":facts")}
+    assert any(title.startswith("Enter the incident country") for title in needing.values())
+    assert any(title.startswith("Enter the awareness date") for title in needing.values())
+    event = _ok(user.get("/api/v1/oversight/events/F3-1"))
+    (markets_check,) = [check for check in event["checklist"] if check["code"] == "MARKETS"]
+    assert markets_check["result"] == "BLOCKED" and "Enter the incident country" in markets_check["detail"]
+    assert event["event"]["needs"][0]["fact"] == "COUNTRY"
+
+    # No market conclusion is signed until the fact is entered.
+    no_country = _watch(user, "F3-1")["id"]
+    refused = user.post(
+        f"/api/v1/complaints/{no_country}/market-assessments/US/sign",
+        json={"conclusion": "REPORTABLE", "version": 1, "saved_at": "2026-11-03T00:00:00+00:00", "password": PASSWORD},
+    )
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "FACT_NEEDED"
+    assert _facts(user, no_country, country="Atlantis").status_code == 422
+    _ok(_facts(user, no_country, country="GB"))
+    entered = _watch(user, "F3-1")
+    assert entered["needs"] == [] and [market["market"] for market in entered["markets"]] == ["GB"]
+    (event_row,) = [
+        row for row in _audit(tenant_id, "COMPLAINT_REPORTING_FACTS_SET") if row.entity_id == uuid.UUID(no_country)
+    ]
+    assert (event_row.old_values, event_row.new_values) == ({"country": None}, {"country": "GB"})
+
+    unaware = late["id"]
+    assert _facts(user, unaware, awareness_date="2999-01-01").status_code == 422
+    _ok(_facts(user, unaware, awareness_date="2026-08-14"))
+    known = _watch(user, "F4-1")
+    assert known["needs"] == [] and not known["provisional"]
+    assert (known["aware_source"], known["aware_date"]) == ("AWARENESS_DATE", "2026-08-14")
+

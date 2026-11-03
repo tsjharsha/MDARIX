@@ -1629,6 +1629,20 @@ def complete_triage(
             record.awareness_confirmed_at = confirmed
             record.awareness_note = rules.clean(payload.awareness_note) or None
         record.completed_by, record.completed_at, record.updated_at = str(ctx.user_id), now, now
+        if confirmed is not None and member_kind == service.COMPLAINT:
+            # A complaint with no awareness or received date keeps the confirmed time as its awareness, so the
+            # watch and the market assessment count from it and do not ask again (0.10.81, F4).
+            complaint = (
+                db.query(Complaint)
+                .filter(Complaint.tenant_id == tenant_id, Complaint.id == uuid.UUID(member_id))
+                .one_or_none()
+            )
+            if (
+                complaint is not None
+                and complaint.awareness_timestamp is None
+                and complaint.complaint_timestamp is None
+            ):
+                complaint.awareness_timestamp, complaint.updated_at = confirmed, now
     db.flush()
     db.add(
         make_audit_event(
