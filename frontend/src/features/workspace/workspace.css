@@ -431,6 +431,11 @@
   justify-content: space-between;
   align-items: flex-start;
 }
+/* Edit keeps its word on a phone (0.10.79: it broke into "E di t" under the row's overflow-wrap). */
+.uw-identity-head > button {
+  flex-shrink: 0;
+  overflow-wrap: normal;
+}
 .uw-identity-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
