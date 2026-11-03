@@ -48,7 +48,7 @@ def test_the_sample_story_ticks_each_step_from_the_saved_record(trial):
     sample = first["sample"]
     assert sample["complaint"]["ref"] == "SAMPLE-RV-11" and sample["market"] == "US"
     assert [step["label"] for step in sample["steps"]] == [
-        "The call",
+        "Call",
         "Triage",
         "Tree",
         "Decide",

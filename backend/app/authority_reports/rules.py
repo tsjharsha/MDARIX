@@ -38,13 +38,14 @@ CLOSED = (*MET, CANCELLED)
 # A report a later "not reportable" conclusion cancels: anything not yet submitted.
 CANCELLABLE = (DRAFT, CORRECTION, APPROVED)
 
-# The report's status path on the new navigation (0.10.75, Release C part C3), in order.
+# The report's status path on the new navigation (0.10.75, Release C part C3), in order; one word per step, so a
+# step never wraps (0.10.85, D3.15: "Created from the / decision tree" wrapped on Reports).
 STAGES = (
-    ("CREATED", "Created from the decision tree"),
-    ("COMPLETE", "Mandatory fields complete"),
-    ("APPROVAL", "Sent for approval"),
-    ("APPROVED", "Approved · PDF ready"),
-    ("SUBMITTED", "Submitted by you"),
+    ("CREATED", "Created"),
+    ("COMPLETE", "Complete"),
+    ("APPROVAL", "Approval"),
+    ("APPROVED", "Approved"),
+    ("SUBMITTED", "Submitted"),
     ("ACKNOWLEDGED", "Acknowledged"),
 )
 STAGE_LABELS = dict(STAGES)

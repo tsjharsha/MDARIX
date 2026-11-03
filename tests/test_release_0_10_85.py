@@ -161,3 +161,12 @@ def test_one_request_reads_the_triage_list_once_per_kind(trial, monkeypatch):
     monkeypatch.setattr(service, "_triage", lambda *args, **kwargs: calls.append(1) or real(*args, **kwargs))
     _ok(trial["user"].get(LIST, params={"view": "open", "work": "true", "page_size": 50}))
     assert 0 < len(calls) <= 3, len(calls)
+
+
+def test_every_step_label_is_one_word():
+    """D3.15: the story's ten steps and the report's status path read one word per step, so none wraps."""
+    from backend.app.authority_reports.rules import STAGES
+    from backend.app.trial.one_story import STEPS
+
+    assert [label for _, label in STEPS if len(label.split()) != 1] == []
+    assert [label for _, label in STAGES if len(label.split()) != 1] == []

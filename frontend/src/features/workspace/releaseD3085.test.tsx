@@ -260,3 +260,15 @@ describe("D3.14 decision tree leftovers", () => {
     expect(source).toContain("current={index === firstOpen}");
   });
 });
+
+describe("D3.15 polish from the reviews", () => {
+  it("shows the report's stage as plain text, one date-field width, and one avatar on the top bar", () => {
+    const reports = fs.readFileSync(new URL("./sections/ReportsTab.tsx", import.meta.url), "utf8");
+    expect(reports).toContain("render: (row) => row.stage_label ?? row.state_label,");
+    expect(fs.readFileSync(new URL("./workspace.css", import.meta.url), "utf8")).toMatch(
+      /main\[data-navigation="new"\] :is\(input\[type="date"\], input\[type="datetime-local"\]\) \{\s*inline-size: min\(100%, 16rem\);/,
+    );
+    // The persona's dot is in its menu only; the top bar shows one avatar (0.10.82, kept).
+    expect(hybridShell.match(/<PersonaDot /g)).toHaveLength(1);
+  });
+});

@@ -179,7 +179,7 @@ def test_the_pdf_comes_only_after_approval_and_alone_the_practice_label_shows(tr
     # The list view "Waiting for my approval" holds it (in a trial, one's own as practice).
     assert "my-approval" in next(item for item in _reports(user, complaint))["views"]
     detail = _ok(user.post(f"{REPORTS}/{report['id']}/snapshots/{pending}/approve", json={"password": PASSWORD}))
-    assert (detail["state"], detail["stage"], detail["stage_label"]) == ("APPROVED", "APPROVED", "Approved · PDF ready")
+    assert (detail["state"], detail["stage"], detail["stage_label"]) == ("APPROVED", "APPROVED", "Approved")
     snapshot = detail["approved_snapshot"]
     assert snapshot["same_person"]
     pdf = user.get(f"{REPORTS}/{report['id']}/worksheet.pdf", params={"snapshot": snapshot["id"]})

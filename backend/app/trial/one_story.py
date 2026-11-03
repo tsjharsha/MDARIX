@@ -34,7 +34,7 @@ from backend.app.db.models.foundation import Complaint
 PROFILE_KEY = "one_story"
 RUNS = ("sample", "yours")
 STEPS = (
-    ("call", "The call"),
+    ("call", "Call"),
     ("triage", "Triage"),
     ("tree", "Tree"),
     ("reportable", "Decide"),

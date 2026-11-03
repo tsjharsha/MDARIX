@@ -7785,6 +7785,11 @@ main[data-navigation="new"] small {
   cursor: pointer;
 }
 
+/* 0.10.85, D3.15: one width for every date field on the new navigation. */
+main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]) {
+  inline-size: min(100%, 16rem);
+}
+
 /* The phone's search: an icon that opens the same search as a bar under the top bar. */
 .uw-search-toggle {
   display: none;
