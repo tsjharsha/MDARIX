@@ -59,7 +59,7 @@ export function ComplaintList({
   /** A list view the server filters (0.10.74, C2: listViews.ts SERVER_VIEWS): its name and code; no filter bar. */
   view?: { name: string; code: string };
 }) {
-  const { work, open, session } = useWorkspace();
+  const { work, open, session, dataSource } = useWorkspace();
   const canImport = sectionAllowed(
     "Import data",
     session?.allowed_menu,
@@ -70,8 +70,10 @@ export function ComplaintList({
   const [filters, setFilters] = useState<ComplaintListFilters>(() => initialFilters ?? EMPTY_COMPLAINT_FILTERS);
   const [page, setPage] = useState(1);
   const { sort, onSort } = useServerSort(() => setPage(1));
+  // The top bar's "Sample data · Your data" (0.10.80) decides the data while a trial has both; else the list's own.
+  const shown = { ...filters, source: dataSource || filters.source };
   const list = useResource<any>(
-    `${complaintListPath(filters, page, sortParams(sort))}${sixColumns || view ? "&work=1" : ""}${
+    `${complaintListPath(shown, page, sortParams(sort))}${sixColumns || view ? "&work=1" : ""}${
       view ? `&view=${encodeURIComponent(view.code)}` : ""
     }`,
   );
@@ -97,6 +99,7 @@ export function ComplaintList({
           data={list.data}
           products={work.products}
           onChange={set}
+          sourceChosen={!!dataSource}
         />
       )}
       <Table
@@ -220,16 +223,19 @@ export function ComplaintFilterBar({
   data,
   products,
   onChange,
+  sourceChosen = false,
 }: {
   filters: ComplaintListFilters;
   data: any;
   products: { id: string; name: string | null }[];
   onChange: (change: Partial<ComplaintListFilters>) => void;
+  /** The top bar chooses the data (0.10.80): no Data choice here. */
+  sourceChosen?: boolean;
 }) {
   // The lot number as typed; the list asks for it when the person presses Enter or leaves the field.
   const [lotText, setLotText] = useState(filters.lot);
   const versions = versionChoices(listOf(data?.versions) as ComplaintVersionChoice[], filters.productId);
-  const sources = sourceChoices(listOf(data?.sources), filters.source);
+  const sources = sourceChosen ? [] : sourceChoices(listOf(data?.sources), filters.source);
   // The IMDRF codes the problem codes map to (G2a, approved links only), shown in the problem-code choice.
   const problemCodes = listOf(data?.problem_codes) as string[];
   const imdrf = useResource<{ links: ImdrfLinks }>(

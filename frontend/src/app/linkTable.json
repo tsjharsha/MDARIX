@@ -1,5 +1,5 @@
 {
-  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. newPlaces, newMenu, newRecords and newHomes (stage 7, 0.10.68): the screens of the new navigation, its menu, where each record opens there, and the new home of every screen and tab above; they apply only to an organization on the new navigation (tenants.navigation = new). classicHomes: where an address of the new navigation opens for an organization on the classic one. 0.10.73 (Release C, C1): the new navigation's tabs (newMenu.main) are Home (My work), Complaints, Decision trees, Reports, Investigations, Trends, Records and Team; each persona shows some of them (access_control/personas.py). 0.10.74 (C2): Complaints' list views (features/workspace/listViews.ts) are its tabs; one complaint's page shows Details (address name Summary), Related and Activity, and opens its former sections' addresses (Evidence: Related; Decisions & actions: Details; History: Activity); Investigations lists every investigation (All investigations).",
+  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. newPlaces, newMenu, newRecords and newHomes (stage 7, 0.10.68): the screens of the new navigation, its menu, where each record opens there, and the new home of every screen and tab above; they apply only to an organization on the new navigation (tenants.navigation = new). classicHomes: where an address of the new navigation opens for an organization on the classic one. 0.10.73 (Release C, C1): the new navigation's tabs (newMenu.main) are Home (My work), Complaints, Decision trees, Reports, Investigations, Trends, Records and Team; each persona shows some of them (access_control/personas.py). 0.10.74 (C2): Complaints' list views (features/workspace/listViews.ts) are its tabs; one complaint's page shows Details (address name Summary), Related and Activity, and opens its former sections' addresses (Evidence: Related; Decisions & actions: Details; History: Activity); Investigations lists every investigation (All investigations). 0.10.80: a trial's own import is its own page on the new navigation, Import your data (/app/import); Getting started › Your data opens it there, and on the classic navigation /app/import opens Getting started › Your data.",
   "places": {
     "Getting started": {
       "path": "/app/getting-started",
@@ -166,7 +166,8 @@
     "settings": ["Settings"],
     "team": ["Team"],
     "decision-trees": ["Decision trees"],
-    "reports": ["Reports"]
+    "reports": ["Reports"],
+    "import": ["Import your data"]
   },
   "oldSections": [
     {
@@ -309,7 +310,8 @@
     "Team": "team",
     "Complaint": "complaint",
     "Decision trees": "decision-trees",
-    "Reports": "reports"
+    "Reports": "reports",
+    "Import your data": "import"
   },
   "oldTabs": {
     "Signals": {
@@ -418,7 +420,7 @@
     },
     "Getting started": {
       "path": "/app/getting-started",
-      "tabs": ["Your data", "About the sample data", "Your trial"]
+      "tabs": ["About the sample data", "Your trial"]
     },
     "Share feedback": {
       "path": "/app/feedback",
@@ -438,6 +440,10 @@
     },
     "Reports": {
       "path": "/app/reports",
+      "tabs": []
+    },
+    "Import your data": {
+      "path": "/app/import",
       "tabs": []
     }
   },
@@ -488,6 +494,14 @@
     }
   },
   "newHomes": [
+    {
+      "section": "Getting started",
+      "tab": "Your data",
+      "to": {
+        "section": "Import your data"
+      },
+      "keep": "query"
+    },
     {
       "section": "Getting started",
       "tab": "Team",
@@ -969,6 +983,14 @@
         "section": "Complaints",
         "tab": "Reports"
       }
+    },
+    {
+      "section": "Import your data",
+      "to": {
+        "section": "Getting started",
+        "tab": "Your data"
+      },
+      "keep": "query"
     }
   ]
 }

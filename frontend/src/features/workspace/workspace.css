@@ -7618,3 +7618,42 @@ button.uw-org:hover {
     display: flex;
   }
 }
+/* "Sample data · Your data" (0.10.80): which of a trial's data the lists and insights show, while both exist. At 1100 px
+   and narrower it is in the avatar menu, as the Sample data label and Import your data are. */
+.uw-data-choice {
+  display: inline-flex;
+  flex: none;
+  margin-left: var(--ms-space-2);
+  border: 1px solid var(--ms-warn-line);
+  border-radius: var(--ms-radius-pill);
+  overflow: hidden;
+}
+.uw-data-choice button {
+  border: 0;
+  padding: 2px 10px;
+  background: transparent;
+  color: var(--ms-warn);
+  font-size: var(--ms-fs-12);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.uw-data-choice button + button {
+  border-left: 1px solid var(--ms-warn-line);
+}
+.uw-data-choice button.is-on {
+  background: var(--ms-warn-bg);
+  font-weight: var(--ms-fw-bold);
+}
+.uw-data-choice button:focus-visible {
+  outline: 2px solid var(--ms-warn);
+  outline-offset: -2px;
+}
+.uw-avatar-data {
+  display: none;
+  border-block: 1px solid var(--ms-line);
+}
+@media (max-width: 1100px) {
+  .uw-avatar-data {
+    display: block;
+  }
+}

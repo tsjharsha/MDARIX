@@ -271,6 +271,7 @@ export function ImportPanel({
   eyebrow = "Bring your own data",
   onReport,
   setup: given,
+  reportSecondary = false,
 }: {
   /** After an import: what it imported, and of which template. */
   onImported: (result: ImportResult, entity: string) => void;
@@ -279,6 +280,8 @@ export function ImportPanel({
   /** Opens the data-quality report of the import just done (shown below the panel). */
   onReport?: (importRef: string) => void;
   setup?: ImportSetup;
+  /** The page's main button is elsewhere (Import your data's "See your complaints", 0.10.80). */
+  reportSecondary?: boolean;
 }) {
   const fetched = useResource<ImportSetup>(given ? null : `${IMPORT_PATH}/templates`);
   const setup = given ?? fetched.data;
@@ -288,7 +291,16 @@ export function ImportPanel({
         {null}
       </Panel>
     );
-  return <ImportForm setup={setup} onImported={onImported} id={id} eyebrow={eyebrow} onReport={onReport} />;
+  return (
+    <ImportForm
+      setup={setup}
+      onImported={onImported}
+      id={id}
+      eyebrow={eyebrow}
+      onReport={onReport}
+      reportSecondary={reportSecondary}
+    />
+  );
 }
 
 function ImportForm({
@@ -297,12 +309,14 @@ function ImportForm({
   id,
   eyebrow,
   onReport,
+  reportSecondary,
 }: {
   setup: ImportSetup;
   onImported: (result: ImportResult, entity: string) => void;
   id: string;
   eyebrow: string;
   onReport?: (importRef: string) => void;
+  reportSecondary: boolean;
 }) {
   const templates = setup.templates;
   // Where a complaints export alone is enough (a free trial), the panel opens on it, until the person chooses another.
@@ -558,7 +572,11 @@ function ImportForm({
       {(rejects || (lastRun && onReport)) && !report && (
         <div className="ca-action-row">
           {lastRun && onReport && (
-            <button type="button" className="ac-primary" onClick={() => onReport(lastRun)}>
+            <button
+              type="button"
+              className={reportSecondary ? "ac-secondary" : "ac-primary"}
+              onClick={() => onReport(lastRun)}
+            >
               <CheckCircle2 size={15} aria-hidden="true" /> See its data-quality report
             </button>
           )}

@@ -1,6 +1,6 @@
 // 0.10.79: "Import your data" on the new navigation's top bar (beside the Sample data label) and, at phone width, in
 // the avatar menu; the Complaints header offers it in a trial too. Every path opens the trial import that Help › Try
-// your own data opens (Getting started › Your data). A sample-only trial and a person who may not change records do
+// your own data opens: Getting started › Your data until 0.10.80, its own page Import your data since. A sample-only trial and a person who may not change records do
 // not see it. The classic navigation is unchanged.
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
@@ -35,13 +35,13 @@ const render = (node: ReactNode, value: WorkspaceApi) =>
   renderToStaticMarkup(<WorkspaceContext.Provider value={value}>{node}</WorkspaceContext.Provider>);
 
 describe("Import your data on the top bar", () => {
-  it("is offered to the trial owner and opens the trial import (Getting started › Your data)", () => {
+  it("is offered to the trial owner and opens the trial import (Import your data since 0.10.80)", () => {
     expect(canImportOwnData(OWNER as never)).toBe(true);
     const open = vi.fn();
     const action = importOwnDataAction(true, OWNER as never, open);
     expect(action).toBeTypeOf("function");
     action?.();
-    expect(open).toHaveBeenCalledWith("Getting started", "Your data");
+    expect(open).toHaveBeenCalledWith("Import your data");
     const button = renderToStaticMarkup(<ImportOwnData onOpen={() => undefined} />);
     expect(button).toContain("Import your data");
     expect(button).toContain("<svg"); // the upload icon
@@ -73,7 +73,7 @@ describe("Import your data on the Complaints header", () => {
     expect(render(<ComplaintViews />, api(REGULATORY))).not.toContain("Import your data");
     const open = vi.fn();
     openImport(open, true);
-    expect(open).toHaveBeenLastCalledWith("Getting started", "Your data");
+    expect(open).toHaveBeenLastCalledWith("Import your data");
     // A pilot keeps its Import data screen.
     expect(render(<ComplaintViews />, api(OWNER, { isTrial: false }))).toContain("Import your data");
     openImport(open, false);
