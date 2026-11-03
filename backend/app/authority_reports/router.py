@@ -112,7 +112,7 @@ def _names(control_db, tenant_id, refs) -> dict[str, str]:
     return {**SAMPLE_NAMES, **found}
 
 
-def _audit(db, ctx, action: str, obligation: ReportObligation, **details) -> None:
+def _audit(db, ctx, action: str, obligation: ReportObligation, old=None, new=None, **details) -> None:
     db.add(
         make_audit_event(
             tenant_id=obligation.tenant_id,
@@ -122,6 +122,8 @@ def _audit(db, ctx, action: str, obligation: ReportObligation, **details) -> Non
             entity_id=obligation.id,
             correlation_id=ctx.correlation_id,
             details={"complaint_id": str(obligation.complaint_id), "market": obligation.market, **details},
+            old_values=old,
+            new_values=new,
         )
     )
 
@@ -415,6 +417,7 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "approved_snapshot": _snapshot_view(approved, names) if approved else None,
         "preparers": sorted({names.get(ref) or "A colleague" for ref in _preparers(obligation)}),
         "cancelled_reason": obligation.note if obligation.state == rules.CANCELLED else None,
+        "conclusion_changed": conclusion_changed(obligation, context["current"]),
         "deadline": deadline,
         "report_type": obligation.report_type,
         "assessment": _assessment_view(context, names),
@@ -809,8 +812,66 @@ def follow_conclusion(db, ctx, tenant_id, complaint_id, market: str, signed, now
     return pending
 
 
-def end_cancelled_approvals(db, ctx, tenant_id, pending: list) -> None:
-    """The approval tasks of the snapshots a cancelled report no longer needs, after the signing is saved."""
+def follow_signed(db, ctx, obligation: ReportObligation, signed, now: datetime) -> list:
+    """An open report follows its market's latest signed reportable conclusion (0.10.81, F1): its report type, its due
+    date and its provisional flag, audited with before and after. A pending or approved snapshot of another report type
+    is superseded (it was approved as another report) and an approved report is a draft again. A report already
+    submitted is never changed: the change is audited and the report page flags it, so a follow-up report can be
+    considered (``conclusion_changed``). Returns the pending snapshots whose approval tasks end."""
+    before = {
+        "report_type": obligation.report_type,
+        "due_on": _iso(obligation.due_on),
+        "provisional": obligation.due_provisional,
+    }
+    after = {"report_type": signed.report_type, "due_on": _iso(signed.due_on), "provisional": False}
+    if obligation.state in rules.SUBMITTED:
+        if (before["report_type"], before["due_on"]) != (after["report_type"], after["due_on"]):
+            _audit(
+                db, ctx, "REPORT_CONCLUSION_CHANGED_AFTER_SUBMISSION", obligation, before, after, version=signed.version
+            )
+        return []
+    if obligation.state not in rules.CANCELLABLE:
+        return []
+    obligation.assessment_id = signed.id
+    if before == after:
+        return []
+    pending = []
+    if before["report_type"] != after["report_type"]:
+        for row in _snapshots(db, obligation):
+            if row.state in ("PENDING", "APPROVED"):
+                if row.state == "PENDING":
+                    pending.append(row.id)
+                row.state = "SUPERSEDED"
+        if obligation.state == rules.APPROVED:
+            obligation.state = rules.DRAFT
+    obligation.report_type, obligation.due_on, obligation.due_provisional = signed.report_type, signed.due_on, False
+    obligation.updated_at = now
+    _audit(db, ctx, "REPORT_RETYPED_BY_CONCLUSION", obligation, before, after, version=signed.version)
+    return pending
+
+
+def conclusion_changed(obligation: ReportObligation, current) -> str | None:
+    """A submitted report whose market's latest signed conclusion now says otherwise (0.10.81, F1; F13): what to
+    consider. It never changes the report."""
+    if obligation.kind != "INITIAL" or obligation.state not in rules.SUBMITTED or current is None:
+        return None
+    label = markets.MARKET_LABELS.get(obligation.market, obligation.market)
+    signed = f"The {label} conclusion signed later (version {current.version})"
+    if current.conclusion == markets.NOT_REPORTABLE:
+        return f"{signed} says not reportable. This report stays as submitted: consider a final report that says so."
+    if current.conclusion == markets.REPORTABLE and current.report_type != obligation.report_type:
+        kind = markets.REPORT_TYPES.get(current.report_type or "")
+        was = markets.REPORT_TYPES.get(obligation.report_type or "")
+        return (
+            f"{signed} says {kind.label if kind else 'another report type'}; this report was submitted as "
+            f"{was.label if was else 'another report type'}. It stays as submitted: consider a follow-up report."
+        )
+    return None
+
+
+def end_cancelled_approvals(db, ctx, tenant_id, pending: list, outcome: str = "Cancelled: not reportable") -> None:
+    """The approval tasks of the snapshots a cancelled (or retyped) report no longer needs, after the signing is
+    saved."""
     for snapshot_id in pending:
         run_hook(
             db,
@@ -819,7 +880,7 @@ def end_cancelled_approvals(db, ctx, tenant_id, pending: list) -> None:
             tenant_id,
             source_type=OBJECT_TYPE,
             source_id=snapshot_id,
-            outcome="Cancelled: not reportable",
+            outcome=outcome,
             actor=str(ctx.user_id),
             approved=False,
         )

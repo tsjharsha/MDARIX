@@ -118,26 +118,28 @@ def _market(market: str) -> str:
     return code
 
 
-def _settle_provisional_reports(db: Session, tenant_id, complaint_id, market: str, signed, now) -> None:
-    """J14: a report started while the market was pending kept its provisional deadline; a signed reportable conclusion
-    now gives every open initial report of that market its category's deadline (never a reset of a set one)."""
-    from backend.app.authority_reports import rules as report_rules
+def _settle_open_reports(db: Session, ctx, tenant_id, complaint_id, market: str, signed, now) -> list:
+    """J14 and 0.10.81 (F1): a signed reportable conclusion gives every open initial report of its market its report
+    type, due date and provisional flag (authority_reports/router.py ``follow_signed``); a submitted one is flagged,
+    never changed. Returns the pending snapshots whose approval tasks end."""
+    from backend.app.authority_reports import router as reports
     from backend.app.db.models.authority_reports import ReportObligation
 
-    if signed.conclusion != markets.REPORTABLE or signed.due_on is None:
-        return
-    for obligation in db.query(ReportObligation).filter(
-        ReportObligation.tenant_id == tenant_id,
-        ReportObligation.complaint_id == complaint_id,
-        ReportObligation.market == market,
-        ReportObligation.kind == "INITIAL",
-        ReportObligation.due_provisional.is_(True),
+    if signed.conclusion != markets.REPORTABLE:
+        return []
+    ended = []
+    for obligation in (
+        db.query(ReportObligation)
+        .filter(
+            ReportObligation.tenant_id == tenant_id,
+            ReportObligation.complaint_id == complaint_id,
+            ReportObligation.market == market,
+            ReportObligation.kind == "INITIAL",
+        )
+        .with_for_update()
     ):
-        if obligation.state in report_rules.MET:
-            continue
-        obligation.due_on, obligation.due_provisional = signed.due_on, False
-        obligation.assessment_id, obligation.report_type = signed.id, signed.report_type
-        obligation.updated_at = now
+        ended += reports.follow_signed(db, ctx, obligation, signed, now)
+    return ended
 
 
 def _versions(db: Session, tenant_id, complaint_id, market: str, lock: bool = False):
@@ -567,7 +569,7 @@ def sign_conclusion(
     draft.due_on = date.fromisoformat(clock["due_date"]) if clock else None
     draft.signed_record_id, draft.content_fingerprint = record_row.id, content_fingerprint
     draft.signed_by, draft.signed_at, draft.updated_at = str(ctx.user_id), now, now
-    _settle_provisional_reports(db, tenant_id, complaint_id, market, draft, now)
+    retyped = _settle_open_reports(db, ctx, tenant_id, complaint_id, market, draft, now)
     # 0.10.75 (C3), the new navigation: the signed conclusion creates the market's report, or cancels an unsubmitted
     # one when it says not reportable, in this same transaction. Never on a draft (saving answers never comes here).
     from backend.app.authority_reports import router as reports
@@ -593,6 +595,9 @@ def sign_conclusion(
         control_db.rollback()
         raise _error(409, "SIGNED_MEANWHILE", "This market was signed a moment ago; reload to see it") from exc
     reports.end_cancelled_approvals(db, ctx, tenant_id, ended)
+    reports.end_cancelled_approvals(
+        db, ctx, tenant_id, retyped, "Replaced: the signed conclusion changed the report type"
+    )
     if assessments.settled(
         assessments.markets_summary(
             record,

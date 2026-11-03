@@ -217,6 +217,8 @@ export type ReportDetail = {
   approved_snapshot?: Snapshot | null;
   preparers?: string[];
   cancelled_reason?: string | null;
+  /** 0.10.81: a submitted report whose market's later signed conclusion says otherwise: what to consider. */
+  conclusion_changed?: string | null;
   deadline: DeadlineFields;
   assessment: {
     conclusion: string | null;

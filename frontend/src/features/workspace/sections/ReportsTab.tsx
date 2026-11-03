@@ -337,6 +337,11 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
           </div>
         </dl>
         {detail.stages && detail.stage && <StagePath stages={detail.stages} />}
+        {detail.conclusion_changed && (
+          <p className="ac-message tone-warning" role="status">
+            {detail.conclusion_changed}
+          </p>
+        )}
       </header>
       <div className="uw-rec">
         <section className="uw-card uw-rec-main" aria-label="The form's fields">
