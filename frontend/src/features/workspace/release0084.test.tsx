@@ -12,6 +12,7 @@ import type { TrendItem } from "./signalAi";
 import { ComplaintPage, clockPrefix } from "./sections/ComplaintPage";
 import { ONE_STORY_PATH, stepPlace, type StoryRun } from "./oneStory";
 import { NewRecordsSection } from "./sections/Records";
+import { awarenessInput } from "./intake";
 import { eventPath } from "./oversight";
 import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 import { rv11 } from "../../test/rv11";
@@ -343,5 +344,24 @@ describe("M5: Home follows the Sample · Your data switch, and lists the complai
     expect(next).toContain("SAMPLE-RV-08");
     expect(next).not.toContain("FIC-200");
     expect(html).toContain("OrbitCare 300 Rev B is rising");
+  });
+});
+
+describe("M7: a date-only awareness stays a date, and a later one asks its reason up front", () => {
+  it("offers the day the record holds, never a time nobody recorded", () => {
+    const field = awarenessInput({ at: "2026-10-31T12:00:00+00:00", date_only: true });
+    expect(field.type).toBe("date");
+    expect(field.initial).toBe("2026-10-31");
+    // Saved as the server keeps a day given without a time: 12:00 UTC.
+    expect(field.moment("2026-10-31")).toBe("2026-10-31T12:00:00.000Z");
+  });
+
+  it("knows before saving that a later awareness needs its reason", () => {
+    const field = awarenessInput({ at: "2026-10-31T12:00:00+00:00", date_only: true });
+    expect(field.later("2026-10-31")).toBe(false);
+    expect(field.later("2026-10-30")).toBe(false);
+    expect(field.later("2026-11-01")).toBe(true);
+    const timed = awarenessInput({ at: "2026-10-31T09:15:00Z", date_only: false });
+    expect(timed.type).toBe("datetime-local");
   });
 });
