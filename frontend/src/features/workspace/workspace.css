@@ -438,8 +438,32 @@
   margin-top: 10px;
 }
 .uw-identity-form .ca-action-row,
-.uw-identity-form .uw-trial-message {
+.uw-identity-form .uw-trial-message,
+.uw-identity-form > p {
   grid-column: 1 / -1;
+  margin: 0;
+}
+/* A product's registrations per market (0.10.77). */
+.uw-identity-regs {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ac-line);
+}
+.uw-identity-regs ul {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-identity-regs li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.uw-identity-regs p {
+  margin: 4px 0;
 }
 .uw-trial-findings {
   margin: 0;
@@ -4467,6 +4491,74 @@ div.uw-task-count:hover {
 }
 .uw-rp-value.empty {
   color: var(--ac-ink-2);
+}
+/* Codes (0.10.77): a suggestion waits for the regulatory manager; the picker searches and browses an annex. */
+.uw-rp-field.is-suggested {
+  border-color: var(--ms-warn-line);
+  background: var(--ms-warn-bg);
+}
+.uw-picker {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-sm);
+  background: var(--ms-subtle);
+  min-width: 0;
+}
+.uw-picker-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.uw-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.uw-picker-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.uw-picker-trail {
+  overflow-wrap: anywhere;
+}
+.uw-picker-list {
+  display: grid;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-picker-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  padding: 8px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-sm);
+  background: var(--ms-surface);
+}
+.uw-picker-code {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.uw-picker-code p {
+  margin: 2px 0 0;
+}
+.uw-picker-code .ms-chip {
+  margin-left: 6px;
+}
+.uw-picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 .uw-rp-edit {
   display: flex;

@@ -87,6 +87,12 @@ export type WorksheetField = {
   note: string | null;
   by: string | null;
   at: string | null;
+  /** A code field's IMDRF annex (0.10.77); absent: not a code field. */
+  code_annex?: string | null;
+  /** The code the approved mapping suggests, waiting for a person (status SUGGESTED). */
+  suggestion?: string | null;
+  /** What the mapping suggested before the person changed it. */
+  suggested?: string | null;
 };
 
 export type WorksheetSection = { code: string; title: string; note: string | null; fields: WorksheetField[] };
@@ -238,6 +244,8 @@ export type ReportDetail = {
   practice_label: string | null;
   never_submits: string;
   sample: boolean;
+  /** Mapped codes are suggestions a person confirms or changes (the new navigation, 0.10.77). */
+  codes_confirmed?: boolean;
 };
 
 /** The tab name that opens Reports on one complaint ("Reports?complaint=<id>"), and its reading. */
@@ -284,8 +292,8 @@ export function stateTone(state: ObligationState, overdue = false): Tone {
 /** Each field status's tone: a missing must-have stands out, a patient field outside the sample is neutral. */
 export function fieldTone(status: string): Tone {
   if (status === "MUST_HAVE") return "critical";
-  if (status === "MAY_BE_UNKNOWN" || status === "FOLLOW_UP") return "warning";
-  if (status === "FROM_RECORD" || status === "CONFIRMED" || status === "ENTERED") return "good";
+  if (status === "MAY_BE_UNKNOWN" || status === "FOLLOW_UP" || status === "SUGGESTED") return "warning";
+  if (["FROM_RECORD", "CONFIRMED", "ENTERED", "CHANGED"].includes(status)) return "good";
   return "neutral";
 }
 
@@ -464,7 +472,8 @@ export function nowLocal(now: Date = new Date()): string {
 }
 
 /** A field still to enter before submission. */
-export const isMissing = (field: Pick<WorksheetField, "status">) => field.status === "MUST_HAVE";
+export const isMissing = (field: Pick<WorksheetField, "status"> & { missing_class?: string }) =>
+  field.status === "MUST_HAVE" || (field.status === "SUGGESTED" && field.missing_class === "MUST_HAVE");
 
 /** The worksheet's meter (wow screen 5): fields filled from the records, entered by a person, missing, and in all. */
 export function worksheetMeter(sections: readonly WorksheetSection[]) {

@@ -42,23 +42,34 @@ export type TrendItem = {
   linked_records?: number;
   /** The lots of the recent complaints (0.10.72). */
   lots?: string[];
+  /** How many recent complaints each lot has (0.10.77). */
+  lot_counts?: Record<string, number>;
 };
 
-/** "003 and 004" from "SAMPLE-ORBIT-300-LOT-003", "SAMPLE-ORBIT-300-LOT-004": the part that differs (0.10.72). */
-export function lotsText(lots: readonly string[]): string {
-  if (lots.length < 2) return lots[0] ?? "";
-  let prefix = lots[0];
-  for (const lot of lots) while (!lot.startsWith(prefix)) prefix = prefix.slice(0, -1);
-  const cut = Math.max(prefix.lastIndexOf("-"), prefix.lastIndexOf(" ")) + 1;
-  const parts = lots.map((lot) => lot.slice(cut));
+/** "003 and 004" from "SAMPLE-ORBIT-300-LOT-003", "SAMPLE-ORBIT-300-LOT-004": the part that differs (0.10.72); with
+ * each lot's complaints when known, "003 (4), 004 (4), 005 (1)" (0.10.77). */
+export function lotsText(lots: readonly string[], counts?: Record<string, number>): string {
+  let cut = 0;
+  if (lots.length > 1) {
+    let prefix = lots[0];
+    for (const lot of lots) while (!lot.startsWith(prefix)) prefix = prefix.slice(0, -1);
+    cut = Math.max(prefix.lastIndexOf("-"), prefix.lastIndexOf(" ")) + 1;
+  }
+  const parts = lots.map((lot) => lot.slice(cut) + (counts?.[lot] ? ` (${counts[lot]})` : ""));
+  if (counts) return parts.join(", ");
+  if (parts.length < 2) return parts[0] ?? "";
   return parts.length === 2 ? parts.join(" and ") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
 /** One sentence per rising group (0.10.72, B5): "OrbitCare 300 Rev B: 9 complaints against 1.0 expected (9.3×),
  * lots 003 and 004". */
-export function risingSentence(item: Pick<TrendItem, "name" | "recent" | "expected" | "ratio" | "lots">): string {
+export function risingSentence(
+  item: Pick<TrendItem, "name" | "recent" | "expected" | "ratio" | "lots" | "lot_counts">,
+): string {
   const ratio = typeof item.ratio === "number" ? ` (${item.ratio.toFixed(1)}×)` : "";
-  const lots = item.lots?.length ? `, ${item.lots.length === 1 ? "lot" : "lots"} ${lotsText(item.lots)}` : "";
+  const lots = item.lots?.length
+    ? `, ${item.lots.length === 1 ? "lot" : "lots"} ${lotsText(item.lots, item.lot_counts)}`
+    : "";
   return `${item.name}: ${grouped(item.recent)} complaints against ${grouped(item.expected, 1)} expected${ratio}${lots}`;
 }
 

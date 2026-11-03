@@ -19,6 +19,8 @@ const MARKETS: Record<string, string> = {
   GB: "Great Britain",
   IN: "India",
   CA: "Canada",
+  NI: "Northern Ireland",
+  AU: "Australia",
 };
 
 /** A market by its name: "EU_NI" -> "EU and Northern Ireland". */

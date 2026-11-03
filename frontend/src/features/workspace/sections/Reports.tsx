@@ -11,6 +11,7 @@ import { AlsoKnownAs, countOf, DecideAndSign, shortPrint } from "./common";
 import { ComplaintNextStep } from "./ComplaintNextStep";
 import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
+import { CodePicker } from "./CodePicker";
 import {
   OUTCOME_LABELS,
   REASON_MIN,
@@ -927,6 +928,98 @@ function Worksheet({
   );
 }
 
+/** Who settled a code and how: "Confirmed by Asha Quality 3 Nov 2026", "Changed by …; suggested A0908 …". */
+export function codeMeta(item: Pick<WorksheetField, "status" | "by" | "at" | "suggested">): string {
+  if (!item.by) return "";
+  const how = { CONFIRMED: "Confirmed", CHANGED: "Changed" }[item.status] ?? "Chosen";
+  const was = item.status === "CHANGED" && item.suggested ? `; suggested ${item.suggested}` : "";
+  return `${how} by ${item.by} ${formatDate(item.at)}${was}`;
+}
+
+/**
+ * A code field on the new navigation (0.10.77, C5): what the approved mapping suggests waits for the regulatory
+ * manager, who confirms it or changes it in the code picker; the report records which, who and when. Nothing is
+ * filed unconfirmed: a suggestion counts as missing and is never frozen into a snapshot.
+ */
+function CodeFieldRow({
+  detail,
+  item,
+  onChanged,
+  canEdit,
+}: {
+  detail: ReportDetail;
+  item: WorksheetField;
+  onChanged: (detail: ReportDetail) => void;
+  canEdit: boolean;
+}) {
+  const [picking, setPicking] = useState(false);
+  const action = useAction(onChanged, "The code was not saved.");
+  const path = `${REPORTS}/${detail.id}/fields/${item.id}`;
+  const settled = ["CONFIRMED", "CHANGED", "ENTERED"].includes(item.status);
+  return (
+    <li className={item.status === "SUGGESTED" ? "uw-rp-field is-suggested" : "uw-rp-field"}>
+      <div className="uw-rp-field-head">
+        <span className="uw-rp-number">{item.number}</span>
+        <span className="uw-rp-label">{item.label}</span>
+        <ToneBadge tone={fieldTone(item.status)} label={item.status_label} />
+      </div>
+      {item.status === "SUGGESTED" ? (
+        <p className="uw-rp-value uw-rp-suggestion">
+          <span className="ac-muted">Suggested: </span>
+          {item.suggestion}
+        </p>
+      ) : (
+        <p className={item.value ? "uw-rp-value" : "uw-rp-value empty"}>{item.value ?? "—"}</p>
+      )}
+      <p className="uw-cr-meta">
+        {item.status === "SUGGESTED"
+          ? `From your approved mapping${item.source?.ref ? `: ${item.source.ref}` : ""}. You confirm or change it; it is not filed until you do.`
+          : codeMeta(item)}
+        {item.note ? ` ${item.note}` : ""}
+      </p>
+      {canEdit && !picking && (
+        <div className="ca-action-row">
+          {item.status === "SUGGESTED" && (
+            <button
+              type="button"
+              className="ac-secondary"
+              disabled={action.busy}
+              onClick={() => void action.run(path, "PUT", { confirmed: true })}
+            >
+              Confirm
+            </button>
+          )}
+          <button type="button" className="ac-link" onClick={() => setPicking(true)}>
+            {item.status === "SUGGESTED" || settled ? "Change" : "Choose a code"}
+          </button>
+          {settled && (
+            <button
+              type="button"
+              className="ac-link"
+              disabled={action.busy}
+              onClick={() => void action.run(path, "PUT", { clear: true })}
+            >
+              Undo
+            </button>
+          )}
+        </div>
+      )}
+      {picking && (
+        <CodePicker
+          annex={item.code_annex!}
+          label={`${item.number} ${item.label}`.trim()}
+          busy={action.busy}
+          onCancel={() => setPicking(false)}
+          onChoose={async (code) => {
+            if (await action.run(path, "PUT", { codes: [code.code] })) setPicking(false);
+          }}
+        />
+      )}
+      <InlineError text={action.error} />
+    </li>
+  );
+}
+
 export function FieldRow({
   detail,
   item,
@@ -943,6 +1036,8 @@ export function FieldRow({
   const action = useAction(onChanged, "The field was not saved.");
   const path = `${REPORTS}/${detail.id}/fields/${item.id}`;
   const editable = canEdit && item.editable !== false;
+  if (item.code_annex && detail.codes_confirmed)
+    return <CodeFieldRow detail={detail} item={item} onChanged={onChanged} canEdit={editable} />;
   return (
     <li className="uw-rp-field">
       <div className="uw-rp-field-head">
