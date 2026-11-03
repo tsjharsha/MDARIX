@@ -101,7 +101,8 @@ describe("Canada's tree and a market outside the reporting windows", () => {
     };
     resources.data["/api/v1/decision-trees"] = trees;
     const html = render(<DecisionTreesSection />);
-    // 0.10.83 (D2): the tab opens on answering; with no complaint on the watch it says so.
+    // 0.10.83 (D2): the tab opens on answering; with no complaint on the watch it says so. Its editor (releaseD2083)
+    // names the form and the windows.
     expect(html).toContain("No complaint waits for a decision");
   });
 });

@@ -7,6 +7,8 @@ import { treePlace, type Trees } from "./decisionTrees";
 import { DecisionTreesSection } from "./sections/DecisionTrees";
 import { firstComplaint, groupClause } from "./sections/TreeAnswer";
 import { conclusionOf, signItems } from "./sections/TreeSign";
+import { guideChanges } from "./sections/TreeEdit";
+import { GUIDES, type GuideVersion } from "./decisionGuides";
 import {
   foldedRuns,
   groupQuestions,
@@ -444,5 +446,118 @@ describe("D2.5: the form for the incident's country", () => {
     const html = show(not);
     expect(html).toContain("No report for United States (FDA).");
     expect(html).not.toContain("May also apply");
+  });
+});
+
+const guideVersion = (over: Partial<GuideVersion>): GuideVersion =>
+  ({
+    version: 2,
+    code: "US-v2",
+    state: "PUBLISHED",
+    state_label: "In use",
+    starter: false,
+    approved_by: "Rahul Iyer",
+    published_at: "2026-10-30T10:00:00Z",
+    sample: false,
+    market: "US",
+    market_label: "United States (FDA)",
+    title: "US medical device reporting (21 CFR Part 803)",
+    based_on: null,
+    question_set: { ...usItem().question_set, questions: US_QUESTIONS.slice(0, 2) },
+    test_cases: [],
+    test_results: { results: [], passed: 6, failed: 0, current: true, run_at: null, run_by: "" },
+    problems: [],
+    change_reason: null,
+    editors: [],
+    requested_by: null,
+    requested_at: null,
+    approved_at: null,
+    signature: null,
+    editable: false,
+    catalog: [],
+    answer_labels: {},
+    expected_labels: {} as GuideVersion["expected_labels"],
+    report_types: [],
+    core_rule: "",
+    never_decides: "",
+    scale_note: "",
+    starter_mark: "",
+    practice_label: null,
+    ...over,
+  }) as GuideVersion;
+
+const IN_USE = guideVersion({});
+const PREPARED = guideVersion({
+  version: 3,
+  code: "US-v3",
+  state: "AWAITING_APPROVAL",
+  requested_by: "Asha Menon",
+  change_reason: "Explain question 1 for our pumps",
+  approval: { may_approve: true, same_person: false, approvers: ["Rahul Iyer"], message: null },
+  question_set: {
+    ...IN_USE.question_set,
+    questions: [
+      { ...US_QUESTIONS[0], explanation: "A death of anyone the device touched." },
+      US_QUESTIONS[1],
+      { ...q("X1", "Is the device part of VMSR?", ""), extra: true },
+    ],
+  },
+});
+
+function showEdit(open: GuideVersion | null, permissions?: string[]) {
+  resources.data = {
+    "/api/v1/decision-trees": TREES,
+    [GUIDES]: {
+      markets: [
+        {
+          market: "US",
+          label: "United States (FDA)",
+          enabled: true,
+          current: { ...IN_USE, title: IN_USE.title, questions: 2, extra_questions: 0, tests: 6 },
+          open: open ? { ...open, problems: [], editors: ["Asha Menon"] } : null,
+          history: [],
+        },
+      ],
+    },
+    [`${GUIDES}/US/versions/2`]: IN_USE,
+    [`${GUIDES}/US/versions/3`]: open,
+  };
+  return render(<DecisionTreesSection />, api(permissions, "regulatory", "?mode=edit&market=US"));
+}
+
+describe("D2.6: Edit this tree on the same tab", () => {
+  it("shows the questions as read-only rows with a pencil, the regulation's text and clause always locked", () => {
+    const html = showEdit(null);
+    expect(html).toContain('aria-pressed="true">Edit this tree</button>');
+    expect(html).toContain("The regulation&#x27;s text, locked · 21 CFR 803.50(a)(1)");
+    expect(html).toContain('aria-label="Edit question 1&#x27;s explanation"');
+    expect(html).not.toContain("<textarea");
+    expect(html).toContain("Add an extra question");
+    expect(html).toContain("6 of 6 worked complaints pass");
+    expect(html).toContain("A reportable outcome creates the Form FDA 3500A (eMDR).");
+  });
+
+  it("tests and sends for approval with one button", () => {
+    const draft3 = guideVersion({ ...PREPARED, state: "DRAFT", approval: null });
+    const html = showEdit(draft3);
+    expect(html).toContain("Your version 3 (draft) · version 2 in use");
+    expect(html).toContain("Test against the worked complaints and send for approval</button>");
+    expect(html).not.toContain(">Send for approval<");
+  });
+
+  it("shows the approver only what changed, read-only, with password and authenticator code", () => {
+    const html = showEdit(PREPARED);
+    expect(html).toContain("What changes in version 3");
+    expect(html).toContain("Q1 · your explanation");
+    expect(html).toContain("A death of anyone the device touched.");
+    expect(html).toContain("Extra question · added, never changes the conclusion");
+    expect(html).not.toContain('aria-label="Edit question');
+    expect(html).toContain("Prepared by Asha Menon.");
+    expect(html).toContain('aria-label="Authenticator code"');
+    expect(html).toContain("Approve version 3</button>");
+    expect(guideChanges(IN_USE, PREPARED).map((change) => change.label)).toEqual([
+      "Q1 · your explanation",
+      "Extra question · added, never changes the conclusion",
+    ]);
   });
 });

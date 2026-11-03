@@ -1,7 +1,9 @@
 import { Panel } from "../../admin/console/charts";
 import { errorText, useResource } from "../../customer-admin/shared";
 import type { Trees } from "../decisionTrees";
+import { useTabParam } from "../workspaceContext";
 import { TreeAnswer } from "./TreeAnswer";
+import { TreeEdit } from "./TreeEdit";
 
 export { TREE_NAMES, treePlace, type TreeMarket, type TreeNode, type TreePath, type Trees } from "../decisionTrees";
 
@@ -13,11 +15,25 @@ export { TREE_NAMES, treePlace, type TreeMarket, type TreeNode, type TreePath, t
  */
 export function DecisionTreesSection() {
   const all = useResource<Trees>("/api/v1/decision-trees");
+  const [mode, setMode] = useTabParam("mode");
   if (!all.data)
     return (
       <Panel eyebrow="Decision trees" title="Is it reportable, and by when?" source={all}>
         {all.state === "error" && <p className="ac-muted">{errorText(all.error, "The trees could not be read.")}</p>}
       </Panel>
     );
-  return <TreeAnswer trees={all.data} />;
+  const edit = mode === "edit";
+  return (
+    <div className="dt-page">
+      <div className="dt-modes" role="group" aria-label="Mode">
+        <button type="button" aria-pressed={!edit} onClick={() => setMode(null)}>
+          Answer
+        </button>
+        <button type="button" aria-pressed={edit} onClick={() => setMode("edit")}>
+          Edit this tree
+        </button>
+      </div>
+      {edit ? <TreeEdit trees={all.data} /> : <TreeAnswer trees={all.data} />}
+    </div>
+  );
 }

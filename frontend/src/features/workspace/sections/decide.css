@@ -63,6 +63,8 @@
 .dt-sign-btn {
   justify-self: stretch;
   justify-content: center;
+  text-align: center;
+  white-space: normal;
 }
 .dt-signature {
   margin: 0;
@@ -109,6 +111,125 @@
 }
 .dt-flag .dt-tag {
   justify-self: start;
+}
+
+/* Answer · Edit this tree (D2.6). */
+.dt-page {
+  display: grid;
+  gap: var(--ms-space-3);
+}
+.dt-modes {
+  display: inline-flex;
+  justify-self: start;
+  padding: 3px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-surface);
+}
+.dt-modes button {
+  min-height: 32px;
+  padding: 4px 16px;
+  border: 0;
+  border-radius: var(--ms-radius-pill);
+  background: transparent;
+  color: var(--ms-ink-2);
+  font: inherit;
+  font-weight: var(--ms-fw-semibold);
+  cursor: pointer;
+}
+.dt-modes button[aria-pressed="true"] {
+  background: var(--ms-navy);
+  color: var(--ms-surface);
+}
+.dt-locked {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.dt-own {
+  margin: 4px 0 0;
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-14);
+}
+.dt-q-body .dt-hint {
+  margin-top: 4px;
+}
+.dt-pencil {
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  min-height: 32px;
+}
+.dt-editbox {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0 0 34px;
+}
+.dt-editbox label {
+  display: grid;
+  gap: 4px;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.dt-editbox input,
+.dt-editbox textarea {
+  padding: 6px 10px;
+  border: 1px solid var(--ms-line-control);
+  border-radius: var(--ms-radius-sm);
+  font: inherit;
+  font-size: var(--ms-fs-14);
+}
+.dt-add {
+  justify-self: start;
+  margin-top: 10px;
+  min-height: 32px;
+}
+.dt-big.dt-big-sm {
+  font-size: var(--ms-fs-16);
+}
+.dt-success {
+  padding: 8px 10px;
+  border-radius: var(--ms-radius-sm);
+  background: var(--ms-good-bg);
+  color: var(--ms-good);
+  font-weight: var(--ms-fw-semibold);
+}
+.dt-diffs {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.dt-ba {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+.dt-ba > div {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--ms-radius-sm);
+  font-size: var(--ms-fs-14);
+}
+.dt-ba small {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-bold);
+  text-transform: uppercase;
+}
+.dt-before {
+  background: var(--ms-crit-bg);
+}
+.dt-after {
+  background: var(--ms-good-bg);
+}
+.dt-locked-note {
+  margin: 0;
 }
 
 .dt-answer {
@@ -209,6 +330,7 @@
   font-size: var(--ms-fs-16);
 }
 .dt-rail {
+  min-width: 0;
   position: sticky;
   top: 12px;
   display: grid;
@@ -512,6 +634,12 @@
   .dt-unknown,
   .dt-note {
     margin-left: 0;
+  }
+  .dt-ba {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dt-editbox {
+    padding-left: 0;
   }
   .dt-mini {
     position: sticky;
