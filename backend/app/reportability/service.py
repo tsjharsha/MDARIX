@@ -71,10 +71,14 @@ def awareness(complaint: Complaint, linked: datetime | None = None) -> tuple[dat
     """When the organization became aware: the earliest of the awareness, received and recorded times (as the case's
     regulatory review reads it; the earliest only ever makes a due date earlier), and which of them it is. ``linked``:
     the earliest awareness among the sources a person linked to this complaint (G20, intake/service.py), which then
-    counts too. The market's counting rule takes its day in each time zone (deadlines.py)."""
+    counts too. The market's counting rule takes its day in each time zone (deadlines.py). With neither an awareness
+    nor a received date, the event date counts too (``EVENT_DATE``, 0.10.81: the earliest the record has, never
+    called "received"); the clock is then provisional."""
+    unknown = complaint.awareness_timestamp is None and complaint.complaint_timestamp is None
     moments = [
         (_moment(complaint.awareness_timestamp), "AWARENESS_DATE"),
         (_moment(complaint.complaint_timestamp), "RECEIVED_DATE"),
+        (_moment(complaint.event_timestamp) if unknown else None, "EVENT_DATE"),
         (_moment(complaint.recorded_timestamp), "RECORDED_DATE"),
         (_moment(linked), "LINKED_SOURCE"),
     ]

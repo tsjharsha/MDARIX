@@ -2,6 +2,7 @@
 
 - F1: re-signing a market conclusion with another report type moves the open report with it (type, due date,
   provisional flag), audited; a submitted report is never changed, only flagged.
+- F10: an imported blank received date stays blank; the clock counts from the event date, named so.
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -134,3 +135,24 @@ def test_f5_a_great_britain_or_canada_complaint_gets_its_assessment_and_clock_an
         assert [entry["market"] for entry in item["markets"]] == [market]
         detail = _ok(user.get(f"/api/v1/complaints/{item['id']}/market-assessments"))
         assert market in detail["enabled_markets"]
+
+
+def test_f10_a_blank_received_date_stays_blank_and_the_event_date_is_named_as_such(trial):
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    _import(
+        user,
+        "complaint_id,product_id,description,event_date,received_date,awareness_date,country,patient_involved,"
+        "serious_injury,death,malfunction\n"
+        "F10-1,F10-PUMP,Pump alarm failed; no harm.,2026-10-20,,,US,N,N,N,Y\n",
+    )
+    from backend.app.db.models.foundation import Complaint
+    from backend.app.db.tenant_scope import bind_tenant
+
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        row = db.query(Complaint).filter(Complaint.complaint_identifier == "F10-1").one()
+        assert row.complaint_timestamp is None and row.event_timestamp is not None
+    item = _watch(user, "F10-1")
+    # Still the conservative start (the event day), but named as the event date, never "received".
+    assert (item["aware_source"], item["aware_date"]) == ("EVENT_DATE", "2026-10-20")
+    assert item["received_date"] is None

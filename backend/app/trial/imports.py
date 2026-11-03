@@ -1978,7 +1978,8 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             "product_version_id": version.id if version else (lot.product_version_id if lot else None),
             "lot_batch_id": lot.id if lot else None,
             "event_timestamp": event,
-            "complaint_timestamp": received or event,
+            # Only the received date the file gives (0.10.81, F10): an event date is never shown as "received".
+            "complaint_timestamp": received,
             "description": row["description"],
             "status": (row.get("status") or "open").lower(),
             **_complaint_details(row),

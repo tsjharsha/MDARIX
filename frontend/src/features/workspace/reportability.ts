@@ -103,7 +103,7 @@ export type WatchItem = {
   aware_date: string | null;
   /** When the organization became aware (the day shown is the reader's, as on triage). */
   aware_at?: string | null;
-  aware_source: "AWARENESS_DATE" | "RECEIVED_DATE" | "RECORDED_DATE" | "LINKED_SOURCE" | null;
+  aware_source: "AWARENESS_DATE" | "RECEIVED_DATE" | "EVENT_DATE" | "RECORDED_DATE" | "LINKED_SOURCE" | null;
   days_since_aware: number | null;
   triggers: Trigger[];
   clocks: Clock[];
@@ -193,6 +193,7 @@ export const windowLength = (window: Pick<ReportingWindow, "days" | "day_basis">
 export const AWARE_SOURCE: Record<string, string> = {
   AWARENESS_DATE: "awareness date",
   RECEIVED_DATE: "received date (no awareness date recorded)",
+  EVENT_DATE: "event date (no awareness or received date)",
   RECORDED_DATE: "recorded date (no awareness or received date)",
   LINKED_SOURCE: "earlier linked source (a logged call or intake about the same event)",
 };

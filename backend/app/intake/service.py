@@ -172,9 +172,19 @@ def event_awareness(event: IntakeEvent, record: TriageRecord | None = None) -> d
 def complaint_awareness(complaint: Complaint, record: TriageRecord | None = None) -> dict:
     if record is not None and record.awareness_confirmed_at is not None:
         return {"at": rules.utc(record.awareness_confirmed_at), "source": "CONFIRMED", "unresolved": False}
+    # With neither an awareness nor a received date, the event date counts too (0.10.81, as the watch does).
+    event = (
+        complaint.event_timestamp
+        if complaint.awareness_timestamp is None and complaint.complaint_timestamp is None
+        else None
+    )
     return rules.awareness(
         complaint.awareness_timestamp,
-        [(complaint.complaint_timestamp, "RECEIVED"), (complaint.recorded_timestamp, "SOURCE_DATE")],
+        [
+            (complaint.complaint_timestamp, "RECEIVED"),
+            (event, "EVENT_DATE"),
+            (complaint.recorded_timestamp, "SOURCE_DATE"),
+        ],
         complaint.ingestion_timestamp or complaint.created_at,
         earliest=True,
     )
