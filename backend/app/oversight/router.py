@@ -975,6 +975,17 @@ def _complaint(db, tenant_id, complaint_id) -> Complaint:
     return complaint
 
 
+def harm_words(complaint) -> str:
+    """The reported harm in plain words: a death, a serious injury, none reported, or not known yet (a blank flag)."""
+    if complaint.death:
+        return "Death"
+    if complaint.serious_injury:
+        return "Serious injury"
+    if complaint.serious_injury is None and complaint.death is None:
+        return "Not known yet"
+    return "No harm reported"
+
+
 def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict:
     from backend.app.reportability import facts, markets
     from backend.app.reportability.deadlines import day_only
@@ -1025,6 +1036,10 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
             else "PATIENT_INVOLVED"
             if complaint.patient_involved
             else None,
+            # The harm in words, apart from whether a patient was involved (0.10.82, U-18): a blank serious-injury
+            # flag is "not known yet", never "no harm".
+            "harm_words": harm_words(complaint),
+            "patient_involved": complaint.patient_involved,
             "market": markets.market_of(complaint.country),
             "awareness_at": _iso(complaint.awareness_timestamp),
             # A day given without a time is shown as a date (0.10.81, U-06).

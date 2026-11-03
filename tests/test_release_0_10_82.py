@@ -152,3 +152,20 @@ def test_home_tiles_are_the_counts_of_the_lists_they_open_and_open_complaints_ar
     overdue = {item["id"] for item in listed if any(due["state"] == "OVERDUE" for due in item["work"]["due"])}
     tile = _ok(user.get("/api/v1/complaints", params={"view": "overdue", "page": 1, "page_size": 200}))
     assert overdue and tile["total"] == len(overdue) == len({item["id"] for item in tile["items"]} & overdue)
+
+
+def test_the_complaint_page_gives_the_harm_in_words_apart_from_patient_involvement(trial):
+    """D1.7, U-18: "Patient involved" is never the harm; a blank serious-injury flag is "Not known yet"."""
+    from types import SimpleNamespace
+
+    from backend.app.oversight.router import harm_words
+
+    event = _ok(trial["user"].get("/api/v1/oversight/events/SAMPLE-RV-11"))["event"]
+    assert (event["harm_words"], event["patient_involved"]) == ("No harm reported", True)
+    flags = [(True, None), (None, True), (None, None), (False, False)]
+    assert [harm_words(SimpleNamespace(death=d, serious_injury=s)) for d, s in flags] == [
+        "Death",
+        "Serious injury",
+        "Not known yet",
+        "No harm reported",
+    ]

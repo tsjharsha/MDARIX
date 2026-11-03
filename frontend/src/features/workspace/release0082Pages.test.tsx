@@ -152,3 +152,88 @@ describe("Home for every persona (D1.6)", () => {
     delete resources.data[trendPath("version").split("?")[0]];
   });
 });
+
+describe("the complaint page (D1.7, D1.8)", () => {
+  const page = (event: Partial<ReturnType<typeof rv11>["event"]>, extra: Partial<ReturnType<typeof rv11>> = {}) => {
+    const view = rv11();
+    resources.data[eventPath("SAMPLE-RV-11")] = { ...view, ...extra, event: { ...view.event, ...event } };
+    resources.data[ONE_STORY_PATH] = { sample: null, yours: null };
+    return render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />);
+  };
+
+  it("gives the harm in words, with patient involvement as its own line", () => {
+    const html = page({ harm: "PATIENT_INVOLVED", harm_words: "No harm reported", patient_involved: true });
+    expect(html).toContain("No harm reported");
+    expect(html).not.toMatch(/ms-chip-harm[^"]*"><span[^>]*>[^<]*<\/span>Patient involved/);
+    expect(html).toMatch(/ms-chip-harm[^"]*"><span[^>]*>[^<]*<\/span>No harm reported/);
+    expect(html).toContain("<dt>Patient involved</dt><dd>Yes</dd>");
+    expect(page({ harm: null, harm_words: "Not known yet" })).toContain("Not known yet");
+  });
+
+  it("never writes a checklist line that contradicts itself", () => {
+    const view = rv11();
+    const html = page(
+      {},
+      {
+        checklist: [
+          {
+            ...view.checklist[0],
+            code: "TRIAGE",
+            label: "Triage is complete",
+            detail: "On the triage list: its triage record is not complete",
+          },
+        ],
+      },
+    );
+    expect(html).not.toContain("Triage is complete.");
+    expect(html).toContain("<strong>Triage record:</strong> On the triage list: its triage record is not complete");
+  });
+
+  it("asks each missing fact once, and says where elsewhere", () => {
+    const needs = [
+      { fact: "COUNTRY", label: "Incident country", given: null, message: "No incident country.", rule: "21 CFR 803" },
+      { fact: "AWARENESS_DATE", label: "Awareness date", given: null, message: "No date.", rule: "21 CFR 803.50" },
+    ];
+    const html = page({ needs } as never);
+    expect(html.match(/Incident country needed\./g)).toHaveLength(1);
+    expect(html.match(/Awareness date needed\./g)).toHaveLength(1);
+    expect(html).toContain("Incident country asked below");
+    expect(html).toContain("Asked below");
+    expect(html).toContain("Asked above");
+  });
+
+  it("shows one clock line: whose clock, the time left and the day it ends", () => {
+    const view = rv11();
+    const due = view.work!.due[0];
+    const html = page(
+      {},
+      {
+        work: {
+          ...view.work!,
+          due: [
+            { ...due, key: "watch:x:facts", due_label: "Thu 5 Nov 2026, 23:59 IST", hours_left: 72 },
+            { ...due, key: "triage", category: "TRIAGE", category_label: "Triage target", hours_left: 5 },
+          ],
+        },
+      },
+    );
+    const chips = html.slice(html.indexOf('class="uw-cp-chips"'), html.indexOf("</header>"));
+    expect(chips.match(/ms-chip-deadline/g)).toHaveLength(1);
+    expect(chips).toMatch(/Shortest possible: [^<]* · due Thu 5 Nov</);
+  });
+
+  it("makes the progress steps links: Market assessment opens the tree, Report opens the report", () => {
+    const view = rv11();
+    const html = page(
+      {},
+      {
+        related: view.related!.map((group) =>
+          group.key === "reports" ? { ...group, items: [{ id: "r1", ref: "US MDR" }] } : group,
+        ),
+      },
+    );
+    const line = html.slice(html.indexOf('class="uw-stageline"'));
+    expect(line).toMatch(/<button type="button" class="ac-link">Market assessment<\/button>/);
+    expect(line).toMatch(/<button type="button" class="ac-link">Report<\/button>/);
+  });
+});

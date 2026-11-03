@@ -8144,6 +8144,7 @@ button.uw-org:hover {
   padding: 12px 16px 12px 20px;
 }
 .uw-home-trend-title {
+  font-weight: 600;
   margin: 0 0 6px;
   font-size: var(--ms-fs-16);
   line-height: 1.35;

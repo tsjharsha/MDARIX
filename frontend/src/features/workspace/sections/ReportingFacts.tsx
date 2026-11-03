@@ -23,10 +23,13 @@ export function ReportingFacts({
   complaintId,
   needs,
   onSaved,
+  quiet = false,
 }: {
   complaintId: string;
   needs: FactNeed[] | null | undefined;
   onSaved: () => void;
+  /** Another form on the page holds the main button (the triage record): this one is secondary (0.10.82). */
+  quiet?: boolean;
 }) {
   const canEnter = useCanReport();
   const [values, setValues] = useState<Record<string, string>>({});
@@ -74,7 +77,12 @@ export function ReportingFacts({
         </div>
       ))}
       {canEnter ? (
-        <button type="button" className="ac-primary" disabled={busy || !ready} onClick={save}>
+        <button
+          type="button"
+          className={quiet ? "ac-secondary" : "ac-primary"}
+          disabled={busy || !ready}
+          onClick={save}
+        >
           {busy ? "Saving…" : "Save"}
         </button>
       ) : (

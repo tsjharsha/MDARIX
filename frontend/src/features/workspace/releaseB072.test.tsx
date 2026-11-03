@@ -162,7 +162,7 @@ describe("B3: the complaint page shows one action per row and does the triage it
     // the highlights panel's path instead of a "Stage by stage" list.
     expect(page()).toContain('Summary: "Details"');
     expect(page()).toContain("<dt>Problem</dt>");
-    expect(page()).toContain("<StagePath stages={view.stages} />");
+    expect(page()).toMatch(/<StagePath\s+stages={view\.stages}/);
   });
   it("leads with the intake decision summary once step 4 is reached (Addendum 2)", () => {
     expect(page()).toContain("<summary>The full complaint record</summary>");

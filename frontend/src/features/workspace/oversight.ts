@@ -176,6 +176,9 @@ export type EventView = {
     lot?: string | null;
     country?: string | null;
     harm?: "DEATH" | "SERIOUS_INJURY" | "PATIENT_INVOLVED" | null;
+    /** 0.10.82 (U-18): the harm in words, and whether a patient was involved, apart from it. */
+    harm_words?: string;
+    patient_involved?: boolean | null;
   };
   summary: {
     nearest_deadline: { title: string; due_at: string; opens: Opens } | null;
