@@ -72,7 +72,10 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
           tone="over"
           value={reading ? null : counts.overdue}
           title="Overdue"
-          detail={counts.overdue ? "Past their time: act on these first" : "Nothing past its time"}
+          // Never an all-clear before the data has arrived (0.10.81, U-07).
+          detail={
+            reading ? "Reading…" : counts.overdue ? "Past their time: act on these first" : "Nothing past its time"
+          }
         />
         <Stat
           tone="soon"
@@ -128,7 +131,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
           </section>
         )}
         <div className="uw-home-side">
-          {persona === "regulatory" && <LegalClocks clocks={clocks} onOpen={go} />}
+          {persona === "regulatory" && <LegalClocks clocks={clocks} onOpen={go} reading={reading} />}
           {(persona === "investigator" || persona === "risk") && <OpenInvestigations />}
           <section className="uw-card uw-card-pad uw-home-trend" aria-labelledby="home-trend">
             <span className="ac-eyebrow" id="home-trend">
@@ -238,7 +241,15 @@ function HomeHero() {
 }
 
 /** The Regulatory Leader's legal clocks: each market's deadline, soonest first, with how much time is used. */
-function LegalClocks({ clocks, onOpen }: { clocks: OversightItem[]; onOpen: (item: OversightItem) => void }) {
+export function LegalClocks({
+  clocks,
+  onOpen,
+  reading = false,
+}: {
+  clocks: OversightItem[];
+  onOpen: (item: OversightItem) => void;
+  reading?: boolean;
+}) {
   return (
     <section className="uw-card" aria-labelledby="home-clocks">
       <div className="uw-card-head">
@@ -270,7 +281,9 @@ function LegalClocks({ clocks, onOpen }: { clocks: OversightItem[]; onOpen: (ite
           ))}
         </ul>
       ) : (
-        <p className="ac-muted uw-card-pad">No legal clock is running.</p>
+        <p className="ac-muted uw-card-pad" role={reading ? "status" : undefined}>
+          {reading ? "Reading the legal clocks…" : "No legal clock is running."}
+        </p>
       )}
     </section>
   );
