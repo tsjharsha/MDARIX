@@ -807,8 +807,19 @@ def follow_conclusion(db, ctx, tenant_id, complaint_id, market: str, signed, now
                 pending.append(row.id)
             row.state = "SUPERSEDED"
     before = existing.state
+    old = {"state": before, "note": existing.note}
     existing.state, existing.note, existing.updated_at = rules.CANCELLED, reason, now
-    _audit(db, ctx, "REPORT_CANCELLED", existing, reason=reason, state_before=before, version=signed.version)
+    _audit(
+        db,
+        ctx,
+        "REPORT_CANCELLED",
+        existing,
+        old,
+        {"state": rules.CANCELLED, "note": reason},
+        reason=reason,
+        state_before=before,
+        version=signed.version,
+    )
     return pending
 
 
@@ -963,6 +974,7 @@ def set_field(
     if field.missing == forms.NOT_USED:
         raise _error(422, "FIELD_NOT_USED", "This field is not used in this report")
     entries = dict(obligation.entries or {})
+    before = entries.get(field_id)
     coded = bool(field.source and field.source.startswith("imdrf_"))
     if payload.codes and not coded:
         raise _error(422, "NOT_A_CODE_FIELD", "Only an IMDRF code field takes codes")
@@ -1001,6 +1013,9 @@ def set_field(
         ctx,
         "REPORT_FIELD_SET",
         obligation,
+        # The field's entry before and after (0.10.81, F7): an overwritten value stays in the audit trail.
+        _entry_values(field_id, before),
+        _entry_values(field_id, entries.get(field_id)),
         field=field_id,
         cleared=payload.clear,
         confirmed=payload.confirmed,
@@ -1008,6 +1023,14 @@ def set_field(
     )
     db.commit()
     return detail(db, control_db, ctx, obligation)
+
+
+def _entry_values(field_id: str, entry: dict | None) -> dict:
+    """A worksheet entry as the audit keeps it: its value, codes and whether it was a confirmation."""
+    entry = entry or {}
+    return {
+        field_id: {key: entry[key] for key in ("value", "codes", "code_state", "confirmed") if entry.get(key)} or None
+    }
 
 
 def _conclusion(context: dict, market: str):

@@ -7,6 +7,7 @@
   import rows are flagged.
 - F6: report fields take dates and codes only; a bad stored value is flagged.
 - F12: the EU and GB MIR forms never pre-fill 1.2d or 3.2c.
+- F7: report fields, product identity, registrations and responsible parties are audited before and after.
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -278,3 +279,51 @@ def test_f12_the_mir_forms_never_pre_fill_the_reportability_date_or_the_device_l
     assert fields["1_2D"]["value"] is None and fields["1_2D"]["source"] is None and fields["1_2D"]["note"]
     assert fields["3_2C"]["value"] is None and fields["3_2C"]["status"] == "MUST_HAVE"
     assert "3_2C" in detail["mandatory"]["missing"]
+
+
+def test_f7_report_fields_product_identity_registrations_and_parties_are_audited_before_and_after(trial):
+    from backend.app.db.models.foundation import Product
+    from backend.app.db.tenant_scope import bind_tenant
+
+    user, complaint, tenant_id = trial["user"], trial["complaint"], trial["tenant_id"]
+    (report,) = _reports(user, complaint)
+    from backend.app.db.models.authority_reports import ReportObligation
+
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        db.get(ReportObligation, uuid.UUID(report["id"])).state = "DRAFT"
+        db.commit()
+    path = f"{REPORTS}/{report['id']}/fields/B4"
+    _ok(user.put(path, json={"value": "2026-11-02"}))
+    _ok(user.put(path, json={"value": "2026-11-04"}))
+    changed = _audit(tenant_id, "REPORT_FIELD_SET")[-1]
+    assert changed.old_values == {"B4": {"value": "2026-11-02"}} and changed.new_values == {
+        "B4": {"value": "2026-11-04"}
+    }
+
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        product = db.query(Product).filter(Product.tenant_id == tenant_id).order_by(Product.created_at).first()
+        product_id, udi = str(product.id), product.udi_di
+    reference = "/api/v1/regulatory-reference"
+    _ok(user.put(f"{reference}/products/{product_id}/identity", json={"udi_di": "00812345678918"}))
+    (identity,) = [event for event in _audit(tenant_id, "PRODUCT_IDENTITY_SET")][-1:]
+    assert identity.old_values["udi_di"] == udi and identity.new_values["udi_di"] == "00812345678918"
+    added = _ok(
+        user.post(
+            f"{reference}/products/{product_id}/registrations",
+            json={"market": "US", "registration_type": "510K", "registration_number": "K260001", "product_code": "FRN"},
+        )
+    )
+    assert user.delete(f"{reference}/products/{product_id}/registrations/{added['id']}").status_code == 204
+    (removed,) = _audit(tenant_id, "PRODUCT_REGISTRATION_REMOVED")[-1:]
+    assert removed.old_values["registration_number"] == "K260001" and removed.new_values is None
+    party = _ok(
+        user.put(
+            f"{reference}/responsible-parties",
+            json={"market": "US", "role": "MANUFACTURER", "organisation": "F7 Devices"},
+        )
+    )
+    assert user.delete(f"{reference}/responsible-parties/{party['id']}").status_code == 204
+    (gone,) = _audit(tenant_id, "RESPONSIBLE_PARTY_REMOVED")[-1:]
+    assert gone.old_values["organisation"] == "F7 Devices"
