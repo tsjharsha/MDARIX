@@ -1,7 +1,7 @@
 // 0.10.84: the independent rating's defects on the combined D1 + D2 build, each with the test that fails before.
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { legalClocks } from "./home";
 import type { OversightItem } from "./oversight";
@@ -10,7 +10,8 @@ import { HomeSection, HomeStory } from "./sections/Home";
 import { TrendBars } from "./sections/OneStory";
 import type { TrendItem } from "./signalAi";
 import { ComplaintPage, clockPrefix } from "./sections/ComplaintPage";
-import { ONE_STORY_PATH, type StoryRun } from "./oneStory";
+import { ONE_STORY_PATH, stepPlace, type StoryRun } from "./oneStory";
+import { NewRecordsSection } from "./sections/Records";
 import { eventPath } from "./oversight";
 import { IMPORTED_SOURCE } from "./complaintList";
 import { rv11 } from "../../test/rv11";
@@ -23,6 +24,11 @@ vi.mock("../customer-admin/shared", async (original) => ({
     return { state: "ready", data: value, reload: () => undefined };
   },
 }));
+
+// Each test sets the server's answers it needs.
+beforeEach(() => {
+  resources.data = {};
+});
 
 const api = (overrides: Partial<WorkspaceApi> = {}) =>
   ({
@@ -154,11 +160,16 @@ describe("H3: once the country is known, the header names that market's clock", 
 
 describe("M1: the story is read again after every saved change", () => {
   it("tells the story's readers when send saves a change", async () => {
-    const { onSaved, send } = await vi.importActual<typeof import("../customer-admin/shared")>(
-      "../customer-admin/shared",
+    const { onSaved, send } =
+      await vi.importActual<typeof import("../customer-admin/shared")>("../customer-admin/shared");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("{}", { status: 200 })),
     );
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
-    vi.stubGlobal("window", Object.assign(new EventTarget(), { setTimeout, clearTimeout, location: { pathname: "/app" } }));
+    vi.stubGlobal(
+      "window",
+      Object.assign(new EventTarget(), { setTimeout, clearTimeout, location: { pathname: "/app" } }),
+    );
     try {
       const heard = vi.fn();
       const stop = onSaved(heard);
@@ -211,5 +222,47 @@ describe("M3: the finale says the trend check's own verdict, with its own number
     // The bars carry the trend check's numbers: 1.0 expected, as Trends shows it, not 0.99.
     expect(html).toContain(">1.0<");
     expect(html).not.toContain("0.99");
+  });
+});
+
+describe("M4: step 9 opens the finished record in Records, and Your data's step 10 your own trend", () => {
+  it("opens Records on the story's record, and Trends on the story's own product", () => {
+    expect(stepPlace(storyRun(), 8)).toEqual({ section: "Records", tab: "Decision records?complaint=FIC-2001" });
+    const yours = storyRun({ complaint: { ...storyRun().complaint, product_ref: "FIC-NEB-20" } });
+    expect(stepPlace(yours, 9)).toEqual({ section: "Trends", tab: "Trend check?product=FIC-NEB-20" });
+    // Never the sample's OrbitCare rise on your data.
+    expect(stepPlace(storyRun(), 9).tab).not.toContain("SAMPLE-ORBIT-300");
+  });
+
+  it("leads Records with what the story finished: the signed conclusion, the report and who signed", () => {
+    const view = rv11();
+    view.related = [
+      {
+        key: "assessments",
+        label: "Market assessments",
+        count: 1,
+        lines: ["United States (FDA): reportable, signed 2026-11-03"],
+      },
+      {
+        key: "reports",
+        label: "Authority reports",
+        count: 1,
+        lines: ["United States (FDA) · FDA 3500A · submitted"],
+        items: [{ id: "r1", ref: "US" }],
+      },
+      { key: "decisions", label: "Decision records", count: 1, lines: ["Report approved 2026-11-03 by Rahul Iyer"] },
+    ];
+    resources.data[eventPath("SAMPLE-RV-11")] = view;
+    resources.data["/api/v1/oversight/latest-signed"] = { record: null };
+    const html = render(
+      <NewRecordsSection tab="Decision records?complaint=SAMPLE-RV-11" />,
+      api({ session: { user_id: "u1", business_permissions: ["data.export"] } as never }),
+    );
+    expect(html).toContain("The record you just finished");
+    expect(html).toContain("SAMPLE-RV-11 · ready for an inspector");
+    expect(html).toContain("United States (FDA): reportable, signed 2026-11-03");
+    expect(html).toContain("Report approved 2026-11-03 by Rahul Iyer");
+    expect(html).toContain("Download the decision record (PDF)");
+    expect(html).toContain("Open the report");
   });
 });

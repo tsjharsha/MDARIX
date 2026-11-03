@@ -108,7 +108,7 @@ describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
     expect(stepPlace(run, 0).tab).toBe("Summary?ref=SAMPLE-RV-11");
     expect(stepPlace(run, 2)).toEqual({ section: "Decision trees", tab: "?market=US&complaint=sample-id" });
     expect(stepPlace(run, 5)).toEqual({ section: "Reports", tab: "?report=r1" });
-    expect(stepPlace(run, 8)).toEqual({ section: "Records" });
+    expect(stepPlace(run, 8)).toEqual({ section: "Records", tab: "Decision records?complaint=SAMPLE-RV-11" });
     expect(stepPlace(run, 9).tab).toBe("Trend check?product=SAMPLE-ORBIT-300");
     // Before the report exists, its steps open the tree, where signing "reportable" creates it.
     expect(stepPlace(runAt("sample", 4), 5).section).toBe("Decision trees");

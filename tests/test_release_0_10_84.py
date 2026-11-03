@@ -76,3 +76,12 @@ def test_a_complaint_waiting_for_its_country_never_says_no_market_to_assess(fic)
     assert "No market to assess" not in json.dumps(event)
     (group,) = [group for group in event["related"] if group["key"] == "assessments"]
     assert group["lines"] == ["Waits for the incident country, asked on the complaint's page"]
+
+
+def test_the_story_names_its_products_identifier_so_step_10_opens_your_own_trend(fic):
+    """M4: Your data's step 10 opened the sample's OrbitCare rise; the story now carries each run's product identifier,
+    which the trend check opens on."""
+    story = _ok(fic["user"].get(STORY))
+    assert story["yours"]["complaint"]["ref"] == "FIC-2001"
+    assert story["yours"]["complaint"]["product_ref"] == "FIC-PUMP"
+    assert story["sample"]["complaint"]["product_ref"].startswith("SAMPLE-")

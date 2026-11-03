@@ -89,7 +89,7 @@ function stepCopy(run: StoryRun, index: number): { h: string; p: string; b: stri
       : {
           h: "Is it happening elsewhere?",
           p: "Trends compare each product version with its own history, per unit in the field where your file has units. A short history says what it can show now.",
-          b: "Open Trends",
+          b: "Open your product's trend",
         },
   ][index];
   return copy;

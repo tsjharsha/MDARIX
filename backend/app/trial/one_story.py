@@ -138,9 +138,19 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
     from backend.app.reportability import facts, markets
     from backend.app.reportability import service as reporting_service
 
+    from backend.app.db.models.foundation import Product
+
     complaint = subject(data, control_db, tenant_id, run)
     if complaint is None:
         return None
+    # The product's own identifier, which the trend check opens on (0.10.84, M4: your data's trend, not the sample's).
+    product_ref = (
+        data.query(Product.product_identifier)
+        .filter(Product.tenant_id == tenant_id, Product.id == complaint.product_id)
+        .scalar()
+        if complaint.product_id
+        else None
+    )
     market = markets.market_of(complaint.country)
     found = closure.facts(data, tenant_id, complaint)
     record = found["record"]
@@ -161,6 +171,7 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
             "ref": complaint.complaint_identifier,
             "description": complaint.description,
             "product_id": str(complaint.product_id) if complaint.product_id else None,
+            "product_ref": product_ref,
             "serious_injury": bool(complaint.serious_injury),
             "death": bool(complaint.death),
         },

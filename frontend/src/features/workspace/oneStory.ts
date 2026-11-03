@@ -21,6 +21,8 @@ export type StoryRun = {
     ref: string;
     description: string | null;
     product_id: string | null;
+    /** The product's own identifier, which the trend check opens on (0.10.84). */
+    product_ref?: string | null;
     serious_injury: boolean;
     death: boolean;
   };
@@ -87,11 +89,17 @@ export function stepPlace(run: StoryRun, index: number): Place {
   if (index <= 3 || (index <= 7 && !run.report_id))
     return run.market ? treePlace(run.market, run.complaint.id) : complaint;
   if (index <= 7) return reportPlace(run.report_id!);
-  if (index === 8) return { section: "Records" };
-  return run.run === "sample"
-    ? { section: "Trends", tab: "Trend check?product=SAMPLE-ORBIT-300" }
-    : { section: "Trends" };
+  // Records opens on the record just finished, and Trends on the story's own product: the sample's real rise, or your
+  // data's product, never the sample's on your data (0.10.84, M4).
+  if (index === 8) return { section: "Records", tab: recordsTab(run.complaint.ref) };
+  const product = run.run === "sample" ? "SAMPLE-ORBIT-300" : run.complaint.product_ref;
+  return product
+    ? { section: "Trends", tab: `Trend check?${new URLSearchParams({ product })}` }
+    : { section: "Trends", tab: "Trend check" };
 }
+
+/** Records on the record one story finished: its decision record leads (Records reads ``complaint``). */
+export const recordsTab = (ref: string) => `Decision records?${new URLSearchParams({ complaint: ref })}`;
 
 /** Open a step: its own mark saved first where the step is the person's (the call, the report, Records, Trends). */
 export async function openStep(

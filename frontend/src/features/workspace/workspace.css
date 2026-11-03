@@ -8278,3 +8278,30 @@ details.uw-team-change[open] {
   color: var(--ms-teal);
   pointer-events: none;
 }
+
+/* The record a story just finished, on Records (0.10.84, M4): what was signed, the report and who signed. */
+.uw-finished {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 16px;
+}
+.uw-finished > div {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ms-line);
+}
+.uw-finished dt {
+  color: var(--ms-muted, #5b6770);
+  font-weight: 600;
+}
+.uw-finished dd {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .uw-finished > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
