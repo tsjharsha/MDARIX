@@ -2284,15 +2284,20 @@ def after_import(background, tenant_id, result: dict, *, source: str) -> dict:
     return result
 
 
-def insights(db: Session, tenant_id) -> dict:
-    """Counts and concentrations computed from the workspace's complaints; facts for a person to interpret."""
-    own = (
-        db.query(Complaint.id)
-        .filter(Complaint.tenant_id == tenant_id, Complaint.source_system == UPLOAD_SOURCE)
-        .first()
-        is not None
-    )
-    scope = UPLOAD_SOURCE if own else SAMPLE_SOURCE
+def insights(db: Session, tenant_id, source: str | None = None) -> dict:
+    """Counts and concentrations computed from the workspace's complaints; facts for a person to interpret. ``source``
+    names the data (the top bar's "Sample data · Your data", 0.10.80); without it, the imported data, else the sample."""
+    if source in (UPLOAD_SOURCE, SAMPLE_SOURCE):
+        scope = source
+    else:
+        own = (
+            db.query(Complaint.id)
+            .filter(Complaint.tenant_id == tenant_id, Complaint.source_system == UPLOAD_SOURCE)
+            .first()
+            is not None
+        )
+        scope = UPLOAD_SOURCE if own else SAMPLE_SOURCE
+    own = scope == UPLOAD_SOURCE
     # The columns the panel reads and each complaint's month, not whole records (insight_questions.COMPLAINT_COLUMNS);
     # the same filter as before and no order, so the complaints come in the same order.
     complaints = (

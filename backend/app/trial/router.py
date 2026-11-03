@@ -13,7 +13,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -258,6 +258,8 @@ for _path, _handler in (
 
 @router.get("/trial/insights")
 def trial_insights(
+    # The data to read (0.10.80): MDARIX_SAMPLE or TRIAL_UPLOAD; any other value, or none, reads as before.
+    source: str = Query("", max_length=40),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
@@ -266,7 +268,7 @@ def trial_insights(
     # Answered as it is: the insights hold only strings, numbers, booleans, lists and dicts, and for an import of 5,000
     # complaints FastAPI's generic conversion of its 100,000 values took longer than working them out (0.10.44). The
     # same bytes as before.
-    return JSONResponse(imports.insights(data, uuid.UUID(str(ctx.tenant_id))))
+    return JSONResponse(imports.insights(data, uuid.UUID(str(ctx.tenant_id)), source=source or None))
 
 
 @router.get("/trial/story")
