@@ -38,7 +38,7 @@ describe("website home", () => {
     expect(trialIncludes).toContain("AI is off during the trial: every step works by hand");
     const html = renderToStaticMarkup(<HomePage />);
     expect(html).toContain("In your free trial");
-    expect(html).toContain("Up to 3 users and 5,000 uploaded rows");
+    expect(html).toContain("Up to 50 people and 5,000 uploaded rows");
     expect(html).not.toContain("AI answers show their evidence");
   });
 

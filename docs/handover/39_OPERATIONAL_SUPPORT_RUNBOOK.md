@@ -85,8 +85,9 @@ new feature). Each judge gets their own free trial, with the sample data, and is
 3. **The activation.** The judge activates from the email and sets up an authenticator app at the first sign-in (ask
    them to bring a phone with one). If the email does not arrive, use "Resend invitation" in the queue, or issue a
    fresh activation link from the person's account (your own session must have passed MFA) and hand it over yourself.
-4. **A panel that shares one workspace.** A trial owner invites up to two colleagues (3 users per trial) in Getting
-   started > Team. Each colleague activates and sets up MFA in the same way.
+4. **A panel that shares one workspace.** A trial owner invites colleagues (up to 50 people per trial, the safety cap
+   `MDARIX_TRIAL_USER_CAP`) in Getting started > Team, choosing each colleague's persona. Each colleague activates
+   and sets up MFA in the same way.
 5. **On the day.** Sign-ups from one network address are limited to `MDARIX_SIGNUP_PER_ADDRESS_PER_HOUR` per hour
    (30 by default); the day's automatic approvals to `MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX` (company emails) and
    `MDARIX_TRIAL_AUTO_APPROVE_PERSONAL_DAILY_MAX` (personal emails). Raise them in `.env.production` before the event

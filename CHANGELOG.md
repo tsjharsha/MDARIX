@@ -10,6 +10,21 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.78] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): the trial's size, in words. Since 0.10.73 a trial holds up to 50
+people (the safety cap `MDARIX_TRIAL_USER_CAP`); the website and the legal text still said 3. No migration and no
+change to how the product behaves.
+
+### Changed
+- **Website:** the home page, the free trial page, the questions page and the search descriptions say "up to 50
+  people" instead of "up to 3 users".
+- **Free trial agreement** (`legal/trial-agreement.md`): "Users: up to 50 people from your organization", last
+  updated 3 November 2026. Its SHA-256 changes, so sign-ups from now on record the new version
+  (`onboarding_requests.legal_acceptance`); earlier acceptances keep the version they accepted.
+- `legal/README.md`, the support runbook and the trial guide's team picture ("3 people · up to 50") say the same.
+- The trial invitation e-mail already read the cap and is unchanged.
+
 ## [0.10.77] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): part C5 of Release C, "Codes", built to the owner-approved design (the
