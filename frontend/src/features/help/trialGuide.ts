@@ -163,12 +163,14 @@ export type JourneyStep = { key: JourneyKey; title: string; done: boolean; detai
 
 /** Three chapters tried is the point where a trial has felt the story (the Platform Admin's "engaged" is the same). */
 export const SAMPLE_CHAPTERS_GOAL = 3;
+/** The colleagues the journey's "Invite two colleagues" step asks for. */
+export const TEAM_GOAL = 2;
 
 /** The journey's steps with what is done, from the trial's own records (a signed-in person has opened and signed in). */
 export function journeyProgress(input: JourneyInput): JourneyStep[] {
-  const limit = Math.max(1, input.userLimit ?? 3);
   const invited = Math.max(0, (input.users ?? 1) - 1);
-  const wanted = limit - 1;
+  // "Invite two colleagues" (0.10.81, U-05): two, whatever the trial's user cap (50 since 0.10.73).
+  const wanted = TEAM_GOAL;
   const tried = input.chaptersTried ?? 0;
   const own = (input.ownComplaints ?? 0) + (input.ownRecords ?? 0);
   const detail: Record<JourneyKey, [boolean, string]> = {

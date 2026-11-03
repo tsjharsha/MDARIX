@@ -73,6 +73,12 @@ describe("free trial user guide", () => {
     });
     expect(all.every((step) => step.done)).toBe(true);
     expect(all.find((step) => step.key === "team")?.detail).toBe("2 of 2 colleagues invited");
+    // U-05 (0.10.81): with the trial's cap of 50, two colleagues still complete the step.
+    const capped = journeyProgress({ users: 4, userLimit: 50, chaptersTried: 0 });
+    expect(capped.find((step) => step.key === "team")).toMatchObject({
+      done: true,
+      detail: "2 of 2 colleagues invited",
+    });
   });
 
   it("shows the journey in Getting started with the next step and the guide one click away", () => {
