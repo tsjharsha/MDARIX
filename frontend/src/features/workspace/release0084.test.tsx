@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
-import { legalClocks } from "./home";
+import { DUE_WEEK_PATH, OVERDUE_PATH, legalClocks, nextActions, withSource } from "./home";
 import type { OversightItem } from "./oversight";
 import { OVERSIGHT } from "./oversight";
 import { HomeSection, HomeStory } from "./sections/Home";
@@ -13,7 +13,7 @@ import { ComplaintPage, clockPrefix } from "./sections/ComplaintPage";
 import { ONE_STORY_PATH, stepPlace, type StoryRun } from "./oneStory";
 import { NewRecordsSection } from "./sections/Records";
 import { eventPath } from "./oversight";
-import { IMPORTED_SOURCE } from "./complaintList";
+import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 import { rv11 } from "../../test/rv11";
 
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
@@ -133,9 +133,9 @@ const pendingApproval = () => {
 
 describe("H2: the Your data hero and the complaint header read the legal deadline, not an approval's due date", () => {
   it("says the legal deadline in the Your data hero on Home", () => {
-    resources.data[ONE_STORY_PATH] = { sample: null, yours: storyRun() };
     resources.data[eventPath("FIC-2001")] = pendingApproval();
-    const html = render(<HomeStory />, api({ dataSource: IMPORTED_SOURCE }));
+    const story = { state: "ready" as const, data: { sample: null, yours: storyRun() }, reload: () => undefined };
+    const html = render(<HomeStory story={story} />, api({ dataSource: IMPORTED_SOURCE }));
     expect(html).toContain("Its clock ends Tue 1 Dec.");
     expect(html).not.toContain("Wed 4 Nov");
   });
@@ -264,5 +264,84 @@ describe("M4: step 9 opens the finished record in Records, and Your data's step 
     expect(html).toContain("Report approved 2026-11-03 by Rahul Iyer");
     expect(html).toContain("Download the decision record (PDF)");
     expect(html).toContain("Open the report");
+  });
+});
+
+describe("M5: Home follows the Sample · Your data switch, and lists the complaint its hero names", () => {
+  const fic = (ref: string, id: string) =>
+    item({
+      key: `triage:COMPLAINT:${id}`,
+      category: "TRIAGE",
+      title: "Triage not done yet (urgent)",
+      ref,
+      complaint_id: id,
+      market: null,
+      due_at: "2026-11-04T10:00:00Z",
+      due_label: "Wed 4 Nov 2026, 15:30 IST",
+      hours_left: 20,
+    });
+  const items = [
+    item({ key: "obligation:s1", ref: "SAMPLE-RV-08", state: "OVERDUE", due_at: "2026-11-01T18:29:59Z" }),
+    fic("FIC-2002", "c2"),
+    fic("FIC-2003", "c3"),
+    fic("FIC-2004", "c4"),
+    fic("FIC-2005", "c5"),
+    fic("FIC-2006", "c6"),
+    fic("FIC-2001", "c-fic"),
+  ];
+  const trends = [
+    {
+      key: "orbit",
+      name: "OrbitCare 300 Rev B",
+      product: { id: "o", business_id: "PRD-1", identifier: "SAMPLE-ORBIT-300", name: "OrbitCare" },
+      recent: 9,
+      expected: 0.97,
+      ratio: 9.3,
+      result: "SIGNIFICANT",
+    },
+    {
+      key: "neb",
+      name: "FIC-NEB-20 Rev A",
+      product: { id: "n", business_id: "PRD-9", identifier: "FIC-NEB-20", name: "FIC-NEB-20" },
+      recent: 6,
+      expected: 1.0,
+      ratio: 6.0,
+      result: "SIGNIFICANT",
+    },
+  ];
+
+  it("lists the hero's complaint first among those due at the same time, and always lists it", () => {
+    expect(nextActions(items, 5).map((row) => row.ref)).not.toContain("FIC-2001");
+    const led = nextActions(items, 5, "c-fic").map((row) => row.ref);
+    expect(led[0]).toBe("SAMPLE-RV-08");
+    expect(led[1]).toBe("FIC-2001");
+  });
+
+  it("counts, lists and trends your data only on Your data", () => {
+    resources.data[OVERSIGHT] = { items };
+    resources.data["/api/v1/triage/trends"] = { items: trends };
+    resources.data[ONE_STORY_PATH] = { sample: null, yours: storyRun({ current: 0 }) };
+    const html = render(<HomeSection heading={{ current: null }} />, api({ dataSource: IMPORTED_SOURCE }));
+    const next = html.slice(html.indexOf('id="home-next"'), html.indexOf("uw-home-side"));
+    expect(next).not.toContain("SAMPLE-RV-08");
+    expect(next).toContain("FIC-2001");
+    expect(html).toContain("FIC-NEB-20 Rev A is rising");
+    expect(html).not.toContain("OrbitCare");
+  });
+
+  it("reads the tiles' counts from the complaint lists of the data shown", () => {
+    expect(withSource(OVERDUE_PATH, IMPORTED_SOURCE)).toBe(`${OVERDUE_PATH}&source_system=TRIAL_UPLOAD`);
+    expect(withSource(DUE_WEEK_PATH, SAMPLE_SOURCE)).toBe(`${DUE_WEEK_PATH}&source_system=MDARIX_SAMPLE`);
+    expect(withSource(OVERDUE_PATH, "")).toBe(OVERDUE_PATH);
+  });
+
+  it("keeps the sample's records on the sample, and drops your imported complaints there", () => {
+    resources.data[OVERSIGHT] = { items };
+    resources.data["/api/v1/triage/trends"] = { items: trends };
+    const html = render(<HomeSection heading={{ current: null }} />, api({ dataSource: SAMPLE_SOURCE }));
+    const next = html.slice(html.indexOf('id="home-next"'), html.indexOf("uw-home-side"));
+    expect(next).toContain("SAMPLE-RV-08");
+    expect(next).not.toContain("FIC-200");
+    expect(html).toContain("OrbitCare 300 Rev B is rising");
   });
 });

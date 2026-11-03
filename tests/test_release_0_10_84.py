@@ -85,3 +85,18 @@ def test_the_story_names_its_products_identifier_so_step_10_opens_your_own_trend
     assert story["yours"]["complaint"]["ref"] == "FIC-2001"
     assert story["yours"]["complaint"]["product_ref"] == "FIC-PUMP"
     assert story["sample"]["complaint"]["product_ref"].startswith("SAMPLE-")
+
+
+def test_home_can_tell_the_samples_trends_and_lists_from_your_data(fic):
+    """M5: on Your data, Home's Overdue tile counted SAMPLE-RV-08 and its trend card showed the sample's OrbitCare.
+    The tiles read the complaint list views with the data's source, and each trend row names its product's own
+    identifier, so Home keeps the sample's apart."""
+    user = fic["user"]
+    overdue = {"view": "overdue", "page": 1, "page_size": 200}
+    sample = _ok(user.get("/api/v1/complaints", params={**overdue, "source_system": "MDARIX_SAMPLE"}))["items"]
+    yours = _ok(user.get("/api/v1/complaints", params={**overdue, "source_system": "TRIAL_UPLOAD"}))["items"]
+    assert any(row["complaint_identifier"].startswith("SAMPLE-") for row in sample)
+    assert not any(row["complaint_identifier"].startswith("SAMPLE-") for row in yours)
+    board = _ok(user.get("/api/v1/triage/trends", params={"group": "version"}))["items"]
+    assert board and all(row["product"]["identifier"] for row in board)
+    assert any(row["product"]["identifier"] == "SAMPLE-ORBIT-300" for row in board)

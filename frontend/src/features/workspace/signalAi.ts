@@ -10,7 +10,8 @@ export type TrendGroup = "version" | "problem" | "type";
 
 export type TrendItem = {
   key: string;
-  product: { id: string; business_id: string | null; name: string | null };
+  /** ``identifier``: the organization's own (SAMPLE-ORBIT-300), 0.10.84. */
+  product: { id: string; business_id: string | null; identifier?: string | null; name: string | null };
   product_version: { id: string; business_id: string | null; version_identifier: string | null } | null;
   problem: string | null;
   name: string;

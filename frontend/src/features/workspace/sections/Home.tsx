@@ -4,7 +4,7 @@ import { DeadlineChip } from "../../../app/chips";
 import { formatDateTime, formatDay, zoneName } from "../../../app/dates";
 import { marketLabel } from "../../../app/labels";
 import { placeOf } from "../../../app/linkTable";
-import { useResource } from "../../customer-admin/shared";
+import { useResource, type Resource } from "../../customer-admin/shared";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { OVERSIGHT, eventPath, type EventView, type Oversight, type OversightItem } from "../oversight";
 import { READINESS_PATH, readinessHeadline, type Readiness } from "../readiness";
@@ -16,14 +16,16 @@ import {
   OVERDUE_VIEW,
   PERSONA_GREETING,
   greeting,
+  inData,
   isLegalDeadline,
   laneShare,
   legalClocks,
   nextActions,
   personaItems,
+  withSource,
 } from "../home";
 import { IMPORTED_SOURCE } from "../complaintList";
-import { openStep, shownRun, STORY_STEPS, useOneStory } from "../oneStory";
+import { openStep, shownRun, STORY_STEPS, useOneStory, type OneStory } from "../oneStory";
 import { TrendBars } from "./OneStory";
 import { MyWorkMore } from "./MyWork";
 import { RemindersPanel } from "./Reminders";
@@ -37,13 +39,21 @@ import { RemindersPanel } from "./Reminders";
  */
 export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject<HTMLHeadingElement | null> }) {
   const { session, persona = "admin", personaLabel, personaTabs = [], isTrial, open, dataSource } = useWorkspace();
-  const overdue = useResource<{ total: number }>(OVERDUE_PATH);
+  // Home follows the Sample · Your data switch (0.10.84, M5): its tiles, next actions and trends count the data shown.
+  const overdue = useResource<{ total: number }>(withSource(OVERDUE_PATH, dataSource));
   const oversight = useResource<Oversight>(`${OVERSIGHT}?show=all`);
   const trends = useResource<TrendBoard>(trendPath("version"));
   const readiness = useResource<Readiness>(persona === "executive" ? READINESS_PATH : null);
-  const items = personaItems(oversight.data?.items ?? [], persona);
-  const rising = (trends.data?.items ?? []).filter((row) => row.result === "SIGNIFICANT" || row.result === "ELEVATED");
-  const actions = nextActions(items);
+  const story = useOneStory(!!isTrial);
+  const items = personaItems(oversight.data?.items ?? [], persona).filter((item) =>
+    inData(item.ref, dataSource, !!item.complaint_id),
+  );
+  const rising = (trends.data?.items ?? []).filter(
+    (row) => (row.result === "SIGNIFICANT" || row.result === "ELEVATED") && inData(row.product.identifier, dataSource),
+  );
+  // The complaint the hero names is always in the list, first among those due at the same time.
+  const hero = shownRun(story.data, dataSource);
+  const actions = nextActions(items, 5, hero?.run === "yours" ? hero.complaint.id : null);
   const clocks = persona === "regulatory" ? legalClocks(items) : [];
   const name = (session?.display_name ?? "").split(/\s+/)[0];
   const go = (item: OversightItem) => {
@@ -51,7 +61,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
     const place = placeOf(item.opens);
     open(place.section as WorkspaceSection, place.tab);
   };
-  const dueWeek = useResource<{ total: number }>(DUE_WEEK_PATH);
+  const dueWeek = useResource<{ total: number }>(withSource(DUE_WEEK_PATH, dataSource));
   const reading = oversight.state === "loading";
   const tenant = session?.current_tenant?.tenant_name;
   return (
@@ -78,7 +88,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
 
       {/* The story (0.10.82, D1.6): a slim banner on the sample, the hero of your most urgent complaint on your data,
           "Story complete" once its ten steps are done. Never a second retelling of Getting started. */}
-      {isTrial && <HomeStory />}
+      {isTrial && <HomeStory story={story} />}
 
       {/* Each tile is the count of the complaint list it opens (0.10.82, D1.6): one number, one list. */}
       <section className="uw-home-stats" aria-label="What needs attention">
@@ -228,9 +238,8 @@ function Stat({
  * - on your data, the hero of your most urgent imported complaint and what the file did not say;
  * - once its ten steps are done, a "Story complete" card.
  */
-export function HomeStory() {
+export function HomeStory({ story }: { story: Resource<OneStory> }) {
   const { open, dataSource, chooseDataSource, startStory, session } = useWorkspace();
-  const story = useOneStory();
   const run = shownRun(story.data, dataSource);
   const event = useResource<EventView>(run && run.run === "yours" ? eventPath(run.complaint.ref) : null);
   if (!run) return null;
