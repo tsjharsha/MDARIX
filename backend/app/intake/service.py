@@ -23,6 +23,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from backend.app.trial.sample_source import is_sample
 from backend.app.complaint_review import rules as review_rules
 from backend.app.db.models.complaint_disposition import ComplaintDisposition
 from backend.app.db.models.complaint_review import ComplaintSecondLook
@@ -440,7 +441,7 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
             "awareness": event_awareness(event, record),
             "classification": signed.classification if signed else None,
             "suggestion": latest.suggestion if latest else None,
-            "sample": event.source_system is not None,
+            "sample": is_sample(event.source_system),
         }
     complaints = (
         db.query(Complaint)

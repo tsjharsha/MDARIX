@@ -34,7 +34,7 @@ from backend.app.db.models.foundation import (
     Supplier,
 )
 
-SAMPLE_SOURCE = "MDARIX_SAMPLE"
+from backend.app.trial.sample_source import SAMPLE_SOURCE  # noqa: E402 (one definition; re-exported)
 
 # (identifier, name, family, symptom, complaint pattern, problem code). The pattern lists days-ago for each complaint:
 # OrbitCare complaints cluster after the day-75 Rev B release; the others stay flat. With the story complaints

@@ -23,6 +23,7 @@ sweeps their organization when the last sweep is older than five minutes. Nothin
 
 from __future__ import annotations
 
+from backend.app.trial.sample_source import is_sample
 from backend.app import links
 import logging
 import uuid
@@ -120,7 +121,7 @@ def absences(db: Session, tenant_id, today: date | None = None) -> list[dict]:
             "starts_on": row.starts_on,
             "ends_on": row.ends_on,
             "note": row.note,
-            "sample": row.source_system is not None,
+            "sample": is_sample(row.source_system),
         }
         for row in query.order_by(UserAbsence.starts_on).limit(READ_LIMIT)
     ]

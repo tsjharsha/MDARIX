@@ -32,6 +32,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.trial.sample_source import is_sample
 from backend.app.access.permissions import INVESTIGATION_CREATE, QUALITY_REVIEW, SIGNAL_TRIAGE
 from backend.app.complaint_classification import rules as coding
 from backend.app.db.data_plane import get_data_plane_db
@@ -260,7 +261,7 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
         "flagged": bool(flags),
         "qms_ref": event.qms_ref,
         "service_ticket": event.service_ticket,
-        "sample": event.source_system is not None,
+        "sample": is_sample(event.source_system),
         "created_by": name(event.created_by),
         "created_at": event.created_at.isoformat(),
         "version": latest.version if latest else 0,

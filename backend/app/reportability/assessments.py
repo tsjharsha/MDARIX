@@ -14,6 +14,7 @@ import uuid
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.app.trial.sample_source import is_sample
 from backend.app.db.models.market_assessment import ComplaintMarketAssessment
 from backend.app.reportability import markets
 
@@ -81,7 +82,7 @@ def row_view(
         "signed_by": (names.get(row.signed_by) or "A colleague") if row.signed_by else None,
         "signed_at": _iso(row.signed_at),
         "superseded": row.superseded_by is not None,
-        "sample": row.source_system is not None,
+        "sample": is_sample(row.source_system),
         "created_by": names.get(row.created_by) or "A colleague",
         "saved_at": _iso(row.updated_at),
     }

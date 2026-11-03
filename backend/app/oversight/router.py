@@ -31,6 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.trial.sample_source import is_sample
 from backend.app.downloads import attachment
 from backend.app.access.permissions import (
     DATA_EXPORT,
@@ -299,7 +300,7 @@ def _event_summary(complaint, facts: dict, row: EventClosure | None, products: d
         "next": blocked[0]["action"] if blocked and not closure.settled(complaint, items, row) else None,
         "state": state,
         "state_label": EVENT_STATES[state],
-        "sample": complaint.source_system is not None,
+        "sample": is_sample(complaint.source_system),
     }
 
 
@@ -1015,7 +1016,7 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
             "owner_id": owner,
             "owner_name": names.get(owner or "") if owner else None,
             "owner_named": bool(row and row.owner_id),
-            "sample": complaint.source_system is not None,
+            "sample": is_sample(complaint.source_system),
         },
         "summary": {
             # The nearest dated item, the reportability watch's provisional clock included (0.10.68).

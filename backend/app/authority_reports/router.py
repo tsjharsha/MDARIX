@@ -25,6 +25,7 @@ regulatory.approve. These routes serve a free trial and a pilot alike (T-B1).
 
 from __future__ import annotations
 
+from backend.app.trial.sample_source import is_sample
 from backend.app.downloads import attachment
 from backend.app import links
 import base64
@@ -288,7 +289,7 @@ def _snapshot_view(row: ReportSnapshot, names: dict) -> dict:
         and (
             row.approved_by in (row.preparers or []) or row.approved_by == (row.fields or {}).get("conclusion_signer")
         ),
-        "sample": row.source_system is not None,
+        "sample": is_sample(row.source_system),
     }
 
 
@@ -330,7 +331,7 @@ def _submission_view(
         "recorded_at": _iso(row.recorded_at),
         "evidence": [_evidence_view(item, names) for item in evidence],
         "receipt_only": row.result == "PENDING" and any(item.outcome == "RECEIPT" for item in evidence),
-        "sample": row.source_system is not None,
+        "sample": is_sample(row.source_system),
     }
 
 
@@ -476,7 +477,7 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         # A mapped code is a suggestion a person confirms or changes (the new navigation, 0.10.77).
         "codes_confirmed": context["confirm_codes"],
         "never_submits": rules.NEVER_SUBMITS,
-        "sample": obligation.source_system is not None,
+        "sample": is_sample(obligation.source_system),
     }
 
 
@@ -545,7 +546,7 @@ def report_list(
             "description": complaint.description,
             "market": market,
             "market_label": markets.MARKET_LABELS.get(market, market),
-            "sample": complaint.source_system is not None,
+            "sample": is_sample(complaint.source_system),
         }
 
     for row in candidates:

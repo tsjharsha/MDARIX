@@ -13,6 +13,7 @@
 - Security F1: the trial invite is rate limited first and never says whether an address has an account.
 - U-06: a day-only awareness counts from that day everywhere and is shown as a date.
 - The refresh (open_deadlines.py) lists and updates the open reports and draft assessments the fixed rules change.
+- Navigation M6: an imported record is never marked sample.
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -477,3 +478,17 @@ def test_the_refresh_lists_and_updates_open_reports_and_drafts_the_fixed_rules_c
     detail = _ok(user.get(f"{REPORTS}/{report['id']}"))
     assert (detail["report_type"], detail["deadline"]["due_on"]) == ("US_5_WORK_DAY", signed["due_on"])
     assert _audit(tenant_id, "COMPLAINT_MARKET_ASSESSMENT_RECOMPUTED")
+
+
+def test_navigation_m6_an_imported_record_is_never_marked_sample(trial):
+    user = trial["user"]
+    _import(
+        user,
+        "complaint_id,product_id,description,event_date,received_date,awareness_date,country,patient_involved,"
+        "serious_injury,death,malfunction\n"
+        "M6-1,M6-PUMP,Pump alarm failed; no harm.,2026-10-20,2026-10-21,2026-10-21,US,N,N,N,Y\n",
+    )
+    assert _ok(user.get("/api/v1/oversight/events/M6-1"))["event"]["sample"] is False
+    assert _ok(user.get("/api/v1/oversight/events/SAMPLE-RV-11"))["event"]["sample"] is True
+    watched = _watch(user, "M6-1")
+    assert all(not market.get("sample") for market in watched["markets"])
