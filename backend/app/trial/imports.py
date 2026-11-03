@@ -1845,6 +1845,9 @@ def import_file(
         )
         if entity == "complaints":
             result["quality_report"]["row_flags"] = report["row_flags"]
+            # The products and versions it created, kept with the run: Import's checklist shows them loaded (0.10.84).
+            if result.get("also_created"):
+                result["quality_report"]["also_created"] = result["also_created"]
         if entity == "distribution":
             # Units shipped beyond the units a lot released are flagged, never refused (T-G5).
             result["quality_report"]["flags"] = business_imports.distribution_flags(

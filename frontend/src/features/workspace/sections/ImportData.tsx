@@ -353,9 +353,14 @@ export const UNLOCKS: Readonly<Record<string, string>> = {
 /** Each object's latest import, from the import runs (the newest first): what the checklist shows as loaded. */
 export function loadedObjects(runs: readonly Pick<ImportRun, "entity" | "imported_at" | "report">[]) {
   const found: Record<string, { at: string; rows: number }> = {};
-  for (const run of runs)
-    if (!found[run.entity] && !(run as { sample?: boolean }).sample)
-      found[run.entity] = { at: run.imported_at, rows: run.report?.rows_accepted ?? 0 };
+  for (const run of runs) {
+    if ((run as { sample?: boolean }).sample) continue;
+    if (!found[run.entity]) found[run.entity] = { at: run.imported_at, rows: run.report?.rows_accepted ?? 0 };
+    // What a complaints file created on the way (its products, 0.10.84) counts as loaded too.
+    const also = (run.report as { also_created?: Record<string, number> } | undefined)?.also_created ?? {};
+    for (const [kind, count] of Object.entries(also))
+      if (!found[kind] && count > 0) found[kind] = { at: run.imported_at, rows: count };
+  }
   return found;
 }
 
@@ -547,6 +552,8 @@ function ImportForm({
         setReport(null);
         setFile(null);
         setChecked(false);
+        // The checklist reads the runs again: what was just loaded shows at once (0.10.84, L1).
+        runs.reload();
         onImported(result, template.entity);
       }
     } catch (error) {

@@ -163,3 +163,10 @@ def test_every_deadline_a_person_reads_is_in_the_organizations_time_zone(fic):
     (header,) = [item for item in event["work"]["due"] if item["key"].endswith(":facts")]
     earliest = min((d for d in row["deadlines"] if d["due_at"]), key=lambda d: d["due_at"])
     assert header["due_label"] == earliest["due_label"]
+
+
+def test_an_import_run_keeps_the_products_its_complaints_created(fic):
+    """L1: after a complaints import that created its product, Import's checklist still said "Products and versions:
+    not loaded". The run's report keeps what it created, so the checklist counts it."""
+    (run,) = [run for run in _ok(fic["user"].get("/api/v1/data/import/runs"))["runs"] if not run["sample"]]
+    assert run["entity"] == "complaints" and run["report"]["also_created"] == {"products": 1}

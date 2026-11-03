@@ -13,6 +13,7 @@ import { ComplaintPage, clockPrefix } from "./sections/ComplaintPage";
 import { ONE_STORY_PATH, stepPlace, type StoryRun } from "./oneStory";
 import { NewRecordsSection } from "./sections/Records";
 import { awarenessInput } from "./intake";
+import { loadedObjects } from "./sections/ImportData";
 import { eventPath } from "./oversight";
 import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 import { rv11 } from "../../test/rv11";
@@ -363,5 +364,20 @@ describe("M7: a date-only awareness stays a date, and a later one asks its reaso
     expect(field.later("2026-11-01")).toBe(true);
     const timed = awarenessInput({ at: "2026-10-31T09:15:00Z", date_only: false });
     expect(timed.type).toBe("datetime-local");
+  });
+});
+
+describe("L1: Import's checklist counts what a complaints file created", () => {
+  it("shows products as loaded when the complaints import created them", () => {
+    const runs = [
+      {
+        entity: "complaints",
+        imported_at: "2026-11-03T10:00:00Z",
+        report: { rows_accepted: 4, also_created: { products: 1 } },
+      },
+    ] as never;
+    const loaded = loadedObjects(runs);
+    expect(loaded.complaints.rows).toBe(4);
+    expect(loaded.products.rows).toBe(1);
   });
 });
