@@ -149,3 +149,24 @@ describe("H3: once the country is known, the header names that market's clock", 
     expect(clockPrefix({ ...due, key: "watch:c:facts", market: "US" })).toBe("United States");
   });
 });
+
+describe("M1: the story is read again after every saved change", () => {
+  it("tells the story's readers when send saves a change", async () => {
+    const { onSaved, send } = await vi.importActual<typeof import("../customer-admin/shared")>(
+      "../customer-admin/shared",
+    );
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
+    vi.stubGlobal("window", Object.assign(new EventTarget(), { setTimeout, clearTimeout, location: { pathname: "/app" } }));
+    try {
+      const heard = vi.fn();
+      const stop = onSaved(heard);
+      await send("/api/v1/triage/COMPLAINT/c1/record", "POST", { severity: "LOW" });
+      expect(heard).toHaveBeenCalledTimes(1);
+      stop();
+      await send("/api/v1/triage/COMPLAINT/c1/record", "POST", { severity: "LOW" });
+      expect(heard).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

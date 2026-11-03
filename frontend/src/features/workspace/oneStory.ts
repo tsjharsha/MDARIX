@@ -1,5 +1,6 @@
 import { recordPlace } from "../../app/linkTable";
-import { send, useResource } from "../customer-admin/shared";
+import { useEffect } from "react";
+import { onSaved, send, useResource } from "../customer-admin/shared";
 import { reportPlace } from "./authorityReports";
 import { treePlace } from "./sections/DecisionTrees";
 import { IMPORTED_SOURCE } from "./complaintList";
@@ -39,7 +40,13 @@ export const STORY_STEPS = 10;
 /** The steps whose tick is the person's own mark: it is saved when the step's screen is opened from the story. */
 const MARKED: Record<number, string> = { 0: "call", 4: "form", 8: "records", 9: "trends" };
 
-export const useOneStory = (on = true) => useResource<OneStory>(on ? ONE_STORY_PATH : null);
+/** The story, read again after every saved change (0.10.84, M1): saving the triage moves the pill and Next step on. */
+export function useOneStory(on = true) {
+  const story = useResource<OneStory>(on ? ONE_STORY_PATH : null);
+  const { reload } = story;
+  useEffect(() => (on ? onSaved(reload) : undefined), [on, reload]);
+  return story;
+}
 
 /** The run shown: the one the data switch chose, while it has a complaint; else whichever has one. */
 export function shownRun(story: OneStory | null | undefined, dataSource?: string): StoryRun | null {
