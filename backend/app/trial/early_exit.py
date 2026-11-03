@@ -161,8 +161,12 @@ def overview(db: Session) -> list[dict]:
     from backend.app.paging import open_first
 
     # Every pending request, however old; then the newest 500 decided ones.
-    rows, _ = open_first(
-        db.query(TrialExitRequest), TrialExitRequest.status == PENDING, [TrialExitRequest.created_at.desc()], 500
+    rows = open_first(
+        db.query(TrialExitRequest),
+        TrialExitRequest.id,
+        TrialExitRequest.status == PENDING,
+        [TrialExitRequest.created_at.desc()],
+        500,
     )
     tenant_ids = {row.trial_tenant_id for row in rows}
     person_ids = {row.requested_by for row in rows if row.requested_by}

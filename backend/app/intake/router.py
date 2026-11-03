@@ -431,12 +431,8 @@ def intake_list(
     now = service.now_utc()
     # Every contact still waiting (to sign, pending, the QA review of "service only"), however old; then the newest
     # 500 finished ones (0.10.86: the newest 500 were read before the waiting ones were picked out).
-    events, finished = open_first(
-        db.query(IntakeEvent).filter(IntakeEvent.tenant_id == tenant_id),
-        _waiting(),
-        [IntakeEvent.created_at.desc(), IntakeEvent.id.desc()],
-        500,
-    )
+    mine = db.query(IntakeEvent).filter(IntakeEvent.tenant_id == tenant_id)
+    events = open_first(mine, IntakeEvent.id, _waiting(), [IntakeEvent.created_at.desc(), IntakeEvent.id.desc()], 500)
     ids = [event.id for event in events]
     checks = service.checks_of(db, tenant_id, ids)
     tasks = service.tasks_of(db, tenant_id, ids)
@@ -471,7 +467,7 @@ def intake_list(
         item["state"] = state(item)
     summary = {name: sum(1 for item in items if item["state"] == name) for name in SHOWS[1:]}
     # Every contact and urgent intake, the finished ones not listed included.
-    summary["all"] = len(items) + max(finished - 500, 0)
+    summary["all"] = mine.order_by(None).count()
     summary["flagged"] = sum(1 for item in items if item["flagged"])
     summary["service_only"] += summary["review"]
     shown = [

@@ -8,7 +8,7 @@ screens are unaffected, and says how many rows exist in ``X-Total-Count`` and wh
 from __future__ import annotations
 
 from fastapi import Query, Response
-from sqlalchemy import false, func, not_
+from sqlalchemy import case, false, func, not_
 
 MAX_PAGE = 1000
 
@@ -31,11 +31,12 @@ class Page:
         return query.limit(self.limit).offset(self.offset).all()
 
 
-def open_first(query, is_open, newest, limit: int) -> tuple[list, int]:
-    """Every row of ``query`` for which ``is_open`` holds, however many, then the newest ``limit`` of the others
-    (``newest``: the order clauses), and how many others there are in all. For a list whose open, pending or overdue
-    items must never fall behind its cap (0.10.86): the cap only ever drops finished history."""
+def open_first(query, key, is_open, newest, limit: int) -> list:
+    """In one statement: every row of ``query`` for which ``is_open`` holds, however many, then the newest ``limit``
+    of the others (``newest``: the order clauses; ``key``: the rows' id column). For a list whose open, pending or
+    overdue items must never fall behind its cap (0.10.86): the cap only ever drops finished history."""
     flag = func.coalesce(is_open, false())
-    opened = query.filter(flag).order_by(*newest).all()
-    rest = query.filter(not_(flag))
-    return opened + rest.order_by(*newest).limit(limit).all(), rest.order_by(None).count()
+    newest_closed = query.filter(not_(flag)).order_by(*newest).limit(limit).with_entities(key)
+    return (
+        query.filter(flag | key.in_(newest_closed.scalar_subquery())).order_by(case((flag, 0), else_=1), *newest).all()
+    )
