@@ -157,6 +157,9 @@ class Product(TenantOwned, Base):
     udi_di: Mapped[str | None] = mapped_column(String(80))
     gmdn_code: Mapped[str | None] = mapped_column(String(10))
     gmdn_term: Mapped[str | None] = mapped_column(String(300))
+    # tr16: the Basic UDI-DI (EU) and the EMDN code; GMDN stays the organization's own code (GMDN is licensed).
+    basic_udi_di: Mapped[str | None] = mapped_column(String(120))
+    emdn_code: Mapped[str | None] = mapped_column(String(30))
     # tr09: IMPLANT, SINGLE_USE, REUSABLE, SOFTWARE, IVD or KIT (backend/app/product_facts.py); null when not known.
     device_category: Mapped[str | None] = mapped_column(String(40))
     # tr09: a single-use product, and the days a unit stays in use after its lot's release (signals/trend_rules.py).
