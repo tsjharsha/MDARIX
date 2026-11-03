@@ -25,6 +25,8 @@ import {
 import { InlineError } from "./boardParts";
 import { listTitle } from "./common";
 import { StagePath } from "./ComplaintPage";
+import { StoryPill } from "./OneStory";
+import { runOfReport, useOneStory } from "../oneStory";
 import {
   AfterAcceptance,
   Approval,
@@ -236,7 +238,9 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
 
 /** One report on its own page: highlights, the status path, the form's fields in order, and the rail. */
 export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
-  const { open } = useWorkspace();
+  const { open, isTrial } = useWorkspace();
+  // The ten-step story's pill on its own report (0.10.82, D1.5); the rail's Next step is already the story's step.
+  const storyRun = runOfReport(useOneStory(!!isTrial).data, id);
   const resource = useResource<ReportDetail>(`${REPORTS}/${id}`);
   const [shown, setShown] = useState<ReportDetail | null>(null);
   const [onlyMissing, setOnlyMissing] = useState(false);
@@ -284,15 +288,18 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   const write = canWrite && detail.state !== "CANCELLED";
   return (
     <div className="uw-cp uw-report-page">
-      <nav className="uw-crumbs" aria-label="Where you are">
-        <button type="button" className="ac-link" onClick={onBack}>
-          Reports
-        </button>
-        <span aria-hidden="true">›</span>
-        <span>
-          {detail.form.title} · {ref}
-        </span>
-      </nav>
+      <div className="uw-topline">
+        <nav className="uw-crumbs" aria-label="Where you are">
+          <button type="button" className="ac-link" onClick={onBack}>
+            Reports
+          </button>
+          <span aria-hidden="true">›</span>
+          <span>
+            {detail.form.title} · {ref}
+          </span>
+        </nav>
+        {storyRun && <StoryPill run={storyRun} />}
+      </div>
       <header className="uw-card uw-highlights" aria-label="The report at a glance">
         <div className="uw-hl-top">
           <div className="uw-hl-title">

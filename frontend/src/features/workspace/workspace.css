@@ -8058,3 +8058,79 @@ button.uw-org:hover {
     margin: 0;
   }
 }
+/* The record's one progress indicator (0.10.82, D1.5): a status line, "Stage 2 of 6 · Triage › Market assessment › …". */
+.uw-topline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ms-space-2) var(--ms-space-3);
+}
+.uw-topline .uw-crumbs {
+  margin: 0;
+}
+.uw-stageline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  padding-top: var(--ms-space-3);
+  border-top: 1px solid var(--ms-line);
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-14);
+}
+.uw-stageline-count {
+  color: var(--ms-ink);
+  white-space: nowrap;
+}
+.uw-stageline-ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-stageline-ol li {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ms-muted);
+}
+.uw-stageline-ol li + li::before {
+  content: "›";
+  margin: 0 8px;
+  color: var(--ms-line-control);
+}
+.uw-stageline-ol li.is-done {
+  color: var(--ms-good);
+}
+.uw-stageline-ol li.is-now {
+  color: var(--ms-ink);
+  font-weight: 700;
+}
+.uw-stageline-ol li.is-skip > span:first-of-type {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+.uw-stageline-ol .ac-link {
+  padding: 0;
+  font: inherit;
+}
+.uw-stageline-ol .uw-stageline-extra::before {
+  content: "·";
+  margin: 0 6px;
+  color: var(--ms-line-control);
+}
+@media (max-width: 720px) {
+  /* On a phone the line names only the stage now: "Stage 2 of 6 · Market assessment". */
+  .uw-stageline-ol li:not(.is-now) {
+    display: none;
+  }
+  .uw-stageline-ol li.is-now::before {
+    content: none;
+  }
+}

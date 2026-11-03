@@ -262,10 +262,14 @@ export function StoryView({
   trends: TrendItem[];
   heading?: RefObject<HTMLHeadingElement | null>;
 }) {
-  const { open, dataSource, chooseDataSource, session } = useWorkspace();
+  const { open, dataSource, chooseDataSource, session, startStory } = useWorkspace();
   const [picked, setPicked] = useState<number | null>(null);
   const run = shownRun(story, dataSource);
-  const go = (section: string, tab?: string) => open(section as WorkspaceSection, tab);
+  // The ten-step story replaces an older story's bar: one progress indicator per page (D1.5).
+  const go = (section: string, tab?: string) => {
+    startStory?.(null);
+    open(section as WorkspaceSection, tab);
+  };
   const header = (
     <div className="uw-os-head">
       <span className="ac-eyebrow">Getting started</span>

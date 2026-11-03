@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useState, type ReactNode, type RefObject } from "react";
 import { Check, ChevronRight, History, MoreHorizontal, Send } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { errorText, formatDate, send, useResource } from "../../customer-admin/shared";
@@ -34,6 +34,8 @@ import { FLAGSHIP } from "../entrance";
 import { requestJson } from "../../../app/apiClient";
 import { awarenessText } from "../../../app/dates";
 import { ReportingFacts } from "./ReportingFacts";
+import { StoryPill } from "./OneStory";
+import { openStep, runOf, useOneStory, type StoryRun } from "../oneStory";
 
 const HARM = {
   DEATH: { harm: "critical", label: "Death" },
@@ -97,11 +99,14 @@ export function attentionText(blocked: Array<{ detail: string }>, hasStep: boole
  * addresses still open: Summary and Decisions & actions on Details, Evidence on Related, History on Activity.
  */
 export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObject<HTMLHeadingElement | null> }) {
-  const { open, reportTab, shownTab, story } = useWorkspace();
+  const { open, reportTab, shownTab, story, startStory, isTrial } = useWorkspace();
+  // The ten-step story (0.10.82, D1.5): on its own complaint, its step is the rail's Next step, and a slim pill.
   const ref = tabParam(tab, "ref") ?? "";
+  const oneStory = useOneStory(!!ref && !!isTrial);
   const resource = useResource<EventView>(ref ? eventPath(ref) : null);
   const [shown, setShown] = useState<EventView | null>(null);
   const view = shown ?? resource.data;
+  const storyRun = runOf(oneStory.data, view?.event.ref);
   const [active, setActive] = useState<ComplaintSection>(() => sectionOf(tab));
   // Ready to close is shown when it is the next step or signed; before that it is revealed on request (one main button).
   const [readyShown, setReadyShown] = useState(false);
@@ -162,13 +167,16 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   const readyNow = (!!step && !step.opens) || !!view.ready;
   const record = (
     <>
-      <nav className="uw-crumbs" aria-label="Where you are">
-        <button type="button" className="ac-link" onClick={() => open("Complaints")}>
-          Complaints
-        </button>
-        <span aria-hidden="true">›</span>
-        <span>{event.ref}</span>
-      </nav>
+      <div className="uw-topline">
+        <nav className="uw-crumbs" aria-label="Where you are">
+          <button type="button" className="ac-link" onClick={() => open("Complaints")}>
+            Complaints
+          </button>
+          <span aria-hidden="true">›</span>
+          <span>{event.ref}</span>
+        </nav>
+        {storyRun && <StoryPill run={storyRun} />}
+      </div>
       <header className="uw-card uw-highlights" aria-label="The complaint at a glance">
         <div className="uw-hl-top">
           <div className="uw-hl-title">
@@ -335,6 +343,11 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           step={step}
           triageHere={triageHere}
           storyShown={storyShown}
+          storyRun={storyRun}
+          onStory={(run) => {
+            startStory?.(null);
+            void openStep(run, run.current, open).then(oneStory.reload);
+          }}
           onStep={() => {
             if (step?.opens) return go(step.opens);
             choose("Summary");
@@ -389,30 +402,67 @@ export function sectionOf(tab: string | undefined): ComplaintSection {
   return FORMER_SECTIONS[name] ?? offeredTab(name, COMPLAINT_SECTIONS, "Summary");
 }
 
-/** The stage line as chevrons (the record page's path): done, now, later, not needed. */
-export function StagePath({ stages }: { stages: EventView["stages"] }) {
+/** "Stage 2 of 6", from the stage marked current (else the first not done; every stage done: the last). */
+export function stageCount(stages: EventView["stages"]): string {
+  const at = stages.findIndex((stage) => stage.state === "CURRENT");
+  const open = stages.findIndex((stage) => stage.state !== "DONE" && stage.state !== "NOT_NEEDED");
+  const index = at >= 0 ? at : open >= 0 ? open : stages.length - 1;
+  return `Stage ${index + 1} of ${stages.length}`;
+}
+
+/**
+ * The page's one progress indicator (0.10.82, D1.5): one status line, "Stage 2 of 6 · Triage › Market assessment ›
+ * …", the current stage marked (on a phone only the current one shows). A stage with a place of its own is a link
+ * (D1.8): ``links`` gives what opening it does, ``after`` what follows its name (the report beside its assessment).
+ */
+export function StagePath({
+  stages,
+  links = {},
+  after = {},
+}: {
+  stages: EventView["stages"];
+  links?: Record<string, (() => void) | undefined>;
+  after?: Record<string, ReactNode>;
+}) {
   return (
-    <ol className="uw-path" aria-label="Stage">
-      {stages.map((stage) => {
-        const state =
-          stage.state === "DONE"
-            ? "done"
-            : stage.state === "CURRENT"
-              ? "now"
-              : stage.state === "NOT_NEEDED"
-                ? "skip"
-                : "later";
-        return (
-          <li key={stage.code} className={`is-${state}`} aria-current={state === "now" ? "step" : undefined}>
-            {state === "done" && <Check size={13} aria-hidden="true" />}
-            <span>{stage.label}</span>
-            <span className="sr-only">
-              {state === "done" ? ": done" : state === "now" ? ": now" : state === "skip" ? ": not needed" : ": later"}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="uw-stageline">
+      <b className="uw-stageline-count">{stageCount(stages)} ·</b>
+      <ol className="uw-stageline-ol" aria-label="Stage">
+        {stages.map((stage) => {
+          const state =
+            stage.state === "DONE"
+              ? "done"
+              : stage.state === "CURRENT"
+                ? "now"
+                : stage.state === "NOT_NEEDED"
+                  ? "skip"
+                  : "later";
+          const go = links[stage.code];
+          return (
+            <li key={stage.code} className={`is-${state}`} aria-current={state === "now" ? "step" : undefined}>
+              {state === "done" && <Check size={13} aria-hidden="true" />}
+              {go ? (
+                <button type="button" className="ac-link" onClick={go}>
+                  {stage.label}
+                </button>
+              ) : (
+                <span>{stage.label}</span>
+              )}
+              {after[stage.code]}
+              <span className="sr-only">
+                {state === "done"
+                  ? ": done"
+                  : state === "now"
+                    ? ": now"
+                    : state === "skip"
+                      ? ": not needed"
+                      : ": later"}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
@@ -422,11 +472,16 @@ function Rail({
   step,
   triageHere,
   storyShown,
+  storyRun,
+  onStory,
   onStep,
   onShowTriage,
   onChanged,
 }: {
   view: EventView;
+  /** The ten-step story's run when this complaint is its record: its step is the Next step (0.10.82, D1.5). */
+  storyRun?: StoryRun | null;
+  onStory?: (run: StoryRun) => void;
   step: ReturnType<typeof nextStep>;
   /** Opens Details, where the triage record is, when another section is shown. */
   onShowTriage?: () => void;
@@ -447,7 +502,17 @@ function Rail({
     <aside className="uw-rail" aria-label="What to do next">
       <section className="uw-card uw-card-pad uw-rail-next">
         <h2>Next step</h2>
-        {triageHere ? (
+        {storyRun && !storyRun.finished && !triageHere && !storyShown && onStory ? (
+          <>
+            <b>
+              Story step {storyRun.current + 1}: {STORY_ACTIONS[storyRun.current][0]}
+            </b>
+            <p className="ac-muted">{STORY_ACTIONS[storyRun.current][1]}</p>
+            <button type="button" className="ac-primary" onClick={() => onStory(storyRun)}>
+              {STORY_ACTIONS[storyRun.current][2]} <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          </>
+        ) : triageHere ? (
           <>
             <b>{step?.label}</b>
             <p className="ac-muted">The triage record is first in Details.</p>
@@ -531,6 +596,20 @@ function Rail({
     </aside>
   );
 }
+
+/** Each story step on the rail: what it is, one line, and its one button (Getting started's step card's action). */
+const STORY_ACTIONS: Array<[string, string, string]> = [
+  ["read the call", "The reporter's words are on this page; the awareness time starts every clock.", "Read the call"],
+  ["triage", "Severity, owner and the first action.", "Open the triage"],
+  ["the decision tree", "Facts from the record arrive to confirm; judgement questions are yours.", "Open the tree"],
+  ["reportable or not", "Sign the conclusion: your role decides who signs, never the persona.", "Go to the outcome"],
+  ["the form", "Created when you signed “reportable”.", "Open the report"],
+  ["fill what is missing", "Each field still empty names its form box.", "Open the missing fields"],
+  ["approval", "A second person approves.", "Open the approval"],
+  ["PDF and submission", "MDARIX never submits: you record what you sent.", "Open the PDF step"],
+  ["records", "The signed record, ready for an inspector.", "Open Records"],
+  ["trends", "Is it happening elsewhere?", "Open Trends"],
+];
 
 /** What each step is, for "Who signs". */
 const STEP_NAMES: Record<string, string> = {

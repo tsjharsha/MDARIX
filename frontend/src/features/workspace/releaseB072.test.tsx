@@ -153,7 +153,7 @@ describe("B3: the complaint page shows one action per row and does the triage it
   });
   it("shows the triage panel on the page instead of a button to the triage list", () => {
     expect(page()).toContain("<InlineTriage complaintId={event.complaint_id}");
-    expect(page()).toContain("{triageHere ? (");
+    expect(page()).toContain(") : triageHere ? (");
     // Saved on the page, it stays on the page.
     expect(source("Triage")).toContain('item.kind === "COMPLAINT" && !inline');
   });
