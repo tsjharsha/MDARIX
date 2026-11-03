@@ -37,6 +37,7 @@ import { awarenessText } from "../../../app/dates";
 import { ReportingFacts } from "./ReportingFacts";
 import { StoryPill } from "./OneStory";
 import { dueDay } from "./Home";
+import { isLegalDeadline } from "../home";
 import { openStep, runOf, useOneStory, type StoryRun } from "../oneStory";
 
 /**
@@ -56,13 +57,13 @@ export function harmOf(event: Pick<EventView["event"], "harm" | "harm_words">): 
 
 /** The header's one clock: the nearest legal clock, else the nearest of the organization's own targets. */
 export const oneClock = (due: NonNullable<EventView["work"]>["due"]) =>
-  due.find((item) => LEGAL.includes(item.category)) ?? due[0] ?? null;
+  due.find((item) => isLegalDeadline(item)) ?? due[0] ?? null;
 
 /** Whose clock it is: a market's, "Shortest possible" while the facts are missing, or the target's kind. */
 export const clockPrefix = (item: NonNullable<EventView["work"]>["due"][number]) =>
   item.key.endsWith(":facts")
     ? "Shortest possible"
-    : LEGAL.includes(item.category) && item.market
+    : isLegalDeadline(item) && item.market
       ? marketLabel(item.market)
       : item.category_label;
 
@@ -85,14 +86,13 @@ export const headline = (text: string | null | undefined, max = 140) => {
   return words.length > max ? `${words.slice(0, max - 1).trimEnd()}…` : words;
 };
 
-const LEGAL = ["REPORTING", "OBLIGATION"];
 
 /** One chip per market's legal deadline, then one per kind of the organization's own target (a triage target, a
  * reply due), each the nearest. */
 export function deadlineChips(due: NonNullable<EventView["work"]>["due"]) {
   const seen = new Set<string>();
   return due.filter((item) => {
-    const key = LEGAL.includes(item.category) ? `market:${item.market ?? ""}` : item.category;
+    const key = isLegalDeadline(item) ? `market:${item.market ?? ""}` : item.category;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -597,7 +597,7 @@ function Rail({
   const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
   const lanes = legalLanes(view);
   const clocked = new Set(
-    (view.work?.due ?? []).filter((item) => LEGAL.includes(item.category)).map((item) => item.market),
+    (view.work?.due ?? []).filter((item) => isLegalDeadline(item)).map((item) => item.market),
   );
   const without = (view.work?.markets ?? []).filter((market) => !clocked.has(market)).map(marketLabel);
   const code = blocked[0]?.code ?? "READY";
@@ -962,7 +962,7 @@ function SendTo({ view, code, onSent }: { view: EventView; code: string; onSent:
  */
 export function legalLanes(view: Pick<EventView, "event" | "work">): Lane[] {
   return deadlineChips(view.work?.due ?? [])
-    .filter((item) => LEGAL.includes(item.category) && item.market)
+    .filter((item) => isLegalDeadline(item) && item.market)
     .map((item) => ({
       key: item.key,
       market: marketLabel(item.market!),

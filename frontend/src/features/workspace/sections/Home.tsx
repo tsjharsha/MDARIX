@@ -16,6 +16,7 @@ import {
   OVERDUE_VIEW,
   PERSONA_GREETING,
   greeting,
+  isLegalDeadline,
   laneShare,
   legalClocks,
   nextActions,
@@ -283,7 +284,8 @@ export function HomeStory() {
         </div>
       </section>
     );
-  const clock = event.data?.work?.due.find((item) => item.category === "REPORTING" || item.category === "OBLIGATION");
+  // The legal clock only, never an approval task's due date (0.10.84, H2): the rule Home's legal clocks use.
+  const clock = event.data?.work?.due.find(isLegalDeadline);
   const harm = run.complaint.death ? "a death" : run.complaint.serious_injury ? "a serious injury" : "a malfunction";
   const country = run.market_label;
   return (

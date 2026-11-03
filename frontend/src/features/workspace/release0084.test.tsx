@@ -6,7 +6,12 @@ import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { legalClocks } from "./home";
 import type { OversightItem } from "./oversight";
 import { OVERSIGHT } from "./oversight";
-import { HomeSection } from "./sections/Home";
+import { HomeSection, HomeStory } from "./sections/Home";
+import { ComplaintPage } from "./sections/ComplaintPage";
+import { ONE_STORY_PATH, type StoryRun } from "./oneStory";
+import { eventPath } from "./oversight";
+import { IMPORTED_SOURCE } from "./complaintList";
+import { rv11 } from "../../test/rv11";
 
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("../customer-admin/shared", async (original) => ({
@@ -77,5 +82,62 @@ describe("H1: Home's legal clocks are the legal deadlines only", () => {
     const clocks = html.slice(html.indexOf('id="home-clocks"'));
     expect(clocks).toContain("Due Wed 2 Dec 2026, 23:59 IST");
     expect(clocks).not.toContain("Wed 4 Nov");
+  });
+});
+
+const LABELS = ["The call", "Triage", "Tree", "Decide", "Form", "Fill", "Approval", "Submit", "Records", "Trends"];
+const storyRun = (overrides: Partial<StoryRun> = {}): StoryRun => ({
+  run: "yours",
+  complaint: {
+    id: "c-fic",
+    ref: "FIC-2001",
+    description: "The pump over-infused.",
+    product_id: "p-fic",
+    serious_injury: true,
+    death: false,
+  },
+  market: "US",
+  market_label: "United States (FDA)",
+  conclusion: "REPORTABLE",
+  report_id: "r1",
+  report_stage: "APPROVAL",
+  needs: [],
+  steps: LABELS.map((label, index) => ({ key: label, label, done: index < 6, skipped: false })),
+  current: 6,
+  finished: false,
+  ...overrides,
+});
+
+/** FIC-2001's page while its report waits for approval: the approval task is due first, the legal deadline later. */
+const pendingApproval = () => {
+  const view = rv11();
+  const legal = { ...view.work!.due[0], key: "obligation:o1", category: "OBLIGATION", title: "FDA 3500A: approval" };
+  legal.due_at = "2026-12-02T04:59:59Z";
+  legal.due_label = "Tue 1 Dec 2026, 23:59 EST";
+  const task = { ...legal, key: "task:t1", title: "Approve the US report for FIC-2001" };
+  task.due_at = "2026-11-04T18:29:59Z";
+  task.due_label = "Wed 4 Nov 2026, 23:59 IST";
+  task.hours_left = 30;
+  view.event.ref = "FIC-2001";
+  view.work!.due = [task, legal];
+  return view;
+};
+
+describe("H2: the Your data hero and the complaint header read the legal deadline, not an approval's due date", () => {
+  it("says the legal deadline in the Your data hero on Home", () => {
+    resources.data[ONE_STORY_PATH] = { sample: null, yours: storyRun() };
+    resources.data[eventPath("FIC-2001")] = pendingApproval();
+    const html = render(<HomeStory />, api({ dataSource: IMPORTED_SOURCE }));
+    expect(html).toContain("Its clock ends Tue 1 Dec.");
+    expect(html).not.toContain("Wed 4 Nov");
+  });
+
+  it("names the legal deadline in the complaint page's one clock line", () => {
+    resources.data[ONE_STORY_PATH] = { sample: null, yours: null };
+    resources.data[eventPath("FIC-2001")] = pendingApproval();
+    const html = render(<ComplaintPage tab="Summary?ref=FIC-2001" />);
+    const header = html.slice(html.indexOf('class="uw-cp-chips"'), html.indexOf("uw-hl-fields"));
+    expect(header).toContain("due Tue 1 Dec");
+    expect(header).not.toContain("Wed 4 Nov");
   });
 });
