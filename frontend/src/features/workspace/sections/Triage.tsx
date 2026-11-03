@@ -5,6 +5,7 @@ import { CheckCircle2, Clock, FileWarning, Flag, Link2, Siren } from "lucide-rea
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
+import { withTabParam } from "../workspaceAddress";
 import { DeadlineChip, HarmChip, StateChip, type Harm } from "../../../app/chips";
 import { deadlineLabel } from "../../../app/dates";
 import { AlsoKnownAs, countOf } from "./common";
@@ -52,6 +53,7 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const [complaint] = useTabParam("complaint");
   // A story opens its record by the reference people read (Triage?ref=SAMPLE-URG-01, 0.10.71).
   const [ref] = useTabParam("ref");
+  const { reportTab, shownTab } = useWorkspace();
   const list = useResource<TriageList>(`${TRIAGE}?show=${show}`);
   const summary = list.data?.summary;
   const items = list.data?.items ?? [];
@@ -60,7 +62,15 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
     (complaint ? `COMPLAINT:${complaint}` : null) ??
     (ref ? (items.find((item) => item.ref === ref || item.identifier === ref)?.key ?? null) : null);
   const open = wanted ? (items.find((item) => item.key === wanted) ?? null) : null;
-  const setOpen = (item: TriageItem | null) => setOpenKey(item ? item.key : null);
+  const setOpen = (item: TriageItem | null) => {
+    if (item || !reportTab || !shownTab) return setOpenKey(item ? item.key : null);
+    // Closing clears every parameter that opens the panel, in one address change: complaint= or ref= left behind
+    // would open it again at once (0.10.79).
+    reportTab(
+      ["item", "complaint", "ref"].reduce((tab, name) => withTabParam(tab, name, null), shownTab),
+      "push",
+    );
+  };
   const overdue = items.filter((item) => item.triage_clock.state === "OVERDUE").length;
   return (
     <div className="ac-overview">
