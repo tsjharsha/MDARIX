@@ -10,6 +10,7 @@
 - F7: report fields, product identity, registrations and responsible parties are audited before and after.
 - F11: a cancelled report reads Cancelled, not MET; a reopened one drops its cancellation note (kept in the audit).
 - Security F3: a download named in any script answers with an ASCII name and the UTF-8 one.
+- Security F1: the trial invite is rate limited first and never says whether an address has an account.
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -386,3 +387,27 @@ def test_security_f3_a_download_named_in_any_script_answers_with_both_names(tria
     answer = trial["user"].get(path)
     assert answer.status_code == 200
     assert answer.headers["content-disposition"].endswith("filename*=UTF-8''Acknowledgement%20%E2%80%93%20India.txt")
+
+
+def test_security_f1_the_invite_is_rate_limited_first_and_never_says_an_address_has_an_account(trial, monkeypatch):
+    from backend.app import rate_limit
+    from backend.app.db.models.foundation import AuthUser
+    from backend.app.db.tenant_scope import bind_system
+
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    with SessionLocal() as db:
+        bind_system(db, "test: an account in another organization")
+        elsewhere = db.query(AuthUser.username).filter(AuthUser.tenant_id != tenant_id).first()[0]
+    invite = {"email": elsewhere, "display_name": "Someone Else", "persona": "regulatory"}
+    refused = user.post("/api/v1/trial/team", json=invite)
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "CANNOT_INVITE"
+    message = refused.json()["detail"]["message"].lower()
+    assert "account" not in message and "organization" not in message
+
+    def limited(*_args, **_kwargs):
+        raise rate_limit.HTTPException(429, detail={"code": "RATE_LIMITED", "message": "Try again tomorrow"})
+
+    monkeypatch.setattr(rate_limit, "enforce", limited)
+    # Over the limit nothing is looked up: the same answer for an address with an account and one without.
+    assert user.post("/api/v1/trial/team", json=invite).status_code == 429
+    assert user.post("/api/v1/trial/team", json={**invite, "email": "nobody-f1@example.invalid"}).status_code == 429
