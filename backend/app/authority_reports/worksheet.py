@@ -346,7 +346,7 @@ def _imdrf(annex: str):
             return None
         from backend.app.regulatory_reference import code_text
 
-        text = "; ".join(code_text(code["code"], code["term"], context["fda"].get(code["code"])) for code in codes)
+        text = "; ".join(code_text(code["code"], code["term"], context.get("fda", {}).get(code["code"])) for code in codes)
         release = codes[0]["release"]
         complaint = context["complaint"]
         return text, _source(
