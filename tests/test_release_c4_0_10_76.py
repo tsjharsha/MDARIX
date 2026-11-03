@@ -16,6 +16,8 @@ from __future__ import annotations
 import uuid
 
 import pytest
+
+from tests.report_fill import fill
 from fastapi.testclient import TestClient
 
 from backend.app.authority_reports import forms, render, worksheet
@@ -26,7 +28,7 @@ from tests.test_authority_reports_api import _empty_context
 from tests.test_free_trial import PASSWORD, _activation_token, _approved_trial_client
 from tests.test_market_assessment_api import WHY, _acknowledge, _save, _sign
 from tests.test_release_c3_0_10_75 import REPORTS, TREES, _classic, _flagship, _ok, _purge, _reports, _sign_us
-from tests.test_reporting_capa_api import REASON, SETTINGS
+from tests.test_reporting_capa_api import SETTINGS
 
 NEW = (forms.EU_MIR, forms.GB_MIR, forms.HC_MDPR)
 
@@ -172,7 +174,10 @@ def test_the_samples_rv07_has_its_eu_mir_and_it_goes_the_whole_way(trial):
     assert blocked.status_code == 422 and blocked.json()["detail"]["code"] == "MANDATORY_FIELDS_MISSING"
     for field in detail["mandatory"]["missing"]:
         choice = values[field]["options"]
-        _ok(user.put(f"{REPORTS}/{eu['id']}/fields/{field}", json={"value": choice[0] if choice else "Test (sample)"}))
+        if choice:
+            _ok(user.put(f"{REPORTS}/{eu['id']}/fields/{field}", json={"value": choice[0]}))
+        else:
+            fill(user, REPORTS, eu["id"], [field])  # 0.10.81: a date field takes a date, a code field a code
     pdf = user.get(f"{REPORTS}/{eu['id']}/worksheet.pdf")
     assert pdf.status_code == 409 and pdf.json()["detail"]["code"] == "APPROVE_FIRST"
     asked = _ok(user.post(f"{REPORTS}/{eu['id']}/snapshots"))
@@ -192,8 +197,8 @@ def test_the_samples_rv07_has_its_eu_mir_and_it_goes_the_whole_way(trial):
 def test_a_signed_reportable_canada_conclusion_creates_the_health_canada_report(trial):
     user = trial["user"]
     settings = _ok(user.get(SETTINGS))
-    canada = [item for item in settings["templates"] if "Health Canada" in item["name"]]
-    _ok(user.put(SETTINGS, json={"windows": settings["windows"] + canada, "lookback_days": 365, "reason": REASON}))
+    # 0.10.81 (F5): a trial has every market's windows, Canada's included.
+    assert [item["name"] for item in settings["windows"] if "Health Canada" in item["name"]]
     complaint = _flagship(user)
     _acknowledge(user, "CA")
     answers = {
@@ -228,8 +233,8 @@ def test_the_decision_trees_show_every_market():
     try:
         trees = {tree["market"]: tree for tree in _ok(user.get(TREES))["markets"]}
         assert list(trees) == ["US", "EU_NI", "GB", "IN", "CA"]
-        # The sample reports to the US, the EU and India; GB and Canada say they are not in its windows.
-        assert [market for market, tree in trees.items() if not tree["enabled"]] == ["GB", "CA"]
+        # 0.10.81 (F5): every trial has every market's windows, so every tree is enabled.
+        assert [market for market, tree in trees.items() if not tree["enabled"]] == []
         assert trees["GB"]["tests"]["total"] == trees["GB"]["tests"]["passed"] == 5
         assert trees["EU_NI"]["form"]["starter"] and not trees["US"]["form"]["starter"]
     finally:
@@ -298,8 +303,7 @@ def test_waiting_for_my_approval_holds_only_what_i_may_approve_and_links_open_th
         complaint = _flagship(owner)
         _ok(_sign_us(owner, complaint, "REPORTABLE"))
         (report,) = _reports(owner, complaint)
-        for field in _ok(owner.get(f"{REPORTS}/{report['id']}"))["mandatory"]["missing"]:
-            _ok(owner.put(f"{REPORTS}/{report['id']}/fields/{field}", json={"value": "Test value (sample)"}))
+        fill(owner, REPORTS, report["id"], _ok(owner.get(f"{REPORTS}/{report['id']}"))["mandatory"]["missing"])
         _ok(owner.post(f"{REPORTS}/{report['id']}/snapshots"))
         # The preparer may not approve (a colleague may): not in the preparer's "Waiting for my approval".
         assert "my-approval" not in _reports(owner, complaint)[0]["views"]

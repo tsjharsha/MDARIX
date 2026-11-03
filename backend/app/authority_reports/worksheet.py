@@ -346,7 +346,9 @@ def _imdrf(annex: str):
             return None
         from backend.app.regulatory_reference import code_text
 
-        text = "; ".join(code_text(code["code"], code["term"], context.get("fda", {}).get(code["code"])) for code in codes)
+        text = "; ".join(
+            code_text(code["code"], code["term"], context.get("fda", {}).get(code["code"])) for code in codes
+        )
         release = codes[0]["release"]
         complaint = context["complaint"]
         return text, _source(
@@ -743,6 +745,13 @@ def build(
                 source = source if status == CONFIRMED else None
             elif value and entry.get("confirmed"):
                 status = CONFIRMED
+            # A value typed before 0.10.81 that does not fit its field is flagged, never deleted (F6): it counts as
+            # missing until a person corrects it.
+            problem = None
+            if status == ENTERED and not entry.get("codes"):  # the code picker's codes are checked when chosen
+                problem = forms.value_problem(item, value)
+                if item.source == "front_page" and found and found[0] != value:
+                    problem = "Differs from the front page's manufacturer report number: clear it to use that one"
             if status is None:
                 status = (
                     OUTSIDE
@@ -763,6 +772,8 @@ def build(
                     "editable": not item.personal and missing != forms.NOT_USED,
                     "options": list(item.options) or None,
                     "note": item.note or None,
+                    "kind": item.kind,
+                    "problem": problem,
                     "by": names.get(entry.get("by")) if entry else None,
                     "at": entry.get("at") if entry else None,
                     # Codes (0.10.77): the annex the field codes, the suggestion waiting, what was suggested before a
@@ -809,7 +820,7 @@ def mandatory(sections: list[dict]) -> dict:
         for item in section["fields"]
         if item["missing_class"] == forms.MUST and not item.get("personal")
     ]
-    missing = [item["id"] for item in fields if item["status"] in (forms.MUST, SUGGESTED)]
+    missing = [item["id"] for item in fields if item["status"] in (forms.MUST, SUGGESTED) or item.get("problem")]
     return {"total": len(fields), "filled": len(fields) - len(missing), "missing": missing}
 
 

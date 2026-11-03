@@ -3,6 +3,8 @@
 
 - **Every market's reporting windows** (F5): a market no window covers gets its starter templates
   (reportability/rules.py ``TEMPLATES``), so a Great Britain or Canada complaint gets its assessment and clock.
+- **The sample's FDA product code** (F6): the sample US report's D2A held "SMP (sample: your FDA product code)", which
+  a code field no longer takes; it becomes FRN (Pump, Infusion), as new trials have it.
 """
 
 from __future__ import annotations
@@ -70,4 +72,30 @@ def refresh(db: Session, tenant_id, apply: bool, now: datetime | None = None) ->
         if apply:
             add_windows(db, tenant_id, now)
         found.append(f"{'added' if apply else 'would add'} the reporting windows {', '.join(windows)}")
+    old_code = _sample_product_code(db, tenant_id, apply, now)
+    if old_code:
+        found.append(f"{'set' if apply else 'would set'} the sample US report's FDA product code to FRN")
     return found
+
+
+OLD_SAMPLE_CODE = "SMP (sample: your FDA product code)"
+
+
+def _sample_product_code(db: Session, tenant_id, apply: bool, now: datetime) -> int:
+    """The sample's report entries still holding the old D2A text (F6), set to FRN with ``apply``."""
+    from backend.app.db.models.authority_reports import ReportObligation
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
+
+    rows = [
+        row
+        for row in db.query(ReportObligation).filter(
+            ReportObligation.tenant_id == tenant_id, ReportObligation.source_system == SAMPLE_SOURCE
+        )
+        if ((row.entries or {}).get("D2A") or {}).get("value") == OLD_SAMPLE_CODE
+    ]
+    if apply:
+        for row in rows:
+            row.entries = {**row.entries, "D2A": {**row.entries["D2A"], "value": "FRN"}}
+            row.updated_at = now
+        db.flush()
+    return len(rows)

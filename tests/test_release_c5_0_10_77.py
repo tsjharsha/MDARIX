@@ -21,6 +21,7 @@ import pytest
 from backend.app.authority_reports import forms, render, worksheet
 from scripts import load_code_lists as loader
 from tests.code_lists import ensure_loaded
+from tests.report_fill import fill
 from tests.test_free_trial import PASSWORD, _approved_trial_client
 from tests.test_release_c3_0_10_75 import REPORTS, _flagship, _ok, _purge, _reports, _sign_us
 
@@ -222,9 +223,9 @@ def test_nothing_is_filed_unconfirmed_and_one_choice_fills_fda_and_imdrf(trial):
     )
     assert {"H6_PROBLEM", "H6_CLINICAL", "H6_IMPACT"} <= set(detail["mandatory"]["missing"])
     # Fill every other mandatory field: Send for approval still waits for the codes.
-    for field in [item for item in detail["mandatory"]["missing"] if not item.startswith("H6_")]:
-        if field != "G8":
-            detail = _ok(user.put(f"{REPORTS}/{report['id']}/fields/{field}", json={"value": "Test value"}))
+    detail = fill(
+        user, REPORTS, report["id"], [item for item in detail["mandatory"]["missing"] if not item.startswith("H6_")]
+    )
     blocked = user.post(f"{REPORTS}/{report['id']}/snapshots")
     assert blocked.status_code == 422 and "H6_PROBLEM" in blocked.json()["detail"]["missing"]
     # Confirm the suggestion; choose the health effect codes in the picker: each with its FDA code.

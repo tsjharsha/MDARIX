@@ -969,6 +969,20 @@ def set_field(
     value = None if payload.clear else _text(payload.value, worksheet.VALUE_MAX)
     if value and field.options and value not in field.options:
         raise _error(422, "NOT_A_CHOICE", f"Choose one of: {'; '.join(field.options)}", choices=list(field.options))
+    if value and field.source == "front_page":
+        raise _error(
+            422, "FOLLOWS_FRONT_PAGE", "This field follows the front page's manufacturer report number: change it there"
+        )
+    problem = forms.value_problem(field, value)
+    if problem:
+        raise _error(422, f"NOT_A_{field.kind}", problem)
+    if value and field.kind == forms.LIST_CODE:
+        from backend.app import regulatory_reference as reference
+
+        value = value.upper()
+        name = forms.LIST_CODES[field.source][0]
+        if name:
+            reference._known(control_db, name, value, "CODE_UNKNOWN", f"is not in the loaded {name.replace('_', ' ')}")
     code_state = None
     if payload.clear:
         entries.pop(field_id, None)

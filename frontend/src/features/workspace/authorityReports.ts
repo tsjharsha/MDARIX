@@ -93,6 +93,10 @@ export type WorksheetField = {
   suggestion?: string | null;
   /** What the mapping suggested before the person changed it. */
   suggested?: string | null;
+  /** 0.10.81: what the field takes (TEXT, DATE, DATE_RANGE, IMDRF_CODE, LIST_CODE), and why a value typed before does
+   * not fit it (flagged, counted as missing, never deleted). */
+  kind?: string;
+  problem?: string | null;
 };
 
 export type WorksheetSection = { code: string; title: string; note: string | null; fields: WorksheetField[] };

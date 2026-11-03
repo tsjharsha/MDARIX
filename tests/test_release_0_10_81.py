@@ -5,6 +5,7 @@
 - F10: an imported blank received date stays blank; the clock counts from the event date, named so.
 - F3, F4, F9: a missing country or awareness date is asked for, provisional, and blocks signing; contradictory
   import rows are flagged.
+- F6: report fields take dates and codes only; a bad stored value is flagged.
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -231,3 +232,37 @@ def test_f3_f4_f9_a_missing_country_or_awareness_date_is_asked_for_and_blocks_si
     assert known["needs"] == [] and not known["provisional"]
     assert (known["aware_source"], known["aware_date"]) == ("AWARENESS_DATE", "2026-08-14")
 
+
+def test_f6_report_fields_take_dates_and_codes_only_and_a_bad_stored_value_is_flagged(trial):
+    from backend.app.db.models.authority_reports import ReportObligation
+    from backend.app.db.tenant_scope import bind_tenant
+    from tests.code_lists import ensure_loaded
+
+    ensure_loaded()
+    user, complaint, tenant_id = trial["user"], trial["complaint"], trial["tenant_id"]
+    (report,) = _reports(user, complaint)
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        row = db.get(ReportObligation, uuid.UUID(report["id"]))
+        # A draft again, holding a value typed before 0.10.81 into a date field.
+        row.state = "DRAFT"
+        row.entries = {**(row.entries or {}), "B4": {"value": "next tuesday", "by": "test", "at": "2026-11-03"}}
+        db.commit()
+    path = f"{REPORTS}/{report['id']}/fields"
+    detail = _ok(user.get(f"{REPORTS}/{report['id']}"))
+    b4 = next(item for section in detail["sections"] for item in section["fields"] if item["id"] == "B4")
+    # Flagged, not deleted, and counted as missing.
+    assert (b4["value"], b4["kind"], b4["problem"]) == ("next tuesday", "DATE", "Enter a date as YYYY-MM-DD")
+    assert "B4" in detail["mandatory"]["missing"]
+    for field, value, code in (
+        ("B4", "next tuesday", "NOT_A_DATE"),
+        ("H6_CLINICAL", "headache, probably", "NOT_A_IMDRF_CODE"),
+        ("G8", "1234567-2026-00011", "FOLLOWS_FRONT_PAGE"),
+        ("D2A", "ZZ1", "NOT_A_LIST_CODE"),
+        ("D2A", "ZZZ", "CODE_UNKNOWN"),
+    ):
+        refused = user.put(f"{path}/{field}", json={"value": value})
+        assert refused.status_code == 422 and refused.json()["detail"]["code"] == code, (field, refused.text)
+    detail = _ok(user.put(f"{path}/B4", json={"value": "2026-11-03"}))
+    assert "B4" not in detail["mandatory"]["missing"]
+    assert _ok(user.put(f"{path}/D2A", json={"value": "frn"}))["sections"]
