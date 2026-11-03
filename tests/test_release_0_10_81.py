@@ -9,6 +9,7 @@
 - F12: the EU and GB MIR forms never pre-fill 1.2d or 3.2c.
 - F7: report fields, product identity, registrations and responsible parties are audited before and after.
 - F11: a cancelled report reads Cancelled, not MET; a reopened one drops its cancellation note (kept in the audit).
+- Security F3: a download named in any script answers with an ASCII name and the UTF-8 one.
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -358,3 +359,30 @@ def test_f11_a_cancelled_report_reads_cancelled_and_a_reopened_one_drops_its_can
     assert reopened["state"] == "DRAFT" and reopened["note"] is None and reopened["cancelled_reason"] is None
     (event,) = _audit(tenant_id, "REPORT_REOPENED_BY_CONCLUSION")[-1:]
     assert event.old_values == {"state": "CANCELLED", "note": note} and event.new_values["note"] is None
+
+
+def test_security_f3_a_download_named_in_any_script_answers_with_both_names(trial):
+    from backend.app.db.models.authority_reports import ReportEvidence, ReportSubmission
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.downloads import attachment
+
+    assert attachment("report.pdf") == 'attachment; filename="report.pdf"'
+    assert attachment("../a\b/Receipt – दस्तावेज़.txt") == (
+        "attachment; filename=\"Receipt .txt\"; filename*=UTF-8''Receipt%20%E2%80%93%20"
+        "%E0%A4%A6%E0%A4%B8%E0%A5%8D%E0%A4%A4%E0%A4%BE%E0%A4%B5%E0%A5%87%E0%A4%9C%E0%A4%BC.txt"
+    )
+    assert attachment('"\r\n') == 'attachment; filename="download"'
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        row = (
+            db.query(ReportEvidence)
+            .filter(ReportEvidence.tenant_id == trial["tenant_id"], ReportEvidence.content.isnot(None))
+            .first()
+        )
+        submission = db.get(ReportSubmission, row.submission_id)
+        row.file_name = "Acknowledgement – India.txt"
+        db.commit()
+        path = f"{REPORTS}/{submission.obligation_id}/submissions/{submission.id}/evidence/{row.id}/file"
+    answer = trial["user"].get(path)
+    assert answer.status_code == 200
+    assert answer.headers["content-disposition"].endswith("filename*=UTF-8''Acknowledgement%20%E2%80%93%20India.txt")

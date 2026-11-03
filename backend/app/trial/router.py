@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.app.downloads import attachment
 from backend.app.access.authz import _require_platform_admin
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import (
@@ -231,7 +232,7 @@ def trial_template(
     return Response(
         imports.template_csv(entity),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="mdarix-{entity}-template.csv"'},
+        headers={"Content-Disposition": attachment(f"mdarix-{entity}-template.csv")},
     )
 
 

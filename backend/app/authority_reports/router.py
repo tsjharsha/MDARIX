@@ -25,6 +25,7 @@ regulatory.approve. These routes serve a free trial and a pilot alike (T-B1).
 
 from __future__ import annotations
 
+from backend.app.downloads import attachment
 from backend.app import links
 import base64
 import binascii
@@ -1670,7 +1671,7 @@ def evidence_file(
     return Response(
         content=bytes(row.content),
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{row.file_name or "evidence"}"'},
+        headers={"Content-Disposition": attachment(f"{row.file_name or 'evidence'}")},
     )
 
 
@@ -1848,5 +1849,5 @@ def export(
     return Response(
         content=body,
         media_type=MEDIA[kind],
-        headers={"Content-Disposition": f'attachment; filename="{stem}.{kind}"'},
+        headers={"Content-Disposition": attachment(f"{stem}.{kind}")},
     )

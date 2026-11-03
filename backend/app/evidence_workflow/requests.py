@@ -1035,7 +1035,7 @@ def download_evidence_request_attachment(
     return Response(
         content=content,
         media_type=attachment.content_type,
-        headers={"Content-Disposition": f'attachment; filename="{safe_filename(attachment.filename)}"'},
+        headers={"Content-Disposition": attachment(f"{safe_filename(attachment.filename)}")},
     )
 
 

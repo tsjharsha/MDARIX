@@ -20,6 +20,7 @@ pilot alike (T-B1).
 
 from __future__ import annotations
 
+from backend.app.downloads import attachment
 from backend.app import links
 import logging
 import uuid
@@ -834,5 +835,5 @@ def export(
     return Response(
         content=body,
         media_type=MEDIA[kind],
-        headers={"Content-Disposition": f'attachment; filename="mdarix-guide-{view["code"]}.{kind}"'},
+        headers={"Content-Disposition": attachment(f"mdarix-guide-{view['code']}.{kind}")},
     )

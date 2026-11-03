@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.app.downloads import attachment
 from backend.app import support_access
 from backend.app.access.authz import _admin_tenant, _require_platform_admin, ensure_user_visible
 from backend.app.business_ids import business_id_of
@@ -146,7 +147,7 @@ def _download(db: Session, tenant_id, export_id: uuid.UUID, actor_ref: str) -> S
         _chunks(content),
         media_type="application/zip",
         headers={
-            "Content-Disposition": f'attachment; filename="mdarix-export-{stamp}-{str(row.id)[:8]}.zip"',
+            "Content-Disposition": attachment(f"mdarix-export-{stamp}-{str(row.id)[:8]}.zip"),
             "Content-Length": str(len(content)),
             "Cache-Control": "no-store",
         },
@@ -304,7 +305,7 @@ def export_person(user_id: uuid.UUID, request: Request, db: Session = Depends(ge
     return JSONResponse(
         document,
         headers={
-            "Content-Disposition": f'attachment; filename="mdarix-person-{str(user.id)[:8]}.json"',
+            "Content-Disposition": attachment(f"mdarix-person-{str(user.id)[:8]}.json"),
             "Cache-Control": "no-store",
         },
     )

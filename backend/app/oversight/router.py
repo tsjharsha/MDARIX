@@ -31,6 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.downloads import attachment
 from backend.app.access.permissions import (
     DATA_EXPORT,
     DECISION_SIGN,
@@ -635,7 +636,7 @@ def export(
     return Response(
         content=stream.getvalue().encode("utf-8-sig"),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="mdarix-oversight.csv"'},
+        headers={"Content-Disposition": attachment("mdarix-oversight.csv")},
     )
 
 
@@ -1502,7 +1503,5 @@ def decision_record_pdf(
     return Response(
         content=body,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'attachment; filename="mdarix-event-record-{complaint.complaint_identifier}.pdf"'
-        },
+        headers={"Content-Disposition": attachment(f"mdarix-event-record-{complaint.complaint_identifier}.pdf")},
     )
