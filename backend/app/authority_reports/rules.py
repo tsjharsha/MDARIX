@@ -130,11 +130,12 @@ def approver_problem(approver: str, role: str | None, preparers: set[str], signe
     """Why this person may not approve the snapshot (G2b, G33), or None: never the preparer, never the signer of the
     market conclusion behind it, never an administrator."""
     if (role or "").upper() in ADMINISTRATOR_ROLES:
-        return "An administrator cannot approve a report snapshot"
+        # Plain words on the report's screens, no "snapshot" (0.10.83, D2.8; 0.10.84).
+        return "An administrator cannot approve a report"
     if approver in preparers:
-        return "You prepared this worksheet: a second person must approve the snapshot"
+        return "You prepared this report: a second person must approve it"
     if signer and approver == signer:
-        return "You signed the market conclusion behind this report: a second person must approve the snapshot"
+        return "You signed the market conclusion behind this report: a second person must approve it"
     return None
 
 

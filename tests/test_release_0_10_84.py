@@ -187,3 +187,16 @@ def test_a_signed_conclusion_names_who_signed_it_on_the_record(fic):
     related = {g["key"]: g for g in _ok(user.get("/api/v1/oversight/events/SAMPLE-RV-11"))["related"]}
     (line,) = related["assessments"]["lines"][:1]
     assert line.startswith("United States (FDA): Reportable, signed") and line.endswith(f" by {me}")
+
+
+def test_the_report_approval_reasons_say_report_not_snapshot():
+    """D2's miss: the report page's Next step said "a second person must approve the snapshot"."""
+    from backend.app.authority_reports.rules import approver_problem
+
+    reasons = [
+        approver_problem("u1", "LEADER", {"u1"}, None),
+        approver_problem("u2", "LEADER", {"u1"}, "u2"),
+        approver_problem("u3", "ADMINISTRATOR", set(), None),
+    ]
+    assert all(reason and "snapshot" not in reason for reason in reasons), reasons
+    assert reasons[0] == "You prepared this report: a second person must approve it"

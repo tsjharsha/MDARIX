@@ -121,7 +121,7 @@ export type ApprovalStanding = {
 
 /** What the draft says before approval is asked: who gets the approval task in My Work. */
 export function askNote(standing: ApprovalStanding | null | undefined): string {
-  if (!standing) return "When ready, ask a colleague to approve the snapshot.";
+  if (!standing) return "When ready, ask a colleague to approve it.";
   const names = standing.approvers;
   if (names.length)
     return `When ready, ask for approval: ${names.join(", ")} ${names.length === 1 ? "gets" : "get"} a task in My Work.`;
