@@ -205,6 +205,6 @@ describe("Addendum: one number per thing", () => {
     expect(summaryLine(counts)).toMatch(/^16 from your records · 8 entered/);
     // Before 0.10.72 the list said "24 filled" beside a meter of 16.
     expect(summaryLine(counts)).not.toContain("24");
-    expect(source("Reports")).toContain("filledCounts(detail.counts).fromRecords");
+    // 0.10.83 (D2.8): the approval no longer restates the counts; the approver reads the values themselves.
   });
 });

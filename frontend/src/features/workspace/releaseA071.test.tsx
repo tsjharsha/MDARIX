@@ -357,7 +357,7 @@ describe("A6: separation of duties, shown honestly", () => {
     expect(renderToStaticMarkup(<PracticeApproval shown={false} />)).toBe("");
     // Beside the approve button of a report snapshot and of a decision guide version (stage 3's practice exception).
     expect(source("Reports")).toMatch(
-      /Approve the snapshot"\}\s*<\/button>\s*<PracticeApproval shown=\{standing\?\.same_person\} \/>/,
+      /"Approve"\}\s*<\/button>\s*<PracticeApproval shown=\{standing\?\.same_person\} \/>/, // 0.10.83: plain words
     );
     expect(source("DecisionGuides")).toMatch(
       /Approve and publish"\}\s*<\/button>\s*<PracticeApproval shown=\{view\.approval\?\.same_person\} \/>/,

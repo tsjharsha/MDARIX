@@ -173,7 +173,8 @@ export function ApprovingDoc({ detail }: { detail: ReportDetail }) {
             <h3>{section.title}</h3>
             <dl>
               {section.fields
-                .filter((item) => item.missing_class !== "NOT_USED")
+                // What is submitted: every value, and every mandatory field; empty optional boxes are left out.
+                .filter((item) => item.value || item.missing_class === "MUST_HAVE")
                 .map((item) => (
                   <div key={item.id}>
                     <dt>

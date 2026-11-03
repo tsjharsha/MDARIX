@@ -484,7 +484,7 @@ export function RecordSubmission({
         }}
       >
         <p className="ac-muted ca-wide">
-          Enter the approved snapshot in the authority's route yourself, then record it here at once.
+          Enter the approved report in the authority's route yourself, then record it here at once.
         </p>
         <DecideAndSign />
         <label className="ca-field">
@@ -523,7 +523,7 @@ export function RecordSubmission({
             checked={form.matches}
             onChange={(event) => set({ matches: event.target.checked, differences: [] })}
           />{" "}
-          The submitted content matches the approved snapshot
+          The submitted content matches the approved report
         </label>
         {!form.matches && (
           <div className="ca-wide">
@@ -1151,7 +1151,7 @@ export function SubmissionRecord({ detail }: { detail: ReportDetail }) {
               {attempt.authority_reference ? `Reference ${attempt.authority_reference} · ` : ""}
               {attempt.differences.length
                 ? `Differences: ${attempt.differences.map((item) => `${item.field} (${item.classification.toLowerCase().replace("_", " ")}: ${item.reason})`).join("; ")}`
-                : "Matches the approved snapshot"}
+                : "Matches the approved report"}
             </p>
             <ul>
               {attempt.evidence.map((item) => (
