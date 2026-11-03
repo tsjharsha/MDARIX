@@ -210,8 +210,16 @@ def _party(
     return party
 
 
+def late_log(at: datetime, calendar) -> datetime:
+    """When the sample's late call is logged: a day after its one working hour ended, so it counts outside MDARIX."""
+    from backend.app.communications import rules
+
+    return rules.working_hour_after(at, calendar) + timedelta(days=1)
+
+
 def _communications(db, tenant_id, complaints: dict, author: str, owner: str, now: datetime) -> dict:
     from backend.app.communications import rules, service
+    from backend.app.oversight.service import calendar_of
 
     limit = service.attempts_limit(db, tenant_id)
     found = {}
@@ -338,7 +346,9 @@ def _communications(db, tenant_id, complaints: dict, author: str, owner: str, no
             source_system=SAMPLE_SOURCE,
         )
         # Two more to the desk (three in all), then three to the head of department: unresolved after attempts. One
-        # call was logged the next day: it counts as done outside MDARIX (S4).
+        # call was logged a day after its working hour had passed: done outside MDARIX (S4) whatever weekday the trial
+        # starts on (a call made on a Friday evening and logged on the Saturday was still "within one working hour").
+        calendar = calendar_of(db, tenant_id)
         for days, channel, outcome, late in (
             (3, "EMAIL", "SENT", False),
             (6, "PHONE", "NO_ANSWER", False),
@@ -356,7 +366,7 @@ def _communications(db, tenant_id, complaints: dict, author: str, owner: str, no
                 outcome=outcome,
                 note=None,
                 actor=author,
-                now=at + (timedelta(days=1) if late else timedelta(minutes=30)),
+                now=late_log(at, calendar) if late else at + timedelta(minutes=30),
                 limit=limit,
             )
             if entry.status != rules.OPEN:
