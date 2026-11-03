@@ -12,6 +12,7 @@
 - Security F3: a download named in any script answers with an ASCII name and the UTF-8 one.
 - Security F1: the trial invite is rate limited first and never says whether an address has an account.
 - U-06: a day-only awareness counts from that day everywhere and is shown as a date.
+- The refresh (open_deadlines.py) lists and updates the open reports and draft assessments the fixed rules change.
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -431,3 +432,48 @@ def test_u06_a_day_only_awareness_counts_from_that_day_everywhere_and_shows_as_a
     # A moment with a time keeps the earliest local day, as before.
     moment = datetime(2026, 10, 29, 12, 30, tzinfo=timezone.utc)
     assert deadlines.count(moment, 10, "CALENDAR", "CA", "Pacific/Auckland").day == date(2026, 11, 9)
+
+
+def test_the_refresh_lists_and_updates_open_reports_and_drafts_the_fixed_rules_change(trial):
+    """F1 and F2 on running trials (backend/app/trial/open_deadlines.py): dry run, apply (audited), then nothing."""
+    from datetime import timedelta
+
+    from backend.app.db.models.authority_reports import ReportObligation
+    from backend.app.db.models.market_assessment import ComplaintMarketAssessment
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.trial import open_deadlines
+
+    user, complaint, tenant_id = trial["user"], trial["complaint"], trial["tenant_id"]
+    signed = _sign_us(user, complaint, "YES")  # the 5-work-day report, signed
+    (report,) = _reports(user, complaint)
+    detail = _ok(user.get(f"/api/v1/complaints/{complaint}/market-assessments"))
+    answers, _ = _answers_from_record(detail, "US", {**FLAGSHIP_US, "US6": "UNKNOWN"})
+    _save(user, complaint, "US", answers, harm_level=detail["severity_level"])
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        # As 0.10.80 left them: the report on the old 30-day date, the draft's Unknown read as No.
+        row = db.get(ReportObligation, uuid.UUID(report["id"]))
+        row.state, row.report_type = "DRAFT", "US_30_DAY"
+        row.due_on = row.due_on + timedelta(days=20)
+        draft = (
+            db.query(ComplaintMarketAssessment)
+            .filter(
+                ComplaintMarketAssessment.complaint_id == uuid.UUID(complaint),
+                ComplaintMarketAssessment.market == "US",
+                ComplaintMarketAssessment.conclusion.is_(None),
+            )
+            .one()
+        )
+        draft.report_type = "US_30_DAY"
+        db.commit()
+        dry = open_deadlines.refresh(db, tenant_id, apply=False)
+        print("\nDRY RUN:", *dry, sep="\n  ")
+        assert any("report: report_type US_30_DAY -> US_5_WORK_DAY" in line for line in dry)
+        assert any("draft assessment: report_type US_30_DAY -> US_5_WORK_DAY" in line for line in dry)
+        refreshed = open_deadlines.refresh(db, tenant_id, apply=True)
+        db.commit()
+        print("APPLY:", *refreshed, sep="\n  ")
+        assert open_deadlines.refresh(db, tenant_id, apply=False) == []
+    detail = _ok(user.get(f"{REPORTS}/{report['id']}"))
+    assert (detail["report_type"], detail["deadline"]["due_on"]) == ("US_5_WORK_DAY", signed["due_on"])
+    assert _audit(tenant_id, "COMPLAINT_MARKET_ASSESSMENT_RECOMPUTED")

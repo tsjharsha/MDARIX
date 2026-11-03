@@ -5,11 +5,18 @@
   (reportability/rules.py ``TEMPLATES``), so a Great Britain or Canada complaint gets its assessment and clock.
 - **The sample's FDA product code** (F6): the sample US report's D2A held "SMP (sample: your FDA product code)", which
   a code field no longer takes; it becomes FRN (Pump, Infusion), as new trials have it.
+- **Open reports and assessments under the fixed rules** (F1, F2): an open report (not yet submitted) whose report
+  type, due date or provisional flag differs from its market's latest signed reportable conclusion follows it,
+  audited (authority_reports/router.py ``follow_signed``); a draft assessment whose stored suggestion, report type or
+  due date the fixed Unknown rule changes is recomputed, audited. A signed conclusion is never changed: one the fixed
+  rule would give another report type is listed for a person to sign again, and a submitted report whose type
+  differs is listed (its page already flags it).
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from types import SimpleNamespace
 
 from sqlalchemy.orm import Session
 
@@ -72,6 +79,7 @@ def refresh(db: Session, tenant_id, apply: bool, now: datetime | None = None) ->
         if apply:
             add_windows(db, tenant_id, now)
         found.append(f"{'added' if apply else 'would add'} the reporting windows {', '.join(windows)}")
+    found += _deadline_changes(db, tenant_id, apply, now)
     old_code = _sample_product_code(db, tenant_id, apply, now)
     if old_code:
         found.append(f"{'set' if apply else 'would set'} the sample US report's FDA product code to FRN")
@@ -99,3 +107,120 @@ def _sample_product_code(db: Session, tenant_id, apply: bool, now: datetime) -> 
             row.updated_at = now
         db.flush()
     return len(rows)
+
+
+SYSTEM = SimpleNamespace(user_id="system:trial-refresh-0.10.81", correlation_id=None)
+
+
+def _deadline_changes(db: Session, tenant_id, apply: bool, now: datetime) -> list[str]:
+    """F1 and F2 for one trial: what would change (or, with ``apply``, changed), one line per record."""
+    from backend.app.authority_reports import router as reports
+    from backend.app.authority_reports import rules as report_rules
+    from backend.app.db.models.authority_reports import ReportObligation
+    from backend.app.db.models.foundation import Complaint
+    from backend.app.enterprise_audit import make_audit_event
+    from backend.app.reportability import assessments, markets, service
+
+    lines: list[str] = []
+    verb = "updated" if apply else "would update"
+    complaint_ids = [row[0] for row in db.query(Complaint.id).filter(Complaint.tenant_id == tenant_id)]
+    versions = assessments.rows_by_complaint(db, tenant_id, complaint_ids)
+    obligations = {
+        (row.complaint_id, row.market): row
+        for row in db.query(ReportObligation).filter(
+            ReportObligation.tenant_id == tenant_id, ReportObligation.kind == "INITIAL"
+        )
+    }
+    windows = service.settings_of(db, tenant_id)["windows"]
+    for complaint_id, by_market in versions.items():
+        complaint = db.get(Complaint, complaint_id)
+        ref = complaint.complaint_identifier or complaint.business_id
+        for market, rows in by_market.items():
+            current, draft = assessments.current_and_draft(rows)
+            label = markets.MARKET_LABELS.get(market, market)
+            if draft is not None and draft.answers:
+                evaluation = markets.evaluate(market, draft.answers)
+                seen = service.one(db, tenant_id, complaint_id, now)[2]
+                aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
+                clock = markets.market_clock(
+                    market, evaluation["suggested"], evaluation["report_type"], windows, aware, now, seen["org_zone"]
+                )
+                due = date.fromisoformat(clock["due_date"]) if clock else None
+                old = {
+                    "suggested": draft.suggested_conclusion,
+                    "report_type": draft.report_type,
+                    "due_on": _iso(draft.due_on),
+                }
+                new = {
+                    "suggested": evaluation["suggested"],
+                    "report_type": evaluation["report_type"],
+                    "due_on": _iso(due),
+                }
+                if old != new:
+                    lines.append(f"{verb} {ref} {label} draft assessment: {_change(old, new)}")
+                    if apply:
+                        draft.suggested_conclusion, draft.report_type, draft.due_on = (
+                            new["suggested"],
+                            new["report_type"],
+                            due,
+                        )
+                        draft.window_name = clock["window"] if clock else None
+                        draft.updated_at = now
+                        db.add(
+                            make_audit_event(
+                                tenant_id=tenant_id,
+                                actor_ref=SYSTEM.user_id,
+                                action="COMPLAINT_MARKET_ASSESSMENT_RECOMPUTED",
+                                entity_type="Complaint",
+                                entity_id=complaint_id,
+                                reason="0.10.81: an Unknown answer keeps the shortest category not yet excluded",
+                                details={"complaint": ref, "market": market, "version": draft.version},
+                                old_values=old,
+                                new_values=new,
+                                created_at=now,
+                            )
+                        )
+            if current is None or current.conclusion != markets.REPORTABLE:
+                continue
+            fixed = markets.evaluate(market, current.answers or {})["report_type_if_reportable"]
+            if fixed != current.report_type:
+                lines.append(
+                    f"listed {ref} {label} conclusion version {current.version}: signed as {current.report_type}, "
+                    f"the fixed rule gives {fixed}; a person signs it again (never changed here)"
+                )
+            obligation = obligations.get((complaint_id, market))
+            if obligation is None:
+                continue
+            if obligation.state in report_rules.SUBMITTED:
+                if obligation.report_type != current.report_type:
+                    lines.append(
+                        f"listed {ref} {label} report: submitted as {obligation.report_type}, the latest signed "
+                        f"conclusion says {current.report_type}; its page flags a follow-up"
+                    )
+                continue
+            if obligation.state not in report_rules.CANCELLABLE:
+                continue
+            old = {
+                "report_type": obligation.report_type,
+                "due_on": _iso(obligation.due_on),
+                "provisional": obligation.due_provisional,
+            }
+            new = {"report_type": current.report_type, "due_on": _iso(current.due_on), "provisional": False}
+            if old != new:
+                lines.append(f"{verb} {ref} {label} report: {_change(old, new)}")
+                if apply:
+                    ended = reports.follow_signed(db, SYSTEM, obligation, current, now)
+                    reports.end_cancelled_approvals(
+                        db, SYSTEM, tenant_id, ended, "Replaced: the signed conclusion changed the report type"
+                    )
+    if apply:
+        db.flush()
+    return lines
+
+
+def _iso(value) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+def _change(old: dict, new: dict) -> str:
+    return ", ".join(f"{key} {old[key]} -> {new[key]}" for key in old if old[key] != new[key])
