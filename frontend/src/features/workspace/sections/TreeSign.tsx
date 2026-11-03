@@ -1,23 +1,91 @@
-import { deadlineLabel, timeLeft } from "../../../app/dates";
+import { useState } from "react";
+import { PenLine } from "lucide-react";
+import { deadlineLabel, formatDateTime, timeLeft } from "../../../app/dates";
+import { errorText, send } from "../../customer-admin/shared";
+import { collapsed } from "../complaintReview";
+import { useWorkspace } from "../workspaceContext";
 import {
+  ASSESSMENT_LIMITS,
   CONCLUSION_LABELS,
+  assessmentPath,
+  trainingMissing,
   type AssessmentDetail,
+  type Conclusion,
   type MarketItem,
   type Question,
   type Suggestion,
 } from "../marketAssessment";
-import type { QuestionGroup, TreeForm } from "../treeAnswer";
+import { signChecklist, type CheckItem, type QuestionGroup, type TreeForm } from "../treeAnswer";
 import type { TreeMarket, TreePath } from "../decisionTrees";
+import { InlineError } from "./boardParts";
 
 export type HarmState = { level: string; reason: string; disagreement: string };
 
-/** The outcome, live from the saved answers: Reportable · type · rule · due date, Not reportable, or Pending
- * information; its "Why" chips jump to the answers that lead to it. */
-export function SignCard({
+/** What a signature means, in words, as it is shown wherever the signature is (21 CFR 11.50). */
+export const signedMeaning = (conclusion: Conclusion | null | undefined) =>
+  conclusion === "REPORTABLE" ? "signed reportable" : "signed not reportable";
+
+/** The conclusion the person signs: the outcome when they follow it, else the other one (pending can only be
+ * overridden to reportable: Unknown is never No). */
+export function conclusionOf(outcome: Suggestion | null, choice: "follow" | "override"): Conclusion | null {
+  if (!outcome) return null;
+  if (choice === "follow") return outcome === "PENDING_INFORMATION" ? null : outcome;
+  return outcome === "REPORTABLE" ? "NOT_REPORTABLE" : "REPORTABLE";
+}
+
+/** Everything that stands before Sign, as the short checklist under the outcome (the server checks it all again). */
+export function signItems({
+  groups,
   item,
+  form,
+  folded,
+  harm,
+  choice,
+  overrideReason,
+  trainingNeeded,
+  trained,
+}: {
+  groups: QuestionGroup[];
+  item: MarketItem;
+  form: TreeForm;
+  folded: Record<string, string>;
+  harm: HarmState;
+  choice: "follow" | "override";
+  overrideReason: string;
+  trainingNeeded: boolean;
+  trained: boolean;
+}): CheckItem[] {
+  const items = signChecklist(groups, item, form, folded);
+  if (!harm.level) items.push({ ok: false, text: "The harm level" });
+  if (item.disagreement && collapsed(harm.disagreement).length < ASSESSMENT_LIMITS.reasonMin)
+    items.push({ ok: false, text: "Why the answers differ from the harm level" });
+  if (choice === "override" && collapsed(overrideReason).length < ASSESSMENT_LIMITS.reasonMin)
+    items.push({ ok: false, text: "Your reason for overriding the outcome" });
+  if (trainingNeeded && !trained) items.push({ ok: false, text: "Your training confirmation" });
+  return items;
+}
+
+/**
+ * The outcome and Sign in one card (0.10.83, D2.4): the outcome live from the saved answers (Reportable · type · due
+ * date, Not reportable, or Pending information) with its "Why" chips; then "Follow the outcome" by default, the short
+ * checklist, the harm level, the password and authenticator code with the training confirmation as one line, and
+ * Sign. The real role decides who may sign, never the persona. Once signed: who signed, when, and what it means.
+ */
+export function SignCard({
+  detail,
+  item,
+  tree,
   outcome,
   chips,
   signed,
+  canDecide,
+  groups,
+  form,
+  folded,
+  harm,
+  onHarm,
+  flush,
+  onSigned,
 }: {
   detail: AssessmentDetail;
   item: MarketItem;
@@ -36,36 +104,230 @@ export function SignCard({
   onSigned: (next: MarketItem) => void;
   flat: readonly Question[];
 }) {
+  const { session } = useWorkspace();
+  const [picked, setPicked] = useState<"follow" | "override" | null>(null);
+  const [overrideReason, setOverrideReason] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [trained, setTrained] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const version = signed ? item.current : item.draft;
   const tone = outcome === "REPORTABLE" ? "is-rep" : outcome === "NOT_REPORTABLE" ? "is-not" : "is-open";
   const clock = signed && item.current?.due_on ? { due_date: item.current.due_on } : item.clock;
+  const definite = outcome === "REPORTABLE" || outcome === "NOT_REPORTABLE";
+  // "Follow the outcome" is the default once there is one; pending information can only be overridden.
+  const choice = picked ?? (definite || !outcome ? "follow" : "override");
+  const conclusion = conclusionOf(outcome, choice);
+  const missing = trainingMissing(item);
+  const trainingNeeded = detail.training_required && missing.length > 0;
+  const items = signItems({
+    groups,
+    item,
+    form,
+    folded,
+    harm,
+    choice,
+    overrideReason,
+    trainingNeeded,
+    trained,
+  });
+  const ready = !!outcome && !!conclusion && items.every((entry) => entry.ok) && !!password && !busy;
+  const levels = detail.scale.levels;
+  const fromMapping = detail.severity_level;
+  const sign = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const saved = await flush();
+      if (!saved?.draft) throw new Error("The answers were not saved.");
+      if (trained)
+        for (const document of missing)
+          await send(`/api/v1/signer-training/${encodeURIComponent(document.code)}/acknowledge`, "POST", {
+            version: document.version,
+            statement: document.statement,
+          });
+      const out = await send<AssessmentDetail>(assessmentPath(detail.complaint.id, item.market, "/sign"), "POST", {
+        conclusion,
+        override_reason: choice === "override" ? overrideReason : "",
+        version: saved.draft.version,
+        saved_at: saved.draft.saved_at,
+        password,
+        mfa_code: code || null,
+      });
+      const next = out.markets.find((entry) => entry.market === item.market);
+      setPassword("");
+      setCode("");
+      if (next) onSigned(next);
+    } catch (reason) {
+      setError(errorText(reason, "The conclusion was not signed."));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
-    <section className={`uw-card dt-outcome ${tone}`} id="dt-outcome" aria-live="polite" aria-label="The outcome">
-      <p className="ac-eyebrow">{signed ? "Signed conclusion" : "Points to"}</p>
-      <p className="dt-big">{outcome ? CONCLUSION_LABELS[outcome] : "Not decided yet"}</p>
-      {outcome === "REPORTABLE" && version?.report_type_label && <p className="dt-type">{version.report_type_label}</p>}
-      {outcome && outcome !== "NOT_REPORTABLE" && clock && (
-        <p>
-          Due <b>{deadlineLabel(clock)}</b>
-          {"days_left" in clock ? ` · ${timeLeft(clock)}` : ""}
+    <section className={`uw-card dt-outcome ${tone}`} id="dt-outcome" aria-label="The outcome">
+      <div aria-live="polite" className="dt-outcome-top">
+        <p className="ac-eyebrow">{signed ? "Signed conclusion" : "Points to"}</p>
+        <p className="dt-big">{outcome ? CONCLUSION_LABELS[outcome] : "Not decided yet"}</p>
+        {outcome === "REPORTABLE" && version?.report_type_label && (
+          <p className="dt-type">{version.report_type_label}</p>
+        )}
+        {outcome && outcome !== "NOT_REPORTABLE" && clock && (
+          <p>
+            Due <b>{deadlineLabel(clock)}</b>
+            {"days_left" in clock ? ` · ${timeLeft(clock)}` : ""}
+          </p>
+        )}
+        {!outcome && <p className="ac-muted">The outcome updates as you answer.</p>}
+        {!signed &&
+          (item.evaluation?.notes ?? []).map((note) => (
+            <p key={note} className="dt-hint">
+              {note}
+            </p>
+          ))}
+        {chips.length > 0 && (
+          <p className="dt-whys">
+            <span className="ac-muted">Why:</span>
+            {chips.map((chip) => (
+              <a key={chip.id} className="dt-whychip" href={`#q-${chip.id}`}>
+                {chip.label}
+              </a>
+            ))}
+          </p>
+        )}
+      </div>
+      {signed && item.current && (
+        <p className="dt-signature">
+          <b>{item.current.signed_by ?? "A colleague"}</b> · {formatDateTime(item.current.signed_at)} · meaning:{" "}
+          {signedMeaning(item.current.conclusion)}
+          {item.current.override_reason ? ` · overrode the outcome: ${item.current.override_reason}` : ""}
         </p>
       )}
-      {!outcome && <p className="ac-muted">The outcome updates as you answer.</p>}
-      {!signed &&
-        (item.evaluation?.notes ?? []).map((note) => (
-          <p key={note} className="dt-hint">
-            {note}
+      {!signed && !canDecide && (
+        <p className="ac-muted">Your role reads this tree. A Regulatory Leader or Quality Leader signs it.</p>
+      )}
+      {!signed && canDecide && (
+        <form
+          className="dt-sign"
+          aria-label={`Sign the ${item.label} conclusion`}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (ready) void sign();
+          }}
+        >
+          <div className="dt-choice" role="radiogroup" aria-label="Your conclusion">
+            <label className="ca-check">
+              <input
+                type="radio"
+                name={`choice-${item.market}`}
+                checked={choice === "follow"}
+                disabled={!definite}
+                onChange={() => setPicked("follow")}
+              />
+              Follow the outcome
+            </label>
+            <label className="ca-check">
+              <input
+                type="radio"
+                name={`choice-${item.market}`}
+                checked={choice === "override"}
+                disabled={!outcome}
+                onChange={() => setPicked("override")}
+              />
+              Override it
+              {outcome && choice === "override" && conclusion
+                ? ` (${CONCLUSION_LABELS[conclusion].toLowerCase()})`
+                : ""}
+            </label>
+          </div>
+          {choice === "override" && outcome && (
+            <input
+              className="dt-input"
+              aria-label="Your reason for overriding the outcome"
+              placeholder="Your reason for overriding (required)"
+              value={overrideReason}
+              onChange={(event) => setOverrideReason(event.target.value)}
+            />
+          )}
+          <ul className="dt-check" id={`dt-check-${item.market}`} aria-label="Before you sign">
+            {items.map((entry) => (
+              <li key={entry.text} className={entry.ok ? "is-ok" : ""}>
+                <span aria-hidden="true">{entry.ok ? "✓" : "○"}</span> {entry.text}
+              </li>
+            ))}
+          </ul>
+          <label className="dt-harm">
+            <span>Harm level</span>
+            <select value={harm.level} onChange={(event) => onHarm({ ...harm, level: event.target.value })}>
+              <option value="">Choose</option>
+              {levels.map((level) => (
+                <option key={level.code} value={level.code}>
+                  {level.label}
+                </option>
+              ))}
+            </select>
+            {fromMapping && harm.level === fromMapping && detail.severity_source && (
+              <small>{`From ${detail.severity_source.replace(/^The /, "the ").replace(/^Your /, "your ")}`}</small>
+            )}
+          </label>
+          {fromMapping && harm.level && harm.level !== fromMapping && (
+            <input
+              className="dt-input"
+              aria-label="Why this harm level"
+              placeholder="Why this level (it differs from the record)"
+              value={harm.reason}
+              onChange={(event) => onHarm({ ...harm, reason: event.target.value })}
+            />
+          )}
+          {item.disagreement && (
+            <input
+              className="dt-input"
+              aria-label="Why the answers differ from the harm level"
+              placeholder={`${item.disagreement}: say why`}
+              value={harm.disagreement}
+              onChange={(event) => onHarm({ ...harm, disagreement: event.target.value })}
+            />
+          )}
+          <div className="dt-creds">
+            <input
+              type="password"
+              aria-label="Your password"
+              placeholder="Your password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <input
+              inputMode="numeric"
+              aria-label="Authenticator code"
+              placeholder="Authenticator code"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+            />
+          </div>
+          {missing.length > 0 && (
+            <label className="ca-check dt-trained">
+              <input type="checkbox" checked={trained} onChange={(event) => setTrained(event.target.checked)} />I have
+              read this version of the questions and the harm scale (training record, ISO 13485 6.2)
+            </label>
+          )}
+          <button
+            type="submit"
+            className="ac-primary dt-sign-btn"
+            disabled={!ready}
+            aria-describedby={`dt-check-${item.market}`}
+          >
+            <PenLine size={15} aria-hidden="true" />{" "}
+            {busy ? "Signing…" : `Sign as ${session?.display_name ?? "yourself"}`}
+          </button>
+          <p className="dt-hint">
+            {tree?.version_label ?? item.question_set.version} · {tree?.tests.passed ?? 0} of {tree?.tests.total ?? 0}{" "}
+            worked complaints pass
           </p>
-        ))}
-      {chips.length > 0 && (
-        <p className="dt-whys">
-          <span className="ac-muted">Why:</span>
-          {chips.map((chip) => (
-            <a key={chip.id} className="dt-whychip" href={`#q-${chip.id}`}>
-              {chip.label}
-            </a>
-          ))}
-        </p>
+          <InlineError text={error} />
+        </form>
       )}
     </section>
   );

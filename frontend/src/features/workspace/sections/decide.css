@@ -1,6 +1,77 @@
 /* 0.10.83, round D2 "Decide and report": the Decision trees tab as the questionnaire, its outcome and Sign card, the
    tree editor, and the report page's body and approval. Its own file, beside workspace.css. */
 
+/* The Sign part of the outcome card (D2.4): about four actions. */
+.dt-outcome-top {
+  display: grid;
+  gap: 6px;
+}
+.dt-sign {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ms-line);
+}
+.dt-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.dt-input,
+.dt-creds input,
+.dt-harm select {
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--ms-line-control);
+  border-radius: var(--ms-radius-sm);
+  font: inherit;
+  font-size: var(--ms-fs-14);
+}
+.dt-creds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.dt-harm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  font-size: var(--ms-fs-14);
+}
+.dt-harm small {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.dt-check {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ms-warn);
+  font-size: var(--ms-fs-12);
+}
+.dt-check li.is-ok {
+  color: var(--ms-teal-dark);
+}
+.dt-trained {
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+}
+.dt-sign-btn {
+  justify-self: stretch;
+  justify-content: center;
+}
+.dt-signature {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--ms-radius-sm);
+  background: var(--ms-subtle);
+  font-size: var(--ms-fs-14);
+}
+
 .dt-answer {
   display: grid;
   gap: var(--ms-space-3);

@@ -6,6 +6,7 @@ import { addressFor } from "./workspaceAddress";
 import { treePlace, type Trees } from "./decisionTrees";
 import { DecisionTreesSection } from "./sections/DecisionTrees";
 import { firstComplaint, groupClause } from "./sections/TreeAnswer";
+import { conclusionOf, signItems } from "./sections/TreeSign";
 import {
   foldedRuns,
   groupQuestions,
@@ -329,5 +330,79 @@ describe("D2.1-D2.3: a group names its shared clause", () => {
   it("cuts the criteria's clauses to what they share", () => {
     expect(groupClause(US_QUESTIONS.slice(1, 4))).toBe("21 CFR 803.3(w)");
     expect(groupClause(US_QUESTIONS.slice(0, 1))).toBe("21 CFR 803.50(a)(1)");
+  });
+});
+
+const FOLDED = { US3: "Not asked: no death and no serious injury" };
+const READY = usItem({
+  draft: draft(ANSWERED),
+  evaluation: { suggested: "REPORTABLE", report_type: "US_30_DAY", notes: [], not_asked: FOLDED },
+  training: [
+    {
+      code: "QUESTION_SET_US",
+      title: "US guide",
+      version: "US-v2",
+      statement: "I have read it",
+      state: "MISSING",
+      held_version: null,
+      trained_at: null,
+      method: null,
+    },
+  ],
+});
+
+describe("D2.4: signing in about four actions", () => {
+  it("puts the outcome and Sign in one card, follows the outcome by default, and lists what stands before Sign", () => {
+    const html = show(READY);
+    const card = html.slice(html.indexOf('id="dt-outcome"'));
+    expect(card).toContain('<p class="dt-big">Reportable</p>');
+    expect(card).toMatch(/<input type="radio" name="choice-US" checked=""\/>Follow the outcome/);
+    expect(card).toContain("Every question answered");
+    expect(card).toContain("A reason for each judgement");
+    expect(card).toContain('aria-label="Your password"');
+    // The training confirmation is one line under the password.
+    expect(card.indexOf("training record, ISO 13485 6.2")).toBeGreaterThan(card.indexOf('aria-label="Your password"'));
+    expect(card).toContain("Your training confirmation");
+    expect(card).toContain("Sign as Asha Menon");
+    expect(card).toMatch(/<button type="submit" class="ac-primary dt-sign-btn" disabled=""/);
+  });
+
+  it("lets the real role sign, never the persona", () => {
+    const executive = show(READY, api(["regulatory.review"], "executive"));
+    expect(executive).toContain("Sign as Asha Menon");
+    const reader = show(READY, api(["records.read"], "regulatory"));
+    expect(reader).not.toContain("Sign as");
+    expect(reader).toContain("Your role reads this tree. A Regulatory Leader or Quality Leader signs it.");
+  });
+
+  it("turns each answer into text with its reason once signed, with who signed, when and what it means", () => {
+    const current = {
+      ...draft(ANSWERED, {
+        conclusion: "REPORTABLE",
+        signed_by: "Asha Menon",
+        signed_at: "2026-11-02T09:02:00Z",
+      })!,
+    };
+    const html = show(usItem({ current, draft: null }));
+    expect(html).not.toContain('class="dt-ab"');
+    expect(html).toContain('<b class="dt-given">✓ No</b>');
+    expect(html).toContain('<p class="dt-reason-text">Read the nurse&#x27;s report</p>');
+    expect(html).toMatch(/<b>Asha Menon<\/b> · 2 Nov 2026, \d\d:\d\d · meaning: signed reportable/);
+    expect(html).not.toContain("Sign as");
+  });
+
+  it("signs the outcome when followed and the other conclusion when overridden; pending only to reportable", () => {
+    expect(conclusionOf("REPORTABLE", "follow")).toBe("REPORTABLE");
+    expect(conclusionOf("REPORTABLE", "override")).toBe("NOT_REPORTABLE");
+    expect(conclusionOf("PENDING_INFORMATION", "follow")).toBeNull();
+    expect(conclusionOf("PENDING_INFORMATION", "override")).toBe("REPORTABLE");
+    const groups = groupQuestions(US_QUESTIONS);
+    const form = treeFormOf(READY, groups);
+    const harm = { level: "NEGLIGIBLE", reason: "", disagreement: "" };
+    const base = { groups, item: READY, form, folded: FOLDED, harm, trainingNeeded: true, trained: true };
+    expect(signItems({ ...base, choice: "follow", overrideReason: "" }).every((entry) => entry.ok)).toBe(true);
+    expect(signItems({ ...base, choice: "override", overrideReason: "no" }).map((entry) => entry.text)).toContain(
+      "Your reason for overriding the outcome",
+    );
   });
 });
