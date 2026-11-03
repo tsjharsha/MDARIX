@@ -719,3 +719,65 @@
 .rp-give .uw-rp-value.empty {
   display: none;
 }
+
+/* "What you are approving" (D2.8): a document of the real values, above the password and Approve. */
+.rp-doc {
+  display: grid;
+  gap: 14px;
+  padding: 20px 22px;
+  border-top: 4px solid var(--ms-navy);
+}
+.rp-doc-head h2 {
+  margin: 4px 0;
+  font-size: var(--ms-fs-20);
+}
+.rp-doc-head p {
+  margin: 0;
+}
+.rp-doc-part h3 {
+  margin: 0 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--ms-line);
+  font-size: var(--ms-fs-14);
+}
+.rp-doc-part dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.rp-doc-part dl > div {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 2px 14px;
+}
+.rp-doc-part dt {
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-14);
+}
+.rp-doc-part dd {
+  display: grid;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.rp-doc-part dd small {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+}
+.rp-signatures {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--ms-fs-14);
+}
+.rp-signatures li {
+  padding: 6px 10px;
+  border-left: 3px solid var(--ms-teal);
+  background: var(--ms-subtle);
+}
+@media (max-width: 960px) {
+  .rp-doc-part dl > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

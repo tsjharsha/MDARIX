@@ -301,7 +301,7 @@ describe("a report's page: the record page's shape, the status path and the rail
   it("keeps the practice label at the approve button when the preparer approves alone in a trial", () => {
     resources.data[`${REPORTS}/r1`] = report(2);
     const html = render(<ReportsSection />, api("?report=r1"));
-    expect(html).toContain("Approve the snapshot");
+    expect(html).toContain("Approve the United States report for SAMPLE-RV-11.");
     expect(html).toContain(PRACTICE_APPROVAL);
     expect(html).not.toContain("Generate the PDF");
     // A colleague approves: named in Who signs, never the preparer; no practice label.

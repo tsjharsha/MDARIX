@@ -269,7 +269,7 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     asked = _ok(user.post(f"{REPORTS}/{report['id']}/snapshots"))
     # The colleague may approve: the approval is a task in their My work, its first.
     task = _ok(colleague.get("/api/v1/tasks", params={"view": "assigned"}))["items"][0]
-    assert task["title"].startswith("Approve snapshot 1 of the Form FDA 3500A")
+    assert task["title"].startswith("Approve the United States report for SAMPLE-RV-11 (prepared by ")
     _ok(
         colleague.post(
             f"{REPORTS}/{report['id']}/snapshots/{asked['pending_snapshot']['id']}/approve",

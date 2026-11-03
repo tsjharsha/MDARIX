@@ -242,7 +242,9 @@ export type ReportDetail = {
   status_labels: Record<string, string>;
   editable: boolean;
   snapshots: Snapshot[];
-  pending_snapshot: Snapshot | null;
+  pending_snapshot: (Snapshot & { sections?: WorksheetSection[] | null }) | null;
+  /** 0.10.83 (D2.8): every signature on the report, with the signer's full name, the moment and its meaning. */
+  signatures?: { name: string; at: string | null; meaning: string }[];
   cannot_approve: string[];
   approval?: ApprovalStanding | null;
   submissions: Submission[];

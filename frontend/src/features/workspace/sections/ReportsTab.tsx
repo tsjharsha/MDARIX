@@ -35,7 +35,7 @@ import {
   useCanReport,
 } from "./Reports";
 import { ListViewPicker } from "./Views";
-import { ThingsToGive } from "./ReportBody";
+import { ApprovingDoc, ThingsToGive, signatureLine } from "./ReportBody";
 
 /** What MDARIX does with an authority report, said once where it matters (Release C guardrail 3). */
 export const NEVER_SUBMITS =
@@ -282,6 +282,11 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
     }
   };
   const write = canWrite && detail.state !== "CANCELLED";
+  const approving = canWrite && detail.stage === "APPROVAL" && !!detail.approval?.may_approve;
+  const approvedBy =
+    detail.stage === "APPROVED"
+      ? (detail.signatures ?? []).find((item) => /^(approved|practice)/.test(item.meaning))
+      : undefined;
   return (
     <div className="uw-cp uw-report-page">
       <nav className="uw-crumbs" aria-label="Where you are">
@@ -349,7 +354,21 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
         <div className="rp-main">
           {/* 0.10.83 (D2.7): what is missing first, grouped by who knows it; the full report folds away meanwhile. */}
           {write && <ThingsToGive detail={detail} onChanged={changed} canEdit={write} />}
-          <details className="uw-card uw-rec-main rp-fold" open={!missing || !write} aria-label="The form's fields">
+          {/* 0.10.83 (D2.8): the approver reads what they approve, then approves below it. */}
+          {approving && (
+            <>
+              <ApprovingDoc detail={detail} />
+              <section className="uw-card uw-card-pad" aria-label="Approve">
+                <Approval detail={detail} onChanged={changed} />
+              </section>
+            </>
+          )}
+          <details
+            className="uw-card uw-rec-main rp-fold"
+            open={!approving && (!missing || !write)}
+            hidden={approving}
+            aria-label="The form's fields"
+          >
             <summary className="uw-card-head">
               <h2>The report, in the form's order</h2>
               <span className="ac-muted">
@@ -433,7 +452,14 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                 </button>
               </>
             )}
-            {canWrite && detail.stage === "APPROVAL" && <Approval detail={detail} onChanged={changed} />}
+            {canWrite &&
+              detail.stage === "APPROVAL" &&
+              (approving ? (
+                <p className="ac-muted">Read every value under “What you are approving”, then approve below it.</p>
+              ) : (
+                <Approval detail={detail} onChanged={changed} />
+              ))}
+            {approvedBy && <p className="dt-success">✓ {signatureLine(approvedBy)}</p>}
             {detail.stage === "APPROVED" && approved && (
               <>
                 {canExport ? (
@@ -461,21 +487,25 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
           </section>
           <section className="uw-card uw-card-pad uw-rail-signs" aria-label="Who signs">
             <h2>Who signs</h2>
-            <ul className="uw-rail-signers">
-              {(detail.preparers ?? []).map((person) => (
-                <li key={`p-${person}`} className="ms-chip">
-                  Prepared: {person}
-                </li>
+            <ul className="rp-signatures">
+              {(detail.signatures ?? []).map((item) => (
+                <li key={`${item.meaning}-${item.at}`}>{signatureLine(item)}</li>
               ))}
-              {approved?.approved_by ? (
-                <li className="ms-chip">Approved: {approved.approved_by}</li>
-              ) : (
-                (detail.approval?.approvers ?? []).map((person) => (
-                  <li key={`a-${person}`} className="ms-chip">
-                    May approve: {person}
+            </ul>
+            <ul className="uw-rail-signers">
+              {!detail.signatures?.length &&
+                (detail.preparers ?? []).map((person) => (
+                  <li key={`p-${person}`} className="ms-chip">
+                    Prepared: {person}
                   </li>
-                ))
-              )}
+                ))}
+              {approved?.approved_by
+                ? !detail.signatures?.length && <li className="ms-chip">Approved: {approved.approved_by}</li>
+                : (detail.approval?.approvers ?? []).map((person) => (
+                    <li key={`a-${person}`} className="ms-chip">
+                      May approve: {person}
+                    </li>
+                  ))}
             </ul>
             <p className="ac-note">Never the person who prepared it, nor the signer of the conclusion behind it.</p>
             <p className="uw-never-submits">{NEVER_SUBMITS}</p>

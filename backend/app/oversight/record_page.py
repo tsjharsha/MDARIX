@@ -237,6 +237,15 @@ def activity(db, found: dict, complaint, names_of) -> dict:
     return {"items": items + start, "more": len(rows) > ACTIVITY_LIMIT}
 
 
+def _meaning_label(row) -> str:
+    """A signature's meaning in a few words: "approved for submission", "signed reportable", or "signed"."""
+    if row.object_type == "ReportSnapshot":
+        return "approved for submission"
+    if row.object_type == "ComplaintMarketAssessment":
+        return "signed reportable" if row.decision == "REPORTABLE" else "signed not reportable"
+    return "signed"
+
+
 def latest_signed(db, tenant_id, me: str, names_of) -> dict | None:
     """The newest record this person signed in this organization, with what it is and where it opens."""
     from backend.app.db.models.authority_reports import ReportObligation, ReportSnapshot
@@ -296,6 +305,9 @@ def latest_signed(db, tenant_id, me: str, names_of) -> dict | None:
         "signed_at": _day(row.signed_at),
         "signed_by": names_of({me}).get(me),
         "meaning": row.signature_meaning,
+        # The moment and the meaning in a few words, as every signature shows them (21 CFR 11.50; 0.10.83, D2.8).
+        "signed_at_time": row.signed_at.isoformat() if row.signed_at else None,
+        "meaning_label": _meaning_label(row),
         "complaint": {"id": str(complaint.id), "ref": complaint.complaint_identifier or complaint.business_id}
         if complaint is not None
         else None,

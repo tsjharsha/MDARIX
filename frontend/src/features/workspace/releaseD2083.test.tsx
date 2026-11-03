@@ -686,3 +686,87 @@ describe("D2.7: the report page body", () => {
     expect(html.split("of 19 mandatory").length - 1).toBe(1);
   });
 });
+
+describe("D2.8: approval in plain words", () => {
+  const FILLED = {
+    ...REPORT,
+    stage: "APPROVAL",
+    mandatory: { total: 19, filled: 19, missing: [] },
+    sections: [
+      {
+        code: "D",
+        title: "D. Suspect medical device",
+        note: null,
+        fields: [
+          wf("D1", "D1", "Brand name", {
+            status: "FROM_RECORD",
+            value: "PulseWatch 410",
+            source: { type: "Product", ref: "PW-410", label: "The product's name", id: null },
+          }),
+        ],
+      },
+    ],
+    pending_snapshot: {
+      id: "s1",
+      version: 1,
+      state: "PENDING",
+      requested_by: "Asha Menon",
+      requested_at: "2026-11-02T09:00:00Z",
+      content_fingerprint: "f".repeat(64),
+      sections: [
+        {
+          code: "D",
+          title: "D. Suspect medical device",
+          note: null,
+          fields: [
+            wf("D1", "D1", "Brand name", {
+              status: "FROM_RECORD",
+              value: "PulseWatch 410 (as frozen)",
+              source: { type: "Product", ref: "PW-410", label: "The product's name", id: null },
+            }),
+          ],
+        },
+      ],
+    },
+    approval: { may_approve: true, same_person: false, approvers: [], message: null },
+    signatures: [
+      { name: "Asha Menon", at: "2026-11-02T08:30:00Z", meaning: "signed reportable" },
+      { name: "Asha Menon", at: "2026-11-02T09:00:00Z", meaning: "prepared" },
+    ],
+  } as unknown as ReportDetail;
+
+  it("shows what you are approving, the real values with their sources, above the password and Approve", () => {
+    resources.data = { [`/api/v1/reports/r1`]: FILLED };
+    const html = render(<ReportsSection />, api(undefined, "regulatory", "?report=r1"));
+    const doc = html.indexOf("What you are approving</p>");
+    expect(doc).toBeGreaterThan(-1);
+    expect(doc).toBeLessThan(html.indexOf("Your password"));
+    expect(html.indexOf("Your password")).toBeLessThan(html.indexOf(">Approve</button>"));
+    expect(html).toContain("PulseWatch 410 (as frozen)<small>The product&#x27;s name: PW-410</small>");
+    expect(html).toContain(
+      "<strong>Approve the United States report for SAMPLE-RV-11.</strong> Prepared by Asha Menon. You confirm with your password.",
+    );
+    expect(html).not.toMatch(/snapshot|fingerprint|checksum/i);
+    // Every signature: full name, date and time, meaning.
+    expect(html).toMatch(/<li>Asha Menon · 2 Nov 2026, \d\d:\d\d · signed reportable<\/li>/);
+    expect(html).toMatch(/<li>Asha Menon · 2 Nov 2026, \d\d:\d\d · prepared<\/li>/);
+  });
+
+  it("shows a success panel with the approval's name, time and meaning", () => {
+    resources.data = {
+      [`/api/v1/reports/r1`]: {
+        ...FILLED,
+        stage: "APPROVED",
+        state: "APPROVED",
+        pending_snapshot: null,
+        approved_snapshot: { id: "s1", version: 1, state: "APPROVED", approved_by: "Rahul Iyer", preparers: [] },
+        signatures: [
+          ...FILLED.signatures!,
+          { name: "Rahul Iyer", at: "2026-11-02T09:32:00Z", meaning: "approved for submission" },
+        ],
+      },
+    };
+    const html = render(<ReportsSection />, api(undefined, "regulatory", "?report=r1"));
+    expect(html).toMatch(/<p class="dt-success">✓ Rahul Iyer · 2 Nov 2026, \d\d:\d\d · approved for submission<\/p>/);
+  });
+});

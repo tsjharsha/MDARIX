@@ -7,7 +7,7 @@ import { Drawer, errorText, formatDate, send, useResource } from "../../customer
 import { downloadFile } from "../../reports/download";
 import { WorkspaceContext, useCan, useNavigation, useTabParam } from "../workspaceContext";
 import { communicationsTab } from "../communications";
-import { AlsoKnownAs, countOf, DecideAndSign, shortPrint } from "./common";
+import { AlsoKnownAs, countOf, DecideAndSign } from "./common";
 import { ComplaintNextStep } from "./ComplaintNextStep";
 import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
@@ -30,7 +30,6 @@ import {
   isMissing,
   reportPlace,
   worksheetMeter,
-  filledCounts,
   summaryLine,
   type ReportDetail,
   type ReportList,
@@ -366,30 +365,30 @@ function NextStep({
   return null;
 }
 
+/** "Approve the India report for SAMPLE-RV-10.": the task in plain words (0.10.83, D2.8; usability U-09). */
+export const approveWords = (detail: Pick<ReportDetail, "market_label" | "complaint">) =>
+  `Approve the ${detail.market_label.split(" (")[0]} report for ${detail.complaint.ref}.`;
+
 export function Approval({ detail, onChanged }: { detail: ReportDetail; onChanged: (detail: ReportDetail) => void }) {
   const snapshot = detail.pending_snapshot!;
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
-  const action = useAction(onChanged, "The snapshot was not approved.");
+  const action = useAction(onChanged, "The report was not approved.");
   const standing = detail.approval;
-  const waiting = (
-    <>
-      <strong>Snapshot {snapshot.version}</strong> frozen by {snapshot.requested_by} {formatDate(snapshot.requested_at)}
-      , waiting for a second person.
-    </>
-  );
   // Who approves is told before any password: someone who may not approve never sees the form (J13).
   if (standing && !standing.may_approve)
     return (
-      <div className="uw-rp-approval" role="note" aria-label="Who approves the snapshot">
-        <p>{waiting}</p>
+      <div className="uw-rp-approval" role="note" aria-label="Who approves the report">
+        <p>
+          Sent for approval by {snapshot.requested_by} {formatDate(snapshot.requested_at)}.
+        </p>
         <p>{standing.message}</p>
       </div>
     );
   return (
     <form
       className="uw-rp-approval"
-      aria-label="Approve the snapshot"
+      aria-label="Approve the report"
       onSubmit={(event) => {
         event.preventDefault();
         void action.run(`${REPORTS}/${detail.id}/snapshots/${snapshot.id}/approve`, "POST", {
@@ -398,30 +397,11 @@ export function Approval({ detail, onChanged }: { detail: ReportDetail; onChange
         });
       }}
     >
-      {standing?.same_person ? (
-        <>
-          <p>{waiting}</p>
-          <p className="ac-message tone-warning">{standing.message}</p>
-        </>
-      ) : (
-        <p>
-          {waiting} Not allowed to approve: {detail.cannot_approve.join(", ")} (the preparer and the signer of the
-          market conclusion).
-        </p>
-      )}
+      <p>
+        <strong>{approveWords(detail)}</strong> Prepared by {snapshot.requested_by}. You confirm with your password.
+      </p>
+      {standing?.same_person && <p className="ac-message tone-warning">{standing.message}</p>}
       <div className="ca-form-grid">
-        <DecideAndSign
-          signs={`Approval of snapshot ${snapshot.version} of the ${detail.form.title} for ${detail.complaint.ref}, as frozen.`}
-          restsOn={[
-            `${filledCounts(detail.counts).fromRecords} fields filled from your records, ${detail.counts.MUST_HAVE ?? 0} still to enter; fingerprint ${shortPrint(snapshot.content_fingerprint)}.`,
-            detail.assessment
-              ? `The ${detail.market_label} conclusion: ${String(detail.assessment.conclusion ?? "")
-                  .toLowerCase()
-                  .replace("_", " ")}, version ${detail.assessment.version}, signed by ${detail.assessment.signed_by}.`
-              : null,
-            `${detail.form.title}, ${detail.form.version}.`,
-          ]}
-        />
         <label className="ca-field">
           Your password
           <input
@@ -441,13 +421,10 @@ export function Approval({ detail, onChanged }: { detail: ReportDetail; onChange
           />
         </label>
       </div>
-      <p className="ac-muted">
-        Your approval covers this snapshot exactly as frozen (checksum {snapshot.content_fingerprint.slice(0, 12)}…). It
-        is what is submitted.
-      </p>
+      <p className="ac-muted">You approve this version of the report. Any later change needs a new approval.</p>
       <div className="ca-action-row">
         <button type="submit" className="ac-primary" disabled={action.busy || !password}>
-          {action.busy ? "Approving…" : "Approve the snapshot"}
+          {action.busy ? "Approving…" : "Approve"}
         </button>
         <PracticeApproval shown={standing?.same_person} />
       </div>

@@ -194,3 +194,86 @@ def test_a_products_fact_is_entered_once_and_reused_on_every_report_of_that_prod
         assert again.status_code in (409, 422), again.text
     finally:
         _purge(_uuid.UUID(approval["tenant_id"]))
+
+
+# --------------------------------------------------------------------------------------------- D2.8
+
+
+@pytest.mark.db
+def test_approval_in_plain_words_with_every_signatures_name_time_and_meaning():
+    import uuid as _uuid
+
+    from fastapi.testclient import TestClient
+
+    from backend.app.main import app
+    from tests.report_fill import fill
+    from tests.test_free_trial import PASSWORD as TRIAL_PASSWORD
+    from tests.test_free_trial import _activation_token, _approved_trial_client
+    from tests.test_release_c3_0_10_75 import REPORTS, _flagship, _purge, _reports, _sign_us
+
+    owner, approval, _ = _approved_trial_client()
+    tenant_id = _uuid.UUID(approval["tenant_id"])
+    try:
+        mail = f"d2-{_uuid.uuid4().hex[:8]}@example.invalid"
+        invited = owner.post(
+            "/api/v1/trial/team", json={"email": mail, "display_name": "Rahul Iyer", "persona": "regulatory"}
+        ).json()
+        colleague = TestClient(app)
+        token = _activation_token(invited, mail)
+        assert (
+            colleague.post(
+                "/api/v1/auth/activate-account", json={"token": token, "password": TRIAL_PASSWORD}
+            ).status_code
+            == 200
+        )
+        assert (
+            colleague.post("/api/v1/auth/signin", json={"email": mail, "password": TRIAL_PASSWORD}).status_code == 200
+        )
+        complaint = _flagship(owner)
+        assert _sign_us(owner, complaint, "REPORTABLE").status_code == 200
+        (report,) = _reports(owner, complaint)
+        fill(owner, REPORTS, report["id"], owner.get(f"{REPORTS}/{report['id']}").json()["mandatory"]["missing"])
+        sent = owner.post(f"{REPORTS}/{report['id']}/snapshots").json()
+        # The approver reads the values as frozen, in the form's order.
+        theirs = colleague.get(f"{REPORTS}/{report['id']}").json()
+        frozen = theirs["pending_snapshot"]["sections"]
+        assert [section["code"] for section in frozen] == [section["code"] for section in theirs["sections"]]
+        # One task per approver, in plain words: no "snapshot", the customer's reference, who prepared it.
+        tasks = colleague.get("/api/v1/tasks").json()["items"]
+        titles = [task["title"] for task in tasks if task["title"].startswith("Approve")]
+        assert titles == ["Approve the United States report for SAMPLE-RV-11 (prepared by Taylor Quality)"], titles
+        assert [item["meaning"] for item in sent["signatures"]] == ["signed reportable", "prepared"]
+        done = colleague.post(
+            f"{REPORTS}/{report['id']}/snapshots/{theirs['pending_snapshot']['id']}/approve",
+            json={"password": TRIAL_PASSWORD},
+        )
+        assert done.status_code == 200, done.text
+        signatures = done.json()["signatures"]
+        assert [(item["name"], item["meaning"]) for item in signatures][-1] == ("Rahul Iyer", "approved for submission")
+        assert all(item["at"] for item in signatures)
+        # The PDF prints each signature: name, moment and meaning (21 CFR 11.50); no "snapshot" in the meaning.
+        from backend.app.authority_reports import render
+
+        view = {
+            **done.json(),
+            "snapshot": done.json()["approved_snapshot"],
+            "signature": {
+                "signer_name": "Rahul Iyer",
+                "signer_role": "Regulatory Leader",
+                "signed_at": signatures[-1]["at"],
+                "meaning": "I approve version 1 of the Form FDA 3500A (eMDR) for SAMPLE-RV-11 as the content to submit.",
+                "record_business_id": "SIG-1",
+                "record_id": "x",
+                "content_fingerprint": "f" * 64,
+            },
+        }
+        printed = render.manifestation(view)
+        assert printed[0].startswith("Taylor Quality · ") and printed[0].endswith("· meaning: signed reportable")
+        assert printed[2].startswith("Approved by Rahul Iyer (Regulatory Leader) · ")
+        assert printed[2].endswith("meaning: approved for submission")
+        # Records: the newest signature with its moment and meaning.
+        latest = colleague.get("/api/v1/oversight/latest-signed").json()["record"]
+        assert latest["meaning_label"] == "approved for submission" and latest["signed_at_time"]
+        assert "snapshot" not in latest["meaning"]
+    finally:
+        _purge(tenant_id)
