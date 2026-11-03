@@ -7667,6 +7667,45 @@ button.uw-org:hover {
   font-size: var(--ms-fs-18, 18px);
 }
 
+/* 0.10.85, D3.5: Trends' hero per group: one sentence, three bars, "How we compared" folded. */
+.uw-trend-heroes {
+  display: grid;
+  gap: var(--ms-space-4);
+}
+.uw-trend-hero {
+  display: grid;
+  gap: var(--ms-space-3);
+  padding: var(--ms-space-5, 24px);
+}
+.uw-trend-hero h2 {
+  margin: 0;
+  font-weight: var(--ms-fw-semibold);
+  font-size: var(--ms-fs-20, 20px);
+  line-height: 1.35;
+}
+.uw-trend-verdict {
+  justify-self: start;
+}
+.uw-trend-verdict.is-significant {
+  background: var(--ms-critical-bg, #fdecec);
+  color: var(--ms-critical-ink, #9b1c1c);
+}
+.uw-trend-verdict.is-elevated {
+  background: var(--ms-warning-bg, #fff4e0);
+  color: var(--ms-warning-ink, #7a4a00);
+}
+.uw-trend-note {
+  margin: 0;
+  color: var(--ms-ink-2);
+}
+.uw-trend-hero .uw-bar-row {
+  grid-template-columns: 120px minmax(0, 1fr) 48px;
+}
+.uw-trend-how p {
+  margin: 6px 0 0;
+  color: var(--ms-ink-2);
+}
+
 /* The phone's search: an icon that opens the same search as a bar under the top bar. */
 .uw-search-toggle {
   display: none;

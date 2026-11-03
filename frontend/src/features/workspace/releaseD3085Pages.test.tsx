@@ -8,6 +8,11 @@ import { ONE_STORY_PATH, type StoryRun } from "./oneStory";
 import { eventPath } from "./oversight";
 import { rv11 } from "../../test/rv11";
 import { NewRecordsSection } from "./sections/Records";
+import { TrendHeroes } from "./sections/TrendCheck";
+import { SignalInbox } from "./sections/SignalInbox";
+import { DEFAULT_SIGNAL_FILTERS } from "./signals";
+import type { TrendBoard, TrendItem } from "./signalAi";
+import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("../customer-admin/shared", async (original) => ({
@@ -129,5 +134,101 @@ describe("D3.4 Records opens on your latest record", () => {
     const html = render(<NewRecordsSection />);
     expect(html).toContain("No signed record yet");
     expect(html.indexOf("No signed record yet")).toBeLessThan(html.indexOf("Inspection readiness"));
+  });
+});
+
+describe("D3.5 Trends in plain words, with a hero", () => {
+  const item = (extra: Partial<TrendItem>): TrendItem =>
+    ({
+      key: "k",
+      product: { id: "p", business_id: null, identifier: "SAMPLE-ORBIT-300", name: "OrbitCare 300" },
+      product_version: { id: "v", business_id: null, version_identifier: "Rev B" },
+      problem: null,
+      name: "OrbitCare 300 Rev B",
+      recent: 9,
+      recent_days: 30,
+      history: 6,
+      history_days: 180,
+      expected: 0.97,
+      p_value: 0.0001,
+      p_adjusted: 0.0004,
+      groups_tested: 2,
+      ratio: 9.3,
+      result: "SIGNIFICANT",
+      label: "",
+      sentence: "",
+      recent_complaints: [{ id: "c", business_id: null }],
+      open_signals: [],
+      basis: "UNITS",
+      baseline: "PREVIOUS_VERSION",
+      baseline_name: "OrbitCare 300 Rev A",
+      ...extra,
+    }) as TrendItem;
+  const board = (items: TrendItem[]) =>
+    ({
+      grouping: "version",
+      recent_days: 30,
+      history_days: 180,
+      min_complaints: 3,
+      summary: {
+        groups: items.length,
+        complaints_counted: 13,
+        significant: 1,
+        elevated: 0,
+        steady: 0,
+        too_few: 1,
+        short_history: 0,
+      },
+      items,
+    }) as unknown as TrendBoard;
+  const yours = item({
+    key: "y",
+    product: { id: "b", business_id: null, identifier: "BREEZE-50", name: "BreezeMist 50" },
+    name: "BreezeMist 50 Rev B",
+    recent: 4,
+    result: "TOO_FEW",
+    p_value: null,
+    ratio: null,
+  });
+
+  it("answers per rising group with observed, expected and the version before, the method folded", () => {
+    const html = render(<TrendHeroes board={board([item({}), yours])} action={() => null} source={SAMPLE_SOURCE} />);
+    for (const bar of ["Observed", "Expected", "Version before"]) expect(html).toContain(`<span>${bar}</span>`);
+    expect(html).toMatch(/<details class="uw-more uw-trend-how"><summary>How we compared<\/summary>/);
+    expect(html).not.toContain("BreezeMist");
+  });
+
+  it("on your data never shows the sample's rise, and says what a short history can show", () => {
+    const html = render(<TrendHeroes board={board([item({}), yours])} action={() => null} source={IMPORTED_SOURCE} />);
+    expect(html).not.toContain("OrbitCare");
+    expect(html).toContain("Too early to compare");
+    expect(html).toContain("never called a rise");
+    expect(html).toContain("BreezeMist 50 Rev B: 4");
+  });
+
+  it("names Trends to review and Raise a trend, puts the title before SIG0…, and offers no AI filter in a trial", () => {
+    resources.data["/api/v1/triage/signals"] = {
+      items: [
+        {
+          id: "s1",
+          business_id: "SIG000001",
+          title: "OrbitCare 300 Rev B: pressure alarms",
+          origin: "THRESHOLD_RULE",
+          status: "NEW",
+        },
+      ],
+      total: 1,
+      page: 1,
+      page_size: 25,
+    };
+    const html = render(
+      <SignalInbox initialFilters={DEFAULT_SIGNAL_FILTERS} initialSignal={null} />,
+      api({ session: { user_id: "u1", business_permissions: ["signal.triage"] } as WorkspaceApi["session"] }),
+    );
+    expect(html).toContain("Trends to review");
+    expect(html).toContain("Raise a trend");
+    expect(html).not.toContain("Signal inbox");
+    expect(html).not.toContain("Suggested by AI");
+    expect(html.indexOf("OrbitCare 300 Rev B: pressure alarms")).toBeLessThan(html.indexOf("SIG000001"));
   });
 });

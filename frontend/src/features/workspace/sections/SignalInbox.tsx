@@ -84,7 +84,8 @@ export function SignalInbox({
   initialSignal: string | null;
   onSignalClosed?: () => void;
 }) {
-  const { work, dataSource } = useWorkspace();
+  const { work, dataSource, navigation, isTrial } = useWorkspace();
+  const fresh = navigation === "new";
   const canTriage = useCan("signal.triage");
   const [filters, setFilters] = useState<SignalFilters>(initialFilters);
   const [query, setQuery] = useState(initialFilters.q);
@@ -148,13 +149,13 @@ export function SignalInbox({
   return (
     <>
       <Panel
-        eyebrow="Signals"
-        title={listTitle("Signal inbox", list.data?.total)}
+        eyebrow={fresh ? "Trends" : "Signals"}
+        title={listTitle(fresh ? "Trends to review" : "Signal inbox", list.data?.total)}
         source={list}
         action={
           canTriage ? (
             <button type="button" className="ac-primary" onClick={() => setCreating(true)}>
-              <Plus size={16} aria-hidden="true" /> New signal
+              <Plus size={16} aria-hidden="true" /> {fresh ? "Raise a trend" : "New signal"}
             </button>
           ) : undefined
         }
@@ -216,7 +217,8 @@ export function SignalInbox({
             onChange={(event) => change({ origin: event.target.value })}
           >
             <option value="">Any origin</option>
-            {SIGNAL_ORIGINS.map((origin) => (
+            {/* AI is off in a trial: no "Suggested by AI" to filter by (0.10.85, U-17). */}
+            {SIGNAL_ORIGINS.filter((origin) => !(isTrial && origin === "AI_SUGGESTED")).map((origin) => (
               <option key={origin} value={origin}>
                 {signalOriginLabel(origin)}
               </option>
@@ -302,11 +304,13 @@ export function SignalInbox({
           </p>
         )}
         <Table
-          caption="Signal inbox"
+          caption={fresh ? "Trends to review" : "Signal inbox"}
           rows={rows}
           rowKey={(row) => String(row.id)}
           empty={inboxEmpty(filters, finding)}
-          columns={columns}
+          // The trend's title first, its reference after (0.10.85, U-17: "SIG000001" was the first thing read).
+          columns={fresh ? [columns[1], columns[0], ...columns.slice(2)] : columns}
+          chooserUnderMore={fresh}
           serverSort={{
             sort: tableSort,
             onSort: (key) => change(nextSignalSort(filters, key)),
