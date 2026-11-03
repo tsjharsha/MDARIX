@@ -8,6 +8,7 @@ screens are unaffected, and says how many rows exist in ``X-Total-Count`` and wh
 from __future__ import annotations
 
 from fastapi import Query, Response
+from sqlalchemy import false, func, not_
 
 MAX_PAGE = 1000
 
@@ -28,3 +29,13 @@ class Page:
         following = self.offset + self.limit
         response.headers["X-Next-Offset"] = str(following) if following < total else ""
         return query.limit(self.limit).offset(self.offset).all()
+
+
+def open_first(query, is_open, newest, limit: int) -> tuple[list, int]:
+    """Every row of ``query`` for which ``is_open`` holds, however many, then the newest ``limit`` of the others
+    (``newest``: the order clauses), and how many others there are in all. For a list whose open, pending or overdue
+    items must never fall behind its cap (0.10.86): the cap only ever drops finished history."""
+    flag = func.coalesce(is_open, false())
+    opened = query.filter(flag).order_by(*newest).all()
+    rest = query.filter(not_(flag))
+    return opened + rest.order_by(*newest).limit(limit).all(), rest.order_by(None).count()

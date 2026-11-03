@@ -230,7 +230,12 @@ def overview(db: Session) -> dict:
     from backend.app.trial import retention
     from backend.app.trial.early_exit import _days_until, _trial_ends
 
-    rows = db.query(TrialMvpRequest).order_by(TrialMvpRequest.created_at.desc()).limit(500).all()
+    from backend.app.paging import open_first
+
+    # Every open request (new or contacted), however old: it holds the trial's data. Then the newest 500 closed ones.
+    rows, _ = open_first(
+        db.query(TrialMvpRequest), TrialMvpRequest.status.in_(OPEN), [TrialMvpRequest.created_at.desc()], 500
+    )
     tenant_ids = {row.tenant_id for row in rows}
     tenants = {tenant.id: tenant for tenant in db.query(Tenant).filter(Tenant.id.in_(tenant_ids))} if tenant_ids else {}
     ends = _trial_ends(db, tenant_ids)

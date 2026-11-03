@@ -30,6 +30,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import exists
 from sqlalchemy.orm import Session
 
 from backend.app.trial.sample_source import is_sample
@@ -44,6 +45,7 @@ from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import current_person, require_any_permission
 from backend.app.intake import rules, service
+from backend.app.paging import open_first
 from backend.app.reportability import markets
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.signer_training.router import is_trial
@@ -400,6 +402,21 @@ def _event_or_404(db, tenant_id, event_id, lock: bool = False) -> IntakeEvent:
 SHOWS = ("all", "to_sign", "pending", "service_only", "review", "complaint")
 
 
+def _waiting():
+    """In SQL, the contacts ``intake_list``'s ``state`` reads as to_sign, pending or review: not an urgent intake, and
+    no current signed check that ends it (a complaint, both, or service only once its QA review is done)."""
+    check = FirstContactCheck
+    done = exists().where(
+        check.tenant_id == IntakeEvent.tenant_id,
+        check.intake_event_id == IntakeEvent.id,
+        check.signed_at.isnot(None),
+        check.superseded_by.is_(None),
+        check.classification.notin_(list(rules.PENDING_OUTCOMES)),
+        ~((check.classification == rules.SERVICE_ONLY) & check.review_outcome.is_(None)),
+    )
+    return (IntakeEvent.kind != "URGENT") & ~done
+
+
 @router.get("/intake")
 def intake_list(
     show: str = Query("all", max_length=20),
@@ -412,12 +429,13 @@ def intake_list(
         raise _error(422, "UNKNOWN_SHOW", f"Show one of {', '.join(SHOWS)}")
     tenant_id = _tenant(ctx)
     now = service.now_utc()
-    events = (
-        db.query(IntakeEvent)
-        .filter(IntakeEvent.tenant_id == tenant_id)
-        .order_by(IntakeEvent.created_at.desc())
-        .limit(500)
-        .all()
+    # Every contact still waiting (to sign, pending, the QA review of "service only"), however old; then the newest
+    # 500 finished ones (0.10.86: the newest 500 were read before the waiting ones were picked out).
+    events, finished = open_first(
+        db.query(IntakeEvent).filter(IntakeEvent.tenant_id == tenant_id),
+        _waiting(),
+        [IntakeEvent.created_at.desc(), IntakeEvent.id.desc()],
+        500,
     )
     ids = [event.id for event in events]
     checks = service.checks_of(db, tenant_id, ids)
@@ -452,7 +470,8 @@ def intake_list(
     for item in items:
         item["state"] = state(item)
     summary = {name: sum(1 for item in items if item["state"] == name) for name in SHOWS[1:]}
-    summary["all"] = len(items)
+    # Every contact and urgent intake, the finished ones not listed included.
+    summary["all"] = len(items) + max(finished - 500, 0)
     summary["flagged"] = sum(1 for item in items if item["flagged"])
     summary["service_only"] += summary["review"]
     shown = [

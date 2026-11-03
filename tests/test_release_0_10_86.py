@@ -149,3 +149,138 @@ def test_the_sample_s_late_call_counts_outside_mdarix_whatever_day_the_trial_sta
     calendar = Calendar(zone="Asia/Kolkata")
     at = datetime(2026, 10, 26, hour, 30, tzinfo=calendar.tz).astimezone(timezone.utc) + timedelta(days=day)
     assert comm_rules.in_mdarix(at, late_log(at, calendar), calendar) is False
+
+
+# ------------------------------------------------------- DEV-03 sweep: no open item behind a list's cap
+
+
+@pytest.mark.db
+def test_a_contact_waiting_to_be_signed_stays_listed_behind_500_newer_urgent_intakes(trial):
+    from backend.app.db.models.intake import IntakeEvent
+
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    now = datetime.now(timezone.utc)
+    waiting = uuid.uuid4()
+    common = {"tenant_id": tenant_id, "reporter_words": "The monitor alarmed twice", "created_by": "test"}
+    rows = [
+        {
+            **common,
+            "id": waiting,
+            "reference": "CALL-T86-OLD",
+            "kind": "CONTACT",
+            "created_at": now - timedelta(days=90),
+        }
+    ]
+    rows += [
+        {**common, "id": uuid.uuid4(), "reference": f"URG-T86-{index}", "kind": "URGENT", "created_at": now}
+        for index in range(501)
+    ]
+    for row in rows:
+        row["updated_at"] = row["created_at"]
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        insert_rows(db, IntakeEvent, rows)
+        db.commit()
+    body = _ok(user.get("/api/v1/intake?show=to_sign"))
+    # Before 0.10.86 the newest 500 were read first: this call, waiting to be signed, was not listed or counted.
+    assert str(waiting) in [item["id"] for item in body["items"]]
+    assert body["summary"]["to_sign"] >= 1 and body["summary"]["all"] >= 502
+
+
+@pytest.mark.db
+def test_open_items_are_never_cut_by_the_read_limits(trial, monkeypatch):
+    """A complaint waiting for a disposition, a dated report and a dated CAPA: the lists that read them were capped
+    newest first, or unordered, before 0.10.86. With the cap set to one, every one is still there."""
+    from backend.app.complaint_disposition import service as dispositions
+    from backend.app.oversight import service as oversight
+
+    from backend.app.db.models.foundation import Capa
+
+    tenant_id = trial["tenant_id"]
+    due = datetime.now(timezone.utc) + timedelta(days=10)
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        for number, status in ((1, "open"), (2, "Closed"), (3, "in progress")):
+            db.add(
+                Capa(
+                    tenant_id=tenant_id,
+                    capa_identifier=f"CAPA-T86-{number}",
+                    title="Seal",
+                    status=status,
+                    due_at=due,
+                    created_at=due,
+                    updated_at=due,
+                )
+            )
+        db.commit()
+        zone = oversight.calendar_of(db, tenant_id).zone
+        before = (
+            dispositions.waiting_ids(db, tenant_id),
+            oversight._report_items(db, tenant_id, zone),
+            oversight._capa_items(db, tenant_id),
+        )
+        monkeypatch.setattr(dispositions, "READ_LIMIT", 1)
+        monkeypatch.setattr(oversight, "READ_LIMIT", 1)
+        after = (
+            dispositions.waiting_ids(db, tenant_id),
+            oversight._report_items(db, tenant_id, zone),
+            oversight._capa_items(db, tenant_id),
+        )
+    assert all(len(items) > 1 for items in before), [len(items) for items in before]
+    assert after == before
+
+
+def _platform_requests(model, rows):
+    from backend.app.db.tenant_scope import bind_system
+
+    with SessionLocal() as db:
+        bind_system(db, "test: 0.10.86 request lists")
+        insert_rows(db, model, rows)
+        db.commit()
+
+
+@pytest.mark.db
+def test_a_pending_exit_request_and_an_open_mvp_request_stay_listed_behind_500_newer_decided_ones(trial):
+    from backend.app.db.models.stage2 import TrialExitRequest, TrialMvpRequest
+    from backend.app.db.tenant_scope import bind_system
+    from backend.app.trial import early_exit, mvp_request
+
+    tenant_id = trial["tenant_id"]
+    now = datetime.now(timezone.utc)
+    old = now - timedelta(days=60)
+    pending, ids = uuid.uuid4(), []
+    exits = [{"id": pending, "trial_tenant_id": uuid.uuid4(), "organization": "Old Co", "status": "PENDING"}]
+    exits[0].update(created_at=old, updated_at=old)
+    for _ in range(501):
+        exits.append(
+            {
+                "id": uuid.uuid4(),
+                "trial_tenant_id": uuid.uuid4(),
+                "organization": "New Co",
+                "status": "DECLINED",
+                "created_at": now,
+                "updated_at": now,
+            }
+        )
+    opened = uuid.uuid4()
+    person = {"requested_by": uuid.uuid4(), "display_name": "Asha", "email": "asha@example.invalid"}
+    common = {**person, "tenant_id": tenant_id, "organization": "Trial Co", "expectations": "A pilot on our data"}
+    mvps = [{**common, "id": opened, "status": "NEW", "created_at": old, "updated_at": old}]
+    mvps += [
+        {**common, "id": uuid.uuid4(), "status": "CLOSED", "created_at": now, "updated_at": now} for _ in range(501)
+    ]
+    ids = [row["id"] for row in exits]
+    _platform_requests(TrialExitRequest, exits)
+    _platform_requests(TrialMvpRequest, mvps)
+    try:
+        with SessionLocal() as db:
+            bind_system(db, "test: 0.10.86 request lists")
+            listed = early_exit.overview(db)
+            assert listed[0]["id"] == str(pending) and listed[0]["status"] == "PENDING"
+            assert str(opened) in [item["id"] for item in mvp_request.overview(db)["items"]]
+    finally:
+        with SessionLocal() as db:
+            bind_system(db, "test: 0.10.86 request lists cleanup")
+            db.query(TrialExitRequest).filter(TrialExitRequest.id.in_(ids)).delete(synchronize_session=False)
+            db.query(TrialMvpRequest).filter(TrialMvpRequest.tenant_id == tenant_id).delete(synchronize_session=False)
+            db.commit()
