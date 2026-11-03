@@ -7603,3 +7603,18 @@ button.uw-org:hover {
     min-width: 0;
   }
 }
+/* "Import your data" beside the Sample data label (0.10.79); where the label is hidden, it is in the avatar menu. */
+.uw-top-import {
+  flex: none;
+}
+.uw-avatar-import {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .uw-top-import {
+    display: none;
+  }
+  .uw-pop-option.uw-avatar-import {
+    display: flex;
+  }
+}
