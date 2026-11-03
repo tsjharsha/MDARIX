@@ -83,6 +83,7 @@ describe("list views: one choice, the persona's own first", () => {
     expect(NEW_PLACES.Complaints.tabs).toEqual([...COMPLAINT_LIST_VIEWS]);
     expect(Object.values(SERVER_VIEWS).map((view) => view.code)).toEqual([
       "open",
+      "overdue",
       "due-week",
       "legal-week",
       "reportability",

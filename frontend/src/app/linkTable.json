@@ -346,6 +346,7 @@
       "path": "/app/complaints",
       "tabs": [
         "All open complaints",
+        "Overdue",
         "Due this week",
         "Legal clocks this week",
         "Reportability: decision needed",

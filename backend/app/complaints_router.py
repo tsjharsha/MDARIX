@@ -176,7 +176,7 @@ def list_complaints(
     default = [RECEIVED_AT.desc().nullslast()]
     if view:
         from backend.app.oversight import closure
-        from backend.app.oversight.router import LIST_VIEWS, list_view
+        from backend.app.oversight.router import DATED, LIST_VIEWS, list_view
 
         if view not in LIST_VIEWS:
             raise HTTPException(status_code=422, detail={"code": "UNKNOWN_LIST_VIEW", "message": "No such list view"})
@@ -184,13 +184,16 @@ def list_complaints(
             query = query.filter(
                 or_(Complaint.status.is_(None), func.lower(Complaint.status).notin_(closure.CLOSED_STATUSES))
             )
+            # The most urgent first (0.10.82, U-08): overdue, then the nearest clock; the undated after, newest first.
+            moments = list_view(db, control_db, tenant_id, DATED, str(ctx.user_id))
         else:
             moments = list_view(db, control_db, tenant_id, view, str(ctx.user_id))
             query = query.filter(Complaint.id.in_([uuid.UUID(key) for key in moments] or [None]))
-            # Most urgent first (the newest signature first for "signed-month"); undated after the dated ones.
-            ranked = sorted(moments, key=lambda key: moments[key] or "~", reverse=view == "signed-month")
-            if ranked:
-                default = [case({uuid.UUID(key): rank for rank, key in enumerate(ranked)}, value=Complaint.id)]
+        # Most urgent first (the newest signature first for "signed-month"); undated after the dated ones.
+        ranked = sorted(moments, key=lambda key: moments[key] or "~", reverse=view == "signed-month")
+        if ranked:
+            rank = case({uuid.UUID(key): index for index, key in enumerate(ranked)}, value=Complaint.id)
+            default = [rank.asc().nullslast(), *default]
     total = query.count()
     # Newest first (a list view: its own order) unless a column heading asks for another order across every page.
     ordered = order_query(query, sort, order, _sorts(), default=default, tiebreak=[Complaint.id])

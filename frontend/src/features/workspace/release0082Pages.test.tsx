@@ -7,6 +7,11 @@ import { ComplaintPage } from "./sections/ComplaintPage";
 import { ONE_STORY_PATH, type StoryRun } from "./oneStory";
 import { eventPath } from "./oversight";
 import { rv11 } from "../../test/rv11";
+import { HomeSection } from "./sections/Home";
+import { IMPORTED_SOURCE } from "./complaintList";
+import { trendPath } from "./signalAi";
+import { SERVER_VIEWS } from "./listViews";
+import { OVERDUE_PATH, OVERDUE_VIEW } from "./home";
 
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("../customer-admin/shared", async (original) => ({
@@ -82,5 +87,68 @@ describe("every record page: one Next step, which is the story's, and one progre
     expect(html.slice(html.indexOf('aria-label="What to do next"'))).toContain(
       "<b>Assess the United States (FDA) market</b>",
     );
+  });
+});
+
+describe("Home for every persona (D1.6)", () => {
+  const home = (persona = "admin", extra: Partial<WorkspaceApi> = {}) =>
+    render(<HomeSection heading={{ current: null }} />, api({ persona, ...extra }));
+
+  it("on the sample shows a slim Continue-the-story banner, not a second retelling of the story", () => {
+    resources.data[ONE_STORY_PATH] = { sample: run(3), yours: null };
+    for (const persona of ["admin", "regulatory", "handler", "executive"]) {
+      const html = home(persona);
+      expect(html).toContain('class="uw-card uw-home-banner"');
+      expect(html).toContain("Step 4 of 10: Reportable?");
+      expect(html).toContain("Continue the story");
+      expect(html).not.toContain("Review this sample event");
+    }
+  });
+
+  it("on your data leads with the most urgent complaint and what the file did not say", () => {
+    const yours: StoryRun = {
+      ...run(1),
+      run: "yours",
+      market: null,
+      market_label: null,
+      complaint: { ...run(1).complaint, ref: "FAC-1001", serious_injury: true, description: "It burned her hand." },
+      needs: [{ fact: "COUNTRY", label: "Incident country", message: "", rule: "21 CFR 803; EU MDR Art. 87" }],
+    };
+    resources.data[ONE_STORY_PATH] = { sample: run(10), yours };
+    const html = home("admin", { dataSource: IMPORTED_SOURCE });
+    expect(html).toContain("FAC-1001 is a serious injury with no incident country.");
+    expect(html).toContain("What your file did not say");
+    expect(html).toContain("Incident country");
+    expect(html).toContain("Asked on the complaint page: 21 CFR 803");
+    expect(html).toContain("Walk it through · step 2 of 10");
+  });
+
+  it("shows a Story complete card once the ten steps are done", () => {
+    resources.data[ONE_STORY_PATH] = { sample: run(10), yours: null };
+    expect(home()).toContain("Story complete · SAMPLE-RV-11");
+  });
+
+  it("draws the trend card with observed and expected bars, and each tile opens its own list", () => {
+    resources.data[ONE_STORY_PATH] = { sample: run(3), yours: null };
+    resources.data[trendPath("version").split("?")[0]] = {
+      items: [
+        {
+          key: "o",
+          name: "OrbitCare 300 Rev B",
+          product: { id: "o" },
+          recent: 9,
+          expected: 0.97,
+          ratio: 9.3,
+          result: "SIGNIFICANT",
+          lots: [],
+        },
+      ],
+    };
+    const html = home();
+    expect(html).toContain("OrbitCare 300 Rev B: 9 complaints against 1.0 expected (9.3×)");
+    expect(html.match(/class="uw-bar-fill/g)).toHaveLength(2);
+    expect(SERVER_VIEWS[OVERDUE_VIEW].code).toBe("overdue");
+    expect(OVERDUE_PATH).toContain("view=overdue");
+    delete resources.data[trendPath("version").split("?")[0]];
   });
 });

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 import { runOf, shownRun, stepBlocker, stepPlace, type OneStory, type StoryRun } from "./oneStory";
 import { StoryView } from "./sections/OneStory";
+import { HomeSection } from "./sections/Home";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import type { TrendItem } from "./signalAi";
 
@@ -124,5 +125,22 @@ describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
     expect(runOf(story, "SAMPLE-RV-07")).toBeNull();
     expect(shownRun(story, SAMPLE_SOURCE)?.run).toBe("sample");
     expect(shownRun({ sample: null, yours: story.yours }, SAMPLE_SOURCE)?.run).toBe("yours");
+  });
+});
+
+describe("Home's tiles while they read (D1.6)", () => {
+  beforeEach(stubWindow);
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("say Reading… on every tile, never an all-clear, before the data arrives", () => {
+    const html = renderToStaticMarkup(
+      <WorkspaceContext.Provider value={workspace({ isTrial: true } as Partial<WorkspaceApi>)}>
+        <HomeSection heading={{ current: null }} />
+      </WorkspaceContext.Provider>,
+    );
+    const stats = html.slice(html.indexOf('aria-label="What needs attention"'), html.indexOf("uw-home-grid"));
+    expect(stats.match(/Reading…/g)).toHaveLength(3);
+    expect(stats).not.toContain("No product rising");
+    expect(stats).not.toContain("Nothing past its time");
   });
 });

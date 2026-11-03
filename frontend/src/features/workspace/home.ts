@@ -27,15 +27,15 @@ export const PERSONA_GREETING: Readonly<Record<string, string>> = {
   executive: "What needs attention today, in one minute.",
 };
 
-/** The personas whose Home leads with the sample event (Release A's one-event card and its short story). */
-export const HERO_PERSONAS: readonly string[] = ["admin", "quality"];
-
 const WEEK_MS = 7 * 24 * 3_600_000;
 
 /** "Due this week", one definition everywhere (0.10.81, navigation M1): the complaints of the Complaints list view
  * of that name (a deadline or target in the next seven days, not yet past), read from the server's own list. */
 export const DUE_WEEK_PATH = "/api/v1/complaints?view=due-week&page=1&page_size=1";
 export const DUE_WEEK_VIEW = "Due this week";
+/** "Overdue" (0.10.82, D1.6): the complaints of the list view of that name, a deadline or target already past. */
+export const OVERDUE_PATH = "/api/v1/complaints?view=overdue&page=1&page_size=1";
+export const OVERDUE_VIEW = "Overdue";
 
 /** The items a persona's Home is about. */
 export function personaItems(items: readonly OversightItem[], persona: string): OversightItem[] {

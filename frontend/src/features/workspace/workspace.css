@@ -8134,3 +8134,23 @@ button.uw-org:hover {
     content: none;
   }
 }
+/* Home's story (0.10.82, D1.6): a slim banner on the sample, never a second retelling of Getting started. */
+.uw-home-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ms-space-3);
+  padding: 12px 16px 12px 20px;
+}
+.uw-home-trend-title {
+  margin: 0 0 6px;
+  font-size: var(--ms-fs-16);
+  line-height: 1.35;
+}
+@media (max-width: 720px) {
+  .uw-home-banner .ac-primary {
+    justify-content: center;
+    width: 100%;
+  }
+}

@@ -200,16 +200,18 @@ function StepPreview({ run, index, trends }: { run: StoryRun; index: number; tre
 }
 
 /** Observed against expected, as two bars (Home's trend card and the story's finale). */
-export function TrendBars({ row }: { row: TrendItem }) {
+export function TrendBars({ row, bare = false }: { row: TrendItem; bare?: boolean }) {
   const top = Math.max(row.recent, row.expected, 0.01);
   const rising = row.result === "SIGNIFICANT" || row.result === "ELEVATED";
   const ratio = typeof row.ratio === "number" ? ` · ${row.ratio.toFixed(1)}×` : "";
   return (
     <div className="uw-os-trend">
-      <b>
-        {row.name}
-        {rising ? ratio : ": in line with its history"}
-      </b>
+      {!bare && (
+        <b>
+          {row.name}
+          {rising ? ratio : ": in line with its history"}
+        </b>
+      )}
       <div className="uw-bars">
         {[
           ["Observed", row.recent, rising ? "is-over" : "is-ok"],

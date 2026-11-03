@@ -137,3 +137,18 @@ def test_the_story_rules_skip_the_report_steps_after_a_signed_not_reportable_con
     # A draft only: the tree is answered, nothing is signed, the report steps wait.
     draft = SimpleNamespace(signed_at=None, superseded_by=None, conclusion=None)
     assert steps_done({}, True, [draft], None)[:5] == [True, True, True, False, False]
+
+
+def test_home_tiles_are_the_counts_of_the_lists_they_open_and_open_complaints_are_most_urgent_first(trial):
+    """D1.6 and U-08: "Overdue" is a list view, so the tile and the list are one number; "All open complaints" lists
+    the overdue first, then the nearest clock, the undated last."""
+    user = trial["user"]
+    listed = _ok(user.get("/api/v1/complaints", params={"view": "open", "work": "true", "page_size": 200}))["items"]
+    nearest = [(item["work"]["due"] or [None])[0] for item in listed]
+    dated = [due["due_at"] for due in nearest if due]
+    assert dated and dated == sorted(dated)
+    # Every dated complaint comes before every undated one.
+    assert all(due for due in nearest[: len(dated)]) and not any(nearest[len(dated) :])
+    overdue = {item["id"] for item in listed if any(due["state"] == "OVERDUE" for due in item["work"]["due"])}
+    tile = _ok(user.get("/api/v1/complaints", params={"view": "overdue", "page": 1, "page_size": 200}))
+    assert overdue and tile["total"] == len(overdue) == len({item["id"] for item in tile["items"]} & overdue)
