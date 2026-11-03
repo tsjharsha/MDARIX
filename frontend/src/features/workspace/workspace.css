@@ -3795,6 +3795,10 @@ div.uw-task-count:hover {
   color: var(--ac-ink);
   font-size: var(--ms-fs-14);
 }
+/* The link on the tinted line reaches 4.5:1 (0.10.84; #087b78 on #e3f2f1 was 4.43:1). */
+.uw-cited-line > .ac-link {
+  color: var(--ms-teal-dark);
+}
 .uw-cited-badge {
   display: inline-block;
   margin-left: 8px;

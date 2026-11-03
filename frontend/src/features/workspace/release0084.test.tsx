@@ -15,6 +15,7 @@ import { NewRecordsSection } from "./sections/Records";
 import { awarenessInput } from "./intake";
 import { loadedObjects } from "./sections/ImportData";
 import { TeamView, type Team } from "./sections/TrialTeam";
+import { GlobalSearch } from "./HybridShell";
 import { eventPath } from "./oversight";
 import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 import { rv11 } from "../../test/rv11";
@@ -448,5 +449,13 @@ describe("L3 and L5: the story's words match its numbers, and its end offers wha
     // The preview beside the finished story is the finale (Trends), not Records.
     const preview = team.slice(team.indexOf('class="uw-os-mini-bar"'));
     expect(preview).toContain("<span>Trends</span>");
+  });
+});
+
+describe("accessibility: the search names its results only while they exist", () => {
+  it("has no aria-controls pointing at a list that is not on the page", () => {
+    const html = renderToStaticMarkup(<GlobalSearch open={() => undefined} />);
+    expect(html).toContain('type="search"');
+    expect(html).not.toContain('aria-controls="uw-search-results"');
   });
 });

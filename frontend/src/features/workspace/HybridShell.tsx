@@ -311,7 +311,8 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
         value={text}
         placeholder="Search complaints, products, reports"
         aria-label="Search complaints, products and reports"
-        aria-controls="uw-search-results"
+        // Only while the results exist: a reference to a missing id is invalid (0.10.84, accessibility).
+        aria-controls={shown && hits ? "uw-search-results" : undefined}
         onFocus={() => hits && setShown(true)}
         onChange={(event) => setText(event.target.value)}
       />
