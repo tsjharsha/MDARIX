@@ -532,7 +532,10 @@ def triage_shortest(db: Session, control_db, tenant_id: uuid.UUID, now) -> dict[
         dated = [deadline for deadline in item["deadlines"] if deadline.get("due_at")]
         if not dated:
             continue
-        first = min(dated, key=lambda deadline: deadline["due_at"])
+        # Once the incident country is known, its market's deadline is the clock (0.10.84, H3): the other markets
+        # apply "only if also reportable", as the triage table says; the earliest of all only while no country is.
+        own = [deadline for deadline in dated if deadline.get("own")]
+        first = own[0] if own else min(dated, key=lambda deadline: deadline["due_at"])
         for key in item["members"]:
             kind, record_id = key.split(":", 1)
             if kind == intake.COMPLAINT:
@@ -550,6 +553,8 @@ def shortest_binding(binding: dict, triage_first: dict | None) -> dict:
         **binding,
         **{key: triage_first[key] for key in keys if key in triage_first},
         "window": triage_first["basis"],
+        # The market whose clock it is once the country is known (0.10.84, H3).
+        **({"market": triage_first["market"]} if triage_first.get("own") else {}),
     }
 
 

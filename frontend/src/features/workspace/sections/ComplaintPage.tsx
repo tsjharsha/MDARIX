@@ -59,9 +59,10 @@ export function harmOf(event: Pick<EventView["event"], "harm" | "harm_words">): 
 export const oneClock = (due: NonNullable<EventView["work"]>["due"]) =>
   due.find((item) => isLegalDeadline(item)) ?? due[0] ?? null;
 
-/** Whose clock it is: a market's, "Shortest possible" while the facts are missing, or the target's kind. */
+/** Whose clock it is: a market's, "Shortest possible" while the country is missing, or the target's kind. Once the
+ * country is known the clock is that market's, also while the awareness date is still asked (0.10.84, H3). */
 export const clockPrefix = (item: NonNullable<EventView["work"]>["due"][number]) =>
-  item.key.endsWith(":facts")
+  item.key.endsWith(":facts") && !item.market
     ? "Shortest possible"
     : isLegalDeadline(item) && item.market
       ? marketLabel(item.market)

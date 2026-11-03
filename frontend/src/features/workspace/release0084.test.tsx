@@ -7,7 +7,7 @@ import { legalClocks } from "./home";
 import type { OversightItem } from "./oversight";
 import { OVERSIGHT } from "./oversight";
 import { HomeSection, HomeStory } from "./sections/Home";
-import { ComplaintPage } from "./sections/ComplaintPage";
+import { ComplaintPage, clockPrefix } from "./sections/ComplaintPage";
 import { ONE_STORY_PATH, type StoryRun } from "./oneStory";
 import { eventPath } from "./oversight";
 import { IMPORTED_SOURCE } from "./complaintList";
@@ -139,5 +139,13 @@ describe("H2: the Your data hero and the complaint header read the legal deadlin
     const header = html.slice(html.indexOf('class="uw-cp-chips"'), html.indexOf("uw-hl-fields"));
     expect(header).toContain("due Tue 1 Dec");
     expect(header).not.toContain("Wed 4 Nov");
+  });
+});
+
+describe("H3: once the country is known, the header names that market's clock", () => {
+  it("says the market, not 'Shortest possible', while only the awareness date is still asked", () => {
+    const due = rv11().work!.due[0];
+    expect(clockPrefix({ ...due, key: "watch:c:facts", market: null })).toBe("Shortest possible");
+    expect(clockPrefix({ ...due, key: "watch:c:facts", market: "US" })).toBe("United States");
   });
 });
