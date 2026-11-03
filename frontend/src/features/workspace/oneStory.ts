@@ -32,7 +32,8 @@ export type StoryRun = {
   report_id: string | null;
   report_stage: string | null;
   needs: StoryNeed[];
-  steps: Array<{ key: string; label: string; done: boolean; skipped: boolean }>;
+  /** ``earlier`` (0.10.85): done by the team out of order; ticked once the steps before it are done. */
+  steps: Array<{ key: string; label: string; done: boolean; skipped: boolean; earlier?: boolean }>;
   current: number;
   finished: boolean;
 };
@@ -109,9 +110,10 @@ export async function openStep(
 ): Promise<void> {
   const mark = MARKED[index];
   const place = stepPlace(run, index);
-  // The report's mark only counts once there is a report to open (step 5 is otherwise blocked).
+  // The report's mark only counts once there is a report to open (step 5 is otherwise blocked). The screen opens at
+  // once (0.10.85): the button waited for the mark, seconds on a busy server, and read as a dead click.
   if (mark && !(index === 4 && !run.report_id))
-    await send(`${ONE_STORY_PATH}/marks`, "POST", { run: run.run, step: mark }).catch(() => null);
+    void send(`${ONE_STORY_PATH}/marks`, "POST", { run: run.run, step: mark }).catch(() => null);
   open(place.section, place.tab);
 }
 

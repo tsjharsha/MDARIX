@@ -8318,3 +8318,56 @@ details.uw-team-change[open] {
     border-radius: 12px;
   }
 }
+
+/* 0.10.85: the story's step done earlier by the team (not ticked until the steps before it are), a tab the persona
+   does not list while its screen is open, and "More ways to explore" as one compact card (the approved design). */
+.uw-os-step.is-earlier {
+  background: rgba(76, 199, 193, 0.1);
+  color: #c8f0ed;
+  font-style: italic;
+}
+.uw-tab.is-extra {
+  border-bottom-style: dashed;
+  font-style: italic;
+}
+.uw-os-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--ms-space-3);
+  margin-top: var(--ms-space-3);
+}
+.uw-os-part {
+  display: grid;
+  gap: 4px;
+  min-height: 44px;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-surface);
+  color: var(--ms-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.uw-os-part:hover,
+.uw-os-part:focus-visible {
+  border-color: var(--ms-teal);
+}
+.uw-os-part span {
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-14);
+}
+.uw-os-quiet {
+  margin: var(--ms-space-3) 0 0;
+}
+.uw-gs-more-head {
+  display: grid;
+  gap: 6px;
+  margin-bottom: var(--ms-space-4);
+}
+.uw-gs-more-head > .ac-link {
+  justify-self: start;
+}
+.uw-flip {
+  transform: rotate(180deg);
+}

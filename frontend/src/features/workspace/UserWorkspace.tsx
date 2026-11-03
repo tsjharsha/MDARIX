@@ -652,6 +652,7 @@ export function UserWorkspace({
     dataSource,
     chooseDataSource,
     refreshTrial,
+    canOpen: (name: string) => visibleSections.includes(name as WorkspaceSection),
   };
   const { section, tab } = location;
   // "Import your data" beside the Sample data label, and in the avatar menu on a phone (0.10.79).
@@ -745,7 +746,12 @@ export function UserWorkspace({
                 data={dataBar === "choice" ? { source: dataSource, onChoose: chooseDataSource } : undefined}
               />
             </header>
-            <TabBar tabs={tabs} current={tabOfSection(section)} open={open} />
+            <TabBar
+              tabs={tabs}
+              current={tabOfSection(section)}
+              open={open}
+              personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
+            />
           </>
         )}
         {!fresh && (

@@ -132,7 +132,7 @@ def test_the_story_is_the_teams_one_step_for_every_colleague():
         _ok(owner.post(f"{STORY}/marks", json={"run": "sample", "step": "call"}))
         _ok(colleague.post(f"{STORY}/marks", json={"run": "sample", "step": "trends"}))
         mine, theirs = _ok(owner.get(STORY))["sample"], _ok(colleague.get(STORY))["sample"]
-        done = lambda run: [step["key"] for step in run["steps"] if step["done"]]  # noqa: E731
+        done = lambda run: [step["key"] for step in run["steps"] if step["done"] or step["earlier"]]  # noqa: E731
         assert done(mine) == done(theirs) == ["call", "trends"]
         assert mine["current"] == theirs["current"] == 1
     finally:

@@ -546,14 +546,20 @@ export function AvatarMenu({
 
 /** The tab bar: only the persona's destinations, the current one marked. */
 export function TabBar({
-  tabs,
+  tabs: listed,
   current,
   open,
+  personaLabel,
 }: {
   tabs: readonly string[];
   current: string | null;
   open: (section: WorkspaceSection) => void;
+  personaLabel?: string;
 }) {
+  // A screen the persona's tabs do not list (opened from the story or a link) shows as a tab of its own while it is
+  // open, marked so (0.10.85; the approved design): the person always sees where they are.
+  const extra = current && current in PERSONA_TABS && !listed.includes(current) ? current : null;
+  const tabs = extra ? [...listed, extra] : listed;
   // On a phone the bar scrolls: a fade and an arrow say more tabs exist, until the last one is in view (0.10.82).
   const row = useRef<HTMLDivElement>(null);
   const [more, setMore] = useState(false);
@@ -566,6 +572,13 @@ export function TabBar({
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, [tabs.length]);
+  // The current tab is always in view on a phone (U-12).
+  useEffect(() => {
+    row.current
+      ?.querySelector<HTMLElement>("[aria-current='page']")
+      ?.scrollIntoView?.({ block: "nearest", inline: "center" });
+    measure();
+  }, [current, tabs.length]);
   return (
     <nav className={`uw-tabs${more ? " has-more" : ""}`} aria-label="Destinations">
       <div className="uw-tabs-in" ref={row} onScroll={measure}>
@@ -573,11 +586,17 @@ export function TabBar({
           <button
             key={key}
             type="button"
-            className="uw-tab"
+            className={key === extra ? "uw-tab is-extra" : "uw-tab"}
             aria-current={current === key ? "page" : undefined}
+            title={
+              key === extra
+                ? `Opened from Getting started or a link: not one of ${personaLabel ?? "this view"}'s tabs`
+                : undefined
+            }
             onClick={() => open(PERSONA_TABS[key].section)}
           >
             {PERSONA_TABS[key].label}
+            {key === extra && <span className="sr-only"> (opened from Getting started; not one of your tabs)</span>}
           </button>
         ))}
       </div>
