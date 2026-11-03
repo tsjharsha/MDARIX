@@ -4,6 +4,7 @@ source_record_id is the first identifier a row carries, so every lot of one prod
 it once collapsed 18 golden lots into 3 and 13 investigations into 2.
 """
 
+import pytest
 from sqlalchemy import text
 
 from backend.app.db.session import engine
@@ -31,15 +32,18 @@ def _latest() -> list[dict]:
     return [row["raw_payload"] for row in rows if row["rank"] == 1]
 
 
+@pytest.mark.db
 def test_each_record_keeps_only_its_latest_revision():
     lots = sorted((row["lot_id"], row["rev"]) for row in _latest() if "lot_id" in row)
     assert lots == [("L1", 2), ("L2", 1)]
 
 
+@pytest.mark.db
 def test_records_that_share_a_parent_id_are_never_merged():
     assert sorted(row["investigation_id"] for row in _latest() if "investigation_id" in row) == ["INV-1", "INV-2"]
 
 
+@pytest.mark.db
 def test_an_unknown_record_type_is_not_merged_at_all():
     assert sorted(row["a"] for row in _latest() if "a" in row) == [1, 2]
 

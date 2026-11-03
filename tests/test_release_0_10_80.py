@@ -3,6 +3,7 @@ data" on the new navigation's top bar). Automatic insights read the data the per
 choice they read as before: the imported data, else the sample.
 """
 
+import pytest
 import inspect
 
 from backend.app.db.session import SessionLocal
@@ -16,6 +17,7 @@ from tests.test_trial_insights import (  # noqa: F401  (the fixture is used by n
 )
 
 
+@pytest.mark.db
 def test_insights_read_the_chosen_data_and_default_as_before(workspaces):  # noqa: F811
     tenant_id = _uploaded_workspace(workspaces)
     with SessionLocal() as db:

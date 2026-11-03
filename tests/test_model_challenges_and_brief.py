@@ -135,6 +135,7 @@ def _challenge(model, persist):
         db.close()
 
 
+@pytest.mark.db
 def test_the_model_challenges_each_hypothesis_and_the_rules_check_them(cleanup_ai_hypotheses):
     result = _challenge(FullModel(), persist=False)
     assert result.provenance["author"] == "LANGUAGE_MODEL"
@@ -152,11 +153,13 @@ def test_the_model_challenges_each_hypothesis_and_the_rules_check_them(cleanup_a
     ]
 
 
+@pytest.mark.db
 def test_without_model_hypotheses_the_rule_challenges_are_used(cleanup_ai_hypotheses):
     result = _challenge(None, persist=False)
     assert result.provenance["author"] == "RULES" and result.challenges
 
 
+@pytest.mark.db
 def test_the_brief_is_drafted_from_the_checked_results(cleanup_ai_hypotheses):
     model = FullModel()
     _challenge(model, persist=True)  # persists the model analysis, hypotheses and challenges
@@ -182,6 +185,7 @@ def test_the_brief_is_drafted_from_the_checked_results(cleanup_ai_hypotheses):
     assert content["ai_advisory"]["status"] == "NOT_NEEDED"
 
 
+@pytest.mark.db
 def test_a_brief_is_drafted_only_from_an_analysis_of_the_same_point_in_time(cleanup_ai_hypotheses):
     tenant_id, investigation_id = context()
     as_of = datetime(2026, 2, 15, tzinfo=timezone.utc)
@@ -207,6 +211,7 @@ def test_a_brief_is_drafted_only_from_an_analysis_of_the_same_point_in_time(clea
     assert other["content"]["ai_brief"] == {"author": "RULES", "fallback_reason": "ANALYSIS_FOR_ANOTHER_TIME"}
 
 
+@pytest.mark.db
 def test_a_model_drafted_brief_is_saved_as_an_ai_result_with_its_trust_check(cleanup_ai_hypotheses):
     from trust_engine import auto
 

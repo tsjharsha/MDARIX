@@ -35,6 +35,7 @@ def test_a_relative_reference_inside_evidence_storage_is_read():
     assert content.strip() and "MDARIX_" not in content
 
 
+@pytest.mark.db
 def test_the_api_never_serves_a_file_outside_evidence_storage():
     client = authenticated_client()
     tenant_id = client.get("/api/v1/auth/session").json()["tenant_id"]

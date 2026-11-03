@@ -1,5 +1,6 @@
 """The workspace dashboard: the signed-in user's own quality work, day by day, counts only."""
 
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
@@ -9,6 +10,7 @@ PATH = "/api/v1/analytics/trends"
 SERIES = ("signals", "investigations_opened", "investigations_closed", "evidence", "decisions", "ai_runs")
 
 
+@pytest.mark.db
 def test_every_series_has_one_row_per_day_and_the_window_is_bounded():
     user = _client_with_role("INVESTIGATOR")
     body = user.get(PATH, params={"days": 14}).json()
@@ -20,6 +22,7 @@ def test_every_series_has_one_row_per_day_and_the_window_is_bounded():
     assert user.get(PATH, params={"days": 1}).json()["days"] == 7
 
 
+@pytest.mark.db
 def test_breakdowns_add_up_to_the_tenants_own_totals():
     user = _client_with_role("INVESTIGATOR")
     body = user.get(PATH).json()

@@ -17,7 +17,7 @@ from backend.app.db.session import RuntimeSessionLocal, SessionLocal, runtime_ro
 from backend.app.db.tenant_scope import bind_tenant
 from tests.test_free_trial import _approved_trial_client
 
-pytestmark = pytest.mark.db
+# Database tests by default, its pure tests marked unit (tests/conftest.py DB_WITHOUT_GOLDEN).
 
 LOG = "/api/v1/communications"
 

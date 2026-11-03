@@ -32,7 +32,7 @@ from tests.test_reporting_capa_api import PASSWORD as COLLEAGUE_PASSWORD
 from tests.test_reporting_capa_api import _client
 from tests.test_sample_story_days import FLAGSHIP_IN, FLAGSHIP_US
 
-pytestmark = pytest.mark.db
+# Database tests by default, its pure tests marked unit (tests/conftest.py DB_WITHOUT_GOLDEN).
 
 EVENT = "/api/v1/oversight/events/SAMPLE-RV-11"
 REPORTS = "/api/v1/reports"

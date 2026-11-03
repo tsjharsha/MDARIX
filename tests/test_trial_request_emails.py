@@ -1,6 +1,7 @@
 """Free-trial requesters hear back: an acknowledgement when they ask, and a polite email when a request is declined.
 Neither can fail the request or the decision."""
 
+import pytest
 from sqlalchemy import text
 
 from auth import emailer
@@ -12,6 +13,7 @@ from tests.conftest import authenticated_client
 from tests.test_free_trial import _request_id, _request_trial
 
 
+@pytest.mark.db
 def test_a_declined_requester_is_told_politely_without_the_internal_reason(monkeypatch):
     admin = authenticated_client()
     email = _request_trial("Declined Devices Ltd")

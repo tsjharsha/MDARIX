@@ -21,6 +21,7 @@ from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system, bind_tenant
 from backend.app.main import app
 from backend.app.request_context import get_request_context
+
 # org: the fixture of test_human_decision (hence the F811 notes below).
 from tests.test_human_decision import _approved, _body, _governance_status, _path, org  # noqa: F401
 
@@ -230,7 +231,6 @@ def test_a_crash_after_everything_committed_is_answered_by_a_retry_with_that_dec
     assert state["signed_events"] == ["CASE_DECISION_SIGNED"]
 
 
-@pytest.mark.unit
 def test_the_signing_states_are_documented_where_the_code_is():
     doc = signing_commit.__doc__
     for state in ("PREPARE", "PENDING", "SAVED", "SIGNED", "SIGNATURE_ABANDONED", "signature-settlement"):

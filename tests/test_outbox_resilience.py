@@ -73,6 +73,7 @@ def _row(event_id):
         return db.get(OutboxEvent, event_id)
 
 
+@pytest.mark.db
 def test_each_delivered_event_is_committed_before_the_next_so_a_kill_cannot_resend_it(two_events):
     first, second = sorted(two_events)
     delivered = []
@@ -90,6 +91,7 @@ def test_each_delivered_event_is_committed_before_the_next_so_a_kill_cannot_rese
     assert untouched.published_at is None and untouched.attempts == 0 and untouched.claimed_at is None
 
 
+@pytest.mark.db
 def test_a_shutdown_request_is_honoured_between_events_after_finishing_the_current_one(two_events):
     first, second = sorted(two_events)
     delivered = []
@@ -99,6 +101,7 @@ def test_a_shutdown_request_is_honoured_between_events_after_finishing_the_curre
     assert _row(two_events[second]).published_at is None
 
 
+@pytest.mark.db
 def test_a_failed_event_waits_the_configured_delay_and_records_the_error(two_events):
     first, second = sorted(two_events)
     worker = OutboxWorker(

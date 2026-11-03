@@ -25,6 +25,7 @@ def _connector(admin) -> str:
     return created.json()["connector_id"]
 
 
+@pytest.mark.db
 def test_the_api_key_is_stored_encrypted_and_never_shown_again():
     admin = authenticated_client()
     connector_id = _connector(admin)
@@ -44,6 +45,7 @@ def test_the_api_key_is_stored_encrypted_and_never_shown_again():
     assert admin.delete(f"/api/v1/admin/configuration/connectors/{connector_id}/api-key").status_code == 404
 
 
+@pytest.mark.db
 def test_only_administrators_of_the_tenant_can_set_a_key():
     admin = authenticated_client()
     connector_id = _connector(admin)
