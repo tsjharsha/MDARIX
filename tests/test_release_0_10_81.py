@@ -11,6 +11,7 @@
 - F11: a cancelled report reads Cancelled, not MET; a reopened one drops its cancellation note (kept in the audit).
 - Security F3: a download named in any script answers with an ASCII name and the UTF-8 one.
 - Security F1: the trial invite is rate limited first and never says whether an address has an account.
+- U-06: a day-only awareness counts from that day everywhere and is shown as a date.
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -411,3 +412,22 @@ def test_security_f1_the_invite_is_rate_limited_first_and_never_says_an_address_
     # Over the limit nothing is looked up: the same answer for an address with an account and one without.
     assert user.post("/api/v1/trial/team", json=invite).status_code == 429
     assert user.post("/api/v1/trial/team", json={**invite, "email": "nobody-f1@example.invalid"}).status_code == 429
+
+
+def test_u06_a_day_only_awareness_counts_from_that_day_everywhere_and_shows_as_a_date():
+    from datetime import date, datetime, timezone
+
+    from backend.app.reportability import deadlines
+
+    day = datetime(2026, 10, 29, 12, 0, tzinfo=timezone.utc)  # an imported "2026-10-29"
+    assert deadlines.day_only(day) and not deadlines.day_only(datetime(2026, 10, 29, 12, 0, 1, tzinfo=timezone.utc))
+    # Canada counts in the organization's zone: in New Zealand noon UTC is already 30 Oct, yet the day given is 29 Oct.
+    found = deadlines.count(day, 10, "CALENDAR", "CA", "Pacific/Auckland")
+    assert (
+        found.day
+        == date(2026, 11, 8)
+        == deadlines.count(date(2026, 10, 29), 10, "CALENDAR", "CA", "Pacific/Auckland").day
+    )
+    # A moment with a time keeps the earliest local day, as before.
+    moment = datetime(2026, 10, 29, 12, 30, tzinfo=timezone.utc)
+    assert deadlines.count(moment, 10, "CALENDAR", "CA", "Pacific/Auckland").day == date(2026, 11, 9)

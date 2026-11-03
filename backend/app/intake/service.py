@@ -32,6 +32,7 @@ from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordF
 from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
 from backend.app.intake import rules
 from backend.app.reportability import markets
+from backend.app.reportability.deadlines import day_only
 from backend.app.business_ids import complaint_ref
 
 SOURCE_TYPE = "IntakeEvent"
@@ -708,6 +709,8 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
         ],
         "awareness": {
             "at": awareness["at"].isoformat(),
+            # A day given without a time is shown as a date (0.10.81, U-06).
+            "date_only": day_only(awareness["at"]),
             "source": awareness["source"],
             "source_label": rules.AWARENESS_LABELS.get(awareness["source"], awareness["source"]),
             "linked_ref": awareness.get("linked_ref"),

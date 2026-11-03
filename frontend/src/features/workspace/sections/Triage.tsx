@@ -7,7 +7,7 @@ import { Drawer, errorText, formatDate, send, useResource } from "../../customer
 import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import { withTabParam } from "../workspaceAddress";
 import { DeadlineChip, HarmChip, StateChip, type Harm } from "../../../app/chips";
-import { deadlineLabel } from "../../../app/dates";
+import { awarenessText, deadlineLabel } from "../../../app/dates";
 import { AlsoKnownAs, countOf } from "./common";
 import { ChipFilter, Hero, InlineError } from "./boardParts";
 import {
@@ -230,7 +230,7 @@ function TriageCard({
           )}
         </p>
         <p className="uw-cr-meta">
-          Aware {formatDate(item.awareness.at)} ({item.awareness.source_label}
+          Aware {awarenessText(item.awareness.at, item.awareness.date_only)} ({item.awareness.source_label}
           {item.awareness.linked_ref ? `: ${item.awareness.linked_ref}` : ""}) · reached MDARIX {item.delay.text} later
         </p>
         {first && (
@@ -376,8 +376,8 @@ function TriageDrawer({
             {formatDate(item.triage_clock.due_at)}, {hoursText(item.triage_clock)}.
           </p>
           <p>
-            <strong>Regulatory clocks</strong> count from awareness: {formatDate(item.awareness.at)} (
-            {item.awareness.source_label}
+            <strong>Regulatory clocks</strong> count from awareness:{" "}
+            {awarenessText(item.awareness.at, item.awareness.date_only)} ({item.awareness.source_label}
             {item.awareness.linked_ref ? `: ${item.awareness.linked_ref}` : ""}). It reached MDARIX {item.delay.text}{" "}
             later.
           </p>

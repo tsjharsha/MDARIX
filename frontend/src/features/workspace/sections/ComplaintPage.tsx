@@ -32,6 +32,7 @@ import { InlineTriage } from "./Triage";
 import { treePlace } from "./DecisionTrees";
 import { FLAGSHIP } from "../entrance";
 import { requestJson } from "../../../app/apiClient";
+import { awarenessText } from "../../../app/dates";
 import { ReportingFacts } from "./ReportingFacts";
 
 const HARM = {
@@ -277,7 +278,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                   </dd>
                   <dt>Awareness</dt>
                   <dd>
-                    {formatDate(event.awareness_at)}
+                    {awarenessText(event.awareness_at, event.awareness_date_only)}
                     <small>The legal clocks count from here.</small>
                   </dd>
                   <dt>In your QMS</dt>

@@ -160,6 +160,8 @@ export type EventView = {
     product: string | null;
     market: string | null;
     awareness_at: string | null;
+    /** 0.10.81 (U-06): the awareness is a day given without a time. */
+    awareness_date_only?: boolean;
     /** 0.10.81: the facts a reporting step needs and the record does not give (asked for on the page). */
     needs?: FactNeed[];
     status_in_qms: string;
