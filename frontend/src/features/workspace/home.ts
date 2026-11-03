@@ -32,6 +32,11 @@ export const HERO_PERSONAS: readonly string[] = ["admin", "quality"];
 
 const WEEK_MS = 7 * 24 * 3_600_000;
 
+/** "Due this week", one definition everywhere (0.10.81, navigation M1): the complaints of the Complaints list view
+ * of that name (a deadline or target in the next seven days, not yet past), read from the server's own list. */
+export const DUE_WEEK_PATH = "/api/v1/complaints?view=due-week&page=1&page_size=1";
+export const DUE_WEEK_VIEW = "Due this week";
+
 /** The items a persona's Home is about. */
 export function personaItems(items: readonly OversightItem[], persona: string): OversightItem[] {
   const categories = PERSONA_CATEGORIES[persona] ?? null;

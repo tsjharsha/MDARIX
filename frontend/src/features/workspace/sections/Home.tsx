@@ -11,6 +11,8 @@ import { OVERSIGHT, eventPath, type EventView, type Oversight, type OversightIte
 import { READINESS_PATH, readinessHeadline, type Readiness } from "../readiness";
 import { comparisonLine, risingSentence, trendPath, type TrendBoard } from "../signalAi";
 import {
+  DUE_WEEK_PATH,
+  DUE_WEEK_VIEW,
   HERO_PERSONAS,
   PERSONA_GREETING,
   greeting,
@@ -47,6 +49,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
     const place = placeOf(item.opens);
     open(place.section as WorkspaceSection, place.tab);
   };
+  const dueWeek = useResource<{ total: number }>(DUE_WEEK_PATH);
   const reading = oversight.state === "loading";
   const tenant = session?.current_tenant?.tenant_name;
   return (
@@ -72,6 +75,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
         <Stat
           tone="over"
           value={reading ? null : counts.overdue}
+          onOpen={() => open("My Work", "Team overview")}
           title="Overdue"
           // Never an all-clear before the data has arrived (0.10.81, U-07).
           detail={
@@ -80,13 +84,15 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
         />
         <Stat
           tone="soon"
-          value={reading ? null : counts.week}
+          value={dueWeek.state === "loading" ? null : (dueWeek.data?.total ?? null)}
+          onOpen={() => open("Complaints", DUE_WEEK_VIEW)}
           title="Due this week"
-          detail="Deadlines in the next 7 days"
+          detail="Complaints with a deadline or target in the next 7 days"
         />
         <Stat
           tone="risk"
           value={trends.state === "loading" ? null : rising.length}
+          onOpen={() => open("Trends")}
           title="At risk"
           detail={rising.length ? `${rising[0].name} is rising` : "No product rising against its history"}
         />
@@ -177,18 +183,21 @@ function Stat({
   value,
   title,
   detail,
+  onOpen,
 }: {
   tone: "over" | "soon" | "risk";
   value: number | null;
   title: string;
   detail: string;
+  /** Each tile opens its list (0.10.81, navigation M1). */
+  onOpen: () => void;
 }) {
   return (
-    <div className={`uw-card uw-home-stat is-${tone}`}>
+    <button type="button" className={`uw-card uw-home-stat is-${tone}`} onClick={onOpen}>
       <b className="uw-home-num">{value === null ? "…" : value}</b>
       <strong>{title}</strong>
       <span>{detail}</span>
-    </div>
+    </button>
   );
 }
 

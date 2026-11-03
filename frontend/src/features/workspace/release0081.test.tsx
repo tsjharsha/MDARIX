@@ -1,10 +1,11 @@
 // 0.10.81: the functional, usability, security and navigation reviews' findings that show on screen.
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
+import css from "./workspace.css?raw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { awarenessText, formatDay } from "../../app/dates";
 import { reportHits } from "./HybridShell";
+import { DUE_WEEK_PATH, DUE_WEEK_VIEW } from "./home";
+import { SERVER_VIEWS } from "./listViews";
 import { HomeSection, LegalClocks } from "./sections/Home";
 import { AlertsBell } from "./sections/Reminders";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
@@ -90,8 +91,14 @@ describe("the bell on the new navigation (navigation H1)", () => {
   });
 
   it("stays in the top bar on a phone", () => {
-    const css = readFileSync(resolve(__dirname, "workspace.css"), "utf8");
     const phone = css.slice(css.indexOf("@media (max-width: 640px) {\n  /* The bell stays"));
     expect(phone.slice(0, phone.indexOf("}"))).not.toContain(".uw-top-bell");
+  });
+});
+
+describe("Due this week, one number (navigation M1)", () => {
+  it("is read from the Complaints list view of that name, which the tile opens", () => {
+    expect(DUE_WEEK_PATH).toBe("/api/v1/complaints?view=due-week&page=1&page_size=1");
+    expect(SERVER_VIEWS[DUE_WEEK_VIEW].code).toBe("due-week");
   });
 });

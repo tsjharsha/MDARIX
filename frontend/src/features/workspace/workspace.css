@@ -6653,6 +6653,11 @@ button.uw-org:hover {
   gap: var(--ms-space-1);
   padding: 16px 18px;
   border-top: 4px solid var(--ms-line);
+  /* A tile is a button that opens its list (0.10.81). */
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .uw-home-stat.is-over {
   border-top-color: var(--ms-crit);
