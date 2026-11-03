@@ -28,7 +28,8 @@ function stepCopy(run: StoryRun, index: number): { h: string; p: string; b: stri
           b: `Open the call on ${ref}`,
         }
       : {
-          h: `Your most urgent complaint: ${ref}`,
+          // A reference never breaks at its hyphen (a non-breaking hyphen in the heading).
+          h: `Your most urgent complaint: ${ref.replace(/-/g, "‑")}`,
           p: "MDARIX picked it from your file: the most serious harm, then the shortest clock. Read what your file says, and see what it does not.",
           b: `Open ${ref}`,
         },

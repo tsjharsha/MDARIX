@@ -89,7 +89,7 @@ describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
     // The data switch on Your data shows that run, its label and its most urgent complaint.
     const yours = view({ sample: runAt("sample", 10), yours: runAt("yours", 0) }, { dataSource: IMPORTED_SOURCE });
     expect(yours).toContain(">Your data<");
-    expect(yours).toContain("Your most urgent complaint: OS-1002");
+    expect(yours).toContain("Your most urgent complaint: OS‑1002");
   });
 
   it("says which fact the import lacks, and opens the complaint page where it is asked", () => {
