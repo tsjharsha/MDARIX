@@ -1,8 +1,8 @@
 import { useContext, useEffect, useId, useState } from "react";
-import { DecideAndSign } from "./common";
+import { AlsoKnownAs, DecideAndSign } from "./common";
 import { ComplaintNextStep } from "./ComplaintNextStep";
 import { MARKET_QUESTION_WHY } from "../whyAsked";
-import { versionWords } from "../../../app/labels";
+import { marketLabel, questionNumber, versionWords } from "../../../app/labels";
 import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
@@ -97,6 +97,8 @@ export function MarketAssessmentDrawer({
       {data && active && (
         <ComplaintNextStep
           complaintId={complaint.id}
+          here="Reportability"
+          pending={!active.current}
           refreshKey={shown.map((item) => `${item.current?.version ?? 0}.${item.draft?.version ?? 0}`).join()}
           first={
             alsoIndia(story, shown, active) ? { label: "Assess India (CDSCO) too", run: () => setMarket("IN") } : null
@@ -118,6 +120,7 @@ function AssessmentIntro({ detail }: { detail: AssessmentDetail }) {
         {detail.complaint.aware_date ? ` · aware ${formatDay(detail.complaint.aware_date)}` : ""}
       </p>
       {detail.complaint.description && <q className="uw-cr-text">{detail.complaint.description}</q>}
+      <AlsoKnownAs id={detail.complaint.business_id} shown={recordName(detail.complaint)} />
       <p className="uw-ma-starter" role="note">
         <FileWarning size={15} aria-hidden="true" /> {detail.starter_mark}
       </p>
@@ -240,6 +243,7 @@ export function MarketPanel({
           {item.preselected ? " · the event's market" : ""}
           {item.question_set_current === false ? " · started before your current guide version: it keeps this one" : ""}
         </span>
+        {!item.preselected && detail.markets.some((other) => other.preselected) && <WhyAssessed />}
         {item.clock && (
           <span
             className={`uw-rw-clock tone-${item.clock.state === "OVERDUE" ? "critical" : item.clock.state === "DUE_SOON" ? "warning" : "neutral"}`}
@@ -432,7 +436,7 @@ function QuestionRow({
       {/* Not a disabled fieldset: the definition toggle stays usable when the answers are read-only. */}
       <fieldset className="ca-field">
         <legend>
-          <strong>{question.id}.</strong> {question.text}
+          <strong>{questionNumber(question.id)}.</strong> {question.text}
         </legend>
         <p className="uw-ma-clause">
           <span className="uw-basis-chip">{question.clause}</span> <BasisChips ids={question.basis} label="Basis" />
@@ -458,7 +462,11 @@ function QuestionRow({
         </p>
         <WhyAsked why={{ why: question.note || MARKET_QUESTION_WHY, basis: [] }} clause={question.clause} />
         <OwnText question={question} />
-        <div className="uw-ma-answers" role="radiogroup" aria-label={`Answer to ${question.id}`}>
+        <div
+          className="uw-ma-answers"
+          role="radiogroup"
+          aria-label={`Answer to question ${questionNumber(question.id)}`}
+        >
           {ANSWERS.map((answer) => (
             <label key={answer} className="ca-check">
               <input
@@ -642,7 +650,7 @@ export function TrainingPanel({
       <h3>
         <BookOpenCheck size={15} aria-hidden="true" />{" "}
         {required ? "Before you sign: practice training on" : "Training record on"}{" "}
-        {documents.map((document) => document.version).join(" and ")}
+        {documents.map((document) => versionWords(document.version)).join(" and ")}
       </h3>
       <p className="ac-muted">
         ISO 13485 clause 6.2: whoever signs is trained on the current version of what the signature relies on. {note}{" "}
@@ -654,7 +662,7 @@ export function TrainingPanel({
         {documents.map((document) => (
           <li key={document.code}>
             <span>
-              {document.title}, version {document.version}
+              {document.title}, {versionWords(document.version)}
               {document.state === "OUT_OF_DATE" ? ` (you hold version ${document.held_version}: out of date)` : ""}
             </span>
             <button type="button" className="ac-secondary" disabled={!!busy} onClick={() => void acknowledge(document)}>
@@ -715,8 +723,8 @@ export function SignedVersion({
         {version.report_type_label && <span className="uw-cr-meta">{version.report_type_label}</span>}
         {version.due_on && <span className="uw-cr-meta">Due {formatDay(version.due_on)}</span>}
         <span className="uw-cr-meta">
-          Signed by {version.signed_by} · {formatDate(version.signed_at)} · {version.question_set} ·{" "}
-          {version.scale_version}
+          Signed by {version.signed_by} · {formatDate(version.signed_at)} · guide {versionWords(version.question_set)} ·
+          scale {versionWords(version.scale_version)}
           {version.sample ? " · sample" : ""}
         </span>
         {version.override_reason && (
@@ -738,7 +746,8 @@ export function SignedVersion({
         <div className="ca-action-row">
           <button
             type="button"
-            className="ac-primary"
+            // On the new navigation the drawer's one main button is the complaint's next step (0.10.70).
+            className={workspace?.navigation === "new" ? "ac-secondary" : "ac-primary"}
             onClick={() => workspace?.open("Complaints", reportsTab(complaintId))}
             disabled={!workspace}
           >
@@ -802,6 +811,23 @@ export function OwnText({ question }: { question: Pick<Question, "explanation" |
  * The flagship story asks "in the US and India?": once the market shown is signed, India comes next when it is
  * enabled and not assessed yet. Outside that story the complaint's own next action leads.
  */
+/** Why a market other than the event's own is assessed (0.10.70; the flagship's India): one sentence, starter. */
+export const WHY_ASSESSED =
+  "Assessed because your procedure asks every market where this device is sold to be assessed.";
+
+export function WhyAssessed() {
+  return (
+    <p className="uw-cr-meta uw-why-assessed">
+      {WHY_ASSESSED} <em>Starter wording, for your consultant to confirm.</em>
+    </p>
+  );
+}
+
+/** Whether a receipt line is the conclusion of a market other than the event's own ("Market conclusion, India
+ * (CDSCO)" on a US complaint): the record names markets in words, so the line is read by its market's name. */
+export const otherMarketLine = (kind: string, own: string | null | undefined): boolean =>
+  kind.startsWith("Market conclusion, ") && !!own && !kind.includes(marketLabel(own));
+
 export function alsoIndia(
   story: string | null | undefined,
   shown: ReadonlyArray<Pick<MarketItem, "market" | "current">>,

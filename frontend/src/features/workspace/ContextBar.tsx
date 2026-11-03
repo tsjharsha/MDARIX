@@ -58,6 +58,10 @@ export function ContextBar() {
           disabled={!work.investigations.length}
         >
           {!work.investigations.length && <option value="">No investigations</option>}
+          {/* The investigation being opened, until its product's list is read (0.10.70: the first one showed). */}
+          {work.investigationId && !work.investigations.some((item) => String(item.id) === work.investigationId) && (
+            <option value={work.investigationId}>Opening the investigation…</option>
+          )}
           {work.investigations.map((item) => (
             <option key={String(item.id)} value={String(item.id ?? "")}>
               {displayId(item, "investigation_identifier", "Investigation")} ·{" "}

@@ -97,6 +97,16 @@ export function CaseSections({
       </Panel>
     );
   const id = work.investigationId;
+  // Opened a moment ago and not in the product's list yet: say so, never a header with no question, owner or due
+  // date (0.10.70).
+  if (!selected)
+    return (
+      <Panel title="Opening the investigation…">
+        <p className="ac-muted" role="status">
+          Reading its question, owner and due date.
+        </p>
+      </Panel>
+    );
   return (
     <div className="uw-case-sections">
       <CaseHeader
@@ -216,6 +226,7 @@ export function CaseSections({
             {scope.data?.current?.included_complaints?.length === 1 && (
               <ComplaintNextStep
                 complaintId={scope.data.current.included_complaints[0].id}
+                here="Decision"
                 refreshKey={String(scope.data.current.version)}
               />
             )}

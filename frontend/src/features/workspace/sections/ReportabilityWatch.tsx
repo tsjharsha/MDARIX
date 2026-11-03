@@ -31,7 +31,7 @@ import {
   type WatchShow,
 } from "../reportability";
 import { marketChip } from "../marketAssessment";
-import { StatusBadge, countOf } from "./common";
+import { AlsoKnownAs, StatusBadge, countOf } from "./common";
 import { ChipFilter, Hero, Pager, ProductFilter } from "./boardParts";
 import { MarketAssessmentDrawer } from "./MarketAssessment";
 import { BasisChips, BasisNote } from "../../shared/Basis";
@@ -228,10 +228,6 @@ export function WatchCard({
       <div className="uw-cr-body">
         <div className="uw-cr-head">
           <strong className="uw-cr-id">{name}</strong>
-          {/* The complaint's number in the source system, as on the second look (DEV-008). */}
-          {item.business_id && item.complaint_identifier && (
-            <span className="uw-cr-meta">Source ID {item.complaint_identifier}</span>
-          )}
           <span className="uw-cr-meta">
             {item.product_name ?? "No product"}
             {item.version ? ` · ${item.version}` : ""} · {item.country ?? "Country not recorded"}
@@ -278,6 +274,7 @@ export function WatchCard({
           </ul>
         )}
         {item.description && <p className="uw-cr-text uw-cr-clip-3">{item.description}</p>}
+        <AlsoKnownAs id={item.business_id} shown={name} />
         {item.case && (
           <p className="uw-cr-meta">
             In case {item.case.case.business_id ?? "—"}

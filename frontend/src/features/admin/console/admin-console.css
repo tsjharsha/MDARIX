@@ -599,6 +599,8 @@ button.ac-stat:hover {
   color: var(--ac-navy);
 }
 .ac-skeleton {
+  display: grid;
+  place-items: center;
   height: 140px;
   border-radius: var(--ms-radius-sm);
   background: linear-gradient(90deg, var(--ac-track), var(--ac-page), var(--ac-track));
@@ -2232,4 +2234,8 @@ button.ac-kpi:focus-visible {
   .ac-pulse-link {
     background: repeating-linear-gradient(90deg, var(--ac-axis) 0 6px, transparent 6px 10px);
   }
+}
+.ac-skeleton-text {
+  color: var(--ac-muted);
+  font-size: var(--ms-fs-14);
 }

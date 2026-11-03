@@ -38,12 +38,12 @@ def _assessment(market: str, version: int = 1, conclusion=None, harm_level=None,
 
 
 def test_a_met_trigger_allows_only_escalation_and_no_trigger_refuses_it():
-    assert "other branches are refused" in rules.branch_problem("SERVICE_LEVEL", True, [], None, "", "")
-    assert "other branches are refused" in rules.branch_problem("KNOWN_ISSUE", True, [CASE], CASE, "same lot", "")
+    assert "other branches are closed" in rules.branch_problem("SERVICE_LEVEL", True, [], None, "", "")
+    assert "other branches are closed" in rules.branch_problem("KNOWN_ISSUE", True, [CASE], CASE, "same lot", "")
     assert rules.branch_problem("ESCALATED_BY_TRIGGER", True, [], None, "Product investigation needed", "") is None
     assert "No escalation trigger" in rules.branch_problem("ESCALATED_BY_TRIGGER", False, [], None, "x" * 20, "")
     assert rules.branch_problem("SERVICE_LEVEL", False, [], None, "", "") is None
-    assert "open cases that match" in rules.branch_problem(
+    assert "open investigations that match" in rules.branch_problem(
         "KNOWN_ISSUE", False, [CASE], str(uuid.uuid4()), "x" * 20, ""
     )
     assert "why it is the same issue" in rules.branch_problem("KNOWN_ISSUE", False, [CASE], CASE, "short", "")
@@ -92,7 +92,7 @@ def test_each_answer_is_kept_with_its_rationale_and_refused_branches_say_so():
     }
     assert {escalated[key]["answer"] for key in ("KNOWN_ISSUE", "SERVICE_LEVEL", "CHOICE")} == {"REFUSED"}
     service = rules.answers_of("SERVICE_LEVEL", [], [], "", "")
-    assert service["KNOWN_ISSUE"]["answer"] == "NO" and "No open case" in service["KNOWN_ISSUE"]["rationale"]
+    assert service["KNOWN_ISSUE"]["answer"] == "NO" and "No open investigation" in service["KNOWN_ISSUE"]["rationale"]
     assert "CHOICE" not in service
     choice = rules.answers_of("ESCALATED_BY_CHOICE", [], [CASE], "Customer asks for an analysis", "Different lot")
     assert choice["KNOWN_ISSUE"]["rationale"] == "Different lot" and choice["CHOICE"]["answer"] == "YES"

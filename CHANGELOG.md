@@ -10,6 +10,159 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.70] - 2026-11-02
+
+On the trial maintenance line (`release/0.10`): "Polish before proof", the owner-approved round that fixes what stage 8
+left before stage 9 starts. It applies to both navigations unless it says "new navigation".
+
+No migration. The API and web images change. **Operators:** run `scripts/refresh_trial_story.py` (dry run first, then
+`--apply`) once after the upgrade: it signs SAMPLE-RV-09's ready to close again in running trials (below).
+
+### Fixed: the disposition's words and the escalation triggers (item 1)
+
+- The disposition says "investigation", one word per thing: "Why the investigation is needed", "Escalate: open an
+  investigation", "No open investigation holds…", "Known issue, linked to an open investigation". A branch closed by a
+  met trigger reads "Closed: a trigger is met" (it read "Refused").
+- A met trigger shows its name ("Reportable outcome", "New failure mode"), not its code (REPORTABLE,
+  NEW_FAILURE_MODE), on the disposition and its signed version. Readiness's dispositions check names them in words
+  ("Escalated: reportable outcome, new failure mode"). The triggers' facts and definitions say "investigation" and
+  "trend" ("Open trend … no open investigation covers it"); the recurrence trigger is "Recurrence no investigation
+  covers".
+- An escalated investigation's question reads "… Escalated from complaint SAMPLE-RV-11 by the triggers reportable
+  outcome, new failure mode." (it read "(escalated: trigger met: reportable outcome; new failure mode)").
+- The complaint page's next step for an escalated complaint is "Sign the investigation's decision" ("… on the case").
+
+### Changed: a problem code reads by its IMDRF term (item 2)
+
+- The IMDRF term is the label and the customer's own code the small detail: "Infusion or Flow Problem; Protective
+  Measures Problem · IMDRF A14, A16 · your code UNDER_INFUSION_NO_ALARM". The code is never altered or dropped; a code
+  with no approved IMDRF link shows as it is, "your code; no IMDRF term mapped yet". One component
+  (`sections/ProblemCode.tsx`) for the complaint list, the complaint page, the disposition, the second look, the
+  problem-code filter and the authorised-representative preview.
+
+### Fixed: one ID per complaint (item 3)
+
+- A drawer, a toast and a card name a complaint by one ID, its own reference ("SAMPLE-RV-11: assess per market"; it read
+  "CMP000038 (SAMPLE-RV-11)"); the MDARIX ID is under "Also known as" (the market assessment, the second look and the
+  reportability watch cards, which showed "CMP000029 · Source ID SAMPLE-RV-01"). A disposition opened by its address
+  names its complaint (it said "Complaint: disposition").
+
+### Fixed: a finished sample event asked for work (item 4)
+
+- **Root cause: the sample's seeding.** SAMPLE-RV-09's ready to close was signed "checklist clear" over an empty
+  checklist, although its decision is not in MDARIX, and dated before its own US conclusion. So the event asked "Sign
+  the disposition" and its checklist read as changed since signing. It is now signed as the product records it: with
+  its one open item and the reason ("Decided in our QMS: the investigation and its decision are recorded there (sample
+  QMS-INV-0909)"), the day after its US report was accepted.
+- **Next-step rule:** an event closed in the QMS after its ready to close was signed, whose checklist is as it was
+  signed, asks for no next step and has no current stage ("Closed in the QMS"); any change since signing asks again.
+  Its header reads "Nothing: 1 item was signed open, with a reason".
+- Every other sample record was checked: the closed-before-ready records (RV-01, RV-03 to RV-05 and the older closed
+  records) keep their open items, as the readiness story intends; the OrbitCare complaints in SAMPLE-INV-001's scope
+  asked "Sign the disposition" while their stage read "Investigation": their next step is now "Sign the investigation's
+  decision", on that investigation. RT-01 to RT-05 are open and unchanged; RT-03 is ready to sign.
+
+### Changed: one main button per drawer (item 5)
+
+- On the new navigation, a drawer that ends with the complaint's next step has that step as its one main button: the
+  market assessment's "Open the report worksheet" is secondary. When the next step is the drawer's own work (the
+  assessment, the disposition, the report, the investigation's decision), it says so ("…: here, above.") instead of a
+  second main button. On the investigation page, the progress line's "Next" is the main button; the state changes
+  ("Put on hold") and the sections' other buttons read as secondary. Classic keeps its buttons.
+
+### Fixed: the top bar on one line (item 6)
+
+- At a computer's width the name and the role sit on one line, the role shortened ("Asha Quality · Leader"), the
+  whole role in the tooltip; the "Sample data" chip and the trial badge no longer wrap. At 390 px the menu of stage 7
+  is unchanged.
+
+### Fixed: the story bar on another record (item 7)
+
+- The story bar counts a step only on the story's own record: the flagship's complaint and its escalated
+  investigation, SAMPLE-INV-001 for "Is a problem rising?". Elsewhere (SAMPLE-RV-06, INV000001 during the flagship) it
+  reads "Off the story's path" with **Back to the story**, on every screen. After ready to close is signed, the
+  receipt in History is still step 7.
+
+### Fixed: the flagship's investigation context (items 9 and 10)
+
+- Opening an investigation (a next step, a task, a link, the saved context) shows it on its own product version, the
+  one its complaints carry: the flagship's escalated investigation is PulseWatch 410 **Rev A** (it read Rev B, the
+  product's latest, on every route). The product's investigation list carries each investigation's version.
+- An investigation opened a moment ago that is not yet in the product's list is read again, never replaced by the
+  first in the list; meanwhile the page says "Opening the investigation…" (it showed a header with "No question
+  recorded", "No owner recorded" and "No due date", and the context bar the first investigation).
+- Wherever the India assessment of a US complaint appears (its market tab, the decision record), one sentence says
+  why: "Assessed because your procedure asks every market where this device is sold to be assessed." marked "Starter
+  wording, for your consultant to confirm." The complaint's Markets field stays United States.
+
+### Fixed: what the stage 8 screenshots showed (item 8)
+
+- **One word per thing:** "case" reads "investigation" and "signal" reads "trend" on the disposition and its board
+  ("Open, in no investigation"; the tile "Escalated to an investigation"), the complaint page's step ("Escalated to an
+  investigation: its decision is not signed"), the investigation's evidence count, documents line, decision note and
+  Unknowns note, the lot impact suggestion ("2 of the investigation's 2 lots share it"), Readiness ("Trends waiting
+  past their triage date"; "open in no trend or investigation"; "decided trends"; "in no investigation"; "escalations
+  to an investigation") and the trend check's footnote.
+- **No codes:** the market assessment numbers its questions "1.", "2a." (it read "US1.", "US2A."), names versions in
+  words ("guide your version 2 · scale MDARIX starter, version 1"; it read "US-v2 · scale-starter-1"), also in its
+  training heading and its sign hints ("Answer question 5"); the investigation's history names record kinds in words
+  ("Investigation scope", "Decision brief version", "Workflow task"; they read "Investigationscope").
+- **Doubled words and brackets:** a role after a name never nests brackets ("Asha Quality (Leader, Quality
+  Manager)"); "All 1 piece of evidence are reviewed" reads "The piece of evidence is reviewed" (and the hypothesis);
+  a worksheet value's source reads "From an initial report" ("From An …").
+- **What is open, in words:** the complaint page's "Needs attention" says what is missing ("3 open: On the triage
+  list: its triage record is not complete"; it read "3 open: Triage is complete"). The stage line shows
+  "Investigation" as later, not "not needed", until the decision says whether one is needed (it read "Investigation:
+  not needed" on a serious injury before any disposition).
+- **Never claims more than it has read:** the investigation's progress line says "Reading where this investigation
+  stands…" until its steps are read (it read "Every step is done: the decision is signed" on an investigation opened
+  a moment ago); a loading panel says "Reading…" (it was an empty grey box: the decision panels load as they scroll
+  into view; their data is there within a second).
+- **One main button** (see item 5): also a disposition or an assessment not signed yet keeps its own Sign as the main
+  button, with the next step secondary; the report's optional "Complete the obligation" and the complaint page's
+  "Sign ready to close" header button are secondary where the form's own button is on screen.
+
+### Sample numbers and labels that change
+
+No deadline, trend figure, signal or record count changes.
+
+| Where | Before | After |
+|---|---|---|
+| Disposition, question 1 | Why the case is needed | Why the investigation is needed |
+| Disposition, trigger chips | REPORTABLE, NEW_FAILURE_MODE | Reportable outcome, New failure mode |
+| Disposition, branches closed by a trigger | Refused: a trigger is met | Closed: a trigger is met |
+| Disposition, other words | open a case; no open case holds…; linked to an open case; Link to the open case | open an investigation; no open investigation holds…; linked to an open investigation; Link to the open investigation |
+| Trigger facts and definitions | Open signal … no open case covers it | Open trend … no open investigation covers it |
+| Recurrence trigger | Recurrence no case covers | Recurrence no investigation covers |
+| Escalated investigation's question | … (escalated: trigger met: reportable outcome; new failure mode). | … by the triggers reportable outcome, new failure mode. |
+| Complaint page, escalated complaint's step | Sign the investigation decision on the case | Sign the investigation's decision |
+| SAMPLE-RV-09 | next "Sign the disposition", stage Decision, "1 open: The decision is signed", signed Sep 22 "checklist clear" | no next step, stage "Closed in the QMS", "Nothing: 1 item was signed open, with a reason", signed Oct 21 (the day after its report's acceptance) "signed with items still open" with its reason |
+| SAMPLE-ORBIT-300-CMP-005 to -018 (in SAMPLE-INV-001) | Sign the disposition | Sign the investigation's decision |
+| Stage line before a decision (RV-06, RV-11 and others) | Investigation: not needed | Investigation (later) |
+| Problem codes | UNDER_INFUSION_NO_ALARM · IMDRF A14 …; Problem code: SPO2_DROPOUT_HARM | Infusion or Flow Problem; Protective Measures Problem · IMDRF A14, A16 · your code UNDER_INFUSION_NO_ALARM; Problem: SPO2_DROPOUT_HARM · your code; no IMDRF term mapped yet |
+| Assessment drawer title | CMP000038 (SAMPLE-RV-11): assess per market | SAMPLE-RV-11: assess per market (Also known as CMP000038) |
+| Second look and watch cards | CMP000029 · Source ID SAMPLE-RV-01 | SAMPLE-RV-01 (Also known as CMP000029) |
+| Readiness labels | Signals waiting past their triage date; open in no signal or case; decided signals … with no signal; in no case; escalations to a case; no open case covers | Trends waiting past their triage date; open in no trend or investigation; decided trends … with no trend to review; in no investigation; escalations to an investigation; no open investigation covers |
+| Lot impact suggestion | 2 of the case's 2 lots share it | 2 of the investigation's 2 lots share it |
+| Top bar | Asha Quality / Leader (Quality Manager) on 4 lines | Asha Quality · Leader, one line |
+
+Every Readiness value, Oversight count (items, overdue, due soon), the bell and My work are the same on a fresh
+trial before and after (measured on both builds).
+
+### Tests
+
+- pytest: `tests/test_polish_0_10_70.py` (new, 7: the triggers in words, the disposition's words, a new failure
+  mode's fact, history kinds, the second look's problem-code value, the stage line, a finished event);
+  `tests/test_flagship_walkthrough.py` (+2 tests and new checks: RV-09 finished and its re-record by the refresh, an
+  OrbitCare complaint decided in its investigation, the escalated investigation's question, owner, due date and Rev A
+  in the product's list, Markets stays US, Readiness in words). Updated wording: `test_complaint_disposition_rules.py`,
+  `test_complaint_disposition_api.py`, `test_lot_impact_api.py`, `test_sample_story_days.py` (the stage is "later").
+- vitest: `polish070.test.tsx` and `nextStepButtons.test.tsx` (new); updated `disposition.test.tsx`,
+  `marketAssessment.test.tsx`, `complaints.test.tsx`, `complaintReview.test.ts`, `entrance.test.tsx`,
+  `ImportReports.test.tsx`, `labels.test.ts`, `lotImpact.test.tsx`.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.70-review` (`new/`, `classic/`, `walkthrough/`), and every
+  route into the flagship's investigation (`routes-before/` on 0.10.69, `routes-after/`).
+
 ## [0.10.69] - 2026-11-02
 
 On the trial maintenance line (`release/0.10`): stage 8 of the quality plan, "The investigation in 4 sections, the

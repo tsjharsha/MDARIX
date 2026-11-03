@@ -14,7 +14,7 @@ import {
   type Column,
 } from "../../customer-admin/shared";
 import { safeText } from "../../../app/displayId";
-import { roleLabel } from "../../../app/roles";
+import { roleNote } from "../../../app/roles";
 import { usePanelFlag, usePanelState, useWorkspace } from "../workspaceContext";
 import {
   EMPTY_INVENTORY_FILTER,
@@ -107,7 +107,7 @@ export function CaseEvidencePanel({ investigationId, caseLabel }: { investigatio
         }
       >
         <p className="ac-note">
-          {total} {total === 1 ? "record" : "records"} in this case. {QUALITY_VS_RELATIONSHIP}
+          {total} {total === 1 ? "record" : "records"} in this investigation. {QUALITY_VS_RELATIONSHIP}
         </p>
         <div className="uw-evidence-chips">
           <div className="ca-chips" role="group" aria-label="Filter by review status">
@@ -760,7 +760,7 @@ function ProvenanceDrawer({
                     <strong>{reviewEventText(event)}</strong>
                     <small className="ac-muted">
                       {safeText(event.actor_name) ?? "MDARIX"}
-                      {event.actor_role ? ` (${roleLabel(event.actor_role)})` : ""} · {formatDate(event.created_at)}
+                      {event.actor_role ? roleNote(event.actor_role) : ""} · {formatDate(event.created_at)}
                     </small>
                     {safeText(event.reason) && <p>{event.reason}</p>}
                   </li>

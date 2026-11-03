@@ -4,7 +4,7 @@ import { AI_TIMEOUT_MS, ApiError, postJson } from "../../../app/apiClient";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { safeText } from "../../../app/displayId";
-import { roleLabel } from "../../../app/roles";
+import { roleNote } from "../../../app/roles";
 import { AiInterpretationNote, StatementKind } from "../../shared/StatementKind";
 import { useCanRunAi, usePanelFlag, useWorkspace } from "../workspaceContext";
 import {
@@ -942,7 +942,7 @@ function QualityReviewPanel({
               <small className="ac-muted">
                 {" "}
                 · {safeText(item.actor_name) ?? "—"}
-                {item.actor_role ? ` (${roleLabel(item.actor_role)})` : ""}
+                {item.actor_role ? roleNote(item.actor_role) : ""}
                 {item.created_at ? ` · ${formatDate(item.created_at)}` : ""}
               </small>
               {safeText(item.comment) && <p className="uw-intel-statement">{item.comment}</p>}

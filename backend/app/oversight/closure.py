@@ -229,6 +229,10 @@ def facts(
     }
 
 
+def _open(case) -> bool:
+    return str(case.status or "open").lower() not in CLOSED_STATUSES
+
+
 def _signed_decision(row) -> bool:
     from backend.app.case_workflow.readiness import SIGNED_DECISION_STATUSES
     from backend.app.human_decision.rules import SIGNED
@@ -353,18 +357,23 @@ def checklist(found: dict) -> list[dict]:
         branch = "service-level resolution" if disposition.branch == "SERVICE_LEVEL" else "known issue"
         items.append(_check("DECISION", "The decision is signed", PASS, f"The disposition is signed as a {branch}"))
     else:
-        if escalated:
-            actions["DECISION"] = "Sign the investigation decision on the case"
+        # A complaint in an investigation's scope is decided there (0.10.70: it asked "Sign the disposition" while its
+        # stage read "Investigation").
+        in_case = escalated or (disposition is None and any(_open(case) for case in found["cases"]))
+        if in_case:
+            actions["DECISION"] = "Sign the investigation's decision"
         items.append(
             _check(
                 "DECISION",
                 "The decision is signed",
                 BLOCKED,
-                "Escalated to a case: its investigation decision is not signed"
+                "Escalated to an investigation: its decision is not signed"
                 if escalated
+                else "In an investigation: its decision is not signed"
+                if in_case
                 else "No disposition or investigation decision is signed",
                 _case_decision(found, disposition)
-                if escalated
+                if in_case
                 else links.target("Complaints", "Dispositions", record=("disposition", complaint.id)),
             )
         )
@@ -417,7 +426,14 @@ def checklist(found: dict) -> list[dict]:
 def _case_decision(found: dict, disposition) -> dict:
     """An escalated complaint's decision opens on its investigation's decision, not on the list of investigations
     (stage 8: the walk-through's next step needs no search)."""
-    case = next((row for row in found["cases"] if row.id == disposition.investigation_id), None)
+    case = next(
+        (
+            row
+            for row in found["cases"]
+            if (row.id == disposition.investigation_id if disposition is not None else _open(row))
+        ),
+        None,
+    )
     return (
         links.target("Investigations", "Decision", record=("case", case.id)) if case else links.target("Investigations")
     )
@@ -429,6 +445,18 @@ def fingerprint(complaint_id, items: list[dict]) -> str:
         "checks": [{key: item[key] for key in ("code", "result", "detail")} for item in items],
     }
     return hashlib.sha256(json.dumps(content, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def settled(complaint, items: list[dict], row: EventClosure | None) -> bool:
+    """A finished event (0.10.70): closed in the QMS after its ready to close was signed, and its checklist is as it was
+    signed. Any item still open was signed with its reason, so the event asks for no next step and no stage is current;
+    a change since signing (a new trigger, a report) asks again."""
+    return (
+        str(complaint.status or "").lower() in CLOSED_STATUSES
+        and row is not None
+        and row.ready_state is not None
+        and row.content_fingerprint == fingerprint(complaint.id, items)
+    )
 
 
 def stage_line(found: dict, items: list[dict], row: EventClosure | None) -> list[dict]:
@@ -454,18 +482,28 @@ def stage_line(found: dict, items: list[dict], row: EventClosure | None) -> list
         "READY": ready,
         "CLOSED": closed,
     }
+    # Without an investigation, whether one is needed is known only once the decision is signed (0.10.70: it read
+    # "Investigation: not needed" before any disposition, a serious injury included).
+    undecided = not found["cases"] and not done("DECISION")
     skipped = {
         "TRIAGE": not needed("TRIAGE", "FIRST_CONTACT"),
         "MARKETS": not needed("MARKETS", "OBLIGATIONS"),
-        "INVESTIGATION": not found["cases"],
+        "INVESTIGATION": not found["cases"] and not undecided,
         "DECISION": not needed("DECISION"),
     }
-    first_open = next((code for code, _ in STAGES if not state[code] and not skipped.get(code)), None)
+    later = {"INVESTIGATION"} if undecided else set()
+    first_open = (
+        None
+        if settled(complaint, items, row)
+        else next((code for code, _ in STAGES if not state[code] and not skipped.get(code) and code not in later), None)
+    )
     return [
         {
             "code": code,
             "label": label,
-            "state": "NOT_NEEDED"
+            "state": "LATER"
+            if code in later
+            else "NOT_NEEDED"
             if skipped.get(code)
             else "DONE"
             if state[code]

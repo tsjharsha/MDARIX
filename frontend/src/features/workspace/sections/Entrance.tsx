@@ -1,7 +1,10 @@
 import { useEffect } from "react";
 import { ArrowLeft, ChevronRight, Clock, FileSpreadsheet, Inbox, LineChart, Scale, X } from "lucide-react";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
-import { SCENARIOS, markEntranceSeen, storyStep, type Scenario } from "../entrance";
+import { SCENARIOS, markEntranceSeen, onStoryRecord, storyStep, type Scenario, type StoryIds } from "../entrance";
+import { useResource } from "../../customer-admin/shared";
+import { eventPath, type EventView } from "../oversight";
+import { dispositionPath } from "../disposition";
 import { ReadinessNumbers } from "./MyWork";
 import { RestartSamplePanel } from "./RemoveSample";
 
@@ -67,21 +70,65 @@ export function Entrance({ onRestarted }: { onRestarted: (text: string) => void 
   );
 }
 
-/** The story bar (8.4): which story, which step, and the way back to the entrance. */
+/**
+ * The story's records as the server knows them (0.10.70): the complaint's id, and the investigation its disposition
+ * opened (the flagship) or the one it names (SAMPLE-INV-001). Read again when the screen changes, since the flagship's
+ * investigation opens during the story.
+ */
+function useStoryIds(scenario: Scenario | undefined, section: string): StoryIds {
+  const ref = scenario?.record?.complaint ?? null;
+  const named = scenario?.record?.investigation;
+  const event = useResource<EventView>(ref ? eventPath(ref) : null);
+  const complaintId = event.data?.event?.complaint_id ?? null;
+  const disposition = useResource<{ current: { investigation_id?: string | null } | null }>(
+    complaintId && named === "escalated" ? dispositionPath(complaintId) : null,
+  );
+  const resolved = useResource<{ investigation_id: string }>(
+    named && named !== "escalated"
+      ? `/api/v1/workspace/context/resolve?investigation=${encodeURIComponent(named)}`
+      : null,
+  );
+  useEffect(() => {
+    if (section === "Investigations" && named === "escalated" && complaintId) disposition.reload();
+  }, [section, complaintId]);
+  return {
+    complaintId: event.data ? complaintId : undefined,
+    caseId:
+      named === "escalated"
+        ? disposition.data
+          ? (disposition.data.current?.investigation_id ?? null)
+          : undefined
+        : resolved.data?.investigation_id,
+  };
+}
+
+/** The story bar (8.4): which story, which step, and the way back to the entrance; off the story's record, the way
+ * back to the story (0.10.70: it kept counting steps on another complaint). */
 export function StoryBar({ section, tab }: { section: string; tab?: string }) {
-  const { story, startStory, open } = useWorkspace();
+  const { story, startStory, open, work } = useWorkspace();
   const scenario = SCENARIOS.find((item) => item.key === story);
+  const ids = useStoryIds(scenario, section);
   if (!scenario || section === "Getting started") return null;
-  const step = storyStep(scenario, { section, tab });
+  const place = { section, tab };
+  const step = onStoryRecord(scenario, place, ids, work?.investigationId) ? storyStep(scenario, place) : -1;
   return (
     <nav className="uw-story-bar" aria-label="Your story">
       <span className="uw-story-title">{scenario.title}</span>
       <span className="uw-story-step" aria-live="polite">
         {step >= 0
           ? `Step ${step + 1} of ${scenario.steps.length}: ${scenario.steps[step].label}`
-          : "Off the story's path: its next step is on the record's page"}
+          : "Off the story's path"}
       </span>
       <span className="uw-story-actions">
+        {step < 0 && (
+          <button
+            type="button"
+            className="ac-link"
+            onClick={() => open(scenario.start.section as WorkspaceSection, scenario.start.tab)}
+          >
+            <ArrowLeft size={14} aria-hidden="true" /> Back to the story
+          </button>
+        )}
         <button type="button" className="ac-link" onClick={() => open("Getting started")}>
           <ArrowLeft size={14} aria-hidden="true" /> Back to the stories
         </button>

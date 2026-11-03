@@ -147,10 +147,39 @@ def _tasks_due_later(db: Session, tenant_id, now: datetime) -> int:
     return moved
 
 
+# RV-09's ready to close, as the sample author signed it (0.10.70): with the checklist as it stood, so its fingerprint
+# is the real one and the finished event asks for nothing. Before 0.10.70 it was signed "checklist clear" over an empty
+# checklist although its decision is not in MDARIX, so the event asked "Sign the disposition" and read "changed since
+# signed". The decision is the QMS's: the sample author gives that as the reason.
+RV09_REASON = "Decided in our QMS: the investigation and its decision are recorded there (sample QMS-INV-0909)."
+
+
+def _rv09_signed_at(complaint, now: datetime) -> datetime:
+    """The day after its US report was accepted (sample_reports.py: submitted on day 27 after awareness)."""
+    aware = complaint.awareness_timestamp or now
+    return min(aware + timedelta(days=28), now - timedelta(hours=1))
+
+
+def _rv09_record(db: Session, tenant_id, complaint, row, record) -> None:
+    """Record RV-09's checklist as it stands on ``row`` and its signed record: state, reason, fingerprint, meaning."""
+    from backend.app.human_decision.rules import signature_hash
+    from backend.app.oversight import closure
+
+    items = closure.checklist(closure.facts(db, tenant_id, complaint))
+    blocked = [item for item in items if item["result"] == closure.BLOCKED]
+    print_ = closure.fingerprint(complaint.id, items)
+    record.remarks = (RV09_REASON if blocked else "Checklist clear")[:500]
+    record.signature_meaning = closure.signature_meaning(complaint.complaint_identifier, 1, len(blocked))
+    record.content_fingerprint = print_
+    record.signature_hash = signature_hash(print_, record.signer_user_id, "v1")
+    row.ready_state = "READY_WITH_REASON" if blocked else "READY"
+    row.ready_reason = RV09_REASON if blocked else None
+    row.checklist, row.content_fingerprint = [], print_
+
+
 def _rv09_closed_ready(db: Session, tenant_id, now: datetime) -> int:
     from backend.app.db.models.foundation import SignedApprovalRecord
     from backend.app.db.models.oversight import EventClosure
-    from backend.app.human_decision.rules import signature_hash
     from backend.app.oversight import closure
     from backend.app.trial.sample_decision import SAMPLE_AUTHOR_ROLE, sample_author
 
@@ -158,8 +187,7 @@ def _rv09_closed_ready(db: Session, tenant_id, now: datetime) -> int:
     if complaint is None:
         return 0
     author = str(sample_author(db, tenant_id, now).id)
-    # Signed ready to close the day before it was closed (its report is the finished US example, sample_reports.py).
-    signed = (complaint.updated_at or now) - timedelta(days=1)
+    signed = _rv09_signed_at(complaint, now)
     row = EventClosure(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
@@ -173,7 +201,6 @@ def _rv09_closed_ready(db: Session, tenant_id, now: datetime) -> int:
     )
     db.add(row)
     db.flush()
-    print_ = closure.fingerprint(complaint.id, [])
     record = SignedApprovalRecord(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
@@ -182,19 +209,50 @@ def _rv09_closed_ready(db: Session, tenant_id, now: datetime) -> int:
         object_version="v1",
         decision_type=closure.DECISION_TYPE,
         decision="APPROVED",
-        remarks="Sample: a finished example signed by the MDARIX sample author",
         signer_user_id=author,
         signer_role=SAMPLE_AUTHOR_ROLE,
-        signature_meaning=closure.signature_meaning(complaint.complaint_identifier, 1, 0),
-        content_fingerprint=print_,
-        signature_hash=signature_hash(print_, author, "v1"),
         status="SIGNED",
         signed_at=signed,
         created_at=signed,
     )
+    _rv09_record(db, tenant_id, complaint, row, record)
     db.add(record)
-    row.ready_state, row.checklist, row.content_fingerprint = "READY", [], print_
     row.signed_record_id, row.signed_by, row.signed_at = record.id, author, signed
     row.qms_filing_ref, row.filed_by, row.filed_at = "QMS-CLOSE-SAMPLE-09 (Sample)", author, signed
     db.flush()
+    return 1
+
+
+def rerecord_rv09(db: Session, tenant_id, apply: bool = False, now: datetime | None = None) -> int:
+    """A running trial's RV-09 signed before 0.10.70 (over an empty checklist): signed again as above, the day after its
+    US report was accepted (it was dated before its own conclusion), by the same sample author (scripts/refresh_trial_story.py). 1 when it needs it (done when ``apply``), else 0.
+    Idempotent: once recorded, its fingerprint is no longer the empty checklist's."""
+    from backend.app.db.models.foundation import SignedApprovalRecord
+    from backend.app.db.models.oversight import EventClosure
+    from backend.app.oversight import closure
+
+    complaint = _rv09(db, tenant_id)
+    if complaint is None:
+        return 0
+    row = (
+        db.query(EventClosure)
+        .filter(
+            EventClosure.tenant_id == tenant_id,
+            EventClosure.complaint_id == complaint.id,
+            EventClosure.source_system == SAMPLE_SOURCE,
+            EventClosure.version == 1,
+        )
+        .first()
+    )
+    if row is None or row.content_fingerprint != closure.fingerprint(complaint.id, []):
+        return 0
+    if apply:
+        record = db.get(SignedApprovalRecord, row.signed_record_id) if row.signed_record_id else None
+        if record is None:
+            return 0
+        _rv09_record(db, tenant_id, complaint, row, record)
+        signed = _rv09_signed_at(complaint, now or datetime.now(timezone.utc))
+        row.owner_set_at = row.signed_at = row.filed_at = row.updated_at = signed
+        record.signed_at = record.created_at = signed
+        db.flush()
     return 1
