@@ -3,7 +3,14 @@ import { Check, ChevronRight } from "lucide-react";
 import { useResource } from "../../customer-admin/shared";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { IMPORTED_SOURCE } from "../complaintList";
-import { TREND_RESULT, trendPath, type TrendBoard, type TrendItem } from "../signalAi";
+import {
+  chanceText,
+  trendCountText,
+  trendPath,
+  trendResultLabel,
+  type TrendBoard,
+  type TrendItem,
+} from "../signalAi";
 import {
   STORY_STEPS,
   openStep,
@@ -204,15 +211,20 @@ function StepPreview({ run, index, trends }: { run: StoryRun; index: number; tre
 export function TrendBars({ row, bare = false }: { row: TrendItem; bare?: boolean }) {
   const top = Math.max(row.recent, row.expected, 0.01);
   const rising = row.result === "SIGNIFICANT" || row.result === "ELEVATED";
-  const ratio = typeof row.ratio === "number" ? ` · ${row.ratio.toFixed(1)}×` : "";
   return (
     <div className="uw-os-trend">
       {!bare && (
-        <b>
-          {row.name}
-          {/* The trend check's own verdict: never "in line" for a group too small to assess. */}
-          {rising ? ratio : `: ${(TREND_RESULT[row.result]?.label ?? "not rising").toLowerCase()}`}
-        </b>
+        <>
+          {/* The trend check's own verdict, words and numbers as Trends shows them (0.10.84, M3): a count above the
+              expected one that chance explains says so, never "in line" beside it alone. */}
+          <b>
+            {row.name}: {trendResultLabel(row).toLowerCase()}
+          </b>
+          <small className="ac-muted">
+            {trendCountText(row)} · {chanceText(row)}
+            {!rising && row.recent > row.expected && row.result === "STEADY" ? ": within chance, not a rise" : ""}
+          </small>
+        </>
       )}
       <div className="uw-bars">
         {[
@@ -227,7 +239,7 @@ export function TrendBars({ row, bare = false }: { row: TrendItem; bare?: boolea
                 style={{ width: `${Math.max(3, Math.round(((value as number) / top) * 100))}%` }}
               />
             </span>
-            <b className="uw-num">{Number((value as number).toFixed(2))}</b>
+            <b className="uw-num">{label === "Expected" ? (value as number).toFixed(1) : value}</b>
           </div>
         ))}
       </div>

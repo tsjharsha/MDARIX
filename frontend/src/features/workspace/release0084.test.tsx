@@ -7,6 +7,8 @@ import { legalClocks } from "./home";
 import type { OversightItem } from "./oversight";
 import { OVERSIGHT } from "./oversight";
 import { HomeSection, HomeStory } from "./sections/Home";
+import { TrendBars } from "./sections/OneStory";
+import type { TrendItem } from "./signalAi";
 import { ComplaintPage, clockPrefix } from "./sections/ComplaintPage";
 import { ONE_STORY_PATH, type StoryRun } from "./oneStory";
 import { eventPath } from "./oversight";
@@ -185,5 +187,29 @@ describe("M2: a complaint waiting for its country never says 'No market to asses
     const html = render(<ComplaintPage tab="Summary?ref=FIC-2001" />);
     expect(html).not.toContain("No market to assess");
     expect(html).toContain("Waits for the incident country, asked above");
+  });
+});
+
+describe("M3: the finale says the trend check's own verdict, with its own numbers", () => {
+  const pulse = {
+    key: "pulse",
+    name: "PulseWatch 410 Rev A",
+    product: { id: "p", business_id: null, name: "PulseWatch 410" },
+    recent: 3,
+    expected: 0.99,
+    ratio: 3.03,
+    p_value: 0.0757,
+    p_adjusted: 0.0757,
+    groups_tested: 1,
+    result: "STEADY",
+  } as unknown as TrendItem;
+
+  it("never sets 'in line' beside 3 observed against 0.99 expected without saying why", () => {
+    const html = renderToStaticMarkup(<TrendBars row={pulse} />);
+    expect(html).toContain("PulseWatch 410 Rev A: in line with history");
+    expect(html).toContain("3 against 1.0 expected (3.0× expected) · p 0.076: within chance, not a rise");
+    // The bars carry the trend check's numbers: 1.0 expected, as Trends shows it, not 0.99.
+    expect(html).toContain(">1.0<");
+    expect(html).not.toContain("0.99");
   });
 });

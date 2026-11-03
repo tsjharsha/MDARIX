@@ -120,7 +120,7 @@ describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
       trend("PulseWatch 410 Rev A", "pulse", 1, 1.2, "STEADY"),
     ]);
     expect(html.indexOf("PulseWatch 410 Rev A")).toBeLessThan(html.lastIndexOf("OrbitCare 300 Rev B"));
-    expect(html).toContain("OrbitCare 300 Rev B · 9.3×");
+    expect(html).toContain("OrbitCare 300 Rev B: significant rise");
     expect(html).toContain("Open the OrbitCare 300 trend");
     // A group too small to assess says so, never "in line" (3 observed against 0.99 expected).
     const few = view({ sample: runAt("sample", 9), yours: null }, {}, [
