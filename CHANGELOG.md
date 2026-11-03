@@ -10,6 +10,81 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.80] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): a trial's own data on the new navigation (owner request, 3 November
+2026). No migration. The API and web images change. No operator step: `scripts/refresh_trial_story.py` has nothing new
+to do (the sample does not change).
+
+### Changed (trials on the new navigation; the classic navigation and pilots are unchanged)
+
+- **Getting started is a tab, the first one, left of Home**, for every persona in a trial (it holds the guide and the
+  stories). A pilot's tab bar has no Getting started.
+- **The import leaves Getting started.** Its "Your data" tab is gone on the new navigation; the rest of Getting started
+  (the sample event, the stories, the ten chapters, About the sample data, Your trial) stays.
+- **Import your data is its own page, `/app/import`** (in the link table, as Decision trees and Reports are). The top
+  bar's Import your data button, its avatar-menu item at narrow widths, the Complaints header's button and Help › Try
+  your own data open it. Old links to Getting started › Your data (a data-quality report's `?report=` too) land on it;
+  on the classic navigation `/app/import` opens Getting started › Your data, as before. The page holds the same upload,
+  each import's data-quality report and what the data shows (Automatic insights). Once the organization's complaints
+  are in, one main button, **See your complaints**, opens Complaints › All complaints on your data. Removing the sample
+  is offered on the page, folded and optional, with its existing confirmation (the trial owner only).
+- **A sample-only trial and a person who may not change records** see no Import button and no Help › Try your own
+  data. Opening `/app/import` says plainly "This evaluation uses the sample only" (with Discuss a pilot) or "Import is
+  not available to you"; the server refuses their imports as before.
+- **The top bar's data, read from the server** (`/api/v1/trial/status`, read again after an import or the sample's
+  removal): the sample alone shows the **Sample data** label and Import your data, as before; the sample and imported
+  complaints together show a small choice, **Sample data · Your data**, the sample by default; once the sample is
+  removed, neither (until now the label read "Practice records" then, and kept "Sample data" until a reload). At 1100 px
+  and narrower the choice is in the avatar menu, as Import your data is.
+- **The choice decides which data these show:** every complaint list and list view (Complaints, the All complaints
+  filters: the Data filter steps aside while the top bar chooses), Trends › Trends to review, and Automatic insights on
+  the Import page. Changing it opens the screen again on the chosen data. It is remembered per person and organization
+  in this browser (a view, not a record).
+- `GET /api/v1/trial/insights?source=MDARIX_SAMPLE|TRIAL_UPLOAD`: the insights of that data. Without it (or with any
+  other value) the insights read as before: the imported data, else the sample. No new route.
+
+### Not reached by the choice yet
+
+Home's counts and next actions, Trends › Trend check, Over time and By resolution, Investigations, Decision trees,
+Reports and Records, the Complaints work queues with their own screens (To triage, Calls to check, Due soon, Past
+target, Second look, Dismissed, Reporting, Authority reports, Communications), the complaint page, and the top bar's
+search. Each shows both datasets, as before.
+
+### Sample numbers and labels that change
+
+No sample record, deadline, signal, trend figure, Readiness value or count changes.
+
+| Where | Before | After |
+|---|---|---|
+| Top bar (new navigation), sample removed | "Practice records" | no label |
+| Top bar (new navigation), sample and imported complaints | "Sample data" | "Sample data · Your data" (Sample data chosen) |
+| Tab bar (new navigation, trial) | Home first | Getting started, then Home |
+| Getting started tabs (new navigation) | Your data, About the sample data, Your trial | About the sample data, Your trial |
+| Getting started's fold (new navigation) | "Explore all capabilities: the ten chapters, your own data and your trial" | "… the ten chapters, the sample data and your trial" |
+| The own-data chapter's data line (new navigation) | "…, under Your data below." | "…, on Import your data." |
+
+### Tests
+
+- pytest `tests/test_release_0_10_80.py` (new, 2): the insights read the chosen data and, without a choice, as before;
+  the route's parameter is bounded.
+- vitest `release0080.test.tsx` (new, 11): Getting started first in a trial's bar, never a pilot's; Getting started
+  without the upload (new) and with it (classic); `/app/import`, the old links and every way in; the page's upload,
+  reports, insights, its one main button and the folded removal; the bar's label, choice or nothing from the server's
+  counts; the choice in the avatar menu, remembered per person; the complaint lists, list views, Trends to review and
+  insights follow it; sample-only and no-rights people get the plain message and no Help item. Updated:
+  `importOwnData.test.tsx` (the button opens the new page), `releaseC1073.test.tsx` (Getting started before the
+  personas' tabs).
+- Targeted pytest (this release, free trial, trial insights and status reads, business permissions, link targets,
+  alembic drift policy, the migration chain, 0.10.79, import signals after the response): 77 passed. vitest: every
+  file that renders the shell, Getting started, the complaint list, the signal inbox, Help or the link table, plus the
+  import, insights and sample-removal files (38 files): 260 passed. tsc, ruff and prettier clean.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.80-review` (`owner/`: the tab bar, Getting started without the
+  import, the Import page before and after uploading six fictional complaints, an old Your data link landing there, See
+  your complaints; `both/`: Sample data · Your data in both states, Complaints, Trends to review and the insights on
+  your data, the avatar menu at 390; `removed/`: the bar after the sample is removed; `regulatory/`: a locked
+  Regulatory Leader, "Import is not available to you"; `classic/`: unchanged).
+
 ## [0.10.79] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): small owner-approved follow-ups to Release C. No migration. The API and
