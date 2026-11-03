@@ -11,7 +11,7 @@ import type { ImportRun } from "./sections/ImportReports";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import type { TrendItem } from "./signalAi";
 
-const LABELS = ["The call", "Triage", "Tree", "Reportable?", "Form", "Fill", "Approval", "Submit", "Records", "Trends"];
+const LABELS = ["The call", "Triage", "Tree", "Decide", "Form", "Fill", "Approval", "Submit", "Records", "Trends"];
 export const runAt = (run: "sample" | "yours", current: number, extra: Partial<StoryRun> = {}): StoryRun => ({
   run,
   complaint: {
@@ -76,8 +76,8 @@ describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
     expect(html).toContain("Step 3 of 10 · SAMPLE-RV-11");
     expect(html.match(/ac-primary/g)).toHaveLength(1);
     expect(html).toContain("Open the decision tree");
-    // One-word labels on the rail.
-    for (const label of LABELS) expect(html).toContain(`>${label.replace("?", "?")}<`);
+    // One-word labels on the rail, so none wraps or is cut.
+    for (const label of LABELS) expect(label.split(" ").length <= 2 && html.includes(`>${label}<`)).toBe(true);
   });
 
   it("after the sample's tenth step offers the same ten steps on your data", () => {

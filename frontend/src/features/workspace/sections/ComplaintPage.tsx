@@ -29,6 +29,7 @@ import { COMPLAINT_STEP_WHY } from "../whyAsked";
 import { ServiceWork, serviceText } from "./ServiceWork";
 import { ShortStoryPanel, useShortStory } from "./ShortStory";
 import { InlineTriage } from "./Triage";
+import { TRIAGE, type TriageList } from "../intake";
 import { treePlace } from "./DecisionTrees";
 import { FLAGSHIP } from "../entrance";
 import { requestJson } from "../../../app/apiClient";
@@ -141,6 +142,9 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   const [shown, setShown] = useState<EventView | null>(null);
   const view = shown ?? resource.data;
   const storyRun = runOf(oneStory.data, view?.event.ref);
+  // An urgent call that is not a complaint yet has no complaint page: it is found on the triage list (U-20).
+  const calls = useResource<TriageList>(resource.state === "error" ? TRIAGE : null);
+  const call = calls.data?.items.find((item) => item.kind === "INTAKE" && item.ref === ref);
   const [active, setActive] = useState<ComplaintSection>(() => sectionOf(tab));
   // Ready to close is shown when it is the next step or signed; before that it is revealed on request (one main button).
   const [readyShown, setReadyShown] = useState(false);
@@ -162,8 +166,24 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   };
   if (!view)
     return (
-      <Panel eyebrow="Complaint" title={ref || "Complaint"} source={resource}>
-        {resource.state === "error" && (
+      // A call found on the triage list is shown as such (the panel shows its children only when ready).
+      <Panel eyebrow="Complaint" title={ref || "Complaint"} source={call ? undefined : resource}>
+        {resource.state === "error" && call && (
+          <Empty
+            title={`${ref} is a call, not a complaint yet`}
+            detail="It waits on the triage list: triage it there, and decide whether it is a complaint."
+            action={
+              <button
+                type="button"
+                className="ac-primary"
+                onClick={() => open("Complaints", `To triage?${new URLSearchParams({ ref })}`)}
+              >
+                Triage it
+              </button>
+            }
+          />
+        )}
+        {resource.state === "error" && !call && (
           <Empty
             title="This complaint could not be opened"
             detail={errorText(resource.error, "It is not in your organization, or your role cannot open it.")}

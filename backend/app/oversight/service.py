@@ -23,6 +23,8 @@ sweeps their organization when the last sweep is older than five minutes. Nothin
 
 from __future__ import annotations
 
+import urllib.parse
+
 from backend.app.trial.sample_source import is_sample
 from backend.app import links
 import logging
@@ -260,15 +262,17 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
             "backup_id": record.get("backup_owner"),
             "queue": None if owner else "Triage",
             "product": item.get("product_name"),
+            # A call that is not a complaint yet opens its own triage card by its reference (0.10.82, navigation
+            # M5), as the triage screen reads ref=; it opened the bare list before.
             "opens": links.target("Complaints", "Triage", record=("complaint", complaint_id))
             if complaint_id
-            else links.target("Complaints", "Triage"),
+            else links.target("Complaints", f"Triage?{urllib.parse.urlencode({'ref': item['ref']})}"),
         }
         found.append(
             _item(
                 f"triage:{item['key']}",
                 "TRIAGE",
-                f"Triage: {item['tier_label'].lower()}, not yet complete",
+                f"Triage not done yet ({item['tier_label'].lower()})",
                 datetime.fromisoformat(item["triage_clock"]["due_at"]),
                 **common,
             )

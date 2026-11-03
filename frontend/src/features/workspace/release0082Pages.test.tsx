@@ -7,6 +7,8 @@ import { ComplaintPage } from "./sections/ComplaintPage";
 import { ONE_STORY_PATH, type StoryRun } from "./oneStory";
 import { eventPath } from "./oversight";
 import { rv11 } from "../../test/rv11";
+
+import { PersonaSwitch } from "./HybridShell";
 import { HomeSection } from "./sections/Home";
 import { IMPORTED_SOURCE } from "./complaintList";
 import { trendPath } from "./signalAi";
@@ -16,11 +18,13 @@ import { OVERDUE_PATH, OVERDUE_VIEW } from "./home";
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("../customer-admin/shared", async (original) => ({
   ...(await original<typeof import("../customer-admin/shared")>()),
-  useResource: (path: string | null) => ({
-    state: "ready",
-    data: (path && resources.data[path.split("?")[0]]) ?? null,
-    reload: () => undefined,
-  }),
+  useResource: (path: string | null) => {
+    const value = (path && resources.data[path.split("?")[0]]) ?? null;
+    // An Error stands for a read the server refused (a reference that is no complaint).
+    return value instanceof Error
+      ? { state: "error", data: null, error: value.message, reload: () => undefined }
+      : { state: "ready", data: value, reload: () => undefined };
+  },
 }));
 
 const api = (overrides: Partial<WorkspaceApi> = {}) =>
@@ -38,7 +42,7 @@ const api = (overrides: Partial<WorkspaceApi> = {}) =>
 const render = (node: ReactNode, value: WorkspaceApi = api()) =>
   renderToStaticMarkup(<WorkspaceContext.Provider value={value}>{node}</WorkspaceContext.Provider>);
 
-const LABELS = ["The call", "Triage", "Tree", "Reportable?", "Form", "Fill", "Approval", "Submit", "Records", "Trends"];
+const LABELS = ["The call", "Triage", "Tree", "Decide", "Form", "Fill", "Approval", "Submit", "Records", "Trends"];
 const run = (current: number): StoryRun => ({
   run: "sample",
   complaint: {
@@ -99,7 +103,7 @@ describe("Home for every persona (D1.6)", () => {
     for (const persona of ["admin", "regulatory", "handler", "executive"]) {
       const html = home(persona);
       expect(html).toContain('class="uw-card uw-home-banner"');
-      expect(html).toContain("Step 4 of 10: Reportable?");
+      expect(html).toContain("Step 4 of 10: Decide");
       expect(html).toContain("Continue the story");
       expect(html).not.toContain("Review this sample event");
     }
@@ -235,5 +239,28 @@ describe("the complaint page (D1.7, D1.8)", () => {
     const line = html.slice(html.indexOf('class="uw-stageline"'));
     expect(line).toMatch(/<button type="button" class="ac-link">Market assessment<\/button>/);
     expect(line).toMatch(/<button type="button" class="ac-link">Report<\/button>/);
+  });
+});
+
+describe("the review's items on these screens", () => {
+  it("opens an urgent call by its reference as a call to triage, not a dead end (U-20)", () => {
+    resources.data[eventPath("SAMPLE-URG-01")] = new Error("No such complaint");
+    resources.data["/api/v1/triage"] = { items: [{ kind: "INTAKE", ref: "SAMPLE-URG-01", id: "i1" }] };
+    const html = render(<ComplaintPage tab="Summary?ref=SAMPLE-URG-01" />);
+    expect(html).toContain("SAMPLE-URG-01 is a call, not a complaint yet");
+    expect(html).toContain("Triage it");
+  });
+
+  it("shows one avatar: the persona is named, its circle only in the menu", () => {
+    const html = renderToStaticMarkup(
+      <PersonaSwitch
+        persona="regulatory"
+        options={[{ code: "regulatory", label: "Regulatory Leader", sub: "", tabs: [] }]}
+        locked
+        onChoose={() => undefined}
+      />,
+    );
+    expect(html).toContain("Regulatory Leader");
+    expect(html).not.toContain("uw-persona-dot");
   });
 });

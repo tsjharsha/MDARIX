@@ -8263,3 +8263,18 @@ details.uw-team-change[open] {
 .uw-load-list li.is-loaded .uw-load-mark {
   border-color: transparent;
 }
+/* On a phone the tab bar says more tabs exist (0.10.82): a fade and an arrow at its right edge while it scrolls. */
+.uw-tabs.has-more .uw-tabs-in {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
+}
+.uw-tabs-more {
+  position: absolute;
+  top: 0;
+  right: 4px;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ms-teal);
+  pointer-events: none;
+}

@@ -35,7 +35,7 @@ STEPS = (
     ("call", "The call"),
     ("triage", "Triage"),
     ("tree", "Tree"),
-    ("reportable", "Reportable?"),
+    ("reportable", "Decide"),
     ("form", "Form"),
     ("fill", "Fill"),
     ("approval", "Approval"),

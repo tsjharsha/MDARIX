@@ -130,7 +130,9 @@ const ROW = {
 
 describe("B5: Trends leads with one sentence per rising group", () => {
   it("says the rise, its lots and the comparison basis, and says plainly when units are missing", () => {
-    expect(risingSentence(ROW)).toBe("OrbitCare 300 Rev B: 9 complaints against 1.0 expected (9.3×), lots 003 and 004");
+    expect(risingSentence(ROW)).toBe(
+      "OrbitCare 300 Rev B: 9 complaints in the last 30 days against 1.0 expected (9.3×), lots 003 and 004",
+    );
     expect(comparisonLine(ROW)).toBe(
       "Compared with OrbitCare 300 Rev A: 6 in the 180 days before this version's release · per unit in the field",
     );
@@ -165,7 +167,9 @@ describe("B5: Trends leads with one sentence per rising group", () => {
         <TrendCheck onOpenSignal={() => undefined} />
       </WorkspaceContext.Provider>,
     );
-    const lead = html.indexOf("OrbitCare 300 Rev B: 9 complaints against 1.0 expected (9.3×), lots 003 and 004");
+    const lead = html.indexOf(
+      "OrbitCare 300 Rev B: 9 complaints in the last 30 days against 1.0 expected (9.3×), lots 003 and 004",
+    );
     const revealed = html.indexOf("<summary>All groups, the method and the chart</summary>");
     expect(lead).toBeGreaterThan(-1);
     expect(revealed).toBeGreaterThan(lead);

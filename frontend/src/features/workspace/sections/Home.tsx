@@ -139,10 +139,11 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
                       <span className="uw-home-what">
                         <b>
                           {item.ref ? `${item.ref} · ` : ""}
-                          {item.title}
+                          {/* The reference once (U-21): "Reply due from Reporter of SAMPLE-RV-08" repeated it. */}
+                          {item.ref ? item.title.replace(` of ${item.ref}`, "") : item.title}
                         </b>
                         <small>
-                          {item.category_label} · Owner: {item.owner ?? "nobody yet"} · Due{" "}
+                          {item.category_label} · {item.owner ? `Owner: ${item.owner}` : "No owner yet"} · Due{" "}
                           {item.due_label ?? formatDateTime(item.due_at)}
                         </small>
                       </span>

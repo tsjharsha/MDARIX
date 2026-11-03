@@ -51,7 +51,7 @@ def test_the_sample_story_ticks_each_step_from_the_saved_record(trial):
         "The call",
         "Triage",
         "Tree",
-        "Reportable?",
+        "Decide",
         "Form",
         "Fill",
         "Approval",
@@ -262,3 +262,12 @@ def test_one_drop_zone_detects_which_object_a_file_is_and_flags_what_it_did_not_
     blank = CSV.replace("Y,Y,N,Y\n", "Y,,N,Y\n")
     flagged = _ok(user.post("/api/v1/data/import/complaints/check", content=blank.encode()))["row_flags"]
     assert any(flag["message"].startswith("Serious injury left blank") for flag in flagged)
+
+
+def test_a_call_not_yet_a_complaint_opens_its_own_triage_card_from_home(trial):
+    """Navigation M5 and U-20: SAMPLE-URG-01 is an urgent call; Home's next action opens its triage card by its
+    reference, not the bare list, and its title says what to do without repeating codes."""
+    items = _ok(trial["user"].get("/api/v1/oversight", params={"show": "all"}))["items"]
+    calls = [item for item in items if item.get("ref") == "SAMPLE-URG-01" and item["key"].startswith("triage:")]
+    assert calls and all(call["opens"]["target"]["tab"] == "Triage?ref=SAMPLE-URG-01" for call in calls)
+    assert all(call["title"].startswith("Triage not done yet (") for call in calls)

@@ -973,7 +973,7 @@ export function UserWorkspace({
                     <ContextBar />
                   ))}
                 {/* A colleague the owner invited is greeted by name on their first screens (UX-26). */}
-                {trial?.is_trial && <ColleagueWelcome me={trial.me} />}
+                {trial?.is_trial && <ColleagueWelcome me={trial.me} onStart={() => open("Getting started")} />}
                 {trial?.is_trial && section !== "Share feedback" && (
                   <FeedbackPrompt onOpen={() => open("Share feedback")} />
                 )}
