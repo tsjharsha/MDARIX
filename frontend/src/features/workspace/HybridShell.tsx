@@ -239,13 +239,7 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
           });
         }
         const needle = q.toLowerCase();
-        for (const row of ((reports?.items ?? reports?.reports ?? []) as any[])
-          .filter((item) =>
-            [item.complaint_ref, item.complaint, item.form_title, item.title, item.market_label]
-              .filter(Boolean)
-              .some((value: unknown) => String(value).toLowerCase().includes(needle)),
-          )
-          .slice(0, 5)) {
+        for (const row of reportHits(reports?.items ?? reports?.reports ?? [], needle)) {
           found.push({
             key: `r-${row.id}`,
             kind: "Report",
@@ -541,4 +535,17 @@ export function TabBar({
       </div>
     </nav>
   );
+}
+
+/** The top bar's report hits (0.10.81, navigation M2): only started reports, which have a page; a report not started
+ * yet (no id) is found through its complaint. */
+export function reportHits(items: any[], needle: string): any[] {
+  return items
+    .filter((item) => item.id)
+    .filter((item) =>
+      [item.complaint_ref, item.complaint, item.form_title, item.title, item.market_label]
+        .filter(Boolean)
+        .some((value: unknown) => String(value).toLowerCase().includes(needle)),
+    )
+    .slice(0, 5);
 }

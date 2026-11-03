@@ -2,6 +2,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { awarenessText, formatDay } from "../../app/dates";
+import { reportHits } from "./HybridShell";
 import { HomeSection, LegalClocks } from "./sections/Home";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 
@@ -48,5 +49,16 @@ describe("a day-only awareness (U-06)", () => {
     );
     expect(awarenessText("2026-10-29T12:00:00+00:00", false)).not.toContain("time not recorded");
     expect(awarenessText(null, true)).toBe("—");
+  });
+});
+
+describe("search's report hits (navigation M2)", () => {
+  it("never links a report that is not started (no id) to /app/reports?report=null", () => {
+    const items = [
+      { id: null, complaint_ref: "NAV-0002", form_title: "Form FDA 3500A worksheet (eMDR)" },
+      { id: "r1", complaint_ref: "NAV-0002", form_title: "Form FDA 3500A worksheet (eMDR)" },
+      { id: "r2", complaint_ref: "SAMPLE-RV-09", form_title: "Form FDA 3500A worksheet (eMDR)" },
+    ];
+    expect(reportHits(items, "nav-0002").map((item) => item.id)).toEqual(["r1"]);
   });
 });
