@@ -73,7 +73,8 @@ count or deadline moment changes, and `refresh_trial_story.py` has nothing new t
 - **The tree while answering**: the Answer · Edit switch sits on the market row, the page head is shorter, the starter
   mark is said once, and the line under Sign gives the worked complaints only. Sign now ends about 95 px above the
   bottom of a 1440×900 screen on every market's tree, India included (it ended 28 px above).
-- **The report header's starter chip** reads "Starter, for your consultant to confirm", the one starter wording.
+- **The report header's starter chip** reads "Starter, for your consultant to confirm", the one starter wording, and
+  its approval reasons say "You prepared this report: a second person must approve it", never "snapshot".
 
 ## [0.10.83] - 2026-11-03
 
