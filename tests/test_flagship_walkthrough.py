@@ -141,6 +141,10 @@ def _ok(response, status: int = 200):
 def trial():
     from backend.app.trial.retention import purge_trial
 
+    from tests.code_lists import ensure_loaded
+
+    ensure_loaded()  # the IMDRF terms and FDA's codes (0.10.77)
+
     user, approval, _ = _approved_trial_client()
     tenant_id = uuid.UUID(approval["tenant_id"])
     try:
@@ -244,6 +248,10 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     values = {"MFR_REPORT": "1234567-2026-00011", "G2": "Health professional"}
     for field in [item for item in missing if item != "G8"]:
         report = _ok(user.put(f"{REPORTS}/{report['id']}/fields/{field}", json={"value": values.get(field, "Entered")}))
+    # 0.10.77: the device problem code is suggested from the approved mapping (with its FDA code) and confirmed.
+    (problem,) = [f for s in report["sections"] for f in s["fields"] if f["status"] == "SUGGESTED"]
+    assert (problem["id"], problem["suggestion"]) == ("H6_PROBLEM", "A090807 High Readings (FDA 2459)")
+    report = _ok(user.put(f"{REPORTS}/{report['id']}/fields/H6_PROBLEM", json={"confirmed": True}))
     g8 = next(f for s in report["sections"] for f in s["fields"] if f["id"] == "G8")
     assert (g8["value"], g8["status"], g8["source"]["label"]) == (
         "1234567-2026-00011",

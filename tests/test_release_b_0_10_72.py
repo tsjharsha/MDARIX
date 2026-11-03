@@ -262,7 +262,7 @@ def test_addendum_2_sample_only_chosen_on_the_approval_is_set_at_creation_and_au
 
 @pytest.mark.db
 def test_addenda_sample_corrections_new_trials_have_them_and_the_refresh_records_them_once(story_trial):
-    """A new trial maps SPO2_READING_HIGH to IMDRF A0908 and its guide's examples read without "Sample examples:";
+    """A new trial maps SPO2_READING_HIGH to IMDRF (A090807 from 0.10.77; A0908 in 0.10.72) and its guide's examples read without "Sample examples:";
     a trial made before 0.10.72 is corrected by scripts/refresh_trial_story.py once (dry run first), the guide's
     approval re-recorded on the new fingerprint."""
     import uuid
@@ -286,7 +286,7 @@ def test_addenda_sample_corrections_new_trials_have_them_and_the_refresh_records
         links = db.query(ImdrfCodeMapping).filter(
             ImdrfCodeMapping.tenant_id == tenant_id, ImdrfCodeMapping.customer_code == "SPO2_READING_HIGH"
         )
-        assert [row.imdrf_code for row in links] == ["A0908"]
+        assert [row.imdrf_code for row in links] == ["A090807"]
         assert sample_0_10_72.refresh(db, tenant_id, apply=False) == 0  # a new trial has them
         # As a trial made before 0.10.72 had them: no link, and the old example text in the signed guide.
         links.delete()

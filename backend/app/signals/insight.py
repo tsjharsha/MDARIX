@@ -475,7 +475,10 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
         else {}
     )
     for item in items:
-        item["lots"] = sorted({lot_of[key] for key in item.pop("_recent_ids") if key in lot_of})
+        named = [lot_of[key] for key in item.pop("_recent_ids") if key in lot_of]
+        item["lots"] = sorted(set(named))
+        # How many of the recent complaints each lot has (0.10.77: "003 (4), 004 (4), 005 (1)").
+        item["lot_counts"] = {lot: named.count(lot) for lot in item["lots"]}
     items.sort(
         key=lambda item: (
             trend_rules.RESULT_ORDER[item["result"]],

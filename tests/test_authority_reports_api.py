@@ -36,7 +36,10 @@ def _ok(response):
 def trial():
     from backend.app.trial.retention import purge_trial
 
+    from tests.code_lists import ensure_loaded
     from tests.test_release_c3_0_10_75 import _classic
+
+    ensure_loaded()  # the IMDRF terms and FDA's codes (0.10.77)
 
     user, approval, _ = _approved_trial_client()
     tenant_id = uuid.UUID(approval["tenant_id"])
@@ -137,7 +140,8 @@ def test_the_worksheets_use_the_mapped_imdrf_codes(trial):  # TA-2c.4
     fields = _fields(_start_rv06(trial))
     problem = fields["H6_PROBLEM"]
     assert problem["status"] == "FROM_RECORD" and problem["source"]["type"] == "ImdrfMapping"
-    assert problem["value"].startswith("A14") and "A16" in problem["value"]  # UNDER_INFUSION_NO_ALARM -> A14, A16
+    # UNDER_INFUSION_NO_ALARM -> A1407, A160102 (0.10.77), each with its FDA code from FDA's IMDRF mapping.
+    assert problem["value"].startswith("A1407") and "A160102" in problem["value"] and "(FDA " in problem["value"]
 
 
 def test_the_india_sample_drafts_an_mdae_v12_worksheet_in_field_order(trial):  # TA-2c.2, TA-2b.3

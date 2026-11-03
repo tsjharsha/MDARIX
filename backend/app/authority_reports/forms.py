@@ -35,6 +35,10 @@ MISSING_LABELS = {
     NOT_USED: "Not used in this report",
 }
 PATIENT, REPORTER = "PATIENT", "REPORTER"
+# Codes a form needs beyond its own classes, on the new navigation (0.10.77, C5; starter, for your consultant to
+# confirm): an initial 3500A needs the device problem and both health effect codes (H6). The EU and GB MIR already
+# need Annex A, E and F, and B, C, D (and G) in a final report (``must_in``).
+CODES_REQUIRED = {"FDA_3500A": ("H6_CLINICAL", "H6_IMPACT")}
 
 
 @dataclass(frozen=True)
@@ -315,7 +319,7 @@ MVPI_MDAE = Form(
                 Field("A_MANUFACTURER", "", "Manufacturer: name and address", "in_manufacturer", MUST),
                 Field("A_IMPORTER", "", "Importer: name and address", "in_importer", INITIAL),
                 Field("A_DISTRIBUTOR", "", "Distributor: name and address", None, INITIAL),
-                Field("A1", "1", "Device risk classification as per India MDR 2017 (A, B, C, D)", None, MUST),
+                Field("A1", "1", "Device risk classification as per India MDR 2017 (A, B, C, D)", "risk_class", MUST),
                 Field("A2", "2", "Is the device refurbished? If yes, by whom"),
                 Field("A3", "3", "License no. (manufacturer/importer)", "in_licence", MUST),
                 Field("A4", "4", "Model no.", "model", INITIAL),
@@ -570,7 +574,7 @@ def _mir_device(market: str) -> tuple[Field, ...]:
             "2_3P_NB",
             "2.3p",
             "Notified body (NB) ID number(s), if applicable",
-            None,
+            "nb_number",
             INITIAL,
             must_in=() if gb else _WITH_UDI,
             note="Depends on the risk class (2.4): the per-class rule is to confirm.",
@@ -602,7 +606,7 @@ def _mir_device(market: str) -> tuple[Field, ...]:
             "2.4",
             "Risk class of the device when placed on the market (legislation unknown; before the MDD/AIMDD/IVDD; the "
             "MDD/AIMDD/IVDD class; or the MDR/IVDR class and type)",
-            None,
+            "risk_class",
             INITIAL if gb else MUST,
             note="GB: optional in MHRA's schema (to confirm)." if gb else "",
         ),
@@ -1036,7 +1040,7 @@ EU_MIR = Form(
                     "1_3_2B",
                     "1.3.2b",
                     "Manufacturer's single registration number (SRN)",
-                    None,
+                    "manufacturer_srn",
                     MUST,
                     note="Unknown is allowed until EUDAMED is in place.",
                 ),
@@ -1090,7 +1094,7 @@ EU_MIR = Form(
                     "2_1C",
                     "2.1c",
                     "Basic UDI-DI / EUDAMED DI, and its issuing entity",
-                    None,
+                    "basic_udi",
                     INITIAL,
                     must_in=_WITH_UDI,
                 ),
@@ -1105,14 +1109,14 @@ EU_MIR = Form(
                     "2_2A",
                     "2.2a",
                     "Medical device nomenclature",
-                    "gmdn_system",
+                    "eu_nomenclature_system",
                     options=("EMDN", "GMDN", "UMDNS (ECRI)", "GIVD/EDMS", "Other"),
                 ),
                 Field(
                     "2_2B",
                     "2.2b",
                     "Medical device nomenclature code",
-                    "gmdn_code",
+                    "eu_nomenclature_code",
                     note="Mandatory once 2.2a is chosen.",
                 ),
             ),
@@ -1418,7 +1422,7 @@ HC_MDPR = Form(
                 Field("C1", "C1", "Trade/brand name", "brand_name", MUST),
                 _ca("C2", "C2", "Control/lot/serial no.", "lot_serial"),
                 _ca("C3", "C3", "Expiration date", "lot_expiry"),
-                _ca("C4_I", "C4 i", "Device classification", options=("I", "II", "III", "IV")),
+                _ca("C4_I", "C4 i", "Device classification", "risk_class", options=("I", "II", "III", "IV")),
                 _ca("C4_II", "C4 ii", "Device licence no.", "ca_licence"),
                 _ca("C4_III", "C4 iii", "Device identification no.", "udi"),
                 _ca("C4_IV", "C4 iv", "Manufacturer's medical device identifier (catalogue/model no.)", "model"),

@@ -7,6 +7,12 @@ and, for a patient or reporter field outside the sample, **enter in the authorit
 stores them). Values are copied by fixed mappings (``SOURCES``); MDARIX never invents a patient outcome, a device
 identifier, a date, an investigation result, a root cause or a conclusion. IMDRF codes are the organization's
 approved mappings of the complaint's problem code (T-G2a, ``regulatory_reference.approved_links``).
+
+Codes (0.10.77, C5): on the new navigation a code the approved mapping supplies is only **suggested**: it shows as
+"Suggested from your approved mapping" and counts as missing until the regulatory manager confirms it or changes it
+(``code_state`` CONFIRMED or CHANGED, with who and when). An unconfirmed suggestion is never frozen into a snapshot,
+so it never reaches the form or the PDF. On the FDA's form each IMDRF code carries its FDA code (FDA's published
+FDA-IMDRF mapping): one choice fills both.
 """
 
 from __future__ import annotations
@@ -21,11 +27,14 @@ from backend.app.authority_reports import forms
 from backend.app.reportability import markets
 
 FROM_RECORD, ENTERED, CONFIRMED, OUTSIDE = "FROM_RECORD", "ENTERED", "CONFIRMED", "OUTSIDE"
+SUGGESTED, CHANGED = "SUGGESTED", "CHANGED"
 FICTIONAL_STATUS = "FICTIONAL"
 STATUS_LABELS = {
     FROM_RECORD: "From record",
     ENTERED: "Entered by a person",
     CONFIRMED: "Confirmed",
+    SUGGESTED: "Suggested from your approved mapping",
+    CHANGED: "Changed from the suggestion",
     OUTSIDE: "Enter in the authority's route",
     FICTIONAL_STATUS: "Fictional (sample only)",
     **forms.MISSING_LABELS,
@@ -184,6 +193,12 @@ def load(db: Session, control_db: Session, tenant_id: uuid.UUID, complaint_id: u
         "registrations": registrations,
         "parties": parties,
         "imdrf": codes,
+        # FDA's code for each IMDRF code, on the FDA's form (0.10.77): one choice fills both.
+        "fda": regulatory_reference.fda_codes(control_db, [code["code"] for code in codes])
+        if market == markets.US
+        else {},
+        # Codes are suggestions a person confirms (the new navigation; the router sets it, 0.10.77).
+        "confirm_codes": False,
         "sample": complaint.source_system == SAMPLE_SOURCE,
     }
 
@@ -329,7 +344,9 @@ def _imdrf(annex: str):
         codes = [code for code in context["imdrf"] if code["annex"] == annex]
         if not codes:
             return None
-        text = "; ".join(f"{code['code']} {code['term'] or '(term not loaded)'}" for code in codes)
+        from backend.app.regulatory_reference import code_text
+
+        text = "; ".join(code_text(code["code"], code["term"], context["fda"].get(code["code"])) for code in codes)
         release = codes[0]["release"]
         complaint = context["complaint"]
         return text, _source(
@@ -497,6 +514,37 @@ def _returned(value: str):
     )
 
 
+def _risk_class(context):
+    for item in context["registrations"]:
+        if item.risk_class:
+            return item.risk_class, _source(
+                "Registration",
+                f"{item.market} {item.registration_type} {item.registration_number}",
+                "The registration's risk class",
+                item.id,
+            )
+    return None
+
+
+def _srn(context):
+    party = next((item for item in context["parties"] if item.role == "MANUFACTURER" and item.srn), None)
+    return (
+        (party.srn, _source("ResponsibleParty", f"{party.market} manufacturer", "The manufacturer's SRN", party.id))
+        if party
+        else None
+    )
+
+
+def _nomenclature(context, part: int):
+    """EU 2.2a and 2.2b: the product's EMDN code where it has one (the EU's nomenclature), else its GMDN code."""
+    product = context["product"]
+    if product is None:
+        return None
+    if product.emdn_code:
+        return _product(context, ("EMDN", product.emdn_code)[part], "The product's EMDN code")
+    return SOURCES[("gmdn_system", "gmdn_code")[part]](context)
+
+
 def _immediate_action(context):
     triage = context["triage"]
     text = triage.immediate_action if triage else None
@@ -631,6 +679,15 @@ SOURCES = {
     "mir_reporter_role": _user_type(
         {"HEALTHCARE_PROFESSIONAL": "Healthcare professional", "LAY_USER": "Lay user", "PATIENT": "Patient"}
     ),
+    # 0.10.77 (C5): the product and organization identity fields.
+    "basic_udi": lambda c: _product(
+        c, c["product"].basic_udi_di if c["product"] else None, "The product's Basic UDI-DI"
+    ),
+    "risk_class": _risk_class,
+    "manufacturer_srn": _srn,
+    "nb_number": lambda c: _registration(c, ("CE",), "body_number", "The notified body of the EU registration (CE)"),
+    "eu_nomenclature_system": lambda c: _nomenclature(c, 0),
+    "eu_nomenclature_code": lambda c: _nomenclature(c, 1),
     "ca_complainant": _user_type(
         {"HEALTHCARE_PROFESSIONAL": "Health professional", "LAY_USER": "Consumer", "PATIENT": "Consumer"}
     ),
@@ -644,12 +701,15 @@ def build(
     personal = SAMPLE_PERSONAL.get(context["complaint"].complaint_identifier, {}) if context["sample"] else {}
     # The report type decides which fields are mandatory (0.10.76: the EU, GB and Canada forms).
     kind = forms.report_kind(form, entries)
+    confirm = context.get("confirm_codes", False)
+    required = forms.CODES_REQUIRED.get(form.code, ()) if confirm else ()
     out = []
     for section in form.sections:
         rows = []
         for item in section.fields:
             entry = entries.get(item.id) or {}
-            missing = forms.missing_class(item, kind)
+            missing = forms.MUST if item.id in required else forms.missing_class(item, kind)
+            annex = item.source[-1] if item.source and item.source.startswith("imdrf_") else None
             found = None
             if item.personal:
                 value = personal.get(item.id)
@@ -671,8 +731,16 @@ def build(
                 found = SOURCES[item.source](context)
             value, source = found if found and found[0] else (None, None)
             status = (FICTIONAL_STATUS if item.personal else FROM_RECORD) if value else None
+            suggestion = None
+            if annex and confirm and value and not entry.get("value") and not entry.get("confirmed"):
+                # A code the mapping supplies waits for a person (0.10.77): never filed unconfirmed.
+                suggestion, value, status = value, None, SUGGESTED
             if not item.personal and entry.get("value"):
-                value, status, source = entry["value"], ENTERED, None
+                value, status = (
+                    entry["value"],
+                    {CONFIRMED: CONFIRMED, CHANGED: CHANGED}.get(entry.get("code_state"), ENTERED),
+                )
+                source = source if status == CONFIRMED else None
             elif value and entry.get("confirmed"):
                 status = CONFIRMED
             if status is None:
@@ -697,6 +765,11 @@ def build(
                     "note": item.note or None,
                     "by": names.get(entry.get("by")) if entry else None,
                     "at": entry.get("at") if entry else None,
+                    # Codes (0.10.77): the annex the field codes, the suggestion waiting, what was suggested before a
+                    # change, and how the person settled it.
+                    "code_annex": annex,
+                    "suggestion": suggestion,
+                    "suggested": entry.get("suggested") if annex else None,
                 }
             )
         out.append({"code": section.code, "title": section.title, "note": section.note or None, "fields": rows})
@@ -717,7 +790,11 @@ def frozen(sections: list[dict]) -> list[dict]:
     return [
         {
             **section,
-            "fields": [{key: value for key, value in item.items() if key != "editable"} for item in section["fields"]],
+            # A suggestion nobody confirmed is never frozen (0.10.77): it never reaches the form or the PDF.
+            "fields": [
+                {key: value for key, value in item.items() if key not in ("editable", "suggestion")}
+                for item in section["fields"]
+            ],
         }
         for section in sections
     ]
@@ -732,5 +809,23 @@ def mandatory(sections: list[dict]) -> dict:
         for item in section["fields"]
         if item["missing_class"] == forms.MUST and not item.get("personal")
     ]
-    missing = [item["id"] for item in fields if item["status"] == forms.MUST]
+    missing = [item["id"] for item in fields if item["status"] in (forms.MUST, SUGGESTED)]
     return {"total": len(fields), "filled": len(fields) - len(missing), "missing": missing}
+
+
+def confirm_suggestions(form: forms.Form, context: dict, entries: dict, actor: str, at: str) -> dict:
+    """The entries with every code the mapping suggests confirmed by ``actor`` (the sample author's own report):
+    what a person does field by field on the report page."""
+    out = dict(entries)
+    for item in form.fields():
+        if item.source and item.source.startswith("imdrf_") and not (out.get(item.id) or {}).get("value"):
+            found = SOURCES[item.source](context)
+            if found:
+                out[item.id] = {
+                    "value": found[0],
+                    "code_state": CONFIRMED,
+                    "suggested": found[0],
+                    "by": actor,
+                    "at": at,
+                }
+    return out

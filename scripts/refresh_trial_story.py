@@ -39,7 +39,9 @@ Free Trial plan, whose "up to 3 users" and licensed-user limit read the trial's 
 0.10.75's reports: on the new navigation, the report of each US or India conclusion signed reportable before the
 upgrade that has none (backend/app/trial/reports_0_10_75.py; the sample's own reports fit the status path as they are);
 from 0.10.76 the same step covers EU / NI, Great Britain and Canada, so SAMPLE-RV-07's signed EU conclusion gets its
-EU MIR worksheet, once. The sample's dates themselves are brought to today by the
+EU MIR worksheet, once, and 0.10.77's code corrections (backend/app/trial/sample_0_10_77.py: the sample's IMDRF links
+re-recorded to IMDRF Release 2026's most specific terms; the code fields of the sample's frozen reports recorded as
+confirmed by the sample author, with the values they were approved with). The sample's dates themselves are brought to today by the
 hourly "trial-sample-clock" job (backend/app/trial/sample_clock.py) while nobody has worked on the sample. Each trial
 is committed on its own, with an audit event.
 """
@@ -91,7 +93,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.db.models.foundation import LotBatch, Product, ProductVersion
     from sqlalchemy import or_
     from backend.app.signals.hooks import seed_demo_signals
-    from backend.app.trial import reports_0_10_75, sample_0_10_72
+    from backend.app.trial import reports_0_10_75, sample_0_10_72, sample_0_10_77
     from backend.app.trial.sample_calm import has_calm_story, rerecord_rv09, stage_calm_story
     from backend.app.trial.sample_clock import _absence_to_trial_end
     from backend.app.trial.sample_data import (
@@ -183,6 +185,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             corrections = sample_0_10_72.refresh(session, tenant_id, apply=False)
             # 0.10.75: on the new navigation, the report of a reportable conclusion signed before the upgrade.
             reports_owed = reports_0_10_75.refresh(session, tenant_id, apply=False)
+            # 0.10.77: the sample's IMDRF links (Release 2026) and its frozen reports' confirmed codes.
+            codes_owed = sample_0_10_77.refresh(session, tenant_id, apply=False)
             if not (
                 story_missing
                 or flagship_missing
@@ -204,6 +208,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or service_missing
                 or corrections
                 or reports_owed
+                or codes_owed
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -239,6 +244,11 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *(
                         [f"{reports_owed} authority reports of conclusions signed reportable (0.10.75)"]
                         if reports_owed
+                        else []
+                    ),
+                    *(
+                        [f"{codes_owed} sample code corrections (0.10.77: IMDRF Release 2026 links, confirmed codes)"]
+                        if codes_owed
                         else []
                     ),
                 ]
@@ -287,6 +297,9 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["corrections_0_10_72"] = sample_0_10_72.refresh(session, tenant_id, apply=True, now=now)
             if reports_owed:
                 added["reports_0_10_75"] = reports_0_10_75.refresh(session, tenant_id, apply=True, now=now)
+            if codes_owed:
+                # After the reports: a report the step above creates is a draft, never frozen.
+                added["codes_0_10_77"] = sample_0_10_77.refresh(session, tenant_id, apply=True, now=now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,

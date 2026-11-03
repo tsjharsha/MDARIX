@@ -17,31 +17,28 @@ from backend.app.db.models.guides_communications import DecisionGuideVersion
 from backend.app.db.models.regulatory_reference import ImdrfCodeMapping
 from backend.app.trial.sample_data import SAMPLE_SOURCE
 from backend.app.trial.sample_guides import INJURY_EXAMPLES
-from backend.app.trial.sample_imports import (
-    PROBLEM_CODES,
-    SAMPLE_ACTOR,
-    SAMPLE_IMDRF_LINKS,
-    SAMPLE_IMDRF_RELEASE,
-    SAMPLE_REVIEWER,
-    has_sample_import,
-)
+from backend.app.trial.sample_imports import PROBLEM_CODES, SAMPLE_ACTOR, SAMPLE_REVIEWER, has_sample_import
 
 FLAGSHIP_CODE = "SPO2_READING_HIGH"
+# 0.10.72's link, as it was (0.10.77 re-records it as A090807 of release 2026, sample_0_10_77.py).
+SAMPLE_IMDRF_RELEASE, RELEASE_B_LINKS = "2025", ("A0908",)
 OLD_EXAMPLES_PREFIX = "Sample examples: "
 
 
 def _missing_links(db: Session, tenant_id) -> list[tuple[str, str]]:
     if not has_sample_import(db, tenant_id):
         return []
-    have = {
-        (row.customer_code, row.imdrf_code)
-        for row in db.query(ImdrfCodeMapping.customer_code, ImdrfCodeMapping.imdrf_code).filter(
+    linked = (
+        db.query(ImdrfCodeMapping.id)
+        .filter(
             ImdrfCodeMapping.tenant_id == tenant_id,
             ImdrfCodeMapping.customer_system == PROBLEM_CODES,
             ImdrfCodeMapping.customer_code == FLAGSHIP_CODE,
         )
-    }
-    return [(FLAGSHIP_CODE, code) for code in SAMPLE_IMDRF_LINKS[FLAGSHIP_CODE] if (FLAGSHIP_CODE, code) not in have]
+        .first()
+    )
+    # Any link of the flagship's code will do: 0.10.77 changes the code, and this step must not add it back.
+    return [] if linked else [(FLAGSHIP_CODE, code) for code in RELEASE_B_LINKS]
 
 
 def _old_guides(db: Session, tenant_id) -> list[DecisionGuideVersion]:

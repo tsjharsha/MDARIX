@@ -174,6 +174,8 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
     context = worksheet.load(db, control_db, obligation.tenant_id, obligation.complaint_id, obligation.market)
     if context is None:
         raise _error(404, "COMPLAINT_NOT_FOUND", "The complaint of this report no longer exists")
+    # On the new navigation a mapped code is a suggestion a person confirms (0.10.77, C5).
+    context["confirm_codes"] = new_navigation(control_db, obligation.tenant_id)
     return context
 
 
@@ -461,6 +463,8 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "follow_up_due_on": _iso(obligation.follow_up_due_on),
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,
+        # A mapped code is a suggestion a person confirms or changes (the new navigation, 0.10.77).
+        "codes_confirmed": context["confirm_codes"],
         "never_submits": rules.NEVER_SUBMITS,
         "sample": obligation.source_system is not None,
     }
@@ -838,6 +842,39 @@ class FieldRequest(BaseModel):
     value: str | None = Field(default=None, max_length=worksheet.VALUE_MAX * 2)
     confirmed: bool = False
     clear: bool = False
+    # IMDRF codes chosen in the code picker (0.10.77), for a code field: the server writes the field's text.
+    codes: list[str] | None = Field(default=None, max_length=5)
+
+
+def _code_entry(db, control_db, obligation, field, payload: FieldRequest, actor: str) -> dict:
+    """A code field's entry (0.10.77): the suggestion confirmed, or the codes chosen in the picker (CHANGED when the
+    mapping suggested others, else ENTERED), each code checked against the newest loaded IMDRF release and written
+    with its term (and its FDA code on the FDA's form). The entry keeps what was suggested."""
+    from backend.app import regulatory_reference as reference
+
+    context = _context(db, control_db, obligation)
+    found = worksheet.SOURCES[field.source](context)
+    suggestion = found[0] if found else None
+    entry = {"by": actor, "at": _iso(_now()), "suggested": suggestion}
+    if payload.codes:
+        release = reference.newest_release(control_db)
+        if not release:
+            raise _error(409, "NO_IMDRF_RELEASE", "No IMDRF release is loaded yet")
+        codes = [code.strip().upper() for code in payload.codes if code and code.strip()]
+        items = reference.chosen_codes(control_db, release, field.source[-1], list(dict.fromkeys(codes)))
+        fda = reference.fda_codes(control_db, [item.code for item in items]) if obligation.market == "US" else {}
+        value = "; ".join(reference.code_text(item.code, item.term, fda.get(item.code)) for item in items)
+        state = worksheet.CONFIRMED if value == suggestion else worksheet.CHANGED if suggestion else None
+        return {
+            **entry,
+            "value": value,
+            "codes": [item.code for item in items],
+            "release": release,
+            "code_state": state,
+        }
+    if not suggestion:
+        raise _error(422, "NOTHING_SUGGESTED", "No code is suggested here: choose one in the code picker")
+    return {**entry, "value": suggestion, "code_state": worksheet.CONFIRMED}
 
 
 @router.put("/{obligation_id}/fields/{field_id}", dependencies=[DECIDERS])
@@ -865,11 +902,18 @@ def set_field(
     if field.missing == forms.NOT_USED:
         raise _error(422, "FIELD_NOT_USED", "This field is not used in this report")
     entries = dict(obligation.entries or {})
+    coded = bool(field.source and field.source.startswith("imdrf_"))
+    if payload.codes and not coded:
+        raise _error(422, "NOT_A_CODE_FIELD", "Only an IMDRF code field takes codes")
     value = None if payload.clear else _text(payload.value, worksheet.VALUE_MAX)
     if value and field.options and value not in field.options:
         raise _error(422, "NOT_A_CHOICE", f"Choose one of: {'; '.join(field.options)}", choices=list(field.options))
+    code_state = None
     if payload.clear:
         entries.pop(field_id, None)
+    elif coded and (payload.codes or (payload.confirmed and not value)):
+        entries[field_id] = _code_entry(db, control_db, obligation, field, payload, str(ctx.user_id))
+        code_state = entries[field_id]["code_state"] or worksheet.ENTERED
     elif value:
         entries[field_id] = {"value": value, "by": str(ctx.user_id), "at": _iso(_now())}
     elif payload.confirmed:
@@ -877,7 +921,16 @@ def set_field(
     else:
         raise _error(422, "NOTHING_TO_SAVE", "Enter a value, or confirm the record's value")
     obligation.entries, obligation.updated_at = entries, _now()
-    _audit(db, ctx, "REPORT_FIELD_SET", obligation, field=field_id, cleared=payload.clear, confirmed=payload.confirmed)
+    _audit(
+        db,
+        ctx,
+        "REPORT_FIELD_SET",
+        obligation,
+        field=field_id,
+        cleared=payload.clear,
+        confirmed=payload.confirmed,
+        **({"code_state": code_state, "codes": entries[field_id].get("codes")} if code_state else {}),
+    )
     db.commit()
     return detail(db, control_db, ctx, obligation)
 
