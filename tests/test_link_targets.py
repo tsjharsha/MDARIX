@@ -163,6 +163,14 @@ def test_every_target_a_trial_receives_names_an_existing_screen_and_record(trial
     for path, response in answers.items():
         assert response.status_code == 200, (path, response.text)
         found += _opens_of(response.json(), path)
+        if path.startswith("/api/v1/oversight/events/"):
+            # The record asked for, not merely an answer (DEV-06): its id, and the same complaint by the references a
+            # direct link or a refresh of /app/complaints/<ref> uses (its own reference, else its MDARIX ID).
+            event = response.json()["event"]
+            assert event["complaint_id"] == path.rsplit("/", 1)[1], path
+            for ref in {event["ref"], event["business_id"]} - {None}:
+                again = user.get(f"/api/v1/oversight/events/{ref}")
+                assert again.status_code == 200 and again.json()["event"]["complaint_id"] == event["complaint_id"]
     assert len(found) >= 40, len(found)
     with_record = 0
     with SessionLocal() as db:
@@ -181,6 +189,11 @@ def test_every_target_a_trial_receives_names_an_existing_screen_and_record(trial
             if target["record"]:
                 with_record += 1
                 assert _record_exists(db, tenant_id, target["record"]), f"{where}: no such {target['record']}"
+                if target["record"]["kind"] in ("complaint", "disposition"):
+                    # The action opens that very complaint.
+                    opened = user.get(f"/api/v1/oversight/events/{target['record']['id']}")
+                    assert opened.status_code == 200, (where, opened.text)
+                    assert opened.json()["event"]["complaint_id"] == target["record"]["id"], where
     assert with_record >= 1
 
 
@@ -320,3 +333,17 @@ def test_a_new_trial_starts_on_the_new_navigation_and_only_a_platform_administra
     )
     assert changed.status_code == 200, changed.text
     assert user.get("/api/v1/session/context").json()["navigation"] == "new"
+
+
+@pytest.mark.db
+def test_a_link_to_a_complaint_that_is_gone_says_so_and_never_opens_another(trial):
+    """The external review saw this test answer COMPLAINT_NOT_FOUND: its run shared one database with another whose
+    test_free_trial fixture (_clean_trial_workspaces) deletes every trial's business data. A complaint removed after its
+    link was given is a 404 with a code the complaint page turns into "This complaint could not be opened" and a way
+    back to the list (ComplaintPage.tsx), never another complaint."""
+    user = trial["user"]
+    missing = uuid.uuid4()
+    for ref in (str(missing), "NO-SUCH-COMPLAINT-REF"):
+        response = user.get(f"/api/v1/oversight/events/{ref}")
+        assert response.status_code == 404, response.text
+        assert response.json()["detail"]["code"] == "COMPLAINT_NOT_FOUND"
