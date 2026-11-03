@@ -333,6 +333,9 @@ def checklist(found: dict) -> list[dict]:
         label, state = markets.MARKET_LABELS.get(row.market, row.market), report_rules.STATE_LABELS[row.state].lower()
         unmet.append(f"{label}: {state}")
         actions.setdefault("OBLIGATIONS", f"Complete the {label} report ({state})")
+        if len(unmet) == 1:
+            # The step's button opens that report's own page (0.10.81, navigation M7), as its approval task does.
+            reports = links.target("Complaints", "Reports", record=("report", row.id))
     for market in wanted:
         current, _ = current_and_draft(by_market.get(market, []))
         if (

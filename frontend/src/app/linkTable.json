@@ -458,8 +458,8 @@
       "param": "ref"
     },
     "report": {
-      "section": "Complaints",
-      "tab": "Reporting",
+      "section": "Reports",
+      "tab": "",
       "param": "report"
     },
     "communication": {

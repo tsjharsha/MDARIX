@@ -14,6 +14,7 @@
 - U-06: a day-only awareness counts from that day everywhere and is shown as a date.
 - The refresh (open_deadlines.py) lists and updates the open reports and draft assessments the fixed rules change.
 - Navigation M6: an imported record is never marked sample.
+- Navigation M7: the complaint page's report step opens the report page.
 - F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
   Great Britain or Canada complaint gets its market assessment and clock.
 """
@@ -492,3 +493,13 @@ def test_navigation_m6_an_imported_record_is_never_marked_sample(trial):
     assert _ok(user.get("/api/v1/oversight/events/SAMPLE-RV-11"))["event"]["sample"] is True
     watched = _watch(user, "M6-1")
     assert all(not market.get("sample") for market in watched["markets"])
+
+
+def test_navigation_m7_the_complete_the_report_step_opens_the_report_page(trial):
+    user, complaint = trial["user"], trial["complaint"]
+    _sign_us(user, complaint, "NO")  # its report, open
+    (report,) = _reports(user, complaint)
+    ref = _ok(user.get(f"/api/v1/oversight/events/{complaint}"))["event"]["ref"]
+    event = _ok(user.get(f"/api/v1/oversight/events/{ref}"))
+    (step,) = [item for item in event["checklist"] if item["code"] == "OBLIGATIONS"]
+    assert step["result"] == "BLOCKED" and step["opens"]["target"]["record"] == {"kind": "report", "id": report["id"]}
