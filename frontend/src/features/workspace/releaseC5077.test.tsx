@@ -84,7 +84,8 @@ describe("a suggested code waits for the regulatory manager", () => {
     // Someone who may not work on reports reads it: no buttons.
     const html = render(<FieldRow detail={detail} item={SUGGESTED} onChanged={() => undefined} canEdit={false} />);
     expect(html).not.toContain(">Confirm</button>");
-    // The classic navigation keeps its field row (no suggestion there).
+    // The classic navigation (no suggestion there): the code from the record is confirmed against its source, and
+    // since 0.10.81 (F6) any other code comes from the picker on either navigation.
     const classic = { ...detail, codes_confirmed: false } as ReportDetail;
     const row = { ...SUGGESTED, status: "FROM_RECORD", value: "A0908 x", suggestion: null };
     expect(render(<FieldRow detail={classic} item={row} onChanged={() => undefined} canEdit />)).toContain(

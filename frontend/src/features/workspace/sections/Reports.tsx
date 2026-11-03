@@ -989,6 +989,17 @@ function CodeFieldRow({
               Confirm
             </button>
           )}
+          {/* The classic navigation: a code from the record is confirmed against its source (0.10.81). */}
+          {item.status === "FROM_RECORD" && (
+            <button
+              type="button"
+              className="ac-link"
+              disabled={action.busy}
+              onClick={() => void action.run(path, "PUT", { confirmed: true })}
+            >
+              Confirm against the source
+            </button>
+          )}
           <button type="button" className="ac-link" onClick={() => setPicking(true)}>
             {item.status === "SUGGESTED" || settled ? "Change" : "Choose a code"}
           </button>
