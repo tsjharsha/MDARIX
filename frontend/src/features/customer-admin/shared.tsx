@@ -220,8 +220,21 @@ export function useResource<T>(
 export const listOf = (value: any): any[] =>
   Array.isArray(value) ? value : (value?.items ?? value?.results ?? value?.records ?? []);
 
+/** Said after every change saved through ``send`` (0.10.84, M1): a view that sums up several records (the story's
+ * step on Getting started, Home and the record pages) reads them again, with no reload of the page. */
+export const SAVED_EVENT = "mdarix:saved";
+
+/** Call ``listener`` after every saved change; returns the call that stops it. */
+export function onSaved(listener: () => void): () => void {
+  window.addEventListener(SAVED_EVENT, listener);
+  return () => window.removeEventListener(SAVED_EVENT, listener);
+}
+
 export async function send<T = any>(path: string, method: "POST" | "PUT" | "PATCH" | "DELETE", body?: unknown) {
-  return requestJson<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+  const saved = await requestJson<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+  // Optional: a test's stand-in window may have no events.
+  globalThis.window?.dispatchEvent?.(new Event(SAVED_EVENT));
+  return saved;
 }
 
 /** The server's message for a failed change, with the reference to quote to support when there is one. */

@@ -41,6 +41,17 @@ NEVER_DECIDES = (
     "reportable conclusion creates the market's report."
 )
 
+# 0.10.83 (D2.5): where reporting to another market may also apply for an incident elsewhere, advice only. Starter text,
+# for the consultant to confirm; it never creates a second report.
+FOREIGN = {
+    markets.US: "FDA reporting can cover events outside the US for a device also marketed in the US (21 CFR 803).",
+    markets.EU_NI: "EU MDR Art. 87(1)(b): a field safety corrective action taken outside the EU, for a device also on "
+    "the EU market.",
+    markets.GB: "MHRA guidance: check it for incidents outside Great Britain.",
+    markets.IN: "CDSCO's MvPI guidance: check it for events outside India.",
+    markets.CA: "SOR/98-282 s. 61.1: foreign risk notification when you, or a regulator abroad, take corrective action.",
+}
+
 
 def _tree(market: str, row: DecisionGuideVersion | None, names: dict) -> dict:
     """A market's tree from the guide version in use: an approved version of the organization, else the starter."""
@@ -57,7 +68,7 @@ def _tree(market: str, row: DecisionGuideVersion | None, names: dict) -> dict:
         "status": "APPROVED" if approved else "STARTER",
         "status_label": "Approved" if approved else "Starter",
         "version_label": (
-            f"Your version {view['version']} · approved {row.approved_at.date().isoformat()}"
+            f"Your version {view['version']} · approved {row.approved_at.day} {row.approved_at:%b %Y}"
             if approved and row.approved_at
             else f"Your version {view['version']}"
             if approved
@@ -74,6 +85,7 @@ def _tree(market: str, row: DecisionGuideVersion | None, names: dict) -> dict:
             if market in forms.BY_MARKET
             else None
         ),
+        "foreign": FOREIGN[market],
     }
 
 
@@ -83,6 +95,7 @@ def _path(db, tenant_id, market: str, versions: list, names: dict, reports: dict
     row = current or draft
     question_set = service.by_code(db, tenant_id, market, row.question_set)
     answers = row.answers or {}
+    folded = markets.not_asked(market, answers)
     nodes = [
         {
             "id": question.id,
@@ -91,6 +104,7 @@ def _path(db, tenant_id, market: str, versions: list, names: dict, reports: dict
             "extra": question.extra,
             "answer": (answers.get(question.id) or {}).get("answer"),
             "answer_label": markets.ANSWER_LABELS.get((answers.get(question.id) or {}).get("answer"), "Not answered"),
+            "not_asked": folded.get(question.id),
         }
         for question in question_set.questions
     ]
@@ -173,12 +187,27 @@ def decision_trees(
             )
         )
     walked.sort(key=lambda item: item[:2])
+    # 0.10.83 (D2): the tree is where a complaint is answered, so the complaints still to assess come too, after the
+    # walked ones: the watch's open ones, most urgent first.
+    known = {item[2]["id"] for item in walked}
+    waiting = [
+        {
+            "id": item["id"],
+            "ref": complaint_ref(item),
+            "description": item.get("description"),
+            "markets": [],
+            "signed": [],
+        }
+        for item in reporting.watch(db, control_db, tenant_id, show="open", page_size=COMPLAINTS_MAX)["items"]
+        if item["id"] not in known
+    ]
+    ordered = [item[2] for item in walked] + waiting
     # Every market's tree (0.10.76): one not in the organization's reporting windows says so ("enabled").
     shown = list(markets.MARKETS)
     names = people(control_db, tenant_id, [row.approved_by for row in published.values() if row.approved_by])
     out = {
         "markets": [{**_tree(market, published.get(market), names), "enabled": market in enabled} for market in shown],
-        "complaints": [item[2] for item in walked[:COMPLAINTS_MAX]],
+        "complaints": ordered[:COMPLAINTS_MAX],
         "complaint": None,
         "paths": {},
         "never_decides": NEVER_DECIDES,

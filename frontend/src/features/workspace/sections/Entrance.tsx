@@ -91,7 +91,7 @@ export function Entrance({ onRestarted }: { onRestarted: (text: string) => void 
         </ul>
       </details>
       <details className="uw-entrance-more">
-        <summary>More</summary>
+        <summary>Restart the sample story</summary>
         <RestartSamplePanel onRestarted={onRestarted} />
       </details>
     </section>

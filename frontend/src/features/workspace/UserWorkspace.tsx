@@ -274,8 +274,7 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   "Decision trees": {
     icon: GitBranch,
     description: "Is it reportable, and by when?",
-    guide:
-      "One tree per market. Each complaint is walked through it; a reportable outcome creates the report with its data.",
+    guide: "Answer one complaint's questions per market; the outcome and Sign sit beside them.",
     context: false,
   },
   Reports: {
@@ -323,6 +322,18 @@ const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
     guide:
       "Every investigation in one list; each opens in four sections: its summary, its evidence, its decisions and actions, and its history. The main button names the next step.",
   },
+};
+
+/** The new navigation's page headings (0.10.82, U-15, the approved design): the question each page answers. */
+export const NEW_HEADS: Partial<Record<WorkspaceSection, string>> = {
+  Complaints: "What needs you first?",
+  "Decision trees": "Is it reportable, and by when?",
+  Reports: "Which authority reports are due?",
+  Investigations: "Why is it happening?",
+  Trends: "Is a product problem rising?",
+  Records: "What did you finish last?",
+  Team: "Who works on your trial?",
+  "Import your data": "Bring your own complaints in",
 };
 
 /** Under the MVP feature set Records and My Work also hold what the parked sections did (app/featureSet.ts). */
@@ -690,6 +701,7 @@ export function UserWorkspace({
                 persona={persona}
                 options={personaOptions}
                 locked={personaLocked}
+                colleague={!!trial?.is_trial && !trial?.is_owner}
                 onChoose={(code) => void choosePersona(code)}
               />
               <span className="uw-top-bell">
@@ -921,18 +933,31 @@ export function UserWorkspace({
             ) : (
               <>
                 {/* One complaint's page has its own header (sections/ComplaintPage.tsx); so has Home (0.10.73). */}
-                {section !== "Complaint" && !(fresh && section === "My Work") && (
-                  <div className="ac-page-head">
-                    <div>
-                      <p className="ac-eyebrow">{tenantName}</p>
-                      <h1 ref={heading} tabIndex={-1}>
-                        {placeLabel(section, navigation)}
-                      </h1>
-                      <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
-                      <p className="ac-page-zone">Times are in {zoneName()}.</p>
+                {section !== "Complaint" &&
+                  !(fresh && (section === "My Work" || (section === "Getting started" && trial?.is_trial))) && (
+                    <div className="ac-page-head">
+                      {fresh ? (
+                        // The new navigation (0.10.82, U-15): the section as eyebrow, the question as heading; the
+                        // time zone is said once, in Home's date line (every deadline names its own zone).
+                        <div>
+                          <p className="ac-eyebrow">{placeLabel(section, navigation)}</p>
+                          <h1 ref={heading} tabIndex={-1}>
+                            {NEW_HEADS[section] ?? placeLabel(section, navigation)}
+                          </h1>
+                          <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="ac-eyebrow">{tenantName}</p>
+                          <h1 ref={heading} tabIndex={-1}>
+                            {placeLabel(section, navigation)}
+                          </h1>
+                          <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
+                          <p className="ac-page-zone">Times are in {zoneName()}.</p>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  )}
                 {NAV[section].context &&
                   (!fresh || section === "Investigations" || section === "Trends") &&
                   (navigation === "new" ? (
@@ -947,7 +972,7 @@ export function UserWorkspace({
                     <ContextBar />
                   ))}
                 {/* A colleague the owner invited is greeted by name on their first screens (UX-26). */}
-                {trial?.is_trial && <ColleagueWelcome me={trial.me} />}
+                {trial?.is_trial && <ColleagueWelcome me={trial.me} onStart={() => open("Getting started")} />}
                 {trial?.is_trial && section !== "Share feedback" && (
                   <FeedbackPrompt onOpen={() => open("Share feedback")} />
                 )}
@@ -970,7 +995,7 @@ export function UserWorkspace({
                 <ColumnScopeProvider key={location.key} scope={columnScopeFor(section)}>
                   <SectionErrorBoundary name={section} resetKey={location.key}>
                     <div className="ca-section">
-                      {section === "Getting started" && <GettingStartedSection focus={tab} />}
+                      {section === "Getting started" && <GettingStartedSection focus={tab} heading={heading} />}
                       {section === "Readiness" && <ReadinessSection tab={tab} />}
                       {section === "Dashboard" && <DashboardSection />}
                       {section === "My Work" &&

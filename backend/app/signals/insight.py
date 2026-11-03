@@ -242,6 +242,7 @@ def _names(db: Session, tenant_id: uuid.UUID, product_ids, version_ids) -> tuple
         for row in db.query(
             Product.id,
             Product.business_id,
+            Product.product_identifier,
             Product.name,
             Product.product_family,
             Product.gmdn_term,
@@ -437,6 +438,8 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
                 "product": {
                     "id": str(product_ref),
                     "business_id": getattr(product, "business_id", None),
+                    # The organization's own identifier (SAMPLE-ORBIT-300): Home tells the sample's from yours by it.
+                    "identifier": getattr(product, "product_identifier", None),
                     "name": getattr(product, "name", None),
                 },
                 "product_version": (

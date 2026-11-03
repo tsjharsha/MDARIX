@@ -35,7 +35,7 @@ def _mark(question: dict) -> str:
     if question.get("extra"):
         return "Your extra question: recorded and printed with the answer; it never changes the conclusion."
     return (
-        "Starter text: the regulation's wording, locked."
+        "Starter, for your consultant to confirm: the regulation's wording, locked."
         if question.get("starter")
         else "Your wording of a question that drives the conclusion (a version from before the wording was locked)."
     )

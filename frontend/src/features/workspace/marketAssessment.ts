@@ -139,12 +139,20 @@ export type MarketItem = {
   question_set: QuestionSet;
   /** The factual answers the complaint's record states (never a judgement question), to confirm or correct. */
   suggestions?: Record<string, Suggestion_>;
+  /** 0.10.83 (D2): beside a judgement question (serious injury), what the record says, never its answer. */
+  record_notes?: Record<string, string>;
   /** False when a draft keeps a guide version older than the one in use now (T-G15). */
   question_set_current?: boolean;
   threshold: { level: string; label: string };
   current: Version | null;
   draft: Version | null;
-  evaluation: { suggested: Suggestion; report_type: string | null; notes: string[] } | null;
+  evaluation: {
+    suggested: Suggestion;
+    report_type: string | null;
+    notes: string[];
+    /** 0.10.83 (D2): the questions earlier answers make unnecessary, with why; not required to sign. */
+    not_asked?: Record<string, string>;
+  } | null;
   disagreement: string | null;
   history: Version[];
   clock: MarketClock | null;

@@ -61,10 +61,13 @@ class ColleagueInvite(BaseModel):
     display_name: str = Field(min_length=1, max_length=120)
     # The colleague's persona, which sets their real role (0.10.73); none named: the Quality Leader (Leader).
     persona: str | None = Field(default=None, max_length=40)
+    # Several personas (0.10.82, D1.9): each one's role; ``persona`` alone still works (one persona).
+    personas: list[str] | None = Field(default=None, max_length=7)
 
 
 class ColleaguePersona(BaseModel):
-    persona: str = Field(min_length=1, max_length=40)
+    persona: str | None = Field(default=None, min_length=1, max_length=40)
+    personas: list[str] | None = Field(default=None, max_length=7)
 
 
 # ------------------------------------------------------------------------------------------- Platform Admin queue
@@ -503,6 +506,54 @@ def mark_short_story(
     story.record_mark(request, me, complaint.id, payload.step, story.now_utc())
     db.commit()
     return story.progress(data, db, tenant_id, me, request)
+
+
+# ------------------------------------------------------------------------- One story, ten steps (0.10.82, D1)
+
+
+@router.get("/trial/one-story")
+def one_story(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The ten-step story, on the sample and on the trial's own most urgent imported complaint, each step done from
+    what was saved on the record; one story for the whole team (backend/app/trial/one_story.py)."""
+    from backend.app.trial import one_story as story
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    request = team.trial_request(db, tenant_id)
+    if request is None:
+        return {"sample": None, "yours": None}
+    return story.progress(data, db, ctx, tenant_id, request)
+
+
+class OneStoryMark(BaseModel):
+    run: str = Field(pattern="^(sample|yours)$")
+    step: str = Field(pattern="^(call|form|records|trends)$")
+
+
+@router.post("/trial/one-story/marks")
+def mark_one_story(
+    payload: OneStoryMark,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The person opened a step's screen from the story (the call, the report, Records, Trends): kept on the trial's
+    request under their name, and counted for the whole team. No business record changes."""
+    from backend.app.trial import one_story as story
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    request = db.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).with_for_update().first()
+    complaint = story.subject(data, db, tenant_id, payload.run)
+    if request is None or complaint is None:
+        raise HTTPException(404, detail={"code": "NO_STORY_COMPLAINT", "message": "This story has no complaint yet"})
+    story.record_mark(request, str(ctx.user_id), payload.run, complaint.id, payload.step, datetime.now(timezone.utc))
+    db.commit()
+    return story.progress(data, db, ctx, tenant_id, request)
 
 
 class TrialFocus(BaseModel):
@@ -1054,7 +1105,7 @@ def invite_trial_colleague(
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     return team.invite_colleague(
-        db, tenant_id, _current_user(db, ctx), payload.email, payload.display_name, payload.persona
+        db, tenant_id, _current_user(db, ctx), payload.email, payload.display_name, payload.persona, payload.personas
     )
 
 
@@ -1068,7 +1119,9 @@ def change_trial_colleague_persona(
     """The trial owner gives a colleague another persona, and with it the persona's role (backend/app/trial/team.py)."""
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
-    return team.change_colleague_persona(db, tenant_id, _current_user(db, ctx), user_id, payload.persona)
+    return team.change_colleague_persona(
+        db, tenant_id, _current_user(db, ctx), user_id, payload.persona, payload.personas
+    )
 
 
 @router.post("/trial/team/{user_id}/resend-invitation")

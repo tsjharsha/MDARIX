@@ -107,14 +107,24 @@ def _opens_of(value, where="", found=None):
 RECORD_MODELS = {"complaint": Complaint, "disposition": Complaint, "capa": Capa, "case": Investigation}
 
 
+def _intake_model():
+    from backend.app.db.models.intake import IntakeEvent
+
+    return IntakeEvent
+
+
 def _record_exists(db, tenant_id, record: dict) -> bool:
     from backend.app.db.models.authority_reports import ReportObligation
     from backend.app.db.models.guides_communications import CommunicationEntry
     from backend.app.db.models.signals import Signal
 
-    model = {**RECORD_MODELS, "report": ReportObligation, "communication": CommunicationEntry, "signal": Signal}[
-        record["kind"]
-    ]
+    model = {
+        **RECORD_MODELS,
+        "report": ReportObligation,
+        "communication": CommunicationEntry,
+        "signal": Signal,
+        "intake": _intake_model(),
+    }[record["kind"]]
     key = uuid.UUID(record["id"])
     return db.query(model).filter(model.id == key, model.tenant_id == tenant_id).first() is not None
 

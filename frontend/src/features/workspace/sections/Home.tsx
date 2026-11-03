@@ -1,28 +1,32 @@
 import type { RefObject } from "react";
 import { ChevronRight } from "lucide-react";
 import { DeadlineChip } from "../../../app/chips";
-import { formatDateTime, formatDay } from "../../../app/dates";
+import { formatDateTime, formatDay, zoneName } from "../../../app/dates";
 import { marketLabel } from "../../../app/labels";
 import { placeOf } from "../../../app/linkTable";
-import { useResource } from "../../customer-admin/shared";
+import { useResource, type Resource } from "../../customer-admin/shared";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
-import { FLAGSHIP, SHORT } from "../entrance";
 import { OVERSIGHT, eventPath, type EventView, type Oversight, type OversightItem } from "../oversight";
 import { READINESS_PATH, readinessHeadline, type Readiness } from "../readiness";
 import { comparisonLine, risingSentence, trendPath, type TrendBoard } from "../signalAi";
 import {
   DUE_WEEK_PATH,
   DUE_WEEK_VIEW,
-  HERO_PERSONAS,
+  OVERDUE_PATH,
+  OVERDUE_VIEW,
   PERSONA_GREETING,
   greeting,
-  homeCounts,
+  inData,
+  isLegalDeadline,
   laneShare,
   legalClocks,
   nextActions,
   personaItems,
+  withSource,
 } from "../home";
-import { ResumeShortStory } from "./ShortStory";
+import { IMPORTED_SOURCE } from "../complaintList";
+import { openStep, shownRun, STORY_STEPS, useOneStory, type OneStory } from "../oneStory";
+import { TrendBars } from "./OneStory";
 import { MyWorkMore } from "./MyWork";
 import { RemindersPanel } from "./Reminders";
 
@@ -34,14 +38,22 @@ import { RemindersPanel } from "./Reminders";
  * Leader's) Home keeps Release A's one-event card and the short story. All of My work stays one click below.
  */
 export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject<HTMLHeadingElement | null> }) {
-  const { session, persona = "admin", personaLabel, personaTabs = [], isTrial, open } = useWorkspace();
+  const { session, persona = "admin", personaLabel, personaTabs = [], isTrial, open, dataSource } = useWorkspace();
+  // Home follows the Sample · Your data switch (0.10.84, M5): its tiles, next actions and trends count the data shown.
+  const overdue = useResource<{ total: number }>(withSource(OVERDUE_PATH, dataSource));
   const oversight = useResource<Oversight>(`${OVERSIGHT}?show=all`);
   const trends = useResource<TrendBoard>(trendPath("version"));
   const readiness = useResource<Readiness>(persona === "executive" ? READINESS_PATH : null);
-  const items = personaItems(oversight.data?.items ?? [], persona);
-  const counts = homeCounts(items);
-  const rising = (trends.data?.items ?? []).filter((row) => row.result === "SIGNIFICANT" || row.result === "ELEVATED");
-  const actions = nextActions(items);
+  const story = useOneStory(!!isTrial);
+  const items = personaItems(oversight.data?.items ?? [], persona).filter((item) =>
+    inData(item.ref, dataSource, !!item.complaint_id),
+  );
+  const rising = (trends.data?.items ?? []).filter(
+    (row) => (row.result === "SIGNIFICANT" || row.result === "ELEVATED") && inData(row.product.identifier, dataSource),
+  );
+  // The complaint the hero names is always in the list, first among those due at the same time.
+  const hero = shownRun(story.data, dataSource);
+  const actions = nextActions(items, 5, hero?.run === "yours" ? hero.complaint.id : null);
   const clocks = persona === "regulatory" ? legalClocks(items) : [];
   const name = (session?.display_name ?? "").split(/\s+/)[0];
   const go = (item: OversightItem) => {
@@ -49,14 +61,18 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
     const place = placeOf(item.opens);
     open(place.section as WorkspaceSection, place.tab);
   };
-  const dueWeek = useResource<{ total: number }>(DUE_WEEK_PATH);
+  const dueWeek = useResource<{ total: number }>(withSource(DUE_WEEK_PATH, dataSource));
   const reading = oversight.state === "loading";
   const tenant = session?.current_tenant?.tenant_name;
   return (
     <div className="uw-home">
       <header className="uw-home-head">
         <div>
-          <span className="uw-viewing">Viewing as {personaLabel ?? persona}</span>
+          <span className="uw-viewing">
+            {isTrial
+              ? `Home · ${dataSource === IMPORTED_SOURCE ? "your data" : "sample data"}`
+              : `Viewing as ${personaLabel ?? persona}`}
+          </span>
           <h1 ref={heading} tabIndex={-1}>
             {greeting()}
             {name ? `, ${name}` : ""}
@@ -64,22 +80,30 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
           <p>{PERSONA_GREETING[persona] ?? PERSONA_GREETING.admin}</p>
         </div>
         <span className="uw-home-date">
-          {formatDay(new Date().toISOString())}
+          {/* The page's one time-zone note (0.10.82, U-15): the date line. */}
+          {formatDay(new Date().toISOString())} · times in {zoneName()}
           {tenant ? ` · ${tenant}` : ""}
         </span>
       </header>
 
-      {isTrial && HERO_PERSONAS.includes(persona) && <HomeHero />}
+      {/* The story (0.10.82, D1.6): a slim banner on the sample, the hero of your most urgent complaint on your data,
+          "Story complete" once its ten steps are done. Never a second retelling of Getting started. */}
+      {isTrial && <HomeStory story={story} />}
 
+      {/* Each tile is the count of the complaint list it opens (0.10.82, D1.6): one number, one list. */}
       <section className="uw-home-stats" aria-label="What needs attention">
         <Stat
           tone="over"
-          value={reading ? null : counts.overdue}
-          onOpen={() => open("My Work", "Team overview")}
+          value={overdue.state === "loading" ? null : (overdue.data?.total ?? null)}
+          onOpen={() => open("Complaints", OVERDUE_VIEW)}
           title="Overdue"
           // Never an all-clear before the data has arrived (0.10.81, U-07).
           detail={
-            reading ? "Reading…" : counts.overdue ? "Past their time: act on these first" : "Nothing past its time"
+            overdue.state === "loading"
+              ? "Reading…"
+              : overdue.data?.total
+                ? "Complaints past a deadline or target: act on these first"
+                : "Nothing past its time"
           }
         />
         <Stat
@@ -87,14 +111,21 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
           value={dueWeek.state === "loading" ? null : (dueWeek.data?.total ?? null)}
           onOpen={() => open("Complaints", DUE_WEEK_VIEW)}
           title="Due this week"
-          detail="Complaints with a deadline or target in the next 7 days"
+          detail={dueWeek.state === "loading" ? "Reading…" : "Complaints with a deadline or target in the next 7 days"}
         />
         <Stat
           tone="risk"
           value={trends.state === "loading" ? null : rising.length}
-          onOpen={() => open("Trends")}
+          // The trend check, where the count is (0.10.84, L3): the signal inbox lists a signal's own complaints.
+          onOpen={() => open("Trends", "Trend check")}
           title="At risk"
-          detail={rising.length ? `${rising[0].name} is rising` : "No product rising against its history"}
+          detail={
+            trends.state === "loading"
+              ? "Reading…"
+              : rising.length
+                ? `${rising[0].name} is rising`
+                : "No product rising against its history"
+          }
         />
       </section>
 
@@ -120,10 +151,11 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
                       <span className="uw-home-what">
                         <b>
                           {item.ref ? `${item.ref} · ` : ""}
-                          {item.title}
+                          {/* The reference once (U-21): "Reply due from Reporter of SAMPLE-RV-08" repeated it. */}
+                          {item.ref ? item.title.replace(` of ${item.ref}`, "") : item.title}
                         </b>
                         <small>
-                          {item.category_label} · Owner: {item.owner ?? "nobody yet"} · Due{" "}
+                          {item.category_label} · {item.owner ? `Owner: ${item.owner}` : "No owner yet"} · Due{" "}
                           {item.due_label ?? formatDateTime(item.due_at)}
                         </small>
                       </span>
@@ -148,11 +180,11 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
               <p className="ac-muted">Reading the trend check…</p>
             ) : rising.length ? (
               <ul>
-                {rising.slice(0, 3).map((row) => (
+                {rising.slice(0, 2).map((row) => (
                   <li key={row.key}>
-                    <p>
-                      <strong>{risingSentence(row)}</strong>
-                    </p>
+                    {/* Observed against expected, as bars (0.10.82, D1.6, the approved design's trend card). */}
+                    <h2 className="uw-home-trend-title">{risingSentence(row)}</h2>
+                    <TrendBars row={row} bare />
                     <p className="ac-muted">{comparisonLine(row)}</p>
                   </li>
                 ))}
@@ -161,7 +193,18 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
               <p className="ac-muted">No product is rising against its own history.</p>
             )}
             {personaTabs.includes("trends") && (
-              <button type="button" className="ac-secondary" onClick={() => open("Trends")}>
+              <button
+                type="button"
+                className="ac-secondary"
+                onClick={() =>
+                  open(
+                    "Trends",
+                    rising[0]?.product.identifier
+                      ? `Trend check?${new URLSearchParams({ product: rising[0].product.identifier })}`
+                      : "Trend check",
+                  )
+                }
+              >
                 Open the trends
               </button>
             )}
@@ -201,58 +244,126 @@ function Stat({
   );
 }
 
-/** The sample event first (Release A's one-event card, retitled in Release B), with its four steps beside it. */
-function HomeHero() {
-  const { open, startStory } = useWorkspace();
-  const event = useResource<EventView>(eventPath(FLAGSHIP));
-  const words = event.data?.event.description;
-  if (event.state === "error") return null;
-  return (
-    <>
-      <ResumeShortStory />
-      <section className="uw-card uw-home-hero" aria-labelledby="home-hero-title">
+/**
+ * The story on Home (0.10.82, D1.6), read from the same saved records as Getting started:
+ * - on the sample, a slim "Continue the story" banner (never a second retelling of the story);
+ * - on your data, the hero of your most urgent imported complaint and what the file did not say;
+ * - once its ten steps are done, a "Story complete" card.
+ */
+export function HomeStory({ story }: { story: Resource<OneStory> }) {
+  const { open, dataSource, chooseDataSource, startStory, session } = useWorkspace();
+  const run = shownRun(story.data, dataSource);
+  const event = useResource<EventView>(run && run.run === "yours" ? eventPath(run.complaint.ref) : null);
+  if (!run) return null;
+  const go = () => {
+    startStory?.(null);
+    void openStep(run, Math.min(run.current, STORY_STEPS - 1), (section, tab) => open(section, tab));
+  };
+  if (run.run === "sample" && !run.finished)
+    return (
+      <section className="uw-card uw-home-banner" aria-label="The sample story">
+        <span>
+          <span className="ms-chip is-sample">Sample story</span>{" "}
+          <b>
+            Step {run.current + 1} of {STORY_STEPS}: {run.steps[run.current].label}
+          </b>{" "}
+          <span className="ac-muted">· {run.complaint.ref}</span>
+        </span>
+        <button type="button" className="ac-primary" onClick={go}>
+          Continue the story <ChevronRight size={15} aria-hidden="true" />
+        </button>
+      </section>
+    );
+  if (run.finished)
+    return (
+      <section className="uw-card uw-home-hero" aria-labelledby="home-story-title">
         <div className="uw-home-hero-main">
-          <span className="ac-eyebrow">Start here · sample event · {FLAGSHIP}</span>
-          <h2 id="home-hero-title">{SHORT.title}</h2>
-          <blockquote className="uw-entrance-words">{words ? `“${words}”` : "Reading the sample event…"}</blockquote>
+          <span className="ac-eyebrow">Story complete · {run.complaint.ref}</span>
+          <h2 id="home-story-title">
+            {run.run === "sample"
+              ? "The sample complaint went from the call to a recorded submission and the trend check."
+              : `Your first complaint went from the call to ${
+                  run.conclusion === "NOT_REPORTABLE" ? "a signed “not reportable” conclusion" : "a recorded submission"
+                }.`}
+          </h2>
+          <p className="ac-muted">Every missing fact was asked at the step that needed it. Nothing was guessed.</p>
           <div className="ca-action-row">
-            <button
-              type="button"
-              className="ac-primary"
-              disabled={!words}
-              onClick={() => {
-                startStory?.(SHORT.key);
-                open(SHORT.start.section as WorkspaceSection, SHORT.start.tab);
-              }}
-            >
-              Review this sample event <ChevronRight size={15} aria-hidden="true" />
-            </button>
-            <button type="button" className="ac-link" onClick={() => open("Getting started")}>
-              More stories
-            </button>
+            {run.run === "sample" && story.data?.yours ? (
+              <button type="button" className="ac-primary" onClick={() => chooseDataSource?.(IMPORTED_SOURCE)}>
+                Do the same with your data <ChevronRight size={15} aria-hidden="true" />
+              </button>
+            ) : run.run === "sample" && !session?.sample_only ? (
+              <button type="button" className="ac-primary" onClick={() => open("Import your data")}>
+                Do the same with your data <ChevronRight size={15} aria-hidden="true" />
+              </button>
+            ) : (
+              <button type="button" className="ac-primary" onClick={() => open("Records")}>
+                See the record <ChevronRight size={15} aria-hidden="true" />
+              </button>
+            )}
           </div>
-          <p className="uw-entrance-tag">Fictional manufacturer · Sample data only</p>
         </div>
-        <aside className="uw-home-hero-side" aria-label={`${SHORT.steps.length} steps`}>
-          <span className="ac-eyebrow">{SHORT.steps.length} steps</span>
-          <ol>
-            {SHORT.steps.map((step, index) => (
-              <li key={step.label}>
+      </section>
+    );
+  // The legal clock only, never an approval task's due date (0.10.84, H2): the rule Home's legal clocks use.
+  const clock = event.data?.work?.due.find(isLegalDeadline);
+  const harm = run.complaint.death ? "a death" : run.complaint.serious_injury ? "a serious injury" : "a malfunction";
+  const country = run.market_label;
+  return (
+    <section className="uw-card uw-home-hero" aria-labelledby="home-story-title">
+      <div className="uw-home-hero-main">
+        <span className="ac-eyebrow">Your data · your most urgent complaint</span>
+        <h2 id="home-story-title">
+          {run.complaint.ref} is {harm}
+          {country ? ` in ${country}` : " with no incident country"}.
+          {clock
+            ? ` Its ${clock.key.endsWith(":facts") ? (run.market ? "provisional " : "shortest possible ") : ""}clock ends ${dueDay(clock)}.`
+            : ""}
+        </h2>
+        {run.complaint.description && (
+          <blockquote className="uw-entrance-words">“{run.complaint.description}”</blockquote>
+        )}
+        <div className="ca-action-row">
+          <button type="button" className="ac-primary" onClick={go}>
+            Walk it through · step {run.current + 1} of {STORY_STEPS} <ChevronRight size={15} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+      <aside className="uw-home-hero-side" aria-label="What your file did not say">
+        <span className="ac-eyebrow">What your file did not say</span>
+        <ol>
+          {run.needs.length ? (
+            run.needs.map((need) => (
+              <li key={need.fact}>
                 <span className="uw-home-step" aria-hidden="true">
-                  {index + 1}
+                  ?
                 </span>
                 <span>
-                  {step.label}
-                  {index === SHORT.steps.length - 1 && <small>The record you can hand to a colleague</small>}
+                  {need.label}
+                  <small>Asked on the complaint page: {need.rule.split(";")[0]}</small>
                 </span>
               </li>
-            ))}
-          </ol>
-        </aside>
-      </section>
-    </>
+            ))
+          ) : (
+            <li>
+              <span className="uw-home-step" aria-hidden="true">
+                ✓
+              </span>
+              <span>
+                Every fact the reporting steps need is given
+                <small>Nothing was guessed</small>
+              </span>
+            </li>
+          )}
+        </ol>
+      </aside>
+    </section>
   );
 }
+
+/** "Thu 5 Nov" from a due item's label ("Thu 5 Nov 2026, 23:59 IST"). */
+export const dueDay = (item: { due_label?: string; due_at: string }) =>
+  (item.due_label ?? formatDay(item.due_at)).split(",")[0].replace(/ \d{4}$/, "");
 
 /** The Regulatory Leader's legal clocks: each market's deadline, soonest first, with how much time is used. */
 export function LegalClocks({

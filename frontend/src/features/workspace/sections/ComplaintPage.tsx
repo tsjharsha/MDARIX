@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useState, type ReactNode, type RefObject } from "react";
 import { Check, ChevronRight, History, MoreHorizontal, Send } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { errorText, formatDate, send, useResource } from "../../customer-admin/shared";
@@ -29,17 +29,59 @@ import { COMPLAINT_STEP_WHY } from "../whyAsked";
 import { ServiceWork, serviceText } from "./ServiceWork";
 import { ShortStoryPanel, useShortStory } from "./ShortStory";
 import { InlineTriage } from "./Triage";
+import { TRIAGE, type TriageList } from "../intake";
 import { treePlace } from "./DecisionTrees";
 import { FLAGSHIP } from "../entrance";
 import { requestJson } from "../../../app/apiClient";
 import { awarenessText } from "../../../app/dates";
 import { ReportingFacts } from "./ReportingFacts";
+import { StoryPill } from "./OneStory";
+import { dueDay } from "./Home";
+import { isLegalDeadline } from "../home";
+import { openStep, runOf, useOneStory, type StoryRun } from "../oneStory";
 
-const HARM = {
-  DEATH: { harm: "critical", label: "Death" },
-  SERIOUS_INJURY: { harm: "serious", label: "Serious injury" },
-  PATIENT_INVOLVED: { harm: "none", label: "Patient involved" },
-} as const;
+/**
+ * The harm in words (0.10.82, D1.7; U-18): "Death", "Serious injury", "No harm reported" or "Not known yet", never
+ * "Patient involved", which is its own line.
+ */
+export function harmOf(event: Pick<EventView["event"], "harm" | "harm_words">): {
+  harm: "critical" | "serious" | "none";
+  label: string;
+} {
+  const tone = event.harm === "DEATH" ? "critical" : event.harm === "SERIOUS_INJURY" ? "serious" : "none";
+  const label =
+    event.harm_words ??
+    (event.harm === "DEATH" ? "Death" : event.harm === "SERIOUS_INJURY" ? "Serious injury" : "No harm reported");
+  return { harm: tone, label };
+}
+
+/** The header's one clock: the nearest legal clock, else the nearest of the organization's own targets. */
+export const oneClock = (due: NonNullable<EventView["work"]>["due"]) =>
+  due.find((item) => isLegalDeadline(item)) ?? due[0] ?? null;
+
+/** Whose clock it is: a market's; while a fact is missing, "Shortest possible" (no country yet) or the incident
+ * country's market, provisional (only the awareness date missing: 0.10.84, H3; never a market's firm deadline, 0.10.81
+ * F4); else the target's kind. ``country``: the complaint's market once its country is known. */
+export const clockPrefix = (item: NonNullable<EventView["work"]>["due"][number], country: string | null = null) =>
+  item.key.endsWith(":facts")
+    ? country
+      ? `${marketLabel(country)}, provisional`
+      : "Shortest possible"
+    : isLegalDeadline(item) && item.market
+      ? marketLabel(item.market)
+      : item.category_label;
+
+/** Each step of the checklist by its name (its state follows in words). */
+const CHECK_NAMES: Record<string, string> = {
+  TRIAGE: "Triage record",
+  FIRST_CONTACT: "First-contact check",
+  MARKETS: "Market assessments",
+  OBLIGATIONS: "Authority reports",
+  DECISION: "Disposition or investigation decision",
+  REQUESTS: "Information requests",
+  TASKS: "Tasks on the event",
+  CAPA: "CAPA",
+};
 
 /** "Short words from the description": the header's one line on what happened. */
 export const headline = (text: string | null | undefined, max = 140) => {
@@ -48,14 +90,12 @@ export const headline = (text: string | null | undefined, max = 140) => {
   return words.length > max ? `${words.slice(0, max - 1).trimEnd()}…` : words;
 };
 
-const LEGAL = ["REPORTING", "OBLIGATION"];
-
 /** One chip per market's legal deadline, then one per kind of the organization's own target (a triage target, a
  * reply due), each the nearest. */
 export function deadlineChips(due: NonNullable<EventView["work"]>["due"]) {
   const seen = new Set<string>();
   return due.filter((item) => {
-    const key = LEGAL.includes(item.category) ? `market:${item.market ?? ""}` : item.category;
+    const key = isLegalDeadline(item) ? `market:${item.market ?? ""}` : item.category;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -97,11 +137,17 @@ export function attentionText(blocked: Array<{ detail: string }>, hasStep: boole
  * addresses still open: Summary and Decisions & actions on Details, Evidence on Related, History on Activity.
  */
 export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObject<HTMLHeadingElement | null> }) {
-  const { open, reportTab, shownTab, story } = useWorkspace();
+  const { open, reportTab, shownTab, story, startStory, isTrial } = useWorkspace();
+  // The ten-step story (0.10.82, D1.5): on its own complaint, its step is the rail's Next step, and a slim pill.
   const ref = tabParam(tab, "ref") ?? "";
+  const oneStory = useOneStory(!!ref && !!isTrial);
   const resource = useResource<EventView>(ref ? eventPath(ref) : null);
   const [shown, setShown] = useState<EventView | null>(null);
   const view = shown ?? resource.data;
+  const storyRun = runOf(oneStory.data, view?.event.ref);
+  // An urgent call that is not a complaint yet has no complaint page: it is found on the triage list (U-20).
+  const calls = useResource<TriageList>(resource.state === "error" ? TRIAGE : null);
+  const call = calls.data?.items.find((item) => item.kind === "INTAKE" && item.ref === ref);
   const [active, setActive] = useState<ComplaintSection>(() => sectionOf(tab));
   // Ready to close is shown when it is the next step or signed; before that it is revealed on request (one main button).
   const [readyShown, setReadyShown] = useState(false);
@@ -123,8 +169,24 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   };
   if (!view)
     return (
-      <Panel eyebrow="Complaint" title={ref || "Complaint"} source={resource}>
-        {resource.state === "error" && (
+      // A call found on the triage list is shown as such (the panel shows its children only when ready).
+      <Panel eyebrow="Complaint" title={ref || "Complaint"} source={call ? undefined : resource}>
+        {resource.state === "error" && call && (
+          <Empty
+            title={`${ref} is a call, not a complaint yet`}
+            detail="It waits on the triage list: triage it there, and decide whether it is a complaint."
+            action={
+              <button
+                type="button"
+                className="ac-primary"
+                onClick={() => open("Complaints", `To triage?${new URLSearchParams({ ref })}`)}
+              >
+                Triage it
+              </button>
+            }
+          />
+        )}
+        {resource.state === "error" && !call && (
           <Empty
             title="This complaint could not be opened"
             detail={errorText(resource.error, "It is not in your organization, or your role cannot open it.")}
@@ -145,7 +207,13 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   const work = view.work;
   const step = nextStep(view);
   const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
-  const harm = event.harm ? HARM[event.harm] : null;
+  const harm = harmOf(event);
+  // Each missing fact is asked once, in Details (0.10.82, D1.7): the awareness in the triage record while triage is
+  // here, else beside the country; the header and the facts say where.
+  const needs = event.needs ?? [];
+  const needed = (fact: string) => needs.some((need) => need.fact === fact);
+  const clock = oneClock(work?.due ?? []);
+  const reports = view.related?.find((group) => group.key === "reports")?.items ?? [];
   // Triage is done here, on the page (0.10.72, B3): its panel replaces the button that opened the triage list. The
   // short story records the triage in its own step 2.
   const triageHere =
@@ -162,13 +230,16 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   const readyNow = (!!step && !step.opens) || !!view.ready;
   const record = (
     <>
-      <nav className="uw-crumbs" aria-label="Where you are">
-        <button type="button" className="ac-link" onClick={() => open("Complaints")}>
-          Complaints
-        </button>
-        <span aria-hidden="true">›</span>
-        <span>{event.ref}</span>
-      </nav>
+      <div className="uw-topline">
+        <nav className="uw-crumbs" aria-label="Where you are">
+          <button type="button" className="ac-link" onClick={() => open("Complaints")}>
+            Complaints
+          </button>
+          <span aria-hidden="true">›</span>
+          <span>{event.ref}</span>
+        </nav>
+        {storyRun && <StoryPill run={storyRun} />}
+      </div>
       <header className="uw-card uw-highlights" aria-label="The complaint at a glance">
         <div className="uw-hl-top">
           <div className="uw-hl-title">
@@ -181,21 +252,16 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
             <p className="uw-cp-what">{headline(event.description)}</p>
           </div>
           <div className="uw-cp-chips">
-            {harm && <HarmChip harm={harm.harm} label={harm.label} />}
-            {deadlineChips(work?.due ?? []).map((item) => (
+            <HarmChip harm={harm.harm} label={harm.label} />
+            {/* One clock line (0.10.82, D1.7): the nearest legal clock, its time left and its day; a clock waiting
+                for the country or the awareness date is the shortest possible one, never a market's (0.10.81). */}
+            {clock && (
               <DeadlineChip
-                key={item.key}
-                item={item}
-                prefix={
-                  // A clock waiting for the country or the awareness date is never shown as a real deadline (0.10.81).
-                  item.key.endsWith(":facts")
-                    ? "Provisional deadline"
-                    : LEGAL.includes(item.category) && item.market
-                      ? marketLabel(item.market)
-                      : item.category_label
-                }
+                item={clock}
+                prefix={clockPrefix(clock, needed("COUNTRY") ? null : event.market)}
+                suffix={`due ${dueDay(clock)}`}
               />
-            ))}
+            )}
             <ToneBadge tone={EVENT_TONES[view.state]} label={view.state_label} />
           </div>
         </div>
@@ -214,7 +280,23 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           </div>
           <div>
             <dt>Markets</dt>
-            <dd>{markets.map(marketLabel).join(", ") || "—"}</dd>
+            <dd>
+              {needed("COUNTRY") ? (
+                <span className="ac-muted">Incident country asked below</span>
+              ) : (
+                markets.map(marketLabel).join(", ") || "—"
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Awareness</dt>
+            <dd>
+              {needed("AWARENESS_DATE") ? (
+                <span className="ac-muted">Asked below</span>
+              ) : (
+                awarenessText(event.awareness_at, event.awareness_date_only)
+              )}
+            </dd>
           </div>
           <div>
             <dt>Lot</dt>
@@ -227,7 +309,35 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
             </dd>
           </div>
         </dl>
-        <StagePath stages={view.stages} />
+        {/* The progress steps are links (0.10.82, D1.8): Market assessment opens the tree, Report the report. */}
+        <StagePath
+          stages={view.stages}
+          links={{
+            TRIAGE: triageHere ? () => openHere(step?.opens ?? null) : undefined,
+            MARKETS: markets[0]
+              ? () => {
+                  const place = treePlace(markets[0], event.complaint_id);
+                  open(place.section, place.tab);
+                }
+              : undefined,
+          }}
+          after={{
+            MARKETS: reports.length ? (
+              <span className="uw-stageline-extra">
+                <button
+                  type="button"
+                  className="ac-link"
+                  onClick={() => {
+                    const place = reportPlace(reports[0].id);
+                    open(place.section, place.tab);
+                  }}
+                >
+                  Report
+                </button>
+              </span>
+            ) : null,
+          }}
+        />
       </header>
       {/* The short story's step to do now (0.10.71, A4), from what was saved on this record. */}
       {storyShown && !summaryLeads && <ShortStoryPanel view={view} onChanged={changed} />}
@@ -253,11 +363,20 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
               <>
                 {/* Triage is done here when it is the next step (0.10.72, B3), first in Details beside the rail. */}
                 {triageHere && <InlineTriage complaintId={event.complaint_id} onDone={() => resource.reload()} />}
+                {/* The facts the reporting steps need, asked once (0.10.81's ask; 0.10.82, D1.7: here, not twice). */}
+                <ReportingFacts
+                  complaintId={event.complaint_id}
+                  needs={triageHere ? needs.filter((need) => need.fact !== "AWARENESS_DATE") : needs}
+                  quiet={triageHere}
+                  onSaved={() => void requestJson<EventView>(eventPath(event.ref)).then(changed)}
+                />
                 <dl className="uw-rec-facts">
                   <dt>What happened</dt>
                   <dd>{event.description || "No description recorded."}</dd>
                   <dt>Harm</dt>
-                  <dd>{harm ? harm.label : "None recorded"}</dd>
+                  <dd>{harm.label}</dd>
+                  <dt>Patient involved</dt>
+                  <dd>{event.patient_involved == null ? "Not recorded" : event.patient_involved ? "Yes" : "No"}</dd>
                   <dt>Problem</dt>
                   <dd>
                     {event.problem_code ? <ProblemCode code={event.problem_code} links={links} /> : "None recorded"}
@@ -280,12 +399,16 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                             </button>
                           </span>
                         ))
-                      : "No market to assess"}
+                      : needed("COUNTRY")
+                        ? "Waits for the incident country, asked above"
+                        : "None of your reporting markets applies"}
                     <small>Each market's tree: the question, the answer, the clause and the outcome.</small>
                   </dd>
                   <dt>Awareness</dt>
                   <dd>
-                    {awarenessText(event.awareness_at, event.awareness_date_only)}
+                    {needed("AWARENESS_DATE")
+                      ? "Asked above"
+                      : awarenessText(event.awareness_at, event.awareness_date_only)}
                     <small>The legal clocks count from here.</small>
                   </dd>
                   <dt>In your QMS</dt>
@@ -335,6 +458,11 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           step={step}
           triageHere={triageHere}
           storyShown={storyShown}
+          storyRun={storyRun}
+          onStory={(run) => {
+            startStory?.(null);
+            void openStep(run, run.current, open).then(oneStory.reload);
+          }}
           onStep={() => {
             if (step?.opens) return go(step.opens);
             choose("Summary");
@@ -389,30 +517,67 @@ export function sectionOf(tab: string | undefined): ComplaintSection {
   return FORMER_SECTIONS[name] ?? offeredTab(name, COMPLAINT_SECTIONS, "Summary");
 }
 
-/** The stage line as chevrons (the record page's path): done, now, later, not needed. */
-export function StagePath({ stages }: { stages: EventView["stages"] }) {
+/** "Stage 2 of 6", from the stage marked current (else the first not done; every stage done: the last). */
+export function stageCount(stages: EventView["stages"]): string {
+  const at = stages.findIndex((stage) => stage.state === "CURRENT");
+  const open = stages.findIndex((stage) => stage.state !== "DONE" && stage.state !== "NOT_NEEDED");
+  const index = at >= 0 ? at : open >= 0 ? open : stages.length - 1;
+  return `Stage ${index + 1} of ${stages.length}`;
+}
+
+/**
+ * The page's one progress indicator (0.10.82, D1.5): one status line, "Stage 2 of 6 · Triage › Market assessment ›
+ * …", the current stage marked (on a phone only the current one shows). A stage with a place of its own is a link
+ * (D1.8): ``links`` gives what opening it does, ``after`` what follows its name (the report beside its assessment).
+ */
+export function StagePath({
+  stages,
+  links = {},
+  after = {},
+}: {
+  stages: EventView["stages"];
+  links?: Record<string, (() => void) | undefined>;
+  after?: Record<string, ReactNode>;
+}) {
   return (
-    <ol className="uw-path" aria-label="Stage">
-      {stages.map((stage) => {
-        const state =
-          stage.state === "DONE"
-            ? "done"
-            : stage.state === "CURRENT"
-              ? "now"
-              : stage.state === "NOT_NEEDED"
-                ? "skip"
-                : "later";
-        return (
-          <li key={stage.code} className={`is-${state}`} aria-current={state === "now" ? "step" : undefined}>
-            {state === "done" && <Check size={13} aria-hidden="true" />}
-            <span>{stage.label}</span>
-            <span className="sr-only">
-              {state === "done" ? ": done" : state === "now" ? ": now" : state === "skip" ? ": not needed" : ": later"}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="uw-stageline">
+      <b className="uw-stageline-count">{stageCount(stages)} ·</b>
+      <ol className="uw-stageline-ol" aria-label="Stage">
+        {stages.map((stage) => {
+          const state =
+            stage.state === "DONE"
+              ? "done"
+              : stage.state === "CURRENT"
+                ? "now"
+                : stage.state === "NOT_NEEDED"
+                  ? "skip"
+                  : "later";
+          const go = links[stage.code];
+          return (
+            <li key={stage.code} className={`is-${state}`} aria-current={state === "now" ? "step" : undefined}>
+              {state === "done" && <Check size={13} aria-hidden="true" />}
+              {go ? (
+                <button type="button" className="ac-link" onClick={go}>
+                  {stage.label}
+                </button>
+              ) : (
+                <span>{stage.label}</span>
+              )}
+              {after[stage.code]}
+              <span className="sr-only">
+                {state === "done"
+                  ? ": done"
+                  : state === "now"
+                    ? ": now"
+                    : state === "skip"
+                      ? ": not needed"
+                      : ": later"}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
@@ -422,11 +587,16 @@ function Rail({
   step,
   triageHere,
   storyShown,
+  storyRun,
+  onStory,
   onStep,
   onShowTriage,
   onChanged,
 }: {
   view: EventView;
+  /** The ten-step story's run when this complaint is its record: its step is the Next step (0.10.82, D1.5). */
+  storyRun?: StoryRun | null;
+  onStory?: (run: StoryRun) => void;
   step: ReturnType<typeof nextStep>;
   /** Opens Details, where the triage record is, when another section is shown. */
   onShowTriage?: () => void;
@@ -437,17 +607,27 @@ function Rail({
 }) {
   const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
   const lanes = legalLanes(view);
-  const clocked = new Set(
-    (view.work?.due ?? []).filter((item) => LEGAL.includes(item.category)).map((item) => item.market),
-  );
-  const without = (view.work?.markets ?? []).filter((market) => !clocked.has(market)).map(marketLabel);
+  const clocked = new Set((view.work?.due ?? []).filter((item) => isLegalDeadline(item)).map((item) => item.market));
+  // A clock waiting for a fact stands for every market (0.10.84): none of them is "without a clock" meanwhile.
+  const waiting = (view.work?.due ?? []).some((item) => item.key.endsWith(":facts"));
+  const without = waiting ? [] : (view.work?.markets ?? []).filter((market) => !clocked.has(market)).map(marketLabel);
   const code = blocked[0]?.code ?? "READY";
   const signers = view.signers?.[code];
   return (
     <aside className="uw-rail" aria-label="What to do next">
       <section className="uw-card uw-card-pad uw-rail-next">
         <h2>Next step</h2>
-        {triageHere ? (
+        {storyRun && !storyRun.finished && !triageHere && !storyShown && onStory ? (
+          <>
+            <b>
+              Story step {storyRun.current + 1}: {STORY_ACTIONS[storyRun.current][0]}
+            </b>
+            <p className="ac-muted">{STORY_ACTIONS[storyRun.current][1]}</p>
+            <button type="button" className="ac-primary" onClick={() => onStory(storyRun)}>
+              {STORY_ACTIONS[storyRun.current][2]} <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          </>
+        ) : triageHere ? (
           <>
             <b>{step?.label}</b>
             <p className="ac-muted">The triage record is first in Details.</p>
@@ -481,11 +661,11 @@ function Rail({
       </section>
       <section className="uw-card uw-card-pad uw-rail-clocks" aria-label="Legal clocks">
         <h2>Legal clocks</h2>
-        <ReportingFacts
-          complaintId={view.event.complaint_id}
-          needs={view.event.needs}
-          onSaved={() => void requestJson<EventView>(eventPath(view.event.ref)).then(onChanged)}
-        />
+        {!!view.event.needs?.length && (
+          <p className="ac-muted">
+            Provisional: {view.event.needs.map((need) => need.label.toLowerCase()).join(" and ")} asked in Details.
+          </p>
+        )}
         {lanes.map((lane) => (
           <div key={lane.key} className="uw-rail-clock">
             <div className="uw-home-clock-line">
@@ -531,6 +711,20 @@ function Rail({
     </aside>
   );
 }
+
+/** Each story step on the rail: what it is, one line, and its one button (Getting started's step card's action). */
+const STORY_ACTIONS: Array<[string, string, string]> = [
+  ["read the call", "The reporter's words are on this page; the awareness time starts every clock.", "Read the call"],
+  ["triage", "Severity, owner and the first action.", "Open the triage"],
+  ["the decision tree", "Facts from the record arrive to confirm; judgement questions are yours.", "Open the tree"],
+  ["reportable or not", "Sign the conclusion: your role decides who signs, never the persona.", "Go to the outcome"],
+  ["the form", "Created when you signed “reportable”.", "Open the report"],
+  ["fill what is missing", "Each field still empty names its form box.", "Open the missing fields"],
+  ["approval", "A second person approves.", "Open the approval"],
+  ["PDF and submission", "MDARIX never submits: you record what you sent.", "Open the PDF step"],
+  ["records", "The signed record, ready for an inspector.", "Open Records"],
+  ["trends", "Is it happening elsewhere?", "Open Trends"],
+];
 
 /** What each step is, for "Who signs". */
 const STEP_NAMES: Record<string, string> = {
@@ -675,7 +869,8 @@ function CheckRow({
     <li>
       <ToneBadge tone={CHECK_TONES[item.result]} label={item.result_label} />
       <span>
-        <strong>{item.label}.</strong> {item.detail}
+        {/* The step's name, then its state in words: never a goal beside a state that denies it (U-19, D1.7). */}
+        <strong>{CHECK_NAMES[item.code] ?? item.label}:</strong> {item.detail}
         {open && <WhyAsked why={COMPLAINT_STEP_WHY[item.code]} />}
         {open && <WhoSigns view={view} code={item.code} />}
       </span>
@@ -778,7 +973,7 @@ function SendTo({ view, code, onSent }: { view: EventView; code: string; onSent:
  */
 export function legalLanes(view: Pick<EventView, "event" | "work">): Lane[] {
   return deadlineChips(view.work?.due ?? [])
-    .filter((item) => LEGAL.includes(item.category) && item.market)
+    .filter((item) => isLegalDeadline(item) && item.market)
     .map((item) => ({
       key: item.key,
       market: marketLabel(item.market!),

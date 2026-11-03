@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Lock, LogOut, Search, Settings2, Upload, UserRound } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Lock, LogOut, Search, Settings2, Upload, UserRound } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { recordPlace } from "../../app/linkTable";
 import { shortRoles } from "../../app/roles";
@@ -105,11 +105,14 @@ export function PersonaSwitch({
   options,
   locked,
   onChoose,
+  colleague = false,
 }: {
   persona: string;
   options: readonly PersonaOption[];
   locked: boolean;
   onChoose: (code: string) => void;
+  /** A colleague the owner gave several personas: the menu lists only theirs (0.10.82, D1.9). */
+  colleague?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -120,7 +123,6 @@ export function PersonaSwitch({
     return (
       <div className="uw-persona">
         <span className="uw-persona-btn is-locked" title="Your persona is your role, set by the trial owner">
-          <PersonaDot code={persona} label={label} />
           <span>{label}</span>
           <small className="uw-persona-hint">· set by the trial owner</small>
           <Lock size={14} aria-label="Locked" />
@@ -137,14 +139,14 @@ export function PersonaSwitch({
         aria-controls="uw-persona-menu"
         onClick={() => setOpen((value) => !value)}
       >
-        <PersonaDot code={persona} label={label} />
+        {/* One avatar on the top bar (0.10.82): the persona is named here, its circle only in the menu. */}
         <small className="uw-persona-hint">Viewing as</small>
         <span>{label}</span>
         <ChevronDown size={14} aria-hidden="true" />
       </button>
       {open && (
         <div className="uw-pop uw-persona-menu" id="uw-persona-menu" role="menu" aria-label="View MDARIX as">
-          <p className="uw-pop-title">View MDARIX as</p>
+          <p className="uw-pop-title">{colleague ? "Your personas · set by the trial owner" : "View MDARIX as"}</p>
           {options.map((item) => (
             <button
               key={item.code}
@@ -166,8 +168,9 @@ export function PersonaSwitch({
             </button>
           ))}
           <p className="uw-pop-note">
-            Changes what you see, not what you may sign. Signing follows your own role. MDARIX remembers your choice for
-            your next sign-in.
+            {colleague
+              ? `You hold these ${options.length} personas, so you can switch between them. Only the trial owner can add or remove one. You may sign what each of your roles allows, but never approve something you prepared.`
+              : "Changes what you see, not what you may sign. Signing follows your own role. MDARIX remembers your choice for your next sign-in."}
           </p>
         </div>
       )}
@@ -175,7 +178,13 @@ export function PersonaSwitch({
   );
 }
 
-type Hit = { key: string; kind: "Complaint" | "Product" | "Report"; title: string; detail: string; go: () => void };
+type Hit = {
+  key: string;
+  kind: "Complaint" | "Call" | "Product" | "Report";
+  title: string;
+  detail: string;
+  go: () => void;
+};
 
 /**
  * One search across complaints, products and reports (the server's own reads: the complaint list, the product search
@@ -213,7 +222,9 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
         requestJson<any>(`/api/v1/complaints?q=${term}&page_size=5`).catch(() => null),
         requestJson<any>(`/api/v1/data-plane/search?q=${term}&limit=20`).catch(() => null),
         requestJson<any>("/api/v1/reports").catch(() => null),
-      ]).then(([complaints, records, reports]) => {
+        // Calls not yet a complaint (SAMPLE-URG-01) are found too, and open their triage card (0.10.82, U-20).
+        requestJson<any>("/api/v1/triage").catch(() => null),
+      ]).then(([complaints, records, reports, triage]) => {
         if (!live) return;
         const found: Hit[] = [];
         for (const row of (complaints?.items ?? complaints?.complaints ?? []) as any[]) {
@@ -239,6 +250,23 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
           });
         }
         const needle = q.toLowerCase();
+        for (const row of ((triage?.items ?? []) as any[])
+          .filter(
+            (item) =>
+              item.kind === "INTAKE" &&
+              String(item.ref ?? "")
+                .toLowerCase()
+                .includes(needle),
+          )
+          .slice(0, 3)) {
+          found.push({
+            key: `t-${row.id}`,
+            kind: "Call",
+            title: String(row.ref),
+            detail: `A call to triage · ${String(row.words ?? "").slice(0, 70)}`,
+            go: go({ section: "Complaints", tab: `To triage?${new URLSearchParams({ ref: String(row.ref) })}` }),
+          });
+        }
         for (const row of reportHits(reports?.items ?? reports?.reports ?? [], needle)) {
           found.push({
             key: `r-${row.id}`,
@@ -283,7 +311,8 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
         value={text}
         placeholder="Search complaints, products, reports"
         aria-label="Search complaints, products and reports"
-        aria-controls="uw-search-results"
+        // Only while the results exist: a reference to a missing id is invalid (0.10.84, accessibility).
+        aria-controls={shown && hits ? "uw-search-results" : undefined}
         onFocus={() => hits && setShown(true)}
         onChange={(event) => setText(event.target.value)}
       />
@@ -429,7 +458,14 @@ export function AvatarMenu({
         <div className="uw-pop uw-avatar-menu" role="menu" aria-label="Account">
           <p className="uw-avatar-who">
             <b>{name}</b>
-            <small>{shortRoles(session)}</small>
+            {/* The persona(s) the person works as, the words of the "Viewing as" chip (0.10.82, U-21). */}
+            <small>
+              {session?.persona_label
+                ? session.persona_locked === false && (session.persona_options?.length ?? 0) < 8
+                  ? session.persona_options!.map((item) => item.label).join(" + ")
+                  : session.persona_label
+                : shortRoles(session)}
+            </small>
           </p>
           <button
             type="button"
@@ -518,9 +554,21 @@ export function TabBar({
   current: string | null;
   open: (section: WorkspaceSection) => void;
 }) {
+  // On a phone the bar scrolls: a fade and an arrow say more tabs exist, until the last one is in view (0.10.82).
+  const row = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  const measure = () => {
+    const el = row.current;
+    setMore(!!el && el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  };
+  useEffect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [tabs.length]);
   return (
-    <nav className="uw-tabs" aria-label="Destinations">
-      <div className="uw-tabs-in">
+    <nav className={`uw-tabs${more ? " has-more" : ""}`} aria-label="Destinations">
+      <div className="uw-tabs-in" ref={row} onScroll={measure}>
         {tabs.map((key) => (
           <button
             key={key}
@@ -533,6 +581,11 @@ export function TabBar({
           </button>
         ))}
       </div>
+      {more && (
+        <span className="uw-tabs-more" aria-hidden="true">
+          <ChevronRight size={16} />
+        </span>
+      )}
     </nav>
   );
 }

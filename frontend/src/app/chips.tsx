@@ -15,7 +15,18 @@ export const deadlineUrgency = (text: string): DeadlineUrgency =>
   /overdue/i.test(text) ? "overdue" : /^(Due today|Due now|\d+ h left)$/.test(text) ? "soon" : "later";
 
 /** A deadline chip: icon and words from the one time-left helper; `prefix` names it ("Triage target"). */
-export function DeadlineChip({ item, prefix, now }: { item: DueLike; prefix?: string; now?: Date }) {
+export function DeadlineChip({
+  item,
+  prefix,
+  suffix,
+  now,
+}: {
+  item: DueLike;
+  prefix?: string;
+  /** After the time left, as " · due Thu 5 Nov" (the complaint page's one clock line, 0.10.82). */
+  suffix?: string;
+  now?: Date;
+}) {
   const text = timeLeft(item, now);
   if (!text) return null;
   const urgency = deadlineUrgency(text);
@@ -24,6 +35,7 @@ export function DeadlineChip({ item, prefix, now }: { item: DueLike; prefix?: st
     <span className={`ms-chip ms-chip-deadline is-${urgency}`}>
       <Icon size={14} aria-hidden="true" />
       {prefix ? `${prefix}: ${text}` : text}
+      {suffix ? ` · ${suffix}` : ""}
     </span>
   );
 }

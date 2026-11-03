@@ -276,15 +276,15 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           "The quality loop MDARIX closes, chapter by chapter: what your records show in each, why inspectors care, and where to try it. Start on the sample data, then on your own export.",
         tasks: [
           {
-            title: "Review the sample event (the new navigation)",
+            title: "Follow one complaint, from the first call to the signed report (the new navigation)",
             steps: [
-              "On the new navigation a trial opens on one sample event: A hospital sent a monitor for service. Should Quality review this too? It shows the reporter's own words. Choose Review this sample event.",
-              "The short story has 4 steps on SAMPLE-RV-11: read the call, decide its route, name the open question, and the intake decision summary. A bar at the top shows the step you are on; it counts what you saved, not the screen you are on.",
-              "On each screen the main button is the next step; Why am I asked? under each question gives its reason and clause. After the summary, Continue the full evaluation leads to the markets, the report, the decision and ready to close.",
-              "The other stories are under More stories, and Restart the sample story under More. The ten chapters are under Explore all capabilities. Getting started is the first tab, left of Home. Your own export goes in on its own page: Import your data on the top bar (in the avatar menu on a phone), or Help, Try your own data.",
+              "On the new navigation Getting started opens on one story of ten steps: the call, triage, the decision tree, reportable or not, the form for the country, fill what is missing, approval, the PDF and submission, Records and Trends.",
+              "The sample walks it first, on SAMPLE-RV-11. Each step has one main button that opens the real screen with the record in place. A step is ticked from what was saved on the record, never from the screen you are on.",
+              "After step 10, Do the same with your data runs the same ten steps on your own most urgent imported complaint: the most serious harm, then the shortest clock. Where your file lacks a fact, the step says so and the complaint page asks for it.",
+              "The shorter stories (the sample event's four steps among them), the ten chapters and your trial are under More ways to explore. Getting started is the first tab, left of Home. Your own export goes in on its own page: Import your data on the top bar (in the avatar menu on a phone), or Help, Try your own data.",
             ],
             result:
-              "After your first visit the trial opens on My work, with Resume SAMPLE-RV-11 first while the short story is unfinished.",
+              "On the story's own complaint and report, a slim Story · Step N of 10 · Back pill keeps your place.",
           },
           {
             title: "Follow the story",

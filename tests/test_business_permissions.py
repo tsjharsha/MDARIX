@@ -39,6 +39,8 @@ EXEMPT = {
     ("PUT", "/api/v1/workspace/context"): "the user's own workspace preferences",
     ("POST", "/api/v1/trial/short-story/marks"): "the person's own progress in the trial's short story (the call "
     "read, the summary seen; 0.10.71): no business record changes, trial only",
+    ("POST", "/api/v1/trial/one-story/marks"): "the person's own progress in the trial's ten-step story (a step's "
+    "screen opened; 0.10.82): no business record changes, trial only",
     ("POST", "/api/v1/signer-training/{document_code}/acknowledge"): "the person's own record of reading a document "
     "(T-G40P): every signed-in member acknowledges for themselves, nobody for another",
     ("POST", "/api/v1/workspace/context/reset"): "the user's own workspace preferences",
@@ -172,6 +174,7 @@ EXEMPT_BUT_SIGNED_IN = {
     ("POST", "/api/v1/investigations/{investigation_id}/decision/sign"),
     ("POST", "/api/v1/signer-training/{document_code}/acknowledge"),
     ("POST", "/api/v1/trial/short-story/marks"),
+    ("POST", "/api/v1/trial/one-story/marks"),
 }
 
 

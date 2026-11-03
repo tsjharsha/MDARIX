@@ -151,7 +151,7 @@ def test_a_serious_us_complaint_is_assessed_trained_signed_versioned_and_filed(o
     us = _market(detail, "US")
     assert us["question_set"]["version"] == "US-starter-1" and us["threshold"]["level"] == "SERIOUS"
     assert all(q["clause"] and q["starter"] for q in us["question_set"]["questions"])
-    assert "awaiting regulatory confirmation" in detail["starter_mark"]
+    assert detail["starter_mark"] == "Starter, for your consultant to confirm."
     assert [item["state"] for item in us["training"]] == ["MISSING", "MISSING"]
     assert us["clock"] is None and us["draft"] is None  # the complaint's own window clock binds until assessed
 

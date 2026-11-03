@@ -457,7 +457,18 @@ def _watch_clocks(db, control_db, tenant_id, ids: set[str] | None, now, reminder
 # The list views of the new navigation (0.10.74, Release C part C2): each a filter of the one complaint list, read from
 # the same dated items, watch, requests and signatures as the complaint page, Home and Oversight. "open" is filtered by
 # the list itself (the complaint's status in the QMS).
-LIST_VIEWS = ("open", "due-week", "legal-week", "reportability", "waiting-reporter", "my-approval", "signed-month")
+LIST_VIEWS = (
+    "open",
+    "overdue",
+    "due-week",
+    "legal-week",
+    "reportability",
+    "waiting-reporter",
+    "my-approval",
+    "signed-month",
+)
+# Not a view of its own: every complaint's nearest dated item, overdue first, which orders "open" (0.10.82, U-08).
+DATED = "dated"
 WEEK_HOURS = 7 * 24
 
 
@@ -478,7 +489,7 @@ def list_view(db, control_db, tenant_id, view: str, me: str) -> dict[str, str]:
         if key not in found or (at and (not found[key] or at < found[key])):
             found[key] = at
 
-    if view in ("due-week", "legal-week"):
+    if view in ("due-week", "legal-week", "overdue", DATED):
         views, context = _item_views(db, control_db, tenant_id, now)
         items = [item for item in views if item["complaint_id"]]
         # The watch's provisional clock of a market not assessed yet, as the complaint page lists it (complaint_work).
@@ -491,7 +502,9 @@ def list_view(db, control_db, tenant_id, view: str, me: str) -> dict[str, str]:
             items += [{**clock, "complaint_id": key} for clock in clocks if (key, clock["market"]) not in dated]
         for item in items:
             soon = item["hours_left"] <= WEEK_HOURS
-            if view == "due-week" and soon and item["state"] != rules.OVERDUE:
+            if view == DATED or (view == "overdue" and item["state"] == rules.OVERDUE):
+                keep(item["complaint_id"], item["due_at"])
+            elif view == "due-week" and soon and item["state"] != rules.OVERDUE:
                 keep(item["complaint_id"], item["due_at"])
             elif view == "legal-week" and soon and item["category"] in ("REPORTING", "OBLIGATION"):
                 keep(item["complaint_id"], item["due_at"])
@@ -962,6 +975,17 @@ def _complaint(db, tenant_id, complaint_id) -> Complaint:
     return complaint
 
 
+def harm_words(complaint) -> str:
+    """The reported harm in plain words: a death, a serious injury, none reported, or not known yet (a blank flag)."""
+    if complaint.death:
+        return "Death"
+    if complaint.serious_injury:
+        return "Serious injury"
+    if complaint.serious_injury is None and complaint.death is None:
+        return "Not known yet"
+    return "No harm reported"
+
+
 def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict:
     from backend.app.reportability import facts, markets
     from backend.app.reportability.deadlines import day_only
@@ -1012,6 +1036,10 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
             else "PATIENT_INVOLVED"
             if complaint.patient_involved
             else None,
+            # The harm in words, apart from whether a patient was involved (0.10.82, U-18): a blank serious-injury
+            # flag is "not known yet", never "no harm".
+            "harm_words": harm_words(complaint),
+            "patient_involved": complaint.patient_involved,
             "market": markets.market_of(complaint.country),
             "awareness_at": _iso(complaint.awareness_timestamp),
             # A day given without a time is shown as a date (0.10.81, U-06).

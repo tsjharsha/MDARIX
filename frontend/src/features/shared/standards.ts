@@ -3,7 +3,13 @@
 // disclaimer once per page; references elsewhere (the sample story, the trial's citation themes) are built from it.
 import catalog from "./standards.json";
 
-/** ``starter``: the wording awaits the regulatory consultant's confirmation (shown marked "Starter text"). */
+/** The one wording of the starter mark, on starter content only (0.10.83, D2.9; usability U-11). */
+export const STARTER_LABEL = "Starter, for your consultant to confirm";
+
+/** A question set or guide version that is MDARIX's starter ("US-starter-1"), not the organization's approved one. */
+export const isStarterVersion = (code: string | null | undefined) => /starter/i.test(code ?? "");
+
+/** ``starter``: the wording awaits the regulatory consultant's confirmation (shown with ``STARTER_LABEL``). */
 export type Standard = { id: string; short: string; title: string; jurisdiction: string; starter?: boolean };
 
 export const STANDARDS: readonly Standard[] = catalog.standards;
