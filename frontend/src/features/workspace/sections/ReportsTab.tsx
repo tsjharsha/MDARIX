@@ -327,7 +327,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
             {due && <DeadlineChip item={due} prefix="Due" />}
             <span className="ms-chip">{meter.text} fields</span>
             {detail.form.report_kind && <span className="ms-chip">{detail.form.report_kind} report</span>}
-            {detail.form.starter && <span className="ms-chip">Starter form, for your consultant to confirm</span>}
+            {detail.form.starter && <span className="ms-chip">{STARTER_LABEL}</span>}
             {(detail.state === "CORRECTION_REQUIRED" || detail.state === "CANCELLED") && (
               <StateChip label={detail.state_label} />
             )}

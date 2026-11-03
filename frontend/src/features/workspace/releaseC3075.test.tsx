@@ -290,6 +290,15 @@ describe("a report's page: the record page's shape, the status path and the rail
     expect(html.split(NEVER_SUBMITS.replace(/'/g, "&#x27;")).length - 1).toBe(1);
   });
 
+  it("marks a starter form in the header with the one starter wording (0.10.84)", () => {
+    const starter = report(0);
+    resources.data[`${REPORTS}/r1`] = { ...starter, form: { ...starter.form, starter: true } };
+    const html = render(<ReportsSection />, api("?report=r1"));
+    const chips = html.slice(html.indexOf('class="uw-cp-chips"'));
+    expect(chips).toContain('<span class="ms-chip">Starter, for your consultant to confirm</span>');
+    expect(html).not.toContain("Starter form, for your consultant to confirm");
+  });
+
   it("opens Send for approval once every mandatory field is filled", () => {
     resources.data[`${REPORTS}/r1`] = report(1);
     const html = render(<ReportsSection />, api("?report=r1"));
