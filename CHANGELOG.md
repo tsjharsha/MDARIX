@@ -10,6 +10,71 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.84] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): the fixes from the independent rating of rounds D1 (0.10.82) and D2
+(0.10.83), on the combined build. No migration. The API and web images change. No operator step: no sample record,
+count or deadline moment changes, and `refresh_trial_story.py` has nothing new to do.
+
+### Fixed: one legal deadline, everywhere
+
+- **Legal clocks show legal deadlines only.** An approval task's due date was read as a market's legal clock on the
+  Regulatory Leader's Home ("United States · SAMPLE-RV-11 · Due Wed 4 Nov"; the deadline is Wed 2 Dec), in the Your
+  data hero ("Its clock ends Wed 4 Nov") and in the complaint page's clock line. A task is never a legal clock now.
+- **Once the incident country is known, the header shows that market's clock.** FIC-2001, imported with no country,
+  kept "Shortest possible: … Mon 9 Nov" (Great Britain's) after its country was entered as the United States, while
+  its triage table gave the US 30 days. The complaint page, Home and the story's hero now read the US date from the
+  same triage calculation: "United States, provisional: … due …" while the awareness date is still asked (0.10.81's
+  rule stays: a clock counted without the awareness date is never a market's firm deadline). "Shortest possible" only
+  while the country is missing.
+- **Every deadline a person reads is in the organization's time zone** (its working calendar in Settings), whichever
+  market's it is. One clock read EST on the complaint page and GMT in its triage table. The moment, the latest day and
+  the counting rules are unchanged. An organization in India keeps reading "23:59 IST"; an organization elsewhere reads
+  the authority's end of day in its own time (an EU deadline for a New York organization: "18:59 EDT", not "23:59 CET").
+
+### Fixed: the story
+
+- **The story moves on after a save, with no reload.** After saving the triage, the "Step 2 of 10" pill and the rail's
+  Next step stayed stale until a reload. Every saved change now reads the story again.
+- **Step 3 opens the story complaint's own tree** with its questions, on the sample and on your data (checked on the
+  combined build: D2 had already fixed it).
+- **Step 9 opens the finished record in Records**: "The record you just finished", with the signed conclusion and
+  who signed it (the conclusion's line now names its signer, on the complaint's Related tab too), the authority report,
+  its approval and the decision record PDF. **Your data's step 10 opens your own product's trend**, not
+  the sample's OrbitCare rise.
+- **The story is the team's.** One step for every colleague, read from the shared record; a step any colleague opened
+  from the story (the call, the report, Records, Trends) counts for everyone. A colleague's banner no longer says "Step
+  5 of 10: Form" while the shared report waits for approval.
+- **The finale says the trend check's own verdict with its numbers**: "PulseWatch 410 Rev A: in line with history · 3
+  against 1.0 expected (3.0× expected) · p 0.076: within chance, not a rise", never "in line" alone beside 3 against
+  0.99. Once the story is done, its preview is the finale; the last button offers a pilot once a colleague has joined.
+
+### Fixed: Home, the complaint page, Import and Team
+
+- **Home follows the Sample · Your data switch**: on Your data its Overdue and Due this week tiles, its next actions
+  and its rising trends are your data's only (the sample's SAMPLE-RV-08 and OrbitCare were counted before), and the
+  complaint its hero names is always in "Your next actions", first among those due at the same time. Each trend row
+  now names its product's own identifier (`product.identifier` on `GET /api/v1/triage/trends`).
+- **A complaint waiting for its country** says "Waits for the incident country" in its decision path and its market
+  assessments, never "No market to assess"; while a clock waits for a fact, the rail no longer says "No legal clock
+  running" for the market the header names.
+- **A day-only awareness stays a date** in the triage form ("31 Oct 2026, time not recorded" offered "05:30 PM"), and a
+  later awareness asks "Why is it later than the earliest known?" before saving, not after a refused save.
+- **Import's checklist** shows what was just loaded at once, products a complaints file created included (the run's
+  data-quality report keeps `also_created`).
+- **Team**: the owner's control to change a colleague's personas says "Change", not a lock.
+- **Smaller fixes**: Home's At risk tile and trend card open the trend check, where their count is; step 6 no longer
+  promises "Most fields arrive filled"; on a phone the complaint header's clock chip wraps inside its card, and the
+  privacy notice sits above a side drawer; the search's `aria-controls` names its results only while they are shown,
+  and the cited line's link reaches 4.5:1 contrast; Getting started's type sizes are the scale's.
+
+### Changed: the decision tree and the report page (D2's misses)
+
+- **The tree while answering**: the Answer · Edit switch sits on the market row, the page head is shorter, the starter
+  mark is said once, and the line under Sign gives the worked complaints only. Sign now ends about 95 px above the
+  bottom of a 1440×900 screen on every market's tree, India included (it ended 28 px above).
+- **The report header's starter chip** reads "Starter, for your consultant to confirm", the one starter wording.
+
 ## [0.10.83] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): round D2 "Decide and report" of the approved redesign, on the new
