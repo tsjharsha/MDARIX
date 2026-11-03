@@ -164,6 +164,24 @@ def _product(db: Session, tenant_id, product_id: uuid.UUID) -> Product:
     return product
 
 
+# The product identity columns set_identity changes (check_identity's keys), audited before and after (0.10.81).
+IDENTITY_COLUMNS = ("udi_di", "basic_udi_di", "gmdn_code", "gmdn_term", "emdn_code")
+
+
+def registration_view(db: Session, tenant_id, product_id: uuid.UUID, registration_id: uuid.UUID) -> dict | None:
+    """One registration as the screen shows it, or None."""
+    item = (
+        db.query(ProductRegistration)
+        .filter(
+            ProductRegistration.tenant_id == tenant_id,
+            ProductRegistration.product_id == product_id,
+            ProductRegistration.id == registration_id,
+        )
+        .one_or_none()
+    )
+    return _registration_view(item) if item is not None else None
+
+
 def _registration_view(item: ProductRegistration) -> dict:
     return {
         "id": str(item.id),

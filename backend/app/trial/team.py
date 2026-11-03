@@ -168,10 +168,17 @@ def _expired_invitations(db: Session, tenant_id, users) -> set:
     return {user_id for user_id in invited if open_until.get(user_id) is None or open_until[user_id] <= now}
 
 
+CANNOT_INVITE = (
+    "This email cannot be invited to your trial. Invite your colleague with another work email, or ask them to write "
+    "to MDARIX support."
+)
+
+
 def _invitable(db: Session, tenant_id, email: str) -> AuthUser | None:
     """Who already has this email: nobody (None), or a colleague removed from this trial, who may be invited again.
-    Every other case is refused with what it is (J37): an invitation waiting, a colleague on the team, an account in
-    another organization."""
+    The trial's own cases are refused with what they are (J37): an invitation waiting, a colleague on the team. An
+    account in another organization gets one neutral answer that does not say so (0.10.81, the security review's F1:
+    the answer told anyone whether an address has an MDARIX account)."""
     existing = db.query(AuthUser).filter(AuthUser.username == email).first()
     if existing is None:
         # The organization's own session reads only its own accounts: an account elsewhere is looked up apart, and
@@ -185,12 +192,7 @@ def _invitable(db: Session, tenant_id, email: str) -> AuthUser | None:
         if not elsewhere:
             return None
     if existing is None or existing.tenant_id != tenant_id:
-        raise _error(
-            409,
-            "ACCOUNT_IN_ANOTHER_ORGANIZATION",
-            "This email already has an MDARIX account in another organization. Invite them with another work email, "
-            "or ask them to write to MDARIX support.",
-        )
+        raise _error(409, "CANNOT_INVITE", CANNOT_INVITE)
     if existing.status == "INVITED":
         raise _error(
             409,
@@ -218,6 +220,8 @@ def invite_colleague(
     # The name goes into the invitation email to the colleague: never a link (SEC-04).
     if looks_like_link(name):
         raise _error(422, "NAME_HAS_LINK", "Write the colleague's name without a web or email address")
+    # The invitation limits first (0.10.81, security F1): nobody learns anything about an address past them.
+    _limit_invitations(tenant_id, inviter, "invite")
     returning = _invitable(db, tenant_id, email)
     # Lock the trial's request row so two simultaneous invites cannot both take the last seat.
     db.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).with_for_update().first()
@@ -230,7 +234,6 @@ def invite_colleague(
             f"Your trial has {cap} people, its safety limit. Remove someone to invite another, or write to MDARIX "
             "support to raise it.",
         )
-    _limit_invitations(tenant_id, inviter, "invite")
     now = datetime.now(timezone.utc)
     if returning is not None:
         # A removed colleague invited again: the same account (their earlier work stays theirs), a new password set

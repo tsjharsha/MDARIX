@@ -1003,8 +1003,8 @@ def test_the_story_is_added_once_and_the_refresh_leaves_a_trial_with_it_alone():
         bind_tenant(db, tenant_id)
         assert seed_story_examples(db, tenant_id) == {"created": False}
         windows = db.query(ReportabilitySettings).filter(ReportabilitySettings.tenant_id == tenant_id).one()
-        # The FDA and EU windows, and India's (enabled by the sample's report examples, sample_reports.py).
-        assert windows.updated_by == STORY_WINDOWS_BY and len(windows.windows) == 4
+        # 0.10.81 (F5): every market's starter windows (US 1, EU 2, GB 2, Canada 2, India 1).
+        assert windows.updated_by == STORY_WINDOWS_BY and len(windows.windows) == 8
         assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 44  # 0.10.64: the flagship RV-11
     finally:
         db.close()

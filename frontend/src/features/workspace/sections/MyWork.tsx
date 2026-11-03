@@ -75,6 +75,7 @@ import { StatusBadge } from "./common";
 import { parseRequestTab } from "../evidenceWorkflow";
 import { EvidenceRequestsPanel } from "./EvidenceRequests";
 import { RemindersPanel } from "./Reminders";
+import { DUE_WEEK_PATH, DUE_WEEK_VIEW } from "../home";
 import { useAiReady } from "../useAiStatus";
 import { Why } from "./boardParts";
 import { ChevronRight } from "lucide-react";
@@ -393,6 +394,8 @@ export function NextStep({ secondary = false }: { secondary?: boolean } = {}) {
 /** Managers' four inspection-readiness numbers and the oversight summary, above My work's tabs (7.2). */
 function TeamNumbers({ onOpen }: { onOpen: () => void }) {
   const oversight = useResource<Oversight>(OVERSIGHT);
+  const dueWeek = useResource<{ total: number }>(DUE_WEEK_PATH);
+  const { open } = useWorkspace();
   const view = oversight.data;
   return (
     <div className="uw-team-numbers" aria-label="Your team at a glance">
@@ -401,9 +404,14 @@ function TeamNumbers({ onOpen }: { onOpen: () => void }) {
         <span className="uw-rd-tile-head">Overdue, whole team</span>
         <strong className="uw-rd-value">{view?.overdue ?? "…"}</strong>
       </button>
-      <button type="button" className={`uw-rd-tile tone-${view?.due_soon ? "warning" : "good"}`} onClick={onOpen}>
-        <span className="uw-rd-tile-head">Due soon, whole team</span>
-        <strong className="uw-rd-value">{view?.due_soon ?? "…"}</strong>
+      {/* "Due this week": the one definition and source Home and Complaints use (0.10.81, navigation M1). */}
+      <button
+        type="button"
+        className={`uw-rd-tile tone-${dueWeek.data?.total ? "warning" : "good"}`}
+        onClick={() => open("Complaints", DUE_WEEK_VIEW)}
+      >
+        <span className="uw-rd-tile-head">Due this week, whole team</span>
+        <strong className="uw-rd-value">{dueWeek.data?.total ?? "…"}</strong>
       </button>
     </div>
   );

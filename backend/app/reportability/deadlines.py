@@ -46,6 +46,18 @@ COUNTING_WORDS = {
     "CA": "from the day after awareness (awareness is day zero); your time zone",
 }
 END_OF_DAY = time(23, 59, 59)
+# A day given without a time (an imported date, a date entered as a reporting fact) is kept at 12:00 UTC.
+DAY_ONLY = time(12)
+
+
+def day_only(moment) -> bool:
+    """Whether a stored moment is a day given without a time (``DAY_ONLY``, 0.10.81, U-06): shown as a date, and
+    counted as that day everywhere. shortcut: a time typed as exactly 12:00:00 UTC reads as a day too, which counts
+    from the same day in every authority's time zone anyway; a day-only column comes with a migration if needed."""
+    if not isinstance(moment, datetime):
+        return False
+    utc = _utc(moment).astimezone(timezone.utc)
+    return utc.time() == DAY_ONLY
 
 
 def add_work_days(start: date, days: int) -> date:
@@ -122,8 +134,11 @@ def end_of(day: date, market: str | None, org_zone: str | None) -> Deadline:
 
 def count(aware: datetime | date, days: int, day_basis: str, market: str | None, org_zone: str | None) -> Deadline:
     """The deadline ``days`` (calendar or work) days from awareness, by the market's counting rule (module docstring).
-    A day without a time (an older stored day) is taken as that day everywhere."""
-    if isinstance(aware, datetime):
+    A day without a time (an older stored day, or a day-only awareness: ``day_only``) is taken as that day everywhere:
+    the conservative start of that day under the counting rule (0.10.81, U-06)."""
+    if isinstance(aware, datetime) and day_only(aware):
+        start = _utc(aware).astimezone(timezone.utc).date()
+    elif isinstance(aware, datetime):
         start = min(_utc(aware).astimezone(zone_info(zone) or timezone.utc).date() for zone in _zones(market, org_zone))
     else:
         start = aware

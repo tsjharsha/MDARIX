@@ -12,7 +12,7 @@ import { parseComplaintListTab } from "../complaintList";
 import { listTitle } from "./common";
 import { Triage } from "./Triage";
 import { ReportabilityWatch } from "./ReportabilityWatch";
-import { Reports } from "./Reports";
+import { ReportsSection } from "./ReportsTab";
 import { Communications } from "./Communications";
 import { ComplaintList } from "./ComplaintList";
 import { Backlog, SecondLook } from "./Complaints";
@@ -89,10 +89,12 @@ export function ComplaintViews({ tab }: { tab?: string }) {
         <>
           {/* A market assessment's link (part=assess) opens the complaint's assessment; a report's link its reports. */}
           {(!complaint || tabParam(carried, "part") === "assess") && <ReportabilityWatch onOpenTab={go} />}
-          <Reports complaintId={complaint} />
+          <ReportsSection complaintId={complaint} />
         </>
       )}
-      {view === "Authority reports" && <Reports complaintId={complaint} />}
+      {/* The Reports tab's own list (0.10.81, navigation M7): one status word per state, one count, no "Start the
+          worksheet" on the new navigation, where a report is created when its conclusion is signed. */}
+      {view === "Authority reports" && <ReportsSection complaintId={complaint} />}
       {view === "Communications" && <Communications key={complaint ?? "all"} complaintId={complaint} />}
       {view === "Investigations" && <InvestigationList />}
       {view === "All complaints" && (

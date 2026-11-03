@@ -5,6 +5,7 @@ import { MARKET_QUESTION_WHY } from "../whyAsked";
 import { marketLabel, questionNumber, versionWords } from "../../../app/labels";
 import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
+import { ReportingFacts } from "./ReportingFacts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { deadlineLabel, formatDay } from "../../../app/dates";
 import { WorkspaceContext, useCan, useWorkspace } from "../workspaceContext";
@@ -79,6 +80,7 @@ export function MarketAssessmentDrawer({
     <Drawer title={`${recordName(complaint)}: assess per market`} onClose={onClose}>
       {detail.state === "error" && <InlineError text="The assessment could not be read." />}
       {data && <AssessmentIntro detail={data} />}
+      {data && <ReportingFacts complaintId={complaint.id} needs={data.complaint.needs} onSaved={reload} />}
       {data && !shown.length && (
         <p className="uw-hint">
           No market is enabled: enter your reporting windows (Complaints › Reporting windows) for the markets you report

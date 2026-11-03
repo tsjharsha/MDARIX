@@ -23,6 +23,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from backend.app.trial.sample_source import is_sample
 from backend.app.complaint_review import rules as review_rules
 from backend.app.db.models.complaint_disposition import ComplaintDisposition
 from backend.app.db.models.complaint_review import ComplaintSecondLook
@@ -32,6 +33,7 @@ from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordF
 from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
 from backend.app.intake import rules
 from backend.app.reportability import markets
+from backend.app.reportability.deadlines import day_only
 from backend.app.business_ids import complaint_ref
 
 SOURCE_TYPE = "IntakeEvent"
@@ -172,9 +174,19 @@ def event_awareness(event: IntakeEvent, record: TriageRecord | None = None) -> d
 def complaint_awareness(complaint: Complaint, record: TriageRecord | None = None) -> dict:
     if record is not None and record.awareness_confirmed_at is not None:
         return {"at": rules.utc(record.awareness_confirmed_at), "source": "CONFIRMED", "unresolved": False}
+    # With neither an awareness nor a received date, the event date counts too (0.10.81, as the watch does).
+    event = (
+        complaint.event_timestamp
+        if complaint.awareness_timestamp is None and complaint.complaint_timestamp is None
+        else None
+    )
     return rules.awareness(
         complaint.awareness_timestamp,
-        [(complaint.complaint_timestamp, "RECEIVED"), (complaint.recorded_timestamp, "SOURCE_DATE")],
+        [
+            (complaint.complaint_timestamp, "RECEIVED"),
+            (event, "EVENT_DATE"),
+            (complaint.recorded_timestamp, "SOURCE_DATE"),
+        ],
         complaint.ingestion_timestamp or complaint.created_at,
         earliest=True,
     )
@@ -429,7 +441,7 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
             "awareness": event_awareness(event, record),
             "classification": signed.classification if signed else None,
             "suggestion": latest.suggestion if latest else None,
-            "sample": event.source_system is not None,
+            "sample": is_sample(event.source_system),
         }
     complaints = (
         db.query(Complaint)
@@ -698,6 +710,8 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
         ],
         "awareness": {
             "at": awareness["at"].isoformat(),
+            # A day given without a time is shown as a date (0.10.81, U-06).
+            "date_only": day_only(awareness["at"]),
             "source": awareness["source"],
             "source_label": rules.AWARENESS_LABELS.get(awareness["source"], awareness["source"]),
             "linked_ref": awareness.get("linked_ref"),

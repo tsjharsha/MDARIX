@@ -51,7 +51,8 @@ def test_the_five_work_day_report_only_for_remedial_action_or_fda_s_written_requ
     yes = markets.evaluate(markets.US, answers(**{**US_SERIOUS, "US6": "YES"}))
     assert yes["report_type"] == "US_5_WORK_DAY"
     unknown = markets.evaluate(markets.US, answers(**{**US_SERIOUS, "US6": "UNKNOWN"}))
-    assert unknown["report_type"] == "US_30_DAY" and "a Yes makes it the 5-work-day report" in unknown["notes"][0]
+    # 0.10.81 (F2): Unknown takes the shorter report until it is answered; the note says a No lengthens it.
+    assert unknown["report_type"] == "US_5_WORK_DAY" and "A No can lengthen it to 30 days" in unknown["notes"][0]
     # Not reportable stays not reportable, whatever question 6 says.
     assert markets.evaluate(markets.US, answers(**{**US_NONE, "US6": "YES"}))["suggested"] == markets.NOT_REPORTABLE
     assert markets.REPORT_TYPES["US_5_WORK_DAY"].day_basis == watch_rules.WORK
@@ -183,3 +184,32 @@ def test_classification_codes_list_labels_and_keeps_any_other_source_value_as_un
     assert "other" in classification.classification_problem("OTHER", "", "PATIENT", None)
     assert classification.classification_problem("HOME", None, "LAY_USER", None) is None
     assert classification.CODING_CRITERIA_VERSION == "coding-starter-1"
+
+
+@pytest.mark.parametrize("market", [markets.EU_NI, markets.GB])
+def test_f2_an_unknown_takes_the_shortest_category_not_yet_excluded_in_the_eu_and_gb(market):
+    """0.10.81 (F2): MDCG 2023-3, report within the period even when uncertain; a starter rule. Canada keeps its own."""
+    p = "EU" if market == markets.EU_NI else "GB"
+    base = {f"{p}1": "YES", f"{p}2": "NO", f"{p}3A": "YES", f"{p}4": "NO", f"{p}5": "YES", f"{p}6": "NO"}
+    base.update({f"{p}3{letter}": "NO" for letter in "BCDEF"})
+
+    def found(**changed):
+        return markets.evaluate(market, answers(**{**base, **changed}))
+
+    assert found()["report_type"] == f"{p}_15_DAY" and found()["notes"] == []
+    threat = found(**{f"{p}4": "UNKNOWN"})
+    assert threat["report_type"] == f"{p}_2_DAY" and threat["suggested"] == markets.REPORTABLE
+    assert "Question 4 (serious public health threat) is Unknown" in threat["notes"][0]
+    assert "MDCG 2023-3" in threat["notes"][0] and "consultant to confirm" in threat["notes"][0]
+    death = found(**{f"{p}2": "UNKNOWN"})
+    assert death["report_type"] == f"{p}_10_DAY" and "Question 2 (death) is Unknown" in death["notes"][0]
+    unanticipated = found(**{f"{p}6": "UNKNOWN"})
+    assert (
+        unanticipated["report_type"] == f"{p}_10_DAY" and "A No can lengthen it to 15 days" in unanticipated["notes"][0]
+    )
+    assert found(**{f"{p}4": "YES"})["report_type"] == f"{p}_2_DAY"
+
+
+def test_f2_canada_keeps_its_shorter_report_while_question_3_is_unknown():
+    ca = answers(CA1="YES", CA2="YES", CA3="UNKNOWN", CA4="YES", CA5="YES", CA6="NOT_APPLICABLE")
+    assert markets.evaluate(markets.CA, ca)["report_type"] == "CA_10_DAY"

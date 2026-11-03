@@ -989,6 +989,17 @@ function CodeFieldRow({
               Confirm
             </button>
           )}
+          {/* The classic navigation: a code from the record is confirmed against its source (0.10.81). */}
+          {item.status === "FROM_RECORD" && (
+            <button
+              type="button"
+              className="ac-link"
+              disabled={action.busy}
+              onClick={() => void action.run(path, "PUT", { confirmed: true })}
+            >
+              Confirm against the source
+            </button>
+          )}
           <button type="button" className="ac-link" onClick={() => setPicking(true)}>
             {item.status === "SUGGESTED" || settled ? "Change" : "Choose a code"}
           </button>
@@ -1020,6 +1031,11 @@ function CodeFieldRow({
   );
 }
 
+const FIELD_HINTS: Record<string, string> = {
+  DATE_RANGE: "YYYY-MM-DD, or YYYY-MM-DD to YYYY-MM-DD",
+  LIST_CODE: "A code of the published list",
+};
+
 export function FieldRow({
   detail,
   item,
@@ -1036,8 +1052,8 @@ export function FieldRow({
   const action = useAction(onChanged, "The field was not saved.");
   const path = `${REPORTS}/${detail.id}/fields/${item.id}`;
   const editable = canEdit && item.editable !== false;
-  if (item.code_annex && detail.codes_confirmed)
-    return <CodeFieldRow detail={detail} item={item} onChanged={onChanged} canEdit={editable} />;
+  // A code field takes only codes from the picker, on either navigation (0.10.81, F6).
+  if (item.code_annex) return <CodeFieldRow detail={detail} item={item} onChanged={onChanged} canEdit={editable} />;
   return (
     <li className="uw-rp-field">
       <div className="uw-rp-field-head">
@@ -1055,6 +1071,7 @@ export function FieldRow({
           : ""}
         {item.note ? ` ${item.note}` : ""}
       </p>
+      {item.problem && <InlineError text={`${item.problem}: it counts as missing until it is corrected.`} />}
       {editable && !editing && (
         <div className="ca-action-row">
           <button type="button" className="ac-link" onClick={() => setEditing(true)}>
@@ -1106,6 +1123,9 @@ export function FieldRow({
           ) : (
             <input
               aria-label={`${item.number} ${item.label}`.trim()}
+              // A date field takes a date (0.10.81, F6); a range or a list's code says its form.
+              type={item.kind === "DATE" ? "date" : "text"}
+              placeholder={FIELD_HINTS[item.kind ?? ""]}
               value={value}
               onChange={(event) => setValue(event.target.value)}
             />

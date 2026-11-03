@@ -109,6 +109,7 @@ def test_a_trial_import_is_governed_and_its_report_names_the_file():
         "rows_unchanged": 0,
         "balanced": True,
         "columns_not_used": [],  # 0.10.65: every column of the file was used
+        "row_flags": [],  # 0.10.81: no row contradicts itself or lacks a reporting fact
     }
     newest = _ok(user.get(RUNS))["runs"][0]
     assert newest["import_ref"] == result["import_ref"] and newest["file_name"] == "Own complaints.csv"

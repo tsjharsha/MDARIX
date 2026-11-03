@@ -25,7 +25,9 @@ starter mapping, marked starter text until the regulatory consultant reviews it 
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from datetime import date
 
 MUST, INITIAL, LATER, NOT_USED = "MUST_HAVE", "MAY_BE_UNKNOWN", "FOLLOW_UP", "NOT_APPLICABLE"
 MISSING_LABELS = {
@@ -35,6 +37,54 @@ MISSING_LABELS = {
     NOT_USED: "Not used in this report",
 }
 PATIENT, REPORTER = "PATIENT", "REPORTER"
+TEXT, DATE, DATE_RANGE, IMDRF_CODE, LIST_CODE = "TEXT", "DATE", "DATE_RANGE", "IMDRF_CODE", "LIST_CODE"
+_DATE_WORD = re.compile(r"\bdate\b", re.I)
+_NOT_A_DATE = re.compile(r"^(age|duration)\b", re.I)
+# The fields whose value is a code of a published list, with the list it is checked against when loaded
+# (backend/app/regulatory_reference.py) and the pattern every code of it has.
+LIST_CODES = {
+    "us_product_code": ("FDA_PRODUCT_CODE", re.compile(r"^[A-Z]{3}$"), "An FDA product code is three letters"),
+    "eu_nomenclature_code": (
+        "EMDN",
+        re.compile(r"^[A-Z](\d{2})*$"),
+        "An EMDN code is a letter and pairs of digits, for example Z12030101",
+    ),
+    "gmdn_code": (None, re.compile(r"^\d{5}$"), "A GMDN code is five digits"),
+}
+_RANGE = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:\s*(?:to|-|–|—)\s*(\d{4}-\d{2}-\d{2}))?$")
+
+
+def _day(text: str) -> date | None:
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def value_problem(field: "Field", value: str | None) -> str | None:
+    """Why a typed value does not fit its field (0.10.81, F6), or None: a date field takes a date (YYYY-MM-DD), a range
+    field a date or "YYYY-MM-DD to YYYY-MM-DD", a list code its list's pattern, and an IMDRF code field only the code
+    picker's codes. The server refuses such a value; one stored before is flagged on the report."""
+    text = (value or "").strip()
+    if not text:
+        return None
+    kind = field.kind
+    if kind == IMDRF_CODE:
+        return "Choose the code in the code picker: typed text is not a code"
+    if kind == DATE and _day(text) is None:
+        return "Enter a date as YYYY-MM-DD"
+    if kind == DATE_RANGE:
+        found = _RANGE.match(text)
+        days = [_day(part) for part in found.groups() if part] if found else []
+        if not days or None in days or days != sorted(days):
+            return "Enter a date as YYYY-MM-DD, or a range as YYYY-MM-DD to YYYY-MM-DD"
+    if kind == LIST_CODE:
+        _, pattern, words = LIST_CODES[field.source]
+        if not pattern.match(text.upper()):
+            return words
+    return None
+
+
 # Codes a form needs beyond its own classes, on the new navigation (0.10.77, C5; starter, for your consultant to
 # confirm): an initial 3500A needs the device problem and both health effect codes (H6). The EU and GB MIR already
 # need Annex A, E and F, and B, C, D (and G) in a final report (``must_in``).
@@ -54,6 +104,19 @@ class Field:
     must_in: tuple[str, ...] = ()
     # The form's fixed list for this field, as printed (0.10.76); empty: free text.
     options: tuple[str, ...] = ()
+
+    @property
+    def kind(self) -> str:
+        """What the field takes (0.10.81, F6), read from its source and label: an IMDRF code (picked, never typed), a
+        published list's code (an FDA product code, an EMDN or GMDN code), a date, a date or a range of dates
+        ("from ... to ..."), or text."""
+        if self.source and self.source.startswith("imdrf_"):
+            return IMDRF_CODE
+        if self.source in LIST_CODES:
+            return LIST_CODE
+        if self.options or self.personal or not _DATE_WORD.search(self.label) or _NOT_A_DATE.match(self.label):
+            return TEXT
+        return DATE_RANGE if "(from" in self.label else DATE
 
 
 @dataclass(frozen=True)
@@ -677,7 +740,16 @@ def _mir_incident(market: str) -> tuple[Section, ...]:
                     note="GB: A27 when no code fits (MHRA)." if gb else "",
                 ),
                 Field("3_2B", "3.2b", "Number of patients involved"),
-                Field("3_2C", "3.2c", "Current location of the device", "mir_location", MUST, options=_MIR_LOCATIONS),
+                # 0.10.81 (F12): never guessed from "device returned" (it may be with a distributor or the facility).
+                Field(
+                    "3_2C",
+                    "3.2c",
+                    "Current location of the device",
+                    None,
+                    MUST,
+                    options=_MIR_LOCATIONS,
+                    note="Where the device is now.",
+                ),
                 Field(
                     "3_2D",
                     "3.2d",
@@ -974,9 +1046,11 @@ EU_MIR = Form(
                     "1_2D",
                     "1.2d",
                     "Manufacturer awareness date of reportability",
-                    "conclusion_date",
+                    None,
                     INITIAL,
                     must_in=_NOT_NON,
+                    # 0.10.81 (F12): not the signing day; the MIR help text (7.3.1) asks for this date.
+                    note="The date you received the information that showed the incident is reportable.",
                 ),
                 Field("1_2E", "1.2e", "Type of report", "report_type", MUST, options=MIR_TYPES),
                 Field(

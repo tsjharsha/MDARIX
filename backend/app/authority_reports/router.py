@@ -25,6 +25,8 @@ regulatory.approve. These routes serve a free trial and a pilot alike (T-B1).
 
 from __future__ import annotations
 
+from backend.app.trial.sample_source import is_sample
+from backend.app.downloads import attachment
 from backend.app import links
 import base64
 import binascii
@@ -112,7 +114,7 @@ def _names(control_db, tenant_id, refs) -> dict[str, str]:
     return {**SAMPLE_NAMES, **found}
 
 
-def _audit(db, ctx, action: str, obligation: ReportObligation, **details) -> None:
+def _audit(db, ctx, action: str, obligation: ReportObligation, old=None, new=None, **details) -> None:
     db.add(
         make_audit_event(
             tenant_id=obligation.tenant_id,
@@ -122,6 +124,8 @@ def _audit(db, ctx, action: str, obligation: ReportObligation, **details) -> Non
             entity_id=obligation.id,
             correlation_id=ctx.correlation_id,
             details={"complaint_id": str(obligation.complaint_id), "market": obligation.market, **details},
+            old_values=old,
+            new_values=new,
         )
     )
 
@@ -212,12 +216,18 @@ def _deadline(obligation: ReportObligation, context: dict, today, org_zone: str 
         if row is not None and row.due_on is not None:
             due = row.due_on
             provisional = row.conclusion is None
-    return due_fields(due, obligation.market, org_zone, today, provisional, obligation.state in rules.CLOSED)
+    return due_fields(
+        due, obligation.market, org_zone, today, provisional, obligation.state in rules.MET, obligation.state
+    )
 
 
-def due_fields(due: date | None, market: str, org_zone: str | None, now, provisional: bool, met: bool) -> dict:
+def due_fields(
+    due: date | None, market: str, org_zone: str | None, now, provisional: bool, met: bool, state: str | None = None
+) -> dict:
     """A report's deadline on the wire: its latest day, its end with the time zone, days left, and overdue (never
-    once met), counted by the market's rule (reportability/deadlines.py)."""
+    once met, never once cancelled), counted by the market's rule (reportability/deadlines.py). A cancelled report's
+    deadline state is CANCELLED (0.10.81, F11: it read MET)."""
+    cancelled = state == rules.CANCELLED
     if due is None:
         return {
             "due_on": None,
@@ -228,16 +238,16 @@ def due_fields(due: date | None, market: str, org_zone: str | None, now, provisi
             "due_state": None,
         }
     found = deadlines.end_of(due, market, org_zone)
-    state = deadlines.state(found, now, 1)
+    clock = deadlines.state(found, now, 1)
     return {
         "due_on": due.isoformat(),
         "provisional": provisional,
         "days_left": deadlines.days_left(found, now),
-        "overdue": state == deadlines.OVERDUE and not met,
+        "overdue": clock == deadlines.OVERDUE and not met and not cancelled,
         "due_at": found.at.isoformat(),
         "due_zone": found.zone,
         "due_label": found.label,
-        "due_state": "MET" if met else state,
+        "due_state": rules.CANCELLED if cancelled else "MET" if met else clock,
     }
 
 
@@ -279,7 +289,7 @@ def _snapshot_view(row: ReportSnapshot, names: dict) -> dict:
         and (
             row.approved_by in (row.preparers or []) or row.approved_by == (row.fields or {}).get("conclusion_signer")
         ),
-        "sample": row.source_system is not None,
+        "sample": is_sample(row.source_system),
     }
 
 
@@ -321,7 +331,7 @@ def _submission_view(
         "recorded_at": _iso(row.recorded_at),
         "evidence": [_evidence_view(item, names) for item in evidence],
         "receipt_only": row.result == "PENDING" and any(item.outcome == "RECEIPT" for item in evidence),
-        "sample": row.source_system is not None,
+        "sample": is_sample(row.source_system),
     }
 
 
@@ -415,6 +425,7 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "approved_snapshot": _snapshot_view(approved, names) if approved else None,
         "preparers": sorted({names.get(ref) or "A colleague" for ref in _preparers(obligation)}),
         "cancelled_reason": obligation.note if obligation.state == rules.CANCELLED else None,
+        "conclusion_changed": conclusion_changed(obligation, context["current"]),
         "deadline": deadline,
         "report_type": obligation.report_type,
         "assessment": _assessment_view(context, names),
@@ -466,7 +477,7 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         # A mapped code is a suggestion a person confirms or changes (the new navigation, 0.10.77).
         "codes_confirmed": context["confirm_codes"],
         "never_submits": rules.NEVER_SUBMITS,
-        "sample": obligation.source_system is not None,
+        "sample": is_sample(obligation.source_system),
     }
 
 
@@ -535,7 +546,7 @@ def report_list(
             "description": complaint.description,
             "market": market,
             "market_label": markets.MARKET_LABELS.get(market, market),
-            "sample": complaint.source_system is not None,
+            "sample": is_sample(complaint.source_system),
         }
 
     for row in candidates:
@@ -578,7 +589,7 @@ def report_list(
                 "state": row.state,
                 "state_label": rules.STATE_LABELS[row.state],
                 "next_step": rules.next_step(row.state),
-                **due_fields(due, row.market, org_zone, today, row.due_provisional, row.state in rules.CLOSED),
+                **due_fields(due, row.market, org_zone, today, row.due_provisional, row.state in rules.MET, row.state),
                 "assessment": None,
                 "can_start": False,
                 **paths[row.id],
@@ -664,7 +675,8 @@ def _list_paths(db, control_db, ctx, tenant_id, obligations: list[ReportObligati
             for name, holds in (
                 ("open", row.state not in rules.CLOSED),
                 ("my-approval", mine),
-                ("submitted-month", row.id in latest and latest[row.id] >= month),
+                # Submitted, and still so: a report sent back for correction is not (0.10.81).
+                ("submitted-month", row.state in rules.SUBMITTED and row.id in latest and latest[row.id] >= month),
             )
             if holds
         ]
@@ -787,9 +799,20 @@ def follow_conclusion(db, ctx, tenant_id, complaint_id, market: str, signed, now
                 db, ctx, "REPORT_CREATED_FROM_CONCLUSION", obligation, form=obligation.form_code, version=signed.version
             )
         elif existing.state == rules.CANCELLED:
+            # The cancellation's note leaves the report and stays in the audit trail (0.10.81, F11).
+            old = {"state": existing.state, "note": existing.note}
             existing.state, existing.assessment_id, existing.report_type = rules.DRAFT, signed.id, signed.report_type
             existing.due_on, existing.due_provisional, existing.updated_at = signed.due_on, False, now
-            _audit(db, ctx, "REPORT_REOPENED_BY_CONCLUSION", existing, version=signed.version)
+            existing.note = None
+            _audit(
+                db,
+                ctx,
+                "REPORT_REOPENED_BY_CONCLUSION",
+                existing,
+                old,
+                {"state": rules.DRAFT, "note": None},
+                version=signed.version,
+            )
         return []
     if signed.conclusion != markets.NOT_REPORTABLE or existing is None or existing.state not in rules.CANCELLABLE:
         return []
@@ -804,13 +827,82 @@ def follow_conclusion(db, ctx, tenant_id, complaint_id, market: str, signed, now
                 pending.append(row.id)
             row.state = "SUPERSEDED"
     before = existing.state
+    old = {"state": before, "note": existing.note}
     existing.state, existing.note, existing.updated_at = rules.CANCELLED, reason, now
-    _audit(db, ctx, "REPORT_CANCELLED", existing, reason=reason, state_before=before, version=signed.version)
+    _audit(
+        db,
+        ctx,
+        "REPORT_CANCELLED",
+        existing,
+        old,
+        {"state": rules.CANCELLED, "note": reason},
+        reason=reason,
+        state_before=before,
+        version=signed.version,
+    )
     return pending
 
 
-def end_cancelled_approvals(db, ctx, tenant_id, pending: list) -> None:
-    """The approval tasks of the snapshots a cancelled report no longer needs, after the signing is saved."""
+def follow_signed(db, ctx, obligation: ReportObligation, signed, now: datetime) -> list:
+    """An open report follows its market's latest signed reportable conclusion (0.10.81, F1): its report type, its due
+    date and its provisional flag, audited with before and after. A pending or approved snapshot of another report type
+    is superseded (it was approved as another report) and an approved report is a draft again. A report already
+    submitted is never changed: the change is audited and the report page flags it, so a follow-up report can be
+    considered (``conclusion_changed``). Returns the pending snapshots whose approval tasks end."""
+    before = {
+        "report_type": obligation.report_type,
+        "due_on": _iso(obligation.due_on),
+        "provisional": obligation.due_provisional,
+    }
+    after = {"report_type": signed.report_type, "due_on": _iso(signed.due_on), "provisional": False}
+    if obligation.state in rules.SUBMITTED:
+        if (before["report_type"], before["due_on"]) != (after["report_type"], after["due_on"]):
+            _audit(
+                db, ctx, "REPORT_CONCLUSION_CHANGED_AFTER_SUBMISSION", obligation, before, after, version=signed.version
+            )
+        return []
+    if obligation.state not in rules.CANCELLABLE:
+        return []
+    obligation.assessment_id = signed.id
+    if before == after:
+        return []
+    pending = []
+    if before["report_type"] != after["report_type"]:
+        for row in _snapshots(db, obligation):
+            if row.state in ("PENDING", "APPROVED"):
+                if row.state == "PENDING":
+                    pending.append(row.id)
+                row.state = "SUPERSEDED"
+        if obligation.state == rules.APPROVED:
+            obligation.state = rules.DRAFT
+    obligation.report_type, obligation.due_on, obligation.due_provisional = signed.report_type, signed.due_on, False
+    obligation.updated_at = now
+    _audit(db, ctx, "REPORT_RETYPED_BY_CONCLUSION", obligation, before, after, version=signed.version)
+    return pending
+
+
+def conclusion_changed(obligation: ReportObligation, current) -> str | None:
+    """A submitted report whose market's latest signed conclusion now says otherwise (0.10.81, F1; F13): what to
+    consider. It never changes the report."""
+    if obligation.kind != "INITIAL" or obligation.state not in rules.SUBMITTED or current is None:
+        return None
+    label = markets.MARKET_LABELS.get(obligation.market, obligation.market)
+    signed = f"The {label} conclusion signed later (version {current.version})"
+    if current.conclusion == markets.NOT_REPORTABLE:
+        return f"{signed} says not reportable. This report stays as submitted: consider a final report that says so."
+    if current.conclusion == markets.REPORTABLE and current.report_type != obligation.report_type:
+        kind = markets.REPORT_TYPES.get(current.report_type or "")
+        was = markets.REPORT_TYPES.get(obligation.report_type or "")
+        return (
+            f"{signed} says {kind.label if kind else 'another report type'}; this report was submitted as "
+            f"{was.label if was else 'another report type'}. It stays as submitted: consider a follow-up report."
+        )
+    return None
+
+
+def end_cancelled_approvals(db, ctx, tenant_id, pending: list, outcome: str = "Cancelled: not reportable") -> None:
+    """The approval tasks of the snapshots a cancelled (or retyped) report no longer needs, after the signing is
+    saved."""
     for snapshot_id in pending:
         run_hook(
             db,
@@ -819,7 +911,7 @@ def end_cancelled_approvals(db, ctx, tenant_id, pending: list) -> None:
             tenant_id,
             source_type=OBJECT_TYPE,
             source_id=snapshot_id,
-            outcome="Cancelled: not reportable",
+            outcome=outcome,
             actor=str(ctx.user_id),
             approved=False,
         )
@@ -902,12 +994,27 @@ def set_field(
     if field.missing == forms.NOT_USED:
         raise _error(422, "FIELD_NOT_USED", "This field is not used in this report")
     entries = dict(obligation.entries or {})
+    before = entries.get(field_id)
     coded = bool(field.source and field.source.startswith("imdrf_"))
     if payload.codes and not coded:
         raise _error(422, "NOT_A_CODE_FIELD", "Only an IMDRF code field takes codes")
     value = None if payload.clear else _text(payload.value, worksheet.VALUE_MAX)
     if value and field.options and value not in field.options:
         raise _error(422, "NOT_A_CHOICE", f"Choose one of: {'; '.join(field.options)}", choices=list(field.options))
+    if value and field.source == "front_page":
+        raise _error(
+            422, "FOLLOWS_FRONT_PAGE", "This field follows the front page's manufacturer report number: change it there"
+        )
+    problem = forms.value_problem(field, value)
+    if problem:
+        raise _error(422, f"NOT_A_{field.kind}", problem)
+    if value and field.kind == forms.LIST_CODE:
+        from backend.app import regulatory_reference as reference
+
+        value = value.upper()
+        name = forms.LIST_CODES[field.source][0]
+        if name:
+            reference._known(control_db, name, value, "CODE_UNKNOWN", f"is not in the loaded {name.replace('_', ' ')}")
     code_state = None
     if payload.clear:
         entries.pop(field_id, None)
@@ -926,6 +1033,9 @@ def set_field(
         ctx,
         "REPORT_FIELD_SET",
         obligation,
+        # The field's entry before and after (0.10.81, F7): an overwritten value stays in the audit trail.
+        _entry_values(field_id, before),
+        _entry_values(field_id, entries.get(field_id)),
         field=field_id,
         cleared=payload.clear,
         confirmed=payload.confirmed,
@@ -933,6 +1043,14 @@ def set_field(
     )
     db.commit()
     return detail(db, control_db, ctx, obligation)
+
+
+def _entry_values(field_id: str, entry: dict | None) -> dict:
+    """A worksheet entry as the audit keeps it: its value, codes and whether it was a confirmation."""
+    entry = entry or {}
+    return {
+        field_id: {key: entry[key] for key in ("value", "codes", "code_state", "confirmed") if entry.get(key)} or None
+    }
 
 
 def _conclusion(context: dict, market: str):
@@ -1555,7 +1673,7 @@ def evidence_file(
     return Response(
         content=bytes(row.content),
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{row.file_name or "evidence"}"'},
+        headers={"Content-Disposition": attachment(f"{row.file_name or 'evidence'}")},
     )
 
 
@@ -1733,5 +1851,5 @@ def export(
     return Response(
         content=body,
         media_type=MEDIA[kind],
-        headers={"Content-Disposition": f'attachment; filename="{stem}.{kind}"'},
+        headers={"Content-Disposition": attachment(f"{stem}.{kind}")},
     )

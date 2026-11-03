@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from backend.app.downloads import attachment
 from backend.app import csv_safe
 from backend.app.business_ids import business_id_map
 from backend.app.db.data_plane import get_data_plane_db
@@ -117,5 +118,5 @@ def export_csv(deps=Depends(_deps)):
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=tenant-products.csv"},
+        headers={"Content-Disposition": attachment("tenant-products.csv")},
     )

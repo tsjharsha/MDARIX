@@ -57,7 +57,8 @@ describe("the shell and its tab bar", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("maps each tab onto a place of the link table, Home being My work", () => {
-    expect(Object.values(PERSONA_TABS).map((tab) => tab.section)).toEqual([...NEW_MENU.main]);
+    // 0.10.80: a trial's Getting started comes first, outside the personas' tabs (release0080.test.tsx).
+    expect(Object.values(PERSONA_TABS).map((tab) => tab.section)).toEqual(["Getting started", ...NEW_MENU.main]);
     expect(PERSONA_TABS.home.section).toBe("My Work");
     expect(tabOfSection("Complaint")).toBe("complaints");
     expect(tabOfSection("Settings")).toBeNull();

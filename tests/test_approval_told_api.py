@@ -11,6 +11,8 @@ from datetime import timedelta
 
 import pytest
 
+from tests.report_fill import fill
+
 from backend.app.db.models.oversight import DueAlert
 from backend.app.db.models.workflow import WorkflowTask
 from backend.app.db.session import SessionLocal
@@ -94,8 +96,7 @@ def test_who_approves_is_said_before_any_password():
 
 def _fill(user, report_id: str) -> None:
     """Every mandatory field still empty, entered: on the new navigation Send for approval waits for them (0.10.75)."""
-    for field in _ok(user.get(f"{REPORTS}/{report_id}"))["mandatory"]["missing"]:
-        _ok(user.put(f"{REPORTS}/{report_id}/fields/{field}", json={"value": "Test value (sample)"}))
+    fill(user, REPORTS, report_id, _ok(user.get(f"{REPORTS}/{report_id}"))["mandatory"]["missing"])
 
 
 # --------------------------------------------------------------------------------------------- alone in a trial

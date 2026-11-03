@@ -24,6 +24,7 @@ from backend.app.authority_reports import rules
 from backend.app.db.models.foundation import AuditEvent
 from backend.app.db.session import SessionLocal
 from backend.app.main import app
+from tests.report_fill import fill
 from tests.conftest import authenticated_client
 from tests.test_flagship_walkthrough import _answers_from_record
 from tests.test_free_trial import PASSWORD, _activation_token, _approved_trial_client
@@ -155,11 +156,10 @@ def test_send_for_approval_stays_blocked_until_every_mandatory_field_is_filled(t
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "MANDATORY_FIELDS_MISSING"
     missing = refused.json()["detail"]["missing"]
     assert missing == _ok(user.get(f"{REPORTS}/{report['id']}"))["mandatory"]["missing"]
-    for field in missing[:-1]:
-        _ok(user.put(f"{REPORTS}/{report['id']}/fields/{field}", json={"value": "Test value (sample)"}))
+    fill(user, REPORTS, report["id"], missing[:-1])
     still = user.post(f"{REPORTS}/{report['id']}/snapshots")
     assert still.status_code == 422 and still.json()["detail"]["missing"] == missing[-1:]
-    detail = _ok(user.put(f"{REPORTS}/{report['id']}/fields/{missing[-1]}", json={"value": "Test value (sample)"}))
+    detail = fill(user, REPORTS, report["id"], missing[-1:])
     assert detail["stage"] == "COMPLETE" and detail["mandatory"]["missing"] == []
     detail = _ok(user.post(f"{REPORTS}/{report['id']}/snapshots"))
     assert detail["stage"] == "APPROVAL" and detail["pending_snapshot"]
@@ -206,8 +206,7 @@ def test_a_colleague_approves_a_report_prepared_by_someone_else():
         complaint = _flagship(owner)
         _ok(_sign_us(owner, complaint, "REPORTABLE"))
         (report,) = _reports(owner, complaint)
-        for field in _ok(owner.get(f"{REPORTS}/{report['id']}"))["mandatory"]["missing"]:
-            _ok(owner.put(f"{REPORTS}/{report['id']}/fields/{field}", json={"value": "Test value (sample)"}))
+        fill(owner, REPORTS, report["id"], _ok(owner.get(f"{REPORTS}/{report['id']}"))["mandatory"]["missing"])
         detail = _ok(owner.post(f"{REPORTS}/{report['id']}/snapshots"))
         # The preparer may not approve once a colleague may: no practice approval, the colleague named.
         assert not detail["approval"]["may_approve"] and detail["approval"]["approvers"] == ["Rahul Colleague"]
@@ -264,8 +263,13 @@ def test_the_sample_reports_fit_the_status_path(trial):
     us, india = items["SAMPLE-RV-09"], items["SAMPLE-RV-10"]
     assert (us["state"], us["stage"], us["stage_label"]) == ("ACCEPTED", "ACKNOWLEDGED", "Acknowledged")
     assert us["views"] == [] or us["views"] == ["submitted-month"]
-    assert (india["state"], india["stage"]) == ("CORRECTION_REQUIRED", "COMPLETE")
-    assert india["mandatory"]["filled"] == india["mandatory"]["total"] and "open" in india["views"]
+    # 0.10.81: sent back for correction, it is neither complete nor submitted this month.
+    assert (india["state"], india["stage"], india["stage_label"]) == (
+        "CORRECTION_REQUIRED",
+        "CREATED",
+        "Draft: correction required",
+    )
+    assert india["mandatory"]["filled"] == india["mandatory"]["total"] and india["views"] == ["open"]
 
 
 def test_the_classic_navigation_keeps_its_rules_and_the_refresh_adds_the_report_once():
@@ -340,7 +344,8 @@ def test_the_decision_trees_show_each_market_and_the_path_a_complaint_took(trial
         ("DRAFT", 3, False, "CREATED"),
         ("DRAFT", 0, False, "COMPLETE"),
         ("DRAFT", 0, True, "APPROVAL"),
-        ("CORRECTION_REQUIRED", 0, False, "COMPLETE"),
+        ("CORRECTION_REQUIRED", 0, False, "CREATED"),
+        ("CORRECTION_REQUIRED", 0, True, "APPROVAL"),
         ("APPROVED", 0, False, "APPROVED"),
         ("SUBMITTED_PENDING", 0, False, "SUBMITTED"),
         ("SUBMITTED_NO_ACK", 0, False, "SUBMITTED"),

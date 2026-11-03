@@ -11,6 +11,8 @@ import { OVERSIGHT, eventPath, type EventView, type Oversight, type OversightIte
 import { READINESS_PATH, readinessHeadline, type Readiness } from "../readiness";
 import { comparisonLine, risingSentence, trendPath, type TrendBoard } from "../signalAi";
 import {
+  DUE_WEEK_PATH,
+  DUE_WEEK_VIEW,
   HERO_PERSONAS,
   PERSONA_GREETING,
   greeting,
@@ -22,6 +24,7 @@ import {
 } from "../home";
 import { ResumeShortStory } from "./ShortStory";
 import { MyWorkMore } from "./MyWork";
+import { RemindersPanel } from "./Reminders";
 
 /**
  * Home (0.10.73, Release C part C1; My work's place on the new navigation): what needs attention within the first
@@ -46,6 +49,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
     const place = placeOf(item.opens);
     open(place.section as WorkspaceSection, place.tab);
   };
+  const dueWeek = useResource<{ total: number }>(DUE_WEEK_PATH);
   const reading = oversight.state === "loading";
   const tenant = session?.current_tenant?.tenant_name;
   return (
@@ -71,18 +75,24 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
         <Stat
           tone="over"
           value={reading ? null : counts.overdue}
+          onOpen={() => open("My Work", "Team overview")}
           title="Overdue"
-          detail={counts.overdue ? "Past their time: act on these first" : "Nothing past its time"}
+          // Never an all-clear before the data has arrived (0.10.81, U-07).
+          detail={
+            reading ? "Reading…" : counts.overdue ? "Past their time: act on these first" : "Nothing past its time"
+          }
         />
         <Stat
           tone="soon"
-          value={reading ? null : counts.week}
+          value={dueWeek.state === "loading" ? null : (dueWeek.data?.total ?? null)}
+          onOpen={() => open("Complaints", DUE_WEEK_VIEW)}
           title="Due this week"
-          detail="Deadlines in the next 7 days"
+          detail="Complaints with a deadline or target in the next 7 days"
         />
         <Stat
           tone="risk"
           value={trends.state === "loading" ? null : rising.length}
+          onOpen={() => open("Trends")}
           title="At risk"
           detail={rising.length ? `${rising[0].name} is rising` : "No product rising against its history"}
         />
@@ -128,7 +138,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
           </section>
         )}
         <div className="uw-home-side">
-          {persona === "regulatory" && <LegalClocks clocks={clocks} onOpen={go} />}
+          {persona === "regulatory" && <LegalClocks clocks={clocks} onOpen={go} reading={reading} />}
           {(persona === "investigator" || persona === "risk") && <OpenInvestigations />}
           <section className="uw-card uw-card-pad uw-home-trend" aria-labelledby="home-trend">
             <span className="ac-eyebrow" id="home-trend">
@@ -159,6 +169,10 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
         </div>
       </div>
 
+      {/* The bell's reminders and escalations, read and cleared here on the new navigation (0.10.81, H1). */}
+      <div id="home-reminders">
+        <RemindersPanel />
+      </div>
       <MyWorkMore tab={tab} />
     </div>
   );
@@ -169,18 +183,21 @@ function Stat({
   value,
   title,
   detail,
+  onOpen,
 }: {
   tone: "over" | "soon" | "risk";
   value: number | null;
   title: string;
   detail: string;
+  /** Each tile opens its list (0.10.81, navigation M1). */
+  onOpen: () => void;
 }) {
   return (
-    <div className={`uw-card uw-home-stat is-${tone}`}>
+    <button type="button" className={`uw-card uw-home-stat is-${tone}`} onClick={onOpen}>
       <b className="uw-home-num">{value === null ? "…" : value}</b>
       <strong>{title}</strong>
       <span>{detail}</span>
-    </div>
+    </button>
   );
 }
 
@@ -238,7 +255,15 @@ function HomeHero() {
 }
 
 /** The Regulatory Leader's legal clocks: each market's deadline, soonest first, with how much time is used. */
-function LegalClocks({ clocks, onOpen }: { clocks: OversightItem[]; onOpen: (item: OversightItem) => void }) {
+export function LegalClocks({
+  clocks,
+  onOpen,
+  reading = false,
+}: {
+  clocks: OversightItem[];
+  onOpen: (item: OversightItem) => void;
+  reading?: boolean;
+}) {
   return (
     <section className="uw-card" aria-labelledby="home-clocks">
       <div className="uw-card-head">
@@ -270,7 +295,9 @@ function LegalClocks({ clocks, onOpen }: { clocks: OversightItem[]; onOpen: (ite
           ))}
         </ul>
       ) : (
-        <p className="ac-muted uw-card-pad">No legal clock is running.</p>
+        <p className="ac-muted uw-card-pad" role={reading ? "status" : undefined}>
+          {reading ? "Reading the legal clocks…" : "No legal clock is running."}
+        </p>
       )}
     </section>
   );

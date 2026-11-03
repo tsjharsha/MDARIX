@@ -6653,6 +6653,11 @@ button.uw-org:hover {
   gap: var(--ms-space-1);
   padding: 16px 18px;
   border-top: 4px solid var(--ms-line);
+  /* A tile is a button that opens its list (0.10.81). */
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .uw-home-stat.is-over {
   border-top-color: var(--ms-crit);
@@ -6797,9 +6802,9 @@ button.uw-org:hover {
   }
 }
 @media (max-width: 640px) {
+  /* The bell stays on a phone (0.10.81, H1): its count is the only way to the reminders there. */
   .uw-org,
   .uw-search,
-  .uw-top-bell,
   .uw-persona-btn .uw-persona-hint {
     display: none;
   }
@@ -7617,4 +7622,69 @@ button.uw-org:hover {
   .uw-pop-option.uw-avatar-import {
     display: flex;
   }
+}
+/* "Sample data · Your data" (0.10.80): which of a trial's data the lists and insights show, while both exist. At 1100 px
+   and narrower it is in the avatar menu, as the Sample data label and Import your data are. */
+.uw-data-choice {
+  display: inline-flex;
+  flex: none;
+  margin-left: var(--ms-space-2);
+  border: 1px solid var(--ms-warn-line);
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-warn-bg);
+  overflow: hidden;
+}
+.uw-data-choice button {
+  border: 0;
+  padding: 3px 9px;
+  background: transparent;
+  color: var(--ms-warn);
+  font-size: var(--ms-fs-12);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.uw-data-choice button + button {
+  border-left: 1px solid var(--ms-warn-line);
+}
+.uw-data-choice button.is-on {
+  background: var(--ms-warn);
+  color: var(--ms-surface);
+  font-weight: var(--ms-fw-bold);
+}
+.uw-data-choice button:focus-visible {
+  outline: 2px solid var(--ms-navy);
+  outline-offset: -2px;
+}
+.uw-avatar-data {
+  display: none;
+  border-block: 1px solid var(--ms-line);
+}
+@media (max-width: 1100px) {
+  .uw-data-choice {
+    display: none;
+  }
+  .uw-avatar-data {
+    display: block;
+  }
+}
+
+/* A fact the reporting steps need, asked for in place (0.10.81): the field takes the box's width. */
+.uw-facts {
+  display: grid;
+  gap: var(--ms-space-2);
+}
+.uw-facts p {
+  margin: 0;
+}
+.uw-facts label {
+  display: grid;
+  gap: 4px;
+  font-weight: 600;
+}
+.uw-facts input {
+  width: 100%;
+  min-width: 0;
+}
+.uw-facts > button {
+  justify-self: start;
 }

@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
+from backend.app.downloads import attachment
 from backend.app import import_lineage, import_quarantine
 from backend.app.access.permissions import RECORDS_WRITE, require_permission
 from backend.app.db.data_plane import get_data_plane_db
@@ -120,7 +121,7 @@ def import_template(
     return Response(
         imports.template_csv(entity),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="mdarix-{entity}-template.csv"'},
+        headers={"Content-Disposition": attachment(f"mdarix-{entity}-template.csv")},
     )
 
 

@@ -10,6 +10,193 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.81] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): the Critical, High and Medium findings of the functional review of
+0.10.79, and selected findings of the usability, security and navigation reviews. Some of them gave wrong regulatory
+deadlines on mdarix.com. No migration. The API and web images change.
+
+**Operator step:** run `python scripts/refresh_trial_story.py` (a dry run: it lists what it would change), read the
+list, then run it again with `--apply`. For every running trial, with or without its sample, it now adds the
+reporting windows of every market the trial lacks, moves each open report (not yet submitted) to its market's latest
+signed conclusion (report type, due date, provisional flag), recomputes draft assessments under the Unknown rule
+below, and sets the sample US report's FDA product code. Everything it changes is audited; it never changes a signed
+conclusion or a submitted report: those it lists, for a person to act on. A second run changes nothing (it lists
+again only what a person must act on).
+
+### Fixed: deadlines (trials and pilots)
+
+- **Re-signing a conclusion moves its report** (F1). A report created as the 30-day 3500A stayed on its old date
+  after the conclusion was signed again as the 5-work-day report. Every open report of the market now follows the
+  latest signed reportable conclusion: report type, due date and provisional flag, with before and after in the
+  audit trail. A snapshot approved for the old type is set aside and needs a new approval. A submitted report is
+  never changed: its page says what the later conclusion says and suggests a follow-up (or final) report.
+- **An Unknown answer keeps the shorter report** (F2). In the US, an Unknown on "remedial action" now gives the
+  5-work-day report; in the EU and Great Britain an Unknown on "serious public health threat" gives the 2-day report,
+  and one on "death" or "unanticipated" the 10-day report. A note says which question is Unknown and what a No would
+  change it to (MDCG 2023-3 for the EU and GB). Starter rule, for your consultant to confirm. Canada is unchanged.
+- **Every market has a reporting window in every trial** (F5). A trial started with windows for the US, the EU and
+  India, so a Great Britain or Canada death had no assessment and no clock. New trials get every market's starter
+  windows; running trials get them through the refresh.
+
+### Fixed: missing facts are asked for, never guessed (trials and pilots)
+
+- **No country, or one MDARIX does not know** (F3, U-01): the complaint is no longer "No market to assess". The
+  complaint page and the market assessment ask for the country, with why and which rule needs it; until it is
+  entered every market's shortest clock runs, provisional, Home lists "Enter the incident country", the checklist's
+  market step waits, and no market conclusion can be signed. Countries are read by name or ISO code.
+- **No awareness or received date** (F4): the clock is provisional (counted from the event date, else from when the
+  record arrived), the awareness date is asked for the same way, and no conclusion is signed until it is entered. A
+  time confirmed at triage becomes the complaint's awareness, so it is not asked twice.
+- **A blank received date stays blank** (F10): an import no longer copies the event date into it; the watch says the
+  clock counts from the "event date (no awareness or received date)". Complaints imported earlier keep theirs.
+- **A day without a time is a day** (U-06): an imported awareness date is shown as "29 Oct 2026, time not recorded",
+  and counted as that day in every time zone (the counting rule for a day without a time).
+- **The import check flags rows** (F9) that import but need a look: no or an unknown country, no awareness or
+  received date, an awareness before the event, a death or serious injury with no patient involved, a text row with
+  fewer columns than its header. They are listed in the check and in the run's data-quality report ("Rows to check").
+
+### Fixed: authority reports
+
+- **Fields take what they are** (F6): a date field takes a date, a range field a date or "date to date", an IMDRF
+  code field only codes from the code picker (on both navigations), the FDA product code and EMDN fields only codes
+  of the loaded lists; G8 follows the front page's manufacturer report number. A value typed earlier that does not
+  fit is flagged on the report and counts as missing; nothing is deleted.
+- **The EU and GB MIR do not guess 1.2d or 3.2c** (F12): the reportability date and the device's current location
+  are left for the person, each with a short note.
+- **Cancelled reads Cancelled** (F11): a report cancelled by "not reportable" no longer reads MET, and once a new
+  conclusion reopens it, the old cancellation note leaves the page (it stays in the audit trail).
+- **A report sent back for correction** is not "Mandatory fields complete" and not "Submitted this month" (M3).
+- **One report list on the new navigation** (M7): Complaints › Authority reports and › Reporting show the Reports
+  tab's own list and words; a report link opens the Reports page; the complaint page's report step opens the report.
+
+### Fixed: records, screens and security
+
+- **Audit before and after** (F7) for report fields, a product's identity (UDI-DI, Basic UDI-DI, GMDN, EMDN), its
+  registrations and the responsible parties, and for a cancelled report.
+- **Trend check** (F8): a version's first day is counted in its history (it was left out, so "expected" was low).
+- **Imported records are never "sample"** (M6).
+- **The bell** (H1) opens Home, which now shows the reminders and escalations with Mark all read; the bell stays on
+  a phone.
+- **"Due this week" is one number** (M1): the complaints of the Complaints list view of that name, on Home and in
+  Team overview; each Home tile opens its list.
+- **Search** never opens `/app/reports?report=null` (M2).
+- **Home while it reads** says so, never "Nothing past its time" or "No legal clock is running." (U-07).
+- **"Invite two colleagues"** completes at two (U-05).
+- **Downloads** whose file name has an en dash or any non-Latin letter no longer fail: every download sends an ASCII
+  name and the UTF-8 one (security F3).
+- **Trial invitations** are rate limited first, and an address with an account in another organization gets the
+  same neutral answer as any address that cannot be invited (security F1).
+
+### Sample numbers and labels that change
+
+| Where | Before | After |
+|---|---|---|
+| Reporting windows | 4 (FDA 30, EU 15, EU 10, India 15) | 8 (adds MHRA 15 and 10, Health Canada 10 and 30) |
+| Decision trees | Great Britain and Canada "not in your reporting windows" | enabled |
+| A sample complaint's market assessment | US, EU / NI, India | the five markets |
+| Triage panel, provisional clocks (e.g. SAMPLE-RV-11) | US, EU / NI, India | adds Great Britain and Canada "if also reportable" (GB 11 Nov, CA 12 Nov) |
+| SAMPLE-CALL-03 (GB) | "No reporting window for the event's own market" | its Great Britain clock |
+| Home, Due this week (Admin, day 0) | 11 (every dated item) | 4 (complaints, the list view) |
+| Team overview | "Due soon, whole team" 2 | "Due this week, whole team" 4 |
+| Sample US report, D2A | "SMP (sample: your FDA product code)" | FRN |
+| SAMPLE-RV-07 EU MIR, 1.2d | the signing day ("From record") | empty, for the person |
+| SAMPLE-RV-07 EU MIR, 3.2c | from "device returned" | empty, must have (the meter counts it) |
+| SAMPLE-RV-10 India report | "Mandatory fields complete"; in Submitted this month | "Draft: correction required"; Open reports only |
+| A cancelled report's deadline | "No deadline: not reportable" (state MET) | "Cancelled: not reportable" |
+
+No sample deadline, trend figure or signal count changes on day 0 (the sample's versions are older than the trend
+history's 180 days, so F8 does not move them).
+
+### Tests
+
+- pytest `tests/test_release_0_10_81.py` (new, 15), `tests/test_market_assessment_rules.py` (F2),
+  `tests/test_signal_trend_rules.py` (F8); updated: `test_release_c3_0_10_75.py`, `test_release_c4_0_10_76.py`,
+  `test_release_c5_0_10_77.py`, `test_approval_told_api.py` (fields filled by kind: `tests/report_fill.py`),
+  `test_free_trial.py` (8 windows), `test_trial_import_reports.py` (row flags).
+  `test_flagship_walkthrough.py` (the report step opens the report; fields filled by kind), `test_trial_self_admin.py`
+  (CANNOT_INVITE).
+- vitest `release0081.test.tsx` (new), `TrialGuidePage.test.tsx`, `releaseC5077.test.tsx`.
+- Targeted pytest (this release, the reports, assessments, imports, intake, oversight, links, complaint page, trends,
+  deadlines, decision guides, readiness, team, business permissions, alembic drift, the migration chain, free trial):
+  427 passed; 1 fails as it did on 0.10.80 (`test_one_deadline_api.py::test_triage_shows_the_events_own_market_first...`,
+  unchanged by this release). vitest: the 71 files that render or import a changed module, 638 passed.
+
+## [0.10.80] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): a trial's own data on the new navigation (owner request, 3 November
+2026). No migration. The API and web images change. No operator step: `scripts/refresh_trial_story.py` has nothing new
+to do (the sample does not change).
+
+### Changed (trials on the new navigation; the classic navigation and pilots are unchanged)
+
+- **Getting started is a tab, the first one, left of Home**, for every persona in a trial (it holds the guide and the
+  stories). A pilot's tab bar has no Getting started.
+- **The import leaves Getting started.** Its "Your data" tab is gone on the new navigation; the rest of Getting started
+  (the sample event, the stories, the ten chapters, About the sample data, Your trial) stays.
+- **Import your data is its own page, `/app/import`** (in the link table, as Decision trees and Reports are). The top
+  bar's Import your data button, its avatar-menu item at narrow widths, the Complaints header's button and Help › Try
+  your own data open it. Old links to Getting started › Your data (a data-quality report's `?report=` too) land on it;
+  on the classic navigation `/app/import` opens Getting started › Your data, as before. The page holds the same upload,
+  each import's data-quality report and what the data shows (Automatic insights). Once the organization's complaints
+  are in, one main button, **See your complaints**, opens Complaints › All complaints on your data. Removing the sample
+  is offered on the page, folded and optional, with its existing confirmation (the trial owner only).
+- **A sample-only trial and a person who may not change records** see no Import button and no Help › Try your own
+  data. Opening `/app/import` says plainly "This evaluation uses the sample only" (with Discuss a pilot) or "Import is
+  not available to you"; the server refuses their imports as before.
+- **The top bar's data, read from the server** (`/api/v1/trial/status`, read again after an import or the sample's
+  removal): the sample alone shows the **Sample data** label and Import your data, as before; the sample and imported
+  complaints together show a small choice, **Sample data · Your data**, the sample by default; once the sample is
+  removed, neither (until now the label read "Practice records" then, and kept "Sample data" until a reload). At 1100 px
+  and narrower the choice is in the avatar menu, as Import your data is.
+- **The choice decides which data these show:** every complaint list and list view (Complaints, the All complaints
+  filters: the Data filter steps aside while the top bar chooses), Trends › Trends to review, and Automatic insights on
+  the Import page. Changing it opens the screen again on the chosen data. It is remembered per person and organization
+  in this browser (a view, not a record).
+- `GET /api/v1/trial/insights?source=MDARIX_SAMPLE|TRIAL_UPLOAD`: the insights of that data. Without it (or with any
+  other value) the insights read as before: the imported data, else the sample. No new route.
+
+### Not reached by the choice yet
+
+Home's counts and next actions, Trends › Trend check, Over time and By resolution, Investigations, Decision trees,
+Reports and Records, the Complaints work queues with their own screens (To triage, Calls to check, Due soon, Past
+target, Second look, Dismissed, Reporting, Authority reports, Communications), the complaint page, and the top bar's
+search. Each shows both datasets, as before.
+
+### Sample numbers and labels that change
+
+No sample record, deadline, signal, trend figure, Readiness value or count changes.
+
+| Where | Before | After |
+|---|---|---|
+| Top bar (new navigation), sample removed | "Practice records" | no label |
+| Top bar (new navigation), sample and imported complaints | "Sample data" | "Sample data · Your data" (Sample data chosen) |
+| Tab bar (new navigation, trial) | Home first | Getting started, then Home |
+| Getting started tabs (new navigation) | Your data, About the sample data, Your trial | About the sample data, Your trial |
+| Getting started's fold (new navigation) | "Explore all capabilities: the ten chapters, your own data and your trial" | "… the ten chapters, the sample data and your trial" |
+| The own-data chapter's data line (new navigation) | "…, under Your data below." | "…, on Import your data." |
+
+### Tests
+
+- pytest `tests/test_release_0_10_80.py` (new, 2): the insights read the chosen data and, without a choice, as before;
+  the route's parameter is bounded.
+- vitest `release0080.test.tsx` (new, 11): Getting started first in a trial's bar, never a pilot's; Getting started
+  without the upload (new) and with it (classic); `/app/import`, the old links and every way in; the page's upload,
+  reports, insights, its one main button and the folded removal; the bar's label, choice or nothing from the server's
+  counts; the choice in the avatar menu, remembered per person; the complaint lists, list views, Trends to review and
+  insights follow it; sample-only and no-rights people get the plain message and no Help item. Updated:
+  `importOwnData.test.tsx` (the button opens the new page), `releaseC1073.test.tsx` (Getting started before the
+  personas' tabs).
+- Targeted pytest (this release, free trial, trial insights and status reads, business permissions, link targets,
+  alembic drift policy, the migration chain, 0.10.79, import signals after the response): 77 passed. vitest: every
+  file that renders the shell, Getting started, the complaint list, the signal inbox, Help or the link table, plus the
+  import, insights and sample-removal files (38 files): 260 passed. tsc, ruff and prettier clean.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.80-review` (`owner/`: the tab bar, Getting started without the
+  import, the Import page before and after uploading six fictional complaints, an old Your data link landing there, See
+  your complaints; `both/`: Sample data · Your data in both states, Complaints, Trends to review and the insights on
+  your data, the avatar menu at 390; `removed/`: the bar after the sample is removed; `regulatory/`: a locked
+  Regulatory Leader, "Import is not available to you"; `classic/`: unchanged).
+
 ## [0.10.79] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): small owner-approved follow-ups to Release C. No migration. The API and

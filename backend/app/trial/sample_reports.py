@@ -73,7 +73,8 @@ IN_EXAMPLE = {
 US_ENTRIES = {
     "MFR_REPORT": "SAMPLE-0000000-2026-00001 (sample)",
     "B4": "{submitted}",
-    "D2A": "SMP (sample: your FDA product code)",
+    # An FDA product code from the published list (0.10.81: a code field takes only a code; FRN: Pump, Infusion).
+    "D2A": "FRN",
     "D3": "Orbit Medical Devices (Sample), Springfield, US",
     "G1": "Orbit Medical Devices (Sample), 1 Sample Way, Springfield, US; vigilance office (sample)",
     "G2": "Health professional",

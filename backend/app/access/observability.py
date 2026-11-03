@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from auth.emailer import (
     smtp_configuration_status,
 )
+from backend.app.downloads import attachment
 from backend.app import csv_safe
 from backend.app.business_ids import business_id_map, business_id_of
 from backend.app.db.models.foundation import (
@@ -178,7 +179,7 @@ def export_audit_history(
     return Response(
         content=stream.getvalue(),
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="mdarix-audit-{admin.tenant_id}.csv"'},
+        headers={"Content-Disposition": attachment(f"mdarix-audit-{admin.tenant_id}.csv")},
     )
 
 
@@ -248,7 +249,7 @@ def download_audit_evidence_package(
     return Response(
         content=output.getvalue(),
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="mdarix-compliance-{admin.tenant_id}.zip"'},
+        headers={"Content-Disposition": attachment(f"mdarix-compliance-{admin.tenant_id}.zip")},
     )
 
 
