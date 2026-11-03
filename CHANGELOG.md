@@ -10,6 +10,118 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.81] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): the Critical, High and Medium findings of the functional review of
+0.10.79, and selected findings of the usability, security and navigation reviews. Some of them gave wrong regulatory
+deadlines on mdarix.com. No migration. The API and web images change.
+
+**Operator step:** run `python scripts/refresh_trial_story.py` (a dry run: it lists what it would change), read the
+list, then run it again with `--apply`. For every running trial, with or without its sample, it now adds the
+reporting windows of every market the trial lacks, moves each open report (not yet submitted) to its market's latest
+signed conclusion (report type, due date, provisional flag), recomputes draft assessments under the Unknown rule
+below, and sets the sample US report's FDA product code. Everything it changes is audited; it never changes a signed
+conclusion or a submitted report: those it lists, for a person to act on. A second run changes nothing (it lists
+again only what a person must act on).
+
+### Fixed: deadlines (trials and pilots)
+
+- **Re-signing a conclusion moves its report** (F1). A report created as the 30-day 3500A stayed on its old date
+  after the conclusion was signed again as the 5-work-day report. Every open report of the market now follows the
+  latest signed reportable conclusion: report type, due date and provisional flag, with before and after in the
+  audit trail. A snapshot approved for the old type is set aside and needs a new approval. A submitted report is
+  never changed: its page says what the later conclusion says and suggests a follow-up (or final) report.
+- **An Unknown answer keeps the shorter report** (F2). In the US, an Unknown on "remedial action" now gives the
+  5-work-day report; in the EU and Great Britain an Unknown on "serious public health threat" gives the 2-day report,
+  and one on "death" or "unanticipated" the 10-day report. A note says which question is Unknown and what a No would
+  change it to (MDCG 2023-3 for the EU and GB). Starter rule, for your consultant to confirm. Canada is unchanged.
+- **Every market has a reporting window in every trial** (F5). A trial started with windows for the US, the EU and
+  India, so a Great Britain or Canada death had no assessment and no clock. New trials get every market's starter
+  windows; running trials get them through the refresh.
+
+### Fixed: missing facts are asked for, never guessed (trials and pilots)
+
+- **No country, or one MDARIX does not know** (F3, U-01): the complaint is no longer "No market to assess". The
+  complaint page and the market assessment ask for the country, with why and which rule needs it; until it is
+  entered every market's shortest clock runs, provisional, Home lists "Enter the incident country", the checklist's
+  market step waits, and no market conclusion can be signed. Countries are read by name or ISO code.
+- **No awareness or received date** (F4): the clock is provisional (counted from the event date, else from when the
+  record arrived), the awareness date is asked for the same way, and no conclusion is signed until it is entered. A
+  time confirmed at triage becomes the complaint's awareness, so it is not asked twice.
+- **A blank received date stays blank** (F10): an import no longer copies the event date into it; the watch says the
+  clock counts from the "event date (no awareness or received date)". Complaints imported earlier keep theirs.
+- **A day without a time is a day** (U-06): an imported awareness date is shown as "29 Oct 2026, time not recorded",
+  and counted as that day in every time zone (the counting rule for a day without a time).
+- **The import check flags rows** (F9) that import but need a look: no or an unknown country, no awareness or
+  received date, an awareness before the event, a death or serious injury with no patient involved, a text row with
+  fewer columns than its header. They are listed in the check and in the run's data-quality report ("Rows to check").
+
+### Fixed: authority reports
+
+- **Fields take what they are** (F6): a date field takes a date, a range field a date or "date to date", an IMDRF
+  code field only codes from the code picker (on both navigations), the FDA product code and EMDN fields only codes
+  of the loaded lists; G8 follows the front page's manufacturer report number. A value typed earlier that does not
+  fit is flagged on the report and counts as missing; nothing is deleted.
+- **The EU and GB MIR do not guess 1.2d or 3.2c** (F12): the reportability date and the device's current location
+  are left for the person, each with a short note.
+- **Cancelled reads Cancelled** (F11): a report cancelled by "not reportable" no longer reads MET, and once a new
+  conclusion reopens it, the old cancellation note leaves the page (it stays in the audit trail).
+- **A report sent back for correction** is not "Mandatory fields complete" and not "Submitted this month" (M3).
+- **One report list on the new navigation** (M7): Complaints › Authority reports and › Reporting show the Reports
+  tab's own list and words; a report link opens the Reports page; the complaint page's report step opens the report.
+
+### Fixed: records, screens and security
+
+- **Audit before and after** (F7) for report fields, a product's identity (UDI-DI, Basic UDI-DI, GMDN, EMDN), its
+  registrations and the responsible parties, and for a cancelled report.
+- **Trend check** (F8): a version's first day is counted in its history (it was left out, so "expected" was low).
+- **Imported records are never "sample"** (M6).
+- **The bell** (H1) opens Home, which now shows the reminders and escalations with Mark all read; the bell stays on
+  a phone.
+- **"Due this week" is one number** (M1): the complaints of the Complaints list view of that name, on Home and in
+  Team overview; each Home tile opens its list.
+- **Search** never opens `/app/reports?report=null` (M2).
+- **Home while it reads** says so, never "Nothing past its time" or "No legal clock is running." (U-07).
+- **"Invite two colleagues"** completes at two (U-05).
+- **Downloads** whose file name has an en dash or any non-Latin letter no longer fail: every download sends an ASCII
+  name and the UTF-8 one (security F3).
+- **Trial invitations** are rate limited first, and an address with an account in another organization gets the
+  same neutral answer as any address that cannot be invited (security F1).
+
+### Sample numbers and labels that change
+
+| Where | Before | After |
+|---|---|---|
+| Reporting windows | 4 (FDA 30, EU 15, EU 10, India 15) | 8 (adds MHRA 15 and 10, Health Canada 10 and 30) |
+| Decision trees | Great Britain and Canada "not in your reporting windows" | enabled |
+| A sample complaint's market assessment | US, EU / NI, India | the five markets |
+| Triage panel, provisional clocks (e.g. SAMPLE-RV-11) | US, EU / NI, India | adds Great Britain and Canada "if also reportable" (GB 11 Nov, CA 12 Nov) |
+| SAMPLE-CALL-03 (GB) | "No reporting window for the event's own market" | its Great Britain clock |
+| Home, Due this week (Admin, day 0) | 11 (every dated item) | 4 (complaints, the list view) |
+| Team overview | "Due soon, whole team" 2 | "Due this week, whole team" 4 |
+| Sample US report, D2A | "SMP (sample: your FDA product code)" | FRN |
+| SAMPLE-RV-07 EU MIR, 1.2d | the signing day ("From record") | empty, for the person |
+| SAMPLE-RV-07 EU MIR, 3.2c | from "device returned" | empty, must have (the meter counts it) |
+| SAMPLE-RV-10 India report | "Mandatory fields complete"; in Submitted this month | "Draft: correction required"; Open reports only |
+| A cancelled report's deadline | "No deadline: not reportable" (state MET) | "Cancelled: not reportable" |
+
+No sample deadline, trend figure or signal count changes on day 0 (the sample's versions are older than the trend
+history's 180 days, so F8 does not move them).
+
+### Tests
+
+- pytest `tests/test_release_0_10_81.py` (new, 14), `tests/test_market_assessment_rules.py` (F2),
+  `tests/test_signal_trend_rules.py` (F8); updated: `test_release_c3_0_10_75.py`, `test_release_c4_0_10_76.py`,
+  `test_release_c5_0_10_77.py`, `test_approval_told_api.py` (fields filled by kind: `tests/report_fill.py`),
+  `test_free_trial.py` (8 windows), `test_trial_import_reports.py` (row flags).
+  `test_flagship_walkthrough.py` (the report step opens the report; fields filled by kind), `test_trial_self_admin.py`
+  (CANNOT_INVITE).
+- vitest `release0081.test.tsx` (new), `TrialGuidePage.test.tsx`, `releaseC5077.test.tsx`.
+- Targeted pytest (this release, the reports, assessments, imports, intake, oversight, links, complaint page, trends,
+  deadlines, decision guides, readiness, team, business permissions, alembic drift, the migration chain, free trial):
+  427 passed; 1 fails as it did on 0.10.80 (`test_one_deadline_api.py::test_triage_shows_the_events_own_market_first...`,
+  unchanged by this release). vitest: the 71 files that render or import a changed module, 638 passed.
+
 ## [0.10.80] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): a trial's own data on the new navigation (owner request, 3 November
