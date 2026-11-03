@@ -77,7 +77,8 @@ describe("the summary before signing (8.3)", () => {
 
   it("names the facts at the flagship's signatures: the market, the report, the decision and ready to close", () => {
     expect(source("MarketAssessment")).toMatch(/signs=\{`\$\{item\.label\}/);
-    expect(source("Reports")).toContain("fingerprint ${shortPrint(snapshot.content_fingerprint)}");
+    // 0.10.83 (D2.8): a report approval reads in plain words; its fingerprint stays in the PDF and Activity.
+    expect(source("Reports")).toContain("You confirm with your password.");
     expect(source("CaseDecision")).toContain("fingerprint ${shortPrint(context.briefContentHash)}");
     expect(source("Oversight")).toContain("fingerprint ${shortPrint(view.decision_record.sha256)}");
     expect(source("FirstContact")).toContain("The first-contact check of ${item.reference}");

@@ -11,7 +11,8 @@ import { guideChanges } from "./sections/TreeEdit";
 import { thingsToGive } from "./sections/ReportBody";
 import { ReportsSection } from "./sections/ReportsTab";
 import type { ReportDetail, WorksheetField } from "./authorityReports";
-import { GUIDES, type GuideVersion } from "./decisionGuides";
+import { GUIDES, questionMark, type GuideVersion } from "./decisionGuides";
+import { STARTER_LABEL, isStarterVersion } from "../shared/standards";
 import {
   foldedRuns,
   groupQuestions,
@@ -768,5 +769,18 @@ describe("D2.8: approval in plain words", () => {
     };
     const html = render(<ReportsSection />, api(undefined, "regulatory", "?report=r1"));
     expect(html).toMatch(/<p class="dt-success">✓ Rahul Iyer · 2 Nov 2026, \d\d:\d\d · approved for submission<\/p>/);
+  });
+});
+
+describe("D2.9: the starter mark only on starter content, in one wording", () => {
+  it("marks MDARIX's starter version and never the organization's approved one", () => {
+    expect(STARTER_LABEL).toBe("Starter, for your consultant to confirm");
+    expect(isStarterVersion("US-starter-1")).toBe(true);
+    expect(isStarterVersion("US-v2")).toBe(false);
+    expect(questionMark({ starter: true, extra: false })).toBe(STARTER_LABEL);
+    expect(show(usItem())).toContain(`<span class="dt-tag"> ${STARTER_LABEL}</span>`);
+    const approved = usItem();
+    approved.question_set = { ...approved.question_set, version: "US-v2" };
+    expect(show(approved)).not.toContain(STARTER_LABEL);
   });
 });

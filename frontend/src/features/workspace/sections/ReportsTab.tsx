@@ -35,6 +35,7 @@ import {
   useCanReport,
 } from "./Reports";
 import { ListViewPicker } from "./Views";
+import { STARTER_LABEL } from "../../shared/standards";
 import { ApprovingDoc, ThingsToGive, signatureLine } from "./ReportBody";
 
 /** What MDARIX does with an authority report, said once where it matters (Release C guardrail 3). */
@@ -221,7 +222,7 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
                 <span>{form.title.replace(/ worksheet$/, "")}</span>
                 <span className="ac-muted">{versionWords(form.version)}</span>
                 {form.starter ? (
-                  <ToneBadge tone="neutral" label="Starter, for your consultant to confirm" />
+                  <ToneBadge tone="neutral" label={STARTER_LABEL} />
                 ) : (
                   <ToneBadge tone="good" label="In MDARIX today" />
                 )}

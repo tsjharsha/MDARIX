@@ -217,7 +217,7 @@ TEMPLATES = (
         "triggers": [DEATH, SERIOUS_INJURY],
         "days": 15,
         "day_basis": CALENDAR,
-        "note": "Starter text: confirm the period against Rule 26 and the Materiovigilance Programme of India guidance "
+        "note": "Starter, for your consultant to confirm: confirm the period against Rule 26 and the Materiovigilance Programme of India guidance "
         "before saving.",
         "basis": ["IN_MDR"],
     },

@@ -400,7 +400,13 @@ export function Approval({ detail, onChanged }: { detail: ReportDetail; onChange
       <p>
         <strong>{approveWords(detail)}</strong> Prepared by {snapshot.requested_by}. You confirm with your password.
       </p>
-      {standing?.same_person && <p className="ac-message tone-warning">{standing.message}</p>}
+      {standing?.same_person ? (
+        <p className="ac-message tone-warning">{standing.message}</p>
+      ) : detail.cannot_approve.length ? (
+        <p className="ac-muted">
+          Not allowed to approve: {detail.cannot_approve.join(", ")} (who prepared it and who signed the conclusion).
+        </p>
+      ) : null}
       <div className="ca-form-grid">
         <label className="ca-field">
           Your password

@@ -29,6 +29,7 @@ import { ReportingFacts } from "./ReportingFacts";
 import { InlineError } from "./boardParts";
 import { TREE_NAMES, type TreeMarket, type TreePath, type Trees } from "../decisionTrees";
 import { FormCard, SignCard } from "./TreeSign";
+import { STARTER_LABEL, isStarterVersion } from "../../shared/standards";
 import "./decide.css";
 
 /** Whether the signed-in person's real role may answer and sign (regulatory review or approval), never the persona. */
@@ -252,6 +253,7 @@ export function MarketTree({
           <h2>{item.question_set.title}</h2>
           <span className="ac-muted">
             {tree?.version_label ?? item.question_set.version}
+            {isStarterVersion(item.question_set.version) && <span className="dt-tag"> {STARTER_LABEL}</span>}
             {item.question_set_current === false ? " · started on an earlier version: it keeps that one" : ""}
           </span>
         </div>
