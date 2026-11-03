@@ -283,7 +283,7 @@ function TeamScene() {
     >
       <rect x="24" y="52" width="512" height="262" rx="12" fill={C.surface} stroke={C.line} />
       <text x="44" y="78" fontSize="9" fontWeight="700" fill={C.teal} letterSpacing="1">
-        3 OF 3 USERS
+        3 PEOPLE · UP TO 50
       </text>
       <text x="44" y="98" fontSize="15" fontWeight="800" fill={C.ink}>
         Your team
