@@ -122,6 +122,12 @@ describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
     expect(html.indexOf("PulseWatch 410 Rev A")).toBeLessThan(html.lastIndexOf("OrbitCare 300 Rev B"));
     expect(html).toContain("OrbitCare 300 Rev B · 9.3×");
     expect(html).toContain("Open the OrbitCare 300 trend");
+    // A group too small to assess says so, never "in line" (3 observed against 0.99 expected).
+    const few = view({ sample: runAt("sample", 9), yours: null }, {}, [
+      trend("PulseWatch 410 Rev A", "pulse", 3, 0.99, "TOO_FEW"),
+    ]);
+    expect(few).toContain("PulseWatch 410 Rev A: too few to assess");
+    expect(few).not.toContain("in line");
   });
 
   it("finds the story's run by its complaint, and shows the sample unless Your data is chosen", () => {
