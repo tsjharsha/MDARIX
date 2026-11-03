@@ -274,8 +274,7 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   "Decision trees": {
     icon: GitBranch,
     description: "Is it reportable, and by when?",
-    guide:
-      "One tree per market. Each complaint is walked through it; a reportable outcome creates the report with its data.",
+    guide: "Answer one complaint's questions per market; the outcome and Sign sit beside them.",
     context: false,
   },
   Reports: {

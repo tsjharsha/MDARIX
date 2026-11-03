@@ -797,3 +797,26 @@ describe("D2.3: pending information only once everything is answered", () => {
     expect(shownOutcome("REPORTABLE", groups, item, some, {})).toBe("REPORTABLE");
   });
 });
+
+describe("0.10.84: the tree while answering, compact enough for Sign on the first screen", () => {
+  it("puts Answer · Edit on the market row, says the starter once and not the version again beside Sign", () => {
+    const starter = usItem({
+      question_set: { ...usItem().question_set, version: "US-starter-1" },
+    });
+    const trees = {
+      ...TREES,
+      markets: [{ ...TREES.markets[0], version_label: "MDARIX starter · version 1, for your consultant to confirm" }],
+    };
+    resources.data = {
+      "/api/v1/decision-trees": trees,
+      "/api/v1/complaints/c-rv11/market-assessments": detailOf(starter),
+    };
+    const html = render(<DecisionTreesSection />);
+    const row = html.slice(html.indexOf('class="dt-markets"'), html.indexOf('class="dt-rec"'));
+    expect(row).toContain('class="dt-modes"');
+    expect(html.split("for your consultant to confirm").length - 1).toBe(1);
+    const rail = html.slice(html.indexOf('class="dt-rail"'));
+    expect(rail).toContain("12 of 12 worked complaints pass");
+    expect(rail).not.toContain("MDARIX starter · version 1");
+  });
+});

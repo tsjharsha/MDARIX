@@ -270,6 +270,11 @@
   border-left: 3px solid var(--ms-teal);
   color: var(--ms-ink-2);
   font-size: var(--ms-fs-14);
+  /* Two lines at most while answering (0.10.84); the whole call is on the complaint's page. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .dt-open {
   grid-row: 1;
@@ -280,6 +285,11 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
+}
+/* The Answer · Edit switch at the end of the market row while answering (0.10.84). */
+.dt-markets > .dt-modes {
+  margin-left: auto;
 }
 .dt-mkt {
   min-height: 34px;

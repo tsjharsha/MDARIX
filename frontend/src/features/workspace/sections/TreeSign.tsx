@@ -324,9 +324,9 @@ export function SignCard({
             <PenLine size={15} aria-hidden="true" />{" "}
             {busy ? "Signing…" : `Sign as ${session?.display_name ?? "yourself"}`}
           </button>
+          {/* The tree's head names its version already (0.10.84: fewer words beside Sign). */}
           <p className="dt-hint">
-            {tree?.version_label ?? item.question_set.version} · {tree?.tests.passed ?? 0} of {tree?.tests.total ?? 0}{" "}
-            worked complaints pass
+            {tree?.tests.passed ?? 0} of {tree?.tests.total ?? 0} worked complaints pass
           </p>
           <InlineError text={error} />
         </form>

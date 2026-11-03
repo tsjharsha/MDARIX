@@ -51,7 +51,7 @@ export function firstComplaint(trees: Pick<Trees, "complaints">, asked: string |
  * tree in place. Facts the record states arrive as one line to confirm; judgements are never pre-filled; questions
  * earlier answers make unnecessary fold away; the outcome updates as the answers are saved. Signing is the rail's.
  */
-export function TreeAnswer({ trees }: { trees: Trees }) {
+export function TreeAnswer({ trees, modes = null }: { trees: Trees; modes?: ReactNode }) {
   const { open } = useWorkspace();
   const [complaintParam, setComplaint] = useTabParam("complaint", "replace");
   const [marketParam, setMarket] = useTabParam("market", "replace");
@@ -72,12 +72,15 @@ export function TreeAnswer({ trees }: { trees: Trees }) {
   };
   if (!trees.complaints.length && !complaintParam)
     return (
-      <section className="uw-card uw-card-pad dt-empty">
-        <h2>No complaint waits for a decision</h2>
-        <p className="ac-muted">
-          A complaint that reports a death, a serious injury or a malfunction comes here to be answered.
-        </p>
-      </section>
+      <>
+        {modes}
+        <section className="uw-card uw-card-pad dt-empty">
+          <h2>No complaint waits for a decision</h2>
+          <p className="ac-muted">
+            A complaint that reports a death, a serious injury or a malfunction comes here to be answered.
+          </p>
+        </section>
+      </>
     );
   return (
     <div className="dt-answer">
@@ -125,8 +128,10 @@ export function TreeAnswer({ trees }: { trees: Trees }) {
               </button>
             );
           })}
+          {modes}
         </div>
       )}
+      {!data && modes}
       {data && !shown.length && (
         <p className="ac-muted">
           No market is enabled yet: enter your reporting windows (Settings › Reporting windows) for the markets you
@@ -252,7 +257,10 @@ export function MarketTree({
           <h2>{item.question_set.title}</h2>
           <span className="ac-muted">
             {tree?.version_label ?? item.question_set.version}
-            {isStarterVersion(item.question_set.version) && <span className="dt-tag"> {STARTER_LABEL}</span>}
+            {/* The starter mark once: a version label that says it already gets no second chip (0.10.84). */}
+            {isStarterVersion(item.question_set.version) && !/consultant/i.test(tree?.version_label ?? "") && (
+              <span className="dt-tag"> {STARTER_LABEL}</span>
+            )}
             {item.question_set_current === false ? " · started on an earlier version: it keeps that one" : ""}
           </span>
         </div>

@@ -23,17 +23,27 @@ export function DecisionTreesSection() {
       </Panel>
     );
   const edit = mode === "edit";
+  const modes = (
+    <div className="dt-modes" role="group" aria-label="Mode">
+      <button type="button" aria-pressed={!edit} onClick={() => setMode(null)}>
+        Answer
+      </button>
+      <button type="button" aria-pressed={edit} onClick={() => setMode("edit")}>
+        Edit this tree
+      </button>
+    </div>
+  );
+  // While answering, the mode switch sits on the market row (0.10.84): the questions and Sign start higher.
   return (
     <div className="dt-page">
-      <div className="dt-modes" role="group" aria-label="Mode">
-        <button type="button" aria-pressed={!edit} onClick={() => setMode(null)}>
-          Answer
-        </button>
-        <button type="button" aria-pressed={edit} onClick={() => setMode("edit")}>
-          Edit this tree
-        </button>
-      </div>
-      {edit ? <TreeEdit trees={all.data} /> : <TreeAnswer trees={all.data} />}
+      {edit ? (
+        <>
+          {modes}
+          <TreeEdit trees={all.data} />
+        </>
+      ) : (
+        <TreeAnswer trees={all.data} modes={modes} />
+      )}
     </div>
   );
 }
