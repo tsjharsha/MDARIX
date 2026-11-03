@@ -230,7 +230,7 @@ export function FinishedRecord({ reference }: { reference: string }) {
   const rows: Array<[string, string[]]> = [
     ["Signed conclusion", lines("assessments")],
     ["Authority report", lines("reports")],
-    ["Who signed", lines("decisions")],
+    ["Approval and decisions", lines("decisions")],
   ];
   return (
     <Panel eyebrow="The record you just finished" title={`${reference} · ready for an inspector`} source={view}>

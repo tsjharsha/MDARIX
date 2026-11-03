@@ -173,3 +173,17 @@ def test_an_import_run_keeps_the_products_its_complaints_created(fic):
     not loaded". The run's report keeps what it created, so the checklist counts it."""
     (run,) = [run for run in _ok(fic["user"].get("/api/v1/data/import/runs"))["runs"] if not run["sample"]]
     assert run["entity"] == "complaints" and run["report"]["also_created"] == {"products": 1}
+
+
+def test_a_signed_conclusion_names_who_signed_it_on_the_record(fic):
+    """M4 follow-up: Records' finished record listed "United States (FDA): Reportable, signed <day>" and nothing under
+    who signed (a conclusion is not a disposition or a report approval). The conclusion's line names its signer."""
+    from tests.test_release_c3_0_10_75 import _flagship, _sign_us
+
+    user = fic["user"]
+    complaint = _flagship(user)
+    _ok(_sign_us(user, complaint, "REPORTABLE"))
+    me = _ok(user.get("/api/v1/session/context"))["display_name"]
+    related = {g["key"]: g for g in _ok(user.get("/api/v1/oversight/events/SAMPLE-RV-11"))["related"]}
+    (line,) = related["assessments"]["lines"][:1]
+    assert line.startswith("United States (FDA): Reportable, signed") and line.endswith(f" by {me}")

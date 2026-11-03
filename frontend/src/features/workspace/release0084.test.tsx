@@ -247,7 +247,7 @@ describe("M4: step 9 opens the finished record in Records, and Your data's step 
         key: "assessments",
         label: "Market assessments",
         count: 1,
-        lines: ["United States (FDA): reportable, signed 2026-11-03"],
+        lines: ["United States (FDA): reportable, signed 2026-11-03 by Asha Menon"],
       },
       {
         key: "reports",
@@ -266,7 +266,7 @@ describe("M4: step 9 opens the finished record in Records, and Your data's step 
     );
     expect(html).toContain("The record you just finished");
     expect(html).toContain("SAMPLE-RV-11 · ready for an inspector");
-    expect(html).toContain("United States (FDA): reportable, signed 2026-11-03");
+    expect(html).toContain("United States (FDA): reportable, signed 2026-11-03 by Asha Menon");
     expect(html).toContain("Report approved 2026-11-03 by Rahul Iyer");
     expect(html).toContain("Download the decision record (PDF)");
     expect(html).toContain("Open the report");
@@ -459,5 +459,21 @@ describe("accessibility: the search names its results only while they exist", ()
     const html = renderToStaticMarkup(<GlobalSearch open={() => undefined} />);
     expect(html).toContain('type="search"');
     expect(html).not.toContain('aria-controls="uw-search-results"');
+  });
+});
+
+describe("the rail's legal clocks agree with the header while a fact is asked", () => {
+  it("never says 'No legal clock running' for the market whose provisional clock the header shows", () => {
+    const view = rv11();
+    view.event.ref = "FIC-2001";
+    view.event.needs = [
+      { fact: "AWARENESS_DATE", label: "Awareness date", given: null, message: "", rule: "21 CFR 803.50(a)" },
+    ];
+    view.work!.due = [{ ...view.work!.due[0], key: "watch:c:facts", market: null }];
+    resources.data[ONE_STORY_PATH] = { sample: null, yours: null };
+    resources.data[eventPath("FIC-2001")] = view;
+    const html = render(<ComplaintPage tab="Summary?ref=FIC-2001" />);
+    expect(html).toContain("United States, provisional:");
+    expect(html).not.toContain("No legal clock running");
   });
 });

@@ -608,7 +608,9 @@ function Rail({
   const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
   const lanes = legalLanes(view);
   const clocked = new Set((view.work?.due ?? []).filter((item) => isLegalDeadline(item)).map((item) => item.market));
-  const without = (view.work?.markets ?? []).filter((market) => !clocked.has(market)).map(marketLabel);
+  // A clock waiting for a fact stands for every market (0.10.84): none of them is "without a clock" meanwhile.
+  const waiting = (view.work?.due ?? []).some((item) => item.key.endsWith(":facts"));
+  const without = waiting ? [] : (view.work?.markets ?? []).filter((market) => !clocked.has(market)).map(marketLabel);
   const code = blocked[0]?.code ?? "READY";
   const signers = view.signers?.[code];
   return (

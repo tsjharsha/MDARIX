@@ -92,7 +92,11 @@ def related(db, found: dict, complaint, names: dict[str, str], service: dict | N
         current, draft = current_and_draft(found["assessments"].get(market, []))
         if current is not None:
             text = market_rules.CONCLUSION_LABELS.get(current.conclusion, current.conclusion)
-            assessments.append(f"{label.get(market, market)}: {text}, signed {current.signed_at.date().isoformat()}")
+            # Who signed it, as every signature says (0.10.84: Records' finished record names the signer).
+            who = names.get(current.signed_by or "") or "a colleague"
+            assessments.append(
+                f"{label.get(market, market)}: {text}, signed {current.signed_at.date().isoformat()} by {who}"
+            )
         elif draft is not None:
             assessments.append(f"{label.get(market, market)}: started, not signed")
         else:
