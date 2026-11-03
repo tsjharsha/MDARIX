@@ -9,6 +9,8 @@ import userWorkspace from "./UserWorkspace.tsx?raw";
 import hybridShell from "./HybridShell.tsx?raw";
 import { recordHits } from "./HybridShell";
 import { itemsText } from "./readiness";
+import { inData } from "./home";
+import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 import { versionWords } from "../../app/labels";
 import home from "./sections/Home.tsx?raw";
 
@@ -241,5 +243,20 @@ describe("D3.12 no internal id or code where a name exists", () => {
       } as never),
     ).toBe("PulseWatch 410 Patient Monitor (Sample), SAMPLE-RV-09");
     expect(versionWords("US-v2")).toBe("your version 2");
+  });
+});
+
+describe("D3.14 decision tree leftovers", () => {
+  const tree = () => fs.readFileSync(new URL("./sections/TreeAnswer.tsx", import.meta.url), "utf8");
+  it("lists in the complaint picker only the complaints of the data shown", () => {
+    expect(tree()).toContain("complaints: all.complaints.filter((entry) => inData(entry.ref, dataSource))");
+    expect(inData("SAMPLE-RV-11", IMPORTED_SOURCE)).toBe(false);
+    expect(inData("FIC-2001", SAMPLE_SOURCE)).toBe(false);
+  });
+  it("folds a long list of legal criteria unless it is the question being answered, never shortening it", () => {
+    const source = tree();
+    expect(source).toContain('<details className="dt-criteria" open={current}>');
+    expect(source).toContain("group.questions.length <= 3) return rows;");
+    expect(source).toContain("current={index === firstOpen}");
   });
 });

@@ -7776,6 +7776,15 @@ main[data-navigation="new"] small {
   line-height: 1.35;
 }
 
+/* 0.10.85, D3.14: a long list of legal criteria folds while it is not the question being answered. */
+.dt-criteria > summary {
+  min-height: 44px;
+  padding: 10px 0;
+  color: var(--ms-teal-dark);
+  font-weight: var(--ms-fw-semibold);
+  cursor: pointer;
+}
+
 /* The phone's search: an icon that opens the same search as a bar under the top bar. */
 .uw-search-toggle {
   display: none;
