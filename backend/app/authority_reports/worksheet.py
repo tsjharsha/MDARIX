@@ -204,8 +204,9 @@ def load(db: Session, control_db: Session, tenant_id: uuid.UUID, complaint_id: u
 
 
 def _ref(context) -> str:
+    # The customer's own reference, as every screen names the complaint (navigation finding L1; 0.10.83).
     record = context["record"]
-    return record["business_id"] or record["complaint_identifier"]
+    return record["complaint_identifier"] or record["business_id"]
 
 
 def _complaint(context, label: str) -> dict:
@@ -217,7 +218,8 @@ def _assessment(context, label: str):
     if row is None:
         return None
     state = "signed" if row.conclusion else "draft"
-    return _source("MarketAssessment", f"{_ref(context)} {row.market} v{row.version} ({state})", label, row.id)
+    market = markets.MARKET_LABELS.get(row.market, row.market)
+    return _source("MarketAssessment", f"{_ref(context)} {market} v{row.version} ({state})", label, row.id)
 
 
 def _answer(context, question_id: str) -> str | None:

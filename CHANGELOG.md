@@ -10,6 +10,55 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.83] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): round D2 "Decide and report" of the approved redesign, on the new
+navigation. No migration. The API and web images change. No operator step: nothing stored is rewritten (signed
+records keep their words).
+
+### Changed: the decision tree is the questionnaire
+
+- **Answer on the Decision trees tab.** Pick a complaint, then answer each question of its market's tree in place: Yes,
+  No, Unknown or Not applicable. The complaints still to assess are listed, not only those already walked. The
+  Complaints › Reporting side panel's address opens the tree.
+- **Facts arrive as one line to confirm; judgements are never pre-filled.** "Serious injury" (21 CFR 803.3(w), and
+  India's serious criteria alike) is now a judgement, with the record's words beside it.
+- **Questions earlier answers make unnecessary fold into one grey line** saying why, and are not required to sign.
+- **The outcome updates as you answer**: Reportable with its type, rule and due date, Not reportable, or Pending
+  information, with "Why" chips. On a phone a sticky outcome bar below the first question carries Sign.
+- **Signing takes about four actions**: the outcome and Sign in one card, "Follow the outcome" by default (an
+  override needs a reason), a one-line reason for each judgement and each fact changed from the record shown as a short
+  checklist, the training confirmation as one line under the password. After signing, each answer reads as text with
+  its reason, with who signed, when and what it means. The real role decides who signs, never the persona.
+- **The form for the incident's country** is named beside the outcome (US 3500A, India MDAE, EU/NI MIR, GB MHRA MIR,
+  the Health Canada report) and opens once signed. Where another market's reporting may also apply, an advice-only
+  flag, starter; it creates no second report.
+- **Edit this tree on the same tab**: questions as read-only rows with a pencil, the regulation's text and clause
+  locked, extra questions that never change the conclusion, one button to test against the worked complaints and send
+  for approval, and an approver who sees only what changed, with password and authenticator code. Settings ›
+  Reportability guides still works.
+
+### Changed: the report and its approval
+
+- **"N things to give (M fields)"**, grouped by who knows them: your product (enter once), your organization (enter
+  once), this event. A product's or the organization's fact entered once on a report is saved on the product or as the
+  market's responsible party and reused on every report for that product; it never overwrites a value already held.
+  The full report folds away while anything is missing, and the field count is said once.
+- **Approval in plain words**: "Approve the India report for SAMPLE-RV-10. Prepared by Asha. You confirm with your
+  password." The approver reads "What you are approving", the values as frozen in the form's order with their sources,
+  above the password and Approve; a success panel follows. The approval task reads the same way. No "snapshot",
+  "fingerprint" or "checksum" on these screens (the PDF keeps the checksum).
+- **Every signature shows the signer's full name, date and time, and its meaning** (signed reportable, prepared,
+  approved for submission, or practice approval) on the report, the PDF and Records (21 CFR 11.50). A new approval's
+  meaning says "version", not "snapshot".
+
+### Fixed
+
+- **One starter wording, on starter content only**: "Starter, for your consultant to confirm". An approved guide of your
+  own is no longer marked "Starter text" in the assessment.
+- Report field sources name the complaint by your reference and the market in words ("SAMPLE-RV-07 EU and Northern
+  Ireland (EU MDR) v1 (signed)", not "CMP000035 EU_NI v1"); the tree's version line reads "approved 30 Oct 2026".
+
 ## [0.10.81] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): the Critical, High and Medium findings of the functional review of

@@ -175,6 +175,9 @@ def test_a_products_fact_is_entered_once_and_reused_on_every_report_of_that_prod
         detail = user.get(f"{REPORTS}/{report['id']}").json()
         fields = {item["id"]: item for section in detail["sections"] for item in section["fields"]}
         assert {item["scope"] for item in fields.values()} == {"PRODUCT", "ORGANIZATION", "EVENT"}
+        # Sources name the customer's reference and the market in words (navigation finding L1).
+        refs = {item["source"]["ref"] for item in fields.values() if item["source"] and item["source"]["ref"]}
+        assert "SAMPLE-RV-11 United States (FDA) v1 (signed)" in refs and not any("CMP0" in ref for ref in refs)
         once = [fields[key] for key in detail["mandatory"]["missing"] if fields[key]["once"]]
         assert once, [(key, fields[key]["label"]) for key in detail["mandatory"]["missing"]]
         values = {item["id"]: "Sample value 1" for item in once if item["once_key"] != "US_REGISTRATION"}
