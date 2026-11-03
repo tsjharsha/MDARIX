@@ -1,7 +1,7 @@
 """External communications log API (T-G30, MVP G30).
 
-- ``GET /api/v1/communications``: every entry (``complaint_id`` narrows to one complaint), open and overdue requests
-  first, with the parties, the attempts setting and the S4 count (done in MDARIX or outside);
+- ``GET /api/v1/communications``: the log a page at a time (``complaint_id`` narrows to one complaint), overdue and
+  open requests first, with the parties, the attempts setting and the S4 count (done in MDARIX or outside);
 - ``POST /api/v1/communications``: record a message sent or received (a request sent records its first attempt);
 - ``GET /api/v1/communications/{id}``; ``PUT`` its owner, reply due date, evidence references, QMS reference and note;
 - ``POST .../attempts``: another attempt, including an unsuccessful one; after the organization's number of unanswered
@@ -24,7 +24,7 @@ from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import false
+from sqlalchemy import and_, case, false
 from sqlalchemy.orm import Session
 
 from backend.app.trial.sample_source import is_sample
@@ -150,6 +150,21 @@ def _attempt_view(
     }
 
 
+def _entry_in_mdarix(purpose, occurred_at, logged_at, attempts, calendar) -> bool | None:
+    """S4 of the entry itself: a request counts from its first attempt (the attempts count on their own)."""
+    return rules.in_mdarix(occurred_at, logged_at, calendar) if attempts or purpose != rules.REQUEST else None
+
+
+def _s4_flags(purpose, occurred_at, logged_at, attempts, calendar) -> list[bool]:
+    """The S4 flags of one entry and each of its attempts, as ``entry_view`` shows them (None left out)."""
+    flags = [_entry_in_mdarix(purpose, occurred_at, logged_at, attempts, calendar)]
+    flags += [
+        rules.in_mdarix(datetime.fromisoformat(item["at"]), datetime.fromisoformat(item["logged_at"]), calendar)
+        for item in attempts or []
+    ]
+    return [flag for flag in flags if flag is not None]
+
+
 def entry_view(
     entry: CommunicationEntry,
     party: ExternalParty | None,
@@ -179,9 +194,7 @@ def entry_view(
         "occurred_at": _iso(entry.occurred_at),
         "logged_at": _iso(entry.logged_at),
         "logged_by": names.get(entry.logged_by) or "A colleague",
-        "in_mdarix": rules.in_mdarix(entry.occurred_at, entry.logged_at, calendar)
-        if attempts or entry.purpose != rules.REQUEST
-        else None,
+        "in_mdarix": _entry_in_mdarix(entry.purpose, entry.occurred_at, entry.logged_at, attempts, calendar),
         "owner_id": entry.owner_id,
         "owner": names.get(entry.owner_id) if entry.owner_id else None,
         "reply_due_on": _iso(entry.reply_due_on),
@@ -281,14 +294,21 @@ def _colleagues(control_db, tenant_id) -> list[dict]:
     return colleagues(control_db, tenant_id)
 
 
+PAGE_DEFAULT, PAGE_MAX = 200, 500
+
+
 @router.get("")
 def communications(
     complaint_id: uuid.UUID | None = Query(default=None),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=PAGE_DEFAULT, ge=1, le=PAGE_MAX),
     db: Session = Depends(get_data_plane_db),
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """The log, open and overdue requests first, then the newest; with the parties that can be chosen."""
+    """The log, one page at a time: overdue requests first, then the open ones, then the rest, each newest first
+    (ordered in the query, so no overdue request ever falls behind the page). The counts and the S4 numbers are over
+    the whole log, not the page; ``next_offset`` is where the next, older page starts (None on the last)."""
     tenant_id = _tenant(ctx)
     query = db.query(CommunicationEntry).filter(CommunicationEntry.tenant_id == tenant_id)
     complaint = None
@@ -299,10 +319,19 @@ def communications(
         if complaint is None:
             raise _error(404, "COMPLAINT_NOT_FOUND", "No such complaint in your organization")
         query = query.filter(CommunicationEntry.complaint_id == complaint_id)
-    rows = query.order_by(CommunicationEntry.occurred_at.desc()).limit(500).all()
     today = _today(db, tenant_id)
+    entry = CommunicationEntry
+    is_open = entry.status == rules.OPEN
+    # rules.overdue in SQL: open, with a reply due before today on the organization's calendar.
+    rank = case((and_(is_open, entry.reply_due_on < today), 0), (is_open, 1), else_=2)
+    rows = query.order_by(rank, entry.occurred_at.desc(), entry.id.desc()).offset(offset).limit(limit).all()
     items = _views(db, control_db, tenant_id, rows, today)
-    items.sort(key=lambda item: (not item["overdue"], item["status"] != rules.OPEN))
+    everything = query.with_entities(
+        entry.status, entry.reply_due_on, entry.purpose, entry.occurred_at, entry.logged_at, entry.attempts
+    ).all()
+    calendar = calendar_of(db, tenant_id)
+    messages = [flag for row in everything for flag in _s4_flags(row[2], row[3], row[4], row[5], calendar)]
+    total = len(everything)
     parties = (
         db.query(ExternalParty)
         .filter(
@@ -314,8 +343,6 @@ def communications(
         .order_by(ExternalParty.party_type, ExternalParty.name)
         .all()
     )
-    messages = [flag for item in items for flag in [item["in_mdarix"], *(a["in_mdarix"] for a in item["attempts"])]]
-    messages = [flag for flag in messages if flag is not None]
     return {
         "complaint": (
             {
@@ -329,10 +356,14 @@ def communications(
             else None
         ),
         "items": items,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "next_offset": offset + len(rows) if offset + len(rows) < total else None,
         "counts": {
-            "open": sum(item["status"] == rules.OPEN for item in items),
-            "overdue": sum(item["overdue"] for item in items),
-            "unresolved": sum(item["status"] == rules.UNRESOLVED for item in items),
+            "open": sum(row[0] == rules.OPEN for row in everything),
+            "overdue": sum(rules.overdue(row[0], row[1], today) for row in everything),
+            "unresolved": sum(row[0] == rules.UNRESOLVED for row in everything),
         },
         "s4": {"in_mdarix": messages.count(True), "outside": messages.count(False)},
         "parties": [party_view(party) for party in parties],

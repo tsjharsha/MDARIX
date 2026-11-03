@@ -17,6 +17,7 @@ import {
   evidenceLines,
   isRequest,
   isoOf,
+  pageText,
   s4Text,
   statusTone,
   type CommunicationList,
@@ -42,7 +43,11 @@ function useCanRecord() {
  * complaint's log. MDARIX sends nothing: people send from their own mail and record it here.
  */
 export function Communications({ complaintId }: { complaintId?: string | null }) {
-  const path = complaintId ? `${COMMUNICATIONS}?complaint_id=${complaintId}` : COMMUNICATIONS;
+  // One page of the log at a time, overdue and open first; "Older" moves on to the next page.
+  const [offset, setOffset] = useState(0);
+  const query = new URLSearchParams(complaintId ? { complaint_id: complaintId } : {});
+  if (offset) query.set("offset", String(offset));
+  const path = query.size ? `${COMMUNICATIONS}?${query}` : COMMUNICATIONS;
   const list = useResource<CommunicationList>(path);
   // The entry whose panel is open is part of the address (Communications?communication=<id>).
   const [open, setOpen] = useTabParam("communication");
@@ -135,6 +140,25 @@ export function Communications({ complaintId }: { complaintId?: string | null })
             title="Nothing recorded yet"
             detail="A question you send, an answer you receive, and every attempt in between are recorded here."
           />
+        )}
+        {data && pageText(data) && (
+          <nav className="ca-action-row" aria-label="Pages of the log">
+            <span className="ac-muted">{pageText(data)}</span>
+            {data.offset > 0 && (
+              <button
+                type="button"
+                className="ac-secondary"
+                onClick={() => setOffset(Math.max(0, data.offset - data.limit))}
+              >
+                Newer
+              </button>
+            )}
+            {data.next_offset != null && (
+              <button type="button" className="ac-secondary" onClick={() => setOffset(data.next_offset ?? 0)}>
+                Older
+              </button>
+            )}
+          </nav>
         )}
       </Panel>
       {data && canRecord && complaintId && (
