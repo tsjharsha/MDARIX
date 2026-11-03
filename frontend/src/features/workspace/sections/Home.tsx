@@ -116,7 +116,8 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
         <Stat
           tone="risk"
           value={trends.state === "loading" ? null : rising.length}
-          onOpen={() => open("Trends", "Trends to review")}
+          // The trend check, where the count is (0.10.84, L3): the signal inbox lists a signal's own complaints.
+          onOpen={() => open("Trends", "Trend check")}
           title="At risk"
           detail={
             trends.state === "loading"
@@ -192,7 +193,18 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
               <p className="ac-muted">No product is rising against its own history.</p>
             )}
             {personaTabs.includes("trends") && (
-              <button type="button" className="ac-secondary" onClick={() => open("Trends")}>
+              <button
+                type="button"
+                className="ac-secondary"
+                onClick={() =>
+                  open(
+                    "Trends",
+                    rising[0]?.product.identifier
+                      ? `Trend check?${new URLSearchParams({ product: rising[0].product.identifier })}`
+                      : "Trend check",
+                  )
+                }
+              >
                 Open the trends
               </button>
             )}

@@ -3,6 +3,7 @@ import { Check, ChevronRight } from "lucide-react";
 import { useResource } from "../../customer-admin/shared";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { IMPORTED_SOURCE } from "../complaintList";
+import { TEAM_PATH } from "./TrialTeam";
 import {
   chanceText,
   trendCountText,
@@ -62,7 +63,7 @@ function stepCopy(run: StoryRun, index: number): { h: string; p: string; b: stri
     },
     {
       h: "Fill what is missing",
-      p: "Most fields arrive filled from your records, each with its source. Each one still empty names its form box.",
+      p: "What your records hold arrives filled, each with its source. Each field still empty names its form box and who knows it.",
       b: "Open the missing fields",
     },
     {
@@ -256,12 +257,14 @@ export function TrendBars({ row, bare = false }: { row: TrendItem; bare?: boolea
 export function OneStory({ heading }: { heading?: RefObject<HTMLHeadingElement | null> }) {
   const story = useOneStory();
   const trends = useResource<TrendBoard>(trendPath("version"));
+  const team = useResource<{ seats_used: number }>(story.data?.yours?.finished ? TEAM_PATH : null);
   return (
     <StoryView
       story={story.data}
       loading={story.state === "loading"}
       trends={trends.data?.items ?? []}
       heading={heading}
+      colleagues={team.data?.seats_used ?? 1}
     />
   );
 }
@@ -272,11 +275,14 @@ export function StoryView({
   loading = false,
   trends,
   heading,
+  colleagues = 1,
 }: {
   story: OneStoryData | null;
   loading?: boolean;
   trends: TrendItem[];
   heading?: RefObject<HTMLHeadingElement | null>;
+  /** The people on the trial, the owner included. */
+  colleagues?: number;
 }) {
   const { open, dataSource, chooseDataSource, session, startStory } = useWorkspace();
   const [picked, setPicked] = useState<number | null>(null);
@@ -330,7 +336,7 @@ export function StoryView({
         <p className="uw-os-lead">
           {sample
             ? "From the call to a recorded submission and the trend check. Now the same ten steps on your own most urgent complaint."
-            : "Your first complaint went from the call to its signed conclusion, with every missing fact asked for and nothing guessed. Invite a colleague, or discuss a pilot."}
+            : `Your first complaint went from the call to its signed conclusion, with every missing fact asked for and nothing guessed. ${colleagues > 1 ? "Discuss a pilot with your team." : "Invite a colleague, or discuss a pilot."}`}
         </p>
         <div className="ca-action-row">
           {sample && !session?.sample_only ? (
@@ -341,9 +347,10 @@ export function StoryView({
             <button
               type="button"
               className="ac-primary uw-os-go"
-              onClick={() => (session?.sample_only ? open("Next steps") : open("Team"))}
+              onClick={() => (session?.sample_only || colleagues > 1 ? open("Next steps") : open("Team"))}
             >
-              {session?.sample_only ? "Discuss a pilot" : "Invite a colleague"}{" "}
+              {/* A colleague is invited once (0.10.84, L5): with a team already, the next step is the pilot. */}
+              {session?.sample_only || colleagues > 1 ? "Discuss a pilot" : "Invite a colleague"}{" "}
               <ChevronRight size={15} aria-hidden="true" />
             </button>
           )}
@@ -411,7 +418,7 @@ export function StoryView({
       </nav>
       <div className="uw-os-body">
         {body}
-        <StepPreview run={run} index={finished ? 8 : selected} trends={trends} />
+        <StepPreview run={run} index={finished ? STORY_STEPS - 1 : selected} trends={trends} />
       </div>
     </section>
   );

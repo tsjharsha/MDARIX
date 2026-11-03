@@ -8305,3 +8305,12 @@ details.uw-team-change[open] {
     gap: 2px;
   }
 }
+
+/* On a phone the header's clock chip wraps inside its card instead of running off it (0.10.84, L4). */
+@media (max-width: 600px) {
+  .uw-cp-chips .ms-chip-deadline {
+    max-width: 100%;
+    white-space: normal;
+    border-radius: 12px;
+  }
+}

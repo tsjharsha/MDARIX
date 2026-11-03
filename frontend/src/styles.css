@@ -6352,7 +6352,8 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 }
 .consent-banner {
   position: fixed;
-  z-index: 50;
+  /* Above a side drawer (55), so the notice can be acknowledged while one is open (0.10.84, L4); below dialogs (60). */
+  z-index: 58;
   bottom: 18px;
   left: calc(240px + 18px);
   right: 18px;

@@ -7,7 +7,7 @@ import { DUE_WEEK_PATH, OVERDUE_PATH, legalClocks, nextActions, withSource } fro
 import type { OversightItem } from "./oversight";
 import { OVERSIGHT } from "./oversight";
 import { HomeSection, HomeStory } from "./sections/Home";
-import { TrendBars } from "./sections/OneStory";
+import { StoryView, TrendBars } from "./sections/OneStory";
 import type { TrendItem } from "./signalAi";
 import { ComplaintPage, clockPrefix } from "./sections/ComplaintPage";
 import { ONE_STORY_PATH, stepPlace, type StoryRun } from "./oneStory";
@@ -420,5 +420,33 @@ describe("L2: the control that changes a colleague's personas says Change, not a
     const summary = html.slice(html.indexOf('class="uw-team-change"'), html.indexOf("</summary>"));
     expect(summary).toContain("Change");
     expect(summary).not.toContain("lucide-lock");
+  });
+});
+
+describe("L3 and L5: the story's words match its numbers, and its end offers what comes next", () => {
+  const view = (run: StoryRun, colleagues = 1) =>
+    render(
+      <StoryView story={{ sample: null, yours: run }} trends={[]} colleagues={colleagues} />,
+      api({ dataSource: IMPORTED_SOURCE }),
+    );
+  const done = storyRun({
+    current: 10,
+    finished: true,
+    steps: storyRun().steps.map((step) => ({ ...step, done: true })),
+  });
+
+  it("never promises that most fields arrive filled", () => {
+    expect(view(storyRun({ current: 5 }))).not.toContain("Most fields arrive filled");
+  });
+
+  it("ends on the finale's trend, and offers a pilot once a colleague has joined", () => {
+    const alone = view(done);
+    expect(alone).toContain("Invite a colleague");
+    const team = view(done, 2);
+    expect(team).not.toContain("Invite a colleague");
+    expect(team).toContain("Discuss a pilot");
+    // The preview beside the finished story is the finale (Trends), not Records.
+    const preview = team.slice(team.indexOf('class="uw-os-mini-bar"'));
+    expect(preview).toContain("<span>Trends</span>");
   });
 });
