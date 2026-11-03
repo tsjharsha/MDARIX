@@ -45,9 +45,10 @@ VMSR_QUESTION = {
     "clause": "21 CFR 803.19 (VMSR program)",
     "basis": ["CFR803_19"],
 }
+# Shown after "Your examples:" (0.10.72: it read "Your examples: Sample examples: …"); the guide is the sample's.
 INJURY_EXAMPLES = (
-    "Sample examples: a cut closed with sutures to prevent permanent scarring is part (c); a bruise that healed without "
-    "treatment is not."
+    "A cut closed with sutures to prevent permanent scarring is part (c); a bruise that healed without treatment is "
+    "not."
 )
 V2_REASON = (
     "Sample: our own help text on the three serious-injury parts (procedure QP-08), and the VMSR question our "

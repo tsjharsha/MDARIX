@@ -151,9 +151,10 @@ describe("picker options", () => {
     const options = scopeOptions(view, v1);
     expect(options.versions.map((option) => option.label)).toEqual(["A", "B"]);
     expect(options.complaints.map((option) => option.label)).toEqual(["CMP000001", "CMP000002", "CMP000003", "ACD-4"]);
+    // The customer's own lot and complaint references lead (0.10.72): the MDARIX IDs only where none is held.
     expect(options.lots.map((option) => `${option.label}|${option.detail}`)).toEqual([
-      "LOT000001|null",
-      "LOT000002|Plant 1",
+      "KS-5521|null",
+      "KS-5522|Plant 1",
     ]);
     expect(options.failureModes.map((option) => option.label)).toEqual(["FM000001", "FM000002"]);
     expect(options.markets).toEqual(["DE", "FR"]);
@@ -217,7 +218,7 @@ describe("what changed", () => {
     expect(row("question")?.same).toBe(true);
     expect(row("included")).toMatchObject({ added: ["CMP000004"], removed: ["CMP000002"], same: false });
     expect(row("excluded")?.left).toEqual(["CMP000003 (User error confirmed)"]);
-    expect(row("lots")).toMatchObject({ left: ["LOT000001"], right: [], removed: ["LOT000001"] });
+    expect(row("lots")).toMatchObject({ left: ["KS-5521"], right: [], removed: ["KS-5521"] });
     expect(row("lots_left_out")?.added).toEqual(["LOT000001 (On quality hold in our warehouse)"]);
     expect(row("markets")?.added).toEqual(["FR"]);
     expect(row("failure_modes")?.left).toEqual(["FM000001 Occlusion"]);

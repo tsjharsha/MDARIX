@@ -54,6 +54,7 @@ def seed_sample(db: Session, tenant_id, now: datetime, owner_id: str) -> dict:
     from backend.app.trial.sample_intake import stage_sample_intake
     from backend.app.trial.sample_lot_impact import stage_sample_lot_impact
     from backend.app.trial.sample_oversight import stage_sample_oversight
+    from backend.app.trial import reports_0_10_75
     from backend.app.trial.sample_reports import stage_sample_reports
 
     sample = seed_sample_workspace(db, tenant_id, now)
@@ -75,6 +76,8 @@ def seed_sample(db: Session, tenant_id, now: datetime, owner_id: str) -> dict:
     sample["intake"] = stage_sample_intake(db, tenant_id, now)
     # The report worksheets (a finished US example, an India example with a rejected attempt). After the import run.
     sample["reports"] = stage_sample_reports(db, tenant_id, now)
+    # On the new navigation, a signed reportable conclusion has its report (0.10.75; 0.10.76: SAMPLE-RV-07's EU MIR).
+    sample["reports_signed"] = reports_0_10_75.refresh(db, tenant_id, apply=True, now=now)
     # The organization's own US guide version and a draft whose test fails, and the communications log's examples.
     sample["guides"] = stage_sample_guides(db, tenant_id, now, owner_id=owner_id)
     # The sample author away to the trial's end with the owner as backup, and the two events the owner owns.

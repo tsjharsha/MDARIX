@@ -7,6 +7,12 @@ and, for a patient or reporter field outside the sample, **enter in the authorit
 stores them). Values are copied by fixed mappings (``SOURCES``); MDARIX never invents a patient outcome, a device
 identifier, a date, an investigation result, a root cause or a conclusion. IMDRF codes are the organization's
 approved mappings of the complaint's problem code (T-G2a, ``regulatory_reference.approved_links``).
+
+Codes (0.10.77, C5): on the new navigation a code the approved mapping supplies is only **suggested**: it shows as
+"Suggested from your approved mapping" and counts as missing until the regulatory manager confirms it or changes it
+(``code_state`` CONFIRMED or CHANGED, with who and when). An unconfirmed suggestion is never frozen into a snapshot,
+so it never reaches the form or the PDF. On the FDA's form each IMDRF code carries its FDA code (FDA's published
+FDA-IMDRF mapping): one choice fills both.
 """
 
 from __future__ import annotations
@@ -21,11 +27,14 @@ from backend.app.authority_reports import forms
 from backend.app.reportability import markets
 
 FROM_RECORD, ENTERED, CONFIRMED, OUTSIDE = "FROM_RECORD", "ENTERED", "CONFIRMED", "OUTSIDE"
+SUGGESTED, CHANGED = "SUGGESTED", "CHANGED"
 FICTIONAL_STATUS = "FICTIONAL"
 STATUS_LABELS = {
     FROM_RECORD: "From record",
     ENTERED: "Entered by a person",
     CONFIRMED: "Confirmed",
+    SUGGESTED: "Suggested from your approved mapping",
+    CHANGED: "Changed from the suggestion",
     OUTSIDE: "Enter in the authority's route",
     FICTIONAL_STATUS: "Fictional (sample only)",
     **forms.MISSING_LABELS,
@@ -146,7 +155,8 @@ def load(db: Session, control_db: Session, tenant_id: uuid.UUID, complaint_id: u
         )
         .first()
     )
-    registry_market = "IN" if market == markets.IN else market
+    # The registry names the EU market "EU" (regulatory_reference.MARKETS); every other market by its own code.
+    registry_market = {markets.EU_NI: "EU"}.get(market, market)
     registrations = (
         db.query(ProductRegistration)
         .filter(
@@ -183,6 +193,12 @@ def load(db: Session, control_db: Session, tenant_id: uuid.UUID, complaint_id: u
         "registrations": registrations,
         "parties": parties,
         "imdrf": codes,
+        # FDA's code for each IMDRF code, on the FDA's form (0.10.77): one choice fills both.
+        "fda": regulatory_reference.fda_codes(control_db, [code["code"] for code in codes])
+        if market == markets.US
+        else {},
+        # Codes are suggestions a person confirms (the new navigation; the router sets it, 0.10.77).
+        "confirm_codes": False,
         "sample": complaint.source_system == SAMPLE_SOURCE,
     }
 
@@ -328,7 +344,9 @@ def _imdrf(annex: str):
         codes = [code for code in context["imdrf"] if code["annex"] == annex]
         if not codes:
             return None
-        text = "; ".join(f"{code['code']} {code['term'] or '(term not loaded)'}" for code in codes)
+        from backend.app.regulatory_reference import code_text
+
+        text = "; ".join(code_text(code["code"], code["term"], context.get("fda", {}).get(code["code"])) for code in codes)
         release = codes[0]["release"]
         complaint = context["complaint"]
         return text, _source(
@@ -421,6 +439,110 @@ def _single_use(context):
     product = context["product"]
     flag = getattr(product, "single_use", None) if product else None
     return _product(context, None if flag is None else ("Yes" if flag else "No"), "The product's single-use field")
+
+
+def _party_name(context, roles: tuple[str, ...], label: str):
+    found = _party(context, roles, label)
+    party = next((item for item in context["parties"] if item.role in roles), None)
+    return (party.organisation, found[1]) if found and party and party.organisation else None
+
+
+def _signed(context):
+    row = context["current"]
+    return row if row is not None and row.conclusion == markets.REPORTABLE else None
+
+
+def _mir_classification(context):
+    """EU and GB 1.2g from the signed conclusion's report type: 2 days a public health threat; 10 days a death
+    (question 2) or else an unanticipated serious deterioration; 15 days all other reportable incidents."""
+    row = _signed(context)
+    kind = (row.report_type or "") if row else ""
+    if kind.endswith("_2_DAY"):
+        value = "Serious public health threat"
+    elif kind.endswith("_10_DAY"):
+        died = _answer(context, f"{kind.split('_')[0]}2") == markets.YES
+        value = "Death" if died else "Unanticipated serious deterioration in state of health"
+    elif kind.endswith("_15_DAY"):
+        value = "All other reportable incidents"
+    else:
+        return None
+    return value, _assessment(context, "The signed conclusion's report type")
+
+
+def _conclusion_date(context):
+    row = _signed(context)
+    if row is None or row.signed_at is None:
+        return None
+    return row.signed_at.date().isoformat(), _assessment(context, "The day the reportable conclusion was signed")
+
+
+def _ca_classification(context):
+    """Canada B1 from the signed conclusion's report type."""
+    row = _signed(context)
+    kind = {"CA_10_DAY": "10-Day; Canadian", "CA_30_DAY": "30-Day; Canadian", "CA_FOREIGN": "Foreign"}.get(
+        (row.report_type or "") if row else ""
+    )
+    return (kind, _assessment(context, "The signed Canada conclusion's report type")) if kind else None
+
+
+def _consequences(context):
+    """Canada B4 from the complaint's harm fields: what the record states, never more."""
+    complaint = context["complaint"]
+    if complaint.death:
+        value = "Death"
+    elif complaint.serious_injury:
+        value = "Serious injury"
+    elif complaint.death is False and complaint.serious_injury is False:
+        value = "No death or serious injury reported"
+    else:
+        return None
+    return value, _complaint(context, "The complaint's harm fields")
+
+
+def _lot_serial(context):
+    parts = [found[0] for found in (_lots(context), SOURCES["serial"](context)) if found]
+    return ("; ".join(parts), _complaint(context, "The complaint's lot and serial number")) if parts else None
+
+
+def _user_type(table: dict):
+    return lambda c: _classification(c, table, "user_type", "The confirmed classification's user type")
+
+
+def _returned(value: str):
+    return lambda c: (
+        (value, _complaint(c, "The complaint's device-returned field")) if c["complaint"].device_returned else None
+    )
+
+
+def _risk_class(context):
+    for item in context["registrations"]:
+        if item.risk_class:
+            return item.risk_class, _source(
+                "Registration",
+                f"{item.market} {item.registration_type} {item.registration_number}",
+                "The registration's risk class",
+                item.id,
+            )
+    return None
+
+
+def _srn(context):
+    party = next((item for item in context["parties"] if item.role == "MANUFACTURER" and item.srn), None)
+    return (
+        (party.srn, _source("ResponsibleParty", f"{party.market} manufacturer", "The manufacturer's SRN", party.id))
+        if party
+        else None
+    )
+
+
+def _nomenclature(context, part: int):
+    """EU 2.2a and 2.2b: the product's EMDN code where it has one (the EU's nomenclature), else its GMDN code."""
+    product = context["product"]
+    if product is None:
+        return None
+    if product.emdn_code:
+        return _product(context, ("EMDN", product.emdn_code)[part], "The product's EMDN code")
+    return SOURCES[("gmdn_system", "gmdn_code")[part]](context)
 
 
 def _immediate_action(context):
@@ -518,6 +640,57 @@ SOURCES = {
     "investigation_needed": lambda c: ("Yes", _case(c)[1]) if c["case"] else None,
     "immediate_action": _immediate_action,
     "request": lambda c: None,  # a response obligation's request is set by build()
+    # 0.10.76 (C4): the EU, GB and Canada forms.
+    "conclusion_date": _conclusion_date,
+    "mir_classification": _mir_classification,
+    "ca_classification": _ca_classification,
+    "consequences": _consequences,
+    "lot_serial": _lot_serial,
+    "manufacturer_name": lambda c: _party_name(c, ("MANUFACTURER",), "The market's responsible party (manufacturer)"),
+    "manufacturer": lambda c: _party(c, ("MANUFACTURER",), "The market's responsible party (manufacturer)"),
+    "importer": lambda c: _party(c, ("IMPORTER",), "The market's importer"),
+    "contact_office": lambda c: _party(c, ("MANUFACTURER", "IMPORTER"), "The market's responsible party"),
+    "authorised_rep": lambda c: _party(c, ("AUTHORISED_REPRESENTATIVE",), "The EU authorised representative"),
+    "uk_responsible_person": lambda c: _party(
+        c, ("UK_RESPONSIBLE_PERSON", "AUTHORISED_REPRESENTATIVE"), "The UK Responsible Person"
+    ),
+    "eu_certificate": lambda c: _registration(c, ("CE",), "registration_number", "The EU registration (CE)"),
+    "gb_certificate": lambda c: _registration(c, ("UKCA",), "registration_number", "The GB registration (UKCA)"),
+    "ca_licence": lambda c: _registration(c, ("MDL",), "registration_number", "The Health Canada device licence"),
+    "gb_nca": lambda c: (
+        "Medicines and Healthcare products Regulatory Agency (MHRA)",
+        _source("Form", None, "The authority for an incident in Great Britain"),
+    ),
+    "gmdn_system": lambda c: _product(
+        c, "GMDN" if c["product"] and c["product"].gmdn_code else None, "The product's GMDN code"
+    ),
+    "incident_country": lambda c: (
+        (c["record"]["country"], _complaint(c, "The complaint's event country")) if c["record"].get("country") else None
+    ),
+    "mir_location": _returned("Manufacturer"),
+    "ca_available": _returned("Returned to Manufacturer/Importer"),
+    "mir_operator": _user_type(
+        {
+            "HEALTHCARE_PROFESSIONAL": "Healthcare professional",
+            "LAY_USER": "Patient/lay user",
+            "PATIENT": "Patient/lay user",
+        }
+    ),
+    "mir_reporter_role": _user_type(
+        {"HEALTHCARE_PROFESSIONAL": "Healthcare professional", "LAY_USER": "Lay user", "PATIENT": "Patient"}
+    ),
+    # 0.10.77 (C5): the product and organization identity fields.
+    "basic_udi": lambda c: _product(
+        c, c["product"].basic_udi_di if c["product"] else None, "The product's Basic UDI-DI"
+    ),
+    "risk_class": _risk_class,
+    "manufacturer_srn": _srn,
+    "nb_number": lambda c: _registration(c, ("CE",), "body_number", "The notified body of the EU registration (CE)"),
+    "eu_nomenclature_system": lambda c: _nomenclature(c, 0),
+    "eu_nomenclature_code": lambda c: _nomenclature(c, 1),
+    "ca_complainant": _user_type(
+        {"HEALTHCARE_PROFESSIONAL": "Health professional", "LAY_USER": "Consumer", "PATIENT": "Consumer"}
+    ),
 }
 
 
@@ -526,11 +699,17 @@ def build(
 ) -> list[dict]:
     """The worksheet's sections, each field with its value, status and source, in the form's order."""
     personal = SAMPLE_PERSONAL.get(context["complaint"].complaint_identifier, {}) if context["sample"] else {}
+    # The report type decides which fields are mandatory (0.10.76: the EU, GB and Canada forms).
+    kind = forms.report_kind(form, entries)
+    confirm = context.get("confirm_codes", False)
+    required = forms.CODES_REQUIRED.get(form.code, ()) if confirm else ()
     out = []
     for section in form.sections:
         rows = []
         for item in section.fields:
             entry = entries.get(item.id) or {}
+            missing = forms.MUST if item.id in required else forms.missing_class(item, kind)
+            annex = item.source[-1] if item.source and item.source.startswith("imdrf_") else None
             found = None
             if item.personal:
                 value = personal.get(item.id)
@@ -539,6 +718,11 @@ def build(
                 # The front page's number, entered once (stage 8: nothing typed twice).
                 front = (entries.get("MFR_REPORT") or {}).get("value")
                 found = (front, _source("Worksheet", None, "This worksheet's front page")) if front else None
+            elif item.source == "report_type":
+                found = (
+                    form.report_types[0],
+                    _source("Worksheet", None, "A new report starts as the form's first type"),
+                )
             elif item.source == "request":
                 found = (
                     (request, _source("Obligation", None, "The authority's request, as recorded")) if request else None
@@ -547,15 +731,23 @@ def build(
                 found = SOURCES[item.source](context)
             value, source = found if found and found[0] else (None, None)
             status = (FICTIONAL_STATUS if item.personal else FROM_RECORD) if value else None
+            suggestion = None
+            if annex and confirm and value and not entry.get("value") and not entry.get("confirmed"):
+                # A code the mapping supplies waits for a person (0.10.77): never filed unconfirmed.
+                suggestion, value, status = value, None, SUGGESTED
             if not item.personal and entry.get("value"):
-                value, status, source = entry["value"], ENTERED, None
+                value, status = (
+                    entry["value"],
+                    {CONFIRMED: CONFIRMED, CHANGED: CHANGED}.get(entry.get("code_state"), ENTERED),
+                )
+                source = source if status == CONFIRMED else None
             elif value and entry.get("confirmed"):
                 status = CONFIRMED
             if status is None:
                 status = (
                     OUTSIDE
                     if item.personal and not context["sample"]
-                    else (forms.NOT_USED if item.missing == forms.NOT_USED else item.missing)
+                    else (forms.NOT_USED if missing == forms.NOT_USED else missing)
                 )
             rows.append(
                 {
@@ -567,11 +759,17 @@ def build(
                     "status_label": STATUS_LABELS[status],
                     "source": source,
                     "personal": item.personal,
-                    "missing_class": item.missing,
-                    "editable": not item.personal and item.missing != forms.NOT_USED,
+                    "missing_class": missing,
+                    "editable": not item.personal and missing != forms.NOT_USED,
+                    "options": list(item.options) or None,
                     "note": item.note or None,
                     "by": names.get(entry.get("by")) if entry else None,
                     "at": entry.get("at") if entry else None,
+                    # Codes (0.10.77): the annex the field codes, the suggestion waiting, what was suggested before a
+                    # change, and how the person settled it.
+                    "code_annex": annex,
+                    "suggestion": suggestion,
+                    "suggested": entry.get("suggested") if annex else None,
                 }
             )
         out.append({"code": section.code, "title": section.title, "note": section.note or None, "fields": rows})
@@ -592,7 +790,42 @@ def frozen(sections: list[dict]) -> list[dict]:
     return [
         {
             **section,
-            "fields": [{key: value for key, value in item.items() if key != "editable"} for item in section["fields"]],
+            # A suggestion nobody confirmed is never frozen (0.10.77): it never reaches the form or the PDF.
+            "fields": [
+                {key: value for key, value in item.items() if key not in ("editable", "suggestion")}
+                for item in section["fields"]
+            ],
         }
         for section in sections
     ]
+
+
+def mandatory(sections: list[dict]) -> dict:
+    """The mandatory-fields meter (0.10.75): the form's fields that must have a value before submission (its "must
+    have" class, never a patient or reporter field), how many have one, and the ones still empty, in the form's order."""
+    fields = [
+        item
+        for section in sections
+        for item in section["fields"]
+        if item["missing_class"] == forms.MUST and not item.get("personal")
+    ]
+    missing = [item["id"] for item in fields if item["status"] in (forms.MUST, SUGGESTED)]
+    return {"total": len(fields), "filled": len(fields) - len(missing), "missing": missing}
+
+
+def confirm_suggestions(form: forms.Form, context: dict, entries: dict, actor: str, at: str) -> dict:
+    """The entries with every code the mapping suggests confirmed by ``actor`` (the sample author's own report):
+    what a person does field by field on the report page."""
+    out = dict(entries)
+    for item in form.fields():
+        if item.source and item.source.startswith("imdrf_") and not (out.get(item.id) or {}).get("value"):
+            found = SOURCES[item.source](context)
+            if found:
+                out[item.id] = {
+                    "value": found[0],
+                    "code_state": CONFIRMED,
+                    "suggested": found[0],
+                    "by": actor,
+                    "at": at,
+                }
+    return out

@@ -58,6 +58,69 @@ export function ViewChooser<T extends string>({
 }
 
 /**
+ * "List view ▾" (0.10.74, Release C part C2): one choice of the list's views, the persona's own first and the rest
+ * under "More views", with a line on what the chosen view holds. The same on a computer and a phone.
+ */
+export function ListViewPicker({
+  mine,
+  more = [],
+  active,
+  onChange,
+  forLabel,
+  detail,
+  count,
+  noun = "record",
+}: {
+  mine: readonly string[];
+  more?: readonly string[];
+  active: string;
+  onChange: (view: string) => void;
+  /** Whose views come first ("Quality Leader"). */
+  forLabel?: string;
+  /** What the chosen view holds. */
+  detail?: string;
+  /** How many records the chosen view holds, once read. */
+  count?: number | null;
+  /** What the list holds, in the singular ("complaint"). */
+  noun?: string;
+}) {
+  const id = useId();
+  const option = (view: string) => (
+    <option key={view} value={view}>
+      {view}
+    </option>
+  );
+  return (
+    <div className="uw-listbar">
+      <label className="uw-lv" htmlFor={id}>
+        <span>List view</span>
+        <select id={id} value={active} onChange={(event) => onChange(event.target.value)}>
+          {more.length ? (
+            <>
+              <optgroup label={forLabel ? `For ${forLabel}` : "Your views"}>{mine.map(option)}</optgroup>
+              <optgroup label="More views">{more.map(option)}</optgroup>
+            </>
+          ) : (
+            mine.map(option)
+          )}
+        </select>
+      </label>
+      {(detail || count != null) && (
+        <p className="uw-listbar-note">
+          {count != null && (
+            <strong>
+              {count} {count === 1 ? noun : `${noun}s`}
+            </strong>
+          )}
+          {count != null && detail ? " · " : ""}
+          {detail}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
  * Who holds each permission a setting needs (backend/app/access/permissions.py ROLE_PERMISSIONS; Leader holds every
  * one). Kept beside the screens that say it; the server still decides every change.
  */

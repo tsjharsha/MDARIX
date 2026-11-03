@@ -218,6 +218,7 @@ function shortStory(current: number): ShortStory {
       asked:
         current > 2
           ? {
+              id: "q-1",
               subject: "Did any treatment decision rely on the high SpO2 readings?",
               owner_name: "Asha Quality",
               due_on: "2026-11-04",
@@ -377,5 +378,42 @@ describe("A6: separation of duties, shown honestly", () => {
     expect(html).toContain("<dt>May approve</dt><dd>Asha Quality</dd>");
     expect(html).toContain("Nobody yet");
     expect(html).toContain("Practice approval: in a pilot a colleague approves this.");
+  });
+});
+
+describe("F1 (0.10.72): Confirm the route never saves a harm judgement silently", () => {
+  it("shows the reporter's statement, the unknown effect, the proposed severity to confirm, and what the click records", () => {
+    const route = onPage(1);
+    expect(route).toContain("<q>No harm was reported</q>");
+    expect(route).toContain("Unknown: asked of the hospital in step 3.");
+    expect(route).not.toContain("Negligible: no harm was reported");
+    expect(route).toContain("Proposed: ");
+    expect(route).toContain("I confirm the triage severity: ");
+    expect(route).toContain("Confirm the route records");
+    // Nothing is saved until the severity is confirmed or changed: the button waits (it was enabled before 0.10.72).
+    expect(route).toMatch(/<button type="button" class="ac-primary" disabled=""[^>]*>Confirm the route/);
+    expect(route).toContain("Confirm or change the triage severity first.");
+  });
+});
+
+describe("Addendum 2 (0.10.72): the full evaluation counts its progress from the complaint's own checklist", () => {
+  it("reads the step from the saved records on the complaint's page, and keeps Off the story's path", () => {
+    resources.data[SHORT_STORY_PATH] = {
+      ...shortStory(4),
+      full_evaluation: {
+        current: 2,
+        steps: ["read", "triage", "markets", "report", "disposition", "decision", "ready"].map((key, index) => ({
+          key,
+          done: index < 2,
+        })),
+      },
+    };
+    resources.data[eventPath("SAMPLE-RV-11")] = rv11();
+    const bar = (section: string, tab?: string) =>
+      render(<StoryBar section={section} tab={tab} />, api({ story: "reportable" }));
+    // The complaint's Summary is open, but its triage is done: the step is the market assessment (0.10.71 read the
+    // screen and said step 1).
+    expect(bar("Complaint", "Summary?ref=SAMPLE-RV-11")).toContain("Step 3 of 7: Assess the US, then India");
+    expect(bar("Complaint", "Summary?ref=SAMPLE-RV-06")).toContain("Off the story&#x27;s path");
   });
 });

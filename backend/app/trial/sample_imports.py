@@ -61,15 +61,32 @@ SAMPLE_IDENTITY = {
     "SAMPLE-PULSE-410": ("04000000041016", None, "Multiple-parameter patient monitor"),
     "SAMPLE-VENTRA-250": ("04000000025016", None, "Intensive-care ventilator"),
 }
-# The IMDRF release the sample's links name; its terms show once that release is loaded.
-SAMPLE_IMDRF_RELEASE = "2025"
-# The sample's problem codes -> IMDRF Annex A codes (A14 infusion or flow problem, A16 protective measures problem,
-# alarms among them). Under-infusion without an alarm links to both: one code may map to several.
+# The IMDRF release the sample's links name; its terms show once that release is loaded (data/code_lists, 0.10.77).
+SAMPLE_IMDRF_RELEASE = "2026"
+# The sample's problem codes -> IMDRF Annex A codes, each looked up in IMDRF's own Release 2026 workbook
+# (imdrf-tech-ae-terminologies-n43-ReleaseNumber2026-Annexes-revisedJune.xlsx), the most specific term that says what
+# the complaint says (0.10.77; before, A14 and A16, the level-1 headings, and A0908 for the SpO2 reading). Under-infusion
+# without an alarm links to two: one code may map to several.
 SAMPLE_IMDRF_LINKS = {
-    "PRESSURE_ALARM": ("A16",),
-    "UNDER_INFUSION_NO_ALARM": ("A14", "A16"),
-    "FREE_FLOW_DOOR": ("A14",),
-    "ALARM_VOLUME_LOW": ("A16",),
+    # A1601 "Device Alarm System" (level 2, under A16 Protective Measures Problem): pressure alarms during infusion.
+    "PRESSURE_ALARM": ("A1601",),
+    # A1407 "Insufficient Flow or Under Infusion" (level 2, A14); A160102 "No Audible Alarm" (level 3, A1601).
+    "UNDER_INFUSION_NO_ALARM": ("A1407", "A160102"),
+    # A140502 "Free or Unrestricted Flow" (level 3, A1405 Improper Flow or Infusion).
+    "FREE_FLOW_DOOR": ("A140502",),
+    # A160103 "Low Audible Alarm" (level 3, A1601): the alarm volume too low to hear.
+    "ALARM_VOLUME_LOW": ("A160103",),
+    # SAMPLE-RV-11: A090807 "High Readings" (level 3, under A0908 Incorrect, Inadequate or Imprecise Result or Readings).
+    "SPO2_READING_HIGH": ("A090807",),
+}
+# The links before 0.10.77 (release 2025) and the code each becomes (sample_0_10_77.py re-records running trials).
+EARLIER_IMDRF_LINKS = {
+    ("PRESSURE_ALARM", "A16"): "A1601",
+    ("UNDER_INFUSION_NO_ALARM", "A14"): "A1407",
+    ("UNDER_INFUSION_NO_ALARM", "A16"): "A160102",
+    ("FREE_FLOW_DOOR", "A14"): "A140502",
+    ("ALARM_VOLUME_LOW", "A16"): "A160103",
+    ("SPO2_READING_HIGH", "A0908"): "A090807",
 }
 SAMPLE_REVIEWER = "system:trial-sample-reviewer"
 PROBLEM_CODES = "problem_code"

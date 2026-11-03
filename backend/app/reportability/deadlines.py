@@ -43,6 +43,7 @@ COUNTING_WORDS = {
     "EU_NI": "from the day after awareness; Brussels time or yours, whichever ends first; no weekend extension",
     "GB": "the awareness day is day 1; UK time or yours, whichever ends first",
     "IN": "the awareness day is day 1; India time (IST) or yours, whichever ends first",
+    "CA": "from the day after awareness (awareness is day zero); your time zone",
 }
 END_OF_DAY = time(23, 59, 59)
 

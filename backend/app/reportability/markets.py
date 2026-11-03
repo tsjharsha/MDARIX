@@ -34,13 +34,15 @@ YES, NO, UNKNOWN, NOT_APPLICABLE = "YES", "NO", "UNKNOWN", "NOT_APPLICABLE"
 ANSWERS = (YES, NO, UNKNOWN, NOT_APPLICABLE)
 ANSWER_LABELS = {YES: "Yes", NO: "No", UNKNOWN: "Unknown", NOT_APPLICABLE: "Not applicable"}
 
-US, EU_NI, GB, IN = "US", "EU_NI", "GB", "IN"
-MARKETS = (US, EU_NI, GB, IN)
+US, EU_NI, GB, IN, CA = "US", "EU_NI", "GB", "IN", "CA"
+# Canada (0.10.76, Release C part C4) comes last, so every earlier market keeps its place on the screens.
+MARKETS = (US, EU_NI, GB, IN, CA)
 MARKET_LABELS = {
     US: "United States (FDA)",
     EU_NI: "EU and Northern Ireland (EU MDR)",
     GB: "Great Britain (MHRA)",
     IN: "India (CDSCO)",
+    CA: "Canada (Health Canada)",
 }
 # The countries of each market, as complaint and window fields name them (rules.normalize compares them).
 MARKET_COUNTRIES = {
@@ -48,6 +50,7 @@ MARKET_COUNTRIES = {
     EU_NI: [*rules._EU, "Northern Ireland", "NI"],
     GB: rules._GB,
     IN: rules._IN,
+    CA: rules._CA,
 }
 
 REPORTABLE, PENDING, NOT_REPORTABLE = "REPORTABLE", "PENDING_INFORMATION", "NOT_REPORTABLE"
@@ -84,6 +87,20 @@ REPORT_TYPES = {
     "GB_15_DAY": ReportType("Serious incident: 15 days (UK MDR 2002 as amended)", 15),
     # The period is the organization's window for India (rules.TEMPLATES, starter text).
     "IN_SERIOUS_ADVERSE_EVENT": ReportType("Serious adverse event (India MDR 2017 Rule 26)", None),
+    # Canada, Medical Devices Regulations SOR/98-282 s. 60(1) (calendar days; the awareness day is day zero).
+    "CA_10_DAY": ReportType(
+        "Death or serious deterioration: preliminary report in 10 days (SOR/98-282 s. 60(1)(a)(i))", 10
+    ),
+    "CA_30_DAY": ReportType(
+        "Could lead to death or serious deterioration if it recurred: preliminary report in 30 days (SOR/98-282 "
+        "s. 60(1)(a)(ii))",
+        30,
+    ),
+    "CA_FOREIGN": ReportType(
+        "Incident outside Canada: preliminary report as soon as possible after the corrective action decision "
+        "(SOR/98-282 s. 60(1)(b))",
+        None,
+    ),
 }
 
 
@@ -394,7 +411,77 @@ IN_SET = QuestionSet(
     ),
     basis=("IN_MDR",),
 )
-QUESTION_SETS = {question_set.market: question_set for question_set in (US_SET, EU_SET, GB_SET, IN_SET)}
+# Canada (0.10.76, C4): Medical Devices Regulations SOR/98-282 ss. 59-61.1, current to 2026-10-19 (laws-lois.justice.
+# gc.ca, read 3 Nov 2026), and Health Canada's "Incident reporting for medical devices: Guidance document" (2021).
+_CA_LAW = "SOR/98-282"
+_CA_SERIOUS = (
+    "Serious deterioration in the state of health (SOR/98-282 s. 1, starter paraphrase): a life-threatening disease, "
+    "disorder or abnormal physical state, the permanent impairment of a body function or permanent damage to a body "
+    "structure, or a condition that needs an unexpected medical or surgical intervention to prevent them."
+)
+CA_SET = QuestionSet(
+    CA,
+    "CA-starter-1",
+    "Canada mandatory problem reporting (Medical Devices Regulations s. 59-61.1)",
+    (
+        Question(
+            "CA1",
+            "Is the device sold in Canada?",
+            "The duty to report applies to a device sold in Canada.",
+            f"{_CA_LAW} s. 59(1)(a)",
+            ("CA_MDR",),
+        ),
+        Question(
+            "CA2",
+            "Is the incident related to a failure of the device, a deterioration in its effectiveness, or an "
+            "inadequacy in its labelling or in its directions for use?",
+            "An incident is reportable only when it is related to one of these.",
+            f"{_CA_LAW} s. 59(1)(b)(i)",
+            ("CA_MDR",),
+        ),
+        Question(
+            "CA3",
+            "Did it lead to the death or a serious deterioration in the state of health of a patient, user or other "
+            "person?",
+            _CA_SERIOUS,
+            f"{_CA_LAW} s. 59(1)(b)(ii); s. 60(1)(a)(i) (10 days)",
+            ("CA_MDR",),
+            serious=True,
+        ),
+        Question(
+            "CA4",
+            "Could it lead to death or a serious deterioration in the state of health, were it to recur?",
+            _CA_SERIOUS,
+            f"{_CA_LAW} s. 59(1)(b)(ii); s. 60(1)(a)(ii) (30 days)",
+            ("CA_MDR",),
+            serious=True,
+        ),
+        Question(
+            "CA5",
+            "Did the incident occur in Canada?",
+            "An incident in Canada is reported in 10 or 30 days after you become aware of it. An incident outside "
+            "Canada is reported only as question 6 says.",
+            f"{_CA_LAW} s. 59(1) and (1.1)",
+            ("CA_MDR",),
+        ),
+        Question(
+            "CA6",
+            "For an incident outside Canada: is it a Class I device, and has the manufacturer told the regulator of "
+            "that country that it intends to take corrective action, or has that regulator required it?",
+            "A foreign incident is reported for a Class I device, and only once corrective action is intended or "
+            "required; then as soon as possible (Health Canada's guidance: within 48 hours of the decision). Class II "
+            "to IV foreign issues come under s. 61.2 (serious risk of injury), not this tree. Answer Not applicable "
+            "for an incident in Canada.",
+            f"{_CA_LAW} s. 59(1.1) and (2); s. 60(1)(b)",
+            ("CA_MDR",),
+        ),
+    ),
+    note="Calendar days, the awareness day is day zero (Health Canada's guidance). The manufacturer and the importer "
+    "each report, or the importer reports for both (s. 61.1). A final report follows on the timetable the "
+    "preliminary report gives (s. 61).",
+    basis=("CA_MDR",),
+)
+QUESTION_SETS = {question_set.market: question_set for question_set in (US_SET, EU_SET, GB_SET, IN_SET, CA_SET)}
 
 
 # --------------------------------------------------------------------------------------------- answers to a result
@@ -460,6 +547,17 @@ def evaluate(market: str, answers: dict) -> dict:
         kind = "IN_SERIOUS_ADVERSE_EVENT"
         if reportable and v("IN3"):
             notes.append("Serious and unexpected: a suspected unexpected serious adverse event.")
+    elif market == CA:
+        reportable = _all(v("CA1"), v("CA2"), _any(v("CA3"), v("CA4")), _any(v("CA5"), v("CA6")))
+        if v("CA5") is False:
+            kind = "CA_FOREIGN"
+        elif v("CA3") is False:
+            kind = "CA_30_DAY"
+        else:
+            # Conservative (starter): while question 3 is Unknown, the shorter 10-day report.
+            kind = "CA_10_DAY"
+            if reportable and v("CA3") is None:
+                notes.append("Question 3 is Unknown: until it is answered, the shorter 10-day report applies.")
     else:
         raise ValueError(f"unknown market {market}")
     suggested = _suggestion(reportable)
@@ -522,6 +620,71 @@ def answers_problem(question_set: QuestionSet, answers: dict, *, complete: bool)
     return None
 
 
+# --------------------------------------------------------------------------------------------- facts from the record
+
+# Release B (0.10.72), B1: the factual questions a complaint's own record answers, for the person to confirm or
+# correct. Never causation, recurrence, remedial action, "unexpected" or the conclusion: those stay the person's
+# judgement. A field the record leaves empty (Unknown) suggests nothing: it is never read as No. A serious injury on the
+# record suggests no criterion (which one applies is a judgement); no serious injury answers each criterion No.
+_DEATH_QUESTIONS = ("US1", "IN2A")
+_INJURY_QUESTIONS = ("US2A", "US2B", "US2C", "IN2B", "IN2D", "IN2F")
+_MALFUNCTION_QUESTIONS = ("US4",)
+JUDGEMENT_QUESTIONS = ("US3", "US5", "US6", "IN1", "IN2C", "IN2E", "IN3")
+CONFIRMED, CORRECTED, ENTERED = "CONFIRMED", "CORRECTED", "ENTERED"
+
+
+def suggestions(question_set: QuestionSet, record: dict) -> dict[str, dict]:
+    """The factual answers the complaint's record states, each with its source, for the questions of this set."""
+    death, injury, malfunction = record.get("death"), record.get("serious_injury"), record.get("malfunction")
+    found: dict[str, dict] = {}
+
+    def suggest(ids, answer, source, evidence):
+        for question_id in ids:
+            found[question_id] = {
+                "answer": answer,
+                "source": f"From the complaint record: {source}",
+                "evidence": evidence,
+            }
+
+    if death is not None:
+        suggest(
+            _DEATH_QUESTIONS,
+            YES if death else NO,
+            "a death was reported" if death else "no death was reported",
+            "Patient outcome fields",
+        )
+    if injury is False:
+        suggest(_INJURY_QUESTIONS, NO, "no serious injury was reported", "Patient outcome fields")
+    if malfunction is not None:
+        suggest(
+            _MALFUNCTION_QUESTIONS,
+            YES if malfunction else NO,
+            "a malfunction was reported" if malfunction else "no malfunction was reported",
+            "Malfunction field",
+        )
+    asked = {question.id for question in question_set.questions if not question.extra}
+    return {key: value for key, value in found.items() if key in asked}
+
+
+def mark_origins(answers: dict, suggested: dict[str, dict], confirmed: set[str]) -> dict:
+    """Each answer's origin, kept on the answer: a suggestion the person confirmed, one they corrected, or entered."""
+    for question_id, item in answers.items():
+        offer = suggested.get(question_id)
+        if item.get("answer") is None:
+            continue
+        if offer and item["answer"] != offer["answer"]:
+            item.update(origin=CORRECTED, suggested=offer["answer"], source=offer["source"])
+        elif offer and question_id in confirmed:
+            item.update(origin=CONFIRMED, suggested=offer["answer"], source=offer["source"])
+        else:
+            item["origin"] = ENTERED
+    return answers
+
+
+def origins(answers: dict) -> dict[str, str]:
+    return {key: item["origin"] for key, item in (answers or {}).items() if item.get("origin")}
+
+
 # --------------------------------------------------------------------------------------------- the harm scale
 
 SCALE_VERSION = "scale-starter-1"
@@ -547,12 +710,13 @@ TERMS = {
     "DEATH": ("Death", CATASTROPHIC, True),
 }
 # The lowest level that meets each market's "serious" threshold.
-THRESHOLDS = {US: SERIOUS, EU_NI: SERIOUS, GB: SERIOUS, IN: SERIOUS}
+THRESHOLDS = {US: SERIOUS, EU_NI: SERIOUS, GB: SERIOUS, IN: SERIOUS, CA: SERIOUS}
 THRESHOLD_LABELS = {
     US: "US serious injury",
     EU_NI: "EU/NI serious deterioration",
     GB: "GB serious deterioration",
     IN: "India serious adverse event",
+    CA: "Canada serious deterioration",
 }
 # The complaint's severity text from the QMS, lower case, to a level (a fixed table; anything else is not mapped).
 QMS_SEVERITY = {

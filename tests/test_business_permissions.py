@@ -47,6 +47,8 @@ EXEMPT = {
     ("POST", "/api/v1/trial/team/{user_id}/resend-invitation"): "trial owner only, checked in the route",
     ("POST", "/api/v1/trial/team/{user_id}/remove"): "trial owner only, own trial's people, checked in the route",
     ("POST", "/api/v1/trial/team/{user_id}/mfa-reset"): "trial owner only, own trial's people, checked in the route",
+    ("POST", "/api/v1/trial/team/{user_id}/persona"): "trial owner only, own trial's people (a colleague's persona "
+    "and with it their role, never the owner's own), checked in the route",
     (
         "POST",
         "/api/v1/trial/support-access/{grant_id}/approve",
@@ -293,7 +295,10 @@ def test_role_permissions(role, allowed):
     assert permissions_for_role(role) == allowed
 
 
-def test_a_viewer_is_refused_on_every_guarded_route():
+def test_a_viewer_is_refused_on_every_guarded_route(monkeypatch):
+    # Under MDARIX_FEATURE_SET=mvp the feature-set gate answers 404 for parked routes before their guard runs (its own
+    # tests: test_feature_set.py). This test checks the guards themselves, so it serves every route.
+    monkeypatch.setenv("MDARIX_FEATURE_SET", "full")
     viewer = _client_with_role("Viewer")
     allowed = []
     for method, path, route in _business_actions():

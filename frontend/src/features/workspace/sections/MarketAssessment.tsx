@@ -1,4 +1,4 @@
-import { useContext, useEffect, useId, useState } from "react";
+import { useContext, useId, useState } from "react";
 import { AlsoKnownAs, DecideAndSign } from "./common";
 import { ComplaintNextStep } from "./ComplaintNextStep";
 import { MARKET_QUESTION_WHY } from "../whyAsked";
@@ -8,7 +8,7 @@ import { ToneBadge } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { deadlineLabel, formatDay } from "../../../app/dates";
 import { WorkspaceContext, useCan, useWorkspace } from "../workspaceContext";
-import { WORKSHEET_MARKETS, reportsTab } from "../authorityReports";
+import { reportsTab, worksheetMarkets } from "../authorityReports";
 import { communicationsTab } from "../communications";
 import { recordName } from "../complaintReview";
 import { clockText } from "../reportability";
@@ -33,6 +33,7 @@ import {
   type Question,
   type Scale,
   type SignForm,
+  type Suggestion_,
   type TrainingDocument,
   type Version,
 } from "../marketAssessment";
@@ -177,10 +178,8 @@ export function MarketPanel({
   const [error, setError] = useState("");
   const name = recordName(detail.complaint);
   const suggested = item.evaluation?.suggested ?? null;
-  useEffect(() => {
-    if (suggested && suggested !== "PENDING_INFORMATION")
-      setSign((current) => (current.conclusion ? current : { ...current, conclusion: suggested }));
-  }, [suggested]);
+  // The conclusion is never pre-selected (0.10.72, B1): the person chooses it; the suggestion is marked beside it.
+  const [rereading, setRereading] = useState(false);
   const missing = trainingMissing(item);
   const questions = item.question_set.questions;
   const problem = signProblem(
@@ -253,9 +252,17 @@ export function MarketPanel({
         )}
       </header>
       {item.current && <SignedVersion version={item.current} complaintId={detail.complaint.id} onSaved={onSaved} />}
-      {missing.length > 0 && canDecide && (
+      {canDecide && !missing.length && item.training.length > 0 && !rereading && (
+        <p className="uw-cr-meta uw-ma-read">
+          You have read: {item.training.map((document) => readWords(document, item.market)).join(", ")} ·{" "}
+          <button type="button" className="ac-link" onClick={() => setRereading(true)}>
+            Read again
+          </button>
+        </p>
+      )}
+      {(missing.length > 0 || rereading) && canDecide && (
         <TrainingPanel
-          documents={missing}
+          documents={missing.length ? missing : item.training}
           colleagues={item.trained_colleagues}
           required={detail.training_required}
           onDone={onSaved}
@@ -277,6 +284,7 @@ export function MarketPanel({
             key={question.id}
             question={question}
             entry={form.answers[question.id]}
+            suggestion={item.suggestions?.[question.id]}
             disabled={!canDecide}
             onChange={(entry) => setForm({ ...form, answers: { ...form.answers, [question.id]: entry } })}
           />
@@ -359,6 +367,7 @@ export function MarketPanel({
               }${sign.conclusion === "REPORTABLE" && item.draft.report_type_label ? `, ${item.draft.report_type_label}` : ""}.`}
               restsOn={[
                 `Your answers to ${Object.values(item.draft.answers).filter((entry) => entry.answer).length} of ${questions.length} questions, saved as draft version ${item.draft.version}.`,
+                originWords(item.draft.answers),
                 `${item.question_set.title} (${versionWords(item.draft.question_set)}), its clauses locked.`,
                 item.draft.harm_level
                   ? `Harm level ${item.draft.harm_level.toLowerCase()} on the harm-severity scale.`
@@ -420,17 +429,26 @@ export function MarketPanel({
 function QuestionRow({
   question,
   entry,
+  suggestion,
   disabled,
   onChange,
 }: {
   question: Question;
   entry: AnswerEntry | undefined;
+  suggestion?: Suggestion_;
   disabled: boolean;
   onChange: (entry: AnswerEntry) => void;
 }) {
   const value = entry ?? { answer: null, rationale: "", evidence: [] };
   const [open, setOpen] = useState(false);
+  const [evidence, setEvidence] = useState(false);
+  // A suggestion from the record waits for Confirm, or the person corrects it with the answers below.
+  const [correcting, setCorrecting] = useState(false);
   const definitionId = useId();
+  const evidenceId = useId();
+  const waiting = !!suggestion && !value.answer && !correcting;
+  const confirmed =
+    !!suggestion && value.answer === suggestion.answer && (!!value.confirmed || value.origin === "CONFIRMED");
   return (
     <li className="uw-ma-question">
       {/* Not a disabled fieldset: the definition toggle stays usable when the answers are read-only. */}
@@ -457,62 +475,142 @@ function QuestionRow({
             {open ? "Hide definition" : "Show definition"}
           </button>
         </p>
-        <p id={definitionId} className="ac-muted" hidden={!open}>
-          {question.definition}
-        </p>
-        <WhyAsked why={{ why: question.note || MARKET_QUESTION_WHY, basis: [] }} clause={question.clause} />
-        <OwnText question={question} />
-        <div
-          className="uw-ma-answers"
-          role="radiogroup"
-          aria-label={`Answer to question ${questionNumber(question.id)}`}
-        >
-          {ANSWERS.map((answer) => (
-            <label key={answer} className="ca-check">
-              <input
-                type="radio"
-                disabled={disabled}
-                name={`answer-${question.id}`}
-                checked={value.answer === answer}
-                onChange={() => onChange({ ...value, answer })}
-              />
-              {ANSWER_LABELS[answer]}
-            </label>
-          ))}
+        <div id={definitionId} hidden={!open}>
+          <p className="ac-muted">{question.definition}</p>
+          <WhyAsked why={{ why: question.note || MARKET_QUESTION_WHY, basis: [] }} clause={question.clause} />
+          <OwnText question={question} />
         </div>
-        <label className="ca-field">
-          Rationale
-          <textarea
-            rows={2}
-            disabled={disabled}
-            maxLength={ASSESSMENT_LIMITS.rationaleMax}
-            value={value.rationale}
-            onChange={(event) => onChange({ ...value, rationale: event.target.value })}
-          />
-        </label>
-        <div className="uw-ma-evidence" aria-label="Evidence relied on">
-          {EVIDENCE.map((evidence) => (
-            <label key={evidence} className="ca-check">
-              <input
-                type="checkbox"
+        {suggestion && (waiting || confirmed) ? (
+          <div
+            className="uw-ma-suggested"
+            role="group"
+            aria-label={`Question ${questionNumber(question.id)}: from the record`}
+          >
+            <p>
+              <strong>
+                {confirmed ? "Confirmed" : "Suggested"}: {ANSWER_LABELS[suggestion.answer]}
+              </strong>{" "}
+              · {suggestion.source}
+            </p>
+            {!disabled && (
+              <div className="ca-action-row">
+                {waiting && (
+                  <button
+                    type="button"
+                    className="ac-secondary"
+                    onClick={() =>
+                      onChange({
+                        answer: suggestion.answer,
+                        rationale: suggestion.source,
+                        evidence: [suggestion.evidence],
+                        confirmed: true,
+                      })
+                    }
+                  >
+                    Confirm
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="ac-link"
+                  onClick={() => {
+                    setCorrecting(true);
+                    if (confirmed) onChange({ answer: null, rationale: "", evidence: [] });
+                  }}
+                >
+                  Correct it
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {suggestion && (
+              <p className="uw-cr-meta">
+                The record suggested {ANSWER_LABELS[suggestion.answer]} · {suggestion.source}
+              </p>
+            )}
+            <div
+              className="uw-ma-answers"
+              role="radiogroup"
+              aria-label={`Answer to question ${questionNumber(question.id)}`}
+            >
+              {ANSWERS.map((answer) => (
+                <label key={answer} className="ca-check">
+                  <input
+                    type="radio"
+                    disabled={disabled}
+                    name={`answer-${question.id}`}
+                    checked={value.answer === answer}
+                    onChange={() => onChange({ ...value, answer, confirmed: false })}
+                  />
+                  {ANSWER_LABELS[answer]}
+                </label>
+              ))}
+            </div>
+            <label className="ca-field">
+              Rationale
+              <textarea
+                rows={2}
                 disabled={disabled}
-                checked={value.evidence.includes(evidence)}
-                onChange={(event) =>
-                  onChange({
-                    ...value,
-                    evidence: event.target.checked
-                      ? [...value.evidence, evidence]
-                      : value.evidence.filter((item) => item !== evidence),
-                  })
-                }
+                maxLength={ASSESSMENT_LIMITS.rationaleMax}
+                value={value.rationale}
+                onChange={(event) => onChange({ ...value, rationale: event.target.value })}
               />
-              {evidence}
             </label>
-          ))}
-        </div>
+            <button
+              type="button"
+              className="ac-link"
+              aria-expanded={evidence}
+              aria-controls={evidenceId}
+              onClick={() => setEvidence(!evidence)}
+            >
+              {evidence
+                ? "Hide evidence"
+                : `Show evidence${value.evidence.length ? ` (${value.evidence.length})` : ""}`}
+            </button>
+            <div id={evidenceId} className="uw-ma-evidence" aria-label="Evidence relied on" hidden={!evidence}>
+              {EVIDENCE.map((item) => (
+                <label key={item} className="ca-check">
+                  <input
+                    type="checkbox"
+                    disabled={disabled}
+                    checked={value.evidence.includes(item)}
+                    onChange={(event) =>
+                      onChange({
+                        ...value,
+                        evidence: event.target.checked
+                          ? [...value.evidence, item]
+                          : value.evidence.filter((other) => other !== item),
+                      })
+                    }
+                  />
+                  {item}
+                </label>
+              ))}
+            </div>
+          </>
+        )}
       </fieldset>
     </li>
   );
+}
+
+/** "US guide v2", "harm scale v1": what a person has read, in one line (0.10.72, B1). */
+export function readWords(document: Pick<TrainingDocument, "code" | "version">, market: Market): string {
+  const number = /(\d+)$/.exec(document.version)?.[1] ?? document.version;
+  return document.code === "HARM_SCALE" ? `harm scale v${number}` : `${MARKET_SHORT[market]} guide v${number}`;
+}
+
+/** How the answers came: "Answers: 5 confirmed from the complaint record, 3 entered." (0.10.72, B1). */
+export function originWords(answers: Record<string, AnswerEntry>): string | null {
+  const count = (origin: string) => Object.values(answers).filter((entry) => entry.origin === origin).length;
+  const parts = [
+    count("CONFIRMED") && `${count("CONFIRMED")} confirmed from the complaint record`,
+    count("CORRECTED") && `${count("CORRECTED")} corrected from the record's suggestion`,
+    count("ENTERED") && `${count("ENTERED")} entered`,
+  ].filter(Boolean);
+  return parts.length ? `Answers: ${parts.join(", ")}.` : null;
 }
 
 /** The harm-severity scale beside the questions: levels, Annex F terms, each market's threshold, the mapped level. */
@@ -535,13 +633,24 @@ export function ScalePanel({
 }) {
   const label = (code: string) => scale.levels.find((level) => level.code === code)?.label ?? code;
   const thresholdRank = scale.levels.findIndex((level) => level.code === item.threshold.level);
+  const [shown, setShown] = useState(false);
+  const levelsId = useId();
   return (
     <section className="ca-drawer-section uw-ma-scale" aria-label="Harm-severity scale">
       <h3>
         <Gauge size={15} aria-hidden="true" /> Harm-severity scale, {versionWords(scale.version)}{" "}
         <span className="uw-ma-starter-chip">Starter text</span>
       </h3>
-      <ol className="uw-ma-levels">
+      <button
+        type="button"
+        className="ac-link"
+        aria-expanded={shown}
+        aria-controls={levelsId}
+        onClick={() => setShown(!shown)}
+      >
+        {shown ? "Hide scale" : "Show scale"}
+      </button>
+      <ol id={levelsId} className="uw-ma-levels" hidden={!shown}>
         {scale.levels.map((level, index) => (
           <li
             key={level.code}
@@ -727,6 +836,7 @@ export function SignedVersion({
           scale {versionWords(version.scale_version)}
           {version.sample ? " · sample" : ""}
         </span>
+        {originWords(version.answers) && <span className="uw-cr-meta">{originWords(version.answers)}</span>}
         {version.override_reason && (
           <span className="uw-cr-meta">
             Overrides the suggestion ({CONCLUSION_LABELS[version.suggested_conclusion].toLowerCase()}):{" "}
@@ -742,7 +852,7 @@ export function SignedVersion({
           </span>
         )}
       </div>
-      {conclusion === "REPORTABLE" && WORKSHEET_MARKETS.includes(version.market) && (
+      {conclusion === "REPORTABLE" && worksheetMarkets(workspace?.navigation).includes(version.market) && (
         <div className="ca-action-row">
           <button
             type="button"
@@ -760,29 +870,32 @@ export function SignedVersion({
           </p>
         </div>
       )}
-      {conclusion === "REPORTABLE" && !WORKSHEET_MARKETS.includes(version.market) && !version.filed_on && canDecide && (
-        <form className="ca-form-grid" onSubmit={record} aria-label="Filing reference and date">
-          <label className="ca-field">
-            Filing reference
-            <input
-              value={reference}
-              maxLength={ASSESSMENT_LIMITS.referenceMax}
-              placeholder="e.g. the MDR number"
-              onChange={(event) => setReference(event.target.value)}
-            />
-          </label>
-          <label className="ca-field">
-            Filed on
-            <input type="date" value={filedOn} onChange={(event) => setFiledOn(event.target.value)} />
-          </label>
-          <button type="submit" className="ac-secondary" disabled={!reference.trim() || !filedOn}>
-            Record the filing
-          </button>
-          <p className="ac-muted">
-            Empty until your organization reports to the authority itself: MDARIX submits nothing.
-          </p>
-        </form>
-      )}
+      {conclusion === "REPORTABLE" &&
+        !worksheetMarkets(workspace?.navigation).includes(version.market) &&
+        !version.filed_on &&
+        canDecide && (
+          <form className="ca-form-grid" onSubmit={record} aria-label="Filing reference and date">
+            <label className="ca-field">
+              Filing reference
+              <input
+                value={reference}
+                maxLength={ASSESSMENT_LIMITS.referenceMax}
+                placeholder="e.g. the MDR number"
+                onChange={(event) => setReference(event.target.value)}
+              />
+            </label>
+            <label className="ca-field">
+              Filed on
+              <input type="date" value={filedOn} onChange={(event) => setFiledOn(event.target.value)} />
+            </label>
+            <button type="submit" className="ac-secondary" disabled={!reference.trim() || !filedOn}>
+              Record the filing
+            </button>
+            <p className="ac-muted">
+              Empty until your organization reports to the authority itself: MDARIX submits nothing.
+            </p>
+          </form>
+        )}
       <InlineError text={error} />
     </section>
   );

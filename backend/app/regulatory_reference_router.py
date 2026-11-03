@@ -59,9 +59,10 @@ def _run(data: Session, call):
 def product_profile(
     product_id: uuid.UUID,
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
-    return reference.product_profile(data, _tenant(ctx), product_id)
+    return reference.product_profile(data, _tenant(ctx), product_id, db)
 
 
 @router.put("/products/{product_id}/identity", dependencies=[Depends(require_permission(RECORDS_WRITE))])
@@ -72,7 +73,7 @@ def set_identity(
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
-    result = _run(data, lambda: reference.set_identity(data, _tenant(ctx), product_id, payload))
+    result = _run(data, lambda: reference.set_identity(data, _tenant(ctx), product_id, payload, db))
     _commit(data, db, ctx, "PRODUCT_IDENTITY_SET", {"product_id": str(product_id)})
     return result
 
@@ -85,7 +86,7 @@ def add_registration(
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
-    result = _run(data, lambda: reference.add_registration(data, _tenant(ctx), product_id, payload))
+    result = _run(data, lambda: reference.add_registration(data, _tenant(ctx), product_id, payload, db))
     _commit(data, db, ctx, "PRODUCT_REGISTRATION_ADDED", {"product_id": str(product_id), "registration": result["id"]})
     return result
 
@@ -157,13 +158,30 @@ def imdrf_releases(_ctx: AuthenticatedRequestContext = Depends(get_request_conte
 
 @router.get("/imdrf/codes")
 def imdrf_codes(
-    release: str = Query(..., max_length=20),
+    release: str | None = Query(default=None, max_length=20),
     annex: str | None = Query(default=None, pattern="^[A-Ga-g]$"),
     q: str | None = Query(default=None, max_length=100),
+    pick: bool = False,
+    parent: str | None = Query(default=None, max_length=20),
     _ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
 ):
-    return {"codes": reference.search_codes(db, release, annex, q)}
+    """Search a release's codes. With ``pick`` (the code picker, 0.10.77): one annex of the newest full release
+    unless named, searched by word or browsed by ``parent``, retired codes left out, each with its definition and
+    FDA code."""
+    if not pick:
+        if not release:
+            raise HTTPException(422, detail={"code": "RELEASE_REQUIRED", "message": "Name the IMDRF release"})
+        return {"codes": reference.search_codes(db, release, annex, q)}
+    release = release or reference.newest_release(db)
+    if not release or not annex:
+        return {"release": release, "codes": [], "fda_version": None}
+    return {
+        "release": release,
+        "annex": annex.upper(),
+        "fda_version": reference.newest_version(db, "FDA_CDRH"),
+        "codes": reference.pick_codes(db, release, annex, q, parent),
+    }
 
 
 @router.get("/imdrf/links")

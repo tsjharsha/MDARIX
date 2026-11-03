@@ -20,7 +20,14 @@ export type ObligationState =
   | "ACCEPTED"
   | "SUBMITTED_NO_ACK"
   | "FOLLOW_UP_DUE"
-  | "COMPLETE";
+  | "COMPLETE"
+  | "CANCELLED";
+
+/** The report's status path on the new navigation (0.10.75, Release C part C3; the server's rules.STAGES). */
+export type ReportStage = "CREATED" | "COMPLETE" | "APPROVAL" | "APPROVED" | "SUBMITTED" | "ACKNOWLEDGED";
+export type StageStep = { code: ReportStage; label: string; state: "DONE" | "CURRENT" | "LATER" };
+/** The mandatory-fields meter: the form's must-have fields, how many have a value, and the empty ones. */
+export type Mandatory = { total: number; filled: number; missing?: string[] };
 
 export type ReportListItem = {
   id: string | null;
@@ -45,11 +52,18 @@ export type ReportListItem = {
   assessment: string | null;
   can_start: boolean;
   sample: boolean;
+  /** 0.10.75: a started report's place on the status path (null when cancelled or not started). */
+  stage?: ReportStage | null;
+  stage_label?: string;
+  mandatory?: Mandatory;
+  submitted_at?: string | null;
+  /** The Reports tab's list views it belongs to ("open", "my-approval", "submitted-month"). */
+  views?: string[];
 };
 
 export type ReportList = {
   items: ReportListItem[];
-  forms: { market: string; title: string; version: string }[];
+  forms: { market: string; title: string; version: string; starter?: boolean }[];
   never_submits: string;
   starter_mark: string;
   practice_label: string | null;
@@ -68,9 +82,17 @@ export type WorksheetField = {
   personal: "PATIENT" | "REPORTER" | null;
   missing_class: string;
   editable?: boolean;
+  /** The form's fixed list for this field (0.10.76), as printed; absent: free text. */
+  options?: string[] | null;
   note: string | null;
   by: string | null;
   at: string | null;
+  /** A code field's IMDRF annex (0.10.77); absent: not a code field. */
+  code_annex?: string | null;
+  /** The code the approved mapping suggests, waiting for a person (status SUGGESTED). */
+  suggestion?: string | null;
+  /** What the mapping suggested before the person changed it. */
+  suggested?: string | null;
 };
 
 export type WorksheetSection = { code: string; title: string; note: string | null; fields: WorksheetField[] };
@@ -178,12 +200,23 @@ export type ReportDetail = {
     authority: string;
     source_document: string;
     clauses: { id: string; short: string; title: string }[];
+    /** 0.10.76: a starter form (EU MIR, GB MIR, Health Canada), its report types and the one this report is. */
+    starter?: boolean;
+    report_types?: string[];
+    report_kind?: string | null;
   };
   routes: Route[];
   state: ObligationState;
   state_label: string;
   next_step: string;
   steps: { state: ObligationState; label: string }[];
+  stage?: ReportStage | null;
+  stage_label?: string;
+  stages?: StageStep[];
+  mandatory?: Mandatory;
+  approved_snapshot?: Snapshot | null;
+  preparers?: string[];
+  cancelled_reason?: string | null;
   deadline: DeadlineFields;
   assessment: {
     conclusion: string | null;
@@ -211,6 +244,8 @@ export type ReportDetail = {
   practice_label: string | null;
   never_submits: string;
   sample: boolean;
+  /** Mapped codes are suggestions a person confirms or changes (the new navigation, 0.10.77). */
+  codes_confirmed?: boolean;
 };
 
 /** The tab name that opens Reports on one complaint ("Reports?complaint=<id>"), and its reading. */
@@ -225,14 +260,21 @@ export function parseReportsTab(tab: string | null | undefined): { isReports: bo
   return { isReports: true, complaintId: params.get("complaint") };
 }
 
-/** The markets with a worksheet in this release (the server's forms.BY_MARKET). */
+/** The markets with a worksheet (the server's forms.form_for): the classic navigation keeps the US and India; the
+ * new one adds EU / NI, Great Britain and Canada (0.10.76, starters for your consultant to confirm). */
 export const WORKSHEET_MARKETS = ["US", "IN"];
+export const NEW_WORKSHEET_MARKETS = [...WORKSHEET_MARKETS, "EU_NI", "GB", "CA"];
+export const worksheetMarkets = (navigation?: string | null): readonly string[] =>
+  navigation === "new" ? NEW_WORKSHEET_MARKETS : WORKSHEET_MARKETS;
 
-/** Whether a complaint's markets owe a report with a worksheet: a US or India market reportable, or pending. */
-export function owesWorksheet(markets: { market: string; state: string; suggested: string | null }[]): boolean {
+/** Whether a complaint's markets owe a report with a worksheet: a market with one reportable, or pending. */
+export function owesWorksheet(
+  markets: { market: string; state: string; suggested: string | null }[],
+  navigation?: string | null,
+): boolean {
   return markets.some(
     (item) =>
-      WORKSHEET_MARKETS.includes(item.market) &&
+      worksheetMarkets(navigation).includes(item.market) &&
       (item.state === "REPORTABLE" ||
         (item.state === "DRAFT" && (item.suggested === "REPORTABLE" || item.suggested === "PENDING_INFORMATION"))),
   );
@@ -250,8 +292,8 @@ export function stateTone(state: ObligationState, overdue = false): Tone {
 /** Each field status's tone: a missing must-have stands out, a patient field outside the sample is neutral. */
 export function fieldTone(status: string): Tone {
   if (status === "MUST_HAVE") return "critical";
-  if (status === "MAY_BE_UNKNOWN" || status === "FOLLOW_UP") return "warning";
-  if (status === "FROM_RECORD" || status === "CONFIRMED" || status === "ENTERED") return "good";
+  if (status === "MAY_BE_UNKNOWN" || status === "FOLLOW_UP" || status === "SUGGESTED") return "warning";
+  if (["FROM_RECORD", "CONFIRMED", "ENTERED", "CHANGED"].includes(status)) return "good";
   return "neutral";
 }
 
@@ -268,6 +310,34 @@ export function stepIndex(state: ObligationState): number {
 
 /** The states in which the obligation's deadline is met (the server's rules.MET). */
 export const MET_STATES: readonly ObligationState[] = ["ACCEPTED", "SUBMITTED_NO_ACK", "FOLLOW_UP_DUE", "COMPLETE"];
+/** Nothing more is owed: met, or cancelled by a later "not reportable" conclusion (the server's rules.CLOSED). */
+export const CLOSED_STATES: readonly ObligationState[] = [...MET_STATES, "CANCELLED"];
+
+/** The Reports tab's list views (0.10.75): each a filter the server marks on the list's items (``views``). */
+export const REPORT_VIEWS = {
+  "Open reports": { code: "open", detail: "Every report still owed, the nearest deadline first." },
+  "Waiting for my approval": {
+    code: "my-approval",
+    detail: "Sent for approval and not prepared by you (in a trial, your own too, as practice).",
+  },
+  "Submitted this month": {
+    code: "submitted-month",
+    detail: "Submitted through the authority's channel since the first of the month.",
+  },
+} as const;
+export type ReportView = keyof typeof REPORT_VIEWS;
+export const REPORT_VIEW_NAMES = Object.keys(REPORT_VIEWS) as ReportView[];
+
+/** Where one report opens on the new navigation: the Reports tab, the report named in its address. */
+export const reportPlace = (id: string) => ({
+  section: "Reports" as const,
+  tab: `?${new URLSearchParams({ report: id })}`,
+});
+
+/** The reports of a list view: started reports only (a market not yet concluded is not a report). */
+export function reportsInView(items: readonly ReportListItem[], view: ReportView): ReportListItem[] {
+  return items.filter((item) => item.id && (item.views ?? []).includes(REPORT_VIEWS[view].code));
+}
 
 /** A report's deadline on the wire (authority_reports/router.py ``due_fields``). */
 export type DeadlineFields = {
@@ -282,7 +352,7 @@ export type DeadlineFields = {
 
 /** A report's deadline for its chip (app/chips.tsx DeadlineChip), or null once it is met or has no day yet. */
 export function deadlineDue(item: DeadlineFields, state?: ObligationState): DueLike | null {
-  if (!item.due_on || (state && MET_STATES.includes(state))) return null;
+  if (!item.due_on || (state && CLOSED_STATES.includes(state))) return null;
   return {
     due_at: item.due_at,
     due_date: item.due_on,
@@ -297,6 +367,7 @@ export function deadlineText(item: DeadlineFields, state?: ObligationState, now 
   if (!item.due_on) return "No deadline yet";
   const when = deadlineLabel({ due_label: item.due_label, due_date: item.due_on });
   if (state && MET_STATES.includes(state)) return `Deadline ${when}: met by the submission`;
+  if (state === "CANCELLED") return "No deadline: not reportable";
   const left = timeLeft(
     {
       due_at: item.due_at,
@@ -310,10 +381,21 @@ export function deadlineText(item: DeadlineFields, state?: ObligationState, now 
 }
 
 /** The worksheet's summary line: how many fields come from records, were entered or confirmed, and are missing. */
+/** One count per thing (0.10.72): "from your records" is the record's and the confirmed values, everywhere the
+ * worksheet says it (the list's line, the meter, the approval's summary); "entered" is what a person typed. */
+export const FROM_RECORDS = ["FROM_RECORD", "CONFIRMED"];
+export function filledCounts(counts: Record<string, number>): { fromRecords: number; entered: number } {
+  return {
+    fromRecords: FROM_RECORDS.reduce((sum, key) => sum + (counts[key] ?? 0), 0),
+    entered: counts.ENTERED ?? 0,
+  };
+}
+
 export function summaryLine(counts: Record<string, number>): string {
   const n = (key: string) => counts[key] ?? 0;
-  const filled = n("FROM_RECORD") + n("ENTERED") + n("CONFIRMED");
-  const parts = [`${filled} filled`];
+  const { fromRecords, entered } = filledCounts(counts);
+  const parts = [`${fromRecords} from your records`];
+  if (entered) parts.push(`${entered} entered`);
   if (n("MUST_HAVE")) parts.push(`${n("MUST_HAVE")} must have before submission`);
   const later = n("MAY_BE_UNKNOWN") + n("FOLLOW_UP");
   if (later) parts.push(`${later} may wait`);
@@ -390,7 +472,8 @@ export function nowLocal(now: Date = new Date()): string {
 }
 
 /** A field still to enter before submission. */
-export const isMissing = (field: Pick<WorksheetField, "status">) => field.status === "MUST_HAVE";
+export const isMissing = (field: Pick<WorksheetField, "status"> & { missing_class?: string }) =>
+  field.status === "MUST_HAVE" || (field.status === "SUGGESTED" && field.missing_class === "MUST_HAVE");
 
 /** The worksheet's meter (wow screen 5): fields filled from the records, entered by a person, missing, and in all. */
 export function worksheetMeter(sections: readonly WorksheetSection[]) {
@@ -398,7 +481,7 @@ export function worksheetMeter(sections: readonly WorksheetSection[]) {
   const count = (statuses: string[]) => fields.filter((field) => statuses.includes(field.status)).length;
   return {
     total: fields.length,
-    fromRecords: count(["FROM_RECORD", "CONFIRMED"]),
+    fromRecords: count(FROM_RECORDS),
     entered: count(["ENTERED"]),
     missing: fields.filter(isMissing).length,
   };

@@ -1,4 +1,9 @@
-"""Free-trial team: the trial owner invites colleagues, up to the trial's user limit, and looks after them.
+"""Free-trial team: the trial owner invites colleagues, up to the trial's safety cap, and looks after them.
+
+Each colleague gets a persona (0.10.73, C1), and the persona is their real role (access_control/personas.py): a
+Regulatory Leader is a Regulatory Reviewer, a Decision Maker an Approver. Only the owner gives or changes it, each time
+audited as TRIAL_PERSONA_ASSIGNED; the colleague cannot change it (POST /api/v1/me/persona answers 403). Colleagues
+invited before 0.10.73 keep the role Leader (the Quality Leader persona) until the owner changes it.
 
 Only the person whose request created the trial (the trial owner) can invite. Colleagues join that one workspace as
 workspace users (never administrators) with a single-use invitation, exactly like the owner. A trial has no admin
@@ -28,7 +33,8 @@ from backend.app import team_notices
 from backend.app.access.authz import platform_account_clause
 from backend.app.db.models.foundation import AuditEvent, AuthUser, Tenant, TenantMembership
 from backend.app.db.models.stage2 import OnboardingRequest, UserInvitation
-from backend.app.trial.service import TRIAL_USER_LIMIT, TRIAL_USER_ROLE, _send_invitation
+from access_control.personas import COLLEAGUE_PERSONAS, workspace_persona
+from backend.app.trial.service import trial_user_cap, _send_invitation
 
 SEATED_STATUSES = ("ACTIVE", "INVITED")
 # A removed colleague: refused at sign-in and by any invitation link (backend/app/auth_router.py); holds no seat.
@@ -70,8 +76,13 @@ def team(db: Session, tenant_id, viewer: AuthUser) -> dict:
         "can_invite": owner,
         # Remove colleagues, reset their MFA, decide on support access: the trial owner only.
         "can_manage": owner,
-        "limit": TRIAL_USER_LIMIT,
+        "limit": trial_user_cap(),
         "seats_used": len(users),
+        # The personas the owner may give a colleague, in the order the invite form lists them.
+        "personas": [
+            {"code": code, "label": workspace_persona(code).label, "sub": workspace_persona(code).sub}
+            for code in COLLEAGUE_PERSONAS
+        ],
         "members": [
             {
                 "id": str(user.id),
@@ -83,10 +94,57 @@ def team(db: Session, tenant_id, viewer: AuthUser) -> dict:
                 "is_you": user.id == viewer.id,
                 # An invitation whose link no longer works: shown as Expired, with Resend (J37).
                 "invitation_expired": user.id in expired,
+                **_persona_view(db, user, user.username.strip().lower() == owner_email),
             }
             for user in users
         ],
     }
+
+
+def _persona_view(db: Session, user: AuthUser, owner: bool) -> dict:
+    """A person's persona as the team list shows it; a colleague's is locked (only the owner changes it)."""
+    from backend.app.access.session import persona_of
+
+    persona = workspace_persona(persona_of(db, user, owner))
+    return {"persona": persona.code, "persona_label": persona.label, "persona_locked": not owner}
+
+
+def _colleague_persona(code: str | None):
+    """The persona the owner gives a colleague: any but Admin, which is the owner's own; none named is the Quality
+    Leader (the role Leader, as every trial colleague had before 0.10.73)."""
+    try:
+        persona = workspace_persona(code or "quality")
+    except ValueError:
+        raise _error(422, "UNKNOWN_PERSONA", "Choose one of the personas listed")
+    if persona.code not in COLLEAGUE_PERSONAS:
+        raise _error(422, "PERSONA_NOT_FOR_COLLEAGUE", "Admin is the trial owner's own: choose another persona")
+    return persona
+
+
+def _audit_persona(db: Session, tenant_id, owner: AuthUser, user: AuthUser, persona, before: dict, now, how: str):
+    from backend.app.enterprise_audit import make_audit_event
+
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=str(owner.id),
+            action="TRIAL_PERSONA_ASSIGNED",
+            entity_type="AuthUser",
+            entity_id=user.id,
+            details={
+                "user_id": str(user.id),
+                "persona": persona.code,
+                "role": persona.role,
+                "previous_persona": before.get("persona"),
+                "previous_role": before.get("role"),
+                "how": how,
+                "source": SOURCE,
+            },
+            old_values={"role": before.get("role"), "view_persona": before.get("persona")},
+            new_values={"role": persona.role, "view_persona": persona.code},
+            created_at=now,
+        )
+    )
 
 
 def _expired_invitations(db: Session, tenant_id, users) -> set:
@@ -144,8 +202,11 @@ def _invitable(db: Session, tenant_id, email: str) -> AuthUser | None:
     return existing
 
 
-def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, display_name: str) -> dict:
+def invite_colleague(
+    db: Session, tenant_id, inviter: AuthUser, email: str, display_name: str, persona_code: str | None = None
+) -> dict:
     require_owner(db, tenant_id, inviter, "Only the person who started this trial can invite colleagues")
+    persona = _colleague_persona(persona_code)
     email = email.strip().lower()
     name = display_name.strip()
     if not _EMAIL.match(email) or len(email) > 254:
@@ -161,9 +222,13 @@ def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, disp
     # Lock the trial's request row so two simultaneous invites cannot both take the last seat.
     db.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).with_for_update().first()
     seated = db.query(AuthUser.id).filter(AuthUser.tenant_id == tenant_id, AuthUser.status.in_(SEATED_STATUSES)).count()
-    if seated >= TRIAL_USER_LIMIT:
+    cap = trial_user_cap()
+    if seated >= cap:
         raise _error(
-            409, "TRIAL_USER_LIMIT_REACHED", f"Your free trial includes up to {TRIAL_USER_LIMIT} users, all in use"
+            409,
+            "TRIAL_USER_LIMIT_REACHED",
+            f"Your trial has {cap} people, its safety limit. Remove someone to invite another, or write to MDARIX "
+            "support to raise it.",
         )
     _limit_invitations(tenant_id, inviter, "invite")
     now = datetime.now(timezone.utc)
@@ -173,7 +238,9 @@ def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, disp
         from backend.app import mfa
 
         user = returning
+        before = {"persona": user.view_persona, "role": user.role}
         user.display_name, user.status, user.updated_at = name, "INVITED", now
+        user.role, user.view_persona = persona.role, persona.code
         user.password_hash = _hash(secrets.token_urlsafe(24))
         mfa.reset(db, user, now)  # they set up their authenticator again, as a new colleague does
         db.query(TenantMembership).filter(
@@ -187,12 +254,15 @@ def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, disp
             display_name=name,
             company=inviter.company,
             password_hash=_hash(secrets.token_urlsafe(24)),
-            role=TRIAL_USER_ROLE,
+            # The colleague's real role follows the persona the owner chose (0.10.73; it was Leader for everyone).
+            role=persona.role,
+            view_persona=persona.code,
             status="INVITED",
             email_verified=False,
             created_at=now,
             updated_at=now,
         )
+        before = {}
         db.add(user)
         db.flush()
         db.add(
@@ -214,18 +284,46 @@ def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, disp
             action="TRIAL_COLLEAGUE_INVITED",
             entity_type="AuthUser",
             entity_id=user.id,
-            details={"invited_user_id": str(user.id), "invited_again": returning is not None},
+            details={
+                "invited_user_id": str(user.id),
+                "invited_again": returning is not None,
+                "persona": persona.code,
+                "role": persona.role,
+            },
             created_at=now,
         )
     )
+    _audit_persona(db, tenant_id, inviter, user, persona, before, now, "invited")
     db.commit()
     return {
         "id": str(user.id),
         "business_id": user.business_id,
         "email": email,
         "display_name": name,
+        "persona": persona.code,
+        "role": persona.role,
         **_send_invitation(db, user, inviter.company, inviter.id, invited_by=_owner_name(inviter)),
     }
+
+
+def change_colleague_persona(db: Session, tenant_id, owner: AuthUser, user_id: uuid.UUID, persona_code: str) -> dict:
+    """The owner gives a colleague another persona, and with it its role (a colleague invited before 0.10.73 keeps
+    Leader until then). The owner's own is changed with "Viewing as" (POST /api/v1/me/persona), never here. Audited as
+    TRIAL_PERSONA_ASSIGNED; every route reads the new role at the colleague's next request."""
+    require_owner(db, tenant_id, owner, "Only the person who started this trial can change a colleague's persona")
+    persona = _colleague_persona(persona_code)
+    user = _colleague(db, tenant_id, owner, user_id, own="Change your own view with Viewing as, at the top")
+    if user.status not in SEATED_STATUSES:
+        raise _error(409, "NOT_ON_THE_TEAM", "This person is no longer on your trial team")
+    from backend.app.access.session import persona_of
+
+    before = {"persona": persona_of(db, user, False), "role": user.role}
+    if before["persona"] != persona.code or user.role != persona.role or user.view_persona != persona.code:
+        now = datetime.now(timezone.utc)
+        user.role, user.view_persona, user.updated_at = persona.role, persona.code, now
+        _audit_persona(db, tenant_id, owner, user, persona, before, now, "changed")
+        db.commit()
+    return {"id": str(user.id), "business_id": user.business_id, "persona": persona.code, "role": persona.role}
 
 
 def resend_colleague_invitation(db: Session, tenant_id, inviter: AuthUser, user_id: uuid.UUID) -> dict:

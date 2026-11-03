@@ -74,8 +74,9 @@ def test_the_sample_shows_an_import_run_its_set_aside_rows_lineage_and_reference
             params=[("code", "UNDER_INFUSION_NO_ALARM"), ("code", "PRESSURE_ALARM"), ("code", "NFF")],
         )
     )["links"]
-    assert [link["code"] for link in links["UNDER_INFUSION_NO_ALARM"]] == ["A14", "A16"]
-    assert [link["code"] for link in links["PRESSURE_ALARM"]] == ["A16"] and "NFF" not in links
+    # 0.10.77: IMDRF Release 2026's most specific terms (sample_imports.SAMPLE_IMDRF_LINKS).
+    assert [link["code"] for link in links["UNDER_INFUSION_NO_ALARM"]] == ["A1407", "A160102"]
+    assert [link["code"] for link in links["PRESSURE_ALARM"]] == ["A1601"] and "NFF" not in links
 
     profile = _ok(user.get(f"/api/v1/regulatory-reference/products/{complaint['product_id']}"))
     assert profile["gmdn_code"] is None and profile["udi_di"] == "04000000030010"

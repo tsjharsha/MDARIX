@@ -36,8 +36,12 @@ describe("dates", () => {
     expect(isDateOnly("2026-03-04")).toBe(true);
     expect(isDateOnly("2026-03-04T00:00:00Z")).toBe(false);
     expect(formatDay("2026-03-04")).toBe(
-      new Date(2026, 2, 4).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
+      new Date(2026, 2, 4).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }),
     );
+  });
+  it("shows one style per kind, whatever the browser's language (0.10.72): day month year, 24-hour time", () => {
+    expect(formatDay(new Date(2026, 10, 1, 22, 54))).toBe("1 Nov 2026");
+    expect(formatDateTime(new Date(2026, 10, 1, 22, 54))).toBe("1 Nov 2026, 22:54");
   });
 
   it("counts calendar days from today where the person is (DEV-020)", () => {

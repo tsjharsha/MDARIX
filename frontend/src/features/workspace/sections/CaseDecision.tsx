@@ -7,7 +7,7 @@ import { Drawer, Table, errorText, formatDate, listOf, send, useResource } from 
 import { safeText } from "../../../app/displayId";
 import { roleLabel, roleNote, WORKFLOW_ROLE_CODES } from "../../../app/roles";
 import { AiInterpretationNote, StatementKind } from "../../shared/StatementKind";
-import { usePanelFlag, usePanelState, useWorkspace, type SessionContext } from "../workspaceContext";
+import { useNavigation, usePanelFlag, usePanelState, useWorkspace, type SessionContext } from "../workspaceContext";
 import {
   aiDisclosure,
   briefLines,
@@ -111,6 +111,7 @@ export function CaseDecisionPanel({
   // Once a decision is signed, its summary above is what the case shows; a new decision is a deliberate second step.
   const [recordingNew, setRecordingNew] = useState(false);
   const current = data?.current_decision ?? null;
+  const navigation = useNavigation();
   const history = decisionHistory(data?.decisions, current);
   const reload = (text?: string) => {
     setMessage(text ? { text, tone: "warning" } : null);
@@ -168,7 +169,7 @@ export function CaseDecisionPanel({
         ) : (
           <p className="ac-muted">No decision has been signed on this investigation yet.</p>
         )}
-        {!brief && (
+        {!brief && navigation !== "new" && (
           <Empty
             title="No brief to decide on yet"
             detail="A decision is made on a Decision Brief that a quality reviewer accepted for decision. It appears here once accepted."
@@ -254,105 +255,113 @@ export function CaseDecisionPanel({
           </div>
         </Panel>
       )}
-      <Panel eyebrow="History" title="Decisions on this investigation">
-        <Table
-          caption="Decisions on this investigation"
-          rows={history}
-          rowKey={(row) => row.key}
-          empty={{
-            title: "No signed decisions yet",
-            detail:
-              "Each signed decision appears here. A new decision supersedes the previous one; both stay on record.",
+      {/* On the new navigation an empty history, follow-ups and impact assessments say nothing (0.10.72, B2): they
+          begin with the signed decision. */}
+      {(navigation !== "new" || history.length > 0) && (
+        <Panel eyebrow="History" title="Decisions on this investigation">
+          <Table
+            caption="Decisions on this investigation"
+            rows={history}
+            rowKey={(row) => row.key}
+            empty={{
+              title: "No signed decisions yet",
+              detail:
+                "Each signed decision appears here. A new decision supersedes the previous one; both stay on record.",
+            }}
+            columns={[
+              { key: "businessId", label: "Decision ID", render: (row) => <strong>{row.businessId}</strong> },
+              {
+                key: "outcome",
+                label: "Outcome",
+                render: (row) => <ToneBadge tone={row.outcomeTone} label={row.outcome} />,
+              },
+              {
+                key: "status",
+                label: "Status",
+                sortValue: (row) => row.status,
+                render: (row) => <ToneBadge tone={row.statusTone} label={row.status} />,
+              },
+              {
+                key: "signer",
+                label: "Signed by",
+                sortValue: (row) => row.signer ?? "",
+                render: (row) => (row.signer ? `${row.signer}${row.signerRole ? roleNote(row.signerRole) : ""}` : "—"),
+              },
+              {
+                key: "decidedAt",
+                label: "Signed",
+                sortValue: (row) => row.decidedAt ?? "",
+                render: (row) => formatDate(row.decidedAt),
+              },
+              {
+                key: "links",
+                label: "Supersedes / superseded by",
+                sortValue: (row) => row.supersededBy?.label ?? row.supersedes?.label ?? "",
+                render: (row) => (
+                  <span className="ca-person">
+                    {row.supersedes && (
+                      <small>
+                        Supersedes{" "}
+                        {row.supersedes.id ? (
+                          <button
+                            type="button"
+                            className="ac-link"
+                            onClick={() => setRecordId(String(row.supersedes?.id))}
+                          >
+                            {row.supersedes.label}
+                          </button>
+                        ) : (
+                          row.supersedes.label
+                        )}
+                      </small>
+                    )}
+                    {row.supersededBy && (
+                      <small>
+                        Superseded by{" "}
+                        {row.supersededBy.id ? (
+                          <button
+                            type="button"
+                            className="ac-link"
+                            onClick={() => setRecordId(String(row.supersededBy?.id))}
+                          >
+                            {row.supersededBy.label}
+                          </button>
+                        ) : (
+                          row.supersededBy.label
+                        )}
+                      </small>
+                    )}
+                    {!row.supersedes && !row.supersededBy && <span className="ac-muted">—</span>}
+                  </span>
+                ),
+              },
+              {
+                key: "record",
+                label: "",
+                render: (row) =>
+                  row.id ? (
+                    <button type="button" className="ac-link" onClick={() => setRecordId(String(row.id))}>
+                      Signed record
+                    </button>
+                  ) : null,
+              },
+            ]}
+          />
+        </Panel>
+      )}
+      {(navigation !== "new" || current || initialFollowUp) && (
+        <FollowUpsPanel investigationId={investigationId} initialFollowUp={initialFollowUp} reloadKey={signedKey} />
+      )}
+      {(navigation !== "new" || current || initialAssessment) && (
+        <ImpactAssessmentsPanel
+          investigationId={investigationId}
+          initialAssessment={initialAssessment}
+          onReopened={() => {
+            context.reload();
+            onCaseChanged?.();
           }}
-          columns={[
-            { key: "businessId", label: "Decision ID", render: (row) => <strong>{row.businessId}</strong> },
-            {
-              key: "outcome",
-              label: "Outcome",
-              render: (row) => <ToneBadge tone={row.outcomeTone} label={row.outcome} />,
-            },
-            {
-              key: "status",
-              label: "Status",
-              sortValue: (row) => row.status,
-              render: (row) => <ToneBadge tone={row.statusTone} label={row.status} />,
-            },
-            {
-              key: "signer",
-              label: "Signed by",
-              sortValue: (row) => row.signer ?? "",
-              render: (row) => (row.signer ? `${row.signer}${row.signerRole ? roleNote(row.signerRole) : ""}` : "—"),
-            },
-            {
-              key: "decidedAt",
-              label: "Signed",
-              sortValue: (row) => row.decidedAt ?? "",
-              render: (row) => formatDate(row.decidedAt),
-            },
-            {
-              key: "links",
-              label: "Supersedes / superseded by",
-              sortValue: (row) => row.supersededBy?.label ?? row.supersedes?.label ?? "",
-              render: (row) => (
-                <span className="ca-person">
-                  {row.supersedes && (
-                    <small>
-                      Supersedes{" "}
-                      {row.supersedes.id ? (
-                        <button
-                          type="button"
-                          className="ac-link"
-                          onClick={() => setRecordId(String(row.supersedes?.id))}
-                        >
-                          {row.supersedes.label}
-                        </button>
-                      ) : (
-                        row.supersedes.label
-                      )}
-                    </small>
-                  )}
-                  {row.supersededBy && (
-                    <small>
-                      Superseded by{" "}
-                      {row.supersededBy.id ? (
-                        <button
-                          type="button"
-                          className="ac-link"
-                          onClick={() => setRecordId(String(row.supersededBy?.id))}
-                        >
-                          {row.supersededBy.label}
-                        </button>
-                      ) : (
-                        row.supersededBy.label
-                      )}
-                    </small>
-                  )}
-                  {!row.supersedes && !row.supersededBy && <span className="ac-muted">—</span>}
-                </span>
-              ),
-            },
-            {
-              key: "record",
-              label: "",
-              render: (row) =>
-                row.id ? (
-                  <button type="button" className="ac-link" onClick={() => setRecordId(String(row.id))}>
-                    Signed record
-                  </button>
-                ) : null,
-            },
-          ]}
         />
-      </Panel>
-      <FollowUpsPanel investigationId={investigationId} initialFollowUp={initialFollowUp} reloadKey={signedKey} />
-      <ImpactAssessmentsPanel
-        investigationId={investigationId}
-        initialAssessment={initialAssessment}
-        onReopened={() => {
-          context.reload();
-          onCaseChanged?.();
-        }}
-      />
+      )}
       {recordId && <DecisionRecordDrawer key={recordId} decisionId={recordId} onClose={() => setRecordId(null)} />}
       {returning && brief && (
         <ReturnDrawer

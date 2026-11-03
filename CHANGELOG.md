@@ -10,6 +10,794 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.77] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): part C5 of Release C, "Codes", built to the owner-approved design (the
+report page's code fields). Codes change organizations on the **new** navigation (`tenants.navigation = new`); the
+classic navigation, and every pilot on it today, keeps its 0.10.58 report rules (a mapped code there is still "From
+record"). MDARIX never decides and never submits: the code the approved mapping suggests is confirmed or changed by the
+regulatory manager, and nothing reaches a form or a PDF unconfirmed.
+
+**Migration `tr16codelists`** (after `tr15canadamarket`; `tr03pmssources` stays reserved). It is expand-only:
+`imdrf_codes.status` and `status_note`; two shared reference tables, `reference_codes` and `code_list_files` (the
+runtime role only reads them); `products.basic_udi_di` and `emdn_code`; `product_registrations.risk_class`;
+`market_responsible_parties.srn`. No stored row changes. On legacy dedicated organization databases, run
+`scripts/add_workflow_tables_to_legacy_planes.py` (new step tr16). The API and web images change, and the image now
+carries the published code lists in `data/code_lists`.
+
+**Operators, in this order, each dry run first** (the code lists need the owner's explicit OK for production):
+
+1. `docker compose -f docker-compose.prod.yml run --rm migrate python scripts/load_code_lists.py` (dry run: checks
+   every file against `data/code_lists/manifest.json` and says what it would load), then the same with `--apply`. It
+   runs as the database owner. A second run loads nothing.
+2. `scripts/refresh_trial_story.py` (dry run), then `--apply`: re-records each running trial's sample IMDRF links to
+   Release 2026 and records SAMPLE-RV-09's frozen 3500A codes as confirmed (`backend/app/trial/sample_0_10_77.py`).
+   Idempotent.
+
+### Added: the published code lists
+
+Loaded only from the publishers' own files, byte for byte (`data/code_lists`, SHA-256 in `manifest.json`), by
+`scripts/load_code_lists.py`. Each file is checked whole before anything loads (its SHA-256, its columns, every code
+present and unique, every parent in the file) and a malformed file is refused. Nothing is ever deleted: a file that
+leaves out a loaded code is refused; a new version loads beside the old one, so old reports keep their codes.
+
+| List | Source | Version and date | Rows |
+|---|---|---|---|
+| IMDRF adverse event terminology, Annexes A-G | IMDRF, "Terminologies for Categorized Adverse Event Reporting (AER)" (imdrf.org), `imdrf-tech-ae-terminologies-n43-ReleaseNumber2026-Annexes-revisedJune.xlsx` | Release Number 2026; annexes approved January 2026; workbook revised June 2026 | A 491, B 34, C 160, D 45, E 812, F 82, G 307 (1,931; 15 retired, 31 headings "Not selectable") |
+| FDA CDRH adverse event codes, with FDA's IMDRF code per row (FDA's FDA-IMDRF mapping) | NCI EVS `FDA-CDRH_NCIt_Terminology_Subsets.txt`, the file FDA's "MDR Adverse Event Codes" page points to | NCIt 26.08e, posted 2 Sep 2026 | 1,885: device problem 487, clinical 784, health impact 81, component 299, type of investigation 31, findings 160, conclusion 43; every one maps to a code of IMDRF Release 2026 |
+| FDA product codes (product classification) | accessdata.fda.gov `foiclass.zip` | 2 Nov 2026 | 7,098 |
+| EMDN | European Commission, `EMDN v2026_EN.xlsx` (health.ec.europa.eu, "Download EMDN") | v.2026, file dated 25 Sep 2026 | 8,516 |
+
+- Annex E lists 202 terms a second time under another heading with the same code; each code is kept once, at its own
+  heading (the one its code starts with), which carries IMDRF's latest wording.
+- **GMDN is licensed and never loaded**: each product keeps the organization's own GMDN code.
+- **ISO 3166 country codes were already in MDARIX** (the imports' 249 alpha-2 codes): not loaded again.
+
+### Added: codes on reports (new navigation)
+
+- A code the approved mapping supplies is **"Suggested from your approved mapping"**: it counts as missing in the
+  mandatory-fields meter, Send for approval stays blocked, and it is **never frozen into a snapshot**, so it never
+  reaches the form or the PDF, until the regulatory manager **confirms** it or **changes** it. The report records
+  which (Confirmed, Changed from the suggestion, or Entered), what was suggested, who and when; the audit event names
+  the codes.
+- **The code picker**: search an annex by word (code, term or definition), or browse it heading by heading; each code
+  shows its definition and its FDA code. Retired codes are not offered, and IMDRF's "Not selectable" headings cannot be
+  chosen; a report that already holds a retired code keeps it.
+- **One choice fills both**: on the FDA's form every IMDRF code carries its FDA code from FDA's published mapping, for
+  example "A090807 High Readings (FDA 2459)".
+- **Required codes per form and report type** (starter, for your consultant to confirm): an initial 3500A needs the
+  device problem and both health effect codes (H6) and, as before, the conclusion code; the EU MIR needs Annex A, E and
+  F on every report and B, C, D and G in a final one; the GB MIR a code from every annex. The MvPI MDAE and Health
+  Canada's form have no code fields.
+- Device problem codes come from the problem-code mapping. Health effect codes are suggested where an approved mapping
+  of the assessment's harm code exists (none in the sample).
+
+### Added: Settings › Products
+
+- Each product's UDI-DI, **Basic UDI-DI**, GMDN code and term (your own), **EMDN code** (checked against the loaded
+  EMDN, its term shown); its **registrations per market**: the FDA product code (checked against FDA's
+  classification, its device name shown) with the 510(k), PMA or De Novo number, the notified or approved body and its
+  number, the Health Canada licence, the CDSCO licence, and the **risk class** in that market (US I-III; EU, NI and GB
+  I, IIa, IIb, III and IVD A-D; Canada I-IV; India A-D; starter, for your consultant to confirm).
+- The organization's **responsible parties** per market and role, with their **SRN**.
+- They fill the forms: the EU MIR's manufacturer SRN (1.3.2b), Basic UDI-DI (2.1c), nomenclature (2.2a/b: EMDN where
+  set, else GMDN), notified body number (2.3p) and risk class (2.4); GB's risk class; the MDAE's device class (A1);
+  Health Canada's device classification (C4 i).
+
+### Changed: the sample's codes (checked against IMDRF's own Release 2026 file)
+
+The addendum's check, against `imdrf-tech-ae-terminologies-n43-ReleaseNumber2026-Annexes-revisedJune.xlsx` (Release
+Number 2026): all four earlier links exist with their terms word for word, but each was a broad heading where the file
+holds the exact term, so each sample code now links to the most specific term that says what its complaint says, of
+release 2026 (sample mappings, still approved by the sample reviewer; `sample_imports.SAMPLE_IMDRF_LINKS`):
+
+| Sample problem code | Before (release 2025) | After (release 2026) |
+|---|---|---|
+| PRESSURE_ALARM | A16 Protective Measures Problem (level 1) | A1601 Device Alarm System (level 2) |
+| UNDER_INFUSION_NO_ALARM | A14 Infusion or Flow Problem; A16 Protective Measures Problem (level 1) | A1407 Insufficient Flow or Under Infusion (level 2); A160102 No Audible Alarm (level 3) |
+| FREE_FLOW_DOOR | A14 Infusion or Flow Problem (level 1) | A140502 Free or Unrestricted Flow (level 3) |
+| ALARM_VOLUME_LOW | A16 Protective Measures Problem (level 1) | A160103 Low Audible Alarm (level 3) |
+| SPO2_READING_HIGH (SAMPLE-RV-11) | A0908 Incorrect, Inadequate or Imprecise Result or Readings (level 2) | A090807 High Readings (level 3) |
+
+FLOW_ZERO_READING (RV-07), SPO2_DROPOUT_HARM (RV-01) and NFF keep no link, as before. SAMPLE-RV-09's accepted 3500A
+keeps the code it was approved with (A16), recorded as confirmed by the sample author; a new trial's RV-09 holds
+A160103, confirmed by the sample author before its snapshot.
+
+### Fixed
+
+- The trend sentence counts each lot: "lots 003 (4), 004 (4), 005 (1)" (it read "lots 003, 004 and 005").
+
+### Sample numbers and labels that change
+
+No deadline, signal, Readiness value or record count changes.
+
+| Where | Before | After |
+|---|---|---|
+| SAMPLE-RV-11's US report, once its US conclusion is signed reportable | 8 of 17 mandatory fields (9 to fill); H6 device problem code "A0908 …" from record | 7 of 19 (12 to fill): H6 "Suggested: A090807 High Readings (FDA 2459)", waiting to be confirmed; the two health effect codes now mandatory |
+| SAMPLE-RV-09's 3500A (acknowledged) | 17 of 17 | 19 of 19 (H6 clinical and impact "Entered in eSubmitter from the IMDRF Annex E/F release (sample)", as its conclusion code; H6 problem "Confirmed") |
+| SAMPLE-RV-07's EU MIR, SAMPLE-RV-10's MDAE | 8 of 24; 14 of 14 | unchanged |
+| Problem code beside a complaint (Complaints, the complaint page) | PRESSURE_ALARM: A16 Protective Measures Problem; RV-11: A0908 …; RV-06: A14 …, A16 …; RV-08: A14 …; RV-09: A16 … | A1601 Device Alarm System; A090807 High Readings; A1407 Insufficient Flow or Under Infusion, A160102 No Audible Alarm; A140502 Free or Unrestricted Flow; A160103 Low Audible Alarm |
+| Trend sentence (Home, Trends) | OrbitCare 300 Infusion Pump (Sample) Rev B: 9 complaints … lots 003, 004 and 005 | … lots 003 (3), 004 (4), 005 (2) |
+| 3500A section H note | H6 codes come from your approved IMDRF mappings of the complaint's problem code (Records > Reference data). | H6 codes are suggested from your approved IMDRF mappings of the complaint's problem code; you confirm or change each one in the code picker (IMDRF and FDA codes). |
+| A code field's status (new navigation) | From record | Suggested from your approved mapping · Confirmed · Changed from the suggestion · Entered by a person |
+| Settings tabs | 7 | 8: Products |
+
+### Tests
+
+- pytest: `tests/test_release_c5_0_10_77.py` (new, 11): the four published files parse and a malformed file is refused
+  (another SHA-256, a wrong header, a bad or misplaced code, a duplicate, a zip without foiclass.txt); the sample links
+  are Release 2026's codes and terms word for word, at their levels; a suggestion counts as missing and is never frozen;
+  the loaders load once and never delete (a second run finds 0 new, 0 changed; a file leaving out a loaded code is
+  refused); the picker searches by word, browses the annex and leaves out retired codes; nothing is filed unconfirmed,
+  one choice fills FDA and IMDRF, the approved PDF holds the confirmed code and the audit says confirmed, changed,
+  confirmed; a retired code stays on its report and cannot be chosen again; the required codes per report type hold
+  approval (EU MIR final: B, C, D); product identity is checked against the lists and fills the EU MIR; the trend
+  counts each lot; a running trial is re-recorded once (dry run, idempotent; 0.10.72's step does not add A0908 back).
+  Updated: `test_flagship_walkthrough.py` (it confirms the suggested code; still 21 main buttons, 44 actions),
+  `test_authority_reports_api.py`, `test_trial_import_reports.py`, `test_release_b_0_10_72.py` (the new links).
+- Targeted pytest run (this release, C1 to C4, Releases A and B, business permissions, alembic drift, the migration
+  chain, free trial, authority reports API, approval told, the flagship walk-through, import reports, regulatory
+  reference, import governance, record facts, trial story reads, sample story days, workspace trends): 181 passed.
+- vitest: `releaseC5077.test.tsx` (new, 6) and the files touched (releaseC2-C4, releaseB072, releaseA071,
+  ImportReports, authorityReports, linkTable, labels, tokens…): 13 files, 133 passed. tsc, ruff and prettier clean.
+- The loader, locally only: dry run, `--apply`, and a second dry run (0 new, 0 changed) on the test database.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.77-review` (`owner/`: Home's trend with lot counts, RV-11's
+  3500A with the suggested code, only missing, the picker browsing and searching, the code confirmed, RV-07's EU MIR
+  codes, RV-09's acknowledged 3500A, Settings › Products and adding a registration, RV-11's problem code; `colleague/`:
+  a locked Regulatory Leader sees "Confirmed by Asha Quality" and chooses a health effect code in Annex E, and Settings ›
+  Products read only; `classic/`: unchanged).
+
+## [0.10.76] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): part C4 of Release C, "New forms: EU MIR, Great Britain (MHRA) and
+Canada", built to the owner-approved design (its Decision trees and Reports). The three new forms are **starters, for
+your consultant to confirm**, on screen, in the PDF and here. They change organizations on the **new** navigation
+(`tenants.navigation = new`) only; the classic navigation, and every pilot on it today, keeps the US and India
+worksheets and its 0.10.58 report rules. MDARIX still never decides and never submits: a person signs each conclusion
+and each approval, and submits the report through the authority's own channel (EUDAMED or the national authority,
+MHRA's MORE portal, Health Canada).
+
+**Migration `tr15canadamarket`** (after `tr14reportcancelled`; `tr03pmssources` stays reserved). It is expand-only: the
+market check of `complaint_market_assessments` also allows `CA` (Canada). No stored row changes. On legacy dedicated
+organization databases, run `scripts/add_workflow_tables_to_legacy_planes.py` (new step tr15). The API and web images
+change. **Operators:** run `scripts/refresh_trial_story.py` (dry run first, then `--apply`) once after the upgrade: on
+the new navigation it creates the report of each signed reportable conclusion that has none, now for EU / NI, Great
+Britain and Canada too (`backend/app/trial/reports_0_10_75.py`). For the sample this is **SAMPLE-RV-07's EU MIR**
+(one per trial; a second run finds nothing). A trial approved after the upgrade gets it when its sample is staged.
+
+### Added: three forms, in the authority's own order (starters, for your consultant to confirm)
+
+| Market | Form | Source followed (read 3 Nov 2026) | Report types |
+|---|---|---|---|
+| EU / NI | EU Manufacturer Incident Report (MIR) | European Commission, MIR form for Serious Incidents (MDR/IVDR) v7.3.1, build SB-11154 (6 May 2026; mandatory from 1 May 2026), and its help text v7.3.1 | Initial · Follow up · Combined initial and final · Final (Reportable incident) · Final (Non-reportable incident) |
+| Great Britain | GB Manufacturer Incident Report (MHRA) | MHRA, GB MIR 7.2.1 (changelog 04/06/2025, its five GB schemas and help text), GB MIR and FSCA schema implementation guide (9 Jun 2025), Vigilance reporting requirements (5 Sep 2025) | the same five |
+| Canada | Health Canada mandatory medical device problem report | Mandatory Medical Device Problem Reporting Form for Industry, HC Pub. 110180 (April 2018); Incident reporting for medical devices: Guidance document (2021); SOR/98-282 ss. 59-61.1 (current to 2026-10-19) | Preliminary · Update · Final · Preliminary & Final |
+
+- Each form lists its sections and fields in the authority's numbering and order, its fixed lists (the report type,
+  the classification of the incident, the device's location, the reporter's role, Canada's device class…), and
+  **which fields are mandatory for which report type** (`Field.must_in`): for example the MIR's root cause, risk
+  assessment and Annex B, C, D and G codes only in a final report; Canada's preliminary report every section but E2
+  and E3, an update or final report only the starred fields (and E2, E3 in a final one). GB adds MHRA's own: the UK
+  Responsible Person, the UK approved body numbers, GMDN only, and a code from every IMDRF annex on every report; it
+  drops the EUDAMED numbers.
+- A run of address lines (street, number, PO box, city, postal code, contact names, e-mail, phone) is one field in
+  MDARIX. Patient and reporter fields keep their place and are never stored, as on the 3500A.
+- **The report type is a field**: a report starts as the form's first type (Initial; Preliminary); the person chooses
+  another, and the mandatory-fields meter follows it. A fixed list takes only one of its choices (422 `NOT_A_CHOICE`).
+- Pre-filled from the records where MDARIX holds the value: dates, description, device, lot, UDI-DI, GMDN, IMDRF codes
+  of your approved mapping, the classification of the incident from the signed conclusion's report type (2 days: a
+  serious public health threat; 10 days: death or an unanticipated serious deterioration; 15 days: all other), the
+  responsible parties and registrations of the market, and Canada's 10-day or 30-day classification.
+- They use C3's whole path: **created when a reportable conclusion is signed**, the meter, Send for approval blocked
+  until every mandatory field is filled, a second person's approval (or the practice label), **the PDF after approval
+  in the form's order**, cancelled by a later "not reportable". The PDF and the report page say "Starter form, for your
+  consultant to confirm" and the report's type.
+- The routes: EUDAMED or the national competent authority (EU / NI); MHRA's MORE portal (GB: MHRA accepts no other
+  route); Health Canada's Canada Vigilance by e-mail or fax.
+
+### Added: Canada's decision tree
+
+- A starter question set for **SOR/98-282 ss. 59-60** (`CA-starter-1`): sold in Canada; a failure, deterioration or
+  labelling inadequacy; death or serious deterioration, or could do so if it recurred; in Canada, or abroad for a
+  Class I device with corrective action intended or required. Report types: **10 days** (death or serious
+  deterioration), **30 days** (could if it recurred), **foreign: as soon as possible**. While question 3 is Unknown the
+  shorter 10 days applies (conservative). Calendar days, counted in your time zone, as the reporting windows already
+  in MDARIX do.
+- **Six worked complaints** in its test matrix: 6 of 6 pass. Intake's provisional clocks know Canada (10 or 30 days).
+- Canada is a market of the per-market assessment, shown where an organization has a Health Canada reporting window.
+- The EU / NI and GB trees were checked: unchanged, 5 of 5 worked complaints each pass.
+
+### Changed: Decision trees and Reports
+
+- **Decision trees shows every market's tree** (US MDR, EU / NI, Great Britain, India, Canada). A market outside the
+  organization's reporting windows says so: "Not in your reporting windows". Each tree says which report a reportable
+  outcome creates, and whether it is a starter form.
+- Reports' "Forms MDARIX prepares" lists the five forms, the three new ones marked "Starter, for your consultant to
+  confirm".
+- On the new navigation a reportable EU / NI, GB or Canada conclusion opens its report worksheet (the "record where
+  and when you reported" form stays on the classic navigation).
+
+### Fixed (C3 follow-ups)
+
+- "Waiting for my approval" listed the preparer's own report in a trial even when a colleague must approve it. It now
+  holds a report only for a person who may approve it (the same rule as the approve button).
+- An approval task about a report and Oversight's (and Home's) report deadline opened Complaints › Authority reports.
+  They open the report itself: its page on the new navigation, its panel on the classic one.
+
+### Sample numbers and labels that change
+
+No deadline, trend figure, signal or Readiness value changes. One sample record is added in each trial on the new
+navigation: SAMPLE-RV-07's EU MIR (its EU / NI conclusion was already signed reportable by the sample author).
+
+| Where | Before | After |
+|---|---|---|
+| Reports, SAMPLE-RV-07 (new) | no report; the market read "Worksheet comes later" | EU Manufacturer Incident Report (MIR) worksheet, a sample report prepared by the sample author: Created from the decision tree, **8 of 24** mandatory fields (16 to fill: the authority, the submission date, the next report's date, the submitter, the manufacturer's SRN and contact, the authorised representative, the risk class, the IMDRF Annex A, E and F codes, the device's location, the reporter's role, the preliminary results) |
+| Reports, Open reports (fresh trial) | 1 (SAMPLE-RV-10) | 2 (SAMPLE-RV-07, SAMPLE-RV-10) |
+| Home and Oversight, SAMPLE-RV-07's EU item | EU and Northern Ireland (EU MDR): reportable, the report is not started | EU Manufacturer Incident Report (MIR) worksheet: draft; it opens the report (same deadline, same owner) |
+| SAMPLE-RV-07's EU assessment (new navigation) | Filing reference and date | Open the report worksheet |
+| SAMPLE-RV-07's page, Related › Authority reports | — | EU and Northern Ireland (EU MDR) · EU Manufacturer Incident Report (MIR) worksheet · draft |
+| Decision trees, markets shown (sample) | US MDR, EU / NI, India | US MDR, EU / NI, Great Britain, India, Canada; Great Britain and Canada "Not in your reporting windows" |
+| Decision trees, each tree | — | "A reportable outcome creates the …" with "(starter, for your consultant to confirm)" for EU, GB, Canada |
+| Decision trees' footnote | … A reportable conclusion of the US or India creates its report. | … A reportable conclusion creates the market's report. |
+| Reports › Forms MDARIX prepares | United States, India ("In MDARIX today"); "EU and Northern Ireland, Great Britain: record where and when you reported…" | five forms, each with its title and edition; EU, GB, Canada "Starter, for your consultant to confirm" |
+| A report's highlights | — | "Initial report" (its type) and, for the new forms, "Starter form, for your consultant to confirm" |
+| Triage clocks with no reporting window | US, EU / NI, GB, India | the same and Canada (30 days unflagged, 10 flagged) |
+| Approval task for a report; Home and Oversight report items | open Complaints › Authority reports for the complaint | open the report itself |
+
+### Tests
+
+- pytest: `tests/test_release_c4_0_10_76.py` (new, 8): each form's order, report types, fixed lists and sources; the
+  mandatory fields per report type (EU MIR, GB MIR, Canada); the EU, GB and Canada trees' worked complaints and
+  Canada's conservative 10 days; SAMPLE-RV-07's EU MIR from staging through a type change, a refused choice, the meter's
+  block, the practice approval and the PDF in the form's section order with its starter line; a signed reportable
+  Canada conclusion creates the Health Canada report (Preliminary, "30-Day; Canadian"); every market's tree; the
+  classic navigation keeps US and India (409 `NO_WORKSHEET` for EU) and the refresh adds RV-07's report once (dry run,
+  idempotent); "Waiting for my approval" and the report links. Updated: `test_release_c3_0_10_75.py` (RV-07's own
+  creation audit), `test_intake_rules.py` (Canada's clock), `test_approval_told_api.py` (its two RV-06 tests failed on
+  0.10.75 already: C3's Send for approval waits for every mandatory field, so they fill them first; the bell line
+  opens the report).
+- Targeted pytest run (this release, C3, C2, C1, Releases A and B, authority reports API and rules, record facts,
+  business permissions, alembic drift, the migration chain, free trial, market assessments, decision guides, intake
+  rules, legal deadlines, link targets, approval told, Oversight, the flagship walk-through, standards, sample story
+  days, trial story reads): all pass after the updates above (first run 210 passed, 4 failed; the 4 rerun green).
+- vitest: `releaseC4076.test.tsx` (new, 4) and the files touched (releaseC3075, authorityReports, tasks, linkTable,
+  marketAssessment, reportingCapa, flagshipWalk, clickPaths, labels, tokens…): all pass. tsc, ruff and prettier clean.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.76-review` (`owner/`: the EU, GB and Canada trees, RV-07's EU
+  and RV-11's Canada paths, the Reports list and its forms, RV-07's EU MIR sent for approval, RV-11's Health Canada
+  report and its missing fields, RV-07's Related; `colleague/`: a locked Regulatory Leader's waiting list and the
+  EU MIR's approval; `approved/`: the EU MIR approved, PDF ready, and the forms card; `classic/`: unchanged).
+
+## [0.10.75] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): part C3 of Release C, "Decision trees and Reports for the US and
+India", built to the owner-approved design (its Decision trees, Reports and report page). It changes organizations on
+the **new** navigation (`tenants.navigation = new`); the classic navigation, and every pilot on it today, keeps its
+screens and its report rules. MDARIX still never decides and never submits: a person signs each conclusion and each
+approval, and submits the report through the authority's own channel.
+
+**Migration `tr14reportcancelled`** (after `tr13viewpersona`; `tr03pmssources` stays reserved). It is expand-only: the
+state check of `report_obligations` also allows `CANCELLED`. No stored row changes. On legacy dedicated organization
+databases, run `scripts/add_workflow_tables_to_legacy_planes.py` (new step tr14). The API and web images change.
+**Operators:** run `scripts/refresh_trial_story.py` (dry run first, then `--apply`) once after the upgrade: on the new
+navigation, each US or India conclusion signed reportable before the upgrade whose report was never started gets its
+report, as signing now does (`backend/app/trial/reports_0_10_75.py`). The sample's own reports fit the new status path
+as they are; nothing of the sample changes.
+
+### Added: Decision trees
+
+- **One tree per market** (US MDR, EU / NI, Great Britain, India: the markets the organization reports to), built from
+  the decision guides: the version in use (the organization's approved version, else MDARIX's starter, "for your
+  consultant to confirm"), its status (Approved or Starter), its **test matrix result** ("6 of 6 worked complaints
+  pass") and its questions in order, each with its clause.
+- **The path a complaint took:** each question with its answer (Yes, No, Unknown, Not applicable), its clause, then the
+  outcome: the signed conclusion with its report type and who signed it, or what the answers point to so far, "not
+  signed". The rail says what happens next and opens the report.
+- **A complaint's page opens its path:** Details has a "Decision path" line with one link per market
+  (`/app/decision-trees?market=US&complaint=<id>`).
+- `GET /api/v1/decision-trees` (`?complaint_id=` adds the paths). Read only, open to every member, as the guides and
+  assessments it reads.
+
+### Added: Reports, and a report created when its conclusion is signed
+
+- **Signing a market conclusion as reportable creates the market's report** (Form FDA 3500A for the US, the MvPI MDAE
+  form for India), pre-filled from the complaint, the product, the organization and the tree, in the same transaction
+  as the signature. **Only a signed conclusion**: saving answers creates nothing. **One report per market per
+  complaint**: signing reportable again keeps it.
+- **A later signed "not reportable" cancels a report not yet submitted** (a draft, a correction, or approved and not
+  submitted): its state is "Cancelled: not reportable", its reason kept on the report and in the audit trail
+  (`REPORT_CANCELLED`), its waiting approval tasks ended. It is never deleted; signing reportable again reopens it
+  (`REPORT_REOPENED_BY_CONCLUSION`). A submitted report stays as recorded.
+- **The status path:** Created from the decision tree · Mandatory fields complete · Sent for approval · Approved · PDF
+  ready · Submitted by you · Acknowledged, from the existing states, snapshots, approval, submissions and evidence.
+- **The mandatory-fields meter** comes from the form (its "must have before submission" fields, never a patient or
+  reporter field): 17 on the 3500A, 14 on the MDAE form. "Show only missing", and each field says where its value
+  comes from.
+- **Send for approval stays disabled until every mandatory field is filled**, with the reason beside it ("2 mandatory
+  fields missing"); the server refuses it too (422 `MANDATORY_FIELDS_MISSING`, naming the fields).
+- **The PDF after approval:** "Generate the PDF" appears once approved: the form's field order, with the approval on
+  its own last page (the existing worksheet export, stage 1's fonts). The server refuses a PDF or DOCX of a report not
+  approved (409 `APPROVE_FIRST`).
+- **The Reports tab:** List view (Open reports · Waiting for my approval · Submitted this month), six columns (Due ·
+  Report · Status · Mandatory fields · Market · Open), cards on a phone, and the forms MDARIX prepares. A report opens
+  on its own page in the record page's shape: the highlights (market, form, prepared by, due), the path, the form's
+  fields in order, and the rail: the next step (one main button), the approval (with "Practice approval: in a pilot a
+  colleague approves this" at its button when one approves alone), Generate the PDF, Who signs, and once "MDARIX never
+  submits to an authority" with each authority's channel.
+- On the new navigation, Complaints › Authority reports opens a report on that page and offers no working-draft
+  download; the complaint page's Related opens its report.
+
+### Fixed
+
+- `test_business_permissions.py::test_a_viewer_is_refused_on_every_guarded_route` was red only when the tests ran with
+  `MDARIX_FEATURE_SET=mvp`: the feature-set gate (since 13 Oct 2026) answers 404 for the parked routes before their
+  guard runs. No route answered 2xx to a Viewer. The test now checks the guards themselves (the gate has its own tests).
+- On a phone, a report's next step comes before its field list; on an approved report "Generate the PDF" is its one
+  main button.
+- On a phone, a list card's "What happened" (and an investigation's question) reads under its label at full width; it
+  was squeezed into the card's second column.
+- The complaint page's Related named a report by its form code ("FDA_3500A · draft"): it names the form.
+
+### Sample numbers and labels that change
+
+The sample data does not change. No deadline, trend figure, signal, Readiness value or record count changes.
+
+| Where | Before | After |
+|---|---|---|
+| Decision trees tab | "One decision tree per market" (where the questions are today) | each market's tree, version, status, test result and a complaint's path |
+| Reports tab | "Your reports are under Complaints › Reporting" | the list of reports with its three list views |
+| Sample US report, SAMPLE-RV-09 | Accepted | Acknowledged (status path), state Accepted |
+| Sample India report, SAMPLE-RV-10 | Draft: correction required | Mandatory fields complete (14 of 14), with "Draft: correction required" |
+| SAMPLE-RV-11's US report, once its US conclusion is signed reportable (new) | — | Created from the decision tree, 8 of 17 mandatory fields (9 to fill) |
+| Decision trees, the sample's US tree | — | Your version 2 · approved (the sample's own guide), 6 of 6 worked complaints pass; India: MDARIX starter, 3 of 3 |
+| After a reportable US/India conclusion is signed (new navigation) | Home and Oversight: "United States (FDA): reportable, the report is not started"; Reports: Not started | "Form FDA 3500A worksheet (eMDR): draft" (the report exists); the next step "Complete the United States (FDA) report (draft)" |
+| Complaint page, Related › Authority reports | United States (FDA) · FDA_3500A · draft | United States (FDA) · Form FDA 3500A worksheet (eMDR) · draft |
+| Complaint page, Details | — | Decision path: one link per market |
+| Decision trees guide line | One tree per market: the questions each complaint is walked through… | One tree per market. Each complaint is walked through it; a reportable outcome creates the report with its data. |
+| Reports guide line | Every authority report: its mandatory fields, its approval and its PDF. | Created automatically when a decision tree concludes "reportable". You complete, approve and generate the PDF; you submit it through the authority's own channel. |
+
+### Tests
+
+- pytest: `tests/test_release_c3_0_10_75.py` (new, 20): signing reportable creates exactly one report, pre-filled with
+  sources, and a draft creates none; Send for approval stays blocked until every mandatory field is filled; the PDF
+  only after approval, and alone in a trial the practice label shows; a colleague approves a report someone else
+  prepared (never the preparer); a "not reportable" re-sign cancels the unsubmitted report (approved, not submitted)
+  with its reason and audit, and reportable reopens it; the sample's reports fit the path; the classic navigation
+  keeps its rules and the refresh adds the report once (dry run, idempotent); the decision trees and a complaint's
+  path; every state's place on the path; the approval on its own last page. Updated:
+  `test_authority_reports_api.py` (its 0.10.58 lifecycle on the classic navigation),
+  `test_flagship_walkthrough.py` (the report is created on signing; still 21 main buttons, 44 actions),
+  `test_business_permissions.py` (the Viewer check).
+- vitest: `releaseC3075.test.tsx` (new, 11).
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.75-review` (`owner/`: the trees for the US, India and EU / NI
+  and SAMPLE-RV-11's path, the three report list views as Admin and as Regulatory Leader, the reports of RV-11
+  (created), RV-06 (sent for approval), RV-09 (acknowledged) and RV-10 (correction), RV-11's Decision path and
+  Related, the phone's complaint cards; `colleague/`: a locked Regulatory Leader's waiting list and approval;
+  `approved/`: RV-06 approved, PDF ready; `classic/`: unchanged).
+
+## [0.10.74] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): part C2 of Release C, "List views and record pages", built to the
+owner-approved design (its Complaints list, complaint record, Investigations and Records). It changes organizations on
+the **new** navigation (`tenants.navigation = new`); the classic navigation keeps its screens. Pilots keep their
+permissions; a pilot's Records also leads with the person's latest signed record.
+
+**No migration.** The API and web images change. No operator step: `scripts/refresh_trial_story.py` has nothing new to
+do (the sample does not change).
+
+### Added: list views
+
+- Every tab that lists records has one **List view** choice, the persona's own views first (the approved design's list)
+  and every other view under **More views**: the persona narrows the first choice, never what the person may open.
+
+  | Persona | Its list views on Complaints |
+  |---|---|
+  | Admin | All open complaints · Due this week · Second look · Reporting · Waiting for the reporter |
+  | Quality Leader | All open complaints · Due this week · Past target · Second look |
+  | Regulatory Leader | Reportability: decision needed · Authority reports · Legal clocks this week |
+  | Complaint Handler | To triage · Calls to check · Second look · Waiting for the reporter |
+  | Decision Maker | Waiting for my approval · Signed this month |
+
+  A persona without a Complaints tab that reaches it by a link gets Admin's.
+- Seven views are filters of the one complaint list, read on the server from the same dated items, reportability
+  watch, open requests and signatures as the complaint page, Home and Oversight (`GET /api/v1/complaints?work=1&view=`:
+  `open`, `due-week`, `legal-week`, `reportability`, `waiting-reporter`, `my-approval`, `signed-month`; an unknown
+  view is refused, 422 `UNKNOWN_LIST_VIEW`). Each shows **six columns** (Urgency · What happened · Product, version,
+  lot · Markets · Owner · Stage), **one row action** (Open) and **cards on a phone**, most urgent first ("Signed this
+  month": newest first). Each says what it holds beside the choice.
+  - Due this week: a deadline or target in the next seven days, not yet overdue (as Home counts it).
+  - Legal clocks this week: a reporting deadline or report obligation in the next seven days, or already past.
+  - Reportability: decision needed: a market whose reportability a person must still decide (the watch).
+  - Waiting for the reporter: a question still open with the reporter or a partner.
+  - Waiting for my approval: an authority report sent for approval that the person did not prepare; in a trial, their
+    own too, as practice ("Practice approval: in a pilot a colleague approves this" stays at the approve button).
+  - Signed this month: a market conclusion, disposition, report approval or ready to close signed since the first of
+    the month in the organization's time zone.
+- Stage 7's work queues (To triage, Calls to check, Due soon, Past target, Second look, Reporting, Authority reports,
+  Communications, Investigations, Dismissed, All complaints) are views in the same choice and keep their own screens.
+  Every former address still lands (`linkTable.json`: Complaints' views are its tabs).
+- **Investigations** lists every investigation (Open investigations · Assigned to me · All investigations; Due ·
+  Investigation · Product · Priority · Owner · Stage; Open). It opens on the list when no investigation is open; an
+  investigation opens with "Investigations ›" to return. The Investigator, who has no Complaints tab, now reaches the
+  list from their own tab. The list has its own address (`/app/investigations?step=All+investigations`).
+
+### Changed: the record page
+
+- **One complaint's page** in the approved design's shape:
+  - "Complaints › SAMPLE-RV-11" to return to the list;
+  - a **highlights panel**: the reference, product and version, what happened, the chips (harm, each market's
+    deadline, its state), Owner, Markets, Lot and Also known as;
+  - the **path**: the stage line (Triage · Market assessment · Investigation · Decision · Ready to close · Closed in the
+    QMS) as chevrons, done, now, later or not needed;
+  - **Details · Related · Activity**:
+    - Details: what happened, harm, problem (with its IMDRF term), awareness, the status in the QMS and the service
+      work; then each step with who signs it (open ones first), the owner, and Ready to close. Ready to close is
+      revealed on request until it is the next step or signed, so the page has one main button;
+    - Related: communications, market assessments, service work, investigation, authority reports and decision records,
+      each in plain lines with one way to open it, then what was signed and its decision record (PDF);
+    - Activity: the complaint's own audit events, newest first, in plain words, who and when; the record's received
+      and awareness time last, marked "from the complaint record" (the sample was loaded without audit events).
+      `GET /api/v1/oversight/events/{ref}/activity`; nothing but the time, the words, the person and the reason
+      leaves the server.
+  - a **right rail**: Next step (one main button), Legal clocks (a lane per market, its deadline in its own time zone,
+    "Starter rules, for your consultant to confirm"), Who signs the next step (and "never the person who prepared it"
+    where it applies) and the Service work.
+  - Release A's short story and intake summary and Release B's inline triage are kept as they were.
+  - The former sections' addresses open the section that holds them now: Summary and Decisions & actions on Details,
+    Evidence on Related, History on Activity.
+- **One investigation** has the same shape: highlights (the question, its product, the state, priority and due chips,
+  Owner, Complaints in scope, Lots in scope, Blocking the decision), its four sections as the path with the next step's
+  button, and the state changes beside them.
+
+### Changed: Records
+
+- Records leads with **the latest record the person signed**, for every organization, pilots included
+  (`GET /api/v1/oversight/latest-signed`, from the signed approval records, not invalidated): what it is, when, the
+  record it belongs to, its decision record to download and its page to open. In a trial, before the person signs
+  anything, the short story's intake decision summary leads as before.
+- After the short story is finished, its bar reads **"Story finished"** with "Back to the stories" (it read "Off the
+  story's path" with "Resume SAMPLE-RV-11").
+
+### Added: search on a phone
+
+- At phone width the top bar shows a search icon that opens the same search (complaints, products, reports) as a bar
+  under the top bar.
+
+### Fixed
+
+- `releaseB072.test.tsx` F2 read the source with its line endings and failed on a Windows (CRLF) checkout: it reads
+  them as LF. No behaviour change.
+- Font sizes on the design system's scale (`tokens.test.ts` failed on 0.10.73's Home: 11, 17, 22, 24, 26 and 30 px).
+
+### Sample numbers and labels that change
+
+The sample data does not change. No deadline, trend figure, signal, Oversight count, bell, Readiness value or record
+count changes.
+
+| Where | Before | After |
+|---|---|---|
+| Complaints, first view (new navigation) | To triage, for everyone | the persona's first: Admin and Quality Leader "All open complaints", Regulatory Leader "Reportability: decision needed", Complaint Handler "To triage", Decision Maker "Waiting for my approval" |
+| Complaints, view chooser | a row of 9 view buttons | one "List view" choice, 18 views |
+| Complaint page sections | Summary · Evidence · Decisions & actions · History | Details · Related · Activity |
+| Complaint page header | "Needs attention · Owner · Due · Stage" and the next action button | highlights (Owner · Markets · Lot · Also known as), the path, and the rail's Next step |
+| Complaint page, the stage list | "Stage by stage", revealed on request | the path, always shown |
+| Complaint page, coding and record details | revealed on request | in Details |
+| Investigations tab, no investigation open | "No investigation open · Open the investigations" | the list of investigations |
+| Records, first card | the intake decision summary (trial, story finished) | the latest signed record, else the intake decision summary |
+| Complaints' guide line | Choose a view: to triage, due soon, past target, reporting and more. | Choose a list view: your own views come first. |
+| Investigations' guide line | One investigation in four sections: … | Every investigation in one list; each opens in four sections: … |
+| Complaint page, triage as the next step | between the header and the sections | first in Details, beside the rail |
+| Story bar after the short story, off its record | Off the story's path · Resume SAMPLE-RV-11 | Story finished · Back to the stories |
+
+### Tests
+
+- pytest: `tests/test_release_c2_0_10_74.py` (new, 6): for SAMPLE-RV-06, RV-08 and RV-11 the record page shows the
+  same deadline, owner, stage and next step as the list views, Home's Oversight items and Oversight's event row, and
+  Related's groups; each list view holds exactly the complaints its rule names, most urgent first, and an unknown view is
+  refused; signing puts the complaint in "Signed this month", its Activity (plain words, newest first, nothing more) and
+  the person's latest signed record; Activity and the latest record stay in their organization.
+- vitest: `releaseC2074.test.tsx` (new, 11): each persona's views match the approved design, nothing lost; Complaints
+  opens on the persona's first view; six columns, one action, the phone's card layout; the investigations list and its
+  views; the record page's highlights, path, sections and rail agree with the work line; former addresses; Related and
+  Activity; the investigation's highlights; Records' latest signed record (a pilot too); "Story finished"; the phone's
+  search; the list's own address. Updated: `app/linkTable.test.ts`, `releaseB072.test.tsx`.
+- Targeted pytest run (this release's tests, the complaint page and list, Oversight, business permissions, alembic drift,
+  the migration chain, link targets, Releases A, B and C1, the flagship walk-through, free trial): 114 passed, 2 failed.
+  Neither is this release's: `test_business_permissions.py::test_a_viewer_is_refused_on_every_guarded_route` fails the
+  same way on 0.10.73 (nine routes answer 404 instead of 403, `POST /api/v1/regulatory/draft` first), and
+  `test_complaint_page.py` (SAMPLE-RV-06) passed on its own rerun (a deadline crossing a state boundary during the
+  11-minute run). vitest for the files touched: 33 files, 248 passed; tsc, ruff and prettier clean.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.74-review` (`owner/`: each persona's Complaints, two list views,
+  SAMPLE-RV-11, RV-06 and RV-08, Related, Activity, the investigations list and page, Records, the phone's search;
+  `colleague/`: a locked Regulatory Leader; `signed/`: after a signed US conclusion, Records, Activity, Related and
+  "Signed this month"; `classic/`: unchanged).
+
+## [0.10.73] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): part C1 of Release C, "The shell, personas and team", built to the
+owner-approved design. Organizations on the **new** navigation (`tenants.navigation = new`, every trial approved since
+0.10.71) get a new shell: a top bar with **Viewing as [persona]**, and a tab bar showing only that persona's
+destinations. Organizations on the classic navigation keep their screens exactly as they were. Pilots keep their
+permissions; a pilot user's tabs follow their real role.
+
+**Migration `tr13viewpersona`** (after `tr12sampleservice`; `tr03pmssources` stays reserved). It is expand-only: one
+nullable column, `auth_users.view_persona`. No existing row changes. On legacy dedicated organization databases, run
+`scripts/add_workflow_tables_to_legacy_planes.py` (new step tr13). The API and web images change. **Operators:** run
+`scripts/refresh_trial_story.py` (dry run first, then `--apply`) once after the upgrade. It changes the Free Trial
+plan's description ("up to 3 users" to "up to 50 people") and its licensed-user limit (3 to 50). The sample data does
+not change. New setting: `MDARIX_TRIAL_USER_CAP` (default 50; `docs/runbooks/ENVIRONMENT_VARIABLES.md`).
+
+### Added: the shell on the new navigation
+
+- **Top bar:** the MDARIX tile, the organization (in a trial: "Free trial · N days left"; it opens Getting started),
+  **one search** across complaints, products and reports, **Viewing as [persona ▾]**, the bell, Help and the avatar.
+  The avatar's menu holds Account, Settings, the admin console (customer administrators), Switch organization and Sign
+  out. A phone shows the tile, the persona and the avatar; the tabs scroll sideways.
+- **Tab bar:** Home, Complaints, Decision trees, Reports, Investigations, Trends, Records and Team, each persona showing
+  its own (below). **My work is Home.** Decision trees (`/app/decision-trees`) and Reports (`/app/reports`) are new
+  places. Until part C3 they say where the work is today: the reportability guides, and Complaints › Reporting.
+  Reports says once that MDARIX prepares, gets approved and records, and never submits to an authority.
+- **Every old address still lands** (`linkTable.json`). An address of a tab the persona does not show still opens: the
+  persona narrows the bar, not what the server lets the person open. On the classic navigation, `/app/decision-trees`
+  opens Complaints › Decision guides and `/app/reports` opens Complaints › Reports.
+- A trial on the new navigation opens on **Home**, not on Getting started. The sample event card is on Admin's Home.
+  Getting started stays one click away (the trial pill, Help, "More stories").
+
+### Added: personas, "Viewing as"
+
+| Persona | Tabs | Role behind it |
+|---|---|---|
+| Admin | all eight | the trial owner (role Leader, unchanged) |
+| Quality Leader | Home, Complaints, Reports, Investigations, Trends, Records | Leader |
+| Regulatory Leader | Home, Complaints, Decision trees, Reports, Records | Regulatory Reviewer |
+| Complaint Handler | Home, Complaints | PMS / Signal Triage Lead |
+| Investigator | Home, Investigations, Trends | Quality Investigator |
+| Risk Reviewer | Home, Investigations, Records | Risk Reviewer |
+| Decision Maker | Home, Complaints, Reports, Records | Authorized Decision Maker (Approver) |
+| Executive | Home, Trends, Records | Viewer |
+
+- **The persona changes what a person sees, never what they may sign.** Every route keeps its guard, and the persona
+  never reaches the server as a permission. The menu says so: "Changes what you see, not what you may sign."
+- **The trial owner's choice is kept on the server** (`auth_users.view_persona`). Their next sign-in, on any device,
+  opens on it. `POST /api/v1/me/persona` (the trial owner only, audited as `PERSONA_VIEW_CHANGED`, with the role
+  unchanged). Anyone else is refused with **403 `PERSONA_LOCKED`**.
+- **An invited colleague's persona is their real role**, shown with a lock ("set by the trial owner"). A pilot user's
+  persona follows their role (a customer administrator's is Admin).
+- The session context gives `persona`, `persona_label`, `persona_locked`, `persona_tabs` and `persona_options`.
+- The Regulatory Leader is a Regulatory Reviewer. That role already holds `regulatory.approve`, so the authority
+  reports' DECIDERS rule (`require_any_permission(REGULATORY_REVIEW, REGULATORY_APPROVE)`) lets them approve. A report's
+  approval still needs a second person: never its preparer (`standing`, unchanged).
+
+### Added: Home per persona
+
+- **Overdue · Due this week · At risk**, counted from the organization's own dated items (`/api/v1/oversight`, the
+  persona's categories) and the trend check's rising groups.
+- **Your next actions**, most urgent first, each with its reason, its owner and its deadline, opening its record.
+- **One sentence per rising trend**, with its comparison basis.
+- The Regulatory Leader's **legal clocks**, each market's deadline in its own time zone with a lane. The Executive's
+  **readiness line** ("N of M inspection checks clear").
+- Admin's Home (and the Quality Leader's) keeps Release A's **one-event card** with Release B's title and the short
+  story's four steps, and "Resume SAMPLE-RV-11" while it is unfinished. All of My work (tasks, approvals, requests,
+  queues, the team overview) stays below, revealed on request.
+
+### Changed: the trial team
+
+- **The 3-user limit is gone.** A trial has a **safety cap of 50 people** (`MDARIX_TRIAL_USER_CAP`). When the cap is
+  reached, the owner is told so plainly: "Your trial has 50 people, its safety limit. Remove someone to invite
+  another, or write to MDARIX support to raise it." (409 `TRIAL_USER_LIMIT_REACHED`, as before.)
+- The invitation takes the colleague's name, work e-mail and **persona**, and **the persona sets the colleague's real
+  role** (until now every colleague was a Leader). Admin is the owner's own (422 `PERSONA_NOT_FOR_COLLEAGUE`). A call
+  with no persona keeps Leader, as before.
+- The list shows each person's persona, locked for colleagues. The owner changes a colleague's persona, and with it
+  their role, after a confirmation (`POST /api/v1/trial/team/{user_id}/persona`, owner only). Every assignment and
+  change is audited as `TRIAL_PERSONA_ASSIGNED`, with the persona and role before and after.
+- **Running trials:** colleagues invited before 0.10.73 keep the role Leader (the Quality Leader persona) until the
+  owner changes their persona. Trial owners keep Leader. Nobody is made a Customer Administrator.
+- Classic navigation: Getting started › Team offers the same persona choice, because the server gives the colleague
+  that persona's role on either navigation.
+
+### Sample numbers and labels that change
+
+The sample data does not change. No deadline, trend figure, signal, Oversight count, bell, Readiness value or record
+count changes.
+
+| Where | Before | After |
+|---|---|---|
+| First screen of a trial on the new navigation | Getting started (the entrance), then My work | Home (Admin's: the sample event card) |
+| Menu, new navigation | My work, Complaints, Trends, Records; Settings, Team, Account at the top right | tabs Home … Team per persona; Settings and Account in the avatar's menu |
+| Guide paths, new navigation | My work › Team overview | Home › Team overview |
+| Team panel's eyebrow | 2 of 3 users | 2 people · up to 50 |
+| Invite button | Invite colleague | Send the invitation |
+| Trial full | All 3 trial seats are in use… | Your trial has 50 people, its safety limit… |
+| Sign-up and sign-in pages | up to 3 users and 5,000 uploaded rows | your whole team (up to 50 people) and 5,000 uploaded rows |
+| Free Trial plan description | … up to 3 users. | … up to 50 people. |
+| Trial status `limits.users`, team `limit` | 3 | 50 |
+| Next steps, People | Up to 3 users | Up to 50 people, each with the persona you choose |
+
+### Tests
+
+- pytest: `tests/test_release_c1_0_10_73.py` (new, 8). The personas match the approved design, each persona is a real
+  role. A fresh owner opens on Admin and the choice persists across sign-in, with the role and permissions unchanged
+  and the change audited. A colleague's role follows the persona and they cannot change it (403), nor anyone's. A
+  colleague invited without a persona keeps Leader. The owner's market sign route answers the same under all eight
+  personas, and a View-only colleague is refused by the role until the owner gives them one that may sign. The 4th
+  person is invited, the cap holds at its setting and is said plainly. The plan's refresh is idempotent. A pilot user
+  is locked. Updated: `test_free_trial.py` and `test_trial_self_admin.py` (their full-trial paths use a cap of 3),
+  `test_release_a_0_10_71.py` (the fresh sign-up opens on Admin), `test_business_permissions.py` (the new team route
+  is a reviewed exemption), `test_free_trial.py`'s trials overview (a trial's user limit reads 50).
+- Targeted pytest run (this release's tests, business permissions, alembic drift, the migration chain, free trial, the
+  trial's self-administration, Releases A and B, link targets, e-mails): 109 passed. `scripts/refresh_trial_story.py`
+  dry run on the test database names the plan's description and both entitlements' limit (3 -> 50).
+- vitest: `releaseC1073.test.tsx` (new, 13). The tabs per persona, the shell for the owner and for a locked colleague,
+  the classic navigation unchanged, the fresh trial on Home, the old addresses on the new shell, the switch, Home's
+  rules, the team's persona. Updated: `app/linkTable.test.ts`, `app/newPathText.test.ts`, `app/clickPaths.test.ts`,
+  `help/UserGuidePage.test.tsx`, `help/TrialGuidePage.test.tsx`.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.73-review` (`owner/`: each persona's Home, the menus, search,
+  Team, Decision trees, Reports; `colleague/`; `classic/`).
+
+## [0.10.72] - 2026-11-02
+
+On the trial maintenance line (`release/0.10`): Release B of the owner-approved "Simplicity and WoW" plan, "Show less,
+by default": one obvious next action on each screen, every consequential open obligation in sight, the rest revealed
+on request. No menu item or tab is added or moved. Organizations on the classic navigation keep their screens, except
+the plain fixes marked below. Pilots are otherwise unchanged.
+
+**No migration.** The API and web images change. **Operators:** run `scripts/refresh_trial_story.py` (dry run first,
+then `--apply`) once after the upgrade: it gives SAMPLE-RV-11's problem code its IMDRF term and corrects the sample
+guide's example text in running trials (below).
+
+### Changed: the market assessment asks only for judgement (B1) — for the consultant to confirm
+
+- The US and India assessments arrive with the **factual** answers the complaint record states, each with its source,
+  for the person to **Confirm** or **Correct it**: did a death occur, each serious-injury part (the record says no
+  serious injury), did the device malfunction; for India death and the serious criteria that mean a serious injury.
+  **Causation, recurrence ("what if it recurs"), remedial action, "unexpected", hospitalisation, congenital anomaly
+  and the market's conclusion are never pre-filled**, and the conclusion is no longer pre-selected: the suggestion is
+  marked beside it. A field the record leaves empty suggests nothing: Unknown is never read as No. A serious injury on
+  the record suggests no criterion (which one applies is a judgement). EU/NI and GB suggest nothing ("might have led
+  to" is a judgement). Starter rules, for the consultant to confirm.
+- Each answer keeps whether it was a **confirmed suggestion, a corrected suggestion or entered**, in the assessment's
+  answers (`origin`, the suggested answer and its source): on the signed record's content, on the signed version
+  ("Answers: 5 confirmed from the complaint record, 3 entered."), in the signature summary and in the audit trail
+  (`answer_origins` on `COMPLAINT_MARKET_ASSESSMENT_SAVED` and `COMPLAINT_MARKET_CONCLUSION_SIGNED`).
+- The training acknowledgements read in one line, "You have read: US guide v2, harm scale v1 · Read again", unless one
+  is missing. Definitions (with "Why am I asked?" and the organization's own explanation), the full harm scale and the
+  evidence ticks are behind **Show definition**, **Show scale** and **Show evidence**. The guide lock, the test matrix
+  and the signature summary are unchanged.
+
+### Changed: the investigation leads with what the decision rests on (B2)
+
+- Summary opens on the **leading explanation, the evidence for and against it, and what blocks the decision**, each
+  open item with its owner ("Investigation brief: waits for its quality review · Owner: A quality reviewer (not the
+  author)"). The scope versions and the lot impact are revealed on request.
+- One set of section controls: the progress line (the tabs repeated it).
+- The empty parts of Decisions & actions fold into one line, "Not started yet: …"; the next step, the part a link
+  asks for and a step that blocks the decision stay visible. An empty decision history, follow-ups and impact
+  assessments say nothing until the decision is signed.
+- The product, version, investigation and as-of selectors are behind **Change investigation** (on Trends: **Change
+  product or version**).
+
+### Changed: the complaint page (B3)
+
+- **Triage is done on the page:** when the triage record is the next step, its panel is on the complaint page and
+  stays there once saved. The next action reads "Complete the triage record" (it said "(on the triage list)").
+- One action per "What needs attention" row: **Send to** a colleague is behind the row's **⋯**, shown only when a
+  colleague may sign the step.
+- The problem coding, awareness, QMS status and MDARIX ID are behind **Coding and record details**; the stage list
+  behind **Stage by stage**. The legal clocks stay visible.
+
+### Changed: My work (B4)
+
+- **Your next step** says why it needs attention, its owner and its deadline. Below it, always visible: the reminders
+  and escalations, and **every task due soon or overdue** with its deadline and one Open.
+- Team numbers, and all my work (task views and filters, completed work, approvals, evidence requests, queues, team
+  overview) are revealed on request; a link to a part of My work opens them.
+
+### Changed: Trends (B5)
+
+- The trend check leads with **one sentence per rising group** ("OrbitCare 300 Infusion Pump (Sample) Rev B: 9
+  complaints against 1.0 expected (9.3×), lots 003, 004 and 005") and its comparison basis in one line, saying plainly
+  "Units not imported: compared by calendar days" where lot quantities are missing. The tiles, every group, the
+  grouping controls, the chart and the method are behind **All groups, the method and the chart**. The trend board
+  lists each group's recent lots (`lots`).
+
+### Changed: Records (B6)
+
+- Once the short story reaches its intake decision summary, Records opens on **the work you just finished**: the
+  intake decision summary of SAMPLE-RV-11, its decision record to **Download (PDF)**, and the summary to open and
+  print. Inspection readiness, documents, decision and CAPA records, the audit trail, signature verification and
+  exports are behind **All records**. With nothing just finished, Records opens as before.
+
+### Fixed: the short story's two correctness faults (F1, F2)
+
+- **F1:** "Confirm the route" saved the triage severity Negligible with no way to change it. Step 2 now shows "No harm
+  was reported" as the reporter's statement and "Effect on treatment: Unknown: asked of the hospital in step 3"; the
+  triage severity is an editable field with its proposal and basis, and nothing is saved until the person ticks "I
+  confirm the triage severity" (or chooses another level). The step lists exactly what the click records.
+- **F2:** step 3 took any later request with an owner and a reply date (a "When can the device be collected?" completed
+  it), and the summary always said "Not known until the hospital answers". Step 3 is now the request the screen
+  recorded, kept with the story (`POST /api/v1/trial/short-story/marks` `{"step": "question", "request_id": …}`, refused
+  `409 NOT_THE_QUESTION` otherwise; a trial recorded before 0.10.72 is read by the question's own wording). The
+  consequence follows that request: open, "Not known until the hospital answers"; answered, the answer and its date
+  with "Reassess each market's answers with it"; closed unanswered, still not known.
+
+### Fixed and added: the leftovers (addenda)
+
+- The investigation's scope names complaints and lots by **your references** (a long list reads "14 complaints ·
+  show") and hides empty lines (no more "None" under Markets, Failure modes, Period, Objectives). Plain fix: classic too.
+- **One number per thing:** the report list's "24 filled" beside a meter of "16 from your records" now both read "16
+  from your records · 8 entered"; the trend check's "the 2 groups checked" beside a "Groups checked 6" tile now says
+  "assessed".
+- **The same evidence listed twice**, and once as both supporting and contradicting, in a Decision Brief: the root
+  cause was the brief merging the case's own judgement with every hypothesis's links. A brief now lists the evidence
+  for and against the **leading** explanation, each piece once; an alternative's links stay on the alternative. Briefs
+  composed before keep their stored content (versioned, hashed); the investigation's Summary reads them by the same rule.
+- **Dates:** "1 Nov 2026" and "1 Nov 2026, 22:54" whatever the browser's language, as stage 5's rule says (an en-US
+  browser showed "Nov 1, 2026, 10:54 PM" beside "Tue 1 Dec 2026, 23:59 IST").
+- The organization's name in the top bar is in full from 1280 px; from 1280 to 1599 px the top-right buttons (Settings,
+  Team, Account, Sign out) show their icons, their names kept as tooltips and for screen readers.
+- The market tab reads "EU and Northern Ireland" (the label map), not "EU/NI"; an extra question reads "Extra 1".
+- Sample wording: the guide's example for question 2c no longer starts "Sample examples:" ("Your examples: Sample
+  examples: …"); the worksheet's front-page field reads "Manufacturer report number" ("Mfr report # Manufacturer report
+  number"). Running trials: through the refresh, the published guide version's approval re-recorded on its new
+  fingerprint. The sample's approved worksheet snapshots stay as frozen.
+- The first card reads "A hospital sent a monitor for service. Should Quality review this too?". The sample is
+  unchanged.
+- On My work, while "Resume SAMPLE-RV-11" shows, "Your next step" is a secondary button: one main button.
+- **Sample only on the approval:** the platform admin's approval dialog has a "Sample only" checkbox;
+  `POST /api/v1/platform-admin/trial-requests/{id}/approve` takes `{"sample_only": true}` (no body: as before). It
+  sets `tenants.sample_only` at creation; `TRIAL_REQUEST_APPROVED` records it.
+- SAMPLE-RV-11's problem code SPO2_READING_HIGH maps to IMDRF Annex A **A0908** "Incorrect, Inadequate or Imprecise
+  Result or Readings", the way the other sample codes are mapped (it showed raw).
+- Once the short story's intake decision summary is reached it leads the complaint page, and the rest folds under
+  **The full complaint record**.
+- "Continue the full evaluation" counts its progress from SAMPLE-RV-11's own checklist and records (the same server
+  response as the short story, `full_evaluation`), not from the screen that is open; off the record the bar still says
+  "Off the story's path".
+
+### The flagship walk-through
+
+From the entrance to ready to close: **54 actions before, 44 now** (each main button, each answer entered: choose it
+and type its rationale, two actions; each suggestion confirmed: one). 22 main buttons became 21 (triage on the
+page); the US and India answers took 32 actions and now take 23 (9 factual answers confirmed, 7 judgement answers
+entered).
+
+### Sample numbers and labels that change
+
+No deadline, trend figure, signal, Oversight count, bell, Readiness value or record count changes.
+
+| Where | Before | After |
+|---|---|---|
+| Entrance card | A hospital asked for recalibration. Should Quality review this too? | A hospital sent a monitor for service. Should Quality review this too? |
+| RV-11 market assessments | every answer empty | US 1, 2a, 2b, 2c, 4 and India 2a, 2b, 2d, 2f suggested from the record, to confirm |
+| RV-11 conclusion radio | pre-selected to the suggestion | not selected |
+| Market tab | EU/NI | EU and Northern Ireland |
+| Extra US question | 1. | Extra 1. |
+| RV-11 step 2 | Harm so far: Negligible: no harm was reported… | The reporter says "No harm was reported" · Effect on treatment: Unknown · Triage severity: Negligible (proposed, to confirm) |
+| RV-11 next action | Complete the triage record (on the triage list) | Complete the triage record |
+| RV-11 problem code | SPO2_READING_HIGH (raw) | mapped to A0908 |
+| Sample guide, 2c examples | Sample examples: a cut closed with sutures… | A cut closed with sutures… |
+| Worksheet front page | Mfr report # Manufacturer report number | Manufacturer report number |
+| Report list line | e.g. 24 filled | 16 from your records · 8 entered |
+| Trend check headline | Results allow for the 2 groups checked. | Results allow for the 2 groups assessed. |
+| Trend check lead | (none) | OrbitCare 300 Infusion Pump (Sample) Rev B: 9 complaints against 1.0 expected (9.3×), lots 003, 004 and 005 |
+| INV-001 scope | CMP000017, CMP000013, … (14 pills); LOT000003, LOT000004; None lines | 14 complaints · show (your references); SAMPLE-ORBIT-300-LOT-003, -004; no empty lines |
+| INV-001 brief (new trials) | supporting 4 entries (EVD000001, EVD000002 twice each), contradicting 1 (EVD000002) | supporting 2, contradicting 0 |
+| Dates (en-US browser) | Nov 1, 2026, 10:54 PM | 1 Nov 2026, 22:54 |
+
+### Tests
+
+- pytest: `tests/test_release_b_0_10_72.py` (new): the record's facts only, never a judgement question, never Unknown →
+  No, confirmed vs corrected recorded; F2 (an unrelated request, the question open, the question answered) and the
+  full evaluation's progress; the trend's lots and its one count; sample only on the approval; the sample corrections
+  and the refresh (dry run, apply, idempotent, the guide's approval re-recorded). `test_flagship_walkthrough.py`: the
+  walk with the record's suggestions confirmed, origins on the signed record and in the audit trail, the action count
+  (44, below 54). `test_decision_brief_unit.py`: evidence for and against the leading explanation, each once.
+- vitest: `releaseB072.test.tsx`, `releaseB072Screens.test.tsx` (new: each screen's default render, without its
+  revealed parts and with its required ones), `marketAssessment.test.tsx`, `releaseA071.test.tsx` (F1, the full
+  evaluation's bar), `app/dates.test.ts`, `scopeModel.test.ts`, `authorityReports.test.tsx`, `signalAi.test.tsx`,
+  `entrance.test.tsx`.
+- Screens at 1440 and 390, before and after, in `MDARIX-videos/site-0.10.72-review` (`before/`, `after/`).
+
 ## [0.10.71] - 2026-11-02
 
 On the trial maintenance line (`release/0.10`): Release A of the owner-approved "Simplicity and WoW" plan, "The first

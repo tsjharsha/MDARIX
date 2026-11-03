@@ -8,7 +8,9 @@ import {
   Building2,
   ClipboardList,
   FileSearch,
+  FileText,
   Gavel,
+  GitBranch,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -51,7 +53,7 @@ import { DashboardSection } from "./sections/Dashboard";
 import { ReadinessSection } from "./sections/Readiness";
 import { AlertsBell } from "./sections/Reminders";
 import { ColumnScopeProvider } from "../tables/ColumnChooser";
-import { MyWorkSection, NewMyWorkSection } from "./sections/MyWork";
+import { MyWorkSection } from "./sections/MyWork";
 import { ComplaintViews } from "./sections/ComplaintViews";
 import { ProductsSection } from "./sections/Products";
 import { ComplaintsSection } from "./sections/Complaints";
@@ -79,13 +81,26 @@ import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext
 import { signalFromSearch, signalLinkStart } from "./signals";
 import { zoneName } from "../../app/dates";
 import { PARKED_SECTIONS, featureSetOf, routeFor } from "../../app/featureSet";
-import { NEW_MENU, NEW_PLACES, OLD_VIEWS, navigationOf, placeLabel, placeOf } from "../../app/linkTable";
+import { NEW_MENU, NEW_PLACES, OLD_VIEWS, navigationOf, placeLabel, placeOf, tabParts } from "../../app/linkTable";
 import { TrendsSection } from "./sections/Trends";
 import { SettingsSection } from "./sections/Settings";
 import { TeamSection } from "./sections/Team";
 import { ComplaintPage } from "./sections/ComplaintPage";
+import { HomeSection } from "./sections/Home";
+import { DecisionTreesSection } from "./sections/DecisionTrees";
+import { ReportsSection } from "./sections/ReportsTab";
+import {
+  AvatarMenu,
+  GlobalSearch,
+  PERSONA_TABS,
+  PersonaSwitch,
+  TabBar,
+  tabOfSection,
+  visibleTabs,
+  type PersonaOption,
+} from "./HybridShell";
 import { StoryBar } from "./sections/Entrance";
-import { entranceSeen, savedStory, saveStory } from "./entrance";
+import { savedStory, saveStory } from "./entrance";
 import { carryOverColumnChoices, columnScopeFor } from "../tables/columnViews";
 import {
   addressFor,
@@ -247,6 +262,21 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
     guide: "",
     context: false,
   },
+  // Release C's tabs on the new navigation (0.10.73).
+  "Decision trees": {
+    icon: GitBranch,
+    description: "Is it reportable, and by when?",
+    guide:
+      "One tree per market. Each complaint is walked through it; a reportable outcome creates the report with its data.",
+    context: false,
+  },
+  Reports: {
+    icon: FileText,
+    description: "Authority reports",
+    guide:
+      'Created automatically when a decision tree concludes "reportable". You complete, approve and generate the PDF; you submit it through the authority\'s own channel.',
+    context: false,
+  },
 };
 
 /** The new navigation's menu lines and page purposes (0.10.68), where they differ from the classic ones. */
@@ -257,8 +287,7 @@ const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
   },
   Complaints: {
     description: "Every complaint, in views",
-    guide:
-      "One list of complaints. Choose a view: to triage, due soon, past target, reporting and more. Each complaint opens its own page.",
+    guide: "One list of complaints. Choose a list view: your own views come first. Each complaint opens its own page.",
   },
   Records: {
     description: "Readiness, documents, audit trail",
@@ -276,7 +305,7 @@ const NEW_NAV: Partial<Record<WorkspaceSection, { description: string; guide: st
   Investigations: {
     description: "One investigation, from its question to its decision",
     guide:
-      "One investigation in four sections: its summary, its evidence, its decisions and actions, and its history. The main button names the next step.",
+      "Every investigation in one list; each opens in four sections: its summary, its evidence, its decisions and actions, and its history. The main button names the next step.",
   },
 };
 
@@ -368,6 +397,12 @@ export function UserWorkspace({
     saveStory(key as Parameters<typeof saveStory>[0]);
     setStory(key);
   }, []);
+  // "Viewing as" (0.10.73, C1): the persona the server kept for this person, changed by the trial owner only.
+  const personaOptions: readonly PersonaOption[] = session?.persona_options ?? [];
+  const personaLocked = session?.persona_locked ?? true;
+  const [persona, setPersona] = useState<string>(() => session?.persona ?? "admin");
+  const personaOption = personaOptions.find((item) => item.code === persona);
+  const personaTabs = personaOption?.tabs ?? session?.persona_tabs ?? Object.keys(PERSONA_TABS);
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
   const [trial, setTrial] = useState<TrialStatus | null>(null);
   const [trialChecked, setTrialChecked] = useState(false);
@@ -454,8 +489,9 @@ export function UserWorkspace({
 
   // A free-trial user starts on Getting started, unless they followed a link to a specific screen. On the new
   // navigation that is the entrance the first time; a returning person starts on My work (stage 8).
+  // On the new navigation Home holds the sample event (0.10.73, C1): a fresh sign-up lands on Admin's Home.
   useEffect(() => {
-    if (trial?.is_trial && (initialView ?? "home") === "home" && !addressed && !(fresh && entranceSeen()))
+    if (trial?.is_trial && (initialView ?? "home") === "home" && !addressed && !fresh)
       setLocation((current) => (current.key === 0 ? { ...current, section: "Getting started" } : current));
   }, [trial?.is_trial]);
 
@@ -471,8 +507,9 @@ export function UserWorkspace({
   const caseResolving = work.caseLink?.state === "resolving";
   useEffect(() => {
     if (featureSet !== "mvp" || caseResolving) return;
-    const onCasePage = location.section === "Investigations";
     const tab = shown ?? location.tab;
+    // The new navigation's list of investigations (0.10.74) names no case, so its address reopens the list.
+    const onCasePage = location.section === "Investigations" && !(fresh && tabParts(tab).name === "All investigations");
     const next = addressFor({ section: location.section, tab, caseRef: onCasePage ? caseRef : null });
     const { pathname, search, hash } = window.location;
     const state: WorkspaceHistoryState = {
@@ -534,6 +571,22 @@ export function UserWorkspace({
   }, [visibleSections, location.section, trialChecked]);
 
   const tenantName = session?.current_tenant?.tenant_name ?? "Your organization";
+  const tabs = visibleTabs(personaTabs, visibleSections);
+  const choosePersona = async (code: string) => {
+    try {
+      const state = await requestJson<{ persona: string; persona_tabs: string[] }>("/api/v1/me/persona", {
+        method: "POST",
+        body: JSON.stringify({ persona: code }),
+      });
+      setPersona(state.persona);
+      const label = personaOptions.find((item) => item.code === state.persona)?.label ?? state.persona;
+      const current = tabOfSection(location.section);
+      if (current && !state.persona_tabs.includes(current)) open("My Work");
+      notify(`Viewing as ${label}. Saved for your next sign-in.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Your view could not be changed.", "critical");
+    }
+  };
   const api: WorkspaceApi = {
     session,
     work,
@@ -546,168 +599,259 @@ export function UserWorkspace({
     navigation,
     story,
     startStory,
+    persona,
+    personaLabel: personaOption?.label ?? session?.persona_label,
+    personaTabs,
   };
   const { section, tab } = location;
 
   return (
     <WorkspaceContext.Provider value={api}>
-      <div className="admin-console user-workspace">
-        <header className="ac-header">
-          <a className="app-skip" href="#app-main">
-            Skip to content
-          </a>
-          <button
-            type="button"
-            className="ac-menu-toggle"
-            aria-label={menuOpen ? "Close navigation" : "Open navigation"}
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((value) => !value)}
-          >
-            {menuOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-          <div className="ac-brand">
-            <i className="ac-brand-tile" aria-hidden="true">
-              M
-            </i>
-            <b className="ac-brand-word">MDARIX</b>
-          </div>
-          <div className="uw-tenant" title="Every screen shows only this organization's data">
-            <Building2 size={15} aria-hidden="true" />
-            <span>{tenantName}</span>
-          </div>
-          {trial?.is_trial && (
+      <div className={`admin-console user-workspace${fresh ? " uw-hybrid" : ""}`}>
+        {fresh && (
+          // The new navigation's shell (0.10.73, C1): the top bar, then only the persona's tabs.
+          <>
+            <header className="ac-header uw-top">
+              <a className="app-skip" href="#app-main">
+                Skip to content
+              </a>
+              <div className="ac-brand">
+                <i className="ac-brand-tile" aria-hidden="true">
+                  M
+                </i>
+                <b className="ac-brand-word">MDARIX</b>
+              </div>
+              {trial?.is_trial ? (
+                <button
+                  type="button"
+                  className="uw-org"
+                  title={`${tenantName}. ${TRIAL_DATA_NOTE}`}
+                  onClick={() => open("Getting started")}
+                >
+                  {tenantName} · Free trial · {trial.days_left} {trial.days_left === 1 ? "day" : "days"} left
+                </button>
+              ) : (
+                <span className="uw-org" title="Every screen shows only this organization's data">
+                  {tenantName}
+                </span>
+              )}
+              {/* One label for the trial's data (V5), as on the classic bar; PDFs carry a watermark. */}
+              {trial?.is_trial && (
+                <span className="ms-chip uw-sample-chip uw-top-sample" title={TRIAL_DATA_NOTE}>
+                  {(trial.sample?.complaints ?? 0) > 0 ? "Sample data" : "Practice records"}
+                </span>
+              )}
+              <GlobalSearch open={open} />
+              <PersonaSwitch
+                persona={persona}
+                options={personaOptions}
+                locked={personaLocked}
+                onChoose={(code) => void choosePersona(code)}
+              />
+              <span className="uw-top-bell">
+                <AlertsBell onOpen={() => open("My Work")} />
+              </span>
+              <HelpMenu
+                onGettingStarted={trial?.is_trial ? () => open("Getting started", "Your data") : undefined}
+                more={[
+                  ...(trial?.is_trial
+                    ? [
+                        {
+                          label: "The sample event and its stories",
+                          detail: "Getting started",
+                          onSelect: () => open("Getting started"),
+                        },
+                        { label: "Look ahead", detail: LOOK_AHEAD_SUBTITLE, onSelect: () => open("Look ahead") },
+                      ]
+                    : []),
+                  {
+                    label: "Share feedback",
+                    detail: "Tell us what to improve",
+                    onSelect: () => open("Share feedback"),
+                  },
+                ]}
+              />
+              <AvatarMenu
+                session={session}
+                current={section}
+                open={open}
+                onAdminConsole={onAdminConsole}
+                showSettings={visibleSections.includes("Settings")}
+              />
+            </header>
+            <TabBar tabs={tabs} current={tabOfSection(section)} open={open} />
+          </>
+        )}
+        {!fresh && (
+          <header className="ac-header">
+            <a className="app-skip" href="#app-main">
+              Skip to content
+            </a>
             <button
               type="button"
-              className="uw-trial-badge"
-              onClick={() => open("Getting started")}
-              aria-label={`Free trial, ${trial.days_left} ${trial.days_left === 1 ? "day" : "days"} left`}
+              className="ac-menu-toggle"
+              aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((value) => !value)}
             >
-              <span className="uw-trial-badge-long" aria-hidden="true">
-                Free trial · {trial.days_left} {trial.days_left === 1 ? "day" : "days"} left
-              </span>
-              <span className="uw-trial-badge-short" aria-hidden="true">
-                Trial · {trial.days_left}d
-              </span>
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-          )}
-          {/* One label for the trial's data (V5), instead of practice notes on seven screens; PDFs carry a watermark. */}
-          {trial?.is_trial && (
-            <span className="ms-chip uw-sample-chip" title={TRIAL_DATA_NOTE}>
-              {(trial.sample?.complaints ?? 0) > 0 ? "Sample data" : "Practice records"}
-            </span>
-          )}
-          <div className="ac-user">
-            {/* One line (0.10.70): the name and the role in a word; the whole role is the tooltip. */}
-            <span className="uw-who" title={`${session?.display_name ?? "User"}: ${rolesSummary(session)}`}>
-              <strong>{session?.display_name ?? "User"}</strong>
-              <small>{shortRoles(session)}</small>
-            </span>
-            {onAdminConsole && (
+            <div className="ac-brand">
+              <i className="ac-brand-tile" aria-hidden="true">
+                M
+              </i>
+              <b className="ac-brand-word">MDARIX</b>
+            </div>
+            <div className="uw-tenant" title="Every screen shows only this organization's data">
+              <Building2 size={15} aria-hidden="true" />
+              <span>{tenantName}</span>
+            </div>
+            {trial?.is_trial && (
               <button
                 type="button"
-                className="ac-secondary"
-                onClick={onAdminConsole}
-                aria-label="Admin console"
-                title="Back to customer administration"
+                className="uw-trial-badge"
+                onClick={() => open("Getting started")}
+                aria-label={`Free trial, ${trial.days_left} ${trial.days_left === 1 ? "day" : "days"} left`}
               >
-                <Settings2 size={16} aria-hidden="true" /> <span className="ac-hide-sm">Admin console</span>
+                <span className="uw-trial-badge-long" aria-hidden="true">
+                  Free trial · {trial.days_left} {trial.days_left === 1 ? "day" : "days"} left
+                </span>
+                <span className="uw-trial-badge-short" aria-hidden="true">
+                  Trial · {trial.days_left}d
+                </span>
               </button>
             )}
-            <SwitchOrganization />
-            <AlertsBell onOpen={() => open("My Work")} />
-            {/* The new navigation: Settings, Help, Team and Account at the top right (0.10.68). */}
-            {topSections
-              .filter((name) => name !== "My Account")
-              .map((name) => {
+            {/* One label for the trial's data (V5), instead of practice notes on seven screens; PDFs carry a watermark. */}
+            {trial?.is_trial && (
+              <span className="ms-chip uw-sample-chip" title={TRIAL_DATA_NOTE}>
+                {(trial.sample?.complaints ?? 0) > 0 ? "Sample data" : "Practice records"}
+              </span>
+            )}
+            <div className="ac-user">
+              {/* One line (0.10.70): the name and the role in a word; the whole role is the tooltip. */}
+              <span className="uw-who" title={`${session?.display_name ?? "User"}: ${rolesSummary(session)}`}>
+                <strong>{session?.display_name ?? "User"}</strong>
+                <small>{shortRoles(session)}</small>
+              </span>
+              {onAdminConsole && (
+                <button
+                  type="button"
+                  className="ac-secondary"
+                  onClick={onAdminConsole}
+                  aria-label="Admin console"
+                  title="Back to customer administration"
+                >
+                  <Settings2 size={16} aria-hidden="true" /> <span className="ac-hide-sm">Admin console</span>
+                </button>
+              )}
+              <SwitchOrganization />
+              <AlertsBell onOpen={() => open("My Work")} />
+              {/* The new navigation: Settings, Help, Team and Account at the top right (0.10.68). */}
+              {topSections
+                .filter((name) => name !== "My Account")
+                .map((name) => {
+                  const { icon: Icon } = NAV[name];
+                  return (
+                    <button
+                      type="button"
+                      key={name}
+                      className={section === name ? "ac-secondary selected uw-top-only" : "ac-secondary uw-top-only"}
+                      aria-current={section === name ? "page" : undefined}
+                      title={placeLabel(name, navigation)}
+                      onClick={() => open(name)}
+                    >
+                      <Icon size={16} aria-hidden="true" />{" "}
+                      <span className="ac-hide-sm">{placeLabel(name, navigation)}</span>
+                    </button>
+                  );
+                })}
+              <HelpMenu
+                onGettingStarted={trial?.is_trial ? () => open("Getting started", "Your data") : undefined}
+                more={
+                  fresh
+                    ? [
+                        ...(trial?.is_trial
+                          ? [{ label: "Look ahead", detail: LOOK_AHEAD_SUBTITLE, onSelect: () => open("Look ahead") }]
+                          : []),
+                        {
+                          label: "Share feedback",
+                          detail: "Tell us what to improve",
+                          onSelect: () => open("Share feedback"),
+                        },
+                      ]
+                    : []
+                }
+              />
+              {topSections.includes("My Account") && (
+                <button
+                  type="button"
+                  className={
+                    section === "My Account" ? "ac-secondary selected uw-top-only" : "ac-secondary uw-top-only"
+                  }
+                  aria-current={section === "My Account" ? "page" : undefined}
+                  title="Account"
+                  onClick={() => open("My Account")}
+                >
+                  <UserRound size={16} aria-hidden="true" /> <span className="ac-hide-sm">Account</span>
+                </button>
+              )}
+              <button
+                type="button"
+                className="ac-secondary uw-sign-out"
+                onClick={() => void signOut()}
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <LogOut size={16} /> <span className="ac-hide-sm">Sign out</span>
+              </button>
+            </div>
+          </header>
+        )}
+
+        <div className="ac-body">
+          {!fresh && (
+            <nav className={`ac-nav ${menuOpen ? "open" : ""}`} aria-label="Workspace navigation">
+              <p className="ac-nav-label">Workspace</p>
+              {menuSections.map((name) => {
                 const { icon: Icon } = NAV[name];
+                const { description } = navText(name, featureSet === "mvp", fresh);
                 return (
                   <button
                     type="button"
                     key={name}
-                    className={section === name ? "ac-secondary selected uw-top-only" : "ac-secondary uw-top-only"}
+                    className={section === name ? "selected" : ""}
                     aria-current={section === name ? "page" : undefined}
                     onClick={() => open(name)}
                   >
-                    <Icon size={16} aria-hidden="true" />{" "}
-                    <span className="ac-hide-sm">{placeLabel(name, navigation)}</span>
+                    <Icon size={18} aria-hidden="true" />
+                    <span>
+                      <strong>{placeLabel(name, navigation)}</strong>
+                      <small>{description}</small>
+                    </span>
                   </button>
                 );
               })}
-            <HelpMenu
-              onGettingStarted={trial?.is_trial ? () => open("Getting started", "Your data") : undefined}
-              more={
-                fresh
-                  ? [
-                      ...(trial?.is_trial
-                        ? [{ label: "Look ahead", detail: LOOK_AHEAD_SUBTITLE, onSelect: () => open("Look ahead") }]
-                        : []),
-                      {
-                        label: "Share feedback",
-                        detail: "Tell us what to improve",
-                        onSelect: () => open("Share feedback"),
-                      },
-                    ]
-                  : []
-              }
-            />
-            {topSections.includes("My Account") && (
-              <button
-                type="button"
-                className={section === "My Account" ? "ac-secondary selected uw-top-only" : "ac-secondary uw-top-only"}
-                aria-current={section === "My Account" ? "page" : undefined}
-                onClick={() => open("My Account")}
-              >
-                <UserRound size={16} aria-hidden="true" /> <span className="ac-hide-sm">Account</span>
-              </button>
-            )}
-            <button type="button" className="ac-secondary" onClick={() => void signOut()} aria-label="Sign out">
-              <LogOut size={16} /> <span className="ac-hide-sm">Sign out</span>
-            </button>
-          </div>
-        </header>
-
-        <div className="ac-body">
-          <nav className={`ac-nav ${menuOpen ? "open" : ""}`} aria-label="Workspace navigation">
-            <p className="ac-nav-label">Workspace</p>
-            {menuSections.map((name) => {
-              const { icon: Icon } = NAV[name];
-              const { description } = navText(name, featureSet === "mvp", fresh);
-              return (
-                <button
-                  type="button"
-                  key={name}
-                  className={section === name ? "selected" : ""}
-                  aria-current={section === name ? "page" : undefined}
-                  onClick={() => open(name)}
-                >
-                  <Icon size={18} aria-hidden="true" />
-                  <span>
-                    <strong>{placeLabel(name, navigation)}</strong>
-                    <small>{description}</small>
-                  </span>
-                </button>
-              );
-            })}
-            {/* On a phone the top-right screens (Settings, Team, Account) are in this menu, so the header fits. */}
-            {topSections.map((name) => {
-              const { icon: Icon } = NAV[name];
-              return (
-                <button
-                  type="button"
-                  key={`top-${name}`}
-                  className={section === name ? "selected uw-nav-top" : "uw-nav-top"}
-                  aria-current={section === name ? "page" : undefined}
-                  onClick={() => open(name)}
-                >
-                  <Icon size={18} aria-hidden="true" />
-                  <span>
-                    <strong>{placeLabel(name, navigation)}</strong>
-                  </span>
-                </button>
-              );
-            })}
-            <p className="ca-nav-scope">You see only {tenantName}'s data.</p>
-          </nav>
+              {/* On a phone the top-right screens (Settings, Team, Account) are in this menu, so the header fits. */}
+              {topSections.map((name) => {
+                const { icon: Icon } = NAV[name];
+                return (
+                  <button
+                    type="button"
+                    key={`top-${name}`}
+                    className={section === name ? "selected uw-nav-top" : "uw-nav-top"}
+                    aria-current={section === name ? "page" : undefined}
+                    onClick={() => open(name)}
+                  >
+                    <Icon size={18} aria-hidden="true" />
+                    <span>
+                      <strong>{placeLabel(name, navigation)}</strong>
+                    </span>
+                  </button>
+                );
+              })}
+              <p className="ca-nav-scope">You see only {tenantName}'s data.</p>
+            </nav>
+          )}
 
           <main
             className="ac-main"
@@ -722,8 +866,8 @@ export function UserWorkspace({
               </p>
             ) : (
               <>
-                {/* One complaint's page has its own header (sections/ComplaintPage.tsx). */}
-                {section !== "Complaint" && (
+                {/* One complaint's page has its own header (sections/ComplaintPage.tsx); so has Home (0.10.73). */}
+                {section !== "Complaint" && !(fresh && section === "My Work") && (
                   <div className="ac-page-head">
                     <div>
                       <p className="ac-eyebrow">{tenantName}</p>
@@ -735,9 +879,19 @@ export function UserWorkspace({
                     </div>
                   </div>
                 )}
-                {NAV[section].context && (!fresh || section === "Investigations" || section === "Trends") && (
-                  <ContextBar />
-                )}
+                {NAV[section].context &&
+                  (!fresh || section === "Investigations" || section === "Trends") &&
+                  (navigation === "new" ? (
+                    // The selectors are revealed on request on the new navigation (0.10.72, B2 and B5).
+                    <details className="uw-more uw-change-context">
+                      <summary>
+                        {section === "Investigations" ? "Change investigation" : "Change product or version"}
+                      </summary>
+                      <ContextBar />
+                    </details>
+                  ) : (
+                    <ContextBar />
+                  ))}
                 {/* A colleague the owner invited is greeted by name on their first screens (UX-26). */}
                 {trial?.is_trial && <ColleagueWelcome me={trial.me} />}
                 {trial?.is_trial && section !== "Share feedback" && (
@@ -765,7 +919,8 @@ export function UserWorkspace({
                       {section === "Getting started" && <GettingStartedSection focus={tab} />}
                       {section === "Readiness" && <ReadinessSection tab={tab} />}
                       {section === "Dashboard" && <DashboardSection />}
-                      {section === "My Work" && (fresh ? <NewMyWorkSection tab={tab} /> : <MyWorkSection tab={tab} />)}
+                      {section === "My Work" &&
+                        (fresh ? <HomeSection tab={tab} heading={heading} /> : <MyWorkSection tab={tab} />)}
                       {section === "Products" && <ProductsSection tab={tab} />}
                       {section === "Complaints" &&
                         (fresh ? <ComplaintViews tab={tab} /> : <ComplaintsSection tab={tab} />)}
@@ -786,6 +941,8 @@ export function UserWorkspace({
                       {section === "Settings" && <SettingsSection tab={tab} />}
                       {section === "Team" && <TeamSection onAdminConsole={onAdminConsole} />}
                       {section === "Complaint" && <ComplaintPage tab={tab} heading={heading} />}
+                      {section === "Decision trees" && <DecisionTreesSection />}
+                      {section === "Reports" && <ReportsSection />}
                     </div>
                   </SectionErrorBoundary>
                 </ColumnScopeProvider>

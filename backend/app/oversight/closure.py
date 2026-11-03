@@ -254,7 +254,7 @@ def checklist(found: dict) -> list[dict]:
     items = []
     # What to do next, one imperative per open item (the event summary's next action and the events list).
     actions: dict[str, str] = {
-        "TRIAGE": "Complete the triage record (on the triage list)",
+        "TRIAGE": "Complete the triage record",
         "FIRST_CONTACT": "Sign the first-contact check",
         "DECISION": "Sign the disposition",
         "TASKS": "Finish the open task in My Work",
@@ -322,7 +322,7 @@ def checklist(found: dict) -> list[dict]:
     started = {row.market for row in found["obligations"] if row.kind == "INITIAL"}
     unmet = []
     for row in found["obligations"]:
-        if row.state in report_rules.MET:
+        if row.state in report_rules.CLOSED:
             continue
         label, state = markets.MARKET_LABELS.get(row.market, row.market), report_rules.STATE_LABELS[row.state].lower()
         unmet.append(f"{label}: {state}")

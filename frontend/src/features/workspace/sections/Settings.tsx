@@ -14,6 +14,7 @@ import { DetectionRules } from "./DetectionRules";
 import { AttemptsSetting } from "./Communications";
 import { IMPORT_PATH, type ImportSetup } from "./ImportData";
 import { WhoCanChange } from "./Views";
+import { ProductIdentityPanel, ResponsibleParties } from "./ImportReports";
 
 export const SETTINGS_TABS = NEW_PLACES.Settings.tabs;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
@@ -27,6 +28,7 @@ export const SETTING_PERMISSIONS: Record<SettingsTab, readonly BusinessPermissio
   "Trend rules": ["signal.triage"],
   "Contact attempts": ["quality.review", "regulatory.approve"],
   "Import templates": ["records.write"],
+  Products: ["records.write"],
 };
 
 /**
@@ -49,6 +51,7 @@ export function SettingsSection({ tab }: { tab?: string }) {
       {active === "Trend rules" && <TrendRules />}
       {active === "Contact attempts" && <ContactAttempts />}
       {active === "Import templates" && <ImportTemplates />}
+      {active === "Products" && <ProductSettings />}
     </Tabs>
   );
 }
@@ -64,6 +67,18 @@ function SettingOwner({ tab }: { tab: SettingsTab }) {
     "records.write": useCan("records.write"),
   };
   return <WhoCanChange permissions={permissions} canChange={permissions.some((item) => granted[item])} />;
+}
+
+/** Settings › Products (0.10.77, C5): each product's identity and registrations per market, and the organization's
+ * responsible parties with their SRN; the report forms read them. */
+function ProductSettings() {
+  const { work } = useWorkspace();
+  return (
+    <>
+      <ProductIdentityPanel products={work.products} title="Products: identity and registrations" />
+      <ResponsibleParties />
+    </>
+  );
 }
 
 function WorkingCalendar() {

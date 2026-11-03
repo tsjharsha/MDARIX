@@ -314,15 +314,22 @@ def hypotheses_rows(db: Session, case) -> tuple[list[dict], list[dict]]:
     return items, considered_links
 
 
-def evidence_for_and_against(rows: list[dict], links: list[dict]) -> tuple[list[dict], list[dict]]:
-    """Supporting and contradicting evidence: the case's own judgement of its evidence, then the evidence linked to the
-    hypotheses still considered."""
-    supporting: list[dict] = []
-    contradicting: list[dict] = []
+def evidence_for_and_against(
+    rows: list[dict], links: list[dict], leading: str | None = None
+) -> tuple[list[dict], list[dict]]:
+    """Supporting and contradicting evidence, for and against the leading explanation, each piece of evidence once.
+
+    The case's own judgement of its evidence, then the links to the leading hypothesis (``leading``, its business ID),
+    which replace the case's judgement of the same evidence (they say why). A link to another hypothesis stays on that
+    hypothesis (0.10.72: listed here, the same evidence read twice, and as both supporting and contradicting, when it
+    supports the leading explanation and contradicts an alternative). Without a leading hypothesis every link counts,
+    the first one per evidence."""
+    found: dict[str, tuple[str, dict]] = {}
     for row in rows:
-        target = {"SUPPORTING": supporting, "CONTRADICTING": contradicting}.get(row["relationship"])
-        if target is not None:
-            target.append(
+        side = {"SUPPORTING": "for", "CONTRADICTING": "against"}.get(row["relationship"])
+        if side is not None:
+            found[row["business_id"]] = (
+                side,
                 {
                     "source": "CASE",
                     "evidence_business_id": row["business_id"],
@@ -331,22 +338,29 @@ def evidence_for_and_against(rows: list[dict], links: list[dict]) -> tuple[list[
                     "hypothesis_business_id": None,
                     "rationale": None,
                     "linked_by": "HUMAN",
-                }
+                },
             )
     for link in links:
-        target = {"support": supporting, "contradict": contradicting}.get(link["relation"])
-        if target is not None:
-            target.append(
-                {
-                    "source": "HYPOTHESIS",
-                    "evidence_business_id": link["evidence_business_id"],
-                    "title": link["title"],
-                    "review_status": None,
-                    "hypothesis_business_id": link["hypothesis_business_id"],
-                    "rationale": link["rationale"],
-                    "linked_by": link["linked_by"],
-                }
-            )
+        side = {"support": "for", "contradict": "against"}.get(link["relation"])
+        key = link["evidence_business_id"]
+        if side is None or (leading and link["hypothesis_business_id"] != leading):
+            continue
+        if key in found and found[key][1]["source"] == "HYPOTHESIS":
+            continue
+        found[key] = (
+            side,
+            {
+                "source": "HYPOTHESIS",
+                "evidence_business_id": key,
+                "title": link["title"],
+                "review_status": None,
+                "hypothesis_business_id": link["hypothesis_business_id"],
+                "rationale": link["rationale"],
+                "linked_by": link["linked_by"],
+            },
+        )
+    supporting = [item for side, item in found.values() if side == "for"]
+    contradicting = [item for side, item in found.values() if side == "against"]
     return supporting[:EVIDENCE_MAX], contradicting[:EVIDENCE_MAX]
 
 
@@ -580,7 +594,7 @@ def compose(db: Session, control_db, case, *, now: datetime, ai_draft_used: bool
     rows = read("evidence", lambda session: evidence_rows(session, case), [])
     hypotheses, links = read("hypotheses", lambda session: hypotheses_rows(session, case), ([], []))
     leading = rules.leading_hypothesis(hypotheses)
-    supporting, contradicting = evidence_for_and_against(rows, links)
+    supporting, contradicting = evidence_for_and_against(rows, links, (leading or {}).get("business_id"))
     reviews = read("reviews", lambda session: latest_reviews(session, control_db, case), {})
     executions = read("ai executions", lambda session: ai_executions(session, case), [])
     content = {

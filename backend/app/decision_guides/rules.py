@@ -34,7 +34,7 @@ LOCKED = ("text", "definition", "note", "clause", "basis")
 OWN = ("explanation", "examples")
 EXTRA_MAX, TESTS_MAX, NAME_MAX = 10, 30, 160
 REASON_MIN = 10
-PREFIX = {markets.US: "US", markets.EU_NI: "EU", markets.GB: "GB", markets.IN: "IN"}
+PREFIX = {markets.US: "US", markets.EU_NI: "EU", markets.GB: "GB", markets.IN: "IN", markets.CA: "CA"}
 EXPECTED = (markets.REPORTABLE, markets.NOT_REPORTABLE, markets.PENDING)
 _EXTRA_ID = re.compile(r"^X\d{1,2}$")
 
@@ -445,6 +445,42 @@ STARTER_TESTS: dict[str, list[dict]] = {
         _test(
             "Whether it needed hospitalisation is unknown: pending information (Unknown is never No)",
             _answers(markets.IN, "NO", IN1="YES", IN2C="UNKNOWN"),
+            markets.PENDING,
+        ),
+    ],
+    # Canada (0.10.76, C4): starter worked complaints for SOR/98-282 ss. 59-60, for the consultant to confirm.
+    markets.CA: [
+        _test(
+            "A death in Canada after a device failure: the 10-day report",
+            _answers(markets.CA, "NO", CA1="YES", CA2="YES", CA3="YES", CA5="YES", CA6="NOT_APPLICABLE"),
+            markets.REPORTABLE,
+            "CA_10_DAY",
+        ),
+        _test(
+            "A failure in Canada, no harm, that could cause serious deterioration if it recurred: the 30-day report",
+            _answers(markets.CA, "NO", CA1="YES", CA2="YES", CA4="YES", CA5="YES", CA6="NOT_APPLICABLE"),
+            markets.REPORTABLE,
+            "CA_30_DAY",
+        ),
+        _test(
+            "An incident abroad, Class I, corrective action told to that country's regulator: as soon as possible",
+            _answers(markets.CA, "NO", CA1="YES", CA2="YES", CA3="YES", CA6="YES"),
+            markets.REPORTABLE,
+            "CA_FOREIGN",
+        ),
+        _test(
+            "An incident abroad with no corrective action intended or required: not reportable",
+            _answers(markets.CA, "NO", CA1="YES", CA2="YES", CA3="YES"),
+            markets.NOT_REPORTABLE,
+        ),
+        _test(
+            "A failure in Canada that could not cause serious deterioration: not reportable",
+            _answers(markets.CA, "NO", CA1="YES", CA2="YES", CA5="YES", CA6="NOT_APPLICABLE"),
+            markets.NOT_REPORTABLE,
+        ),
+        _test(
+            "Whether the patient's health seriously deteriorated is unknown: pending information (Unknown is never No)",
+            _answers(markets.CA, "NO", CA1="YES", CA2="YES", CA3="UNKNOWN", CA5="YES", CA6="NOT_APPLICABLE"),
             markets.PENDING,
         ),
     ],

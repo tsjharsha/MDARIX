@@ -8,6 +8,7 @@ so a failure never leaves a half-built workspace with a live activation link.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import secrets
 import uuid
@@ -40,18 +41,36 @@ from backend.app.runtime_env import is_development
 
 FREE_TRIAL_PLAN = "FREE_TRIAL"
 TRIAL_DAYS = 30
-TRIAL_USER_LIMIT = 3
+# A trial invites as many colleagues as it needs (0.10.73, C1; it was 3). The cap is a safety net against misuse, set
+# by MDARIX_TRIAL_USER_CAP (default 50), and the trial owner is told plainly when it is reached.
+TRIAL_USER_CAP_DEFAULT = 50
 TRIAL_ROW_LIMIT = 5000
 TRIAL_FILE_LIMIT_BYTES = 2 * 1024 * 1024
 TRIAL_INVITATION_TTL_SECONDS = INVITATION_SECONDS
 # The requester works in the workspace (not the admin console), so they get a workspace role.
 TRIAL_USER_ROLE = "Leader"
-TRIAL_LIMITS = {
-    "licensed_users_limit": TRIAL_USER_LIMIT,
-    "customer_admin_limit": 0,
-    "trial_days": TRIAL_DAYS,
-    "upload_row_limit": TRIAL_ROW_LIMIT,
-}
+
+
+def trial_user_cap() -> int:
+    """The most people a free trial may have (MDARIX_TRIAL_USER_CAP, a whole number from 1; default 50)."""
+    try:
+        value = int((os.getenv("MDARIX_TRIAL_USER_CAP") or "").strip() or TRIAL_USER_CAP_DEFAULT)
+    except ValueError:
+        return TRIAL_USER_CAP_DEFAULT
+    return value if value >= 1 else TRIAL_USER_CAP_DEFAULT
+
+
+def trial_limits() -> dict:
+    return {
+        "licensed_users_limit": trial_user_cap(),
+        "customer_admin_limit": 0,
+        "trial_days": TRIAL_DAYS,
+        "upload_row_limit": TRIAL_ROW_LIMIT,
+    }
+
+
+def plan_description() -> str:
+    return f"{TRIAL_DAYS}-day evaluation: sample data, CSV templates, up to {trial_user_cap()} people."
 
 
 def _error(status: int, code: str, message: str) -> HTTPException:
@@ -129,7 +148,7 @@ def _free_trial_plan(db: Session, now: datetime) -> PlanDefinition:
         id=uuid.uuid4(),
         code=FREE_TRIAL_PLAN,
         name="Free Trial",
-        description=f"{TRIAL_DAYS}-day evaluation: sample data, CSV templates, up to {TRIAL_USER_LIMIT} users.",
+        description=plan_description(),
         version="v1",
         status="ACTIVE",
         effective_from=now,
@@ -145,13 +164,34 @@ def _free_trial_plan(db: Session, now: datetime) -> PlanDefinition:
                 plan_id=plan.id,
                 feature_code=feature,
                 enabled=True,
-                limits=dict(TRIAL_LIMITS),
+                limits=trial_limits(),
                 status="ACTIVE",
                 created_at=now,
                 updated_at=now,
             )
         )
     return plan
+
+
+def refresh_plan_limits(db: Session, apply: bool) -> list[str]:
+    """The Free Trial plan made before 0.10.73 says "up to 3 users" and holds a licensed-user limit of 3: what changes
+    to read the cap (scripts/refresh_trial_story.py); with ``apply`` it is changed (the caller commits). Idempotent."""
+    from backend.app.db.models.foundation import FeatureEntitlement
+
+    changes: list[str] = []
+    cap = trial_user_cap()
+    for plan in db.query(PlanDefinition).filter(PlanDefinition.code == FREE_TRIAL_PLAN).all():
+        if plan.description != plan_description():
+            changes.append(f"the plan's description ({plan.description!r} -> {plan_description()!r})")
+            if apply:
+                plan.description = plan_description()
+        for item in db.query(FeatureEntitlement).filter(FeatureEntitlement.plan_id == plan.id).all():
+            limits = dict(item.limits or {})
+            if "licensed_users_limit" in limits and limits["licensed_users_limit"] != cap:
+                changes.append(f"{item.feature_code}'s licensed users ({limits['licensed_users_limit']} -> {cap})")
+                if apply:
+                    item.limits = {**limits, "licensed_users_limit": cap}
+    return changes
 
 
 def _trial_tenant_key(organization: str) -> str:
@@ -366,7 +406,7 @@ def _send_invitation(
             token,
             organization,
             ends_on=ends_on,
-            users=TRIAL_USER_LIMIT,
+            users=trial_user_cap(),
             rows=TRIAL_ROW_LIMIT,
             **colleague,
         )
@@ -455,7 +495,7 @@ def retry_invitation(db: Session, request_id) -> str:
     return delivery
 
 
-def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict:
+def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser, *, sample_only: bool = False) -> dict:
     now = datetime.now(timezone.utc)
     row = db.query(OnboardingRequest).filter(OnboardingRequest.id == request_id).with_for_update().first()
     if row is None:
@@ -473,6 +513,8 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         # A new free trial starts on the new navigation (0.10.71, A1), set here and not by the column's default, so
         # existing organizations and pilots keep theirs; Tenant 360 still switches it either way.
         tenant.navigation = "new"
+        # "Sample only" chosen on the approval (0.10.72): every import route refuses (refuse_sample_only).
+        tenant.sample_only = sample_only
         db.add(customer)
         db.add(tenant)
         db.flush()
@@ -594,6 +636,7 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
                     "trial_user_id": str(user.id),
                     "expires_at": subscription.expires_at.isoformat(),
                     "sample_data": sample,
+                    "sample_only": sample_only,
                 },
                 created_at=now,
             )

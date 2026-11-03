@@ -11,6 +11,7 @@ from datetime import date, datetime, timedelta
 DRAFT, CORRECTION, APPROVED = "DRAFT", "CORRECTION_REQUIRED", "APPROVED"
 PENDING, ACCEPTED, NO_ACK = "SUBMITTED_PENDING", "ACCEPTED", "SUBMITTED_NO_ACK"
 FOLLOW_UP, COMPLETE = "FOLLOW_UP_DUE", "COMPLETE"
+CANCELLED = "CANCELLED"
 NOT_STARTED, NO_WORKSHEET = "NOT_STARTED", "NO_WORKSHEET"
 STATE_LABELS = {
     NOT_STARTED: "Not started",
@@ -23,6 +24,7 @@ STATE_LABELS = {
     NO_ACK: "Submitted, no acknowledgement expected",
     FOLLOW_UP: "Follow-up due",
     COMPLETE: "Complete",
+    CANCELLED: "Cancelled: not reportable",
 }
 # The order the screen shows the steps in.
 STEPS = (DRAFT, APPROVED, PENDING, ACCEPTED, COMPLETE)
@@ -31,6 +33,21 @@ SUBMITTED = (PENDING, ACCEPTED, NO_ACK, FOLLOW_UP, COMPLETE)
 # A request for information comes after a valid submission (G2b).
 VALID_SUBMISSION = (ACCEPTED, NO_ACK, FOLLOW_UP, COMPLETE)
 MET = (ACCEPTED, NO_ACK, FOLLOW_UP, COMPLETE)
+# Nothing more is owed: met by its submission, or cancelled by a later signed "not reportable" conclusion (0.10.75).
+CLOSED = (*MET, CANCELLED)
+# A report a later "not reportable" conclusion cancels: anything not yet submitted.
+CANCELLABLE = (DRAFT, CORRECTION, APPROVED)
+
+# The report's status path on the new navigation (0.10.75, Release C part C3), in order.
+STAGES = (
+    ("CREATED", "Created from the decision tree"),
+    ("COMPLETE", "Mandatory fields complete"),
+    ("APPROVAL", "Sent for approval"),
+    ("APPROVED", "Approved · PDF ready"),
+    ("SUBMITTED", "Submitted by you"),
+    ("ACKNOWLEDGED", "Acknowledged"),
+)
+STAGE_LABELS = dict(STAGES)
 MATERIAL, NON_MATERIAL = "MATERIAL", "NON_MATERIAL"
 REASON_MIN = 10
 NOTE_MAX = 4000
@@ -64,7 +81,46 @@ def next_step(state: str, has_pending_snapshot: bool = False) -> str:
         NO_ACK: "Complete it, or record a follow-up",
         FOLLOW_UP: "Complete the follow-up",
         COMPLETE: "Nothing: the obligation is complete",
+        CANCELLED: "Nothing: a later signed conclusion says not reportable",
     }[state]
+
+
+def stage(state: str, missing: int, pending: bool) -> str | None:
+    """Where the report is on its status path: ``missing`` mandatory fields still empty, ``pending`` a snapshot waiting
+    for approval. None for a cancelled report (off the path). A draft after a rejection is back at its first stages."""
+    if state == CANCELLED:
+        return None
+    if state in EDITABLE:
+        return "APPROVAL" if pending else "CREATED" if missing else "COMPLETE"
+    if state == APPROVED:
+        return "APPROVED"
+    if state in (PENDING, NO_ACK):
+        return "SUBMITTED"
+    return "ACKNOWLEDGED"
+
+
+def stage_view(state: str, missing: int, pending: bool) -> dict:
+    """The status path for the screen: each stage done, now or later."""
+    now = stage(state, missing, pending)
+    codes = [code for code, _ in STAGES]
+    at = codes.index(now) if now else -1
+    # Acknowledged is the last stage: once there, it is done too.
+    return {
+        "stage": now,
+        "stage_label": STAGE_LABELS[now] if now else STATE_LABELS[state],
+        "stages": [
+            {
+                "code": code,
+                "label": label,
+                "state": "DONE"
+                if index < at or (now == "ACKNOWLEDGED" and index == at)
+                else "CURRENT"
+                if index == at
+                else "LATER",
+            }
+            for index, (code, label) in enumerate(STAGES)
+        ],
+    }
 
 
 def approver_problem(approver: str, role: str | None, preparers: set[str], signer: str | None) -> str | None:

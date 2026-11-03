@@ -219,7 +219,7 @@ def test_the_result_allows_for_every_group_checked_and_reads_the_same_everywhere
     assert found["p_value"] == pytest.approx(0.0037, abs=1e-4)
     assert found["p_adjusted"] == pytest.approx(0.0146, abs=5e-5) and found["groups_tested"] == 4
     assert found["result"] == "ELEVATED" and board["summary"]["groups_tested"] == 4
-    assert "allowing for the 4 groups checked" in found["sentence"]
+    assert "allowing for the 4 groups assessed" in found["sentence"]
     alone = _item(_board(tenant, product_id=uuid.UUID(items[0]["product"])), items[0])
     assert (alone["p_adjusted"], alone["result"]) == (found["p_adjusted"], found["result"])
     with SessionLocal() as db:

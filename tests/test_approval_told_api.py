@@ -92,6 +92,12 @@ def test_who_approves_is_said_before_any_password():
     }
 
 
+def _fill(user, report_id: str) -> None:
+    """Every mandatory field still empty, entered: on the new navigation Send for approval waits for them (0.10.75)."""
+    for field in _ok(user.get(f"{REPORTS}/{report_id}"))["mandatory"]["missing"]:
+        _ok(user.put(f"{REPORTS}/{report_id}/fields/{field}", json={"value": "Test value (sample)"}))
+
+
 # --------------------------------------------------------------------------------------------- alone in a trial
 
 
@@ -101,6 +107,7 @@ def test_the_trial_owner_alone_finishes_rv06(solo):
     detail = _start_rv06(solo)
     assert detail["approval"]["approvers"] == [] and detail["approval"]["same_person"]
     _ok(user.put(f"{REPORTS}/{detail['id']}/fields/MFR_REPORT", json={"value": "1234567-2026-00001"}))
+    _fill(user, detail["id"])
     asked = _ok(user.post(f"{REPORTS}/{detail['id']}/snapshots"))
     standing = asked["approval"]
     assert standing["may_approve"] and standing["same_person"]
@@ -159,6 +166,7 @@ def test_the_approver_gets_a_task_and_a_bell_line_and_the_preparer_is_told_who(p
     user, colleague = pair["user"], pair["colleague"]
     detail = _start_rv06(pair)
     assert detail["approval"]["approvers"] == ["Rahul Colleague"]
+    _fill(user, detail["id"])
     asked = _ok(user.post(f"{REPORTS}/{detail['id']}/snapshots"))
     standing = asked["approval"]
     # The preparer sees who approves in place of the form; separation of duties holds when a colleague may approve.
@@ -173,7 +181,8 @@ def test_the_approver_gets_a_task_and_a_bell_line_and_the_preparer_is_told_who(p
         row = db.get(WorkflowTask, uuid.UUID(task["id"]))
         items = [item for item in service.due_items(db, db, pair["tenant_id"]) if item["key"] == f"task:{row.id}"]
         assert len(items) == 1 and items[0]["category"] == "OBLIGATION"
-        assert items[0]["opens"]["tab"].startswith("Reports?complaint=")
+        # The report itself (0.10.76), not the complaint's list of reports.
+        assert items[0]["opens"]["tab"] == f"Reports?report={detail['id']}"
         service.sweep(db, db, pair["tenant_id"], row.due_at - timedelta(hours=1))
         db.commit()
         alerts = db.query(DueAlert).filter(

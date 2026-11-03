@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Activity, AlertTriangle, Plus, TrendingUp } from "lucide-react";
 import { Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Table, errorText, send, useResource } from "../../customer-admin/shared";
-import { sectionAllowed, useCan, useTabParam, useWorkspace } from "../workspaceContext";
+import { sectionAllowed, useCan, useNavigation, useTabParam, useWorkspace } from "../workspaceContext";
 import {
   TREND_GROUPS,
   canRaiseFromTrend,
@@ -20,6 +20,8 @@ import {
   type TrendGroup,
   type TrendItem,
   TREND_BASIS,
+  comparisonLine,
+  risingSentence,
 } from "../signalAi";
 import { ChipFilter, Hero, InlineError, ProductFilter } from "./boardParts";
 import { BasisLine } from "../../shared/Basis";
@@ -46,6 +48,25 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
   const board = useResource<TrendBoard>(trendPath(group, product));
   const headline = trendHeadline(board.data);
   const summary = board.data?.summary;
+  const navigation = useNavigation();
+  const rising = (board.data?.items ?? []).filter(
+    (item) => item.result === "SIGNIFICANT" || item.result === "ELEVATED",
+  );
+  // The one action on a group: open its trend, or raise one (the table and the lead sentences share it).
+  const action = (row: TrendItem) =>
+    row.open_signals.length ? (
+      <button
+        type="button"
+        className="ac-link"
+        onClick={() => onOpenSignal(String(row.open_signals[0].business_id ?? row.open_signals[0].id))}
+      >
+        {row.open_signals[0].business_id ?? "Open trend"}
+      </button>
+    ) : canTriage && canRaiseFromTrend(row) ? (
+      <button type="button" className="ac-secondary" disabled={busy === row.key} onClick={() => void raise(row)}>
+        <Plus size={14} aria-hidden="true" /> {busy === row.key ? "Raising…" : "Raise a trend"}
+      </button>
+    ) : null;
   const raise = async (item: TrendItem) => {
     setBusy(item.key);
     setError("");
@@ -89,111 +110,128 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
           </div>
         )}
       </Hero>
-      <div className="uw-cr-stats">
-        <StatTile
-          label="Significant rise"
-          value={summary ? summary.significant : null}
-          detail="Chance under 1% if nothing changed, allowing for the groups checked"
-          icon={<AlertTriangle size={18} />}
-          tone={summary?.significant ? "critical" : undefined}
-        />
-        <StatTile
-          label="Higher than usual"
-          value={summary ? summary.elevated : null}
-          detail="Chance under 5%"
-          icon={<TrendingUp size={18} />}
-          tone={summary?.elevated ? "warning" : undefined}
-        />
-        <StatTile
-          label="Groups checked"
-          value={summary ? summary.groups : null}
-          detail={
-            summary
-              ? `${summary.groups_tested ?? summary.groups - summary.too_few - summary.short_history} assessed; ${summary.too_few + summary.short_history} too few or too new`
-              : ""
-          }
-          icon={<Activity size={18} />}
-        />
-        <StatTile
-          label="Complaints counted"
-          value={summary ? summary.complaints_counted : null}
-          detail={
-            summary?.linked_records
-              ? "Every status; dismissed records left out; an event linked from several records counts once"
-              : "Every status; dismissed records left out"
-          }
-          icon={<Activity size={18} />}
-        />
-      </div>
-      <Panel eyebrow="Trends" title="Trend check" source={board}>
-        <div className="uw-cr-toolbar">
-          <ChipFilter label="Group complaints" options={TREND_GROUPS} value={group} onChange={setGroup} />
-          <ProductFilter value={product} onChange={setProduct} />
+      {navigation === "new" && board.data && (
+        // One sentence per rising group, then its comparison basis in one line (0.10.72, B5).
+        <section className="uw-trend-lead" aria-label="Rising groups">
+          {rising.length ? (
+            <ul>
+              {rising.map((row) => (
+                <li key={row.key}>
+                  <p>
+                    <strong>{risingSentence(row)}</strong>
+                  </p>
+                  <p className="uw-cr-meta">{comparisonLine(row)}</p>
+                  {action(row)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="ac-muted">No group is rising against its own history.</p>
+          )}
+          <InlineError text={error} />
+        </section>
+      )}
+      <Revealed when={navigation === "new"} summary="All groups, the method and the chart">
+        <div className="uw-cr-stats">
+          <StatTile
+            label="Significant rise"
+            value={summary ? summary.significant : null}
+            detail="Chance under 1% if nothing changed, allowing for the groups assessed"
+            icon={<AlertTriangle size={18} />}
+            tone={summary?.significant ? "critical" : undefined}
+          />
+          <StatTile
+            label="Higher than usual"
+            value={summary ? summary.elevated : null}
+            detail="Chance under 5%"
+            icon={<TrendingUp size={18} />}
+            tone={summary?.elevated ? "warning" : undefined}
+          />
+          <StatTile
+            label="Groups checked"
+            value={summary ? summary.groups : null}
+            detail={
+              summary
+                ? `${summary.groups_tested ?? summary.groups - summary.too_few - summary.short_history} assessed; ${summary.too_few + summary.short_history} too few or too new`
+                : ""
+            }
+            icon={<Activity size={18} />}
+          />
+          <StatTile
+            label="Complaints counted"
+            value={summary ? summary.complaints_counted : null}
+            detail={
+              summary?.linked_records
+                ? "Every status; dismissed records left out; an event linked from several records counts once"
+                : "Every status; dismissed records left out"
+            }
+            icon={<Activity size={18} />}
+          />
         </div>
-        <InlineError text={error} />
-        <TrendPerUnit items={board.data?.items ?? []} />
-        <Table
-          caption="Trend check"
-          rows={board.data?.items ?? []}
-          rowKey={(row) => row.key}
-          empty={{ title: "No complaints in the period", detail: "Groups appear once complaints are recorded." }}
-          columns={[
-            { key: "name", label: "Group", render: (row: TrendItem) => <strong>{row.name}</strong> },
-            {
-              key: "result",
-              label: "Result",
-              render: (row: TrendItem) => {
-                const result = trendResultOf(row.result);
-                return <ToneBadge tone={result.tone} label={trendResultLabel(row)} />;
+        <Panel eyebrow="Trends" title="Trend check" source={board}>
+          <div className="uw-cr-toolbar">
+            <ChipFilter label="Group complaints" options={TREND_GROUPS} value={group} onChange={setGroup} />
+            <ProductFilter value={product} onChange={setProduct} />
+          </div>
+          <InlineError text={error} />
+          <TrendPerUnit items={board.data?.items ?? []} />
+          <Table
+            caption="Trend check"
+            rows={board.data?.items ?? []}
+            rowKey={(row) => row.key}
+            empty={{ title: "No complaints in the period", detail: "Groups appear once complaints are recorded." }}
+            columns={[
+              { key: "name", label: "Group", render: (row: TrendItem) => <strong>{row.name}</strong> },
+              {
+                key: "result",
+                label: "Result",
+                render: (row: TrendItem) => {
+                  const result = trendResultOf(row.result);
+                  return <ToneBadge tone={result.tone} label={trendResultLabel(row)} />;
+                },
               },
-            },
-            {
-              key: "recent",
-              label: "Last 30 days",
-              numeric: true,
-              render: (row: TrendItem) =>
-                row.recent_days < 30 ? `${trendCountText(row)} in ${row.recent_days} days` : trendCountText(row),
-            },
-            {
-              key: "history",
-              label: "Compared with",
-              render: (row: TrendItem) => trendBaselineText(row),
-            },
-            {
-              key: "basis",
-              label: "Counted",
-              render: (row: TrendItem) => trendBasisText(row),
-            },
-            { key: "p_value", label: "Chance", render: (row: TrendItem) => chanceText(row) },
-            {
-              key: "signals",
-              label: "",
-              render: (row: TrendItem) =>
-                row.open_signals.length ? (
-                  <button
-                    type="button"
-                    className="ac-link"
-                    onClick={() => onOpenSignal(String(row.open_signals[0].business_id ?? row.open_signals[0].id))}
-                  >
-                    {row.open_signals[0].business_id ?? "Open trend"}
-                  </button>
-                ) : canTriage && canRaiseFromTrend(row) ? (
-                  <button
-                    type="button"
-                    className="ac-secondary"
-                    disabled={busy === row.key}
-                    onClick={() => void raise(row)}
-                  >
-                    <Plus size={14} aria-hidden="true" /> {busy === row.key ? "Raising…" : "Raise a trend"}
-                  </button>
-                ) : null,
-            },
-          ]}
-        />
-        <p className="ac-note">{board.data?.note}</p>
-        <BasisLine ids={TREND_BASIS} />
-      </Panel>
+              {
+                key: "recent",
+                label: "Last 30 days",
+                numeric: true,
+                render: (row: TrendItem) =>
+                  row.recent_days < 30 ? `${trendCountText(row)} in ${row.recent_days} days` : trendCountText(row),
+              },
+              {
+                key: "history",
+                label: "Compared with",
+                render: (row: TrendItem) => trendBaselineText(row),
+              },
+              {
+                key: "basis",
+                label: "Counted",
+                render: (row: TrendItem) => trendBasisText(row),
+              },
+              { key: "p_value", label: "Chance", render: (row: TrendItem) => chanceText(row) },
+              {
+                key: "signals",
+                label: "",
+                render: (row: TrendItem) => action(row),
+              },
+            ]}
+          />
+          <p className="ac-note">{board.data?.note}</p>
+          <BasisLine ids={TREND_BASIS} />
+        </Panel>
+      </Revealed>
     </div>
+  );
+}
+
+/** On the new navigation the statistics, every group, the grouping controls and the chart are revealed on request. */
+function Revealed({ when, summary, children }: { when: boolean; summary: string; children: React.ReactNode }) {
+  return when ? (
+    <details className="uw-more">
+      <summary>{summary}</summary>
+      {children}
+    </details>
+  ) : (
+    <>{children}</>
   );
 }
 

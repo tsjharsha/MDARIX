@@ -38,7 +38,7 @@ export const FLAGSHIP = "SAMPLE-RV-11";
 /** The short story (0.10.71, A4): four steps on SAMPLE-RV-11, ending in the intake decision summary. */
 export const SHORT: Scenario = {
   key: "short",
-  title: "A hospital asked for recalibration. Should Quality review this too?",
+  title: "A hospital sent a monitor for service. Should Quality review this too?",
   lede: "Read the call, decide its route, name the open question and see the intake decision summary.",
   start: { section: "Complaint", tab: `Summary?ref=${FLAGSHIP}` },
   record: { complaint: FLAGSHIP },

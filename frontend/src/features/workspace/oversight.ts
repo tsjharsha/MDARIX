@@ -221,6 +221,26 @@ export type EventView = {
   service?: ServiceWork | null;
   /** Who prepared, who may approve and who approved the event's work (0.10.71, A6). */
   record_people?: { prepared_by: string[]; may_approve: string[]; approved_by: string[]; practice_note: string | null };
+  /** The records linked to the complaint, for the page's Related (0.10.74, C2). */
+  related?: RelatedGroup[];
+};
+
+/** One kind of record linked to a complaint, in plain lines (backend/app/oversight/record_page.py related). */
+export type RelatedGroup = {
+  key: "communications" | "assessments" | "service" | "investigations" | "reports" | "decisions";
+  label: string;
+  count: number;
+  lines: string[];
+  items?: Array<{ id: string; ref: string }>;
+};
+
+/** One line of a complaint's Activity: its own audit event, or (from_record) the record's own received time. */
+export type ActivityItem = {
+  at: string | null;
+  title: string;
+  who: string | null;
+  reason: string | null;
+  from_record?: boolean;
 };
 
 export type ServiceStatus = "OPEN" | "IN_PROGRESS" | "COMPLETE";

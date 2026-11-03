@@ -1,5 +1,5 @@
 {
-  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. newPlaces, newMenu, newRecords and newHomes (stage 7, 0.10.68): the screens of the new navigation, its menu, where each record opens there, and the new home of every screen and tab above; they apply only to an organization on the new navigation (tenants.navigation = new). classicHomes: where an address of the new navigation opens for an organization on the classic one.",
+  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. newPlaces, newMenu, newRecords and newHomes (stage 7, 0.10.68): the screens of the new navigation, its menu, where each record opens there, and the new home of every screen and tab above; they apply only to an organization on the new navigation (tenants.navigation = new). classicHomes: where an address of the new navigation opens for an organization on the classic one. 0.10.73 (Release C, C1): the new navigation's tabs (newMenu.main) are Home (My work), Complaints, Decision trees, Reports, Investigations, Trends, Records and Team; each persona shows some of them (access_control/personas.py). 0.10.74 (C2): Complaints' list views (features/workspace/listViews.ts) are its tabs; one complaint's page shows Details (address name Summary), Related and Activity, and opens its former sections' addresses (Evidence: Related; Decisions & actions: Details; History: Activity); Investigations lists every investigation (All investigations).",
   "places": {
     "Getting started": {
       "path": "/app/getting-started",
@@ -164,7 +164,9 @@
     "look-ahead": ["Look ahead"],
     "trends": ["Trends"],
     "settings": ["Settings"],
-    "team": ["Team"]
+    "team": ["Team"],
+    "decision-trees": ["Decision trees"],
+    "reports": ["Reports"]
   },
   "oldSections": [
     {
@@ -305,7 +307,9 @@
     "Trends": "trends",
     "Settings": "settings",
     "Team": "team",
-    "Complaint": "complaint"
+    "Complaint": "complaint",
+    "Decision trees": "decision-trees",
+    "Reports": "reports"
   },
   "oldTabs": {
     "Signals": {
@@ -321,7 +325,7 @@
   "newPlaces": {
     "My Work": {
       "path": "/app/my-work",
-      "label": "My work",
+      "label": "Home",
       "tabs": ["Tasks for me", "Approvals", "Evidence requests", "Queues", "Team overview", "My AI conversations"],
       "views": {
         "Tasks for me": [
@@ -339,11 +343,20 @@
     "Complaints": {
       "path": "/app/complaints",
       "tabs": [
+        "All open complaints",
+        "Due this week",
+        "Legal clocks this week",
+        "Reportability: decision needed",
+        "Waiting for the reporter",
+        "Waiting for my approval",
+        "Signed this month",
         "To triage",
+        "Calls to check",
         "Due soon",
         "Past target",
         "Second look",
         "Reporting",
+        "Authority reports",
         "Communications",
         "Investigations",
         "Dismissed",
@@ -353,7 +366,7 @@
     "Complaint": {
       "path": "/app/complaints/<ref>",
       "label": "Complaint",
-      "tabs": ["Summary", "Evidence", "Decisions & actions", "History"]
+      "tabs": ["Summary", "Related", "Activity", "Evidence", "Decisions & actions", "History"]
     },
     "Trends": {
       "path": "/app/trends",
@@ -382,7 +395,8 @@
         "Working calendar",
         "Trend rules",
         "Contact attempts",
-        "Import templates"
+        "Import templates",
+        "Products"
       ]
     },
     "Team": {
@@ -396,7 +410,7 @@
     },
     "Investigations": {
       "path": "/app/investigations",
-      "tabs": ["Summary", "Evidence", "Decisions & actions", "History"]
+      "tabs": ["Summary", "Evidence", "Decisions & actions", "History", "All investigations"]
     },
     "Import data": {
       "path": "/app/import-data",
@@ -417,11 +431,19 @@
     "Next steps": {
       "path": "/app/next-steps",
       "tabs": []
+    },
+    "Decision trees": {
+      "path": "/app/decision-trees",
+      "tabs": []
+    },
+    "Reports": {
+      "path": "/app/reports",
+      "tabs": []
     }
   },
   "newMenu": {
-    "main": ["My Work", "Complaints", "Trends", "Records"],
-    "top": ["Settings", "Team", "My Account"]
+    "main": ["My Work", "Complaints", "Decision trees", "Reports", "Investigations", "Trends", "Records", "Team"],
+    "top": ["Settings", "My Account"]
   },
   "newRecords": {
     "complaint": {
@@ -851,8 +873,8 @@
       "section": "Investigations",
       "tab": "All investigations",
       "to": {
-        "section": "Complaints",
-        "tab": "Investigations"
+        "section": "Investigations",
+        "tab": "All investigations"
       },
       "keep": "query"
     },
@@ -932,6 +954,20 @@
       "to": {
         "section": "Getting started",
         "tab": "Team"
+      }
+    },
+    {
+      "section": "Decision trees",
+      "to": {
+        "section": "Complaints",
+        "tab": "Decision guides"
+      }
+    },
+    {
+      "section": "Reports",
+      "to": {
+        "section": "Complaints",
+        "tab": "Reports"
       }
     }
   ]

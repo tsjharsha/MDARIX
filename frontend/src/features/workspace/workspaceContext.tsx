@@ -38,10 +38,20 @@ export const WORKSPACE_SECTIONS = [
   "Settings",
   "Team",
   "Complaint",
+  // Release C's tabs on the new navigation (0.10.73): one decision tree per market, and the authority reports.
+  "Decision trees",
+  "Reports",
 ] as const;
 
 /** Sections only the new navigation shows. */
-export const NEW_ONLY_SECTIONS: readonly string[] = ["Trends", "Settings", "Team", "Complaint"];
+export const NEW_ONLY_SECTIONS: readonly string[] = [
+  "Trends",
+  "Settings",
+  "Team",
+  "Complaint",
+  "Decision trees",
+  "Reports",
+];
 
 /** Sections that exist only in a free-trial workspace. */
 export const TRIAL_ONLY_SECTIONS: readonly string[] = ["Getting started", "Look ahead", "Next steps"];
@@ -73,6 +83,8 @@ export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   Settings: [],
   Team: [],
   Complaint: ["products"],
+  "Decision trees": ["products"],
+  Reports: ["products"],
 };
 
 export type SessionContext = {
@@ -103,6 +115,13 @@ export type SessionContext = {
   navigation?: string;
   /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
   sample_only?: boolean;
+  /** "Viewing as" (0.10.73): the persona the workspace opens on, whether only the server's role sets it (anyone but
+   * the trial owner), its tabs, and every persona for the switch (access_control/personas.py). */
+  persona?: string;
+  persona_label?: string;
+  persona_locked?: boolean;
+  persona_tabs?: string[];
+  persona_options?: Array<{ code: string; label: string; sub: string; tabs: string[] }>;
 };
 
 export type WorkContext = {
@@ -170,6 +189,10 @@ export type WorkspaceApi = {
   /** The story under way (entrance.ts), and starting or ending one (stage 8). */
   story?: string | null;
   startStory?: (key: string | null) => void;
+  /** "Viewing as" on the new navigation (0.10.73, C1): the persona's code, label and tabs. A view, never a permission. */
+  persona?: string;
+  personaLabel?: string;
+  personaTabs?: readonly string[];
 };
 
 export const WorkspaceContext = createContext<WorkspaceApi | null>(null);
