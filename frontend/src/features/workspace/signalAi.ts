@@ -10,7 +10,8 @@ export type TrendGroup = "version" | "problem" | "type";
 
 export type TrendItem = {
   key: string;
-  product: { id: string; business_id: string | null; name: string | null };
+  /** ``identifier``: the organization's own (SAMPLE-ORBIT-300), 0.10.84. */
+  product: { id: string; business_id: string | null; identifier?: string | null; name: string | null };
   product_version: { id: string; business_id: string | null; version_identifier: string | null } | null;
   problem: string | null;
   name: string;
@@ -64,13 +65,16 @@ export function lotsText(lots: readonly string[], counts?: Record<string, number
 /** One sentence per rising group (0.10.72, B5): "OrbitCare 300 Rev B: 9 complaints against 1.0 expected (9.3×),
  * lots 003 and 004". */
 export function risingSentence(
-  item: Pick<TrendItem, "name" | "recent" | "expected" | "ratio" | "lots" | "lot_counts">,
+  item: Pick<TrendItem, "name" | "recent" | "expected" | "ratio" | "lots" | "lot_counts"> & { recent_days?: number },
 ): string {
   const ratio = typeof item.ratio === "number" ? ` (${item.ratio.toFixed(1)}×)` : "";
   const lots = item.lots?.length
     ? `, ${item.lots.length === 1 ? "lot" : "lots"} ${lotsText(item.lots, item.lot_counts)}`
     : "";
-  return `${item.name}: ${grouped(item.recent)} complaints against ${grouped(item.expected, 1)} expected${ratio}${lots}`;
+  // The window is named (0.10.82): the trend counts recent complaints, an investigation's scope every linked one, so
+  // the two numbers differ for a reason the screen says.
+  const window = item.recent_days ? ` in the last ${item.recent_days} days` : "";
+  return `${item.name}: ${grouped(item.recent)} complaints${window} against ${grouped(item.expected, 1)} expected${ratio}${lots}`;
 }
 
 /** The comparison basis in one line, saying plainly when unit quantities are missing. */

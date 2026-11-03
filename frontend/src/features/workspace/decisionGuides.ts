@@ -3,6 +3,7 @@
 // the test cases and decides whether a version can be published; these only shape what the person sees and sends.
 import type { Tone } from "../admin/console/dashboardModel";
 import { questionNumber } from "../../app/labels";
+import { STARTER_LABEL } from "../shared/standards";
 import type { Market, Question, QuestionSet } from "./marketAssessment";
 import type { ApprovalStanding } from "./authorityReports";
 
@@ -165,7 +166,7 @@ export function stateTone(state: GuideState): Tone {
 /** The mark beside a question: starter text, the organization's wording, or its extra question. */
 export function questionMark(question: Pick<Question, "starter" | "extra">): string {
   if (question.extra) return "Your extra question: does not change the conclusion";
-  return question.starter ? "Starter text" : "Your wording";
+  return question.starter ? STARTER_LABEL : "Your wording";
 }
 
 /** Move an extra question up or down among the extra questions (the core questions keep their order). */

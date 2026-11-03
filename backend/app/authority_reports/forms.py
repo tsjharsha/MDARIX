@@ -511,7 +511,7 @@ MVPI_MDAE = Form(
                 "REJECTION": (_REJECTED,),
                 "OTHER": (_RECEIPT,),
             },
-            note="Starter text: keep the sent e-mail with its headers and any reference that comes back. A bounce is "
+            note="Starter, for your consultant to confirm: keep the sent e-mail with its headers and any reference that comes back. A bounce is "
             "a rejection. Whether MvPI acknowledges, and what counts as acceptance, is for your procedure to confirm.",
         ),
         Route(
@@ -524,7 +524,7 @@ MVPI_MDAE = Form(
                 "REJECTION": (_REJECTED,),
                 "OTHER": (_RECEIPT,),
             },
-            note="Starter text: the online form may differ from Version 1.2; check it against the portal.",
+            note="Starter, for your consultant to confirm: the online form may differ from Version 1.2; check it against the portal.",
         ),
     ),
     ("IN_MDR",),
@@ -1205,7 +1205,7 @@ EU_MIR = Form(
             "EU_NCA",
             "EUDAMED, or the national competent authority's channel (the MIR form)",
             _MIR_EVIDENCE,
-            note="Starter text: keep what you sent and the authority's reference; for Northern Ireland, MHRA's MORE "
+            note="Starter, for your consultant to confirm: keep what you sent and the authority's reference; for Northern Ireland, MHRA's MORE "
             "portal with the EU form.",
         ),
     ),
@@ -1363,7 +1363,7 @@ GB_MIR = Form(
             "MHRA_MORE",
             "MHRA's MORE portal (Manufacturer's On-line Reporting Environment): web form, XML or API",
             {key: value for key, value in _MIR_EVIDENCE.items() if key != "SENT_EMAIL"},
-            note="MHRA accepts no other route. Starter text: keep the MORE reference and the submitted copy.",
+            note="MHRA accepts no other route. Starter, for your consultant to confirm: keep the MORE reference and the submitted copy.",
         ),
     ),
     ("UK_MDR",),
@@ -1568,7 +1568,7 @@ HC_MDPR = Form(
                 "REJECTION": (_REJECTED,),
                 "OTHER": (_RECEIPT,),
             },
-            note="Starter text: the form and Health Canada's pages give different addresses (to confirm). Keep the "
+            note="Starter, for your consultant to confirm: the form and Health Canada's pages give different addresses (to confirm). Keep the "
             "sent e-mail and the acknowledgement letter with its Health Canada file number.",
         ),
     ),

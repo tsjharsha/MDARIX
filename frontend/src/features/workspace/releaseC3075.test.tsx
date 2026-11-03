@@ -15,7 +15,7 @@ import {
   type StageStep,
 } from "./authorityReports";
 import { ReportsSection, meterText, reportNext, NEVER_SUBMITS } from "./sections/ReportsTab";
-import { DecisionTreesSection, chosenComplaint, nextAfter, treePlace, type Trees } from "./sections/DecisionTrees";
+import { treePlace } from "./sections/DecisionTrees";
 import { ComplaintPage } from "./sections/ComplaintPage";
 import { eventPath, type EventView } from "./oversight";
 import { PRACTICE_APPROVAL } from "./sections/PracticeApproval";
@@ -278,15 +278,25 @@ describe("a report's page: the record page's shape, the status path and the rail
     );
     for (const label of RSTAGES) expect(html).toContain(label);
     expect(html).toContain("22 of 24 mandatory fields");
-    expect(html).toContain("Show only missing");
-    expect(html).toContain("Fill the 2 missing mandatory fields");
+    // 0.10.83 (D2.7): what is missing comes first, grouped by who knows it; the count is said once.
+    expect(html).toContain("1 thing to give (1 field)");
+    expect(html).toContain("Give what is missing");
     expect(html).toMatch(/<button type="button" class="ac-secondary" disabled="" aria-describedby="rp-why-send">/);
-    expect(html).toContain('id="rp-why-send">2 mandatory fields missing');
+    expect(html).toContain('id="rp-why-send">Send for approval opens when every mandatory field is filled.');
     expect(html).not.toContain("Generate the PDF");
     // Each field says where its value comes from.
     expect(html).toContain("From the complaint record");
     // MDARIX never submits: said once, where it matters.
     expect(html.split(NEVER_SUBMITS.replace(/'/g, "&#x27;")).length - 1).toBe(1);
+  });
+
+  it("marks a starter form in the header with the one starter wording (0.10.84)", () => {
+    const starter = report(0);
+    resources.data[`${REPORTS}/r1`] = { ...starter, form: { ...starter.form, starter: true } };
+    const html = render(<ReportsSection />, api("?report=r1"));
+    const chips = html.slice(html.indexOf('class="uw-cp-chips"'));
+    expect(chips).toContain('<span class="ms-chip">Starter, for your consultant to confirm</span>');
+    expect(html).not.toContain("Starter form, for your consultant to confirm");
   });
 
   it("opens Send for approval once every mandatory field is filled", () => {
@@ -300,7 +310,7 @@ describe("a report's page: the record page's shape, the status path and the rail
   it("keeps the practice label at the approve button when the preparer approves alone in a trial", () => {
     resources.data[`${REPORTS}/r1`] = report(2);
     const html = render(<ReportsSection />, api("?report=r1"));
-    expect(html).toContain("Approve the snapshot");
+    expect(html).toContain("Approve the United States report for SAMPLE-RV-11.");
     expect(html).toContain(PRACTICE_APPROVAL);
     expect(html).not.toContain("Generate the PDF");
     // A colleague approves: named in Who signs, never the preparer; no practice label.
@@ -358,114 +368,8 @@ describe("a report's page: the record page's shape, the status path and the rail
   });
 });
 
-const trees: Trees = {
-  markets: [
-    {
-      market: "US",
-      label: "United States (FDA)",
-      title: "US medical device reporting (21 CFR Part 803)",
-      version: 2,
-      status: "APPROVED",
-      status_label: "Approved",
-      version_label: "Your version 2 · approved 2026-10-28",
-      enabled: true,
-      tests: { passed: 12, total: 12, current: true },
-      questions: [
-        { id: "US1", text: "Did a death occur?", clause: "21 CFR 803.50(a)(1)", extra: false },
-        { id: "US4", text: "Did the device malfunction?", clause: "21 CFR 803.3(k)", extra: false },
-      ],
-    },
-    {
-      market: "IN",
-      label: "India (CDSCO)",
-      title: "India MDR 2017",
-      version: 1,
-      status: "STARTER",
-      status_label: "Starter",
-      version_label: "MDARIX starter · version 1, for your consultant to confirm",
-      enabled: true,
-      tests: { passed: 8, total: 8, current: true },
-      questions: [{ id: "IN1", text: "Is this an adverse event?", clause: "MDR 2017 Rule 26", extra: false }],
-    },
-  ],
-  complaints: [
-    { id: "c-rv09", ref: "SAMPLE-RV-09", description: "Alarm too quiet", markets: ["US"], signed: ["US"] },
-    { id: "c-rv10", ref: "SAMPLE-RV-10", description: "Probe overheated", markets: ["IN"], signed: ["IN"] },
-  ],
-  complaint: { id: "c-rv09", ref: "SAMPLE-RV-09", description: "Alarm too quiet" },
-  paths: {
-    US: {
-      market: "US",
-      label: "United States (FDA)",
-      nodes: [
-        {
-          id: "US1",
-          text: "Did a death occur?",
-          clause: "21 CFR 803.50(a)(1)",
-          extra: false,
-          answer: "NO",
-          answer_label: "No",
-        },
-        {
-          id: "US4",
-          text: "Did the device malfunction?",
-          clause: "21 CFR 803.3(k)",
-          extra: false,
-          answer: "YES",
-          answer_label: "Yes",
-        },
-      ],
-      outcome: {
-        code: "REPORTABLE",
-        label: "Reportable",
-        signed: true,
-        report_type_label: "30-day report",
-        due_on: "2026-12-01",
-        signed_by: "MDARIX sample author",
-        signed_at: "2026-10-01T00:00:00Z",
-        version: 1,
-      },
-      report: { id: "r9", state: "ACCEPTED" },
-      has_form: true,
-    },
-  },
-  never_decides: "Each tree points to a conclusion; a person confirms or overrides it and signs.",
-  starter_mark: "",
-};
-
-describe("Decision trees: one tree per market, and the path a complaint took", () => {
-  it("shows the market's tree: version, status, test result, question, answer, clause and outcome", () => {
-    resources.data["/api/v1/decision-trees"] = trees;
-    const html = render(<DecisionTreesSection />);
-    expect(html).toContain("US MDR</button>");
-    expect(html).toContain("India</button>");
-    expect(html).toContain("Your version 2 · approved 2026-10-28");
-    expect(html).toContain("Approved");
-    expect(html).toContain("12 of 12 worked complaints pass");
-    expect(html).toContain("<b>Did the device malfunction?</b><small>21 CFR 803.3(k)</small>");
-    expect(html).toContain('<span class="uw-pill is-on">Yes</span>');
-    expect(html).toContain('<li class="uw-tout is-reportable"><b>Reportable</b>');
-    expect(html).toContain("Open the report");
-    expect(html).toMatch(/<option value="c-rv09" selected="">SAMPLE-RV-09<\/option>/);
-  });
-
-  it("chooses the complaint asked for when it was walked through that market, else the first", () => {
-    expect(chosenComplaint(trees, "US", "c-rv09")).toBe("c-rv09");
-    expect(chosenComplaint(trees, "US", "c-rv10")).toBe("c-rv09");
-    expect(chosenComplaint(trees, "IN", null)).toBe("c-rv10");
-    expect(chosenComplaint(trees, "GB", null)).toBeNull();
-    expect(nextAfter(null).title).toBe("No complaint walked through it yet");
-    const unsigned = { ...trees.paths.US, outcome: { ...trees.paths.US.outcome, signed: false } };
-    expect(nextAfter(unsigned).title).toBe("Points to: reportable");
-    expect(nextAfter({ ...trees.paths.US, has_form: false }).detail).toContain("signed conclusion");
-    expect(
-      nextAfter({
-        ...trees.paths.US,
-        outcome: { ...trees.paths.US.outcome, code: "NOT_REPORTABLE", label: "Not reportable" },
-      }).title,
-    ).toBe("No report");
-  });
-
+// 0.10.83 (D2): the tree is answered in place; its screen is tested in releaseD2083.test.tsx.
+describe("Decision trees: a complaint's page opens its tree", () => {
   it("opens from a complaint's page: its decision path per market, and its report", () => {
     expect(addressFor(treePlace("US", "c-rv11"))).toBe("/app/decision-trees?market=US&complaint=c-rv11");
     resources.data[eventPath("SAMPLE-RV-11")] = rv11();

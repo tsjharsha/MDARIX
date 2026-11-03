@@ -3,7 +3,9 @@
 Each colleague gets a persona (0.10.73, C1), and the persona is their real role (access_control/personas.py): a
 Regulatory Leader is a Regulatory Reviewer, a Decision Maker an Approver. Only the owner gives or changes it, each time
 audited as TRIAL_PERSONA_ASSIGNED; the colleague cannot change it (POST /api/v1/me/persona answers 403). Colleagues
-invited before 0.10.73 keep the role Leader (the Quality Leader persona) until the owner changes it.
+invited before 0.10.73 keep the role Leader (the Quality Leader persona) until the owner changes it. Since 0.10.82
+(D1.9) the owner may tick several personas: the first one's role is the account role, the others' additional roles,
+so the rights add up; the colleague switches "Viewing as" between their own personas only.
 
 Only the person whose request created the trial (the trial owner) can invite. Colleagues join that one workspace as
 workspace users (never administrators) with a single-use invitation, exactly like the owner. A trial has no admin
@@ -102,28 +104,86 @@ def team(db: Session, tenant_id, viewer: AuthUser) -> dict:
 
 
 def _persona_view(db: Session, user: AuthUser, owner: bool) -> dict:
-    """A person's persona as the team list shows it; a colleague's is locked (only the owner changes it)."""
-    from backend.app.access.session import persona_of
+    """A person's personas as the team list shows them; a colleague's are locked (only the owner changes them)."""
+    from backend.app.access.session import colleague_personas, persona_of
 
     persona = workspace_persona(persona_of(db, user, owner))
-    return {"persona": persona.code, "persona_label": persona.label, "persona_locked": not owner}
+    mine = [persona.code] if owner else colleague_personas(db, user)
+    return {
+        "persona": persona.code,
+        "persona_label": persona.label,
+        "persona_locked": not owner,
+        # Every persona the owner gave the colleague (0.10.82, D1.9).
+        "personas": [{"code": code, "label": workspace_persona(code).label} for code in mine],
+    }
 
 
-def _colleague_persona(code: str | None):
-    """The persona the owner gives a colleague: any but Admin, which is the owner's own; none named is the Quality
-    Leader (the role Leader, as every trial colleague had before 0.10.73)."""
-    try:
-        persona = workspace_persona(code or "quality")
-    except ValueError:
-        raise _error(422, "UNKNOWN_PERSONA", "Choose one of the personas listed")
-    if persona.code not in COLLEAGUE_PERSONAS:
-        raise _error(422, "PERSONA_NOT_FOR_COLLEAGUE", "Admin is the trial owner's own: choose another persona")
-    return persona
+def _colleague_personas(codes) -> list:
+    """The personas the owner gives a colleague (one or more, in the catalog's order): any but Admin, which is the
+    owner's own; none named is the Quality Leader (the role Leader, as every trial colleague had before 0.10.73)."""
+    chosen = []
+    for code in codes or ["quality"]:
+        try:
+            persona = workspace_persona(code)
+        except ValueError:
+            raise _error(422, "UNKNOWN_PERSONA", "Choose one of the personas listed")
+        if persona.code not in COLLEAGUE_PERSONAS:
+            raise _error(422, "PERSONA_NOT_FOR_COLLEAGUE", "Admin is the trial owner's own: choose another persona")
+        chosen.append(persona.code)
+    return [workspace_persona(code) for code in COLLEAGUE_PERSONAS if code in chosen]
 
 
-def _audit_persona(db: Session, tenant_id, owner: AuthUser, user: AuthUser, persona, before: dict, now, how: str):
+def _assign_personas(db: Session, tenant_id, owner: AuthUser, user: AuthUser, personas: list, now) -> None:
+    """The colleague's roles follow their personas (0.10.82, D1.9): the first persona's role is the account role, each
+    other's an additional role (user_additional_roles, revoked rows kept), so their rights add up; the persona shown
+    stays the one they view as while it is still theirs. Separation of duties is per person, so nobody approves what
+    they prepared, whatever roles they hold. The caller audits and commits."""
+    from backend.app.db.models.workflow import UserAdditionalRole
+
+    user.role = personas[0].role
+    if user.view_persona not in [persona.code for persona in personas]:
+        user.view_persona = personas[0].code
+    user.updated_at = now
+    wanted = {persona.role for persona in personas[1:]} - {personas[0].role}
+    rows = {
+        row.role_code: row
+        for row in db.query(UserAdditionalRole).filter(
+            UserAdditionalRole.tenant_id == tenant_id, UserAdditionalRole.user_id == user.id
+        )
+    }
+    for role in wanted:
+        row = rows.get(role)
+        if row is None:
+            db.add(
+                UserAdditionalRole(
+                    id=uuid.uuid4(),
+                    tenant_id=tenant_id,
+                    user_id=user.id,
+                    role_code=role,
+                    status="ACTIVE",
+                    reason="Persona given by the trial owner",
+                    granted_by=str(owner.id),
+                    granted_at=now,
+                )
+            )
+        elif row.status != "ACTIVE":
+            row.status, row.granted_by, row.granted_at, row.revoked_by, row.revoked_at = (
+                "ACTIVE",
+                str(owner.id),
+                now,
+                None,
+                None,
+            )
+    for role, row in rows.items():
+        if row.status == "ACTIVE" and role not in wanted:
+            row.status, row.revoked_by, row.revoked_at = "REVOKED", str(owner.id), now
+
+
+def _audit_persona(db: Session, tenant_id, owner: AuthUser, user: AuthUser, personas, before: dict, now, how: str):
+    """TRIAL_PERSONA_ASSIGNED, with the personas and roles before and after."""
     from backend.app.enterprise_audit import make_audit_event
 
+    after = {"personas": [persona.code for persona in personas], "roles": [persona.role for persona in personas]}
     db.add(
         make_audit_event(
             tenant_id=tenant_id,
@@ -133,15 +193,21 @@ def _audit_persona(db: Session, tenant_id, owner: AuthUser, user: AuthUser, pers
             entity_id=user.id,
             details={
                 "user_id": str(user.id),
-                "persona": persona.code,
-                "role": persona.role,
+                "persona": personas[0].code,
+                "role": personas[0].role,
+                **after,
                 "previous_persona": before.get("persona"),
                 "previous_role": before.get("role"),
+                "previous_personas": before.get("personas"),
                 "how": how,
                 "source": SOURCE,
             },
-            old_values={"role": before.get("role"), "view_persona": before.get("persona")},
-            new_values={"role": persona.role, "view_persona": persona.code},
+            old_values={
+                "role": before.get("role"),
+                "view_persona": before.get("persona"),
+                "personas": before.get("personas"),
+            },
+            new_values={"role": personas[0].role, "view_persona": user.view_persona, **after},
             created_at=now,
         )
     )
@@ -205,10 +271,17 @@ def _invitable(db: Session, tenant_id, email: str) -> AuthUser | None:
 
 
 def invite_colleague(
-    db: Session, tenant_id, inviter: AuthUser, email: str, display_name: str, persona_code: str | None = None
+    db: Session,
+    tenant_id,
+    inviter: AuthUser,
+    email: str,
+    display_name: str,
+    persona_code: str | None = None,
+    persona_codes: list[str] | None = None,
 ) -> dict:
     require_owner(db, tenant_id, inviter, "Only the person who started this trial can invite colleagues")
-    persona = _colleague_persona(persona_code)
+    personas = _colleague_personas(persona_codes or ([persona_code] if persona_code else None))
+    persona = personas[0]
     email = email.strip().lower()
     name = display_name.strip()
     if not _EMAIL.match(email) or len(email) > 254:
@@ -243,7 +316,7 @@ def invite_colleague(
         user = returning
         before = {"persona": user.view_persona, "role": user.role}
         user.display_name, user.status, user.updated_at = name, "INVITED", now
-        user.role, user.view_persona = persona.role, persona.code
+        user.view_persona = None  # they start on their first persona
         user.password_hash = _hash(secrets.token_urlsafe(24))
         mfa.reset(db, user, now)  # they set up their authenticator again, as a new colleague does
         db.query(TenantMembership).filter(
@@ -292,11 +365,13 @@ def invite_colleague(
                 "invited_again": returning is not None,
                 "persona": persona.code,
                 "role": persona.role,
+                "personas": [item.code for item in personas],
             },
             created_at=now,
         )
     )
-    _audit_persona(db, tenant_id, inviter, user, persona, before, now, "invited")
+    _assign_personas(db, tenant_id, inviter, user, personas, now)
+    _audit_persona(db, tenant_id, inviter, user, personas, before, now, "invited")
     db.commit()
     return {
         "id": str(user.id),
@@ -305,28 +380,45 @@ def invite_colleague(
         "display_name": name,
         "persona": persona.code,
         "role": persona.role,
+        "personas": [item.code for item in personas],
         **_send_invitation(db, user, inviter.company, inviter.id, invited_by=_owner_name(inviter)),
     }
 
 
-def change_colleague_persona(db: Session, tenant_id, owner: AuthUser, user_id: uuid.UUID, persona_code: str) -> dict:
+def change_colleague_persona(
+    db: Session,
+    tenant_id,
+    owner: AuthUser,
+    user_id: uuid.UUID,
+    persona_code: str | None,
+    persona_codes: list[str] | None = None,
+) -> dict:
     """The owner gives a colleague another persona, and with it its role (a colleague invited before 0.10.73 keeps
     Leader until then). The owner's own is changed with "Viewing as" (POST /api/v1/me/persona), never here. Audited as
     TRIAL_PERSONA_ASSIGNED; every route reads the new role at the colleague's next request."""
     require_owner(db, tenant_id, owner, "Only the person who started this trial can change a colleague's persona")
-    persona = _colleague_persona(persona_code)
+    if not persona_code and not persona_codes:
+        raise _error(422, "PERSONA_REQUIRED", "Tick at least one persona")
+    personas = _colleague_personas(persona_codes or [persona_code])
     user = _colleague(db, tenant_id, owner, user_id, own="Change your own view with Viewing as, at the top")
     if user.status not in SEATED_STATUSES:
         raise _error(409, "NOT_ON_THE_TEAM", "This person is no longer on your trial team")
-    from backend.app.access.session import persona_of
+    from backend.app.access.session import colleague_personas, persona_of
 
-    before = {"persona": persona_of(db, user, False), "role": user.role}
-    if before["persona"] != persona.code or user.role != persona.role or user.view_persona != persona.code:
+    held = colleague_personas(db, user)
+    before = {"persona": persona_of(db, user, False), "role": user.role, "personas": held}
+    if held != [item.code for item in personas] or user.role != personas[0].role:
         now = datetime.now(timezone.utc)
-        user.role, user.view_persona, user.updated_at = persona.role, persona.code, now
-        _audit_persona(db, tenant_id, owner, user, persona, before, now, "changed")
+        _assign_personas(db, tenant_id, owner, user, personas, now)
+        _audit_persona(db, tenant_id, owner, user, personas, before, now, "changed")
         db.commit()
-    return {"id": str(user.id), "business_id": user.business_id, "persona": persona.code, "role": persona.role}
+    return {
+        "id": str(user.id),
+        "business_id": user.business_id,
+        "persona": persona_of(db, user, False),
+        "role": personas[0].role,
+        "personas": [item.code for item in personas],
+    }
 
 
 def resend_colleague_invitation(db: Session, tenant_id, inviter: AuthUser, user_id: uuid.UUID) -> dict:

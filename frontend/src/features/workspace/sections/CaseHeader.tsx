@@ -399,7 +399,11 @@ function CaseHighlights({
         </div>
         <div>
           <dt>Complaints in scope</dt>
-          <dd>{complaints ?? "—"}</dd>
+          <dd>
+            {complaints ?? "—"}
+            {/* Why it differs from the trend's count (0.10.82): every complaint linked, not the last 30 days. */}
+            {complaints != null && <small> every complaint linked to it, not only the trend's recent ones</small>}
+          </dd>
         </div>
         <div>
           <dt>Lots in scope</dt>

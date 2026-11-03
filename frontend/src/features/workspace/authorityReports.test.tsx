@@ -273,7 +273,7 @@ describe("the reports screens", () => {
     const html = render(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />);
     expect(html).toContain("A. Patient information");
     expect(html).toContain("OUTSIDE");
-    expect(html).toContain("Approve the snapshot");
+    expect(html).toContain("You confirm with your password.");
     expect(html).toContain("Not allowed to approve: Priya");
     // The drawer says it once, at the submission (DecideAndSign), not as a note at its top (0.10.66, V5).
     expect(html).not.toContain("MDARIX never submits a report.");

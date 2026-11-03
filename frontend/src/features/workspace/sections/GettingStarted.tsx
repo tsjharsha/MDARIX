@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   CheckCircle2,
   ChevronRight,
@@ -27,6 +27,7 @@ import { EndTrialPanel } from "./EndTrial";
 import { CitedFor } from "./CitedFor";
 import { RemoveSamplePanel, RestartSamplePanel } from "./RemoveSample";
 import { Entrance } from "./Entrance";
+import { OneStory } from "./OneStory";
 import { TeamPanel } from "./TrialTeam";
 import { BESIDE_YOUR_QMS } from "../../help/besideYourQms";
 import { DISCUSS_PILOT } from "../../shared/HelpMenu";
@@ -92,7 +93,10 @@ export const trialTabFor = (name?: string): TrialTab | undefined =>
  * to try it. A chapter is done when the organization acted in it (a record it created in MDARIX), so the progress here
  * is the progress MDARIX sees (/api/v1/trial/story).
  */
-export function GettingStartedSection({ focus }: { focus?: string } = {}) {
+export function GettingStartedSection({
+  focus,
+  heading,
+}: { focus?: string; heading?: RefObject<HTMLHeadingElement | null> } = {}) {
   const { open, work, session, notify, navigation, refreshTrial } = useWorkspace();
   const status = useResource<TrialStatus>("/api/v1/trial/status");
   // Right after an import its signals are still being found: the story is read again until they are. A reload that
@@ -146,7 +150,10 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
       session?.sample_only,
     );
   const focusTab = trialTabFor(focus);
-  const [tab, setTab] = useReportedTab<TrialTab>(focusTab ?? "Your data");
+  // On the new navigation Your data is its own page (0.10.80): defaulting to it wrote ?tab=Your+data into Getting
+  // started's address, and a refresh then opened the Import page instead (0.10.82). There no tab is chosen until the
+  // person picks one, so the address stays /app/getting-started (the first tab shows meanwhile).
+  const [tab, setTab] = useReportedTab<TrialTab>(focusTab ?? (navigation === "new" ? ("" as TrialTab) : "Your data"));
   // A tab below the story, opened and brought into view.
   const showTab = (name: TrialTab) => {
     setTab(name);
@@ -511,16 +518,20 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
       </div>
     </div>
   );
-  // The new navigation (stage 8): the entrance first, the ten chapters under "Explore all capabilities".
+  // The new navigation (0.10.82, D1): one story of ten steps first; the earlier stories, the ten chapters, the journey
+  // and the dial fold under "More ways to explore".
   if (navigation !== "new") return body;
   return (
     <>
-      <Entrance onRestarted={restarted} />
-      <details className="uw-explore" open={!!focusTab}>
-        <summary>
-          Explore all capabilities:{" "}
-          {hasSample ? "the ten chapters, the sample data and your trial" : "the ten chapters and your trial"}
-        </summary>
+      <OneStory heading={heading} />
+      <details className="uw-explore uw-os-more" open={!!focusTab}>
+        <summary>More ways to explore</summary>
+        <p className="ac-muted">
+          {hasSample
+            ? "The shorter stories, the ten chapters, the sample data and your trial."
+            : "The ten chapters and your trial."}
+        </p>
+        <Entrance onRestarted={restarted} />
         {body}
       </details>
     </>

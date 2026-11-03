@@ -135,6 +135,11 @@
       "section": "My Work",
       "tab": "Evidence requests",
       "param": "request"
+    },
+    "intake": {
+      "section": "Complaints",
+      "tab": "Triage",
+      "param": "intake"
     }
   },
   "oldViews": {
@@ -346,6 +351,7 @@
       "path": "/app/complaints",
       "tabs": [
         "All open complaints",
+        "Overdue",
         "Due this week",
         "Legal clocks this week",
         "Reportability: decision needed",
@@ -491,6 +497,11 @@
       "section": "My Work",
       "tab": "Evidence requests",
       "param": "request"
+    },
+    "intake": {
+      "section": "Complaints",
+      "tab": "To triage",
+      "param": "intake"
     }
   },
   "newHomes": [

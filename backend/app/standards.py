@@ -23,8 +23,9 @@ DISCLAIMER = (
 
 INTERNATIONAL, UNITED_STATES, EUROPEAN_UNION = "International", "United States", "European Union"
 UNITED_KINGDOM, CANADA, INDIA = "United Kingdom", "Canada", "India"
-# Entries whose wording the regulatory consultant has not confirmed yet (T-B6): screens and exports mark them.
-STARTER_MARK = "Starter text — awaiting regulatory confirmation: check it against your own procedure."
+# Entries whose wording the regulatory consultant has not confirmed yet (T-B6): screens and exports mark them, in one
+# wording everywhere (0.10.83, D2.9; usability U-11).
+STARTER_MARK = "Starter, for your consultant to confirm."
 
 
 def version_words(code: str) -> str:

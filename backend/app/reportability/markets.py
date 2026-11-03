@@ -594,7 +594,62 @@ def evaluate(market: str, answers: dict) -> dict:
         "report_type": kind if reportable else None,
         "report_type_if_reportable": kind,
         "notes": notes,
+        "not_asked": not_asked(market, answers),
     }
+
+
+def not_asked(market: str, answers: dict) -> dict[str, str]:
+    """The questions earlier answers make unnecessary, each with why (0.10.83, D2): their answer can no longer change
+    the conclusion, the report type or the form. Only a Yes, No or Not applicable folds a question away; an Unknown or
+    a missing answer never does. A folded question is not required to sign."""
+    v = lambda question_id: _value(answers, question_id)  # noqa: E731
+    found: dict[str, str] = {}
+
+    def fold(ids, why: str) -> None:
+        for question_id in ids:
+            found.setdefault(question_id, why)
+
+    if market == US:
+        if v("US1") is False and _any(v("US2A"), v("US2B"), v("US2C")) is False:
+            fold(["US3"], "Not asked: no death and no serious injury")
+        if v("US4") is False:
+            fold(["US5"], "Not asked: no malfunction")
+        harm = _all(_any(v("US1"), v("US2A"), v("US2B"), v("US2C")), v("US3"))
+        if _any(harm, _all(v("US4"), v("US5"))) is False:
+            fold(["US6"], "Not needed: not reportable on the answers above")
+    elif market in (EU_NI, GB):
+        p = "EU" if market == EU_NI else "GB"
+        limbs = [f"{p}3{letter}" for letter in "ABCDEF"]
+        if v(f"{p}1") is False:
+            fold([f"{p}2", *limbs, f"{p}4", f"{p}5", f"{p}6"], "Not asked: not an incident")
+        serious = _any(v(f"{p}2"), *(v(item) for item in limbs), v(f"{p}4"))
+        if serious is False:
+            fold([f"{p}5"], "Not asked: no death, serious deterioration or public health threat")
+        if v(f"{p}5") is False or serious is False:
+            fold([f"{p}6"], "Not needed: not reportable on the answers above")
+        elif v(f"{p}4") is True:
+            fold([f"{p}6"], "Not needed: a serious public health threat takes the 2-day report")
+        elif v(f"{p}2") is True:
+            fold([f"{p}6"], "Not needed: a death takes the 10-day report")
+        elif _any(*(v(item) for item in limbs)) is False:
+            fold([f"{p}6"], "Not needed: no serious deterioration in health")
+    elif market == IN:
+        criteria = [f"IN2{letter}" for letter in "ABCDEF"]
+        if v("IN1") is False:
+            fold([*criteria, "IN3"], "Not asked: not an adverse event suspected to be associated with the device")
+        elif _any(*(v(item) for item in criteria)) is False:
+            fold(["IN3"], "Not needed: not serious on the answers above")
+    elif market == CA:
+        rest = ["CA2", "CA3", "CA4", "CA5", "CA6"]
+        if v("CA1") is False:
+            fold(rest, "Not asked: the device is not sold in Canada")
+        elif v("CA2") is False:
+            fold(rest[1:], "Not asked: not related to a failure, a deterioration or the labelling")
+        if v("CA3") is True:
+            fold(["CA4"], "Not needed: it already led to death or a serious deterioration")
+        if v("CA5") is True:
+            fold(["CA6"], "Not asked: the incident occurred in Canada")
+    return found
 
 
 def clean_answers(question_set: QuestionSet, raw: dict | None) -> dict:
@@ -617,9 +672,13 @@ def clean_answers(question_set: QuestionSet, raw: dict | None) -> dict:
 
 
 def answers_problem(question_set: QuestionSet, answers: dict, *, complete: bool) -> str | None:
-    """Why the answers cannot be saved (``complete=False``) or signed (``complete=True``), or None."""
+    """Why the answers cannot be saved (``complete=False``) or signed (``complete=True``), or None. A question earlier
+    answers make unnecessary (``not_asked``) is not required."""
+    folded = not_asked(question_set.market, answers) if complete else {}
     for question in question_set.questions:
         item = answers.get(question.id)
+        if question.id in folded:
+            continue
         if question.extra:
             if item is not None and item["answer"] is not None and item["answer"] not in ANSWERS:
                 return f"Question {question.id}: answer Yes, No, Unknown or Not applicable"
@@ -647,18 +706,19 @@ def answers_problem(question_set: QuestionSet, answers: dict, *, complete: bool)
 
 # Release B (0.10.72), B1: the factual questions a complaint's own record answers, for the person to confirm or
 # correct. Never causation, recurrence, remedial action, "unexpected" or the conclusion: those stay the person's
-# judgement. A field the record leaves empty (Unknown) suggests nothing: it is never read as No. A serious injury on the
-# record suggests no criterion (which one applies is a judgement); no serious injury answers each criterion No.
+# judgement. A field the record leaves empty (Unknown) suggests nothing: it is never read as No.
+# 0.10.83 (D2): "serious injury" is a judgement under the regulation's definition (21 CFR 803.3(w); India's serious
+# criteria alike), never pre-filled: the record's words are shown beside it (``record_notes``).
 _DEATH_QUESTIONS = ("US1", "IN2A")
 _INJURY_QUESTIONS = ("US2A", "US2B", "US2C", "IN2B", "IN2D", "IN2F")
 _MALFUNCTION_QUESTIONS = ("US4",)
-JUDGEMENT_QUESTIONS = ("US3", "US5", "US6", "IN1", "IN2C", "IN2E", "IN3")
+JUDGEMENT_QUESTIONS = ("US3", "US5", "US6", "IN1", "IN2C", "IN2E", "IN3", *_INJURY_QUESTIONS)
 CONFIRMED, CORRECTED, ENTERED = "CONFIRMED", "CORRECTED", "ENTERED"
 
 
 def suggestions(question_set: QuestionSet, record: dict) -> dict[str, dict]:
     """The factual answers the complaint's record states, each with its source, for the questions of this set."""
-    death, injury, malfunction = record.get("death"), record.get("serious_injury"), record.get("malfunction")
+    death, malfunction = record.get("death"), record.get("malfunction")
     found: dict[str, dict] = {}
 
     def suggest(ids, answer, source, evidence):
@@ -676,8 +736,6 @@ def suggestions(question_set: QuestionSet, record: dict) -> dict[str, dict]:
             "a death was reported" if death else "no death was reported",
             "Patient outcome fields",
         )
-    if injury is False:
-        suggest(_INJURY_QUESTIONS, NO, "no serious injury was reported", "Patient outcome fields")
     if malfunction is not None:
         suggest(
             _MALFUNCTION_QUESTIONS,
@@ -687,6 +745,21 @@ def suggestions(question_set: QuestionSet, record: dict) -> dict[str, dict]:
         )
     asked = {question.id for question in question_set.questions if not question.extra}
     return {key: value for key, value in found.items() if key in asked}
+
+
+def record_notes(question_set: QuestionSet, record: dict) -> dict[str, str]:
+    """What the record says beside each serious-injury question, never as its answer (0.10.83, D2): the person judges
+    it against the regulation's definition."""
+    injury = record.get("serious_injury")
+    said = {
+        True: "The record says a serious injury was reported",
+        False: "The record says no serious injury was reported",
+        None: "The record does not say whether there was a serious injury",
+    }[injury if injury in (True, False) else None]
+    severity = " ".join(str(record.get("severity") or "").split())
+    text = f"{said}{f' · severity “{severity}”' if severity else ''}."
+    asked = {question.id for question in question_set.questions if not question.extra}
+    return {question_id: text for question_id in _INJURY_QUESTIONS if question_id in asked}
 
 
 def mark_origins(answers: dict, suggested: dict[str, dict], confirmed: set[str]) -> dict:

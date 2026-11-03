@@ -115,7 +115,8 @@ def test_the_trial_owner_alone_finishes_rv06(solo):
     assert standing["message"] == f"{PRACTICE} report as Leader (Quality Manager)."
     # The approval waits in the owner's own My Work, and opens the complaint's reports.
     [task] = _approval_tasks(user, "ReportSnapshot")
-    assert task["title"].startswith("Approve snapshot 1 of the Form FDA 3500A worksheet (eMDR) for CMP")
+    # 0.10.83 (D2.8): in plain words, with the customer's reference.
+    assert task["title"].startswith("Approve the United States report for SAMPLE-RV-06 (prepared by ")
     assert task["details"]["complaint_id"] == _complaint_id(solo["tenant_id"], "SAMPLE-RV-06")
     assert task["due_at"]
     snapshot = asked["pending_snapshot"]

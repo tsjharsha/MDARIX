@@ -55,7 +55,7 @@ describe("the entrance", () => {
     expect(html).toContain("Sample event · SAMPLE-RV-11 · 4 steps");
     // The event comes first, then More stories, then More (with the restart).
     expect(html.indexOf("Review this sample event")).toBeLessThan(html.indexOf("More stories"));
-    expect(html.indexOf("More stories")).toBeLessThan(html.indexOf("<summary>More</summary>"));
+    expect(html.indexOf("More stories")).toBeLessThan(html.indexOf("<summary>Restart the sample story</summary>"));
     // 0.10.71 (A2): your own export is under Help › Try your own data, not a tile.
     expect(html).not.toContain("Upload your export");
     // No time claims; step counts only. The readiness numbers are on the manager's My work.

@@ -204,8 +204,9 @@ def load(db: Session, control_db: Session, tenant_id: uuid.UUID, complaint_id: u
 
 
 def _ref(context) -> str:
+    # The customer's own reference, as every screen names the complaint (navigation finding L1; 0.10.83).
     record = context["record"]
-    return record["business_id"] or record["complaint_identifier"]
+    return record["complaint_identifier"] or record["business_id"]
 
 
 def _complaint(context, label: str) -> dict:
@@ -217,7 +218,8 @@ def _assessment(context, label: str):
     if row is None:
         return None
     state = "signed" if row.conclusion else "draft"
-    return _source("MarketAssessment", f"{_ref(context)} {row.market} v{row.version} ({state})", label, row.id)
+    market = markets.MARKET_LABELS.get(row.market, row.market)
+    return _source("MarketAssessment", f"{_ref(context)} {market} v{row.version} ({state})", label, row.id)
 
 
 def _answer(context, question_id: str) -> str | None:
@@ -687,6 +689,89 @@ SOURCES = {
 }
 
 
+# 0.10.83 (D2.7): who knows each field. A product's or the organization's fact is entered once and reused on every
+# report (``ONCE``); the rest belong to this event.
+PRODUCT, ORGANIZATION, EVENT = "PRODUCT", "ORGANIZATION", "EVENT"
+_PRODUCT_SOURCES = {
+    "brand_name",
+    "common_name",
+    "gmdn_code",
+    "gmdn_system",
+    "model",
+    "udi",
+    "basic_udi",
+    "us_product_code",
+    "us_clearance",
+    "in_licence",
+    "eu_certificate",
+    "gb_certificate",
+    "ca_licence",
+    "risk_class",
+    "nb_number",
+    "eu_nomenclature_system",
+    "eu_nomenclature_code",
+    "implantable",
+    "use",
+    "single_use",
+}
+_ORGANIZATION_SOURCES = {
+    "us_manufacturer",
+    "us_contact_office",
+    "in_manufacturer",
+    "in_importer",
+    "in_reporter",
+    "manufacturer_name",
+    "manufacturer",
+    "importer",
+    "contact_office",
+    "authorised_rep",
+    "uk_responsible_person",
+    "manufacturer_srn",
+}
+# What "enter once" writes for a field's source: a product identity column, a registration (market, type, column), or
+# the market's responsible party (its role). Anything else is entered on this report.
+ONCE_IDENTITY = {
+    "common_name": "gmdn_term",
+    "gmdn_code": "gmdn_code",
+    "udi": "udi_di",
+    "basic_udi": "basic_udi_di",
+    "eu_nomenclature_code": "emdn_code",
+}
+ONCE_REGISTRATION = {
+    "us_product_code": ("US", "product_code"),
+    "us_clearance": ("US", "registration_number"),
+    "in_licence": ("IN", "registration_number"),
+    "gb_certificate": ("GB", "registration_number"),
+    "ca_licence": ("CA", "registration_number"),
+}
+ONCE_PARTY = {
+    "us_manufacturer": "MANUFACTURER",
+    "us_contact_office": "MANUFACTURER",
+    "in_manufacturer": "MANUFACTURER",
+    "manufacturer_name": "MANUFACTURER",
+    "manufacturer": "MANUFACTURER",
+    "contact_office": "MANUFACTURER",
+    "in_importer": "IMPORTER",
+    "importer": "IMPORTER",
+    "in_reporter": "LICENCE_HOLDER",
+    "authorised_rep": "AUTHORISED_REPRESENTATIVE",
+    "uk_responsible_person": "UK_RESPONSIBLE_PERSON",
+}
+
+
+def scope_of(source: str | None) -> str:
+    if source in _PRODUCT_SOURCES:
+        return PRODUCT
+    if source in _ORGANIZATION_SOURCES:
+        return ORGANIZATION
+    return EVENT
+
+
+def once_of(source: str | None) -> bool:
+    """Whether a field can be entered once for every report (the product's or the organization's own fact)."""
+    return source in ONCE_IDENTITY or source in ONCE_REGISTRATION or source in ONCE_PARTY
+
+
 def build(
     form: forms.Form, context: dict, entries: dict, names: dict[str, str], request: str | None = None
 ) -> list[dict]:
@@ -772,6 +857,11 @@ def build(
                     "code_annex": annex,
                     "suggestion": suggestion,
                     "suggested": entry.get("suggested") if annex else None,
+                    # Who knows it, and whether it is entered once for every report (0.10.83, D2.7).
+                    "scope": scope_of(item.source),
+                    "once": once_of(item.source),
+                    # Fields entered together once (a US registration: its product code and its number).
+                    "once_key": "US_REGISTRATION" if item.source in ("us_product_code", "us_clearance") else item.id,
                 }
             )
         out.append({"code": section.code, "title": section.title, "note": section.note or None, "fields": rows})
@@ -794,7 +884,11 @@ def frozen(sections: list[dict]) -> list[dict]:
             **section,
             # A suggestion nobody confirmed is never frozen (0.10.77): it never reaches the form or the PDF.
             "fields": [
-                {key: value for key, value in item.items() if key not in ("editable", "suggestion")}
+                {
+                    key: value
+                    for key, value in item.items()
+                    if key not in ("editable", "suggestion", "scope", "once", "once_key")
+                }
                 for item in section["fields"]
             ],
         }

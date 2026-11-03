@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { formatDay, localDay } from "../../../app/dates";
+import { formatDateTime, formatDay, localDay } from "../../../app/dates";
 import {
   chooseCase,
   sectionAllowed,
@@ -68,7 +68,9 @@ import { offeredTab } from "../../../app/featureSet";
 import { InspectionChecks, SummaryDownload } from "./Readiness";
 import { ExportButton, OversightView } from "./Oversight";
 import { Capas } from "./Investigations";
-import { NO_FILTERS, eventPath } from "../oversight";
+import { NO_FILTERS, eventPath, type EventView } from "../oversight";
+import { tabParam } from "../workspaceAddress";
+import { reportPlace } from "../authorityReports";
 import { useShortStory } from "./ShortStory";
 import { downloadFile } from "../../reports/download";
 
@@ -101,6 +103,8 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
   // decision summary leads while the person has signed nothing yet.
   const signed = useResource<{ record: SignedRecord | null }>("/api/v1/oversight/latest-signed");
   const latest = signed.data?.record ?? null;
+  // The record one story just finished (?complaint=<ref>, 0.10.84, M4): it leads, whoever signed it.
+  const storyRef = tabParam(tab, "complaint");
   const all = (
     <Tabs tabs={tabs} active={active} onChange={setActive} label="Record sections">
       {active === "Inspection readiness" && <InspectionChecks />}
@@ -125,15 +129,17 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
   );
   // The record of the work just finished leads, with its Download; every other record sits behind "All records"
   // (0.10.72, B6). With nothing just finished, Records opens as before.
-  if (!finished && !latest) return all;
+  if (!storyRef && !finished && !latest) return all;
   return (
     <>
-      {latest ? (
+      {storyRef ? (
+        <FinishedRecord reference={storyRef} />
+      ) : latest ? (
         <LatestSigned record={latest} />
       ) : (
         finished && <LatestRecord complaintId={finished.id} reference={finished.ref} />
       )}
-      <details className="uw-more" open={!!tab}>
+      <details className="uw-more" open={!!tab && !storyRef}>
         <summary>
           All records: inspection readiness, documents, decision records, audit trail, signatures, exports
         </summary>
@@ -149,6 +155,9 @@ export type SignedRecord = {
   signed_at: string | null;
   signed_by: string | null;
   meaning: string | null;
+  /** 0.10.83 (D2.8): the moment, and the meaning in a few words (21 CFR 11.50). */
+  signed_at_time?: string | null;
+  meaning_label?: string | null;
   complaint: { id: string; ref: string } | null;
   investigation: { id: string; ref: string } | null;
 };
@@ -175,8 +184,9 @@ export function LatestSigned({ record }: { record: SignedRecord }) {
   return (
     <Panel eyebrow="Your latest signed record" title={reference ? `${record.what} · ${reference}` : record.what}>
       <p className="ac-muted">
-        Signed {formatDate(record.signed_at)}
-        {record.signed_by ? ` by ${record.signed_by}` : ""}. Ready to hand to a colleague or an inspector.
+        {record.signed_by ?? "Signed"} ·{" "}
+        {record.signed_at_time ? formatDateTime(record.signed_at_time) : formatDate(record.signed_at)}
+        {record.meaning_label ? ` · ${record.meaning_label}` : ""}. Ready to hand to a colleague or an inspector.
       </p>
       <div className="ca-action-row">
         {canExport && record.complaint && (
@@ -198,6 +208,74 @@ export function LatestSigned({ record }: { record: SignedRecord }) {
           onClick={openIt}
         >
           {reference ? `Open ${reference}` : "Open the decision records"}
+        </button>
+      </div>
+      <InlineError text={error} />
+    </Panel>
+  );
+}
+
+/**
+ * The record a story just finished (0.10.84, M4): the signed conclusion, the report and who signed, from the
+ * complaint's own record page, with its decision record to download.
+ */
+export function FinishedRecord({ reference }: { reference: string }) {
+  const { open } = useWorkspace();
+  const canExport = useCan("data.export");
+  const [error, setError] = useState("");
+  const view = useResource<EventView>(eventPath(reference));
+  const related = view.data?.related ?? [];
+  const lines = (key: string) => related.find((group) => group.key === key)?.lines ?? [];
+  const report = related.find((group) => group.key === "reports")?.items?.[0];
+  const rows: Array<[string, string[]]> = [
+    ["Signed conclusion", lines("assessments")],
+    ["Authority report", lines("reports")],
+    ["Approval and decisions", lines("decisions")],
+  ];
+  return (
+    <Panel eyebrow="The record you just finished" title={`${reference} · ready for an inspector`} source={view}>
+      {view.data && (
+        <dl className="uw-finished">
+          {rows.map(([label, values]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{values.length ? values.join(" · ") : "—"}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      <div className="ca-action-row">
+        {canExport && view.data && (
+          <button
+            type="button"
+            className="ac-primary"
+            onClick={() =>
+              void downloadFile(`${eventPath(view.data!.event.complaint_id)}/decision-record.pdf`, {
+                fallbackName: `mdarix-event-record-${reference}.pdf`,
+              }).catch((reason) => setError(errorText(reason, "The record could not be downloaded.")))
+            }
+          >
+            Download the decision record (PDF)
+          </button>
+        )}
+        {report && (
+          <button
+            type="button"
+            className="ac-secondary"
+            onClick={() => {
+              const place = reportPlace(report.id);
+              open(place.section, place.tab);
+            }}
+          >
+            Open the report
+          </button>
+        )}
+        <button
+          type="button"
+          className={canExport ? "ac-link" : "ac-primary"}
+          onClick={() => open("Complaint", `Summary?ref=${encodeURIComponent(reference)}`)}
+        >
+          Open {reference}
         </button>
       </div>
       <InlineError text={error} />

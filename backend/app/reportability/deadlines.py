@@ -12,6 +12,9 @@ obligation, its reminders and the oversight view, worksheets and exports) is cou
   working calendar, Settings); **it ends** at the earlier of the end of that day in the two time zones. A market without
   an authority time zone here (Canada, or a country outside the four markets) counts in the organization's time zone,
   from the day after awareness.
+- **Every label is written in the organization's time zone** (0.10.84), whichever zone's end of day binds: a person
+  reads every deadline on every screen in one zone ("Thu 12 Nov 2026, 18:59 EST", never GMT on one screen and EST on
+  the next). The moment itself is unchanged.
 - Work days are Monday to Friday; public holidays are not known and count as work days, which only makes a date
   earlier. No weekend or holiday extension is applied (EU Regulation 1182/71 is left out: conservative).
 
@@ -98,11 +101,13 @@ class Deadline:
     at: datetime  # its end, in UTC
     zone: str  # the time zone whose end of day binds
     market: str | None = None
+    org: str | None = None  # the organization's time zone, which every label is written in
 
     @property
     def label(self) -> str:
-        """ "Mon 30 Nov 2026, 23:59 IST"."""
-        return moment_label(self.at, self.zone)
+        """ "Mon 30 Nov 2026, 23:59 IST": the moment in the organization's time zone (0.10.84), so a person reads every
+        deadline on every screen in one zone; in the binding zone where no organization's is known."""
+        return moment_label(self.at, self.org or self.zone)
 
 
 def moment_label(at: datetime, zone: str) -> str:
@@ -112,12 +117,9 @@ def moment_label(at: datetime, zone: str) -> str:
 
 
 def due_label(at: datetime, market: str | None, org_zone: str | None, legal: bool = False) -> str:
-    """A due time's label on the oversight view and in alerts: a legal deadline (``market`` known, or ``legal``) in the
-    time zone where it ends at 23:59 (its authority's or the organization's); anything else in the organization's."""
-    zones = _zones(market, org_zone) if market else [*AUTHORITY_ZONES.values(), org_zone or "UTC"] if legal else []
-    for zone in zones:
-        if _utc(at).astimezone(zone_info(zone) or timezone.utc).time().replace(microsecond=0) == END_OF_DAY:
-            return moment_label(at, zone)
+    """A due time's label on the oversight view and in alerts, in the organization's time zone like every deadline
+    (0.10.84: the complaint page said EST and its triage table GMT for one clock). ``market`` and ``legal`` are kept for
+    the callers; the zone no longer depends on them."""
     return moment_label(at, org_zone or "UTC")
 
 
@@ -129,7 +131,7 @@ def end_of(day: date, market: str | None, org_zone: str | None) -> Deadline:
         for zone in _zones(market, org_zone)
     ]
     at, zone = min(ends, key=lambda item: item[0])
-    return Deadline(day, at, zone, market)
+    return Deadline(day, at, zone, market, org_zone)
 
 
 def count(aware: datetime | date, days: int, day_basis: str, market: str | None, org_zone: str | None) -> Deadline:

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { errorText, send } from "../../customer-admin/shared";
 import { InlineError } from "./boardParts";
 import { useCanReport } from "./Reports";
+import { STARTER_LABEL } from "../../shared/standards";
 
 /** A fact a reporting step needs and the complaint's record does not give (0.10.81, the server's facts.py). */
 export type FactNeed = {
@@ -23,10 +24,13 @@ export function ReportingFacts({
   complaintId,
   needs,
   onSaved,
+  quiet = false,
 }: {
   complaintId: string;
   needs: FactNeed[] | null | undefined;
   onSaved: () => void;
+  /** Another form on the page holds the main button (the triage record): this one is secondary (0.10.82). */
+  quiet?: boolean;
 }) {
   const canEnter = useCanReport();
   const [values, setValues] = useState<Record<string, string>>({});
@@ -57,7 +61,9 @@ export function ReportingFacts({
           <p>
             <b>{need.label} needed.</b> {need.message}
           </p>
-          <p className="ac-note">Needed by {need.rule}. Starter rule, for your consultant to confirm.</p>
+          <p className="ac-note">
+            Needed by {need.rule}. {STARTER_LABEL}.
+          </p>
           {canEnter && (
             <label>
               {need.label}{" "}
@@ -74,7 +80,12 @@ export function ReportingFacts({
         </div>
       ))}
       {canEnter ? (
-        <button type="button" className="ac-primary" disabled={busy || !ready} onClick={save}>
+        <button
+          type="button"
+          className={quiet ? "ac-secondary" : "ac-primary"}
+          disabled={busy || !ready}
+          onClick={save}
+        >
           {busy ? "Saving…" : "Save"}
         </button>
       ) : (
