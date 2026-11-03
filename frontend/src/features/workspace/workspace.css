@@ -7626,11 +7626,12 @@ button.uw-org:hover {
   margin-left: var(--ms-space-2);
   border: 1px solid var(--ms-warn-line);
   border-radius: var(--ms-radius-pill);
+  background: var(--ms-warn-bg);
   overflow: hidden;
 }
 .uw-data-choice button {
   border: 0;
-  padding: 2px 10px;
+  padding: 3px 9px;
   background: transparent;
   color: var(--ms-warn);
   font-size: var(--ms-fs-12);
@@ -7641,11 +7642,12 @@ button.uw-org:hover {
   border-left: 1px solid var(--ms-warn-line);
 }
 .uw-data-choice button.is-on {
-  background: var(--ms-warn-bg);
+  background: var(--ms-warn);
+  color: var(--ms-surface);
   font-weight: var(--ms-fw-bold);
 }
 .uw-data-choice button:focus-visible {
-  outline: 2px solid var(--ms-warn);
+  outline: 2px solid var(--ms-navy);
   outline-offset: -2px;
 }
 .uw-avatar-data {
@@ -7653,6 +7655,9 @@ button.uw-org:hover {
   border-block: 1px solid var(--ms-line);
 }
 @media (max-width: 1100px) {
+  .uw-data-choice {
+    display: none;
+  }
   .uw-avatar-data {
     display: block;
   }

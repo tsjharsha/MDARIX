@@ -67,7 +67,11 @@ export function ComplaintList({
     session?.sample_only,
   );
   const openInvestigation = useOpenInvestigation();
-  const [filters, setFilters] = useState<ComplaintListFilters>(() => initialFilters ?? EMPTY_COMPLAINT_FILTERS);
+  // While the top bar chooses the data (0.10.80), a link's own data filter is its; the list's filters leave it out.
+  const [filters, setFilters] = useState<ComplaintListFilters>(() => ({
+    ...(initialFilters ?? EMPTY_COMPLAINT_FILTERS),
+    ...(dataSource ? { source: "" } : {}),
+  }));
   const [page, setPage] = useState(1);
   const { sort, onSort } = useServerSort(() => setPage(1));
   // The top bar's "Sample data · Your data" (0.10.80) decides the data while a trial has both; else the list's own.

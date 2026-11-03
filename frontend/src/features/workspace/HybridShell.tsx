@@ -461,6 +461,7 @@ export function AvatarMenu({
           )}
           {data && (
             <div className="uw-avatar-data" role="group" aria-label="Data shown">
+              <p className="uw-pop-title">Data shown</p>
               {DATA_CHOICES.map((item) => (
                 <button
                   key={item.source}
