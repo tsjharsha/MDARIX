@@ -189,7 +189,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                 prefix={
                   // A clock waiting for the country or the awareness date is never shown as a real deadline (0.10.81).
                   item.key.endsWith(":facts")
-                    ? `${item.category_label}, provisional`
+                    ? "Provisional deadline"
                     : LEGAL.includes(item.category) && item.market
                       ? marketLabel(item.market)
                       : item.category_label
