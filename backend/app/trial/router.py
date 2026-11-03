@@ -203,8 +203,9 @@ def trial_status(
         "starts_at": subscription.starts_at.isoformat(),
         "expires_at": subscription.expires_at.isoformat(),
         # When the trial's data is deleted at the earliest unless the organization continues: counting a grace
-        # extension and an open request to move the data into the MVP (backend/app/trial/retention.py).
-        "data_deleted_at": retention.deletion_date(db, data, subscription, now).isoformat(),
+        # extension and an open request to move the data into the MVP; none under a legal hold, with the hold
+        # (backend/app/trial/retention.py, the one projection every screen and e-mail reads).
+        **_retention_fields(retention.projection(db, data, subscription, now)),
         "days_left": max(0, int(-(-seconds_left // 86400))),
         "limits": {"users": trial_user_cap(), "rows": TRIAL_ROW_LIMIT, "file_bytes": TRIAL_FILE_LIMIT_BYTES},
         "usage": {"users": int(users or 0), "rows": uploaded},
@@ -1242,6 +1243,15 @@ def trial_support_access_activity(
 
 
 # ------------------------------------------------------------------------------------------- Data retention
+
+
+def _retention_fields(plan: dict) -> dict:
+    """The status's deletion date and hold (no date under a legal hold)."""
+    return {
+        "data_deleted_at": plan["earliest_deletion"].isoformat() if plan["earliest_deletion"] else None,
+        "data_hold": plan["hold"],
+        "data_hold_reason": retention.HOLD_REASONS.get(plan["hold"]),
+    }
 
 
 @router.get("/platform-admin/trial-retention")

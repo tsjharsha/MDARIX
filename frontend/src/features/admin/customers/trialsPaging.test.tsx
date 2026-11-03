@@ -154,6 +154,10 @@ describe("trial data held for a pilot request", () => {
     ).toBe("Data deleted 2026-12-03");
     expect(retentionText(null, day, "2026-11-19T00:00:00+00:00")).toBe("Data deleted 2026-11-19");
     expect(retentionText(null, day)).toBeNull();
+    // 0.10.86: under a legal hold there is no date, whatever the 30 days would give.
+    expect(
+      retentionText({ ...plan, held_for_mvp_request: false, hold: "LEGAL_HOLD", earliest_deletion: null }, day),
+    ).toBe("Data kept under a legal hold: no deletion date until it is lifted");
     expect(trialBadgeOf({ state: "ENDED", retention: plan }).label).toBe("Ended, data held for its pilot request");
     expect(trialBadgeOf({ state: "ENDED", retention: null }).label).toBe("Ended, data kept 30 days");
   });
