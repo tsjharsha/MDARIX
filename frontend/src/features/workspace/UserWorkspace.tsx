@@ -444,6 +444,9 @@ export function UserWorkspace({
     (source: string) => {
       saveDataChoice(session, source);
       setDataChoice(source);
+      // The screen opens again on the chosen data, as it stands (its address), so no list shows the other data while
+      // it reads the new one.
+      setLocation((current) => ({ ...current, tab: shownRef.current.tab, key: current.key + 1 }));
     },
     [session],
   );
