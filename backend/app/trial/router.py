@@ -61,10 +61,13 @@ class ColleagueInvite(BaseModel):
     display_name: str = Field(min_length=1, max_length=120)
     # The colleague's persona, which sets their real role (0.10.73); none named: the Quality Leader (Leader).
     persona: str | None = Field(default=None, max_length=40)
+    # Several personas (0.10.82, D1.9): each one's role; ``persona`` alone still works (one persona).
+    personas: list[str] | None = Field(default=None, max_length=7)
 
 
 class ColleaguePersona(BaseModel):
-    persona: str = Field(min_length=1, max_length=40)
+    persona: str | None = Field(default=None, min_length=1, max_length=40)
+    personas: list[str] | None = Field(default=None, max_length=7)
 
 
 # ------------------------------------------------------------------------------------------- Platform Admin queue
@@ -1102,7 +1105,7 @@ def invite_trial_colleague(
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     return team.invite_colleague(
-        db, tenant_id, _current_user(db, ctx), payload.email, payload.display_name, payload.persona
+        db, tenant_id, _current_user(db, ctx), payload.email, payload.display_name, payload.persona, payload.personas
     )
 
 
@@ -1116,7 +1119,9 @@ def change_trial_colleague_persona(
     """The trial owner gives a colleague another persona, and with it the persona's role (backend/app/trial/team.py)."""
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
-    return team.change_colleague_persona(db, tenant_id, _current_user(db, ctx), user_id, payload.persona)
+    return team.change_colleague_persona(
+        db, tenant_id, _current_user(db, ctx), user_id, payload.persona, payload.personas
+    )
 
 
 @router.post("/trial/team/{user_id}/resend-invitation")

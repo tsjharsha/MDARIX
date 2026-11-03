@@ -8155,3 +8155,42 @@ button.uw-org:hover {
     width: 100%;
   }
 }
+/* Several personas per colleague (0.10.82, D1.9): ticked, and changed under the colleague's own disclosure. */
+.uw-team-ticks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 16px;
+  flex-basis: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.uw-team-ticks legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-weight: 600;
+}
+.uw-team-ticks .ca-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.uw-team-ticks small {
+  display: block;
+}
+details.uw-team-change {
+  display: grid;
+  gap: var(--ms-space-2);
+}
+details.uw-team-change > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ms-info);
+  font-size: var(--ms-fs-12);
+  font-weight: 600;
+  cursor: pointer;
+}
+details.uw-team-change[open] {
+  flex-basis: 100%;
+}

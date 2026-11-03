@@ -105,11 +105,14 @@ export function PersonaSwitch({
   options,
   locked,
   onChoose,
+  colleague = false,
 }: {
   persona: string;
   options: readonly PersonaOption[];
   locked: boolean;
   onChoose: (code: string) => void;
+  /** A colleague the owner gave several personas: the menu lists only theirs (0.10.82, D1.9). */
+  colleague?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -144,7 +147,7 @@ export function PersonaSwitch({
       </button>
       {open && (
         <div className="uw-pop uw-persona-menu" id="uw-persona-menu" role="menu" aria-label="View MDARIX as">
-          <p className="uw-pop-title">View MDARIX as</p>
+          <p className="uw-pop-title">{colleague ? "Your personas · set by the trial owner" : "View MDARIX as"}</p>
           {options.map((item) => (
             <button
               key={item.code}
@@ -166,8 +169,9 @@ export function PersonaSwitch({
             </button>
           ))}
           <p className="uw-pop-note">
-            Changes what you see, not what you may sign. Signing follows your own role. MDARIX remembers your choice for
-            your next sign-in.
+            {colleague
+              ? `You hold these ${options.length} personas, so you can switch between them. Only the trial owner can add or remove one. You may sign what each of your roles allows, but never approve something you prepared.`
+              : "Changes what you see, not what you may sign. Signing follows your own role. MDARIX remembers your choice for your next sign-in."}
           </p>
         </div>
       )}

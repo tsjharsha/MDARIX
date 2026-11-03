@@ -169,3 +169,77 @@ def test_the_complaint_page_gives_the_harm_in_words_apart_from_patient_involveme
         "Not known yet",
         "No harm reported",
     ]
+
+
+def test_a_colleague_holds_several_personas_switches_between_them_and_never_approves_their_own_work():
+    """D1.9: the owner ticks several personas; the colleague gets every matching role (rights add up), switches
+    "Viewing as" only between their own, the owner can change the set later (audited before and after), and the
+    colleague still never approves a report they prepared."""
+    from fastapi.testclient import TestClient
+
+    from backend.app.main import app
+    from tests.test_free_trial import _activation_token
+    from tests.test_release_c3_0_10_75 import _audit
+
+    owner, approval, _ = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    try:
+        mail = f"d19-{uuid.uuid4().hex[:6]}@example.invalid"
+        invited = _ok(
+            owner.post(
+                "/api/v1/trial/team",
+                json={"email": mail, "display_name": "Rahul Iyer", "personas": ["decision", "regulatory"]},
+            )
+        )
+        assert invited["personas"] == ["regulatory", "decision"] and invited["role"] == "REGULATORY_REVIEWER"
+        colleague = TestClient(app)
+        _ok(
+            colleague.post(
+                "/api/v1/auth/activate-account", json={"token": _activation_token(invited, mail), "password": PASSWORD}
+            )
+        )
+        _ok(colleague.post("/api/v1/auth/signin", json={"email": mail, "password": PASSWORD}))
+        me = _ok(colleague.get("/api/v1/session/context"))
+        assert [item["code"] for item in me["persona_options"]] == ["regulatory", "decision"]
+        assert me["persona"] == "regulatory" and not me["persona_locked"]
+        # Rights add up: the Regulatory Reviewer's review and the Approver's signature.
+        assert {"regulatory.review", "decision.sign"} <= set(me["business_permissions"])
+        # They switch between their own personas, never to one they do not hold.
+        assert _ok(colleague.post("/api/v1/me/persona", json={"persona": "decision"}))["persona"] == "decision"
+        assert colleague.post("/api/v1/me/persona", json={"persona": "quality"}).status_code == 403
+        team = _ok(owner.get("/api/v1/trial/team"))
+        member = next(item for item in team["members"] if item["email"] == mail)
+        assert [item["code"] for item in member["personas"]] == ["regulatory", "decision"]
+        # The owner changes the set later; it is audited before and after, and one persona is locked again.
+        _ok(owner.post(f"/api/v1/trial/team/{invited['id']}/persona", json={"personas": ["handler"]}))
+        last = [e for e in _audit(tenant_id, "TRIAL_PERSONA_ASSIGNED") if e.details.get("how") == "changed"][-1]
+        assert last.old_values["personas"] == ["regulatory", "decision"] and last.new_values["personas"] == ["handler"]
+        again = _ok(colleague.get("/api/v1/session/context"))
+        assert again["persona"] == "handler" and again["persona_locked"]
+        assert "decision.sign" not in again["business_permissions"]
+        assert colleague.post("/api/v1/me/persona", json={"persona": "regulatory"}).status_code == 403
+        # Back to Regulatory + Decision Maker: they prepare a report and may not approve it themselves while a
+        # colleague may (alone in a trial, the practice approval of 0.10.75 still applies).
+        _ok(owner.post(f"/api/v1/trial/team/{invited['id']}/persona", json={"personas": ["regulatory", "decision"]}))
+        third = f"d19-b-{uuid.uuid4().hex[:6]}@example.invalid"
+        other = _ok(
+            owner.post("/api/v1/trial/team", json={"email": third, "display_name": "Meera Das", "persona": "decision"})
+        )
+        _ok(
+            TestClient(app).post(
+                "/api/v1/auth/activate-account", json={"token": _activation_token(other, third), "password": PASSWORD}
+            )
+        )
+        complaint = _flagship(owner)
+        _ok(_sign_us(owner, complaint, "REPORTABLE"))
+        (report,) = _reports(owner, complaint)
+        fill(colleague, REPORTS, report["id"], _ok(colleague.get(f"{REPORTS}/{report['id']}"))["mandatory"]["missing"])
+        detail = _ok(colleague.post(f"{REPORTS}/{report['id']}/snapshots"))
+        assert not detail["approval"]["may_approve"]
+        refused = colleague.post(
+            f"{REPORTS}/{report['id']}/snapshots/{detail['pending_snapshot']['id']}/approve",
+            json={"password": PASSWORD},
+        )
+        assert refused.status_code == 403
+    finally:
+        _purge(tenant_id)

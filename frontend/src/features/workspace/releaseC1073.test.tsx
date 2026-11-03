@@ -253,12 +253,12 @@ describe("the team: a persona per invitation", () => {
     expect(markup).toContain("Persona");
     expect(markup).toContain("Send the invitation");
     expect(markup).not.toContain('value="admin"'); // Admin is the trial owner's own
-    expect(markup).toContain("They see this persona&#x27;s screens and sign as its role");
+    expect(markup).toContain("Their rights add up; nobody approves what they prepared.");
   });
 
   it("lists each person's persona, with a lock for a colleague, and lets the owner change it", () => {
     expect(markup).toContain("Regulatory Leader");
-    expect(markup).toContain("Set by you: they cannot change it");
+    expect(markup).toContain("Save the personas");
     // A colleague viewing the team sees the persona with its lock, and nothing to change.
     const seen = renderToStaticMarkup(
       <TeamView
@@ -272,9 +272,9 @@ describe("the team: a persona per invitation", () => {
       />,
     );
     expect(seen).toContain('aria-label="set by the trial owner"');
-    expect(seen).not.toContain("Persona of Rahul Colleague");
-    expect(markup).toContain("Persona of Rahul Colleague");
-    const confirm = personaConfirmation(team.members[1], team.personas![5], () => undefined);
+    expect(seen).not.toContain("change the personas of Rahul Colleague");
+    expect(markup).toContain("change the personas of Rahul Colleague");
+    const confirm = personaConfirmation(team.members[1], [team.personas![5]], () => undefined);
     expect(confirm.title).toBe("Make Rahul Colleague a Decision Maker?");
     expect(confirm.body).toContain("signs as its role");
   });

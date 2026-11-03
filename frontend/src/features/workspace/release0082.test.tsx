@@ -5,6 +5,7 @@ import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 import { runOf, shownRun, stepBlocker, stepPlace, type OneStory, type StoryRun } from "./oneStory";
 import { StoryView } from "./sections/OneStory";
 import { HomeSection } from "./sections/Home";
+import { TeamView, personaConfirmation } from "./sections/TrialTeam";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import type { TrendItem } from "./signalAi";
 
@@ -142,5 +143,71 @@ describe("Home's tiles while they read (D1.6)", () => {
     expect(stats.match(/Reading…/g)).toHaveLength(3);
     expect(stats).not.toContain("No product rising");
     expect(stats).not.toContain("Nothing past its time");
+  });
+});
+
+describe("Team: several personas per invited colleague (D1.9)", () => {
+  const personas = [
+    { code: "quality", label: "Quality Leader", sub: "Complaints, investigations, CAPA, trends" },
+    { code: "regulatory", label: "Regulatory Leader", sub: "Reportability, legal clocks, authority reports" },
+    { code: "decision", label: "Decision Maker", sub: "Approvals and signed decisions" },
+  ];
+  const rahul = {
+    id: "u2",
+    display_name: "Rahul Iyer",
+    email: "rahul@example.test",
+    status: "ACTIVE",
+    is_owner: false,
+    is_you: false,
+    persona: "regulatory",
+    persona_label: "Regulatory Leader",
+    persona_locked: true,
+    personas: [
+      { code: "regulatory", label: "Regulatory Leader" },
+      { code: "decision", label: "Decision Maker" },
+    ],
+  };
+  const team = {
+    can_invite: true,
+    can_manage: true,
+    limit: 50,
+    seats_used: 2,
+    personas,
+    members: [
+      {
+        ...rahul,
+        id: "u1",
+        display_name: "Asha Menon",
+        is_owner: true,
+        is_you: true,
+        persona_locked: false,
+        personas: [],
+      },
+      rahul,
+    ],
+  };
+
+  it("invites with one or more personas ticked, and shows a colleague's personas together", () => {
+    const html = renderToStaticMarkup(
+      <TeamView
+        team={{ state: "ready", data: team, reload: () => undefined }}
+        busy={false}
+        message={null}
+        onInvite={async () => true}
+        onResend={() => undefined}
+        onConfirm={() => undefined}
+        onChanged={() => undefined}
+      />,
+    );
+    expect(html).toContain("Personas: tick one or more");
+    expect(html.match(/type="checkbox"/g)!.length).toBeGreaterThanOrEqual(3);
+    expect(html).not.toContain("<select");
+    expect(html).toContain("Regulatory Leader + Decision Maker");
+  });
+
+  it("changes the set with one confirmation naming every persona", () => {
+    const confirm = personaConfirmation(rahul, [personas[1], personas[2]], () => undefined);
+    expect(confirm.title).toBe("Make Rahul Iyer a Regulatory Leader + Decision Maker?");
+    expect(confirm.body).toContain("Nobody approves what they prepared themselves.");
   });
 });

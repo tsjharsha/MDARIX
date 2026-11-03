@@ -20,6 +20,8 @@ export type TeamMember = {
   persona?: string;
   persona_label?: string;
   persona_locked?: boolean;
+  /** Every persona the owner gave the colleague (0.10.82, D1.9): their roles add up. */
+  personas?: Array<{ code: string; label: string }>;
 };
 
 /** A persona the owner may give a colleague (access_control/personas.py COLLEAGUE_PERSONAS). */
@@ -84,19 +86,101 @@ export function mfaResetConfirmation(member: TeamMember, onDone: () => void): Co
   };
 }
 
-/** The confirmation for giving a colleague another persona, and with it its role (0.10.73). */
-export function personaConfirmation(member: TeamMember, persona: TeamPersona, onDone: () => void): Confirmation {
+/** "Regulatory Leader + Decision Maker". */
+export const personaList = (personas: ReadonlyArray<{ label: string }>) =>
+  personas.map((item) => item.label).join(" + ");
+
+/** The confirmation for giving a colleague other personas, and with them their roles (0.10.73; several, 0.10.82). */
+export function personaConfirmation(
+  member: TeamMember,
+  personas: readonly TeamPersona[],
+  onDone: () => void,
+): Confirmation {
   const name = member.display_name || member.email;
+  const names = personaList(personas);
   return {
-    title: `Make ${name} a ${persona.label}?`,
-    body: `${name} then sees the ${persona.label}'s screens and signs as its role: ${persona.sub}. Their earlier work stays as it was. Only you can change it again.`,
-    confirmLabel: "Change the persona",
-    done: `${name} is now a ${persona.label}.`,
+    title: `Make ${name} a ${names}?`,
+    body: `${name} then sees ${personas.length > 1 ? "each persona's" : `the ${names}'s`} screens, switches between them, and signs as ${personas.length > 1 ? "their roles together" : "its role"}: ${personas.map((item) => item.sub).join("; ")}. Nobody approves what they prepared themselves. Their earlier work stays as it was. Only you can change it again.`,
+    confirmLabel: personas.length > 1 ? "Change the personas" : "Change the persona",
+    done: `${name} is now a ${names}.`,
     run: async () => {
-      await send(`${TEAM_PATH}/${member.id}/persona`, "POST", { persona: persona.code });
+      await send(`${TEAM_PATH}/${member.id}/persona`, "POST", { personas: personas.map((item) => item.code) });
       onDone();
     },
   };
+}
+
+/** One or more personas, ticked (0.10.82, D1.9). */
+function PersonaTicks({
+  personas,
+  chosen,
+  onChange,
+  legend,
+  disabled = false,
+}: {
+  personas: readonly TeamPersona[];
+  chosen: readonly string[];
+  onChange: (codes: string[]) => void;
+  legend: string;
+  disabled?: boolean;
+}) {
+  return (
+    <fieldset className="uw-team-ticks">
+      <legend>{legend}</legend>
+      {personas.map((item) => (
+        <label key={item.code} className="ca-check">
+          <input
+            type="checkbox"
+            checked={chosen.includes(item.code)}
+            disabled={disabled}
+            onChange={(event) =>
+              onChange(event.target.checked ? [...chosen, item.code] : chosen.filter((code) => code !== item.code))
+            }
+          />{" "}
+          <span>
+            <b>{item.label}</b> <small className="ac-muted">{item.sub}</small>
+          </span>
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+/** A colleague's personas, changed by the owner: tick, then confirm. */
+function ChangePersonas({
+  member,
+  personas,
+  busy,
+  onConfirm,
+  onChanged,
+}: {
+  member: TeamMember;
+  personas: readonly TeamPersona[];
+  busy: boolean;
+  onConfirm: (request: Confirmation) => void;
+  onChanged: () => void;
+}) {
+  const held = (member.personas ?? []).map((item) => item.code);
+  const [chosen, setChosen] = useState<string[]>(held.length ? held : member.persona ? [member.persona] : []);
+  const picked = personas.filter((item) => chosen.includes(item.code));
+  const same = picked.map((item) => item.code).join() === held.join();
+  return (
+    <details className="uw-team-change">
+      <summary>
+        <Lock size={13} aria-hidden="true" /> {personaList(member.personas?.length ? member.personas : picked)}
+        <span className="ca-sr-only"> · change the personas of {member.display_name || member.email}</span>
+      </summary>
+      <PersonaTicks personas={personas} chosen={chosen} onChange={setChosen} legend="Personas" disabled={busy} />
+      <button
+        type="button"
+        className="ac-secondary"
+        disabled={busy || !picked.length || same}
+        onClick={() => onConfirm(personaConfirmation(member, picked, onChanged))}
+      >
+        Save the personas
+      </button>
+    </details>
+  );
 }
 
 type Message = { tone: "good" | "bad"; text: string; link?: string };
@@ -156,7 +240,7 @@ export function TeamPanel({ onChanged }: { onChanged: () => void }) {
         team={team}
         busy={busy}
         message={message}
-        onInvite={(email, name, persona) => invite(TEAM_PATH, { email, display_name: name, persona })}
+        onInvite={(email, name, personas) => invite(TEAM_PATH, { email, display_name: name, personas })}
         onResend={(member) => void invite(`${TEAM_PATH}/${member.id}/resend-invitation`)}
         onConfirm={(request) => {
           setMessage(null);
@@ -190,18 +274,17 @@ export function TeamView({
   team: Resource<Team>;
   busy: boolean;
   message: Message | null;
-  onInvite: (email: string, name: string, persona: string) => Promise<boolean>;
+  onInvite: (email: string, name: string, personas: string[]) => Promise<boolean>;
   onResend: (member: TeamMember) => void;
   onConfirm: (request: Confirmation) => void;
   onChanged: () => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [persona, setPersona] = useState("quality");
+  const [ticked, setTicked] = useState<string[]>(["quality"]);
   const data = team.data;
   const full = !!data && data.seats_used >= data.limit;
   const personas = data?.personas ?? [];
-  const chosen = personas.find((item) => item.code === persona);
   return (
     <Panel
       title="Your trial team"
@@ -214,8 +297,9 @@ export function TeamView({
         <>
           {data.can_invite && (
             <p className="ac-muted">
-              Invite as many colleagues as you need. You choose each person's persona, and it is their role: they see
-              its screens and sign as it. They cannot change it.
+              Invite as many colleagues as you need. Tick one or more personas for each: they are their roles. They see
+              each persona's screens and switch between them; their rights add up, but nobody approves what they
+              prepared. Only you can change them.
             </p>
           )}
           <ul className="uw-team">
@@ -234,7 +318,7 @@ export function TeamView({
                     className="ms-chip uw-team-persona"
                     title={member.persona_locked ? "Set by the trial owner" : undefined}
                   >
-                    {member.persona_label}
+                    {member.personas?.length ? personaList(member.personas) : member.persona_label}
                     {member.persona_locked && <Lock size={12} aria-label="set by the trial owner" />}
                   </span>
                 )}
@@ -242,24 +326,13 @@ export function TeamView({
                   {memberStatus(member)}
                 </span>
                 {data.can_manage && !member.is_owner && personas.length > 0 && (
-                  <label className="uw-team-change" title="Set by you: they cannot change it">
-                    <Lock size={13} aria-hidden="true" />
-                    <span className="ca-sr-only">Persona of {member.display_name || member.email}</span>
-                    <select
-                      value={member.persona ?? ""}
-                      disabled={busy}
-                      onChange={(event) => {
-                        const next = personas.find((item) => item.code === event.target.value);
-                        if (next) onConfirm(personaConfirmation(member, next, onChanged));
-                      }}
-                    >
-                      {personas.map((item) => (
-                        <option key={item.code} value={item.code}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <ChangePersonas
+                    member={member}
+                    personas={personas}
+                    busy={busy}
+                    onConfirm={onConfirm}
+                    onChanged={onChanged}
+                  />
                 )}
                 {memberActions(member, data).map((action) =>
                   action === "resend" ? (
@@ -302,7 +375,8 @@ export function TeamView({
               className="uw-team-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                void onInvite(email.trim(), name.trim(), persona).then((sent) => {
+                if (!ticked.length) return;
+                void onInvite(email.trim(), name.trim(), ticked).then((sent) => {
                   if (!sent) return;
                   setName("");
                   setEmail("");
@@ -324,28 +398,26 @@ export function TeamView({
                 />
               </label>
               {personas.length > 0 && (
-                <label>
-                  Persona
-                  <select
-                    value={persona}
-                    onChange={(event) => setPersona(event.target.value)}
-                    aria-describedby="uw-team-persona-hint"
-                  >
-                    {personas.map((item) => (
-                      <option key={item.code} value={item.code}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <PersonaTicks
+                  personas={personas}
+                  chosen={ticked}
+                  onChange={setTicked}
+                  legend="Personas: tick one or more"
+                />
               )}
-              <button type="submit" className="ac-primary" disabled={busy}>
+              <button
+                type="submit"
+                className="ac-primary"
+                disabled={busy || !ticked.length}
+                aria-describedby="uw-team-persona-hint"
+              >
                 {busy ? "Sending…" : "Send the invitation"}
               </button>
               {personas.length > 0 && (
                 <small id="uw-team-persona-hint" className="ac-muted uw-team-hint">
-                  {chosen ? `${chosen.label}: ${chosen.sub}. ` : ""}They see this persona's screens and sign as its
-                  role. Only you can change it.
+                  {ticked.length
+                    ? `${personaList(personas.filter((item) => ticked.includes(item.code)))}. Their rights add up; nobody approves what they prepared. Only you can change them.`
+                    : "Tick at least one persona."}
                 </small>
               )}
             </form>

@@ -702,6 +702,7 @@ export function UserWorkspace({
                 persona={persona}
                 options={personaOptions}
                 locked={personaLocked}
+                colleague={!!trial?.is_trial && !trial?.is_owner}
                 onChoose={(code) => void choosePersona(code)}
               />
               <span className="uw-top-bell">
