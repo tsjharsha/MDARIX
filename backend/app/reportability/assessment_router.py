@@ -224,6 +224,8 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
                 "required": market in summary,
                 "question_set": question_set.as_dict(),
                 "suggestions": markets.suggestions(question_set, record),
+                # Beside a judgement question, what the record says, never its answer (0.10.83, D2).
+                "record_notes": markets.record_notes(question_set, record),
                 "question_set_current": question_set.version == codes[market],
                 "threshold": {"level": markets.THRESHOLDS[market], "label": markets.THRESHOLD_LABELS[market]},
                 "current": assessments.row_view(current, names, codes[market]),

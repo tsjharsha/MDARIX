@@ -193,7 +193,8 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     assert (detail["severity_level"], detail["severity_source"]) == ("NEGLIGIBLE", "The triage record")
     _acknowledge(user, "US")
     # The factual questions arrive from the complaint record; causation, recurrence and remedial action never do.
-    assert sorted(_market(detail, "US")["suggestions"]) == ["US1", "US2A", "US2B", "US2C", "US4"]
+    # 0.10.83 (D2): serious injury (2a-2c) is a judgement under 21 CFR 803.3(w), never pre-filled.
+    assert sorted(_market(detail, "US")["suggestions"]) == ["US1", "US4"]
     answers, actions = _answers_from_record(detail, "US", FLAGSHIP_US)
     us = _save(user, complaint, "US", answers, harm_level=detail["severity_level"])
     assert us["evaluation"]["report_type"] == "US_30_DAY"
@@ -210,8 +211,8 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     # 3. India, the story's second market (the assessment's next step, "Assess India (CDSCO) too"): not reportable.
     origins = {key: entry["origin"] for key, entry in signed["answers"].items()}
     assert origins == {
-        **dict.fromkeys(["US1", "US2A", "US2B", "US2C", "US4"], "CONFIRMED"),
-        **dict.fromkeys(["US3", "US5", "US6"], "ENTERED"),
+        **dict.fromkeys(["US1", "US4"], "CONFIRMED"),
+        **dict.fromkeys(["US2A", "US2B", "US2C", "US3", "US5", "US6"], "ENTERED"),
     }
     # The audit trail keeps the same origins (0.10.72, B1).
     from backend.app.db.models.foundation import AuditEvent
@@ -228,7 +229,7 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
         )
         assert audit.details["answer_origins"] == origins
     _acknowledge(user, "IN")
-    assert sorted(_market(detail, "IN")["suggestions"]) == ["IN2A", "IN2B", "IN2D", "IN2F"]
+    assert sorted(_market(detail, "IN")["suggestions"]) == ["IN2A"]
     answers, more = _answers_from_record(detail, "IN", FLAGSHIP_IN)
     actions += more
     india = _save(user, complaint, "IN", answers, harm_level=detail["severity_level"])
@@ -414,10 +415,12 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     assert label is None and view["state"] == "READY_TO_SIGN", view["checklist"]
     ready = _ok(user.post(f"/api/v1/oversight/events/{complaint}/ready", json={"password": PASSWORD, "reason": ""}))
     assert ready["ready"]["state"] == "READY"
-    # The action count drops: the market answers took 23 actions instead of 32.
-    assert actions == 23
-    # 0.10.72: 21 main buttons (triage on the page) and 23 answer actions: 44 actions instead of 54.
-    assert (len(WALK), len(WALK) + actions) == (21, 44)
+    # The action count drops: the market answers took 23 actions instead of 32 (0.10.72); 0.10.83 (D2) makes the six
+    # serious-injury criteria judgements again (two actions each instead of one): 29. On the tree one reason covers a
+    # group of criteria, so the screen takes fewer.
+    assert actions == 29
+    # 0.10.72: 21 main buttons (triage on the page) and 23 answer actions: 44 actions instead of 54; 50 from 0.10.83.
+    assert (len(WALK), len(WALK) + actions) == (21, 50)
     assert len(WALK) + actions < ACTIONS_BEFORE
 
 

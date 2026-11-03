@@ -101,12 +101,8 @@ describe("Canada's tree and a market outside the reporting windows", () => {
     };
     resources.data["/api/v1/decision-trees"] = trees;
     const html = render(<DecisionTreesSection />);
-    expect(html).toContain("Canada</button>");
-    expect(html).toContain(
-      "A reportable outcome creates the Health Canada mandatory medical device problem report worksheet (starter, for your consultant to confirm).",
-    );
-    expect(html).toContain("Not in your reporting windows");
-    expect(html).toContain("6 of 6 worked complaints pass");
+    // 0.10.83 (D2): the tab opens on answering; with no complaint on the watch it says so.
+    expect(html).toContain("No complaint waits for a decision");
   });
 });
 
