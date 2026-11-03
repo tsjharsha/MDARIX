@@ -2,6 +2,8 @@
 
 - F1: re-signing a market conclusion with another report type moves the open report with it (type, due date,
   provisional flag), audited; a submitted report is never changed, only flagged.
+- F5: every trial has every market's starter windows (new ones at approval, running ones through the refresh), so a
+  Great Britain or Canada complaint gets its market assessment and clock.
 """
 
 from __future__ import annotations
@@ -89,3 +91,46 @@ def test_f1_a_re_signed_shorter_report_type_moves_the_open_report_and_a_submitte
     assert "consider a follow-up report" in detail["conclusion_changed"]
     (flagged,) = _audit(tenant_id, "REPORT_CONCLUSION_CHANGED_AFTER_SUBMISSION")
     assert flagged.old_values["report_type"] == "US_5_WORK_DAY" and flagged.new_values["report_type"] == "US_30_DAY"
+
+
+def _import(user, csv: str) -> dict:
+    return _ok(user.post("/api/v1/trial/imports/complaints", params={"on_problems": "skip"}, content=csv.encode()))
+
+
+def _watch(user, identifier: str) -> dict:
+    items = _ok(user.get("/api/v1/complaints/reportability", params={"show": "all", "page_size": 200}))["items"]
+    return next(item for item in items if item["complaint_identifier"] == identifier)
+
+
+def test_f5_a_great_britain_or_canada_complaint_gets_its_assessment_and_clock_and_the_refresh_adds_the_windows(trial):
+    from backend.app.db.models.reportability import ReportabilitySettings
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.reportability import rules
+    from backend.app.trial import open_deadlines
+
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    old = [0, 1, 2, len(rules.TEMPLATES) - 1]  # 0.10.80's trial windows: FDA, EU 15 and 10, India
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        row = db.query(ReportabilitySettings).filter(ReportabilitySettings.tenant_id == tenant_id).one()
+        assert len(row.windows) == 8  # a new trial has every market's
+        row.windows = [rules.clean_window(rules.TEMPLATES[index]) for index in old]
+        db.commit()
+        dry = open_deadlines.refresh(db, tenant_id, apply=False)
+        assert len(dry) == 1 and "MHRA" in dry[0] and "Health Canada" in dry[0]
+        assert open_deadlines.refresh(db, tenant_id, apply=True)[0].startswith("added")
+        db.commit()
+        assert open_deadlines.refresh(db, tenant_id, apply=False) == []
+    _import(
+        user,
+        "complaint_id,product_id,description,event_date,received_date,awareness_date,country,patient_involved,"
+        "serious_injury,death,malfunction\n"
+        "F5-GB-1,F5-PUMP,Patient died; pump free-flowed.,2026-11-01,2026-11-02,2026-11-02,GB,Y,N,Y,Y\n"
+        "F5-CA-1,F5-PUMP,Patient injured; pump over-infused.,2026-11-01,2026-11-02,2026-11-02,Canada,Y,Y,N,Y\n",
+    )
+    for identifier, market in (("F5-GB-1", "GB"), ("F5-CA-1", "CA")):
+        item = _watch(user, identifier)
+        assert item["state"] != "NO_WINDOW" and item["clocks"], identifier
+        assert [entry["market"] for entry in item["markets"]] == [market]
+        detail = _ok(user.get(f"/api/v1/complaints/{item['id']}/market-assessments"))
+        assert market in detail["enabled_markets"]
