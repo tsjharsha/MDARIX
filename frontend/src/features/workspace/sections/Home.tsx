@@ -97,6 +97,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
           value={overdue.state === "loading" ? null : (overdue.data?.total ?? null)}
           onOpen={() => open("Complaints", OVERDUE_VIEW)}
           title="Overdue"
+          short={overdue.data?.total ? "Act on these first" : "Nothing late"}
           // Never an all-clear before the data has arrived (0.10.81, U-07).
           detail={
             overdue.state === "loading"
@@ -111,6 +112,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
           value={dueWeek.state === "loading" ? null : (dueWeek.data?.total ?? null)}
           onOpen={() => open("Complaints", DUE_WEEK_VIEW)}
           title="Due this week"
+          short="Next 7 days"
           detail={dueWeek.state === "loading" ? "Reading…" : "Complaints with a deadline or target in the next 7 days"}
         />
         <Stat
@@ -119,6 +121,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
           // The trend check, where the count is (0.10.84, L3): the signal inbox lists a signal's own complaints.
           onOpen={() => open("Trends", "Trend check")}
           title="At risk"
+          short={rising.length ? "A product rising" : "Nothing rising"}
           detail={
             trends.state === "loading"
               ? "Reading…"
@@ -226,12 +229,15 @@ function Stat({
   value,
   title,
   detail,
+  short,
   onOpen,
 }: {
   tone: "over" | "soon" | "risk";
   value: number | null;
   title: string;
   detail: string;
+  /** The tile's one line of meaning on a phone, where the full line does not fit (0.10.85, D3.7; U-12). */
+  short?: string;
   /** Each tile opens its list (0.10.81, navigation M1). */
   onOpen: () => void;
 }) {
@@ -239,7 +245,8 @@ function Stat({
     <button type="button" className={`uw-card uw-home-stat is-${tone}`} onClick={onOpen}>
       <b className="uw-home-num">{value === null ? "…" : value}</b>
       <strong>{title}</strong>
-      <span>{detail}</span>
+      <span className="uw-home-long">{detail}</span>
+      {short && <span className="uw-home-short">{value === null ? "Reading…" : short}</span>}
     </button>
   );
 }

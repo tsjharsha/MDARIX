@@ -6,6 +6,8 @@ import { ColumnScopeProvider } from "../tables/ColumnChooser";
 import { workColumns } from "./sections/ComplaintList";
 import { deadlineLabel, formatDateTime, formatDay, setDisplayZone, zoneName, zoneless } from "../../app/dates";
 import userWorkspace from "./UserWorkspace.tsx?raw";
+import hybridShell from "./HybridShell.tsx?raw";
+import home from "./sections/Home.tsx?raw";
 
 const stubWindow = () =>
   vi.stubGlobal("window", {
@@ -154,5 +156,19 @@ describe("D3.6 the organization's time zone, named once", () => {
   it("names the zone in every new-navigation page head", () => {
     expect(userWorkspace).toContain("Times are in {zoneName()}, your organization's time zone.");
     expect(userWorkspace).toContain('"/api/v1/oversight/settings"');
+  });
+});
+
+// Read as a file: the test run does not load stylesheets (as releaseC2074.test.tsx does).
+const fs = await import(/* @vite-ignore */ ["node", "fs"].join(":"));
+const css: string = fs.readFileSync(new URL("./workspace.css", import.meta.url), "utf8");
+
+describe("D3.7 the phone keeps where you are and what each number means", () => {
+  it("scrolls the current tab into view, and gives each Home tile one short line on a phone", () => {
+    expect(hybridShell).toMatch(/querySelector<HTMLElement>\("\[aria-current='page'\]"\)\s*\?\.scrollIntoView/);
+    expect(home).toContain('className="uw-home-short"');
+    const sheet = css.replace(/\r\n/g, "\n");
+    expect(sheet).toContain(".uw-home-stat .uw-home-short {\n    display: block;");
+    expect(sheet).not.toContain(".uw-home-stat span {\n    display: none;");
   });
 });

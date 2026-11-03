@@ -6680,6 +6680,9 @@ button.uw-org:hover {
 .uw-home-stat span {
   color: var(--ms-ink-2);
 }
+.uw-home-stat .uw-home-short {
+  display: none;
+}
 .uw-home-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
@@ -6826,15 +6829,19 @@ button.uw-org:hover {
     left: 12px;
     width: auto;
   }
-  /* A phone keeps the three numbers on one row: the words under them are in the cards' titles. */
+  /* A phone keeps the three numbers on one row, each with one short line of meaning (0.10.85, D3.7; U-12). */
   .uw-home-stats {
     gap: var(--ms-space-2);
   }
   .uw-home-stat {
     padding: 12px;
   }
-  .uw-home-stat span {
+  .uw-home-stat .uw-home-long {
     display: none;
+  }
+  .uw-home-stat .uw-home-short {
+    display: block;
+    font-size: var(--ms-fs-12);
   }
   .uw-home-num {
     font-size: var(--ms-fs-24);
