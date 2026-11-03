@@ -269,5 +269,7 @@ def test_a_call_not_yet_a_complaint_opens_its_own_triage_card_from_home(trial):
     reference, not the bare list, and its title says what to do without repeating codes."""
     items = _ok(trial["user"].get("/api/v1/oversight", params={"show": "all"}))["items"]
     calls = [item for item in items if item.get("ref") == "SAMPLE-URG-01" and item["key"].startswith("triage:")]
-    assert calls and all(call["opens"]["target"]["tab"] == "Triage?ref=SAMPLE-URG-01" for call in calls)
+    assert calls and all(
+        call["opens"]["tab"] == f"Triage?intake={call['opens']['target']['record']['id']}" for call in calls
+    )
     assert all(call["title"].startswith("Triage not done yet (") for call in calls)

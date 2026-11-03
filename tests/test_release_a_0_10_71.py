@@ -191,6 +191,8 @@ def test_every_import_route_refuses_a_sample_only_trial():
     assert {path for _, path, _ in routes} == {
         "/api/v1/data/import/{entity}/check",
         "/api/v1/data/import/{entity}",
+        # 0.10.82 (D1.10): which template a file is; it reads the file, so it is refused like the others.
+        "/api/v1/data/import/detect",
         "/api/v1/data/import/quarantine/{row_id}/reprocess",
         "/api/v1/trial/imports/{entity}/check",
         "/api/v1/trial/imports/{entity}",

@@ -53,6 +53,8 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const [complaint] = useTabParam("complaint");
   // A story opens its record by the reference people read (Triage?ref=SAMPLE-URG-01, 0.10.71).
   const [ref] = useTabParam("ref");
+  // A call's next action on Home opens its own card (Triage?intake=<id>, 0.10.82, navigation M5).
+  const [intake] = useTabParam("intake");
   const { reportTab, shownTab } = useWorkspace();
   const list = useResource<TriageList>(`${TRIAGE}?show=${show}`);
   const summary = list.data?.summary;
@@ -60,6 +62,7 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const wanted =
     openKey ??
     (complaint ? `COMPLAINT:${complaint}` : null) ??
+    (intake ? `INTAKE:${intake}` : null) ??
     (ref ? (items.find((item) => item.ref === ref || item.identifier === ref)?.key ?? null) : null);
   const open = wanted ? (items.find((item) => item.key === wanted) ?? null) : null;
   const setOpen = (item: TriageItem | null) => {
@@ -67,7 +70,7 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
     // Closing clears every parameter that opens the panel, in one address change: complaint= or ref= left behind
     // would open it again at once (0.10.79).
     reportTab(
-      ["item", "complaint", "ref"].reduce((tab, name) => withTabParam(tab, name, null), shownTab),
+      ["item", "complaint", "ref", "intake"].reduce((tab, name) => withTabParam(tab, name, null), shownTab),
       "push",
     );
   };

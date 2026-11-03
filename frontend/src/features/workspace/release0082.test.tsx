@@ -5,6 +5,7 @@ import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 import { runOf, shownRun, stepBlocker, stepPlace, type OneStory, type StoryRun } from "./oneStory";
 import { StoryView } from "./sections/OneStory";
 import { HomeSection } from "./sections/Home";
+import { placeOf, recordPlace } from "../../app/linkTable";
 import { TeamView, personaConfirmation } from "./sections/TrialTeam";
 import { LoadChecklist, loadedObjects, type ImportTemplate } from "./sections/ImportData";
 import type { ImportRun } from "./sections/ImportReports";
@@ -250,5 +251,20 @@ describe("Import your data: one drop zone and the loading checklist (D1.10)", ()
     expect(html.match(/is-loaded/g)).toHaveLength(1);
     expect(html).toContain("More objects (11)");
     expect(loadedObjects(runs).complaints.rows).toBe(4);
+  });
+});
+
+describe("a call's next action opens its own triage card (navigation M5)", () => {
+  it("opens the triage list on the call's own card", () => {
+    const opens = {
+      section: "Complaints",
+      tab: "Triage?intake=i1",
+      target: { section: "Complaints", tab: "Triage", record: { kind: "intake", id: "i1" }, panel: null },
+    };
+    expect(placeOf(opens as never)).toEqual({ section: "Complaints", tab: "Triage?intake=i1" });
+    expect(recordPlace("intake" as never, "i1", {}, "new")).toEqual({
+      section: "Complaints",
+      tab: "To triage?intake=i1",
+    });
   });
 });
