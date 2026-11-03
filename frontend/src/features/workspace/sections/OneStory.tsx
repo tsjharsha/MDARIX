@@ -3,7 +3,7 @@ import { Check, ChevronRight } from "lucide-react";
 import { useResource } from "../../customer-admin/shared";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { IMPORTED_SOURCE } from "../complaintList";
-import { trendPath, type TrendBoard, type TrendItem } from "../signalAi";
+import { TREND_RESULT, trendPath, type TrendBoard, type TrendItem } from "../signalAi";
 import {
   STORY_STEPS,
   openStep,
@@ -209,7 +209,8 @@ export function TrendBars({ row, bare = false }: { row: TrendItem; bare?: boolea
       {!bare && (
         <b>
           {row.name}
-          {rising ? ratio : ": in line with its history"}
+          {/* The trend check's own verdict: never "in line" for a group too small to assess. */}
+          {rising ? ratio : `: ${(TREND_RESULT[row.result]?.label ?? "not rising").toLowerCase()}`}
         </b>
       )}
       <div className="uw-bars">

@@ -6,6 +6,7 @@ import { runOf, shownRun, stepBlocker, stepPlace, type OneStory, type StoryRun }
 import { StoryView } from "./sections/OneStory";
 import { HomeSection } from "./sections/Home";
 import { placeOf, recordPlace } from "../../app/linkTable";
+import gettingStarted from "./sections/GettingStarted.tsx?raw";
 import { TeamView, personaConfirmation } from "./sections/TrialTeam";
 import { LoadChecklist, loadedObjects, type ImportTemplate } from "./sections/ImportData";
 import type { ImportRun } from "./sections/ImportReports";
@@ -266,5 +267,11 @@ describe("a call's next action opens its own triage card (navigation M5)", () =>
       section: "Complaints",
       tab: "To triage?intake=i1",
     });
+  });
+});
+
+describe("Getting started's address on the new navigation", () => {
+  it("never writes ?tab=Your+data, which a refresh opened as the Import page", () => {
+    expect(gettingStarted).toContain('navigation === "new" ? ("" as TrialTab) : "Your data"');
   });
 });

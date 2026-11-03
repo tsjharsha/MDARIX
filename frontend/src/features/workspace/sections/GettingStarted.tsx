@@ -150,7 +150,10 @@ export function GettingStartedSection({
       session?.sample_only,
     );
   const focusTab = trialTabFor(focus);
-  const [tab, setTab] = useReportedTab<TrialTab>(focusTab ?? "Your data");
+  // On the new navigation Your data is its own page (0.10.80): defaulting to it wrote ?tab=Your+data into Getting
+  // started's address, and a refresh then opened the Import page instead (0.10.82). There no tab is chosen until the
+  // person picks one, so the address stays /app/getting-started (the first tab shows meanwhile).
+  const [tab, setTab] = useReportedTab<TrialTab>(focusTab ?? (navigation === "new" ? ("" as TrialTab) : "Your data"));
   // A tab below the story, opened and brought into view.
   const showTab = (name: TrialTab) => {
     setTab(name);
