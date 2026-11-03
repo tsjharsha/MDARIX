@@ -203,7 +203,8 @@ export function useColumnControls({
           aria-label={`Width of ${label}`}
           aria-valuemin={MIN_COLUMN_WIDTH}
           aria-valuemax={MAX_COLUMN_WIDTH}
-          aria-valuenow={widths ? width : undefined}
+          // A focusable separator needs its value (0.10.85, D3.8): the automatic width reads as the smallest.
+          aria-valuenow={widths && width ? width : MIN_COLUMN_WIDTH}
           tabIndex={0}
           title="Drag to change the width (arrow keys also work). Double-click to return all columns to automatic widths."
           draggable={false}

@@ -6836,7 +6836,7 @@ button.uw-org:hover {
   .uw-home-stat {
     padding: 12px;
   }
-  .uw-home-stat .uw-home-long {
+  .uw-home-stat .uw-home-long:not(:only-of-type) {
     display: none;
   }
   .uw-home-stat .uw-home-short {
@@ -7724,6 +7724,49 @@ button.uw-org:hover {
   margin: 0;
   color: var(--ms-ink-2);
   font-size: var(--ms-fs-12);
+}
+
+/* 0.10.85, D3.8: small text is 12 px or more on the new navigation; touch targets are 44 px tall on a phone; a
+   question's fieldset adds no box of its own. */
+main[data-navigation="new"] small {
+  font-size: max(var(--ms-fs-12), 0.8em);
+}
+/* A link on a teal wash (the colleague welcome, a notice) reads at 4.5:1 or more: the teal alone read 4.43:1. */
+:is(.uw-feedback-prompt, .ac-message, .uw-notice) .ac-link {
+  color: var(--ms-teal-dark);
+}
+@media (max-width: 640px) {
+  main[data-navigation="new"]
+    :is(.ac-primary, .ac-secondary, select, input:not([type="checkbox"]):not([type="radio"]), summary),
+  .uw-tab,
+  .uw-top :is(button, a) {
+    min-height: 44px;
+  }
+  main[data-navigation="new"] :is(input[type="checkbox"], input[type="radio"]) {
+    width: 20px;
+    height: 20px;
+  }
+  main[data-navigation="new"] label:has(> input[type="checkbox"], > input[type="radio"]) {
+    min-height: 44px;
+    align-items: center;
+  }
+}
+.dt-answer {
+  position: relative;
+}
+.dt-skip {
+  top: 0;
+  left: -9999px;
+}
+.dt-skip:focus {
+  top: 0;
+  left: 16px;
+}
+.dt-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 /* The phone's search: an icon that opens the same search as a bar under the top bar. */

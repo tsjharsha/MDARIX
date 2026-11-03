@@ -84,6 +84,10 @@ export function TreeAnswer({ trees, modes = null }: { trees: Trees; modes?: Reac
     );
   return (
     <div className="dt-answer">
+      {/* A keyboard reaches the first question in one step (0.10.85, D3.8; it took 13 Tab presses). */}
+      <a className="app-skip dt-skip" href="#dt-questions">
+        Skip to the questions
+      </a>
       <section className="uw-card dt-picker" aria-label="The complaint">
         <label className="dt-pick">
           <span>Complaint</span>
@@ -264,7 +268,7 @@ export function MarketTree({
             {item.question_set_current === false ? " · started on an earlier version: it keeps that one" : ""}
           </span>
         </div>
-        <ol className="dt-qs">
+        <ol className="dt-qs" id="dt-questions" tabIndex={-1}>
           {groups.map((group, index) => {
             const all = group.questions.every((question) => folded[question.id]);
             if (all) {
@@ -307,7 +311,11 @@ export function MarketTree({
               node,
               <li key="mini" className="dt-mini" aria-hidden={signed ? undefined : "true"}>
                 <span>{miniText(outcome, latest, signed)}</span>
-                <a href="#dt-outcome" className={signed || !outcome ? "ac-link" : "ac-primary dt-mini-sign"}>
+                <a
+                  href="#dt-outcome"
+                  className={signed || !outcome ? "ac-link" : "ac-primary dt-mini-sign"}
+                  tabIndex={signed ? undefined : -1}
+                >
                   {signed || !outcome ? "See the outcome" : "Sign"}
                 </a>
               </li>,
@@ -454,45 +462,46 @@ function GroupCard({
     <li
       className={`dt-q${first.extra ? " is-extra" : ""}${done ? " is-done" : ""}${grouped ? " is-group" : ""}`}
       id={grouped ? `g-${first.id}` : `q-${first.id}`}
-      role="group"
-      aria-labelledby={`qt-${first.id}`}
     >
-      {grouped && head}
-      {group.questions.map((question, index) => (
-        <QuestionRow
-          key={question.id}
-          question={question}
-          head={grouped ? null : head}
-          label={grouped ? `(${criterion(question.text)?.letter}) ${criterion(question.text)?.rest}` : null}
-          state={states[index]}
-          editable={editable}
-          signed={signed}
-          signedAnswer={signedAnswers[question.id]?.answer ?? null}
-          open={changing === question.id}
-          onChange={onChange}
-          onAnswer={onAnswer}
-        />
-      ))}
-      {signed && signedReason && <p className="dt-reason-text">{signedReason}</p>}
-      {!signed && wantsReason && (
-        <label className="dt-why">
-          <span>Why? One line, kept with your signature</span>
-          <input
-            value={form.reasons[group.key] ?? ""}
-            disabled={!editable}
-            maxLength={2000}
-            placeholder="What in the record supports this answer"
-            onChange={(event) => onReason(event.target.value)}
-            onBlur={onBlur}
+      {/* Each question is a fieldset named by its text (0.10.85, D3.8): a list item may not be a group itself. */}
+      <fieldset className="dt-fieldset" aria-labelledby={`qt-${first.id}`}>
+        {grouped && head}
+        {group.questions.map((question, index) => (
+          <QuestionRow
+            key={question.id}
+            question={question}
+            head={grouped ? null : head}
+            label={grouped ? `(${criterion(question.text)?.letter}) ${criterion(question.text)?.rest}` : null}
+            state={states[index]}
+            editable={editable}
+            signed={signed}
+            signedAnswer={signedAnswers[question.id]?.answer ?? null}
+            open={changing === question.id}
+            onChange={onChange}
+            onAnswer={onAnswer}
           />
-        </label>
-      )}
-      {!signed && states.some((state) => state.answer === "UNKNOWN") && (
-        <p className="dt-unknown">
-          Unknown: a question to the reporter is created. Until it is answered, the shortest deadline the facts do not
-          rule out applies.
-        </p>
-      )}
+        ))}
+        {signed && signedReason && <p className="dt-reason-text">{signedReason}</p>}
+        {!signed && wantsReason && (
+          <label className="dt-why">
+            <span>Why? One line, kept with your signature</span>
+            <input
+              value={form.reasons[group.key] ?? ""}
+              disabled={!editable}
+              maxLength={2000}
+              placeholder="What in the record supports this answer"
+              onChange={(event) => onReason(event.target.value)}
+              onBlur={onBlur}
+            />
+          </label>
+        )}
+        {!signed && states.some((state) => state.answer === "UNKNOWN") && (
+          <p className="dt-unknown">
+            Unknown: a question to the reporter is created. Until it is answered, the shortest deadline the facts do not
+            rule out applies.
+          </p>
+        )}
+      </fieldset>
     </li>
   );
 }

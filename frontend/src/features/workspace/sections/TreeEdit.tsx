@@ -366,6 +366,11 @@ function EditBody({
                     type="button"
                     className="ac-secondary"
                     disabled={busy || collapsed(text.question).length < 5}
+                    title={
+                      collapsed(text.question).length < 5
+                        ? "Write the question first (5 characters or more)"
+                        : undefined
+                    }
                     onClick={() => void saveQuestions([...questions, { ...NEW_EXTRA, text: text.question }])}
                   >
                     Add it
@@ -419,7 +424,12 @@ function EditBody({
                   onChange={(event) => setCode(event.target.value)}
                 />
               </div>
-              <button type="submit" className="ac-primary dt-sign-btn" disabled={!password || busy}>
+              <button
+                type="submit"
+                className="ac-primary dt-sign-btn"
+                disabled={!password || busy}
+                title={!password ? "Enter your password first" : undefined}
+              >
                 <ShieldCheck size={15} aria-hidden="true" /> Approve version {open!.version}
               </button>
             </form>
@@ -440,6 +450,13 @@ function EditBody({
                     type="button"
                     className="ac-primary dt-sign-btn"
                     disabled={busy || collapsed(reason).length < REASON_MIN || !changes.length}
+                    title={
+                      !changes.length
+                        ? "Change a question first"
+                        : collapsed(reason).length < REASON_MIN
+                          ? `Give the reason for the change (${REASON_MIN} characters or more)`
+                          : undefined
+                    }
                     onClick={() => void testAndSend()}
                   >
                     {busy ? "Testing…" : "Test against the worked complaints and send for approval"}

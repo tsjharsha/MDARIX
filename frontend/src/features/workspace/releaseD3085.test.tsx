@@ -172,3 +172,31 @@ describe("D3.7 the phone keeps where you are and what each number means", () => 
     expect(sheet).not.toContain(".uw-home-stat span {\n    display: none;");
   });
 });
+
+describe("D3.8 accessibility on the new navigation", () => {
+  const read = (path: string) => fs.readFileSync(new URL(path, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  it("gives every focusable column grip its value, and every tree question a fieldset and a skip link", () => {
+    expect(read("../tables/useColumnControls.tsx")).toContain(
+      "aria-valuenow={widths && width ? width : MIN_COLUMN_WIDTH}",
+    );
+    const tree = read("./sections/TreeAnswer.tsx");
+    expect(tree).toContain('<fieldset className="dt-fieldset" aria-labelledby={`qt-${first.id}`}>');
+    expect(tree).not.toContain('role="group"\n      aria-labelledby');
+    expect(tree).toContain('href="#dt-questions"');
+    expect(tree).toContain('id="dt-questions"');
+  });
+  it("keeps text at 12 px or more, chips and dots at 4.5:1, and phone targets at 44 px", () => {
+    const sheet = read("./workspace.css");
+    expect(sheet).toContain('main[data-navigation="new"] small {\n  font-size: max(var(--ms-fs-12), 0.8em);');
+    expect(sheet).toMatch(/main\[data-navigation="new"\]\s*:is\(\.ac-primary[^{]*\{\s*min-height: 44px;/);
+    expect(read("../customer-admin/customer-admin.css")).toMatch(
+      /\.ca-chips button\.selected \{[^}]*color: var\(--ms-teal-dark\)/,
+    );
+    expect(read("./sections/qualityLoop.css")).toContain("background: #d18f12;");
+  });
+  it("says why a main button is disabled", () => {
+    expect(read("./sections/TreeEdit.tsx")).toContain('title={!password ? "Enter your password first" : undefined}');
+    expect(read("./sections/Reports.tsx")).toContain("title={problem || undefined}");
+    expect(read("./sections/Triage.tsx")).toContain("title={problem || undefined}");
+  });
+});

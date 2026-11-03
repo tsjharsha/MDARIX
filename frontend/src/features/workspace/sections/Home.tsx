@@ -246,7 +246,7 @@ function Stat({
       <b className="uw-home-num">{value === null ? "…" : value}</b>
       <strong>{title}</strong>
       <span className="uw-home-long">{detail}</span>
-      {short && <span className="uw-home-short">{value === null ? "Reading…" : short}</span>}
+      {short && value !== null && <span className="uw-home-short">{short}</span>}
     </button>
   );
 }
