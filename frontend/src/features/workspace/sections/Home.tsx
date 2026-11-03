@@ -317,7 +317,7 @@ export function HomeStory({ story }: { story: Resource<OneStory> }) {
           {run.complaint.ref} is {harm}
           {country ? ` in ${country}` : " with no incident country"}.
           {clock
-            ? ` Its ${clock.key.endsWith(":facts") && !clock.market ? "shortest possible " : ""}clock ends ${dueDay(clock)}.`
+            ? ` Its ${clock.key.endsWith(":facts") ? (run.market ? "provisional " : "shortest possible ") : ""}clock ends ${dueDay(clock)}.`
             : ""}
         </h2>
         {run.complaint.description && (

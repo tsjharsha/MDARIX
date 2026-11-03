@@ -553,8 +553,6 @@ def shortest_binding(binding: dict, triage_first: dict | None) -> dict:
         **binding,
         **{key: triage_first[key] for key in keys if key in triage_first},
         "window": triage_first["basis"],
-        # The market whose clock it is once the country is known (0.10.84, H3).
-        **({"market": triage_first["market"]} if triage_first.get("own") else {}),
     }
 
 

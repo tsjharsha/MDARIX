@@ -59,11 +59,14 @@ export function harmOf(event: Pick<EventView["event"], "harm" | "harm_words">): 
 export const oneClock = (due: NonNullable<EventView["work"]>["due"]) =>
   due.find((item) => isLegalDeadline(item)) ?? due[0] ?? null;
 
-/** Whose clock it is: a market's, "Shortest possible" while the country is missing, or the target's kind. Once the
- * country is known the clock is that market's, also while the awareness date is still asked (0.10.84, H3). */
-export const clockPrefix = (item: NonNullable<EventView["work"]>["due"][number]) =>
-  item.key.endsWith(":facts") && !item.market
-    ? "Shortest possible"
+/** Whose clock it is: a market's; while a fact is missing, "Shortest possible" (no country yet) or the incident
+ * country's market, provisional (only the awareness date missing: 0.10.84, H3; never a market's firm deadline, 0.10.81
+ * F4); else the target's kind. ``country``: the complaint's market once its country is known. */
+export const clockPrefix = (item: NonNullable<EventView["work"]>["due"][number], country: string | null = null) =>
+  item.key.endsWith(":facts")
+    ? country
+      ? `${marketLabel(country)}, provisional`
+      : "Shortest possible"
     : isLegalDeadline(item) && item.market
       ? marketLabel(item.market)
       : item.category_label;
@@ -252,7 +255,13 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
             <HarmChip harm={harm.harm} label={harm.label} />
             {/* One clock line (0.10.82, D1.7): the nearest legal clock, its time left and its day; a clock waiting
                 for the country or the awareness date is the shortest possible one, never a market's (0.10.81). */}
-            {clock && <DeadlineChip item={clock} prefix={clockPrefix(clock)} suffix={`due ${dueDay(clock)}`} />}
+            {clock && (
+              <DeadlineChip
+                item={clock}
+                prefix={clockPrefix(clock, needed("COUNTRY") ? null : event.market)}
+                suffix={`due ${dueDay(clock)}`}
+              />
+            )}
             <ToneBadge tone={EVENT_TONES[view.state]} label={view.state_label} />
           </div>
         </div>

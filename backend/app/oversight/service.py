@@ -309,8 +309,6 @@ def _watch_items(db: Session, control_db, tenant_id, now: datetime) -> list[dict
             continue
         market = binding.get("market")
         needs = item.get("needs") or []
-        # Waiting only for the awareness date, the clock is the incident country's market's (0.10.84, H3).
-        country_known = not any(need.get("fact") == "COUNTRY" for need in needs)
         found.append(
             _item(
                 # A complaint that needs a fact is one line, kept beside its markets' own (0.10.81, F3, F4).
@@ -321,7 +319,7 @@ def _watch_items(db: Session, control_db, tenant_id, now: datetime) -> list[dict
                 else f"{markets.MARKET_LABELS.get(market, market)}: not assessed yet, provisional deadline",
                 datetime.fromisoformat(binding["due_at"]),
                 complaint_id=item["id"],
-                market=market if not needs or country_known else None,
+                market=None if needs else market,
                 opens=links.target("Complaints", "Reportability", record=("complaint", item["id"])),
             )
         )

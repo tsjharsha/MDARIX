@@ -209,13 +209,14 @@ describe("the complaint page (D1.7, D1.8)", () => {
   it("shows one clock line: whose clock, the time left and the day it ends", () => {
     const view = rv11();
     const due = view.work!.due[0];
+    // Waiting for its country (0.10.84: with the country known it is that market's clock, provisional).
+    const country = { fact: "COUNTRY" as const, label: "Incident country", given: null, message: "", rule: "" };
     const html = page(
-      {},
+      { needs: [country] },
       {
         work: {
           ...view.work!,
           due: [
-            // Waiting for the country: no market yet (0.10.84, H3: with a country, the market names the clock).
             { ...due, key: "watch:x:facts", market: null, due_label: "Thu 5 Nov 2026, 23:59 IST", hours_left: 72 },
             { ...due, key: "triage", category: "TRIAGE", category_label: "Triage target", hours_left: 5 },
           ],

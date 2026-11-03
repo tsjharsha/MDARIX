@@ -59,11 +59,14 @@ def test_once_the_country_is_known_the_header_clock_is_that_markets_deadline(fic
     event = _ok(user.get("/api/v1/oversight/events/FIC-2001"))
     (header,) = [item for item in event["work"]["due"] if item["key"].endswith(":facts")]
     (us,) = [deadline for deadline in _triage_row(user, complaint_id)["deadlines"] if deadline["own"]]
-    assert us["market"] == "US"
-    assert (header["market"], header["due_at"]) == ("US", us["due_at"])
+    assert us["market"] == "US" and event["event"]["market"] == "US"
+    # The US clock, still provisional while the awareness date is asked: no market on the line (0.10.81 F4), the
+    # complaint's own market beside it names it ("United States, provisional").
+    assert (header["market"], header["due_at"]) == (None, us["due_at"])
+    assert header["title"].startswith("Enter the awareness date")
     home = _ok(user.get("/api/v1/oversight", params={"show": "all"}))["items"]
     (line,) = [item for item in home if item["key"] == f"watch:{complaint_id}:facts"]
-    assert (line["market"], line["due_at"]) == ("US", us["due_at"])
+    assert line["due_at"] == us["due_at"]
     # Not the shortest of every market any more (Great Britain's 10 days): the US clock is later.
     assert header["due_at"] > min(d["due_at"] for d in _triage_row(user, complaint_id)["deadlines"] if d["due_at"])
 

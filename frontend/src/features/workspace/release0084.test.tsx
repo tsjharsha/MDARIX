@@ -157,8 +157,10 @@ describe("H2: the Your data hero and the complaint header read the legal deadlin
 describe("H3: once the country is known, the header names that market's clock", () => {
   it("says the market, not 'Shortest possible', while only the awareness date is still asked", () => {
     const due = rv11().work!.due[0];
-    expect(clockPrefix({ ...due, key: "watch:c:facts", market: null })).toBe("Shortest possible");
-    expect(clockPrefix({ ...due, key: "watch:c:facts", market: "US" })).toBe("United States");
+    const facts = { ...due, key: "watch:c:facts", market: null };
+    expect(clockPrefix(facts)).toBe("Shortest possible");
+    // The country known, the awareness still asked: that market's clock, never a firm deadline (0.10.81 F4).
+    expect(clockPrefix(facts, "US")).toBe("United States, provisional");
   });
 });
 
