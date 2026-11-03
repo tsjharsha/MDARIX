@@ -29,6 +29,13 @@ the trial already links, the trial user's own link included, is left as it is.
   This holds in pilots too: a pilot's Regulatory Reviewer may change the same records. Every change is audited, as
   before.
 - **Tenant 360** says beside Navigation: "“Viewing as” personas need New."
+- **"Import your data" on the new navigation's top bar**, beside the trial's "Sample data" label (owner request). It
+  opens the trial import that Help › Try your own data opens: Getting started › Your data (upload, the data-quality
+  reports and what the data shows). Where the top bar hides the label (1100 px and narrower, a phone) it is in the
+  avatar menu instead. The Complaints header offers the same button in a trial too (until now pilots only), opening the
+  same flow; a pilot's still opens Import data. One rule everywhere, the Import data screen's: not in a sample-only
+  trial, and only for people who may change records (a Regulatory Leader, Risk Reviewer or Executive colleague does
+  not see it). The sample and its label are unchanged; the classic navigation is unchanged.
 
 ### Fixed
 
@@ -81,11 +88,17 @@ No deadline, signal, trend figure, Readiness value or record count changes.
   story reads): 134 passed.
 - vitest: `release0079.test.tsx` (new, 4), `triageClose.test.tsx` (new, 3), and the files touched (releaseC5077,
   ImportReports, ImportExcel, importPrivacy, lotImpact, releaseA071, TenantPages, intake, linkTable, noCodes): 12
-  files, 99 passed. tsc, ruff and prettier clean.
+  files, 99 passed. `importOwnData.test.tsx` (new, 5: the owner's button opens Getting started › Your data; none for a
+  sample-only trial or a colleague without records.write; the avatar menu item; the Complaints header in a trial and a
+  pilot; classic unchanged) with the shell's tests (releaseA071, now expecting the trial's header button, C1, C2,
+  B072, accessibility, complaints, workspaceStart, readiness, reportingCapa): 10 files, 92 passed. tsc, ruff and
+  prettier clean.
 - `scripts/refresh_trial_story.py` dry run on the local test database: runs, changes nothing.
 - Screens at 1440 and 390 in `MDARIX-videos/site-0.10.79-review` (`regulatory/`: Settings › Products as a locked
   Regulatory Leader, editing a product's identity, setting a responsible party; `risk/`: the same, read only, as a Risk
-  Reviewer; `admin/`: Tenant 360's Overview with the line beside Navigation).
+  Reviewer; `admin/`: Tenant 360's Overview with the line beside Navigation; `topbar-owner/`: the top bar with Import
+  your data, the avatar menu at 390, the flow it opens, the Complaints header; `topbar-sample-only/`: no button, no
+  menu item).
 
 ## [0.10.78] - 2026-11-03
 
