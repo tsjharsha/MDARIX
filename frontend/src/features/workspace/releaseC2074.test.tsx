@@ -312,7 +312,7 @@ describe("Records leads with the latest signed record, and the finished story sa
       },
     };
     const pilot = render(<NewRecordsSection />, api({ isTrial: false }));
-    expect(pilot).toContain("Your latest signed record");
+    expect(pilot).toContain("Your latest record");
     expect(pilot).toContain("United States (FDA) conclusion: reportable · SAMPLE-RV-11");
     expect(pilot).toContain("Download the decision record (PDF)");
     expect(pilot).toContain("Open SAMPLE-RV-11");
@@ -331,7 +331,8 @@ describe("Records leads with the latest signed record, and the finished story sa
     );
     expect(alone).toContain("Open the decision records");
     resources.data["/api/v1/oversight/latest-signed"] = { record: null };
-    expect(render(<NewRecordsSection />, api({ isTrial: false }))).not.toContain("Your latest signed record");
+    // 0.10.85, D3.4: with nothing signed, Records still opens on "Your latest record", saying how a first one comes.
+    expect(render(<NewRecordsSection />, api({ isTrial: false }))).toContain("No signed record yet");
   });
 
   it("says the short story is finished instead of off its path", () => {

@@ -7,6 +7,7 @@ import { ComplaintPage } from "./sections/ComplaintPage";
 import { ONE_STORY_PATH, type StoryRun } from "./oneStory";
 import { eventPath } from "./oversight";
 import { rv11 } from "../../test/rv11";
+import { NewRecordsSection } from "./sections/Records";
 
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("../customer-admin/shared", async (original) => ({
@@ -94,5 +95,39 @@ describe("D3.3 the complaint page is a record with a hero", () => {
     expect(folded).toContain("<summary>Triage record: not complete yet</summary>");
     resources.data[ONE_STORY_PATH] = { sample: run(1), yours: null };
     expect(render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />)).not.toContain("Triage record: not complete yet");
+  });
+});
+
+describe("D3.4 Records opens on your latest record", () => {
+  it("leads with the record, who signed, when and what it means; inspection readiness sits under it", () => {
+    resources.data["/api/v1/oversight/latest-signed"] = {
+      record: {
+        what: "United States (FDA) conclusion: reportable",
+        signed_at: "2026-11-02",
+        signed_at_time: "2026-11-02T09:02:00Z",
+        signed_by: "Asha Menon",
+        meaning: "SIGNED_REPORTABLE",
+        meaning_label: "signed reportable",
+        complaint: { id: "c-rv11", ref: "SAMPLE-RV-11" },
+        investigation: null,
+      },
+    };
+    const html = render(
+      <NewRecordsSection />,
+      api({ session: { user_id: "u1", business_permissions: ["data.export"] } as WorkspaceApi["session"] }),
+    );
+    expect(html.indexOf("Your latest record")).toBeLessThan(html.indexOf("Inspection readiness"));
+    expect(html).toContain("Asha Menon");
+    expect(html).toContain("signed reportable");
+    expect(html).toContain("Download the decision record (PDF)");
+    // Not folded behind "All records: ...".
+    expect(html).not.toMatch(/<details[^>]*><summary>All records/);
+  });
+
+  it("with nothing signed yet still opens on the latest record's place, never on the readiness dial", () => {
+    resources.data["/api/v1/oversight/latest-signed"] = { record: null };
+    const html = render(<NewRecordsSection />);
+    expect(html).toContain("No signed record yet");
+    expect(html.indexOf("No signed record yet")).toBeLessThan(html.indexOf("Inspection readiness"));
   });
 });

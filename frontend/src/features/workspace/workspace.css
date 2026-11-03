@@ -7658,6 +7658,15 @@ button.uw-org:hover {
   }
 }
 
+/* 0.10.85, D3.4: Records opens on "Your latest record"; inspection readiness and the rest sit under it. */
+.uw-records-all {
+  margin-top: var(--ms-space-5, 24px);
+}
+.uw-records-all > h2 {
+  margin: 0 0 var(--ms-space-3);
+  font-size: var(--ms-fs-18, 18px);
+}
+
 /* The phone's search: an icon that opens the same search as a bar under the top bar. */
 .uw-search-toggle {
   display: none;
