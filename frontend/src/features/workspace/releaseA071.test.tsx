@@ -64,8 +64,9 @@ describe("A2: a sample-only trial cannot upload", () => {
     ).toContain("Getting started and import templates");
   });
 
-  it("keeps the upload off the Complaints header in a trial, and on it in a pilot", () => {
-    expect(render(<ComplaintViews />, api())).not.toContain("Import your data");
+  it("offers the upload on the Complaints header in a trial (0.10.79) and a pilot, never in a sample-only trial", () => {
+    expect(render(<ComplaintViews />, api())).toContain("Import your data");
+    expect(render(<ComplaintViews />, api({}, { sample_only: true }))).not.toContain("Import your data");
     expect(render(<ComplaintViews />, api({ isTrial: false }))).toContain("Import your data");
     expect(render(<ComplaintViews />, api({ isTrial: false }, { sample_only: true }))).not.toContain(
       "Import your data",

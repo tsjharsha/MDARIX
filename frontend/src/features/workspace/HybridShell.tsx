@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Lock, LogOut, Search, Settings2, UserRound } from "lucide-react";
+import { Check, ChevronDown, Lock, LogOut, Search, Settings2, Upload, UserRound } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { recordPlace } from "../../app/linkTable";
 import { shortRoles } from "../../app/roles";
 import { signOut } from "../shared/session";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { complaintListTab } from "./complaintList";
-import type { SessionContext, WorkspaceSection } from "./workspaceContext";
+import { canImportOwnData, type SessionContext, type WorkspaceSection } from "./workspaceContext";
 
 /*
  * The new navigation's shell (0.10.73, Release C part C1; the approved design `mdarix-hybrid-mockup.html`): a top bar
@@ -312,6 +312,22 @@ export function GlobalSearch({ open }: { open: (section: WorkspaceSection, tab?:
   );
 }
 
+/** "Import your data" beside the trial's Sample data label (0.10.79): only in a trial whose organization imports, for a
+ * person who may change records; it opens the trial import Help › Try your own data opens. */
+export const importOwnDataAction = (
+  isTrial: boolean,
+  session: SessionContext | null | undefined,
+  open: (section: WorkspaceSection, tab?: string) => void,
+) => (isTrial && canImportOwnData(session) ? () => open("Getting started", "Your data") : undefined);
+
+export function ImportOwnData({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button type="button" className="ac-secondary uw-top-import" onClick={onOpen}>
+      <Upload size={15} aria-hidden="true" /> Import your data
+    </button>
+  );
+}
+
 /** The avatar: who is signed in, Account, Settings, the admin console, another organization and Sign out. */
 export function AvatarMenu({
   session,
@@ -319,14 +335,20 @@ export function AvatarMenu({
   open,
   onAdminConsole,
   showSettings,
+  onImport,
+  defaultOpen = false,
 }: {
   session: SessionContext | null;
   current: string;
   open: (section: WorkspaceSection) => void;
   onAdminConsole?: () => void;
   showSettings: boolean;
+  /** "Import your data", for the phone, where the top bar hides it (0.10.79). */
+  onImport?: () => void;
+  /** Tests only: render the menu open. */
+  defaultOpen?: boolean;
 }) {
-  const [shown, setShown] = useState(false);
+  const [shown, setShown] = useState(defaultOpen);
   const root = useRef<HTMLDivElement>(null);
   useDismiss(shown, () => setShown(false), root);
   const name = session?.display_name ?? "User";
@@ -362,6 +384,19 @@ export function AvatarMenu({
           >
             <UserRound size={16} aria-hidden="true" /> <span>Account</span>
           </button>
+          {onImport && (
+            <button
+              type="button"
+              role="menuitem"
+              className="uw-pop-option uw-avatar-import"
+              onClick={() => {
+                setShown(false);
+                onImport();
+              }}
+            >
+              <Upload size={16} aria-hidden="true" /> <span>Import your data</span>
+            </button>
+          )}
           {showSettings && (
             <button
               type="button"

@@ -10,6 +10,96 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.79] - 2026-11-03
+
+On the trial maintenance line (`release/0.10`): small owner-approved follow-ups to Release C. No migration. The API and
+web images change.
+
+**Operators:** `scripts/refresh_trial_story.py` (dry run), then `--apply`: adds the two new sample IMDRF links to
+each running trial whose sample has none for those codes (`backend/app/trial/sample_0_10_79.py`). Idempotent; a code
+the trial already links, the trial user's own link included, is left as it is.
+
+### Changed
+
+- **Settings › Products: the Regulatory Leader may change it.** A product's identity (UDI-DI, Basic UDI-DI, your own
+  GMDN code and term, EMDN code), its registrations per market and the responsible parties are changed by people who
+  may change records and now also by the Regulatory Reviewer role (the Regulatory Leader persona), through its
+  business permission `regulatory.review` (the server's guard and the screen read the same rule). Nothing else is
+  granted: the Risk Reviewer and View only stay read only, and proposing a code mapping still needs records.write.
+  This holds in pilots too: a pilot's Regulatory Reviewer may change the same records. Every change is audited, as
+  before.
+- **Tenant 360** says beside Navigation: "“Viewing as” personas need New."
+- **"Import your data" on the new navigation's top bar**, beside the trial's "Sample data" label (owner request). It
+  opens the trial import that Help › Try your own data opens: Getting started › Your data (upload, the data-quality
+  reports and what the data shows). Where the top bar hides the label (1100 px and narrower, a phone) it is in the
+  avatar menu instead. The Complaints header offers the same button in a trial too (until now pilots only), opening the
+  same flow; a pilot's still opens Import data. One rule everywhere, the Import data screen's: not in a sample-only
+  trial, and only for people who may change records (a Regulatory Leader, Risk Reviewer or Executive colleague does
+  not see it). The sample and its label are unchanged; the classic navigation is unchanged.
+
+### Fixed
+
+- **The triage panel's × closes it** (reported on mdarix.com). On the new navigation a complaint's page opens its
+  triage panel by the complaint (`To triage?complaint=<id>`; a story by `ref=`). Closing cleared only `item=`, so the
+  complaint or reference left in the address opened the panel again at once. Closing, and saving, now clear all three
+  in one address change; Back still reopens it. The other drawers open by one address parameter and were not affected.
+- Settings › Products on a phone: the Edit button beside a product broke into "E di t" (since 0.10.77).
+
+### Changed: the sample's last two problem codes get their IMDRF terms
+
+Looked up in IMDRF's own Release 2026 workbook
+(`imdrf-tech-ae-terminologies-n43-ReleaseNumber2026-Annexes-revisedJune.xlsx`), the most specific Annex A term that
+says what the complaint says (sample mappings, approved by the sample reviewer; `sample_imports.SAMPLE_IMDRF_LINKS`):
+
+| Sample problem code | Complaint | Before | After (release 2026) |
+|---|---|---|---|
+| FLOW_ZERO_READING (SAMPLE-RV-07) | "Flow sensor showed zero flow for 40 seconds; staff switched to manual ventilation. No harm." | no link | A090808 Low Readings (level 3, under A0908) |
+| SPO2_DROPOUT_HARM (SAMPLE-RV-01) | "Monitor's SpO2 reading dropped out overnight; the patient desaturated …" | no link | A090811 Unable to Obtain Readings (level 3, under A0908) |
+
+NFF (No Fault Found) keeps no link: it is not a device problem.
+
+### Sample numbers and labels that change
+
+No deadline, signal, trend figure, Readiness value or record count changes.
+
+| Where | Before | After |
+|---|---|---|
+| Problem code beside SAMPLE-RV-07 and SAMPLE-RV-01 (Complaints, the complaint page) | no IMDRF term | A090808 Low Readings; A090811 Unable to Obtain Readings |
+| SAMPLE-RV-07's EU MIR, 3.2a IMDRF Annex A (new navigation) | empty, missing | "Suggested: A090808 Low Readings", still missing until the regulatory manager confirms or changes it |
+| SAMPLE-RV-07's EU MIR meter | 8 of 24 | 8 of 24 (unchanged) |
+| SAMPLE-RV-01 | no authority report | unchanged (no report) |
+| Settings › Products, "Who can change this" | PMS / Signal Triage Lead, Quality Investigator, Quality Reviewer, Authorized Decision Maker, Leader (Quality Manager) or Customer Administrator | PMS / Signal Triage Lead, Quality Investigator, Quality Reviewer, Authorized Decision Maker, Leader (Quality Manager), Customer Administrator or Regulatory Reviewer; the Regulatory Leader reads "You can." and gets Edit and Add |
+
+### Documentation
+
+- `docs/release-notes/0.10.79-trial-owners.md` (new, not sent): colleagues invited before 0.10.73 keep the Quality
+  Leader persona until the owner changes it in Team, and how.
+
+### Tests
+
+- pytest: `tests/test_release_0_10_79.py` (new, 2): a locked Regulatory Leader changes a product's identity, adds and
+  removes a registration and sets and removes a responsible party; a Risk Reviewer and an Executive read and are
+  refused every change (403); proposing a code mapping stays refused; a running trial gets the two links once (dry run,
+  idempotent) and a trial user's own link is kept. Updated: `test_release_c5_0_10_77.py` (the sample links test covers
+  the two new codes, word for word, at level 3; its refresh test turns back only 0.10.77's links; its audit check
+  reads the events in order: it read them unordered and failed now and then).
+- Targeted pytest run (this release, C5, C4, C3, C1, Release B, business permissions, alembic drift policy, the
+  migration chain, free trial, flagship walk-through, complaint list, authority reports API, import reports, trial
+  story reads): 134 passed.
+- vitest: `release0079.test.tsx` (new, 4), `triageClose.test.tsx` (new, 3), and the files touched (releaseC5077,
+  ImportReports, ImportExcel, importPrivacy, lotImpact, releaseA071, TenantPages, intake, linkTable, noCodes): 12
+  files, 99 passed. `importOwnData.test.tsx` (new, 5: the owner's button opens Getting started › Your data; none for a
+  sample-only trial or a colleague without records.write; the avatar menu item; the Complaints header in a trial and a
+  pilot; classic unchanged) with the shell's tests (releaseA071, now expecting the trial's header button, C1, C2,
+  B072, accessibility, complaints, workspaceStart, readiness, reportingCapa): 10 files, 92 passed. tsc, ruff and
+  prettier clean.
+- `scripts/refresh_trial_story.py` dry run on the local test database: runs, changes nothing.
+- Screens at 1440 and 390 in `MDARIX-videos/site-0.10.79-review` (`regulatory/`: Settings › Products as a locked
+  Regulatory Leader, editing a product's identity, setting a responsible party; `risk/`: the same, read only, as a Risk
+  Reviewer; `admin/`: Tenant 360's Overview with the line beside Navigation; `topbar-owner/`: the top bar with Import
+  your data, the avatar menu at 390, the flow it opens, the Complaints header; `topbar-sample-only/`: no button, no
+  menu item).
+
 ## [0.10.78] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): the trial's size, in words. Since 0.10.73 a trial holds up to 50

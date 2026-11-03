@@ -5,7 +5,7 @@ import { Table, listOf, useResource } from "../../customer-admin/shared";
 import { displayId } from "../../../app/displayId";
 import { NEW_PLACES } from "../../../app/linkTable";
 import { offeredTab } from "../../../app/featureSet";
-import { chooseCase, sectionAllowed, useCan, useReportedTab, useWorkspace } from "../workspaceContext";
+import { canImportOwnData, chooseCase, openImport, useCan, useReportedTab, useWorkspace } from "../workspaceContext";
 import { tabParam } from "../workspaceAddress";
 import { renamed } from "../workspaceContext";
 import { parseComplaintListTab } from "../complaintList";
@@ -46,10 +46,9 @@ export function ComplaintViews({ tab }: { tab?: string }) {
   // The screens these views came from still name their former tabs (Triage's "Open the reporting clock"): the link
   // table opens each one's new home.
   const go = (classic: string) => open("Complaints", classic);
-  // A trial's own data is under Help › Try your own data (0.10.71), not on the list's header; a pilot keeps it here.
-  const canImport =
-    !isTrial &&
-    sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions, session?.sample_only);
+  // Who may import, by the Import data screen's rule; a trial's button opens its own import, as Help › Try your own
+  // data does (0.10.79; until then a trial had it only under Help).
+  const canImport = canImportOwnData(session);
   const canLog = useCan("signal.triage") || useCan("investigation.create") || useCan("quality.review");
   const complaint = tabParam(carried, "complaint");
   const server = SERVER_VIEWS[view];
@@ -74,7 +73,7 @@ export function ComplaintViews({ tab }: { tab?: string }) {
           </button>
         )}
         {canImport && (
-          <button type="button" className="ac-secondary" onClick={() => open("Import data")}>
+          <button type="button" className="ac-secondary" onClick={() => openImport(open, !!isTrial)}>
             <Upload size={15} aria-hidden="true" /> Import your data
           </button>
         )}

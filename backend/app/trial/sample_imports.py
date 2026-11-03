@@ -78,6 +78,12 @@ SAMPLE_IMDRF_LINKS = {
     "ALARM_VOLUME_LOW": ("A160103",),
     # SAMPLE-RV-11: A090807 "High Readings" (level 3, under A0908 Incorrect, Inadequate or Imprecise Result or Readings).
     "SPO2_READING_HIGH": ("A090807",),
+    # 0.10.79, the two codes that had no link (sample_0_10_79.py adds them to running trials). SAMPLE-RV-07: A090808
+    # "Low Readings" (level 3, A0908): the flow sensor showed zero flow; whether the gas flow stopped is not said.
+    "FLOW_ZERO_READING": ("A090808",),
+    # SAMPLE-RV-01: A090811 "Unable to Obtain Readings" (level 3, A0908): the SpO2 reading dropped out. The harm (the
+    # patient desaturated) is a health effect, Annex E, not a device problem.
+    "SPO2_DROPOUT_HARM": ("A090811",),
 }
 # The links before 0.10.77 (release 2025) and the code each becomes (sample_0_10_77.py re-records running trials).
 EARLIER_IMDRF_LINKS = {

@@ -41,7 +41,8 @@ upgrade that has none (backend/app/trial/reports_0_10_75.py; the sample's own re
 from 0.10.76 the same step covers EU / NI, Great Britain and Canada, so SAMPLE-RV-07's signed EU conclusion gets its
 EU MIR worksheet, once, and 0.10.77's code corrections (backend/app/trial/sample_0_10_77.py: the sample's IMDRF links
 re-recorded to IMDRF Release 2026's most specific terms; the code fields of the sample's frozen reports recorded as
-confirmed by the sample author, with the values they were approved with). The sample's dates themselves are brought to today by the
+confirmed by the sample author, with the values they were approved with), and 0.10.79's two new sample links
+(backend/app/trial/sample_0_10_79.py: FLOW_ZERO_READING and SPO2_DROPOUT_HARM, which had none). The sample's dates themselves are brought to today by the
 hourly "trial-sample-clock" job (backend/app/trial/sample_clock.py) while nobody has worked on the sample. Each trial
 is committed on its own, with an audit event.
 """
@@ -93,7 +94,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.db.models.foundation import LotBatch, Product, ProductVersion
     from sqlalchemy import or_
     from backend.app.signals.hooks import seed_demo_signals
-    from backend.app.trial import reports_0_10_75, sample_0_10_72, sample_0_10_77
+    from backend.app.trial import reports_0_10_75, sample_0_10_72, sample_0_10_77, sample_0_10_79
     from backend.app.trial.sample_calm import has_calm_story, rerecord_rv09, stage_calm_story
     from backend.app.trial.sample_clock import _absence_to_trial_end
     from backend.app.trial.sample_data import (
@@ -187,6 +188,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             reports_owed = reports_0_10_75.refresh(session, tenant_id, apply=False)
             # 0.10.77: the sample's IMDRF links (Release 2026) and its frozen reports' confirmed codes.
             codes_owed = sample_0_10_77.refresh(session, tenant_id, apply=False)
+            # 0.10.79: the two sample problem codes that had no IMDRF link.
+            links_owed = sample_0_10_79.refresh(session, tenant_id, apply=False)
             if not (
                 story_missing
                 or flagship_missing
@@ -209,6 +212,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or corrections
                 or reports_owed
                 or codes_owed
+                or links_owed
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -251,6 +255,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                         if codes_owed
                         else []
                     ),
+                    *([f"{links_owed} sample IMDRF links (0.10.79)"] if links_owed else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -300,6 +305,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             if codes_owed:
                 # After the reports: a report the step above creates is a draft, never frozen.
                 added["codes_0_10_77"] = sample_0_10_77.refresh(session, tenant_id, apply=True, now=now)
+            if links_owed:
+                added["links_0_10_79"] = sample_0_10_79.refresh(session, tenant_id, apply=True, now=now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,

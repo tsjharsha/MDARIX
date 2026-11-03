@@ -133,9 +133,9 @@ describe("a suggested code waits for the regulatory manager", () => {
 });
 
 describe("product identity and the trend's lots", () => {
-  it("Settings has Products, changed by people who may change records", () => {
+  it("Settings has Products, changed by people who may change records and (0.10.79) the Regulatory Leader", () => {
     expect(SETTINGS_TABS).toContain("Products");
-    expect(SETTING_PERMISSIONS.Products).toEqual(["records.write"]);
+    expect(SETTING_PERMISSIONS.Products).toEqual(["records.write", "regulatory.review"]);
   });
 
   it("reads each registration and the EU identity in plain words", () => {
