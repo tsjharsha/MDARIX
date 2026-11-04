@@ -20,7 +20,7 @@ not a certification.
 | Frontend format | `npm run format:check` | Exit 0 |
 | Frontend tests | `npm test` | Exit 0; 1,556 tests in 212 files |
 | Frontend build | `npm run build` | Exit 0 |
-| DEV-13 load measurement (last, machine otherwise idle) | `MDARIX_TRIAL_LOAD_MEASURE=1 python -m pytest -s tests/test_trial_load_measure.py` (dc4e8959) | 1 passed in 6 min 35 s; no server error; 9 of 20 reads and writes within target; the table is in `docs/runbooks/LOAD_AND_FAILURE_DRILLS.md` |
+| DEV-13 load measurement (last, machine otherwise idle) | `MDARIX_TRIAL_LOAD_MEASURE=1 python -m pytest -s tests/test_trial_load_measure.py` (dc4e8959) | 1 passed in 6 min 35 s; no server error; 8 of 19 measured reads, writes and the import within target; the table is in `docs/runbooks/LOAD_AND_FAILURE_DRILLS.md` |
 
 ### The browser journeys: what each covers and how to run it
 
