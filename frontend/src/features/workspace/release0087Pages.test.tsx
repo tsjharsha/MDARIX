@@ -10,6 +10,8 @@ import { ComplaintPage } from "./sections/ComplaintPage";
 import { ONE_STORY_PATH } from "./oneStory";
 import { eventPath } from "./oversight";
 import { rv11 } from "../../test/rv11";
+import { DecisionTreesSection } from "./sections/DecisionTrees";
+import { practiceWarning } from "./sections/Reports";
 
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("../customer-admin/shared", async (original) => ({
@@ -111,5 +113,24 @@ describe("A complaint (rows 21-23)", () => {
     expect(html).not.toContain("asked below");
     expect(html).not.toContain("asked above");
     expect(html).toContain("asked in Details");
+  });
+});
+
+describe("Decision trees (row 26)", () => {
+  it("does not repeat the page's question while the trees load", () => {
+    const html = render(<DecisionTreesSection />);
+    expect(html).toContain("Reading the trees…");
+    expect(html).not.toContain("Is it reportable, and by when?");
+  });
+});
+
+describe("Reports approval (row 33)", () => {
+  it("says only who you approve as; the line at the button says a pilot needs a colleague", () => {
+    expect(
+      practiceWarning(
+        "In a pilot a colleague approves this; in the trial you may approve your own practice report as Leader.",
+      ),
+    ).toBe("You may approve your own practice report as Leader.");
+    expect(practiceWarning("Something else.")).toBe("Something else.");
   });
 });
