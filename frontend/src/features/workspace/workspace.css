@@ -6238,7 +6238,7 @@ section[aria-label="What blocks the decision"] h3 {
 
 /* ------------------------------------------------------------------------------------------------------------------
  * The new navigation's shell and Home (0.10.73, Release C part C1; the approved design mdarix-hybrid-mockup.html):
- * a navy top bar with "Viewing as", a white tab bar of the persona's destinations, then the work canvas.
+ * a top bar with "Viewing as", then the work canvas; since 0.10.89 the rail and the bar's own look are heroShell.css.
  * ---------------------------------------------------------------------------------------------------------------- */
 .uw-hybrid .ac-body {
   grid-template-columns: minmax(0, 1fr);
@@ -6484,43 +6484,6 @@ button.uw-org:hover {
 }
 .uw-avatar-who small {
   color: var(--ms-muted);
-}
-.uw-tabs {
-  position: sticky;
-  top: 56px;
-  z-index: 15;
-  border-bottom: 1px solid var(--ms-line);
-  background: var(--ms-surface);
-}
-.uw-tabs-in {
-  display: flex;
-  gap: var(--ms-space-1);
-  max-width: 1272px;
-  margin: 0 auto;
-  padding: 0 var(--ms-space-4);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.uw-tabs-in::-webkit-scrollbar {
-  display: none;
-}
-.uw-tab {
-  padding: 14px 14px 11px;
-  border: 0;
-  border-bottom: 3px solid transparent;
-  background: transparent;
-  color: var(--ms-ink-2);
-  font: inherit;
-  font-weight: var(--ms-fw-semibold);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.uw-tab:hover {
-  color: var(--ms-ink);
-}
-.uw-tab[aria-current="page"] {
-  border-bottom-color: var(--ms-teal);
-  color: var(--ms-teal-dark);
 }
 .uw-never-submits {
   padding: var(--ms-space-3) var(--ms-space-4);
@@ -8732,22 +8695,6 @@ details.uw-team-change[open] {
 .uw-load-list li.is-loaded .uw-load-mark {
   border-color: transparent;
 }
-/* On a phone the tab bar says more tabs exist (0.10.82): a fade and an arrow at its right edge while it scrolls. */
-.uw-tabs.has-more .uw-tabs-in {
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
-}
-.uw-tabs-more {
-  position: absolute;
-  top: 0;
-  right: 4px;
-  bottom: 0;
-  display: inline-flex;
-  align-items: center;
-  color: var(--ms-teal);
-  pointer-events: none;
-}
-
 /* The record a story just finished, on Records (0.10.84, M4): what was signed, the report and who signed. */
 .uw-finished {
   display: grid;
@@ -8784,11 +8731,6 @@ details.uw-team-change[open] {
   }
 }
 
-/* 0.10.85: a tab the persona does not list while its screen is open (the approved design). */
-.uw-tab.is-extra {
-  border-bottom-style: dashed;
-  font-style: italic;
-}
 .uw-gs-more-head {
   display: grid;
   gap: 6px;

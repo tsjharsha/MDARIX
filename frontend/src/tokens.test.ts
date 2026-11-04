@@ -12,9 +12,12 @@ const SHEETS: Record<string, string> = Object.fromEntries(
     .map((path) => [path, read(`./${path}`)]),
 );
 const FONTS: string[] = fs.readdirSync(new URL("./assets/fonts/", import.meta.url));
-const licence = read("../public/fonts/Inter-OFL.txt");
-const token = (name: string): string => {
-  const found = new RegExp(`--ms-${name}:\\s*(#[0-9a-f]{6})`, "i").exec(css);
+const licence = (name: string): string => read(`../public/fonts/${name}-OFL.txt`);
+// The light theme's tokens (the :root block); the dark theme's are the block switched off in 0.10.89.
+const darkCss = css.slice(css.indexOf(':root[data-theme="dark"]'));
+const lightCss = css.slice(0, css.indexOf(':root[data-theme="dark"]'));
+const token = (name: string, sheet = lightCss): string => {
+  const found = new RegExp(`--ms-${name}:\\s*(#[0-9a-f]{6})`, "i").exec(sheet);
   if (!found) throw new Error(`no colour token --ms-${name}`);
   return found[1];
 };
@@ -29,17 +32,38 @@ const contrast = (a: string, b: string) => {
   return (hi + 0.05) / (lo + 0.05);
 };
 
-const LIGHT_GROUNDS = ["surface", "subtle", "ground", "mint", "crit-bg", "warn-bg", "good-bg", "info-bg", "ai-bg"];
-const TEXT = ["ink", "ink-2", "muted", "navy", "teal-dark", "crit", "warn", "good", "info", "ai"];
-const DARK_GROUNDS = ["navy", "navy-deep", "ink"];
-const TEXT_ON_DARK = ["surface", "on-dark-muted", "teal-bright", "mint"];
-const FILLS = ["teal", "teal-dark", "crit", "good", "info", "ai", "navy", "muted"];
+const LIGHT_GROUNDS = [
+  "surface",
+  "subtle",
+  "ground",
+  "mint",
+  "crit-bg",
+  "warn-bg",
+  "good-bg",
+  "info-bg",
+  "ai-bg",
+  "harm-bg",
+];
+const TEXT = ["ink", "ink-2", "muted", "navy", "teal", "teal-dark", "crit", "warn", "good", "info", "ai", "harm"];
+const DARK_GROUNDS = ["navy", "navy-deep", "ink", "rail", "rail-2", "hero", "hero-2"];
+const TEXT_ON_DARK = [
+  "surface",
+  "on-dark-muted",
+  "teal-bright",
+  "mint",
+  "rail-fg",
+  "rail-muted",
+  "hero-fg",
+  "hero-muted",
+  "glow",
+];
+const FILLS = ["teal", "teal-dark", "crit", "good", "info", "ai", "navy", "muted", "harm"];
 const CONTROLS = ["line-control", "teal", "warn-fill", "crit", "good", "info", "series"];
 
 const pairs = (fgs: string[], bgs: string[]) => fgs.flatMap((fg) => bgs.map((bg) => [fg, bg] as const));
-const failing = (list: ReadonlyArray<readonly [string, string]>, minimum: number) =>
+const failing = (list: ReadonlyArray<readonly [string, string]>, minimum: number, sheet = lightCss) =>
   list
-    .map(([fg, bg]) => ({ fg, bg, ratio: Math.round(contrast(token(fg), token(bg)) * 100) / 100 }))
+    .map(([fg, bg]) => ({ fg, bg, ratio: Math.round(contrast(token(fg, sheet), token(bg, sheet)) * 100) / 100 }))
     .filter((pair) => pair.ratio < minimum);
 
 describe("design tokens meet WCAG 2.1 AA", () => {
@@ -64,8 +88,36 @@ describe("design tokens meet WCAG 2.1 AA", () => {
     expect(failing(pairs(CONTROLS, ["surface", "subtle", "ground", "mint"]), 3)).toEqual([]);
   });
 
-  it("muted text is the darker grey (V-a11y: #6b7c8b was 4.30:1)", () => {
-    expect(token("muted")).toBe("#5c6d7c");
+  it("muted text is the darker grey (V-a11y: #6b7c8b was 4.30:1; 0.10.89 the hero design's, darker still)", () => {
+    expect(token("muted")).toBe("#56647b");
+    expect(contrast(token("muted"), "#ffffff")).toBeGreaterThan(contrast("#5c6d7c", "#ffffff"));
+  });
+
+  it("the white text and the rail's own text on the dark rail and monitor band are at least 4.5:1", () => {
+    expect(failing(pairs(["rail-fg", "rail-muted", "glow"], ["rail", "rail-2"]), 4.5)).toEqual([]);
+    expect(
+      failing(pairs(["hero-fg", "hero-muted", "glow", "h-crit", "h-warn", "h-good"], ["hero", "hero-2"]), 4.5),
+    ).toEqual([]);
+  });
+});
+
+describe("the dark theme (0.10.89: designed, switched off until 0.10.90)", () => {
+  const sources = (fs.readdirSync(new URL("./", import.meta.url), { recursive: true }) as string[])
+    .map((path) => path.split("\\").join("/"))
+    .filter((path) => /\.(tsx?|css|html)$/.test(path) && !path.endsWith(".test.ts") && !path.endsWith(".test.tsx"));
+
+  it("defines its own text and grounds, each text at least 4.5:1 on each ground", () => {
+    expect(darkCss).toContain("--ms-surface: #0f1a2d");
+    const text = ["ink", "ink-2", "muted", "teal", "crit", "warn", "good", "harm"];
+    expect(failing(pairs(text, ["surface", "subtle", "ground"]), 4.5, darkCss)).toEqual([]);
+  });
+
+  it("is never switched on: no colour-scheme query and nothing sets data-theme", () => {
+    expect(css).not.toMatch(/@media[^{]*prefers-color-scheme/);
+    const setters = sources.filter(
+      (path) => /data-theme|dataset\.theme/.test(read(`./${path}`)) && path !== "tokens.css",
+    );
+    expect(setters).toEqual([]);
   });
 });
 
@@ -83,25 +135,40 @@ describe("one token file", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("font sizes are the six of the scale (or a fluid display size on the website)", () => {
+  it("font sizes are those of the scale (or a fluid display size on the website)", () => {
     const sizes = new Set<string>();
     for (const path of sheets)
       for (const match of SHEETS[path].matchAll(/font-size:\s*([^;}]+)/g)) {
         const value = match[1].replace("!important", "").trim();
-        if (!/^var\(--ms-fs-(12|14|16|20|24|32)\)$|clamp\(|max\(|inherit|^\d+(\.\d+)?em$|^1em$|^0$/.test(value))
+        if (
+          !/^var\(--ms-fs-(12|13|14|16|20|24|26|32|34|48|64)\)$|clamp\(|max\(|inherit|^\d+(\.\d+)?em$|^1em$|^0$/.test(
+            value,
+          )
+        )
           sizes.add(value);
       }
     expect([...sizes].filter((value) => !/^(4[1-9]|[5-9]\d)px$|^[0-8](\.\d+)?px$/.test(value))).toEqual([]);
   });
 
-  it("Inter is self-hosted, with its licence", () => {
+  it("Inter, Archivo and IBM Plex Mono are self-hosted, each with its licence, and no font comes from elsewhere", () => {
     expect(css).toContain('url("./assets/fonts/Inter-Regular.woff2")');
     expect(css).toContain("font-weight: 700");
     expect(FONTS.filter((name) => name.endsWith(".woff2")).sort()).toEqual([
+      "Archivo-Latin.woff2",
+      "Archivo-LatinExt.woff2",
+      "IBMPlexMono-Medium.woff2",
+      "IBMPlexMono-Regular.woff2",
+      "IBMPlexMono-SemiBold.woff2",
       "Inter-Bold.woff2",
       "Inter-Regular.woff2",
       "Inter-SemiBold.woff2",
     ]);
-    expect(licence).toContain("SIL Open Font License");
+    for (const file of FONTS.filter((name) => name.endsWith(".woff2")))
+      expect(css, file).toContain(`url("./assets/fonts/${file}")`);
+    expect(css).toContain("font-stretch: 100% 125%");
+    for (const name of ["Inter", "Archivo", "IBMPlexMono"])
+      expect(licence(name), name).toContain("SIL Open Font License");
+    const index = read("../index.html");
+    expect(index + css + Object.values(SHEETS).join("")).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
   });
 });

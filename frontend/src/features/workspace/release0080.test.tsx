@@ -10,7 +10,7 @@ import {
   AvatarMenu,
   DataChoice,
   PERSONA_TABS,
-  TabBar,
+  NavRail,
   importOwnDataAction,
   readDataChoice,
   saveDataChoice,
@@ -84,9 +84,10 @@ describe("1. Getting started in the tab bar", () => {
     // A pilot's sections hold no Getting started (trial-only), even if the tab were asked for.
     expect(visibleTabs(["start", "home"], ["My Work"])).toEqual(["home"]);
     expect(tabOfSection("Getting started")).toBe("start");
-    const bar = renderToStaticMarkup(<TabBar tabs={["start", "home"]} current="start" open={vi.fn()} />);
+    // 0.10.89: the rail's head, above Home.
+    const bar = renderToStaticMarkup(<NavRail tabs={["start", "home"]} current="start" open={vi.fn()} />);
     expect(bar.indexOf("Getting started")).toBeLessThan(bar.indexOf("Home"));
-    expect(bar).toContain('aria-current="page">Getting started');
+    expect(bar).toMatch(/class="uw-rail-story" aria-current="page"[^>]*>.*<strong>Getting started<\/strong>/);
   });
 });
 

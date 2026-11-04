@@ -2,7 +2,7 @@
 // only from Help. Pilots and paid organizations keep their persona's tabs.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { PERSONA_TABS, TabBar, tabOfSection, trialTabs, visibleTabs } from "./HybridShell";
+import { NavRail, PERSONA_TABS, tabOfSection, trialTabs, visibleTabs } from "./HybridShell";
 import { HelpMenu } from "../shared/HelpMenu";
 import { NEXT_STEPS_HELP } from "../help/trialNextSteps";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
@@ -45,11 +45,12 @@ describe("Look ahead and Next steps as tabs of a trial", () => {
 
   it("show as tabs, the open one marked as the current page", () => {
     const bar = renderToStaticMarkup(
-      <TabBar tabs={visibleTabs(trialTabs(["home"], true), ALLOWED)} current="next" open={vi.fn()} />,
+      <NavRail tabs={visibleTabs(trialTabs(["home"], true), ALLOWED)} current="next" open={vi.fn()} />,
     );
     expect(bar.indexOf(">Getting started<")).toBeLessThan(bar.indexOf(">Home<"));
     expect(bar.indexOf(">Home<")).toBeLessThan(bar.indexOf(">Look ahead<"));
-    expect(bar).toContain('aria-current="page">Next steps');
+    // 0.10.89: on the rail, Next steps pinned at its foot.
+    expect(bar).toMatch(/aria-current="page" title="Next steps">.*?<span class="uw-tab-label">Next steps</);
     expect(bar).not.toContain("is-extra");
   });
 

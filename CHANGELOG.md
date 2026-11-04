@@ -10,6 +10,44 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.89] - 2026-11-04
+
+On the trial maintenance line (`release/0.10`): the owner-approved hero design (`mdarix-hero-ui.html`) on the new
+navigation. Presentation only: no page's words, fields, numbers, steps or buttons change, and no API or rule changes.
+No migration. Only the web image changes. No operator step. No sample number or label changes.
+
+### Changed: the new navigation's shell
+
+- **A left icon rail replaces the eleven tabs across the top.** The rail is dark, with the MDARIX mark, Getting
+  started and its ten-step progress ring at the head (a trial only), the persona's destinations in two groups (Work:
+  Home, Complaints, Decision trees, Reports, Investigations, Trends, Records; Plan: Team, Look ahead) and Next steps
+  pinned at the foot. It folds to icons with its button, and by itself below 1240 px; every icon keeps its name for
+  screen readers and as a tooltip. It lists only the persona's destinations, as the tabs did; a screen opened from
+  Getting started or a link that the persona does not list shows as a marked rail item while it is open.
+- **A slim, light top bar**: the organization with its trial status, Sample data, the search, Import your data,
+  Viewing as, the bell, Help and the avatar. The MDARIX mark moves to the rail.
+- **On a phone, a bottom bar of five**: Getting started, Home, Complaints, Trends and More, which opens the persona's
+  other destinations above the bar.
+- The classic navigation is unchanged.
+
+### Changed: the design tokens and fonts
+
+- `tokens.css` takes the hero design's palette (ink, surfaces, lines, the teal action colour, the deadline and harm
+  colours, the rail and the dark monitor band), its type scale (12 to 64 px) and its radii (8, 12, 16, 20). Every text
+  colour still meets 4.5:1 on its grounds (`tokens.test.ts`).
+- The dark theme's tokens are written but switched off: nothing turns them on until 0.10.90.
+- **Archivo** (headings and big numbers) and **IBM Plex Mono** (references and codes) are self-hosted beside Inter,
+  with their SIL Open Font Licence texts in `/fonts/`; no font is loaded from another site.
+
+### Added: the shared visuals
+
+- Clock rings, status and harm pills, flags (the United States, the United Kingdom, Canada, India, Germany, France, the
+  European Union, and a coded tile for any other country), device icons (patient monitor, infusion pump, respiratory
+  controller, and a generic device for imported products), stage dots, the ten-step progress arc, the dark monitor band
+  with its ECG-paper grid, and four illustrations (a hospital bedside, a patient monitor, an infusion pump and a signed
+  record's seal). Each has an accessible name, and no status is shown by colour alone. Motion stops for readers who
+  ask for reduced motion.
+
 ## [0.10.87] - 2026-11-04
 
 On the trial maintenance line (`release/0.10`): security, privacy and evaluation (DEV-08, DEV-11), the regulatory

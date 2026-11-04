@@ -33,6 +33,8 @@ import {
 import "../admin/console/admin-console.css";
 import "../customer-admin/customer-admin.css";
 import "./workspace.css";
+import "./heroShell.css";
+import { shownRun, useOneStory } from "./oneStory";
 import { signOut } from "../shared/session";
 import { useFocusOnChange } from "../shared/focus";
 import { SessionTimeoutWarning, useIdleSignOut } from "../shared/SessionTimeout";
@@ -99,7 +101,10 @@ import {
   importOwnDataAction,
   PERSONA_TABS,
   PersonaSwitch,
-  TabBar,
+  NavRail,
+  PhoneBar,
+  initials,
+  storyProgress,
   readDataChoice,
   saveDataChoice,
   tabOfSection,
@@ -677,6 +682,8 @@ export function UserWorkspace({
   // "Import your data" beside the Sample data label, and in the avatar menu on a phone (0.10.79).
   const importOwn = importOwnDataAction(!!trial?.is_trial, session, open);
   const shell = trialShellShows(section, fresh, dataBar);
+  // Getting started's progress on the rail's ring (0.10.89): the story's own read, on a trial's new navigation only.
+  const progress = storyProgress(shownRun(useOneStory(fresh && !!trial?.is_trial).data, dataSource));
 
   return (
     <WorkspaceContext.Provider value={api}>
@@ -688,12 +695,7 @@ export function UserWorkspace({
               <a className="app-skip" href="#app-main">
                 Skip to content
               </a>
-              <div className="ac-brand">
-                <i className="ac-brand-tile" aria-hidden="true">
-                  M
-                </i>
-                <b className="ac-brand-word">MDARIX</b>
-              </div>
+              {/* The brand is on the rail (0.10.89, the hero design); the organization leads the top bar. */}
               {trial?.is_trial ? (
                 <button
                   type="button"
@@ -702,11 +704,23 @@ export function UserWorkspace({
                   // The trial's dates and limits are in Getting started's settings (0.10.87); the tab opens the page.
                   onClick={() => open("Getting started", "Your trial")}
                 >
-                  {tenantName} · Free trial · {trial.days_left} {trial.days_left === 1 ? "day" : "days"} left
+                  <span className="uw-org-logo" aria-hidden="true">
+                    {initials(tenantName)}
+                  </span>
+                  <span className="uw-org-name">
+                    {tenantName}
+                    <small>
+                      <span className="sr-only"> · </span>Free trial · {trial.days_left}{" "}
+                      {trial.days_left === 1 ? "day" : "days"} left
+                    </small>
+                  </span>
                 </button>
               ) : (
                 <span className="uw-org" title="Every screen shows only this organization's data">
-                  {tenantName}
+                  <span className="uw-org-logo" aria-hidden="true">
+                    {initials(tenantName)}
+                  </span>
+                  <span className="uw-org-name">{tenantName}</span>
                 </span>
               )}
               {/* The trial's data (0.10.80): the sample's label, the choice beside the imported data, or nothing once the
@@ -718,8 +732,8 @@ export function UserWorkspace({
                 </span>
               )}
               {dataBar === "choice" && <DataChoice source={dataSource} onChoose={chooseDataSource} />}
-              {importOwn && shell.importButton && <ImportOwnData onOpen={importOwn} />}
               <GlobalSearch open={open} />
+              {importOwn && shell.importButton && <ImportOwnData onOpen={importOwn} />}
               <PersonaSwitch
                 persona={persona}
                 options={personaOptions}
@@ -768,11 +782,12 @@ export function UserWorkspace({
                 data={dataBar === "choice" ? { source: dataSource, onChoose: chooseDataSource } : undefined}
               />
             </header>
-            <TabBar
+            <NavRail
               tabs={tabs}
               current={tabOfSection(section)}
               open={open}
               personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
+              progress={progress}
             />
           </>
         )}
@@ -1062,6 +1077,15 @@ export function UserWorkspace({
             )}
           </main>
         </div>
+        {fresh && (
+          <PhoneBar
+            tabs={tabs}
+            current={tabOfSection(section)}
+            open={open}
+            personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
+            progress={progress}
+          />
+        )}
         <SessionTimeoutWarning session={idle} />
       </div>
     </WorkspaceContext.Provider>

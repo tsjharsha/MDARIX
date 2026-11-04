@@ -3,15 +3,22 @@
  * website (V14, V15). Every other style sheet takes its values from here; tokens.test.ts checks that each text and
  * control colour pair below meets WCAG 2.1 AA (4.5:1 for text, 3:1 for controls and marks).
  *
+ * 0.10.89, the owner-approved hero design (mdarix-hero-ui.html): its palette, type scale, radii and fonts. A dark
+ * instrument rail and a dark "monitor" band (ECG-paper grid) open each screen; quiet layered surfaces sit below.
+ *
  * Colour roles:
- *   text on light grounds:  ink, ink-2, muted, navy, teal-dark, crit, warn, good, info, ai
- *   light grounds:          surface, subtle, ground, mint, crit-bg, warn-bg, good-bg, info-bg, ai-bg
- *   text on dark grounds:   surface (white), on-dark-muted, teal-bright, mint
- *   dark grounds:           navy (the app bar), navy-deep, ink
- *   fills under white text: teal, teal-dark, crit, good, info, ai, navy, muted
+ *   text on light grounds:  ink, ink-2, muted, navy, teal-dark, crit, warn, good, info, ai, harm
+ *   light grounds:          surface, subtle, ground, mint, crit-bg, warn-bg, good-bg, info-bg, ai-bg, harm-bg
+ *   text on dark grounds:   surface (white), on-dark-muted, teal-bright, mint, rail-fg, rail-muted, hero-fg,
+ *                           hero-muted, glow
+ *   dark grounds:           navy (the classic app bar), navy-deep, ink, rail, rail-2, hero, hero-2
+ *   fills under white text: teal, teal-dark, crit, good, info, ai, navy, muted, harm
  *   controls and marks:     line-control (input and button edges), teal, warn-fill, crit, good, info, series
+ *   marks with a label:     teal-mark, crit-mark, warn-mark, good-mark, harm-mark (rings, bars, dots: never alone)
+ *   marks on the dark band: h-crit, h-warn, h-good, glow, lot-1..3
  *   lines (decorative):     line, line-strong, mint-line, crit-line, warn-line, good-line, info-line, ai-line
- * Red (crit) is only for overdue or critical; it is never decoration.
+ * Red (crit) is only for overdue or critical; it is never decoration. Harm has its own hue, so it never reads as a
+ * deadline.
  */
 
 /* Inter, self-hosted (SIL Open Font License 1.1: /fonts/Inter-OFL.txt). From the Inter 4.1 release, as the PDFs. */
@@ -36,17 +43,71 @@
   font-display: swap;
   src: url("./assets/fonts/Inter-Bold.woff2") format("woff2");
 }
+/* Archivo, the display face (headings and big numbers), self-hosted (SIL Open Font License 1.1: /fonts/Archivo-OFL.txt).
+   One variable file per script range, with its width (100-125%) and weight (500-800) axes. */
+@font-face {
+  font-family: Archivo;
+  font-style: normal;
+  font-weight: 500 800;
+  font-stretch: 100% 125%;
+  font-display: swap;
+  src: url("./assets/fonts/Archivo-Latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: Archivo;
+  font-style: normal;
+  font-weight: 500 800;
+  font-stretch: 100% 125%;
+  font-display: swap;
+  src: url("./assets/fonts/Archivo-LatinExt.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* IBM Plex Mono, for references and codes, self-hosted (SIL Open Font License 1.1: /fonts/IBMPlexMono-OFL.txt). IBM's
+   own Latin-1 files from the @ibm/plex-mono 2.5.0 package. */
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./assets/fonts/IBMPlexMono-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./assets/fonts/IBMPlexMono-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("./assets/fonts/IBMPlexMono-SemiBold.woff2") format("woff2");
+}
 
 :root {
   --ms-font: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --ms-font-display: Archivo, "Arial Narrow", "Segoe UI", system-ui, sans-serif;
+  --ms-font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
 
-  /* Type: six sizes, three weights. */
+  /* Type: the hero scale (12 · 13 · 14 · 16 · 20 · 26 · 34 · 48 · 64), with 24 and 32 kept for the existing pages. */
   --ms-fs-12: 12px;
+  --ms-fs-13: 13px;
   --ms-fs-14: 14px;
   --ms-fs-16: 16px;
   --ms-fs-20: 20px;
   --ms-fs-24: 24px;
+  --ms-fs-26: 26px;
   --ms-fs-32: 32px;
+  --ms-fs-34: 34px;
+  --ms-fs-48: 48px;
+  --ms-fs-64: 64px;
   --ms-fw-regular: 400;
   --ms-fw-semibold: 600;
   --ms-fw-bold: 700;
@@ -61,53 +122,133 @@
   --ms-space-7: 48px;
 
   /* Radii and shadows. */
-  --ms-radius-sm: 6px;
-  --ms-radius-md: 10px;
-  --ms-radius: 14px;
+  --ms-radius-sm: 8px;
+  --ms-radius-md: 12px;
+  --ms-radius: 16px;
+  --ms-radius-xl: 20px;
   --ms-radius-pill: 999px;
-  --ms-shadow-1: 0 1px 3px rgba(16, 32, 47, 0.08);
-  --ms-shadow-2: 0 12px 32px rgba(16, 32, 47, 0.16);
+  --ms-shadow-1: 0 1px 2px rgba(12, 21, 37, 0.05), 0 10px 28px -14px rgba(12, 21, 37, 0.22);
+  --ms-shadow-2: 0 12px 32px rgba(12, 21, 37, 0.16);
+  --ms-shadow-hero: 0 30px 60px -30px rgba(5, 15, 35, 0.55);
 
   /* Neutrals. */
   --ms-surface: #ffffff;
-  --ms-subtle: #f8fafc;
-  --ms-ground: #f3f6fa;
-  --ms-line: #dde5ec;
-  --ms-line-strong: #c7d0db;
+  --ms-subtle: #f5f7fb;
+  --ms-ground: #edf1f6;
+  --ms-line: #dbe2eb;
+  --ms-line-strong: #c2ccd9;
   --ms-line-control: #7b8b99;
-  --ms-muted: #5c6d7c;
-  --ms-ink-2: #4a5d6e;
-  --ms-ink: #10202f;
+  --ms-muted: #56647b;
+  --ms-ink-2: #39475c;
+  --ms-ink: #0c1525;
   --ms-navy: #183249;
   --ms-navy-deep: #0f2233;
   --ms-on-dark-muted: #c5d3df;
 
   /* Teal: the action colour. */
-  --ms-teal: #087b78;
+  --ms-teal: #087680;
   --ms-teal-dark: #06625f;
   --ms-teal-bright: #73d6cb;
-  --ms-mint: #e3f2f1;
+  --ms-teal-mark: #0e9ea6;
+  --ms-mint: #e0f3f3;
   --ms-mint-line: #b9dcd8;
+  --ms-focus: #0e9ea6;
 
-  /* States: text, ground and line of each. */
+  /* States: text, ground, line and mark of each. */
   --ms-crit: #b42318;
   --ms-crit-bg: #fdecec;
   --ms-crit-line: #f0b8b3;
-  --ms-warn: #8a5a00;
+  --ms-crit-mark: #e5484d;
+  --ms-warn: #8a5300;
   --ms-warn-fill: #b07400;
-  --ms-warn-bg: #fff4dc;
+  --ms-warn-bg: #fff2d4;
   --ms-warn-line: #ecc979;
-  --ms-good: #1f7a4d;
-  --ms-good-bg: #e7f5ec;
+  --ms-warn-mark: #e89b0c;
+  --ms-good: #16734a;
+  --ms-good-bg: #e2f4eb;
   --ms-good-line: #a9d8bc;
+  --ms-good-mark: #27a567;
   --ms-info: #2a5f8a;
   --ms-info-bg: #e8f1f8;
   --ms-info-line: #b5cde3;
   --ms-ai: #64558b;
   --ms-ai-bg: #efedf6;
   --ms-ai-line: #cfc8e3;
+  /* Harm (death, serious injury, malfunction): its own hue. */
+  --ms-harm: #b0154a;
+  --ms-harm-bg: #fce7ef;
+  --ms-harm-mark: #d9346a;
+  --ms-harm-track: #ead7df;
+
+  /* The rail and the monitor band: dark in both themes. */
+  --ms-rail: #08101d;
+  --ms-rail-2: #0f1a2c;
+  --ms-rail-fg: #d2dcea;
+  --ms-rail-muted: #8d9cb3;
+  --ms-hero: #0a1427;
+  --ms-hero-2: #0f203c;
+  --ms-hero-fg: #eef3fb;
+  --ms-hero-muted: #a6b6cc;
+  --ms-hero-line: rgba(140, 175, 220, 0.1);
+  --ms-hero-line-2: rgba(140, 175, 220, 0.05);
+  --ms-hero-card: rgba(255, 255, 255, 0.05);
+  --ms-hero-card-line: rgba(160, 190, 230, 0.17);
+  --ms-glow: #3fe0d6;
+  --ms-glow-ink: #032423;
+  --ms-art: rgba(196, 220, 250, 0.62);
+  --ms-art-soft: rgba(196, 220, 250, 0.16);
+  /* Status marks on the dark band. */
+  --ms-h-crit: #ff6b63;
+  --ms-h-warn: #f6b443;
+  --ms-h-good: #45cf8d;
+  /* Lot series on the dark band and the trend chart. */
+  --ms-lot-1: #8f1d14;
+  --ms-lot-2: #c8322a;
+  --ms-lot-3: #ef8a83;
 
   /* Charts: the series colour (4.6:1 on white) and its hover. */
   --ms-series: #2a78d6;
   --ms-series-dark: #1c5cab;
+}
+
+/*
+ * The dark theme, designed with the light one and kept switched off in 0.10.89: nothing sets data-theme="dark" and no
+ * prefers-color-scheme query applies it yet (dark mode is release 0.10.90, with its toggle).
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ms-surface: #0f1a2d;
+  --ms-subtle: #15233b;
+  --ms-ground: #04080f;
+  --ms-line: #26375a;
+  --ms-line-strong: #344a72;
+  --ms-muted: #95a3b9;
+  --ms-ink-2: #b5c2d5;
+  --ms-ink: #e8eef7;
+  --ms-teal: #45d9d0;
+  --ms-teal-dark: #45d9d0;
+  --ms-teal-mark: #45d9d0;
+  --ms-mint: #153141;
+  --ms-focus: #45d9d0;
+  --ms-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 32px -16px rgba(0, 0, 0, 0.7);
+  --ms-rail: #0a1322;
+  --ms-rail-2: #13203a;
+  --ms-hero: #0b1932;
+  --ms-hero-2: #12264c;
+  --ms-crit: #ff8f88;
+  --ms-crit-bg: #2e2332;
+  --ms-crit-mark: #ff5c54;
+  --ms-warn: #f7c35c;
+  --ms-warn-bg: #2d2e2f;
+  --ms-warn-mark: #f2a93b;
+  --ms-good: #61d49e;
+  --ms-good-bg: #163139;
+  --ms-good-mark: #3cc184;
+  --ms-harm: #ff8aab;
+  --ms-harm-bg: #2f2238;
+  --ms-harm-mark: #f2507f;
+  --ms-harm-track: #3a2633;
+  --ms-lot-1: #b8322b;
+  --ms-lot-2: #ff6b63;
+  --ms-lot-3: #ffb0aa;
 }

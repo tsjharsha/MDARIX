@@ -1,0 +1,596 @@
+/* ------------------------------------------------------------------------------------------------------------------
+ * The new navigation's shell in the owner-approved hero design (0.10.89, mdarix-hero-ui.html): a dark instrument rail
+ * on the left (icons only below 1240 px), a slim glass top bar, and on a phone (640 px and narrower) a bottom bar of
+ * five slots. The classic navigation keeps its own shell (workspace.css).
+ * ---------------------------------------------------------------------------------------------------------------- */
+.uw-hybrid {
+  --uw-rail-w: 252px;
+  display: grid;
+  grid-template-columns: var(--uw-rail-w) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  /* The rail's colour runs the page's full height, past the sticky rail itself. */
+  background: linear-gradient(90deg, var(--ms-rail) var(--uw-rail-w), var(--ms-ground) var(--uw-rail-w));
+}
+.uw-hybrid:has(> .uw-rail.is-folded) {
+  --uw-rail-w: 76px;
+}
+.uw-hybrid > * {
+  grid-column: 2;
+  min-width: 0;
+}
+.uw-hybrid > .uw-rail {
+  grid-row: 1 / span 2;
+  grid-column: 1;
+}
+.uw-hybrid > .uw-top {
+  grid-row: 1;
+}
+.uw-hybrid > .ac-body {
+  grid-row: 2;
+  min-height: 0;
+}
+.uw-hybrid .ac-main {
+  max-width: 1340px;
+  margin: 0;
+  padding: 28px 40px 64px;
+}
+
+/* The rail */
+.uw-rail {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100vh;
+  padding: 18px 14px 16px;
+  overflow-y: auto;
+  border-right: 1px solid rgb(160 190 230 / 10%);
+  background: radial-gradient(120% 50% at 0% 0%, rgb(63 224 214 / 9%), transparent 60%), var(--ms-rail);
+  color: var(--ms-rail-fg);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ms-rail-2) transparent;
+}
+.uw-rail-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 6px;
+}
+.uw-rail-brand > svg {
+  flex: none;
+}
+.uw-rail-word {
+  font-family: var(--ms-font-display);
+  font-size: var(--ms-fs-20);
+  font-stretch: 125%;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--ms-surface);
+}
+.uw-rail-fold {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  border: 0;
+  border-radius: var(--ms-radius-sm);
+  background: transparent;
+  color: var(--ms-rail-muted);
+  cursor: pointer;
+}
+.uw-rail-fold:hover {
+  background: var(--ms-rail-2);
+  color: var(--ms-surface);
+}
+.uw-rail :focus-visible {
+  outline: 2px solid var(--ms-glow);
+  outline-offset: 2px;
+}
+.uw-rail-story {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgb(63 224 214 / 24%);
+  border-radius: var(--ms-radius-md);
+  background: linear-gradient(160deg, rgb(63 224 214 / 13%), rgb(63 224 214 / 3%));
+  color: var(--ms-rail-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.uw-rail-story:hover {
+  border-color: rgb(63 224 214 / 50%);
+}
+.uw-rail-story[aria-current="page"] {
+  border-color: var(--ms-glow);
+}
+.uw-rail-story strong {
+  display: block;
+  color: var(--ms-surface);
+  font-size: var(--ms-fs-14);
+  font-weight: var(--ms-fw-semibold);
+  line-height: 1.3;
+}
+.uw-rail-story small {
+  display: block;
+  color: var(--ms-rail-muted);
+  font-size: var(--ms-fs-12);
+  line-height: 1.3;
+}
+.uw-rail-group,
+.uw-rail-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.uw-rail-foot {
+  margin-top: auto;
+}
+.uw-rail-grp {
+  margin: 0;
+  padding: 10px 10px 4px;
+  color: var(--ms-rail-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.uw-rail .uw-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ms-rail-fg);
+  font: inherit;
+  font-size: var(--ms-fs-14);
+  font-weight: var(--ms-fw-semibold);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.uw-rail .uw-tab:hover {
+  background: var(--ms-rail-2);
+  color: var(--ms-surface);
+}
+.uw-rail .uw-tab[aria-current="page"] {
+  background: linear-gradient(90deg, rgb(63 224 214 / 18%), rgb(63 224 214 / 4%));
+  color: var(--ms-surface);
+}
+.uw-rail .uw-tab[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: -14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--ms-glow);
+}
+.uw-rail .uw-tab[aria-current="page"] > svg {
+  color: var(--ms-glow);
+}
+/* A destination the persona does not list, open from Getting started or a link (0.10.85): marked, never hidden. */
+.uw-rail .uw-tab.is-extra {
+  outline: 1px dashed rgb(63 224 214 / 55%);
+  outline-offset: -1px;
+  font-style: italic;
+}
+.uw-rail .uw-tab.is-extra::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--ms-glow);
+  box-shadow: 0 0 0 3px rgb(63 224 214 / 20%);
+}
+
+/* Icons only: on request, and below 1240 px. Each name stays for screen readers, and as the tooltip. */
+.uw-rail.is-folded {
+  align-items: center;
+  padding-inline: 12px;
+}
+.uw-rail.is-folded :is(.uw-rail-word, .uw-rail-grp),
+.uw-rail.is-folded .uw-tab-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.uw-rail.is-folded .uw-rail-brand {
+  flex-direction: column;
+}
+.uw-rail.is-folded .uw-rail-fold {
+  margin: 0;
+}
+.uw-rail.is-folded .uw-rail-story {
+  grid-template-columns: 44px;
+  width: auto;
+  padding: 4px;
+}
+.uw-rail.is-folded .uw-tab {
+  justify-content: center;
+  width: 48px;
+  padding: 0;
+}
+.uw-rail.is-folded .uw-tab.is-extra::after {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+.uw-rail.is-folded .uw-rail-group {
+  align-items: center;
+}
+@media (max-width: 1240px) {
+  .uw-hybrid {
+    --uw-rail-w: 76px;
+  }
+  .uw-rail {
+    align-items: center;
+    padding-inline: 12px;
+  }
+  .uw-rail :is(.uw-rail-word, .uw-rail-grp),
+  .uw-rail .uw-tab-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .uw-rail-fold {
+    display: none;
+  }
+  .uw-rail-story {
+    grid-template-columns: 44px;
+    width: auto;
+    padding: 4px;
+  }
+  .uw-rail .uw-tab {
+    justify-content: center;
+    width: 48px;
+    padding: 0;
+  }
+  .uw-rail .uw-tab.is-extra::after {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+  }
+  .uw-rail-group {
+    align-items: center;
+  }
+  .uw-hybrid .ac-main {
+    padding-inline: 28px;
+  }
+}
+
+/* The top bar: slim, light and glassy, sticky over the page. */
+.uw-hybrid .uw-top.ac-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  gap: 10px;
+  height: 60px;
+  min-height: 60px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--ms-line);
+  background: color-mix(in srgb, var(--ms-surface) 88%, transparent);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  backdrop-filter: saturate(1.4) blur(14px);
+  color: var(--ms-ink);
+}
+.uw-hybrid .uw-top .uw-org {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  max-width: 300px;
+  height: 40px;
+  padding: 0 12px 0 6px;
+  border: 1px solid var(--ms-line);
+  border-radius: 10px;
+  background: var(--ms-surface);
+  color: var(--ms-ink);
+  font-size: var(--ms-fs-14);
+  font-weight: var(--ms-fw-semibold);
+  text-align: left;
+}
+.uw-hybrid .uw-top button.uw-org:hover {
+  border-color: var(--ms-line-strong);
+  color: var(--ms-ink);
+}
+.uw-org-logo {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--ms-teal);
+  color: var(--ms-surface);
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-bold);
+}
+.uw-org-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.uw-org-name small {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-regular);
+}
+.uw-hybrid .uw-top .uw-sample-chip {
+  height: 26px;
+  border: 0;
+  background: var(--ms-warn-bg);
+  color: var(--ms-warn);
+}
+.uw-hybrid .uw-top .uw-search {
+  flex: 1 1 200px;
+  max-width: 400px;
+  height: 40px;
+  margin-left: auto;
+  padding: 0 12px;
+  border: 1px solid var(--ms-line);
+  border-radius: 10px;
+  background: var(--ms-subtle);
+  color: var(--ms-muted);
+}
+.uw-hybrid .uw-top .uw-search input {
+  color: var(--ms-ink);
+}
+.uw-hybrid .uw-top .uw-search input::placeholder {
+  color: var(--ms-muted);
+}
+.uw-hybrid .uw-top .uw-search:focus-within {
+  border-color: var(--ms-teal-mark);
+  background: var(--ms-surface);
+}
+.uw-hybrid .uw-top.ac-header .ac-secondary {
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ms-ink-2);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-hybrid .uw-top.ac-header .ac-secondary:hover {
+  border-color: var(--ms-line);
+  background: var(--ms-subtle);
+}
+.uw-hybrid .uw-top.ac-header .uw-top-import {
+  border-color: var(--ms-line-strong);
+  background: var(--ms-surface);
+  color: var(--ms-ink);
+}
+.uw-hybrid .uw-top .uw-persona-btn {
+  height: 40px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--ms-line);
+  border-radius: 10px;
+  box-shadow: none;
+  font-size: var(--ms-fs-13);
+}
+.uw-hybrid .uw-top .uw-avatar {
+  background: linear-gradient(135deg, #1b5f86, #0b8a8f);
+  color: var(--ms-surface);
+  font-size: var(--ms-fs-12);
+}
+.uw-hybrid .uw-top .uw-data-choice {
+  margin-left: 0;
+}
+@media (max-width: 1240px) {
+  .uw-hybrid .uw-top .uw-persona-hint,
+  .uw-org-name small {
+    display: none;
+  }
+}
+
+/* The page head the shell shows: the eyebrow, the page's question in the display face, its guide. */
+.uw-hybrid .ac-page-head h1 {
+  margin-top: 4px;
+  font-family: var(--ms-font-display);
+  font-size: var(--ms-fs-34);
+  font-stretch: 112%;
+  font-weight: 760;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+}
+.uw-hybrid .ac-page-head .ac-eyebrow {
+  color: var(--ms-teal);
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-semibold);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* The phone's bottom bar: hidden until 640 px. */
+.uw-phonebar {
+  display: none;
+}
+@media (max-width: 640px) {
+  .uw-hybrid,
+  .uw-hybrid:has(> .uw-rail.is-folded) {
+    --uw-rail-w: 0px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .uw-hybrid > * {
+    grid-column: 1;
+  }
+  .uw-hybrid > .uw-rail {
+    display: none;
+  }
+  .uw-hybrid .ac-main {
+    padding: 18px 16px 110px;
+  }
+  .uw-hybrid .uw-top.ac-header {
+    gap: 4px;
+    padding: 0 12px;
+  }
+  .uw-hybrid .uw-top .uw-org {
+    display: flex;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .uw-hybrid .uw-top .uw-org-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .uw-hybrid .uw-top .uw-search {
+    flex: none;
+    max-width: none;
+    height: auto;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .uw-hybrid .uw-top .uw-search-toggle {
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 10px;
+    color: var(--ms-ink-2);
+  }
+  .uw-hybrid .uw-top .uw-search.is-open {
+    top: 60px;
+    border-bottom: 1px solid var(--ms-line);
+    background: var(--ms-surface);
+  }
+  .uw-hybrid .uw-top .uw-search.is-open > input {
+    border: 1px solid var(--ms-line-strong);
+    background: var(--ms-subtle);
+    color: var(--ms-ink);
+  }
+  .uw-hybrid .uw-top .uw-persona-btn {
+    height: 44px;
+  }
+  .uw-hybrid .uw-top.ac-header .ac-secondary {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+  .uw-hybrid .uw-page-head h1,
+  .uw-hybrid .ac-page-head h1 {
+    font-size: var(--ms-fs-26);
+  }
+  .uw-phonebar {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    display: block;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-top: 1px solid var(--ms-line);
+    background: color-mix(in srgb, var(--ms-surface) 94%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+  .uw-phonebar-in {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    padding-inline: 4px;
+  }
+  .uw-phonebar .uw-tab {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 62px;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    color: var(--ms-muted);
+    font: inherit;
+    font-size: var(--ms-fs-12);
+    font-weight: var(--ms-fw-semibold);
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .uw-phonebar .uw-tab[aria-current="page"],
+  .uw-phonebar .uw-tab.is-within {
+    color: var(--ms-teal);
+  }
+  .uw-phonebar .uw-tab[aria-current="page"]::before,
+  .uw-phonebar .uw-tab.is-within::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 28%;
+    left: 28%;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--ms-teal-mark);
+  }
+  .uw-phonebar .uw-tab.is-extra {
+    font-style: italic;
+  }
+  .uw-phonebar-more {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    padding: 12px;
+    border-bottom: 1px solid var(--ms-line);
+    background: var(--ms-surface);
+    box-shadow: 0 -12px 32px rgba(12, 21, 37, 0.12);
+  }
+  .uw-phonebar-more .uw-tab {
+    min-height: 68px;
+    border-radius: var(--ms-radius-md);
+    background: var(--ms-subtle);
+    color: var(--ms-ink-2);
+    white-space: normal;
+    text-align: center;
+  }
+}
+/* The narrowest phones (320 px): the top bar's controls tighten and the bar's longest name may wrap, so nothing
+   runs off the screen. */
+@media (max-width: 380px) {
+  .uw-hybrid .uw-top.ac-header {
+    gap: 2px;
+    padding: 0 8px;
+  }
+  .uw-hybrid .uw-top .uw-persona-eye {
+    display: none;
+  }
+  .uw-hybrid .uw-top .uw-persona-btn {
+    padding: 0 6px 0 8px;
+  }
+  .uw-hybrid .uw-top.ac-header .ac-secondary {
+    min-width: 40px;
+    padding-inline: 6px;
+  }
+  .uw-phonebar .uw-tab {
+    white-space: normal;
+    text-align: center;
+  }
+}
