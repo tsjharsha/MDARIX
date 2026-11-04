@@ -14,8 +14,7 @@ import {
 } from "../workspaceContext";
 import { StatusBadge, listTitle } from "./common";
 import { DeadlineChip, HarmChip } from "../../../app/chips";
-import { marketLabel } from "../../../app/labels";
-import { ProblemCode, problemCodeParts, problemCodeText, useImdrfLinks, type ImdrfLinks } from "./ProblemCode";
+import { problemCodeParts, problemCodeText, useImdrfLinks, type ImdrfLinks } from "./ProblemCode";
 import { isLegalDeadline } from "../home";
 import {
   EMPTY_COMPLAINT_FILTERS,
