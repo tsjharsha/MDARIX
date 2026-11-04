@@ -417,7 +417,8 @@ def test_composing_editing_and_refreshing_a_draft(org):
         for item in content["established_facts"]
     )
     supporting = {(item["source"], item["evidence_business_id"]) for item in content["supporting_evidence"]}
-    assert supporting == {("CASE", case["_evidence"]), ("HYPOTHESIS", case["_evidence"])}
+    # Each piece of evidence once (0.10.72): the link to the leading hypothesis replaces the case's own judgement.
+    assert supporting == {("HYPOTHESIS", case["_evidence"])}
     assert content["contradicting_evidence"] == []
     # The leading hypothesis is the one a person judged; the AI's own "supported" never makes one lead.
     assert content["leading_hypothesis"]["business_id"] == case["_judged"]

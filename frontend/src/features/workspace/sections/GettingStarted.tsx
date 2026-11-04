@@ -518,24 +518,66 @@ export function GettingStartedSection({
       </div>
     </div>
   );
-  // The new navigation (0.10.82, D1): one story of ten steps first; the earlier stories, the ten chapters, the journey
-  // and the dial fold under "More ways to explore".
+  // The new navigation: Getting started is the ten-step story only (owner, 5 Nov 2026). The three short stories, the
+  // chapters, your trial and the sample data are their own page, reached from Help.
   if (navigation !== "new") return body;
-  return (
-    <>
-      <OneStory heading={heading} />
-      <details className="uw-explore uw-os-more" open={!!focusTab}>
-        <summary>More ways to explore</summary>
-        <p className="ac-muted">
-          {hasSample
-            ? "The shorter stories, the ten chapters, the sample data and your trial."
-            : "The ten chapters and your trial."}
-        </p>
-        <Entrance onRestarted={restarted} />
+  const owner = !!trial?.is_owner;
+  const parts: Array<{ key: string; title: string; detail: string; go: () => void }> = [
+    ...(hasSample
+      ? [
+          {
+            key: "call",
+            title: "A new urgent call",
+            detail: "SAMPLE-URG-01: is it a complaint? Triage it against its clock.",
+            go: () => open("Complaints", `To triage?${new URLSearchParams({ ref: "SAMPLE-URG-01" })}`),
+          },
+          {
+            key: "rising",
+            title: "A rising problem",
+            detail: "OrbitCare 300 Rev B against its own history, per unit in the field.",
+            go: () => open("Trends", `Trend check?${new URLSearchParams({ product: "SAMPLE-ORBIT-300" })}`),
+          },
+        ]
+      : []),
+    owner
+      ? {
+          key: "approve",
+          title: "Approve as a colleague",
+          detail: "Invite a colleague: they approve what you prepared, never their own.",
+          go: () => open("Team"),
+        }
+      : {
+          key: "approve",
+          title: "Your approvals",
+          detail: "What a colleague prepared and sent to you to approve.",
+          go: () => open("My Work", "Approvals"),
+        },
+  ];
+  if (focusTab)
+    return (
+      <>
+        <div className="uw-gs-more-head">
+          <button type="button" className="ac-link" onClick={() => open("Getting started")}>
+            <ChevronRight size={14} aria-hidden="true" className="uw-flip" /> Back to the story
+          </button>
+          <p className="ac-eyebrow">Getting started</p>
+          <h1 ref={heading} tabIndex={-1}>
+            Short stories, your trial and the sample data
+          </h1>
+        </div>
+        <div className="uw-os-parts">
+          {parts.map((part) => (
+            <button key={part.key} type="button" className="uw-os-part" onClick={part.go}>
+              <b>{part.title}</b>
+              <span>{part.detail}</span>
+            </button>
+          ))}
+        </div>
+        {hasSample && <Entrance onRestarted={restarted} />}
         {body}
-      </details>
-    </>
-  );
+      </>
+    );
+  return <OneStory heading={heading} />;
 }
 
 /**

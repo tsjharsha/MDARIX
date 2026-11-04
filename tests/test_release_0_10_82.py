@@ -19,7 +19,17 @@ from tests.test_release_c3_0_10_75 import _flagship, _purge, _reports, _sign_us
 
 pytestmark = pytest.mark.db
 
+from tests.test_release_0_10_85 import _urgency  # noqa: E402
+
 STORY = "/api/v1/trial/one-story"
+
+
+def _mark(user, run: str, step: str, status: int = 200):
+    """Open a step from the story: the mark names the complaint the person's screen showed (0.10.86)."""
+    complaint_id = _ok(user.get(STORY))[run]["complaint"]["id"]
+    return _ok(user.post(f"{STORY}/marks", json={"run": run, "step": step, "complaint_id": complaint_id}), status)
+
+
 REPORTS = "/api/v1/reports"
 
 
@@ -47,36 +57,37 @@ def test_the_sample_story_ticks_each_step_from_the_saved_record(trial):
     first = _ok(user.get(STORY))
     sample = first["sample"]
     assert sample["complaint"]["ref"] == "SAMPLE-RV-11" and sample["market"] == "US"
+    # The owner's names (4 Nov 2026).
     assert [step["label"] for step in sample["steps"]] == [
-        "The call",
+        "Review the call",
         "Triage",
-        "Tree",
-        "Decide",
-        "Form",
-        "Fill",
-        "Approval",
-        "Submit",
-        "Records",
-        "Trends",
+        "Assess reportability",
+        "Sign conclusion",
+        "Prepare report",
+        "Complete details",
+        "Approve report",
+        "Record submission",
+        "Review records",
+        "Explore trends",
     ]
     # Nothing imported yet: no second run.
     assert (first["yours"], sample["current"], _done(sample)) == (None, 0, [])
-    # Opening a later step's screen ticks nothing ahead of the record: Trends is marked, Records is not done
-    # until a submission is recorded.
-    _ok(user.post(f"{STORY}/marks", json={"run": "sample", "step": "records"}))
-    after = _ok(user.post(f"{STORY}/marks", json={"run": "sample", "step": "trends"}))["sample"]
-    assert _done(after) == ["trends"] and after["current"] == 0
+    # 0.10.86: Records or Trends opened before their turn is refused and never credited later.
+    for step in ("records", "trends"):
+        assert _mark(user, "sample", step, 409)["detail"]["code"] == "STEP_NOT_YET"
+    after = _ok(user.get(STORY))["sample"]
+    assert _done(after) == [] and after["current"] == 0 and not any(step["earlier"] for step in after["steps"])
     # Step 1 is the person's own mark; step 2 is the triage record.
-    assert _done(_ok(user.post(f"{STORY}/marks", json={"run": "sample", "step": "call"}))["sample"])[:1] == ["call"]
+    assert _done(_mark(user, "sample", "call")["sample"])[:1] == ["call"]
     complaint = _flagship(user)
     run = _ok(user.get(STORY))["sample"]
-    assert _done(run) == ["call", "triage", "trends"] and run["current"] == 2
+    assert _done(run) == ["call", "triage"] and run["current"] == 2
     # Steps 3 and 4: signing the US conclusion "reportable" (the report is created with it).
     _ok(_sign_us(user, complaint, "REPORTABLE"))
     run = _ok(user.get(STORY))["sample"]
     assert run["conclusion"] == "REPORTABLE" and run["report_id"] and run["current"] == 4
     # Step 5 waits for the person to open the report; steps 6 to 8 follow its status path.
-    run = _ok(user.post(f"{STORY}/marks", json={"run": "sample", "step": "form"}))["sample"]
+    run = _mark(user, "sample", "form")["sample"]
     assert run["current"] == 5
     (report,) = _reports(user, complaint)
     fill(user, REPORTS, report["id"], _ok(user.get(f"{REPORTS}/{report['id']}"))["mandatory"]["missing"])
@@ -95,8 +106,10 @@ def test_the_sample_story_ticks_each_step_from_the_saved_record(trial):
             },
         )
     )
-    run = _ok(user.get(STORY))["sample"]
-    # Records was opened before the submission: it counts now that the submission is recorded.
+    # Steps 9 and 10 count when opened in their turn.
+    assert _ok(user.get(STORY))["sample"]["current"] == 8
+    assert _mark(user, "sample", "records")["sample"]["current"] == 9
+    run = _mark(user, "sample", "trends")["sample"]
     assert run["current"] == 10 and run["finished"] and all(step["done"] for step in run["steps"])
 
 
@@ -119,9 +132,16 @@ def test_your_data_runs_on_the_most_serious_complaint_and_says_what_the_file_did
         assert {need["fact"] for need in yours["needs"]} == {"COUNTRY", "AWARENESS_DATE"}
         assert yours["current"] == 0 and not yours["finished"]
         # The sample run is apart: its marks are not this run's.
-        _ok(user.post(f"{STORY}/marks", json={"run": "yours", "step": "call"}))
+        _mark(user, "yours", "call")
         both = _ok(user.get(STORY))
         assert _done(both["yours"]) == ["call"] and _done(both["sample"]) == []
+        # A mark names the complaint the screen showed: the sample's complaint is not the run "yours" follows, so
+        # nothing lands on it (an import that moved the story while the old screen was open).
+        moved = user.post(
+            f"{STORY}/marks", json={"run": "yours", "step": "form", "complaint_id": both["sample"]["complaint"]["id"]}
+        )
+        assert moved.status_code == 409 and moved.json()["detail"]["code"] == "STORY_MOVED"
+        assert _done(_ok(user.get(STORY))["yours"]) == ["call"]
     finally:
         _purge(tenant_id)
 
@@ -144,11 +164,9 @@ def test_home_tiles_are_the_counts_of_the_lists_they_open_and_open_complaints_ar
     the overdue first, then the nearest clock, the undated last."""
     user = trial["user"]
     listed = _ok(user.get("/api/v1/complaints", params={"view": "open", "work": "true", "page_size": 200}))["items"]
-    nearest = [(item["work"]["due"] or [None])[0] for item in listed]
-    dated = [due["due_at"] for due in nearest if due]
-    assert dated and dated == sorted(dated)
-    # Every dated complaint comes before every undated one.
-    assert all(due for due in nearest[: len(dated)]) and not any(nearest[len(dated) :])
+    # The order itself is D3.1's (overdue, then the nearest legal deadline): tests/test_release_0_10_85.py.
+    keys = [_urgency(item) for item in listed]
+    assert keys and keys == sorted(keys)
     overdue = {item["id"] for item in listed if any(due["state"] == "OVERDUE" for due in item["work"]["due"])}
     tile = _ok(user.get("/api/v1/complaints", params={"view": "overdue", "page": 1, "page_size": 200}))
     assert overdue and tile["total"] == len(overdue) == len({item["id"] for item in tile["items"]} & overdue)

@@ -69,6 +69,7 @@ def _set_finished(name, finished):
         db.commit()
 
 
+@pytest.mark.db
 def test_the_scheduler_check_degrades_after_fifteen_minutes_of_silence(job_row):
     with pytest.raises(RuntimeError, match="NOT_REPORTED"):
         readiness._scheduler(job_row)

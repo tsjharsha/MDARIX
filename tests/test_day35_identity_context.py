@@ -34,6 +34,7 @@ def _client(token: str) -> TestClient:
     return client
 
 
+@pytest.mark.db
 def test_context_uses_the_persisted_user():
     user_id, tenant_id, email, role = _legacy()
     db = SessionLocal()
@@ -55,6 +56,7 @@ def test_context_requires_authentication():
     assert response.json()["detail"]["code"] == "UNAUTHENTICATED"
 
 
+@pytest.mark.db
 def test_a_session_for_another_tenant_than_the_user_is_refused():
     user_id, _tenant_id, _email, _role = _legacy()
     db = SessionLocal()
@@ -81,6 +83,7 @@ def test_a_session_for_another_tenant_than_the_user_is_refused():
     assert response.json()["detail"]["code"] == "UNAUTHENTICATED"
 
 
+@pytest.mark.db
 def test_active_role_rejects_an_unassigned_role():
     user_id, tenant_id, _email, role = _legacy()
     db = SessionLocal()

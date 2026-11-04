@@ -29,6 +29,7 @@ import {
 import { ReportingFacts } from "./ReportingFacts";
 import { InlineError } from "./boardParts";
 import { TREE_NAMES, type TreeMarket, type TreePath, type Trees } from "../decisionTrees";
+import { inData } from "../home";
 import { FormCard, SignCard } from "./TreeSign";
 import { STARTER_LABEL, isStarterVersion } from "../../shared/standards";
 import "./decide.css";
@@ -51,8 +52,10 @@ export function firstComplaint(trees: Pick<Trees, "complaints">, asked: string |
  * tree in place. Facts the record states arrive as one line to confirm; judgements are never pre-filled; questions
  * earlier answers make unnecessary fold away; the outcome updates as the answers are saved. Signing is the rail's.
  */
-export function TreeAnswer({ trees, modes = null }: { trees: Trees; modes?: ReactNode }) {
-  const { open } = useWorkspace();
+export function TreeAnswer({ trees: all, modes = null }: { trees: Trees; modes?: ReactNode }) {
+  const { open, dataSource } = useWorkspace();
+  // The picker follows the Sample · Your data switch (0.10.85, D3.14); a complaint a link names still opens.
+  const trees = { ...all, complaints: all.complaints.filter((entry) => inData(entry.ref, dataSource)) };
   const [complaintParam, setComplaint] = useTabParam("complaint", "replace");
   const [marketParam, setMarket] = useTabParam("market", "replace");
   const complaintId = firstComplaint(trees, complaintParam);
@@ -84,6 +87,10 @@ export function TreeAnswer({ trees, modes = null }: { trees: Trees; modes?: Reac
     );
   return (
     <div className="dt-answer">
+      {/* A keyboard reaches the first question in one step (0.10.85, D3.8; it took 13 Tab presses). */}
+      <a className="app-skip dt-skip" href="#dt-questions">
+        Skip to the questions
+      </a>
       <section className="uw-card dt-picker" aria-label="The complaint">
         <label className="dt-pick">
           <span>Complaint</span>
@@ -191,6 +198,13 @@ export function MarketTree({
   const folded: Record<string, string> = signed
     ? Object.fromEntries((path?.nodes ?? []).filter((node) => node.not_asked).map((node) => [node.id, node.not_asked!]))
     : (latest.evaluation?.not_asked ?? {});
+  // The first group still to answer (0.10.85, D3.14): a long list of legal criteria shows open there only.
+  const firstOpen = groups.findIndex((group) =>
+    group.questions.some((question) => {
+      const state = questionState(question, latest, form, folded);
+      return !state.folded && (state.toConfirm || !state.answer);
+    }),
+  );
   const editable = canDecide && !signed;
 
   /** Save the draft (one at a time, in order); the server's evaluation comes back with it. */
@@ -264,7 +278,7 @@ export function MarketTree({
             {item.question_set_current === false ? " · started on an earlier version: it keeps that one" : ""}
           </span>
         </div>
-        <ol className="dt-qs">
+        <ol className="dt-qs" id="dt-questions" tabIndex={-1}>
           {groups.map((group, index) => {
             const all = group.questions.every((question) => folded[question.id]);
             if (all) {
@@ -285,6 +299,7 @@ export function MarketTree({
             const node = (
               <GroupCard
                 key={group.key}
+                current={index === firstOpen}
                 group={group}
                 item={latest}
                 form={form}
@@ -307,7 +322,11 @@ export function MarketTree({
               node,
               <li key="mini" className="dt-mini" aria-hidden={signed ? undefined : "true"}>
                 <span>{miniText(outcome, latest, signed)}</span>
-                <a href="#dt-outcome" className={signed || !outcome ? "ac-link" : "ac-primary dt-mini-sign"}>
+                <a
+                  href="#dt-outcome"
+                  className={signed || !outcome ? "ac-link" : "ac-primary dt-mini-sign"}
+                  tabIndex={signed ? undefined : -1}
+                >
                   {signed || !outcome ? "See the outcome" : "Sign"}
                 </a>
               </li>,
@@ -387,7 +406,10 @@ function GroupCard({
   onReason,
   onBlur,
   notes,
+  current = true,
 }: {
+  /** The first group still to answer: its legal criteria show open (0.10.85, D3.14). */
+  current?: boolean;
   group: QuestionGroup;
   item: MarketItem;
   form: TreeForm;
@@ -454,45 +476,62 @@ function GroupCard({
     <li
       className={`dt-q${first.extra ? " is-extra" : ""}${done ? " is-done" : ""}${grouped ? " is-group" : ""}`}
       id={grouped ? `g-${first.id}` : `q-${first.id}`}
-      role="group"
-      aria-labelledby={`qt-${first.id}`}
     >
-      {grouped && head}
-      {group.questions.map((question, index) => (
-        <QuestionRow
-          key={question.id}
-          question={question}
-          head={grouped ? null : head}
-          label={grouped ? `(${criterion(question.text)?.letter}) ${criterion(question.text)?.rest}` : null}
-          state={states[index]}
-          editable={editable}
-          signed={signed}
-          signedAnswer={signedAnswers[question.id]?.answer ?? null}
-          open={changing === question.id}
-          onChange={onChange}
-          onAnswer={onAnswer}
-        />
-      ))}
-      {signed && signedReason && <p className="dt-reason-text">{signedReason}</p>}
-      {!signed && wantsReason && (
-        <label className="dt-why">
-          <span>Why? One line, kept with your signature</span>
-          <input
-            value={form.reasons[group.key] ?? ""}
-            disabled={!editable}
-            maxLength={2000}
-            placeholder="What in the record supports this answer"
-            onChange={(event) => onReason(event.target.value)}
-            onBlur={onBlur}
-          />
-        </label>
-      )}
-      {!signed && states.some((state) => state.answer === "UNKNOWN") && (
-        <p className="dt-unknown">
-          Unknown: a question to the reporter is created. Until it is answered, the shortest deadline the facts do not
-          rule out applies.
-        </p>
-      )}
+      {/* Each question is a fieldset named by its text (0.10.85, D3.8): a list item may not be a group itself. */}
+      <fieldset className="dt-fieldset" aria-labelledby={`qt-${first.id}`}>
+        {grouped && head}
+        {(() => {
+          const rows = group.questions.map((question, index) => (
+            <QuestionRow
+              key={question.id}
+              question={question}
+              head={grouped ? null : head}
+              label={grouped ? `(${criterion(question.text)?.letter}) ${criterion(question.text)?.rest}` : null}
+              state={states[index]}
+              editable={editable}
+              signed={signed}
+              signedAnswer={signedAnswers[question.id]?.answer ?? null}
+              open={changing === question.id}
+              onChange={onChange}
+              onAnswer={onAnswer}
+            />
+          ));
+          // A long list of legal criteria (EU/NI, Great Britain: six) folds unless it is the question being answered,
+          // so the tree stays near 300 words; the criteria's text is never shortened (0.10.85, D3.14).
+          if (!grouped || signed || group.questions.length <= 3) return rows;
+          const answered = states.filter((state) => state.folded || (!state.toConfirm && !!state.answer)).length;
+          const letters = group.questions.map((question) => criterion(question.text)?.letter).filter(Boolean);
+          return (
+            <details className="dt-criteria" open={current}>
+              <summary>
+                The {group.questions.length} legal criteria, ({letters[0]}) to ({letters[letters.length - 1]}) ·{" "}
+                {answered} of {group.questions.length} answered
+              </summary>
+              {rows}
+            </details>
+          );
+        })()}
+        {signed && signedReason && <p className="dt-reason-text">{signedReason}</p>}
+        {!signed && wantsReason && (
+          <label className="dt-why">
+            <span>Why? One line, kept with your signature</span>
+            <input
+              value={form.reasons[group.key] ?? ""}
+              disabled={!editable}
+              maxLength={2000}
+              placeholder="What in the record supports this answer"
+              onChange={(event) => onReason(event.target.value)}
+              onBlur={onBlur}
+            />
+          </label>
+        )}
+        {!signed && states.some((state) => state.answer === "UNKNOWN") && (
+          <p className="dt-unknown">
+            Unknown: a question to the reporter is created. Until it is answered, the shortest deadline the facts do not
+            rule out applies.
+          </p>
+        )}
+      </fieldset>
     </li>
   );
 }

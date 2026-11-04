@@ -8,6 +8,7 @@ import {
   entryBody,
   entryProblem,
   parseCommunicationsTab,
+  pageText,
   s4Text,
   statusTone,
   type CommunicationList,
@@ -183,6 +184,10 @@ describe("the communications screens", () => {
           unanswered: 2,
         }),
       ],
+      total: 2,
+      offset: 0,
+      limit: 200,
+      next_offset: null,
       counts: { open: 1, overdue: 1, unresolved: 1 },
       s4: { in_mdarix: 8, outside: 1 },
       parties: [party],
@@ -205,6 +210,26 @@ describe("the communications screens", () => {
     expect(html).toContain("Recorded in MDARIX: 8 of 9 messages");
     expect(html).toContain("Record a message sent or received");
     expect(html).toContain("MDARIX sends nothing");
+    expect(html).not.toContain("Pages of the log"); // one page holds it all
+  });
+
+  it("pages a long log, overdue first, with the whole log's counts (0.10.86)", () => {
+    expect(pageText({ items: [entry()], total: 1, offset: 0, next_offset: null })).toBe("");
+    expect(pageText({ items: Array(200).fill(entry()), total: 512, offset: 200, next_offset: 400 })).toBe(
+      "Entries 201–400 of 512",
+    );
+    resources.data["/api/v1/communications"] = {
+      ...(resources.data["/api/v1/communications?complaint_id=c1"] as CommunicationList),
+      complaint: null,
+      total: 512,
+      next_offset: 2,
+      counts: { open: 3, overdue: 2, unresolved: 1 },
+    };
+    const html = render(<Communications />);
+    expect(html).toContain("3 open requests, 2 overdue");
+    expect(html).toContain("Entries 1–2 of 512");
+    expect(html).toContain(">Older<");
+    expect(html).not.toContain(">Newer<");
   });
 
   it("lists every attempt with its contact and the late one", () => {

@@ -995,7 +995,7 @@ def download_supplier_attachment(
     db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    attachment = (
+    stored = (
         db.query(EvidenceAttachment)
         .filter(
             EvidenceAttachment.id == attachment_id,
@@ -1005,7 +1005,7 @@ def download_supplier_attachment(
         .first()
     )
     # Files of requests to colleagues are opened through /api/v1/evidence-requests, which checks who may see them.
-    if attachment and (
+    if stored and (
         db.query(SupplierEvidenceRequest.id)
         .filter(
             SupplierEvidenceRequest.id == request_id,
@@ -1015,19 +1015,19 @@ def download_supplier_attachment(
         .first()
         is None
     ):
-        attachment = None
-    if not attachment:
+        stored = None
+    if not stored:
         raise HTTPException(404, detail={"code": "ATTACHMENT_NOT_FOUND", "message": "Attachment is not available"})
     try:
-        content = ObjectStorageService().get(ctx.tenant_id, attachment.object_key)
+        content = ObjectStorageService().get(ctx.tenant_id, stored.object_key)
     except FileNotFoundError as exc:
         raise HTTPException(
             404, detail={"code": "ATTACHMENT_NOT_FOUND", "message": "Attachment is not available"}
         ) from exc
-    safe_name = safe_filename(attachment.filename)
+    safe_name = safe_filename(stored.filename)
     return Response(
         content=content,
-        media_type=attachment.content_type,
+        media_type=stored.content_type,
         headers={"Content-Disposition": attachment(f"{safe_name}")},
     )
 

@@ -1412,7 +1412,11 @@ def test_09_contradicting_evidence_changes_the_leading_hypothesis(org):
     assert content["leading_hypothesis"]["human_status"] == "STRONGLY_SUPPORTED"
     others = {item["business_id"]: item for item in content["alternative_hypotheses"]}
     assert others[first["business_id"]]["human_status"] == "CONTRADICTED"
-    assert returns["business_id"] in {item.get("evidence_business_id") for item in content["contradicting_evidence"]}
+    # The brief judges evidence against the leading explanation, each piece once (0.10.72): the field returns, which
+    # contradicted the first explanation, support the alternative that now leads, and say so through its link.
+    by_evidence = {item["evidence_business_id"]: item for item in content["supporting_evidence"]}
+    assert by_evidence[returns["business_id"]]["hypothesis_business_id"] == alternative["business_id"]
+    assert returns["business_id"] not in {item["evidence_business_id"] for item in content["contradicting_evidence"]}
     assert refreshed["content_hash"] != draft["content_hash"] and refreshed["hash_verified"] is True
 
     _ok(investigator.put(_brief(case_id) + "/draft", json=NARRATIVE))

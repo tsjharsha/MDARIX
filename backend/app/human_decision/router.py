@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 from backend.app.access.permissions import DECISION_SIGN, require_permission
 from backend.app.business_ids import as_uuid
 from backend.app.case_workflow import states
+from backend.app import signing_commit
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.decision_outcomes import DecisionFollowUp, ImpactAssessment
 from backend.app.db.models.foundation import Decision, Investigation, Product, SignedApprovalRecord
@@ -627,6 +628,28 @@ def sign_decision(
         refuse(
             403, "DENIED_NOT_ENTITLED", "Tenant is not entitled to controlled signatures", "ENTITLEMENT_ACCESS_DENIED"
         )
+    # A retry of a signing that was saved (its answer lost, or its signature still being completed on a dedicated
+    # plane): the same person, case and request give the same decision, never a second one (DEV-07).
+    request_hash = rules.request_hash(tenant.id, actor["user_id"], case.id, payload)
+    earlier = service.signed_before(data, case, actor["user_id"], payload.brief_version_id, request_hash)
+    if earlier is not None:
+        governance.verify_signing_credentials(
+            control_db,
+            ctx,
+            password=payload.password,
+            mfa_code=payload.mfa_code,
+            record_refusal=lambda action: _refusal_event(
+                control_db, tenant.id, actor, case, action, request, brief_version_id=brief_ref
+            ),
+        )
+        record = service.signature_record(control_db, earlier)
+        if record is not None and record.status == signing_commit.PENDING and data is not control_db:
+            if signing_commit.settle(control_db, data, record.id) == rules.SIGNED:
+                outcome = earlier.outcome
+                _after_signing(
+                    data, control_db, case, earlier, actor=actor, role=earlier.decided_under_role, outcome=outcome
+                )
+        return service.record_view(control_db, data, earlier)
     row = service.brief_version(data, case, payload.brief_version_id, lock=True)
     if row is None:
         refuse(404, "BRIEF_VERSION_NOT_FOUND", "This version of the brief does not belong to this case")
@@ -716,7 +739,12 @@ def sign_decision(
         product_id=case.product_id,
         decision_status=rules.SIGNED,
         human_decision=rules.outcome_label(payload.outcome),
-        context_snapshot={"snapshot_id": str(snapshot_id), "snapshot_hash": snapshot_digest},
+        context_snapshot={
+            "snapshot_id": str(snapshot_id),
+            "snapshot_hash": snapshot_digest,
+            # What a retry of this very request is matched on (rules.request_hash).
+            "request_hash": request_hash,
+        },
         updated_at=now,
         decision_timestamp=now,
         authorized_by_ref=user_id,
@@ -948,16 +976,7 @@ def sign_decision(
                 created_at=now,
             )
         )
-    if data is control_db:
-        control_db.commit()  # the shared plane: everything in one transaction
-    else:
-        # A dedicated plane: the signature and its audit trail first (as legacy signing does), then the decision.
-        control_db.commit()
-        try:
-            data.commit()
-        except Exception:
-            logger.exception("Signature %s was saved but its decision %s was not", record.id, decision_id)
-            raise
+    signing_commit.commit(data, control_db, "decision")
     _after_signing(data, control_db, case, decision, actor=actor, role=role, outcome=payload.outcome)
     return service.record_view(control_db, data, decision)
 

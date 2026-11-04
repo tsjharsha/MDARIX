@@ -146,6 +146,7 @@ def mfa_accounts():
     db.close()
 
 
+@pytest.mark.db
 def test_mfa_rotation_from_the_original_key_to_k2_and_removing_k1(monkeypatch, mfa_accounts):
     db, users = mfa_accounts
     ids = [user.id for user in users]
@@ -187,6 +188,7 @@ def test_mfa_rotation_from_the_original_key_to_k2_and_removing_k1(monkeypatch, m
             totp.decrypt_secret(token, str(users[(users.index(user) + 1) % 3].id))  # still bound to its account
 
 
+@pytest.mark.db
 def test_the_mfa_reseal_reports_a_secret_it_cannot_open_and_leaves_it(monkeypatch, mfa_accounts, capsys):
     db, users = mfa_accounts
     _use(monkeypatch, MFA, OLD)

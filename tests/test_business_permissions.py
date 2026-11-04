@@ -298,6 +298,7 @@ def test_role_permissions(role, allowed):
     assert permissions_for_role(role) == allowed
 
 
+@pytest.mark.db
 def test_a_viewer_is_refused_on_every_guarded_route(monkeypatch):
     # Under MDARIX_FEATURE_SET=mvp the feature-set gate answers 404 for parked routes before their guard runs (its own
     # tests: test_feature_set.py). This test checks the guards themselves, so it serves every route.
@@ -315,6 +316,7 @@ def test_a_viewer_is_refused_on_every_guarded_route(monkeypatch):
     assert allowed == []
 
 
+@pytest.mark.db
 def test_an_investigator_passes_the_permission_check():
     investigator = _client_with_role("Investigator")
     response = _call(investigator, "POST", "/api/v1/investigations/{investigation_id}/analysis")

@@ -10,6 +10,157 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.86] - 2026-11-04
+
+On the trial maintenance line (`release/0.10`): a reliability release from an external code review of 0.10.84. No
+migration. The API, worker and scheduler images change, and the web image (the communications log's pages, the
+Platform Admin retention lines). Operator steps: the scheduler runs one new job, `signature-settlement`; CI prepares
+the pinned embedding model before the tests (`scripts/prepare_embedding_cache.py`).
+
+### Fixed: nothing open falls behind a list's limit
+
+- **The communications log shows every overdue and open request, however old.** It read the newest 500 entries and
+  then put overdue ones first, so in a longer log an old overdue request vanished from the screen and from the counts.
+  The log is now ordered overdue, open, then the rest in the database, one page at a time ("Entries 1–200 of 512",
+  Newer and Older), and its open, overdue, unresolved and S4 numbers count the whole log.
+- **The same fix where something waiting could be cut off:** the first-contact list (calls waiting to be signed, pending
+  or waiting for QA review), the complaints waiting for a disposition, the dated reports and CAPAs on Due dates, and on
+  the Platform Admin side pending early-exit requests and open pilot requests.
+
+### Changed: Getting started's ten steps, in the owner's words, as a vertical list
+
+- **Getting started is the ten-step story only.** "More ways to explore" is gone from it: the three short stories
+  (a new urgent call, a rising problem, approving as a colleague), the ten chapters, the sample data and the trial's
+  own page are in Help, Short stories and your trial (`GettingStarted.tsx`; `releaseD3085Story.test.tsx`).
+- The steps read Review the call · Triage · Assess reportability · Sign conclusion · Prepare report · Complete details ·
+  Approve report · Record submission · Review records · Explore trends, in a numbered list beside the step's card (the
+  current step highlighted; on a phone the list sits above the card). What each step opens and when it ticks is
+  unchanged (`trial/one_story.STEPS`; `tests/test_release_0_10_85.py`).
+
+### Fixed: a step's progress lands only on the complaint opened, in its turn
+
+- **A mark names the complaint the person's screen showed.** The story's complaint can move (a new urgent import
+  while an old screen is open); the server took its current choice, so opening complaint A could mark complaint B.
+  It now refuses a mark for another complaint (409 `STORY_MOVED`).
+- **A step counts only in its turn.** Records or Trends opened before the steps ahead of them were done was kept and
+  credited later; it is now refused (409 `STEP_NOT_YET`) and never credited.
+- **A refused or failed mark is said, not dropped.** The screen still opens at once; Getting started shows why the
+  step was not saved (`oneStory.openStep`; `tests/test_release_0_10_82.py`, `releaseD3085Story.test.tsx`).
+
+### Fixed: a person's data export, and the management review's day
+
+- **A person's export carries every sign-in event.** It kept only the newest 500, so a long-standing user's export
+  under the DPDP Act was incomplete (`tenant_export_api.person_export`; `tests/test_person_export.py`).
+
+- **The management review summary counts the organization's whole day.** Its period ended at the UTC midnight
+  after the organization's today, so in the US evening anything signed that day was missing until the next day
+  (`readiness_home/summary._bounds`; `tests/test_summary_period.py`).
+
+### Operations
+
+- The first production restore drill with steps 3 and 4 is recorded in `docs/runbooks/BACKUP_AND_RESTORE.md`
+  (3 Nov 2026: restore 32 s, whole drill 7 min 19 s against the RTO of 4 h).
+
+### Fixed: the row allowance holds when two imports run at once
+
+- Two imports at the same moment could each count the same rows left and together go past the free trial's 5,000
+  rows. Imports into one organization now take turns for the allowance; other organizations never wait.
+
+### Fixed: one deletion date everywhere
+
+- The trial status (Getting started), the trial-ended page, the trial e-mails, the Platform Admin trials overview, the
+  trial requests queue and the pilot requests now give the same date: 30 days after the trial (or its grace
+  extension) ends, later while a request to move the data is open. Before, the requests queue ignored grace and holds
+  and the trial-ended page ignored the hold.
+- **Under a legal hold no date is given** ("no date while a legal hold applies"); nothing is deleted until the hold is
+  lifted. The deletion job checks each trial again just before deleting it.
+
+### Fixed: signing on a dedicated data plane cannot leave half a signature
+
+- When an organization's records are in their own database, a signature could be saved without the record it signs
+  (or "signed" written in the audit trail) if the second save failed. Signing now saves the record first with a
+  receipt, then completes the signature; an interrupted signing is completed, or undone with
+  `SIGNATURE_ABANDONED` in the audit trail, by the new `signature-settlement` job (every 10 minutes) or the next read.
+  A signature being completed is never shown as valid. Retrying the same decision returns the decision already
+  signed, after the password and code are checked again. Organizations on the shared plane are unchanged.
+
+### Fixed: the sample
+
+- The sample hospital request's late call now counts as recorded outside MDARIX on every weekday (on some days it
+  counted as inside, and the log showed no late message). New trials only.
+
+### Tests and checks
+
+- `unit` tests need no database (`MDARIX_TEST_NO_DATABASE=1 pytest -m unit`), and no test is both `unit` and `db`.
+- The local embedding model is never downloaded at run time; tests that need it are marked `model` and skip, saying
+  why, without it (`MDARIX_REQUIRE_LOCAL_MODEL=1` makes them required, as in CI).
+- `ruff check`, `ruff format --check`, `prettier --check` and the frontend lint pass on the whole repository.
+
+## [0.10.85] - 2026-11-04
+
+On the trial maintenance line (`release/0.10`): round D3, "Polish to 9.5", of the approved redesign, on the new
+navigation, with the owner's report on 0.10.84's Getting started first. No migration. The API and web images change. No
+operator step: no sample record, deadline or count changes, and `refresh_trial_story.py` has nothing new to do (every
+change below is read from the records as they are).
+
+### Fixed: Getting started's story, for every persona
+
+- **The ticks read as a story.** A step is ticked only once the steps before it are done or not needed; work the team
+  did out of order (a tree signed before the triage) shows "Done earlier by your team" and ticks once the steps before
+  it are done. "N of 10 done", the ticks and the current step now agree (a trial read "1 of 10 done" with step 3
+  ticked). The call counts as read once later work exists; the form once its report is past "Created".
+- **No dead click.** Each step's button opens its screen at once (it waited seconds for its mark to be saved). A screen
+  the persona's tabs do not list (Executive, Investigator, Risk Reviewer, Complaint Handler) opens as a tab of its own,
+  marked "opened from Getting started". A colleague whose role cannot open a step's screen is told who takes it, with
+  the button disabled and its reason.
+- **More ways to explore** is one compact card: a new urgent call, a rising problem, approve as a colleague, and one
+  link to the chapters, your trial and the sample data on their own page (it opened the old 8,600 px page with six main
+  buttons).
+
+### Changed: the screens (new navigation)
+
+- **Complaints:** every list view is in one order, overdue first, then the nearest legal deadline. The columns read
+  Legal clock · What happened (its IMDRF term, or "No IMDRF term yet") · Product, version, lot · Incident country (or
+  "Asked at the tree") · Owner · Stage; the whole row opens the complaint; the column choice sits under "More"; phone
+  cards are half their height. "Reportability: decision needed" leaves out a complaint whose every market is signed,
+  and its stage reads "Report".
+- **The complaint page** is a record with a hero: the reporter's words, the harm, one clock line and one Next step; the
+  checklist folds, and on a phone the rail's cards fold too (about half the page's length on a phone). The triage form
+  folds while the story is on another step.
+- **Records** always opens on "Your latest record" (who signed, when, what it means, its PDF), with inspection
+  readiness under it.
+- **Trends** answers "Is a product problem rising?" per group with observed, expected and the version before, "How we
+  compared" folded; your data never shows the sample's rise and says what a short history can show. "Trends to
+  review" and "Raise a trend"; no AI origin filter in a trial.
+- **Page heads** ask their question and name the organization's time zone once; every time is shown in it, and each
+  deadline label drops its zone.
+- **Phone:** the current tab stays in view; Home's tiles keep one short line each.
+- **Accessibility:** no serious or critical axe-core finding on any new-navigation screen at 1440 and 390; text 12 px
+  or more; contrast 4.5:1 or more; 44 px touch targets on a phone; each tree question a fieldset; a skip link to the
+  questions; a reason on the main disabled buttons.
+- **Investigations:** the question is the heading, the reference the customer's own, lots read "003 · 004"; on your
+  data, "Open one from the trend".
+- **Log a call** opens in place on Complaints (Calls to check), with a shorter form and the time read back as "3 Nov
+  2026, 23:57".
+- **Search** finds a complaint by its service ticket, serial number or UDI as well, investigations by reference or
+  question, and trends to review.
+- **Words:** no internal ID or code where a name exists (readiness lists, guide versions, the scale note). Sign-in says
+  what MDARIX does for a QA/RA team. The report's steps read one word each (Created · Complete · Approval · Approved ·
+  Submitted · Acknowledged); the story's first step reads "Call"; one date-field width.
+
+### Fixed: Records' readiness
+
+- **"Reported in window" reads the shortest clock again.** Its watch passed a day where the triage list expects a
+  moment; the read failed (logged, swallowed) since 0.10.82, so the check counted without it. On a fresh local trial
+  the check reads 5 items needing attention where it read 4.
+
+### Changed: speed
+
+- The complaint list's work columns and the events list read each kind of record once per page (about a dozen queries
+  per complaint before); the triage list is read once per request; the sample removal's preview asks a few batched
+  queries (about 300 before). On the local stack: the open complaint list 198 -> 51 queries a request, the removal
+  preview 220 -> 30, the story 93 -> 67.
+
 ## [0.10.84] - 2026-11-03
 
 On the trial maintenance line (`release/0.10`): the fixes from the independent rating of rounds D1 (0.10.82) and D2

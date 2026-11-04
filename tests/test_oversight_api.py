@@ -15,7 +15,7 @@ from backend.app.oversight.rules import Calendar
 from tests.test_free_trial import PASSWORD, _approved_trial_client
 from tests.test_reporting_capa_api import _client
 
-pytestmark = pytest.mark.db
+# Database tests by default, its pure tests marked unit (tests/conftest.py DB_WITHOUT_GOLDEN).
 
 VIEW = "/api/v1/oversight"
 

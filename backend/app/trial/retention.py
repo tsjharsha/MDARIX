@@ -28,7 +28,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
@@ -46,6 +46,8 @@ REQUEST_RETENTION_DAYS = 90
 MVP_HOLD_MAX_DAYS = 90
 MVP_HOLD_GRACE_DAYS = 14
 MVP_HOLD_ALERT_DAYS = 7
+# The retention rules ``retention_plan`` applies, as each projection carries them: change it with any rule above.
+POLICY_VERSION = "trial-retention-2026-11-04"
 
 # Records the trial created or uploaded. Identity, plan, subscription and audit tables are deliberately absent.
 TRIAL_DATA_TABLES = (
@@ -224,10 +226,57 @@ def move_requests(db: Session, tenant_ids) -> dict:
     return found
 
 
-def retention_plan(ended: datetime, requests: dict | None, movable: bool, now: datetime) -> dict:
-    """When one closed trial's data is deleted: 30 days after it ended; while an open request asks to move the data and
-    the data may still be moved, not before the hold ends (``MVP_HOLD_MAX_DAYS`` after the trial); after such a request
-    was closed, ``MVP_HOLD_GRACE_DAYS`` after it closed at the earliest, and never after the hold's end."""
+def effective_end(subscription) -> datetime:
+    """When a trial ends for retention: its end date, or the end of a grace extension when one was given."""
+    return max(subscription.expires_at, subscription.grace_ends_at or subscription.expires_at)
+
+
+def move_request_columns(tenant_id_column) -> tuple:
+    """What ``move_requests`` reads for one tenant, as three labelled scalar subqueries to add to a query of tenants
+    (no statement of their own): the open request to move the data (id, status) and when the last one was closed.
+    ``requests_of`` turns a row of them back into ``move_requests``'s form."""
+    from sqlalchemy import select
+
+    from backend.app.db.models.stage2 import TrialMvpRequest
+    from backend.app.trial.mvp_request import OPEN
+
+    asked = (TrialMvpRequest.tenant_id == tenant_id_column, TrialMvpRequest.move_trial_data.is_(True))
+    is_open = (*asked, TrialMvpRequest.status.in_(OPEN))
+    newest = TrialMvpRequest.created_at.desc()
+    return (
+        select(TrialMvpRequest.id).where(*is_open).order_by(newest).limit(1).scalar_subquery().label("move_open_id"),
+        select(TrialMvpRequest.status)
+        .where(*is_open)
+        .order_by(newest)
+        .limit(1)
+        .scalar_subquery()
+        .label("move_open_status"),
+        select(func.max(func.coalesce(TrialMvpRequest.handled_at, TrialMvpRequest.updated_at)))
+        .where(*asked, TrialMvpRequest.status.notin_(OPEN))
+        .scalar_subquery()
+        .label("move_closed_at"),
+    )
+
+
+def requests_of(row) -> dict | None:
+    """``move_requests``'s entry for a row read with ``move_request_columns`` (None: it never asked)."""
+    from types import SimpleNamespace
+
+    if row.move_open_id is None and row.move_closed_at is None:
+        return None
+    opened = SimpleNamespace(id=row.move_open_id, status=row.move_open_status) if row.move_open_id else None
+    return {"open": opened, "closed_at": row.move_closed_at}
+
+
+def retention_plan(
+    ended: datetime, requests: dict | None, movable: bool, now: datetime, legal_hold: bool = False
+) -> dict:
+    """The one retention projection (DEV-05, 0.10.86) every screen, e-mail, error and the purge job read. When one
+    closed trial's data is deleted: 30 days after it ended (``effective_end``: grace counted); while an open request
+    asks to move the data and the data may still be moved, not before the hold ends (``MVP_HOLD_MAX_DAYS`` after the
+    trial); after such a request was closed, ``MVP_HOLD_GRACE_DAYS`` after it closed at the earliest, and never after
+    the hold's end. Under a legal hold there is no date at all (``earliest_deletion`` None): nothing is deleted until
+    the hold is lifted, and no date is invented."""
     original = ended + timedelta(days=RETENTION_DAYS)
     hold_until = ended + timedelta(days=MVP_HOLD_MAX_DAYS)
     request = (requests or {}).get("open")
@@ -242,24 +291,48 @@ def retention_plan(ended: datetime, requests: dict | None, movable: bool, now: d
         "trial_ended_at": ended,
         "original_delete_after": original,
         "delete_after": delete_after,
+        "earliest_deletion": None if legal_hold else delete_after,
+        "hold": LEGAL_HOLD if legal_hold else MVP_REQUEST_HOLD if held else None,
         "hold_until": hold_until,
         "mvp_request": request if held else None,
+        "policy_version": POLICY_VERSION,
     }
 
 
-def deletion_date(db: Session, data: Session, subscription, now: datetime | None = None) -> datetime:
+LEGAL_HOLD, MVP_REQUEST_HOLD = "LEGAL_HOLD", "MVP_REQUEST"
+HOLD_REASONS = {
+    LEGAL_HOLD: "Kept under a legal hold: nothing is deleted until the hold is lifted",
+    MVP_REQUEST_HOLD: "Kept while a request to move the data into the pilot is open",
+}
+
+
+def deletion_words(plan: dict) -> str:
+    """The deletion date as trial e-mails and messages say it: the earliest date, or why there is none."""
+    from backend.app.trial.service import long_moment
+
+    if plan["earliest_deletion"] is None:
+        return "no date while a legal hold applies"
+    return long_moment(plan["earliest_deletion"])
+
+
+def projection(db: Session, data: Session, subscription, now: datetime | None = None) -> dict:
+    """``retention_plan`` for one trial's subscription: its legal hold, grace and any request to move its data."""
+    from backend.app.trial.mvp_request import data_move
+
+    now = now or datetime.now(timezone.utc)
+    asked = move_requests(db, [subscription.tenant_id]).get(subscription.tenant_id)
+    movable = bool(asked and asked["open"] is not None and data_move(data, subscription.tenant_id)["allowed"])
+    tenant = db.get(Tenant, subscription.tenant_id)
+    return retention_plan(effective_end(subscription), asked, movable, now, bool(tenant and tenant.legal_hold))
+
+
+def deletion_date(db: Session, data: Session, subscription, now: datetime | None = None) -> datetime | None:
     """The day one trial's data is deleted at the earliest, as people are told it (trial emails, Getting started): 30
     days after the trial ends, counting any grace extension, or later while an open request to move the data into the
     MVP holds it (``retention_plan``). The scheduled job runs daily, and the date can still move later (a grace
     extension, a new request, a legal hold), so it is always worded "at the earliest". ``data`` reads the trial's
-    records (whether its data may move)."""
-    from backend.app.trial.mvp_request import data_move
-
-    now = now or datetime.now(timezone.utc)
-    ended = max(subscription.expires_at, subscription.grace_ends_at or subscription.expires_at)
-    asked = move_requests(db, [subscription.tenant_id]).get(subscription.tenant_id)
-    movable = bool(asked and asked["open"] is not None and data_move(data, subscription.tenant_id)["allowed"])
-    return retention_plan(ended, asked, movable, now)["delete_after"]
+    records (whether its data may move). None under a legal hold (``retention_plan``)."""
+    return projection(db, data, subscription, now)["earliest_deletion"]
 
 
 def plans(db: Session, now: datetime | None = None, tenant_ids=None) -> list[dict]:
@@ -291,8 +364,10 @@ def plans(db: Session, now: datetime | None = None, tenant_ids=None) -> list[dic
         if asked and asked["open"] is not None and tenant.id not in movable:
             # The data may still be moved only while the sample stays removed and the own data is there.
             movable[tenant.id] = bool(data_move(db, tenant.id)["allowed"])
-        ended = max(subscription.expires_at, subscription.grace_ends_at or subscription.expires_at)
-        found.append({"tenant": tenant, **retention_plan(ended, asked, movable.get(tenant.id, False), now)})
+        plan = retention_plan(
+            effective_end(subscription), asked, movable.get(tenant.id, False), now, bool(tenant.legal_hold)
+        )
+        found.append({"tenant": tenant, **plan})
     return found
 
 
@@ -300,6 +375,10 @@ def plan_view(plan: dict) -> dict:
     """A plan as the Platform Administrator sees it (trials overview, MVP requests, the retention preview)."""
     request = plan["mvp_request"]
     return {
+        "earliest_deletion": plan["earliest_deletion"].isoformat() if plan["earliest_deletion"] else None,
+        "hold": plan["hold"],
+        "hold_reason": HOLD_REASONS.get(plan["hold"]),
+        "policy_version": plan["policy_version"],
         "delete_after": plan["delete_after"].isoformat(),
         "original_delete_after": plan["original_delete_after"].isoformat(),
         "held_for_mvp_request": request is not None,
@@ -314,8 +393,12 @@ def trials_due(db: Session, now: datetime | None = None) -> list[dict]:
     the data into the MVP holds (``delete_after`` is then the end of the hold); a trial whose request was closed lately
     is listed once its grace period has passed."""
     now = now or datetime.now(timezone.utc)
+    return _due(plans(db, now), now)
+
+
+def _due(found: list[dict], now: datetime) -> list[dict]:
     due = []
-    for plan in plans(db, now):
+    for plan in found:
         if plan["original_delete_after"] > now:
             continue
         if plan["mvp_request"] is None and plan["delete_after"] > now:
@@ -624,7 +707,14 @@ def run_retention(db: Session, actor_ref: str, now: datetime | None = None) -> d
     now = now or datetime.now(timezone.utc)
     due = trials_due(db, now)
     results, failed, skipped = [], [], []
-    for trial in due:
+    for listed in due:
+        # Checked again just before its deletion: a grace extension, a legal hold, a request to move the data or a
+        # conversion since the list was read keeps the data (DEV-05).
+        again = _due(plans(db, now, [uuid.UUID(listed["tenant_id"])]), now)
+        if not again:
+            skipped.append({**listed, "why": "NO_LONGER_DUE"})
+            continue
+        trial = again[0]
         if trial["legal_hold"]:
             _note_legal_hold(db, trial, actor_ref, now)
             skipped.append({**trial, "why": "LEGAL_HOLD"})

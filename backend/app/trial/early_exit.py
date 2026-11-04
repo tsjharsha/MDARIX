@@ -158,7 +158,16 @@ def overview(db: Session) -> list[dict]:
     A fixed number of statements however many requests there are (as the trial overview, story.trial_overview): the
     requests, then their organizations, the people who asked and the trials' subscriptions, each read for every
     request at once. Before 0.10.17 each request cost four statements of its own."""
-    rows = db.query(TrialExitRequest).order_by(TrialExitRequest.created_at.desc()).limit(500).all()
+    from backend.app.paging import open_first
+
+    # Every pending request, however old; then the newest 500 decided ones.
+    rows = open_first(
+        db.query(TrialExitRequest),
+        TrialExitRequest.id,
+        TrialExitRequest.status == PENDING,
+        [TrialExitRequest.created_at.desc()],
+        500,
+    )
     tenant_ids = {row.trial_tenant_id for row in rows}
     person_ids = {row.requested_by for row in rows if row.requested_by}
     tenants = {tenant.id: tenant for tenant in db.query(Tenant).filter(Tenant.id.in_(tenant_ids))} if tenant_ids else {}

@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import HTTPException, Request
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from backend.app import product_facts
@@ -1540,6 +1540,18 @@ def upload_counts(tenant_id, source: str = UPLOAD_SOURCE) -> list:
     ]
 
 
+def hold_allowance(db: Session, tenant_id, policy: ImportPolicy) -> None:
+    """An import into an organization with a row allowance waits for any other one into the same organization to
+    commit or roll back, so both never count the same rows left (DEV-04, 0.10.86). A transaction-level advisory lock
+    on the organization: taken first, before any row lock of the import, held until this transaction ends (a rollback
+    releases it too), and never shared with another organization. The rows used are counted after it is held."""
+    if policy.row_limit is not None:
+        db.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+            {"key": f"mdarix:row-allowance:{policy.source}:{tenant_id}"},
+        )
+
+
 def uploaded_rows(db: Session, tenant_id, source: str = UPLOAD_SOURCE) -> int:
     """The rows the organization uploaded that are in its workspace (``upload_counters``): a free trial's allowance.
     Read in one statement (0.10.44; it was one per kind of record, 15 round trips)."""
@@ -1793,6 +1805,7 @@ def import_file(
     row's lineage and stores the rows set aside; a set-aside row of an earlier import closes once its record comes in
     with this one (J11), and is replaced when this one sets the same record aside again. ``actor`` is recorded on the
     rows it closes."""
+    hold_allowance(db, tenant_id, policy)
     checked = _Report()
     parsed = _parse(entity, raw, checked, policy, date_format, reading)
     date_format = checked.date_order
@@ -1916,6 +1929,7 @@ def quality_report(
 
 
 def import_records(db: Session, tenant_id, entity: str, records: list[dict], policy: ImportPolicy) -> dict:
+    hold_allowance(db, tenant_id, policy)
     report = check_records(db, tenant_id, entity, records, policy)
     if not report["ready"]:
         raise HTTPException(

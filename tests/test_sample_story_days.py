@@ -21,7 +21,7 @@ from backend.app.db.tenant_scope import bind_tenant
 from tests.test_free_trial import PASSWORD, _approved_trial_client
 from tests.test_market_assessment_api import _acknowledge, _answers, _market, _save, _sign, _url
 
-pytestmark = pytest.mark.db
+# Database tests by default, its pure tests marked unit (tests/conftest.py DB_WITHOUT_GOLDEN).
 
 KEPT = {"audit_events", "auth_sessions", "auth_users", "authentication_events", "mfa_challenges"}
 # The flagship (sample_data.FLAGSHIP): a malfunction with no harm whose recurrence could cause a serious injury.

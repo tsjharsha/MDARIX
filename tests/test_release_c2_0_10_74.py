@@ -119,18 +119,29 @@ def test_each_list_view_holds_exactly_the_complaints_its_rule_names(trial):
         if item["hours_left"] <= WEEK_HOURS and item["category"] in ("REPORTING", "OBLIGATION")
     }
     assert {row["id"] for row in _view(user, "legal-week")} == legal
-    # Most urgent first: each row's nearest qualifying deadline is no later than the next row's.
-    firsts = [
-        min(
-            item["due_at"]
-            for item in row["work"]["due"]
-            if item["hours_left"] <= WEEK_HOURS and item["state"] != "OVERDUE"
-        )
-        for row in _view(user, "due-week")
-    ]
+
+    # Most urgent first (0.10.85, D3.1: every view in one order, tests/test_release_0_10_85.py): the overdue, then the
+    # nearest legal deadline, then the nearest other date.
+    def place(row):
+        due = row["work"]["due"]
+        legal = [
+            d["due_at"]
+            for d in due
+            if d["category"] in ("REPORTING", "OBLIGATION") and not d["key"].startswith("task:")
+        ]
+        other = [d["due_at"] for d in due if d["due_at"] not in legal]
+        return (0 if any(d["state"] == "OVERDUE" for d in due) else 1, min(legal, default="~"), min(other, default="~"))
+
+    firsts = [place(row) for row in _view(user, "due-week")]
     assert firsts == sorted(firsts)
     watch = _ok(user.get("/api/v1/complaints/reportability", params={"show": "open", "page_size": 200}))["items"]
-    assert {row["id"] for row in _view(user, "reportability")} == {str(item["id"]) for item in watch}
+    # A complaint whose every market is signed needs no decision (0.10.85, D3.2).
+    undecided = [
+        item
+        for item in watch
+        if not (item.get("markets") and all(m["state"] in ("REPORTABLE", "NOT_REPORTABLE") for m in item["markets"]))
+    ]
+    assert {row["id"] for row in _view(user, "reportability")} == {str(item["id"]) for item in undecided}
     requests = _ok(user.get("/api/v1/communications"))["items"]
     waiting = {item["complaint_id"] for item in requests if item["status"] == "OPEN" and item.get("complaint_id")}
     assert {row["id"] for row in _view(user, "waiting-reporter")} == waiting

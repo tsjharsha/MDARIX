@@ -129,11 +129,12 @@ def test_the_story_is_the_teams_one_step_for_every_colleague():
             )
         )
         _ok(colleague.post("/api/v1/auth/signin", json={"email": mail, "password": PASSWORD}))
-        _ok(owner.post(f"{STORY}/marks", json={"run": "sample", "step": "call"}))
-        _ok(colleague.post(f"{STORY}/marks", json={"run": "sample", "step": "trends"}))
+        complaint_id = _ok(owner.get(STORY))["sample"]["complaint"]["id"]
+        # The colleague opens the call; it counts for the owner too (Trends early is refused since 0.10.86).
+        _ok(colleague.post(f"{STORY}/marks", json={"run": "sample", "step": "call", "complaint_id": complaint_id}))
         mine, theirs = _ok(owner.get(STORY))["sample"], _ok(colleague.get(STORY))["sample"]
-        done = lambda run: [step["key"] for step in run["steps"] if step["done"]]  # noqa: E731
-        assert done(mine) == done(theirs) == ["call", "trends"]
+        done = lambda run: [step["key"] for step in run["steps"] if step["done"] or step["earlier"]]  # noqa: E731
+        assert done(mine) == done(theirs) == ["call"]
         assert mine["current"] == theirs["current"] == 1
     finally:
         _purge(tenant_id)

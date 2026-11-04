@@ -213,7 +213,6 @@ def person_export(db: Session, user: AuthUser) -> dict:
         db.query(AuthenticationEvent)
         .filter(AuthenticationEvent.user_id == user.id, AuthenticationEvent.tenant_id == tenant_id)
         .order_by(AuthenticationEvent.created_at.desc())
-        .limit(500)
         .all()
     )
     events_query = (

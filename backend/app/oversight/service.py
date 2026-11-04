@@ -29,6 +29,7 @@ import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -334,7 +335,17 @@ def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
     from backend.app.reportability import markets
 
     found = []
-    obligations = db.query(ReportObligation).filter(ReportObligation.tenant_id == tenant_id).limit(READ_LIMIT).all()
+    # Not capped (0.10.86): an unordered cap could drop an overdue report, or an initial report that was started (its
+    # assessment then read "the report is not started"). Only the open ones and the initial reports are read.
+    obligations = (
+        db.query(ReportObligation)
+        .filter(
+            ReportObligation.tenant_id == tenant_id,
+            (ReportObligation.kind == "INITIAL")
+            | (ReportObligation.due_on.isnot(None) & ReportObligation.state.notin_(list(report_rules.CLOSED))),
+        )
+        .all()
+    )
     started = {(row.complaint_id, row.market) for row in obligations if row.kind == "INITIAL"}
     for row in obligations:
         if row.due_on is None or row.state in report_rules.CLOSED:
@@ -425,8 +436,12 @@ def _capa_items(db: Session, tenant_id) -> list[dict]:
             opens=links.target("Records", "Effectiveness checks", record=("capa", row.id)),
             alerts=False,
         )
-        for row in db.query(Capa).filter(Capa.tenant_id == tenant_id, Capa.due_at.isnot(None)).limit(READ_LIMIT)
-        if str(row.status or "").lower() not in CLOSED_CAPA
+        # The closed ones are left out in the query, not after a cap (0.10.86): every open dated CAPA is listed.
+        for row in db.query(Capa).filter(
+            Capa.tenant_id == tenant_id,
+            Capa.due_at.isnot(None),
+            func.lower(func.coalesce(Capa.status, "")).notin_(CLOSED_CAPA),
+        )
     ]
 
 

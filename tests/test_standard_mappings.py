@@ -46,6 +46,7 @@ def test_every_standard_mapping_passes_the_release_check(mapping):
     assert result["status"] == "READY", result
 
 
+@pytest.mark.db
 def test_loading_every_template_in_order_imports_the_whole_story(tenant_id):
     outcomes = {}
     with SessionLocal() as db:
@@ -81,6 +82,7 @@ def test_loading_every_template_in_order_imports_the_whole_story(tenant_id):
     assert count("evidence", "AND evidence_type = 'SOURCE_RECORD'") >= 6
 
 
+@pytest.mark.db
 def test_administrators_can_start_from_a_standard_mapping():
     from tests.conftest import authenticated_client
 

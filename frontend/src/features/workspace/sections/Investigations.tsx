@@ -16,7 +16,8 @@ import {
   sourceIdColumn,
   useResource,
 } from "../../customer-admin/shared";
-import { displayId, referenceId } from "../../../app/displayId";
+import { displayId, referenceId, sourceId } from "../../../app/displayId";
+import { inData } from "../home";
 import { InvestigationWorkspacePanel } from "../../investigator/InvestigationWorkspacePanel";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
 import {
@@ -100,13 +101,18 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
 }
 
 function NewCaseSections({ tab }: { tab?: string }) {
-  const { work, open } = useWorkspace();
+  const { work, open, dataSource } = useWorkspace();
   const [managing, setManaging] = useState<any | null>(null);
+  const selected = work.investigations.find((item) => String(item.id) === work.investigationId);
+  // On your data the sample's investigation is not shown: the list (and its empty state) is (0.10.85, D3.9).
+  const otherData =
+    !!selected && !inData(String(selected.investigation_identifier ?? selected.business_id ?? ""), dataSource);
   // The tab lists every investigation (0.10.74, C2) when asked to, or when none is open; one opens its page.
   const listing =
-    tabParts(tab).name === "All investigations" || (!work.investigationId && work.caseLink?.state !== "resolving");
+    otherData ||
+    tabParts(tab).name === "All investigations" ||
+    (!work.investigationId && work.caseLink?.state !== "resolving");
   if (listing) return <InvestigationList />;
-  const selected = work.investigations.find((item) => String(item.id) === work.investigationId);
   return (
     <>
       <nav className="uw-crumbs" aria-label="Where you are">
@@ -114,7 +120,9 @@ function NewCaseSections({ tab }: { tab?: string }) {
           Investigations
         </button>
         <span aria-hidden="true">›</span>
-        <span>{selected ? displayId(selected, "investigation_identifier") : "Investigation"}</span>
+        <span>
+          {selected ? (sourceId(selected, "investigation_identifier") ?? displayId(selected)) : "Investigation"}
+        </span>
       </nav>
       <CaseSections tab={tab} onManage={setManaging} onChanged={() => work.refreshInvestigations()} />
       {managing && (

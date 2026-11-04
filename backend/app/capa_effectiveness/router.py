@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.access.permissions import DECISION_SIGN, INVESTIGATION_WORK, QUALITY_REVIEW
 from backend.app.capa_effectiveness import rules, service
+from backend.app import signing_commit
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.capa_effectiveness import CapaEffectivenessCheck
 from backend.app.db.models.foundation import SignedApprovalRecord
@@ -385,18 +386,7 @@ def sign_result(
     current.signed_by, current.signer_role, current.signed_at = str(ctx.user_id), role, now
     current.updated_at = now
     try:
-        if db is control_db:
-            control_db.commit()  # the shared plane: everything in one transaction
-        else:
-            # A dedicated plane: the signature and its audit trail first (as decision signing does), then the result.
-            control_db.commit()
-            try:
-                db.commit()
-            except Exception:
-                logger.exception(
-                    "Signature %s was saved but its effectiveness result %s was not", record.id, current.id
-                )
-                raise
+        signing_commit.commit(db, control_db, "effectiveness result")
     except IntegrityError as exc:
         db.rollback()
         control_db.rollback()

@@ -107,6 +107,7 @@ def test_a_route_the_role_does_not_serve_answers_404_before_any_handler(monkeypa
     assert anonymous.get("/health/live").status_code == 200
 
 
+@pytest.mark.db
 def test_a_cell_signs_in_only_its_own_organization_and_the_platform_only_platform_staff(monkeypatch):
     organization = _tenant(_organization())
     other = _tenant(_organization())
@@ -153,6 +154,7 @@ def test_the_scheduler_runs_only_the_jobs_its_role_owns(monkeypatch):
     assert cell | platform == names
 
 
+@pytest.mark.db
 def test_the_configuration_check_names_what_each_role_needs(monkeypatch):
     from backend.app.config_check import _cell_tenant_problem, _deployment_role_problems
 

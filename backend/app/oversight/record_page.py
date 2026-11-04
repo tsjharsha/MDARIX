@@ -154,7 +154,7 @@ def related(db, found: dict, complaint, names: dict[str, str], service: dict | N
             ]
             or ["Not opened"],
             "items": [
-                {"id": str(case.id), "ref": case.business_id or case.investigation_identifier}
+                {"id": str(case.id), "ref": case.investigation_identifier or case.business_id}
                 for case in found["cases"]
             ],
         },
@@ -326,7 +326,7 @@ def latest_signed(db, tenant_id, me: str, names_of) -> dict | None:
         "complaint": {"id": str(complaint.id), "ref": complaint.complaint_identifier or complaint.business_id}
         if complaint is not None
         else None,
-        "investigation": {"id": str(case.id), "ref": case.business_id or case.investigation_identifier}
+        "investigation": {"id": str(case.id), "ref": case.investigation_identifier or case.business_id}
         if case is not None
         else None,
     }

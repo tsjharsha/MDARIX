@@ -236,7 +236,9 @@ def test_work_emails_without_a_case_keep_their_links(outbox):
     emailer.send_review_pending_notice("a@x.test", organization="Acme", reference="DEC1", submitted_by=None)
     emailer.send_signoff_completed_notice("a@x.test", organization="Acme", reference="DEC1", signed_by=None)
     assert "https://app.example.com/app/my-work" in outbox[0]["text"] and "?case=" not in outbox[0]["text"]
-    assert "https://app.example.com/app/my-work?tab=Approvals" in outbox[1]["text"] and "?case=" not in outbox[1]["text"]
+    assert (
+        "https://app.example.com/app/my-work?tab=Approvals" in outbox[1]["text"] and "?case=" not in outbox[1]["text"]
+    )
     assert "https://app.example.com/app/investigations" in outbox[2]["text"] and "?case=" not in outbox[2]["text"]
 
 

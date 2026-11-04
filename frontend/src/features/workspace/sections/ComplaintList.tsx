@@ -14,9 +14,8 @@ import {
 } from "../workspaceContext";
 import { StatusBadge, listTitle } from "./common";
 import { DeadlineChip, HarmChip } from "../../../app/chips";
-import { marketLabel } from "../../../app/labels";
-import { ProblemCode, problemCodeText, useImdrfLinks, type ImdrfLinks } from "./ProblemCode";
-import { RowMenu } from "./RowMenu";
+import { problemCodeParts, problemCodeText, useImdrfLinks, type ImdrfLinks } from "./ProblemCode";
+import { isLegalDeadline } from "../home";
 import {
   EMPTY_COMPLAINT_FILTERS,
   complaintFilterValues,
@@ -82,6 +81,8 @@ export function ComplaintList({
     }`,
   );
   const links = useImdrfLinks(sixColumns || view ? listOf(list.data?.items).map((row: any) => row.problem_code) : []);
+  const openRow = (row: any) =>
+    open("Complaint", `Summary?${new URLSearchParams({ ref: row.complaint_identifier ?? row.id })}`);
   const pages = list.data?.pages ?? 1;
   // The filters are part of the address (Complaint list?country=US): a change replaces it, so refresh keeps them.
   const keepFilters = useTabFilters();
@@ -134,14 +135,10 @@ export function ComplaintList({
                 }
         }
         serverSort={{ sort, onSort, keys: COMPLAINT_SORTS }}
+        {...(sixColumns || view ? { onRowClick: openRow, chooserUnderMore: true, className: "uw-clist" } : {})}
         columns={
           sixColumns || view
-            ? workColumns(
-                links,
-                (row) =>
-                  open("Complaint", `Summary?${new URLSearchParams({ ref: row.complaint_identifier ?? row.id })}`),
-                openInvestigation,
-              )
+            ? workColumns(links, openRow)
             : [
                 idColumn("Complaint ID", "complaint_identifier"),
                 sourceIdColumn("complaint_identifier"),
@@ -351,6 +348,8 @@ export function imdrfLabels(codes: string[], links: ImdrfLinks | undefined): Rec
 /** One deadline or target of a complaint (backend/app/oversight/router.py complaint_work). */
 type WorkDue = {
   key: string;
+  category?: string;
+  category_label?: string;
   title: string;
   market: string | null;
   due_at: string;
@@ -376,25 +375,28 @@ const harmOf = (row: any) =>
       : null;
 
 /**
- * The six columns of the new navigation's lists (7.5): Urgency · What happened · Product, version, lot · Markets ·
- * Owner · Stage. What happened opens the complaint's page; one visible action (Open) and the rest under ⋯.
+ * The six columns of the new navigation's lists (7.5; 0.10.85, D3.1): Legal clock · What happened · Product, version,
+ * lot · Incident country · Owner · Stage. The reference is the row's one action, and the whole row opens the
+ * complaint's page; the problem reads as its IMDRF term (U-16), the customer's code only in its tooltip.
  */
-export function workColumns(
-  links: ImdrfLinks,
-  onOpen: (row: any) => void,
-  openInvestigation: ReturnType<typeof useOpenInvestigation>,
-) {
+export function workColumns(links: ImdrfLinks, onOpen: (row: any) => void) {
   const work = (row: any): ComplaintWork | null => row.work ?? null;
   return [
     {
       key: "urgency",
-      label: "Urgency",
+      label: "Legal clock",
       render: (row: any) => {
-        const nearest = work(row)?.due[0];
+        const due = work(row)?.due ?? [];
+        const legal = (item: WorkDue) => isLegalDeadline({ key: item.key, category: item.category ?? "" });
+        const nearest = due.find(legal) ?? due[0];
+        // An overdue target of the organization's own (a reply, the triage) shows beside the legal clock: it is why
+        // the row is first.
+        const late = due.find((item) => item !== nearest && !legal(item) && item.state === "OVERDUE");
         const harm = harmOf(row);
         return (
           <span className="uw-urgency">
             {nearest ? <DeadlineChip item={nearest} /> : <span className="ac-muted">No deadline</span>}
+            {late && <DeadlineChip item={late} prefix={late.category_label ?? "Target"} />}
             {harm && <HarmChip harm={harm.harm} label={harm.label} />}
           </span>
         );
@@ -409,45 +411,43 @@ export function workColumns(
             <strong>{row.complaint_identifier ?? row.business_id}</strong>
           </button>{" "}
           <span className="uw-what-text">{row.description ?? "No description recorded"}</span>
-          <ProblemCode code={row.problem_code} links={links} />
+          <ImdrfTerm code={row.problem_code} links={links} />
         </span>
       ),
     },
     {
       key: "product",
       label: "Product, version, lot",
-      render: (row: any) =>
-        [row.product_name, row.version, row.lot ? `Lot ${row.lot}` : null].filter(Boolean).join(" · ") || "—",
+      render: (row: any) => (
+        <>
+          {[row.product_name, row.version].filter(Boolean).join(" · ") || "—"}
+          {row.lot && <span className="uw-lot"> · Lot {row.lot}</span>}
+        </>
+      ),
     },
     {
-      key: "markets",
-      label: "Markets",
-      render: (row: any) => (work(row)?.markets ?? []).map(marketLabel).join(", ") || "—",
+      key: "country",
+      label: "Incident country",
+      render: (row: any) => String(row.country ?? "").trim() || <span className="ac-muted">Asked at the tree</span>,
     },
     { key: "owner", label: "Owner", render: (row: any) => work(row)?.owner_name ?? "Not named" },
     { key: "stage", label: "Stage", render: (row: any) => work(row)?.stage ?? "—" },
-    {
-      key: "open",
-      label: "",
-      render: (row: any) => {
-        const request = openInvestigation ? investigationRequestFor(row) : null;
-        const ref = row.complaint_identifier ?? row.business_id ?? "this complaint";
-        return (
-          <span className="uw-row-actions">
-            <button type="button" className="ac-secondary" aria-label={`Open ${ref}`} onClick={() => onOpen(row)}>
-              Open
-            </button>
-            {request && openInvestigation && (
-              <RowMenu
-                label={`More for ${ref}`}
-                items={[{ label: "Open an investigation", onSelect: () => openInvestigation(request) }]}
-              />
-            )}
-          </span>
-        );
-      },
-    },
   ];
+}
+
+/** A problem as its IMDRF term, or "No IMDRF term yet"; the customer's own code only in the tooltip (U-16). */
+export function ImdrfTerm({ code, links }: { code: string | null | undefined; links: ImdrfLinks }) {
+  if (!code) return <small className="ac-muted">No problem recorded</small>;
+  const term = problemCodeParts(code, links).term;
+  return term ? (
+    <small className="uw-imdrf" title={`Your code: ${code}`}>
+      {term}
+    </small>
+  ) : (
+    <small className="ac-muted" title={`Your code: ${code}`}>
+      No IMDRF term yet
+    </small>
+  );
 }
 
 function FacetSelect({
