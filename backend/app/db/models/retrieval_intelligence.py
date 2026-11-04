@@ -21,7 +21,8 @@ EMBEDDING_PROVIDER = "mdarix-deterministic"
 EMBEDDING_MODEL = "mdarix-hash-bow-32"
 EMBEDDING_MODEL_VERSION = "1.0"
 EMBEDDING_PIPELINE_VERSION = "R1-Day9"
-RETRIEVAL_CONFIG_VERSION = "R1-Day9"
+# R1-retrieval-2 (0.10.87): the relevance floor per model, stale vectors left out, the question stored masked.
+RETRIEVAL_CONFIG_VERSION = "R1-retrieval-2"
 
 # The local language model (ONNX on CPU, nothing leaves the server). Rows of both models share the embedding column;
 # each search compares only vectors of the model that made the query vector.
