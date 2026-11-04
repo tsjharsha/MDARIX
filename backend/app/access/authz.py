@@ -108,6 +108,18 @@ def _guard_user_administration(
         )
 
 
+def lock_account_email(db: Session, tenant_id, email: str) -> None:
+    """Hold, until the transaction ends, the right to create or re-invite the account for ``email`` in one
+    organization: two invitations of one address at the same moment run one after the other, so the second sees the
+    first's account (auth_users has no unique (tenant, email) since offboarded emails may be reused, p32)."""
+    from sqlalchemy import text
+
+    db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+        {"key": f"account-email:{tenant_id}:{email.strip().lower()}"},
+    )
+
+
 def _is_customer_admin(user: AuthUser) -> bool:
     return is_customer_admin_role(user.role)
 
