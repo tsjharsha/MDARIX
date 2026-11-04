@@ -302,8 +302,15 @@ export function answersProblem(questions: Question[], form: AssessmentForm): str
   return null;
 }
 
-export type SignForm = { conclusion: Conclusion | ""; overrideReason: string; password: string; code: string };
-export const EMPTY_SIGN: SignForm = { conclusion: "", overrideReason: "", password: "", code: "" };
+export type SignForm = {
+  conclusion: Conclusion | "";
+  overrideReason: string;
+  password: string;
+  code: string;
+  /** Why a signed conclusion changes (OD-4, 0.10.88): asked when the market is signed already. */
+  changeReason?: string;
+};
+export const EMPTY_SIGN: SignForm = { conclusion: "", overrideReason: "", password: "", code: "", changeReason: "" };
 
 export function signProblem(
   questions: Question[],
@@ -312,6 +319,7 @@ export function signProblem(
   suggested: Suggestion | null,
   disagreement: string | null,
   trained: boolean,
+  resigning = false,
 ): string | null {
   const answers = answersProblem(questions, form);
   if (answers) return answers;
@@ -323,6 +331,8 @@ export function signProblem(
     return "An Unknown answer could make the event reportable: not reportable cannot be concluded (Unknown is never No)";
   if (sign.conclusion !== suggested && collapsed(sign.overrideReason).length < ASSESSMENT_LIMITS.reasonMin)
     return "You override the suggestion: say why";
+  if (resigning && collapsed(sign.changeReason ?? "").length < ASSESSMENT_LIMITS.reasonMin)
+    return "This market is signed already: say why the signed conclusion changes";
   if (!trained) return "Record your practice training on the documents above first";
   if (!sign.password) return "Enter your password to sign";
   return null;
