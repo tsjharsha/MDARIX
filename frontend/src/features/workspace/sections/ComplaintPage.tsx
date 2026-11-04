@@ -207,8 +207,9 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   const step = nextStep(view);
   const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
   const harm = harmOf(event);
-  // Each missing fact is asked once, in Details (0.10.82, D1.7): the awareness in the triage record while triage is
-  // here, else beside the country; the header and the facts say where.
+  // Each missing fact is asked in Details (0.10.82, D1.7): the awareness in the triage record while triage is here, else
+  // beside the country; the rail's Legal clocks say so once (0.10.87). The decision tree asks the same facts again
+  // where its outcome needs them.
   const needs = event.needs ?? [];
   const needed = (fact: string) => needs.some((need) => need.fact === fact);
   const clock = oneClock(work?.due ?? []);
@@ -234,11 +235,10 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
     <>
       <div className="uw-topline">
         <nav className="uw-crumbs" aria-label="Where you are">
+          {/* The reference is the page's heading (0.10.87): the crumb is the way back. */}
           <button type="button" className="ac-link" onClick={() => open("Complaints")}>
             Complaints
           </button>
-          <span aria-hidden="true">›</span>
-          <span>{event.ref}</span>
         </nav>
         <span className="uw-topline-end">
           {/* The organization's time zone, named once for the page (0.10.85, D3.6). */}
@@ -300,9 +300,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
         {view.service?.header && (
           // Completing the service never closes the complaint (0.10.71, A5): the quality work is still open.
           <p className="uw-cp-service" role="status">
-            <strong>{view.service.header}</strong> · Quality owner:{" "}
-            {work?.owner_name ?? event.owner_name ?? "not named yet"}
-            {step ? ` · Next: ${step.label}` : ""}
+            {/* The owner and the next step are the fields and the card below (0.10.87). */}
+            <strong>{view.service.header}</strong>
           </p>
         )}
         <dl className="uw-hl-fields">
@@ -314,7 +313,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
             <dt>Markets</dt>
             <dd>
               {needed("COUNTRY") ? (
-                <span className="ac-muted">Incident country asked below</span>
+                // The rail's Legal clocks say where the missing facts are asked (0.10.87).
+                <span className="ac-muted">Not recorded</span>
               ) : (
                 markets.map(marketLabel).join(", ") || "—"
               )}
@@ -324,7 +324,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
             <dt>Awareness</dt>
             <dd>
               {needed("AWARENESS_DATE") ? (
-                <span className="ac-muted">Asked below</span>
+                <span className="ac-muted">Not recorded</span>
               ) : (
                 awarenessText(event.awareness_at, event.awareness_date_only)
               )}
@@ -437,7 +437,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                           </span>
                         ))
                       : needed("COUNTRY")
-                        ? "Waits for the incident country, asked above"
+                        ? "Incident country not recorded"
                         : "None of your reporting markets applies"}
                     <small>Each market's tree: the question, the answer, the clause and the outcome.</small>
                   </dd>

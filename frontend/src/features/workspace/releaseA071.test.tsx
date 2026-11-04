@@ -66,8 +66,8 @@ describe("A2: a sample-only trial cannot upload", () => {
     expect(fresh).not.toContain("Discuss a pilot");
   });
 
-  it("offers the upload on the Complaints header in a trial (0.10.79) and a pilot, never in a sample-only trial", () => {
-    expect(render(<ComplaintViews />, api())).toContain("Import your data");
+  it("offers the upload on the Complaints header in a pilot, never in a trial (0.10.87: the top bar) or sample-only", () => {
+    expect(render(<ComplaintViews />, api())).not.toContain("Import your data");
     expect(render(<ComplaintViews />, api({}, { sample_only: true }))).not.toContain("Import your data");
     expect(render(<ComplaintViews />, api({ isTrial: false }))).toContain("Import your data");
     expect(render(<ComplaintViews />, api({ isTrial: false }, { sample_only: true }))).not.toContain(
@@ -158,7 +158,7 @@ export function rv11(service: Partial<NonNullable<EventView["service"]>> | null 
 }
 
 describe("A5: the linked service work", () => {
-  it("says the service is complete and the quality assessment still open, with its owner and next step", () => {
+  it("says the service is complete and the quality assessment still open (0.10.87: owner and next step below)", () => {
     resources.data[eventPath("SAMPLE-RV-11")] = rv11({
       status: "COMPLETE",
       status_label: "Complete",
@@ -167,8 +167,8 @@ describe("A5: the linked service work", () => {
       header: "Service complete · Quality assessment open",
     });
     const html = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />, api());
-    expect(html).toContain("Service complete · Quality assessment open</strong> · Quality owner: Asha Quality");
-    expect(html).toContain("Next: Assess the United States (FDA) market");
+    expect(html).toContain("Service complete · Quality assessment open</strong></p>");
+    expect(html).not.toContain("Quality owner:");
     expect(html).toContain("Complete since");
   });
 

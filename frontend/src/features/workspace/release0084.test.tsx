@@ -203,7 +203,7 @@ describe("M2: a complaint waiting for its country never says 'No market to asses
     resources.data[eventPath("FIC-2001")] = view;
     const html = render(<ComplaintPage tab="Summary?ref=FIC-2001" />);
     expect(html).not.toContain("No market to assess");
-    expect(html).toContain("Waits for the incident country, asked above");
+    expect(html).toContain("Incident country not recorded");
   });
 });
 
