@@ -375,6 +375,13 @@ describe("D2.4: signing in about four actions", () => {
     expect(card).toMatch(/<button type="submit" class="ac-primary dt-sign-btn" disabled=""/);
   });
 
+  it("tells a screen reader which items before Sign are done and which are still to do (0.10.88, DEV-10)", () => {
+    const list = show(READY).match(/<ul class="dt-check"[^>]*>(.*?)<\/ul>/)?.[1] ?? "";
+    // The tick and the circle are hidden from assistive technology, so the words carry the state.
+    expect(list).toMatch(/<span class="sr-only">Done: <\/span>Every question answered/);
+    expect(list).toMatch(/<span class="sr-only">To do: <\/span>Your training confirmation/);
+  });
+
   it("lets the real role sign, never the persona", () => {
     const executive = show(READY, api(["regulatory.review"], "executive"));
     expect(executive).toContain("Sign as Asha Menon");

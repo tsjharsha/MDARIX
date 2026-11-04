@@ -257,7 +257,9 @@ export function SignCard({
           <ul className="dt-check" id={`dt-check-${item.market}`} aria-label="Before you sign">
             {items.map((entry) => (
               <li key={entry.text} className={entry.ok ? "is-ok" : ""}>
-                <span aria-hidden="true">{entry.ok ? "✓" : "○"}</span> {entry.text}
+                <span aria-hidden="true">{entry.ok ? "✓" : "○"}</span>{" "}
+                <span className="sr-only">{entry.ok ? "Done: " : "To do: "}</span>
+                {entry.text}
               </li>
             ))}
           </ul>
