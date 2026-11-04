@@ -39,6 +39,7 @@ def _report(tag, **extra):
     return {"path": "/app/investigations", "message": f"TypeError: x is undefined [{tag}]", **extra}
 
 
+@pytest.mark.db
 def test_an_anonymous_report_is_stored_without_an_organization(cleanup, monkeypatch):
     monkeypatch.setenv("MDARIX_RELEASE", "2026.10.3")
     tag = uuid.uuid4().hex[:10]
@@ -55,6 +56,7 @@ def test_an_anonymous_report_is_stored_without_an_organization(cleanup, monkeypa
     assert row.user_agent == "TestBrowser/2.0" and row.request_id == "req-browser-001" and row.release == "2026.10.3"
 
 
+@pytest.mark.db
 def test_a_signed_in_report_is_filed_under_the_organization_and_user(cleanup):
     tag = uuid.uuid4().hex[:10]
     cleanup.append(tag)
@@ -65,6 +67,7 @@ def test_a_signed_in_report_is_filed_under_the_organization_and_user(cleanup):
     assert row.request_id is None  # an unusable caller id is dropped, not stored
 
 
+@pytest.mark.db
 def test_a_stale_or_unknown_cookie_falls_back_to_anonymous(cleanup):
     tag = uuid.uuid4().hex[:10]
     cleanup.append(tag)
@@ -74,6 +77,7 @@ def test_a_stale_or_unknown_cookie_falls_back_to_anonymous(cleanup):
     assert _row(tag).tenant_id is None
 
 
+@pytest.mark.db
 def test_oversized_and_invalid_reports_are_refused_without_a_500(cleanup):
     client = TestClient(app)
     huge = client.post(URL, json=_report("huge", stack="x" * (client_errors.MAX_BODY_BYTES + 100)))
@@ -94,6 +98,7 @@ def test_a_storage_failure_still_answers_202(monkeypatch, caplog):
     assert any("could not be stored" in record.getMessage() for record in caplog.records)
 
 
+@pytest.mark.db
 def test_reports_are_rate_limited_per_address(monkeypatch, cleanup):
     monkeypatch.setenv("MDARIX_RATE_LIMITS_ENABLED", "true")
     monkeypatch.setenv("MDARIX_RATE_LIMIT_SALT", secrets.token_hex(16))
@@ -110,6 +115,7 @@ def test_reports_are_rate_limited_per_address(monkeypatch, cleanup):
     assert client.post(URL, json=_report(tag), headers={"X-Forwarded-For": "198.51.100.9"}).status_code == 202
 
 
+@pytest.mark.db
 def test_every_value_is_cut_to_its_column(cleanup):
     tag = uuid.uuid4().hex[:10]
     cleanup.append(tag)
@@ -131,6 +137,7 @@ def test_every_value_is_cut_to_its_column(cleanup):
     assert len(row.user_agent) == 512 and row.request_id is None
 
 
+@pytest.mark.db
 def test_nul_characters_are_dropped_not_a_reason_to_lose_the_report(cleanup):
     tag = uuid.uuid4().hex[:10]
     cleanup.append(tag)

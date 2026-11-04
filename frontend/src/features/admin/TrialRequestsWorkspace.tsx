@@ -23,6 +23,7 @@ type TrialRequest = {
   tenant_identifier: string | null;
   trial_expires_at: string | null;
   data_delete_after: string | null;
+  data_hold?: "LEGAL_HOLD" | "MVP_REQUEST" | null;
   data_deleted: boolean;
   owner_status: string | null;
   // The latest invitation email: SENT, FAILED (retried by MDARIX, resend here), NOT_CONFIGURED; null before 0.10.29.
@@ -401,8 +402,12 @@ export function TrialRequestsWorkspace() {
                       <small>Trial data deleted</small>
                     ) : (
                       <small>
-                        Trial ends {formatDate(row.trial_expires_at)} · data kept until{" "}
-                        {formatDate(row.data_delete_after)}
+                        Trial ends {formatDate(row.trial_expires_at)} ·{" "}
+                        {row.data_hold === "LEGAL_HOLD"
+                          ? "data kept under a legal hold"
+                          : row.data_delete_after
+                            ? `data kept until ${formatDate(row.data_delete_after)}`
+                            : "data kept (not a trial now)"}
                       </small>
                     )}
                   </span>

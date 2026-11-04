@@ -34,18 +34,20 @@ from backend.app.db.models.foundation import Complaint
 PROFILE_KEY = "one_story"
 RUNS = ("sample", "yours")
 STEPS = (
-    ("call", "The call"),
+    # The owner's names for the ten steps (4 Nov 2026), shown as a vertical list on Getting started.
+    ("call", "Review the call"),
     ("triage", "Triage"),
-    ("tree", "Tree"),
-    ("reportable", "Decide"),
-    ("form", "Form"),
-    ("fill", "Fill"),
-    ("approval", "Approval"),
-    ("submit", "Submit"),
-    ("records", "Records"),
-    ("trends", "Trends"),
+    ("tree", "Assess reportability"),
+    ("reportable", "Sign conclusion"),
+    ("form", "Prepare report"),
+    ("fill", "Complete details"),
+    ("approval", "Approve report"),
+    ("submit", "Record submission"),
+    ("records", "Review records"),
+    ("trends", "Explore trends"),
 )
 MARKS = ("call", "form", "records", "trends")
+MARK_STEP = {key: index for index, (key, _) in enumerate(STEPS) if key in MARKS}
 # The report's status path (authority_reports/rules.py STAGES), in order: where steps 6 to 8 are done.
 REPORT_PATH = ("CREATED", "COMPLETE", "APPROVAL", "APPROVED", "SUBMITTED", "ACKNOWLEDGED")
 
@@ -133,18 +135,33 @@ def steps_done(marks: dict, triaged: bool, versions: list, report_stage: str | N
     at = REPORT_PATH.index(report_stage) if report_stage in REPORT_PATH else -1
     skip = "skip" if not_reportable else None
     submitted = not_reportable or at >= 4
+    # A step the record shows done says the person's own steps before it were taken (0.10.85): any later work on the
+    # complaint means its call was read; a report past "Created" means its form was opened.
     return [
-        bool(marks.get("call")) or triaged,
+        bool(marks.get("call")) or triaged or bool(versions) or at >= 0,
         triaged,
         bool(versions),
         signed is not None,
-        skip or (at >= 0 and bool(marks.get("form"))),
+        skip or (at >= 0 and (bool(marks.get("form")) or at >= 1)),
         skip or at >= 1,
         skip or at >= 3,
         skip or at >= 4,
         bool(marks.get("records")) and submitted,
         bool(marks.get("trends")),
     ]
+
+
+def in_order(done: list) -> tuple[list, list[bool]]:
+    """The story's ticks in order (0.10.85): a step is ticked only once every step before it is done or not needed, so
+    the count, the ticks and the current step agree. A step the team did out of order (a tree signed before the
+    triage) is not ticked: it is flagged "done earlier by your team", and ticks once the steps before it are done."""
+    ticked, earlier, gap = [], [], False
+    for value in done:
+        # "Not needed" stays so wherever it is: it is no tick and no gap.
+        ticked.append(value if value == "skip" or (value is True and not gap) else False)
+        earlier.append(value is True and gap)
+        gap = gap or value is False
+    return ticked, earlier
 
 
 def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, run: str) -> dict | None:
@@ -177,7 +194,7 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
         None,
     )
     stage = _list_paths(data, control_db, ctx, tenant_id, [report])[report.id]["stage"] if report else None
-    done = steps_done(team_marks(request, run, complaint.id), triaged, versions, stage)
+    done, earlier = in_order(steps_done(team_marks(request, run, complaint.id), triaged, versions, stage))
     current = next((index for index, value in enumerate(done) if value is False), len(done))
     signed = next((v for v in reversed(versions) if v.signed_at is not None and v.superseded_by is None), None)
     return {
@@ -199,8 +216,8 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
         # The facts the import did not give; each is asked on the complaint page, where the step needs it.
         "needs": facts.of_complaint(complaint, reporting_service._record(complaint, None, None)),
         "steps": [
-            {"key": key, "label": label, "done": value is True, "skipped": value == "skip"}
-            for (key, label), value in zip(STEPS, done)
+            {"key": key, "label": label, "done": value is True, "skipped": value == "skip", "earlier": early}
+            for (key, label), value, early in zip(STEPS, done, earlier)
         ],
         "current": current,
         "finished": current == len(STEPS),

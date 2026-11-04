@@ -1,5 +1,6 @@
 """The language model writes the investigation analysis; MDARIX rules drop anything ungrounded, invented or causal."""
 
+import pytest
 import json
 
 from backend.app.db.session import SessionLocal
@@ -80,6 +81,7 @@ def _analyze(model, **updates):
         db.close()
 
 
+@pytest.mark.db
 def test_the_model_writes_the_analysis_and_the_rules_drop_what_is_not_grounded():
     model = FakeModel(_good_reply)
     analysis = _analyze(model)
@@ -118,6 +120,7 @@ def test_the_model_writes_the_analysis_and_the_rules_drop_what_is_not_grounded()
     assert "required_findings" in obligations
 
 
+@pytest.mark.db
 def test_the_model_sees_only_this_investigations_evidence():
     model = FakeModel(_good_reply)
     _analyze(model)
@@ -144,6 +147,7 @@ def test_the_model_sees_only_this_investigations_evidence():
     assert {entry["id"] for entry in model.seen["context"]["evidence"]} <= linked
 
 
+@pytest.mark.db
 def test_rules_take_over_when_the_model_is_unavailable_or_unusable():
     failed = _analyze(FakeModel(fail=True))
     assert failed.analysis_author == "RULES" and failed.model_provenance["fallback_reason"] == "MODEL_CALL_FAILED"
@@ -158,6 +162,7 @@ def test_rules_take_over_when_the_model_is_unavailable_or_unusable():
     assert rejected.model_provenance["fallback_reason"] == "MODEL_OUTPUT_FAILED_CHECKS"
 
 
+@pytest.mark.db
 def test_without_a_configured_model_the_rules_write_the_analysis():
     analysis = _analyze(None)  # the suite runs with the live provider switched off
     assert analysis.analysis_author == "RULES"

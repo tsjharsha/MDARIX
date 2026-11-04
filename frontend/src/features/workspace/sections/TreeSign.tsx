@@ -225,6 +225,7 @@ export function SignCard({
                 name={`choice-${item.market}`}
                 checked={choice === "follow"}
                 disabled={!definite}
+                title={!definite ? "Answer every question first: the tree gives no outcome yet" : undefined}
                 onChange={() => setPicked("follow")}
               />
               Follow the outcome
@@ -235,6 +236,7 @@ export function SignCard({
                 name={`choice-${item.market}`}
                 checked={choice === "override"}
                 disabled={!outcome}
+                title={!outcome ? "Answer every question first: the tree gives no outcome yet" : undefined}
                 onChange={() => setPicked("override")}
               />
               Override it

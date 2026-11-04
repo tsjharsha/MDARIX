@@ -146,6 +146,7 @@ def test_an_invitation_names_the_administrator_who_sent_it(company, mail):  # no
 # ------------------------------------------------------------------------------------------- through the API
 
 
+@pytest.mark.db
 def test_removing_a_user_tells_them_and_nobody_else(organization, mail):
     org, tenant = organization, organization["tenant_id"]
     removed = org["client"].patch(f"{USERS}/{org['v']['id']}/status", json={"status": "OFFBOARDED"})
@@ -157,6 +158,7 @@ def test_removing_a_user_tells_them_and_nobody_else(organization, mail):
     assert message["subject"] == f"Ada Admin removed you from MDARIX for {org['organization']}"
 
 
+@pytest.mark.db
 def test_suspending_an_administrator_tells_them_and_the_other_administrators_never_the_actor(organization, mail):
     org, tenant = organization, organization["tenant_id"]
     suspended = org["client"].patch(f"{USERS}/{org['b']['id']}/status", json={"status": "SUSPENDED"})
@@ -178,6 +180,7 @@ def test_suspending_an_administrator_tells_them_and_the_other_administrators_nev
     ]
 
 
+@pytest.mark.db
 def test_a_role_change_says_before_and_after_and_an_administrator_role_tells_the_administrators(organization, mail):
     org, tenant = organization, organization["tenant_id"]
     changed = org["client"].patch(
@@ -198,6 +201,7 @@ def test_a_role_change_says_before_and_after_and_an_administrator_role_tells_the
     )
 
 
+@pytest.mark.db
 def test_workflow_roles_given_and_taken_are_listed_for_the_person(organization, mail):
     org, tenant = organization, organization["tenant_id"]
     with SessionLocal() as db:
@@ -223,6 +227,7 @@ def test_workflow_roles_given_and_taken_are_listed_for_the_person(organization, 
         assert db.query(UserAdditionalRole).filter(UserAdditionalRole.user_id == uuid.UUID(org["v"]["id"])).count()
 
 
+@pytest.mark.db
 def test_an_mfa_reset_tells_the_person_without_the_reason(organization, mail):
     org, tenant = organization, organization["tenant_id"]
     reset = org["client"].post(f"{USERS}/{org['c']['id']}/mfa-reset", json={"reason": REASON})
@@ -238,6 +243,7 @@ def test_an_mfa_reset_tells_the_person_without_the_reason(organization, mail):
         assert REASON not in message["text"] and REASON not in message["html"]
 
 
+@pytest.mark.db
 def test_inviting_an_administrator_tells_the_others_and_withdrawing_the_invitation_tells_the_invitee(
     organization, mail
 ):
@@ -273,6 +279,7 @@ def test_inviting_an_administrator_tells_the_others_and_withdrawing_the_invitati
     assert viewer.status_code == 200 and len(mail) == 1 and queued_notices(tenant) == []
 
 
+@pytest.mark.db
 def test_one_failed_administrator_address_is_retried_alone_and_nobody_gets_it_twice(organization, monkeypatch):
     from outbox.worker import OutboxWorker
 
@@ -315,6 +322,7 @@ def test_one_failed_administrator_address_is_retried_alone_and_nobody_gets_it_tw
     assert sent == [org["b"]["email"], org["c"]["email"]] and queued_notices(tenant) == []
 
 
+@pytest.mark.db
 def test_an_administrator_who_lost_the_role_meanwhile_gets_nothing(organization, mail):
     org, tenant = organization, organization["tenant_id"]
     assert org["client"].patch(f"{USERS}/{org['b']['id']}/status", json={"status": "SUSPENDED"}).status_code == 200
@@ -326,6 +334,7 @@ def test_an_administrator_who_lost_the_role_meanwhile_gets_nothing(organization,
     assert [message["to"] for message in mail] == [org["b"]["email"]]
 
 
+@pytest.mark.db
 def test_a_free_trial_and_mdarix_staff_get_no_organization_emails():
     from tests.test_trial_self_admin import _trial_with_colleague
 

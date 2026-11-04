@@ -179,7 +179,8 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
             {
               key: "status",
               label: "Status",
-              render: (row) => <StateChip label={row.stage_label ?? row.state_label} />,
+              // Plain text, as the complaint list's Stage (0.10.85, D3.15).
+              render: (row) => row.stage_label ?? row.state_label,
             },
             {
               key: "mandatory",

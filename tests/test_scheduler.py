@@ -41,6 +41,7 @@ def _run_row(name):
         return db.get(SchedulerRun, name)
 
 
+@pytest.mark.db
 def test_a_due_job_runs_once_and_its_run_is_recorded(job_name):
     calls = []
     job = Job(job_name, timedelta(minutes=5), lambda db, state: calls.append(1) or {"done": len(calls)}, "Test job")
@@ -52,6 +53,7 @@ def test_a_due_job_runs_once_and_its_run_is_recorded(job_name):
     assert row.last_status == "OK" and row.consecutive_failures == 0 and row.last_finished_at is not None
 
 
+@pytest.mark.db
 def test_state_persists_between_runs_only_when_the_job_succeeds(job_name):
     seen = []
 
@@ -69,6 +71,7 @@ def test_state_persists_between_runs_only_when_the_job_succeeds(job_name):
     assert seen == [{}, {"counter": 1}, {"counter": 1}]
 
 
+@pytest.mark.db
 def test_another_instance_holding_the_lock_means_the_job_is_skipped(job_name):
     job = Job(job_name, timedelta(minutes=5), lambda db, state: {"ran": True}, "Test job")
     with engine.connect() as other:
@@ -83,6 +86,7 @@ def test_another_instance_holding_the_lock_means_the_job_is_skipped(job_name):
     assert scheduler.run_job(job)["status"] == "OK"
 
 
+@pytest.mark.db
 def test_three_failures_alert_once_and_recovery_alerts_once(job_name, alerts):
     broken = {"now": True}
 
@@ -196,6 +200,7 @@ def _dead_count(db):
     return int(db.execute(text("SELECT count(*) FROM event_outbox WHERE dead_lettered_at IS NOT NULL")).scalar())
 
 
+@pytest.mark.db
 def test_the_operations_job_alerts_only_when_the_dead_letter_count_rises(alerts, monkeypatch, dead_letter):
     from backend.app.worker_status import worker_status
 

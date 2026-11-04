@@ -93,19 +93,23 @@ def test_authenticated_home_tells_and_connects_the_workflow_story():
 
 
 def test_semantic_design_tokens_cover_business_meaning():
+    # Since 0.10.66 (stage 5) the one token file holds every colour by role (frontend/src/tokens.css; tokens.test.ts
+    # checks their contrast); the former per-sheet names (--brand-primary, --ai-advisory, ...) are gone. Each business
+    # meaning still has its role: the brand, text, the page, critical, warning, good, information and AI advisory.
+    tokens = (ROOT / "frontend" / "src" / "tokens.css").read_text(encoding="utf-8")
+    assert '@import "./tokens.css";' in STYLES
     for token in (
-        "--brand-primary",
-        "--text-primary",
-        "--background-page",
-        "--status-critical",
-        "--ai-advisory",
-        "--evidence",
-        "--contradiction",
-        "--unknown",
-        "--human-decision",
-        "--assurance",
+        "--ms-teal",
+        "--ms-ink",
+        "--ms-ground",
+        "--ms-crit",
+        "--ms-warn",
+        "--ms-good",
+        "--ms-info",
+        "--ms-ai",
     ):
-        assert token in STYLES
+        assert f"  {token}:" in tokens, token
+    assert "Red (crit) is only for overdue or critical" in tokens
 
 
 def test_website_is_consolidated_and_every_former_url_still_resolves():

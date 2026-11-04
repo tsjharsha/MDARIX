@@ -1,5 +1,6 @@
 """The Trust page shows the latest honest evaluation of the real pipeline, read safely from the golden tenant."""
 
+import pytest
 from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
@@ -40,6 +41,7 @@ REPORT = {
 }
 
 
+@pytest.mark.db
 def test_the_latest_recorded_evaluation_is_shown_on_the_trust_page():
     db = SessionLocal()
     try:

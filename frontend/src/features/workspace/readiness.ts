@@ -83,7 +83,11 @@ export const checkValue = (check: Pick<ReadinessCheck, "value">) =>
 
 /** The records a check names, as short references ("CMP000031, CMP000032 and 3 more"). */
 export function itemsText(check: Pick<ReadinessCheck, "items" | "value">): string {
-  const refs = check.items.map((item) => item.ref || item.label).filter((ref): ref is string => !!ref);
+  // A record's name before an internal MDARIX ID ("PulseWatch 410", not "PROD000002"; 0.10.85, D3.12).
+  const internal = /^[A-Z]{2,5}\d{6}$/;
+  const refs = check.items
+    .map((item) => (item.ref && !(internal.test(item.ref) && item.label) ? item.ref : item.label || item.ref))
+    .filter((ref): ref is string => !!ref);
   if (!refs.length) return "";
   const shown = refs.slice(0, 3).join(", ");
   const more = Math.max(0, (check.value ?? refs.length) - Math.min(3, refs.length));

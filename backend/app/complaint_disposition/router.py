@@ -32,6 +32,7 @@ from backend.app.access.permissions import INVESTIGATION_CREATE, QUALITY_REVIEW,
 from backend.app.complaint_classification import rules as coding
 from backend.app.complaint_disposition import rules, service, triggers
 from backend.app.complaint_review.service import people
+from backend.app import signing_commit
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import AuthUser, Investigation, SignedApprovalRecord
 from backend.app.db.models.complaint_disposition import ComplaintDisposition
@@ -707,16 +708,7 @@ def sign_disposition(
         if earlier.superseded_by is None:
             earlier.superseded_by = disposition_id
     try:
-        if db is control_db:
-            control_db.commit()  # the shared plane: everything in one transaction
-        else:
-            # A dedicated plane: the signature and its audit trail first (as decision signing does), then the record.
-            control_db.commit()
-            try:
-                db.commit()
-            except Exception:
-                logger.exception("Signature %s was saved but its disposition %s was not", record_id, disposition_id)
-                raise
+        signing_commit.commit(db, control_db, "disposition")
     except IntegrityError as exc:
         db.rollback()
         control_db.rollback()

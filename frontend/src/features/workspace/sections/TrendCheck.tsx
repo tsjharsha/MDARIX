@@ -26,6 +26,8 @@ import {
 import { ChipFilter, Hero, InlineError, ProductFilter } from "./boardParts";
 import { BasisLine } from "../../shared/Basis";
 import { Bars, BarsTable, ChartOrTable, type BarRow } from "./WowCharts";
+import { IMPORTED_SOURCE } from "../complaintList";
+import { inData } from "../home";
 
 /**
  * Signals › Trend check: every product version (or version and problem, or complaint type) against its own history,
@@ -33,7 +35,7 @@ import { Bars, BarsTable, ChartOrTable, type BarRow } from "./WowCharts";
  * signal by itself; a triage lead raises one from a notable group in one click.
  */
 export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string) => void }) {
-  const { notify, open, session, work } = useWorkspace();
+  const { notify, open, session, work, dataSource } = useWorkspace();
   const canTriage = useCan("signal.triage");
   const [group, setGroup] = useState<TrendGroup>("version");
   const [product, setProduct] = useState("");
@@ -47,11 +49,12 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
   const [error, setError] = useState("");
   const board = useResource<TrendBoard>(trendPath(group, product));
   const headline = trendHeadline(board.data);
-  const summary = board.data?.summary;
   const navigation = useNavigation();
-  const rising = (board.data?.items ?? []).filter(
-    (item) => item.result === "SIGNIFICANT" || item.result === "ELEVATED",
+  // The Sample · Your data switch decides the groups shown (0.10.85, D3.5): your data never shows the sample's rise.
+  const shownItems = (board.data?.items ?? []).filter((item) =>
+    navigation === "new" ? inData(item.product.identifier, dataSource, false) : true,
   );
+  const summary = board.data?.summary;
   // The one action on a group: open its trend, or raise one (the table and the lead sentences share it).
   const action = (row: TrendItem) =>
     row.open_signals.length ? (
@@ -87,50 +90,34 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
   };
   return (
     <div className="ac-overview">
-      <Hero
-        tone={board.data ? headline.tone : "neutral"}
-        icon={<TrendingUp size={28} />}
-        eyebrow="Trend check · last 30 days against each version's own history"
-        title={headline.title}
-        detail={headline.detail}
-      >
-        {perUnitHint(board.data) && (
-          <div className="uw-trend-hint" role="note">
-            <p>{perUnitHint(board.data)}</p>
-            {sectionAllowed(
-              "Import data",
-              session?.allowed_menu,
-              session?.business_permissions,
-              session?.sample_only,
-            ) && (
-              <button type="button" className="ac-secondary" onClick={() => open("Import data")}>
-                Add lot quantities
-              </button>
-            )}
-          </div>
-        )}
-      </Hero>
-      {navigation === "new" && board.data && (
-        // One sentence per rising group, then its comparison basis in one line (0.10.72, B5).
-        <section className="uw-trend-lead" aria-label="Rising groups">
-          {rising.length ? (
-            <ul>
-              {rising.map((row) => (
-                <li key={row.key}>
-                  <p>
-                    <strong>{risingSentence(row)}</strong>
-                  </p>
-                  <p className="uw-cr-meta">{comparisonLine(row)}</p>
-                  {action(row)}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="ac-muted">No group is rising against its own history.</p>
+      {navigation === "new" ? (
+        board.data && <TrendHeroes board={board.data} action={action} source={dataSource} />
+      ) : (
+        <Hero
+          tone={board.data ? headline.tone : "neutral"}
+          icon={<TrendingUp size={28} />}
+          eyebrow="Trend check · last 30 days against each version's own history"
+          title={headline.title}
+          detail={headline.detail}
+        >
+          {perUnitHint(board.data) && (
+            <div className="uw-trend-hint" role="note">
+              <p>{perUnitHint(board.data)}</p>
+              {sectionAllowed(
+                "Import data",
+                session?.allowed_menu,
+                session?.business_permissions,
+                session?.sample_only,
+              ) && (
+                <button type="button" className="ac-secondary" onClick={() => open("Import data")}>
+                  Add lot quantities
+                </button>
+              )}
+            </div>
           )}
-          <InlineError text={error} />
-        </section>
+        </Hero>
       )}
+      <InlineError text={error} />
       <Revealed when={navigation === "new"} summary="All groups, the method and the chart">
         <div className="uw-cr-stats">
           <StatTile
@@ -174,10 +161,10 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
             <ProductFilter value={product} onChange={setProduct} />
           </div>
           <InlineError text={error} />
-          <TrendPerUnit items={board.data?.items ?? []} />
+          <TrendPerUnit items={shownItems} />
           <Table
             caption="Trend check"
-            rows={board.data?.items ?? []}
+            rows={shownItems}
             rowKey={(row) => row.key}
             empty={{ title: "No complaints in the period", detail: "Groups appear once complaints are recorded." }}
             columns={[
@@ -268,5 +255,125 @@ export function TrendPerUnit({ items }: { items: TrendItem[] }) {
       }
       note="The bar is what arrived; the marker is what the group's earlier average predicts. A rise counts only when it is unlikely to be chance."
     />
+  );
+}
+
+/** The version before, or the group's own history, as complaints in the same window as the recent count. */
+export function beforeRate(row: Pick<TrendItem, "history" | "history_days" | "recent_days">): number {
+  return row.history_days > 0 ? (row.history / row.history_days) * row.recent_days : 0;
+}
+
+/**
+ * Trends' hero on the new navigation (0.10.85, D3.5; the approved design): "Is a product problem rising?" answered per
+ * group in one sentence, with three bars (observed, expected, the version before or its own history in the same
+ * window) and "How we compared" folded. With nothing rising, the group closest to rising says so; a short history says
+ * plainly what it can and cannot show.
+ */
+export function TrendHeroes({
+  board,
+  action,
+  source,
+}: {
+  board: TrendBoard;
+  action: (row: TrendItem) => React.ReactNode;
+  /** The Sample · Your data switch: on your data, your products only (never the sample's rise). */
+  source?: string;
+}) {
+  const yours = source === IMPORTED_SOURCE;
+  const items = (board.items ?? []).filter((item) => inData(item.product.identifier, source, false));
+  const rising = items.filter((item) => item.result === "SIGNIFICANT" || item.result === "ELEVATED");
+  const assessed = items.filter((item) => item.result === "STEADY").sort((a, b) => (b.ratio ?? 0) - (a.ratio ?? 0));
+  const shown = rising.length ? rising : assessed.slice(0, 1);
+  const tested = rising.length + assessed.length;
+  const counted = items.reduce((sum, item) => sum + item.recent, 0);
+  return (
+    <div className="uw-trend-heroes">
+      {shown.map((row) => {
+        const top = Math.max(row.recent, row.expected, beforeRate(row), 0.01);
+        const bars: Array<[string, number, string]> = [
+          ["Observed", row.recent, row.result === "STEADY" ? "is-ok" : "is-over"],
+          ["Expected", row.expected, "is-muted"],
+          [row.baseline === "PREVIOUS_VERSION" ? "Version before" : "Its own history", beforeRate(row), "is-muted"],
+        ];
+        return (
+          <section key={row.key} className="uw-card uw-trend-hero" aria-label={row.name}>
+            <span className={`ms-chip uw-trend-verdict is-${row.result.toLowerCase()}`}>{trendResultLabel(row)}</span>
+            <h2>{risingSentence(row)}</h2>
+            <div
+              className="uw-bars"
+              role="img"
+              aria-label={bars.map(([label, value]) => `${label} ${value.toFixed(1)}`).join(", ")}
+            >
+              {bars.map(([label, value, tone]) => (
+                <div key={label} className="uw-bar-row">
+                  <span>{label}</span>
+                  <span className="uw-bar-track">
+                    <span
+                      className={`uw-bar-fill ${tone}`}
+                      style={{ width: `${Math.max(3, Math.round((value / top) * 100))}%` }}
+                    />
+                  </span>
+                  <b className="uw-num">{label === "Observed" ? value : value.toFixed(1)}</b>
+                </div>
+              ))}
+            </div>
+            <p className="uw-trend-note">
+              Each bar counts complaints in the last {row.recent_days} days: the expected number and the earlier one
+              come from {trendBaselineText(row).replace(/^Own history/, "its own history")}.
+            </p>
+            <details className="uw-more uw-trend-how">
+              <summary>How we compared</summary>
+              <p>{comparisonLine(row)}</p>
+              <p>{chanceText(row)}</p>
+              {perUnitHint(board) && <p>{perUnitHint(board)}</p>}
+            </details>
+            <div className="ca-action-row">{action(row)}</div>
+          </section>
+        );
+      })}
+      {!rising.length && (
+        <section className="uw-card uw-trend-hero" aria-label="What the history can show">
+          <span className="ms-chip uw-trend-verdict is-steady">
+            {tested ? "No version is rising against its own history" : "Too early to compare"}
+          </span>
+          <h2>
+            {tested
+              ? `${tested} ${tested === 1 ? "group" : "groups"} compared with their own history: none rising.`
+              : `${counted} recent ${counted === 1 ? "complaint" : "complaints"} across ${items.length} ${items.length === 1 ? "group" : "groups"}; none can be compared with a history yet.`}
+          </h2>
+          {!tested && items.length > 0 && (
+            <div
+              className="uw-bars"
+              role="img"
+              aria-label={items.map((item) => `${item.name}: ${item.recent}`).join(", ")}
+            >
+              {items.slice(0, 4).map((item) => (
+                <div key={item.key} className="uw-bar-row">
+                  <span>{item.problem ?? item.product_version?.version_identifier ?? item.name}</span>
+                  <span className="uw-bar-track">
+                    <span
+                      className="uw-bar-fill is-muted"
+                      style={{
+                        width: `${Math.max(3, Math.round((item.recent / Math.max(...items.map((x) => x.recent), 1)) * 100))}%`,
+                      }}
+                    />
+                  </span>
+                  <b className="uw-num">{item.recent}</b>
+                </div>
+              ))}
+            </div>
+          )}
+          {(yours || !tested) && (
+            <p className="uw-trend-note">
+              {yours ? "Your data" : "This data"} gives each group {board.recent_days} recent days to count. A rise is
+              judged against a version's own history ({board.history_days} days before) or the version it replaced, and
+              per unit in the field once your lots file gives quantities. A group with fewer than {board.min_complaints}{" "}
+              complaints, or a younger history, is listed, counted and never called a rise: what it can show now is how
+              many complaints each group has, and which lots they share.
+            </p>
+          )}
+        </section>
+      )}
+    </div>
   );
 }

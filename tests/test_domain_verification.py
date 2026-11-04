@@ -35,6 +35,7 @@ def _verify(platform, tenant_id, **body):
     return platform.post(f"/api/v1/platform-admin/tenants/{tenant_id}/domain-verifications", json=body)
 
 
+@pytest.mark.db
 def test_a_domain_is_verified_only_when_it_publishes_the_issued_token(platform, tenant_id, monkeypatch):
     domain = _domain()
     issued = _verify(platform, tenant_id, domain=domain)
@@ -61,6 +62,7 @@ def test_a_domain_is_verified_only_when_it_publishes_the_issued_token(platform, 
     assert verified["status"] == "VERIFIED" and verified["verified_at"] and verified["last_error"] is None
 
 
+@pytest.mark.db
 def test_an_unreachable_domain_stays_pending_with_the_reason(platform, tenant_id, monkeypatch):
     monkeypatch.setattr(platform_onboarding, "fetch_domain_proof", lambda name, timeout=5.0: (None, "PROOF_NOT_FOUND"))
     result = _verify(platform, tenant_id, domain=_domain(), verification_token="customer-chosen-token").json()
@@ -68,6 +70,7 @@ def test_an_unreachable_domain_stays_pending_with_the_reason(platform, tenant_id
 
 
 @pytest.mark.parametrize("domain", ["127.0.0.1", "localhost", "intranet", "exa mple.com", "-bad.example.com"])
+@pytest.mark.db
 def test_only_public_domain_names_are_accepted(platform, tenant_id, domain):
     refused = _verify(platform, tenant_id, domain=domain, verification_token="whatever-token")
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "DOMAIN_INVALID"
@@ -100,6 +103,7 @@ def test_the_proof_is_fetched_safely(monkeypatch):
     assert platform_onboarding.fetch_domain_proof("example.com") == ("mdarix-verify-abc\n", None)
 
 
+@pytest.mark.db
 def test_identity_provider_verification_is_not_available(platform, tenant_id):
     refused = platform.post(
         f"/api/v1/platform-admin/tenants/{tenant_id}/identity-provider/verify",

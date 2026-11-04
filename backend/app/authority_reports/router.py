@@ -43,6 +43,7 @@ from sqlalchemy.orm import Session
 from backend.app.access.permissions import DATA_EXPORT, REGULATORY_APPROVE, REGULATORY_REVIEW, require_permission
 from backend.app.authority_reports import forms, rules, worksheet
 from backend.app.complaint_review.service import people
+from backend.app import signing_commit
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.authority_reports import ReportEvidence, ReportObligation, ReportSnapshot, ReportSubmission
 from backend.app.db.models.foundation import Complaint, SignedApprovalRecord
@@ -1455,15 +1456,7 @@ def approve_snapshot(
     snapshot.state, snapshot.approved_by, snapshot.approved_at = "APPROVED", me, now
     snapshot.signed_record_id = record.id
     obligation.state, obligation.updated_at = rules.APPROVED, now
-    if db is control_db:
-        control_db.commit()
-    else:
-        control_db.commit()
-        try:
-            db.commit()
-        except Exception:
-            logger.exception("Signature %s was saved but its snapshot %s was not", record.id, snapshot.id)
-            raise
+    signing_commit.commit(db, control_db, "report snapshot")
     run_hook(
         db,
         "report snapshot approval task",

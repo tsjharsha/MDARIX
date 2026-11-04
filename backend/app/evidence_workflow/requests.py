@@ -30,6 +30,7 @@ from sqlalchemy import case as sql_case
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
+from backend.app.downloads import attachment
 from backend.app.access.permissions import (
     EVIDENCE_REQUEST,
     EVIDENCE_REVIEW,
@@ -1015,7 +1016,7 @@ def download_evidence_request_attachment(
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     person = current_person(control_db, ctx)
     row = _load(db, tenant_id, request_id)
-    attachment = (
+    stored = (
         db.query(EvidenceAttachment)
         .filter(
             EvidenceAttachment.id == attachment_id,
@@ -1024,18 +1025,18 @@ def download_evidence_request_attachment(
         )
         .first()
     )
-    if attachment is None:
+    if stored is None:
         raise error(404, "ATTACHMENT_NOT_FOUND", "Attachment is not available")
     if not (is_requester(person, row) or is_recipient(person, row) or person.holds(INVESTIGATION_WORK)):
         raise error(403, "PERMISSION_DENIED", "Only the people on this request or on its case can open its files")
     try:
-        content = ObjectStorageService().get(str(tenant_id), attachment.object_key)
+        content = ObjectStorageService().get(str(tenant_id), stored.object_key)
     except FileNotFoundError as exc:
         raise error(404, "ATTACHMENT_NOT_FOUND", "Attachment is not available") from exc
     return Response(
         content=content,
-        media_type=attachment.content_type,
-        headers={"Content-Disposition": attachment(f"{safe_filename(attachment.filename)}")},
+        media_type=stored.content_type,
+        headers={"Content-Disposition": attachment(safe_filename(stored.filename))},
     )
 
 

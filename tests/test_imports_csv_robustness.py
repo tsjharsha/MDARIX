@@ -78,6 +78,7 @@ def test_an_unknown_date_format_is_refused():
 # ------------------------------------------------------------------------------------------- through the API
 
 
+@pytest.mark.db
 def test_any_organization_checks_a_multipart_upload_with_semicolons_and_day_first_dates():
     investigator = _client_with_role("Investigator")  # a paying organization, not a trial
     csv_bytes = "product_id;product_name;version;version_release_date\nIMPX-1;Pompe à perfusion;Rev A;15/07/2026\n"
@@ -96,6 +97,7 @@ def test_any_organization_checks_a_multipart_upload_with_semicolons_and_day_firs
     }
 
 
+@pytest.mark.db
 def test_a_raw_body_still_works_and_a_bad_form_or_format_is_refused():
     investigator = _client_with_role("Investigator")
     raw = investigator.post(

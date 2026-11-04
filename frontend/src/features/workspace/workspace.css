@@ -6680,6 +6680,9 @@ button.uw-org:hover {
 .uw-home-stat span {
   color: var(--ms-ink-2);
 }
+.uw-home-stat .uw-home-short {
+  display: none;
+}
 .uw-home-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
@@ -6826,15 +6829,19 @@ button.uw-org:hover {
     left: 12px;
     width: auto;
   }
-  /* A phone keeps the three numbers on one row: the words under them are in the cards' titles. */
+  /* A phone keeps the three numbers on one row, each with one short line of meaning (0.10.85, D3.7; U-12). */
   .uw-home-stats {
     gap: var(--ms-space-2);
   }
   .uw-home-stat {
     padding: 12px;
   }
-  .uw-home-stat span {
+  .uw-home-stat .uw-home-long:not(:only-of-type) {
     display: none;
+  }
+  .uw-home-stat .uw-home-short {
+    display: block;
+    font-size: var(--ms-fs-12);
   }
   .uw-home-num {
     font-size: var(--ms-fs-24);
@@ -7515,6 +7522,274 @@ button.uw-org:hover {
   }
 }
 
+/* 0.10.85, D3.1: the complaint list. The whole row opens the record; the column choice sits under one "More"; on a
+   phone each complaint is a short card: the clock, the reference and what happened in two lines, then one line of
+   product, country and stage (half the height of 0.10.84's labelled cards). */
+.ac-table tr.is-clickable {
+  cursor: pointer;
+}
+.ac-table tr.is-clickable:hover td {
+  background: var(--ms-surface-2, #f4f8f8);
+}
+.tc-more {
+  display: flex;
+  justify-content: flex-end;
+}
+.tc-more > summary {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--ms-line-control);
+  border-radius: var(--ms-radius-md);
+  color: var(--ms-ink);
+  font-weight: var(--ms-fw-semibold);
+  cursor: pointer;
+}
+.tc-more[open] > summary {
+  margin-right: var(--ms-space-2);
+}
+.uw-imdrf {
+  color: var(--ms-ink-2);
+}
+@media (max-width: 640px) {
+  .ac-table.uw-clist tr {
+    padding: 10px 12px;
+  }
+  .ac-table.uw-clist td,
+  .ac-table.uw-clist td:first-child {
+    display: block;
+    padding: 1px 0;
+    font-size: var(--ms-fs-14);
+    font-weight: 400;
+  }
+  .ac-table.uw-clist td::before,
+  .ac-table.uw-clist td[data-label="Owner"] {
+    display: none;
+  }
+  .ac-table.uw-clist td[data-label="Product, version, lot"],
+  .ac-table.uw-clist td[data-label="Incident country"],
+  .ac-table.uw-clist td[data-label="Stage"] {
+    display: inline;
+    color: var(--ms-ink-2);
+  }
+  .ac-table.uw-clist td[data-label="Incident country"]::after,
+  .ac-table.uw-clist td[data-label="Product, version, lot"]::after {
+    content: " · ";
+  }
+  .ac-table.uw-clist .uw-lot {
+    display: none;
+  }
+  .ac-table.uw-clist .uw-what-text {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
+/* 0.10.85, D3.3: the complaint page as a record with a hero: the reporter's words beside the one Next step; the
+   checklist, who signs and the service work fold (open at desktop width, folded on a phone). */
+.uw-cp-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+  gap: var(--ms-space-4);
+  align-items: start;
+  margin-top: var(--ms-space-3);
+}
+.uw-cp-words {
+  margin: 0;
+}
+.uw-cp-words blockquote {
+  margin: 0;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border-left: 4px solid var(--ms-teal);
+  border-radius: 0 var(--ms-radius-md) var(--ms-radius-md) 0;
+  background: var(--ms-surface-2, #f4f8f8);
+  color: var(--ms-ink);
+  font-size: var(--ms-fs-20);
+  line-height: 1.5;
+}
+.uw-cp-words figcaption {
+  margin-top: 6px;
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+}
+.uw-cp-next {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-surface);
+}
+.uw-cp-next h2 {
+  margin: 0;
+  color: var(--ms-teal-dark);
+  font-size: var(--ms-fs-12);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.uw-cp-next p {
+  margin: 0;
+}
+.uw-cp-fold > summary {
+  display: list-item;
+  min-height: 44px;
+  padding: 10px 0;
+  cursor: pointer;
+}
+.uw-cp-fold > summary h2 {
+  display: inline;
+  margin: 0;
+}
+.uw-cp-fold > summary > .ac-muted {
+  display: block;
+  margin-top: 4px;
+}
+.uw-rec-part.uw-cp-fold > summary h2 {
+  font-size: var(--ms-fs-16);
+}
+.uw-cp-fold > summary::marker {
+  color: var(--ms-teal-dark);
+}
+@media (max-width: 760px) {
+  .uw-cp-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .uw-cp-next .ac-primary {
+    justify-self: stretch;
+    justify-content: center;
+  }
+  .uw-cp-words blockquote {
+    font-size: var(--ms-fs-16);
+  }
+}
+
+/* 0.10.85, D3.4: Records opens on "Your latest record"; inspection readiness and the rest sit under it. */
+.uw-records-all {
+  margin-top: var(--ms-space-5, 24px);
+}
+.uw-records-all > h2 {
+  margin: 0 0 var(--ms-space-3);
+  font-size: var(--ms-fs-20);
+}
+
+/* 0.10.85, D3.5: Trends' hero per group: one sentence, three bars, "How we compared" folded. */
+.uw-trend-heroes {
+  display: grid;
+  gap: var(--ms-space-4);
+}
+.uw-trend-hero {
+  display: grid;
+  gap: var(--ms-space-3);
+  padding: var(--ms-space-5, 24px);
+}
+.uw-trend-hero h2 {
+  margin: 0;
+  font-weight: var(--ms-fw-semibold);
+  font-size: var(--ms-fs-20);
+  line-height: 1.35;
+}
+.uw-trend-verdict {
+  justify-self: start;
+}
+.uw-trend-verdict.is-significant {
+  background: var(--ms-critical-bg, #fdecec);
+  color: var(--ms-critical-ink, #9b1c1c);
+}
+.uw-trend-verdict.is-elevated {
+  background: var(--ms-warning-bg, #fff4e0);
+  color: var(--ms-warning-ink, #7a4a00);
+}
+.uw-trend-note {
+  margin: 0;
+  color: var(--ms-ink-2);
+}
+.uw-trend-hero .uw-bar-row {
+  grid-template-columns: 120px minmax(0, 1fr) 48px;
+}
+.uw-trend-how p {
+  margin: 6px 0 0;
+  color: var(--ms-ink-2);
+}
+
+/* 0.10.85, D3.6: the organization's time zone, named once in the complaint page's top line. */
+.uw-topline-end {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+.uw-topline-end .ac-page-zone {
+  margin: 0;
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+}
+
+/* 0.10.85, D3.8: small text is 12 px or more on the new navigation; touch targets are 44 px tall on a phone; a
+   question's fieldset adds no box of its own. */
+main[data-navigation="new"] small {
+  font-size: max(var(--ms-fs-12), 0.8em);
+}
+/* A link on a teal wash (the colleague welcome, a notice) reads at 4.5:1 or more: the teal alone read 4.43:1. */
+:is(.uw-feedback-prompt, .ac-message, .uw-notice) .ac-link {
+  color: var(--ms-teal-dark);
+}
+@media (max-width: 640px) {
+  main[data-navigation="new"]
+    :is(.ac-primary, .ac-secondary, select, input:not([type="checkbox"]):not([type="radio"]), summary),
+  .uw-tab,
+  .uw-top :is(button, a) {
+    min-height: 44px;
+  }
+  main[data-navigation="new"] :is(input[type="checkbox"], input[type="radio"]) {
+    width: 20px;
+    height: 20px;
+  }
+  main[data-navigation="new"] label:has(> input[type="checkbox"], > input[type="radio"]) {
+    min-height: 44px;
+    align-items: center;
+  }
+}
+.dt-answer {
+  position: relative;
+}
+.dt-skip {
+  top: 0;
+  left: -9999px;
+}
+.dt-skip:focus {
+  top: 0;
+  left: 16px;
+}
+.dt-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* 0.10.85, D3.9: the investigation's question is its heading, at the record pages' size. */
+.uw-highlights .uw-case-question {
+  margin: 6px 0 0;
+  font-size: var(--ms-fs-20);
+  line-height: 1.35;
+}
+
+/* 0.10.85, D3.14: a long list of legal criteria folds while it is not the question being answered. */
+.dt-criteria > summary {
+  min-height: 44px;
+  padding: 10px 0;
+  color: var(--ms-teal-dark);
+  font-weight: var(--ms-fw-semibold);
+  cursor: pointer;
+}
+
+/* 0.10.85, D3.15: one width for every date field on the new navigation. */
+main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]) {
+  inline-size: min(100%, 16rem);
+}
+
 /* The phone's search: an icon that opens the same search as a bar under the top bar. */
 .uw-search-toggle {
   display: none;
@@ -7767,9 +8042,25 @@ button.uw-org:hover {
   background: var(--ms-mint);
   color: var(--ms-teal-dark);
 }
-.uw-os-rail {
+/* A step the person opened that was not saved (wrong complaint, or opened before its turn): said, never dropped. */
+.uw-os-problem {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid #f5c76b;
+  background: rgba(245, 199, 107, 0.12);
+  color: #fbe3b0;
+  font-size: var(--ms-fs-14);
+}
+/* 4 Nov 2026 (owner): the ten steps as a vertical list beside the step's card, the current step highlighted. */
+.uw-os-grid {
   display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.uw-os-rail {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 .uw-os-step {
@@ -7777,33 +8068,30 @@ button.uw-org:hover {
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  min-height: 40px;
-  padding: 10px 8px 10px 22px;
-  background: rgba(255, 255, 255, 0.07);
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: var(--ms-radius-md);
   color: var(--ms-on-dark-muted);
-  font-size: var(--ms-fs-12);
+  font-size: var(--ms-fs-14);
   font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
+  line-height: 1.25;
   cursor: pointer;
-  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
 }
-.uw-os-step:first-child {
-  padding-left: 12px;
-  border-radius: 999px 0 0 999px;
-  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+.uw-os-step:hover {
+  background: rgba(255, 255, 255, 0.07);
 }
 .uw-os-step:focus-visible {
   outline: 2px solid #fff;
   outline-offset: -2px;
 }
 .uw-os-step.is-done {
-  background: rgba(76, 199, 193, 0.22);
   color: #c8f0ed;
 }
 .uw-os-step.is-now {
   background: #2fb3ad;
   color: #06201f;
+  font-weight: 700;
 }
 .uw-os-step.is-sel {
   outline: 2px solid #fff;
@@ -7815,20 +8103,37 @@ button.uw-org:hover {
 }
 .uw-os-k {
   display: inline-flex;
-  margin-right: 5px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  font-size: var(--ms-fs-12);
   font-weight: 800;
 }
-.uw-os-t {
-  overflow: hidden;
-  text-overflow: ellipsis;
+.uw-os-step.is-done .uw-os-k {
+  border-color: transparent;
+  background: rgba(76, 199, 193, 0.3);
+}
+.uw-os-step.is-now .uw-os-k {
+  border-color: transparent;
+  background: #06201f;
+  color: #fff;
 }
 .uw-os-body {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: 28px;
-  align-items: center;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  align-items: start;
+  padding-left: 28px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+@media (max-width: 1180px) {
+  .uw-os-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .uw-os-main {
   display: grid;
@@ -8004,9 +8309,6 @@ button.uw-org:hover {
 .uw-num {
   font-variant-numeric: tabular-nums;
 }
-.uw-os-more {
-  margin-top: var(--ms-space-4);
-}
 /* The story on the story's own record: one slim pill, never a second progress panel (D1.5). */
 .uw-story-pill {
   display: inline-flex;
@@ -8044,22 +8346,13 @@ button.uw-org:hover {
     justify-content: center;
     width: 100%;
   }
-  .uw-os-rail {
-    gap: 3px;
+  .uw-os-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ms-space-4);
   }
-  .uw-os-step,
-  .uw-os-step:first-child {
-    justify-content: center;
-    min-height: 30px;
-    padding: 0;
-    border-radius: 999px;
-    clip-path: none;
-  }
-  .uw-os-t {
-    display: none;
-  }
-  .uw-os-k {
-    margin: 0;
+  .uw-os-body {
+    padding-left: 0;
+    border-left: 0;
   }
 }
 /* The record's one progress indicator (0.10.82, D1.5): a status line, "Stage 2 of 6 · Triage › Market assessment › …". */
@@ -8317,4 +8610,54 @@ details.uw-team-change[open] {
     white-space: normal;
     border-radius: 12px;
   }
+}
+
+/* 0.10.85: the story's step done earlier by the team (not ticked until the steps before it are), a tab the persona
+   does not list while its screen is open, and "More ways to explore" as one compact card (the approved design). */
+.uw-os-step.is-earlier {
+  background: rgba(76, 199, 193, 0.1);
+  color: #c8f0ed;
+  font-style: italic;
+}
+.uw-tab.is-extra {
+  border-bottom-style: dashed;
+  font-style: italic;
+}
+.uw-os-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--ms-space-3);
+  margin-top: var(--ms-space-3);
+}
+.uw-os-part {
+  display: grid;
+  gap: 4px;
+  min-height: 44px;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-surface);
+  color: var(--ms-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.uw-os-part:hover,
+.uw-os-part:focus-visible {
+  border-color: var(--ms-teal);
+}
+.uw-os-part span {
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-14);
+}
+.uw-gs-more-head {
+  display: grid;
+  gap: 6px;
+  margin-bottom: var(--ms-space-4);
+}
+.uw-gs-more-head > .ac-link {
+  justify-self: start;
+}
+.uw-flip {
+  transform: rotate(180deg);
 }

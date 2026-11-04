@@ -72,6 +72,7 @@ def test_summary_never_reveals_whether_non_connector_secrets_exist(monkeypatch):
     assert _safe_connector_summary(row)["credential_configured"] is False
 
 
+@pytest.mark.db
 def test_api_refuses_a_connector_that_names_a_platform_secret():
     admin = authenticated_client()
     response = admin.post(

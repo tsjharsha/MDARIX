@@ -94,6 +94,11 @@ export type Labels = {
 export type CommunicationList = {
   complaint: { id: string; ref: string; identifier: string; description: string; sample: boolean } | null;
   items: Entry[];
+  /** The whole log's size; ``items`` is one page of it, overdue and open first (``offset``, ``next_offset``). */
+  total: number;
+  offset: number;
+  limit: number;
+  next_offset: number | null;
   counts: { open: number; overdue: number; unresolved: number };
   s4: { in_mdarix: number; outside: number };
   parties: Party[];
@@ -132,6 +137,12 @@ export function s4Text(s4: CommunicationList["s4"]): string {
   return total
     ? `Recorded in MDARIX: ${s4.in_mdarix} of ${total} messages (logged before sending, or within one working hour); ${s4.outside} recorded later.`
     : "No message recorded yet.";
+}
+
+/** "Entries 201–400 of 512": which part of the log a page shows (empty when one page holds it all). */
+export function pageText(list: Pick<CommunicationList, "items" | "total" | "offset" | "next_offset">): string {
+  if (!list.offset && list.next_offset == null) return "";
+  return `Entries ${list.offset + 1}–${list.offset + list.items.length} of ${list.total}`;
 }
 
 /** The local date-time an input shows, as the ISO time with its zone the server takes. */

@@ -294,6 +294,14 @@ def due_alerts(db: Session, _state: dict) -> dict:
     return run_for_all_tenants(db)
 
 
+def signature_settlement(db: Session, _state: dict) -> dict:
+    """Complete or abandon every signature a dedicated plane's signing left PENDING (a restart, a lost connection
+    between its two commits): backend/app/signing_commit.py. Idempotent."""
+    from backend.app.signing_commit import settle_pending
+
+    return settle_pending(db)
+
+
 def readiness_digest(db: Session, _state: dict) -> dict:
     """The weekly readiness email for every active organization: queued once per ISO week, from Monday 06:00 UTC
     (backend/app/readiness_home/digest.py); the outbox worker sends it to the quality leads."""
@@ -408,6 +416,13 @@ JOBS: tuple[Job, ...] = (
         timedelta(minutes=15),
         due_alerts,
         "Remind owners of items due soon and escalate overdue ones to their backup and the escalation role",
+        CELL_JOBS,
+    ),
+    Job(
+        "signature-settlement",
+        timedelta(minutes=10),
+        signature_settlement,
+        "Complete or abandon signatures a dedicated plane's signing left half-way",
         CELL_JOBS,
     ),
     Job(

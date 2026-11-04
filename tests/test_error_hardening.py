@@ -1,5 +1,6 @@
 """Inputs that used to crash the server (HTTP 500) now get a clear answer."""
 
+import pytest
 import uuid
 from types import SimpleNamespace
 
@@ -8,6 +9,7 @@ from tests.test_business_permissions import _client_with_role
 from tests.test_supplier_evidence_requests import own_supplier
 
 
+@pytest.mark.db
 def test_a_duplicate_connector_or_mapping_code_is_refused_clearly():
     admin = _client_with_role("CUSTOMER_ADMIN")
     code = f"DUP_{uuid.uuid4().hex[:8].upper()}"
@@ -41,6 +43,7 @@ def test_a_value_that_cannot_be_converted_blocks_the_batch_with_a_report():
     assert issue["row"] == 1 and issue["column"] == "opened" and "not-a-date" in issue["message"]
 
 
+@pytest.mark.db
 def test_ask_refuses_bad_or_foreign_references_cleanly():
     user = _client_with_role("INVESTIGATOR")
     long_context = user.post("/api/v1/stage3/interactions", json={"prompt": "Hi", "page_context": "x" * 121})
@@ -52,6 +55,7 @@ def test_ask_refuses_bad_or_foreign_references_cleanly():
         assert foreign.status_code == 404, (field, foreign.text)
 
 
+@pytest.mark.db
 def test_uploads_keep_only_a_safe_name_and_must_be_what_they_claim():
     user = _client_with_role("INVESTIGATOR")
     made = user.post(
@@ -71,6 +75,7 @@ def test_uploads_keep_only_a_safe_name_and_must_be_what_they_claim():
     assert disguised.status_code == 415 and disguised.json()["detail"]["code"] == "ATTACHMENT_CONTENT_MISMATCH"
 
 
+@pytest.mark.db
 def test_decisions_made_in_the_same_second_get_distinct_identifiers():
     from backend.app.db.models.foundation import Investigation, Tenant
     from backend.app.db.session import SessionLocal

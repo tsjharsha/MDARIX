@@ -63,6 +63,7 @@ def test_the_real_outbound_policy_refuses_a_private_endpoint():
     assert result["status"] in {"FAILED", "INVALID_CONFIGURATION"}
 
 
+@pytest.mark.db
 def test_file_health_follows_object_storage(monkeypatch):
     client = _client_with_role("Investigator")
     from backend.app import readiness
@@ -145,6 +146,7 @@ def _alerts(db, row) -> list:
     )
 
 
+@pytest.mark.db
 def test_an_unattended_failure_is_emailed_once_per_outage(db):
     row = _connector(db)
     _run(db, row, "COMPLETED", 60)
@@ -157,6 +159,7 @@ def test_an_unattended_failure_is_emailed_once_per_outage(db):
     assert len(_alerts(db, row)) == 1
 
 
+@pytest.mark.db
 def test_a_failed_sync_now_is_not_emailed(db):
     row = _connector(db)
     connector_sync._notify_failure(db, row.tenant_id, row, "PROVIDER_READ_FAILED", "MANUAL")

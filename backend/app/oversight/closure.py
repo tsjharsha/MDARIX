@@ -156,10 +156,15 @@ def open_on_triage(db: Session, tenant_id) -> set[str]:
 
 
 def facts(
-    db: Session, tenant_id, complaint, tasks: dict[str, list] | None = None, triage: set[str] | None = None
+    db: Session,
+    tenant_id,
+    complaint,
+    tasks: dict[str, list] | None = None,
+    triage: set[str] | None = None,
+    enabled: list[str] | None = None,
 ) -> dict:
     """Everything the checklist, the stage line and the decision record read, in one place (``tasks``: the open
-    tasks by complaint, when already read)."""
+    tasks by complaint, ``enabled``: the organization's markets, when already read for a whole list)."""
     from backend.app.communications.service import open_requests
     from backend.app.db.models.authority_reports import ReportObligation, ReportSnapshot
     from backend.app.db.models.complaint_disposition import ComplaintDisposition
@@ -216,7 +221,7 @@ def facts(
         "intakes": intakes,
         "first_contact": checks,
         "assessments": rows_by_complaint(db, tenant_id, [complaint.id]).get(complaint.id, {}),
-        "enabled": enabled_markets(db, tenant_id),
+        "enabled": enabled if enabled is not None else enabled_markets(db, tenant_id),
         "obligations": obligations,
         "snapshots": snapshots,
         "dispositions": dispositions,
@@ -227,6 +232,145 @@ def facts(
         "tasks": tasks,
         "capas": capas,
     }
+
+
+def facts_many(
+    db: Session,
+    tenant_id,
+    complaints: list,
+    tasks: dict[str, list] | None = None,
+    triage: set[str] | None = None,
+    enabled: list[str] | None = None,
+) -> dict[str, dict]:
+    """``facts`` of a page of complaints, by complaint id (0.10.85, D3.13): each kind of record is read once for the
+    page, not once per complaint (a list page read about a dozen queries per complaint). Same values as ``facts``."""
+    from backend.app.communications.service import open_requests
+    from backend.app.db.models.authority_reports import ReportObligation, ReportSnapshot
+    from backend.app.db.models.complaint_disposition import ComplaintDisposition
+    from backend.app.db.models.foundation import Capa, Decision, Investigation, InvestigationComplaint
+    from backend.app.db.models.intake import FirstContactCheck, RecordLink, TriageRecord
+    from backend.app.intake.service import enabled_markets
+    from backend.app.reportability.assessments import rows_by_complaint
+
+    ids = [complaint.id for complaint in complaints]
+    if not ids:
+        return {}
+    tasks = tasks if tasks is not None else open_tasks_by_complaint(db, tenant_id)
+    triage = triage if triage is not None else open_on_triage(db, tenant_id)
+    enabled = enabled if enabled is not None else enabled_markets(db, tenant_id)
+
+    def grouped(rows, key) -> dict:
+        found: dict = {}
+        for row in rows:
+            found.setdefault(key(row), []).append(row)
+        return found
+
+    dispositions = grouped(
+        db.query(ComplaintDisposition)
+        .filter(ComplaintDisposition.tenant_id == tenant_id, ComplaintDisposition.complaint_id.in_(ids))
+        .order_by(ComplaintDisposition.version),
+        lambda row: row.complaint_id,
+    )
+    wanted = set(ids)
+    intakes: dict = {}
+    for link in db.query(RecordLink).filter(
+        RecordLink.tenant_id == tenant_id,
+        RecordLink.state == "LINKED",
+        RecordLink.left_id.in_(ids) | RecordLink.right_id.in_(ids),
+    ):
+        if link.left_kind == "INTAKE" and link.right_id in wanted:
+            intakes.setdefault(link.right_id, []).append(link.left_id)
+        elif link.right_kind == "INTAKE" and link.left_id in wanted:
+            intakes.setdefault(link.left_id, []).append(link.right_id)
+    every_intake = [intake for found in intakes.values() for intake in found]
+    checks = grouped(
+        db.query(FirstContactCheck)
+        .filter(FirstContactCheck.tenant_id == tenant_id, FirstContactCheck.intake_event_id.in_(every_intake))
+        .order_by(FirstContactCheck.version)
+        if every_intake
+        else [],
+        lambda row: row.intake_event_id,
+    )
+    obligations = grouped(
+        db.query(ReportObligation).filter(
+            ReportObligation.tenant_id == tenant_id, ReportObligation.complaint_id.in_(ids)
+        ),
+        lambda row: row.complaint_id,
+    )
+    every_obligation = [row.id for found in obligations.values() for row in found]
+    snapshots = grouped(
+        db.query(ReportSnapshot).filter(
+            ReportSnapshot.tenant_id == tenant_id, ReportSnapshot.obligation_id.in_(every_obligation)
+        )
+        if every_obligation
+        else [],
+        lambda row: row.obligation_id,
+    )
+    records = {
+        row.subject_id: row
+        for row in db.query(TriageRecord).filter(
+            TriageRecord.tenant_id == tenant_id,
+            TriageRecord.subject_kind == "COMPLAINT",
+            TriageRecord.subject_id.in_(ids),
+        )
+    }
+    current = {
+        key: next((row for row in reversed(rows) if row.superseded_by is None), None)
+        for key, rows in dispositions.items()
+    }
+    case_ids: dict = {}
+    for complaint_id, investigation_id in db.query(
+        InvestigationComplaint.complaint_id, InvestigationComplaint.investigation_id
+    ).filter(InvestigationComplaint.tenant_id == tenant_id, InvestigationComplaint.complaint_id.in_(ids)):
+        case_ids.setdefault(complaint_id, set()).add(investigation_id)
+    for key, row in current.items():
+        if row is not None and row.investigation_id:
+            case_ids.setdefault(key, set()).add(row.investigation_id)
+    every_case = list({case for found in case_ids.values() for case in found})
+    cases = (
+        grouped(
+            db.query(Investigation).filter(Investigation.tenant_id == tenant_id, Investigation.id.in_(every_case)),
+            lambda row: row.id,
+        )
+        if every_case
+        else {}
+    )
+    decisions = grouped(
+        db.query(Decision).filter(Decision.tenant_id == tenant_id, Decision.investigation_id.in_(every_case))
+        if every_case
+        else [],
+        lambda row: row.investigation_id,
+    )
+    capas = grouped(
+        db.query(Capa).filter(Capa.tenant_id == tenant_id, Capa.investigation_id.in_(every_case)) if every_case else [],
+        lambda row: row.investigation_id,
+    )
+    assessed = rows_by_complaint(db, tenant_id, ids)
+    requests = grouped(open_requests(db, tenant_id, ids), lambda row: row.complaint_id)
+    out = {}
+    for complaint in complaints:
+        mine = [case for found in (cases.get(key, []) for key in case_ids.get(complaint.id, ())) for case in found]
+        mine_obligations = obligations.get(complaint.id, [])
+        mine_intakes = intakes.get(complaint.id, [])
+        out[str(complaint.id)] = {
+            "complaint": complaint,
+            "record": records.get(complaint.id),
+            "on_triage": str(complaint.id) in triage,
+            "intakes": mine_intakes,
+            "first_contact": [check for intake in mine_intakes for check in checks.get(intake, [])],
+            "assessments": assessed.get(complaint.id, {}),
+            "enabled": enabled,
+            "obligations": mine_obligations,
+            "snapshots": [snap for row in mine_obligations for snap in snapshots.get(row.id, [])],
+            "dispositions": dispositions.get(complaint.id, []),
+            "disposition": current.get(complaint.id),
+            "cases": mine,
+            "decisions": [row for case in mine for row in decisions.get(case.id, [])],
+            "requests": requests.get(complaint.id, []),
+            "tasks": tasks.get(str(complaint.id), []),
+            "capas": [row for case in mine for row in capas.get(case.id, [])],
+        }
+    return out
 
 
 def _open(case) -> bool:
@@ -506,10 +650,13 @@ def stage_line(found: dict, items: list[dict], row: EventClosure | None) -> list
         if settled(complaint, items, row)
         else next((code for code, _ in STAGES if not state[code] and not skipped.get(code) and code not in later), None)
     )
+    # Once every market's conclusion is signed and a report is still to file, the stage reads "Report" (0.10.85, D3.2;
+    # U-13: the list's Stage read "Market assessment" beside a signed conclusion).
+    reporting = done("MARKETS") and not done("OBLIGATIONS")
     return [
         {
             "code": code,
-            "label": label,
+            "label": "Report" if code == "MARKETS" and reporting else label,
             "state": "LATER"
             if code in later
             else "NOT_NEEDED"

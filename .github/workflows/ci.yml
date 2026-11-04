@@ -83,6 +83,9 @@ jobs:
         with:
           path: .model-cache
           key: embedding-model-bge-small-en-v1.5-fastembed-0.8.1
+      # Nothing downloads the model at run time (DEV-02): the pinned revision is prepared here, checksum-checked.
+      - name: Prepare the pinned local embedding model
+        run: python scripts/prepare_embedding_cache.py
       - name: Apply complete schema and runtime hardening
         run: alembic upgrade head
       - name: The newest migration can be undone and applied again
@@ -101,7 +104,10 @@ jobs:
       - name: Seed deterministic investigation data
         run: python scripts/seed_demo_expansion.py
       - run: python -m compileall backend auth access_control counterfactual graph scenario_intelligence
+      # The model-enabled qualification gate: the tests that need the model must run, never skip.
       - run: python -m pytest -q
+        env:
+          MDARIX_REQUIRE_LOCAL_MODEL: '1'
       - name: Validate compose configuration
         run: docker compose config --quiet
   dedicated-plane:
@@ -371,6 +377,8 @@ jobs:
           key: embedding-model-bge-small-en-v1.5-fastembed-0.8.1
       - name: Remove a stale CI TLS database from an interrupted self-hosted run
         run: docker rm -f pg 2>/dev/null || true
+      - name: Prepare the pinned local embedding model (nothing downloads it at run time)
+        run: python scripts/prepare_embedding_cache.py
       - name: The embedding model is in place (a production server refuses to download it; the image carries it)
         env:
           MDARIX_ENV: development

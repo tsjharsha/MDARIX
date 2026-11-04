@@ -27,6 +27,9 @@ export const teamChangeText = (item: TrialTeamChange) =>
  * request asks to move the data into the pilot (held until the request closes, at the latest until ``hold_until``).
  */
 export type TrialRetention = {
+  /** The one projection's date: null under a legal hold (no date is given until the hold is lifted). */
+  earliest_deletion?: string | null;
+  hold?: "LEGAL_HOLD" | "MVP_REQUEST" | null;
   delete_after: string;
   original_delete_after: string;
   held_for_mvp_request: boolean;
@@ -40,9 +43,10 @@ export function retentionText(
   format: (value: string) => string,
   deletedAt?: string | null,
 ): string | null {
+  if (retention?.hold === "LEGAL_HOLD") return "Data kept under a legal hold: no deletion date until it is lifted";
   if (retention?.held_for_mvp_request)
     return `Data held for its pilot request (would have been deleted ${format(retention.original_delete_after)}); deleted ${format(retention.hold_until)} at the latest`;
-  const day = retention?.delete_after ?? deletedAt;
+  const day = retention ? (retention.earliest_deletion ?? retention.delete_after) : deletedAt;
   return day ? `Data deleted ${format(day)}` : null;
 }
 

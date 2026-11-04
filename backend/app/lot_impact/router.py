@@ -36,6 +36,7 @@ from backend.app.access.permissions import (
     require_permission,
 )
 from backend.app.case_workflow import scope, states
+from backend.app import signing_commit
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import Investigation, SignedApprovalRecord
 from backend.app.db.session import get_db
@@ -431,15 +432,7 @@ def sign_lot_impact(
     }
     scope.write_version(db, case, current, actor_ref=me, actor_role=role, now=now)
     case.updated_at = now
-    if db is control_db:
-        control_db.commit()
-    else:
-        control_db.commit()
-        try:
-            db.commit()
-        except Exception:
-            logger.exception("Signature %s was saved but the lot impact list of %s was not", record.id, case.id)
-            raise
+    signing_commit.commit(db, control_db, "lot impact list")
     return view(db, control_db, ctx, case)
 
 

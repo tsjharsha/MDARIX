@@ -753,6 +753,7 @@ def trial_overview(
                 Tenant.business_id,
                 Tenant.tenant_key,
                 Tenant.name,
+                Tenant.legal_hold,
             ).select_from(SubscriptionLifecycle)
         ).order_by(SubscriptionLifecycle.expires_at, SubscriptionLifecycle.id)
     ).all()
@@ -774,9 +775,14 @@ def trial_overview(
         items, tenant_of, searched = [], {}, []
         for row in rows:
             request = requests.get(row.tenant_id)
-            trial_end = max(row.expires_at, row.grace_ends_at or row.expires_at)
             kept = retention.plan_view(
-                retention.retention_plan(trial_end, moves.get(row.tenant_id), movable.get(row.tenant_id, False), now)
+                retention.retention_plan(
+                    retention.effective_end(row),
+                    moves.get(row.tenant_id),
+                    movable.get(row.tenant_id, False),
+                    now,
+                    bool(row.legal_hold),
+                )
             )
             ended = row.expires_at <= now
             seconds_left = (row.expires_at - now).total_seconds()
@@ -789,7 +795,7 @@ def trial_overview(
                 "people": [],
                 "starts_at": row.starts_at.isoformat() if row.starts_at else None,
                 "expires_at": row.expires_at.isoformat(),
-                "data_deleted_at": kept["delete_after"],
+                "data_deleted_at": kept["earliest_deletion"],
                 # Held while an open request asks to move the data into the MVP (backend/app/trial/retention.py).
                 "retention": kept,
                 "state": "ENDED" if ended else "ENDING_SOON" if seconds_left <= 7 * 86400 else "ACTIVE",

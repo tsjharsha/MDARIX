@@ -1,8 +1,24 @@
 # MDARIX R1 — current status
 
-**Last verified:** 2026-10-08, `main` after PR #2 (`mvp/pilot-readiness-final`, merged as `c57e2d9`), CI on GitHub
+**Last verified:** 2026-11-04 (0.10.86, local; section below). Before that 2026-10-08, `main` after PR #2 (`mvp/pilot-readiness-final`, merged as `c57e2d9`), CI on GitHub
 Actions and the local Windows development stack (Docker Compose). Earlier results are kept below for comparison.
 Update this file only from real command output.
+
+## 2026-11-04 verified results (0.10.86, `fix/trial-0.10.86`, local, not pushed)
+
+Run locally on Windows, each suite on its own disposable database (`mdarix_r1_test_rel86`, recreated and prepared with
+`scripts/prepare_test_environment.py` before the final run). CI was not run (no push). These are command results,
+not a certification.
+
+| Check | Command | Result |
+|---|---|---|
+| Backend suite at 0.10.84 (5cb450e7), before the fixes | `python -m pytest` | 3,686 passed, 12 failed, 7 skipped, 4 deselected (dataplane). Each failure reproduced alone; classified in the 0.10.86 commits: 2 tests of one product defect (evidence-request downloads answered 500), 1 sample defect (the late call's S4, by weekday), 8 outdated expectations, 1 environment check too strict (database name). The embedding tests passed only because the old code downloaded the model at run time into the worktree's cache |
+| Backend suite, final commit | `python -m pytest` | 3,742 passed, 0 failed, 6 skipped, 4 deselected, 1 h 14 min. Skips: 4 need `MDARIX_TEST_DATA_PLANE_URL` (a dedicated plane), 1 is a later-release scenario, 1 is the opt-in scale benchmark |
+| Unit selection with no database | `MDARIX_TEST_NO_DATABASE=1 pytest -m unit` | 1,709 passed, 5 skipped, 1 failed (fixed in the next commit, then passed alone), 97 s, no database reachable |
+| Markers | `pytest --collect-only` | 3,751 tests: unit 1,715, db 2,036 (4 dataplane), model 14; unit and db 0 (249 at 0.10.84) |
+| Model tests with the pinned model | `MDARIX_REQUIRE_LOCAL_MODEL=1 pytest tests/test_local_embeddings.py tests/test_real_evaluation.py` | 22 passed, loaded offline from the main checkout's prepared cache; model SHA-256 51f1bd0a... equals Hugging Face's LFS oid for revision aa8f8b06 |
+| Python lint and format | `ruff check .`, `ruff format --check .` | Both exit 0 |
+| Frontend | `npm run lint`, `npm run format:check`, `npm test`, `npm run build` | All exit 0; 1,446 tests in 202 files |
 
 ## 2026-10-08 verified results (PR #2, `mvp/pilot-readiness-final`, merged into `main`)
 

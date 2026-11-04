@@ -147,6 +147,7 @@ def _admin(db, tenant):
     return user
 
 
+@pytest.mark.db
 def test_a_subscription_reminder_emails_the_customer_administrators(company, monkeypatch):
     sent = []
     monkeypatch.setattr(
@@ -179,6 +180,7 @@ def test_a_subscription_reminder_emails_the_customer_administrators(company, mon
         db.close()
 
 
+@pytest.mark.db
 def test_a_failed_email_makes_the_outbox_retry(company, monkeypatch):
     def refuse(*_args, **_kwargs):
         raise emailer.EmailDeliveryError("refused")
@@ -206,6 +208,7 @@ def test_other_events_are_not_notifications():
         db.close()
 
 
+@pytest.mark.db
 def test_trial_reminders_are_queued_once_per_stage():
     db = SessionLocal()
     try:

@@ -122,6 +122,25 @@ def _ids(db: Session, sql: str, params: dict) -> set[uuid.UUID]:
     return {row[0] for row in db.execute(text(sql), params)}
 
 
+def _ids_by_table(db: Session, tenant_id, asks: list[tuple[str, str, list]]) -> dict[str, set[uuid.UUID]]:
+    """Several "the ids of <table> whose <column> is one of <values>" in one round trip each 40 (UNION ALL), by table
+    (0.10.85, D3.13: one query per table and key made a trial's preview about 300 queries). Every tenant table's id is
+    a UUID, so the parts union."""
+    found: dict[str, set[uuid.UUID]] = defaultdict(set)
+    for start in range(0, len(asks), 40):
+        chunk = asks[start : start + 40]
+        params: dict = {"tenant": tenant_id}
+        parts = []
+        for index, (table, column, values) in enumerate(chunk):
+            params[f"v{index}"] = values
+            parts.append(
+                f"SELECT {index} AS part, id FROM {table} WHERE tenant_id = :tenant AND {column} = ANY(:v{index})"
+            )
+        for part, row_id in db.execute(text(" UNION ALL ".join(parts)), params):
+            found[chunk[part][0]].add(row_id)
+    return found
+
+
 def plan(db: Session, tenant_id: uuid.UUID, *, sources: tuple = (SAMPLE_SOURCE,), marked: dict | None = None) -> dict:
     """Every row the removal deletes, by table (``rows``), and the rows without an ``id`` column that go with them
     (``links``: table -> [(column, parent table)]): the records of ``sources`` (the sample by default; the
@@ -130,58 +149,35 @@ def plan(db: Session, tenant_id: uuid.UUID, *, sources: tuple = (SAMPLE_SOURCE,)
     tables = set(_tenant_tables(db))
     columns = _columns(db)
     doomed: dict[str, set[uuid.UUID]] = defaultdict(set)
-    for table in tables:
-        if {"source_system", "id"} <= columns[table]:
-            doomed[table] |= _ids(
-                db,
-                f"SELECT id FROM {table} WHERE tenant_id = :tenant AND source_system = ANY(:sample)",
-                {"tenant": tenant_id, "sample": list(sources)},
-            )
-    for table, (column, marker) in marked.items():
-        if table in tables:
-            doomed[table] |= _ids(
-                db,
-                f"SELECT id FROM {table} WHERE tenant_id = :tenant AND {column} = ANY(:sample)",
-                {"tenant": tenant_id, "sample": list(marker) if isinstance(marker, tuple) else [marker]},
-            )
+    asks = [
+        (table, "source_system", list(sources)) for table in sorted(tables) if {"source_system", "id"} <= columns[table]
+    ]
+    asks += [
+        (table, column, list(marker) if isinstance(marker, tuple) else [marker])
+        for table, (column, marker) in marked.items()
+        if table in tables
+    ]
+    for table, ids in _ids_by_table(db, tenant_id, asks).items():
+        doomed[table] |= ids
     keys = [(child, column, parent) for child, column, parent in _foreign_keys(db) if child in tables]
     generic = [(table, column) for table, column in GENERIC_REFERENCES if table in tables and column in columns[table]]
-    changed = True
-    while changed:
-        changed = False
-        for child, column, parent in keys:
-            parents = doomed.get(parent)
-            if not parents or "id" not in columns[child]:
-                continue
-            found = (
-                _ids(
-                    db,
-                    f"SELECT id FROM {child} WHERE tenant_id = :tenant AND {column} = ANY(:ids)",
-                    {"tenant": tenant_id, "ids": list(parents)},
-                )
-                - doomed[child]
-            )
-            if found:
-                doomed[child] |= found
-                changed = True
-        every = set().union(*doomed.values()) if doomed else set()
-        for table, column in generic:
-            if not every or "id" not in columns[table]:
-                continue
-            found = (
-                _ids(
-                    db,
-                    f"SELECT id FROM {table} WHERE tenant_id = :tenant AND {column} = ANY(:ids)",
-                    {"tenant": tenant_id, "ids": list(every)},
-                )
-                - doomed[table]
-            )
-            if found:
-                doomed[table] |= found
-                changed = True
+    # The dependants, round by round: each round asks only about the rows the round before added (0.10.85, D3.13: every
+    # round asked again about every row found so far, about 300 queries for a trial's preview). Same rows in the end.
+    fresh = {table: set(ids) for table, ids in doomed.items() if ids}
+    while fresh:
+        every = set().union(*fresh.values())
+        asks = [
+            (child, column, list(fresh[parent]))
+            for child, column, parent in keys
+            if fresh.get(parent) and "id" in columns[child]
+        ]
+        asks += [(table, column, list(every)) for table, column in generic if "id" in columns[table]]
+        added: dict[str, set[uuid.UUID]] = defaultdict(set)
+        for table, ids in _ids_by_table(db, tenant_id, asks).items():
+            added[table] |= ids - doomed[table]
         # A document version (T-G35) made on sample records cites them in its context's source_ids, not by a key.
-        if every and "report_jobs" in tables:
-            found = (
+        if "report_jobs" in tables:
+            added["report_jobs"] |= (
                 _ids(
                     db,
                     "SELECT id FROM report_jobs WHERE tenant_id = :tenant AND context -> 'source_ids' ?| :ids",
@@ -189,9 +185,9 @@ def plan(db: Session, tenant_id: uuid.UUID, *, sources: tuple = (SAMPLE_SOURCE,)
                 )
                 - doomed["report_jobs"]
             )
-            if found:
-                doomed["report_jobs"] |= found
-                changed = True
+        for table, ids in added.items():
+            doomed[table] |= ids
+        fresh = {table: ids for table, ids in added.items() if ids}
     links: dict[str, list[tuple[str, str]]] = defaultdict(list)
     for child, column, parent in keys:
         if "id" not in columns[child] and doomed.get(parent):

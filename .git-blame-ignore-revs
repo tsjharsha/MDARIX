@@ -4,3 +4,5 @@
 0cef2e5d24092ca67e7159e8eaef69e18e97cc54
 # prettier (frontend)
 f63ee455e2b39bd4e1a64bb9c9307334f5e6eab2
+# ruff format of one test and an unused import (0.10.86)
+a18048f12f02ff8eb60a98f579bd382c31ad369f

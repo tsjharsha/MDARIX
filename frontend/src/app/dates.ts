@@ -7,6 +7,21 @@
 
 type DateInput = string | number | Date | null | undefined;
 
+// The organization's time zone (its working calendar in Settings), set by the new navigation's workspace (0.10.85,
+// D3.6): every time shown is in it, the page head names it once, and each deadline label drops its zone. Unset (the
+// classic navigation, a test), times are the browser's as before.
+let displayZone: string | undefined;
+
+/** Show every time in this zone (an IANA name); null goes back to the browser's. */
+export function setDisplayZone(zone: string | null | undefined): void {
+  displayZone = zone || undefined;
+}
+
+/** A deadline label without its trailing zone ("Wed 2 Dec 2026, 23:59 IST" -> "Wed 2 Dec 2026, 23:59"), once the
+ * page names the organization's zone; as it is otherwise. */
+export const zoneless = (label: string): string =>
+  displayZone ? label.replace(/\s+(?:[A-Z]{2,5}|GMT[+-]\d{1,2}(?::\d{2})?)$/, "") : label;
+
 // One style per kind on every screen (0.10.72): "3 Oct 2026" and "3 Oct 2026, 14:05", as the legal deadlines read
 // ("Tue 1 Dec 2026, 23:59 IST"), whatever the browser's language ("Nov 1, 2026, 10:54 PM" sat beside them before).
 const DAY_FIRST = "en-GB";
@@ -32,7 +47,11 @@ function toDate(value: DateInput): Date | null {
 /** "3 Oct 2026" (or the reader's order of day, month and year). */
 export function formatDay(value: DateInput, fallback = "—"): string {
   const date = toDate(value);
-  return date ? date.toLocaleDateString(DAY_FIRST, { day: "numeric", month: "short", year: "numeric" }) : fallback;
+  // A calendar date stays that day; a moment reads in the organization's zone once it is set.
+  const zone = typeof value === "string" && DATE_ONLY.test(value.trim()) ? undefined : displayZone;
+  return date
+    ? date.toLocaleDateString(DAY_FIRST, { day: "numeric", month: "short", year: "numeric", timeZone: zone })
+    : fallback;
 }
 
 /** An awareness as it was given (0.10.81, U-06): a day without a time reads "29 Oct 2026, time not recorded" (the
@@ -55,16 +74,17 @@ export function formatDateTime(value: DateInput, fallback = "—"): string {
         hour: "2-digit",
         minute: "2-digit",
         hourCycle: "h23",
+        timeZone: displayZone,
       })
     : fallback;
 }
 
 /** The reader's time zone in words ("India Standard Time"), said once per screen for the times on it. */
 export function zoneName(now = new Date()): string {
-  const part = new Intl.DateTimeFormat(undefined, { timeZoneName: "long" })
+  const part = new Intl.DateTimeFormat("en-GB", { timeZoneName: "long", timeZone: displayZone })
     .formatToParts(now)
     .find((item) => item.type === "timeZoneName");
-  return part?.value ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return part?.value ?? displayZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 /** "14:05:12" for events within the current screen (for example a connection check). */
@@ -149,4 +169,4 @@ export function timeLeft(item: DueLike, now = new Date()): string {
 
 /** A legal deadline as the server writes it, with its time zone ("Mon 30 Nov 2026, 23:59 IST"); its day otherwise. */
 export const deadlineLabel = (item: { due_label?: string | null; due_date?: string | null } | null | undefined) =>
-  item?.due_label || formatDay(item?.due_date);
+  item?.due_label ? zoneless(item.due_label) : formatDay(item?.due_date);

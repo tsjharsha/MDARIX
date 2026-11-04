@@ -209,6 +209,8 @@ export type WorkspaceApi = {
   chooseDataSource?: (source: string) => void;
   /** Read the trial status again (the top bar's labels): after an import or the sample removed. */
   refreshTrial?: () => void;
+  /** Whether this person's role may open a section (the server's menu), whatever persona they view as. */
+  canOpen?: (section: string) => boolean;
 };
 
 export const WorkspaceContext = createContext<WorkspaceApi | null>(null);

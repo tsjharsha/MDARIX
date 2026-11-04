@@ -243,6 +243,7 @@ def _deliver(db, event: OutboxEvent) -> bool:
     return notifications.handle_event(db, event.event_name, dict(event.payload))
 
 
+@pytest.mark.db
 def test_an_assignment_emails_the_assignee_and_names_who_assigned(db, tenant_id, sent):
     lead = _user(db, tenant_id, "LEADER", name="Lena Lead")
     investigator = _user(db, tenant_id, "INVESTIGATOR")
@@ -274,6 +275,7 @@ def test_an_assignment_emails_the_assignee_and_names_who_assigned(db, tenant_id,
     assert notifications.notify_assignment(db, tenant_id, investigation_id=case, assignee_user_id=other.id) is None
 
 
+@pytest.mark.db
 def test_a_pending_decision_reaches_every_approver_but_the_submitter(db, tenant_id, sent):
     approver = _user(db, tenant_id, "APPROVER")
     leader = _user(db, tenant_id, "LEADER")
@@ -294,6 +296,7 @@ def test_a_pending_decision_reaches_every_approver_but_the_submitter(db, tenant_
     assert _deliver(db, event) and [recipient for _, recipient, _ in sent] == [approver.username]
 
 
+@pytest.mark.db
 def test_a_signoff_tells_the_case_owner_found_by_their_email(db, tenant_id, sent):
     owner = _user(db, tenant_id, "INVESTIGATOR")
     signer = _user(db, tenant_id, "APPROVER", name="Ada Approver")
@@ -318,6 +321,7 @@ def test_a_signoff_tells_the_case_owner_found_by_their_email(db, tenant_id, sent
     )
 
 
+@pytest.mark.db
 def test_a_risk_review_request_reaches_the_approvers_without_the_reason(db, tenant_id, sent):
     approver = _user(db, tenant_id, "APPROVER")
     requester = _user(db, tenant_id, "INVESTIGATOR")
@@ -335,6 +339,7 @@ def test_a_risk_review_request_reaches_the_approvers_without_the_reason(db, tena
     assert all(kw["reference"] == "RISK-12" for _, _, kw in sent)
 
 
+@pytest.mark.db
 def test_connector_failures_and_ai_budget_reach_customer_administrators(db, tenant_id, sent):
     admin = _user(db, tenant_id, "CUSTOMER_ADMIN")
     _user(db, tenant_id, "INVESTIGATOR")
@@ -370,6 +375,7 @@ def test_connector_failures_and_ai_budget_reach_customer_administrators(db, tena
     assert sent[0][1] == admin.username and sent[0][2]["month"] == "January 2031" and sent[0][2]["percent"] == 80
 
 
+@pytest.mark.db
 def test_feedback_alerts_staff_and_a_declined_request_is_told_politely(db, tenant_id, sent, monkeypatch):
     user = _user(db, tenant_id, "INVESTIGATOR")
     now = datetime.now(timezone.utc)
@@ -414,6 +420,7 @@ def test_feedback_alerts_staff_and_a_declined_request_is_told_politely(db, tenan
     ]
 
 
+@pytest.mark.db
 def test_security_notices_and_support_reports_are_delivered_by_the_worker(db, tenant_id, monkeypatch):
     user = _user(db, tenant_id, "INVESTIGATOR")
     delivered = []
@@ -432,6 +439,7 @@ def test_security_notices_and_support_reports_are_delivered_by_the_worker(db, te
     assert len(called) == 1
 
 
+@pytest.mark.db
 def test_a_failed_email_makes_a_new_notification_retry(db, tenant_id, monkeypatch):
     investigator = _user(db, tenant_id, "INVESTIGATOR")
 
@@ -515,6 +523,7 @@ def _contact(db, tenant_id, policy, recipient_type) -> str:
     return contact.email
 
 
+@pytest.mark.db
 def test_reminders_follow_the_saved_recipients_and_wording(db, tenant_id, sent):
     admin = _user(db, tenant_id, "CUSTOMER_ADMIN")
     policy = _policy(db, tenant_id, ["CUSTOMER_ADMIN", "BILLING_CONTACT"])
@@ -548,6 +557,7 @@ def test_reminders_follow_the_saved_recipients_and_wording(db, tenant_id, sent):
     assert body.startswith(f"Hello {organization},") and "30 days left" in body and "{{" not in body
 
 
+@pytest.mark.db
 def test_reminders_without_admins_in_the_settings_still_reach_someone(db, tenant_id, sent):
     admin = _user(db, tenant_id, "CUSTOMER_ADMIN")
     _policy(db, tenant_id, ["ACCOUNT_OWNER"])  # nobody saved with that type
@@ -557,6 +567,7 @@ def test_reminders_without_admins_in_the_settings_still_reach_someone(db, tenant
     assert all(kw["template"] is None for _, _, kw in sent)  # no saved email: the standard wording
 
 
+@pytest.mark.db
 def test_a_template_with_an_unknown_value_falls_back_to_the_standard_wording(db, tenant_id):
     now = datetime.now(timezone.utc)
     row = _subscription(db, tenant_id)
@@ -579,6 +590,7 @@ def test_a_template_with_an_unknown_value_falls_back_to_the_standard_wording(db,
     assert notifications.reminder_template(db, row, "7_DAY", values) is None
 
 
+@pytest.mark.db
 def test_saving_a_reminder_email_makes_it_the_one_used(tenant_id):
     platform = authenticated_client()
     for version, subject in (("v1", "First {{expiry_date}}"), ("v2", "Second {{expiry_date}}")):
@@ -609,6 +621,7 @@ def test_saving_a_reminder_email_makes_it_the_one_used(tenant_id):
 # ------------------------------------------------------------------------------------------- trial conversion
 
 
+@pytest.mark.db
 def test_converting_a_trial_makes_its_owner_the_customer_administrator(tenant_id):
     """A tenant on the Free Trial plan, owned by the person who requested it, moves to a paid plan."""
     db = SessionLocal()

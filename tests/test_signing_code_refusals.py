@@ -105,6 +105,7 @@ def _verify(ctx, *, password=PASSWORD, code=None):
     return 200, None, refusals
 
 
+@pytest.mark.db
 def test_a_wrong_blank_or_reused_code_is_a_signature_refusal(monkeypatch, signer):
     monkeypatch.setenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "true")
     ctx, secret = signer
@@ -121,6 +122,7 @@ def test_a_wrong_blank_or_reused_code_is_a_signature_refusal(monkeypatch, signer
     assert status == 403 and detail["code"] == "SIGNATURE_CODE_INVALID"
 
 
+@pytest.mark.db
 def test_repeated_wrong_codes_lock_signing_with_a_signature_code(monkeypatch, signer):
     monkeypatch.setenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "true")
     ctx, _ = signer

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+import os
 import pytest
 from alembic.config import Config
 from alembic.script import ScriptDirectory
@@ -136,9 +137,9 @@ def seed_core(conn):
 
 
 def test_database_connection_and_version(conn):
-    # The suite runs against the dedicated mdarix_r1_test database locally and
-    # a fresh mdarix_r1 service database in CI.
-    assert scalar(conn, "SELECT current_database()") in {"mdarix_r1", "mdarix_r1_test"}
+    # The suite runs against the database it was given (POSTGRES_DB: mdarix_r1_test locally, an isolated disposable
+    # one such as mdarix_r1_test_<name> for parallel work, a fresh mdarix_r1 service database in CI), never another.
+    assert scalar(conn, "SELECT current_database()") == os.environ["POSTGRES_DB"]
     assert scalar(conn, "SELECT current_setting('server_version')").startswith("16.")
 
 

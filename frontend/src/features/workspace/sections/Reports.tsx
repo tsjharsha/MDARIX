@@ -429,7 +429,12 @@ export function Approval({ detail, onChanged }: { detail: ReportDetail; onChange
       </div>
       <p className="ac-muted">You approve this version of the report. Any later change needs a new approval.</p>
       <div className="ca-action-row">
-        <button type="submit" className="ac-primary" disabled={action.busy || !password}>
+        <button
+          type="submit"
+          className="ac-primary"
+          disabled={action.busy || !password}
+          title={!password ? "Enter your password first" : undefined}
+        >
           {action.busy ? "Approving…" : "Approve"}
         </button>
         <PracticeApproval shown={standing?.same_person} />
@@ -588,7 +593,12 @@ export function RecordSubmission({
         )}
         {problem && <p className="uw-hint ca-wide">{problem}</p>}
         <div className="ca-action-row ca-wide">
-          <button type="submit" className={quiet ? "ac-secondary" : "ac-primary"} disabled={action.busy || !!problem}>
+          <button
+            type="submit"
+            className={quiet ? "ac-secondary" : "ac-primary"}
+            disabled={action.busy || !!problem}
+            title={problem || undefined}
+          >
             <Send size={15} aria-hidden="true" /> {action.busy ? "Recording…" : "Mark as submitted"}
           </button>
         </div>

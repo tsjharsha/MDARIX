@@ -36,6 +36,7 @@ def _set_heartbeat_age(service, seconds):
         db.commit()
 
 
+@pytest.mark.db
 def test_a_heartbeat_reads_as_running_then_stopped_when_it_goes_quiet():
     service = f"test-worker-{uuid.uuid4().hex[:8]}"
     started = datetime.now(timezone.utc)
@@ -53,6 +54,7 @@ def test_a_heartbeat_reads_as_running_then_stopped_when_it_goes_quiet():
         db.commit()
 
 
+@pytest.mark.db
 def test_the_operations_view_shows_the_worker_state_and_its_counters():
     with SessionLocal() as db:
         record_heartbeat(db, OUTBOX_WORKER, "instance-1", datetime.now(timezone.utc), {"cycles": 7, "published": 3})
@@ -100,6 +102,7 @@ def two_queued_jobs():
         db.commit()
 
 
+@pytest.mark.db
 def test_report_jobs_on_the_shared_database_are_taken_for_one_tenant_only(monkeypatch, two_queued_jobs):
     handled = []
     monkeypatch.setattr(

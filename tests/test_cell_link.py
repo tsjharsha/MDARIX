@@ -122,6 +122,7 @@ def test_certificates_round_trip_under_the_platform_authority(platform, tmp_path
     assert len(fingerprint(certificate)) == 64 and fingerprint(certificate) != fingerprint(platform["ca_cert"])
 
 
+@pytest.mark.db
 def test_a_cell_enrolls_once_reports_metadata_and_receives_the_licence_and_packages(platform, monkeypatch):
     organization = _tenant(_organization())
     enrollment, licence = _issue(organization.tenant_key, platform["private"])
@@ -208,6 +209,7 @@ def test_a_cell_enrolls_once_reports_metadata_and_receives_the_licence_and_packa
     assert package_id not in {item["id"] for item in listing["packages"]}
 
 
+@pytest.mark.db
 def test_the_heartbeat_refuses_free_text_unknown_fields_and_strangers(platform, monkeypatch):
     organization = _tenant(_organization())
     enrollment, _ = _issue(organization.tenant_key, platform["private"])
@@ -249,6 +251,7 @@ def test_the_heartbeat_refuses_free_text_unknown_fields_and_strangers(platform, 
     assert client.get("/api/v1/cells/packages", headers=headers).status_code == 200
 
 
+@pytest.mark.db
 def test_an_expired_licence_makes_a_cell_read_only_after_the_grace_period(platform, monkeypatch):
     organization = _tenant(_organization())
     admin, _ = _admin(str(organization.id))
