@@ -129,6 +129,9 @@ def _save(client, complaint_id: str, market: str, answers: dict, **harm) -> dict
 def _sign(client, complaint_id: str, market: str, item: dict, conclusion: str, **extra):
     draft = item["draft"]
     body = {"conclusion": conclusion, "version": draft["version"], "saved_at": draft["saved_at"], "password": PASSWORD}
+    # A re-signed market says why it changes (OD-4, 0.10.88; refused without one in test_release_0_10_88_resign.py);
+    # a first signature ignores it.
+    body["change_reason"] = "The answers changed after new information on the complaint."
     return client.post(_url(complaint_id, market, "/sign"), json={**body, **extra})
 
 

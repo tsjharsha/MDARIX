@@ -17,6 +17,7 @@ import {
   type Scale,
   type Version,
 } from "./marketAssessment";
+import marketAssessmentSource from "./sections/MarketAssessment.tsx?raw";
 
 function workspace(permissions: string[]): WorkspaceApi {
   return {
@@ -217,6 +218,45 @@ describe("the per-market assessment rules", () => {
     expect(signProblem(QUESTIONS, form, reasoned, "PENDING_INFORMATION", "Against the scale", true)).toContain(
       "written reason",
     );
+  });
+
+  it("asks why the conclusion changes when the market is signed already (OD-4, 0.10.88), and sends it", async () => {
+    const form = {
+      answers: {
+        US1: { answer: "NO" as const, rationale: "No death reported by the nurse.", evidence: [] },
+        US5: { answer: "UNKNOWN" as const, rationale: "Recurrence effect not judged yet.", evidence: [] },
+      },
+      harm: { level: "CRITICAL", term: "", reason: "" },
+      disagreementReason: "",
+    };
+    const sign = {
+      ...EMPTY_SIGN,
+      password: "secret",
+      conclusion: "REPORTABLE" as const,
+      overrideReason: "Report when unsure, QP-08",
+    };
+    // A first signature needs no change reason; signing again does, at least 10 characters.
+    expect(signProblem(QUESTIONS, form, sign, "PENDING_INFORMATION", null, true)).toBeNull();
+    expect(signProblem(QUESTIONS, form, sign, "PENDING_INFORMATION", null, true, true)).toContain(
+      "why the signed conclusion changes",
+    );
+    expect(
+      signProblem(QUESTIONS, form, { ...sign, changeReason: "too short" }, "PENDING_INFORMATION", null, true, true),
+    ).toContain("why the signed conclusion changes");
+    expect(
+      signProblem(
+        QUESTIONS,
+        form,
+        { ...sign, changeReason: "Service found the alarm fault recurs." },
+        "PENDING_INFORMATION",
+        null,
+        true,
+        true,
+      ),
+    ).toBeNull();
+    // The drawer asks for it and sends it with the signature.
+    expect(marketAssessmentSource).toContain('aria-label="Why the signed conclusion changes"');
+    expect(marketAssessmentSource).toContain('change_reason: item.current ? sign.changeReason : ""');
   });
 
   it("starts from the saved draft, or the QMS severity's mapped level, and sends what the form holds", () => {

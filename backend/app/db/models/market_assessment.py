@@ -100,6 +100,8 @@ class ComplaintMarketAssessment(Base):
     suggested_conclusion: Mapped[str] = mapped_column(String(30), nullable=False)
     conclusion: Mapped[str | None] = mapped_column(String(30))
     override_reason: Mapped[str | None] = mapped_column(Text)
+    # Why a re-signed conclusion changes (owner decision OD-4, tr18): asked when it supersedes a signed version.
+    change_reason: Mapped[str | None] = mapped_column(Text)
     report_type: Mapped[str | None] = mapped_column(String(40))
     window_name: Mapped[str | None] = mapped_column(String(160))
     due_on = mapped_column(Date)

@@ -178,7 +178,8 @@ docs/runbooks/BACKUP_AND_RESTORE.md.
 | `MDARIX_BACKUP_S3_URI` | yes (production), or the acknowledgement below | Off-site copy, e.g. `s3://bucket/mdarix`. |
 | `MDARIX_BACKUP_OFFSITE_ACKNOWLEDGED` | no | `true` states that backups leave the server another way (e.g. the managed database's own backups and point-in-time recovery), so production starts without `MDARIX_BACKUP_S3_URI`. |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` | with `MDARIX_BACKUP_S3_URI` (`.env.migrate`) | Write-and-list credentials for the backup bucket (not needed with an instance role). |
-| `MDARIX_BACKUP_KEEP_DAYS` | no | Local backups kept (14 days). |
+| `MDARIX_BACKUP_KEEP_DAYS` | no | Every local backup of the last 30 days is kept (default 30). |
+| `MDARIX_BACKUP_KEEP_MONTHS` | no | Then the newest backup of each of this many months (default 12); the newest backup of all is always kept. |
 | `MDARIX_BACKUP_DIR` | no | Host directory for backups (`/var/backups/mdarix`, owned by uid 70). |
 | `MDARIX_BACKUP_HEARTBEAT_URL` | yes (production) | Dead-man's switch (https) pinged after every successful backup. |
 | `MDARIX_BACKUP_MAX_AGE_HOURS` | no | `scripts/check_backup_age.sh` alerts when the newest backup is older (26). |

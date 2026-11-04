@@ -80,6 +80,8 @@ class DraftRequest(BaseModel):
 class SignRequest(BaseModel):
     conclusion: str = Field(max_length=30)
     override_reason: str = Field(default="", max_length=2000)
+    # Why a re-signed conclusion changes (OD-4, 0.10.88): needed when a signed version is superseded.
+    change_reason: str = Field(default="", max_length=2000)
     # The draft the person read: a draft saved again meanwhile is refused, so nobody signs what they did not see.
     version: int = Field(ge=1)
     saved_at: str = Field(max_length=40)
@@ -446,6 +448,16 @@ def sign_conclusion(
     )
     if problem:
         raise _error(422, "ASSESSMENT_INCOMPLETE", problem)
+    # Re-signing (a new version over a signed one) says why the conclusion changes, as a disposition does (OD-4).
+    resigning = any(row.conclusion is not None and row.superseded_by is None for row in versions)
+    change_reason = _collapse(payload.change_reason) if resigning else ""
+    if resigning and len(change_reason) < markets.REASON_MIN:
+        raise _error(
+            422,
+            "CHANGE_REASON_NEEDED",
+            f"This market's conclusion is signed already: say in at least {markets.REASON_MIN} characters why it "
+            "changes",
+        )
     person = current_person(control_db, ctx)
     role = person.role_for(REGULATORY_APPROVE if person.holds(REGULATORY_APPROVE) else REGULATORY_REVIEW)
     if (role or "").upper() in ADMINISTRATOR_ROLES:
@@ -521,6 +533,8 @@ def sign_conclusion(
         "suggested": evaluation["suggested"],
         "conclusion": conclusion,
         "override_reason": override_reason or None,
+        # Signed with a re-signed version only, so a first signature's content is as before (OD-4).
+        **({"change_reason": change_reason} if change_reason else {}),
         "report_type": report_type,
         "due_on": clock["due_date"] if clock else None,
         "due_label": clock["due_label"] if clock else None,
@@ -557,10 +571,11 @@ def sign_conclusion(
             entity_type="Complaint",
             entity_id=complaint_id,
             correlation_id=ctx.correlation_id,
-            reason=override_reason or None,
+            reason=change_reason or override_reason or None,
             details={
                 "complaint": ref,
                 "market": market,
+                "change_reason": change_reason or None,
                 "version": draft.version,
                 "question_set": draft.question_set,
                 "scale_version": draft.scale_version,
@@ -581,6 +596,7 @@ def sign_conclusion(
         if earlier.conclusion is not None and earlier.superseded_by is None:
             earlier.superseded_by = draft.id
     draft.conclusion, draft.override_reason, draft.report_type = conclusion, override_reason or None, report_type
+    draft.change_reason = change_reason or None
     draft.suggested_conclusion = evaluation["suggested"]
     draft.window_name = clock["window"] if clock else None
     draft.due_on = date.fromisoformat(clock["due_date"]) if clock else None
@@ -649,6 +665,12 @@ def set_reporting_facts(
     new: dict = {}
     if payload.country is not None:
         country = _collapse(payload.country)
+        if rules.names_the_uk_whole(country):
+            raise _error(
+                422,
+                "COUNTRY_UK_PART_NEEDED",
+                "Choose Great Britain or Northern Ireland: Northern Ireland follows the EU MDR",
+            )
         if not facts.country_known(country):
             raise _error(
                 422,

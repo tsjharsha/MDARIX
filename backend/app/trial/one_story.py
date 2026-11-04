@@ -98,25 +98,52 @@ def most_urgent(data: Session, control_db: Session, tenant_id) -> Complaint | No
     return min(serious, key=lambda row: (clock(row), row.complaint_identifier or ""))
 
 
-def subject(data: Session, control_db: Session, tenant_id, run: str) -> Complaint | None:
+def under_way(request, run: str, rows: list):
+    """The imported complaint the team's walkthrough is under way on (0.10.88): the one the latest marks name, until
+    its last step (Trends) is marked. Followed while no complaint reports a more serious harm, so concluding it (which
+    closes its clock) never sends the walkthrough back to another complaint in the middle of its steps."""
+    latest = None
+    for person in ((request.profile or {}).get(PROFILE_KEY) or {}).values():
+        mine = (person or {}).get(run) or {}
+        stamp = max((mine[step] for step in MARKS if mine.get(step)), default=None)
+        if stamp and (latest is None or stamp > latest[0]):
+            latest = (stamp, mine)
+    if latest is None or latest[1].get("trends"):
+        return None
+    kept = next((row for row in rows if str(row.id) == latest[1].get("complaint_id")), None)
+    if kept is None or harm_rank(kept) < max(harm_rank(row) for row in rows):
+        return None
+    return kept
+
+
+def subject(data: Session, control_db: Session, tenant_id, run: str, request=None) -> Complaint | None:
     from backend.app.trial.short_story import flagship
 
-    return flagship(data, tenant_id) if run == "sample" else most_urgent(data, control_db, tenant_id)
+    if run == "sample":
+        return flagship(data, tenant_id)
+    kept = under_way(request, run, _imported(data, tenant_id)) if request is not None else None
+    return kept or most_urgent(data, control_db, tenant_id)
+
+
+def _slot(person: dict, run: str, complaint_id) -> dict:
+    """A person's marks on one complaint of the run: the current one's, or an earlier one's, kept when the story
+    moved on (0.10.88: a story back on it keeps its ticks)."""
+    mine = (person or {}).get(run) or {}
+    if mine.get("complaint_id") == str(complaint_id):
+        return mine
+    return ((person or {}).get(f"{run}_earlier") or {}).get(str(complaint_id)) or {}
 
 
 def _marks(request, user_id: str, run: str, complaint_id) -> dict:
     """One person's own marks on the run's complaint."""
-    mine = (((request.profile or {}).get(PROFILE_KEY) or {}).get(str(user_id)) or {}).get(run) or {}
-    return mine if mine.get("complaint_id") == str(complaint_id) else {}
+    return _slot(((request.profile or {}).get(PROFILE_KEY) or {}).get(str(user_id)) or {}, run, complaint_id)
 
 
 def team_marks(request, run: str, complaint_id) -> dict:
     """Every colleague's marks on the run's complaint, merged: a step anyone opened, at the earliest time it was."""
     found: dict = {}
     for person in ((request.profile or {}).get(PROFILE_KEY) or {}).values():
-        mine = (person or {}).get(run) or {}
-        if mine.get("complaint_id") != str(complaint_id):
-            continue
+        mine = _slot(person, run, complaint_id)
         for step in MARKS:
             if mine.get(step) and (not found.get(step) or mine[step] < found[step]):
                 found[step] = mine[step]
@@ -128,16 +155,25 @@ def record_mark(request, user_id: str, run: str, complaint_id, step: str, now: d
     profile = dict(request.profile or {})
     story = dict(profile.get(PROFILE_KEY) or {})
     person = dict(story.get(str(user_id)) or {})
-    mine = _marks(request, user_id, run, complaint_id) or {"complaint_id": str(complaint_id)}
+    mine = _slot(person, run, complaint_id) or {"complaint_id": str(complaint_id)}
+    earlier = dict(person.get(f"{run}_earlier") or {})
+    current = person.get(run) or {}
+    if current.get("complaint_id") and current["complaint_id"] != str(complaint_id):
+        earlier[current["complaint_id"]] = current
+    earlier.pop(str(complaint_id), None)
+    if earlier:
+        person[f"{run}_earlier"] = earlier
     person[run] = {**mine, step: mine.get(step) or now.isoformat()}
     story[str(user_id)] = person
     profile[PROFILE_KEY] = story
     request.profile = profile
 
 
-def steps_done(marks: dict, triaged: bool, versions: list, report_stage: str | None) -> list:
-    """Per step: True (done), False, or "skip" (not needed after a signed "not reportable" conclusion). Pure, so its
-    rules are tested apart from the records."""
+def steps_done(
+    marks: dict, triaged: bool, versions: list, report_stage: str | None, *, triage_needed: bool = True
+) -> list:
+    """Per step: True (done), False, or "skip" (not needed: the triage of a complaint not flagged for it, the report's
+    steps after a signed "not reportable" conclusion). Pure, so its rules are tested apart from the records."""
     from backend.app.reportability.markets import NOT_REPORTABLE
 
     signed = next((v for v in reversed(versions) if v.signed_at is not None and v.superseded_by is None), None)
@@ -149,7 +185,8 @@ def steps_done(marks: dict, triaged: bool, versions: list, report_stage: str | N
     # complaint means its call was read; a report past "Created" means its form was opened.
     return [
         bool(marks.get("call")) or triaged or bool(versions) or at >= 0,
-        triaged,
+        # A complaint not on the triage list has no triage form (its page reads "Triage: not needed", 0.10.88).
+        "skip" if not triaged and not triage_needed else triaged,
         bool(versions),
         signed is not None,
         skip or (at >= 0 and (bool(marks.get("form")) or at >= 1)),
@@ -183,7 +220,7 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
 
     from backend.app.db.models.foundation import Product
 
-    complaint = subject(data, control_db, tenant_id, run)
+    complaint = subject(data, control_db, tenant_id, run, request)
     if complaint is None:
         return None
     # The product's own identifier, which the trend check opens on (0.10.84, M4: your data's trend, not the sample's),
@@ -199,13 +236,15 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
     found = closure.facts(data, tenant_id, complaint)
     record = found["record"]
     triaged = record is not None and record.completed_at is not None
+    triage_needed = bool(found["on_triage"]) or record is not None
     versions = found["assessments"].get(market, []) if market else []
     report = next(
         (row for row in found["obligations"] if row.market == market and row.kind == "INITIAL"),
         None,
     )
     stage = _list_paths(data, control_db, ctx, tenant_id, [report])[report.id]["stage"] if report else None
-    done, earlier = in_order(steps_done(team_marks(request, run, complaint.id), triaged, versions, stage))
+    marks = team_marks(request, run, complaint.id)
+    done, earlier = in_order(steps_done(marks, triaged, versions, stage, triage_needed=triage_needed))
     current = next((index for index, value in enumerate(done) if value is False), len(done))
     signed = next((v for v in reversed(versions) if v.signed_at is not None and v.superseded_by is None), None)
     return {

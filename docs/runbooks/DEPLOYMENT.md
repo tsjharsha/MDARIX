@@ -184,7 +184,33 @@ follow this (a rename, a type change, a destructive data fix) is called out in t
 backup and a planned window. CI runs every new migration down and up again (`alembic downgrade -1`), but a downgrade
 is a last resort on production data.
 
+**The readiness gate (0.10.88).** `/health/live` only says the process answers. After `up -d --wait`, ask the new
+API container whether the release can serve, and roll back when it cannot:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production exec -T api   python scripts/deploy_gate.py --release v0.10.88 --timeout 180 --require worker,scheduler
+```
+
+It passes (exit 0, `DEPLOY_GATE=PASS`) when the code is the release named, the database answers as the runtime role
+with its schema at the code's head, and every component named in `--require` is ok; otherwise it says why
+(`DEPLOY_GATE=FAIL ...`, exit 1). Local drills of 0.10.88: a wrong database port gave `DEPLOY_GATE=FAIL database`, an
+unwritable object store `DEPLOY_GATE=FAIL object_storage`. The upgrade scripts call `/health/live` today; adding the
+gate to the next upgrade script is noted for the owner.
+
 ## 4. Rolling back
+
+**The upgrade scripts roll back on their own** when `docker compose up` fails, the web container runs as root, or
+`/health/live` does not answer within 3 minutes: `.env.production` is restored from its pre-upgrade copy, the previous
+tag is checked out and started with `up -d --no-build --wait` (its images are still on the server), and `up-<NNNN>.log`
+ends with `ROLLBACK=1` and the reason. 0.10.88 drilled that branch locally with Docker, Git and the network stubbed
+(the rollback function of upgrade-0186.sh): the environment file was restored, the previous tag checked out and
+started, and the three outcomes were reported as written (previous release answers; previous release does not answer;
+no previous release recorded). A drill on real containers needs a server that is not production: run the release's
+upgrade script there with a deliberately broken release (for example a tag whose API exits at start), and check that
+`ROLLBACK=1`, the previous release answers, and the database is untouched. The database is not rolled back by the
+script: migrations are expand/contract (above).
+
+By hand:
 
 1. Set `MDARIX_RELEASE` to the previous tag, `git checkout <previous tag>`, then `pull` and `up -d --no-build --wait`
    as above. With expand/contract migrations the old release runs on the new schema.

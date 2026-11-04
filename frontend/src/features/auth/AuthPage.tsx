@@ -37,6 +37,8 @@ export function signInNotice(query: URLSearchParams): string {
   if (reason === "idle" || query.get("expired") === "1")
     return "You were signed out after 30 minutes without activity, to protect your organization's data. Sign in again to continue where you left off.";
   if (reason === "expired") return "Your session has ended. Sign in again to continue where you left off.";
+  if (reason === "unsaved")
+    return "Your session ended, so your last change was not saved. Sign in again: you return to the same screen to make it once more.";
   return "";
 }
 

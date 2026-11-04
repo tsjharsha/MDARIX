@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 from backend.app.reportability import deadlines, rules
 from backend.app.standards import STARTER_MARK, version_words
@@ -924,9 +925,15 @@ def conclusion_problem(suggested: str, conclusion: str, reason: str) -> str | No
 
 def _market_of_one(name: str) -> str | None:
     for market in MARKETS:
-        if name in {rules.normalize(item) for item in MARKET_COUNTRIES[market]}:
+        if name in _country_names(market):
             return market
     return None
+
+
+@lru_cache(maxsize=None)
+def _country_names(market: str) -> frozenset[str]:
+    """A market's country names, normalized once (0.10.88: they were normalized again for every complaint)."""
+    return frozenset(rules.normalize(item) for item in MARKET_COUNTRIES[market])
 
 
 def markets_of(country: object) -> list[str]:
@@ -977,7 +984,7 @@ def window_markets(window: dict) -> set[str]:
     if not window.get("markets"):
         return set(MARKETS)
     names = {rules.normalize(item) for item in window["markets"]}
-    return {market for market in MARKETS if names & {rules.normalize(item) for item in MARKET_COUNTRIES[market]}}
+    return {market for market in MARKETS if names & _country_names(market)}
 
 
 def enabled_markets(windows: list[dict]) -> list[str]:
