@@ -42,7 +42,8 @@ def two_events():
     """Two pending events of one tenant, in order; names are unique to this test run."""
     tag = uuid.uuid4().hex[:8]
     names = (f"KILL_A_{tag}", f"KILL_B_{tag}")
-    now = datetime.now(timezone.utc)
+    # The oldest due events, so the worker (oldest first, in batches) reaches them before any other test's leftovers.
+    now = datetime(2000, 1, 1, tzinfo=timezone.utc)
     with SessionLocal() as db:
         bind_system(db, "test: two pending events")
         tenant = db.execute(text("select id from tenants order by created_at limit 1")).scalar_one()
