@@ -272,3 +272,31 @@ def test_the_scheduler_script_applies_the_configuration_gate_first(monkeypatch):
     monkeypatch.setattr(scheduler, "run_due_jobs", lambda: pytest.fail("jobs ran before the configuration check"))
     with pytest.raises(SystemExit, match="probe"):
         _script().main(["--once"])
+
+
+def test_a_stuck_or_unsettled_signature_alerts_once_and_its_clearing_once(alerts, monkeypatch):
+    """0.10.88 (DEV-13): a signature PENDING over 30 minutes, or one the settlement could not settle, reaches the
+    operators; before, the job only logged it."""
+    from backend.app import signing_commit
+
+    outcome = {"failed": ["sig-1"], "stuck": 0}
+    monkeypatch.setattr(
+        signing_commit, "settle_pending", lambda db: {"pending": 1, "settled": {}, "failed": outcome["failed"]}
+    )
+    monkeypatch.setattr(scheduler, "_stuck_signatures", lambda db: outcome["stuck"])
+    state: dict = {}
+    assert scheduler.signature_settlement(None, state)["failed"] == ["sig-1"]
+    assert [subject for subject, _ in alerts] == ["Signatures not settled"]
+    outcome.update(failed=[], stuck=2)
+    assert scheduler.signature_settlement(None, state)["stuck"] == 2
+    assert len(alerts) == 1  # still a problem: no second alert
+    outcome.update(stuck=0)
+    scheduler.signature_settlement(None, state)
+    assert [subject for subject, _ in alerts] == ["Signatures not settled", "Signatures settled again"]
+
+
+@pytest.mark.db
+def test_stuck_signatures_are_counted_in_the_control_database():
+    with SessionLocal() as db:
+        assert scheduler._stuck_signatures(db, timedelta(days=36500)) == 0
+        assert scheduler._stuck_signatures(db) >= 0

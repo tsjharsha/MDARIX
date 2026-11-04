@@ -294,12 +294,43 @@ def due_alerts(db: Session, _state: dict) -> dict:
     return run_for_all_tenants(db)
 
 
-def signature_settlement(db: Session, _state: dict) -> dict:
+# A signature still PENDING this long after it was asked for is stuck (settlement normally runs every 10 minutes).
+SIGNATURE_STUCK_AFTER = timedelta(minutes=30)
+
+
+def _stuck_signatures(db: Session, older_than: timedelta = SIGNATURE_STUCK_AFTER) -> int:
+    from backend.app.db.models.foundation import SignedApprovalRecord
+    from backend.app.signing_commit import PENDING
+
+    bind_system(db, "signature settlement: stuck signatures")
+    cutoff = datetime.now(timezone.utc) - older_than
+    return (
+        db.query(SignedApprovalRecord.id)
+        .filter(SignedApprovalRecord.status == PENDING, SignedApprovalRecord.created_at <= cutoff)
+        .count()
+    )
+
+
+def signature_settlement(db: Session, state: dict) -> dict:
     """Complete or abandon every signature a dedicated plane's signing left PENDING (a restart, a lost connection
-    between its two commits): backend/app/signing_commit.py. Idempotent."""
+    between its two commits): backend/app/signing_commit.py. Idempotent. The operators are alerted once when a
+    signature could not be settled or one stays PENDING over 30 minutes, and once when that clears (0.10.88, DEV-13)."""
     from backend.app.signing_commit import settle_pending
 
-    return settle_pending(db)
+    result = settle_pending(db)
+    result["stuck"] = _stuck_signatures(db)
+    problem = bool(result["failed"]) or result["stuck"] > 0
+    if problem and not state.get("alerted"):
+        send_alert(
+            "Signatures not settled",
+            f"{len(result['failed'])} signature(s) could not be settled in this run and {result['stuck']} have been "
+            "PENDING for over 30 minutes. A PENDING signature is never shown as valid; the person sees it as being "
+            "completed. See the scheduler log (signature-settlement) and docs/runbooks/OUTBOX_AND_SCHEDULER.md.",
+        )
+    if not problem and state.get("alerted"):
+        send_alert("Signatures settled again", "No signature is PENDING for over 30 minutes and none failed to settle.")
+    state["alerted"] = problem
+    return result
 
 
 def readiness_digest(db: Session, _state: dict) -> dict:
