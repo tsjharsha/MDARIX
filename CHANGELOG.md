@@ -10,6 +10,62 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.88] - 2026-11-04
+
+On the trial maintenance line (`release/0.10`): R3 of the external code review's plan, DEV-10 (the trial's journeys
+and accessibility) and DEV-13 (performance, monitoring and recovery). No migration. The API, worker, scheduler and
+web images change. Operator steps: none required; two are recommended (below, Operations).
+
+### Fixed: what the browser journeys found (DEV-10)
+
+- **A decision tree's outcome keeps up with quick answers.** Every answer queued a save of all the answers, one after
+  another; answering the US tree at a normal pace left the outcome several saves behind, for seconds showing the
+  result of answers already changed, with nothing saying so. A save still waiting when a newer one is asked for is now
+  skipped, and the outcome says "updating from your answers…" until the newest is in. Signing was never affected.
+- **A removed or mistyped record offers the way back.** Opening a complaint or an authority report that is not there
+  showed "Unavailable" and a Retry that can never work; it now says "This complaint (report) could not be opened"
+  with "Open the complaint list" ("All reports").
+- **A save refused because the session ended says the change was lost.** The sign-in page said "continue where you
+  left off" although what was typed was gone; it now says "your last change was not saved" and still returns to the
+  same screen.
+- **Inviting a colleague while e-mail is slow no longer invites twice.** With a slow e-mail provider the screen gave
+  up after 15 s and said "Try again" while the invitation was being made and sent; it now waits up to 45 s, and if the
+  answer is still lost says the invitation may have been sent and to check the list.
+- **"Record the submission" puts the keyboard on the form** (it stayed on the rail's button, far from the form, and
+  the form could be folded away).
+- **Screen readers hear which items before Sign are done** ("Done:" / "To do:"; the ticks were hidden from them).
+
+### Changed: speed (DEV-13)
+
+- **Getting started's story on your own data, three times faster.** On a trial with 5,000 imported complaints the
+  story took a minute or more a read; most of it was the same few market and country names being normalized millions
+  of times. They are now normalized once.
+- **Possible duplicates on the triage list** are paired by product and lot or serial number instead of comparing every
+  record with every other (about 12 s to 3.8 s a read on 5,000 imported complaints, locally).
+- **The complaint page** reads each colleague's permissions once instead of seven times (a trial at its cap of 50
+  people paid it on every complaint opened).
+
+### Operations (DEV-13)
+
+- **New health signals** on `/health/ready`: `outbox` (events waiting, retrying, and the queue's lag; degraded over
+  15 minutes) and `email` now degraded while e-mails the provider refused wait to be retried.
+- **New alerts** (to `MDARIX_ALERT_WEBHOOK` and/or `MDARIX_ALERT_EMAIL`): the outbox falling behind and catching up,
+  e-mail delivery failing and recovering, and a signature not settled or PENDING over 30 minutes (and when that
+  clears).
+- **A readiness gate for the deploy**, `scripts/deploy_gate.py`, run inside the new API container after `up`: the
+  release named, the database at this build's schema, and the components named with `--require`. Recommended in the
+  next upgrade script, beside `/health/live` (DEPLOYMENT.md).
+- **Recommended:** an alert webhook to a channel independent of the SMTP provider (with the provider down, an e-mail
+  alert about it cannot arrive: seen in the local drill).
+- Local drills recorded in `docs/runbooks/LOAD_AND_FAILURE_DRILLS.md`: worker, scheduler, e-mail, database, object
+  store and the upgrade script's rollback branch; and a measurement of a trial against the approved targets
+  (`tests/test_trial_load_measure.py`, opt-in).
+
+### Tests and checks
+
+- `frontend/e2e/trial-journeys.spec.ts`: the trial's journeys at 1440 and 390 with captured e-mail
+  (`scripts/journey_api.py`), axe-core, accessible names and keyboard on every screen, and the failure cases.
+
 ## [0.10.86] - 2026-11-04
 
 On the trial maintenance line (`release/0.10`): a reliability release from an external code review of 0.10.84. No
