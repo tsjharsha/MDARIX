@@ -13,8 +13,32 @@ operator knows a release migrates the database.
 ## [0.10.88] - 2026-11-04
 
 On the trial maintenance line (`release/0.10`): R3 of the external code review's plan, DEV-10 (the trial's journeys
-and accessibility) and DEV-13 (performance, monitoring and recovery). No migration. The API, worker, scheduler and
-web images change. Operator steps: none required; two are recommended (below, Operations).
+and accessibility) and DEV-13 (performance, monitoring and recovery), with two owner decisions on the regulatory rules
+(OD-2, OD-4). One migration, `tr18changereason` (a nullable column, `complaint_market_assessments.change_reason`;
+the legacy-plane script carries it). The API, worker, scheduler, web and backup images change. Operator steps: the
+off-site bucket's lifecycle rule (below, Operations); two more are recommended.
+
+### Fixed: a step counted only when its screen loaded (P0 of the review of 0.10.87)
+
+- **"Open sample complaint" no longer ticks step 1 when the complaint fails to load.** The main button of steps 1, 5,
+  9 and 10 saved the step's mark as it opened the screen, whatever the screen then showed. The mark is now saved by
+  the screen itself once its read succeeded for the story's record: the complaint page (step 1), the report page
+  (step 5), Records' finished record (step 9) and the trend check of the story's product (step 10). A failed read (a
+  server error, a lost connection, a record not found) ticks nothing, and Retry ticks it once. A refusal (step not
+  yet in its turn, the story moved) is still said on Getting started. The trend check now reads the story's product
+  from the first render, not all products first. The server is unchanged.
+
+### Changed: two owner decisions on the regulatory rules
+
+- **OD-2: "United Kingdom" is asked, Great Britain or Northern Ireland.** A complaint whose country is "United
+  Kingdom" or "UK" is two markets: Great Britain follows UK MDR 2002, Northern Ireland the EU MDR (market EU_NI). The
+  complaint page asks which, with a choice of the two, and until then every market's shortest clock runs,
+  provisional; `PUT /api/v1/complaints/{id}/reporting-facts` refuses the whole-UK name (422 `COUNTRY_UK_PART_NEEDED`).
+  "Great Britain", "GB", England, Scotland and Wales stay Great Britain. Decision tables MK-5, MK-5a and MK-5b.
+- **OD-4: re-signing a market conclusion asks why it changes.** Signing a conclusion where a signed one stands now
+  needs a change reason of at least 10 characters (422 `CHANGE_REASON_NEEDED` without it), asked as "Why the signed
+  conclusion changes" wherever a conclusion is signed: the decision tree and the reportability watch's assessment. The reason is part of the signed material, stored with the new
+  version (`change_reason`), in its audit event, and shown on its signed line. A first signature is unchanged.
 
 ### Fixed: what the browser journeys found (DEV-10)
 
@@ -23,6 +47,12 @@ web images change. Operator steps: none required; two are recommended (below, Op
   has no triage form; step 2 waited for a triage record that could never be made, its button opened the page already
   open, and the story could not finish. Step 2 now reads "Not needed: not flagged for triage". No sample number
   changes.
+- **The walkthrough on your own data stays on its complaint until its last step.** With a second upload more urgent
+  than a finished first complaint, the walkthrough moved to it (as it should), but concluding it "not reportable"
+  closed its clock and sent the walkthrough back to the first complaint in the middle of the second's steps; there,
+  steps 9 and 10 read as not done, because the steps opened were kept for one complaint per run. The walkthrough now
+  keeps following the complaint under way until its Trends step, unless a complaint with more serious harm arrives,
+  and the steps opened on each complaint are kept. Found by the uploaded-data journey.
 - **Screen readers hear which steps are not needed** in Getting started's step list (after a "not reportable"
   conclusion, or a triage not needed).
 - **A decision tree's outcome keeps up with quick answers.** Every answer queued a save of all the answers, one after
@@ -79,6 +109,13 @@ web images change. Operator steps: none required; two are recommended (below, Op
   the real forms, on the sample (solo, with the practice approval) and on a team's own data (a second person
   approving on a phone; a "not reportable" conclusion); with the authenticator, a reload and a resume, a step opened
   out of turn (STEP_NOT_YET), a moved story (STORY_MOVED), an API error, and ticks checked in order after every step.
+- `frontend/e2e/your-data-journey.spec.ts` (new): uploaded data from the file to the ten steps, at 1440 with a
+  phone pass: a most urgent complaint without country or awareness date, both asked and entered (a lost save retried
+  once), its complaint failing to load once (step 1 not ticked until Retry), a reload and resume, the reportable
+  branch through the real forms with the authenticator, a colleague's approval on a phone and a real PDF (served as
+  `application/pdf`, a non-empty `%PDF-` file); then a second upload's complaint concluded not reportable, steps 5 to
+  8 "Not needed", no report for it and exactly one for the first. The story's helpers are shared in
+  `frontend/e2e/support/story.ts`; the sample journey checks the failed screen too.
 - `frontend/e2e/trial-journeys.spec.ts`: the trial's journeys at 1440 and 390 with captured e-mail
   (`scripts/journey_api.py`), axe-core, accessible names and keyboard on every screen, and the failure cases.
 

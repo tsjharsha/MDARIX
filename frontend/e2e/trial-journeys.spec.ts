@@ -185,7 +185,7 @@ test.describe("a team on its own uploaded data, phone", () => {
     const problems = watch(page);
     await activate(page, colleague, await linkFromMail(colleague.email, /invited you/i, ACTIVATION));
     await page.goto("/app/getting-started");
-    await expect(page.locator(".uw-os-label")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("list", { name: "Walkthrough steps" })).toBeVisible({ timeout: 30_000 });
     await accessible(page, "Getting started as the colleague (phone)");
     await shot(page, "08-colleague-story");
     await page.goto("/app/getting-started?tab=Your+trial");
