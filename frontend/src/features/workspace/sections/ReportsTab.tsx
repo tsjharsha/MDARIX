@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileText, Send } from "lucide-react";
+import { Download, FileText, Send } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Table, errorText, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
@@ -278,16 +278,22 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
               : ""
           }.`
         : "Started while the market was still being assessed.";
-  const pdf = async () => {
+  const fetchFile = async (path: string, name: string, failed: string) => {
     setPdfError("");
     try {
-      await downloadFile(`${REPORTS}/${detail.id}/worksheet.pdf?snapshot=${approved!.id}`, {
-        fallbackName: `mdarix-${detail.form.code.toLowerCase()}-${ref}.pdf`,
-      });
+      await downloadFile(`${REPORTS}/${detail.id}/${path}?snapshot=${approved!.id}`, { fallbackName: name });
     } catch (reason) {
-      setPdfError(errorText(reason, "The PDF could not be generated."));
+      setPdfError(errorText(reason, failed));
     }
   };
+  const pdf = () =>
+    fetchFile(
+      "worksheet.pdf",
+      `mdarix-${detail.form.code.toLowerCase()}-${ref}.pdf`,
+      "The PDF could not be generated.",
+    );
+  // A US report also as FDA's eMDR file: the blocks it still needs, by their names ("H6 Component code").
+  const emdrNeeds = (detail.emdr?.missing ?? []).map((item) => item.split(":")[0]);
   const write = canWrite && detail.state !== "CANCELLED";
   const approving = canWrite && detail.stage === "APPROVAL" && !!detail.approval?.may_approve;
   const approvedBy =
@@ -435,6 +441,11 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
             <h2>Next step</h2>
             <b>{next.title}</b>
             <p className="ac-muted">{next.detail}</p>
+            {detail.emdr && emdrNeeds.length > 0 && (
+              <p className="ac-muted" id="rp-emdr-needs">
+                The eMDR XML also needs: {emdrNeeds.join("; ")}.
+              </p>
+            )}
             {write && detail.stage === "CREATED" && (
               <>
                 <button type="button" className="ac-secondary" disabled aria-describedby="rp-why-send">
@@ -469,9 +480,30 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
             {detail.stage === "APPROVED" && approved && (
               <>
                 {canExport ? (
-                  <button type="button" className="ac-primary" onClick={() => void pdf()}>
-                    <FileText size={15} aria-hidden="true" /> Generate the PDF
-                  </button>
+                  <>
+                    <button type="button" className="ac-primary" onClick={() => void pdf()}>
+                      <FileText size={15} aria-hidden="true" /> Generate the PDF
+                    </button>
+                    {detail.emdr && (
+                      <>
+                        <button
+                          type="button"
+                          className="ac-secondary"
+                          disabled={emdrNeeds.length > 0}
+                          aria-describedby={emdrNeeds.length ? "rp-emdr-needs" : undefined}
+                          onClick={() =>
+                            void fetchFile("emdr.xml", `mdarix-emdr-${ref}.xml`, "The eMDR XML could not be made.")
+                          }
+                        >
+                          <Download size={15} aria-hidden="true" /> Download the eMDR XML
+                        </button>
+                        <p className="ac-note">
+                          MDARIX prepares it; you submit it through your own ESG or eSubmitter account and record the
+                          submission here.
+                        </p>
+                      </>
+                    )}
+                  </>
                 ) : (
                   <p className="ac-muted">A colleague with export rights generates the PDF.</p>
                 )}

@@ -345,6 +345,31 @@ describe("a report's page: the record page's shape, the status path and the rail
     expect(render(<ReportsSection />, api("?report=r1", ["regulatory.review"]))).not.toContain("Generate the PDF");
   });
 
+  it("offers FDA's eMDR XML beside the PDF on a US report, and names what it still needs", () => {
+    resources.data[`${REPORTS}/r1`] = report(3, { emdr: { missing: [], left_out: [] } });
+    const ready = render(<ReportsSection />, api("?report=r1"));
+    expect(ready).toContain("Generate the PDF");
+    expect(ready).toMatch(/<button type="button" class="ac-secondary">.*Download the eMDR XML<\/button>/);
+    expect(ready).toContain(
+      "MDARIX prepares it; you submit it through your own ESG or eSubmitter account and record the submission here.",
+    );
+    expect(ready.match(/class="ac-primary"/g)?.length).toBe(1);
+    resources.data[`${REPORTS}/r1`] = report(3, {
+      emdr: {
+        missing: ["H6 Component code: at least one code with its FDA code", "G8 Manufacturer report number: x"],
+        left_out: [],
+      },
+    });
+    const waiting = render(<ReportsSection />, api("?report=r1"));
+    expect(waiting).toContain("The eMDR XML also needs: H6 Component code; G8 Manufacturer report number.");
+    expect(waiting).toMatch(/disabled="" aria-describedby="rp-emdr-needs">.*Download the eMDR XML/);
+    // Before approval the page says it too; another market's report has no eMDR file.
+    resources.data[`${REPORTS}/r1`] = report(0, { emdr: { missing: ["H6 Component code: x"], left_out: [] } });
+    expect(render(<ReportsSection />, api("?report=r1"))).toContain("The eMDR XML also needs: H6 Component code.");
+    resources.data[`${REPORTS}/r1`] = report(3, { emdr: null });
+    expect(render(<ReportsSection />, api("?report=r1"))).not.toContain("eMDR XML");
+  });
+
   it("says why a cancelled report is off the path", () => {
     resources.data[`${REPORTS}/r1`] = report(0, {
       state: "CANCELLED",
