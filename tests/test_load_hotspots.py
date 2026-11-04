@@ -44,3 +44,22 @@ def test_the_complaint_page_reads_each_persons_permissions_once_not_once_per_ste
     signers = response.json().get("signers") or {}
     assert signers, "the page still names who may sign"
     assert max(calls.count(person) for person in set(calls)) <= 2
+
+
+def test_the_watch_normalizes_each_market_and_country_name_once(monkeypatch):
+    """For a trial of 5,000 complaints the reportability watch normalized the same few names millions of times (100 s
+    of a 173 s read of Getting started's story). The names read the same; each is normalized once."""
+    import re
+
+    from backend.app.reportability import markets, rules
+
+    windows = [{"markets": ["United States", "EU"]}, {"markets": ["India"]}]
+    before = [markets.market_of(name) for name in ("U.S.A.", "usa", "Germany", "India", "Mars")]
+    calls = []
+    real = re.sub
+    monkeypatch.setattr(re, "sub", lambda *args, **kwargs: calls.append(1) or real(*args, **kwargs))
+    for _ in range(2000):
+        assert markets.market_of("U.S.A.") == "US" and markets.enabled_markets(windows)
+    assert [markets.market_of(name) for name in ("U.S.A.", "usa", "Germany", "India", "Mars")] == before
+    assert rules.normalize("U.S.A.") == rules.normalize(" usa ") == "usa"
+    assert len(calls) < 100

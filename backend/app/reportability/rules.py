@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from datetime import date, datetime
 
 from backend.app.reportability import deadlines
@@ -227,7 +228,14 @@ TEMPLATE_BASIS = {template["name"]: template["basis"] for template in TEMPLATES}
 
 def normalize(value: object) -> str:
     """Lower case, dots removed, separators as spaces, single spaces: "U.S.A." and "usa" are the same market."""
-    text = str(value or "").lower().replace(".", "")
+    return _normalized(str(value or ""))
+
+
+@lru_cache(maxsize=4096)
+def _normalized(text: str) -> str:
+    # Cached (0.10.88, DEV-13): the watch normalized the same few market and country names millions of times for a
+    # trial of 5,000 complaints (100 s of a 173 s read).
+    text = text.lower().replace(".", "")
     text = re.sub(r"[_\-/,;:]+", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
