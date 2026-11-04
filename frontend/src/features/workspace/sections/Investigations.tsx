@@ -16,7 +16,7 @@ import {
   sourceIdColumn,
   useResource,
 } from "../../customer-admin/shared";
-import { displayId, referenceId, sourceId } from "../../../app/displayId";
+import { displayId, referenceId } from "../../../app/displayId";
 import { inData } from "../home";
 import { InvestigationWorkspacePanel } from "../../investigator/InvestigationWorkspacePanel";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
@@ -119,10 +119,7 @@ function NewCaseSections({ tab }: { tab?: string }) {
         <button type="button" className="ac-link" onClick={() => open("Investigations", "All investigations")}>
           Investigations
         </button>
-        <span aria-hidden="true">›</span>
-        <span>
-          {selected ? (sourceId(selected, "investigation_identifier") ?? displayId(selected)) : "Investigation"}
-        </span>
+        {/* The reference is in the page's eyebrow (0.10.87): the crumb is the way back. */}
       </nav>
       <CaseSections tab={tab} onManage={setManaging} onChanged={() => work.refreshInvestigations()} />
       {managing && (

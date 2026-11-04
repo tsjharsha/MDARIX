@@ -23,8 +23,14 @@ export type StoryRun = {
     product_id: string | null;
     /** The product's own identifier, which the trend check opens on (0.10.84). */
     product_ref?: string | null;
+    /** The product's name, for the step's complaint summary (0.10.87). */
+    product_name?: string | null;
     serious_injury: boolean;
     death: boolean;
+    /** The harm the record states (0.10.87); null when it does not say, shown as not recorded. */
+    harm?: "DEATH" | "SERIOUS_INJURY" | "NONE" | null;
+    /** The linked service work's status (OPEN, IN_PROGRESS, COMPLETE), if any. */
+    service_status?: string | null;
   };
   market: string | null;
   market_label: string | null;

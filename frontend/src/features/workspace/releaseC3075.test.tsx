@@ -277,7 +277,8 @@ describe("a report's page: the record page's shape, the status path and the rail
       "Created when the United States (FDA) conclusion was signed reportable: 30-day malfunction report.",
     );
     for (const label of RSTAGES) expect(html).toContain(label);
-    expect(html).toContain("22 of 24 mandatory fields");
+    // 0.10.87: while fields are missing the "things to give" head counts them; the meter chip waits until none is.
+    expect(html).not.toContain("22 of 24 mandatory fields");
     // 0.10.83 (D2.7): what is missing comes first, grouped by who knows it; the count is said once.
     expect(html).toContain("1 thing to give (1 field)");
     expect(html).toContain("Give what is missing");

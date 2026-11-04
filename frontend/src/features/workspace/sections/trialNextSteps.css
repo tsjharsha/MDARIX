@@ -4,6 +4,7 @@
   gap: 24px;
   max-width: 1040px;
 }
+.uw-ns h1,
 .uw-ns h2 {
   margin: 0;
   color: var(--ac-ink);
@@ -44,6 +45,7 @@
   gap: 14px;
   padding: 28px;
 }
+.uw-ns-intro h1,
 .uw-ns-intro h2 {
   font-size: var(--ms-fs-32);
   line-height: 1.2;
@@ -375,6 +377,7 @@
   .uw-ns-talk {
     padding: 20px;
   }
+  .uw-ns-intro h1,
   .uw-ns-intro h2 {
     font-size: var(--ms-fs-24);
   }

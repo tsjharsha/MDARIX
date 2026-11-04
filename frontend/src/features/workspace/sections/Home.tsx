@@ -63,16 +63,12 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
   };
   const dueWeek = useResource<{ total: number }>(withSource(DUE_WEEK_PATH, dataSource));
   const reading = oversight.state === "loading";
-  const tenant = session?.current_tenant?.tenant_name;
   return (
     <div className="uw-home">
       <header className="uw-home-head">
         <div>
-          <span className="uw-viewing">
-            {isTrial
-              ? `Home · ${dataSource === IMPORTED_SOURCE ? "your data" : "sample data"}`
-              : `Viewing as ${personaLabel ?? persona}`}
-          </span>
+          {/* In a trial the top bar names the data and the tab names the page (0.10.87): no eyebrow. */}
+          {!isTrial && <span className="uw-viewing">Viewing as {personaLabel ?? persona}</span>}
           <h1 ref={heading} tabIndex={-1}>
             {greeting()}
             {name ? `, ${name}` : ""}
@@ -81,8 +77,8 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
         </div>
         <span className="uw-home-date">
           {/* The page's one time-zone note (0.10.82, U-15): the date line. */}
+          {/* The organization is on the top bar (0.10.87). */}
           {formatDay(new Date().toISOString())} · times in {zoneName()}
-          {tenant ? ` · ${tenant}` : ""}
         </span>
       </header>
 
@@ -126,7 +122,8 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
             trends.state === "loading"
               ? "Reading…"
               : rising.length
-                ? `${rising[0].name} is rising`
+                ? // The Trends card below names the product and its rise (0.10.87): the tile says only how many.
+                  "Products rising against their history"
                 : "No product rising against its history"
           }
         />

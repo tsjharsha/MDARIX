@@ -93,12 +93,13 @@ describe("1. Getting started in the tab bar", () => {
 describe("2. Getting started without the import (new navigation)", () => {
   it("has no Your data tab and no upload; the classic navigation keeps both", () => {
     reads.data[STATUS] = status(37, 0);
-    // The trial's tabs are on their own page, reached from Help (Short stories and your trial).
+    // A link to the trial's page opens Getting started's collapsed sample data and trial settings (0.10.87).
     const fresh = render(<GettingStartedSection focus="Your trial" />, api());
     expect(fresh).not.toContain(">Your data<");
     expect(fresh).not.toContain("Upload your export");
-    expect(fresh).toContain(">About the sample data<");
-    expect(fresh).toContain(">Your trial<");
+    expect(fresh).toMatch(/<details id="trial-settings"[^>]* open="">/);
+    expect(fresh).toContain("What your sample data is, and why it looks like this");
+    expect(fresh).toContain("Your free trial");
     expect(reads.paths.some((path) => path.startsWith("/api/v1/trial/insights"))).toBe(false);
     const classic = render(<GettingStartedSection />, api({ navigation: "classic" }));
     expect(classic).toContain(">Your data<");
@@ -252,7 +253,8 @@ describe("6. Sample-only trials and people without import rights", () => {
   it("see no Try your own data in Help on the new navigation", () => {
     const help = (session: object) =>
       render(<HelpMenu onGettingStarted={vi.fn()} defaultOpen />, api({ session: session as never }));
-    expect(help(OWNER)).toContain("Try your own data");
+    // 0.10.87: nobody does there; the top bar's Import your data is the one way in (release0087Shell.test.tsx).
+    expect(help(OWNER)).not.toContain("Try your own data");
     expect(help(REGULATORY)).not.toContain("Try your own data");
     expect(help({ ...OWNER, sample_only: true })).not.toContain("Try your own data");
     // The free trial user guide stays for everyone in a trial.

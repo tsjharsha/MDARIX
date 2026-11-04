@@ -18,7 +18,8 @@ export function DecisionTreesSection() {
   const [mode, setMode] = useTabParam("mode");
   if (!all.data)
     return (
-      <Panel eyebrow="Decision trees" title="Is it reportable, and by when?" source={all}>
+      // The page head asks the question (0.10.87): while the trees load the panel says only that.
+      <Panel title="Reading the trees…" source={all}>
         {all.state === "error" && <p className="ac-muted">{errorText(all.error, "The trees could not be read.")}</p>}
       </Panel>
     );

@@ -17,6 +17,75 @@ rules and controlled records (DEV-09), and Getting started v2 with the owner-app
 The API, worker, scheduler and web images change. No operator step. Sample: four background complaints move from the
 routine path to the standard path (their harm facts are not recorded).
 
+### Changed: Getting started v2, one walkthrough and one next action (owner's specification, 5 Nov 2026)
+
+- **Getting started is one white walkthrough card**, in place of the dark hero: "Getting started", "Follow one sample
+  complaint from first call to reporting.", the practice line once ("Fictional data · Trial outputs are practice
+  records · Human sign-off required"), then "Your sample walkthrough" with its Sample data badge, "X of 10 completed"
+  and one progress bar. The ten steps are a list on the left; the step chosen is on the right with a small label, one
+  heading, one instruction, a short summary of the complaint and one main button. On the trial's own data the same
+  card runs on "Your data", without "Fictional data".
+- **The complaint summary is read from the record**: its reference, the description's first sentence, the device, the
+  reported harm and the service status. Harm the record does not state says "Not recorded", never "None reported".
+  The one-story read (`GET /api/v1/trial/one-story`) now also returns each run's `product_name`, `harm` and
+  `service_status`.
+- **Picking a step on the list previews it**: it is marked "Preview", with the real next step named and one click
+  back. Completion is unchanged: ticks come from the saved record, and steps 1, 5, 9 and 10 still count only when
+  their main button opens the step's screen in its turn.
+- **Under the card, "Explore at your own pace"**: Invite your team (the trial owner manages; a colleague sees who is
+  on the trial), Explore other workflows (Choose a focus: the short stories, the ten chapters and the audit focus, on
+  `Getting started › Other workflows`), and Guides & support (the guides, support, feedback, the one-to-one demo and
+  Next steps, shown when asked for).
+- **One collapsed "Sample data & trial settings"** at the foot of the page holds the sample's explanation and counts,
+  the trial's dates and limits, and the trial owner's Restart the sample story, Remove the sample data and End my
+  trial early, each with its confirmation as before. Old links to Getting started › About the sample data and ›
+  Your trial open it.
+- **Removed from the page**: the miniature screen previews, the second chapter wheel, the seven-step trial journey, the
+  repeated first-call and report explanations, the duplicate demo and Next steps banners, the short-story tiles that
+  repeated the short stories, and the restart control on the short stories. Every capability stays reachable.
+- The walkthrough says when it is still reading, when its read failed (with Try again), when a role may not read it,
+  and when there is no complaint to follow.
+
+### Changed: Look ahead and Next steps are tabs of every free trial
+
+- Every persona in a free trial now has **Look ahead** and **Next steps** as tabs, after its own; Getting started stays
+  first. Pilots and paid organizations are unchanged.
+- Help no longer repeats them on the new navigation; its "Short stories and your trial" entry is now "Short stories and
+  other workflows" and opens the library.
+
+### Changed: each trial page says each thing once (owner-approved duplication review)
+
+New navigation only; the classic navigation is unchanged. No capability is removed, only repeated ways in.
+
+- **Shell:** the trial badge opens Getting started's trial settings; the top bar's Sample data chip is left out on
+  Getting started, and Import your data on its own page. Help no longer offers Try your own data, the sample-only
+  Discuss a pilot or Next steps (the top bar and the tabs do), and calls the trial guide "The trial, step by step".
+  The time-zone line shows only on pages with times. No chapter banners, and no story bar on Home. The avatar menu
+  shows the name only. The investigation picker is gone, and the product picker shows on Trends only off the trend
+  check.
+- **Page heads:** one report and Next steps have only their own heading. Look ahead asks "What will your partners
+  see?", and its panels name the party.
+- **Getting started:** the third card is "Plan your next steps" (the demo and Next steps). The team card is left out
+  for a persona whose tabs hold Team. Other workflows drops the four-step short story on SAMPLE-RV-11 (the walkthrough
+  follows that complaint) and the second star rating, and lists "Workflows to try".
+- **Home:** the date line drops the organization, a trial's Home drops its data eyebrow, and the At risk tile no
+  longer names the product the Trends card names.
+- **Complaints and a complaint:**
+  - No import button on the list in a trial, and the list's title is its count.
+  - Authority reports and Investigations views are offered only to personas without those tabs.
+  - A complaint's crumb is the way back; its service line keeps to the service; missing facts read "Not recorded".
+- **Decision trees and Reports:**
+  - The trees' loading panel no longer repeats the question.
+  - A report drops its Market and Due fields, and shows the meter chip once nothing is missing.
+  - The practice-approval warning says only who you approve as.
+  - "MDARIX never submits" is said once.
+- **Investigations and Trends:** no second eyebrows. Investigations drops the header Lot impact button (its fold
+  stays). Trends shows the Investigations button only for personas without that tab, and its fold drops the rise
+  tiles the heroes say.
+- **Records, Import your data, Settings, Account:**
+  - Records and Import your data drop repeated sentences.
+  - Settings' panels are named by topic, and Account's panel is "Profile".
+
 ### Fixed: sign-in steps and invitations (DEV-08)
 
 - **An idle session can no longer set up an authenticator.** The two-factor steps skipped the idle timeout: a

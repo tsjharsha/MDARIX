@@ -43,7 +43,8 @@ function Banner({ text }: { text?: string }) {
 function IntakePage() {
   const page = useResource<IntakePreview>(PREVIEW_PATHS["How a distributor reports"]);
   return (
-    <Panel title="How a distributor reports" eyebrow={page.data?.party ?? "Sample distributor"} source={page}>
+    // The tab names the page (0.10.87): the panel names the party.
+    <Panel title={page.data?.party ?? "Sample distributor"} source={page}>
       {page.data && <IntakeBody data={page.data} />}
     </Panel>
   );
@@ -108,7 +109,7 @@ export function IntakeBody({ data }: { data: IntakePreview }) {
 function DistributorPage() {
   const page = useResource<DistributorPreview>(PREVIEW_PATHS["As your distributor sees it"]);
   return (
-    <Panel title="As your distributor sees it" eyebrow={page.data?.party ?? "Sample distributor"} source={page}>
+    <Panel title={page.data?.party ?? "Sample distributor"} source={page}>
       {page.data && <DistributorBody data={page.data} />}
     </Panel>
   );
@@ -154,11 +155,7 @@ export function DistributorBody({ data }: { data: DistributorPreview }) {
 function RepresentativePage() {
   const page = useResource<RepresentativePreview>(PREVIEW_PATHS["As your authorised representative sees it"]);
   return (
-    <Panel
-      title="As your authorised representative sees it"
-      eyebrow={page.data?.party ?? "Sample authorised representative"}
-      source={page}
-    >
+    <Panel title={page.data?.party ?? "Sample authorised representative"} source={page}>
       {page.data && <RepresentativeBody data={page.data} />}
     </Panel>
   );

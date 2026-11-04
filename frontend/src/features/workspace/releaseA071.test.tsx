@@ -49,23 +49,25 @@ describe("A2: a sample-only trial cannot upload", () => {
     expect(sectionAllowed("Complaints", MENU, ["records.write"], true)).toBe(true);
   });
 
-  it("offers Discuss a pilot in Help instead of your own data", () => {
-    const normal = render(<HelpMenu onGettingStarted={() => undefined} defaultOpen />, api());
-    expect(normal).toContain("Try your own data");
+  it("offers Discuss a pilot in Help instead of your own data on the classic navigation", () => {
+    const classic = { navigation: "classic" as const };
+    const normal = render(<HelpMenu onGettingStarted={() => undefined} defaultOpen />, api(classic));
+    expect(normal).toContain("Getting started and import templates");
     expect(normal).not.toContain("Discuss a pilot");
-    const sample = render(<HelpMenu onGettingStarted={() => undefined} defaultOpen />, api({}, { sample_only: true }));
+    const sample = render(
+      <HelpMenu onGettingStarted={() => undefined} defaultOpen />,
+      api(classic, { sample_only: true }),
+    );
     expect(sample).toContain("Discuss a pilot");
     expect(sample).toContain("This evaluation uses the sample only");
-    expect(sample).not.toContain("Try your own data");
     expect(sample).not.toContain("import templates");
-    // Classic keeps its wording.
-    expect(
-      render(<HelpMenu onGettingStarted={() => undefined} defaultOpen />, api({ navigation: "classic" })),
-    ).toContain("Getting started and import templates");
+    // 0.10.87: the new navigation's Help offers neither; the top bar and the Next steps tab do.
+    const fresh = render(<HelpMenu onGettingStarted={() => undefined} defaultOpen />, api({}, { sample_only: true }));
+    expect(fresh).not.toContain("Discuss a pilot");
   });
 
-  it("offers the upload on the Complaints header in a trial (0.10.79) and a pilot, never in a sample-only trial", () => {
-    expect(render(<ComplaintViews />, api())).toContain("Import your data");
+  it("offers the upload on the Complaints header in a pilot, never in a trial (0.10.87: the top bar) or sample-only", () => {
+    expect(render(<ComplaintViews />, api())).not.toContain("Import your data");
     expect(render(<ComplaintViews />, api({}, { sample_only: true }))).not.toContain("Import your data");
     expect(render(<ComplaintViews />, api({ isTrial: false }))).toContain("Import your data");
     expect(render(<ComplaintViews />, api({ isTrial: false }, { sample_only: true }))).not.toContain(
@@ -156,7 +158,7 @@ export function rv11(service: Partial<NonNullable<EventView["service"]>> | null 
 }
 
 describe("A5: the linked service work", () => {
-  it("says the service is complete and the quality assessment still open, with its owner and next step", () => {
+  it("says the service is complete and the quality assessment still open (0.10.87: owner and next step below)", () => {
     resources.data[eventPath("SAMPLE-RV-11")] = rv11({
       status: "COMPLETE",
       status_label: "Complete",
@@ -165,8 +167,8 @@ describe("A5: the linked service work", () => {
       header: "Service complete · Quality assessment open",
     });
     const html = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />, api());
-    expect(html).toContain("Service complete · Quality assessment open</strong> · Quality owner: Asha Quality");
-    expect(html).toContain("Next: Assess the United States (FDA) market");
+    expect(html).toContain("Service complete · Quality assessment open</strong></p>");
+    expect(html).not.toContain("Quality owner:");
     expect(html).toContain("Complete since");
   });
 
