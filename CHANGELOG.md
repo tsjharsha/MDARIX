@@ -33,7 +33,7 @@ operator step: no sample record, deadline or count changes.
 - **A question no record answers gets "not enough in your records", not the nearest unrelated records.** The search
   scored every record as a match on organization alone, so an unrelated question came back with five arbitrary
   records, and Ask (where AI is on) gave them to the AI. The search now abstains below a relevance floor set before
-  qualification, and Ask then asks no AI to guess. Free trials (AI off) see "No matching evidence found".
+  qualification, and Ask then asks no AI to guess. In a free trial's Ask (AI off) the answer now says "No record is close enough in meaning to the question to count as an answer" instead of listing the nearest records as found by the search.
 - **Evidence an investigation set aside is no longer offered to Ask for that investigation** (its review rejected,
   quarantined or superseded it), and a record's vector of earlier text is never ranked.
 - **Text inside a record that reads like an instruction to the AI is named to the reader** ("contain text that reads
