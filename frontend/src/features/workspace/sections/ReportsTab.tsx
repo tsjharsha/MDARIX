@@ -239,6 +239,16 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
   );
 }
 
+/** "Record the submission" in the rail: open the folded report part that holds the form, bring it into view and put
+ * the keyboard on its first field (focus stayed on the rail's button, far from the form). Exported for its test. */
+export function openSubmission(part: HTMLElement | null) {
+  if (!part) return;
+  const folded = part.closest("details");
+  if (folded) folded.open = true;
+  part.scrollIntoView({ behavior: "smooth" });
+  part.querySelector<HTMLElement>("select, input, textarea, button")?.focus({ preventScroll: true });
+}
+
 /** One report on its own page: highlights, the status path, the form's fields in order, and the rail. */
 export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   const { open, isTrial } = useWorkspace();
@@ -490,7 +500,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                   <button
                     type="button"
                     className="ac-secondary"
-                    onClick={() => document.getElementById("rp-submission")?.scrollIntoView({ behavior: "smooth" })}
+                    onClick={() => openSubmission(document.getElementById("rp-submission"))}
                   >
                     Record the submission
                   </button>

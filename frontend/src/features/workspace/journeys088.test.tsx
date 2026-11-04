@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { ComplaintPage } from "./sections/ComplaintPage";
-import { ReportPage } from "./sections/ReportsTab";
+import { ReportPage, openSubmission } from "./sections/ReportsTab";
 import { eventPath } from "./oversight";
 import { REPORTS } from "./authorityReports";
 import { latestSaves } from "./treeAnswer";
@@ -77,5 +77,21 @@ describe("the decision tree's saves (0.10.88): answering quickly never leaves th
     expect(sent).toEqual([1, 6]);
     expect(results[5]).toBe(6);
     expect(saves.pending()).toBe(false);
+  });
+});
+
+describe("Record the submission, from the report's rail (0.10.88)", () => {
+  it("opens the folded part that holds the form, scrolls to it and puts the keyboard on its first field", () => {
+    const field = { focus: vi.fn() };
+    const folded = { open: false };
+    const part = {
+      closest: vi.fn(() => folded),
+      scrollIntoView: vi.fn(),
+      querySelector: vi.fn(() => field),
+    } as unknown as HTMLElement;
+    openSubmission(part);
+    expect(folded.open).toBe(true);
+    expect(part.scrollIntoView).toHaveBeenCalled();
+    expect(field.focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 });
