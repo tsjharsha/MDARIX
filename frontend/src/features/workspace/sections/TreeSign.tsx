@@ -87,6 +87,7 @@ export function SignCard({
   harm,
   onHarm,
   flush,
+  updating = false,
   onSigned,
 }: {
   detail: AssessmentDetail;
@@ -103,6 +104,8 @@ export function SignCard({
   harm: HarmState;
   onHarm: (next: HarmState) => void;
   flush: () => Promise<MarketItem | null>;
+  /** An answer is being saved: the outcome shown may still change. */
+  updating?: boolean;
   onSigned: (next: MarketItem) => void;
   flat: readonly Question[];
 }) {
@@ -169,8 +172,11 @@ export function SignCard({
   };
   return (
     <section className={`uw-card dt-outcome ${tone}`} id="dt-outcome" aria-label="The outcome">
-      <div aria-live="polite" className="dt-outcome-top">
-        <p className="ac-eyebrow">{signed ? "Signed conclusion" : "Points to"}</p>
+      <div aria-live="polite" aria-busy={updating} className="dt-outcome-top">
+        <p className="ac-eyebrow">
+          {signed ? "Signed conclusion" : "Points to"}
+          {updating && !signed && <span className="ac-muted"> · updating from your answers…</span>}
+        </p>
         <p className="dt-big">{outcome ? CONCLUSION_LABELS[outcome] : "Not decided yet"}</p>
         {outcome === "REPORTABLE" && version?.report_type_label && (
           <p className="dt-type">{version.report_type_label}</p>

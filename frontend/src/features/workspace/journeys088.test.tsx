@@ -7,6 +7,7 @@ import { ComplaintPage } from "./sections/ComplaintPage";
 import { ReportPage } from "./sections/ReportsTab";
 import { eventPath } from "./oversight";
 import { REPORTS } from "./authorityReports";
+import { latestSaves } from "./treeAnswer";
 
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("../customer-admin/shared", async (original) => ({
@@ -52,5 +53,29 @@ describe("a record that is not there (removed, or a mistyped link) offers the wa
     expect(html).toContain("This report could not be opened");
     expect(html).toContain("All reports");
     expect(html).not.toContain(">Retry<");
+  });
+});
+
+describe("the decision tree's saves (0.10.88): answering quickly never leaves the outcome behind", () => {
+  it("sends the newest answers once the save in flight is answered, skipping the ones in between", async () => {
+    const saves = latestSaves<number>();
+    const sent: number[] = [];
+    let release = () => undefined as void;
+    const first = new Promise<void>((resolve) => (release = resolve));
+    const send = (answer: number) => async () => {
+      sent.push(answer);
+      if (answer === 1) await first;
+      return answer;
+    };
+    const runs = [saves.run(send(1))];
+    await vi.waitFor(() => expect(sent).toEqual([1]));
+    runs.push(...[2, 3, 4, 5, 6].map((answer) => saves.run(send(answer))));
+    expect(saves.pending()).toBe(true);
+    release();
+    const results = await Promise.all(runs);
+    // One save was in flight, five were asked for meanwhile: only the newest of them is sent.
+    expect(sent).toEqual([1, 6]);
+    expect(results[5]).toBe(6);
+    expect(saves.pending()).toBe(false);
   });
 });
