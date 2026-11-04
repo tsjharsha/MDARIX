@@ -70,7 +70,8 @@ test.describe("a solo owner, desktop", () => {
     await accessible(page, "Home");
     await shot(page, "01-home");
     await openFromMenu(page, /^Getting started/);
-    await expect(page.getByRole("heading", { level: 1, name: /One complaint, from the first call/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Getting started" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Walkthrough steps" })).toBeVisible({ timeout: 60_000 });
     await accessible(page, "Getting started");
     await shot(page, "02-getting-started");
     expect(problems).toEqual([]);
