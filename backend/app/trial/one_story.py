@@ -98,25 +98,52 @@ def most_urgent(data: Session, control_db: Session, tenant_id) -> Complaint | No
     return min(serious, key=lambda row: (clock(row), row.complaint_identifier or ""))
 
 
-def subject(data: Session, control_db: Session, tenant_id, run: str) -> Complaint | None:
+def under_way(request, run: str, rows: list):
+    """The imported complaint the team's walkthrough is under way on (0.10.88): the one the latest marks name, until
+    its last step (Trends) is marked. Followed while no complaint reports a more serious harm, so concluding it (which
+    closes its clock) never sends the walkthrough back to another complaint in the middle of its steps."""
+    latest = None
+    for person in ((request.profile or {}).get(PROFILE_KEY) or {}).values():
+        mine = (person or {}).get(run) or {}
+        stamp = max((mine[step] for step in MARKS if mine.get(step)), default=None)
+        if stamp and (latest is None or stamp > latest[0]):
+            latest = (stamp, mine)
+    if latest is None or latest[1].get("trends"):
+        return None
+    kept = next((row for row in rows if str(row.id) == latest[1].get("complaint_id")), None)
+    if kept is None or harm_rank(kept) < max(harm_rank(row) for row in rows):
+        return None
+    return kept
+
+
+def subject(data: Session, control_db: Session, tenant_id, run: str, request=None) -> Complaint | None:
     from backend.app.trial.short_story import flagship
 
-    return flagship(data, tenant_id) if run == "sample" else most_urgent(data, control_db, tenant_id)
+    if run == "sample":
+        return flagship(data, tenant_id)
+    kept = under_way(request, run, _imported(data, tenant_id)) if request is not None else None
+    return kept or most_urgent(data, control_db, tenant_id)
+
+
+def _slot(person: dict, run: str, complaint_id) -> dict:
+    """A person's marks on one complaint of the run: the current one's, or an earlier one's, kept when the story
+    moved on (0.10.88: a story back on it keeps its ticks)."""
+    mine = (person or {}).get(run) or {}
+    if mine.get("complaint_id") == str(complaint_id):
+        return mine
+    return ((person or {}).get(f"{run}_earlier") or {}).get(str(complaint_id)) or {}
 
 
 def _marks(request, user_id: str, run: str, complaint_id) -> dict:
     """One person's own marks on the run's complaint."""
-    mine = (((request.profile or {}).get(PROFILE_KEY) or {}).get(str(user_id)) or {}).get(run) or {}
-    return mine if mine.get("complaint_id") == str(complaint_id) else {}
+    return _slot(((request.profile or {}).get(PROFILE_KEY) or {}).get(str(user_id)) or {}, run, complaint_id)
 
 
 def team_marks(request, run: str, complaint_id) -> dict:
     """Every colleague's marks on the run's complaint, merged: a step anyone opened, at the earliest time it was."""
     found: dict = {}
     for person in ((request.profile or {}).get(PROFILE_KEY) or {}).values():
-        mine = (person or {}).get(run) or {}
-        if mine.get("complaint_id") != str(complaint_id):
-            continue
+        mine = _slot(person, run, complaint_id)
         for step in MARKS:
             if mine.get(step) and (not found.get(step) or mine[step] < found[step]):
                 found[step] = mine[step]
@@ -128,7 +155,14 @@ def record_mark(request, user_id: str, run: str, complaint_id, step: str, now: d
     profile = dict(request.profile or {})
     story = dict(profile.get(PROFILE_KEY) or {})
     person = dict(story.get(str(user_id)) or {})
-    mine = _marks(request, user_id, run, complaint_id) or {"complaint_id": str(complaint_id)}
+    mine = _slot(person, run, complaint_id) or {"complaint_id": str(complaint_id)}
+    earlier = dict(person.get(f"{run}_earlier") or {})
+    current = person.get(run) or {}
+    if current.get("complaint_id") and current["complaint_id"] != str(complaint_id):
+        earlier[current["complaint_id"]] = current
+    earlier.pop(str(complaint_id), None)
+    if earlier:
+        person[f"{run}_earlier"] = earlier
     person[run] = {**mine, step: mine.get(step) or now.isoformat()}
     story[str(user_id)] = person
     profile[PROFILE_KEY] = story
@@ -186,7 +220,7 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
 
     from backend.app.db.models.foundation import Product
 
-    complaint = subject(data, control_db, tenant_id, run)
+    complaint = subject(data, control_db, tenant_id, run, request)
     if complaint is None:
         return None
     # The product's own identifier, which the trend check opens on (0.10.84, M4: your data's trend, not the sample's),

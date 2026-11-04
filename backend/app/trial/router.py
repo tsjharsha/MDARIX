@@ -552,7 +552,7 @@ def mark_one_story(
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     request = db.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).with_for_update().first()
-    complaint = story.subject(data, db, tenant_id, payload.run)
+    complaint = story.subject(data, db, tenant_id, payload.run, request) if request is not None else None
     if request is None or complaint is None:
         raise HTTPException(404, detail={"code": "NO_STORY_COMPLAINT", "message": "This story has no complaint yet"})
     if complaint.id != payload.complaint_id:
