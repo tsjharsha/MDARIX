@@ -292,6 +292,8 @@ def _mfa_session(request: Request, db: Session, *, lock: bool = False):
     user = (query.with_for_update().populate_existing() if lock else query).first()
     if not user:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    # The organization's access rules, as on every other route: a suspended member or an ended trial sets up nothing.
+    ensure_tenant_access(db, user)
     return row, user
 
 

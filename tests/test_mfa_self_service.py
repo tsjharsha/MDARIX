@@ -265,3 +265,21 @@ def test_an_idle_session_cannot_set_up_an_authenticator(clock):
     with SessionLocal() as db:
         bind_system(db, "test: read the account")
         assert db.get(AuthUser, user.id).mfa_pending_secret_encrypted is None
+
+
+def test_a_suspended_member_cannot_set_up_an_authenticator(clock):
+    """The MFA steps apply the organization's access rules as every other route does: a person whose membership is
+    suspended (or whose trial has ended) is refused before an authenticator is started (DEV-08 matrix)."""
+    from backend.app.db.models.foundation import TenantMembership
+
+    user = _user(role="Investigator")
+    client, _token = _client_for(user)
+    with SessionLocal() as db:
+        bind_system(db, "test: suspend the membership")
+        db.query(TenantMembership).filter(TenantMembership.user_id == user.id).update({"status": "SUSPENDED"})
+        db.commit()
+    refused = client.post("/api/v1/auth/mfa/enroll")
+    assert refused.status_code == 403 and refused.json()["detail"]["code"] == "MEMBERSHIP_SUSPENDED", refused.text
+    with SessionLocal() as db:
+        bind_system(db, "test: read the account")
+        assert db.get(AuthUser, user.id).mfa_pending_secret_encrypted is None
