@@ -1,8 +1,24 @@
 # MDARIX R1 — current status
 
-**Last verified:** 2026-11-04 (0.10.86, local; section below). Before that 2026-10-08, `main` after PR #2 (`mvp/pilot-readiness-final`, merged as `c57e2d9`), CI on GitHub
+**Last verified:** 2026-11-04 (0.10.88, local; section below). Before that 2026-10-08, `main` after PR #2 (`mvp/pilot-readiness-final`, merged as `c57e2d9`), CI on GitHub
 Actions and the local Windows development stack (Docker Compose). Earlier results are kept below for comparison.
 Update this file only from real command output.
+
+## 2026-11-04 verified results (0.10.88, `fix/trial-0.10.88-journeys`, local, not pushed)
+
+Build C of R2/R3 (DEV-10 journeys and accessibility, DEV-13 performance, monitoring and recovery), on 0.10.86 as
+released (v0.10.86 merged in). Run on Windows on the disposable database `mdarix_r1_test_r3`, recreated and prepared
+with `scripts/prepare_test_environment.py` before the gates. CI was not run (no push). Command results, not a
+certification.
+
+| Check | Command | Result |
+|---|---|---|
+| Backend suite | `python -m pytest` (commit 047da270) | 3,781 passed, 0 failed, 7 skipped, 4 deselected (dataplane), 42 min 35 s |
+| Python lint and format | `ruff check .`, `ruff format --check .` | Both exit 0 |
+| Frontend | `npm run lint`, `npm test`, `npm run build` | All exit 0; 1,488 tests in 207 files |
+| Frontend format | `npm run format:check` | Exit 1 on 047da270 (one test file formatted from the repository root); fixed in ff968020, exit 0 on 7e4bf303 |
+| Getting started's ten steps in the browser | `playwright test e2e/getting-started-journey.spec.ts` (Chrome, against `scripts/journey_api.py` and Vite) | 6 passed in 4 min 54 s: solo on the sample at 1440; a team with a second person approving at 390; its own data, not reportable; STEP_NOT_YET and STORY_MOVED refusals; no page error, no 5xx |
+| The trial's other journeys | `playwright test e2e/trial-journeys.spec.ts` | 5 passed. The team describe first met the activation throttle ("Too many attempts", from back-to-back runs on one machine), then a check of its own that counted the status line (fixed in 047da270); passed after both |
 
 ## 2026-11-04 verified results (0.10.86, `fix/trial-0.10.86`, local, not pushed)
 
