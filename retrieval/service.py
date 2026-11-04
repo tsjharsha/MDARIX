@@ -209,9 +209,8 @@ class TrustedRetrievalService:
             # Structured candidates score on tenant and anchors alone, so without a close match in meaning the
             # results are only the nearest records, not an answer.
             status = "INSUFFICIENT_RELEVANT_EVIDENCE"
-            limitations.append(
-                f"No record is close enough in meaning to the question (best {best_meaning:.2f}, needed {floor:.2f})."
-            )
+            # Plain words for the reader; the scores stay in the search log (returned_refs) and the result provenance.
+            limitations.append("No record is close enough in meaning to the question to count as an answer.")
 
         provenance = RetrievalQuery(
             id=uuid.uuid4(),

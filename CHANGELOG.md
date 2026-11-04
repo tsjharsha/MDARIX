@@ -10,6 +10,47 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.87] - 2026-11-04
+
+On the trial maintenance line (`release/0.10`): security, privacy and evaluation from the external code review's
+plan (DEV-08, DEV-11). No migration. The API, worker and scheduler images change; the web image does not. No
+operator step: no sample record, deadline or count changes.
+
+### Fixed: sign-in steps and invitations (DEV-08)
+
+- **An idle session can no longer set up an authenticator.** The two-factor steps skipped the idle timeout: a
+  browser left signed in and unused could still bind an authenticator app to an account that had none. They now end
+  an idle session as every other page does.
+- **The two-factor steps follow the organization's access rules**: a suspended member, or a trial that has ended,
+  sets up nothing (they answered as if access were open).
+- **Two invitations of one email at the same moment make one account.** An administrator's or a trial owner's two
+  quick clicks (or two people inviting one colleague) could create two accounts for one email in one organization.
+- **The first-contact guide needs a session**, as the rest of the first-contact pages do (it answered anyone; it
+  holds the starter guide text, no organization's records).
+
+### Fixed: the evidence search and Ask MDARIX (DEV-11)
+
+- **A question no record answers gets "not enough in your records", not the nearest unrelated records.** The search
+  scored every record as a match on organization alone, so an unrelated question came back with five arbitrary
+  records, and Ask (where AI is on) gave them to the AI. The search now abstains below a relevance floor set before
+  qualification, and Ask then asks no AI to guess. Free trials (AI off) see "No matching evidence found".
+- **Evidence an investigation set aside is no longer offered to Ask for that investigation** (its review rejected,
+  quarantined or superseded it), and a record's vector of earlier text is never ranked.
+- **Text inside a record that reads like an instruction to the AI is named to the reader** ("contain text that reads
+  like an instruction to the AI; it was given to the AI as data only").
+- **The search log keeps questions without personal details** (the masker every AI request uses), and each result
+  names the model revision and the relevance floor it was found with (search configuration `R1-retrieval-2`).
+- **Evidence searches and Ask questions are limited per person** (60 in 5 minutes), on top of the monthly AI
+  allowance.
+
+### Tests and checks
+
+- `tests/test_authorization_matrix.py`: the authorization and tenant-isolation matrix, generated from the route
+  table (actors x actions x states; a new route is in it automatically).
+- `evaluation/retrieval/local_retrieval_v1.json` and `tests/test_local_retrieval_evaluation.py`: a versioned
+  evaluation of the local search with the pinned model, thresholds set before qualification, and its governance
+  tested apart.
+
 ## [0.10.86] - 2026-11-04
 
 On the trial maintenance line (`release/0.10`): a reliability release from an external code review of 0.10.84. No
