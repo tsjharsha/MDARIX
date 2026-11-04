@@ -105,6 +105,7 @@ def behind_proxy(monkeypatch):
 # ------------------------------------------------------------------------------------------- Sign-up
 
 
+@pytest.mark.db
 def test_signup_tells_a_known_or_repeated_email_to_sign_in_or_wait():
     client = TestClient(app)
     existing = _user()
@@ -126,10 +127,15 @@ def test_signup_tells_a_known_or_repeated_email_to_sign_in_or_wait():
         db.close()
 
 
+@pytest.mark.db
 def test_signup_is_rate_limited_per_address(limits_on, behind_proxy):
+    from backend.app.rate_limit import SIGNUP_PER_ADDRESS_PER_HOUR
+
     client = TestClient(app)
     headers = {"X-Forwarded-For": "203.0.113.20"}
-    for _ in range(5):
+    # The policy is 30 an hour per address (0.10.62, J12: a venue's Wi-Fi); this test used to send 5.
+    assert SIGNUP_PER_ADDRESS_PER_HOUR == 30
+    for _ in range(SIGNUP_PER_ADDRESS_PER_HOUR):
         email = f"limit-{uuid.uuid4().hex[:10]}@example.invalid"
         response = client.post(
             "/api/v1/auth/signup",
@@ -167,6 +173,7 @@ def test_signup_is_rate_limited_per_address(limits_on, behind_proxy):
 # ------------------------------------------------------------------------------------------- Sign-in
 
 
+@pytest.mark.db
 def test_wrong_passwords_lock_only_the_address_that_sent_them(behind_proxy):
     user = _user()
     client = TestClient(app)
@@ -185,6 +192,7 @@ def test_wrong_passwords_lock_only_the_address_that_sent_them(behind_proxy):
     assert owner.status_code == 200, owner.text
 
 
+@pytest.mark.db
 def test_unknown_email_and_wrong_password_give_the_same_answer():
     user = _user()
     client = TestClient(app)
@@ -196,6 +204,7 @@ def test_unknown_email_and_wrong_password_give_the_same_answer():
     assert unknown.json() == wrong.json()
 
 
+@pytest.mark.db
 def test_signin_response_comes_from_the_database_and_sets_the_cookie():
     user = _user()
     client = TestClient(app)
@@ -207,6 +216,7 @@ def test_signin_response_comes_from_the_database_and_sets_the_cookie():
     assert client.cookies.get("mdarix_session")
 
 
+@pytest.mark.db
 def test_a_legacy_password_hash_is_upgraded_at_sign_in():
     salt = secrets.token_bytes(16)
     legacy = salt.hex() + ":" + hashlib.scrypt(PASSWORD.encode(), salt=salt, n=2**14, r=8, p=1).hex()
@@ -222,6 +232,7 @@ def test_a_legacy_password_hash_is_upgraded_at_sign_in():
         db.close()
 
 
+@pytest.mark.db
 def test_a_session_that_still_owes_mfa_lives_for_minutes_not_an_hour(monkeypatch):
     monkeypatch.setenv("MDARIX_REQUIRE_MFA_ROLES", "CUSTOMER_ADMIN")
     user = _user(role="CUSTOMER_ADMIN")
@@ -242,6 +253,7 @@ def test_a_session_that_still_owes_mfa_lives_for_minutes_not_an_hour(monkeypatch
 # ------------------------------------------------------------------------------------------- Passwords
 
 
+@pytest.mark.db
 def test_change_password_checks_the_current_one_and_the_rules():
     user = _user()
     client, _token = _client_for(user)
@@ -257,6 +269,7 @@ def test_change_password_checks_the_current_one_and_the_rules():
     assert reused.status_code == 422 and reused.json()["detail"]["code"] == "PASSWORD_REUSE_NOT_ALLOWED"
 
 
+@pytest.mark.db
 def test_change_password_signs_out_other_sessions_and_keeps_this_one():
     user = _user()
     client, token = _client_for(user)
@@ -280,6 +293,7 @@ def test_change_password_signs_out_other_sessions_and_keeps_this_one():
         db.close()
 
 
+@pytest.mark.db
 def test_change_password_counts_only_the_other_sessions_still_live():
     """NEW-5: sessions that had already expired or gone idle are no longer counted as "signed out"."""
     user = _user()
@@ -305,6 +319,7 @@ def test_change_password_counts_only_the_other_sessions_still_live():
     assert _session_live(token) and not any(_session_live(raw) for raw in (live_token, expired, idle))
 
 
+@pytest.mark.db
 def test_a_refused_password_leaves_the_reset_link_usable_and_success_ends_every_session():
     user = _user()
     _client, live_token = _client_for(user)
@@ -323,6 +338,7 @@ def test_a_refused_password_leaves_the_reset_link_usable_and_success_ends_every_
     assert again.status_code == 400
 
 
+@pytest.mark.db
 def test_invitations_last_48_hours_and_a_new_one_replaces_the_old():
     user = _user()
     db = SessionLocal()
@@ -347,6 +363,7 @@ def test_invitations_last_48_hours_and_a_new_one_replaces_the_old():
 # ------------------------------------------------------------------------------------------- MFA reset
 
 
+@pytest.mark.db
 def test_a_customer_admin_resets_a_users_mfa_but_not_their_own():
     tenant_admin = _user(role="CUSTOMER_ADMIN")
     member = _user(role="Investigator")
@@ -373,6 +390,7 @@ def test_a_customer_admin_resets_a_users_mfa_but_not_their_own():
         db.close()
 
 
+@pytest.mark.db
 def test_only_platform_admins_reset_mfa_across_organizations():
     member = _user(role="Investigator")
     viewer_client, _ = _client_for(_user(role="Viewer"))
@@ -509,6 +527,7 @@ def test_production_ai_goes_only_to_contracted_or_self_hosted_providers(monkeypa
 
 
 @pytest.mark.skipif(not runtime_role_active(), reason="needs the least-privilege runtime role")
+@pytest.mark.db
 def test_the_application_role_cannot_open_system_scope_by_itself():
     with runtime_engine.connect() as connection:
         connection.execute(text("SELECT set_config('app.rls_bypass', 'on', true)"))

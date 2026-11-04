@@ -9,6 +9,7 @@ The decision, its context snapshot and its follow-ups live in the tenant data pl
 from __future__ import annotations
 
 import logging
+import uuid
 from types import SimpleNamespace
 
 from sqlalchemy.orm import Session
@@ -555,11 +556,34 @@ def follow_up_view(row: DecisionFollowUp, people: dict[str, str], now) -> dict:
     }
 
 
+def signed_before(db: Session, case, signer_id, brief_version_id, request_hash: str) -> Decision | None:
+    """The decision this signer already signed on this case with exactly this request (rules.request_hash), if any."""
+    for decision in db.query(Decision).filter(
+        Decision.tenant_id == case.tenant_id,
+        Decision.investigation_id == case.id,
+        Decision.decision_kind == rules.DECISION_KIND,
+        Decision.brief_version_id == brief_version_id,
+        Decision.decided_by_user_id == uuid.UUID(str(signer_id)),
+    ):
+        if (
+            isinstance(decision.context_snapshot, dict)
+            and decision.context_snapshot.get("request_hash") == request_hash
+        ):
+            return decision
+    return None
+
+
 def record_view(control_db: Session, db: Session, decision: Decision) -> dict:
     """The signed decision record: the decision, its brief, its signature and verification, its snapshot, its
-    follow-ups and the decisions it supersedes or is superseded by."""
+    follow-ups and the decisions it supersedes or is superseded by. A signature still PENDING (a dedicated plane's
+    signing interrupted after its decision was saved) is settled first (backend/app/signing_commit.py)."""
+    from backend.app import signing_commit
+
     tenant_id = decision.tenant_id
     record = signature_record(control_db, decision)
+    if record is not None and record.status == signing_commit.PENDING and db is not control_db:
+        signing_commit.settle(control_db, db, record.id)
+        record = signature_record(control_db, decision)
     rows = follow_ups(db, decision)
     people = names(
         control_db,

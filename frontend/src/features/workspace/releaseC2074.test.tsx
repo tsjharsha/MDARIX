@@ -18,7 +18,7 @@ import { CaseHeader } from "./sections/CaseHeader";
 import { LatestSigned, NewRecordsSection } from "./sections/Records";
 import { StoryBar } from "./sections/Entrance";
 import { GlobalSearch } from "./HybridShell";
-import { eventPath, type EventView } from "./oversight";
+import { eventPath } from "./oversight";
 import { SHORT_STORY_PATH, type ShortStory } from "./shortStory";
 import { Table } from "../customer-admin/shared";
 import { addressFor } from "./workspaceAddress";
@@ -139,17 +139,24 @@ describe("list views: one choice, the persona's own first", () => {
         rows={[row]}
         rowKey={(item) => String(item.id)}
         empty={{ title: "", detail: "" }}
-        columns={workColumns({}, () => undefined, null)}
+        columns={workColumns({}, () => undefined)}
       />,
     );
     // The design system's card layout at phone width (admin-console.css .ac-table.ms-cards, ≤640 px).
     expect(html).toContain('class="ac-table ms-cards');
     const labels = [...html.matchAll(/data-label="([^"]*)"/g)].map((match) => match[1]);
-    expect(labels).toEqual(["Urgency", "What happened", "Product, version, lot", "Markets", "Owner", "Stage", ""]);
-    expect(html.match(/<button[^>]*class="ac-secondary"/g)?.length).toBe(1);
-    expect(html).toContain(">Open<");
+    // 0.10.85, D3.1: the legal clock and the incident country; the reference is the row's one action.
+    expect(labels).toEqual([
+      "Legal clock",
+      "What happened",
+      "Product, version, lot",
+      "Incident country",
+      "Owner",
+      "Stage",
+    ]);
+    expect(html.match(/<tbody>.*<\/tbody>/s)![0].match(/<button/g)?.length).toBe(1);
     expect(html).toContain("Asha Quality");
-    expect(html).toContain("OrbitCare 300 · Rev B · Lot LOT-004");
+    expect(html).toContain('OrbitCare 300 · Rev B<span class="uw-lot"> · Lot LOT-004</span>');
   });
 
   it("lists every investigation in the Investigations tab, open ones first, with the same six-column shape", () => {
@@ -203,8 +210,9 @@ describe("the record page: highlights, path, Details · Related · Activity, and
     expect(html).toContain("Complaint · PulseWatch 410 Patient Monitor (Sample) · Rev A");
     expect(html).toContain("<h1");
     expect(html).toContain("SAMPLE-PULSE-410-LOT-002");
-    expect(html).toContain("CMP000038");
-    for (const field of ["Owner", "Markets", "Lot", "Also known as"]) expect(html).toContain(`<dt>${field}</dt>`);
+    // 0.10.85, D3.12: no internal id where the record has a name.
+    expect(html).not.toContain("CMP000038");
+    for (const field of ["Owner", "Markets", "Lot"]) expect(html).toContain(`<dt>${field}</dt>`);
     // The path: each stage as a chevron, the current one marked.
     expect(html).toMatch(/<li class="is-done"[^>]*>.*Triage/);
     expect(html).toMatch(/<li class="is-now" aria-current="step">.*Market assessment/);
@@ -214,7 +222,7 @@ describe("the record page: highlights, path, Details · Related · Activity, and
     expect(html).toContain(">Related<");
     expect(html).toContain(">Activity<");
     // The rail: the next step is the list's and Oversight's next action, one main button.
-    const rail = html.slice(html.indexOf('aria-label="What to do next"'));
+    const rail = html.slice(html.indexOf('aria-label="Next step"'));
     expect(rail).toContain("<b>Assess the United States (FDA) market</b>");
     expect(html.match(/class="ac-primary"/g)?.length).toBe(1);
     // Legal clocks: the work line's nearest deadline, as the list's urgency reads it.
@@ -283,7 +291,8 @@ describe("the record page: highlights, path, Details · Related · Activity, and
         onChanged={() => undefined}
       />,
     );
-    expect(html).toContain("Investigation · OrbitCare 300");
+    // 0.10.85, D3.9: the reference beside the product; the question is the heading.
+    expect(html).toContain("Investigation · INV000001 · OrbitCare 300");
     expect(html).toContain("INV000001");
     for (const field of ["Owner", "Complaints in scope", "Lots in scope", "Blocking the decision"])
       expect(html).toContain(`<dt>${field}</dt>`);
@@ -304,7 +313,7 @@ describe("Records leads with the latest signed record, and the finished story sa
       },
     };
     const pilot = render(<NewRecordsSection />, api({ isTrial: false }));
-    expect(pilot).toContain("Your latest signed record");
+    expect(pilot).toContain("Your latest record");
     expect(pilot).toContain("United States (FDA) conclusion: reportable · SAMPLE-RV-11");
     expect(pilot).toContain("Download the decision record (PDF)");
     expect(pilot).toContain("Open SAMPLE-RV-11");
@@ -323,7 +332,8 @@ describe("Records leads with the latest signed record, and the finished story sa
     );
     expect(alone).toContain("Open the decision records");
     resources.data["/api/v1/oversight/latest-signed"] = { record: null };
-    expect(render(<NewRecordsSection />, api({ isTrial: false }))).not.toContain("Your latest signed record");
+    // 0.10.85, D3.4: with nothing signed, Records still opens on "Your latest record", saying how a first one comes.
+    expect(render(<NewRecordsSection />, api({ isTrial: false }))).toContain("No signed record yet");
   });
 
   it("says the short story is finished instead of off its path", () => {

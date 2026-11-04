@@ -203,8 +203,9 @@ def trial_status(
         "starts_at": subscription.starts_at.isoformat(),
         "expires_at": subscription.expires_at.isoformat(),
         # When the trial's data is deleted at the earliest unless the organization continues: counting a grace
-        # extension and an open request to move the data into the MVP (backend/app/trial/retention.py).
-        "data_deleted_at": retention.deletion_date(db, data, subscription, now).isoformat(),
+        # extension and an open request to move the data into the MVP; none under a legal hold, with the hold
+        # (backend/app/trial/retention.py, the one projection every screen and e-mail reads).
+        **_retention_fields(retention.projection(db, data, subscription, now)),
         "days_left": max(0, int(-(-seconds_left // 86400))),
         "limits": {"users": trial_user_cap(), "rows": TRIAL_ROW_LIMIT, "file_bytes": TRIAL_FILE_LIMIT_BYTES},
         "usage": {"users": int(users or 0), "rows": uploaded},
@@ -532,6 +533,9 @@ def one_story(
 class OneStoryMark(BaseModel):
     run: str = Field(pattern="^(sample|yours)$")
     step: str = Field(pattern="^(call|form|records|trends)$")
+    # The complaint the person's screen showed: the story's complaint can move (a new urgent import), and a mark
+    # must never land on a complaint the person did not open.
+    complaint_id: uuid.UUID
 
 
 @router.post("/trial/one-story/marks")
@@ -551,6 +555,27 @@ def mark_one_story(
     complaint = story.subject(data, db, tenant_id, payload.run)
     if request is None or complaint is None:
         raise HTTPException(404, detail={"code": "NO_STORY_COMPLAINT", "message": "This story has no complaint yet"})
+    if complaint.id != payload.complaint_id:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "STORY_MOVED",
+                "message": f"The story now follows {complaint.complaint_identifier}. Open Getting started again.",
+            },
+        )
+    # A mark counts only at its place in the story: Records or Trends opened before the steps ahead of it are done is
+    # not credited later.
+    index = story.MARK_STEP[payload.step]
+    run = story.run_progress(data, db, ctx, tenant_id, request, payload.run)
+    if run["current"] < index:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "STEP_NOT_YET",
+                "message": f"Step {index + 1} counts once steps 1 to {index} are done; "
+                f"step {run['current'] + 1} is next.",
+            },
+        )
     story.record_mark(request, str(ctx.user_id), payload.run, complaint.id, payload.step, datetime.now(timezone.utc))
     db.commit()
     return story.progress(data, db, ctx, tenant_id, request)
@@ -1242,6 +1267,15 @@ def trial_support_access_activity(
 
 
 # ------------------------------------------------------------------------------------------- Data retention
+
+
+def _retention_fields(plan: dict) -> dict:
+    """The status's deletion date and hold (no date under a legal hold)."""
+    return {
+        "data_deleted_at": plan["earliest_deletion"].isoformat() if plan["earliest_deletion"] else None,
+        "data_hold": plan["hold"],
+        "data_hold_reason": retention.HOLD_REASONS.get(plan["hold"]),
+    }
 
 
 @router.get("/platform-admin/trial-retention")

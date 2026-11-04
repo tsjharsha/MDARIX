@@ -121,8 +121,9 @@ def trial_has_ended(db: Session, tenant_id, now: datetime | None = None) -> bool
 
 def trial_end_dates(db: Session, tenant_id) -> tuple[str | None, str | None]:
     """When a Free Trial ended and when its data is deleted, with the time and its zone (``long_moment``), for the
-    trial-ended page."""
-    from backend.app.trial.retention import RETENTION_DAYS
+    trial-ended page: the one retention projection (grace, an open request to move the data; no date under a legal
+    hold)."""
+    from backend.app.trial import retention
 
     free_trial = select(PlanDefinition.id).where(PlanDefinition.code == FREE_TRIAL_PLAN).scalar_subquery()
     row = (
@@ -132,8 +133,8 @@ def trial_end_dates(db: Session, tenant_id) -> tuple[str | None, str | None]:
     )
     if row is None or not isinstance(row.expires_at, datetime):
         return None, None
-    ended = max(row.expires_at, row.grace_ends_at or row.expires_at)
-    return long_moment(ended), long_moment(ended + timedelta(days=RETENTION_DAYS))
+    plan = retention.projection(db, db, row)
+    return long_moment(plan["trial_ended_at"]), retention.deletion_words(plan)
 
 
 def _free_trial_plan(db: Session, now: datetime) -> PlanDefinition:
@@ -203,6 +204,25 @@ def serialize_request(db: Session, row: OnboardingRequest) -> dict:
     return serialize_requests(db, [row])[0]
 
 
+def _retention_of(db: Session, tenants: dict, subscriptions: dict) -> dict:
+    """``{tenant id: retention.plan_view}`` of the trials still holding data (not archived, not converted), from what
+    the queue read already (retention.retention_plan; the requests to move data come with the tenants)."""
+    from backend.app.trial import retention
+    from backend.app.trial.mvp_request import data_move
+
+    now = datetime.now(timezone.utc)
+    live = [key for key, tenant in tenants.items() if tenant.status != "ARCHIVED" and key in subscriptions]
+    found = {}
+    for key in live:
+        asked = retention.requests_of(tenants[key])
+        movable = bool(asked and asked["open"] is not None and data_move(db, key)["allowed"])
+        plan = retention.retention_plan(
+            retention.effective_end(subscriptions[key]), asked, movable, now, bool(tenants[key].legal_hold)
+        )
+        found[key] = retention.plan_view(plan)
+    return found
+
+
 def serialize_requests(db: Session, rows: list[OnboardingRequest]) -> list[dict]:
     """The queue's view of each request, with its trial workspace, the trial's end, whether the requester has
     activated their account (INVITED until they do, then ACTIVE) and who reviewed it: four statements for any number
@@ -222,15 +242,25 @@ def serialize_requests(db: Session, rows: list[OnboardingRequest]) -> list[dict]
         else {}
     )
     if tenant_ids:
+        from backend.app.trial.retention import move_request_columns
+
         tenants = {
             tenant.id: tenant
             for tenant in db.query(
-                Tenant.id, Tenant.business_id, Tenant.tenant_key, Tenant.tenant_identifier, Tenant.status
+                Tenant.id,
+                Tenant.business_id,
+                Tenant.tenant_key,
+                Tenant.tenant_identifier,
+                Tenant.status,
+                Tenant.legal_hold,
+                *move_request_columns(Tenant.id),
             ).filter(Tenant.id.in_(tenant_ids))
         }
         # Each tenant's latest Free Trial subscription (trial_subscription); a converted tenant has none.
         for subscription in (
-            db.query(SubscriptionLifecycle.tenant_id, SubscriptionLifecycle.expires_at)
+            db.query(
+                SubscriptionLifecycle.tenant_id, SubscriptionLifecycle.expires_at, SubscriptionLifecycle.grace_ends_at
+            )
             .join(PlanDefinition, PlanDefinition.id == SubscriptionLifecycle.plan_id)
             .filter(SubscriptionLifecycle.tenant_id.in_(tenant_ids), PlanDefinition.code == FREE_TRIAL_PLAN)
             .order_by(SubscriptionLifecycle.created_at.desc(), SubscriptionLifecycle.id)
@@ -243,6 +273,7 @@ def serialize_requests(db: Session, rows: list[OnboardingRequest]) -> list[dict]
                 AuthUser.tenant_id.in_(tenant_ids), AuthUser.username.in_(emails)
             )
         }
+    kept = _retention_of(db, tenants, subscriptions)
     return [
         _request_view(
             row,
@@ -250,13 +281,19 @@ def serialize_requests(db: Session, rows: list[OnboardingRequest]) -> list[dict]
             subscriptions.get(row.tenant_id),
             owner_status.get((row.tenant_id, row.email.strip().lower())) if row.tenant_id else None,
             reviewers.get(row.reviewed_by) if row.reviewed_by else None,
+            kept.get(row.tenant_id),
         )
         for row in rows
     ]
 
 
 def _request_view(
-    row: OnboardingRequest, tenant, subscription, owner_status: str | None, reviewed_by_name: str | None = None
+    row: OnboardingRequest,
+    tenant,
+    subscription,
+    owner_status: str | None,
+    reviewed_by_name: str | None = None,
+    retention_plan: dict | None = None,
 ) -> dict:
     return {
         "id": str(row.id),
@@ -277,8 +314,10 @@ def _request_view(
         "tenant_key": tenant.tenant_key if tenant else None,
         "tenant_identifier": tenant.tenant_identifier if tenant else None,
         "trial_expires_at": subscription.expires_at.isoformat() if subscription else None,
-        # Closed trials keep their data for 30 days (trial.retention), then it is deleted and the workspace archived.
-        "data_delete_after": (subscription.expires_at + timedelta(days=30)).isoformat() if subscription else None,
+        # When its data is deleted at the earliest (trial.retention, the one projection: grace, an open request to move
+        # the data, none under a legal hold or once converted or archived).
+        "data_delete_after": retention_plan["earliest_deletion"] if retention_plan else None,
+        "data_hold": retention_plan["hold"] if retention_plan else None,
         "data_deleted": bool(tenant and tenant.status == "ARCHIVED"),
         "owner_status": owner_status,
         # The latest invitation email (SENT, FAILED or NOT_CONFIGURED; None before md47) and when it was tried.

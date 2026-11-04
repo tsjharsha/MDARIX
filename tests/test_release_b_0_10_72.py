@@ -11,7 +11,6 @@ import pytest
 
 from backend.app.reportability import markets
 
-pytestmark = pytest.mark.unit
 
 RV11 = {"death": False, "serious_injury": False, "malfunction": True, "patient_involved": True}
 

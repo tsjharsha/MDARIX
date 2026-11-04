@@ -534,7 +534,7 @@ function TriageDrawer({
             </div>
             {problem && <p className="uw-hint">{problem}</p>}
             <div className="ca-action-row">
-              <button type="submit" className="ac-primary" disabled={busy || !!problem}>
+              <button type="submit" className="ac-primary" disabled={busy || !!problem} title={problem || undefined}>
                 {busy ? "Saving…" : "Save the triage record"}
               </button>
             </div>

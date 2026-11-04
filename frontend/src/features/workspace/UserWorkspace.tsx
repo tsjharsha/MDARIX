@@ -79,7 +79,8 @@ import { requestJson } from "../../app/apiClient";
 import { rolesSummary, shortRoles } from "../../app/roles";
 import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
 import { signalFromSearch, signalLinkStart } from "./signals";
-import { zoneName } from "../../app/dates";
+import { setDisplayZone, zoneName } from "../../app/dates";
+import { useResource } from "../customer-admin/shared";
 import { PARKED_SECTIONS, featureSetOf, routeFor } from "../../app/featureSet";
 import { NEW_MENU, NEW_PLACES, OLD_VIEWS, navigationOf, placeLabel, placeOf, tabParts } from "../../app/linkTable";
 import { TrendsSection } from "./sections/Trends";
@@ -334,6 +335,11 @@ export const NEW_HEADS: Partial<Record<WorkspaceSection, string>> = {
   Records: "What did you finish last?",
   Team: "Who works on your trial?",
   "Import your data": "Bring your own complaints in",
+  // 0.10.85, D3.6: every new-navigation page asks its question.
+  Settings: "How does your organization work?",
+  "My Account": "How do you sign in and work?",
+  "Share feedback": "What should we improve?",
+  "Next steps": "What comes after the trial?",
 };
 
 /** Under the MVP feature set Records and My Work also hold what the parked sections did (app/featureSet.ts). */
@@ -379,6 +385,10 @@ export function UserWorkspace({
   // The organization's navigation: the new one (stage 7) only under the MVP feature set, whose screens have addresses.
   const navigation = featureSet === "mvp" ? navigationOf(session?.navigation) : "classic";
   const fresh = navigation === "new";
+  // The organization's time zone (its working calendar): every time on the new navigation is in it, and each page
+  // head names it once (0.10.85, D3.6). The classic navigation keeps the browser's.
+  const calendar = useResource<{ time_zone?: string }>(fresh ? "/api/v1/oversight/settings" : null);
+  setDisplayZone(fresh ? calendar.data?.time_zone : null);
   // The screen the address names (?section=, ?step=, ?tab=), under the MVP feature set only.
   const [addressed] = useState(() =>
     featureSet === "mvp"
@@ -652,6 +662,7 @@ export function UserWorkspace({
     dataSource,
     chooseDataSource,
     refreshTrial,
+    canOpen: (name: string) => visibleSections.includes(name as WorkspaceSection),
   };
   const { section, tab } = location;
   // "Import your data" beside the Sample data label, and in the avatar menu on a phone (0.10.79).
@@ -721,9 +732,9 @@ export function UserWorkspace({
                   ...(trial?.is_trial
                     ? [
                         {
-                          label: "The sample event and its stories",
-                          detail: "Getting started",
-                          onSelect: () => open("Getting started"),
+                          label: "Short stories and your trial",
+                          detail: "Three short stories, the ten chapters, the sample data",
+                          onSelect: () => open("Getting started", "Your trial"),
                         },
                         { label: "Look ahead", detail: LOOK_AHEAD_SUBTITLE, onSelect: () => open("Look ahead") },
                       ]
@@ -745,7 +756,12 @@ export function UserWorkspace({
                 data={dataBar === "choice" ? { source: dataSource, onChoose: chooseDataSource } : undefined}
               />
             </header>
-            <TabBar tabs={tabs} current={tabOfSection(section)} open={open} />
+            <TabBar
+              tabs={tabs}
+              current={tabOfSection(section)}
+              open={open}
+              personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
+            />
           </>
         )}
         {!fresh && (
@@ -945,6 +961,7 @@ export function UserWorkspace({
                             {NEW_HEADS[section] ?? placeLabel(section, navigation)}
                           </h1>
                           <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
+                          <p className="ac-page-zone">Times are in {zoneName()}, your organization's time zone.</p>
                         </div>
                       ) : (
                         <div>

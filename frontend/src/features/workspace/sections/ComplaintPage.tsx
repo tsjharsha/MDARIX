@@ -10,7 +10,6 @@ import { chooseCase, renamed, useCan, useOpenTarget, useWorkspace } from "../wor
 import { tabParam, withTabParam } from "../workspaceAddress";
 import {
   CHECK_TONES,
-  EVENT_TONES,
   eventPath,
   type ActivityItem,
   type CheckItem,
@@ -33,7 +32,7 @@ import { TRIAGE, type TriageList } from "../intake";
 import { treePlace } from "./DecisionTrees";
 import { FLAGSHIP } from "../entrance";
 import { requestJson } from "../../../app/apiClient";
-import { awarenessText } from "../../../app/dates";
+import { awarenessText, zoneName, zoneless } from "../../../app/dates";
 import { ReportingFacts } from "./ReportingFacts";
 import { StoryPill } from "./OneStory";
 import { dueDay } from "./Home";
@@ -228,6 +227,9 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   const markets = (work?.markets?.length ? work.markets : [event.market]).filter(Boolean) as string[];
   const ordered = [...blocked, ...view.checklist.filter((item) => item.result !== "BLOCKED")];
   const readyNow = (!!step && !step.opens) || !!view.ready;
+  // The stage reads "Report" once every conclusion is signed (0.10.85, D3.2): it opens the report itself.
+  const reportStage =
+    reports.length > 0 && view.stages.some((stage) => stage.code === "MARKETS" && stage.label === "Report");
   const record = (
     <>
       <div className="uw-topline">
@@ -238,7 +240,11 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           <span aria-hidden="true">›</span>
           <span>{event.ref}</span>
         </nav>
-        {storyRun && <StoryPill run={storyRun} />}
+        <span className="uw-topline-end">
+          {/* The organization's time zone, named once for the page (0.10.85, D3.6). */}
+          <span className="ac-page-zone">Times in {zoneName()}</span>
+          {storyRun && <StoryPill run={storyRun} />}
+        </span>
       </div>
       <header className="uw-card uw-highlights" aria-label="The complaint at a glance">
         <div className="uw-hl-top">
@@ -249,7 +255,6 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
             <h1 ref={heading} tabIndex={-1}>
               {event.ref}
             </h1>
-            <p className="uw-cp-what">{headline(event.description)}</p>
           </div>
           <div className="uw-cp-chips">
             <HarmChip harm={harm.harm} label={harm.label} />
@@ -262,8 +267,34 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                 suffix={`due ${dueDay(clock)}`}
               />
             )}
-            <ToneBadge tone={EVENT_TONES[view.state]} label={view.state_label} />
           </div>
+        </div>
+        {/* The record's hero (0.10.85, D3.3): the reporter's words, the harm and the one clock line above, the one
+            Next step beside them. */}
+        <div className="uw-cp-hero">
+          <figure className="uw-cp-words">
+            <blockquote>“{event.description || "No description recorded."}”</blockquote>
+            <figcaption>
+              {event.sample ? "The reporter's words (fictional sample)" : "The reporter's words, from your record"}
+            </figcaption>
+          </figure>
+          <NextStepCard
+            view={view}
+            step={step}
+            triageHere={triageHere}
+            storyShown={storyShown}
+            storyRun={storyRun}
+            onStory={(run) => {
+              startStory?.(null);
+              void openStep(run, run.current, open);
+            }}
+            onStep={() => {
+              if (step?.opens) return go(step.opens);
+              choose("Summary");
+              document.getElementById("cp-ready")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+            onShowTriage={active === "Summary" ? undefined : () => choose("Summary")}
+          />
         </div>
         {view.service?.header && (
           // Completing the service never closes the complaint (0.10.71, A5): the quality work is still open.
@@ -302,40 +333,40 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
             <dt>Lot</dt>
             <dd className="uw-mono">{event.lot ?? "—"}</dd>
           </div>
-          <div>
-            <dt>Also known as</dt>
-            <dd className="uw-mono">
-              {event.business_id && event.business_id !== event.ref ? event.business_id : "—"}
-            </dd>
-          </div>
         </dl>
         {/* The progress steps are links (0.10.82, D1.8): Market assessment opens the tree, Report the report. */}
         <StagePath
           stages={view.stages}
           links={{
             TRIAGE: triageHere ? () => openHere(step?.opens ?? null) : undefined,
-            MARKETS: markets[0]
+            MARKETS: reportStage
               ? () => {
-                  const place = treePlace(markets[0], event.complaint_id);
+                  const place = reportPlace(reports[0].id);
                   open(place.section, place.tab);
                 }
-              : undefined,
+              : markets[0]
+                ? () => {
+                    const place = treePlace(markets[0], event.complaint_id);
+                    open(place.section, place.tab);
+                  }
+                : undefined,
           }}
           after={{
-            MARKETS: reports.length ? (
-              <span className="uw-stageline-extra">
-                <button
-                  type="button"
-                  className="ac-link"
-                  onClick={() => {
-                    const place = reportPlace(reports[0].id);
-                    open(place.section, place.tab);
-                  }}
-                >
-                  Report
-                </button>
-              </span>
-            ) : null,
+            MARKETS:
+              reports.length && !reportStage ? (
+                <span className="uw-stageline-extra">
+                  <button
+                    type="button"
+                    className="ac-link"
+                    onClick={() => {
+                      const place = reportPlace(reports[0].id);
+                      open(place.section, place.tab);
+                    }}
+                  >
+                    Report
+                  </button>
+                </span>
+              ) : null,
           }}
         />
       </header>
@@ -362,7 +393,16 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
             {active === "Summary" && (
               <>
                 {/* Triage is done here when it is the next step (0.10.72, B3), first in Details beside the rail. */}
-                {triageHere && <InlineTriage complaintId={event.complaint_id} onDone={() => resource.reload()} />}
+                {triageHere &&
+                  (storyRun && !storyRun.finished && storyRun.current !== 1 ? (
+                    // The story is on another step: the triage form folds until it is asked for (0.10.85, D3.3).
+                    <details className="uw-more uw-cp-fold">
+                      <summary>Triage record: not complete yet</summary>
+                      <InlineTriage complaintId={event.complaint_id} onDone={() => resource.reload()} />
+                    </details>
+                  ) : (
+                    <InlineTriage complaintId={event.complaint_id} onDone={() => resource.reload()} />
+                  ))}
                 {/* The facts the reporting steps need, asked once (0.10.81's ask; 0.10.82, D1.7: here, not twice). */}
                 <ReportingFacts
                   complaintId={event.complaint_id}
@@ -371,10 +411,6 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                   onSaved={() => void requestJson<EventView>(eventPath(event.ref)).then(changed)}
                 />
                 <dl className="uw-rec-facts">
-                  <dt>What happened</dt>
-                  <dd>{event.description || "No description recorded."}</dd>
-                  <dt>Harm</dt>
-                  <dd>{harm.label}</dd>
                   <dt>Patient involved</dt>
                   <dd>{event.patient_involved == null ? "Not recorded" : event.patient_involved ? "Yes" : "No"}</dd>
                   <dt>Problem</dt>
@@ -404,29 +440,24 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                         : "None of your reporting markets applies"}
                     <small>Each market's tree: the question, the answer, the clause and the outcome.</small>
                   </dd>
-                  <dt>Awareness</dt>
-                  <dd>
-                    {needed("AWARENESS_DATE")
-                      ? "Asked above"
-                      : awarenessText(event.awareness_at, event.awareness_date_only)}
-                    <small>The legal clocks count from here.</small>
-                  </dd>
                   <dt>In your QMS</dt>
                   <dd>{event.status_in_qms}</dd>
-                  <dt>Service work</dt>
-                  <dd>{serviceText(view)}</dd>
                 </dl>
-                <section className="uw-rec-part" aria-label="Each step, and who signs it">
-                  <h2>
-                    {blocked.length ? "What needs attention, and who signs each step" : "Each step, and who signs it"}
-                  </h2>
+                <details className="uw-rec-part uw-cp-fold">
+                  <summary>
+                    <h2>
+                      {blocked.length
+                        ? `Each step, and who signs it · ${blocked.length} open`
+                        : "Each step, and who signs it · nothing open"}
+                    </h2>
+                  </summary>
                   <ul className="uw-ov-checks">
                     {ordered.map((item) => (
                       <CheckRow key={item.code} item={item} view={view} onOpen={openHere} onChanged={changed} />
                     ))}
                   </ul>
                   <OwnerPicker view={view} onChanged={changed} />
-                </section>
+                </details>
                 {readyNow || readyShown ? (
                   <section className="uw-rec-part" id="cp-ready" aria-label="Ready to close">
                     <h2>Ready to close</h2>
@@ -453,24 +484,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
             {active === "Activity" && <Activity reference={event.ref} />}
           </div>
         </section>
-        <Rail
-          view={view}
-          step={step}
-          triageHere={triageHere}
-          storyShown={storyShown}
-          storyRun={storyRun}
-          onStory={(run) => {
-            startStory?.(null);
-            void openStep(run, run.current, open).then(oneStory.reload);
-          }}
-          onStep={() => {
-            if (step?.opens) return go(step.opens);
-            choose("Summary");
-            document.getElementById("cp-ready")?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }}
-          onShowTriage={active === "Summary" ? undefined : () => choose("Summary")}
-          onChanged={changed}
-        />
+        <Rail view={view} onChanged={changed} />
       </div>
     </>
   );
@@ -581,8 +595,8 @@ export function StagePath({
   );
 }
 
-/** The right rail: the next step (one main button), the legal clocks, who signs and the service work. */
-function Rail({
+/** The record's one Next step (one main button), in its hero (0.10.85, D3.3; the rail's first card before). */
+function NextStepCard({
   view,
   step,
   triageHere,
@@ -591,7 +605,6 @@ function Rail({
   onStory,
   onStep,
   onShowTriage,
-  onChanged,
 }: {
   view: EventView;
   /** The ten-step story's run when this complaint is its record: its step is the Next step (0.10.82, D1.5). */
@@ -603,8 +616,58 @@ function Rail({
   triageHere: boolean;
   storyShown: boolean;
   onStep: () => void;
-  onChanged: (view: EventView) => void;
 }) {
+  const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
+  return (
+    <section className="uw-cp-next" aria-label="Next step">
+      <h2>Next step</h2>
+      {storyRun && !storyRun.finished && !triageHere && !storyShown && onStory ? (
+        <>
+          <b>
+            Story step {storyRun.current + 1}: {STORY_ACTIONS[storyRun.current][0]}
+          </b>
+          <p className="ac-muted">{STORY_ACTIONS[storyRun.current][1]}</p>
+          <button type="button" className="ac-primary" onClick={() => onStory(storyRun)}>
+            {STORY_ACTIONS[storyRun.current][2]} <ChevronRight size={15} aria-hidden="true" />
+          </button>
+        </>
+      ) : triageHere ? (
+        <>
+          <b>{step?.label}</b>
+          <p className="ac-muted">The triage record is first in Details, below.</p>
+          {onShowTriage && (
+            <button type="button" className="ac-secondary" onClick={onShowTriage}>
+              Show the triage record
+            </button>
+          )}
+        </>
+      ) : step ? (
+        <>
+          <b>{step.label}</b>
+          <p className="ac-muted">{attentionText(blocked, true)}</p>
+          <button
+            type="button"
+            // While the short story shows its step, that step's button is the page's one main button (0.10.71).
+            // Sign ready to close is the form's own button in Details: this one is then secondary.
+            className={storyShown || !step.opens ? "ac-secondary" : "ac-primary"}
+            onClick={onStep}
+          >
+            {step.label} <ChevronRight size={15} aria-hidden="true" />
+          </button>
+        </>
+      ) : (
+        <p className="ac-muted">
+          {blocked.length
+            ? "Nothing to do: closed in your QMS, signed ready to close with its reason."
+            : "Nothing to do: every MDARIX decision on it is signed."}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** The right rail: the legal clocks, who signs and the service work (the last two fold on a phone's long page). */
+function Rail({ view, onChanged }: { view: EventView; onChanged: (view: EventView) => void }) {
   const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
   const lanes = legalLanes(view);
   const clocked = new Set((view.work?.due ?? []).filter((item) => isLegalDeadline(item)).map((item) => item.market));
@@ -614,53 +677,11 @@ function Rail({
   const code = blocked[0]?.code ?? "READY";
   const signers = view.signers?.[code];
   return (
-    <aside className="uw-rail" aria-label="What to do next">
-      <section className="uw-card uw-card-pad uw-rail-next">
-        <h2>Next step</h2>
-        {storyRun && !storyRun.finished && !triageHere && !storyShown && onStory ? (
-          <>
-            <b>
-              Story step {storyRun.current + 1}: {STORY_ACTIONS[storyRun.current][0]}
-            </b>
-            <p className="ac-muted">{STORY_ACTIONS[storyRun.current][1]}</p>
-            <button type="button" className="ac-primary" onClick={() => onStory(storyRun)}>
-              {STORY_ACTIONS[storyRun.current][2]} <ChevronRight size={15} aria-hidden="true" />
-            </button>
-          </>
-        ) : triageHere ? (
-          <>
-            <b>{step?.label}</b>
-            <p className="ac-muted">The triage record is first in Details.</p>
-            {onShowTriage && (
-              <button type="button" className="ac-secondary" onClick={onShowTriage}>
-                Show the triage record
-              </button>
-            )}
-          </>
-        ) : step ? (
-          <>
-            <b>{step.label}</b>
-            <p className="ac-muted">{attentionText(blocked, true)}</p>
-            <button
-              type="button"
-              // While the short story shows its step, that step's button is the page's one main button (0.10.71).
-              // Sign ready to close is the form's own button in Details: the rail's is then secondary.
-              className={storyShown || !step.opens ? "ac-secondary" : "ac-primary"}
-              onClick={onStep}
-            >
-              {step.label} <ChevronRight size={15} aria-hidden="true" />
-            </button>
-          </>
-        ) : (
-          <p className="ac-muted">
-            {blocked.length
-              ? "Nothing to do: closed in your QMS, signed ready to close with its reason."
-              : "Nothing to do: every MDARIX decision on it is signed."}
-          </p>
-        )}
-      </section>
-      <section className="uw-card uw-card-pad uw-rail-clocks" aria-label="Legal clocks">
-        <h2>Legal clocks</h2>
+    <aside className="uw-rail" aria-label="Clocks, signers and service work">
+      <details className="uw-card uw-card-pad uw-rail-clocks uw-cp-fold" open={!onPhone()}>
+        <summary>
+          <h2>Legal clocks</h2>
+        </summary>
         {!!view.event.needs?.length && (
           <p className="ac-muted">
             Provisional: {view.event.needs.map((need) => need.label.toLowerCase()).join(" and ")} asked in Details.
@@ -687,9 +708,11 @@ function Rail({
           <p className="ac-muted">No market to report to.</p>
         )}
         <p className="ac-note">Each clock counts from awareness. Starter rules, for your consultant to confirm.</p>
-      </section>
-      <section className="uw-card uw-card-pad uw-rail-signs" aria-label="Who signs">
-        <h2>Who signs</h2>
+      </details>
+      <details className="uw-card uw-card-pad uw-rail-signs uw-cp-fold" open={!onPhone()}>
+        <summary>
+          <h2>Who signs</h2>
+        </summary>
         <p className="ac-muted">{STEP_NAMES[code] ?? "This step"}:</p>
         {signers?.people.length ? (
           <ul className="uw-rail-signers">
@@ -704,13 +727,23 @@ function Rail({
         )}
         {signers?.second_person && <p className="ac-note">Never the person who prepared it.</p>}
         {view.record_people?.practice_note && <p className="ac-note">{view.record_people.practice_note}</p>}
-      </section>
-      <section className="uw-card uw-card-pad uw-rail-service">
+      </details>
+      <details className="uw-card uw-card-pad uw-rail-service uw-cp-fold" open={!onPhone()}>
+        <summary>
+          <h2>Service work</h2>
+          <span className="ac-muted">{serviceText(view)}</span>
+        </summary>
         <ServiceWork view={view} onChanged={onChanged} title="Service work" />
-      </section>
+      </details>
     </aside>
   );
 }
+
+/** A phone's width: the rail's long cards start folded there. */
+const onPhone = () =>
+  typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia("(max-width: 640px)").matches
+    : false;
 
 /** Each story step on the rail: what it is, one line, and its one button (Getting started's step card's action). */
 const STORY_ACTIONS: Array<[string, string, string]> = [
@@ -980,7 +1013,7 @@ export function legalLanes(view: Pick<EventView, "event" | "work">): Lane[] {
       from: view.event.awareness_at ?? item.due_at,
       to: item.due_at,
       note: item.title,
-      dueText: `Due ${item.due_label ?? formatDate(item.due_at)}`,
+      dueText: `Due ${item.due_label ? zoneless(item.due_label) : formatDate(item.due_at)}`,
       stateText:
         item.state === "OVERDUE"
           ? "Overdue"

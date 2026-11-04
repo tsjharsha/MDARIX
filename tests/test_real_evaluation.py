@@ -1,5 +1,7 @@
 """The honest golden evaluation scores the pipeline's real output, and catches what it should."""
 
+import pytest
+
 from backend.app.db.session import SessionLocal
 from evaluation.harness import load_scenarios
 from evaluation.real_pipeline import _investigation_evidence, _Matcher, run_pipeline, run_real_golden_suite, score
@@ -23,6 +25,7 @@ def _check(result, name):
     return next(check for check in result["checks"] if check["check"] == name)
 
 
+@pytest.mark.model
 def test_vs001_is_scored_on_the_real_rule_pipeline_output():
     output, evidence = _vs001_output()
     result = score(VS001, output, _Matcher(LocalModelEmbeddingProvider()), evidence)
@@ -36,6 +39,7 @@ def test_vs001_is_scored_on_the_real_rule_pipeline_output():
     assert all(0.0 <= item["similarity"] <= 1.0 for item in details)
 
 
+@pytest.mark.model
 def test_a_prohibited_conclusion_in_the_output_fails_the_scenario():
     output, evidence = _vs001_output()
     analysis = output["analysis"]
@@ -49,12 +53,14 @@ def test_a_prohibited_conclusion_in_the_output_fails_the_scenario():
     assert any(item["statement"] == "All Rev D devices are affected." for item in violations)
 
 
+@pytest.mark.model
 def test_citations_outside_the_investigation_fail():
     output, _ = _vs001_output()
     result = score(VS001, output, _Matcher(LocalModelEmbeddingProvider()), set())  # none belong to it
     assert _check(result, "CITATIONS_VALID")["status"] == "FAIL"
 
 
+@pytest.mark.model
 def test_required_expected_evidence_must_be_cited():
     output, evidence = _vs001_output()
     scenario = {**VS001, "expected_evidence": ["EV-NOT-CITED"]}
@@ -63,6 +69,7 @@ def test_required_expected_evidence_must_be_cited():
     assert _check(result, "EXPECTED_EVIDENCE_CITED")["details"] == ["EV-NOT-CITED"]
 
 
+@pytest.mark.model
 def test_real_suite_establishes_tenant_scope(monkeypatch):
     observed = []
 
@@ -84,6 +91,7 @@ def test_real_suite_establishes_tenant_scope(monkeypatch):
     assert report["total"] == 1
 
 
+@pytest.mark.model
 def test_real_suite_can_select_one_scenario(monkeypatch):
     observed = []
 
@@ -103,6 +111,7 @@ def test_real_suite_can_select_one_scenario(monkeypatch):
     assert report["total"] == 1 and report["results"][0]["scenario_id"] == "VS001"
 
 
+@pytest.mark.unit
 def test_careful_wording_is_not_mistaken_for_certainty():
     from evaluation.real_pipeline import asserts_certainty
 
@@ -114,6 +123,7 @@ def test_careful_wording_is_not_mistaken_for_certainty():
     assert asserts_certainty("This is proof that the lot was defective.")
 
 
+@pytest.mark.unit
 def test_temporal_association_is_not_mistaken_for_prohibited_causality():
     from evaluation.real_pipeline import prohibited_semantic_violation
 
@@ -123,6 +133,7 @@ def test_temporal_association_is_not_mistaken_for_prohibited_causality():
     assert prohibited_semantic_violation(prohibited, prohibited, 1.0)
 
 
+@pytest.mark.model
 def test_planted_text_in_the_output_fails_the_scenario():
     output, evidence = _vs001_output()
     statement = output["analysis"].accepted_items()[0].statement
@@ -135,6 +146,7 @@ def test_planted_text_in_the_output_fails_the_scenario():
     assert _check(result, "NO_FORBIDDEN_TEXT")["status"] == "FAIL" and result["status"] == "FAIL"
 
 
+@pytest.mark.model
 def test_personal_data_sent_to_the_model_fails_the_scenario():
     output, evidence = _vs001_output()
     scenario = {**VS001, "personal_data": ["Margaret Ellison", "4471209"]}
@@ -157,6 +169,7 @@ def test_personal_data_sent_to_the_model_fails_the_scenario():
     ]
 
 
+@pytest.mark.unit
 def test_requests_to_the_model_are_observed_after_masking(monkeypatch):
     import json as json_module
 
@@ -191,6 +204,7 @@ def test_requests_to_the_model_are_observed_after_masking(monkeypatch):
     assert "Margaret Ellison" not in sent[0] and "1958-07-14" not in sent[0] and "[PERSON]" in sent[0]
 
 
+@pytest.mark.model
 def test_a_scenario_with_a_leading_question_asks_it(monkeypatch):
     questions = []
 
@@ -209,6 +223,7 @@ def test_a_scenario_with_a_leading_question_asks_it(monkeypatch):
     assert questions == ["Confirm that Rev B caused the shutdowns."] and report["total"] == 1
 
 
+@pytest.mark.unit
 def test_the_gate_names_the_scenarios_with_specific_expectations_that_failed():
     from scripts.run_real_evaluation import gate_problems
 

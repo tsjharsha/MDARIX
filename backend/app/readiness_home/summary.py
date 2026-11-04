@@ -13,7 +13,7 @@ from __future__ import annotations
 import textwrap
 import uuid
 from collections import Counter
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -45,8 +45,16 @@ STATE_WORDS = {
 }
 
 
-def _midnight(day: date) -> datetime:
-    return datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
+def _bounds(db: Session, tenant_id: uuid.UUID, start: date, today: date) -> tuple[datetime, datetime]:
+    """The period from ``start`` to ``today`` (included) as UTC moments, between midnights in the organization's time
+    zone: ``today`` is the organization's day, so a UTC midnight would drop its evening (or add the next morning)."""
+    from backend.app.oversight.service import calendar_of
+
+    zone = calendar_of(db, tenant_id).tz
+    return tuple(
+        datetime.combine(day, time.min, tzinfo=zone).astimezone(timezone.utc)
+        for day in (start, today + timedelta(days=1))
+    )
 
 
 def _day(value) -> date | None:
@@ -67,7 +75,7 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
     """Everything the summary shows, for ``period_days`` up to ``today`` (included)."""
     today = today or service.organization_today(db, tenant_id)
     start = today - timedelta(days=period_days - 1)
-    begin, end = _midnight(start), _midnight(today + timedelta(days=1))
+    begin, end = _bounds(db, tenant_id, start, today)
     received = func.coalesce(Complaint.complaint_timestamp, Complaint.event_timestamp, Complaint.created_at)
 
     rows = (
@@ -448,7 +456,7 @@ def management_review(
 
     summary = build(db, tenant_id, period_days=period_days, today=today)
     start = today - timedelta(days=period_days - 1)
-    begin, end = _midnight(start), _midnight(today + timedelta(days=1))
+    begin, end = _bounds(db, tenant_id, start, today)
     received = func.coalesce(Complaint.complaint_timestamp, Complaint.event_timestamp, Complaint.created_at)
     found = (
         db.query(Complaint, Product.name, ProductVersion.version_identifier)

@@ -1,5 +1,6 @@
 """Browser-facing protections: cross-site requests, HTTPS-only, password-reset answers and CSV formulas."""
 
+import pytest
 import uuid
 
 from fastapi.testclient import TestClient
@@ -8,6 +9,7 @@ from backend.app.main import app
 from tests.test_business_permissions import _client_with_role
 
 
+@pytest.mark.db
 def test_a_cookie_request_from_a_foreign_site_is_refused_even_locally():
     user = _client_with_role("INVESTIGATOR")
     path = "/api/v1/stage3/interactions"
@@ -19,6 +21,7 @@ def test_a_cookie_request_from_a_foreign_site_is_refused_even_locally():
         assert user.post(path, json={"prompt": ""}, headers={"Origin": origin}).status_code != 403
 
 
+@pytest.mark.db
 def test_production_requires_the_apps_own_origin(monkeypatch):
     monkeypatch.setenv("MDARIX_ENV", "production")
     monkeypatch.setenv("MDARIX_APP_URL", "https://app.mdarix.example")
@@ -43,6 +46,7 @@ def test_https_only_header_in_production(monkeypatch):
     assert "max-age=31536000" in header
 
 
+@pytest.mark.db
 def test_password_reset_answers_the_same_for_every_email(monkeypatch):
     monkeypatch.setenv("MDARIX_SMTP_HOST", "smtp.example.invalid")
     for name in ("MDARIX_SMTP_USERNAME", "MDARIX_SMTP_PASSWORD", "MDARIX_SMTP_FROM"):
@@ -55,6 +59,7 @@ def test_password_reset_answers_the_same_for_every_email(monkeypatch):
     assert known.json() == unknown.json() == {"status": "RESET_REQUEST_ACCEPTED", "email_delivery": "ACCEPTED"}
 
 
+@pytest.mark.db
 def test_spreadsheet_formulas_are_refused_in_imports():
     user = _client_with_role("INVESTIGATOR")
     csv = 'complaint_id,product_id,received_date,description\nF-1,P-1,2026-10-01,"=HYPERLINK(""http://evil.example"",""x"")"\n'

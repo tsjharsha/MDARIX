@@ -127,24 +127,23 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
       {active === "Exports" && <Exports />}
     </Tabs>
   );
-  // The record of the work just finished leads, with its Download; every other record sits behind "All records"
-  // (0.10.72, B6). With nothing just finished, Records opens as before.
-  if (!storyRef && !finished && !latest) return all;
+  // Records always opens on "Your latest record" (0.10.85, D3.4; U-14): the record just finished, else the newest one
+  // signed, else what to do for a first one. Inspection readiness and every other record sit under it.
   return (
     <>
       {storyRef ? (
         <FinishedRecord reference={storyRef} />
       ) : latest ? (
         <LatestSigned record={latest} />
+      ) : finished ? (
+        <LatestRecord complaintId={finished.id} reference={finished.ref} />
       ) : (
-        finished && <LatestRecord complaintId={finished.id} reference={finished.ref} />
+        signed.data && <NoRecordYet />
       )}
-      <details className="uw-more" open={!!tab && !storyRef}>
-        <summary>
-          All records: inspection readiness, documents, decision records, audit trail, signatures, exports
-        </summary>
+      <section className="uw-records-all" aria-labelledby="uw-records-all">
+        <h2 id="uw-records-all">All records</h2>
         {all}
-      </details>
+      </section>
     </>
   );
 }
@@ -182,7 +181,7 @@ export function LatestSigned({ record }: { record: SignedRecord }) {
     open("Records", "Decision records");
   };
   return (
-    <Panel eyebrow="Your latest signed record" title={reference ? `${record.what} · ${reference}` : record.what}>
+    <Panel eyebrow="Your latest record" title={reference ? `${record.what} · ${reference}` : record.what}>
       <p className="ac-muted">
         {record.signed_by ?? "Signed"} ·{" "}
         {record.signed_at_time ? formatDateTime(record.signed_at_time) : formatDate(record.signed_at)}
@@ -279,6 +278,28 @@ export function FinishedRecord({ reference }: { reference: string }) {
         </button>
       </div>
       <InlineError text={error} />
+    </Panel>
+  );
+}
+
+/** Nothing signed yet: what makes the first record, and the way there. */
+function NoRecordYet() {
+  const { open, isTrial } = useWorkspace();
+  return (
+    <Panel eyebrow="Your latest record" title="No signed record yet">
+      <p className="ac-muted">
+        Your first appears here when a conclusion is signed or a report approved: who signed, when, what it means, and
+        its PDF, ready for an inspector.
+      </p>
+      <div className="ca-action-row">
+        <button
+          type="button"
+          className="ac-primary"
+          onClick={() => (isTrial ? open("Getting started") : open("Complaints"))}
+        >
+          {isTrial ? "Continue the story" : "Open the complaints"}
+        </button>
+      </div>
     </Panel>
   );
 }

@@ -247,11 +247,10 @@
 .ql-dot.tone-good {
   background: var(--ms-teal-bright);
 }
-.ql-dot.tone-warning {
-  background: var(--ms-warn-fill);
-}
+/* The amber dots carry dark text at 4.5:1 or more (0.10.85, D3.8: 4.2:1 on the warning fill). */
+.ql-dot.tone-warning,
 .ql-dot.tone-serious {
-  background: var(--ms-warn-fill);
+  background: #d18f12;
 }
 .ql-dot.tone-critical {
   background: var(--ms-crit);

@@ -371,7 +371,9 @@ def _open_unlinked(db: Session, tenant_id: uuid.UUID):
 
 def waiting_ids(db: Session, tenant_id: uuid.UUID) -> list[tuple[uuid.UUID, date | None]]:
     """Open complaints with no current disposition and in no case (a case decides those), newest first."""
-    rows = _open_unlinked(db, tenant_id).order_by(RECEIVED_AT.desc(), Complaint.id).limit(READ_LIMIT).all()
+    # Never capped: a cap of the newest dropped the oldest complaints waiting, the most urgent ones (0.10.86). The
+    # columns read are few, so a large organization's list stays cheap.
+    rows = _open_unlinked(db, tenant_id).order_by(RECEIVED_AT.desc(), Complaint.id).all()
     found = []
     for complaint_id, status, complaint_type, decision, received in rows:
         if review_rules.counts_as_open(status, complaint_type, decision):

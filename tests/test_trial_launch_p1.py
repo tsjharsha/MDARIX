@@ -99,6 +99,7 @@ def test_the_welcome_email_tells_a_person_who_must_use_two_factor_sign_in_to_set
 # --------------------------------------------------- DEV-004: a spent link is known before a password is typed
 
 
+@pytest.mark.db
 def test_the_link_status_says_whether_a_one_time_link_still_works_without_spending_it():
     from auth.durable import issue_invitation
     from backend.app.db.session import SessionLocal

@@ -1,7 +1,7 @@
 import { PracticeApproval } from "./PracticeApproval";
 import { useState } from "react";
 import { DecideAndSign } from "./common";
-import { questionNumber } from "../../../app/labels";
+import { questionNumber, versionWords } from "../../../app/labels";
 import {
   ArrowDown,
   ArrowUp,
@@ -78,7 +78,7 @@ export function DecisionGuides() {
         title={
           list.data
             ? own.length
-              ? `${own.map((item) => item.current.code).join(", ")} in use`
+              ? `${own.map((item) => `${item.label}: ${versionWords(item.current.code)}`).join(", ")} in use`
               : "MDARIX starter guides in use"
             : "Reading the guides…"
         }
@@ -105,7 +105,7 @@ export function DecisionGuides() {
                   <div className="uw-cr-head">
                     <strong className="uw-cr-id">{item.label}</strong>
                     <span className="uw-cr-meta">
-                      In use: {item.current.code}
+                      In use: {versionWords(item.current.code)}
                       {item.current.starter ? " (MDARIX starter)" : ` · approved by ${item.current.approved_by}`}
                       {item.enabled ? "" : " · market not enabled in your reporting windows"}
                     </span>
@@ -113,7 +113,8 @@ export function DecisionGuides() {
                   </div>
                   {item.open && (
                     <p className="uw-cr-meta">
-                      Being prepared: <strong>{item.open.code}</strong>, {item.open.state_label.toLowerCase()}
+                      Being prepared: <strong>{versionWords(item.open.code)}</strong>,{" "}
+                      {item.open.state_label.toLowerCase()}
                       {item.open.problems.length ? ` · ${item.open.problems[0]}` : " · ready to publish"}
                     </p>
                   )}
@@ -125,7 +126,7 @@ export function DecisionGuides() {
                           className="ac-link"
                           onClick={() => setOpen({ market: item.market, version: version.version })}
                         >
-                          {version.code}
+                          {versionWords(version.code)}
                         </button>{" "}
                         <ToneBadge tone={stateTone(version.state)} label={version.state_label} />
                         {version.sample ? <span className="uw-cr-meta"> sample</span> : null}
@@ -139,12 +140,13 @@ export function DecisionGuides() {
                         className="ac-primary"
                         onClick={() => setOpen({ market: item.market, version: item.open!.version })}
                       >
-                        Open {item.open.code}
+                        Open {versionWords(item.open.code)}
                       </button>
                     ) : (
                       canEdit && (
                         <button type="button" className="ac-secondary" onClick={() => void start(item)}>
-                          <Plus size={15} aria-hidden="true" /> Start a new version from {item.current.code}
+                          <Plus size={15} aria-hidden="true" /> Start a new version from{" "}
+                          {versionWords(item.current.code)}
                         </button>
                       )
                     )}
@@ -208,7 +210,7 @@ export function GuideDrawer({ market, version, onClose }: { market: string; vers
   }
   const editing = view.state === "DRAFT" && canEdit;
   return (
-    <Drawer title={`${view.market_label}: ${view.code}`} onClose={onClose}>
+    <Drawer title={`${view.market_label}: ${versionWords(view.code)}`} onClose={onClose}>
       <div className="uw-dp uw-dg">
         <div className="uw-cr-decision">
           <ToneBadge tone={stateTone(view.state)} label={view.state_label} />
@@ -763,7 +765,8 @@ function Publish({
       {view.state === "AWAITING_APPROVAL" && view.approval && !view.approval.may_approve && (
         <div className="uw-rp-approval" role="note" aria-label="Who approves the version">
           <p>
-            <strong>{view.code}</strong> sent for approval by {view.requested_by} {formatDate(view.requested_at)}.
+            <strong>{versionWords(view.code)}</strong> sent for approval by {view.requested_by}{" "}
+            {formatDate(view.requested_at)}.
           </p>
           <p>{view.approval.message}</p>
         </div>
@@ -790,8 +793,9 @@ function Publish({
           }}
         >
           <p>
-            <strong>{view.code}</strong> sent for approval by {view.requested_by} {formatDate(view.requested_at)}. Not
-            allowed to approve: {view.editors.join(", ")} (who edited it) and administrators.
+            <strong>{versionWords(view.code)}</strong> sent for approval by {view.requested_by}{" "}
+            {formatDate(view.requested_at)}. Not allowed to approve: {view.editors.join(", ")} (who edited it) and
+            administrators.
           </p>
           {view.approval?.same_person && <p className="ac-message tone-warning">{view.approval.message}</p>}
           <div className="ca-form-grid">

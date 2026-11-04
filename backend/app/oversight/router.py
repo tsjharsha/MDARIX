@@ -46,6 +46,7 @@ from backend.app.access.permissions import (
     require_permission,
 )
 from backend.app.complaint_review.service import people as names_of
+from backend.app import signing_commit
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import Complaint, SignedApprovalRecord
 from backend.app.db.models.oversight import DueAlert, EventClosure, OversightSettings, UserAbsence
@@ -228,8 +229,7 @@ def _events(db, control_db, tenant_id) -> list[dict]:
     }
     if not ids:
         return []
-    # shortcut: each event's checklist is read one by one (a few queries each), capped at EVENTS_MAX; batch the reads
-    # when an organization works on more events at once.
+    # Capped at EVENTS_MAX; each kind of record is read once for them all (0.10.85, D3.13).
     complaints = (
         db.query(Complaint)
         .filter(Complaint.tenant_id == tenant_id, Complaint.id.in_(list(ids)))
@@ -241,10 +241,8 @@ def _events(db, control_db, tenant_id) -> list[dict]:
     triage = closure.open_on_triage(db, tenant_id)
     rows = {row.complaint_id: row for row in db.query(EventClosure).filter(EventClosure.tenant_id == tenant_id)}
     products = _products(db, tenant_id)
-    found = []
-    for complaint in complaints:
-        facts = closure.facts(db, tenant_id, complaint, tasks, triage)
-        found.append(_event_summary(complaint, facts, rows.get(complaint.id), products))
+    facts = closure.facts_many(db, tenant_id, complaints, tasks, triage)
+    found = [_event_summary(c, facts[str(c.id)], rows.get(c.id), products) for c in complaints]
     refs = {item["owner_id"] for item in found}
     names = _names(control_db, tenant_id, refs)
     for item in found:
@@ -345,7 +343,41 @@ def _signers(control_db, tenant_id, me: str, has_case: bool) -> dict[str, dict]:
     return out
 
 
-def complaint_work(db, control_db, tenant_id, complaints: list) -> dict[str, dict]:
+def dated_reads(db, control_db, tenant_id, now) -> tuple[list[dict], dict, dict[str, list[dict]]]:
+    """The dated items, their context and the watch's clocks that the list's views, its order and its work columns all
+    read: read once per request (0.10.85, D3.13; each read the whole watch again)."""
+    views, context = _item_views(db, control_db, tenant_id, now)
+    clocks = _watch_clocks(db, control_db, tenant_id, None, now, context["settings"]["reminder_hours"])
+    return views, context, clocks
+
+
+def _dated_items(reads) -> list[dict]:
+    """Every complaint's dated items: its deadlines and targets, and the watch's provisional clock of a market not
+    assessed yet, as the complaint page lists them (complaint_work)."""
+    views, _, clocks = reads
+    items = [item for item in views if item["complaint_id"]]
+    dated = {
+        (item["complaint_id"], item["market"]) for item in items if item["category"] in ("REPORTING", "OBLIGATION")
+    }
+    for key, found in clocks.items():
+        items += [{**clock, "complaint_id": key} for clock in found if (key, clock["market"]) not in dated]
+    return items
+
+
+def urgency(reads) -> dict[str, tuple]:
+    """Each complaint's place in every list view (0.10.85, D3.1): overdue first, then the nearest legal deadline (a
+    market's reporting clock or report, never a task filed under it), then the nearest of its other dates."""
+    found: dict[str, list] = {}
+    for item in _dated_items(reads):
+        mine = found.setdefault(str(item["complaint_id"]), [1, "~", "~"])
+        if item["state"] == rules.OVERDUE:
+            mine[0] = 0
+        place = 1 if item["category"] in ("REPORTING", "OBLIGATION") and not str(item["key"]).startswith("task:") else 2
+        mine[place] = min(mine[place], item["due_at"])
+    return {key: tuple(value) for key, value in found.items()}
+
+
+def complaint_work(db, control_db, tenant_id, complaints: list, reads=None) -> dict[str, dict]:
     """What the new navigation shows for each complaint (0.10.68), from the same reads as Oversight and the event:
     its owner, stage, next action, its dated items (a deadline per market, then its own targets, soonest first) and
     the markets they are for. The complaint page, the complaint list and My work show these values, so they agree
@@ -356,9 +388,12 @@ def complaint_work(db, control_db, tenant_id, complaints: list) -> dict[str, dic
         return {}
     ids = {str(complaint.id) for complaint in complaints}
     now = service.now_utc()
-    views, context = _item_views(db, control_db, tenant_id, now)
+    if reads is None:
+        views, context = _item_views(db, control_db, tenant_id, now)
+        clocks = _watch_clocks(db, control_db, tenant_id, ids, now, context["settings"]["reminder_hours"])
+    else:
+        views, context, clocks = reads
     due = [view for view in views if view["complaint_id"] in ids]
-    clocks = _watch_clocks(db, control_db, tenant_id, ids, now, context["settings"]["reminder_hours"])
     tasks = closure.open_tasks_by_complaint(db, tenant_id)
     triage = closure.open_on_triage(db, tenant_id)
     rows = {
@@ -368,12 +403,9 @@ def complaint_work(db, control_db, tenant_id, complaints: list) -> dict[str, dic
         )
     }
     products = _products(db, tenant_id)
-    # shortcut: each complaint's checklist is read one by one (a few queries each) for one page of a list; batch the
-    # reads if a page ever holds more than the list's 200.
-    found = {
-        str(c.id): _event_summary(c, closure.facts(db, tenant_id, c, tasks, triage), rows.get(c.id), products)
-        for c in complaints
-    }
+    # Each kind of record is read once for the page (0.10.85, D3.13; it was a dozen queries per complaint).
+    facts = closure.facts_many(db, tenant_id, complaints, tasks, triage)
+    found = {str(c.id): _event_summary(c, facts[str(c.id)], rows.get(c.id), products) for c in complaints}
     names = _names(control_db, tenant_id, {item["owner_id"] for item in found.values()})
     out = {}
     for complaint in complaints:
@@ -472,7 +504,7 @@ DATED = "dated"
 WEEK_HOURS = 7 * 24
 
 
-def list_view(db, control_db, tenant_id, view: str, me: str) -> dict[str, str]:
+def list_view(db, control_db, tenant_id, view: str, me: str, reads=None) -> dict[str, str]:
     """The complaints of a list view (``view`` other than "open"), each with the moment it is ordered by: its nearest
     deadline (soonest first), or, for "signed-month", its latest signature (newest first)."""
     from backend.app.communications.service import open_requests
@@ -480,6 +512,7 @@ def list_view(db, control_db, tenant_id, view: str, me: str) -> dict[str, str]:
     from backend.app.db.models.complaint_disposition import ComplaintDisposition
     from backend.app.db.models.market_assessment import ComplaintMarketAssessment
     from backend.app.reportability import service as reportability
+    from backend.app.reportability.markets import CONCLUSIONS
 
     now = service.now_utc()
     found: dict[str, str] = {}
@@ -490,17 +523,7 @@ def list_view(db, control_db, tenant_id, view: str, me: str) -> dict[str, str]:
             found[key] = at
 
     if view in ("due-week", "legal-week", "overdue", DATED):
-        views, context = _item_views(db, control_db, tenant_id, now)
-        items = [item for item in views if item["complaint_id"]]
-        # The watch's provisional clock of a market not assessed yet, as the complaint page lists it (complaint_work).
-        dated = {
-            (item["complaint_id"], item["market"]) for item in items if item["category"] in ("REPORTING", "OBLIGATION")
-        }
-        for key, clocks in _watch_clocks(
-            db, control_db, tenant_id, None, now, context["settings"]["reminder_hours"]
-        ).items():
-            items += [{**clock, "complaint_id": key} for clock in clocks if (key, clock["market"]) not in dated]
-        for item in items:
+        for item in _dated_items(reads or dated_reads(db, control_db, tenant_id, now)):
             soon = item["hours_left"] <= WEEK_HOURS
             if view == DATED or (view == "overdue" and item["state"] == rules.OVERDUE):
                 keep(item["complaint_id"], item["due_at"])
@@ -510,6 +533,11 @@ def list_view(db, control_db, tenant_id, view: str, me: str) -> dict[str, str]:
                 keep(item["complaint_id"], item["due_at"])
     elif view == "reportability":
         for item in reportability.watch(db, control_db, tenant_id, show="open", page_size=10_000, today=now)["items"]:
+            # A decision is needed while a market has no signed conclusion; a signed reportable one waiting for its
+            # report is under "Authority reports", not here (0.10.85, D3.2; U-13).
+            summary = item.get("markets") or []
+            if summary and all(market["state"] in CONCLUSIONS for market in summary):
+                continue
             keep(item["id"], (item.get("binding") or {}).get("due_at") or "")
     elif view == "waiting-reporter":
         for row in open_requests(db, tenant_id):
@@ -1466,15 +1494,7 @@ def sign_ready(
     row.ready_reason, row.checklist, row.content_fingerprint = reason or None, items, print_
     row.signed_record_id, row.signed_by, row.signed_at, row.updated_at = record.id, me, now, now
     row.qms_filing_ref = row.filed_by = row.filed_at = None  # a new version is filed again
-    if db is control_db:
-        control_db.commit()
-    else:
-        control_db.commit()
-        try:
-            db.commit()
-        except Exception:
-            logger.exception("Signature %s was saved but event %s was not marked ready", record.id, complaint.id)
-            raise
+    signing_commit.commit(db, control_db, "event closure")
     return event_view(db, control_db, tenant_id, complaint, me)
 
 

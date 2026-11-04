@@ -83,6 +83,7 @@ def test_a_parked_route_answers_404_before_any_handler(monkeypatch):
     assert anonymous.get("/health/live").status_code == 200
 
 
+@pytest.mark.db
 def test_the_session_context_names_the_feature_set_for_the_interface(monkeypatch):
     from tests.conftest import authenticated_client
 

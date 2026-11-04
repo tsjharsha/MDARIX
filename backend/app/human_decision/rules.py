@@ -213,6 +213,17 @@ class SignPayload(BaseModel):
         return value.strip() if isinstance(value, str) else value
 
 
+def request_hash(tenant_id, signer_id, case_id, payload: SignPayload) -> str:
+    """The canonical identity of one signing request: the organization, the signer, the case and everything signed,
+    never the password or the authenticator code. A retry with the same identity is the same signing (DEV-07)."""
+    import hashlib
+    import json
+
+    signed = payload.model_dump(mode="json", exclude={"password", "mfa_code"})
+    material = {"tenant": str(tenant_id), "signer": str(signer_id), "case": str(case_id), "request": signed}
+    return hashlib.sha256(json.dumps(material, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
 class ReturnPayload(BaseModel):
     brief_version_id: uuid.UUID
     comment: str = Field(max_length=RETURN_COMMENT_MAX + 1000)
