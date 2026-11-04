@@ -5,7 +5,10 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { HomeSection } from "./sections/Home";
-import { ComplaintViews } from "./sections/ComplaintViews";
+import { ComplaintViews, InvestigationList } from "./sections/ComplaintViews";
+import { Panel } from "../admin/console/charts";
+import caseSections from "./sections/CaseSections.tsx?raw";
+import investigations from "./sections/Investigations.tsx?raw";
 import { ComplaintPage } from "./sections/ComplaintPage";
 import { ONE_STORY_PATH } from "./oneStory";
 import { eventPath } from "./oversight";
@@ -132,5 +135,26 @@ describe("Reports approval (row 33)", () => {
       ),
     ).toBe("You may approve your own practice report as Leader.");
     expect(practiceWarning("Something else.")).toBe("Something else.");
+  });
+});
+
+describe("Investigations (rows 35-38)", () => {
+  it("lists the investigations under the page's one eyebrow", () => {
+    resources.data["/api/v1/data-plane/investigations"] = { records: [] };
+    expect(render(<InvestigationList />)).not.toContain('<p class="ac-eyebrow">Investigations</p>');
+  });
+
+  it("keeps the reference in the investigation's eyebrow, Lot impact in its summary, and no second title in the fold", () => {
+    const crumbs = investigations.slice(investigations.indexOf('<nav className="uw-crumbs"'));
+    expect(crumbs.slice(0, crumbs.indexOf("</nav>"))).not.toContain("investigation_identifier");
+    expect(caseSections).not.toContain("onLotImpact=");
+    // A panel without a title has no empty heading.
+    const html = renderToStaticMarkup(
+      <Panel title="" eyebrow="Investigation progress">
+        <p>Steps</p>
+      </Panel>,
+    );
+    expect(html).not.toContain("<h2>");
+    expect(html).toContain("Investigation progress");
   });
 });

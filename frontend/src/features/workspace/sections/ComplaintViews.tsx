@@ -178,7 +178,7 @@ export function InvestigationList() {
           }
         />
       </div>
-      <Panel eyebrow="Investigations" title={listTitle(view, cases.data ? rows.length : undefined)} source={cases}>
+      <Panel title={listTitle(view, cases.data ? rows.length : undefined)} source={cases}>
         <Table
           caption={view}
           rows={rows}

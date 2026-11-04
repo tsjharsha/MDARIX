@@ -157,7 +157,6 @@ export function CaseSections({
         investigationId={id}
         row={selected}
         onManage={onManage && selected ? () => onManage(selected) : undefined}
-        onLotImpact={isTrial ? () => go("Summary", "lot-impact") : undefined}
         onStep={() => undefined}
         onSection={go}
         onChanged={onChanged}
