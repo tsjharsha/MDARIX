@@ -518,26 +518,9 @@ export function GettingStartedSection({
       </div>
     </div>
   );
-  // The new navigation (0.10.82, D1): one story of ten steps first; the earlier stories, the ten chapters, the journey
-  // and the dial fold under "More ways to explore".
+  // The new navigation: Getting started is the ten-step story only (owner, 5 Nov 2026). The three short stories, the
+  // chapters, your trial and the sample data are their own page, reached from Help.
   if (navigation !== "new") return body;
-  // The chapters, the shorter stories, your trial and the sample data: their own page, one quiet link away (0.10.85).
-  if (focusTab)
-    return (
-      <>
-        <div className="uw-gs-more-head">
-          <button type="button" className="ac-link" onClick={() => open("Getting started")}>
-            <ChevronRight size={14} aria-hidden="true" className="uw-flip" /> Back to the story
-          </button>
-          <p className="ac-eyebrow">Getting started</p>
-          <h1 ref={heading} tabIndex={-1}>
-            The chapters, your trial and the sample data
-          </h1>
-        </div>
-        {hasSample && <Entrance onRestarted={restarted} />}
-        {body}
-      </>
-    );
   const owner = !!trial?.is_owner;
   const parts: Array<{ key: string; title: string; detail: string; go: () => void }> = [
     ...(hasSample
@@ -570,11 +553,18 @@ export function GettingStartedSection({
           go: () => open("My Work", "Approvals"),
         },
   ];
-  return (
-    <>
-      <OneStory heading={heading} />
-      <details className="uw-explore uw-os-more">
-        <summary>More ways to explore</summary>
+  if (focusTab)
+    return (
+      <>
+        <div className="uw-gs-more-head">
+          <button type="button" className="ac-link" onClick={() => open("Getting started")}>
+            <ChevronRight size={14} aria-hidden="true" className="uw-flip" /> Back to the story
+          </button>
+          <p className="ac-eyebrow">Getting started</p>
+          <h1 ref={heading} tabIndex={-1}>
+            Short stories, your trial and the sample data
+          </h1>
+        </div>
         <div className="uw-os-parts">
           {parts.map((part) => (
             <button key={part.key} type="button" className="uw-os-part" onClick={part.go}>
@@ -583,14 +573,11 @@ export function GettingStartedSection({
             </button>
           ))}
         </div>
-        <p className="uw-os-quiet">
-          <button type="button" className="ac-link" onClick={() => open("Getting started", "Your trial")}>
-            The ten chapters, your trial{hasSample ? " and about the sample data" : ""}
-          </button>
-        </p>
-      </details>
-    </>
-  );
+        {hasSample && <Entrance onRestarted={restarted} />}
+        {body}
+      </>
+    );
+  return <OneStory heading={heading} />;
 }
 
 /**

@@ -732,9 +732,9 @@ export function UserWorkspace({
                   ...(trial?.is_trial
                     ? [
                         {
-                          label: "The sample event and its stories",
-                          detail: "Getting started",
-                          onSelect: () => open("Getting started"),
+                          label: "Short stories and your trial",
+                          detail: "Three short stories, the ten chapters, the sample data",
+                          onSelect: () => open("Getting started", "Your trial"),
                         },
                         { label: "Look ahead", detail: LOOK_AHEAD_SUBTITLE, onSelect: () => open("Look ahead") },
                       ]

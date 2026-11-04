@@ -122,14 +122,12 @@ describe("The story always works (owner report on 0.10.84)", () => {
   });
 });
 
-describe("More ways to explore: one compact card (the approved design)", () => {
-  it("offers the three parts and one quiet line, not the chapters' wall of main buttons", () => {
-    const more = gettingStarted.slice(gettingStarted.indexOf("<summary>More ways to explore</summary>"));
-    const card = more.slice(0, more.indexOf("</details>"));
-    expect(card).toContain("uw-os-parts");
-    expect(card).not.toContain("<Entrance");
-    expect(card).not.toContain("{body}");
-    expect(card).toContain("The ten chapters, your trial");
+describe("Getting started is the ten-step story only (owner, 5 Nov 2026)", () => {
+  it("renders the story and nothing else; the short stories sit on the trial page reached from Help", () => {
+    expect(gettingStarted).toContain("return <OneStory heading={heading} />;");
+    expect(gettingStarted).not.toContain("More ways to explore");
+    const page = gettingStarted.slice(gettingStarted.indexOf("if (focusTab)"));
+    expect(page).toContain("uw-os-parts");
     for (const part of ["A new urgent call", "A rising problem", "Approve as a colleague"])
       expect(gettingStarted).toContain(part);
   });

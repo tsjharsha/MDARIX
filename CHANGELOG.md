@@ -29,6 +29,9 @@ the pinned embedding model before the tests (`scripts/prepare_embedding_cache.py
 
 ### Changed: Getting started's ten steps, in the owner's words, as a vertical list
 
+- **Getting started is the ten-step story only.** "More ways to explore" is gone from it: the three short stories
+  (a new urgent call, a rising problem, approving as a colleague), the ten chapters, the sample data and the trial's
+  own page are in Help, Short stories and your trial (`GettingStarted.tsx`; `releaseD3085Story.test.tsx`).
 - The steps read Review the call · Triage · Assess reportability · Sign conclusion · Prepare report · Complete details ·
   Approve report · Record submission · Review records · Explore trends, in a numbered list beside the step's card (the
   current step highlighted; on a phone the list sits above the card). What each step opens and when it ticks is

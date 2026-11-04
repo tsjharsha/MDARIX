@@ -8309,9 +8309,6 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
 .uw-num {
   font-variant-numeric: tabular-nums;
 }
-.uw-os-more {
-  margin-top: var(--ms-space-4);
-}
 /* The story on the story's own record: one slim pill, never a second progress panel (D1.5). */
 .uw-story-pill {
   display: inline-flex;
@@ -8652,9 +8649,6 @@ details.uw-team-change[open] {
 .uw-os-part span {
   color: var(--ms-ink-2);
   font-size: var(--ms-fs-14);
-}
-.uw-os-quiet {
-  margin: var(--ms-space-3) 0 0;
 }
 .uw-gs-more-head {
   display: grid;
