@@ -1,0 +1,5 @@
+{
+  "note": "Two of FDA's example eMDR files (eMDR Implementation Package, MDR examples, files dated 5 Aug 2024), byte-identical, for tests/test_fda_3500a_emdr.py.",
+  "Manufacturer Initial - Typical.xml": "525131c1a0a1b182e07ad4c051c62aed6130ee2ff3cd5f04769e4c72d3b93f3d",
+  "User Facility Initial.xml": "f318b119b4323fcee037e6541babc16143796650f0fbde93e280fa03cd973d9b"
+}

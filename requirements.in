@@ -11,6 +11,8 @@ fastapi==0.141.1
 httpx==0.28.1
 pg8000==1.31.5
 pydantic==2.13.5
+# FDA's own fillable Form 3500A, filled for an approved US report (backend/app/authority_reports/fda_3500a.py).
+pypdf==6.21.2
 # The DOCX of the ready-to-use documents (backend/app/qms_documents/render.py; owner decision D-T5).
 python-docx==1.2.0
 python-multipart==0.0.31
