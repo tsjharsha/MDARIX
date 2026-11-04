@@ -73,8 +73,8 @@ and warns while old keys are listed. Rotate both keys together, in a quiet hour:
    file (an attachment or a report download).
 6. A week later, remove the `k1` entries from both `<key>S` settings and `dc up -d --no-build --wait`; the
    configuration check stops warning. **Keep the old keys in the password manager** for as long as any backup made
-   while they were in use is kept (`MDARIX_BACKUP_KEEP_DAYS` on the server, 14 days by default, and the off-site
-   copy's retention, up to 90 days): a database backup holds MFA secrets sealed with the old MFA key, and a file
+   while they were in use is kept (on the server 30 days, then one a month for 12 months, since 0.10.88:
+   `MDARIX_BACKUP_KEEP_DAYS` and `MDARIX_BACKUP_KEEP_MONTHS`; and the off-site copy's retention): a database backup holds MFA secrets sealed with the old MFA key, and a file
    backup holds files encrypted with the old file key. To restore such a backup, list the old key again as `k1` in
    `<key>S`, restore, then run step 4 again.
 
@@ -88,6 +88,6 @@ Backups are encrypted to `MDARIX_BACKUP_AGE_RECIPIENT` (BACKUP_AND_RESTORE.md). 
 
 1. Create a new key pair offline (`age-keygen`), keep the private key in the password manager or offline storage.
 2. Set the new public key as `MDARIX_BACKUP_AGE_RECIPIENT`; the next backup uses it. Run one now to check.
-3. **Keep the old private key** for as long as any backup encrypted with it is kept (`MDARIX_BACKUP_KEEP_DAYS` on the
-   server, and the bucket's retention off-site). Without it those backups cannot be restored. Destroy it only after
+3. **Keep the old private key** for as long as any backup encrypted with it is kept (`MDARIX_BACKUP_KEEP_DAYS` and
+   `MDARIX_BACKUP_KEEP_MONTHS` on the server: up to 13 months, and the bucket's retention off-site). Without it those backups cannot be restored. Destroy it only after
    the last of them has expired.

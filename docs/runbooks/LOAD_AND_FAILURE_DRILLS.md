@@ -75,9 +75,8 @@ needs production settings, which this build may not read).
 
 - **Alert destination and on-call person:** set `MDARIX_ALERT_WEBHOOK` to a channel independent of the SMTP provider
   (a phone or chat service) and `MDARIX_ALERT_EMAIL`, and name who acknowledges within 1 hour.
-- **Backup retention (30 daily + 12 monthly):** `MDARIX_BACKUP_KEEP_DAYS` stays 14 by default in this release; the
-  change is prepared for the owner's decision (backup.sh keeps 30 days and the newest backup of each of the last 12
-  months; the off-site bucket needs the same lifecycle rule).
+- **Backup retention (30 daily + 12 monthly):** accepted by the owner on 5 Nov 2026 and applied in 0.10.88
+  (`retention.sh`; BACKUP_AND_RESTORE.md). The off-site bucket needs the same lifecycle rule (an owner action).
 - **The off-site copy:** verify on the server that the newest backup is in `MDARIX_BACKUP_S3_URI`, in another
   region, encrypted, and can be restored from there.
 - **The deploy gate:** add `scripts/deploy_gate.py` to the next upgrade script, after `/health/live`.

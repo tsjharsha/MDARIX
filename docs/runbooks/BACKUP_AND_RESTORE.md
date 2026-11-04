@@ -10,7 +10,15 @@ records), any dedicated tenant databases, and uploaded files. Two independent la
 | 1. Managed database | Point-in-time recovery of every database (provider feature) | continuous | 7+ days |
 | 1. Managed database | Automated snapshots | daily | 14+ days |
 | 1. File bucket (pilots: `MDARIX_OBJECT_STORAGE_PROVIDER=s3`) | Object versioning in the bucket that holds uploaded files | every write | 90 days of old versions (lifecycle rule) |
-| 2. MDARIX backup | Encrypted logical dump of every database (plus the `objects` volume when files are stored locally), copied off-site | daily (cron) | 14 days local, 90 days off-site (bucket lifecycle rule) |
+| 2. MDARIX backup | Encrypted logical dump of every database (plus the `objects` volume when files are stored locally), copied off-site | daily (cron) | Local: every backup of the last 30 days, then the newest of each of 12 months, and always the newest (0.10.88); off-site: the bucket lifecycle rule (set it to the same: see 3) |
+
+**Retention (owner decision, 5 Nov 2026: 30 daily + 12 monthly).** `infrastructure/docker/backup/retention.sh`
+decides, from the folder names (UTC timestamps), which local backups `backup.sh` removes after each run: every backup
+of the last `MDARIX_BACKUP_KEEP_DAYS` (30) days, a backup taken before an upgrade included; then the newest backup of
+each of the `MDARIX_BACKUP_KEEP_MONTHS` (12) months before those days; and always the newest backup of all, however
+old, so a rollback always has the backup taken just before the last upgrade. Tested in `tests/test_backup_retention.py`.
+The production disk check of 5 Nov 2026 (read-only): 23 GB free of 48 GB, 59 backups taking 731 MB (about 12 MB each),
+so 42 backups need about 0.5 GB.
 
 Erased data stays in these backups for that period; see section 4.
 
@@ -35,7 +43,8 @@ the daily backup: up to **24 hours** of uploads can be lost with the VM.
    Put the public key in `.env.production` as `MDARIX_BACKUP_AGE_RECIPIENT`. Keep `mdarix-backup.key` offline in two
    places (password manager and a sealed envelope). Without it the backups cannot be read; the server never has it.
 3. **Off-site copy**: create a bucket in another account or region with versioning, object lock (or a retention
-   policy) and a 90-day lifecycle rule. Give the VM credentials that may only write and list it
+   policy) and a lifecycle rule that keeps 30 days of daily copies and one copy a month for 12 months (an owner
+   action on the provider's console; before 0.10.88 the advice was 90 days). Give the VM credentials that may only write and list it
    (`s3:PutObject`, `s3:ListBucket`): `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_DEFAULT_REGION` in
    `.env.migrate` (or an instance role), and `MDARIX_BACKUP_S3_URI` in `.env.production`.
 4. **Backup folder** on the VM, owned by the backup image's user (uid 70); the job stops with this hint when the

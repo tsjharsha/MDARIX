@@ -62,6 +62,11 @@ web images change. Operator steps: none required; two are recommended (below, Op
 - **A readiness gate for the deploy**, `scripts/deploy_gate.py`, run inside the new API container after `up`: the
   release named, the database at this build's schema, and the components named with `--require`. Recommended in the
   next upgrade script, beside `/health/live` (DEPLOYMENT.md).
+- **Backup retention, 30 daily + 12 monthly** (owner decision, 5 Nov 2026): the backup job keeps every local backup
+  of the last 30 days (a pre-upgrade one included), then the newest backup of each of 12 months, and always the newest
+  of all; it kept 14 days before. New setting `MDARIX_BACKUP_KEEP_MONTHS` (12); `MDARIX_BACKUP_KEEP_DAYS` now defaults
+  to 30. The backup image changes (it carries `retention.sh`). Operator step: set the off-site bucket's lifecycle rule
+  to the same. Disk: about 42 backups of about 12 MB.
 - **Recommended:** an alert webhook to a channel independent of the SMTP provider (with the provider down, an e-mail
   alert about it cannot arrive: seen in the local drill).
 - Local drills recorded in `docs/runbooks/LOAD_AND_FAILURE_DRILLS.md`: worker, scheduler, e-mail, database, object
