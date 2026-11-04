@@ -197,7 +197,34 @@ def operations_alerts(db: Session, state: dict) -> dict:
     if worker == "RUNNING" and state.get("worker") == "STOPPED":
         send_alert("Background worker recovered", "The background worker is sending heartbeats again.")
     state["worker"] = worker
-    return {"dead_letters": dead, "worker": worker, "heartbeat_url": ping_heartbeat_url()}
+    # The queue's lag and failing e-mail (0.10.88, DEV-13): alerted once when they start and once when they clear.
+    from backend.app.readiness import OUTBOX_MAX_LAG, outbox_backlog
+
+    backlog = outbox_backlog(db)
+    lagging = backlog["lag_seconds"] > OUTBOX_MAX_LAG.total_seconds()
+    if lagging != bool(state.get("lagging")):
+        send_alert(
+            "Outbox falling behind" if lagging else "Outbox caught up",
+            f"The oldest event due to be published has waited {backlog['lag_seconds']} s ({backlog['waiting']} waiting)."
+            if lagging
+            else "Events are being published again without delay.",
+        )
+    failing = backlog["email_failing"] > 0
+    if failing != bool(state.get("email_failing")):
+        send_alert(
+            "E-mail delivery failing" if failing else "E-mail delivery recovered",
+            f"{backlog['email_failing']} e-mail(s) were refused by the provider and are being retried. Check the SMTP "
+            "provider and its settings; the readiness check shows email as failing meanwhile."
+            if failing
+            else "The e-mails waiting to be retried have gone out.",
+        )
+    state["lagging"], state["email_failing"] = lagging, failing
+    return {
+        "dead_letters": dead,
+        "worker": worker,
+        "outbox": backlog,
+        "heartbeat_url": ping_heartbeat_url(),
+    }
 
 
 def connector_sync(db: Session, _state: dict) -> dict:
