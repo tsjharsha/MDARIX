@@ -7,6 +7,10 @@ import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { HomeSection } from "./sections/Home";
 import { ComplaintViews, InvestigationList } from "./sections/ComplaintViews";
 import { Panel } from "../admin/console/charts";
+import { TrendsSection } from "./sections/Trends";
+import { TrendCheck, TrendHeroes } from "./sections/TrendCheck";
+import type { TrendBoard, TrendItem } from "./signalAi";
+import { SAMPLE_SOURCE } from "./complaintList";
 import caseSections from "./sections/CaseSections.tsx?raw";
 import investigations from "./sections/Investigations.tsx?raw";
 import { ComplaintPage } from "./sections/ComplaintPage";
@@ -156,5 +160,70 @@ describe("Investigations (rows 35-38)", () => {
     );
     expect(html).not.toContain("<h2>");
     expect(html).toContain("Investigation progress");
+  });
+});
+
+describe("Trends (rows 40, 41)", () => {
+  const steady = {
+    key: "k",
+    product: { id: "p", business_id: null, identifier: "SAMPLE-PULSE-410", name: "PulseWatch 410" },
+    product_version: { id: "v", business_id: null, version_identifier: "Rev A" },
+    problem: null,
+    name: "PulseWatch 410 Rev A",
+    recent: 1,
+    recent_days: 30,
+    history: 6,
+    history_days: 180,
+    expected: 1.2,
+    p_value: 0.6,
+    p_adjusted: 0.9,
+    groups_tested: 1,
+    ratio: 0.8,
+    result: "STEADY",
+    label: "",
+    sentence: "",
+    recent_complaints: [],
+    open_signals: [],
+    basis: "UNITS",
+    baseline: "OWN_HISTORY",
+  } as unknown as TrendItem;
+  const board = {
+    grouping: "version",
+    recent_days: 30,
+    history_days: 180,
+    min_complaints: 3,
+    summary: {
+      groups: 1,
+      complaints_counted: 1,
+      significant: 0,
+      elevated: 0,
+      steady: 1,
+      too_few: 0,
+      short_history: 0,
+      groups_tested: 1,
+    },
+    items: [steady],
+  } as unknown as TrendBoard;
+
+  it("offers the Investigations button only to a persona without the Investigations tab", () => {
+    expect(render(<TrendsSection />)).not.toContain("> Investigations</button>");
+    const executive = render(
+      <TrendsSection />,
+      api({ persona: "executive", personaTabs: ["home", "trends", "records"] }),
+    );
+    expect(executive).toContain("Investigations</button>");
+  });
+
+  it("says no rise once, and leaves the rise counts and a second Trends eyebrow out of the fold", () => {
+    const heroes = render(<TrendHeroes board={board} action={() => null} source={SAMPLE_SOURCE} />);
+    // The chip says the verdict; the heading says what it was compared with.
+    expect(heroes).toContain('uw-trend-verdict is-steady">No version is rising</span>');
+    expect(heroes).toContain("compared with their own history: none rising.");
+    resources.data["/api/v1/triage/trends"] = board;
+    const page = render(<TrendCheck onOpenSignal={vi.fn()} />);
+    expect(page).not.toContain("Significant rise</");
+    expect(page).not.toContain("Higher than usual</");
+    expect(page).toContain("Groups checked");
+    expect(page).not.toContain('<p class="ac-eyebrow">Trends</p>');
   });
 });

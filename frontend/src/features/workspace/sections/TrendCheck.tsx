@@ -120,20 +120,25 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
       <InlineError text={error} />
       <Revealed when={navigation === "new"} summary="All groups, the method and the chart">
         <div className="uw-cr-stats">
-          <StatTile
-            label="Significant rise"
-            value={summary ? summary.significant : null}
-            detail="Chance under 1% if nothing changed, allowing for the groups assessed"
-            icon={<AlertTriangle size={18} />}
-            tone={summary?.significant ? "critical" : undefined}
-          />
-          <StatTile
-            label="Higher than usual"
-            value={summary ? summary.elevated : null}
-            detail="Chance under 5%"
-            icon={<TrendingUp size={18} />}
-            tone={summary?.elevated ? "warning" : undefined}
-          />
+          {/* On the new navigation the heroes above say the rises (0.10.87): the fold keeps the counts. */}
+          {navigation !== "new" && (
+            <>
+              <StatTile
+                label="Significant rise"
+                value={summary ? summary.significant : null}
+                detail="Chance under 1% if nothing changed, allowing for the groups assessed"
+                icon={<AlertTriangle size={18} />}
+                tone={summary?.significant ? "critical" : undefined}
+              />
+              <StatTile
+                label="Higher than usual"
+                value={summary ? summary.elevated : null}
+                detail="Chance under 5%"
+                icon={<TrendingUp size={18} />}
+                tone={summary?.elevated ? "warning" : undefined}
+              />
+            </>
+          )}
           <StatTile
             label="Groups checked"
             value={summary ? summary.groups : null}
@@ -155,7 +160,7 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
             icon={<Activity size={18} />}
           />
         </div>
-        <Panel eyebrow="Trends" title="Trend check" source={board}>
+        <Panel eyebrow={navigation === "new" ? undefined : "Trends"} title="Trend check" source={board}>
           <div className="uw-cr-toolbar">
             <ChipFilter label="Group complaints" options={TREND_GROUPS} value={group} onChange={setGroup} />
             <ProductFilter value={product} onChange={setProduct} />
@@ -318,8 +323,8 @@ export function TrendHeroes({
               ))}
             </div>
             <p className="uw-trend-note">
-              Each bar counts complaints in the last {row.recent_days} days: the expected number and the earlier one
-              come from {trendBaselineText(row).replace(/^Own history/, "its own history")}.
+              {/* The bars name what they compare with; "How we compared" says how (0.10.87). */}
+              Each bar counts complaints in the last {row.recent_days} days.
             </p>
             <details className="uw-more uw-trend-how">
               <summary>How we compared</summary>
@@ -334,7 +339,7 @@ export function TrendHeroes({
       {!rising.length && (
         <section className="uw-card uw-trend-hero" aria-label="What the history can show">
           <span className="ms-chip uw-trend-verdict is-steady">
-            {tested ? "No version is rising against its own history" : "Too early to compare"}
+            {tested ? "No version is rising" : "Too early to compare"}
           </span>
           <h2>
             {tested
