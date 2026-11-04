@@ -27,6 +27,16 @@ the pinned embedding model before the tests (`scripts/prepare_embedding_cache.py
   or waiting for QA review), the complaints waiting for a disposition, the dated reports and CAPAs on Due dates, and on
   the Platform Admin side pending early-exit requests and open pilot requests.
 
+### Fixed: a person's data export is complete
+
+- **A person's export carries every sign-in event.** It kept only the newest 500, so a long-standing user's export
+  under the DPDP Act was incomplete (`tenant_export_api.person_export`; `tests/test_person_export.py`).
+
+### Operations
+
+- The first production restore drill with steps 3 and 4 is recorded in `docs/runbooks/BACKUP_AND_RESTORE.md`
+  (3 Nov 2026: restore 32 s, whole drill 7 min 19 s against the RTO of 4 h).
+
 ### Fixed: the row allowance holds when two imports run at once
 
 - Two imports at the same moment could each count the same rows left and together go past the free trial's 5,000

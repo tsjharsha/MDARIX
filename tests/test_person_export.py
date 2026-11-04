@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from auth.durable import persist_session
 from auth.service import _hash
 from backend.app.db.models.foundation import AuditEvent, AuthUser, TenantMembership
+from backend.app.db.models.stage2 import AuthenticationEvent
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system
 from backend.app.main import app
@@ -128,3 +129,29 @@ def test_a_person_export_stays_inside_the_administrators_organization(platform, 
     investigator, _ = _client_in(tenant_id, "Investigator")
     assert investigator.get(f"/api/v1/admin/people/{person_id}/export").status_code in (401, 403)
     assert _count(AuditEvent, tenant_id=tenant_id, action="PERSONAL_DATA_EXPORTED") == 0
+
+
+def test_a_person_export_carries_every_sign_in_event(organization):
+    """DPDP: the export is complete. It once kept only the newest 500 sign-in events."""
+    tenant_id, person_id = organization["tenant_id"], organization["user_id"]
+    db = SessionLocal()
+    bind_system(db, "test")
+    try:
+        db.add_all(
+            AuthenticationEvent(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                user_id=person_id,
+                event_type="LOGIN",
+                outcome="SUCCESS",
+                created_at=datetime.now(timezone.utc),
+            )
+            for _ in range(501)
+        )
+        db.commit()
+    finally:
+        db.close()
+    admin, _ = _client_in(tenant_id, "CUSTOMER_ADMIN")
+    response = admin.get(f"/api/v1/admin/people/{person_id}/export")
+    assert response.status_code == 200, response.text
+    assert len(response.json()["sign_in_events"]) >= 501
