@@ -8042,9 +8042,16 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
   background: var(--ms-mint);
   color: var(--ms-teal-dark);
 }
-.uw-os-rail {
+/* 4 Nov 2026 (owner): the ten steps as a vertical list beside the step's card, the current step highlighted. */
+.uw-os-grid {
   display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.uw-os-rail {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 .uw-os-step {
@@ -8052,33 +8059,30 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  min-height: 40px;
-  padding: 10px 8px 10px 22px;
-  background: rgba(255, 255, 255, 0.07);
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: var(--ms-radius-md);
   color: var(--ms-on-dark-muted);
-  font-size: var(--ms-fs-12);
+  font-size: var(--ms-fs-14);
   font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
+  line-height: 1.25;
   cursor: pointer;
-  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
 }
-.uw-os-step:first-child {
-  padding-left: 12px;
-  border-radius: 999px 0 0 999px;
-  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+.uw-os-step:hover {
+  background: rgba(255, 255, 255, 0.07);
 }
 .uw-os-step:focus-visible {
   outline: 2px solid #fff;
   outline-offset: -2px;
 }
 .uw-os-step.is-done {
-  background: rgba(76, 199, 193, 0.22);
   color: #c8f0ed;
 }
 .uw-os-step.is-now {
   background: #2fb3ad;
   color: #06201f;
+  font-weight: 700;
 }
 .uw-os-step.is-sel {
   outline: 2px solid #fff;
@@ -8090,20 +8094,37 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
 }
 .uw-os-k {
   display: inline-flex;
-  margin-right: 5px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  font-size: var(--ms-fs-12);
   font-weight: 800;
 }
-.uw-os-t {
-  overflow: hidden;
-  text-overflow: ellipsis;
+.uw-os-step.is-done .uw-os-k {
+  border-color: transparent;
+  background: rgba(76, 199, 193, 0.3);
+}
+.uw-os-step.is-now .uw-os-k {
+  border-color: transparent;
+  background: #06201f;
+  color: #fff;
 }
 .uw-os-body {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: 28px;
-  align-items: center;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  align-items: start;
+  padding-left: 28px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+@media (max-width: 1180px) {
+  .uw-os-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .uw-os-main {
   display: grid;
@@ -8319,22 +8340,13 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
     justify-content: center;
     width: 100%;
   }
-  .uw-os-rail {
-    gap: 3px;
+  .uw-os-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ms-space-4);
   }
-  .uw-os-step,
-  .uw-os-step:first-child {
-    justify-content: center;
-    min-height: 30px;
-    padding: 0;
-    border-radius: 999px;
-    clip-path: none;
-  }
-  .uw-os-t {
-    display: none;
-  }
-  .uw-os-k {
-    margin: 0;
+  .uw-os-body {
+    padding-left: 0;
+    border-left: 0;
   }
 }
 /* The record's one progress indicator (0.10.82, D1.5): a status line, "Stage 2 of 6 · Triage › Market assessment › …". */

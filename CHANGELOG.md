@@ -27,6 +27,13 @@ the pinned embedding model before the tests (`scripts/prepare_embedding_cache.py
   or waiting for QA review), the complaints waiting for a disposition, the dated reports and CAPAs on Due dates, and on
   the Platform Admin side pending early-exit requests and open pilot requests.
 
+### Changed: Getting started's ten steps, in the owner's words, as a vertical list
+
+- The steps read Review the call · Triage · Assess reportability · Sign conclusion · Prepare report · Complete details ·
+  Approve report · Record submission · Review records · Explore trends, in a numbered list beside the step's card (the
+  current step highlighted; on a phone the list sits above the card). What each step opens and when it ticks is
+  unchanged (`trial/one_story.STEPS`; `tests/test_release_0_10_85.py`).
+
 ### Fixed: a person's data export, and the management review's day
 
 - **A person's export carries every sign-in event.** It kept only the newest 500, so a long-standing user's export
