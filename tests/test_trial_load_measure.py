@@ -233,7 +233,7 @@ def test_measure_a_trial_against_the_targets(monkeypatch):
         _save(report)
         # 5. A write: a decision tree's answers saved (each answer saves every answer).
         sample = user.get("/api/v1/oversight/events/SAMPLE-RV-11").json()
-        complaint_id = sample.get("event", {}).get("id") or sample.get("id")
+        complaint_id = sample["event"]["complaint_id"]
         path = f"/api/v1/complaints/{complaint_id}/market-assessments/IN"
         answers = {"answers": {}, "harm_level": None, "harm_code": None, "harm_level_reason": ""}
         report["write_tree_answers"] = _series(user, "PUT", path, body=answers, target=WRITE_MS)
