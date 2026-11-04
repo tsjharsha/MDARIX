@@ -1,10 +1,49 @@
 # MDARIX R1 — current status
 
-**Last verified:** 2026-11-04 (0.10.88, local; section below). Before that 2026-10-08, `main` after PR #2 (`mvp/pilot-readiness-final`, merged as `c57e2d9`), CI on GitHub
+**Last verified:** 2026-11-04 (0.10.88 final, local; section below). Before that 2026-10-08, `main` after PR #2 (`mvp/pilot-readiness-final`, merged as `c57e2d9`), CI on GitHub
 Actions and the local Windows development stack (Docker Compose). Earlier results are kept below for comparison.
 Update this file only from real command output.
 
-## 2026-11-04 verified results (0.10.88, `fix/trial-0.10.88-journeys`, local, not pushed)
+## 2026-11-04 verified results (0.10.88 final, `fix/trial-0.10.88-journeys`, local, not pushed)
+
+Build C's final 0.10.88: v0.10.87 merged in, the P0 fix (a story step counts only when its screen loaded), OD-2,
+OD-4, backup retention, and the uploaded-data journey with the defects it found. The gates ran once on commit
+0dd1449c (one test fixed after, in 2f9faf20), on `mdarix_r1_test_r3` dropped, recreated and prepared with `scripts/prepare_test_environment.py`
+(`MDARIX_ENV=test`, a random `DAY35_FIXTURE_PASSWORD` for that step only). CI was not run (no push). Command results,
+not a certification.
+
+| Check | Command | Result on 0dd1449c |
+|---|---|---|
+| Backend suite | `python -m pytest -q -p no:cacheprovider` | Exit 1: 4,044 passed, 1 failed, 7 skipped, 4 deselected (dataplane), 1 h 12 min 57 s. The failure, `tests/test_standards_unit.py::test_each_template_names_its_basis`, expected the UK MDR 2002 template under "United Kingdom"; OD-2 names it Great Britain, as intended. The test was updated in 2f9faf20 and its file re-run alone: 15 passed. The whole suite was not run again (coordinator's instruction) |
+| Python lint and format | `ruff check .`, `ruff format --check .` | Both exit 0 |
+| Frontend type check | `npm run lint` | Exit 0 |
+| Frontend format | `npm run format:check` | Exit 0 |
+| Frontend tests | `npm test` | Exit 0; 1,556 tests in 212 files |
+| Frontend build | `npm run build` | Exit 0 |
+| DEV-13 load measurement (last, machine otherwise idle) | `MDARIX_TRIAL_LOAD_MEASURE=1 python -m pytest -s tests/test_trial_load_measure.py` (dc4e8959) | 1 passed in 6 min 35 s; no server error; 9 of 20 reads and writes within target; the table is in `docs/runbooks/LOAD_AND_FAILURE_DRILLS.md` |
+
+### The browser journeys: what each covers and how to run it
+
+Each runs in Chrome against the API started by `scripts/journey_api.py`, which captures every e-mail into a folder
+(no e-mail is sent) and refuses production, and the Vite dev server proxying `/api` to it. Synthetic people and data
+only; a new trial is signed up on every run.
+
+```
+MDARIX_JOURNEY_MAIL_DIR=<mail folder> MDARIX_REQUIRE_MFA_ROLES=PLATFORM_ADMIN,CUSTOMER_ADMIN,LEADER,APPROVER   MDARIX_ENV=development MDARIX_FEATURE_SET=mvp MDARIX_APP_URL=http://127.0.0.1:5231   POSTGRES_DB=<test database> python scripts/journey_api.py --port 8121
+# Vite on 5231 with /api proxied to 8121, then, in frontend/:
+E2E_MAIL_DIR=<mail folder> PLAYWRIGHT_BASE_URL=http://127.0.0.1:5231   npx playwright test e2e/<spec> --project=chromium --reporter=list
+```
+
+| Spec | Covers | Result on the final code |
+|---|---|---|
+| `e2e/your-data-journey.spec.ts` (new) | Uploaded data, team, 1440 with a phone pass (390): a file whose most urgent complaint gives no incident country and no awareness date; Getting started switched to Your data; the country asked on the complaint page (first save lost, retried, saved once) and the awareness date in its triage form; step 1's complaint failing to load once (not ticked, no mark sent, until Retry); reload and resume at step 3; the reportable branch through the real forms with password and authenticator; a colleague's approval on a phone; a real PDF (`application/pdf`, a non-empty `%PDF-` file); submission, Records, Trends; a second upload's complaint concluded not reportable on a phone, steps 5 to 8 "Not needed", no report for it and exactly one for the first. No 5xx (one 503 on purpose excepted), no page error, ticks only in order | 4 passed (2.8 min). Its first runs found two defects, fixed in 934cb8d1 and 3403719d |
+| `e2e/getting-started-journey.spec.ts` | The sample, solo at 1440: the ten steps with the authenticator, step 1's complaint failing to load once, a reload and resume, a step out of turn (409 STEP_NOT_YET, said on Getting started), a save lost and retried, the labelled practice approval. A team: the owner to Approve report, a colleague approving as the second person on a phone, the owner finishing on a phone; the team's own complaint concluded not reportable (steps 5 to 8 "Not needed"); a moved story refusing a stale step (409 STORY_MOVED) | 6 passed (9.5 min) |
+| `e2e/trial-journeys.spec.ts` | Sign-up, the activation e-mail and the authenticator, Home and Getting started (desktop); a removed record and a session ending during a save; a team on a phone: invitation while e-mail is slow, an Excel upload, the colleague's activation and the retention notice; axe-core, accessible names and keyboard on every screen | 5 passed: 3 in the full run; the solo pair failed on 0.10.86's Getting started heading, fixed in 0dd1449c, then 2 passed (`-g "a solo owner"`) |
+
+The local activation throttle ("Too many attempts", 15 minutes) stops a journey run that follows another within a
+few minutes on one machine; the runs above were spaced for it.
+
+## 2026-11-04 verified results (0.10.88 before the 0.10.87 merge, `fix/trial-0.10.88-journeys`, local, not pushed)
 
 Build C of R2/R3 (DEV-10 journeys and accessibility, DEV-13 performance, monitoring and recovery), on 0.10.86 as
 released (v0.10.86 merged in). Run on Windows on the disposable database `mdarix_r1_test_r3`, recreated and prepared

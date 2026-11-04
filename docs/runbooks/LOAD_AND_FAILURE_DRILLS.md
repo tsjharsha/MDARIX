@@ -34,17 +34,33 @@ $env:MDARIX_TRIAL_LOAD_REPORT = "load.json"          # written as it goes
 
 ## Results
 
-See the 0.10.88 delivery report for the full JSON. Before and after the 0.10.88 fixes, same machine, same synthetic
-5,000-row export (five products, forty lots, five countries):
+The final measurement, 5 Nov 2026, 01:13-01:20 IST, on 0.10.88's final code (commit dc4e8959), with no other test
+suite running on the machine (CPU about 15-25 % before it started); `tests/test_trial_load_measure.py`, 1 passed in
+6 min 35 s. The earlier figures were taken on 4 Nov while two other builds' suites ran, so part of the difference is
+the machine, not the code. Same synthetic 5,000-row export (five products, forty lots, five countries).
 
-| What | Before 0.10.88 | After | Target |
-|---|---|---|---|
-| Getting started's story, 5,000 imported complaints (GET /trial/one-story) | 60-86 s a read | about 25 s (p50) | 500 ms |
-| Picking the trial's most urgent complaint (profiled) | 173 s, 5.7 million name normalizations | 59 s | - |
-| Possible duplicates (GET /intake/duplicates) | about 12 s a read | 3.8 s | 500 ms |
-| The complaint page's "who may sign": each person's permissions read | 7 times | once (at most twice) | - |
-| Team list at the cap of 50 people (GET /trial/team) | 3-7 s, 301 queries | unchanged (reported) | 500 ms |
-| 5,000-row import: check / import with its after-answer work | 12 s / 157 s | see the report | 60 s |
+| What | 4 Nov, before 0.10.88's fixes (shared machine) | 5 Nov, final (quiet machine) | Target | Meets |
+|---|---|---|---|---|
+| Getting started's story, 5,000 imported complaints (GET /trial/one-story) | 60-86 s a read | p50 5.6 s, p95 5.8 s, 143 queries | 500 ms | No |
+| The short stories (GET /trial/story) | 7.3 s p50 (after the first fixes) | p50 2.0 s, p95 2.1 s | 500 ms | No |
+| Trial status (GET /trial/status) | 0.30 s p50 | p50 100 ms, p95 115 ms | 500 ms | Yes |
+| A complaint's page, SAMPLE-RV-11 (GET /oversight/events/{ref}) | - | p50 4.6 s, p95 5.1 s, 141 queries | 500 ms | No |
+| Triage list (GET /triage) | - | p50 1.3 s, p95 1.5 s | 500 ms | No |
+| Possible duplicates (GET /intake/duplicates) | about 12 s a read | p50 395 ms, p95 490 ms | 500 ms | Yes |
+| Intake list (GET /intake) | - | p50 466 ms, p95 567 ms | 500 ms | No (p95) |
+| Dispositions (GET /complaints/dispositions) | - | p50 956 ms, p95 985 ms, 235 queries | 500 ms | No |
+| Readiness (GET /readiness) | - | p50 1.9 s, p95 2.1 s | 500 ms | No |
+| Oversight alerts (GET /oversight/alerts) | - | p50 164 ms, p95 26.6 s (one cold read) | 500 ms | No (p95) |
+| Communications, plain and with the provider down (502) | - | p50 102 ms / 153 ms | 500 ms | Yes |
+| Team list at the cap of 50 people (GET /trial/team) | 3-7 s, 301 queries | p50 1.05 s, p95 1.11 s, 311 queries | 500 ms | No |
+| Inviting a colleague (team of 50) | - | p50 211 ms, p95 229 ms | 1 s | Yes |
+| A decision tree's answers saved (PUT market-assessments) | - | p50 227 ms, p95 286 ms | 1 s | Yes |
+| 5,000-row import: check / import / after the answer | 12 s / 157 s | 2.8 s / 33.4 s / 0.5 s; peak Python memory 74.5 MB | 60 s | Yes |
+| Four trials at once, eight threads, 72 reads | - | wall 54 s; p50 3.0 s, p95 13.2 s; no failures | 500 ms | No |
+| Picking the trial's most urgent complaint (profiled) | 173 s, 5.7 million name normalizations | 59 s (4 Nov profile) | - | - |
+
+No read answered with a server error. Production runs two uvicorn workers on a 2-CPU VM with a managed database: these
+in-process numbers are not production numbers.
 
 The remaining cost of the story and of every read that shows a complaint's work is the whole organization's due
 items (the reportability watch and the triage list, the latter read twice), computed on each such read however few
