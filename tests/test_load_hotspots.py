@@ -92,3 +92,22 @@ def test_possible_duplicates_are_found_without_comparing_every_record_with_every
     candidates = candidate_pairs(fields)
     assert [(i, j) for i, j in candidates if rules.duplicate_reasons(fields[i], fields[j])] == found
     assert len(candidates) < len(every) / 3
+
+
+def test_an_upload_the_person_abandons_is_not_a_server_error():
+    """A browser that leaves during an upload made the import routes answer 500 with a traceback (seen in the DEV-10
+    journeys under load): it counted against the server-error target and would alert. It is a 400 now."""
+    import asyncio
+
+    from fastapi import HTTPException
+    from starlette.requests import Request
+
+    from backend.app.request_body import read_limited
+
+    async def receive():
+        return {"type": "http.disconnect"}
+
+    request = Request({"type": "http", "method": "POST", "headers": []}, receive)
+    with pytest.raises(HTTPException) as refused:
+        asyncio.run(read_limited(request, 1024))
+    assert refused.value.status_code == 400 and refused.value.detail["code"] == "UPLOAD_INTERRUPTED"
