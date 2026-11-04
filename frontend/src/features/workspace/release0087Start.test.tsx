@@ -377,6 +377,20 @@ describe("one collapsed section holds the sample and trial controls", () => {
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*>.*Remove the sample data/);
   });
 
+  it("shows the counts, the dates and the controls first; the seven pain points fold behind About the sample data", () => {
+    reads.data[STATUS] = trialStatus(37);
+    reads.data[SAMPLE_REMOVAL_PATH] = { ...preview, has_sample: true, is_owner: true };
+    const html = render(<GettingStartedSection focus="About the sample data" />);
+    const fold = html.indexOf('<details class="uw-more uw-gs-about"><summary>About the sample data</summary>');
+    expect(fold).toBeGreaterThan(0);
+    // The fold is closed, and the counts, the trial's dates and the controls come before it.
+    for (const before of ["What the sample holds", "Trial ends", "Restart the sample story", "Remove the sample data<"])
+      expect(html.indexOf(before), before).toBeLessThan(fold);
+    expect(html.indexOf("What your sample data is, and why it looks like this")).toBeGreaterThan(fold);
+    // The counts are listed once.
+    expect(count(html, 'aria-label="What the sample holds"')).toBe(1);
+  });
+
   it("tells a colleague who may not restart or remove the sample, instead of hiding it silently", () => {
     reads.data[SAMPLE_REMOVAL_PATH] = { ...preview, has_sample: true, is_owner: false };
     const html = render(

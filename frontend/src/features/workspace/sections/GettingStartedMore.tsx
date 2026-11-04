@@ -7,6 +7,7 @@ import { BookDemo } from "./BookDemo";
 import { EndTrialPanel } from "./EndTrial";
 import { RemoveSamplePanel, RestartSamplePanel } from "./RemoveSample";
 import { SampleDataPanel } from "./SampleData";
+import { sampleFacts } from "../sampleStory";
 import type { StoryChapter } from "../trialStory";
 import type { TrialStatus } from "./GettingStarted";
 
@@ -127,8 +128,15 @@ export function TrialSettings({
       </summary>
       {shown && (
         <div className="uw-gs-settings-body">
+          {/* The counts first; the long explanation (seven pain points) folds below the controls (0.10.87). */}
           {hasSample ? (
-            <SampleDataPanel counts={trial?.sample} allowed={allowed} onOpen={onOpen} />
+            <Panel eyebrow="Sample data" title="What the sample holds">
+              <ul className="uw-sample-facts" aria-label="What the sample holds">
+                {sampleFacts(trial?.sample).map((fact) => (
+                  <li key={fact}>{fact}</li>
+                ))}
+              </ul>
+            </Panel>
           ) : (
             trial && (
               <Panel eyebrow="Sample data" title="The sample data is not in this trial">
@@ -170,6 +178,12 @@ export function TrialSettings({
           {hasSample && <RestartSamplePanel onRestarted={onRestarted} />}
           {hasSample && <RemoveSamplePanel onRemoved={onRemoved} />}
           <EndTrialPanel onNextSteps={onNextSteps} />
+          {hasSample && (
+            <details className="uw-more uw-gs-about">
+              <summary>About the sample data</summary>
+              <SampleDataPanel counts={trial?.sample} allowed={allowed} onOpen={onOpen} facts={false} />
+            </details>
+          )}
         </div>
       )}
     </details>
