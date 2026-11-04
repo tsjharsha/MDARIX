@@ -147,3 +147,21 @@ describe("the step list tells a screen reader which steps are not needed (0.10.8
     expect(form).toContain('<span class="sr-only">not needed</span>');
   });
 });
+
+describe("a triage not needed (0.10.88, DEV-10)", () => {
+  beforeEach(stubWindow);
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("says the complaint was not flagged for triage, not that a conclusion was signed", () => {
+    // The card of step 2, as shown when it is selected.
+    const run = { ...runAt("yours", 1), current: 1 };
+    run.steps = run.steps.map((step, index) => (index === 1 ? { ...step, done: false, skipped: true } : step));
+    const html = renderToStaticMarkup(
+      <WorkspaceContext.Provider value={workspace()}>
+        <StoryView story={{ sample: null, yours: run }} trends={[]} />
+      </WorkspaceContext.Provider>,
+    );
+    expect(html).toContain("Not needed: not flagged for triage");
+    expect(html).not.toContain("the signed conclusion is");
+  });
+});

@@ -125,9 +125,11 @@ def record_mark(request, user_id: str, run: str, complaint_id, step: str, now: d
     request.profile = profile
 
 
-def steps_done(marks: dict, triaged: bool, versions: list, report_stage: str | None) -> list:
-    """Per step: True (done), False, or "skip" (not needed after a signed "not reportable" conclusion). Pure, so its
-    rules are tested apart from the records."""
+def steps_done(
+    marks: dict, triaged: bool, versions: list, report_stage: str | None, *, triage_needed: bool = True
+) -> list:
+    """Per step: True (done), False, or "skip" (not needed: the triage of a complaint not flagged for it, the report's
+    steps after a signed "not reportable" conclusion). Pure, so its rules are tested apart from the records."""
     from backend.app.reportability.markets import NOT_REPORTABLE
 
     signed = next((v for v in reversed(versions) if v.signed_at is not None and v.superseded_by is None), None)
@@ -139,7 +141,8 @@ def steps_done(marks: dict, triaged: bool, versions: list, report_stage: str | N
     # complaint means its call was read; a report past "Created" means its form was opened.
     return [
         bool(marks.get("call")) or triaged or bool(versions) or at >= 0,
-        triaged,
+        # A complaint not on the triage list has no triage form (its page reads "Triage: not needed", 0.10.88).
+        "skip" if not triaged and not triage_needed else triaged,
         bool(versions),
         signed is not None,
         skip or (at >= 0 and (bool(marks.get("form")) or at >= 1)),
@@ -188,13 +191,15 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
     found = closure.facts(data, tenant_id, complaint)
     record = found["record"]
     triaged = record is not None and record.completed_at is not None
+    triage_needed = bool(found["on_triage"]) or record is not None
     versions = found["assessments"].get(market, []) if market else []
     report = next(
         (row for row in found["obligations"] if row.market == market and row.kind == "INITIAL"),
         None,
     )
     stage = _list_paths(data, control_db, ctx, tenant_id, [report])[report.id]["stage"] if report else None
-    done, earlier = in_order(steps_done(team_marks(request, run, complaint.id), triaged, versions, stage))
+    marks = team_marks(request, run, complaint.id)
+    done, earlier = in_order(steps_done(marks, triaged, versions, stage, triage_needed=triage_needed))
     current = next((index for index, value in enumerate(done) if value is False), len(done))
     signed = next((v for v in reversed(versions) if v.signed_at is not None and v.superseded_by is None), None)
     return {
