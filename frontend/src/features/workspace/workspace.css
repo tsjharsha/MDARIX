@@ -8042,6 +8042,15 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
   background: var(--ms-mint);
   color: var(--ms-teal-dark);
 }
+/* A step the person opened that was not saved (wrong complaint, or opened before its turn): said, never dropped. */
+.uw-os-problem {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid #f5c76b;
+  background: rgba(245, 199, 107, 0.12);
+  color: #fbe3b0;
+  font-size: var(--ms-fs-14);
+}
 /* 4 Nov 2026 (owner): the ten steps as a vertical list beside the step's card, the current step highlighted. */
 .uw-os-grid {
   display: grid;

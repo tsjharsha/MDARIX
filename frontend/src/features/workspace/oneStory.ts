@@ -1,6 +1,6 @@
 import { recordPlace } from "../../app/linkTable";
 import { useEffect } from "react";
-import { onSaved, send, useResource } from "../customer-admin/shared";
+import { errorText, onSaved, send, useResource } from "../customer-admin/shared";
 import { reportPlace } from "./authorityReports";
 import { treePlace } from "./sections/DecisionTrees";
 import { IMPORTED_SOURCE } from "./complaintList";
@@ -102,7 +102,15 @@ export function stepPlace(run: StoryRun, index: number): Place {
 /** Records on the record one story finished: its decision record leads (Records reads ``complaint``). */
 export const recordsTab = (ref: string) => `Decision records?${new URLSearchParams({ complaint: ref })}`;
 
-/** Open a step: its own mark saved first where the step is the person's (the call, the report, Records, Trends). */
+/** Why the last step the person opened was not saved (shown once on Getting started), or null. */
+let markProblem: string | null = null;
+export const takeMarkProblem = () => {
+  const found = markProblem;
+  markProblem = null;
+  return found;
+};
+
+/** Open a step: its own mark saved where the step is the person's (the call, the report, Records, Trends). */
 export async function openStep(
   run: StoryRun,
   index: number,
@@ -110,11 +118,15 @@ export async function openStep(
 ): Promise<void> {
   const mark = MARKED[index];
   const place = stepPlace(run, index);
-  // The report's mark only counts once there is a report to open (step 5 is otherwise blocked). The screen opens at
-  // once (0.10.85): the button waited for the mark, seconds on a busy server, and read as a dead click.
-  if (mark && !(index === 4 && !run.report_id))
-    void send(`${ONE_STORY_PATH}/marks`, "POST", { run: run.run, step: mark }).catch(() => null);
+  // The screen opens at once (0.10.85: waiting for the mark read as a dead click). The mark names the complaint the
+  // person opened, so it never lands on another one; a refusal is kept and shown on Getting started, never dropped.
   open(place.section, place.tab);
+  if (!mark || (index === 4 && !run.report_id)) return;
+  try {
+    await send(`${ONE_STORY_PATH}/marks`, "POST", { run: run.run, step: mark, complaint_id: run.complaint.id });
+  } catch (reason) {
+    markProblem = errorText(reason, `Step ${index + 1} was not saved. Open it again from Getting started.`);
+  }
 }
 
 /** "Step 4 of 10", or "All ten steps done". */

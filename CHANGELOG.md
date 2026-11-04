@@ -34,6 +34,16 @@ the pinned embedding model before the tests (`scripts/prepare_embedding_cache.py
   current step highlighted; on a phone the list sits above the card). What each step opens and when it ticks is
   unchanged (`trial/one_story.STEPS`; `tests/test_release_0_10_85.py`).
 
+### Fixed: a step's progress lands only on the complaint opened, in its turn
+
+- **A mark names the complaint the person's screen showed.** The story's complaint can move (a new urgent import
+  while an old screen is open); the server took its current choice, so opening complaint A could mark complaint B.
+  It now refuses a mark for another complaint (409 `STORY_MOVED`).
+- **A step counts only in its turn.** Records or Trends opened before the steps ahead of them were done was kept and
+  credited later; it is now refused (409 `STEP_NOT_YET`) and never credited.
+- **A refused or failed mark is said, not dropped.** The screen still opens at once; Getting started shows why the
+  step was not saved (`oneStory.openStep`; `tests/test_release_0_10_82.py`, `releaseD3085Story.test.tsx`).
+
 ### Fixed: a person's data export, and the management review's day
 
 - **A person's export carries every sign-in event.** It kept only the newest 500, so a long-standing user's export

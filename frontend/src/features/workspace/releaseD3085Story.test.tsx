@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoryView } from "./sections/OneStory";
 import { TabBar } from "./HybridShell";
-import { ONE_STORY_PATH, openStep, type StoryRun } from "./oneStory";
+import { ONE_STORY_PATH, openStep, takeMarkProblem, type StoryRun } from "./oneStory";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import gettingStarted from "./sections/GettingStarted.tsx?raw";
 import { SAMPLE_SOURCE } from "./complaintList";
@@ -89,6 +89,20 @@ describe("The story always works (owner report on 0.10.84)", () => {
     await Promise.resolve();
     expect(open).toHaveBeenCalledWith("Complaint", expect.stringContaining("SAMPLE-RV-11"));
     expect(ONE_STORY_PATH).toBe("/api/v1/trial/one-story");
+  });
+
+  it("names the complaint the screen showed in the mark, and keeps a refusal for Getting started", async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({ detail: { code: "STORY_MOVED", message: "The story now follows OS-1002." } }, { status: 409 }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("window", { setTimeout, clearTimeout });
+    const run = runAt("sample", 0);
+    await openStep(run, 0, vi.fn());
+    const body = JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(body).toEqual({ run: "sample", step: "call", complaint_id: run.complaint.id });
+    expect(takeMarkProblem()).toContain("The story now follows OS-1002.");
+    expect(takeMarkProblem()).toBeNull();
   });
 
   it("shows the open screen as a tab of its own when the persona's tabs do not list it", () => {

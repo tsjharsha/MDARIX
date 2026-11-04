@@ -12,6 +12,7 @@ import {
   stepBlocker,
   stepCount,
   stepPlace,
+  takeMarkProblem,
   useOneStory,
   type OneStory as OneStoryData,
   type StoryRun,
@@ -291,6 +292,7 @@ export function StoryView({
 }) {
   const { open, dataSource, chooseDataSource, session, startStory, canOpen } = useWorkspace();
   const [picked, setPicked] = useState<number | null>(null);
+  const [problem] = useState(takeMarkProblem);
   const run = shownRun(story, dataSource);
   // The ten-step story replaces an older story's bar: one progress indicator per page (D1.5).
   const go = (section: string, tab?: string) => {
@@ -426,6 +428,11 @@ export function StoryView({
         <span className="uw-num">{done} of 10 done</span>
         <span className="sr-only">{stepCount(run)}</span>
       </p>
+      {problem && (
+        <p className="uw-os-problem" role="status">
+          {problem}
+        </p>
+      )}
       <div className="uw-os-grid">
         <nav className="uw-os-rail" aria-label="Story steps">
           {run.steps.map((step, index) => (

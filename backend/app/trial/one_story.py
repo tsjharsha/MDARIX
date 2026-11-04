@@ -47,6 +47,7 @@ STEPS = (
     ("trends", "Explore trends"),
 )
 MARKS = ("call", "form", "records", "trends")
+MARK_STEP = {key: index for index, (key, _) in enumerate(STEPS) if key in MARKS}
 # The report's status path (authority_reports/rules.py STAGES), in order: where steps 6 to 8 are done.
 REPORT_PATH = ("CREATED", "COMPLETE", "APPROVAL", "APPROVED", "SUBMITTED", "ACKNOWLEDGED")
 
