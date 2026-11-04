@@ -148,7 +148,8 @@ test.describe("a team on its own uploaded data, phone", () => {
       timeout: 60_000,
     });
     provider({});
-    await expect(page.getByText(colleague.email)).toHaveCount(1);
+    // Listed once on the team (the status line names the address too).
+    await expect(page.getByRole("listitem").filter({ hasText: colleague.email })).toHaveCount(1);
     await shot(page, "06-team-invited");
     expect(problems).toEqual([]);
     await page.context().close();
