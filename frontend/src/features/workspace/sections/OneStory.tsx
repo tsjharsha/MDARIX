@@ -446,6 +446,7 @@ export function StoryView({
             >
               <span className="uw-os-k">{step.done ? <Check size={13} aria-label="done" /> : index + 1}</span>
               {step.earlier && <span className="sr-only">done earlier by your team</span>}
+              {step.skipped && <span className="sr-only">not needed</span>}
               <span className="uw-os-t">{step.label}</span>
             </button>
           ))}

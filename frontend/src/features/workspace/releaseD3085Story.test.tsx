@@ -132,3 +132,18 @@ describe("Getting started is the ten-step story only (owner, 5 Nov 2026)", () =>
       expect(gettingStarted).toContain(part);
   });
 });
+
+describe("the step list tells a screen reader which steps are not needed (0.10.88, DEV-10)", () => {
+  beforeEach(stubWindow);
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("names a step skipped by a not-reportable conclusion as not needed, not as a step still to do", () => {
+    const run = { ...runAt("sample", 8), conclusion: "NOT_REPORTABLE" } as StoryRun;
+    run.steps = run.steps.map((step, index) =>
+      index >= 4 && index <= 7 ? { ...step, done: false, skipped: true } : step,
+    );
+    const rail = view({}, run).match(/aria-label="Story steps">(.*?)<\/nav>/)?.[1] ?? "";
+    const form = rail.split("<button").find((item) => item.includes(">Form<")) ?? "";
+    expect(form).toContain('<span class="sr-only">not needed</span>');
+  });
+});
