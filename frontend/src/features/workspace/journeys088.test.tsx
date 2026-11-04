@@ -8,6 +8,8 @@ import { ReportPage, openSubmission } from "./sections/ReportsTab";
 import { eventPath } from "./oversight";
 import { REPORTS } from "./authorityReports";
 import { latestSaves } from "./treeAnswer";
+import { INVITE_TIMEOUT_MS, unansweredInvite } from "./sections/TrialTeam";
+import { ApiError } from "../../app/apiClient";
 
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("../customer-admin/shared", async (original) => ({
@@ -93,5 +95,17 @@ describe("Record the submission, from the report's rail (0.10.88)", () => {
     expect(folded.open).toBe(true);
     expect(part.scrollIntoView).toHaveBeenCalled();
     expect(field.focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+});
+
+describe("inviting a colleague while the e-mail provider is slow (0.10.88)", () => {
+  it("waits longer than a usual request, since the invitation is sent while it waits", () => {
+    expect(INVITE_TIMEOUT_MS).toBeGreaterThanOrEqual(30_000);
+  });
+
+  it("never says 'try again' when the answer was lost: the invitation may have been sent", () => {
+    for (const code of ["TIMEOUT", "NETWORK_ERROR"])
+      expect(unansweredInvite(new ApiError("MDARIX took too long", 0, code))).toMatch(/check the list below/);
+    expect(unansweredInvite(new ApiError("That colleague is already invited", 409, "ALREADY_INVITED"))).toBeNull();
   });
 });
