@@ -277,6 +277,14 @@ def _mfa_session(request: Request, db: Session, *, lock: bool = False):
     )
     if not row:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    from backend.app.request_context import _idle_limit
+
+    now = datetime.now(timezone.utc)
+    if row.last_seen_at is not None and now - row.last_seen_at > _idle_limit():
+        # Idle too long: over for the MFA steps too (a stale cookie must not bind an authenticator).
+        row.revoked_at = now
+        db.commit()
+        raise HTTPException(401, detail={"code": "SESSION_IDLE_TIMEOUT", "message": "Signed out after inactivity"})
     bind_tenant(db, row.tenant_id)
     query = db.query(AuthUser).filter(
         AuthUser.id == row.user_id, AuthUser.tenant_id == row.tenant_id, AuthUser.status == "ACTIVE"
@@ -284,6 +292,8 @@ def _mfa_session(request: Request, db: Session, *, lock: bool = False):
     user = (query.with_for_update().populate_existing() if lock else query).first()
     if not user:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    # The organization's access rules, as on every other route: a suspended member or an ended trial sets up nothing.
+    ensure_tenant_access(db, user)
     return row, user
 
 

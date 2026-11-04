@@ -309,7 +309,9 @@ describe("the reports screens", () => {
       approval: { may_approve: true, same_person: true, approvers: [], message: practice },
     });
     html = render(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />);
-    expect(html).toContain(practice);
+    // 0.10.87: the pilot half is the Approve button's practice line; the warning says only who you approve as.
+    expect(html).toContain("You may approve your own practice report as Leader.");
+    expect(html.split("in a pilot a colleague approves this").length - 1).toBe(1);
     expect(html).toContain("Your password");
     expect(askNote({ may_approve: false, same_person: false, approvers: ["Rahul"], message: "x" })).toBe(
       "When ready, ask for approval: Rahul gets a task in My Work.",

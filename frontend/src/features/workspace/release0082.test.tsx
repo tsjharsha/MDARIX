@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 import { runOf, shownRun, stepBlocker, stepPlace, type OneStory, type StoryRun } from "./oneStory";
-import { StoryView } from "./sections/OneStory";
+import { StoryView, TrendBars } from "./sections/OneStory";
 import { HomeSection } from "./sections/Home";
 import { placeOf, recordPlace } from "../../app/linkTable";
 import gettingStarted from "./sections/GettingStarted.tsx?raw";
@@ -60,22 +60,22 @@ const trend = (name: string, product: string, recent: number, expected: number, 
 describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
   beforeEach(stubWindow);
   afterEach(() => vi.unstubAllGlobals());
-  const view = (story: OneStory, extra: Partial<WorkspaceApi> = {}, trends: TrendItem[] = []) =>
+  const view = (story: OneStory, extra: Partial<WorkspaceApi> = {}) =>
     renderToStaticMarkup(
       <WorkspaceContext.Provider value={workspace(extra)}>
-        <StoryView story={story} trends={trends} />
+        <StoryView story={story} />
       </WorkspaceContext.Provider>,
     );
 
-  it("has one hero, one ten-step rail with its Sample label and one main button", () => {
+  it("has one title, one ten-step list with its Sample data label and one main button", () => {
     const html = view({ sample: runAt("sample", 2), yours: null });
     expect(html.match(/<h1/g)).toHaveLength(1);
-    expect(html).toContain("One complaint, from the first call to the signed report");
+    expect(html).toContain("Getting started</h1>");
     expect(html.match(/class="uw-os-step/g)).toHaveLength(10);
-    expect(html).toContain(">Sample<");
-    expect(html).toContain("2 of 10 done");
+    expect(html).toContain(">Sample data<");
+    expect(html).toContain("2 of 10 completed");
     // The step card is the next step from the saved record, and has exactly one main button.
-    expect(html).toContain("Step 3 of 10 · SAMPLE-RV-11");
+    expect(html).toContain("Step 3 · Tree");
     expect(html.match(/ac-primary/g)).toHaveLength(1);
     expect(html).toContain("Open the decision tree");
     // One-word labels on the rail, so none wraps or is cut.
@@ -84,7 +84,7 @@ describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
 
   it("after the sample's tenth step offers the same ten steps on your data", () => {
     const html = view({ sample: runAt("sample", 10), yours: runAt("yours", 0) });
-    expect(html).toContain("The sample story is complete");
+    expect(html).toContain("The sample walkthrough is complete");
     expect(html).toContain("Do the same with your data");
     // The data switch on Your data shows that run, its label and its most urgent complaint.
     const yours = view({ sample: runAt("sample", 10), yours: runAt("yours", 0) }, { dataSource: IMPORTED_SOURCE });
@@ -114,18 +114,15 @@ describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
     expect(stepPlace(runAt("sample", 4), 5).section).toBe("Decision trees");
   });
 
-  it("ends the sample on the OrbitCare rise, with the story's own product shown first", () => {
-    const html = view({ sample: runAt("sample", 9), yours: null }, {}, [
-      trend("OrbitCare 300 Rev B", "orbit", 9, 0.97, "SIGNIFICANT"),
-      trend("PulseWatch 410 Rev A", "pulse", 1, 1.2, "STEADY"),
-    ]);
-    expect(html.indexOf("PulseWatch 410 Rev A")).toBeLessThan(html.lastIndexOf("OrbitCare 300 Rev B"));
-    expect(html).toContain("OrbitCare 300 Rev B: significant rise");
+  it("ends the sample on the OrbitCare rise; the trend bars say their verdict in words", () => {
+    const html = view({ sample: runAt("sample", 9), yours: null });
     expect(html).toContain("Open the OrbitCare 300 trend");
+    const rise = renderToStaticMarkup(
+      <TrendBars row={trend("OrbitCare 300 Rev B", "orbit", 9, 0.97, "SIGNIFICANT")} />,
+    );
+    expect(rise).toContain("OrbitCare 300 Rev B: significant rise");
     // A group too small to assess says so, never "in line" (3 observed against 0.99 expected).
-    const few = view({ sample: runAt("sample", 9), yours: null }, {}, [
-      trend("PulseWatch 410 Rev A", "pulse", 3, 0.99, "TOO_FEW"),
-    ]);
+    const few = renderToStaticMarkup(<TrendBars row={trend("PulseWatch 410 Rev A", "pulse", 3, 0.99, "TOO_FEW")} />);
     expect(few).toContain("PulseWatch 410 Rev A: too few to assess");
     expect(few).not.toContain("in line");
   });
@@ -278,6 +275,6 @@ describe("a call's next action opens its own triage card (navigation M5)", () =>
 
 describe("Getting started's address on the new navigation", () => {
   it("never writes ?tab=Your+data, which a refresh opened as the Import page", () => {
-    expect(gettingStarted).toContain('navigation === "new" ? ("" as TrialTab) : "Your data"');
+    expect(gettingStarted).toContain('navigation === "new" ? ((focus ?? "").split("?")[0] as TrialTab) : "Your data"');
   });
 });

@@ -816,6 +816,9 @@ def create_user(payload: UserCreateRequest, request: Request, db: Session = Depe
         )
     _enforce_invite_limits(db, target_tenant_id, role)
     email = payload.email.strip().lower()
+    from backend.app.access.authz import lock_account_email
+
+    lock_account_email(db, target_tenant_id, email)  # a second invitation of this address waits, then sees this one
     _ensure_email_not_used_elsewhere(db, email, target_tenant_id)
     if (
         db.query(AuthUser)

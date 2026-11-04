@@ -333,3 +333,9 @@ def test_the_deployed_release_is_public_and_says_nothing_else():
     assert answer.json() == {"release": f"v{APP_VERSION}"}
     # The liveness probe's answer is unchanged (the production smoke test reads it as it is).
     assert TestClient(app).get("/health/live").json() == {"status": "alive"}
+
+
+def test_the_first_contact_guide_needs_a_session():
+    """0.10.87 (DEV-08 matrix): reads of the first-contact guide are for signed-in members, as its route says; it
+    answered anyone."""
+    assert TestClient(app).get("/api/v1/intake/guide").status_code == 401

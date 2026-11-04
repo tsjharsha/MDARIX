@@ -217,6 +217,30 @@ def test_the_routine_complaint_closes_at_service_level_on_one_screen_with_one_si
     assert [(row["version"], row["superseded"]) for row in body["history"]] == [(1, True)]
 
 
+def test_a_complaint_whose_harm_facts_are_not_recorded_is_never_closed_not_reportable_on_the_routine_basis(trial):
+    """DEV-09 (0.10.87), table ROUTINE: the sample's background complaint records no malfunction and no patient
+    outcome. It is off the watch, but the routine basis ("no death, serious injury or malfunction recorded; patient
+    outcome known") does not hold: before 0.10.87 the routine path was offered, and signing it concluded "not
+    reportable" for every enabled market on unrecorded facts."""
+    user, blank = trial["user"], trial["ids"]["SAMPLE-VENTRA-250-CMP-003"]
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        row = db.get(Complaint, uuid.UUID(blank))
+        assert (row.malfunction, row.patient_involved, row.death, row.serious_injury) == (None, None, None, None)
+    screen = user.get(_url(blank)).json()
+    assert screen["reportability"]["on_watch"] is False
+    assert screen["routine"]["offered"] is False
+    (reason,) = screen["routine"]["blocked"]
+    assert "whether the device malfunctioned" in reason and "Unknown is never No" in reason
+    board = {item["id"]: item for item in user.get(f"{BOARD}?page_size=100").json()["items"]}
+    assert board[blank]["routine_offered"] is False
+    # A complaint that records no patient and no malfunction keeps the routine path.
+    assert board[trial["ids"]["SAMPLE-RT-02"]]["routine_offered"] is True
+    _acknowledge(user)
+    refused = _sign(user, blank, "SERVICE_LEVEL", screen, routine=True)
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "ROUTINE_NOT_OFFERED"
+
+
 def test_a_source_value_off_the_list_stays_unknown_and_two_cable_closes_raise_the_recurring_matter(trial):
     user, tenant_id = trial["user"], trial["tenant_id"]
     rt02 = trial["ids"]["SAMPLE-RT-02"]
@@ -463,7 +487,10 @@ def test_an_organization_outside_a_trial_signs_without_the_practice_acknowledgem
     tenant_id = _organization("DS")
     try:
         leader = _client(tenant_id, "LEADER", "Lee Leader")
-        complaint = _complaint(tenant_id, _product(tenant_id), country="US", problem_code=None, patient_involved=False)
+        # The routine basis rests on recorded facts (0.10.87): no patient and no malfunction, recorded.
+        complaint = _complaint(
+            tenant_id, _product(tenant_id), country="US", problem_code=None, patient_involved=False, malfunction=False
+        )
         screen = leader.get(_url(complaint)).json()
         assert screen["training_required"] is False and screen["practice_label"] is None
         assert screen["routine"]["offered"] is True

@@ -74,8 +74,9 @@ export function reportNext(detail: Pick<ReportDetail, "stage" | "state" | "manda
     case "APPROVED":
       return {
         title: "Approved · PDF ready",
+        // "MDARIX never submits" is said once, below on the rail (0.10.87).
         detail:
-          "The PDF follows the form's field order, with the approval on its last page. Submit it through the authority's channel, then record the submission.",
+          "The PDF follows the form's field order, with the approval on its last page. Then record your submission.",
       };
     case "SUBMITTED":
       return {
@@ -138,7 +139,7 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
           detail={REPORT_VIEWS[view].detail}
         />
       </div>
-      <Panel eyebrow="Reports" title={listTitle(view, list.data ? rows.length : undefined)} source={list}>
+      <Panel title={listTitle(view, list.data ? rows.length : undefined)} source={list}>
         <Table
           caption={view}
           rows={rows}
@@ -326,7 +327,8 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
           </div>
           <div className="uw-cp-chips">
             {due && <DeadlineChip item={due} prefix="Due" />}
-            <span className="ms-chip">{meter.text} fields</span>
+            {/* The count of what is missing is the "things to give" head while any is (0.10.87). */}
+            {meter.share === 100 && <span className="ms-chip">{meter.text} fields</span>}
             {detail.form.report_kind && <span className="ms-chip">{detail.form.report_kind} report</span>}
             {detail.form.starter && <span className="ms-chip">{STARTER_LABEL}</span>}
             {(detail.state === "CORRECTION_REQUIRED" || detail.state === "CANCELLED") && (
@@ -335,10 +337,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
           </div>
         </div>
         <dl className="uw-hl-fields">
-          <div>
-            <dt>Market</dt>
-            <dd>{detail.market_label}</dd>
-          </div>
+          {/* The market is the eyebrow and the due day the chip (0.10.87). */}
           <div>
             <dt>Form</dt>
             <dd>{versionWords(detail.form.version)}</dd>
@@ -346,10 +345,6 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
           <div>
             <dt>Prepared by</dt>
             <dd>{detail.preparers?.join(", ") || "—"}</dd>
-          </div>
-          <div>
-            <dt>Due</dt>
-            <dd>{deadlineText(detail.deadline, detail.state)}</dd>
           </div>
         </dl>
         {detail.stages && detail.stage && <StagePath stages={detail.stages} />}
@@ -428,7 +423,9 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                 ))}
               <SubmissionRecord detail={detail} />
               <p className="ac-note">
-                {detail.starter_mark} Field order: {detail.form.source_document}.
+                {/* A starter form's chip says it is a starter (0.10.87). */}
+                {!detail.form.starter && detail.starter_mark ? `${detail.starter_mark} ` : ""}Field order:{" "}
+                {detail.form.source_document}.
               </p>
             </div>
           </details>

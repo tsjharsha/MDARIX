@@ -275,14 +275,21 @@ def watch_record(complaint: Complaint) -> dict:
     }
 
 
-def routine_offer(on_watch: bool, second_look: dict | None, met: list[dict]) -> dict:
-    """Whether the routine path is offered (T-U13): not on the reportability watch, no open or confirmed second-look
-    flag, no escalation trigger. Each condition that fails is said."""
+def routine_offer(on_watch: bool, second_look: dict | None, met: list[dict], unrecorded: list[dict] = ()) -> dict:
+    """Whether the routine path is offered (T-U13): not on the reportability watch, every fact its basis rests on
+    recorded (``rules.routine_unrecorded``), no open or confirmed second-look flag, no escalation trigger. Each
+    condition that fails is said."""
     blocked = []
     if on_watch:
         blocked.append(
             "On the reportability watch: a death, serious injury or malfunction is recorded, or a patient's "
             "outcome is unknown"
+        )
+    elif unrecorded:
+        blocked.append(
+            "The record does not say "
+            + " or ".join(item["label"] for item in unrecorded)
+            + ". The routine path concludes not reportable only on recorded facts (Unknown is never No)"
         )
     if second_look is not None:
         blocked.append("The second look flags this record")
@@ -302,7 +309,8 @@ def screen_facts(db: Session, tenant_id: uuid.UUID, complaint_id, today: date) -
     enabled = markets.enabled_markets(settings_of(db, tenant_id)["windows"])
     facts = facts_of(db, tenant_id, complaint, product_name, enabled)
     met = triggers.evaluate(db, tenant_id, facts, today)
-    on_watch = reporting_rules.watched(watch_record(complaint))
+    record = watch_record(complaint)
+    on_watch = reporting_rules.watched(record)
     second_look = second_look_open(db, tenant_id, complaint.id)
     return {
         "complaint": complaint,
@@ -314,7 +322,7 @@ def screen_facts(db: Session, tenant_id: uuid.UUID, complaint_id, today: date) -
         "triggers": met,
         "on_watch": on_watch,
         "second_look": second_look,
-        "routine": routine_offer(on_watch, second_look, met),
+        "routine": routine_offer(on_watch, second_look, met, rules.routine_unrecorded(record)),
         "candidates": known_issue_cases(db, tenant_id, complaint),
     }
 
