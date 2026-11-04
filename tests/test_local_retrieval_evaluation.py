@@ -184,6 +184,7 @@ def test_a_vector_of_a_record_s_earlier_text_is_never_ranked(golden):
     question = "Was a teardown of the returned pumps done?"
     by_meaning = {"semantic", "hybrid"}
     assert any(r.chunk_id == chunk.id and r.retrieval_method in by_meaning for r in _search(golden, question).results)
+    original = (chunk.text_content, chunk.checksum)
     try:
         # The chunk's text changes in place; its vector is of the earlier text (checksum differs) until re-indexed.
         chunk.text_content, chunk.checksum = "Cafeteria opening hours for the site.", "changed-" + uuid.uuid4().hex
@@ -191,31 +192,40 @@ def test_a_vector_of_a_record_s_earlier_text_is_never_ranked(golden):
         stale = [r for r in _search(golden, question).results if r.chunk_id == chunk.id]
         assert all(r.retrieval_method == "structured" for r in stale), stale
     finally:
+        # A search commits (its search log row), so the change is undone and committed, not rolled back: the
+        # module's later tests read this chunk.
         db.rollback()
+        chunk.text_content, chunk.checksum = original
+        db.commit()
 
 
 @pytest.mark.model
 def test_evidence_the_case_set_aside_never_reaches_ask(golden):
     """EV-VS015-003 linked to the golden case, found for its question; once the case's review supersedes it, Ask's
-    search for that case leaves it out (the link is made and undone inside the test's transaction)."""
+    search for that case leaves it out. A search commits (its search log row), so the links are put back as they
+    were and committed at the end, not rolled back."""
     from genai.ask import search_evidence
 
     db, tenant = golden["db"], golden["tenant"]
     case = db.query(Investigation).filter_by(tenant_id=tenant.id, investigation_identifier="INV-001").one()
     evidence = db.query(Evidence).filter_by(tenant_id=tenant.id, evidence_identifier="EV-VS015-003").one()
     question = "Was a teardown of the returned pumps done?"
+    links = db.query(InvestigationEvidence).filter_by(investigation_id=case.id, evidence_id=evidence.id).all()
+    before = {link.id: link.review_status for link in links}
     try:
-        link = db.query(InvestigationEvidence).filter_by(investigation_id=case.id, evidence_id=evidence.id).first()
-        if link is None:
-            link = InvestigationEvidence(
-                id=uuid.uuid4(),
-                tenant_id=tenant.id,
-                investigation_id=case.id,
-                evidence_id=evidence.id,
-                created_at=datetime.now(timezone.utc),
-            )
-            db.add(link)
-        link.review_status = "UNREVIEWED"
+        if not links:
+            links = [
+                InvestigationEvidence(
+                    id=uuid.uuid4(),
+                    tenant_id=tenant.id,
+                    investigation_id=case.id,
+                    evidence_id=evidence.id,
+                    created_at=datetime.now(timezone.utc),
+                )
+            ]
+            db.add(links[0])
+        for link in links:
+            link.review_status = "UNREVIEWED"
         db.flush()
 
         def found():
@@ -225,11 +235,17 @@ def test_evidence_the_case_set_aside_never_reaches_ask(golden):
             return [item["id"] for item in result["evidence"]] + [s["evidence_identifier"] for s in result["sources"]]
 
         assert "EV-VS015-003" in found()
-        link.review_status = "SUPERSEDED"
+        links[0].review_status = "SUPERSEDED"
         db.flush()
         assert "EV-VS015-003" not in found()
     finally:
         db.rollback()
+        for link in db.query(InvestigationEvidence).filter_by(investigation_id=case.id, evidence_id=evidence.id):
+            if link.id in before:
+                link.review_status = before[link.id]
+            else:
+                db.delete(link)
+        db.commit()
 
 
 # --------------------------------------------------------------------------------------------- prompt injection
