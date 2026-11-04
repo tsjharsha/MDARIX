@@ -261,3 +261,10 @@ describe("layout: a long next step wraps inside its card (0.10.87)", () => {
     expect(sheet).toContain(".uw-cp-next {\n  min-width: 0;\n}");
   });
 });
+
+describe("layout: Records never scrolls sideways on a phone (0.10.87)", () => {
+  it("lets the all-records grid item shrink, so the phone's one-row tabs scroll inside themselves", () => {
+    const rule = sheet.slice(sheet.indexOf(".uw-records-all {"));
+    expect(rule.slice(0, rule.indexOf("}"))).toContain("min-width: 0;");
+  });
+});
