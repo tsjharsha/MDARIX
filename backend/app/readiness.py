@@ -141,14 +141,15 @@ OUTBOX_MAX_LAG = timedelta(minutes=15)
 
 def outbox_backlog(db) -> dict:
     """Events waiting to be published: how many, how many are retrying after a failure, how many of those failed
-    sending e-mail, and the lag of the longest-waiting one that is due (an event backing off is not due yet)."""
+    sending e-mail (the provider refused it: EmailDeliveryError, or the notifications' NotificationFailed), and the lag of the longest-waiting one that is due (an event backing off is not due yet)."""
     from backend.app.db.tenant_scope import bind_system
 
     bind_system(db, "readiness: outbox backlog")
     row = db.execute(
         text(
             "SELECT count(*), count(*) FILTER (WHERE attempts > 0), "
-            "count(*) FILTER (WHERE attempts > 0 AND last_error LIKE 'EmailDeliveryError%'), "
+            "count(*) FILTER (WHERE attempts > 0 AND (last_error LIKE 'EmailDeliveryError%' "
+            "OR last_error LIKE 'NotificationFailed%')), "
             "EXTRACT(EPOCH FROM now() - min(coalesce(next_attempt_at, occurred_at)) "
             "FILTER (WHERE coalesce(next_attempt_at, occurred_at) <= now())) "
             "FROM event_outbox WHERE published_at IS NULL AND dead_lettered_at IS NULL"

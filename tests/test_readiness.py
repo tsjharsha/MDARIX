@@ -143,6 +143,18 @@ def test_the_outbox_backlog_counts_due_retrying_and_failing_email_events():
                 attempts=1,
                 last_error="EmailDeliveryError: The email provider refused the message",
             ),
+            # A notification whose e-mail failed (notifications.NotificationFailed): e-mail failing too.
+            OutboxEvent(
+                id=uuid.uuid4(),
+                tenant_id=tenant,
+                event_name="TEST_NOTICE",
+                aggregate_type="Test",
+                payload={},
+                occurred_at=now,
+                attempts=1,
+                next_attempt_at=now + timedelta(minutes=5),
+                last_error="NotificationFailed: the trial invitation could not be delivered",
+            ),
             # Backing off until later: waiting, but not due, so it adds no lag.
             OutboxEvent(
                 id=uuid.uuid4(),
@@ -160,8 +172,8 @@ def test_the_outbox_backlog_counts_due_retrying_and_failing_email_events():
         db.commit()
         try:
             after = readiness.outbox_backlog(db)
-            assert after["waiting"] == before["waiting"] + 2 and after["retrying"] == before["retrying"] + 2
-            assert after["email_failing"] == before["email_failing"] + 1
+            assert after["waiting"] == before["waiting"] + 3 and after["retrying"] == before["retrying"] + 3
+            assert after["email_failing"] == before["email_failing"] + 2
             assert after["lag_seconds"] >= 20 * 60 - 5
         finally:
             bind_system(db, "test cleanup")
