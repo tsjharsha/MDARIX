@@ -63,3 +63,32 @@ def test_the_watch_normalizes_each_market_and_country_name_once(monkeypatch):
     assert [markets.market_of(name) for name in ("U.S.A.", "usa", "Germany", "India", "Mars")] == before
     assert rules.normalize("U.S.A.") == rules.normalize(" usa ") == "usa"
     assert len(calls) < 100
+
+
+def test_possible_duplicates_are_found_without_comparing_every_record_with_every_other():
+    """The triage list's possible duplicates compared every record with every other (2,500 records: 3 million pairs,
+    about 12 s a read on 5,000 imported complaints). Only records of one product with the same lot or serial number
+    can be duplicates, so only those are paired: the same pairs, in the same order."""
+    import random
+    from datetime import date, timedelta
+
+    from backend.app.intake import rules
+    from backend.app.intake.service import candidate_pairs
+
+    pick = random.Random(88)
+    fields = [
+        {
+            "product_id": pick.choice(["p1", "p2", "p3", None]),
+            "lot_id": pick.choice(["LOT-1", "lot 1", "LOT-2", "", None]),
+            "serial": pick.choice(["SN-9", "sn 9", "SN-7", None]),
+            "site": pick.choice(["Ward 3", None]),
+            "country": pick.choice(["US", "IN"]),
+            "event_on": pick.choice([date(2026, 10, 1) + timedelta(days=pick.randint(0, 60)), None]),
+        }
+        for _ in range(400)
+    ]
+    every = [(i, j) for i in range(len(fields)) for j in range(i + 1, len(fields))]
+    found = [(i, j) for i, j in every if rules.duplicate_reasons(fields[i], fields[j])]
+    candidates = candidate_pairs(fields)
+    assert [(i, j) for i, j in candidates if rules.duplicate_reasons(fields[i], fields[j])] == found
+    assert len(candidates) < len(every) / 3
