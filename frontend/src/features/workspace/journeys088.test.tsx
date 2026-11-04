@@ -10,6 +10,7 @@ import { REPORTS } from "./authorityReports";
 import { latestSaves } from "./treeAnswer";
 import { INVITE_TIMEOUT_MS, unansweredInvite } from "./sections/TrialTeam";
 import { ApiError } from "../../app/apiClient";
+import { ReportingFacts } from "./sections/ReportingFacts";
 
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("../customer-admin/shared", async (original) => ({
@@ -107,5 +108,29 @@ describe("inviting a colleague while the e-mail provider is slow (0.10.88)", () 
     for (const code of ["TIMEOUT", "NETWORK_ERROR"])
       expect(unansweredInvite(new ApiError("MDARIX took too long", 0, code))).toMatch(/check the list below/);
     expect(unansweredInvite(new ApiError("That colleague is already invited", 409, "ALREADY_INVITED"))).toBeNull();
+  });
+});
+
+describe("OD-2: the United Kingdom is asked, Great Britain or Northern Ireland (0.10.88)", () => {
+  it("offers the two parts to choose from, not a free text field", () => {
+    const html = render(
+      <ReportingFacts
+        complaintId="c1"
+        needs={[
+          {
+            fact: "COUNTRY",
+            label: "Incident country",
+            given: "United Kingdom",
+            choices: ["Great Britain", "Northern Ireland"],
+            message: '"United Kingdom" is two markets: choose Great Britain or Northern Ireland.',
+            rule: "UK MDR 2002; EU MDR Art. 87",
+          },
+        ]}
+        onSaved={() => undefined}
+      />,
+    );
+    expect(html).toMatch(/<select[^>]*>.*<option value="Great Britain">Great Britain<\/option>/);
+    expect(html).toContain('<option value="Northern Ireland">Northern Ireland</option>');
+    expect(html).not.toContain('placeholder="For example India');
   });
 });

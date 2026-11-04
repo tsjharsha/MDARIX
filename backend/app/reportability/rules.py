@@ -135,7 +135,19 @@ _EU = [
     "NO",
 ]
 
-_GB = ["United Kingdom", "UK", "GB", "Great Britain", "England", "Scotland", "Wales"]
+_GB = ["Great Britain", "GB", "England", "Scotland", "Wales"]
+# The United Kingdom is two markets: Great Britain (UK MDR 2002) and Northern Ireland (EU MDR). Named whole, it is asked,
+# never read as one of them (owner decision OD-2, 0.10.88; markets.markets_of, facts.needed).
+UK_WHOLE = ("United Kingdom", "UK", "United Kingdom of Great Britain and Northern Ireland")
+UK_PARTS = ["Great Britain", "Northern Ireland"]
+
+
+def names_the_uk_whole(value: object) -> bool:
+    """Whether a country cell, or any country it names, is the United Kingdom as a whole."""
+    whole = {normalize(name) for name in UK_WHOLE}
+    return normalize(value) in whole or any(normalize(part) in whole for part in countries(value))
+
+
 _CA = ["Canada", "CA", "CAN"]
 _IN = ["India", "IN", "IND"]
 

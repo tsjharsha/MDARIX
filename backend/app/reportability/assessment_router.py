@@ -649,6 +649,12 @@ def set_reporting_facts(
     new: dict = {}
     if payload.country is not None:
         country = _collapse(payload.country)
+        if rules.names_the_uk_whole(country):
+            raise _error(
+                422,
+                "COUNTRY_UK_PART_NEEDED",
+                "Choose Great Britain or Northern Ireland: Northern Ireland follows the EU MDR",
+            )
         if not facts.country_known(country):
             raise _error(
                 422,

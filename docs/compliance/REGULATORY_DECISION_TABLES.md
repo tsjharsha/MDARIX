@@ -167,14 +167,17 @@ any resolution gives (Canada: OD-3). A deliberate fault (Unknown read as No) fai
 | MK-2 | U.S.A. | US |
 | MK-3 | Germany | EU_NI |
 | MK-4 | Northern Ireland | EU_NI |
-| MK-5 | United Kingdom | GB |
+| MK-5 | United Kingdom | |
+| MK-5a | UK | |
+| MK-5b | Great Britain | GB |
 | MK-6 | India, Germany | IN EU_NI |
 | MK-7 | Canada | CA |
 | MK-8 | Brazil | |
 | MK-9 | | |
 
-MK-5: "United Kingdom" and "UK" are read as Great Britain, though Northern Ireland is part of the UK and follows the EU
-MDR (owner decision OD-2).
+MK-5: "United Kingdom" and "UK" name no market by themselves: Great Britain follows UK MDR 2002, Northern Ireland the
+EU MDR. The complaint page asks the person to choose Great Britain or Northern Ireland, with the other missing facts,
+and every market's shortest clock runs, provisional, until they do (owner decision OD-2, 5 Nov 2026; 0.10.88).
 
 ## 3. Signing: missing facts and missing authority block it ("ask, never guess")
 
@@ -358,9 +361,9 @@ holiday extension; India's period from the organization's window.
 - **OD-1** Work-day windows in Great Britain and India do not apply "the awareness day is day 1" (DL-14); calendar
   windows do. The starter report types are all calendar days, so only a window an organization enters with work days
   is affected. Unchanged until decided.
-- **OD-2** "United Kingdom" or "UK" as the incident country reads as Great Britain (MK-5), though a Northern Ireland
-  incident follows the EU MDR. Unchanged until decided.
+- **OD-2** Decided 5 Nov 2026 (0.10.88): "United Kingdom" or "UK" as the incident country is asked, Great Britain or
+  Northern Ireland (MK-5); Northern Ireland follows the EU MDR (EU_NI).
 - **OD-3** Canada: while "did it occur in Canada" is Unknown, the 10-day type applies (CA-10), though an incident abroad
   is "as soon as possible" (Health Canada's guidance: 48 hours). Unchanged until decided.
-- **OD-4** Re-signing a market conclusion needs no reason of its own (a disposition does): the prior version, its
-  rationale, signer and time stay, but why it was amended is not asked. Unchanged until decided.
+- **OD-4** Decided 5 Nov 2026 (0.10.88): re-signing a market conclusion (a new version superseding a signed one)
+  needs a change reason, kept with the new version, as re-signing a disposition does.

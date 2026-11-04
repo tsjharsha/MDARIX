@@ -12,6 +12,8 @@ export type FactNeed = {
   given: string | null;
   message: string;
   rule: string;
+  /** The answers to choose from: "United Kingdom" is Great Britain or Northern Ireland (OD-2, 0.10.88). */
+  choices?: string[];
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -67,14 +69,28 @@ export function ReportingFacts({
           {canEnter && (
             <label>
               {need.label}{" "}
-              <input
-                type={need.fact === "AWARENESS_DATE" ? "date" : "text"}
-                max={need.fact === "AWARENESS_DATE" ? today() : undefined}
-                maxLength={need.fact === "COUNTRY" ? 60 : undefined}
-                placeholder={need.fact === "COUNTRY" ? "For example India, IN, Germany or GB" : undefined}
-                value={values[need.fact] ?? ""}
-                onChange={(event) => setValues({ ...values, [need.fact]: event.target.value })}
-              />
+              {need.choices?.length ? (
+                <select
+                  value={values[need.fact] ?? ""}
+                  onChange={(event) => setValues({ ...values, [need.fact]: event.target.value })}
+                >
+                  <option value="">Choose…</option>
+                  {need.choices.map((choice) => (
+                    <option key={choice} value={choice}>
+                      {choice}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={need.fact === "AWARENESS_DATE" ? "date" : "text"}
+                  max={need.fact === "AWARENESS_DATE" ? today() : undefined}
+                  maxLength={need.fact === "COUNTRY" ? 60 : undefined}
+                  placeholder={need.fact === "COUNTRY" ? "For example India, IN, Germany or GB" : undefined}
+                  value={values[need.fact] ?? ""}
+                  onChange={(event) => setValues({ ...values, [need.fact]: event.target.value })}
+                />
+              )}
             </label>
           )}
         </div>
