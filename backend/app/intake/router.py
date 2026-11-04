@@ -172,7 +172,7 @@ class TriageIn(BaseModel):
 
 
 @router.get("/intake/guide")
-def guide():
+def guide(_ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     """The starter first-contact guide (starter text, T-B6), its outcomes table, the starter word lists and the time
     zones a call's times are entered in."""
     from backend.app.oversight.rules import LEGACY_ZONES, zone_names
