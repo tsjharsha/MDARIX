@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode, type RefObject } from "react";
 import { Check, ChevronRight, History, MoreHorizontal, Send } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
-import { errorText, formatDate, send, useResource } from "../../customer-admin/shared";
+import { errorText, formatDate, notFound, send, useResource } from "../../customer-admin/shared";
 import { DeadlineChip, HarmChip } from "../../../app/chips";
 import { marketLabel } from "../../../app/labels";
 import { tabParts } from "../../../app/linkTable";
@@ -168,8 +168,9 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   };
   if (!view)
     return (
-      // A call found on the triage list is shown as such (the panel shows its children only when ready).
-      <Panel eyebrow="Complaint" title={ref || "Complaint"} source={call ? undefined : resource}>
+      // A call found on the triage list is shown as such, and a complaint that is not there offers the list (the panel
+      // shows its children only when ready; a passing failure keeps the panel's Retry).
+      <Panel eyebrow="Complaint" title={ref || "Complaint"} source={call || notFound(resource) ? undefined : resource}>
         {resource.state === "error" && call && (
           <Empty
             title={`${ref} is a call, not a complaint yet`}

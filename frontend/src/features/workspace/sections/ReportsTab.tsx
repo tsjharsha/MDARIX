@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { FileText, Send } from "lucide-react";
-import { Panel, ToneBadge } from "../../admin/console/charts";
-import { Table, errorText, useResource } from "../../customer-admin/shared";
+import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
+import { Table, errorText, notFound, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
 import { marketLabel, versionWords } from "../../../app/labels";
 import { DeadlineChip, StateChip } from "../../../app/chips";
@@ -253,9 +253,17 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   const [pdfError, setPdfError] = useState("");
   if (!detail)
     return (
-      <Panel eyebrow="Report" title="Authority report" source={resource}>
+      <Panel eyebrow="Report" title="Authority report" source={notFound(resource) ? undefined : resource}>
         {resource.state === "error" && (
-          <p className="ac-muted">{errorText(resource.error, "It is not in your organization.")}</p>
+          <Empty
+            title="This report could not be opened"
+            detail={errorText(resource.error, "It is not in your organization.")}
+            action={
+              <button type="button" className="ac-secondary" onClick={onBack}>
+                All reports
+              </button>
+            }
+          />
         )}
       </Panel>
     );
