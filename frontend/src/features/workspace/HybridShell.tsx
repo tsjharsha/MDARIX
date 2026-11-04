@@ -30,6 +30,9 @@ export const PERSONA_TABS: Record<string, { label: string; section: WorkspaceSec
   trends: { label: "Trends", section: "Trends" },
   records: { label: "Records", section: "Records" },
   team: { label: "Team", section: "Team" },
+  // A trial's previews and its way to a pilot, right of the persona's tabs, for every persona (0.10.87; trialTabs).
+  ahead: { label: "Look ahead", section: "Look ahead" },
+  next: { label: "Next steps", section: "Next steps" },
 };
 
 /** The tab a screen belongs to: one complaint's page is the Complaints tab's; Settings or Account none. */
@@ -42,9 +45,10 @@ export const tabOfSection = (section: string): string | null =>
 export const visibleTabs = (tabs: readonly string[], allowed: readonly string[]): string[] =>
   Object.keys(PERSONA_TABS).filter((key) => tabs.includes(key) && allowed.includes(PERSONA_TABS[key].section));
 
-/** A trial's tabs: Getting started first, whatever the persona (0.10.80); a pilot's are the persona's. */
+/** A trial's tabs: Getting started first and Look ahead and Next steps last, whatever the persona (0.10.80, 0.10.87);
+ * a pilot's are the persona's. */
 export const trialTabs = (tabs: readonly string[], isTrial: boolean): readonly string[] =>
-  isTrial ? ["start", ...tabs] : tabs;
+  isTrial ? ["start", ...tabs, "ahead", "next"] : tabs;
 
 /** Each persona's mark: two letters on its own colour (the design system's fills under white text). */
 const PERSONA_COLOR: Record<string, string> = {

@@ -41,6 +41,13 @@ operator knows a release migrates the database.
 - The walkthrough says when it is still reading, when its read failed (with Try again), when a role may not read it,
   and when there is no complaint to follow.
 
+### Changed: Look ahead and Next steps are tabs of every free trial
+
+- Every persona in a free trial now has **Look ahead** and **Next steps** as tabs, after its own; Getting started stays
+  first. Pilots and paid organizations are unchanged.
+- Help no longer repeats them on the new navigation; its "Short stories and your trial" entry is now "Short stories and
+  other workflows" and opens the library.
+
 ## [0.10.86] - 2026-11-04
 
 On the trial maintenance line (`release/0.10`): a reliability release from an external code review of 0.10.84. No

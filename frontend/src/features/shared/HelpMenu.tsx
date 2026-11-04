@@ -54,6 +54,8 @@ export function HelpMenu({
   // In a trial workspace: Next steps, from trial to pilot (UserWorkspace says whether it is a trial).
   const workspace = useContext(WorkspaceContext);
   const onNextSteps = workspace?.isTrial ? () => workspace.open("Next steps") : undefined;
+  // On the new navigation Next steps is a tab of every trial (0.10.87): Help no longer repeats it.
+  const nextStepsHere = !!onNextSteps && workspace?.navigation !== "new";
   // A sample-only trial (0.10.71) offers "Discuss a pilot" where a trial offers its own data.
   const sampleOnly = !!workspace?.session?.sample_only;
   // On the new navigation "Try your own data" opens the import page: only for people who may import (0.10.80).
@@ -175,7 +177,7 @@ export function HelpMenu({
               </button>
             </li>
           ))}
-          {onNextSteps && (
+          {nextStepsHere && (
             <li>
               <button
                 type="button"

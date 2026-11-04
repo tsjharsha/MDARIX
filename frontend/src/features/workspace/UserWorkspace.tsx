@@ -68,6 +68,7 @@ import { IntelligenceSection } from "./sections/Intelligence";
 import { TrustSection } from "./sections/Trust";
 import { AccountSection } from "./sections/Account";
 import { GettingStartedSection, type TrialStatus } from "./sections/GettingStarted";
+import { OTHER_WORKFLOWS } from "./sections/GettingStartedMore";
 import { FeedbackPrompt, FeedbackSection } from "./sections/Feedback";
 import { ColleagueWelcome } from "./sections/ColleagueWelcome";
 import { ImportDataSection } from "./sections/ImportData";
@@ -731,12 +732,12 @@ export function UserWorkspace({
                 more={[
                   ...(trial?.is_trial
                     ? [
+                        // Look ahead and Next steps are tabs of a trial (0.10.87); the library stays one click away.
                         {
-                          label: "Short stories and your trial",
-                          detail: "Three short stories, the ten chapters, the sample data",
-                          onSelect: () => open("Getting started", "Your trial"),
+                          label: "Short stories and other workflows",
+                          detail: "Three short stories and the ten chapters",
+                          onSelect: () => open("Getting started", OTHER_WORKFLOWS),
                         },
-                        { label: "Look ahead", detail: LOOK_AHEAD_SUBTITLE, onSelect: () => open("Look ahead") },
                       ]
                     : []),
                   {
