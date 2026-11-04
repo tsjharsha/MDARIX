@@ -206,17 +206,31 @@ def test_production_refuses_a_model_call_without_an_organization(groq, monkeypat
 
 
 def test_a_signed_in_request_applies_its_organizations_controls(groq, tenant):
-    """End to end: the request context names the organization, so its switch and usage apply to Ask MDARIX."""
+    """End to end: the request context names the organization, so its switch and usage apply to Ask MDARIX.
+
+    Asked from the golden investigation, so the model is always asked (with the case's records), whatever the
+    evidence search finds: a question asked of the whole organization that no record answers gets no model since
+    0.10.87 (DEV-11 abstention), and whether the search finds a record depended on what earlier tests left."""
+    from backend.app.db.models.foundation import Investigation
+
+    with SessionLocal() as db:
+        bind_system(db, "test: the golden investigation")
+        case = str(
+            db.query(Investigation.id)
+            .filter(Investigation.tenant_id == tenant, Investigation.investigation_identifier == "INV-001")
+            .scalar()
+        )
     client = authenticated_client()
     before = _usage(tenant)["requests"]
-    response = client.post("/api/v1/stage3/interactions", json={"prompt": "What changed? Contact jane@x.org"})
+    asked = {"prompt": "What changed? Contact jane@x.org", "investigation_id": case}
+    response = client.post("/api/v1/stage3/interactions", json=asked)
     assert response.status_code == 200, response.text
     assert groq and "jane@x.org" not in json.dumps(groq[-1])
     assert _usage(tenant)["requests"] == before + 1
 
     _set(tenant, ai_processing_allowed=False)
     calls = len(groq)
-    response = client.post("/api/v1/stage3/interactions", json={"prompt": "What changed?"})
+    response = client.post("/api/v1/stage3/interactions", json={"prompt": "What changed?", "investigation_id": case})
     assert response.status_code == 200 and len(groq) == calls  # answered without a model
 
 

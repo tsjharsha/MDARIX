@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { Empty, Panel } from "../../admin/console/charts";
 import { useResource } from "../../customer-admin/shared";
-import { canImportOwnData, useWorkspace } from "../workspaceContext";
+import { canImportOwnData, useNavigation, useWorkspace } from "../workspaceContext";
 import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "../complaintList";
 import type { Insights } from "../trialInsights";
 import { ImportPanel, useReportChoice, type ImportResult } from "./ImportData";
@@ -52,11 +52,13 @@ export function YourData({
   });
   const readingImported = expectOwn && insights.state !== "error" && !ownInsights(insights.data);
   const reports = useReportChoice(focus);
+  // On the new navigation the drop zone says each file is checked (0.10.87): only the link to the reports here.
+  const fresh = useNavigation() === "new";
   return (
     <>
       {before}
       <p className="uw-cited-line">
-        Each import has a data-quality report: rows read, written and set aside, and why.{" "}
+        {!fresh && "Each import has a data-quality report: rows read, written and set aside, and why. "}
         <button
           type="button"
           className="ac-link"

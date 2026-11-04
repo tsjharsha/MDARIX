@@ -51,7 +51,6 @@ export function ThingsToGive({
 }) {
   const { groups, things, fields } = thingsToGive(detail);
   if (!things) return null;
-  const form = formName(detail.form.title);
   const rule = detail.form.clauses[0]?.short;
   return (
     <section className="uw-card rp-give" aria-labelledby="rp-give-title">
@@ -59,10 +58,8 @@ export function ThingsToGive({
         <h2 id="rp-give-title">
           {things} thing{things === 1 ? "" : "s"} to give ({fields} field{fields === 1 ? "" : "s"})
         </h2>
-        <span className="ac-muted">
-          {form}
-          {rule ? ` · ${rule}` : ""}
-        </span>
+        {/* The form is the page's heading (0.10.87): only its rule here. */}
+        {rule && <span className="ac-muted">{rule}</span>}
       </div>
       {groups.map((group) => (
         <div key={group.scope} className="rp-give-group">

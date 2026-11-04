@@ -103,6 +103,21 @@ DISPOSITION_RULES = (
 )
 
 
+def routine_unrecorded(record: dict) -> list[dict]:
+    """The facts ``ROUTINE_BASIS`` rests on that the complaint leaves unrecorded (0.10.87, DEV-09): whether the device
+    malfunctioned, and the patient's outcome (no patient involved, or no death and no serious injury). A complaint off
+    the watch may still leave them blank (an import without those columns); the routine path's "not reportable" is
+    then not offered, because Unknown is never No."""
+    found = []
+    if record.get("malfunction") is None:
+        found.append({"code": "MALFUNCTION", "label": "whether the device malfunctioned"})
+    if record.get("patient_involved") is not False and (
+        record.get("death") is None or record.get("serious_injury") is None
+    ):
+        found.append({"code": "PATIENT", "label": "whether a patient was involved, died or was seriously injured"})
+    return found
+
+
 def collapse(value: object) -> str:
     return " ".join(str(value or "").split())
 

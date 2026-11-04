@@ -202,7 +202,8 @@ export function CaseHeader({
       <Collapsed when={!!onSection} summary="Each step and the readiness checklist">
         <Panel
           eyebrow="Investigation progress"
-          title={onSection ? "Each step and the readiness checklist" : "Where this investigation stands"}
+          // Folded, the fold's own label names it (0.10.87).
+          title={onSection ? "" : "Where this investigation stands"}
           source={readiness}
         >
           {!onSection && (

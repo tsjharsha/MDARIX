@@ -193,7 +193,7 @@ describe("the complaint page (D1.7, D1.8)", () => {
     expect(html).toContain("<strong>Triage record:</strong> On the triage list: its triage record is not complete");
   });
 
-  it("asks each missing fact once, and says where elsewhere", () => {
+  it("asks each missing fact once, and says where once", () => {
     const needs = [
       { fact: "COUNTRY", label: "Incident country", given: null, message: "No incident country.", rule: "21 CFR 803" },
       { fact: "AWARENESS_DATE", label: "Awareness date", given: null, message: "No date.", rule: "21 CFR 803.50" },
@@ -201,8 +201,9 @@ describe("the complaint page (D1.7, D1.8)", () => {
     const html = page({ needs } as never);
     expect(html.match(/Incident country needed\./g)).toHaveLength(1);
     expect(html.match(/Awareness date needed\./g)).toHaveLength(1);
-    expect(html).toContain("Incident country asked below");
-    expect(html).toContain("Asked below");
+    // 0.10.87: the header says the facts are not recorded; the rail's Legal clocks say where they are asked.
+    expect(html.match(/Not recorded/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(html).not.toContain("asked below");
     // 0.10.85, D3.3: Details no longer repeats the awareness row the header shows.
   });
 

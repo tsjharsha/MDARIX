@@ -295,6 +295,9 @@ def invite_colleague(
         raise _error(422, "NAME_HAS_LINK", "Write the colleague's name without a web or email address")
     # The invitation limits first (0.10.81, security F1): nobody learns anything about an address past them.
     _limit_invitations(tenant_id, inviter, "invite")
+    from backend.app.access.authz import lock_account_email
+
+    lock_account_email(db, tenant_id, email)  # a second invitation of this address waits, then sees this one
     returning = _invitable(db, tenant_id, email)
     # Lock the trial's request row so two simultaneous invites cannot both take the last seat.
     db.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).with_for_update().first()

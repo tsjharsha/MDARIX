@@ -422,3 +422,38 @@ def test_platform_administrators_still_see_platform_accounts():
     platform = authenticated_client()
     roles = {str(row["role"]).upper() for row in platform.get("/api/v1/admin/identity/users").json()}
     assert "PLATFORM_ADMIN" in roles
+
+
+def test_two_invitations_of_one_email_at_once_make_one_account(world):
+    """0.10.87 (DEV-08 matrix, invitation race): two administrators inviting the same address at the same moment both
+    passed the "already exists" check and made two accounts for one email in one organization."""
+    import threading
+
+    client, ids = world
+    email = f"race-{uuid.uuid4().hex[:8]}@synthetic.invalid"
+    token = client.cookies.get("mdarix_session")
+    answers: list[int] = []
+    barrier = threading.Barrier(2)
+
+    def invite():
+        racer = TestClient(app)
+        racer.cookies.set("mdarix_session", token)
+        body = {"email": email, "display_name": "Race", "company": "Synthetic", "role": "Viewer"}
+        barrier.wait()
+        answers.append(racer.post("/api/v1/admin/identity/users", json=body).status_code)
+
+    threads = [threading.Thread(target=invite) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    db = SessionLocal()
+    try:
+        from backend.app.db.tenant_scope import bind_system
+
+        bind_system(db, "test: count the invited accounts")
+        accounts = db.query(AuthUser).filter(AuthUser.tenant_id == ids["tenant"], AuthUser.username == email).count()
+    finally:
+        db.close()
+    assert accounts == 1, f"{accounts} accounts for one invited email (answers {answers})"
+    assert sorted(answers) == [200, 409]

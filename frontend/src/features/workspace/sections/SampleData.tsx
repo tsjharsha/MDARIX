@@ -40,8 +40,11 @@ export function SampleDataPanel({
   counts,
   allowed,
   onOpen,
+  facts: showFacts = true,
 }: {
   counts: SampleCounts | null | undefined;
+  /** The facts list; left out where the counts are already shown above (Getting started's settings, 0.10.87). */
+  facts?: boolean;
   allowed: (section: string) => boolean;
   onOpen: (opens: SamplePain["opens"]) => void;
 }) {
@@ -60,7 +63,7 @@ export function SampleDataPanel({
             checks run on your own export once you upload it.
           </p>
         </div>
-        {facts.length > 0 && (
+        {showFacts && facts.length > 0 && (
           <ul className="uw-sample-facts" aria-label="What the sample holds">
             {facts.map((fact) => (
               <li key={fact}>{fact}</li>
