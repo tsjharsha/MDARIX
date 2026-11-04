@@ -242,3 +242,26 @@ def test_a_first_authenticator_is_still_set_up_without_reauthentication(clock):
     assert done.status_code == 200
     assert _events(user.id, "MFA_ENROLLED")[-1].details == {"replaced": False, "recovery_codes": 8}
     assert _events(user.id, "MFA_REPLACEMENT_STARTED") == []
+
+
+def test_an_idle_session_cannot_set_up_an_authenticator(clock):
+    """A session left unused past the idle timeout is over, for the MFA steps too: before 0.10.87 a stale cookie (an
+    unattended browser) could still bind its own authenticator app to an account that had none (DEV-08 matrix)."""
+    from datetime import datetime, timedelta, timezone
+
+    from auth.durable import hash_token
+    from backend.app.db.models.stage2 import AuthSession
+
+    user = _user(role="Investigator")
+    client, token = _client_for(user)
+    with SessionLocal() as db:
+        bind_system(db, "test: age the session")
+        row = db.query(AuthSession).filter(AuthSession.session_hash == hash_token(token)).one()
+        row.last_seen_at = datetime.now(timezone.utc) - timedelta(hours=2)
+        db.commit()
+    for step, body in (("enroll", None), ("verify-enrollment", {"code": "123456"}), ("challenge", None)):
+        refused = client.post(f"/api/v1/auth/mfa/{step}", json=body)
+        assert refused.status_code == 401, (step, refused.status_code, refused.text)
+    with SessionLocal() as db:
+        bind_system(db, "test: read the account")
+        assert db.get(AuthUser, user.id).mfa_pending_secret_encrypted is None
