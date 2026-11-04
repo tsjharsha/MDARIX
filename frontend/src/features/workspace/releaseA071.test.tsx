@@ -50,7 +50,7 @@ describe("A2: a sample-only trial cannot upload", () => {
   });
 
   it("offers Discuss a pilot in Help instead of your own data on the classic navigation", () => {
-    const classic = { navigation: "classic" };
+    const classic = { navigation: "classic" as const };
     const normal = render(<HelpMenu onGettingStarted={() => undefined} defaultOpen />, api(classic));
     expect(normal).toContain("Getting started and import templates");
     expect(normal).not.toContain("Discuss a pilot");
