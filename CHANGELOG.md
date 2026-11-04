@@ -12,9 +12,10 @@ operator knows a release migrates the database.
 
 ## [0.10.87] - 2026-11-04
 
-On the trial maintenance line (`release/0.10`): security, privacy and evaluation from the external code review's
-plan (DEV-08, DEV-11). No migration. The API, worker and scheduler images change; the web image does not. No
-operator step: no sample record, deadline or count changes.
+On the trial maintenance line (`release/0.10`): security, privacy and evaluation (DEV-08, DEV-11), the regulatory
+rules and controlled records (DEV-09), and Getting started v2 with the owner-approved duplication review. No migration.
+The API, worker, scheduler and web images change. No operator step. Sample: four background complaints move from the
+routine path to the standard path (their harm facts are not recorded).
 
 ### Fixed: sign-in steps and invitations (DEV-08)
 
@@ -50,6 +51,32 @@ operator step: no sample record, deadline or count changes.
 - `evaluation/retrieval/local_retrieval_v1.json` and `tests/test_local_retrieval_evaluation.py`: a versioned
   evaluation of the local search with the pinned model, thresholds set before qualification, and its governance
   tested apart.
+
+### Fixed: "not reportable" is never concluded on facts the record does not give (regulatory rules, DEV-09)
+
+- **The routine path needs the facts its basis states.** It signs "not reportable" for every enabled market on the
+  basis "no death, serious injury or malfunction recorded; patient outcome known", yet it was offered for a complaint
+  that recorded none of those (an import without the harm columns). It is now offered only when the record says whether
+  the device malfunctioned and either that no patient was involved or that there was no death and no serious injury;
+  otherwise the complaint takes the standard path, and the screen says which facts are missing. In a new or running
+  trial, four background sample complaints (SAMPLE-PULSE-410-CMP-005 and -006, SAMPLE-VENTRA-250-CMP-003 and -004) now
+  read "Standard path" on Dispositions where they read "Routine path"; no other sample number changes.
+- **A complaint on the watch because a patient's outcome is unknown asks for its country and awareness date** before
+  its market conclusion is signed, like a complaint that reports harm. Before, it could be signed with no country and
+  with its clock counted from the day MDARIX recorded it.
+
+### Added: the regulatory decision tables
+
+- `docs/compliance/REGULATORY_DECISION_TABLES.md` writes every branch of the starter rules as a table with its outcome:
+  reportability for the US, EU and Northern Ireland, Great Britain, India and Canada; folded questions; the market of a
+  country; the facts and the authority signing needs; deadlines across time zones, daylight saving and date-only
+  awareness; escalation, recurrence and the routine path; late evidence, amendments and provenance; and the versions
+  of rules, forms and assumptions. `tests/test_regulatory_decision_tables.py` runs every row, plus every Yes/No answer
+  combination with Unknowns, so the tables cannot drift from the code. These are tests of MDARIX's starter rules, not a
+  regulatory qualification: the regulatory expert's review is still pending.
+- `tests/test_regulatory_records.py`: provenance from the complaint to the signed conclusion, the report, its approved
+  snapshot and the PDF; the PDF against its text snapshot (`tests/snapshots/worksheet_us_3500a.txt`); an amended
+  conclusion keeps the prior version with its rationale, signer, time and checksum.
 
 ## [0.10.86] - 2026-11-04
 
