@@ -4,13 +4,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { signInNotice } from "../features/auth/AuthPage";
 
 const ended = () =>
-  vi
-    .fn()
-    .mockResolvedValue(
-      new Response(JSON.stringify({ detail: { code: "SESSION_EXPIRED", message: "Session expired" } }), {
-        status: 401,
-      }),
-    );
+  vi.fn().mockResolvedValue(
+    new Response(JSON.stringify({ detail: { code: "SESSION_EXPIRED", message: "Session expired" } }), {
+      status: 401,
+    }),
+  );
 
 async function redirectAfter(method: string) {
   vi.resetModules();
