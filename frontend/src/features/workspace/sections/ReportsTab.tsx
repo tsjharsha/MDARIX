@@ -25,7 +25,7 @@ import { InlineError } from "./boardParts";
 import { listTitle } from "./common";
 import { StagePath } from "./ComplaintPage";
 import { StoryPill } from "./OneStory";
-import { runOfReport, useOneStory } from "../oneStory";
+import { runOfReport, useOneStory, useVisited } from "../oneStory";
 import {
   AfterAcceptance,
   Approval,
@@ -256,6 +256,8 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   // The ten-step story's pill on its own report (0.10.82, D1.5); the rail's Next step is already the story's step.
   const storyRun = runOfReport(useOneStory(!!isTrial).data, id);
   const resource = useResource<ReportDetail>(`${REPORTS}/${id}`);
+  // Story step 5 counts once this report has loaded (0.10.88).
+  useVisited({ step: "form", reportId: resource.data?.id }, resource.state === "ready");
   const [shown, setShown] = useState<ReportDetail | null>(null);
   const canWrite = useCanReport();
   const canExport = useCan("data.export");

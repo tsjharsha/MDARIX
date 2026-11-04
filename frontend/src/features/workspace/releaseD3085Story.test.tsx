@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoryView } from "./sections/OneStory";
 import { TabBar } from "./HybridShell";
-import { ONE_STORY_PATH, openStep, takeMarkProblem, type StoryRun } from "./oneStory";
+import { ONE_STORY_PATH, openStep, takeMarkProblem, visited, type StoryRun } from "./oneStory";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import gettingStarted from "./sections/GettingStarted.tsx?raw";
 import { SAMPLE_SOURCE } from "./complaintList";
@@ -99,6 +99,8 @@ describe("The story always works (owner report on 0.10.84)", () => {
     vi.stubGlobal("window", { setTimeout, clearTimeout });
     const run = runAt("sample", 0);
     await openStep(run, 0, vi.fn());
+    // 0.10.88: the mark is saved once the complaint page has loaded that complaint.
+    await visited({ step: "call", complaintId: run.complaint.id });
     const body = JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body));
     expect(body).toEqual({ run: "sample", step: "call", complaint_id: run.complaint.id });
     expect(takeMarkProblem()).toContain("The story now follows OS-1002.");
