@@ -2,7 +2,8 @@
 usability review's U-01): MDARIX never guesses a mandatory fact. It asks for it at the step that needs it, and that
 step is not signed until it is entered.
 
-- **The incident country** of a complaint that reports harm or a malfunction: blank, or not a country (ISO 3166-1,
+- **The incident country** of a complaint on the reportability watch (harm, a malfunction, or a patient's outcome
+  unknown): blank, or not a country (ISO 3166-1,
   backend/app/countries.py, by code or name). It decides which authorities' rules and deadlines apply. A known country
   outside the five markets needs nothing (no market's rule applies).
 - **The awareness date**: neither an awareness nor a received date. Every deadline counts from it. Until it is entered
@@ -33,8 +34,10 @@ def country_known(value: object) -> bool:
 
 def needed(record: dict, awareness_given: bool) -> list[dict]:
     """The facts a complaint's reporting steps still need, each with why and which rule needs it (none for a complaint
-    that reports no harm and no malfunction). ``awareness_given``: an awareness or received date is recorded."""
-    if not rules.triggers_of(record):
+    off the reportability watch). ``awareness_given``: an awareness or received date is recorded. A complaint on the
+    watch only because a patient's outcome is unknown is assessed and signed like the rest, so it is asked too
+    (0.10.87, DEV-09)."""
+    if not rules.watched(record):
         return []
     found = []
     country = str(record.get("country") or "").strip()

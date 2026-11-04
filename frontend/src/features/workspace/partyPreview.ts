@@ -12,7 +12,7 @@ export type LookAheadTab = (typeof LOOK_AHEAD_TABS)[number];
 
 export const LOOK_AHEAD_SUBTITLE = "Distributors and your EU representative";
 export const LOOK_AHEAD_SUMMARY =
-  "A read-only preview, with sample data, of how a distributor reports a complaint and follows it, and what your EU authorised representative sees.";
+  "A read-only preview of how a distributor reports a complaint and follows it, and what your EU authorised representative sees.";
 
 /** Each page's API path (GET only). */
 export const PREVIEW_PATHS: Record<LookAheadTab, string> = {

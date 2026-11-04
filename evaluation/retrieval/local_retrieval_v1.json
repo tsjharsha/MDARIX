@@ -1,0 +1,52 @@
+{
+  "dataset": "mdarix-local-retrieval",
+  "version": "1.0.0",
+  "created_on": "2026-11-04",
+  "purpose": "Qualification of MDARIX's local evidence search (the pinned embedding model, no external AI) on the synthetic AcmeCare golden records. Retrieval quality only: it says whether the right records are found and whether the search abstains when no record answers; it says nothing about AI generation, governance or regulatory correctness.",
+  "tenant_key": "ACME_CARE_SYNTHETIC",
+  "retrieval_mode": "hybrid",
+  "top_k": 5,
+  "model": {
+    "name": "BAAI/bge-small-en-v1.5",
+    "repository": "Qdrant/bge-small-en-v1.5-onnx-Q",
+    "revision": "aa8f8b060edb00e03bfdd08813a2949946c8ba55",
+    "weights_sha256": "51f1bd0addd6e859e42c2c8021a5e5461385bb676a649f4b269aa445449f2431"
+  },
+  "thresholds": {
+    "set_on": "2026-11-04, before the qualification queries below were first run",
+    "relevance_floor": 0.55,
+    "recall_at_k_min": 0.8,
+    "mean_reciprocal_rank_min": 0.6,
+    "answered_when_relevant_min": 0.9,
+    "abstained_when_unrelated_min": 1.0
+  },
+  "calibration": {
+    "note": "The relevance floor came from 12 relevant and 3 unrelated exploratory questions (not part of this set): the best semantic match scored 0.66-0.89 for relevant questions and 0.42-0.47 for unrelated ones. The floor sits between them.",
+    "relevant_best_min": 0.656,
+    "unrelated_best_max": 0.466
+  },
+  "queries": [
+    {"id": "R01", "question": "Did the capacitor vendor modify its process ahead of the Rev B part being introduced?", "relevant": ["EV-VS001-001", "EV-VS001-002"]},
+    {"id": "R02", "question": "Did complaints about the device switching off rise once Rev D was in the field?", "relevant": ["EV-VS001-004"]},
+    {"id": "R03", "question": "Which lots lack complete traceability records?", "relevant": ["EV-VS001-003"]},
+    {"id": "R04", "question": "Is the packaging label change electrically connected to the failures?", "relevant": ["EV-VS002-001"]},
+    {"id": "R05", "question": "Was the validation of the new component revision successful?", "relevant": ["EV-VS001-005", "EV-VS004-002"]},
+    {"id": "R06", "question": "Was the genealogy of the lots loaded only after the first closure?", "relevant": ["EV-VS005-001"]},
+    {"id": "R07", "question": "Did the earlier closure consider complaints that predate Rev B?", "relevant": ["EV-VS007-001"]},
+    {"id": "R08", "question": "Did the sampled process control result stay inside its limit?", "relevant": ["EV-VS008-001"]},
+    {"id": "R09", "question": "Is there a matched control group for the baseline comparison?", "relevant": ["EV-VS009-001"]},
+    {"id": "R10", "question": "Were occlusion alarms reproduced on the returned units?", "relevant": ["EV-VS013-001"]},
+    {"id": "R11", "question": "How many returned Rev A pumps showed seal wear beyond tolerance?", "relevant": ["EV-VS014-002"]},
+    {"id": "R12", "question": "Did leak complaints also come from pumps built before the seal supplier switch?", "relevant": ["EV-VS015-002"]},
+    {"id": "R13", "question": "Was a teardown of the returned pumps done?", "relevant": ["EV-VS015-003"]},
+    {"id": "R14", "question": "intermittent connector contact behind some shutdowns", "relevant": ["EV-VS011-001"]},
+    {"id": "R15", "question": "Do Rev C and Rev D use a common power module?", "relevant": ["EV-VS006-001"]}
+  ],
+  "unrelated": [
+    {"id": "U01", "question": "What is the weather forecast for Hyderabad tomorrow?"},
+    {"id": "U02", "question": "Suggest a recipe for vegetable biryani"},
+    {"id": "U03", "question": "How do I renew my passport?"},
+    {"id": "U04", "question": "Which team won the cricket world cup in 2011?"},
+    {"id": "U05", "question": "Recommend a good laptop for programming"}
+  ]
+}

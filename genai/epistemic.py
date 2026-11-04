@@ -70,6 +70,8 @@ def reason_code_for(refusal_code: str | None) -> str | None:
         return AI_DISABLED
     if code == "GENAI_MONTHLY_BUDGET_REACHED":
         return BUDGET_EXHAUSTED
+    if code == "GENAI_INSUFFICIENT_EVIDENCE":
+        return None  # nothing went wrong with AI: the records do not answer the question
     if code.startswith("GENAI_"):
         return PROVIDER_UNAVAILABLE
     return None

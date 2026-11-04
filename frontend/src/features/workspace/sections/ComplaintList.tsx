@@ -12,7 +12,7 @@ import {
   useTabFilters,
   useWorkspace,
 } from "../workspaceContext";
-import { StatusBadge, listTitle } from "./common";
+import { StatusBadge, countOf, listTitle } from "./common";
 import { DeadlineChip, HarmChip } from "../../../app/chips";
 import { problemCodeParts, problemCodeText, useImdrfLinks, type ImdrfLinks } from "./ProblemCode";
 import { isLegalDeadline } from "../home";
@@ -50,8 +50,11 @@ export function ComplaintList({
   initialFilters,
   work: sixColumns = false,
   view,
+  countTitle = false,
 }: {
   eyebrow?: string;
+  /** The title is the count alone (0.10.87): the List view picker above already names the view. */
+  countTitle?: boolean;
   initialFilters?: ComplaintListFilters;
   /** The new navigation's list (0.10.68): six columns, each complaint opening its own page. */
   work?: boolean;
@@ -95,7 +98,17 @@ export function ComplaintList({
   return (
     // Named like the other lists, "Complaint list · 4,993": the count after "Complaints in your organization" read as a
     // stray "· 4993" (0.10.43), and it is the count of the filters chosen, not of the whole organization.
-    <Panel eyebrow={eyebrow} title={listTitle(view?.name ?? "Complaint list", list.data?.total)} source={list}>
+    <Panel
+      eyebrow={eyebrow}
+      title={
+        countTitle
+          ? list.data
+            ? countOf(list.data.total, "complaint")
+            : "Complaints"
+          : listTitle(view?.name ?? "Complaint list", list.data?.total)
+      }
+      source={list}
+    >
       {!view && (
         <ComplaintFilterBar
           // A new lot filter (cleared, or from a link) starts the lot field afresh.
