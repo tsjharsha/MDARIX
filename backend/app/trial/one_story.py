@@ -34,18 +34,20 @@ from backend.app.db.models.foundation import Complaint
 PROFILE_KEY = "one_story"
 RUNS = ("sample", "yours")
 STEPS = (
-    ("call", "Call"),
+    # The owner's names for the ten steps (4 Nov 2026), shown as a vertical list on Getting started.
+    ("call", "Review the call"),
     ("triage", "Triage"),
-    ("tree", "Tree"),
-    ("reportable", "Decide"),
-    ("form", "Form"),
-    ("fill", "Fill"),
-    ("approval", "Approval"),
-    ("submit", "Submit"),
-    ("records", "Records"),
-    ("trends", "Trends"),
+    ("tree", "Assess reportability"),
+    ("reportable", "Sign conclusion"),
+    ("form", "Prepare report"),
+    ("fill", "Complete details"),
+    ("approval", "Approve report"),
+    ("submit", "Record submission"),
+    ("records", "Review records"),
+    ("trends", "Explore trends"),
 )
 MARKS = ("call", "form", "records", "trends")
+MARK_STEP = {key: index for index, (key, _) in enumerate(STEPS) if key in MARKS}
 # The report's status path (authority_reports/rules.py STAGES), in order: where steps 6 to 8 are done.
 REPORT_PATH = ("CREATED", "COMPLETE", "APPROVAL", "APPROVED", "SUBMITTED", "ACKNOWLEDGED")
 

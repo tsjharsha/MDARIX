@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoryView } from "./sections/OneStory";
 import { TabBar } from "./HybridShell";
-import { ONE_STORY_PATH, openStep, type StoryRun } from "./oneStory";
+import { ONE_STORY_PATH, openStep, takeMarkProblem, type StoryRun } from "./oneStory";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import gettingStarted from "./sections/GettingStarted.tsx?raw";
 import { SAMPLE_SOURCE } from "./complaintList";
@@ -91,6 +91,20 @@ describe("The story always works (owner report on 0.10.84)", () => {
     expect(ONE_STORY_PATH).toBe("/api/v1/trial/one-story");
   });
 
+  it("names the complaint the screen showed in the mark, and keeps a refusal for Getting started", async () => {
+    const fetch = vi.fn(async () =>
+      Response.json({ detail: { code: "STORY_MOVED", message: "The story now follows OS-1002." } }, { status: 409 }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("window", { setTimeout, clearTimeout });
+    const run = runAt("sample", 0);
+    await openStep(run, 0, vi.fn());
+    const body = JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(body).toEqual({ run: "sample", step: "call", complaint_id: run.complaint.id });
+    expect(takeMarkProblem()).toContain("The story now follows OS-1002.");
+    expect(takeMarkProblem()).toBeNull();
+  });
+
   it("shows the open screen as a tab of its own when the persona's tabs do not list it", () => {
     const bar = renderToStaticMarkup(
       <TabBar
@@ -108,14 +122,12 @@ describe("The story always works (owner report on 0.10.84)", () => {
   });
 });
 
-describe("More ways to explore: one compact card (the approved design)", () => {
-  it("offers the three parts and one quiet line, not the chapters' wall of main buttons", () => {
-    const more = gettingStarted.slice(gettingStarted.indexOf("<summary>More ways to explore</summary>"));
-    const card = more.slice(0, more.indexOf("</details>"));
-    expect(card).toContain("uw-os-parts");
-    expect(card).not.toContain("<Entrance");
-    expect(card).not.toContain("{body}");
-    expect(card).toContain("The ten chapters, your trial");
+describe("Getting started is the ten-step story only (owner, 5 Nov 2026)", () => {
+  it("renders the story and nothing else; the short stories sit on the trial page reached from Help", () => {
+    expect(gettingStarted).toContain("return <OneStory heading={heading} />;");
+    expect(gettingStarted).not.toContain("More ways to explore");
+    const page = gettingStarted.slice(gettingStarted.indexOf("if (focusTab)"));
+    expect(page).toContain("uw-os-parts");
     for (const part of ["A new urgent call", "A rising problem", "Approve as a colleague"])
       expect(gettingStarted).toContain(part);
   });

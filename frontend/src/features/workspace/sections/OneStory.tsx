@@ -12,6 +12,7 @@ import {
   stepBlocker,
   stepCount,
   stepPlace,
+  takeMarkProblem,
   useOneStory,
   type OneStory as OneStoryData,
   type StoryRun,
@@ -291,6 +292,7 @@ export function StoryView({
 }) {
   const { open, dataSource, chooseDataSource, session, startStory, canOpen } = useWorkspace();
   const [picked, setPicked] = useState<number | null>(null);
+  const [problem] = useState(takeMarkProblem);
   const run = shownRun(story, dataSource);
   // The ten-step story replaces an older story's bar: one progress indicator per page (D1.5).
   const go = (section: string, tab?: string) => {
@@ -426,25 +428,32 @@ export function StoryView({
         <span className="uw-num">{done} of 10 done</span>
         <span className="sr-only">{stepCount(run)}</span>
       </p>
-      <nav className="uw-os-rail" aria-label="Story steps">
-        {run.steps.map((step, index) => (
-          <button
-            key={step.key}
-            type="button"
-            className={`uw-os-step${step.skipped ? " is-skip" : step.done ? " is-done" : index === run.current ? " is-now" : step.earlier ? " is-earlier" : ""}${!finished && index === selected ? " is-sel" : ""}`}
-            aria-current={!finished && index === selected ? "step" : undefined}
-            title={step.earlier ? "Done earlier by your team" : undefined}
-            onClick={() => setPicked(index)}
-          >
-            <span className="uw-os-k">{step.done ? <Check size={13} aria-label="done" /> : index + 1}</span>
-            {step.earlier && <span className="sr-only">done earlier by your team</span>}
-            <span className="uw-os-t">{step.label}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="uw-os-body">
-        {body}
-        <StepPreview run={run} index={finished ? STORY_STEPS - 1 : selected} trends={trends} />
+      {problem && (
+        <p className="uw-os-problem" role="status">
+          {problem}
+        </p>
+      )}
+      <div className="uw-os-grid">
+        <nav className="uw-os-rail" aria-label="Story steps">
+          {run.steps.map((step, index) => (
+            <button
+              key={step.key}
+              type="button"
+              className={`uw-os-step${step.skipped ? " is-skip" : step.done ? " is-done" : index === run.current ? " is-now" : step.earlier ? " is-earlier" : ""}${!finished && index === selected ? " is-sel" : ""}`}
+              aria-current={!finished && index === selected ? "step" : undefined}
+              title={step.earlier ? "Done earlier by your team" : undefined}
+              onClick={() => setPicked(index)}
+            >
+              <span className="uw-os-k">{step.done ? <Check size={13} aria-label="done" /> : index + 1}</span>
+              {step.earlier && <span className="sr-only">done earlier by your team</span>}
+              <span className="uw-os-t">{step.label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="uw-os-body">
+          {body}
+          <StepPreview run={run} index={finished ? STORY_STEPS - 1 : selected} trends={trends} />
+        </div>
       </div>
     </section>
   );

@@ -281,7 +281,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "On the new navigation Getting started opens on one story of ten steps: the call, triage, the decision tree, reportable or not, the form for the country, fill what is missing, approval, the PDF and submission, Records and Trends.",
               "The sample walks it first, on SAMPLE-RV-11. Each step has one main button that opens the real screen with the record in place. A step is ticked from what was saved on the record, never from the screen you are on.",
               "After step 10, Do the same with your data runs the same ten steps on your own most urgent imported complaint: the most serious harm, then the shortest clock. Where your file lacks a fact, the step says so and the complaint page asks for it.",
-              "The shorter stories (the sample event's four steps among them), the ten chapters and your trial are under More ways to explore. Getting started is the first tab, left of Home. Your own export goes in on its own page: Import your data on the top bar (in the avatar menu on a phone), or Help, Try your own data.",
+              "Getting started holds only this story. The short stories (a new urgent call, a rising problem, approving as a colleague), the ten chapters, the sample data and your trial are in Help, Short stories and your trial. Getting started is the first tab, left of Home. Your own export goes in on its own page: Import your data on the top bar (in the avatar menu on a phone), or Help, Try your own data.",
             ],
             result:
               "On the story's own complaint and report, a slim Story · Step N of 10 · Back pill keeps your place.",
