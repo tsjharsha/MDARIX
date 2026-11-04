@@ -18,6 +18,13 @@ web images change. Operator steps: none required; two are recommended (below, Op
 
 ### Fixed: what the browser journeys found (DEV-10)
 
+- **Getting started's story on your own data no longer stops at Triage.** When the trial's most urgent imported
+  complaint reports no harm and no malfunction (or the export has no such columns) it is not on the triage list and
+  has no triage form; step 2 waited for a triage record that could never be made, its button opened the page already
+  open, and the story could not finish. Step 2 now reads "Not needed: not flagged for triage". No sample number
+  changes.
+- **Screen readers hear which steps are not needed** in Getting started's step list (after a "not reportable"
+  conclusion, or a triage not needed).
 - **A decision tree's outcome keeps up with quick answers.** Every answer queued a save of all the answers, one after
   another; answering the US tree at a normal pace left the outcome several saves behind, for seconds showing the
   result of answers already changed, with nothing saying so. A save still waiting when a newer one is asked for is now
@@ -63,6 +70,10 @@ web images change. Operator steps: none required; two are recommended (below, Op
 
 ### Tests and checks
 
+- `frontend/e2e/getting-started-journey.spec.ts`: the browser acceptance test of Getting started's ten steps, through
+  the real forms, on the sample (solo, with the practice approval) and on a team's own data (a second person
+  approving on a phone; a "not reportable" conclusion); with the authenticator, a reload and a resume, a step opened
+  out of turn (STEP_NOT_YET), a moved story (STORY_MOVED), an API error, and ticks checked in order after every step.
 - `frontend/e2e/trial-journeys.spec.ts`: the trial's journeys at 1440 and 390 with captured e-mail
   (`scripts/journey_api.py`), axe-core, accessible names and keyboard on every screen, and the failure cases.
 
