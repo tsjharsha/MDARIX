@@ -10,6 +10,31 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+A US report's two files: FDA's own Form 3500A, filled, and FDA's eMDR XML. No migration. The API and web images
+change; the API image adds `pypdf` 6.21.2 (pinned with hashes). No operator step. Other markets (EU, GB, Canada,
+India) keep their worksheet PDF unchanged.
+
+### Added: the approved US report on FDA's Form 3500A, and as the eMDR XML (owner request, 5 Nov 2026)
+
+- **"Generate the PDF" on an approved US report is FDA's own fillable Form FDA 3500A MedWatch (09/2025)**, filled
+  from the approved snapshot block by block, then one page that is MDARIX's record, not part of FDA's form: who
+  prepared it, who approved it and when, the snapshot's checksum, the records its values came from, and any approved
+  value the form has no place for (with the reason). A box is ticked only for FDA's own choice ("Unknown" ticks
+  Unknown, never No); a missing value stays blank. FDA's form is kept byte-identical in `data/fda_forms` with its
+  edition and source. It is a static XFA form: MDARIX drops the XFA layer so Chrome, Edge and Acrobat all show the
+  values. In a trial the record page says "Practice record: free trial".
+- **"Download the eMDR XML"** (`GET /api/v1/reports/{id}/emdr.xml?snapshot=`): the same approved report as FDA's
+  HL7 ICSR file, built as FDA's eMDR Implementation Package defines it and validated against its published schema
+  before it is offered. One plain line says: MDARIX prepares it; you submit it through your own ESG or eSubmitter
+  account and record the submission here. MDARIX never submits.
+- **The file waits for what FDA requires**, and the report page names it ("The eMDR XML also needs: ..."): the
+  report number in FDA's format (your CFN or FEI, the year and a number), the event description, the product code,
+  the contact office's email, the type of reportable event and at least one FDA code of each H6 kind. The contact
+  office and the manufacturer come from Settings (your organization's US responsible party) only while they read
+  exactly as the approved report does. Values the file cannot carry (not one of FDA's choices, too long, an address
+  FDA wants in parts) are listed, never dropped in silence.
+- Sample: the flagship US report's PDF is now the filled form; its fields and the report page's numbers do not change.
+
 ## [0.10.87] - 2026-11-04
 
 On the trial maintenance line (`release/0.10`): security, privacy and evaluation (DEV-08, DEV-11), the regulatory

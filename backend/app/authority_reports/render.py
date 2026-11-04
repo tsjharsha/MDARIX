@@ -12,7 +12,14 @@ from backend.app.qms_documents.render import SOURCE_LABELS
 from reports.pdf import PAGE_BREAK
 
 DRAFT_LINE = "DRAFT - MDARIX NEVER SUBMITS. Enter this report in the authority's route yourself."
-LABELS = {**SOURCE_LABELS, "Classification": "Classifications", "ImdrfMapping": "IMDRF mappings", "Triage": "Triage"}
+LABELS = {
+    **SOURCE_LABELS,
+    "Classification": "Classifications",
+    "ImdrfMapping": "IMDRF mappings",
+    "Triage": "Triage",
+    "ResponsibleParty": "Your organization's responsible parties",
+    "Registration": "Registrations",
+}
 
 
 def _title(view: dict) -> str:
