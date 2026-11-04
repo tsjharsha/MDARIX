@@ -175,11 +175,12 @@ def test_the_outbox_and_email_checks_degrade_on_lag_and_failing_delivery(monkeyp
     backlog = {"waiting": 3, "retrying": 0, "email_failing": 0, "lag_seconds": 30}
     monkeypatch.setattr(readiness, "outbox_backlog", lambda db: dict(backlog))
     monkeypatch.setattr(auth.emailer, "smtp_configuration_status", lambda: {"configured": True})
-    assert readiness._check("outbox", readiness._outbox)["ok"] is True
-    assert readiness._check("email", readiness._email)["ok"] is True
+    outbox = readiness._check("outbox", readiness._outbox)
+    assert outbox["ok"] is True
+    assert readiness._check("email", lambda: readiness._email(outbox["email_failing"]))["ok"] is True
     backlog.update(lag_seconds=16 * 60, email_failing=2)
     assert readiness._check("outbox", readiness._outbox)["ok"] is False
-    assert readiness._check("email", readiness._email)["ok"] is False
+    assert readiness._check("email", lambda: readiness._email(backlog["email_failing"]))["ok"] is False
 
 
 def test_readiness_reports_the_outbox_as_a_component(fresh_cache):

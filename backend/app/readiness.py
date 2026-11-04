@@ -175,18 +175,13 @@ def _outbox() -> dict:
     return backlog
 
 
-def _email() -> dict:
-    """Configured, and not failing: e-mails the outbox retries after the provider refused them make it degraded."""
+def _email(failing: int = 0) -> dict:
+    """Configured, and not failing: ``failing`` e-mails the outbox retries after the provider refused them (read by
+    the outbox check) make it degraded."""
     from auth.emailer import smtp_configuration_status
-    from backend.app.db.session import SessionLocal
 
     if not smtp_configuration_status().get("configured"):
         raise RuntimeError("SMTP not configured")
-    db = SessionLocal()
-    try:
-        failing = outbox_backlog(db)["email_failing"]
-    finally:
-        db.close()
     if failing:
         raise RuntimeError(f"DELIVERY_FAILING: {failing} e-mail(s) waiting to be retried")
     return {}
@@ -223,19 +218,21 @@ def readiness_report() -> dict:
         if _cached and now - _cached[0] < _CACHE_SECONDS:
             return _cached[1]
         database = _check("database", _database)
+        outbox = _check("outbox", _outbox)
         others = [
             _check("data_planes", _data_planes),
             _check("object_storage", _object_storage),
             _check("worker", _worker),
-            _check("outbox", _outbox),
+            outbox,
             _check("scheduler", _scheduler),
-            _check("email", _email),
+            _check("email", lambda: _email(outbox.get("email_failing", 0))),
         ]
         status = "ready" if database["ok"] else "not_ready"
         if status == "ready" and not all(item["ok"] for item in others):
             status = "degraded"
         report = {"status": status, "checks": [database, *others]}
-        _cached = (now, report)
+        # Cached from when the report is ready: probes that time out (a database down) take longer than the cache.
+        _cached = (time.monotonic(), report)
         return report
 
 
