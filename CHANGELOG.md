@@ -27,10 +27,14 @@ the pinned embedding model before the tests (`scripts/prepare_embedding_cache.py
   or waiting for QA review), the complaints waiting for a disposition, the dated reports and CAPAs on Due dates, and on
   the Platform Admin side pending early-exit requests and open pilot requests.
 
-### Fixed: a person's data export is complete
+### Fixed: a person's data export, and the management review's day
 
 - **A person's export carries every sign-in event.** It kept only the newest 500, so a long-standing user's export
   under the DPDP Act was incomplete (`tenant_export_api.person_export`; `tests/test_person_export.py`).
+
+- **The management review summary counts the organization's whole day.** Its period ended at the UTC midnight
+  after the organization's today, so in the US evening anything signed that day was missing until the next day
+  (`readiness_home/summary._bounds`; `tests/test_summary_period.py`).
 
 ### Operations
 
