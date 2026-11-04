@@ -127,6 +127,34 @@ def test_the_routine_path_is_offered_only_off_the_watch_without_a_flag_or_a_trig
         assert offer["offered"] is False and len(offer["blocked"]) == 1
 
 
+@pytest.mark.parametrize(
+    ("fields", "unrecorded"),
+    [
+        # Nothing recorded (an import without the harm columns): Unknown is never No.
+        ({}, ["malfunction", "patient"]),
+        ({"patient_involved": False}, ["malfunction"]),
+        ({"malfunction": False}, ["patient"]),
+        # A patient's absence settles death and injury; a known No for each settles them too.
+        ({"malfunction": False, "patient_involved": False}, []),
+        ({"malfunction": False, "death": False, "serious_injury": False}, []),
+        ({"malfunction": False, "death": False}, ["patient"]),
+    ],
+)
+def test_the_routine_path_concludes_not_reportable_only_on_recorded_facts(fields, unrecorded):
+    """DEV-09, table ROUTINE (docs/compliance/REGULATORY_DECISION_TABLES.md): the routine path signs "not reportable"
+    for each enabled market on the basis "no death, serious injury or malfunction recorded; patient outcome known". A
+    complaint whose fields leave a malfunction or the patient's outcome unrecorded is off the watch, yet that basis
+    does not hold: the routine path is not offered, and the reason names the missing facts."""
+    record = {"death": None, "serious_injury": None, "patient_involved": None, "malfunction": None, **fields}
+    found = rules.routine_unrecorded(record)
+    assert [item["code"] for item in found] == [code.upper() for code in unrecorded]
+    offer = routine_offer(False, None, [], found)
+    assert offer["offered"] is (not unrecorded)
+    if unrecorded:
+        (reason,) = offer["blocked"]
+        assert "only on recorded facts" in reason and "Unknown is never No" in reason
+
+
 def test_a_source_value_off_the_list_stays_unknown_and_is_kept():
     assert code_source_value("use_environment", "Intensive care unit") == ("INTENSIVE_CARE_UNIT", "Intensive care unit")
     assert code_source_value("use_environment", "Step-down unit") == ("UNKNOWN", "Step-down unit")

@@ -142,7 +142,7 @@ describe("step-by-step user guide", () => {
     // The help menu opens on demand; its source holds both links with their own line of explanation.
     const menu = source("../shared/HelpMenu.tsx");
     expect(menu).toContain("Every screen, task by task");
-    expect(menu).toContain("The trial in 7 steps");
+    expect(menu).toContain("The trial, step by step");
     expect(renderToStaticMarkup(<HelpMenu />)).toContain("Open help menu");
     // The website's videos, in a new tab.
     expect(menu).toContain("Watch the videos");

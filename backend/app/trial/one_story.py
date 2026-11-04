@@ -69,6 +69,16 @@ def harm_rank(complaint) -> int:
     return 1 if (complaint.malfunction or complaint.patient_involved) else 0
 
 
+def reported_harm(complaint) -> str | None:
+    """The harm the record states: DEATH, SERIOUS_INJURY, NONE (both stated as no), or None when the record does not
+    say. Getting started shows None as not recorded, never as "None reported" (0.10.87)."""
+    if complaint.death:
+        return "DEATH"
+    if complaint.serious_injury:
+        return "SERIOUS_INJURY"
+    return "NONE" if complaint.death is False and complaint.serious_injury is False else None
+
+
 def most_urgent(data: Session, control_db: Session, tenant_id) -> Complaint | None:
     """The trial's own most urgent imported complaint: the most serious harm, then the shortest clock, then the
     reference (so the choice holds while nothing changes)."""
@@ -179,14 +189,15 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
     complaint = subject(data, control_db, tenant_id, run)
     if complaint is None:
         return None
-    # The product's own identifier, which the trend check opens on (0.10.84, M4: your data's trend, not the sample's).
-    product_ref = (
-        data.query(Product.product_identifier)
+    # The product's own identifier, which the trend check opens on (0.10.84, M4: your data's trend, not the sample's),
+    # and its name, which the step's complaint summary shows (0.10.87).
+    product_ref, product_name = (
+        data.query(Product.product_identifier, Product.name)
         .filter(Product.tenant_id == tenant_id, Product.id == complaint.product_id)
-        .scalar()
+        .one_or_none()
         if complaint.product_id
         else None
-    )
+    ) or (None, None)
     market = markets.market_of(complaint.country)
     found = closure.facts(data, tenant_id, complaint)
     record = found["record"]
@@ -210,8 +221,11 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
             "description": complaint.description,
             "product_id": str(complaint.product_id) if complaint.product_id else None,
             "product_ref": product_ref,
+            "product_name": product_name,
             "serious_injury": bool(complaint.serious_injury),
             "death": bool(complaint.death),
+            "harm": reported_harm(complaint),
+            "service_status": complaint.service_status,
         },
         "market": market,
         "market_label": markets.MARKET_LABELS.get(market, market) if market else None,

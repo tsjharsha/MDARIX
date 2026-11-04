@@ -10,11 +10,13 @@ from backend.app.db.models.foundation import (
     Evidence,
 )
 from backend.app.db.models.retrieval_intelligence import (
+    LOCAL_EMBEDDING_MODEL,
     RETRIEVAL_CONFIG_VERSION,
     EvidenceChunkEmbedding,
     RetrievalQuery,
 )
 from retrieval.embedding_provider import (
+    LOCAL_EMBEDDING_REVISION,
     EmbeddingProvider,
     EmbeddingUnavailable,
     active_embedding_provider,
@@ -25,6 +27,13 @@ from retrieval.schemas import RetrievalRequest, RetrievalResponse, RetrievalResu
 
 class RetrievalError(Exception):
     pass
+
+
+# The lowest semantic similarity at which a record counts as answering the question, per embedding model. Below it
+# the search abstains (INSUFFICIENT_RELEVANT_EVIDENCE) instead of offering the nearest unrelated records. Set before
+# qualification from evaluation/retrieval/local_retrieval_v1.json's calibration (relevant questions scored 0.66 and
+# up, unrelated ones 0.47 and below); change it only with a new dataset version.
+RELEVANCE_FLOOR = {LOCAL_EMBEDDING_MODEL: 0.55}
 
 
 class TrustedRetrievalService:
@@ -170,6 +179,7 @@ class TrustedRetrievalService:
             self._structured_candidates(db, request) if request.retrieval_mode in {"structured", "hybrid"} else {}
         )
         semantic: dict[uuid.UUID, dict[str, Any]] = {}
+        semantic_ran = False
         if request.retrieval_mode in {"semantic", "hybrid"}:
             try:
                 query_vector = self.embedding_provider.embed_query(request.query_text)
@@ -177,6 +187,7 @@ class TrustedRetrievalService:
                 # Never silently compare against another model's vectors: report it and keep structured matches.
                 limitations.append("Semantic search is unavailable (embedding model not loaded); structured only.")
             else:
+                semantic_ran = True
                 semantic = self._semantic_candidates(db, request, query_vector, metadata)
 
         merged = self._merge_candidates(structured, semantic)
@@ -186,18 +197,27 @@ class TrustedRetrievalService:
         results = results[: request.top_k]
 
         status = "COMPLETED"
+        floor = RELEVANCE_FLOOR.get(metadata.model)
+        best_meaning = max((item["score"] for item in semantic.values()), default=0.0)
         if not results:
             status = "NO_RELEVANT_EVIDENCE"
             limitations.append("No relevant tenant-scoped, context-valid evidence was retrieved.")
         elif max(r.retrieval_score for r in results) < 0.15:
             status = "INSUFFICIENT_RELEVANT_EVIDENCE"
             limitations.append("Retrieved evidence did not meet the minimum relevance threshold.")
+        elif semantic_ran and floor is not None and best_meaning < floor:
+            # Structured candidates score on tenant and anchors alone, so without a close match in meaning the
+            # results are only the nearest records, not an answer.
+            status = "INSUFFICIENT_RELEVANT_EVIDENCE"
+            # Plain words for the reader; the scores stay in the search log (returned_refs) and the result provenance.
+            limitations.append("No record is close enough in meaning to the question to count as an answer.")
 
         provenance = RetrievalQuery(
             id=uuid.uuid4(),
             tenant_id=request.tenant_id,
             investigation_id=request.investigation_id,
-            query_text=request.query_text,
+            # The search log keeps the question without personal details (genai/pii.py, the masker AI requests use).
+            query_text=_masked(request.query_text),
             retrieval_mode=request.retrieval_mode,
             temporal_mode=request.temporal_mode,
             filters=self._filter_payload(request),
@@ -335,6 +355,8 @@ class TrustedRetrievalService:
             "emb.embedding_model = :embedding_model",
             "emb.model_version = :model_version",
             "emb.embedding_dimension = :dimension",
+            # A vector of the chunk's earlier text is stale: never ranked against the question.
+            "emb.chunk_checksum = COALESCE(ec.checksum, '')",
         ]
         params: dict[str, Any] = {
             "tenant_id": request.tenant_id,
@@ -465,6 +487,11 @@ class TrustedRetrievalService:
                 "embedding_dimension": metadata.dimension,
                 "embedding_pipeline_version": metadata.pipeline_version,
                 "retrieval_config_version": RETRIEVAL_CONFIG_VERSION,
+                "relevance_floor": RELEVANCE_FLOOR.get(metadata.model),
+                # The pinned weights (retrieval/embedding_provider.py), for the local model.
+                "embedding_model_revision": LOCAL_EMBEDDING_REVISION
+                if metadata.model == LOCAL_EMBEDDING_MODEL
+                else None,
                 "retrieval_score_semantics": "retrieval relevance only; not truth, confidence, evidence strength, or causality",
             },
         )
@@ -510,3 +537,9 @@ class TrustedRetrievalService:
         payload.pop("query_text", None)
         payload.pop("tenant_id", None)
         return payload
+
+
+def _masked(text_value: str) -> str:
+    from genai import pii
+
+    return pii.mask_text(text_value) if pii.enabled() else text_value

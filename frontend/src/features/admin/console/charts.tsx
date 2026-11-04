@@ -89,7 +89,7 @@ export function Panel({
       <header className="ac-panel-head">
         <div>
           {eyebrow && <p className="ac-eyebrow">{eyebrow}</p>}
-          <h2>{title}</h2>
+          {title && <h2>{title}</h2>}
         </div>
         {action}
       </header>

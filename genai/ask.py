@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.evidence_intelligence import EvidenceChunk
+from genai.grounding import instructions_in_evidence
 from genai.provider import GenAIUnavailable
 from investigator.model_provider import HEDGES, asserts_causality_or_decision
 from retrieval.schemas import RetrievalRequest
@@ -79,6 +80,19 @@ def search_evidence(
     except RetrievalError as exc:
         return {"status": "SEARCH_FAILED", "evidence": [], "sources": [], "limitations": [str(exc)]}
 
+    if response.status != "COMPLETED":
+        # Abstain: the nearest records are not an answer (retrieval/service.py RELEVANCE_FLOOR); nothing is offered
+        # to a model or to the reader as if it were.
+        return {
+            "status": response.status,
+            "retrieval_query_id": str(response.retrieval_query_id),
+            "embedding_model": None,
+            "evidence": [],
+            "sources": [],
+            "limitations": list(response.limitations),
+            "instruction_like": [],
+        }
+    set_aside = _set_aside_evidence(db, tenant_id, investigation_id)
     texts: dict[str, str] = {}
     chunk_ids = [result.chunk_id for result in response.results]
     if chunk_ids:
@@ -93,6 +107,8 @@ def search_evidence(
     for result in response.results:
         if not result.evidence_available or "ground_truth" in (result.evidence_identifier or "").lower():
             continue  # evaluation ground truth never reaches the model
+        if result.evidence_id in set_aside:
+            continue  # the case's review set this record aside (rejected, quarantined, superseded): stale for it
         text = (texts.get(str(result.chunk_id)) or result.excerpt or "")[:TEXT_PER_ITEM]
         if result.evidence_identifier in seen:
             continue
@@ -127,7 +143,24 @@ def search_evidence(
         "evidence": evidence,
         "sources": sources,
         "limitations": list(response.limitations),
+        # Records whose text reads like an instruction to a model: sent as data only, and named to the reader.
+        "instruction_like": instructions_in_evidence(evidence),
     }
+
+
+def _set_aside_evidence(db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID | None) -> set:
+    """The evidence the investigation's own review set aside (genai/structured_answer.py SET_ASIDE_REVIEWS)."""
+    if investigation_id is None:
+        return set()
+    from backend.app.db.models.foundation import InvestigationEvidence
+    from genai.structured_answer import SET_ASIDE_REVIEWS
+
+    rows = db.query(InvestigationEvidence.evidence_id).filter(
+        InvestigationEvidence.tenant_id == tenant_id,
+        InvestigationEvidence.investigation_id == investigation_id,
+        InvestigationEvidence.review_status.in_(sorted(SET_ASIDE_REVIEWS)),
+    )
+    return {row.evidence_id for row in rows}
 
 
 UUID_TEXT = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")

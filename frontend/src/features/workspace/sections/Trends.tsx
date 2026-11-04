@@ -21,7 +21,7 @@ type TrendsTab = (typeof TRENDS_TABS)[number];
  * are in Settings › Trend rules.
  */
 export function TrendsSection({ tab }: { tab?: string }) {
-  const { open, reportTab } = useWorkspace();
+  const { open, reportTab, personaTabs = [] } = useWorkspace();
   // The inbox's filters and the trend to open come in the address (Trends to review?priority=HIGH&signal=SIG000023).
   const [target, setTarget] = useState(() => parseSignalsTab(renamed(tab, "Signal inbox")));
   const [targetKey, setTargetKey] = useState(0);
@@ -34,11 +34,14 @@ export function TrendsSection({ tab }: { tab?: string }) {
   };
   return (
     <>
-      <div className="ca-action-row uw-list-actions">
-        <button type="button" className="ac-secondary" onClick={() => open("Investigations", "All investigations")}>
-          <FileSearch size={15} aria-hidden="true" /> Investigations
-        </button>
-      </div>
+      {/* The Investigations tab is one click away for a persona that has it (0.10.87). */}
+      {!personaTabs.includes("investigations") && (
+        <div className="ca-action-row uw-list-actions">
+          <button type="button" className="ac-secondary" onClick={() => open("Investigations", "All investigations")}>
+            <FileSearch size={15} aria-hidden="true" /> Investigations
+          </button>
+        </div>
+      )}
       <Tabs tabs={TRENDS_TABS} active={active} onChange={setActive} label="Trend sections">
         {active === "Trend check" && <TrendCheck onOpenSignal={openTrend} />}
         {active === "Trends to review" && (

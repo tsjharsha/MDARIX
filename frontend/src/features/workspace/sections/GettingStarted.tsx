@@ -28,6 +28,7 @@ import { CitedFor } from "./CitedFor";
 import { RemoveSamplePanel, RestartSamplePanel } from "./RemoveSample";
 import { Entrance } from "./Entrance";
 import { OneStory } from "./OneStory";
+import { ExploreCards, OTHER_WORKFLOWS, TrialSettings } from "./GettingStartedMore";
 import { TeamPanel } from "./TrialTeam";
 import { BESIDE_YOUR_QMS } from "../../help/besideYourQms";
 import { DISCUSS_PILOT } from "../../shared/HelpMenu";
@@ -97,7 +98,7 @@ export function GettingStartedSection({
   focus,
   heading,
 }: { focus?: string; heading?: RefObject<HTMLHeadingElement | null> } = {}) {
-  const { open, work, session, notify, navigation, refreshTrial } = useWorkspace();
+  const { open, work, session, notify, navigation, refreshTrial, personaTabs } = useWorkspace();
   const status = useResource<TrialStatus>("/api/v1/trial/status");
   // Right after an import its signals are still being found: the story is read again until they are. A reload that
   // fails for a moment (the server busy with the import's follow-up work) is asked again, so the page never stays on
@@ -153,7 +154,10 @@ export function GettingStartedSection({
   // On the new navigation Your data is its own page (0.10.80): defaulting to it wrote ?tab=Your+data into Getting
   // started's address, and a refresh then opened the Import page instead (0.10.82). There no tab is chosen until the
   // person picks one, so the address stays /app/getting-started (the first tab shows meanwhile).
-  const [tab, setTab] = useReportedTab<TrialTab>(focusTab ?? (navigation === "new" ? ("" as TrialTab) : "Your data"));
+  // On the new navigation the tab is the address's own name ("Other workflows" opens the library), so it stays there.
+  const [tab, setTab] = useReportedTab<TrialTab>(
+    focusTab ?? (navigation === "new" ? ((focus ?? "").split("?")[0] as TrialTab) : "Your data"),
+  );
   // A tab below the story, opened and brought into view.
   const showTab = (name: TrialTab) => {
     setTab(name);
@@ -232,6 +236,31 @@ export function GettingStartedSection({
     work.refreshProducts();
     refreshTrial?.();
   };
+  const chapterCount =
+    navigation === "new"
+      ? `${chapters.filter((chapter) => chapter.code !== "YOUR_DATA" && chapter.acted.done).length} of ${chapters.filter((chapter) => chapter.code !== "YOUR_DATA").length || total - 1} tried${session?.sample_only ? "" : " · your own data is optional"}`
+      : `${acted} of ${total} tried`;
+  const chapterList = (
+    <ol className="uw-trial-steps uw-story-steps">
+      {chapters
+        .filter((chapter) => !(session?.sample_only && chapter.code === "YOUR_DATA"))
+        .map((chapter) => (
+          <ChapterRow
+            key={chapter.code}
+            chapter={chapter}
+            isNext={chapter.code === story.data?.next}
+            allowed={allowed(chapter.opens.section)}
+            importHere={navigation !== "new"}
+            templates={
+              chapter.code === "YOUR_DATA"
+                ? importTemplatesFor(trial?.templates ?? [], featureSetOf(session?.feature_set)).core
+                : undefined
+            }
+            onOpen={() => go(chapter)}
+          />
+        ))}
+    </ol>
+  );
   const body = (
     <div className="ac-overview uw-trial">
       <QualityLoop
@@ -278,15 +307,7 @@ export function GettingStartedSection({
       />
 
       <div id="trial-story" className="uw-anchor" />
-      <Panel
-        title="Your story, chapter by chapter"
-        eyebrow={
-          navigation === "new"
-            ? `${chapters.filter((chapter) => chapter.code !== "YOUR_DATA" && chapter.acted.done).length} of ${chapters.filter((chapter) => chapter.code !== "YOUR_DATA").length || total - 1} tried${session?.sample_only ? "" : " · your own data is optional"}`
-            : `${acted} of ${total} tried`
-        }
-        source={story}
-      >
+      <Panel title="Your story, chapter by chapter" eyebrow={chapterCount} source={story}>
         <p className="uw-trial-lede">
           {BESIDE_YOUR_QMS} Each chapter is one pain FDA and notified bodies cite in 2026, shown on the sample records
           first and on your own export once you upload it. It counts as tried when you act in it: decide, record, run or
@@ -342,25 +363,7 @@ export function GettingStartedSection({
             </div>
           </div>
         )}
-        <ol className="uw-trial-steps uw-story-steps">
-          {chapters
-            .filter((chapter) => !(session?.sample_only && chapter.code === "YOUR_DATA"))
-            .map((chapter) => (
-              <ChapterRow
-                key={chapter.code}
-                chapter={chapter}
-                isNext={chapter.code === story.data?.next}
-                allowed={allowed(chapter.opens.section)}
-                importHere={navigation !== "new"}
-                templates={
-                  chapter.code === "YOUR_DATA"
-                    ? importTemplatesFor(trial?.templates ?? [], featureSetOf(session?.feature_set)).core
-                    : undefined
-                }
-                onOpen={() => go(chapter)}
-              />
-            ))}
-        </ol>
+        {chapterList}
         {hasSample && (
           <div id="trial-look-ahead" className="uw-story-partner uw-anchor uw-look-ahead">
             <div>
@@ -518,66 +521,73 @@ export function GettingStartedSection({
       </div>
     </div>
   );
-  // The new navigation: Getting started is the ten-step story only (owner, 5 Nov 2026). The three short stories, the
-  // chapters, your trial and the sample data are their own page, reached from Help.
   if (navigation !== "new") return body;
-  const owner = !!trial?.is_owner;
-  const parts: Array<{ key: string; title: string; detail: string; go: () => void }> = [
-    ...(hasSample
-      ? [
-          {
-            key: "call",
-            title: "A new urgent call",
-            detail: "SAMPLE-URG-01: is it a complaint? Triage it against its clock.",
-            go: () => open("Complaints", `To triage?${new URLSearchParams({ ref: "SAMPLE-URG-01" })}`),
-          },
-          {
-            key: "rising",
-            title: "A rising problem",
-            detail: "OrbitCare 300 Rev B against its own history, per unit in the field.",
-            go: () => open("Trends", `Trend check?${new URLSearchParams({ product: "SAMPLE-ORBIT-300" })}`),
-          },
-        ]
-      : []),
-    owner
-      ? {
-          key: "approve",
-          title: "Approve as a colleague",
-          detail: "Invite a colleague: they approve what you prepared, never their own.",
-          go: () => open("Team"),
-        }
-      : {
-          key: "approve",
-          title: "Your approvals",
-          detail: "What a colleague prepared and sent to you to approve.",
-          go: () => open("My Work", "Approvals"),
-        },
-  ];
-  if (focusTab)
+  // The new navigation (owner's specification, 5 Nov 2026): the walkthrough, three cards to explore at one's own pace,
+  // and one collapsed section for the sample data and the trial. A link to the sample data or the trial's dates
+  // opens that section; "Choose a focus" opens the library of other workflows.
+  if (focus?.split("?")[0] === OTHER_WORKFLOWS)
     return (
-      <>
+      <div className="uw-gs">
         <div className="uw-gs-more-head">
           <button type="button" className="ac-link" onClick={() => open("Getting started")}>
-            <ChevronRight size={14} aria-hidden="true" className="uw-flip" /> Back to the story
+            <ChevronRight size={14} aria-hidden="true" className="uw-flip" /> Back to Getting started
           </button>
           <p className="ac-eyebrow">Getting started</p>
           <h1 ref={heading} tabIndex={-1}>
-            Short stories, your trial and the sample data
+            Explore other workflows
           </h1>
+          <p>Short stories and ten chapters, each on the sample first and on your own data once it is in.</p>
         </div>
-        <div className="uw-os-parts">
-          {parts.map((part) => (
-            <button key={part.key} type="button" className="uw-os-part" onClick={part.go}>
-              <b>{part.title}</b>
-              <span>{part.detail}</span>
-            </button>
-          ))}
-        </div>
-        {hasSample && <Entrance onRestarted={restarted} />}
-        {body}
-      </>
+        <CitedFor onSaved={story.reload} />
+        {hasSample && <Entrance />}
+        {/* "Workflows to try" (0.10.87): "ten chapters" beside the ten-step walkthrough read as one more count. */}
+        <Panel title="Workflows to try" eyebrow={chapterCount} source={story}>
+          <p className="uw-trial-lede">
+            Each chapter is one problem inspectors cite. It counts as tried when you act in it: decide, record, run or
+            sign.
+            {hasSample && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  className="ac-link"
+                  onClick={() => open("Getting started", "About the sample data")}
+                >
+                  What is the sample data?
+                </button>
+              </>
+            )}
+          </p>
+          {/* Feedback is asked by its own prompt and in Help (0.10.87): no second rating here. */}
+          {chapterList}
+        </Panel>
+      </div>
     );
-  return <OneStory heading={heading} />;
+  return (
+    <div className="uw-gs">
+      <OneStory heading={heading} />
+      <ExploreCards
+        owner={!!trial?.is_owner}
+        teamTab={!!personaTabs?.includes("team")}
+        onTeam={() => open("Team")}
+        onWorkflows={() => open("Getting started", OTHER_WORKFLOWS)}
+        onNextSteps={() => open("Next steps")}
+        chapters={chapters}
+        onDemoBooked={demo.reload}
+      />
+      <TrialSettings
+        trial={trial ?? null}
+        startOpen={focusTab === "About the sample data" || focusTab === "Your trial"}
+        allowed={allowed}
+        onOpen={(opens) => {
+          if (allowed(opens.section)) open(opens.section as WorkspaceSection, opens.tab);
+        }}
+        onRestarted={restarted}
+        onRemoved={restarted}
+        onNextSteps={() => open("Next steps")}
+      />
+    </div>
+  );
 }
 
 /**

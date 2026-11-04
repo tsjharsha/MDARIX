@@ -39,10 +39,17 @@ export const COMPLAINT_VIEWS = NEW_PLACES.Complaints.tabs;
  * action, cards on a phone; stage 7's work queues keep their own screens. "Log a call" and, outside a trial, "Import
  * your data" are actions on the list's header. Each complaint opens its own page.
  */
+/** The views that are another tab's own list, and that tab (0.10.87). */
+const TAB_OF_VIEW: Record<string, string> = { "Authority reports": "reports", Investigations: "investigations" };
+
 export function ComplaintViews({ tab }: { tab?: string }) {
-  const { open, session, isTrial, persona, personaLabel } = useWorkspace();
   const [carried] = useState(() => tab);
-  const { mine, more } = listViewsFor(persona);
+  const { open, session, isTrial, persona, personaLabel, personaTabs = [] } = useWorkspace();
+  // A view that is another tab's own list is offered only to a persona without that tab (0.10.87); its link still opens.
+  const own = (name: string) => !personaTabs.includes(TAB_OF_VIEW[name] ?? "");
+  const views = listViewsFor(persona);
+  const mine = views.mine.filter(own);
+  const more = views.more.filter(own);
   const [view, setView] = useReportedTab<string>(() => offeredTab(tab, COMPLAINT_LIST_VIEWS, mine[0]));
   // The screens these views came from still name their former tabs (Triage's "Open the reporting clock"): the link
   // table opens each one's new home.
@@ -79,13 +86,14 @@ export function ComplaintViews({ tab }: { tab?: string }) {
             <PhoneCall size={15} aria-hidden="true" /> Log a call
           </button>
         )}
-        {canImport && (
-          <button type="button" className="ac-secondary" onClick={() => openImport(open, !!isTrial)}>
+        {/* In a trial the top bar's Import your data is the one way in (0.10.87). */}
+        {canImport && !isTrial && (
+          <button type="button" className="ac-secondary" onClick={() => openImport(open, false)}>
             <Upload size={15} aria-hidden="true" /> Import your data
           </button>
         )}
       </div>
-      {server && <ComplaintList key={view} eyebrow="Complaints" view={{ name: view, code: server.code }} />}
+      {server && <ComplaintList key={view} eyebrow="" countTitle view={{ name: view, code: server.code }} />}
       {view === "To triage" && <Triage onOpenTab={go} />}
       {view === "Calls to check" && <FirstContact key={logged} part="calls" startLogging={logged ? "CONTACT" : null} />}
       {view === "Due soon" && <Backlog initial="due_soon" fixed />}
@@ -106,7 +114,8 @@ export function ComplaintViews({ tab }: { tab?: string }) {
       {view === "Investigations" && <InvestigationList />}
       {view === "All complaints" && (
         <ComplaintList
-          eyebrow="Complaints"
+          eyebrow=""
+          countTitle
           initialFilters={parseComplaintListTab(renamed(carried, "Complaint list")).filters}
           work
         />
@@ -169,7 +178,7 @@ export function InvestigationList() {
           }
         />
       </div>
-      <Panel eyebrow="Investigations" title={listTitle(view, cases.data ? rows.length : undefined)} source={cases}>
+      <Panel title={listTitle(view, cases.data ? rows.length : undefined)} source={cases}>
         <Table
           caption={view}
           rows={rows}

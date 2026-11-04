@@ -52,7 +52,7 @@ const stubWindow = () =>
 const view = (extra: Partial<WorkspaceApi>, run = runAt("sample", 1)) =>
   renderToStaticMarkup(
     <WorkspaceContext.Provider value={workspace(extra)}>
-      <StoryView story={{ sample: run, yours: null }} trends={[]} />
+      <StoryView story={{ sample: run, yours: null }} />
     </WorkspaceContext.Provider>,
   );
 
@@ -65,9 +65,9 @@ describe("The story always works (owner report on 0.10.84)", () => {
     const run = runAt("sample", 1);
     run.steps[2] = { ...run.steps[2], done: false, earlier: true };
     const html = view({}, run);
-    expect(html).toContain("1 of 10 done");
+    expect(html).toContain("1 of 10 completed");
     expect(html).toMatch(/class="uw-os-step is-earlier"[^>]*title="Done earlier by your team"/);
-    expect(html.match(/aria-label="done"/g)).toHaveLength(1);
+    expect(html.match(/class="uw-os-s">Completed</g)).toHaveLength(1);
   });
 
   it("says who takes a step this person's role cannot open, with the main button disabled and its reason", () => {
@@ -122,14 +122,12 @@ describe("The story always works (owner report on 0.10.84)", () => {
   });
 });
 
-describe("Getting started is the ten-step story only (owner, 5 Nov 2026)", () => {
-  it("renders the story and nothing else; the short stories sit on the trial page reached from Help", () => {
-    expect(gettingStarted).toContain("return <OneStory heading={heading} />;");
+describe("Getting started is the walkthrough first (owner, 5 Nov 2026)", () => {
+  it("renders the walkthrough, then the three cards and the collapsed settings (0.10.87)", () => {
+    const page = gettingStarted.slice(gettingStarted.lastIndexOf('<div className="uw-gs">'));
+    expect(page.indexOf("<OneStory heading={heading} />")).toBeLessThan(page.indexOf("<ExploreCards"));
+    expect(page.indexOf("<ExploreCards")).toBeLessThan(page.indexOf("<TrialSettings"));
     expect(gettingStarted).not.toContain("More ways to explore");
-    const page = gettingStarted.slice(gettingStarted.indexOf("if (focusTab)"));
-    expect(page).toContain("uw-os-parts");
-    for (const part of ["A new urgent call", "A rising problem", "Approve as a colleague"])
-      expect(gettingStarted).toContain(part);
   });
 });
 
@@ -142,9 +140,10 @@ describe("the step list tells a screen reader which steps are not needed (0.10.8
     run.steps = run.steps.map((step, index) =>
       index >= 4 && index <= 7 ? { ...step, done: false, skipped: true } : step,
     );
-    const rail = view({}, run).match(/aria-label="Story steps">(.*?)<\/nav>/)?.[1] ?? "";
+    // 0.10.87's walkthrough says each step's state in words inside its button.
+    const rail = view({}, run).match(/aria-label="Walkthrough steps">(.*?)<\/ol>/)?.[1] ?? "";
     const form = rail.split("<button").find((item) => item.includes(">Form<")) ?? "";
-    expect(form).toContain('<span class="sr-only">not needed</span>');
+    expect(form).toMatch(/>Not needed</);
   });
 });
 
@@ -158,7 +157,7 @@ describe("a triage not needed (0.10.88, DEV-10)", () => {
     run.steps = run.steps.map((step, index) => (index === 1 ? { ...step, done: false, skipped: true } : step));
     const html = renderToStaticMarkup(
       <WorkspaceContext.Provider value={workspace()}>
-        <StoryView story={{ sample: null, yours: run }} trends={[]} />
+        <StoryView story={{ sample: null, yours: run }} />
       </WorkspaceContext.Provider>,
     );
     expect(html).toContain("Not needed: not flagged for triage");

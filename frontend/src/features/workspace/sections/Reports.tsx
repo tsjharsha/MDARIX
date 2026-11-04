@@ -401,7 +401,8 @@ export function Approval({ detail, onChanged }: { detail: ReportDetail; onChange
         <strong>{approveWords(detail)}</strong> Prepared by {snapshot.requested_by}. You confirm with your password.
       </p>
       {standing?.same_person ? (
-        <p className="ac-message tone-warning">{standing.message}</p>
+        // The button's practice line says a pilot needs a colleague (0.10.87): here only who you approve as.
+        <p className="ac-message tone-warning">{practiceWarning(standing.message)}</p>
       ) : detail.cannot_approve.length ? (
         <p className="ac-muted">
           Not allowed to approve: {detail.cannot_approve.join(", ")} (who prepared it and who signed the conclusion).
@@ -1207,4 +1208,14 @@ function CommunicationsLink({ complaintId }: { complaintId: string }) {
       Open the complaint's communications log
     </button>
   );
+}
+
+/**
+ * The practice-approval warning without what the line at the Approve button already says (0.10.87): "You may
+ * approve your own practice report as Regulatory Leader." (exported for its test).
+ * shortcut: trims the server's own sentence; when the server words it differently, it is shown whole.
+ */
+export function practiceWarning(message: string | null | undefined): string {
+  const trimmed = (message ?? "").replace(/^In a pilot a colleague approves this; in the trial you may/, "You may");
+  return trimmed;
 }

@@ -86,6 +86,10 @@ REFUSAL_MESSAGES = {
         "No AI service approved for customer data is configured here, so MDARIX answered from its rules; "
         "please contact MDARIX support."
     ),
+    "GENAI_INSUFFICIENT_EVIDENCE": (
+        "None of your records answers this question closely enough, so MDARIX did not ask AI to guess. Rephrase "
+        "the question, or ask it from an investigation."
+    ),
     "GENAI_UNAVAILABLE": (
         "The AI service is not available right now, so MDARIX answered from its rules; please try again in a "
         "few minutes."

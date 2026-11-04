@@ -204,6 +204,10 @@ def create_interaction(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     _ensure_own_records(db, ctx.tenant_id, payload)
+    from backend.app.rate_limit import enforce
+    from backend.app.retrieval.router import SEARCH_LIMIT_MESSAGE
+
+    enforce("search:user", ctx.user_id, SEARCH_LIMIT_MESSAGE)
     # A free trial runs without AI: when no model answers, the screen says that, not why no provider answered.
     trial = _is_trial(control_db, ctx.tenant_id)
     now = NOW()
@@ -301,6 +305,9 @@ def create_interaction(
             "searched_tenant_evidence": bool(search["sources"]),
             "field_policy": grounded.get("field_policy", "SERVER_ALLOWLIST_FAIL_CLOSED"),
         }
+        if not trial and not payload.investigation_id and not search["evidence"]:
+            # Abstain: no record answers the question, so no model is asked to (it could only guess).
+            raise GenAIUnavailable("GENAI_INSUFFICIENT_EVIDENCE")
         # The model is asked for the structured sections as JSON; its Markdown answer is rendered from them.
         prompt = structured_ask_prompt(payload.prompt)
         # Fit the provider's input limit: keep the facts, drop internal detail (never fail on a large case).
@@ -333,6 +340,12 @@ def create_interaction(
         shown_answer, shown_known = answer, known
         response["answer_check"] = answer_check
         response["limitations"] = result.output.get("limitations", []) + answer_check["notes"]
+        if search.get("instruction_like"):
+            response["limitations"].append(
+                "Records "
+                + ", ".join(search["instruction_like"])
+                + " contain text that reads like an instruction to the AI; it was given to the AI as data only."
+            )
         if result.output.get("status") == "PROVIDER_NOT_CONFIGURED":
             # No model was asked: say so in plain words (the provider's own note is for operators).
             from genai.structured_answer import AI_NOTE_NOT_CONFIGURED, AI_NOTE_TRIAL

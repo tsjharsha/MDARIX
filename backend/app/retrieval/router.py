@@ -11,6 +11,7 @@ from backend.app.access.permissions import AI_RUN, RECORDS_WRITE, require_permis
 
 router = APIRouter(prefix="/api/v1/retrieval", tags=["Trusted Evidence Retrieval"])
 service = TrustedRetrievalService()
+SEARCH_LIMIT_MESSAGE = "You have run many searches in a few minutes. Please wait a moment and try again."
 
 
 @router.post("/index", dependencies=[Depends(require_permission(RECORDS_WRITE))])
@@ -29,6 +30,9 @@ def query_retrieval(
     db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> RetrievalResponse:
+    from backend.app.rate_limit import enforce
+
+    enforce("search:user", ctx.user_id, SEARCH_LIMIT_MESSAGE)
     tenant_id = ctx.tenant_id
     scoped_request = request.model_copy(update={"tenant_id": tenant_id})
     try:

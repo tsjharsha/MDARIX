@@ -1,3 +1,4 @@
+import reportsTab from "./sections/ReportsTab.tsx?raw";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -684,15 +685,16 @@ describe("D2.7: the report page body", () => {
     resources.data = { [`/api/v1/reports/r1`]: REPORT };
     const html = render(<ReportsSection />, api(undefined, "regulatory", "?report=r1"));
     expect(html).toContain("3 things to give (4 fields)");
-    expect(html).toContain("Form FDA 3500A (eMDR) · 21 CFR 803.50");
+    // 0.10.87: the form is the page's heading; the give-head names only its rule.
+    expect(html).toContain('<span class="ac-muted">21 CFR 803.50</span>');
     expect(html).toContain("D2a · G4");
     expect(html).toContain("Save for PulseWatch 410");
     expect(html).toContain("Entered once for PulseWatch 410: used on every report for that product.");
     expect(html).toContain("Save for your organization");
     expect(html).toMatch(/<details class="uw-card uw-rec-main rp-fold" aria-label="The form&#x27;s fields"><summary/);
     expect(html).toContain("The report, in the form&#x27;s order");
-    // The field count appears once.
-    expect(html.split("of 19 mandatory").length - 1).toBe(1);
+    // The field count is the "things to give" head; the meter chip waits until nothing is missing (0.10.87).
+    expect(html.split("of 19 mandatory").length - 1).toBe(0);
   });
 });
 
@@ -825,5 +827,31 @@ describe("0.10.84: the tree while answering, compact enough for Sign on the firs
     const rail = html.slice(html.indexOf('class="dt-rail"'));
     expect(rail).toContain("12 of 12 worked complaints pass");
     expect(rail).not.toContain("MDARIX starter · version 1");
+  });
+});
+
+describe("0.10.87, duplication review rows 28-34: one report says each thing once", () => {
+  it("names the market and the due day once each, counts what is missing once, and keeps the starter to its chip", () => {
+    resources.data = { [`/api/v1/reports/r1`]: { ...REPORT, starter_mark: "Starter text." } };
+    const html = render(<ReportsSection />, api(undefined, "regulatory", "?report=r1"));
+    expect(html).not.toContain("<dt>Market</dt>");
+    expect(html).not.toContain("<dt>Due</dt>");
+    // While fields are missing the "things to give" head counts them; the meter chip waits until none is.
+    expect(html).not.toContain("15 of 19 mandatory fields");
+    expect(html).toContain("3 things to give (4 fields)");
+    if (REPORT.form.starter) expect(html).not.toContain("Starter text.");
+    // "MDARIX never submits" is said once, on the rail.
+    expect(html.split("never submits").length - 1).toBe(1);
+  });
+
+  it("shows the meter chip once every field is filled", () => {
+    resources.data = { [`/api/v1/reports/r1`]: { ...REPORT, mandatory: { total: 19, filled: 19, missing: [] } } };
+    expect(render(<ReportsSection />, api(undefined, "regulatory", "?report=r1"))).toContain(
+      "19 of 19 mandatory fields",
+    );
+  });
+
+  it("gives the list one eyebrow, the page's", () => {
+    expect(reportsTab).not.toContain('<Panel eyebrow="Reports"');
   });
 });

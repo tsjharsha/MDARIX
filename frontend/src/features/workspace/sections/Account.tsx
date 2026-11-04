@@ -53,7 +53,7 @@ export function Profile() {
   const { session, isTrial } = useWorkspace();
   const support = useSiteInfo()?.support_email || PUBLISHED_CONTACT.support;
   return (
-    <Panel eyebrow="My account" title={session?.display_name ?? "Your profile"}>
+    <Panel eyebrow="Profile" title={session?.display_name ?? "Your profile"}>
       <dl className="ca-facts">
         {!isTrial && (
           <div>

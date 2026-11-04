@@ -76,6 +76,9 @@ LIMITS: dict[str, Limit] = {
     "team-remove:org": Limit(10, 86400),
     # Each MFA reset by a trial owner emails the colleague, the owner and MDARIX.
     "team-mfa-reset:org": Limit(10, 86400),
+    # Evidence searches and Ask questions per person (DEV-11): each runs the local embedding model on the API's CPU,
+    # and Ask may call an AI service; the monthly AI allowance (genai/governance.py) still applies on top.
+    "search:user": Limit(60, 300),
 }
 
 # What a person is told when an invitation limit stops them (the generic sentence fits sign-in, not invitations).
