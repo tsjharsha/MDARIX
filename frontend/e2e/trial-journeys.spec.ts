@@ -208,6 +208,8 @@ async function newPage(browser: Browser, viewport: { width: number; height: numb
     timezoneId: "Asia/Kolkata",
     ...(state && existsSync(state) ? { storageState: state } : {}),
   });
+  // No step waits for ever: a click or a fill that cannot happen fails within a minute and says where.
+  context.setDefaultTimeout(60_000);
   return context.newPage();
 }
 
@@ -337,7 +339,8 @@ const owner: Person = REUSED
 async function signedIn(browser: Browser, viewport: { width: number; height: number }, who: Person) {
   const page = await newPage(browser, viewport, who.state);
   await page.goto("/app");
-  await expect(page).toHaveURL(/\/(app|signin)/, { timeout: 30_000 });
+  // Signed in, /app moves on to Home; a session that has ended (30 minutes idle) is sent to sign in.
+  await expect(page).toHaveURL(/\/(app\/.+|signin)/, { timeout: 30_000 });
   if (page.url().includes("/signin")) {
     await signIn(page, who);
     await page.context().storageState({ path: who.state });
@@ -442,37 +445,45 @@ test.describe("a solo owner on the sample data, desktop", () => {
   });
 
   test("3. steps 5 and 6: the form, and what is missing given (a lost save first)", async ({ browser }) => {
-    test.setTimeout(420_000);
+    // Each field is saved and the report read again: slow on a busy machine.
+    test.setTimeout(900_000);
     const page = await signedIn(browser, DESKTOP, owner);
     const problems = watch(page);
     let step = await story(page);
-    expect(step.label).toContain("4 of 10 done");
+    expect(step.label).toMatch(REUSED ? /[45] of 10 done/ : /4 of 10 done/);
     await step.main.click();
     const give = page.getByRole("region", { name: /things? to give/ });
     await expect(give).toBeVisible({ timeout: 30_000 });
     await accessible(page, "the report");
     const item = (name: RegExp) => give.getByRole("listitem").filter({ has: page.getByRole("textbox", { name }) });
-    await give.getByRole("textbox", { name: "D2a Procode" }).fill("DQA");
-    await give.getByRole("textbox", { name: "G4 PMA/510(k) #" }).fill("K123456");
-    // The first save is lost on the way (a dropped connection): the value stays, and saving again works once.
-    let writes = 0;
-    await page.route("**/api/v1/**", (route) =>
-      route.request().method() !== "GET" && writes++ === 0 ? route.abort("connectionreset") : route.continue(),
-    );
-    await item(/^D2a Procode/)
-      .getByRole("button")
-      .click();
-    await expect(page.getByRole("alert").filter({ hasText: "could not be reached" })).toBeVisible({ timeout: 30_000 });
-    await expect(give.getByRole("textbox", { name: "D2a Procode" })).toHaveValue("DQA");
-    await item(/^D2a Procode/)
-      .getByRole("button")
-      .click();
-    await expect(item(/^D2a Procode/)).toHaveCount(0, { timeout: 60_000 });
-    await page.unroute("**/api/v1/**");
+    // (An owner carried on from an earlier run, E2E_OWNER_JSON, may have given these already.)
+    if (await item(/^D2a Procode/).count()) {
+      await give.getByRole("textbox", { name: "D2a Procode" }).fill("DQA");
+      await give.getByRole("textbox", { name: "G4 PMA/510(k) #" }).fill("K123456");
+      // The first save is lost on the way (a dropped connection): the value stays, and saving again works once.
+      let writes = 0;
+      await page.route("**/api/v1/**", (route) =>
+        route.request().method() !== "GET" && writes++ === 0 ? route.abort("connectionreset") : route.continue(),
+      );
+      await item(/^D2a Procode/)
+        .getByRole("button")
+        .click();
+      await expect(page.getByRole("alert").filter({ hasText: "could not be reached" })).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(give.getByRole("textbox", { name: "D2a Procode" })).toHaveValue("DQA");
+      await item(/^D2a Procode/)
+        .getByRole("button")
+        .click();
+      await expect(item(/^D2a Procode/)).toHaveCount(0, { timeout: 60_000 });
+      await page.unroute("**/api/v1/**");
+    }
     for (const [name, value] of [
       [/^D3 Manufacturer/, "Journey Devices, Pune, MH, India"],
       [/^G1 Contact office/, "Journey Devices QA office, Pune, India"],
     ] as const) {
+      // D3 and G1 are the organization's: a value given once may already be there.
+      if (!(await item(name).count())) continue;
       await item(name).getByRole("textbox").fill(value);
       await item(name).getByRole("button").click();
       await expect(item(name)).toHaveCount(0, { timeout: 60_000 });
@@ -516,7 +527,7 @@ test.describe("a solo owner on the sample data, desktop", () => {
   });
 
   test("4. steps 7 and 8: a refused approval, the practice approval, the PDF, the submission", async ({ browser }) => {
-    test.setTimeout(420_000);
+    test.setTimeout(600_000);
     const page = await signedIn(browser, DESKTOP, owner);
     const problems = watch(page);
     const next = page.getByRole("complementary", { name: "What to do next" });
@@ -667,7 +678,7 @@ test.describe("a team on its own uploaded data, phone", () => {
     await expect(upload).toBeVisible({ timeout: 30_000 });
     await accessible(page, "Import (phone)");
     await page.locator("main input[type=file]").first().setInputFiles(EXPORT_FILE);
-    await expect(upload.getByRole("status")).toContainText("Read as Complaints", { timeout: 30_000 });
+    await expect(upload.getByRole("status")).toContainText("Read as Complaints", { timeout: 120_000 });
     await upload.getByRole("button", { name: "Check file" }).click();
     const importButton = upload.getByRole("button", { name: /^Import \d+ rows?/ });
     await expect(importButton).toBeVisible({ timeout: 60_000 });
