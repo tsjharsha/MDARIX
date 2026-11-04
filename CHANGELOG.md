@@ -83,10 +83,34 @@ the pinned embedding model before the tests (`scripts/prepare_embedding_cache.py
   or waiting for QA review), the complaints waiting for a disposition, the dated reports and CAPAs on Due dates, and on
   the Platform Admin side pending early-exit requests and open pilot requests.
 
-### Fixed: a person's data export is complete
+### Changed: Getting started's ten steps, in the owner's words, as a vertical list
+
+- **Getting started is the ten-step story only.** "More ways to explore" is gone from it: the three short stories
+  (a new urgent call, a rising problem, approving as a colleague), the ten chapters, the sample data and the trial's
+  own page are in Help, Short stories and your trial (`GettingStarted.tsx`; `releaseD3085Story.test.tsx`).
+- The steps read Review the call · Triage · Assess reportability · Sign conclusion · Prepare report · Complete details ·
+  Approve report · Record submission · Review records · Explore trends, in a numbered list beside the step's card (the
+  current step highlighted; on a phone the list sits above the card). What each step opens and when it ticks is
+  unchanged (`trial/one_story.STEPS`; `tests/test_release_0_10_85.py`).
+
+### Fixed: a step's progress lands only on the complaint opened, in its turn
+
+- **A mark names the complaint the person's screen showed.** The story's complaint can move (a new urgent import
+  while an old screen is open); the server took its current choice, so opening complaint A could mark complaint B.
+  It now refuses a mark for another complaint (409 `STORY_MOVED`).
+- **A step counts only in its turn.** Records or Trends opened before the steps ahead of them were done was kept and
+  credited later; it is now refused (409 `STEP_NOT_YET`) and never credited.
+- **A refused or failed mark is said, not dropped.** The screen still opens at once; Getting started shows why the
+  step was not saved (`oneStory.openStep`; `tests/test_release_0_10_82.py`, `releaseD3085Story.test.tsx`).
+
+### Fixed: a person's data export, and the management review's day
 
 - **A person's export carries every sign-in event.** It kept only the newest 500, so a long-standing user's export
   under the DPDP Act was incomplete (`tenant_export_api.person_export`; `tests/test_person_export.py`).
+
+- **The management review summary counts the organization's whole day.** Its period ended at the UTC midnight
+  after the organization's today, so in the US evening anything signed that day was missing until the next day
+  (`readiness_home/summary._bounds`; `tests/test_summary_period.py`).
 
 ### Operations
 

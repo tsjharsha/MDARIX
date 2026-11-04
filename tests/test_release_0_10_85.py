@@ -163,12 +163,23 @@ def test_one_request_reads_the_triage_list_once_per_kind(trial, monkeypatch):
     assert 0 < len(calls) <= 3, len(calls)
 
 
-def test_every_step_label_is_one_word():
-    """D3.15: the story's ten steps and the report's status path read one word per step, so none wraps."""
+def test_the_story_steps_carry_the_owners_names_and_the_report_path_one_word():
+    """The owner's ten step names (4 Nov 2026, a vertical list); the report's status path keeps one word per stage."""
     from backend.app.authority_reports.rules import STAGES
     from backend.app.trial.one_story import STEPS
 
-    assert [label for _, label in STEPS if len(label.split()) != 1] == []
+    assert [label for _, label in STEPS] == [
+        "Review the call",
+        "Triage",
+        "Assess reportability",
+        "Sign conclusion",
+        "Prepare report",
+        "Complete details",
+        "Approve report",
+        "Record submission",
+        "Review records",
+        "Explore trends",
+    ]
     assert [label for _, label in STAGES if len(label.split()) != 1] == []
 
 
