@@ -92,6 +92,8 @@ export type Version = {
   suggested_conclusion: Suggestion;
   conclusion: Conclusion | null;
   override_reason: string | null;
+  /** Why a re-signed conclusion changed (OD-4, 0.10.88); null on a first signature. */
+  change_reason?: string | null;
   report_type: string | null;
   report_type_label: string | null;
   window_name: string | null;
