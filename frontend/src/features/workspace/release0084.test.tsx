@@ -331,7 +331,7 @@ describe("M5: Home follows the Sample · Your data switch, and lists the complai
     const next = html.slice(html.indexOf('id="home-next"'), html.indexOf("uw-home-side"));
     expect(next).not.toContain("SAMPLE-RV-08");
     expect(next).toContain("FIC-2001");
-    expect(html).toContain("FIC-NEB-20 Rev A is rising");
+    expect(html).toContain("FIC-NEB-20 Rev A: 6 complaints");
     expect(html).not.toContain("OrbitCare");
   });
 
@@ -348,7 +348,7 @@ describe("M5: Home follows the Sample · Your data switch, and lists the complai
     const next = html.slice(html.indexOf('id="home-next"'), html.indexOf("uw-home-side"));
     expect(next).toContain("SAMPLE-RV-08");
     expect(next).not.toContain("FIC-200");
-    expect(html).toContain("OrbitCare 300 Rev B is rising");
+    expect(html).toContain("OrbitCare 300 Rev B: 9 complaints");
   });
 });
 
