@@ -48,6 +48,39 @@ operator knows a release migrates the database.
 - Help no longer repeats them on the new navigation; its "Short stories and your trial" entry is now "Short stories and
   other workflows" and opens the library.
 
+### Changed: each trial page says each thing once (owner-approved duplication review)
+
+New navigation only; the classic navigation is unchanged. No capability is removed, only repeated ways in.
+
+- **Shell:** the trial badge opens Getting started's trial settings; the top bar's Sample data chip is left out on
+  Getting started, and Import your data on its own page. Help no longer offers Try your own data, the sample-only
+  Discuss a pilot or Next steps (the top bar and the tabs do), and calls the trial guide "The trial, step by step".
+  The time-zone line shows only on pages with times. No chapter banners, and no story bar on Home. The avatar menu
+  shows the name only. The investigation picker is gone, and the product picker shows on Trends only off the trend
+  check.
+- **Page heads:** one report and Next steps have only their own heading. Look ahead asks "What will your partners
+  see?", and its panels name the party.
+- **Getting started:** the third card is "Plan your next steps" (the demo and Next steps). The team card is left out
+  for a persona whose tabs hold Team. Other workflows drops the four-step short story on SAMPLE-RV-11 (the walkthrough
+  follows that complaint) and the second star rating, and lists "Workflows to try".
+- **Home:** the date line drops the organization, a trial's Home drops its data eyebrow, and the At risk tile no
+  longer names the product the Trends card names.
+- **Complaints and a complaint:**
+  - No import button on the list in a trial, and the list's title is its count.
+  - Authority reports and Investigations views are offered only to personas without those tabs.
+  - A complaint's crumb is the way back; its service line keeps to the service; missing facts read "Not recorded".
+- **Decision trees and Reports:**
+  - The trees' loading panel no longer repeats the question.
+  - A report drops its Market and Due fields, and shows the meter chip once nothing is missing.
+  - The practice-approval warning says only who you approve as.
+  - "MDARIX never submits" is said once.
+- **Investigations and Trends:** no second eyebrows. Investigations drops the header Lot impact button (its fold
+  stays). Trends shows the Investigations button only for personas without that tab, and its fold drops the rise
+  tiles the heroes say.
+- **Records, Import your data, Settings, Account:**
+  - Records and Import your data drop repeated sentences.
+  - Settings' panels are named by topic, and Account's panel is "Profile".
+
 ## [0.10.86] - 2026-11-04
 
 On the trial maintenance line (`release/0.10`): a reliability release from an external code review of 0.10.84. No
