@@ -9,21 +9,24 @@
 export const SERVER_VIEWS: Readonly<Record<string, { code: string; detail: string }>> = {
   "All open complaints": {
     code: "open",
-    detail: "Every complaint not closed in your QMS, the most urgent first: overdue, then the nearest clock.",
+    detail: "Every complaint not closed in your QMS. Overdue first, then the nearest legal deadline.",
   },
-  Overdue: { code: "overdue", detail: "A deadline or target already past, the longest overdue first." },
-  "Due this week": { code: "due-week", detail: "A deadline or target in the next seven days, soonest first." },
+  Overdue: { code: "overdue", detail: "A deadline or target already past. Then the nearest legal deadline first." },
+  "Due this week": {
+    code: "due-week",
+    detail: "A deadline or target in the next seven days. The nearest legal deadline first.",
+  },
   "Legal clocks this week": {
     code: "legal-week",
-    detail: "A reporting deadline in the next seven days, or already past, soonest first.",
+    detail: "A reporting deadline in the next seven days, or already past. Overdue first.",
   },
   "Reportability: decision needed": {
     code: "reportability",
-    detail: "A market where a person must still decide whether to report, soonest clock first.",
+    detail: "A market with no signed conclusion yet. Overdue first, then the nearest legal deadline.",
   },
   "Waiting for the reporter": {
     code: "waiting-reporter",
-    detail: "A question still open with the reporter or a partner, earliest reply first.",
+    detail: "A question still open with the reporter or a partner. Overdue first, then the nearest legal deadline.",
   },
   "Waiting for my approval": {
     code: "my-approval",
@@ -31,7 +34,8 @@ export const SERVER_VIEWS: Readonly<Record<string, { code: string; detail: strin
   },
   "Signed this month": {
     code: "signed-month",
-    detail: "A market conclusion, disposition, report approval or ready to close signed this month, newest first.",
+    detail:
+      "A conclusion, disposition, report approval or ready to close signed this month. The nearest legal deadline first.",
   },
 };
 

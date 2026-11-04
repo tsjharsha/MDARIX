@@ -11,6 +11,7 @@ import {
   shownRun,
   stepBlocker,
   stepCount,
+  stepPlace,
   useOneStory,
   type OneStory as OneStoryData,
   type StoryRun,
@@ -88,6 +89,17 @@ function stepCopy(run: StoryRun, index: number): { h: string; p: string; b: stri
   ][index];
   return copy;
 }
+
+/** Who takes each step, for a colleague whose role cannot open its screen. */
+const STEP_ROLE: Record<number, string> = {
+  1: "A Complaint Handler or the Quality Leader",
+  2: "A Regulatory Leader",
+  3: "A Regulatory Leader",
+  4: "A Regulatory Leader",
+  5: "A Regulatory Leader",
+  6: "A Decision Maker",
+  7: "A Regulatory Leader",
+};
 
 /** The step's preview: a glimpse of the screen it opens, read from the same records. */
 function StepPreview({ run, index, trends }: { run: StoryRun; index: number; trends: TrendItem[] }) {
@@ -277,7 +289,7 @@ export function StoryView({
   /** The people on the trial, the owner included. */
   colleagues?: number;
 }) {
-  const { open, dataSource, chooseDataSource, session, startStory } = useWorkspace();
+  const { open, dataSource, chooseDataSource, session, startStory, canOpen } = useWorkspace();
   const [picked, setPicked] = useState<number | null>(null);
   const run = shownRun(story, dataSource);
   // The ten-step story replaces an older story's bar: one progress indicator per page (D1.5).
@@ -354,6 +366,9 @@ export function StoryView({
     const copy = stepCopy(run, selected);
     const step = run.steps[selected];
     const blocked = stepBlocker(run, selected);
+    // A step whose screen this person's role cannot open says so and who does it: never a dead click (0.10.85).
+    const section = stepPlace(run, selected).section;
+    const closed = canOpen ? !canOpen(section) : false;
     body = (
       <div className="uw-os-main">
         <span className="ac-eyebrow">
@@ -367,10 +382,26 @@ export function StoryView({
           <span className="ms-chip is-good uw-os-state">
             <Check size={13} aria-hidden="true" /> Done · read from the saved record
           </span>
+        ) : step.earlier ? (
+          <span className="ms-chip uw-os-state">
+            Done earlier by your team · ticked once the steps before it are done
+          </span>
         ) : null}
+        {closed && (
+          <p className="uw-os-differ" id="uw-os-closed">
+            {STEP_ROLE[selected] ?? "A colleague with that role"} does this step: your role cannot open its screen. Ask
+            the trial owner, or a colleague with that role, to take it.
+          </p>
+        )}
         {blocked && !step.done && <p className="uw-os-differ">{blocked}</p>}
         <div className="ca-action-row">
-          <button type="button" className="ac-primary uw-os-go" onClick={() => void openStep(run, selected, go)}>
+          <button
+            type="button"
+            className="ac-primary uw-os-go"
+            disabled={closed}
+            aria-describedby={closed ? "uw-os-closed" : undefined}
+            onClick={() => void openStep(run, selected, go)}
+          >
             {blocked && !step.done && !run.report_id && run.needs.length === 0 && run.market
               ? "Open the decision tree"
               : blocked && !step.done && (run.needs.length || !run.market)
@@ -400,11 +431,13 @@ export function StoryView({
           <button
             key={step.key}
             type="button"
-            className={`uw-os-step${step.skipped ? " is-skip" : step.done ? " is-done" : index === run.current ? " is-now" : ""}${!finished && index === selected ? " is-sel" : ""}`}
+            className={`uw-os-step${step.skipped ? " is-skip" : step.done ? " is-done" : index === run.current ? " is-now" : step.earlier ? " is-earlier" : ""}${!finished && index === selected ? " is-sel" : ""}`}
             aria-current={!finished && index === selected ? "step" : undefined}
+            title={step.earlier ? "Done earlier by your team" : undefined}
             onClick={() => setPicked(index)}
           >
             <span className="uw-os-k">{step.done ? <Check size={13} aria-label="done" /> : index + 1}</span>
+            {step.earlier && <span className="sr-only">done earlier by your team</span>}
             <span className="uw-os-t">{step.label}</span>
           </button>
         ))}

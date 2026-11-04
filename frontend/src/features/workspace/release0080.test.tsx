@@ -93,7 +93,8 @@ describe("1. Getting started in the tab bar", () => {
 describe("2. Getting started without the import (new navigation)", () => {
   it("has no Your data tab and no upload; the classic navigation keeps both", () => {
     reads.data[STATUS] = status(37, 0);
-    const fresh = render(<GettingStartedSection />, api());
+    // 0.10.85: the trial's tabs are on their own page, one quiet link under "More ways to explore".
+    const fresh = render(<GettingStartedSection focus="Your trial" />, api());
     expect(fresh).not.toContain(">Your data<");
     expect(fresh).not.toContain("Upload your export");
     expect(fresh).toContain(">About the sample data<");

@@ -48,7 +48,7 @@ def test_the_sample_story_ticks_each_step_from_the_saved_record(trial):
     sample = first["sample"]
     assert sample["complaint"]["ref"] == "SAMPLE-RV-11" and sample["market"] == "US"
     assert [step["label"] for step in sample["steps"]] == [
-        "The call",
+        "Call",
         "Triage",
         "Tree",
         "Decide",
@@ -65,12 +65,14 @@ def test_the_sample_story_ticks_each_step_from_the_saved_record(trial):
     # until a submission is recorded.
     _ok(user.post(f"{STORY}/marks", json={"run": "sample", "step": "records"}))
     after = _ok(user.post(f"{STORY}/marks", json={"run": "sample", "step": "trends"}))["sample"]
-    assert _done(after) == ["trends"] and after["current"] == 0
+    # 0.10.85: a step opened out of order is not ticked ahead of the story; it is flagged "done earlier".
+    assert _done(after) == [] and after["current"] == 0
+    assert [step["key"] for step in after["steps"] if step["earlier"]] == ["trends"]
     # Step 1 is the person's own mark; step 2 is the triage record.
     assert _done(_ok(user.post(f"{STORY}/marks", json={"run": "sample", "step": "call"}))["sample"])[:1] == ["call"]
     complaint = _flagship(user)
     run = _ok(user.get(STORY))["sample"]
-    assert _done(run) == ["call", "triage", "trends"] and run["current"] == 2
+    assert _done(run) == ["call", "triage"] and run["current"] == 2
     # Steps 3 and 4: signing the US conclusion "reportable" (the report is created with it).
     _ok(_sign_us(user, complaint, "REPORTABLE"))
     run = _ok(user.get(STORY))["sample"]

@@ -165,7 +165,7 @@ def complaints_to_recheck(db: Session, tenant_id: uuid.UUID, today: date) -> dic
         CRITICAL if harm else ATTENTION if count else CLEAR,
         detail,
         links.target("Complaints", "Second look"),
-        [{"id": item["id"], "ref": item["business_id"] or item["complaint_identifier"]} for item in found["items"]],
+        [{"id": item["id"], "ref": item["complaint_identifier"] or item["business_id"]} for item in found["items"]],
         {"harm": harm},
     )
 
@@ -185,7 +185,7 @@ def complaints_past_target(db: Session, tenant_id: uuid.UUID, today: date) -> di
         f"{_n(summary['open_unlinked'], 'complaint')} open in no trend or investigation; {summary['due_soon']:,} due within a "
         f"week; target {summary['target_days']} days",
         links.target("Complaints", "Backlog"),
-        [{"id": item["id"], "ref": item["business_id"] or item["complaint_identifier"]} for item in found["items"]],
+        [{"id": item["id"], "ref": item["complaint_identifier"] or item["business_id"]} for item in found["items"]],
         {"open_unlinked": summary["open_unlinked"], "oldest_days": summary["oldest_days"]},
     )
 
@@ -256,7 +256,7 @@ def reporting_clocks(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         state,
         detail,
         links.target("Complaints", "Reportability" if summary["configured"] else "Reporting windows"),
-        [{"id": item["id"], "ref": item["business_id"] or item["complaint_identifier"]} for item in flagged]
+        [{"id": item["id"], "ref": item["complaint_identifier"] or item["business_id"]} for item in flagged]
         + against_scale,
         {
             "overdue": summary["overdue"],

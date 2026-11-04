@@ -107,7 +107,8 @@
 .ca-chips button.selected {
   border-color: var(--ac-teal);
   background: var(--ac-teal-wash);
-  color: var(--ac-teal);
+  /* 4.5:1 on the wash (0.10.85, D3.8: the teal read 4.43:1). */
+  color: var(--ms-teal-dark);
   font-weight: 600;
 }
 .ca-inline-select {

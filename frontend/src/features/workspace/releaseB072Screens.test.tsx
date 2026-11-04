@@ -176,7 +176,8 @@ describe("B5: Trends leads with one sentence per rising group", () => {
     // The steady group, the tiles and the grouping controls are inside the disclosure.
     expect(html.indexOf("PulseWatch 410 Rev A")).toBeGreaterThan(revealed);
     expect(html.indexOf("Groups checked")).toBeGreaterThan(revealed);
-    expect(html).toContain("Results allow for the 2 groups assessed.");
+    // 0.10.85, D3.5: the method is under "How we compared", not a headline sentence.
+    expect(html).toContain("<summary>How we compared</summary>");
   });
 });
 
@@ -212,10 +213,11 @@ describe("B6: Records leads with the record of the work just finished", () => {
     const lead = html.indexOf("Intake decision summary · SAMPLE-RV-11");
     expect(lead).toBeGreaterThan(-1);
     expect(html).toContain("Download the decision record (PDF)");
-    expect(html.indexOf("<summary>All records: ")).toBeGreaterThan(lead);
-    expect(html.indexOf("Inspection readiness")).toBeGreaterThan(html.indexOf("<summary>All records: "));
+    // 0.10.85, D3.4: every other record under "All records", inspection readiness first, unfolded.
+    expect(html.indexOf(">All records</h2>")).toBeGreaterThan(lead);
+    expect(html.indexOf("Inspection readiness")).toBeGreaterThan(html.indexOf(">All records</h2>"));
   });
-  it("opens as before while nothing is finished", () => {
+  it("says no record yet while nothing is finished or signed (0.10.85, D3.4)", () => {
     const html = records(false);
     expect(html).not.toContain("The work you just finished");
     expect(html).not.toContain("<summary>All records: ");

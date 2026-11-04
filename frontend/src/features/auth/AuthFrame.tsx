@@ -18,17 +18,14 @@ function TrialReadyLine() {
 }
 
 const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof ShieldCheck, string, ReactNode][] }> = {
+  // What MDARIX does for a QA/RA team, in one line (0.10.85, D3.12).
   signin: {
-    eyebrow: "Investigation intelligence",
-    title: "Evidence before inference. Humans decide.",
+    eyebrow: "Complaints and vigilance for QA/RA teams",
+    title: "Every complaint triaged, decided and reported on time, with the record to prove it.",
     points: [
-      [ShieldCheck, "Your organization's own workspace", "Every record you see belongs to your tenant only."],
-      [
-        FileSearch,
-        "Evidence-linked investigations",
-        "Complaints, versions, lots and suppliers connected in one place.",
-      ],
-      [UserCheck, "People make the decisions", "Every finding cites its records; authorized reviewers decide."],
+      [CalendarCheck, "Every market's legal clock", "From awareness, in your time zone, the most urgent first."],
+      [FileSearch, "Decision trees on the regulation's text", "Facts from the record to confirm; judgements yours."],
+      [UserCheck, "People decide and sign", "MDARIX never decides or submits; a second person approves."],
     ],
   },
   signup: {

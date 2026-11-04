@@ -8,7 +8,8 @@ import { offeredTab } from "../../../app/featureSet";
 import { canImportOwnData, chooseCase, openImport, useCan, useReportedTab, useWorkspace } from "../workspaceContext";
 import { tabParam } from "../workspaceAddress";
 import { renamed } from "../workspaceContext";
-import { parseComplaintListTab } from "../complaintList";
+import { IMPORTED_SOURCE, parseComplaintListTab } from "../complaintList";
+import { inData } from "../home";
 import { listTitle } from "./common";
 import { Triage } from "./Triage";
 import { ReportabilityWatch } from "./ReportabilityWatch";
@@ -51,6 +52,9 @@ export function ComplaintViews({ tab }: { tab?: string }) {
   const canImport = canImportOwnData(session);
   const canLog = useCan("signal.triage") || useCan("investigation.create") || useCan("quality.review");
   const complaint = tabParam(carried, "complaint");
+  // "Log a call" opens in place (0.10.85, D3.10): the Calls to check view, with the log open beside it. It opened
+  // Home › Queues before (U-21).
+  const [logged, setLogged] = useState(0);
   const server = SERVER_VIEWS[view];
   return (
     <>
@@ -67,7 +71,10 @@ export function ComplaintViews({ tab }: { tab?: string }) {
           <button
             type="button"
             className="ac-secondary"
-            onClick={() => open("Complaints", "First contact?log=CONTACT")}
+            onClick={() => {
+              setView("Calls to check");
+              setLogged((count) => count + 1);
+            }}
           >
             <PhoneCall size={15} aria-hidden="true" /> Log a call
           </button>
@@ -80,7 +87,7 @@ export function ComplaintViews({ tab }: { tab?: string }) {
       </div>
       {server && <ComplaintList key={view} eyebrow="Complaints" view={{ name: view, code: server.code }} />}
       {view === "To triage" && <Triage onOpenTab={go} />}
-      {view === "Calls to check" && <FirstContact part="calls" />}
+      {view === "Calls to check" && <FirstContact key={logged} part="calls" startLogging={logged ? "CONTACT" : null} />}
       {view === "Due soon" && <Backlog initial="due_soon" fixed />}
       {view === "Past target" && <Backlog initial="past_target" fixed />}
       {view === "Second look" && <SecondLook initial="open" fixed />}
@@ -129,8 +136,10 @@ const QUEUE_DETAIL: Record<string, string> = {
  * Product · Priority · Owner · Stage, with one action; a row opens the investigation's page on its own product.
  */
 export function InvestigationList() {
-  const { work, open, notify, session } = useWorkspace();
+  const { work, open, notify, session, dataSource } = useWorkspace();
   const cases = useResource<any>("/api/v1/data-plane/investigations?limit=500");
+  // The Sample · Your data switch decides the investigations listed (0.10.85, D3.9).
+  const yours = dataSource === IMPORTED_SOURCE;
   const [view, setView] = useState<InvestigationView>("Open investigations");
   const productName = (id: unknown) => work.products.find((item) => item.id === String(id ?? ""))?.name ?? "—";
   const openCase = async (row: any) => {
@@ -139,7 +148,11 @@ export function InvestigationList() {
       open("Investigations", "Summary");
     else notify(`${ref} could not be opened right now.`, "critical");
   };
-  const rows = listOf(cases.data?.records).filter((row: any) => inInvestigationView(row, view, session?.user_id));
+  const rows = listOf(cases.data?.records).filter(
+    (row: any) =>
+      inInvestigationView(row, view, session?.user_id) &&
+      inData(String(row.investigation_identifier ?? row.business_id ?? ""), dataSource),
+  );
   return (
     <>
       <div className="ca-action-row uw-list-actions">
@@ -162,11 +175,21 @@ export function InvestigationList() {
           rows={rows}
           rowKey={(row) => String(row.id)}
           empty={{
-            title: view === "All investigations" ? "No investigations yet" : "Nothing in this view",
-            detail: "An investigation opens from a complaint's page or from a trend.",
+            title: yours
+              ? "No investigation on your data yet"
+              : view === "All investigations"
+                ? "No investigations yet"
+                : "Nothing in this view",
+            detail: yours
+              ? "Open one from your product's trend: the complaints it groups come into its scope."
+              : "An investigation opens from a complaint's page or from a trend.",
             action: (
-              <button type="button" className="ac-secondary" onClick={() => open("Trends", "Trend check")}>
-                See the trends
+              <button
+                type="button"
+                className={yours ? "ac-primary" : "ac-secondary"}
+                onClick={() => open("Trends", "Trend check")}
+              >
+                {yours ? "Open one from the trend" : "See the trends"}
               </button>
             ),
           }}

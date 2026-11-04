@@ -25,7 +25,8 @@ describe("the sign-up page's frame", () => {
         <p>form</p>
       </AuthFrame>,
     );
-    expect(html).toContain("Every record you see belongs to your tenant only.");
+    // 0.10.85, D3.12: sign-in says in one line what MDARIX does for a QA/RA team.
+    expect(html).toContain("Every complaint triaged, decided and reported on time, with the record to prove it.");
     expect(html).not.toContain("Ready within minutes");
   });
 });

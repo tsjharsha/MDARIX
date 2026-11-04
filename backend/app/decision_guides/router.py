@@ -73,7 +73,7 @@ MATRIX_RULE = (
     "every version; add your own. A version is sent for approval only when every row passes, and its approval runs the "
     "matrix again: a changed answer blocks it."
 )
-SCALE_NOTE = "The harm-severity scale stays MDARIX's fixed starter scale in the trial (scale-starter-1)."
+SCALE_NOTE = "The harm-severity scale stays MDARIX's fixed starter scale in the trial (MDARIX starter, version 1)."
 
 
 def _error(status: int, code: str, message: str, **extra) -> HTTPException:

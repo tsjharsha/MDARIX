@@ -241,10 +241,12 @@ describe("the decision guide screens", () => {
       practice_label: null,
     } satisfies GuideList;
     const html = render(<DecisionGuides />);
-    expect(html).toContain("US-v2 in use");
+    // 0.10.85, D3.12: versions in words, never "US-v2" or "US-starter-1".
+    expect(html).toContain("United States (FDA): your version 2 in use");
     expect(html).toContain("approved by MDARIX sample approver");
     expect(html).toContain("1 of 7 test cases fail");
-    expect(html).toContain("US-starter-1");
+    expect(html).toContain("MDARIX starter, version 1");
+    expect(html.replace(/<[^>]*>/g, " ")).not.toMatch(/US-v\d|US-starter-1/);
   });
 
   it("edits a draft with the clause column and shows the failing test that blocks publication", () => {

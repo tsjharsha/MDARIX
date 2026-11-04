@@ -45,6 +45,16 @@ import {
 
 const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
+/** A wall-clock time typed in a datetime field ("2026-11-03T21:50"), in the product's one format: "3 Nov 2026, 21:50". */
+export function wallClockText(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
+  if (!match) return "";
+  const month = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][
+    Number(match[2]) - 1
+  ];
+  return `Reads: ${Number(match[3])} ${month} ${match[1]}, ${match[4]}:${match[5]}`;
+}
+
 /**
  * Complaints › First contact: the calls the service desk logged and the urgent intakes, each with the first-contact
  * check (complaint, service only, both or pending, by the starter guide's table), the follow-ups, the QMS-complaint
@@ -361,10 +371,6 @@ function LogDrawer({
             <input value={form.lot} onChange={(event) => set({ lot: event.target.value })} />
           </label>
           <label className="ca-field">
-            Serial number
-            <input value={form.serial} onChange={(event) => set({ serial: event.target.value })} />
-          </label>
-          <label className="ca-field">
             What was asked for
             <select value={form.requested} onChange={(event) => set({ requested: event.target.value })}>
               {guide.requests.map((item) => (
@@ -375,38 +381,49 @@ function LogDrawer({
             </select>
           </label>
           <label className="ca-field">
-            Who called (hospital, distributor, user…)
-            <input value={form.reporterType} onChange={(event) => set({ reporterType: event.target.value })} />
-          </label>
-          <label className="ca-field">
-            Site (no person's name)
-            <input value={form.site} onChange={(event) => set({ site: event.target.value })} />
-          </label>
-          <label className="ca-field">
             Country
             <input value={form.country} onChange={(event) => set({ country: event.target.value })} />
           </label>
-          <label className="ca-field">
-            Use environment
-            <select value={form.environment} onChange={(event) => set({ environment: event.target.value })}>
-              {guide.use_environments.map((item) => (
-                <option key={item.code} value={item.code}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="ca-field">
-            User type
-            <select value={form.userType} onChange={(event) => set({ userType: event.target.value })}>
-              {guide.user_types.map((item) => (
-                <option key={item.code} value={item.code}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
+        {/* The rest of the call folds (0.10.85, D3.10): the short form is the words, product, lot, what was asked,
+            country and the time of the call. */}
+        <details className="uw-more uw-log-more">
+          <summary>More about the call (optional)</summary>
+          <div className="ca-form-grid">
+            <label className="ca-field">
+              Serial number
+              <input value={form.serial} onChange={(event) => set({ serial: event.target.value })} />
+            </label>
+            <label className="ca-field">
+              Who called (hospital, distributor, user…)
+              <input value={form.reporterType} onChange={(event) => set({ reporterType: event.target.value })} />
+            </label>
+            <label className="ca-field">
+              Site (no person's name)
+              <input value={form.site} onChange={(event) => set({ site: event.target.value })} />
+            </label>
+            <label className="ca-field">
+              Use environment
+              <select value={form.environment} onChange={(event) => set({ environment: event.target.value })}>
+                {guide.use_environments.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ca-field">
+              User type
+              <select value={form.userType} onChange={(event) => set({ userType: event.target.value })}>
+                {guide.user_types.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </details>
         <section className="ca-drawer-section">
           <h3>Times ({zoneLabel(form.zone)})</h3>
           <div className="ca-form-grid">
@@ -415,8 +432,11 @@ function LogDrawer({
               <input
                 type="datetime-local"
                 value={form.received}
+                aria-describedby="log-received-reads"
                 onChange={(event) => set({ received: event.target.value, receivedTyped: true })}
               />
+              {/* The browser's own field may show 11/03/2026; MDARIX's one format reads it back (0.10.85, D3.10). */}
+              <small id="log-received-reads">{wallClockText(form.received)}</small>
             </label>
             <label className="ca-field">
               Event
@@ -477,15 +497,16 @@ function LogDrawer({
           </div>
         </section>
         {kind === "CONTACT" && (
-          <section className="ca-drawer-section">
-            <h3>The first-contact questions</h3>
+          // The ten questions fold in the log (0.10.85, D3.10): they can be answered now or at the call's check.
+          <details className="ca-drawer-section uw-more">
+            <summary>The ten first-contact questions (now, or at the check)</summary>
             <p className="uw-hint">{guide.note}</p>
             <Questions guide={guide} answers={form.answers} onChange={(answers) => set({ answers })} />
             <label className="ca-field">
               10. What is still unknown and needs a follow-up with the caller?
               <textarea rows={2} value={form.unknowns} onChange={(event) => set({ unknowns: event.target.value })} />
             </label>
-          </section>
+          </details>
         )}
         {problem && <p className="uw-hint">{problem}</p>}
         <div className="ca-action-row">
