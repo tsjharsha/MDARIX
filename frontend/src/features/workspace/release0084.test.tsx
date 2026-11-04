@@ -429,7 +429,7 @@ describe("L2: the control that changes a colleague's personas says Change, not a
 describe("L3 and L5: the story's words match its numbers, and its end offers what comes next", () => {
   const view = (run: StoryRun, colleagues = 1) =>
     render(
-      <StoryView story={{ sample: null, yours: run }} trends={[]} colleagues={colleagues} />,
+      <StoryView story={{ sample: null, yours: run }} colleagues={colleagues} />,
       api({ dataSource: IMPORTED_SOURCE }),
     );
   const done = storyRun({
@@ -442,15 +442,12 @@ describe("L3 and L5: the story's words match its numbers, and its end offers wha
     expect(view(storyRun({ current: 5 }))).not.toContain("Most fields arrive filled");
   });
 
-  it("ends on the finale's trend, and offers a pilot once a colleague has joined", () => {
+  it("offers a pilot once a colleague has joined", () => {
     const alone = view(done);
     expect(alone).toContain("Invite a colleague");
     const team = view(done, 2);
     expect(team).not.toContain("Invite a colleague");
     expect(team).toContain("Discuss a pilot");
-    // The preview beside the finished story is the finale (Trends), not Records.
-    const preview = team.slice(team.indexOf('class="uw-os-mini-bar"'));
-    expect(preview).toContain("<span>Trends</span>");
   });
 });
 

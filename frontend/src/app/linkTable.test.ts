@@ -287,7 +287,9 @@ describe("every link source resolves to an existing screen (6.10)", () => {
     // Not workspace screens: the Help menu's pages and the Admin console's sections ("In the Admin console open
     // Users › Invite").
     const elsewhere = ["Help", "Users", "Security"];
-    const PANELS: Record<string, string[]> = { "Getting started": ["See it on your own records, one to one"] };
+    const PANELS: Record<string, string[]> = {
+      "Getting started": ["Guides & support", "Sample data & trial settings"],
+    };
     let checked = 0;
     for (const match of text.matchAll(/([A-Z][A-Za-z]*(?: [A-Za-z&]+)?) › /g)) {
       const words = match[1];
@@ -303,7 +305,7 @@ describe("every link source resolves to an existing screen (6.10)", () => {
       }
       const after = text.slice((match.index ?? 0) + match[0].length);
       // A screen without tabs names a part of itself (Import data › Distribution, a template); Getting started has
-      // one panel the guide names besides its tabs.
+      // two parts the guide names besides its tabs (0.10.87).
       const parts = PLACES[section].tabs.length ? [...PLACES[section].tabs, ...(PANELS[section] ?? [])] : [after];
       const tab = parts.find((name) => after.startsWith(name));
       expect(tab, `the guide's "${section} › ${after.slice(0, 30)}" names no tab of ${section}`).toBeDefined();

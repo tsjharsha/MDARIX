@@ -10,6 +10,37 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.87] - 2026-11-04
+
+### Changed: Getting started v2, one walkthrough and one next action (owner's specification, 5 Nov 2026)
+
+- **Getting started is one white walkthrough card**, in place of the dark hero: "Getting started", "Follow one sample
+  complaint from first call to reporting.", the practice line once ("Fictional data · Trial outputs are practice
+  records · Human sign-off required"), then "Your sample walkthrough" with its Sample data badge, "X of 10 completed"
+  and one progress bar. The ten steps are a list on the left; the step chosen is on the right with a small label, one
+  heading, one instruction, a short summary of the complaint and one main button. On the trial's own data the same
+  card runs on "Your data", without "Fictional data".
+- **The complaint summary is read from the record**: its reference, the description's first sentence, the device, the
+  reported harm and the service status. Harm the record does not state says "Not recorded", never "None reported".
+  The one-story read (`GET /api/v1/trial/one-story`) now also returns each run's `product_name`, `harm` and
+  `service_status`.
+- **Picking a step on the list previews it**: it is marked "Preview", with the real next step named and one click
+  back. Completion is unchanged: ticks come from the saved record, and steps 1, 5, 9 and 10 still count only when
+  their main button opens the step's screen in its turn.
+- **Under the card, "Explore at your own pace"**: Invite your team (the trial owner manages; a colleague sees who is
+  on the trial), Explore other workflows (Choose a focus: the short stories, the ten chapters and the audit focus, on
+  `Getting started › Other workflows`), and Guides & support (the guides, support, feedback, the one-to-one demo and
+  Next steps, shown when asked for).
+- **One collapsed "Sample data & trial settings"** at the foot of the page holds the sample's explanation and counts,
+  the trial's dates and limits, and the trial owner's Restart the sample story, Remove the sample data and End my
+  trial early, each with its confirmation as before. Old links to Getting started › About the sample data and ›
+  Your trial open it.
+- **Removed from the page**: the miniature screen previews, the second chapter wheel, the seven-step trial journey, the
+  repeated first-call and report explanations, the duplicate demo and Next steps banners, the short-story tiles that
+  repeated the short stories, and the restart control on the short stories. Every capability stays reachable.
+- The walkthrough says when it is still reading, when its read failed (with Try again), when a role may not read it,
+  and when there is no complaint to follow.
+
 ## [0.10.86] - 2026-11-04
 
 On the trial maintenance line (`release/0.10`): a reliability release from an external code review of 0.10.84. No

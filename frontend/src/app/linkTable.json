@@ -426,7 +426,7 @@
     },
     "Getting started": {
       "path": "/app/getting-started",
-      "tabs": ["About the sample data", "Your trial"]
+      "tabs": ["About the sample data", "Your trial", "Other workflows"]
     },
     "Share feedback": {
       "path": "/app/feedback",

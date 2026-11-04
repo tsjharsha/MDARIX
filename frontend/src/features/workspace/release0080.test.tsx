@@ -93,12 +93,13 @@ describe("1. Getting started in the tab bar", () => {
 describe("2. Getting started without the import (new navigation)", () => {
   it("has no Your data tab and no upload; the classic navigation keeps both", () => {
     reads.data[STATUS] = status(37, 0);
-    // The trial's tabs are on their own page, reached from Help (Short stories and your trial).
+    // A link to the trial's page opens Getting started's collapsed sample data and trial settings (0.10.87).
     const fresh = render(<GettingStartedSection focus="Your trial" />, api());
     expect(fresh).not.toContain(">Your data<");
     expect(fresh).not.toContain("Upload your export");
-    expect(fresh).toContain(">About the sample data<");
-    expect(fresh).toContain(">Your trial<");
+    expect(fresh).toMatch(/<details id="trial-settings"[^>]* open="">/);
+    expect(fresh).toContain("What your sample data is, and why it looks like this");
+    expect(fresh).toContain("Your free trial");
     expect(reads.paths.some((path) => path.startsWith("/api/v1/trial/insights"))).toBe(false);
     const classic = render(<GettingStartedSection />, api({ navigation: "classic" }));
     expect(classic).toContain(">Your data<");

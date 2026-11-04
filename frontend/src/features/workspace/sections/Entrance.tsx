@@ -15,7 +15,6 @@ import {
 import { useResource } from "../../customer-admin/shared";
 import { eventPath, type EventView } from "../oversight";
 import { dispositionPath } from "../disposition";
-import { RestartSamplePanel } from "./RemoveSample";
 import { ResumeShortStory, useShortStory } from "./ShortStory";
 import { stepText } from "../shortStory";
 
@@ -27,12 +26,13 @@ const ICONS: Partial<Record<Scenario["key"], typeof Inbox>> = {
 
 /**
  * The entrance (stage 8, 8.4; 0.10.71, A3): one event first, the short story on SAMPLE-RV-11, in the reporter's own
- * words as the sample records them; the other stories under "More stories"; "Restart the sample story" under "More".
+ * words as the sample records them; the other stories under "More stories". Restarting the sample is on Getting started,
+ * under "Sample data & trial settings" (0.10.87).
  * Step counts only, no time claims. The inspection-readiness numbers are on the manager's My work, not here. The ten
  * chapters follow under "Explore all capabilities" (GettingStarted.tsx). Seeing it once makes My work the start
  * screen next time.
  */
-export function Entrance({ onRestarted }: { onRestarted: (text: string) => void }) {
+export function Entrance() {
   const { open, startStory } = useWorkspace();
   useEffect(markEntranceSeen, []);
   const event = useResource<EventView>(eventPath(FLAGSHIP));
@@ -89,10 +89,6 @@ export function Entrance({ onRestarted }: { onRestarted: (text: string) => void 
             );
           })}
         </ul>
-      </details>
-      <details className="uw-entrance-more">
-        <summary>Restart the sample story</summary>
-        <RestartSamplePanel onRestarted={onRestarted} />
       </details>
     </section>
   );

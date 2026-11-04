@@ -1296,7 +1296,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Remove the sample data (free trial)",
             who: "The person who started the trial.",
             steps: [
-              "Once your own complaints are in, open Getting started › About the sample data.",
+              "Once your own complaints are in, open Getting started › Sample data & trial settings.",
               "Read what is Removed and what is Kept, and tick I understand the sample data cannot be brought back.",
               "Choose Remove the sample data.",
             ],
@@ -1417,13 +1417,13 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
       {
         id: "demo",
         title: "Book a one-to-one demo (free trial)",
-        where: "Getting started › See it on your own records, one to one",
+        where: "Getting started › Guides & support",
         purpose: "A session with the MDARIX team on your own trial and records.",
         tasks: [
           {
             title: "Request the demo",
             steps: [
-              "Choose Book a one-to-one demo.",
+              "Choose Open resources, then Book a one-to-one demo.",
               "Give Times that suit you, tick What should we focus on? and add anything else.",
               "Choose Request the demo.",
             ],
@@ -1434,7 +1434,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
       {
         id: "trial-end",
         title: "When the trial ends",
-        where: "Getting started › Your trial",
+        where: "Getting started › Sample data & trial settings",
         purpose: "A trial lasts 30 days. Reminders arrive 7 days and 1 day before it ends, and on the day.",
         tasks: [
           {
@@ -1448,7 +1448,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "End your trial early",
             who: "The person who started the trial.",
             steps: [
-              "On Your trial choose End my trial early.",
+              "Open Sample data & trial settings and choose End my trial early.",
               "Optionally say why, keep or untick Delete our data when the trial ends, and confirm you understand.",
               "Choose Send the request. Until the MDARIX team confirms, you can Withdraw my request.",
             ],

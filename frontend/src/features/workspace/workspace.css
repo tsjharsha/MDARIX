@@ -7968,51 +7968,87 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
   justify-self: start;
 }
 
-/* ---------------------------------------------------------------- One story, ten steps (0.10.82, round D1) */
-/* Getting started's hero (the approved mock-up's .shero): navy, one h1, one rail of ten chevrons, one step card. */
+/* ---------------------------------------------------------------- Getting started v2 (owner's specification, 5 Nov 2026) */
+/* The page title, the practice line once, and one white walkthrough card: count and progress bar, the ten steps on the
+   left, the chosen step on the right (first built as a navy hero in 0.10.82, round D1). */
+.uw-gs {
+  display: grid;
+  gap: var(--ms-space-5);
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
 .uw-os {
   display: grid;
   gap: var(--ms-space-4);
-  padding: 28px 30px 24px;
-  border-radius: var(--ms-radius);
-  background:
-    radial-gradient(1200px 400px at 85% -10%, rgba(47, 179, 173, 0.35), transparent 60%),
-    linear-gradient(150deg, var(--ms-navy) 0%, #21405c 100%);
-  color: #eaf1f7;
-  box-shadow: var(--ms-shadow-2);
-  overflow: hidden;
 }
-.uw-os .ac-eyebrow {
-  margin: 0;
-  color: #7fd6d1;
-}
-.uw-os-head {
+.uw-gs-head {
   display: grid;
-  gap: var(--ms-space-2);
+  gap: var(--ms-space-1);
 }
-.uw-os-head h1 {
+.uw-gs-head h1 {
   margin: 0;
-  max-width: 24ch;
-  color: #fff;
+  color: var(--ms-ink);
   font-size: var(--ms-fs-32);
   font-weight: 800;
   line-height: 1.15;
   letter-spacing: -0.01em;
 }
-.uw-os-head p,
-.uw-os-lead {
+.uw-gs-head p {
   margin: 0;
-  max-width: 64ch;
-  color: var(--ms-on-dark-muted);
+  color: var(--ms-ink-2);
   font-size: var(--ms-fs-16);
 }
-.uw-os-label {
+.uw-gs-head .uw-gs-practice {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.uw-wt {
+  display: grid;
+  gap: var(--ms-space-4);
+  padding: var(--ms-space-5);
+  border: 1px solid var(--ms-line);
+  border-radius: 12px;
+  background: var(--ms-surface);
+  box-shadow: var(--ms-shadow-1);
+}
+.uw-wt h2 {
+  margin: 0;
+  color: var(--ms-ink);
+  font-size: var(--ms-fs-20);
+  line-height: 1.25;
+}
+.uw-wt.is-empty p {
+  margin: 0;
+  color: var(--ms-ink-2);
+}
+.uw-wt-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--ms-space-2);
-  margin: 0 0 -6px;
-  color: var(--ms-on-dark-muted);
+  gap: var(--ms-space-2) var(--ms-space-3);
+}
+.uw-wt-count {
+  margin-left: auto;
+  color: var(--ms-ink-2);
   font-size: var(--ms-fs-14);
+  font-weight: 600;
+}
+.uw-wt-bar {
+  flex: 1 0 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-ground);
+}
+.uw-wt-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ms-teal);
+  transition: width 0.3s ease;
 }
 .ms-chip.is-sample {
   border-color: #f2c46d;
@@ -8046,108 +8082,159 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
 .uw-os-problem {
   margin: 0;
   padding: 8px 12px;
-  border-left: 3px solid #f5c76b;
-  background: rgba(245, 199, 107, 0.12);
-  color: #fbe3b0;
+  border-left: 3px solid var(--ms-warn-fill);
+  background: var(--ms-warn-bg);
+  color: var(--ms-warn);
   font-size: var(--ms-fs-14);
 }
-/* 4 Nov 2026 (owner): the ten steps as a vertical list beside the step's card, the current step highlighted. */
 .uw-os-grid {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  gap: 28px;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: var(--ms-space-5);
   align-items: start;
 }
 .uw-os-rail {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .uw-os-step {
   all: unset;
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  width: 100%;
   min-height: 44px;
-  padding: 6px 12px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
   border-radius: var(--ms-radius-md);
-  color: var(--ms-on-dark-muted);
+  color: var(--ms-ink-2);
   font-size: var(--ms-fs-14);
   font-weight: 600;
   line-height: 1.25;
   cursor: pointer;
 }
 .uw-os-step:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--ms-subtle);
 }
 .uw-os-step:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: -2px;
+  outline: 2px solid var(--ms-teal-dark);
+  outline-offset: 1px;
 }
-.uw-os-step.is-done {
-  color: #c8f0ed;
+.uw-os-t {
+  flex: 1;
+  min-width: 0;
 }
-.uw-os-step.is-now {
-  background: #2fb3ad;
-  color: #06201f;
-  font-weight: 700;
-}
-.uw-os-step.is-sel {
-  outline: 2px solid #fff;
-  outline-offset: -2px;
-}
-.uw-os-step.is-skip {
-  opacity: 0.5;
-  text-decoration: line-through;
+.uw-os-s {
+  flex: none;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: 600;
 }
 .uw-os-k {
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 999px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: var(--ms-radius-pill);
+  color: var(--ms-ink-2);
   font-size: var(--ms-fs-12);
   font-weight: 800;
 }
+.uw-os-step.is-done {
+  color: var(--ms-ink);
+}
 .uw-os-step.is-done .uw-os-k {
-  border-color: transparent;
-  background: rgba(76, 199, 193, 0.3);
+  border-color: var(--ms-good);
+  background: var(--ms-good);
+  color: var(--ms-surface);
+}
+.uw-os-step.is-done .uw-os-s {
+  color: var(--ms-good);
+}
+/* The real next step: a filled teal number and "Next". */
+.uw-os-step.is-now {
+  color: var(--ms-ink);
+  font-weight: 700;
 }
 .uw-os-step.is-now .uw-os-k {
-  border-color: transparent;
-  background: #06201f;
-  color: #fff;
+  border-color: var(--ms-teal);
+  background: var(--ms-teal);
+  color: var(--ms-surface);
 }
-.uw-os-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-  gap: 28px;
-  align-items: start;
-  padding-left: 28px;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
+.uw-os-step.is-now .uw-os-s {
+  color: var(--ms-teal-dark);
 }
-@media (max-width: 1180px) {
-  .uw-os-body {
-    grid-template-columns: minmax(0, 1fr);
-  }
+/* The step shown on the right (the next one, or one picked to preview). */
+.uw-os-step.is-sel {
+  border-color: var(--ms-mint-line);
+  background: var(--ms-mint);
+  color: var(--ms-ink);
+}
+.uw-os-step.is-skip {
+  color: var(--ms-muted);
+}
+.uw-os-step.is-skip .uw-os-t {
+  text-decoration: line-through;
+}
+.uw-os-step.is-earlier {
+  font-style: italic;
+}
+.uw-os-step.is-earlier .uw-os-k {
+  border-style: dashed;
+  border-color: var(--ms-good);
 }
 .uw-os-main {
   display: grid;
   gap: var(--ms-space-3);
   align-content: start;
+  min-width: 0;
+  padding-left: var(--ms-space-5);
+  border-left: 1px solid var(--ms-line);
 }
-.uw-os-main h2 {
+/* A previewed step's content: a dashed edge and the preview note, unlike the real next step. */
+.uw-os-main.is-preview {
+  border-left-style: dashed;
+}
+.uw-wt-label {
   margin: 0;
-  color: #fff;
+  color: var(--ms-teal-dark);
+  font-size: var(--ms-fs-12);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.uw-os-main h3 {
+  margin: 0;
+  color: var(--ms-ink);
   font-size: var(--ms-fs-24);
   line-height: 1.2;
 }
-.uw-os-main .uw-os-lead {
-  color: #eaf1f7;
+.uw-wt-lead {
+  margin: 0;
+  max-width: 64ch;
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-16);
+}
+.uw-wt-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-self: start;
+  gap: 6px 8px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px dashed var(--ms-info-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-info-bg);
+  color: var(--ms-info);
+  font-size: var(--ms-fs-14);
 }
 .uw-os-state {
   justify-self: start;
@@ -8155,115 +8242,221 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
 .uw-os-differ {
   margin: 0;
   padding: 8px 12px;
+  border: 1px solid var(--ms-line);
   border-radius: var(--ms-radius-md);
-  background: rgba(255, 255, 255, 0.08);
-  color: #eaf1f7;
+  background: var(--ms-subtle);
+  color: var(--ms-ink-2);
   font-size: var(--ms-fs-14);
 }
-.uw-os .ac-primary.uw-os-go {
-  border-color: #2fb3ad;
-  background: #2fb3ad;
-  color: #06201f;
-}
-.uw-os .ac-primary.uw-os-go:hover {
-  background: #4cc7c1;
-}
-.uw-os .ac-link {
-  color: #7fd6d1;
-}
-.uw-os-mini {
-  overflow: hidden;
-  border: 1px solid var(--ms-line);
-  border-radius: 12px;
-  background: var(--ms-surface);
-  color: var(--ms-ink);
-  box-shadow: var(--ms-shadow-2);
-}
-.uw-os-mini .ac-eyebrow {
-  color: var(--ms-teal-dark);
-}
-.uw-os-mini-bar {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 10px;
-  background: var(--ms-navy);
-  color: var(--ms-on-dark-muted);
-  font-size: var(--ms-fs-12);
-}
-.uw-os-mini-bar i {
-  display: block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
-}
-.uw-os-mini-bar span {
-  margin-left: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.uw-os-mini-body {
+.uw-wt-case {
   display: grid;
   gap: var(--ms-space-2);
-  padding: 14px;
+  padding: var(--ms-space-3) var(--ms-space-4);
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-md);
+  background: var(--ms-subtle);
+}
+.uw-wt-case-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin: 0;
+  color: var(--ms-ink);
   font-size: var(--ms-fs-14);
 }
-.uw-os-quote {
+.uw-wt-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
   margin: 0;
-  padding: 8px 12px;
-  border-left: 3px solid var(--ms-mint-line);
-  background: var(--ms-subtle);
   font-size: var(--ms-fs-14);
-  line-height: 1.5;
+}
+.uw-wt-facts > div {
+  display: flex;
+  gap: 6px;
+}
+.uw-wt-facts dt {
+  color: var(--ms-muted);
+}
+.uw-wt-facts dt::after {
+  content: ":";
+}
+.uw-wt-facts dd {
+  margin: 0;
+  color: var(--ms-ink);
+  font-weight: 600;
 }
 .uw-os-tags {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  margin: 0;
   color: var(--ms-muted);
   font-size: var(--ms-fs-12);
 }
-.uw-os-lines,
-.uw-os-path {
-  display: grid;
-  gap: 6px;
+.uw-wt-hint {
   margin: 0;
-  padding: 0;
-  list-style: none;
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-14);
 }
-.uw-os-lines li::before {
-  content: "· ";
+.uw-os .ca-action-row {
+  margin: 0;
+}
+/* Explore at your own pace: three compact cards in a row. */
+.uw-gs-explore {
+  display: grid;
+  gap: var(--ms-space-3);
+}
+.uw-gs-explore > h2 {
+  margin: 0;
+  color: var(--ms-ink);
+  font-size: var(--ms-fs-20);
+}
+.uw-gs-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ms-space-4);
+  align-items: start;
+}
+.uw-gs-card {
+  display: grid;
+  gap: var(--ms-space-2);
+  align-content: start;
+  justify-items: start;
+  padding: var(--ms-space-4) var(--ms-space-5);
+  border: 1px solid var(--ms-line);
+  border-radius: 12px;
+  background: var(--ms-surface);
+  box-shadow: var(--ms-shadow-1);
+}
+.uw-gs-card > svg {
   color: var(--ms-teal);
-  font-weight: 800;
 }
-.uw-os-path li {
+.uw-gs-card h3 {
+  margin: 0;
+  color: var(--ms-ink);
+  font-size: var(--ms-fs-16);
+}
+.uw-gs-card p {
+  margin: 0 0 var(--ms-space-1);
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-14);
+}
+.uw-gs-resources {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  margin: var(--ms-space-1) 0 0;
+  padding: var(--ms-space-2) 0 0;
+  border-top: 1px solid var(--ms-line);
+  list-style: none;
+  font-size: var(--ms-fs-14);
+}
+.uw-gs-resources a,
+.uw-gs-resources .ac-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  color: var(--ms-teal-dark);
+  font-weight: 600;
+}
+.uw-gs-demo {
+  padding-top: var(--ms-space-1);
+}
+/* Sample data & trial settings: one collapsed section at the foot of the page. */
+.uw-gs-settings {
+  border: 1px solid var(--ms-line);
+  border-radius: 12px;
+  background: var(--ms-surface);
+}
+.uw-gs-settings > summary {
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: var(--ms-muted);
-}
-.uw-os-path li.is-done {
-  color: var(--ms-good);
-}
-.uw-os-path li.is-now {
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 var(--ms-space-5);
   color: var(--ms-ink);
   font-weight: 700;
+  cursor: pointer;
 }
-.uw-os-outcome {
-  justify-self: start;
-  padding: 8px 12px;
-  border: 1px solid var(--ms-line);
-  border-radius: var(--ms-radius-md);
-  background: var(--ms-subtle);
-  font-weight: 700;
+.uw-gs-settings > summary:focus-visible {
+  border-radius: 12px;
+  outline: 2px solid var(--ms-teal-dark);
+  outline-offset: 2px;
 }
-.uw-os-outcome.is-signed {
-  border-color: var(--ms-teal);
-  background: var(--ms-mint);
-  color: var(--ms-teal-dark);
+.uw-gs-settings-body {
+  display: grid;
+  gap: var(--ms-space-4);
+  padding: 0 var(--ms-space-5) var(--ms-space-5);
+}
+.uw-gs-settings-body > .ac-muted {
+  margin: 0;
+}
+.uw-gs-more-head p {
+  margin: 0;
+  color: var(--ms-ink-2);
+}
+@media (max-width: 960px) {
+  .uw-gs-cards,
+  .uw-os-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .uw-os-main {
+    padding: var(--ms-space-4) 0 0;
+    border-top: 1px solid var(--ms-line);
+    border-left: 0;
+  }
+  .uw-os-main.is-preview {
+    border-top-style: dashed;
+  }
+}
+@media (max-width: 600px) {
+  .uw-gs-head h1 {
+    font-size: var(--ms-fs-24);
+  }
+  .uw-wt {
+    padding: var(--ms-space-4);
+  }
+  .uw-wt-count {
+    margin-left: 0;
+  }
+  /* The ten steps in two compact columns; the next step keeps its "Next", the others their icon and a hidden word. */
+  .uw-os-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .uw-os-step {
+    gap: 8px;
+    padding: 6px 8px;
+    font-size: var(--ms-fs-12);
+  }
+  .uw-os-step:not(.is-now) .uw-os-s {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .uw-os-main h3 {
+    font-size: var(--ms-fs-20);
+  }
+  .uw-os .ac-primary.uw-os-go {
+    justify-content: center;
+    width: 100%;
+  }
+  .uw-gs-card,
+  .uw-gs-settings > summary,
+  .uw-gs-settings-body {
+    padding-right: var(--ms-space-4);
+    padding-left: var(--ms-space-4);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .uw-wt-bar > span {
+    transition: none;
+  }
 }
 .uw-os-trend {
   display: grid;
@@ -8324,36 +8517,6 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
 }
 .uw-story-pill .ac-link {
   padding: 2px 8px;
-}
-@media (max-width: 720px) {
-  .uw-os {
-    padding: 22px 18px 18px;
-  }
-  .uw-os-head h1 {
-    font-size: var(--ms-fs-24);
-  }
-  .uw-os-head p {
-    display: none;
-  }
-  .uw-os-body {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--ms-space-4);
-  }
-  .uw-os-main h2 {
-    font-size: var(--ms-fs-20);
-  }
-  .uw-os .ac-primary.uw-os-go {
-    justify-content: center;
-    width: 100%;
-  }
-  .uw-os-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--ms-space-4);
-  }
-  .uw-os-body {
-    padding-left: 0;
-    border-left: 0;
-  }
 }
 /* The record's one progress indicator (0.10.82, D1.5): a status line, "Stage 2 of 6 · Triage › Market assessment › …". */
 .uw-topline {
@@ -8612,43 +8775,10 @@ details.uw-team-change[open] {
   }
 }
 
-/* 0.10.85: the story's step done earlier by the team (not ticked until the steps before it are), a tab the persona
-   does not list while its screen is open, and "More ways to explore" as one compact card (the approved design). */
-.uw-os-step.is-earlier {
-  background: rgba(76, 199, 193, 0.1);
-  color: #c8f0ed;
-  font-style: italic;
-}
+/* 0.10.85: a tab the persona does not list while its screen is open (the approved design). */
 .uw-tab.is-extra {
   border-bottom-style: dashed;
   font-style: italic;
-}
-.uw-os-parts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--ms-space-3);
-  margin-top: var(--ms-space-3);
-}
-.uw-os-part {
-  display: grid;
-  gap: 4px;
-  min-height: 44px;
-  padding: var(--ms-space-3) var(--ms-space-4);
-  border: 1px solid var(--ms-line);
-  border-radius: var(--ms-radius-md);
-  background: var(--ms-surface);
-  color: var(--ms-ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.uw-os-part:hover,
-.uw-os-part:focus-visible {
-  border-color: var(--ms-teal);
-}
-.uw-os-part span {
-  color: var(--ms-ink-2);
-  font-size: var(--ms-fs-14);
 }
 .uw-gs-more-head {
   display: grid;

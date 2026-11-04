@@ -45,7 +45,7 @@ describe("the entrance", () => {
     ]);
     const html = renderToStaticMarkup(
       <WorkspaceContext.Provider value={api()}>
-        <Entrance onRestarted={() => undefined} />
+        <Entrance />
       </WorkspaceContext.Provider>,
     );
     expect(html).toContain("A hospital sent a monitor for service. Should Quality review this too?");
@@ -53,9 +53,10 @@ describe("the entrance", () => {
     expect(html).toContain("Review this sample event");
     expect(html).toContain("Fictional manufacturer · Sample data only");
     expect(html).toContain("Sample event · SAMPLE-RV-11 · 4 steps");
-    // The event comes first, then More stories, then More (with the restart).
+    // The event comes first, then More stories. The restart is only under Getting started's sample data and trial
+    // settings (0.10.87).
     expect(html.indexOf("Review this sample event")).toBeLessThan(html.indexOf("More stories"));
-    expect(html.indexOf("More stories")).toBeLessThan(html.indexOf("<summary>Restart the sample story</summary>"));
+    expect(html).not.toContain("Restart the sample story");
     // 0.10.71 (A2): your own export is under Help › Try your own data, not a tile.
     expect(html).not.toContain("Upload your export");
     // No time claims; step counts only. The readiness numbers are on the manager's My work.
