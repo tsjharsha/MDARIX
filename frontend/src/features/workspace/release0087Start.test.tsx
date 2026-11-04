@@ -5,11 +5,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoryView, harmText, pickOn, pickView, practiceLine, summaryOf } from "./sections/OneStory";
 import { GettingStartedSection } from "./sections/GettingStarted";
-import { ExploreCards, GuideLinks, TrialSettings } from "./sections/GettingStartedMore";
+import { ExploreCards, TrialSettings } from "./sections/GettingStartedMore";
 import { openStep, type StoryRun } from "./oneStory";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 import { SAMPLE_REMOVAL_PATH } from "./sections/RemoveSample";
+import complaintPage from "./sections/ComplaintPage.tsx?raw";
 
 const reads = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("../customer-admin/shared", async (original) => ({
@@ -268,13 +269,13 @@ describe("loading, failure, refusal and a removed sample", () => {
 });
 
 describe("explore at your own pace", () => {
-  const cards = (owner: boolean) =>
+  const cards = (owner: boolean, teamTab = false) =>
     render(
       <ExploreCards
         owner={owner}
+        teamTab={teamTab}
         onTeam={vi.fn()}
         onWorkflows={vi.fn()}
-        onFeedback={vi.fn()}
         onNextSteps={vi.fn()}
         chapters={[]}
       />,
@@ -290,27 +291,25 @@ describe("explore at your own pace", () => {
     expect(colleague).not.toContain("Manage team");
     expect(colleague).toContain("View team");
     expect(colleague).toContain("The trial owner invites and manages colleagues.");
-    // No card is a main button, and the resources show only when asked for.
+    // No card is a main button.
     expect(owner).not.toContain("ac-primary");
     expect(owner).toContain("Choose a focus");
-    expect(owner).toMatch(/aria-expanded="false"[^>]*>Open resources/);
-    expect(owner).not.toContain("Free trial user guide");
   });
 
-  it("groups the guides, support, feedback, the pilot page and the demo as quiet links", () => {
-    const html = render(
-      <GuideLinks support="help@mdarix.test" onFeedback={vi.fn()} onNextSteps={vi.fn()} chapters={[]} />,
-    );
-    for (const text of [
-      'href="/help/trial-guide"',
-      'href="/help/user-guide?navigation=new"',
-      'href="mailto:help@mdarix.test"',
-      "Share feedback",
-      "Next steps: from trial to pilot",
-      "Book a one-to-one demo",
-    ])
-      expect(html).toContain(text);
-    expect(html).not.toContain("ac-primary");
+  it("leaves out the team card for a persona whose tabs hold Team (duplication review, row 6)", () => {
+    const html = cards(true, true);
+    expect(count(html, 'class="uw-gs-card"')).toBe(2);
+    expect(html).not.toContain("Invite your team");
+    expect(html).toContain("uw-gs-cards is-two");
+  });
+
+  it("offers only the demo and the way to a pilot; the guides, support and feedback are in Help (row 5)", () => {
+    const html = cards(true);
+    expect(html).toContain("Plan your next steps</h3>");
+    expect(html).toContain("Book a one-to-one demo");
+    expect(html).toContain("Next steps: from trial to pilot");
+    for (const text of ["Free trial user guide", "Step-by-step user guide", "Help and support", "Share feedback"])
+      expect(html).not.toContain(text);
   });
 
   it("keeps the library of other workflows one click away, with the chapters and the audit focus", () => {
@@ -334,6 +333,10 @@ describe("explore at your own pace", () => {
     };
     const html = render(<GettingStartedSection focus="Other workflows" />);
     expect(html).toContain("Explore other workflows</h1>");
+    // One prompt for feedback (the page's banner and Help), and "Workflows to try", not a second count of ten (rows 10, 14).
+    expect(html).toContain("Workflows to try");
+    expect(html).not.toContain("Ten chapters");
+    expect(html).not.toContain("How useful is MDARIX so far?");
     expect(html).toContain("Routine complaints");
     expect(html).toContain("Close a routine complaint");
     // Restarting and removing the sample are not here: only in Getting started's collapsed settings.
@@ -387,5 +390,11 @@ describe("one collapsed section holds the sample and trial controls", () => {
     );
     expect(html).toContain("Only the person who started the trial can restart or remove the sample data.");
     expect(html).not.toContain(">Restart the sample story<");
+  });
+});
+
+describe("one step count on the story's complaint (duplication review, row 12)", () => {
+  it("leaves the walkthrough's pill out while a short story's bar counts the steps", () => {
+    expect(complaintPage).toContain("{storyRun && !story && <StoryPill run={storyRun} />}");
   });
 });

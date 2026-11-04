@@ -5472,9 +5472,10 @@ div.uw-task-count:hover {
   gap: var(--ms-space-4);
   margin: 0 0 var(--ms-space-5);
 }
-.uw-entrance header h2 {
+.uw-entrance header h2,
+.uw-entrance > h2 {
   margin: 0;
-  font-size: var(--ms-fs-24);
+  font-size: var(--ms-fs-20);
 }
 .uw-entrance header p {
   margin: var(--ms-space-1) 0 0;
@@ -8343,26 +8344,14 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
   color: var(--ms-ink-2);
   font-size: var(--ms-fs-14);
 }
-.uw-gs-resources {
-  display: grid;
-  gap: 2px;
-  width: 100%;
-  margin: var(--ms-space-1) 0 0;
-  padding: var(--ms-space-2) 0 0;
-  border-top: 1px solid var(--ms-line);
-  list-style: none;
-  font-size: var(--ms-fs-14);
+.uw-gs-cards.is-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.uw-gs-resources a,
-.uw-gs-resources .ac-link {
-  display: inline-flex;
+.uw-gs-card-actions {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  min-height: 36px;
-  color: var(--ms-teal-dark);
-  font-weight: 600;
-}
-.uw-gs-demo {
-  padding-top: var(--ms-space-1);
+  gap: var(--ms-space-2) var(--ms-space-3);
 }
 /* Sample data & trial settings: one collapsed section at the foot of the page. */
 .uw-gs-settings {
@@ -8399,6 +8388,7 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
 }
 @media (max-width: 960px) {
   .uw-gs-cards,
+  .uw-gs-cards.is-two,
   .uw-os-grid {
     grid-template-columns: minmax(0, 1fr);
   }

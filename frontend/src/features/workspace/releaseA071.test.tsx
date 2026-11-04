@@ -49,19 +49,21 @@ describe("A2: a sample-only trial cannot upload", () => {
     expect(sectionAllowed("Complaints", MENU, ["records.write"], true)).toBe(true);
   });
 
-  it("offers Discuss a pilot in Help instead of your own data", () => {
-    const normal = render(<HelpMenu onGettingStarted={() => undefined} defaultOpen />, api());
-    expect(normal).toContain("Try your own data");
+  it("offers Discuss a pilot in Help instead of your own data on the classic navigation", () => {
+    const classic = { navigation: "classic" };
+    const normal = render(<HelpMenu onGettingStarted={() => undefined} defaultOpen />, api(classic));
+    expect(normal).toContain("Getting started and import templates");
     expect(normal).not.toContain("Discuss a pilot");
-    const sample = render(<HelpMenu onGettingStarted={() => undefined} defaultOpen />, api({}, { sample_only: true }));
+    const sample = render(
+      <HelpMenu onGettingStarted={() => undefined} defaultOpen />,
+      api(classic, { sample_only: true }),
+    );
     expect(sample).toContain("Discuss a pilot");
     expect(sample).toContain("This evaluation uses the sample only");
-    expect(sample).not.toContain("Try your own data");
     expect(sample).not.toContain("import templates");
-    // Classic keeps its wording.
-    expect(
-      render(<HelpMenu onGettingStarted={() => undefined} defaultOpen />, api({ navigation: "classic" })),
-    ).toContain("Getting started and import templates");
+    // 0.10.87: the new navigation's Help offers neither; the top bar and the Next steps tab do.
+    const fresh = render(<HelpMenu onGettingStarted={() => undefined} defaultOpen />, api({}, { sample_only: true }));
+    expect(fresh).not.toContain("Discuss a pilot");
   });
 
   it("offers the upload on the Complaints header in a trial (0.10.79) and a pilot, never in a sample-only trial", () => {

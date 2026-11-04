@@ -98,7 +98,7 @@ export function GettingStartedSection({
   focus,
   heading,
 }: { focus?: string; heading?: RefObject<HTMLHeadingElement | null> } = {}) {
-  const { open, work, session, notify, navigation, refreshTrial } = useWorkspace();
+  const { open, work, session, notify, navigation, refreshTrial, personaTabs } = useWorkspace();
   const status = useResource<TrialStatus>("/api/v1/trial/status");
   // Right after an import its signals are still being found: the story is read again until they are. A reload that
   // fails for a moment (the server busy with the import's follow-up work) is asked again, so the page never stays on
@@ -540,7 +540,8 @@ export function GettingStartedSection({
         </div>
         <CitedFor onSaved={story.reload} />
         {hasSample && <Entrance />}
-        <Panel title="Ten chapters" eyebrow={chapterCount} source={story}>
+        {/* "Workflows to try" (0.10.87): "ten chapters" beside the ten-step walkthrough read as one more count. */}
+        <Panel title="Workflows to try" eyebrow={chapterCount} source={story}>
           <p className="uw-trial-lede">
             Each chapter is one problem inspectors cite. It counts as tried when you act in it: decide, record, run or
             sign.
@@ -557,16 +558,8 @@ export function GettingStartedSection({
               </>
             )}
           </p>
+          {/* Feedback is asked by its own prompt and in Help (0.10.87): no second rating here. */}
           {chapterList}
-          {quickRatingShown({ acted, feedbackLoaded: feedback.state === "ready", feedbackSent, ratedNow }) && (
-            <QuickRating
-              onSent={() => {
-                setRatedNow(true);
-                feedback.reload();
-              }}
-              onMore={() => open("Share feedback")}
-            />
-          )}
         </Panel>
       </div>
     );
@@ -575,9 +568,9 @@ export function GettingStartedSection({
       <OneStory heading={heading} />
       <ExploreCards
         owner={!!trial?.is_owner}
+        teamTab={!!personaTabs?.includes("team")}
         onTeam={() => open("Team")}
         onWorkflows={() => open("Getting started", OTHER_WORKFLOWS)}
-        onFeedback={() => open("Share feedback")}
         onNextSteps={() => open("Next steps")}
         chapters={chapters}
         onDemoBooked={demo.reload}

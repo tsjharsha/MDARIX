@@ -243,7 +243,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
         <span className="uw-topline-end">
           {/* The organization's time zone, named once for the page (0.10.85, D3.6). */}
           <span className="ac-page-zone">Times in {zoneName()}</span>
-          {storyRun && <StoryPill run={storyRun} />}
+          {/* While a short story runs, its bar counts the steps: the walkthrough's pill would be a second count. */}
+          {storyRun && !story && <StoryPill run={storyRun} />}
         </span>
       </div>
       <header className="uw-card uw-highlights" aria-label="The complaint at a glance">

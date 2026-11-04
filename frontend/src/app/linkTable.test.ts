@@ -288,7 +288,7 @@ describe("every link source resolves to an existing screen (6.10)", () => {
     // Users › Invite").
     const elsewhere = ["Help", "Users", "Security"];
     const PANELS: Record<string, string[]> = {
-      "Getting started": ["Guides & support", "Sample data & trial settings"],
+      "Getting started": ["Plan your next steps", "Sample data & trial settings"],
     };
     let checked = 0;
     for (const match of text.matchAll(/([A-Z][A-Za-z]*(?: [A-Za-z&]+)?) › /g)) {

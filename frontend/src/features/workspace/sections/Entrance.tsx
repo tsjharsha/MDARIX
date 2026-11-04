@@ -5,7 +5,6 @@ import {
   FLAGSHIP,
   MORE_STORIES,
   SCENARIOS,
-  SHORT,
   markEntranceSeen,
   onStoryRecord,
   storyStep,
@@ -15,7 +14,7 @@ import {
 import { useResource } from "../../customer-admin/shared";
 import { eventPath, type EventView } from "../oversight";
 import { dispositionPath } from "../disposition";
-import { ResumeShortStory, useShortStory } from "./ShortStory";
+import { useShortStory } from "./ShortStory";
 import { stepText } from "../shortStory";
 
 const ICONS: Partial<Record<Scenario["key"], typeof Inbox>> = {
@@ -25,50 +24,22 @@ const ICONS: Partial<Record<Scenario["key"], typeof Inbox>> = {
 };
 
 /**
- * The entrance (stage 8, 8.4; 0.10.71, A3): one event first, the short story on SAMPLE-RV-11, in the reporter's own
- * words as the sample records them; the other stories under "More stories". Restarting the sample is on Getting started,
- * under "Sample data & trial settings" (0.10.87).
- * Step counts only, no time claims. The inspection-readiness numbers are on the manager's My work, not here. The ten
- * chapters follow under "Explore all capabilities" (GettingStarted.tsx). Seeing it once makes My work the start
- * screen next time.
+ * The short stories (stage 8, 8.4; 0.10.71, A3), on Getting started › Other workflows: each starts on its own sample
+ * record with its step count, no time claims. The four-step short story on SAMPLE-RV-11 is retired on the new
+ * navigation (0.10.87): the ten-step walkthrough follows that complaint. Restarting the sample is on Getting started,
+ * under "Sample data & trial settings". Seeing it once makes My work the start screen next time.
  */
 export function Entrance() {
   const { open, startStory } = useWorkspace();
   useEffect(markEntranceSeen, []);
-  const event = useResource<EventView>(eventPath(FLAGSHIP));
   const start = (scenario: Scenario) => {
     startStory?.(scenario.key);
     open(scenario.start.section as WorkspaceSection, scenario.start.tab);
   };
-  const words = event.data?.event.description;
   return (
     <section className="uw-entrance" aria-labelledby="entrance-title">
-      {/* Unfinished short-story work comes first (0.10.71, A3). */}
-      <ResumeShortStory />
-      {event.state === "error" ? (
-        <header>
-          <h2 id="entrance-title">Your trial</h2>
-          <p className="ac-muted">The sample event is not in this workspace. Explore all capabilities below.</p>
-        </header>
-      ) : (
-        <article className="uw-entrance-event" aria-describedby="entrance-words">
-          <p className="ac-eyebrow">
-            Sample event · {FLAGSHIP} · {SHORT.steps.length} steps
-          </p>
-          <h2 id="entrance-title">{SHORT.title}</h2>
-          <blockquote id="entrance-words" className="uw-entrance-words">
-            {words ? `“${words}”` : "Reading the sample event…"}
-          </blockquote>
-          <div className="ca-action-row">
-            <button type="button" className="ac-primary" onClick={() => start(SHORT)} disabled={!words}>
-              Review this sample event <ChevronRight size={15} aria-hidden="true" />
-            </button>
-          </div>
-          <p className="uw-entrance-tag">Fictional manufacturer · Sample data only</p>
-        </article>
-      )}
-      <details className="uw-entrance-more">
-        <summary>More stories</summary>
+      <h2 id="entrance-title">Short stories</h2>
+      <div>
         <ul className="uw-entrance-tiles">
           {MORE_STORIES.map((scenario) => {
             const Icon = ICONS[scenario.key] ?? Inbox;
@@ -89,7 +60,7 @@ export function Entrance() {
             );
           })}
         </ul>
-      </details>
+      </div>
     </section>
   );
 }

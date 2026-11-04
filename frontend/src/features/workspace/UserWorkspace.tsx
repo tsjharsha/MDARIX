@@ -114,7 +114,7 @@ import {
 } from "./HybridShell";
 import { ImportYourDataSection } from "./sections/YourData";
 import { StoryBar } from "./sections/Entrance";
-import { savedStory, saveStory } from "./entrance";
+import { liveStory, savedStory, saveStory } from "./entrance";
 import { carryOverColumnChoices, columnScopeFor } from "../tables/columnViews";
 import {
   addressFor,
@@ -436,7 +436,9 @@ export function UserWorkspace({
   });
   const [menuOpen, setMenuOpen] = useState(false);
   // The story under way (stage 8, entrance.ts), kept for this browser tab.
-  const [story, setStory] = useState<string | null>(() => (fresh ? savedStory() : null));
+  // The four-step short story on SAMPLE-RV-11 is retired on the new navigation (0.10.87): the ten-step walkthrough
+  // follows the same complaint, so a story saved before then is not resumed.
+  const [story, setStory] = useState<string | null>(() => (fresh ? liveStory(savedStory()) : null));
   const startStory = useCallback((key: string | null) => {
     saveStory(key as Parameters<typeof saveStory>[0]);
     setStory(key);

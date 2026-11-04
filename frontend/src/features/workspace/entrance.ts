@@ -136,6 +136,8 @@ export const SCENARIOS: readonly Scenario[] = [
 
 /** The stories under "More stories" (every one but the short story the entrance leads with). */
 export const MORE_STORIES = SCENARIOS.filter((item) => item.key !== "short");
+/** A saved story that still runs: never the retired short story (0.10.87). */
+export const liveStory = (key: string | null) => (key === "short" ? null : key);
 
 /** The step of a story the place on screen is (the last that fits), or -1 when the place is off the story's path. */
 export function storyStep(scenario: Scenario, place: { section: string; tab?: string }): number {

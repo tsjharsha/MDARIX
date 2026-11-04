@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { BookOpen, ChevronRight, Compass, Settings2, ShieldCheck, Upload, Users } from "lucide-react";
+import { ChevronRight, Compass, Settings2, ShieldCheck, Signpost, Upload, Users } from "lucide-react";
 import { Panel, StatTile } from "../../admin/console/charts";
-import { useSiteInfo } from "../../../site/legal";
-import { TRIAL_GUIDE_PATH, USER_GUIDE_PATH } from "../../help/paths";
 import { NEXT_STEPS_LINK } from "../../help/trialNextSteps";
 import { formatDay } from "../../../app/dates";
 import { BookDemo } from "./BookDemo";
@@ -18,46 +16,48 @@ export const OTHER_WORKFLOWS = "Other workflows";
 export const TRIAL_SETTINGS_ID = "trial-settings";
 
 /**
- * "Explore at your own pace" (owner's specification, 5 Nov 2026): three compact cards under the walkthrough. A, the
- * team (inviting is the trial owner's; anyone else sees who is on it); B, the library of other workflows; C, the
- * guides, support, feedback, the demo and the trial-to-pilot page, shown when asked for, none of them a main button.
+ * "Explore at your own pace" (owner's specification, 5 Nov 2026; trimmed by the owner-approved duplication review,
+ * 0.10.87): compact cards under the walkthrough, none of them a main button. The team, only for a persona whose tabs
+ * do not hold Team (inviting is the trial owner's; anyone else sees who is on it); the library of other workflows;
+ * and the next steps: the one-to-one demo and the way from trial to pilot. The guides, support and feedback are in
+ * Help, on every page.
  */
 export function ExploreCards({
   owner,
+  teamTab,
   onTeam,
   onWorkflows,
-  onFeedback,
   onNextSteps,
   chapters,
   onDemoBooked,
 }: {
   owner: boolean;
+  /** The persona's tab bar already holds Team. */
+  teamTab: boolean;
   onTeam: () => void;
   onWorkflows: () => void;
-  onFeedback: () => void;
   onNextSteps: () => void;
   chapters: readonly StoryChapter[];
   onDemoBooked?: () => void;
 }) {
-  const [resources, setResources] = useState(false);
-  const info = useSiteInfo();
-  const support = info?.support_email;
   return (
     <section className="uw-gs-explore" aria-labelledby="gs-explore-title">
       <h2 id="gs-explore-title">Explore at your own pace</h2>
-      <div className="uw-gs-cards">
-        <article className="uw-gs-card">
-          <Users size={20} aria-hidden="true" />
-          <h3>Invite your team</h3>
-          <p>
-            {owner
-              ? "Try review and approval with colleagues."
-              : "See who is on your trial. The trial owner invites and manages colleagues."}
-          </p>
-          <button type="button" className="ac-secondary" onClick={onTeam}>
-            {owner ? "Manage team" : "View team"} <ChevronRight size={15} aria-hidden="true" />
-          </button>
-        </article>
+      <div className={`uw-gs-cards${teamTab ? " is-two" : ""}`}>
+        {!teamTab && (
+          <article className="uw-gs-card">
+            <Users size={20} aria-hidden="true" />
+            <h3>Invite your team</h3>
+            <p>
+              {owner
+                ? "Try review and approval with colleagues."
+                : "See who is on your trial. The trial owner invites and manages colleagues."}
+            </p>
+            <button type="button" className="ac-secondary" onClick={onTeam}>
+              {owner ? "Manage team" : "View team"} <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          </article>
+        )}
         <article className="uw-gs-card">
           <Compass size={20} aria-hidden="true" />
           <h3>Explore other workflows</h3>
@@ -67,79 +67,18 @@ export function ExploreCards({
           </button>
         </article>
         <article className="uw-gs-card">
-          <BookOpen size={20} aria-hidden="true" />
-          <h3>Guides &amp; support</h3>
-          <p>Get help or plan your next steps.</p>
-          <button
-            type="button"
-            className="ac-secondary"
-            aria-expanded={resources}
-            aria-controls={resources ? "gs-resources" : undefined}
-            onClick={() => setResources((value) => !value)}
-          >
-            {resources ? "Hide resources" : "Open resources"}
-          </button>
-          {resources && (
-            <GuideLinks
-              support={support}
-              onFeedback={onFeedback}
-              onNextSteps={onNextSteps}
-              chapters={chapters}
-              onDemoBooked={onDemoBooked}
-            />
-          )}
+          <Signpost size={20} aria-hidden="true" />
+          <h3>Plan your next steps</h3>
+          <p>A one-to-one demo on your records, or how a pilot starts.</p>
+          <div className="uw-gs-card-actions">
+            <BookDemo chapters={chapters} onBooked={onDemoBooked} />
+            <button type="button" className="ac-link" onClick={onNextSteps}>
+              {NEXT_STEPS_LINK}
+            </button>
+          </div>
         </article>
       </div>
     </section>
-  );
-}
-
-/** Card C's destinations, as quiet links (exported for its test): the guides, support, feedback, the trial-to-pilot
- * page and the one-to-one demo (its own form, as before). */
-export function GuideLinks({
-  support,
-  onFeedback,
-  onNextSteps,
-  chapters,
-  onDemoBooked,
-}: {
-  support?: string | null;
-  onFeedback: () => void;
-  onNextSteps: () => void;
-  chapters: readonly StoryChapter[];
-  onDemoBooked?: () => void;
-}) {
-  return (
-    <ul id="gs-resources" className="uw-gs-resources">
-      <li>
-        <a href={TRIAL_GUIDE_PATH} target="_blank" rel="noopener">
-          Free trial user guide
-        </a>
-      </li>
-      <li>
-        <a href={`${USER_GUIDE_PATH}?navigation=new`} target="_blank" rel="noopener">
-          Step-by-step user guide
-        </a>
-      </li>
-      <li>
-        <a href={support ? `mailto:${support}` : "/contact"} target={support ? undefined : "_blank"} rel="noopener">
-          Help and support{support ? ` (${support})` : ""}
-        </a>
-      </li>
-      <li>
-        <button type="button" className="ac-link" onClick={onFeedback}>
-          Share feedback
-        </button>
-      </li>
-      <li>
-        <button type="button" className="ac-link" onClick={onNextSteps}>
-          {NEXT_STEPS_LINK}
-        </button>
-      </li>
-      <li className="uw-gs-demo">
-        <BookDemo chapters={chapters} onBooked={onDemoBooked} />
-      </li>
-    </ul>
   );
 }
 

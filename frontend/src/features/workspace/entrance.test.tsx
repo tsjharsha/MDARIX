@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { NEW_PLACES, routeFor, tabParts } from "../../app/linkTable";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
-import { FLAGSHIP, SCENARIOS, storyStep } from "./entrance";
+import { FLAGSHIP, SCENARIOS, liveStory, storyStep } from "./entrance";
 import { Entrance, StoryBar } from "./sections/Entrance";
 
 // Quality plan stage 8 (8.4): the five-minute entrance and its story bar.
@@ -36,7 +36,7 @@ const api = (story: string | null = null) =>
   }) as unknown as WorkspaceApi;
 
 describe("the entrance", () => {
-  it("leads with one sample event in the reporter's words; the other stories and the restart under More", () => {
+  it("offers the short stories, without the retired four-step story on the walkthrough's complaint", () => {
     expect(SCENARIOS.map((item) => item.title)).toEqual([
       "A hospital sent a monitor for service. Should Quality review this too?",
       "A complaint just arrived: what now?",
@@ -48,16 +48,17 @@ describe("the entrance", () => {
         <Entrance />
       </WorkspaceContext.Provider>,
     );
-    expect(html).toContain("A hospital sent a monitor for service. Should Quality review this too?");
-    expect(html).toContain("its SpO2 read 4 to 6 points high on two patients. No harm was reported.");
-    expect(html).toContain("Review this sample event");
-    expect(html).toContain("Fictional manufacturer · Sample data only");
-    expect(html).toContain("Sample event · SAMPLE-RV-11 · 4 steps");
-    // The event comes first, then More stories. The restart is only under Getting started's sample data and trial
-    // settings (0.10.87).
-    expect(html.indexOf("Review this sample event")).toBeLessThan(html.indexOf("More stories"));
+    // 0.10.87: the four-step story on SAMPLE-RV-11 is retired on the new navigation (the walkthrough follows it).
+    expect(html).not.toContain("A hospital sent a monitor for service. Should Quality review this too?");
+    expect(html).not.toContain("Review this sample event");
+    expect(html).not.toContain("Sample event · SAMPLE-RV-11 · 4 steps");
+    expect(liveStory("short")).toBeNull();
+    expect(liveStory("rising")).toBe("rising");
+    expect(html).toContain("Short stories</h2>");
+    expect(html).toContain("A complaint just arrived: what now?");
+    // The restart is only under Getting started's sample data and trial settings (0.10.87).
     expect(html).not.toContain("Restart the sample story");
-    // 0.10.71 (A2): your own export is under Help › Try your own data, not a tile.
+    // 0.10.71 (A2): your own export is not a tile.
     expect(html).not.toContain("Upload your export");
     // No time claims; step counts only. The readiness numbers are on the manager's My work.
     expect(html).not.toMatch(/minute/i);

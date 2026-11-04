@@ -1417,13 +1417,13 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
       {
         id: "demo",
         title: "Book a one-to-one demo (free trial)",
-        where: "Getting started › Guides & support",
+        where: "Getting started › Plan your next steps",
         purpose: "A session with the MDARIX team on your own trial and records.",
         tasks: [
           {
             title: "Request the demo",
             steps: [
-              "Choose Open resources, then Book a one-to-one demo.",
+              "Choose Book a one-to-one demo.",
               "Give Times that suit you, tick What should we focus on? and add anything else.",
               "Choose Request the demo.",
             ],
