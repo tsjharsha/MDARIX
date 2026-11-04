@@ -246,3 +246,18 @@ describe("Records, Import your data, Settings and Account (rows 42, 48, 53)", ()
     expect(account).not.toContain('eyebrow="My account"');
   });
 });
+
+// Read as a file: the test run does not load stylesheets (as releaseD3085.test.tsx does).
+const fs = await import(/* @vite-ignore */ ["node", "fs"].join(":"));
+const sheet: string = fs.readFileSync(new URL("./workspace.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+
+describe("layout: a long next step wraps inside its card (0.10.87)", () => {
+  it("lets the complaint's Next step button wrap, at a 44 px touch height", () => {
+    const rule = sheet.slice(sheet.indexOf(".uw-cp-next .ac-primary,\n.uw-cp-next .ac-secondary {"));
+    const body = rule.slice(0, rule.indexOf("}"));
+    expect(body).toContain("white-space: normal;");
+    expect(body).toContain("min-height: 44px;");
+    expect(body).toContain("max-width: 100%;");
+    expect(sheet).toContain(".uw-cp-next {\n  min-width: 0;\n}");
+  });
+});

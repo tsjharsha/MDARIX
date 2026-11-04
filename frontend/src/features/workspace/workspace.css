@@ -7633,6 +7633,23 @@ button.uw-org:hover {
 .uw-cp-next p {
   margin: 0;
 }
+/* A long next step wraps inside its card, never past it (0.10.87); the button keeps a 44 px touch height. */
+.uw-cp-next {
+  min-width: 0;
+}
+.uw-cp-next b {
+  overflow-wrap: anywhere;
+}
+.uw-cp-next .ac-primary,
+.uw-cp-next .ac-secondary {
+  max-width: 100%;
+  height: auto;
+  min-height: 44px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  white-space: normal;
+  text-align: left;
+}
 .uw-cp-fold > summary {
   display: list-item;
   min-height: 44px;
