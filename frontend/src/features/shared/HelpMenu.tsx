@@ -15,12 +15,10 @@ import { useSiteInfo } from "../../site/legal";
 import { ReportProblemDialog } from "./ReportProblem";
 import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
 import { NEXT_STEPS_HELP, NEXT_STEPS_LINK } from "../help/trialNextSteps";
-import { WorkspaceContext, canImportOwnData } from "../workspace/workspaceContext";
+import { WorkspaceContext } from "../workspace/workspaceContext";
 import { USER_GUIDE_PATH } from "../help/userGuide";
 import { BUILT_VERSION } from "./appVersion";
 
-/** Where a trial uploads its own export (0.10.71: not on the entrance or the Complaints header). */
-export const TRY_OWN_DATA = "Try your own data";
 /** What a sample-only trial offers instead of an upload: Next steps, from trial to pilot. */
 export const DISCUSS_PILOT = "Discuss a pilot";
 
@@ -54,12 +52,14 @@ export function HelpMenu({
   // In a trial workspace: Next steps, from trial to pilot (UserWorkspace says whether it is a trial).
   const workspace = useContext(WorkspaceContext);
   const onNextSteps = workspace?.isTrial ? () => workspace.open("Next steps") : undefined;
-  // On the new navigation Next steps is a tab of every trial (0.10.87): Help no longer repeats it.
-  const nextStepsHere = !!onNextSteps && workspace?.navigation !== "new";
   // A sample-only trial (0.10.71) offers "Discuss a pilot" where a trial offers its own data.
   const sampleOnly = !!workspace?.session?.sample_only;
-  // On the new navigation "Try your own data" opens the import page: only for people who may import (0.10.80).
-  const tryOwnData = !sampleOnly && (workspace?.navigation !== "new" || canImportOwnData(workspace?.session));
+  // On the new navigation the top bar's Import your data and the Next steps tab stand in for Help's "Try your own
+  // data" and "Discuss a pilot" (0.10.87); the classic navigation keeps both.
+  const fresh = workspace?.navigation === "new";
+  const tryOwnData = !sampleOnly && !fresh;
+  // Next steps is a tab of every trial on the new navigation (0.10.87): Help no longer repeats it there.
+  const nextStepsHere = !!onNextSteps && !fresh;
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -98,19 +98,11 @@ export function HelpMenu({
                   onGettingStarted();
                 }}
               >
-                <BookOpen size={15} aria-hidden="true" />{" "}
-                {workspace?.navigation === "new" ? (
-                  <span className="help-menu-item">
-                    {TRY_OWN_DATA}
-                    <small>Upload your complaints export; the sample stays until you remove it</small>
-                  </span>
-                ) : (
-                  "Getting started and import templates"
-                )}
+                <BookOpen size={15} aria-hidden="true" /> Getting started and import templates
               </button>
             </li>
           )}
-          {onNextSteps && sampleOnly && (
+          {onNextSteps && sampleOnly && !fresh && (
             <li>
               <button
                 type="button"
@@ -146,7 +138,7 @@ export function HelpMenu({
                 <NotebookText size={15} aria-hidden="true" />
                 <span className="help-menu-item">
                   Free trial user guide
-                  <small>The trial in 7 steps</small>
+                  <small>The trial, step by step</small>
                 </span>
               </a>
             </li>

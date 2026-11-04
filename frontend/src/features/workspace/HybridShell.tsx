@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronRight, Lock, LogOut, Search, Settings2, Upload, UserRound } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { recordPlace } from "../../app/linkTable";
-import { shortRoles } from "../../app/roles";
 import { signOut } from "../shared/session";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { IMPORTED_SOURCE, SAMPLE_SOURCE, complaintListTab } from "./complaintList";
@@ -463,16 +462,9 @@ export function AvatarMenu({
       </button>
       {shown && (
         <div className="uw-pop uw-avatar-menu" role="menu" aria-label="Account">
+          {/* The name only (0.10.87): the persona is on the top bar's "Viewing as" chip. */}
           <p className="uw-avatar-who">
             <b>{name}</b>
-            {/* The persona(s) the person works as, the words of the "Viewing as" chip (0.10.82, U-21). */}
-            <small>
-              {session?.persona_label
-                ? session.persona_locked === false && (session.persona_options?.length ?? 0) < 8
-                  ? session.persona_options!.map((item) => item.label).join(" + ")
-                  : session.persona_label
-                : shortRoles(session)}
-            </small>
           </p>
           <button
             type="button"
@@ -662,4 +654,49 @@ export function reportHits(items: any[], needle: string): any[] {
         .some((value: unknown) => String(value).toLowerCase().includes(needle)),
     )
     .slice(0, 5);
+}
+
+/*
+ * The new navigation's shell, said once (0.10.87, the owner-approved duplication review): which page heads, lines and
+ * banners show where, so the shell never repeats what a page says itself.
+ */
+
+/** Pages that show times or deadlines: only they carry the head's time-zone line. */
+const ZONE_SECTIONS: readonly string[] = [
+  "Complaints",
+  "Decision trees",
+  "Reports",
+  "Investigations",
+  "Trends",
+  "Records",
+  "Settings",
+];
+
+/** Whether the shell's page head (eyebrow, question, guide) shows: not where the page has its own head. */
+export function pageHeadShown(section: string, fresh: boolean, isTrial: boolean, tab?: string): boolean {
+  if (section === "Complaint") return false;
+  if (!fresh) return true;
+  if (section === "My Work" || section === "Next steps" || (section === "Getting started" && isTrial)) return false;
+  // One report has its own head (its form, reference and chips).
+  return !(section === "Reports" && new URLSearchParams(tab?.split("?")[1] ?? "").has("report"));
+}
+
+/** Whether the head says the organization's time zone (the classic head always does). */
+export const zoneLineShown = (section: string, fresh: boolean) => !fresh || ZONE_SECTIONS.includes(section);
+
+/** Whether the product or investigation picker shows on the new navigation: only on Trends' tabs without a filter
+ * of their own (the trend check has one; an investigation is chosen on its list). */
+export const contextPickerShown = (section: string, tab?: string) =>
+  section === "Trends" && !["", "Trend check"].includes((tab ?? "").split("?")[0]);
+
+/** What a trial's shell shows around a page (0.10.87): the top bar's sample label, except on Getting started (its card
+ * says it); Import your data, except on that page; the chapter banners on the classic navigation only (the new one
+ * has the ten-step walkthrough); the story bar, except on Home (its own story banner says it). */
+export function trialShellShows(section: string, fresh: boolean, dataBar: string) {
+  return {
+    sampleChip: dataBar === "sample" && section !== "Getting started",
+    importButton: section !== "Import your data",
+    chapterDone: !fresh,
+    storyBar: fresh && section !== "My Work",
+  };
 }

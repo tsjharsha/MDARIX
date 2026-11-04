@@ -104,8 +104,12 @@ import {
   saveDataChoice,
   tabOfSection,
   trialDataBar,
+  contextPickerShown,
+  pageHeadShown,
+  trialShellShows,
   trialTabs,
   visibleTabs,
+  zoneLineShown,
   type PersonaOption,
 } from "./HybridShell";
 import { ImportYourDataSection } from "./sections/YourData";
@@ -282,16 +286,17 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   Reports: {
     icon: FileText,
     description: "Authority reports",
+    // "MDARIX never submits" is said once, on the report's own rail (0.10.87).
     guide:
-      'Created automatically when a decision tree concludes "reportable". You complete, approve and generate the PDF; you submit it through the authority\'s own channel.',
+      'Created automatically when a decision tree concludes "reportable". You complete, approve and generate the PDF.',
     context: false,
   },
   // A trial's own import on the new navigation (0.10.80).
   "Import your data": {
     icon: Upload,
     description: "Bring in your complaints export",
-    guide:
-      "Upload your export in the template's columns. Each file is checked in full before anything is saved, and each import has a data-quality report. The sample stays until you remove it.",
+    // The checks and the sample's removal are said on the page itself (0.10.87).
+    guide: "Upload your export in the template's columns.",
     context: false,
   },
 };
@@ -341,6 +346,7 @@ export const NEW_HEADS: Partial<Record<WorkspaceSection, string>> = {
   "My Account": "How do you sign in and work?",
   "Share feedback": "What should we improve?",
   "Next steps": "What comes after the trial?",
+  "Look ahead": "What will your partners see?",
 };
 
 /** Under the MVP feature set Records and My Work also hold what the parked sections did (app/featureSet.ts). */
@@ -668,6 +674,7 @@ export function UserWorkspace({
   const { section, tab } = location;
   // "Import your data" beside the Sample data label, and in the avatar menu on a phone (0.10.79).
   const importOwn = importOwnDataAction(!!trial?.is_trial, session, open);
+  const shell = trialShellShows(section, fresh, dataBar);
 
   return (
     <WorkspaceContext.Provider value={api}>
@@ -689,8 +696,9 @@ export function UserWorkspace({
                 <button
                   type="button"
                   className="uw-org"
-                  title={`${tenantName}. ${TRIAL_DATA_NOTE}`}
-                  onClick={() => open("Getting started")}
+                  title={tenantName}
+                  // The trial's dates and limits are in Getting started's settings (0.10.87); the tab opens the page.
+                  onClick={() => open("Getting started", "Your trial")}
                 >
                   {tenantName} · Free trial · {trial.days_left} {trial.days_left === 1 ? "day" : "days"} left
                 </button>
@@ -701,13 +709,14 @@ export function UserWorkspace({
               )}
               {/* The trial's data (0.10.80): the sample's label, the choice beside the imported data, or nothing once the
                   sample is removed; PDFs carry the practice watermark either way. */}
-              {dataBar === "sample" && (
+              {/* Getting started's walkthrough card carries its own Sample data badge (0.10.87). */}
+              {shell.sampleChip && (
                 <span className="ms-chip uw-sample-chip uw-top-sample" title={TRIAL_DATA_NOTE}>
                   Sample data
                 </span>
               )}
               {dataBar === "choice" && <DataChoice source={dataSource} onChoose={chooseDataSource} />}
-              {importOwn && <ImportOwnData onOpen={importOwn} />}
+              {importOwn && shell.importButton && <ImportOwnData onOpen={importOwn} />}
               <GlobalSearch open={open} />
               <PersonaSwitch
                 persona={persona}
@@ -950,34 +959,35 @@ export function UserWorkspace({
             ) : (
               <>
                 {/* One complaint's page has its own header (sections/ComplaintPage.tsx); so has Home (0.10.73). */}
-                {section !== "Complaint" &&
-                  !(fresh && (section === "My Work" || (section === "Getting started" && trial?.is_trial))) && (
-                    <div className="ac-page-head">
-                      {fresh ? (
-                        // The new navigation (0.10.82, U-15): the section as eyebrow, the question as heading; the
-                        // time zone is said once, in Home's date line (every deadline names its own zone).
-                        <div>
-                          <p className="ac-eyebrow">{placeLabel(section, navigation)}</p>
-                          <h1 ref={heading} tabIndex={-1}>
-                            {NEW_HEADS[section] ?? placeLabel(section, navigation)}
-                          </h1>
-                          <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
+                {pageHeadShown(section, fresh, !!trial?.is_trial, shown ?? tab) && (
+                  <div className="ac-page-head">
+                    {fresh ? (
+                      // The new navigation (0.10.82, U-15): the section as eyebrow, the question as heading; the
+                      // time zone only on pages that show times (0.10.87).
+                      <div>
+                        <p className="ac-eyebrow">{placeLabel(section, navigation)}</p>
+                        <h1 ref={heading} tabIndex={-1}>
+                          {NEW_HEADS[section] ?? placeLabel(section, navigation)}
+                        </h1>
+                        <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
+                        {zoneLineShown(section, fresh) && (
                           <p className="ac-page-zone">Times are in {zoneName()}, your organization's time zone.</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="ac-eyebrow">{tenantName}</p>
-                          <h1 ref={heading} tabIndex={-1}>
-                            {placeLabel(section, navigation)}
-                          </h1>
-                          <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
-                          <p className="ac-page-zone">Times are in {zoneName()}.</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="ac-eyebrow">{tenantName}</p>
+                        <h1 ref={heading} tabIndex={-1}>
+                          {placeLabel(section, navigation)}
+                        </h1>
+                        <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
+                        <p className="ac-page-zone">Times are in {zoneName()}.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {NAV[section].context &&
-                  (!fresh || section === "Investigations" || section === "Trends") &&
+                  (!fresh || contextPickerShown(section, shown ?? tab)) &&
                   (navigation === "new" ? (
                     // The selectors are revealed on request on the new navigation (0.10.72, B2 and B5).
                     <details className="uw-more uw-change-context">
@@ -994,8 +1004,10 @@ export function UserWorkspace({
                 {trial?.is_trial && section !== "Share feedback" && (
                   <FeedbackPrompt onOpen={() => open("Share feedback")} />
                 )}
-                {trial?.is_trial && <ChapterDone refreshKey={location.key} onOpen={openChapter} />}
-                {fresh && trial?.is_trial && <StoryBar section={section} tab={shown ?? tab} />}
+                {/* The ten-step walkthrough is the new navigation's one progress (0.10.87): no chapter banners there,
+                    and on Home its own story banner stands in for the story bar. */}
+                {shell.chapterDone && trial?.is_trial && <ChapterDone refreshKey={location.key} onOpen={openChapter} />}
+                {shell.storyBar && trial?.is_trial && <StoryBar section={section} tab={shown ?? tab} />}
                 {message && (
                   <div className={`ac-message uw-notice tone-${message.tone}`} role="status">
                     {message.text}

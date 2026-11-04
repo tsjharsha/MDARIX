@@ -23,6 +23,7 @@ import {
   WHAT_WE_NEED,
   dataMoveExplanation,
 } from "../../help/trialNextSteps";
+import { useNavigation } from "../workspaceContext";
 import "./trialNextSteps.css";
 
 export type MvpRequest = {
@@ -94,6 +95,8 @@ export function TrialNextStepsSection() {
   const info = useSiteInfo();
   const [asking, setAsking] = useState(false);
   usePrintOpensDetails();
+  // On the new navigation the page has no shell head (0.10.87): this intro is its one heading.
+  const Title = useNavigation() === "new" ? "h1" : "h2";
   const support = info?.support_email || PUBLISHED_CONTACT.support;
   const request = state.data?.request ?? null;
   const open = isOpenMvpRequest(request);
@@ -107,7 +110,7 @@ export function TrialNextStepsSection() {
     <div className="uw-ns">
       <section className="uw-ns-intro" aria-labelledby="next-steps-title">
         <p className="uw-ns-eyebrow">{NEXT_STEPS_INTRO.eyebrow}</p>
-        <h2 id="next-steps-title">{NEXT_STEPS_INTRO.title}</h2>
+        <Title id="next-steps-title">{NEXT_STEPS_INTRO.title}</Title>
         <p className="uw-ns-lede">{NEXT_STEPS_INTRO.lede}</p>
         <div className="uw-ns-actions uw-ns-no-print">
           <button type="button" className="ac-primary" onClick={talk}>

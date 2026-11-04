@@ -253,7 +253,8 @@ describe("6. Sample-only trials and people without import rights", () => {
   it("see no Try your own data in Help on the new navigation", () => {
     const help = (session: object) =>
       render(<HelpMenu onGettingStarted={vi.fn()} defaultOpen />, api({ session: session as never }));
-    expect(help(OWNER)).toContain("Try your own data");
+    // 0.10.87: nobody does there; the top bar's Import your data is the one way in (release0087Shell.test.tsx).
+    expect(help(OWNER)).not.toContain("Try your own data");
     expect(help(REGULATORY)).not.toContain("Try your own data");
     expect(help({ ...OWNER, sample_only: true })).not.toContain("Try your own data");
     // The free trial user guide stays for everyone in a trial.
