@@ -112,10 +112,11 @@ const HARM: Record<string, string> = {
   SERIOUS_INJURY: "Serious injury reported",
   NONE: "None reported",
 };
+// The service work order's status (oversight/service_work.py), never the device's: "In service" read as "working".
 const SERVICE: Record<string, string> = {
-  OPEN: "Service open",
-  IN_PROGRESS: "In service",
-  COMPLETE: "Service complete",
+  OPEN: "Open",
+  IN_PROGRESS: "In progress",
+  COMPLETE: "Complete",
 };
 
 /** The harm the record states, or null when it does not say: never "None reported" for a record that is silent. */
@@ -155,7 +156,7 @@ function ComplaintSummary({ run }: { run: StoryRun }) {
         </div>
         {complaint.service_status && (
           <div>
-            <dt>Device status</dt>
+            <dt>Service work</dt>
             <dd>{SERVICE[complaint.service_status] ?? complaint.service_status}</dd>
           </div>
         )}

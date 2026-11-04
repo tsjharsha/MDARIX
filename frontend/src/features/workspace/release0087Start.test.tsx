@@ -140,7 +140,9 @@ describe("the walkthrough card renders the progress the server reports", () => {
     expect(html).not.toContain("The monitor is out of use");
     expect(html).toContain("<dt>Device</dt><dd>PulseWatch 410</dd>");
     expect(html).toContain("<dt>Reported harm</dt><dd>None reported</dd>");
-    expect(html).toContain("<dt>Device status</dt><dd>In service</dd>");
+    // The service work order's status, never "In service" (read as "the device works").
+    expect(html).toContain("<dt>Service work</dt><dd>In progress</dd>");
+    expect(html).not.toContain("In service");
     // A quiet hint names the step after it.
     expect(html).toContain("step 2, Triage");
   });
@@ -203,7 +205,7 @@ describe("facts the record does not give stay missing", () => {
     );
     expect(html).toContain('<dt>Reported harm</dt><dd><span class="ac-muted">Not recorded</span></dd>');
     expect(html).not.toContain("None reported");
-    expect(html).not.toContain("Device status");
+    expect(html).not.toContain("Service work");
   });
 
   it("runs the same card on your own data, without calling it fictional", () => {
