@@ -86,7 +86,8 @@ function WorkingCalendar() {
   return settings.data ? (
     <CalendarPanel settings={settings.data} onSaved={settings.reload} />
   ) : (
-    <Panel eyebrow="Settings" title="Working calendar and escalation" source={settings}>
+    // Each panel names its topic; the page says Settings (0.10.87).
+    <Panel eyebrow="Calendar" title="Working calendar and escalation" source={settings}>
       {null}
     </Panel>
   );
@@ -104,7 +105,7 @@ function ContactAttempts() {
   return list.data ? (
     <AttemptsSetting value={list.data.attempts_limit} onDone={list.reload} readOnly />
   ) : (
-    <Panel eyebrow="Settings" title="Unanswered attempts before a request moves on" source={list}>
+    <Panel eyebrow="Requests" title="Unanswered attempts before a request moves on" source={list}>
       {null}
     </Panel>
   );
@@ -115,7 +116,7 @@ function ImportTemplates() {
   const setup = useResource<ImportSetup>(`${IMPORT_PATH}/templates`);
   const { core, more } = importTemplatesFor(setup.data?.templates ?? [], useFeatureSet());
   return (
-    <Panel eyebrow="Settings" title="Import templates" source={setup}>
+    <Panel eyebrow="Templates" title="Import templates" source={setup}>
       <p className="ac-muted">
         Each template names the columns MDARIX reads. Your own export works too: its headers are read under these names.
       </p>

@@ -11,6 +11,10 @@ import { TrendsSection } from "./sections/Trends";
 import { TrendCheck, TrendHeroes } from "./sections/TrendCheck";
 import type { TrendBoard, TrendItem } from "./signalAi";
 import { SAMPLE_SOURCE } from "./complaintList";
+import { YourData } from "./sections/YourData";
+import records from "./sections/Records.tsx?raw";
+import settings from "./sections/Settings.tsx?raw";
+import account from "./sections/Account.tsx?raw";
 import caseSections from "./sections/CaseSections.tsx?raw";
 import investigations from "./sections/Investigations.tsx?raw";
 import { ComplaintPage } from "./sections/ComplaintPage";
@@ -225,5 +229,20 @@ describe("Trends (rows 40, 41)", () => {
     expect(page).not.toContain("Higher than usual</");
     expect(page).toContain("Groups checked");
     expect(page).not.toContain('<p class="ac-eyebrow">Trends</p>');
+  });
+});
+
+describe("Records, Import your data, Settings and Account (rows 42, 48, 53)", () => {
+  it("says once on Import that each import has a data-quality report, keeping the link to them", () => {
+    const fresh = render(<YourData />);
+    expect(fresh).toContain("See the data-quality reports");
+    expect(fresh).not.toContain("Each import has a data-quality report");
+    expect(render(<YourData />, api({ navigation: "classic" }))).toContain("Each import has a data-quality report");
+  });
+
+  it("leaves what a record is for to the Records guide, and names each settings panel by its topic", () => {
+    expect(records).not.toContain("Ready to hand to a colleague or an inspector.");
+    expect(settings).not.toContain('eyebrow="Settings"');
+    expect(account).not.toContain('eyebrow="My account"');
   });
 });

@@ -67,8 +67,8 @@ describe("Import your data on the top bar", () => {
 });
 
 describe("Import your data on the Complaints header", () => {
-  it("is offered in a trial by the same rule, and opens the same flow", () => {
-    expect(render(<ComplaintViews />, api(OWNER))).toContain("Import your data");
+  it("is offered on the list's header to a pilot only; a trial's is the top bar's (0.10.87), by the same rule", () => {
+    expect(render(<ComplaintViews />, api(OWNER))).not.toContain("Import your data");
     expect(render(<ComplaintViews />, api(SAMPLE_ONLY))).not.toContain("Import your data");
     expect(render(<ComplaintViews />, api(REGULATORY))).not.toContain("Import your data");
     const open = vi.fn();

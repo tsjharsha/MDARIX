@@ -185,7 +185,8 @@ export function LatestSigned({ record }: { record: SignedRecord }) {
       <p className="ac-muted">
         {record.signed_by ?? "Signed"} ·{" "}
         {record.signed_at_time ? formatDateTime(record.signed_at_time) : formatDate(record.signed_at)}
-        {record.meaning_label ? ` · ${record.meaning_label}` : ""}. Ready to hand to a colleague or an inspector.
+        {/* What a record is for is the page's guide (0.10.87). */}
+        {record.meaning_label ? ` · ${record.meaning_label}` : ""}.
       </p>
       <div className="ca-action-row">
         {canExport && record.complaint && (
