@@ -58,8 +58,8 @@
   gap: 16px;
   height: 64px;
   padding: 0 20px;
-  background: var(--ac-navy);
-  color: var(--ms-surface);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
 }
 .ac-brand {
   display: inline-flex;
@@ -1828,8 +1828,8 @@ button.ac-kpi:focus-visible {
   cursor: pointer;
 }
 .ac-range button.selected {
-  background: var(--ac-navy);
-  color: var(--ms-surface);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
   font-weight: 700;
 }
 .ac-range button:focus-visible,
@@ -2097,7 +2097,7 @@ button.ac-kpi:focus-visible {
   animation: ac-rise 0.6s ease-out 0.15s both;
 }
 .ac-donut-value {
-  fill: var(--ac-navy);
+  fill: var(--ms-navy-fill);
   font-size: var(--ms-fs-14);
   font-weight: 700;
 }

@@ -197,8 +197,8 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #1b5f86, #0b8a8f);
-  color: var(--ms-surface);
+  background: linear-gradient(135deg, var(--ms-avatar-1), var(--ms-avatar-2));
+  color: var(--ms-white);
   font-size: var(--ms-fs-12);
   font-weight: var(--ms-fw-bold);
 }
@@ -498,7 +498,7 @@
   border: 2px solid var(--ms-glow);
   border-radius: 50%;
   background: var(--ms-hero);
-  color: var(--ms-surface);
+  color: var(--ms-white);
 }
 .uw-strack-ok {
   position: absolute;
@@ -574,11 +574,11 @@
 }
 .hx-ruler-mk.is-warn {
   background: var(--ms-warn-mark);
-  color: #2b1a00;
+  color: var(--ms-glow-ink);
 }
 .hx-ruler-mk.is-good {
   background: var(--ms-good-mark);
-  color: #06291a;
+  color: var(--ms-glow-ink);
 }
 .uw-hybrid .uw-home-row {
   display: grid;
@@ -709,7 +709,7 @@
   background: var(--ms-line);
 }
 .uw-hybrid .uw-wt-bar > i.is-on {
-  background: linear-gradient(90deg, var(--ms-teal-mark), color-mix(in srgb, var(--ms-teal-mark) 70%, #3fe0d6));
+  background: linear-gradient(90deg, var(--ms-teal-mark), color-mix(in srgb, var(--ms-teal-mark) 70%, var(--ms-glow)));
 }
 .uw-hybrid .uw-wt-bar > i.is-cur {
   background: var(--ms-mint);
@@ -1115,7 +1115,7 @@
   display: grid;
   min-width: 0;
   place-items: center;
-  color: var(--ms-surface);
+  color: var(--ms-white);
   font-size: var(--ms-fs-12);
   font-style: normal;
   font-weight: var(--ms-fw-bold);
@@ -1131,7 +1131,7 @@
 }
 :is(.uw-bar-fill, .uw-lotleg) i.uw-lot-3 {
   background: var(--ms-lot-3);
-  color: #3a0a06;
+  color: var(--ms-glow-ink);
 }
 .uw-hybrid .uw-trend-hero .uw-bar-row:nth-child(2) .uw-bar-fill,
 .uw-lotleg i.is-exp {
@@ -1445,8 +1445,8 @@
     linear-gradient(var(--ms-hero-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--ms-hero-line) 1px, transparent 1px);
   background-size: 40px 40px;
-  -webkit-mask-image: linear-gradient(100deg, transparent 8%, #000 60%);
-  mask-image: linear-gradient(100deg, transparent 8%, #000 60%);
+  -webkit-mask-image: linear-gradient(100deg, transparent 8%, var(--ms-ink) 60%);
+  mask-image: linear-gradient(100deg, transparent 8%, var(--ms-ink) 60%);
 }
 .uw-hybrid .ac-main .uw-highlights:not(.uw-cp-head) .uw-hl-top :is(h1, h2) {
   color: var(--ms-hero-fg);
@@ -1552,8 +1552,8 @@
     linear-gradient(var(--ms-hero-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--ms-hero-line) 1px, transparent 1px);
   background-size: 40px 40px;
-  -webkit-mask-image: linear-gradient(100deg, transparent 8%, #000 60%);
-  mask-image: linear-gradient(100deg, transparent 8%, #000 60%);
+  -webkit-mask-image: linear-gradient(100deg, transparent 8%, var(--ms-ink) 60%);
+  mask-image: linear-gradient(100deg, transparent 8%, var(--ms-ink) 60%);
 }
 .uw-hybrid .ac-main .uw-ns-intro :is(h1, h2) {
   color: var(--ms-hero-fg);
@@ -1797,8 +1797,10 @@
 .uw-hybrid .uw-top .uw-search input::placeholder {
   font-size: var(--ms-fs-13);
 }
-.uw-hybrid .uw-top.ac-header {
-  gap: 8px;
+@media (min-width: 641px) {
+  .uw-hybrid .uw-top.ac-header {
+    gap: 8px;
+  }
 }
 /* The complaint list: the lot on its own grey line, a slimmer header row. */
 @media (min-width: 641px) {
@@ -1867,8 +1869,8 @@
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
-    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
-    mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+    -webkit-mask-image: linear-gradient(90deg, var(--ms-ink) calc(100% - 32px), transparent);
+    mask-image: linear-gradient(90deg, var(--ms-ink) calc(100% - 32px), transparent);
   }
   .uw-hybrid .ac-main [role="tablist"] > * {
     flex: none;

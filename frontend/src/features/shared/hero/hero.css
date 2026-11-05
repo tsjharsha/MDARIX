@@ -204,8 +204,8 @@
     40px 40px,
     8px 8px,
     8px 8px;
-  -webkit-mask-image: linear-gradient(100deg, transparent 8%, #000 60%);
-  mask-image: linear-gradient(100deg, transparent 8%, #000 60%);
+  -webkit-mask-image: linear-gradient(100deg, transparent 8%, var(--ms-ink) 60%);
+  mask-image: linear-gradient(100deg, transparent 8%, var(--ms-ink) 60%);
   pointer-events: none;
 }
 .hx-monitor-in {
@@ -245,7 +245,7 @@
   fill: var(--ms-art-soft);
 }
 .hx-art-screen {
-  fill: #061020;
+  fill: var(--ms-hero);
   stroke: var(--ms-art);
 }
 .hx-scene {

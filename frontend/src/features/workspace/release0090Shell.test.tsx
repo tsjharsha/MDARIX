@@ -176,7 +176,8 @@ describe("the shell around it", () => {
 describe("the fixed bars never cover what is scrolled into view", () => {
   it("pads scrolling by the top bar, and on a phone by the bottom bar", () => {
     expect(shellCss).toMatch(/html:has\(\.uw-hybrid\) \{\s*scroll-padding-top: 72px;/);
-    const phone = shellCss.slice(shellCss.lastIndexOf("@media (max-width: 640px)"));
-    expect(phone).toMatch(/scroll-padding-bottom: 96px/);
+    expect(shellCss).toMatch(
+      /@media \(max-width: 640px\) \{\s*html:has\(\.uw-hybrid\) \{\s*scroll-padding-bottom: 96px;/,
+    );
   });
 });

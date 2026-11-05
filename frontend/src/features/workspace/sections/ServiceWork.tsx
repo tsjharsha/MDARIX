@@ -13,10 +13,13 @@ export function ServiceWork({
   view,
   onChanged,
   title = "Linked service work",
+  headless = false,
 }: {
   view: EventView;
   onChanged: (view: EventView) => void;
   title?: string;
+  /** The heading and the state line are said by the fold that holds this (the complaint page's rail): not again. */
+  headless?: boolean;
 }) {
   const service = view.service ?? null;
   const canWrite = useCan("signal.triage") || useCan("investigation.work") || useCan("quality.review");
@@ -46,10 +49,14 @@ export function ServiceWork({
   };
   return (
     <section className="ca-drawer-section uw-service" aria-label={title}>
-      <h3>
-        <Wrench size={16} aria-hidden="true" /> {title}
-      </h3>
-      <p className="uw-service-state">{serviceText(view)}</p>
+      {!headless && (
+        <>
+          <h3>
+            <Wrench size={16} aria-hidden="true" /> {title}
+          </h3>
+          <p className="uw-service-state">{serviceText(view)}</p>
+        </>
+      )}
       {canWrite && (
         <div className="uw-service-form">
           <label className="ca-field">

@@ -91,7 +91,10 @@
   src: url("./assets/fonts/IBMPlexMono-SemiBold.woff2") format("woff2");
 }
 
-:root {
+/* The light set. Panels that are navy in both themes (the quality loop, the monthly trend, the pilot band, Home's side
+   panel) keep it in the dark theme too, so their text and buttons read as they were drawn. */
+:root,
+:root[data-theme="dark"] :is(.ql-hero, .uw-ins-hero, .uw-ns-talk, .uw-home-hero-side) {
   --ms-font: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
   --ms-font-display: Archivo, "Arial Narrow", "Segoe UI", system-ui, sans-serif;
   --ms-font-mono: "IBM Plex Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
@@ -142,7 +145,14 @@
   --ms-ink-2: #39475c;
   --ms-ink: #0c1525;
   --ms-navy: #183249;
+  /* The navy as a ground (the classic app bar, a navy panel); --ms-navy is also a text colour, light in the dark theme. */
+  --ms-navy-fill: #183249;
   --ms-navy-deep: #0f2233;
+  /* White that stays white in both themes: text and marks on the always-dark rail, band and fixed-colour fills. */
+  --ms-white: #ffffff;
+  /* A person's initials: white on a fixed blue-teal, in both themes. */
+  --ms-avatar-1: #1b5f86;
+  --ms-avatar-2: #0b5f63;
   --ms-on-dark-muted: #c5d3df;
 
   /* Teal: the action colour. */
@@ -212,8 +222,10 @@
 }
 
 /*
- * The dark theme, designed with the light one and kept switched off in 0.10.90: nothing sets data-theme="dark" and no
- * prefers-color-scheme query applies it yet (dark mode comes in a later release, with its toggle).
+ * The dark theme (0.10.91, the hero design's dark set). The new navigation's shell sets data-theme on <html> from the
+ * person's choice (Light, Dark, or the system's setting; features/workspace/theme.tsx) while it is on screen, so the
+ * website and the classic navigation stay light. Each text colour is 4.5:1 or more on each dark ground
+ * (tokens.test.ts); a fill under "white" text becomes light and its text dark, as the design's accent buttons do.
  */
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -222,28 +234,45 @@
   --ms-ground: #04080f;
   --ms-line: #26375a;
   --ms-line-strong: #344a72;
+  --ms-line-control: #6a80a3;
   --ms-muted: #95a3b9;
   --ms-ink-2: #b5c2d5;
   --ms-ink: #e8eef7;
+  --ms-navy: #dbe6f3;
+  --ms-navy-fill: #13203a;
+  --ms-navy-deep: #0a1322;
   --ms-teal: #45d9d0;
   --ms-teal-dark: #45d9d0;
+  --ms-teal-bright: #73d6cb;
   --ms-teal-mark: #45d9d0;
   --ms-mint: #153141;
+  --ms-mint-line: #1f5a5c;
   --ms-focus: #45d9d0;
   --ms-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 32px -16px rgba(0, 0, 0, 0.7);
+  --ms-shadow-2: 0 12px 32px rgba(0, 0, 0, 0.55);
   --ms-rail: #0a1322;
   --ms-rail-2: #13203a;
   --ms-hero: #0b1932;
   --ms-hero-2: #12264c;
   --ms-crit: #ff8f88;
   --ms-crit-bg: #2e2332;
+  --ms-crit-line: #6b3a40;
   --ms-crit-mark: #ff5c54;
   --ms-warn: #f7c35c;
+  --ms-warn-fill: #d9a03a;
   --ms-warn-bg: #2d2e2f;
+  --ms-warn-line: #6a5228;
   --ms-warn-mark: #f2a93b;
   --ms-good: #61d49e;
   --ms-good-bg: #163139;
+  --ms-good-line: #2b5e4b;
   --ms-good-mark: #3cc184;
+  --ms-info: #8fbdf0;
+  --ms-info-bg: #172a46;
+  --ms-info-line: #2f4d78;
+  --ms-ai: #c2b3ef;
+  --ms-ai-bg: #231f3d;
+  --ms-ai-line: #463d6e;
   --ms-harm: #ff8aab;
   --ms-harm-bg: #2f2238;
   --ms-harm-mark: #f2507f;
@@ -251,4 +280,6 @@
   --ms-lot-1: #b8322b;
   --ms-lot-2: #ff6b63;
   --ms-lot-3: #ffb0aa;
+  --ms-series: #6aa8f0;
+  --ms-series-dark: #9cc6f5;
 }

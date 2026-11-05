@@ -87,6 +87,28 @@ describe("D3.3 the complaint page is a record with a hero", () => {
     expect(html).not.toContain("Also known as");
   });
 
+  it("says the service work's heading and its state once, above its form (0.10.91: they were said twice)", () => {
+    const view = rv11();
+    resources.data[eventPath("SAMPLE-RV-11")] = {
+      ...view,
+      service: {
+        reference: "SVC-24-1107 (sample service ticket)",
+        status: "IN_PROGRESS",
+        status_label: "In progress",
+        status_at: "2026-11-03T12:18:00Z",
+        owner_id: null,
+        owner_name: null,
+        header: null,
+      },
+    };
+    const html = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />);
+    const card = html.slice(html.indexOf("uw-rail-service"));
+    expect(card.match(/> ?Service work</g)).toHaveLength(1);
+    expect(card.match(/SVC-24-1107 \(sample service ticket\) · owner not named yet/g)).toHaveLength(1);
+    // The heading and the state come before the form's first field.
+    expect(card.indexOf(">Service work<")).toBeLessThan(card.indexOf("Service reference"));
+  });
+
   it("folds the triage form while the story is on another step", () => {
     const view = rv11();
     // Triage is the record's next step.

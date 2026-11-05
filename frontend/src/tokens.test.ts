@@ -14,8 +14,8 @@ const SHEETS: Record<string, string> = Object.fromEntries(
 const FONTS: string[] = fs.readdirSync(new URL("./assets/fonts/", import.meta.url));
 const licence = (name: string): string => read(`../public/fonts/${name}-OFL.txt`);
 // The light theme's tokens (the :root block); the dark theme's are the block switched off in 0.10.90.
-const darkCss = css.slice(css.indexOf(':root[data-theme="dark"]'));
-const lightCss = css.slice(0, css.indexOf(':root[data-theme="dark"]'));
+const darkCss = css.slice(css.indexOf(':root[data-theme="dark"] {'));
+const lightCss = css.slice(0, css.indexOf(':root[data-theme="dark"] {'));
 const token = (name: string, sheet = lightCss): string => {
   const found = new RegExp(`--ms-${name}:\\s*(#[0-9a-f]{6})`, "i").exec(sheet);
   if (!found) throw new Error(`no colour token --ms-${name}`);
@@ -101,23 +101,61 @@ describe("design tokens meet WCAG 2.1 AA", () => {
   });
 });
 
-describe("the dark theme (0.10.90: designed, switched off until a later release)", () => {
+describe("the dark theme (0.10.91)", () => {
   const sources = (fs.readdirSync(new URL("./", import.meta.url), { recursive: true }) as string[])
     .map((path) => path.split("\\").join("/"))
     .filter((path) => /\.(tsx?|css|html)$/.test(path) && !path.endsWith(".test.ts") && !path.endsWith(".test.tsx"));
 
-  it("defines its own text and grounds, each text at least 4.5:1 on each ground", () => {
+  it("gives each text 4.5:1 or more on each dark ground, each state's text on its own ground", () => {
     expect(darkCss).toContain("--ms-surface: #0f1a2d");
-    const text = ["ink", "ink-2", "muted", "teal", "crit", "warn", "good", "harm"];
+    const text = ["ink", "ink-2", "muted", "navy", "teal", "teal-dark", "crit", "warn", "good", "info", "ai", "harm"];
     expect(failing(pairs(text, ["surface", "subtle", "ground"]), 4.5, darkCss)).toEqual([]);
+    const own: Array<[string, string]> = [
+      ["crit", "crit-bg"],
+      ["warn", "warn-bg"],
+      ["good", "good-bg"],
+      ["info", "info-bg"],
+      ["ai", "ai-bg"],
+      ["harm", "harm-bg"],
+      ["teal-dark", "mint"],
+      ["ink", "mint"],
+    ];
+    expect(failing(own, 4.5, darkCss)).toEqual([]);
   });
 
-  it("is never switched on: no colour-scheme query and nothing sets data-theme", () => {
+  it("turns each fill under white text light, with the dark ground as its text, at 4.5:1 or more", () => {
+    const fills = ["teal", "teal-dark", "crit", "good", "info", "ai", "harm", "muted", "warn-fill"];
+    expect(failing(pairs(["surface"], fills), 4.5, darkCss)).toEqual([]);
+  });
+
+  it("keeps the light set on the panels that are navy in both themes, so their text never turns dark on dark", () => {
+    // The quality loop on Records, the monthly trend on Import, the pilot band on Next steps, Home's side panel.
+    expect(lightCss).toMatch(
+      /:root,\s*:root\[data-theme="dark"\] :is\(\.ql-hero, \.uw-ins-hero, \.uw-ns-talk, \.uw-home-hero-side\) \{/,
+    );
+  });
+
+  it("gives the amber dots' dark ink 4.5:1 on the amber mark in both themes", () => {
+    for (const sheet of [lightCss, darkCss])
+      expect(contrast(token("glow-ink", lightCss), token("warn-mark", sheet))).toBeGreaterThan(4.5);
+  });
+
+  it("keeps white white on the grounds that stay dark: the rail, the band and the navy fill", () => {
+    expect(token("white")).toBe("#ffffff");
+    for (const ground of ["rail", "rail-2", "hero", "hero-2", "navy-fill"])
+      expect(contrast("#ffffff", token(ground, darkCss)), ground).toBeGreaterThan(4.5);
+    expect(failing(pairs(["line-control", "teal-mark", "crit-mark", "good-mark"], ["surface"]), 3, darkCss)).toEqual(
+      [],
+    );
+  });
+
+  it("is switched on only by the new navigation's shell: no colour-scheme query, one module sets data-theme", () => {
+    // The website and the classic navigation stay light: the system's setting is read in theme.tsx, not in CSS.
     expect(css).not.toMatch(/@media[^{]*prefers-color-scheme/);
     const setters = sources.filter(
-      (path) => /data-theme|dataset\.theme/.test(read(`./${path}`)) && path !== "tokens.css",
+      (path) => /data-theme|dataset\.theme/.test(read(`./${path}`)) && !["tokens.css"].includes(path),
     );
-    expect(setters).toEqual([]);
+    expect(setters).toEqual(["features/workspace/theme.tsx"]);
   });
 });
 

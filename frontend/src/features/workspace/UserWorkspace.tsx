@@ -35,6 +35,7 @@ import "../customer-admin/customer-admin.css";
 import "./workspace.css";
 import "./heroShell.css";
 import "./heroPages.css";
+import { ThemeMenu, useTheme } from "./theme";
 import { shownRun, useOneStory } from "./oneStory";
 import { signOut } from "../shared/session";
 import { useFocusOnChange } from "../shared/focus";
@@ -691,9 +692,11 @@ export function UserWorkspace({
   const shell = trialShellShows(section, fresh, dataBar);
   // Getting started's progress on the rail's ring (0.10.90): the story's own read, on a trial's new navigation only,
   // asked once the page's own reads have had their turn, so the ring never slows the page's first content.
+  // Light, dark or the system's (0.10.91): applied by the new navigation's shell only.
+  const look = useTheme(session, fresh);
   const [ringRead, setRingRead] = useState(false);
   useEffect(() => {
-    const timer = window.setTimeout(() => setRingRead(true), 2500);
+    const timer = window.setTimeout(() => setRingRead(true), 1500);
     return () => window.clearTimeout(timer);
   }, []);
   const progress = storyProgress(shownRun(useOneStory(fresh && !!trial?.is_trial && ringRead).data, dataSource));
@@ -754,6 +757,7 @@ export function UserWorkspace({
                 colleague={!!trial?.is_trial && !trial?.is_owner}
                 onChoose={(code) => void choosePersona(code)}
               />
+              <ThemeMenu choice={look.choice} theme={look.theme} onChoose={look.choose} />
               <span className="uw-top-bell">
                 {/* Home holds the reminders on the new navigation (0.10.81, H1): opened there, at them. */}
                 <AlertsBell

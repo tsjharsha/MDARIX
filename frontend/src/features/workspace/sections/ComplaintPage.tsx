@@ -811,7 +811,8 @@ function Rail({ view, onChanged }: { view: EventView; onChanged: (view: EventVie
           <h2>Service work</h2>
           <span className="ac-muted">{serviceText(view)}</span>
         </summary>
-        <ServiceWork view={view} onChanged={onChanged} title="Service work" />
+        {/* The fold's summary says the heading and the state once (0.10.91: they were said twice). */}
+        <ServiceWork view={view} onChanged={onChanged} title="Service work" headless />
       </details>
     </aside>
   );

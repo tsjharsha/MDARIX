@@ -199,7 +199,10 @@ describe("D3.8 accessibility on the new navigation", () => {
     expect(read("../customer-admin/customer-admin.css")).toMatch(
       /\.ca-chips button\.selected \{[^}]*color: var\(--ms-teal-dark\)/,
     );
-    expect(read("./sections/qualityLoop.css")).toContain("background: #d18f12;");
+    // 0.10.91: the dot's amber and its ink are tokens; tokens.test.ts checks the pair at 4.5:1 in both themes.
+    expect(read("./sections/qualityLoop.css")).toMatch(
+      /\.ql-dot\.tone-serious \{\s*background: var\(--ms-warn-mark\);\s*color: var\(--ms-glow-ink\);/,
+    );
   });
   it("says why a main button is disabled", () => {
     expect(read("./sections/TreeEdit.tsx")).toContain('title={!password ? "Enter your password first" : undefined}');

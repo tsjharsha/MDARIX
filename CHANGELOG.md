@@ -10,6 +10,29 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.91] - 2026-11-05
+
+On the trial maintenance line (`release/0.10`), released together with 0.10.90: dark mode on the new navigation, and
+one fix. Presentation only: no page's words, fields, numbers, steps or buttons change, and no API or rule changes. No
+migration. Only the web image changes. No operator step. No sample number or label changes.
+
+### Added: dark mode
+
+- **Light, Dark or System** from a sun or moon on the top bar. System, the default, follows the device's setting
+  and changes with it. Each person's choice is kept in their browser; a browser that refuses storage simply follows
+  the system.
+- The hero design's dark theme: deep navy grounds, the bright teal action colour, and the deadline, harm and lot
+  colours tuned for a dark ground. Every text colour is 4.5:1 or more on its ground, focus stays visible, and status
+  is still never shown by colour alone.
+- Only the new navigation turns dark. The website, the sign-in pages and the classic navigation stay light.
+- The application's last hard-coded colours (about 120, in the shared style sheets) now come from the design tokens,
+  so no surface, chip, table, fold, form field or dialog stays light by accident.
+
+### Fixed
+
+- **Service work on the complaint page said its heading and its state twice** (since before 0.10.90): once in the
+  card's fold and again above the form. It now says each once, above the form, on a desktop and on a phone.
+
 ## [0.10.90] - 2026-11-05
 
 On the trial maintenance line (`release/0.10`): the owner-approved hero design (`mdarix-hero-ui.html`) on the new

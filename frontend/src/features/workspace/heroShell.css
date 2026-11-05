@@ -67,7 +67,7 @@
   font-stretch: 125%;
   font-weight: 800;
   letter-spacing: 0.03em;
-  color: var(--ms-surface);
+  color: var(--ms-white);
 }
 .uw-navrail-fold {
   display: grid;
@@ -83,7 +83,7 @@
 }
 .uw-navrail-fold:hover {
   background: var(--ms-rail-2);
-  color: var(--ms-surface);
+  color: var(--ms-white);
 }
 .uw-navrail :focus-visible {
   outline: 2px solid var(--ms-glow);
@@ -112,7 +112,7 @@
 }
 .uw-navrail-story strong {
   display: block;
-  color: var(--ms-surface);
+  color: var(--ms-white);
   font-size: var(--ms-fs-14);
   font-weight: var(--ms-fw-semibold);
   line-height: 1.3;
@@ -161,11 +161,11 @@
 }
 .uw-navrail .uw-tab:hover {
   background: var(--ms-rail-2);
-  color: var(--ms-surface);
+  color: var(--ms-white);
 }
 .uw-navrail .uw-tab[aria-current="page"] {
   background: linear-gradient(90deg, rgb(63 224 214 / 18%), rgb(63 224 214 / 4%));
-  color: var(--ms-surface);
+  color: var(--ms-white);
 }
 .uw-navrail .uw-tab[aria-current="page"]::before {
   content: "";
@@ -391,8 +391,8 @@
   font-size: var(--ms-fs-13);
 }
 .uw-hybrid .uw-top .uw-avatar {
-  background: linear-gradient(135deg, #1b5f86, #0b8a8f);
-  color: var(--ms-surface);
+  background: linear-gradient(135deg, var(--ms-avatar-1), var(--ms-avatar-2));
+  color: var(--ms-white);
   font-size: var(--ms-fs-12);
 }
 .uw-hybrid .uw-top .uw-data-choice {
@@ -612,4 +612,38 @@ html:has(.uw-hybrid) {
   border-radius: 50%;
   box-shadow: inset 0 0 0 3px rgb(63 224 214 / 35%);
   color: var(--ms-glow);
+}
+/* The theme menu (0.10.91): the sun or moon on the top bar, Light, Dark and System under it. */
+.uw-theme {
+  position: relative;
+}
+.uw-hybrid .uw-top.ac-header .uw-theme-btn {
+  min-width: 40px;
+  justify-content: center;
+  padding: 0 10px;
+}
+.uw-theme-menu {
+  width: 200px;
+}
+/* A phone's top bar holds the theme button too (0.10.91): its controls tighten, nothing runs off the screen. */
+@media (max-width: 640px) {
+  .uw-hybrid .uw-top.ac-header {
+    gap: 2px;
+    padding: 0 8px;
+  }
+  .uw-hybrid .uw-top .uw-persona-eye {
+    display: none;
+  }
+  .uw-hybrid .uw-top .uw-persona-btn {
+    padding: 0 6px 0 8px;
+  }
+  .uw-hybrid .uw-top.ac-header :is(.ac-secondary, .uw-theme-btn, .uw-search-toggle) {
+    min-width: 40px;
+    padding-inline: 6px;
+  }
+}
+@media (max-width: 380px) {
+  .uw-hybrid .uw-top .uw-org {
+    display: none;
+  }
 }
