@@ -1,0 +1,27 @@
+{
+  "note": "FDA's own files MDARIX uses for a US report, each byte-identical to FDA's copy: the fillable Form FDA 3500A that the approved report fills (backend/app/authority_reports/fda_3500a.py) and the eMDR HL7 ICSR schemas the eMDR XML is validated against (backend/app/authority_reports/emdr.py). US Government works. Provided by the owner on 4 Nov 2026 from fda.gov.",
+  "files": [
+    {
+      "file": "FDA-3500A_Eng_Stat_Sec_Ext_09-15-2025.pdf",
+      "sha256": "d9f3e6b6b9fcd5c8d38fda4989c50e73ce77e15ef657476a5e04a968dc2bd382",
+      "edition": "Form FDA 3500A MedWatch (09/2025), OMB No. 0910-0291, expires 09-30-2027; created 15 Sep 2025, modified 1 Oct 2025 (the file's own dates)",
+      "publisher": "U.S. Food and Drug Administration",
+      "source_url": "https://www.fda.gov/media/69876/download"
+    },
+    {
+      "file": "emdr_schemas/",
+      "sha256": {
+        "Con170227.xsd": "a93cd43e7ca3ae875b32a74d7a09e8f2d98b662859edea357e90d8714ec06bbb",
+        "coreschemas/NarrativeBlock.xsd": "c7c438d9e16a964712e13db37685b52bbd4c214e346d9b065ba99e2ae00e7666",
+        "coreschemas/datatypes-base.xsd": "267187db01ecf3d0ccb56e3f4b225108cfabc2ce9d0cce11570daa98e6291079",
+        "coreschemas/datatypes-rX-cs.xsd": "7e096bcc1d16fc14971d07619bfd1000a9f46946b6480e5ab85afb072c5de124",
+        "coreschemas/datatypes.xsd": "5c3ea816e88850e08438e6e9ff77be48f9af836bd89bc023d192725cc2a30f42",
+        "coreschemas/infrastructureRoot.xsd": "d8f6d40018c2f22dc0d6b3283f41fa150759a5fc17bb2e6686e95e0546ea9e56",
+        "coreschemas/voc.xsd": "63e6d79d58bd8cb091687d860749c3a4c704a69501d2d22bb06c1cf4bbd6bef9"
+      },
+      "edition": "eMDR Implementation Package (HL7 ICSR R2, version code V3NORMED_2016), files dated 5 Aug 2024; its mapping workbook HL7Medwatch.xlsx last changed 1 Aug 2024",
+      "publisher": "U.S. Food and Drug Administration, CDRH",
+      "source_url": "https://www.fda.gov/medical-devices/mandatory-reporting-requirements-manufacturers-importers-and-device-user-facilities/health-level-seven-hl7-individual-case-safety-reporting-icsr-files"
+    }
+  ]
+}

@@ -38,3 +38,30 @@ def test_it_refuses_production(monkeypatch):
     monkeypatch.setattr("sys.argv", ["journey_api.py"])
     with pytest.raises(SystemExit, match="Refusing"):
         journey.main()
+
+
+def test_only_the_journey_process_raises_the_activation_limit_and_production_keeps_its_own(monkeypatch):
+    # 0.10.89: back-to-back journeys activate many accounts from 127.0.0.1; the journey API alone lifts token:ip.
+    import os
+    import subprocess
+    import sys
+
+    from backend.app import rate_limit
+
+    production = rate_limit.LIMITS["token:ip"]
+    assert production == rate_limit.Limit(20, 3600)
+    monkeypatch.setitem(rate_limit.LIMITS, "token:ip", production)  # restored after the test
+    journey.raise_activation_limit()
+    assert rate_limit.LIMITS["token:ip"] == rate_limit.Limit(journey.JOURNEY_ACTIVATION_LIMIT, 3600)
+    # A fresh API process (as production starts) reads the unchanged setting: nothing outside the journey script
+    # raises it, and no environment variable can.
+    root = Path(__file__).resolve().parents[1]
+    fresh = subprocess.run(
+        [sys.executable, "-c", "from backend.app import rate_limit; print(rate_limit.LIMITS['token:ip'])"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "MDARIX_ENV": "production"},
+        check=True,
+    )
+    assert fresh.stdout.strip() == "Limit(limit=20, window_seconds=3600)"
