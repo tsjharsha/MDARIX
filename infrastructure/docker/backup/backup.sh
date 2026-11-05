@@ -2,8 +2,8 @@
 # Encrypted logical backup of everything MDARIX keeps: the control database, every dedicated tenant database and
 # the uploaded files on the local "objects" volume. Each part is encrypted to MDARIX_BACKUP_AGE_RECIPIENT (an age
 # public key; the private key is kept offline, so a compromised server cannot read its own backups), written to
-# /backups/<timestamp>/ with a SHA-256 manifest, copied to MDARIX_BACKUP_S3_URI when set, and backups older than
-# MDARIX_BACKUP_KEEP_DAYS are removed locally. The managed database's point-in-time recovery is the first line of
+# /backups/<timestamp>/ with a SHA-256 manifest, copied to MDARIX_BACKUP_S3_URI when set, and local backups beyond
+# MDARIX_BACKUP_KEEP_DAYS (30) days and MDARIX_BACKUP_KEEP_MONTHS (12) monthly ones are removed (retention.sh). The managed database's point-in-time recovery is the first line of
 # defence; this is the second, independent of the provider.
 #
 #   docker compose -f docker-compose.prod.yml --env-file .env.production --profile backup run --rm backup
@@ -58,7 +58,9 @@ else
 fi
 : "${DB_USER:?set MDARIX_BACKUP_DB_USER and MDARIX_BACKUP_DB_PASSWORD in .env.migrate, or the owner credentials}"
 : "${DB_PASSWORD:?set MDARIX_BACKUP_DB_PASSWORD (or MDARIX_DB_OWNER_PASSWORD) in .env.migrate}"
-KEEP_DAYS="${MDARIX_BACKUP_KEEP_DAYS:-14}"
+# Retention (owner decision, 5 Nov 2026): 30 days of backups, then the newest of each of 12 months (retention.sh).
+KEEP_DAYS="${MDARIX_BACKUP_KEEP_DAYS:-30}"
+KEEP_MONTHS="${MDARIX_BACKUP_KEEP_MONTHS:-12}"
 
 if [ ! -d /backups ] || [ ! -w /backups ]; then
     echo "/backups is not writable by uid $(id -u). On the host: sudo install -d -o 70 -g 70 -m 700 ${MDARIX_BACKUP_DIR:-/var/backups/mdarix}" >&2
@@ -159,8 +161,13 @@ if [ -n "${MDARIX_BACKUP_S3_URI:-}" ]; then
     echo "Copied off-site to ${MDARIX_BACKUP_S3_URI%/}/${STAMP}/"
 fi
 
-STAGE="removing local backups older than ${KEEP_DAYS} days"
-find /backups -mindepth 1 -maxdepth 1 -type d -name '20*Z' -mtime "+${KEEP_DAYS}" -exec rm -rf {} +
+STAGE="removing local backups beyond ${KEEP_DAYS} days and ${KEEP_MONTHS} monthly ones"
+# shellcheck source=retention.sh
+HERE="$(dirname "$(readlink -f "$0")")"
+source "${HERE}/mdarix-backup-retention" 2>/dev/null || source "${HERE}/retention.sh"
+expired_backups /backups "$(date -u +%Y%m%d)" "${KEEP_DAYS}" "${KEEP_MONTHS}" | while read -r old; do
+    rm -rf -- "${old}"
+done
 
 if [ -n "${MDARIX_BACKUP_HEARTBEAT_URL:-}" ]; then
     curl --silent --show-error --max-time 10 --retry 2 "${MDARIX_BACKUP_HEARTBEAT_URL}" > /dev/null \

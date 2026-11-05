@@ -13,7 +13,7 @@ const SHEETS: Record<string, string> = Object.fromEntries(
 );
 const FONTS: string[] = fs.readdirSync(new URL("./assets/fonts/", import.meta.url));
 const licence = (name: string): string => read(`../public/fonts/${name}-OFL.txt`);
-// The light theme's tokens (the :root block); the dark theme's are the block switched off in 0.10.89.
+// The light theme's tokens (the :root block); the dark theme's are the block switched off in 0.10.90.
 const darkCss = css.slice(css.indexOf(':root[data-theme="dark"]'));
 const lightCss = css.slice(0, css.indexOf(':root[data-theme="dark"]'));
 const token = (name: string, sheet = lightCss): string => {
@@ -88,7 +88,7 @@ describe("design tokens meet WCAG 2.1 AA", () => {
     expect(failing(pairs(CONTROLS, ["surface", "subtle", "ground", "mint"]), 3)).toEqual([]);
   });
 
-  it("muted text is the darker grey (V-a11y: #6b7c8b was 4.30:1; 0.10.89 the hero design's, darker still)", () => {
+  it("muted text is the darker grey (V-a11y: #6b7c8b was 4.30:1; 0.10.90 the hero design's, darker still)", () => {
     expect(token("muted")).toBe("#56647b");
     expect(contrast(token("muted"), "#ffffff")).toBeGreaterThan(contrast("#5c6d7c", "#ffffff"));
   });
@@ -101,7 +101,7 @@ describe("design tokens meet WCAG 2.1 AA", () => {
   });
 });
 
-describe("the dark theme (0.10.89: designed, switched off until 0.10.90)", () => {
+describe("the dark theme (0.10.90: designed, switched off until a later release)", () => {
   const sources = (fs.readdirSync(new URL("./", import.meta.url), { recursive: true }) as string[])
     .map((path) => path.split("\\").join("/"))
     .filter((path) => /\.(tsx?|css|html)$/.test(path) && !path.endsWith(".test.ts") && !path.endsWith(".test.tsx"));

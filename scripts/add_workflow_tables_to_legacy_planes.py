@@ -4,8 +4,8 @@ complaint classifications, signer training), tr02 (complaint dispositions, the d
 tr04 to tr08 (the trial line's intake, reports, guides, oversight and lot impact tables) and tr09 (a CAPA's QMS
 reference, a lot's expiry date, a product's device category and a complaint's other lots), tr10 (a set-aside import
 row dismissed with a reason), tr11 (each organization's navigation, classic or new) and tr12 (a sample-only trial,
-a complaint's linked service work) tr13 (each person's workspace persona), tr14 (a cancelled authority report), tr15 (a Canada assessment) and tr16 (a product's Basic UDI-DI and EMDN code, a
-registration's risk class, a responsible party's SRN).
+a complaint's linked service work) tr13 (each person's workspace persona), tr14 (a cancelled authority report), tr15 (a Canada assessment), tr16 (a product's Basic UDI-DI and EMDN code, a
+registration's risk class, a responsible party's SRN) and tr18 (a re-signed market conclusion's change reason).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -294,6 +294,17 @@ STEPS = (
         done_sql=(
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
             "AND table_name = 'market_responsible_parties' AND column_name = 'srn')"
+        ),
+    ),
+    Step(
+        "tr18",
+        "tr18_trial_conclusion_change_reason.py",
+        "add_change_reason",
+        (),
+        ("complaint_market_assessments",),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'complaint_market_assessments' AND column_name = 'change_reason')"
         ),
     ),
 )

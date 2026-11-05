@@ -1,4 +1,4 @@
-// 0.10.89, the owner-approved hero design: the shared visuals. Each has an accessible name (or is marked decorative
+// 0.10.90, the owner-approved hero design: the shared visuals. Each has an accessible name (or is marked decorative
 // where its words stand beside it), and no status is shown by colour alone.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";

@@ -49,7 +49,7 @@ describe("Look ahead and Next steps as tabs of a trial", () => {
     );
     expect(bar.indexOf(">Getting started<")).toBeLessThan(bar.indexOf(">Home<"));
     expect(bar.indexOf(">Home<")).toBeLessThan(bar.indexOf(">Look ahead<"));
-    // 0.10.89: on the rail, Next steps pinned at its foot.
+    // 0.10.90: on the rail, Next steps pinned at its foot.
     expect(bar).toMatch(/aria-current="page" title="Next steps">.*?<span class="uw-tab-label">Next steps</);
     expect(bar).not.toContain("is-extra");
   });

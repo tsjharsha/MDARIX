@@ -682,7 +682,7 @@ export function UserWorkspace({
   // "Import your data" beside the Sample data label, and in the avatar menu on a phone (0.10.79).
   const importOwn = importOwnDataAction(!!trial?.is_trial, session, open);
   const shell = trialShellShows(section, fresh, dataBar);
-  // Getting started's progress on the rail's ring (0.10.89): the story's own read, on a trial's new navigation only.
+  // Getting started's progress on the rail's ring (0.10.90): the story's own read, on a trial's new navigation only.
   const progress = storyProgress(shownRun(useOneStory(fresh && !!trial?.is_trial).data, dataSource));
 
   return (
@@ -695,7 +695,7 @@ export function UserWorkspace({
               <a className="app-skip" href="#app-main">
                 Skip to content
               </a>
-              {/* The brand is on the rail (0.10.89, the hero design); the organization leads the top bar. */}
+              {/* The brand is on the rail (0.10.90, the hero design); the organization leads the top bar. */}
               {trial?.is_trial ? (
                 <button
                   type="button"

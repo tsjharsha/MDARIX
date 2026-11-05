@@ -134,11 +134,57 @@ def _worker() -> dict:
     return {"seconds_since": status["seconds_since"]}
 
 
-def _email() -> dict:
+# The outbox's queue lag: how long the longest-waiting event that is due has waited. The worker cycles every few
+# seconds, so fifteen minutes means it is stopped, stuck or overwhelmed (0.10.88, DEV-13).
+OUTBOX_MAX_LAG = timedelta(minutes=15)
+
+
+def outbox_backlog(db) -> dict:
+    """Events waiting to be published: how many, how many are retrying after a failure, how many of those failed
+    sending e-mail (the provider refused it: EmailDeliveryError, or the notifications' NotificationFailed), and the lag of the longest-waiting one that is due (an event backing off is not due yet)."""
+    from backend.app.db.tenant_scope import bind_system
+
+    bind_system(db, "readiness: outbox backlog")
+    row = db.execute(
+        text(
+            "SELECT count(*), count(*) FILTER (WHERE attempts > 0), "
+            "count(*) FILTER (WHERE attempts > 0 AND (last_error LIKE 'EmailDeliveryError%' "
+            "OR last_error LIKE 'NotificationFailed%')), "
+            "EXTRACT(EPOCH FROM now() - min(coalesce(next_attempt_at, occurred_at)) "
+            "FILTER (WHERE coalesce(next_attempt_at, occurred_at) <= now())) "
+            "FROM event_outbox WHERE published_at IS NULL AND dead_lettered_at IS NULL"
+        )
+    ).one()
+    return {
+        "waiting": int(row[0]),
+        "retrying": int(row[1]),
+        "email_failing": int(row[2]),
+        "lag_seconds": int(row[3] or 0),
+    }
+
+
+def _outbox() -> dict:
+    from backend.app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        backlog = outbox_backlog(db)
+    finally:
+        db.close()
+    if backlog["lag_seconds"] > OUTBOX_MAX_LAG.total_seconds():
+        raise RuntimeError(f"LAGGING: the oldest due event has waited {backlog['lag_seconds']}s")
+    return backlog
+
+
+def _email(failing: int = 0) -> dict:
+    """Configured, and not failing: ``failing`` e-mails the outbox retries after the provider refused them (read by
+    the outbox check) make it degraded."""
     from auth.emailer import smtp_configuration_status
 
     if not smtp_configuration_status().get("configured"):
         raise RuntimeError("SMTP not configured")
+    if failing:
+        raise RuntimeError(f"DELIVERY_FAILING: {failing} e-mail(s) waiting to be retried")
     return {}
 
 
@@ -173,18 +219,21 @@ def readiness_report() -> dict:
         if _cached and now - _cached[0] < _CACHE_SECONDS:
             return _cached[1]
         database = _check("database", _database)
+        outbox = _check("outbox", _outbox)
         others = [
             _check("data_planes", _data_planes),
             _check("object_storage", _object_storage),
             _check("worker", _worker),
+            outbox,
             _check("scheduler", _scheduler),
-            _check("email", _email),
+            _check("email", lambda: _email(outbox.get("email_failing", 0))),
         ]
         status = "ready" if database["ok"] else "not_ready"
         if status == "ready" and not all(item["ok"] for item in others):
             status = "degraded"
         report = {"status": status, "checks": [database, *others]}
-        _cached = (now, report)
+        # Cached from when the report is ready: probes that time out (a database down) take longer than the cache.
+        _cached = (time.monotonic(), report)
         return report
 
 

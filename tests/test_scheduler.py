@@ -202,9 +202,14 @@ def _dead_count(db):
 
 @pytest.mark.db
 def test_the_operations_job_alerts_only_when_the_dead_letter_count_rises(alerts, monkeypatch, dead_letter):
+    from backend.app import readiness
     from backend.app.worker_status import worker_status
 
     monkeypatch.setenv("MDARIX_SCHEDULER_HEARTBEAT_URL", "")
+    # This test is about dead letters: a quiet outbox, whatever else the test database holds.
+    monkeypatch.setattr(
+        readiness, "outbox_backlog", lambda db: {"waiting": 0, "retrying": 0, "email_failing": 0, "lag_seconds": 0}
+    )
     with SessionLocal() as db:
         bind_system(db, "test: operations alerts")
         total = _dead_count(db)
@@ -272,3 +277,53 @@ def test_the_scheduler_script_applies_the_configuration_gate_first(monkeypatch):
     monkeypatch.setattr(scheduler, "run_due_jobs", lambda: pytest.fail("jobs ran before the configuration check"))
     with pytest.raises(SystemExit, match="probe"):
         _script().main(["--once"])
+
+
+def test_a_stuck_or_unsettled_signature_alerts_once_and_its_clearing_once(alerts, monkeypatch):
+    """0.10.88 (DEV-13): a signature PENDING over 30 minutes, or one the settlement could not settle, reaches the
+    operators; before, the job only logged it."""
+    from backend.app import signing_commit
+
+    outcome = {"failed": ["sig-1"], "stuck": 0}
+    monkeypatch.setattr(
+        signing_commit, "settle_pending", lambda db: {"pending": 1, "settled": {}, "failed": outcome["failed"]}
+    )
+    monkeypatch.setattr(scheduler, "_stuck_signatures", lambda db: outcome["stuck"])
+    state: dict = {}
+    assert scheduler.signature_settlement(None, state)["failed"] == ["sig-1"]
+    assert [subject for subject, _ in alerts] == ["Signatures not settled"]
+    outcome.update(failed=[], stuck=2)
+    assert scheduler.signature_settlement(None, state)["stuck"] == 2
+    assert len(alerts) == 1  # still a problem: no second alert
+    outcome.update(stuck=0)
+    scheduler.signature_settlement(None, state)
+    assert [subject for subject, _ in alerts] == ["Signatures not settled", "Signatures settled again"]
+
+
+@pytest.mark.db
+def test_stuck_signatures_are_counted_in_the_control_database():
+    with SessionLocal() as db:
+        assert scheduler._stuck_signatures(db, timedelta(days=36500)) == 0
+        assert scheduler._stuck_signatures(db) >= 0
+
+
+@pytest.mark.db
+def test_the_operations_job_alerts_once_when_the_outbox_lags_or_email_fails_and_once_when_it_clears(
+    alerts, monkeypatch
+):
+    from backend.app import readiness
+    from backend.app.worker_status import worker_status
+
+    monkeypatch.setenv("MDARIX_SCHEDULER_HEARTBEAT_URL", "")
+    backlog = {"waiting": 5, "retrying": 2, "email_failing": 2, "lag_seconds": 20 * 60}
+    monkeypatch.setattr(readiness, "outbox_backlog", lambda db: dict(backlog))
+    with SessionLocal() as db:
+        bind_system(db, "test: operations alerts")
+        state = {"dead_letters": _dead_count(db), "worker": worker_status(db)["state"]}
+        scheduler.operations_alerts(db, state)
+        assert sorted(subject for subject, _ in alerts) == ["E-mail delivery failing", "Outbox falling behind"]
+        scheduler.operations_alerts(db, state)
+        assert len(alerts) == 2
+        backlog.update(email_failing=0, lag_seconds=5)
+        scheduler.operations_alerts(db, state)
+        assert sorted(subject for subject, _ in alerts[2:]) == ["E-mail delivery recovered", "Outbox caught up"]

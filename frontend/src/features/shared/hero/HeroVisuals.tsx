@@ -3,7 +3,7 @@ import { AlertTriangle, CircleCheck, Clock, Triangle } from "lucide-react";
 import "./hero.css";
 
 /*
- * The hero design's shared visuals (0.10.89, the owner-approved mock-up mdarix-hero-ui.html): clock rings, status and
+ * The hero design's shared visuals (0.10.90, the owner-approved mock-up mdarix-hero-ui.html): clock rings, status and
  * harm pills, flags, device icons, stage dots, the ten-step progress arc and the dark monitor band. Each has an
  * accessible name; a visual whose words already stand beside it is marked decorative instead, so nothing is read twice.
  * Status is never colour alone: every ring and pill comes with a number, an icon and a word.

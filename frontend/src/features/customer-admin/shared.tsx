@@ -56,6 +56,11 @@ export function isTransientFailure(reason: unknown): boolean {
   return !(reason instanceof ApiError) || reason.status === 0 || reason.status === 429 || reason.status >= 500;
 }
 
+/** Whether a read failed because the record is not there (removed, or a mistyped link): asking again changes nothing,
+ * so the screen offers the way back instead of Retry. */
+export const notFound = (resource: { state: PanelState; code?: string }) =>
+  resource.state === "error" && !!resource.code?.endsWith("_NOT_FOUND");
+
 type ResourceResult<T> = Omit<Resource<T>, "reload">;
 
 /** A failed read, as a resource shows it. */

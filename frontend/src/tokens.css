@@ -3,7 +3,7 @@
  * website (V14, V15). Every other style sheet takes its values from here; tokens.test.ts checks that each text and
  * control colour pair below meets WCAG 2.1 AA (4.5:1 for text, 3:1 for controls and marks).
  *
- * 0.10.89, the owner-approved hero design (mdarix-hero-ui.html): its palette, type scale, radii and fonts. A dark
+ * 0.10.90, the owner-approved hero design (mdarix-hero-ui.html): its palette, type scale, radii and fonts. A dark
  * instrument rail and a dark "monitor" band (ECG-paper grid) open each screen; quiet layered surfaces sit below.
  *
  * Colour roles:
@@ -212,8 +212,8 @@
 }
 
 /*
- * The dark theme, designed with the light one and kept switched off in 0.10.89: nothing sets data-theme="dark" and no
- * prefers-color-scheme query applies it yet (dark mode is release 0.10.90, with its toggle).
+ * The dark theme, designed with the light one and kept switched off in 0.10.90: nothing sets data-theme="dark" and no
+ * prefers-color-scheme query applies it yet (dark mode comes in a later release, with its toggle).
  */
 :root[data-theme="dark"] {
   color-scheme: dark;

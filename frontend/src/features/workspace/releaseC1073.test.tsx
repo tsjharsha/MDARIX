@@ -43,7 +43,7 @@ const session = (persona: string, locked: boolean, navigation = "new") =>
     persona_options: OPTIONS,
   }) as unknown as SessionContext;
 
-// The rail's destinations (0.10.89; the phone's bar repeats some of them).
+// The rail's destinations (0.10.90; the phone's bar repeats some of them).
 const tabLabels = (markup: string) =>
   [
     ...(markup.match(/<nav class="uw-rail"[\s\S]*?<\/nav>/)?.[0] ?? "").matchAll(

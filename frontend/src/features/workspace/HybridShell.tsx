@@ -34,7 +34,7 @@ import type { StoryRun } from "./oneStory";
 import { ProgressArc } from "../shared/hero/HeroVisuals";
 
 /*
- * The new navigation's shell (0.10.73, Release C part C1; since 0.10.89 the owner-approved hero design
+ * The new navigation's shell (0.10.73, Release C part C1; since 0.10.90 the owner-approved hero design
  * `mdarix-hero-ui.html`): a slim top bar with the organization, one search, "Viewing as [persona]", the bell, help and
  * the avatar; a left icon rail with only the persona's destinations, a bottom bar on a phone. The persona changes what a person sees, never what they may sign: every action keeps
  * the server's own check, and the persona never reaches the server as a permission.
@@ -570,7 +570,7 @@ export function AvatarMenu({
   );
 }
 
-/** Each destination's icon on the rail and the phone's bar (0.10.89, the hero design). */
+/** Each destination's icon on the rail and the phone's bar (0.10.90, the hero design). */
 const TAB_ICON: Record<string, LucideIcon> = {
   home: House,
   complaints: Inbox,
@@ -677,7 +677,7 @@ function BrandMark() {
 }
 
 /**
- * The left icon rail (0.10.89, the owner-approved hero design), in place of the eleven tabs across the top: the brand,
+ * The left icon rail (0.10.90, the owner-approved hero design), in place of the eleven tabs across the top: the brand,
  * Getting started with its progress ring, the persona's destinations in two groups, and Next steps pinned at the foot.
  * It folds to icons on request, and by itself below 1240 px; each icon keeps its name for screen readers and as a
  * tooltip. On a phone the bottom bar (PhoneBar) stands in for it.
@@ -747,7 +747,7 @@ export function NavRail({
   );
 }
 
-/** A phone's bottom bar (0.10.89): Getting started, Home, Complaints and Trends where the persona has them, and
+/** A phone's bottom bar (0.10.90): Getting started, Home, Complaints and Trends where the persona has them, and
  * "More", which opens the persona's other destinations above the bar. */
 export function PhoneBar({
   tabs: listed,

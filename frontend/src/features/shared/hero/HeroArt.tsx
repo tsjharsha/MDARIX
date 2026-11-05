@@ -1,7 +1,7 @@
 import { useArtId } from "./HeroVisuals";
 
 /*
- * The hero design's illustrations (0.10.89, drawn for MDARIX in the approved mock-up): the bedside scene, a patient
+ * The hero design's illustrations (0.10.90, drawn for MDARIX in the approved mock-up): the bedside scene, a patient
  * monitor, an infusion pump and the signed-record seal. Line art in the band's own colours; the ECG trace moves only
  * when the reader allows motion (hero.css).
  */

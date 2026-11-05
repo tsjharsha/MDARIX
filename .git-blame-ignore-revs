@@ -6,3 +6,5 @@
 f63ee455e2b39bd4e1a64bb9c9307334f5e6eab2
 # ruff format of one test and an unused import (0.10.86)
 a18048f12f02ff8eb60a98f579bd382c31ad369f
+# 0.10.88: Prettier on sessionEndedOnSave.test.ts
+ff9680206b504f31f0425a77f010ddc30fe6e9ee

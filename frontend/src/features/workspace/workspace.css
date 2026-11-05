@@ -6238,7 +6238,7 @@ section[aria-label="What blocks the decision"] h3 {
 
 /* ------------------------------------------------------------------------------------------------------------------
  * The new navigation's shell and Home (0.10.73, Release C part C1; the approved design mdarix-hybrid-mockup.html):
- * a top bar with "Viewing as", then the work canvas; since 0.10.89 the rail and the bar's own look are heroShell.css.
+ * a top bar with "Viewing as", then the work canvas; since 0.10.90 the rail and the bar's own look are heroShell.css.
  * ---------------------------------------------------------------------------------------------------------------- */
 .uw-hybrid .ac-body {
   grid-template-columns: minmax(0, 1fr);

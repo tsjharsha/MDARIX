@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode, type RefObject } from "react";
 import { Check, ChevronRight, History, MoreHorizontal, Send } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
-import { errorText, formatDate, send, useResource } from "../../customer-admin/shared";
+import { errorText, formatDate, notFound, send, useResource } from "../../customer-admin/shared";
 import { DeadlineChip, HarmChip } from "../../../app/chips";
 import { marketLabel } from "../../../app/labels";
 import { tabParts } from "../../../app/linkTable";
@@ -37,7 +37,7 @@ import { ReportingFacts } from "./ReportingFacts";
 import { StoryPill } from "./OneStory";
 import { dueDay } from "./Home";
 import { isLegalDeadline } from "../home";
-import { openStep, runOf, useOneStory, type StoryRun } from "../oneStory";
+import { openStep, runOf, useOneStory, useVisited, type StoryRun } from "../oneStory";
 
 /**
  * The harm in words (0.10.82, D1.7; U-18): "Death", "Serious injury", "No harm reported" or "Not known yet", never
@@ -151,6 +151,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   // Ready to close is shown when it is the next step or signed; before that it is revealed on request (one main button).
   const [readyShown, setReadyShown] = useState(false);
   const links = useImdrfLinks([view?.event.problem_code]);
+  // Story step 1 counts once this complaint has loaded (0.10.88: never on a page that failed to load).
+  useVisited({ step: "call", complaintId: resource.data?.event.complaint_id }, resource.state === "ready");
   const storyShown = story === "short" && view?.event.ref === FLAGSHIP;
   const shortStory = useShortStory(storyShown);
   // A link by the complaint's id (stage 6's Oversight?event=<id>) is rewritten to the reference people read; a former
@@ -168,8 +170,9 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   };
   if (!view)
     return (
-      // A call found on the triage list is shown as such (the panel shows its children only when ready).
-      <Panel eyebrow="Complaint" title={ref || "Complaint"} source={call ? undefined : resource}>
+      // A call found on the triage list is shown as such, and a complaint that is not there offers the list (the panel
+      // shows its children only when ready; a passing failure keeps the panel's Retry).
+      <Panel eyebrow="Complaint" title={ref || "Complaint"} source={call || notFound(resource) ? undefined : resource}>
         {resource.state === "error" && call && (
           <Empty
             title={`${ref} is a call, not a complaint yet`}

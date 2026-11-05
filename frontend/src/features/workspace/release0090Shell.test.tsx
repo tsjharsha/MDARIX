@@ -1,4 +1,4 @@
-// 0.10.89, the owner-approved hero design: the new navigation's left icon rail, its slim top bar and the phone's
+// 0.10.90, the owner-approved hero design: the new navigation's left icon rail, its slim top bar and the phone's
 // bottom bar, in place of the eleven tabs across the top. Every persona rule and route stays as it was.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
