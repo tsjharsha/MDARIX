@@ -47,6 +47,34 @@ No migration. Only the web image changes. No operator step. No sample number or 
   with its ECG-paper grid, and four illustrations (a hospital bedside, a patient monitor, an infusion pump and a signed
   record's seal). Each has an accessible name, and no status is shown by colour alone. Motion stops for readers who
   ask for reduced motion.
+
+### Changed: the pages
+
+- **Home** opens on the dark band: the story (with its five moments once the sample is done, or its ten-step ring
+  while it runs) beside the three counts, Overdue, Due this week and At risk, each with its icon. The next actions
+  sit under a ten-day deadline ruler ("Now", the day names, the overdue stretch shaded), each with an icon in its
+  deadline's colour; the reminders move beside them, under the trends card, which gains its device and the rise as
+  one big figure.
+- **Complaints**: each legal clock is a ring beside its words, with "Due soon" or "On track"; the row's edge takes the
+  clock's colour. The reference reads in the mono face beside its problem; the product shows its device, the country
+  its flag, the owner initials and the stage its dots, stacked in one column as the design shows. Above the list,
+  one bar shows it by legal clock (7 days or less, more, no deadline) with the late communications and the deaths
+  and serious injuries beside it, when the whole list is on the page.
+- **Getting started**: the dark band with the ten-step ring, the count and the bedside illustration; the progress in
+  ten segments; each step with its icon and "Step N"; the chosen step beside its icon, or the signed seal once all
+  ten are done; picture tiles on "Explore at your own pace". Two columns of steps on a phone.
+- **The complaint page**: the band with the reference, the reporter's words, the harm, the device and the legal clock
+  as a large ring with its line and flag; the facts with icons and flags; the stages as a stepper; the one Next step
+  under them. A report's and an investigation's header open on the same band.
+- **Trends**: the verdict and the sentence beside the device, three figures, the observed bar split by lot with a
+  legend, the expected hatched.
+- **Every other page** on the new navigation (Decision trees, Reports, Investigations, Records, Team, Look ahead,
+  Next steps, Settings, Account, Import your data, Help) takes the same headings in the display face, an emblem
+  beside its question, and the design's cards, buttons, chips, tables, fields and folds; Next steps opens on the band.
+- Getting started's ring on the rail is read a moment after the page's own data, so it never delays the page.
+- The browser journeys' keyboard check tells the end of a page (the browser leaves it and the next Tab starts again
+  at the top) from focus lost in the middle of it.
+
 ## [0.10.88] - 2026-11-04
 
 On the trial maintenance line (`release/0.10`): R3 of the external code review's plan, DEV-10 (the trial's journeys

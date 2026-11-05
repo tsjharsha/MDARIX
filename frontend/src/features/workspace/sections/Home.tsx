@@ -16,7 +16,7 @@ import {
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
-import { MonitorBand, ProgressArc } from "../../shared/hero/HeroVisuals";
+import { DeviceIcon, MonitorBand, ProgressArc, deviceKind } from "../../shared/hero/HeroVisuals";
 import { DeadlineRuler, ringOf } from "../heroBits";
 import { DeadlineChip } from "../../../app/chips";
 import { formatDateTime, formatDay, zoneName, zoneless } from "../../../app/dates";
@@ -215,9 +215,20 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
                 {rising.slice(0, 2).map((row) => (
                   <li key={row.key}>
                     {/* Observed against expected, as bars (0.10.82, D1.6, the approved design's trend card). */}
-                    <h2 className="uw-home-trend-title">{risingSentence(row)}</h2>
+                    <div className="uw-home-trend-head">
+                      <span className="uw-home-trend-pic" aria-hidden="true">
+                        <DeviceIcon kind={deviceKind(row.product.name)} size={36} decorative />
+                      </span>
+                      <h2 className="uw-home-trend-title">{risingSentence(row)}</h2>
+                    </div>
                     <TrendBars row={row} bare />
                     <p className="ac-muted">{comparisonLine(row)}</p>
+                    {typeof row.ratio === "number" && (
+                      // The rise as one big figure, the sentence above says it in words (the hero design's card).
+                      <span className="uw-home-ratio" aria-hidden="true">
+                        {row.ratio.toFixed(1)}×
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -241,12 +252,12 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
               </button>
             )}
           </section>
+          {/* The bell's reminders and escalations, read and cleared here on the new navigation (0.10.81, H1); in the
+              side column under the trends (0.10.90, the hero design). */}
+          <div id="home-reminders">
+            <RemindersPanel />
+          </div>
         </div>
-      </div>
-
-      {/* The bell's reminders and escalations, read and cleared here on the new navigation (0.10.81, H1). */}
-      <div id="home-reminders">
-        <RemindersPanel />
       </div>
       <MyWorkMore tab={tab} />
     </div>
@@ -327,7 +338,6 @@ export function HomeStory({ story }: { story: Resource<OneStory> }) {
                 }.`}
           </h2>
           <p className="ac-muted">Every missing fact was asked at the step that needed it. Nothing was guessed.</p>
-          {run.run === "sample" && <StoryTrack />}
           <div className="ca-action-row">
             {run.run === "sample" && story.data?.yours ? (
               <button type="button" className="ac-primary" onClick={() => chooseDataSource?.(IMPORTED_SOURCE)}>
@@ -343,6 +353,7 @@ export function HomeStory({ story }: { story: Resource<OneStory> }) {
               </button>
             )}
           </div>
+          {run.run === "sample" && <StoryTrack />}
         </div>
       </section>
     );

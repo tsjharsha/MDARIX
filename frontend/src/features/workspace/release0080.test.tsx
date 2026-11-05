@@ -87,7 +87,7 @@ describe("1. Getting started in the tab bar", () => {
     // 0.10.90: the rail's head, above Home.
     const bar = renderToStaticMarkup(<NavRail tabs={["start", "home"]} current="start" open={vi.fn()} />);
     expect(bar.indexOf("Getting started")).toBeLessThan(bar.indexOf("Home"));
-    expect(bar).toMatch(/class="uw-rail-story" aria-current="page"[^>]*>.*<strong>Getting started<\/strong>/);
+    expect(bar).toMatch(/class="uw-navrail-story" aria-current="page"[^>]*>.*<strong>Getting started<\/strong>/);
   });
 });
 

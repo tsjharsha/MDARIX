@@ -131,4 +131,10 @@ describe("each page's emblem and the design's screens", () => {
     expect(phone).toMatch(/\.uw-cp-bandgrid \{\s*grid-template-columns: minmax\(0, 1fr\);/);
     expect(phone).toMatch(/\.uw-hybrid \.uw-os-grid \{\s*grid-template-columns: minmax\(0, 1fr\);/);
   });
+
+  it("keeps each walkthrough step's state in its accessible name (the journeys find steps by it)", () => {
+    // Generated text would join the name ("Step 2: Triage ✓ Completed"); display: none would drop "Completed".
+    expect(pagesCss).not.toMatch(/\.uw-os-s::(before|after)/);
+    expect(pagesCss).not.toMatch(/\.uw-os-s \{\s*display: none/);
+  });
 });

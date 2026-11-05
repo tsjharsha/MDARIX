@@ -170,7 +170,9 @@ const css: string = fs.readFileSync(new URL("./workspace.css", import.meta.url),
 
 describe("D3.7 the phone keeps where you are and what each number means", () => {
   it("scrolls the current tab into view, and gives each Home tile one short line on a phone", () => {
-    expect(hybridShell).toMatch(/querySelector<HTMLElement>\("\[aria-current='page'\]"\)\s*\?\.scrollIntoView/);
+    // 0.10.90: the phone's bottom bar never scrolls; where you are is its marked slot, or More when the screen is
+    // behind it.
+    expect(hybridShell).toContain('current && more.includes(current) ? " is-within" : ""');
     expect(home).toContain('className="uw-home-short"');
     const sheet = css.replace(/\r\n/g, "\n");
     expect(sheet).toContain(".uw-home-stat .uw-home-short {\n    display: block;");

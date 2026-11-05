@@ -972,7 +972,7 @@
   font-weight: var(--ms-fw-bold);
 }
 .uw-hybrid .uw-stageline-ol li.is-done::before {
-  content: "¹3";
+  content: "\2713";
   border-color: var(--ms-teal-mark);
   background: var(--ms-teal-mark);
   color: var(--ms-surface);
@@ -1366,22 +1366,6 @@
 .uw-hybrid .ac-main .hx-clockpill-t .ms-chip-deadline.is-overdue {
   color: var(--ms-crit);
 }
-/* The list's columns: the clock and the record's words take the room; the rest stay compact. */
-@media (min-width: 641px) {
-  .uw-hybrid .ac-table.uw-clist td[data-label="Legal clock"] {
-    width: 190px;
-  }
-  .uw-hybrid .ac-table.uw-clist td[data-label="What happened"] {
-    width: 38%;
-  }
-  .uw-hybrid .ac-table.uw-clist td[data-label="Product, version, lot"] {
-    width: 24%;
-  }
-  .uw-hybrid .ac-table.uw-clist td[data-label="Owner"],
-  .uw-hybrid .ac-table.uw-clist td[data-label="Stage"] {
-    width: 12%;
-  }
-}
 /* Getting started's "Explore at your own pace": each card leads with its picture tile. */
 .uw-hybrid .uw-gs-explore > h2 {
   font-family: var(--ms-font-display);
@@ -1516,5 +1500,415 @@
   /* Every other day's name on a phone, so the ten fit; each day keeps its line. */
   .hx-ruler-days span:nth-child(even) {
     color: transparent;
+  }
+}
+
+/* ---------- Critique round 1 ---------- */
+/* Every fold opens with a chevron, not the browser's triangle. */
+.uw-hybrid .ac-main details > summary {
+  list-style: none;
+}
+.uw-hybrid .ac-main details > summary::-webkit-details-marker {
+  display: none;
+}
+.uw-hybrid .ac-main details.uw-more > summary::after {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-right: 2px solid var(--ms-muted);
+  border-bottom: 2px solid var(--ms-muted);
+  transform: rotate(-45deg);
+  transition: transform 0.2s;
+}
+.uw-hybrid .ac-main details.uw-more[open] > summary::after {
+  transform: rotate(45deg);
+}
+/* Next steps opens on the monitor band: the sales moment. */
+.uw-hybrid .uw-ns {
+  max-width: none;
+}
+.uw-hybrid .ac-main .uw-ns-intro {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 32px 36px;
+  border: 0;
+  border-radius: var(--ms-radius-xl);
+  background:
+    radial-gradient(70% 90% at 100% 0%, rgb(63 224 214 / 17%), transparent 60%),
+    radial-gradient(60% 80% at 0% 100%, rgb(70 120 255 / 13%), transparent 60%),
+    linear-gradient(160deg, var(--ms-hero-2), var(--ms-hero));
+  box-shadow: var(--ms-shadow-hero);
+  color: var(--ms-hero-fg);
+}
+.uw-hybrid .ac-main .uw-ns-intro::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(var(--ms-hero-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ms-hero-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: linear-gradient(100deg, transparent 8%, #000 60%);
+  mask-image: linear-gradient(100deg, transparent 8%, #000 60%);
+}
+.uw-hybrid .ac-main .uw-ns-intro :is(h1, h2) {
+  color: var(--ms-hero-fg);
+  font-size: var(--ms-fs-34);
+}
+.uw-hybrid .ac-main .uw-ns-intro .uw-ns-eyebrow {
+  color: var(--ms-glow);
+}
+.uw-hybrid .ac-main .uw-ns-intro .uw-ns-lede {
+  max-width: 70ch;
+  color: var(--ms-hero-muted);
+}
+.uw-hybrid .ac-main .uw-ns-intro .ac-primary {
+  border-color: var(--ms-glow);
+  background: var(--ms-glow);
+  color: var(--ms-glow-ink);
+}
+.uw-hybrid .ac-main .uw-ns-intro .ac-secondary {
+  border-color: var(--ms-hero-card-line);
+  background: rgb(255 255 255 / 6%);
+  color: var(--ms-hero-fg);
+}
+/* Home: a "2 days left" action reads amber, as its icon does. */
+.uw-hybrid .ac-main .uw-home-row.is-warn .ms-chip-deadline.is-later {
+  border-color: var(--ms-warn-line);
+  background: var(--ms-warn-bg);
+  color: var(--ms-warn);
+}
+.uw-home-trend-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.uw-home-trend-pic {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--ms-mint);
+  color: var(--ms-teal);
+}
+.uw-home-ratio {
+  display: block;
+  margin-top: 8px;
+  color: var(--ms-crit);
+  font-family: var(--ms-font-display);
+  font-size: var(--ms-fs-34);
+  font-stretch: 112%;
+  font-weight: 780;
+  line-height: 1;
+  text-align: right;
+}
+/* The complaint page: room under the way back, and the stages joined by lines. */
+.uw-hybrid .uw-cp > .uw-topline {
+  margin-bottom: var(--ms-space-4);
+}
+.uw-hybrid .uw-stageline-ol li:not(:last-child)::after {
+  content: "";
+  width: 22px;
+  height: 2px;
+  margin: 0 4px 0 10px;
+  border-radius: 2px;
+  background: var(--ms-line);
+}
+.uw-hybrid .uw-stageline-ol li.is-done:not(:last-child)::after {
+  background: var(--ms-teal-mark);
+}
+/* Getting started: a tick beside "Completed", a line joining the steps, the sample's reference in the mono face. */
+/* The tick is a picture beside the word: generated text would join the step's accessible name. */
+.uw-hybrid .uw-os-step.is-done .uw-os-s {
+  padding-left: 16px;
+  background: no-repeat left center / 12px 12px
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2316734a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+}
+.uw-hybrid .uw-os-rail > li {
+  position: relative;
+}
+.uw-hybrid .uw-os-rail > li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 47px;
+  left: 25px;
+  width: 2px;
+  height: 12px;
+  background: var(--ms-line);
+}
+.uw-hybrid .uw-os-rail > li:has(.is-done):not(:last-child)::after {
+  background: var(--ms-teal-mark);
+}
+.uw-hybrid .uw-wt-case-head b {
+  color: var(--ms-teal);
+  font-family: var(--ms-font-mono);
+  font-weight: 600;
+}
+.uw-hybrid .ms-chip.is-sample {
+  border-color: transparent;
+  background: var(--ms-warn-bg);
+  color: var(--ms-warn);
+}
+/* The complaint list as the design's three columns: the clock, what happened, then the product, the country, the
+   owner and the stage stacked. shortcut: the header cells are placed by position, so a column the field chooser hides
+   shifts the header (the cells keep their place); move to named header cells if the chooser is used on this list. */
+@media (min-width: 641px) {
+  .uw-hybrid .ac-table.uw-clist,
+  .uw-hybrid .ac-table.uw-clist :is(thead, tbody) {
+    display: block;
+  }
+  .uw-hybrid .ac-table.uw-clist tr {
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr) minmax(250px, 32%);
+    column-gap: 24px;
+    row-gap: 8px;
+    align-items: start;
+    height: auto;
+    padding: 14px 12px;
+    border-bottom: 1px solid var(--ms-line);
+  }
+  .uw-hybrid .ac-table.uw-clist :is(th, td) {
+    grid-column: 3;
+    width: auto;
+    padding: 0;
+    border: 0;
+  }
+  .uw-hybrid .ac-table.uw-clist :is(th:nth-child(1), td[data-label="Legal clock"]) {
+    grid-column: 1;
+    grid-row: 1 / span 4;
+  }
+  .uw-hybrid .ac-table.uw-clist :is(th:nth-child(2), td[data-label="What happened"]) {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+  }
+  .uw-hybrid .ac-table.uw-clist thead tr {
+    padding-block: 10px;
+    background: var(--ms-subtle);
+  }
+  .uw-hybrid .ac-table.uw-clist thead th {
+    background: none;
+  }
+  .uw-hybrid .ac-table.uw-clist thead th:nth-child(n + 4) {
+    display: none;
+  }
+  .uw-hybrid .ac-table.uw-clist td[data-label="Incident country"],
+  .uw-hybrid .ac-table.uw-clist td[data-label="Owner"] {
+    padding-left: 50px;
+  }
+  .uw-hybrid .ac-table.uw-clist td[data-label="Stage"] {
+    padding-left: 50px;
+  }
+  .uw-hybrid .uw-clist .hx-prod,
+  .uw-hybrid .uw-clist .uw-what {
+    min-width: 0;
+  }
+}
+@media (max-width: 640px) {
+  /* A row of tabs wraps on a phone, so none runs off the screen. */
+  .uw-hybrid .ac-main [role="tablist"] {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+  .uw-phonebar-in {
+    padding-inline: 6px;
+  }
+  .uw-phonebar .uw-tab {
+    letter-spacing: -0.02em;
+  }
+}
+/* The country and the owner share one line under the product, as the design shows them. */
+@media (min-width: 641px) {
+  .uw-hybrid .ac-table.uw-clist tr {
+    grid-template-columns: 190px minmax(0, 1fr) minmax(130px, 15%) minmax(140px, 17%);
+  }
+  .uw-hybrid .ac-table.uw-clist :is(th:nth-child(3), td[data-label="Product, version, lot"], td[data-label="Stage"]) {
+    grid-column: 3 / span 2;
+  }
+  .uw-hybrid .ac-table.uw-clist td[data-label="Incident country"] {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .uw-hybrid .ac-table.uw-clist td[data-label="Owner"] {
+    grid-column: 4;
+    grid-row: 2;
+    padding-left: 0;
+  }
+  .uw-hybrid .ac-table.uw-clist td[data-label="Stage"] {
+    grid-row: 3;
+  }
+  .uw-hybrid .ac-table.uw-clist .hx-stagecell {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+/* ---------- Critique round 2 ---------- */
+/* The page emblem reads as a picture, not a button. */
+.uw-head-art {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: radial-gradient(circle at 30% 25%, var(--ms-surface), var(--ms-mint) 70%);
+  box-shadow: inset 0 0 0 1px var(--ms-mint-line);
+  color: var(--ms-teal);
+}
+/* Form controls in the design's field style: 44 px, rounded, a firm edge, the teal focus. */
+.uw-hybrid
+  .ac-main
+  :is(
+    select,
+    textarea,
+    input:is(
+      [type="text"],
+      [type="email"],
+      [type="search"],
+      [type="number"],
+      [type="date"],
+      [type="datetime-local"],
+      [type="password"],
+      :not([type])
+    )
+  ) {
+  min-height: 44px;
+  border: 1px solid var(--ms-line-strong);
+  border-radius: 10px;
+  background-color: var(--ms-surface);
+  color: var(--ms-ink);
+}
+.uw-hybrid .ac-main textarea {
+  padding: 10px 12px;
+}
+.uw-hybrid .ac-main :is(select, textarea, input):focus-visible {
+  border-color: var(--ms-teal-mark);
+  outline: 2px solid color-mix(in srgb, var(--ms-teal-mark) 35%, transparent);
+  outline-offset: 1px;
+}
+.uw-hybrid .ac-main :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--ms-teal);
+}
+/* The top bar's search shows its whole hint. */
+.uw-hybrid .uw-top .uw-search input,
+.uw-hybrid .uw-top .uw-search input::placeholder {
+  font-size: var(--ms-fs-13);
+}
+.uw-hybrid .uw-top.ac-header {
+  gap: 8px;
+}
+/* The complaint list: the lot on its own grey line, a slimmer header row. */
+@media (min-width: 641px) {
+  .uw-hybrid .uw-clist .uw-lot {
+    display: block;
+    color: var(--ms-muted);
+    white-space: nowrap;
+  }
+  .uw-hybrid .ac-table.uw-clist thead tr {
+    padding-block: 8px;
+  }
+  .uw-hybrid .ac-table.uw-clist thead th {
+    height: auto;
+    padding-block: 0;
+  }
+}
+.uw-hybrid .hx-glance {
+  padding: 16px 18px;
+  border-color: var(--ms-line);
+  background: linear-gradient(100deg, var(--ms-surface), var(--ms-subtle));
+}
+.uw-hybrid .hx-segbar {
+  height: 16px;
+}
+/* The complaint page: the next card stacks its button under its words; the clock's line keeps its flag beside it. */
+.uw-hybrid .uw-cp-head .uw-cp-next {
+  grid-template-columns: minmax(0, 1fr);
+}
+.uw-hybrid .uw-cp-head .uw-cp-next > :is(.ac-primary, .ac-secondary) {
+  grid-column: 1;
+  grid-row: auto;
+  justify-self: start;
+  margin-top: 8px;
+}
+.uw-cp-clockcap {
+  flex-wrap: nowrap;
+  max-width: 250px;
+}
+.uw-cp-clockcap .hx-flag {
+  flex: none;
+}
+/* Home, the sample story under way: its step in the display face, its reference under it. */
+.uw-hybrid .ac-main .uw-home-band .uw-home-banner > span {
+  display: grid;
+  gap: 6px;
+}
+.uw-hybrid .ac-main .uw-home-band .uw-home-banner .ms-chip {
+  justify-self: start;
+}
+.uw-hybrid .ac-main .uw-home-band .uw-home-banner b {
+  font-size: var(--ms-fs-26);
+  line-height: 1.2;
+}
+.uw-hybrid .ac-main .uw-home-band .uw-home-banner .ac-muted {
+  color: var(--ms-hero-muted);
+  font-family: var(--ms-font-mono);
+  font-size: var(--ms-fs-14);
+}
+/* Getting started: the explore cards share a height. */
+.uw-hybrid .uw-gs-cards {
+  align-items: stretch;
+}
+@media (max-width: 640px) {
+  /* A row of tabs scrolls inside itself on a phone, fading at its edge, instead of wrapping into rows. */
+  .uw-hybrid .ac-main [role="tablist"] {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 32px), transparent);
+  }
+  .uw-hybrid .ac-main [role="tablist"] > * {
+    flex: none;
+  }
+  /* Getting started's ten steps in two columns, as the design's phone shows them. */
+  .uw-hybrid .uw-os-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 8px;
+  }
+  .uw-hybrid .uw-os-rail > li::after {
+    display: none;
+  }
+  .uw-hybrid .uw-os-step {
+    gap: 10px;
+    padding: 4px;
+  }
+  .uw-hybrid .uw-os-k {
+    width: 36px;
+    height: 36px;
+  }
+  /* The state stays in each step's name for screen readers; the tile's badge shows it. */
+  .uw-hybrid .uw-os-s {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .uw-hybrid .ac-main .uw-home-band .ac-primary {
+    justify-content: center;
+    width: 100%;
+  }
+  .uw-hybrid .ac-main .uw-home-band .uw-home-banner {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+  .uw-hybrid .ac-main .uw-home-band .uw-home-banner b {
+    font-size: var(--ms-fs-20);
+  }
+  .uw-hybrid .ac-main .uw-home-band .uw-home-banner .ac-primary {
+    grid-column: 1 / -1;
   }
 }

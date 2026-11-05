@@ -689,8 +689,14 @@ export function UserWorkspace({
   // "Import your data" beside the Sample data label, and in the avatar menu on a phone (0.10.79).
   const importOwn = importOwnDataAction(!!trial?.is_trial, session, open);
   const shell = trialShellShows(section, fresh, dataBar);
-  // Getting started's progress on the rail's ring (0.10.90): the story's own read, on a trial's new navigation only.
-  const progress = storyProgress(shownRun(useOneStory(fresh && !!trial?.is_trial).data, dataSource));
+  // Getting started's progress on the rail's ring (0.10.90): the story's own read, on a trial's new navigation only,
+  // asked once the page's own reads have had their turn, so the ring never slows the page's first content.
+  const [ringRead, setRingRead] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setRingRead(true), 2500);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const progress = storyProgress(shownRun(useOneStory(fresh && !!trial?.is_trial && ringRead).data, dataSource));
 
   return (
     <WorkspaceContext.Provider value={api}>

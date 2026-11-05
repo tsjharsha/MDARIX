@@ -338,6 +338,14 @@ export function TrendHeroes({
                   <TrendingUp size={14} aria-hidden="true" /> {trendResultLabel(row)}
                 </span>
                 <h2>{risingSentence(row)}</h2>
+                <div className="uw-trend-figs" aria-hidden="true">
+                  {bars.map(([label, value, tone]) => (
+                    <span key={label} className={tone === "is-over" ? "is-hot" : undefined}>
+                      <b className="uw-num">{label === "Observed" ? value : value.toFixed(1)}</b>
+                      {label}
+                    </span>
+                  ))}
+                </div>
               </div>
               <span className="uw-trend-dev" aria-hidden="true">
                 <DeviceIcon kind={deviceKind(row.product.name)} size={110} decorative />
@@ -345,14 +353,6 @@ export function TrendHeroes({
                   {[shortName(row.product.name), row.product_version?.version_identifier].filter(Boolean).join(" · ")}
                 </span>
               </span>
-            </div>
-            <div className="uw-trend-figs" aria-hidden="true">
-              {bars.map(([label, value, tone]) => (
-                <span key={label} className={tone === "is-over" ? "is-hot" : undefined}>
-                  <b className="uw-num">{label === "Observed" ? value : value.toFixed(1)}</b>
-                  {label}
-                </span>
-              ))}
             </div>
             <div
               className="uw-bars"
