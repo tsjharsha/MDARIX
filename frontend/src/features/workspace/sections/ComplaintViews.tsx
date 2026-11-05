@@ -77,7 +77,8 @@ export function ComplaintViews({ tab }: { tab?: string }) {
         {canLog && (
           <button
             type="button"
-            className="ac-secondary"
+            // The page's main action, filled (owner, 5 Nov 2026: the hero design's primary button).
+            className="ac-primary"
             onClick={() => {
               setView("Calls to check");
               setLogged((count) => count + 1);

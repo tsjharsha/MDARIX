@@ -250,6 +250,10 @@ export function ListGlance({ rows }: { rows: any[] }) {
   ];
   return (
     <div className="hx-glance" role="group" aria-label="This list by legal clock">
+      <p className="hx-glance-big">
+        <b className="uw-num">{rows.length}</b>
+        <small>{rows.length === 1 ? "complaint" : "complaints"}</small>
+      </p>
       <div className="hx-segbar" aria-hidden="true">
         {parts
           .filter((part) => part.n)

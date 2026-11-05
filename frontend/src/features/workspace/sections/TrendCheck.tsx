@@ -70,7 +70,8 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
   );
   const summary = board.data?.summary;
   // The one action on a group: open its trend, or raise one (the table and the lead sentences share it).
-  const action = (row: TrendItem) =>
+  // On the trend's hero Raise a trend is the main action, filled (owner, 5 Nov 2026); in the table it stays secondary.
+  const action = (row: TrendItem, lead = false) =>
     row.open_signals.length ? (
       <button
         type="button"
@@ -80,7 +81,12 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
         {row.open_signals[0].business_id ?? "Open trend"}
       </button>
     ) : canTriage && canRaiseFromTrend(row) ? (
-      <button type="button" className="ac-secondary" disabled={busy === row.key} onClick={() => void raise(row)}>
+      <button
+        type="button"
+        className={lead ? "ac-primary" : "ac-secondary"}
+        disabled={busy === row.key}
+        onClick={() => void raise(row)}
+      >
         <Plus size={14} aria-hidden="true" /> {busy === row.key ? "Raising…" : "Raise a trend"}
       </button>
     ) : null;
@@ -308,7 +314,7 @@ export function TrendHeroes({
   source,
 }: {
   board: TrendBoard;
-  action: (row: TrendItem) => React.ReactNode;
+  action: (row: TrendItem, lead?: boolean) => React.ReactNode;
   /** The Sample · Your data switch: on your data, your products only (never the sample's rise). */
   source?: string;
 }) {
@@ -407,7 +413,7 @@ export function TrendHeroes({
               <p>{chanceText(row)}</p>
               {perUnitHint(board) && <p>{perUnitHint(board)}</p>}
             </details>
-            <div className="ca-action-row">{action(row)}</div>
+            <div className="ca-action-row">{action(row, true)}</div>
           </section>
         );
       })}

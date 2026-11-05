@@ -28,6 +28,15 @@ migration. Only the web image changes. No operator step. No sample number or lab
 - The application's last hard-coded colours (about 120, in the shared style sheets) now come from the design tokens,
   so no surface, chip, table, fold, form field or dialog stays light by accident.
 
+### Changed: the owner's design decisions (5 Nov 2026)
+
+- **Log a call** on Complaints and **Raise a trend** on the trend's hero are filled primary buttons (in the table of
+  every group, Raise a trend stays secondary).
+- **The complaint list's big count** ("27 complaints") leads its summary bar, as the design shows it.
+- **The side menu's alerts are a dot, never a count**: Complaints while a complaint is overdue, Trends while a product
+  is rising; on a phone the dot is on the slot, or on More. Screen readers hear "New items".
+- **The browser journeys' keyboard check** keeps telling the end of a page from focus lost in the middle of it.
+
 ### Fixed
 
 - **Service work on the complaint page said its heading and its state twice** (since before 0.10.90): once in the

@@ -1914,3 +1914,40 @@
     grid-column: 1 / -1;
   }
 }
+/* The list's big count beside its bar (owner, 5 Nov 2026: the design's "27"). */
+.uw-hybrid .hx-glance {
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 22px;
+  align-items: center;
+}
+.hx-glance-big {
+  display: grid;
+  grid-row: span 2;
+  margin: 0;
+}
+.hx-glance-big b {
+  font-family: var(--ms-font-display);
+  font-size: var(--ms-fs-48);
+  font-stretch: 112%;
+  font-weight: 780;
+  line-height: 1;
+}
+.hx-glance-big small {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-13);
+  font-weight: var(--ms-fw-semibold);
+}
+@media (max-width: 640px) {
+  .uw-hybrid .hx-glance {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hx-glance-big {
+    grid-row: auto;
+    grid-template-columns: auto 1fr;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .hx-glance-big b {
+    font-size: var(--ms-fs-34);
+  }
+}

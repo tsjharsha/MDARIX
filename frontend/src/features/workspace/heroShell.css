@@ -647,3 +647,34 @@ html:has(.uw-hybrid) {
     display: none;
   }
 }
+/* A destination with something new (owner, 5 Nov 2026): a dot, never a count; its words are "New items". */
+.uw-tab-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--ms-h-crit);
+  box-shadow: 0 0 0 3px rgb(255 107 99 / 22%);
+}
+.uw-navrail.is-folded .uw-tab-dot,
+.uw-phonebar .uw-tab-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  margin: 0;
+}
+.uw-phonebar .uw-tab-dot {
+  top: 9px;
+  right: calc(50% - 16px);
+  background: var(--ms-crit-mark);
+  box-shadow: 0 0 0 2px var(--ms-surface);
+}
+@media (max-width: 1240px) {
+  .uw-navrail .uw-tab-dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    margin: 0;
+  }
+}

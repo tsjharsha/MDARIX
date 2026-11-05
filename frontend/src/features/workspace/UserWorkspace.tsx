@@ -86,6 +86,8 @@ import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext
 import { signalFromSearch, signalLinkStart } from "./signals";
 import { setDisplayZone, zoneName } from "../../app/dates";
 import { useResource } from "../customer-admin/shared";
+import { OVERDUE_PATH, inData, withSource } from "./home";
+import { trendPath, type TrendBoard } from "./signalAi";
 import { PARKED_SECTIONS, featureSetOf, routeFor } from "../../app/featureSet";
 import { NEW_MENU, NEW_PLACES, OLD_VIEWS, navigationOf, placeLabel, placeOf, tabParts } from "../../app/linkTable";
 import { TrendsSection } from "./sections/Trends";
@@ -107,6 +109,7 @@ import {
   PhoneBar,
   initials,
   storyProgress,
+  railAlerts,
   sectionIcon,
   readDataChoice,
   saveDataChoice,
@@ -699,6 +702,16 @@ export function UserWorkspace({
     const timer = window.setTimeout(() => setRingRead(true), 1500);
     return () => window.clearTimeout(timer);
   }, []);
+  // The rail's dots (owner, 5 Nov 2026): the overdue count and the trend check, read with the ring, after the page.
+  const overdueRead = useResource<{ total: number }>(fresh && ringRead ? withSource(OVERDUE_PATH, dataSource) : null);
+  const trendRead = useResource<TrendBoard>(fresh && ringRead ? trendPath("version") : null);
+  const alerts = railAlerts(
+    overdueRead.data?.total,
+    (trendRead.data?.items ?? []).filter(
+      (row) =>
+        (row.result === "SIGNIFICANT" || row.result === "ELEVATED") && inData(row.product.identifier, dataSource),
+    ).length,
+  );
   const progress = storyProgress(shownRun(useOneStory(fresh && !!trial?.is_trial && ringRead).data, dataSource));
 
   return (
@@ -805,6 +818,7 @@ export function UserWorkspace({
               open={open}
               personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
               progress={progress}
+              alerts={alerts}
             />
           </>
         )}
@@ -1107,6 +1121,7 @@ export function UserWorkspace({
             open={open}
             personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
             progress={progress}
+            alerts={alerts}
           />
         )}
         <SessionTimeoutWarning session={idle} />

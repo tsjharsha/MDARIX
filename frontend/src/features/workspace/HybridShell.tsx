@@ -617,6 +617,21 @@ export const phoneBar = (tabs: readonly string[]) => ({
   more: tabs.filter((key) => !PHONE_SLOTS.includes(key)),
 });
 
+/** The destinations that have something new for the person (owner, 5 Nov 2026: a dot, never a count): Complaints
+ * while a complaint is overdue, Trends while a product is rising against its history. */
+export const railAlerts = (overdue: number | null | undefined, rising: number | null | undefined) =>
+  new Set([...(overdue ? ["complaints"] : []), ...(rising ? ["trends"] : [])]);
+
+/** A destination's dot: a mark beside its name, and the words "New items" for screen readers and as its tooltip. */
+function AlertDot() {
+  return (
+    <>
+      <i className="uw-tab-dot" aria-hidden="true" title="New items" />
+      <span className="sr-only"> · New items</span>
+    </>
+  );
+}
+
 /** The walkthrough's progress for the rail's ring: steps done or not needed, of ten, from the story's own read. */
 export const storyProgress = (run: StoryRun | null | undefined) =>
   run ? run.steps.filter((step) => step.done || step.skipped).length : null;
@@ -628,6 +643,7 @@ function TabButton({
   personaLabel,
   open,
   className = "uw-tab",
+  alert = false,
 }: {
   tab: string;
   current: string | null;
@@ -635,6 +651,8 @@ function TabButton({
   personaLabel?: string;
   open: (section: WorkspaceSection) => void;
   className?: string;
+  /** Something new there: the dot. */
+  alert?: boolean;
 }) {
   const Icon = TAB_ICON[tab] ?? House;
   const label = PERSONA_TABS[tab].label;
@@ -652,6 +670,7 @@ function TabButton({
     >
       <Icon size={20} aria-hidden="true" />
       <span className="uw-tab-label">{label}</span>
+      {alert && <AlertDot />}
       {tab === extra && <span className="sr-only"> (opened from Getting started; not one of your tabs)</span>}
     </button>
   );
@@ -698,6 +717,7 @@ export function NavRail({
   open,
   personaLabel,
   progress = null,
+  alerts = new Set<string>(),
 }: {
   tabs: readonly string[];
   current: string | null;
@@ -705,11 +725,21 @@ export function NavRail({
   personaLabel?: string;
   /** Getting started's steps done of ten, when the story is read. */
   progress?: number | null;
+  /** The destinations with something new (railAlerts). */
+  alerts?: ReadonlySet<string>;
 }) {
   const [folded, setFolded] = useState(false);
   const { tabs, extra } = shownTabs(listed, current);
   const button = (tab: string) => (
-    <TabButton key={tab} tab={tab} current={current} extra={extra} personaLabel={personaLabel} open={open} />
+    <TabButton
+      key={tab}
+      tab={tab}
+      current={current}
+      extra={extra}
+      personaLabel={personaLabel}
+      open={open}
+      alert={alerts.has(tab)}
+    />
   );
   const groups = RAIL_GROUPS.map((group) => ({ ...group, tabs: group.tabs.filter((tab) => tabs.includes(tab)) }));
   return (
@@ -772,12 +802,14 @@ export function PhoneBar({
   open,
   personaLabel,
   progress = null,
+  alerts = new Set<string>(),
 }: {
   tabs: readonly string[];
   current: string | null;
   open: (section: WorkspaceSection) => void;
   personaLabel?: string;
   progress?: number | null;
+  alerts?: ReadonlySet<string>;
 }) {
   const [shown, setShown] = useState(false);
   const root = useRef<HTMLElement>(null);
@@ -801,6 +833,7 @@ export function PhoneBar({
               personaLabel={personaLabel}
               open={go}
               className="uw-tab uw-more-item"
+              alert={alerts.has(tab)}
             />
           ))}
         </div>
@@ -823,7 +856,15 @@ export function PhoneBar({
               <span className="uw-tab-label">Getting started</span>
             </button>
           ) : (
-            <TabButton key={tab} tab={tab} current={current} extra={extra} personaLabel={personaLabel} open={go} />
+            <TabButton
+              key={tab}
+              tab={tab}
+              current={current}
+              extra={extra}
+              personaLabel={personaLabel}
+              open={go}
+              alert={alerts.has(tab)}
+            />
           ),
         )}
         {more.length > 0 && (
@@ -836,6 +877,7 @@ export function PhoneBar({
           >
             <Ellipsis size={20} aria-hidden="true" />
             <span className="uw-tab-label">More</span>
+            {more.some((tab) => alerts.has(tab)) && <AlertDot />}
           </button>
         )}
       </div>
