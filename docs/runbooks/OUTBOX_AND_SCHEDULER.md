@@ -134,7 +134,7 @@ briefly unavailable) is logged and tried again on the next one.
 | `trial-reminders` | 6 h | Email trial owners before and when the trial ends |
 | `trial-retention` | 24 h | Delete trial data 30 days after the trial ends (held while its move into the MVP is requested) |
 | `embedding-catch-up` | 15 min | Embed evidence that has no embedding yet |
-| `operations-alerts` | 5 min | Alert on dead letters and a stopped worker; ping `MDARIX_SCHEDULER_HEARTBEAT_URL` |
+| `operations-alerts` | 5 min | Alert on dead letters, a stopped worker, an outbox falling behind (lag over 15 min) and failing e-mail; ping `MDARIX_SCHEDULER_HEARTBEAT_URL` |
 | `support-access-expiry` | 5 min | Close support access whose time ran out (`SUPPORT_ACCESS_EXPIRED` in the organization's audit trail) and queue `SUPPORT_ACCESS_ENDED` to its decision makers. Access itself ends at the second it expires, whether this has run or not |
 | `export-expiry` | 1 h | Delete data exports after their download period |
 | `connector-sync` | 15 min | Sync connections that have a sync schedule |
@@ -158,6 +158,28 @@ directly to the database, not through a transaction-mode pooler.
 | `Scheduled job recovered: <job>` | First success after 3 or more failures |
 | `Scheduled job missed: <job>` | The job has not started or finished within 2 x its interval (another instance holding the lock, or a slow job starving the loop). Once per occurrence |
 | `Scheduled job running again: <job>` | The missed job ran within its interval again |
+| `Outbox falling behind` / `Outbox caught up` | The longest-waiting event that is due has waited over 15 minutes (the worker stopped, never started, or cannot keep up), and when it no longer has (0.10.88) |
+| `E-mail delivery failing` / `E-mail delivery recovered` | E-mails the provider refused wait in the outbox to be retried (`EmailDeliveryError`, or a notification's `NotificationFailed`), and when none does (0.10.88) |
+| `Signatures not settled` / `Signatures settled again` | The `signature-settlement` job could not settle a signature, or one has been PENDING for over 30 minutes, and when neither is true (0.10.88) |
+
+Every alert goes to `MDARIX_ALERT_WEBHOOK` and/or `MDARIX_ALERT_EMAIL` (backend/app/alerts.py). Which channel, and
+who is on call, is the owner's decision. The local e-mail drill of 0.10.88 showed why one channel should not be the
+same SMTP provider as the customers' e-mail: with the provider down, the alert "Trial invitation not delivered" could
+not be e-mailed either and reached only the log. A webhook to a phone or chat service is independent of it.
+
+### Health signals (`/health/ready`)
+
+| Check | Degraded when |
+|---|---|
+| `database` | Not ready (503): the database does not answer as the runtime role, or its schema is not this build's head |
+| `worker` | No outbox worker heartbeat within 60 s (`STOPPED`), or none ever (`NOT_REPORTED`) |
+| `outbox` | The longest-waiting due event has waited over 15 minutes (`LAGGING`); it reports `waiting`, `retrying`, `email_failing` and `lag_seconds` (0.10.88) |
+| `scheduler` | `operations-alerts` has not finished within 15 minutes |
+| `email` | SMTP is not configured, or e-mails the provider refused wait to be retried (`DELIVERY_FAILING`, 0.10.88) |
+| `data_planes`, `object_storage` | A dedicated plane does not answer or is behind; the object store cannot be written |
+
+Degraded keeps the API in rotation; `/health/status` says one word. The deploy's readiness gate,
+`scripts/deploy_gate.py`, asks the same report from inside the new API container (DEPLOYMENT.md).
 | `Trial data could not be deleted` | `trial-retention` could not purge an ended trial; nothing was changed for it |
 | `Trial data held for a pilot request` | `trial-retention`: a trial kept because its pilot request asks to move its data is 7 days from the date it would otherwise have been deleted, or from the end of its 90-day hold. Once each; close the request (Identity & Access › Onboarding) or convert the trial |
 | `Audit trail integrity check failed` | `audit-chain-verification` found a broken chain; follow [INCIDENT_RESPONSE.md](INCIDENT_RESPONSE.md) |

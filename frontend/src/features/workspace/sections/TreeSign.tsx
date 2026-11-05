@@ -46,6 +46,7 @@ export function signItems({
   overrideReason,
   trainingNeeded,
   trained,
+  changeReason = "",
 }: {
   groups: QuestionGroup[];
   item: MarketItem;
@@ -56,6 +57,8 @@ export function signItems({
   overrideReason: string;
   trainingNeeded: boolean;
   trained: boolean;
+  /** Why a re-signed conclusion changes (OD-4, 0.10.88): asked when the market is signed already. */
+  changeReason?: string;
 }): CheckItem[] {
   const items = signChecklist(groups, item, form, folded);
   if (!harm.level) items.push({ ok: false, text: "The harm level" });
@@ -63,6 +66,8 @@ export function signItems({
     items.push({ ok: false, text: "Why the answers differ from the harm level" });
   if (choice === "override" && collapsed(overrideReason).length < ASSESSMENT_LIMITS.reasonMin)
     items.push({ ok: false, text: "Your reason for overriding the outcome" });
+  if (item.current && collapsed(changeReason).length < ASSESSMENT_LIMITS.reasonMin)
+    items.push({ ok: false, text: "Why the signed conclusion changes" });
   if (trainingNeeded && !trained) items.push({ ok: false, text: "Your training confirmation" });
   return items;
 }
@@ -87,6 +92,7 @@ export function SignCard({
   harm,
   onHarm,
   flush,
+  updating = false,
   onSigned,
 }: {
   detail: AssessmentDetail;
@@ -103,12 +109,15 @@ export function SignCard({
   harm: HarmState;
   onHarm: (next: HarmState) => void;
   flush: () => Promise<MarketItem | null>;
+  /** An answer is being saved: the outcome shown may still change. */
+  updating?: boolean;
   onSigned: (next: MarketItem) => void;
   flat: readonly Question[];
 }) {
   const { session } = useWorkspace();
   const [picked, setPicked] = useState<"follow" | "override" | null>(null);
   const [overrideReason, setOverrideReason] = useState("");
+  const [changeReason, setChangeReason] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [trained, setTrained] = useState(false);
@@ -131,6 +140,7 @@ export function SignCard({
     harm,
     choice,
     overrideReason,
+    changeReason,
     trainingNeeded,
     trained,
   });
@@ -152,6 +162,7 @@ export function SignCard({
       const out = await send<AssessmentDetail>(assessmentPath(detail.complaint.id, item.market, "/sign"), "POST", {
         conclusion,
         override_reason: choice === "override" ? overrideReason : "",
+        change_reason: item.current ? changeReason : "",
         version: saved.draft.version,
         saved_at: saved.draft.saved_at,
         password,
@@ -169,8 +180,11 @@ export function SignCard({
   };
   return (
     <section className={`uw-card dt-outcome ${tone}`} id="dt-outcome" aria-label="The outcome">
-      <div aria-live="polite" className="dt-outcome-top">
-        <p className="ac-eyebrow">{signed ? "Signed conclusion" : "Points to"}</p>
+      <div aria-live="polite" aria-busy={updating} className="dt-outcome-top">
+        <p className="ac-eyebrow">
+          {signed ? "Signed conclusion" : "Points to"}
+          {updating && !signed && <span className="ac-muted"> · updating from your answers…</span>}
+        </p>
         <p className="dt-big">{outcome ? CONCLUSION_LABELS[outcome] : "Not decided yet"}</p>
         {outcome === "REPORTABLE" && version?.report_type_label && (
           <p className="dt-type">{version.report_type_label}</p>
@@ -204,6 +218,7 @@ export function SignCard({
           <b>{item.current.signed_by ?? "A colleague"}</b> · {formatDateTime(item.current.signed_at)} · meaning:{" "}
           {signedMeaning(item.current.conclusion)}
           {item.current.override_reason ? ` · overrode the outcome: ${item.current.override_reason}` : ""}
+          {item.current.change_reason ? ` · why it changed: ${item.current.change_reason}` : ""}
         </p>
       )}
       {!signed && !canDecide && (
@@ -254,10 +269,22 @@ export function SignCard({
               onChange={(event) => setOverrideReason(event.target.value)}
             />
           )}
+          {item.current && (
+            <textarea
+              className="dt-input"
+              aria-label="Why the signed conclusion changes"
+              placeholder="This market is signed already: why does the conclusion change? (required, kept with this version)"
+              rows={2}
+              value={changeReason}
+              onChange={(event) => setChangeReason(event.target.value)}
+            />
+          )}
           <ul className="dt-check" id={`dt-check-${item.market}`} aria-label="Before you sign">
             {items.map((entry) => (
               <li key={entry.text} className={entry.ok ? "is-ok" : ""}>
-                <span aria-hidden="true">{entry.ok ? "✓" : "○"}</span> {entry.text}
+                <span aria-hidden="true">{entry.ok ? "✓" : "○"}</span>{" "}
+                <span className="sr-only">{entry.ok ? "Done: " : "To do: "}</span>
+                {entry.text}
               </li>
             ))}
           </ul>

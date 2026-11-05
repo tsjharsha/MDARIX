@@ -40,25 +40,32 @@ def approvers(control_db: Session, tenant_id, excluded) -> list[tuple[str, str]]
     return holders(control_db, tenant_id, PERMISSIONS, excluded)
 
 
-def holders(control_db: Session, tenant_id, permissions, excluded=()) -> list[tuple[str, str]]:
-    """``[(user id, name)]`` of the active colleagues (never an administrator) who hold any of ``permissions``,
-    outside ``excluded``, by name: who may sign a step, shown before the work starts (0.10.68, 7.8)."""
+def colleagues(control_db: Session, tenant_id) -> list[tuple[str, str, frozenset[str]]]:
+    """``[(user id, name, permissions)]`` of the active colleagues (never an administrator), by name: read once, for a
+    screen that asks who may sign several steps (0.10.88: the complaint page asked it seven times per person)."""
     from backend.app.db.models.foundation import AuthUser
     from backend.app.workflow.people import display_name, permissions_of
 
-    skip = {str(ref) for ref in excluded if ref}
-    found = []
-    for user in (
-        control_db.query(AuthUser)
+    return [
+        (str(user.id), display_name(user) or "A colleague", permissions_of(control_db, user))
+        for user in control_db.query(AuthUser)
         .filter(AuthUser.tenant_id == tenant_id, AuthUser.status == "ACTIVE")
         .order_by(AuthUser.display_name)
         .limit(500)
-    ):
-        if str(user.id) in skip or is_administrator_role(user.role):
-            continue
-        if any(permission in permissions_of(control_db, user) for permission in permissions):
-            found.append((str(user.id), display_name(user) or "A colleague"))
-    return found
+        if not is_administrator_role(user.role)
+    ]
+
+
+def holders(control_db: Session, tenant_id, permissions, excluded=(), everyone=None) -> list[tuple[str, str]]:
+    """``[(user id, name)]`` of the active colleagues (never an administrator) who hold any of ``permissions``,
+    outside ``excluded``, by name: who may sign a step, shown before the work starts (0.10.68, 7.8). ``everyone`` is
+    ``colleagues(...)`` when the caller already read it."""
+    skip = {str(ref) for ref in excluded if ref}
+    return [
+        (ref, name)
+        for ref, name, granted in (everyone if everyone is not None else colleagues(control_db, tenant_id))
+        if ref not in skip and any(permission in granted for permission in permissions)
+    ]
 
 
 def standing(problem: str | None, separation: bool, others: list[str], trial: bool, role: str | None, noun: str):

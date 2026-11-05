@@ -194,6 +194,18 @@ type Message = { tone: "good" | "bad"; text: string; link?: string };
  * trial's limit, removing one (the seat is free again), resetting a colleague's MFA, and deciding on the support access
  * MDARIX asks for (backend/app/trial/team.py). A trial has no admin console: these are its owner's.
  */
+/** The invitation is sent while the request waits: a slow e-mail provider can take up to its own 15-second limit on
+ * top of the save, so the screen waits longer than the usual 15 seconds before it gives up (0.10.88, DEV-10). */
+export const INVITE_TIMEOUT_MS = 45_000;
+
+/** What to say when an invitation got no answer (a timeout or a lost connection): it may have been made and sent, so
+ * "try again" would invite twice. Null for any other failure, whose own message is shown. Exported for its test. */
+export function unansweredInvite(error: unknown): string | null {
+  const code = (error as { code?: string } | null)?.code;
+  if (code !== "TIMEOUT" && code !== "NETWORK_ERROR") return null;
+  return "MDARIX did not answer in time. The invitation may still have been sent: check the list below before you send it again.";
+}
+
 export function TeamPanel({ onChanged }: { onChanged: () => void }) {
   const team = useResource<Team>(TEAM_PATH);
   const [busy, setBusy] = useState(false);
@@ -211,6 +223,7 @@ export function TeamPanel({ onChanged }: { onChanged: () => void }) {
       const result = await requestJson<any>(path, {
         method: "POST",
         ...(body ? { body: JSON.stringify(body) } : {}),
+        timeoutMs: INVITE_TIMEOUT_MS,
       });
       const sent = result.email_delivery === "SENT";
       const link = !sent && result.activation_path ? `${window.location.origin}${result.activation_path}` : undefined;
@@ -231,7 +244,13 @@ export function TeamPanel({ onChanged }: { onChanged: () => void }) {
       changed();
       return true;
     } catch (error) {
-      setMessage({ tone: "bad", text: error instanceof Error ? error.message : "The invitation could not be sent." });
+      const unanswered = unansweredInvite(error);
+      setMessage({
+        tone: "bad",
+        text: unanswered ?? (error instanceof Error ? error.message : "The invitation could not be sent."),
+      });
+      // The invitation may well be there: the list shows what the server did.
+      if (unanswered) changed();
       return false;
     } finally {
       setBusy(false);

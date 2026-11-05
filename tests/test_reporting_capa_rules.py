@@ -201,8 +201,10 @@ def test_uk_and_canadian_templates_follow_their_regulations():
     assert all(window["day_basis"] == rules.CALENDAR for window in by_name.values())
     aware, today = date(2026, 10, 1), date(2026, 10, 3)
     windows = list(by_name.values())
-    uk_death = rules.clocks(_record(country="United Kingdom", death=True), windows, aware, today)
-    assert [clock.name for clock in uk_death] == [gb_death["name"], gb_serious["name"]]
+    gb_death_clocks = rules.clocks(_record(country="Great Britain", death=True), windows, aware, today)
+    assert [clock.name for clock in gb_death_clocks] == [gb_death["name"], gb_serious["name"]]
+    # "United Kingdom" alone is no market (OD-2, 0.10.88): the person chooses Great Britain or Northern Ireland.
+    assert rules.clocks(_record(country="United Kingdom", death=True), windows, aware, today) == []
     canada = rules.clocks(_record(country="Canada", malfunction=True), windows, aware, today)
     assert [clock.name for clock in canada] == [ca_recur["name"]] and canada[0].due == date(2026, 10, 31)
     assert rules.windows_problem(windows) is None

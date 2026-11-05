@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoryView, harmText, pickOn, pickView, practiceLine, summaryOf } from "./sections/OneStory";
 import { GettingStartedSection } from "./sections/GettingStarted";
 import { ExploreCards, TrialSettings } from "./sections/GettingStartedMore";
-import { openStep, type StoryRun } from "./oneStory";
+import { openStep, visited, type StoryRun } from "./oneStory";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { IMPORTED_SOURCE, SAMPLE_SOURCE } from "./complaintList";
 import { SAMPLE_REMOVAL_PATH } from "./sections/RemoveSample";
@@ -183,10 +183,14 @@ describe("picking a step previews it and never completes it", () => {
     vi.stubGlobal("fetch", fetch);
     render(<StoryView story={{ sample: runAt("sample", 1), yours: null }} />);
     expect(fetch).not.toHaveBeenCalled();
-    // The main button of step 1 opens the sample complaint by its reference, in this tenant, and sends its mark.
+    // The main button of step 1 opens the sample complaint by its reference, in this tenant; its mark is sent once
+    // the complaint page has loaded that complaint (0.10.88).
     const open = vi.fn();
-    await openStep(runAt("sample", 0), 0, open);
+    const run = runAt("sample", 0);
+    await openStep(run, 0, open);
     expect(open).toHaveBeenCalledWith("Complaint", "Summary?ref=SAMPLE-RV-11");
+    expect(fetch).not.toHaveBeenCalled();
+    await visited({ step: "call", complaintId: run.complaint.id });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

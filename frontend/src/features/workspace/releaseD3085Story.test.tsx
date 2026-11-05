@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoryView } from "./sections/OneStory";
 import { TabBar } from "./HybridShell";
-import { ONE_STORY_PATH, openStep, takeMarkProblem, type StoryRun } from "./oneStory";
+import { ONE_STORY_PATH, openStep, takeMarkProblem, visited, type StoryRun } from "./oneStory";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import gettingStarted from "./sections/GettingStarted.tsx?raw";
 import { SAMPLE_SOURCE } from "./complaintList";
@@ -99,6 +99,8 @@ describe("The story always works (owner report on 0.10.84)", () => {
     vi.stubGlobal("window", { setTimeout, clearTimeout });
     const run = runAt("sample", 0);
     await openStep(run, 0, vi.fn());
+    // 0.10.88: the mark is saved once the complaint page has loaded that complaint.
+    await visited({ step: "call", complaintId: run.complaint.id });
     const body = JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body));
     expect(body).toEqual({ run: "sample", step: "call", complaint_id: run.complaint.id });
     expect(takeMarkProblem()).toContain("The story now follows OS-1002.");
@@ -128,5 +130,39 @@ describe("Getting started is the walkthrough first (owner, 5 Nov 2026)", () => {
     expect(page.indexOf("<OneStory heading={heading} />")).toBeLessThan(page.indexOf("<ExploreCards"));
     expect(page.indexOf("<ExploreCards")).toBeLessThan(page.indexOf("<TrialSettings"));
     expect(gettingStarted).not.toContain("More ways to explore");
+  });
+});
+
+describe("the step list tells a screen reader which steps are not needed (0.10.88, DEV-10)", () => {
+  beforeEach(stubWindow);
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("names a step skipped by a not-reportable conclusion as not needed, not as a step still to do", () => {
+    const run = { ...runAt("sample", 8), conclusion: "NOT_REPORTABLE" } as StoryRun;
+    run.steps = run.steps.map((step, index) =>
+      index >= 4 && index <= 7 ? { ...step, done: false, skipped: true } : step,
+    );
+    // 0.10.87's walkthrough says each step's state in words inside its button.
+    const rail = view({}, run).match(/aria-label="Walkthrough steps">(.*?)<\/ol>/)?.[1] ?? "";
+    const form = rail.split("<button").find((item) => item.includes(">Form<")) ?? "";
+    expect(form).toMatch(/>Not needed</);
+  });
+});
+
+describe("a triage not needed (0.10.88, DEV-10)", () => {
+  beforeEach(stubWindow);
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("says the complaint was not flagged for triage, not that a conclusion was signed", () => {
+    // The card of step 2, as shown when it is selected.
+    const run = { ...runAt("yours", 1), current: 1 };
+    run.steps = run.steps.map((step, index) => (index === 1 ? { ...step, done: false, skipped: true } : step));
+    const html = renderToStaticMarkup(
+      <WorkspaceContext.Provider value={workspace()}>
+        <StoryView story={{ sample: null, yours: run }} />
+      </WorkspaceContext.Provider>,
+    );
+    expect(html).toContain("Not needed: not flagged for triage");
+    expect(html).not.toContain("the signed conclusion is");
   });
 });

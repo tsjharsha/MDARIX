@@ -71,6 +71,7 @@ def row_view(
         "suggested_conclusion": row.suggested_conclusion,
         "conclusion": row.conclusion,
         "override_reason": row.override_reason,
+        "change_reason": row.change_reason,
         "report_type": row.report_type,
         "report_type_label": kind.label if kind else None,
         "window_name": row.window_name,
