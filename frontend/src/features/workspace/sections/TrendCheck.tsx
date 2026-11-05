@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Activity, AlertTriangle, Plus, TrendingUp } from "lucide-react";
 import { Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Table, errorText, send, useResource } from "../../customer-admin/shared";
@@ -28,6 +28,7 @@ import { BasisLine } from "../../shared/Basis";
 import { Bars, BarsTable, ChartOrTable, type BarRow } from "./WowCharts";
 import { IMPORTED_SOURCE } from "../complaintList";
 import { inData } from "../home";
+import { useVisited } from "../oneStory";
 
 /**
  * Signals › Trend check: every product version (or version and problem, or complaint type) against its own history,
@@ -38,16 +39,27 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
   const { notify, open, session, work, dataSource } = useWorkspace();
   const canTriage = useCan("signal.triage");
   const [group, setGroup] = useState<TrendGroup>("version");
-  const [product, setProduct] = useState("");
   // A story opens the trend check on its product, by the identifier people read (?product=SAMPLE-ORBIT-300, 0.10.71).
   const [named] = useTabParam("product", "replace");
   const namedId = named ? work?.products?.find((item) => item.product_identifier === named)?.id : undefined;
+  // Read on that product from the first render when the products are known (0.10.88): not all products first.
+  const [product, setProduct] = useState(namedId ?? "");
   useEffect(() => {
     if (namedId) setProduct(namedId);
   }, [namedId]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const board = useResource<TrendBoard>(trendPath(group, product));
+  const boardPath = trendPath(group, product);
+  const board = useResource<TrendBoard>(boardPath);
+  // Story step 10 counts once the trend check of the story's product has loaded (0.10.88): a board kept from the
+  // previous read while the next one is asked (useResource) is not that product's.
+  const readFor = useRef<{ data: unknown; path: string } | null>(null);
+  if (board.data && readFor.current?.data !== board.data) readFor.current = { data: board.data, path: boardPath };
+  const onProduct = !named || (!!work?.products && (!namedId || product === namedId));
+  useVisited(
+    { step: "trends", product: named ?? undefined },
+    board.state === "ready" && readFor.current?.path === boardPath && onProduct,
+  );
   const headline = trendHeadline(board.data);
   const navigation = useNavigation();
   // The Sample · Your data switch decides the groups shown (0.10.85, D3.5): your data never shows the sample's rise.

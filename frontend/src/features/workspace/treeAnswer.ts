@@ -225,3 +225,29 @@ export function shownOutcome(
     });
   return open ? null : suggested;
 }
+
+/**
+ * The tree's saves, one at a time and in order (0.10.88): each save sends every answer, so a save still waiting when
+ * a newer one is asked for is skipped, and the outcome is never left behind a queue of older ones. ``pending`` is
+ * true from the first ask until the newest save has answered.
+ */
+export function latestSaves<T>() {
+  let chain: Promise<T | null> = Promise.resolve(null);
+  let asked = 0;
+  let answered = 0;
+  return {
+    run(send: () => Promise<T | null>): Promise<T | null> {
+      const mine = ++asked;
+      chain = chain.then(async (previous) => {
+        if (mine !== asked) return previous;
+        try {
+          return await send();
+        } finally {
+          answered = mine;
+        }
+      });
+      return chain;
+    },
+    pending: () => answered !== asked,
+  };
+}

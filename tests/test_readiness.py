@@ -121,3 +121,80 @@ def test_logged_text_never_shows_tokens_or_passwords():
     record = logging.LogRecord("t", logging.INFO, __file__, 1, "reset link token=%s", ("tok-xyz",), None)
     formatted = JsonFormatter().format(record)
     assert "tok-xyz" not in formatted and "token=[REDACTED]" in formatted
+
+
+@pytest.mark.db
+def test_the_outbox_backlog_counts_due_retrying_and_failing_email_events():
+    """0.10.88 (DEV-13): the queue's lag and the e-mails the provider refused, read from the outbox itself."""
+    from backend.app.db.models.stage2 import OutboxEvent
+
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        before = readiness.outbox_backlog(db)
+        tenant = db.execute(readiness.text("SELECT id FROM tenants LIMIT 1")).scalar()
+        rows = [
+            OutboxEvent(
+                id=uuid.uuid4(),
+                tenant_id=tenant,
+                event_name="TEST_EMAIL",
+                aggregate_type="Test",
+                payload={},
+                occurred_at=now - timedelta(minutes=20),
+                attempts=1,
+                last_error="EmailDeliveryError: The email provider refused the message",
+            ),
+            # A notification whose e-mail failed (notifications.NotificationFailed): e-mail failing too.
+            OutboxEvent(
+                id=uuid.uuid4(),
+                tenant_id=tenant,
+                event_name="TEST_NOTICE",
+                aggregate_type="Test",
+                payload={},
+                occurred_at=now,
+                attempts=1,
+                next_attempt_at=now + timedelta(minutes=5),
+                last_error="NotificationFailed: the trial invitation could not be delivered",
+            ),
+            # Backing off until later: waiting, but not due, so it adds no lag.
+            OutboxEvent(
+                id=uuid.uuid4(),
+                tenant_id=tenant,
+                event_name="TEST_LATER",
+                aggregate_type="Test",
+                payload={},
+                occurred_at=now,
+                attempts=2,
+                next_attempt_at=now + timedelta(hours=1),
+                last_error="RuntimeError: x",
+            ),
+        ]
+        db.add_all(rows)
+        db.commit()
+        try:
+            after = readiness.outbox_backlog(db)
+            assert after["waiting"] == before["waiting"] + 3 and after["retrying"] == before["retrying"] + 3
+            assert after["email_failing"] == before["email_failing"] + 2
+            assert after["lag_seconds"] >= 20 * 60 - 5
+        finally:
+            bind_system(db, "test cleanup")
+            db.query(OutboxEvent).filter(OutboxEvent.id.in_([row.id for row in rows])).delete(synchronize_session=False)
+            db.commit()
+
+
+def test_the_outbox_and_email_checks_degrade_on_lag_and_failing_delivery(monkeypatch):
+    import auth.emailer
+
+    backlog = {"waiting": 3, "retrying": 0, "email_failing": 0, "lag_seconds": 30}
+    monkeypatch.setattr(readiness, "outbox_backlog", lambda db: dict(backlog))
+    monkeypatch.setattr(auth.emailer, "smtp_configuration_status", lambda: {"configured": True})
+    outbox = readiness._check("outbox", readiness._outbox)
+    assert outbox["ok"] is True
+    assert readiness._check("email", lambda: readiness._email(outbox["email_failing"]))["ok"] is True
+    backlog.update(lag_seconds=16 * 60, email_failing=2)
+    assert readiness._check("outbox", readiness._outbox)["ok"] is False
+    assert readiness._check("email", lambda: readiness._email(backlog["email_failing"]))["ok"] is False
+
+
+def test_readiness_reports_the_outbox_as_a_component(fresh_cache):
+    names = [item["name"] for item in TestClient(app).get("/health/ready").json()["checks"]]
+    assert "outbox" in names

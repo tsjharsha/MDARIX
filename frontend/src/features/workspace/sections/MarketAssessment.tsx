@@ -195,6 +195,7 @@ export function MarketPanel({
     suggested,
     item.disagreement,
     !detail.training_required || !missing.length,
+    !!item.current,
   );
   const run = async (step: () => Promise<unknown>, done: string, failed: string) => {
     setBusy(true);
@@ -234,6 +235,7 @@ export function MarketPanel({
           saved_at: draft.saved_at,
           password: sign.password,
           mfa_code: sign.code || null,
+          change_reason: item.current ? sign.changeReason : "",
         });
       },
       `${name}: the ${item.label} conclusion is signed.`,
@@ -364,6 +366,18 @@ export function MarketPanel({
                 rows={2}
                 value={sign.overrideReason}
                 onChange={(event) => setSign({ ...sign, overrideReason: event.target.value })}
+              />
+            </label>
+          )}
+          {item.current && (
+            <label className="ca-field">
+              Why the signed conclusion changes
+              <textarea
+                rows={2}
+                aria-label="Why the signed conclusion changes"
+                placeholder="This market is signed already: why does the conclusion change? (required, kept with this version)"
+                value={sign.changeReason ?? ""}
+                onChange={(event) => setSign({ ...sign, changeReason: event.target.value })}
               />
             </label>
           )}

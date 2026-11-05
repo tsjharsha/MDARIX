@@ -400,7 +400,11 @@ export function StoryView({
         <h3 id="uw-os-title">{copy.h}</h3>
         <p className="uw-wt-lead">{copy.p}</p>
         {step.skipped ? (
-          <span className="ms-chip uw-os-state">Not needed: the signed conclusion is “not reportable”</span>
+          <span className="ms-chip uw-os-state">
+            {selected === 1
+              ? "Not needed: not flagged for triage"
+              : "Not needed: the signed conclusion is “not reportable”"}
+          </span>
         ) : step.done ? (
           <span className="ms-chip is-good uw-os-state">
             <Check size={13} aria-hidden="true" /> Done · read from the saved record

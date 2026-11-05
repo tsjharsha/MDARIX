@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
+import { useVisited } from "../oneStory";
 import { formatDateTime, formatDay, localDay } from "../../../app/dates";
 import {
   chooseCase,
@@ -224,6 +225,8 @@ export function FinishedRecord({ reference }: { reference: string }) {
   const canExport = useCan("data.export");
   const [error, setError] = useState("");
   const view = useResource<EventView>(eventPath(reference));
+  // Story step 9 counts once the finished record has loaded (0.10.88).
+  useVisited({ step: "records", complaintId: view.data?.event.complaint_id }, view.state === "ready");
   const related = view.data?.related ?? [];
   const lines = (key: string) => related.find((group) => group.key === key)?.lines ?? [];
   const report = related.find((group) => group.key === "reports")?.items?.[0];

@@ -280,7 +280,8 @@ def test_each_template_names_its_basis():
     assert by_market == {
         "US": {"CFR803_50", "CFR803_53"},
         "EU": {"MDR_87"},
-        "United Kingdom": {"UK_MDR"},
+        # OD-2 (0.10.88): UK MDR 2002 is Great Britain's; "United Kingdom" is two markets and is asked.
+        "Great Britain": {"UK_MDR"},
         "Canada": {"CA_MDR"},
         "India": {"IN_MDR"},
     }

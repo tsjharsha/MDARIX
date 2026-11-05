@@ -376,6 +376,28 @@ describe("D2.4: signing in about four actions", () => {
     expect(card).toMatch(/<button type="submit" class="ac-primary dt-sign-btn" disabled=""/);
   });
 
+  it("tells a screen reader which items before Sign are done and which are still to do (0.10.88, DEV-10)", () => {
+    const list = show(READY).match(/<ul class="dt-check"[^>]*>(.*?)<\/ul>/)?.[1] ?? "";
+    // The tick and the circle are hidden from assistive technology, so the words carry the state.
+    expect(list).toMatch(/<span class="sr-only">Done: <\/span>Every question answered/);
+    expect(list).toMatch(/<span class="sr-only">To do: <\/span>Your training confirmation/);
+  });
+
+  it("asks why a signed conclusion changes before it is signed again (OD-4, 0.10.88)", () => {
+    const signedBefore = draft(ANSWERED, {
+      version: 1,
+      conclusion: "REPORTABLE",
+      signed_by: "Asha Menon",
+      signed_at: "2026-11-02T09:02:00Z",
+    })!;
+    const html = show({ ...READY, current: signedBefore, draft: { ...READY.draft!, version: 2 } });
+    const card = html.slice(html.indexOf('id="dt-outcome"'));
+    expect(card).toContain('aria-label="Why the signed conclusion changes"');
+    expect(card).toMatch(/To do: <\/span>Why the signed conclusion changes/);
+    // A first signature asks no such reason.
+    expect(show(READY)).not.toContain("Why the signed conclusion changes");
+  });
+
   it("lets the real role sign, never the persona", () => {
     const executive = show(READY, api(["regulatory.review"], "executive"));
     expect(executive).toContain("Sign as Asha Menon");
