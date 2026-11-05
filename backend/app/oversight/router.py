@@ -330,11 +330,12 @@ def _signers(control_db, tenant_id, me: str, has_case: bool) -> dict[str, dict]:
     from backend.app.workflow import approvals
 
     out = {}
+    everyone = approvals.colleagues(control_db, tenant_id)
     for code, permissions in STEP_SIGNERS.items():
         if code == "CASE_DECISION":
             continue
         wanted = STEP_SIGNERS["CASE_DECISION"] if code == "DECISION" and has_case else permissions
-        people = approvals.holders(control_db, tenant_id, wanted)
+        people = approvals.holders(control_db, tenant_id, wanted, everyone=everyone)
         out[code] = {
             "people": [{"id": ref, "name": name} for ref, name in people],
             "you": any(ref == me for ref, _ in people),

@@ -26,6 +26,8 @@ AWARENESS_RULE = "21 CFR 803.50(a); EU MDR Art. 87(3)-(5); UK MDR 2002; SOR/98-2
 def country_known(value: object) -> bool:
     """Whether a country field names a country: a reportability market's name, or an ISO 3166-1 code or name (each
     part of a cell naming several)."""
+    if rules.names_the_uk_whole(value):
+        return False
     if markets.markets_of(value) or code_of(value):
         return True
     parts = rules.countries(value)
@@ -41,7 +43,20 @@ def needed(record: dict, awareness_given: bool) -> list[dict]:
         return []
     found = []
     country = str(record.get("country") or "").strip()
-    if not country_known(country):
+    if country and rules.names_the_uk_whole(country):
+        found.append(
+            {
+                "fact": COUNTRY,
+                "label": "Incident country",
+                "given": country,
+                "choices": rules.UK_PARTS,
+                "message": f'"{country}" is two markets: choose Great Britain or Northern Ireland. Great Britain '
+                "follows UK MDR 2002; Northern Ireland follows the EU MDR. Until then every market's shortest clock "
+                "runs, provisional.",
+                "rule": COUNTRY_RULE,
+            }
+        )
+    elif not country_known(country):
         found.append(
             {
                 "fact": COUNTRY,

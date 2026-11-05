@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Download, FileText, Send } from "lucide-react";
-import { Panel, ToneBadge } from "../../admin/console/charts";
-import { Table, errorText, useResource } from "../../customer-admin/shared";
+import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
+import { Table, errorText, notFound, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
 import { marketLabel, versionWords } from "../../../app/labels";
 import { DeadlineChip, StateChip } from "../../../app/chips";
@@ -25,7 +25,7 @@ import { InlineError } from "./boardParts";
 import { listTitle } from "./common";
 import { StagePath } from "./ComplaintPage";
 import { StoryPill } from "./OneStory";
-import { runOfReport, useOneStory } from "../oneStory";
+import { runOfReport, useOneStory, useVisited } from "../oneStory";
 import {
   AfterAcceptance,
   Approval,
@@ -240,12 +240,24 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
   );
 }
 
+/** "Record the submission" in the rail: open the folded report part that holds the form, bring it into view and put
+ * the keyboard on its first field (focus stayed on the rail's button, far from the form). Exported for its test. */
+export function openSubmission(part: HTMLElement | null) {
+  if (!part) return;
+  const folded = part.closest("details");
+  if (folded) folded.open = true;
+  part.scrollIntoView({ behavior: "smooth" });
+  part.querySelector<HTMLElement>("select, input, textarea, button")?.focus({ preventScroll: true });
+}
+
 /** One report on its own page: highlights, the status path, the form's fields in order, and the rail. */
 export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   const { open, isTrial } = useWorkspace();
   // The ten-step story's pill on its own report (0.10.82, D1.5); the rail's Next step is already the story's step.
   const storyRun = runOfReport(useOneStory(!!isTrial).data, id);
   const resource = useResource<ReportDetail>(`${REPORTS}/${id}`);
+  // Story step 5 counts once this report has loaded (0.10.88).
+  useVisited({ step: "form", reportId: resource.data?.id }, resource.state === "ready");
   const [shown, setShown] = useState<ReportDetail | null>(null);
   const canWrite = useCanReport();
   const canExport = useCan("data.export");
@@ -254,9 +266,17 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   const [pdfError, setPdfError] = useState("");
   if (!detail)
     return (
-      <Panel eyebrow="Report" title="Authority report" source={resource}>
+      <Panel eyebrow="Report" title="Authority report" source={notFound(resource) ? undefined : resource}>
         {resource.state === "error" && (
-          <p className="ac-muted">{errorText(resource.error, "It is not in your organization.")}</p>
+          <Empty
+            title="This report could not be opened"
+            detail={errorText(resource.error, "It is not in your organization.")}
+            action={
+              <button type="button" className="ac-secondary" onClick={onBack}>
+                All reports
+              </button>
+            }
+          />
         )}
       </Panel>
     );
@@ -511,7 +531,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                   <button
                     type="button"
                     className="ac-secondary"
-                    onClick={() => document.getElementById("rp-submission")?.scrollIntoView({ behavior: "smooth" })}
+                    onClick={() => openSubmission(document.getElementById("rp-submission"))}
                   >
                     Record the submission
                   </button>

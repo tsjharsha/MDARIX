@@ -18,6 +18,7 @@ import {
   foldedRuns,
   groupQuestions,
   criterion,
+  latestSaves,
   questionState,
   runLabel,
   treeAnswers as draftAnswers,
@@ -192,7 +193,8 @@ export function MarketTree({
   const [error, setError] = useState("");
   const refs = useRef({ form, harm, latest });
   refs.current = { form, harm, latest };
-  const queue = useRef<Promise<MarketItem | null>>(Promise.resolve(null));
+  const saves = useRef(latestSaves<MarketItem>());
+  const [updating, setUpdating] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const signed = !!latest.current && !latest.draft;
   const folded: Record<string, string> = signed
@@ -207,11 +209,12 @@ export function MarketTree({
   );
   const editable = canDecide && !signed;
 
-  /** Save the draft (one at a time, in order); the server's evaluation comes back with it. */
+  /** Save the draft (one at a time, in order, the newest answers only); the server's evaluation comes back with it. */
   const save = (): Promise<MarketItem | null> => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    queue.current = queue.current.then(async () => {
+    setUpdating(true);
+    const saved = saves.current.run(async () => {
       const now = refs.current;
       try {
         const out = await send<AssessmentDetail>(assessmentPath(detail.complaint.id, item.market), "PUT", {
@@ -230,7 +233,8 @@ export function MarketTree({
         return null;
       }
     });
-    return queue.current;
+    void saved.finally(() => setUpdating(saves.current.pending()));
+    return saved;
   };
   const answer = (id: string, value: Answer | null) => {
     const next = { ...refs.current.form, answers: { ...refs.current.form.answers, [id]: value } };
@@ -351,6 +355,7 @@ export function MarketTree({
           harm={harm}
           onHarm={setHarmNow}
           flush={save}
+          updating={updating}
           onSigned={(next) => {
             setLatest(next);
             onSigned();

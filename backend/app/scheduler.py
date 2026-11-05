@@ -197,7 +197,34 @@ def operations_alerts(db: Session, state: dict) -> dict:
     if worker == "RUNNING" and state.get("worker") == "STOPPED":
         send_alert("Background worker recovered", "The background worker is sending heartbeats again.")
     state["worker"] = worker
-    return {"dead_letters": dead, "worker": worker, "heartbeat_url": ping_heartbeat_url()}
+    # The queue's lag and failing e-mail (0.10.88, DEV-13): alerted once when they start and once when they clear.
+    from backend.app.readiness import OUTBOX_MAX_LAG, outbox_backlog
+
+    backlog = outbox_backlog(db)
+    lagging = backlog["lag_seconds"] > OUTBOX_MAX_LAG.total_seconds()
+    if lagging != bool(state.get("lagging")):
+        send_alert(
+            "Outbox falling behind" if lagging else "Outbox caught up",
+            f"The oldest event due to be published has waited {backlog['lag_seconds']} s ({backlog['waiting']} waiting)."
+            if lagging
+            else "Events are being published again without delay.",
+        )
+    failing = backlog["email_failing"] > 0
+    if failing != bool(state.get("email_failing")):
+        send_alert(
+            "E-mail delivery failing" if failing else "E-mail delivery recovered",
+            f"{backlog['email_failing']} e-mail(s) were refused by the provider and are being retried. Check the SMTP "
+            "provider and its settings; the readiness check shows email as failing meanwhile."
+            if failing
+            else "The e-mails waiting to be retried have gone out.",
+        )
+    state["lagging"], state["email_failing"] = lagging, failing
+    return {
+        "dead_letters": dead,
+        "worker": worker,
+        "outbox": backlog,
+        "heartbeat_url": ping_heartbeat_url(),
+    }
 
 
 def connector_sync(db: Session, _state: dict) -> dict:
@@ -294,12 +321,43 @@ def due_alerts(db: Session, _state: dict) -> dict:
     return run_for_all_tenants(db)
 
 
-def signature_settlement(db: Session, _state: dict) -> dict:
+# A signature still PENDING this long after it was asked for is stuck (settlement normally runs every 10 minutes).
+SIGNATURE_STUCK_AFTER = timedelta(minutes=30)
+
+
+def _stuck_signatures(db: Session, older_than: timedelta = SIGNATURE_STUCK_AFTER) -> int:
+    from backend.app.db.models.foundation import SignedApprovalRecord
+    from backend.app.signing_commit import PENDING
+
+    bind_system(db, "signature settlement: stuck signatures")
+    cutoff = datetime.now(timezone.utc) - older_than
+    return (
+        db.query(SignedApprovalRecord.id)
+        .filter(SignedApprovalRecord.status == PENDING, SignedApprovalRecord.created_at <= cutoff)
+        .count()
+    )
+
+
+def signature_settlement(db: Session, state: dict) -> dict:
     """Complete or abandon every signature a dedicated plane's signing left PENDING (a restart, a lost connection
-    between its two commits): backend/app/signing_commit.py. Idempotent."""
+    between its two commits): backend/app/signing_commit.py. Idempotent. The operators are alerted once when a
+    signature could not be settled or one stays PENDING over 30 minutes, and once when that clears (0.10.88, DEV-13)."""
     from backend.app.signing_commit import settle_pending
 
-    return settle_pending(db)
+    result = settle_pending(db)
+    result["stuck"] = _stuck_signatures(db)
+    problem = bool(result["failed"]) or result["stuck"] > 0
+    if problem and not state.get("alerted"):
+        send_alert(
+            "Signatures not settled",
+            f"{len(result['failed'])} signature(s) could not be settled in this run and {result['stuck']} have been "
+            "PENDING for over 30 minutes. A PENDING signature is never shown as valid; the person sees it as being "
+            "completed. See the scheduler log (signature-settlement) and docs/runbooks/OUTBOX_AND_SCHEDULER.md.",
+        )
+    if not problem and state.get("alerted"):
+        send_alert("Signatures settled again", "No signature is PENDING for over 30 minutes and none failed to settle.")
+    state["alerted"] = problem
+    return result
 
 
 def readiness_digest(db: Session, _state: dict) -> dict:

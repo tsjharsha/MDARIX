@@ -10,6 +10,8 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.89] - 2026-11-05
+
 A US report's two files: FDA's own Form 3500A, filled, and FDA's eMDR XML. No migration. The API and web images
 change; the API image adds `pypdf` 6.21.2 (pinned with hashes). No operator step. Other markets (EU, GB, Canada,
 India) keep their worksheet PDF unchanged.
@@ -34,6 +36,115 @@ India) keep their worksheet PDF unchanged.
   exactly as the approved report does. Values the file cannot carry (not one of FDA's choices, too long, an address
   FDA wants in parts) are listed, never dropped in silence.
 - Sample: the flagship US report's PDF is now the filled form; its fields and the report page's numbers do not change.
+
+## [0.10.88] - 2026-11-04
+
+On the trial maintenance line (`release/0.10`): R3 of the external code review's plan, DEV-10 (the trial's journeys
+and accessibility) and DEV-13 (performance, monitoring and recovery), with two owner decisions on the regulatory rules
+(OD-2, OD-4). One migration, `tr18changereason` (a nullable column, `complaint_market_assessments.change_reason`;
+the legacy-plane script carries it). The API, worker, scheduler, web and backup images change. Operator steps: the
+off-site bucket's lifecycle rule (below, Operations); two more are recommended.
+
+### Fixed: a step counted only when its screen loaded (P0 of the review of 0.10.87)
+
+- **"Open sample complaint" no longer ticks step 1 when the complaint fails to load.** The main button of steps 1, 5,
+  9 and 10 saved the step's mark as it opened the screen, whatever the screen then showed. The mark is now saved by
+  the screen itself once its read succeeded for the story's record: the complaint page (step 1), the report page
+  (step 5), Records' finished record (step 9) and the trend check of the story's product (step 10). A failed read (a
+  server error, a lost connection, a record not found) ticks nothing, and Retry ticks it once. A refusal (step not
+  yet in its turn, the story moved) is still said on Getting started. The trend check now reads the story's product
+  from the first render, not all products first. The server is unchanged.
+
+### Changed: two owner decisions on the regulatory rules
+
+- **OD-2: "United Kingdom" is asked, Great Britain or Northern Ireland.** A complaint whose country is "United
+  Kingdom" or "UK" is two markets: Great Britain follows UK MDR 2002, Northern Ireland the EU MDR (market EU_NI). The
+  complaint page asks which, with a choice of the two, and until then every market's shortest clock runs,
+  provisional; `PUT /api/v1/complaints/{id}/reporting-facts` refuses the whole-UK name (422 `COUNTRY_UK_PART_NEEDED`).
+  "Great Britain", "GB", England, Scotland and Wales stay Great Britain. Decision tables MK-5, MK-5a and MK-5b.
+- **OD-4: re-signing a market conclusion asks why it changes.** Signing a conclusion where a signed one stands now
+  needs a change reason of at least 10 characters (422 `CHANGE_REASON_NEEDED` without it), asked as "Why the signed
+  conclusion changes" wherever a conclusion is signed: the decision tree and the reportability watch's assessment. The reason is part of the signed material, stored with the new
+  version (`change_reason`), in its audit event, and shown on its signed line. A first signature is unchanged.
+
+### Fixed: what the browser journeys found (DEV-10)
+
+- **Getting started's story on your own data no longer stops at Triage.** When the trial's most urgent imported
+  complaint reports no harm and no malfunction (or the export has no such columns) it is not on the triage list and
+  has no triage form; step 2 waited for a triage record that could never be made, its button opened the page already
+  open, and the story could not finish. Step 2 now reads "Not needed: not flagged for triage". No sample number
+  changes.
+- **The walkthrough on your own data stays on its complaint until its last step.** With a second upload more urgent
+  than a finished first complaint, the walkthrough moved to it (as it should), but concluding it "not reportable"
+  closed its clock and sent the walkthrough back to the first complaint in the middle of the second's steps; there,
+  steps 9 and 10 read as not done, because the steps opened were kept for one complaint per run. The walkthrough now
+  keeps following the complaint under way until its Trends step, unless a complaint with more serious harm arrives,
+  and the steps opened on each complaint are kept. Found by the uploaded-data journey.
+- **Screen readers hear which steps are not needed** in Getting started's step list (after a "not reportable"
+  conclusion, or a triage not needed).
+- **A decision tree's outcome keeps up with quick answers.** Every answer queued a save of all the answers, one after
+  another; answering the US tree at a normal pace left the outcome several saves behind, for seconds showing the
+  result of answers already changed, with nothing saying so. A save still waiting when a newer one is asked for is now
+  skipped, and the outcome says "updating from your answers…" until the newest is in. Signing was never affected.
+- **A removed or mistyped record offers the way back.** Opening a complaint or an authority report that is not there
+  showed "Unavailable" and a Retry that can never work; it now says "This complaint (report) could not be opened"
+  with "Open the complaint list" ("All reports").
+- **A save refused because the session ended says the change was lost.** The sign-in page said "continue where you
+  left off" although what was typed was gone; it now says "your last change was not saved" and still returns to the
+  same screen.
+- **Inviting a colleague while e-mail is slow no longer invites twice.** With a slow e-mail provider the screen gave
+  up after 15 s and said "Try again" while the invitation was being made and sent; it now waits up to 45 s, and if the
+  answer is still lost says the invitation may have been sent and to check the list.
+- **"Record the submission" puts the keyboard on the form** (it stayed on the rail's button, far from the form, and
+  the form could be folded away).
+- **Screen readers hear which items before Sign are done** ("Done:" / "To do:"; the ticks were hidden from them).
+
+### Changed: speed (DEV-13)
+
+- **Getting started's story on your own data, three times faster.** On a trial with 5,000 imported complaints the
+  story took a minute or more a read; most of it was the same few market and country names being normalized millions
+  of times. They are now normalized once.
+- **Possible duplicates on the triage list** are paired by product and lot or serial number instead of comparing every
+  record with every other (about 12 s to 3.8 s a read on 5,000 imported complaints, locally).
+- **The complaint page** reads each colleague's permissions once instead of seven times (a trial at its cap of 50
+  people paid it on every complaint opened).
+
+### Operations (DEV-13)
+
+- **New health signals** on `/health/ready`: `outbox` (events waiting, retrying, and the queue's lag; degraded over
+  15 minutes) and `email` now degraded while e-mails the provider refused wait to be retried.
+- **New alerts** (to `MDARIX_ALERT_WEBHOOK` and/or `MDARIX_ALERT_EMAIL`): the outbox falling behind and catching up,
+  e-mail delivery failing and recovering, and a signature not settled or PENDING over 30 minutes (and when that
+  clears).
+- **A readiness gate for the deploy**, `scripts/deploy_gate.py`, run inside the new API container after `up`: the
+  release named, the database at this build's schema, and the components named with `--require`. Recommended in the
+  next upgrade script, beside `/health/live` (DEPLOYMENT.md).
+- **Backup retention, 30 daily + 12 monthly** (owner decision, 5 Nov 2026): the backup job keeps every local backup
+  of the last 30 days (a pre-upgrade one included), then the newest backup of each of 12 months, and always the newest
+  of all; it kept 14 days before. New setting `MDARIX_BACKUP_KEEP_MONTHS` (12); `MDARIX_BACKUP_KEEP_DAYS` now defaults
+  to 30. The backup image changes (it carries `retention.sh`). Operator step: set the off-site bucket's lifecycle rule
+  to the same. Disk: about 42 backups of about 12 MB.
+- **Recommended:** an alert webhook to a channel independent of the SMTP provider (with the provider down, an e-mail
+  alert about it cannot arrive: seen in the local drill).
+- Local drills recorded in `docs/runbooks/LOAD_AND_FAILURE_DRILLS.md`: worker, scheduler, e-mail, database, object
+  store and the upgrade script's rollback branch; and a measurement of a trial against the approved targets
+  (`tests/test_trial_load_measure.py`, opt-in).
+
+### Tests and checks
+
+- `frontend/e2e/getting-started-journey.spec.ts`: the browser acceptance test of Getting started's ten steps, through
+  the real forms, on the sample (solo, with the practice approval) and on a team's own data (a second person
+  approving on a phone; a "not reportable" conclusion); with the authenticator, a reload and a resume, a step opened
+  out of turn (STEP_NOT_YET), a moved story (STORY_MOVED), an API error, and ticks checked in order after every step.
+- `frontend/e2e/your-data-journey.spec.ts` (new): uploaded data from the file to the ten steps, at 1440 with a
+  phone pass: a most urgent complaint without country or awareness date, both asked and entered (a lost save retried
+  once), its complaint failing to load once (step 1 not ticked until Retry), a reload and resume, the reportable
+  branch through the real forms with the authenticator, a colleague's approval on a phone and a real PDF (served as
+  `application/pdf`, a non-empty `%PDF-` file); then a second upload's complaint concluded not reportable, steps 5 to
+  8 "Not needed", no report for it and exactly one for the first. The story's helpers are shared in
+  `frontend/e2e/support/story.ts`; the sample journey checks the failed screen too.
+- `frontend/e2e/trial-journeys.spec.ts`: the trial's journeys at 1440 and 390 with captured e-mail
+  (`scripts/journey_api.py`), axe-core, accessible names and keyboard on every screen, and the failure cases.
 
 ## [0.10.87] - 2026-11-04
 

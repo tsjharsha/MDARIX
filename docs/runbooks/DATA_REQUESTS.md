@@ -124,7 +124,7 @@ Audit events are not changed; the correction itself is audited.
 ## 6. Backups and restores
 
 Deleted and erased data remains in encrypted backups until they expire: 14 days on the server
-(`MDARIX_BACKUP_KEEP_DAYS`), up to 90 days in the off-site copy (bucket lifecycle rule), and the managed database's
+(`MDARIX_BACKUP_KEEP_DAYS`, 30, then one a month for `MDARIX_BACKUP_KEEP_MONTHS`, 12), the same in the off-site copy (bucket lifecycle rule), and the managed database's
 point-in-time recovery window and snapshots (see `BACKUP_AND_RESTORE.md`). On a versioned object-storage bucket,
 deleted files keep a noncurrent version until the bucket's noncurrent-version expiry rule (set it to 30 days)
 removes it. Say so in replies to erasure requests.

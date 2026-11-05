@@ -162,7 +162,7 @@ def _fda_mapped_code(annex: str) -> str:
         return next(row.code for row in rows if row.code in mapped and reference.selectable(row.status))
 
 
-def test_the_emdr_file_waits_for_what_fda_requires_then_validates(trial):  # eMDR, 0.10.88
+def test_the_emdr_file_waits_for_what_fda_requires_then_validates(trial):  # eMDR, 0.10.89
     from backend.app.authority_reports import emdr
 
     user, state = trial["user"], trial["state"]

@@ -91,7 +91,10 @@ const inPrivateApp = (pathname: string) =>
   PRIVATE_ROOTS.some((root) => pathname === root || pathname.startsWith(`${root}/`));
 
 /** The sign-in address that brings the person back to where they were. */
-export function signInPath(reason: "idle" | "expired" | undefined, location: { pathname: string; search: string }) {
+export function signInPath(
+  reason: "idle" | "expired" | "unsaved" | undefined,
+  location: { pathname: string; search: string },
+) {
   const params = new URLSearchParams();
   if (reason) params.set("reason", reason);
   if (inPrivateApp(location.pathname)) params.set("returnTo", `${location.pathname}${location.search}`);
@@ -180,8 +183,10 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
           endsSession(path, response.status, codeText, window.location?.pathname ?? "")
         ) {
           redirecting = true;
+          // A refused save lost what the person typed: the sign-in page says so instead of "continue where you left off".
+          const saving = !!init.method && init.method !== "GET";
           window.location.replace(
-            signInPath(codeText === "SESSION_IDLE_TIMEOUT" ? "idle" : "expired", window.location),
+            signInPath(saving ? "unsaved" : codeText === "SESSION_IDLE_TIMEOUT" ? "idle" : "expired", window.location),
           );
         }
         // The second factor is still due: go where that is handled.

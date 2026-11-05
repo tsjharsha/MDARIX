@@ -825,6 +825,22 @@ def _duplicate_fields(kind: str, row, lots: dict) -> dict:
     }
 
 
+def candidate_pairs(fields: list[dict]) -> list[tuple[int, int]]:
+    """The pairs of records (``i < j``, in the order a nested loop meets them) that may be duplicates: only records of
+    one product with the same lot or the same serial number can be (``rules.duplicate_reasons``), so they are paired
+    by those keys instead of every record with every other (0.10.88, DEV-13: 2,500 records made 3 million pairs)."""
+    groups: dict[tuple, list[int]] = {}
+    for index, item in enumerate(fields):
+        if not item.get("product_id"):
+            continue
+        for key in ("lot_id", "serial"):
+            value = rules.normalize(item.get(key))
+            if value:
+                groups.setdefault((item["product_id"], key, value), []).append(index)
+    pairs = {(a, b) for members in groups.values() for i, a in enumerate(members) for b in members[i + 1 :]}
+    return sorted(pairs)
+
+
 def duplicates(db: Session, tenant_id: uuid.UUID) -> list[dict]:
     """The possible duplicates across the trial's sources (uploads, the sample, logged contacts, urgent intakes) that
     nobody has decided on: each pair with its reasons."""
@@ -860,25 +876,25 @@ def duplicates(db: Session, tenant_id: uuid.UUID) -> list[dict]:
             records.append((COMPLAINT, complaint, _duplicate_fields(COMPLAINT, complaint, lots)))
             sources[complaint.id] = complaint.source_system
     found = []
-    for index, (left_kind, left, left_fields) in enumerate(records):
-        for right_kind, right, right_fields in records[index + 1 :]:
-            if left_kind == COMPLAINT and right_kind == COMPLAINT and sources[left.id] == sources[right.id]:
-                continue
-            pair = frozenset({(left_kind, left.id), (right_kind, right.id)})
-            if pair in decided:
-                continue
-            a, b = group.get((left_kind, left.id)), group.get((right_kind, right.id))
-            if a is not None and a == b:
-                continue
-            reasons = rules.duplicate_reasons(left_fields, right_fields)
-            if reasons:
-                found.append(
-                    {
-                        "left": _side(left_kind, left, products),
-                        "right": _side(right_kind, right, products),
-                        "reasons": reasons,
-                    }
-                )
+    for index, other in candidate_pairs([fields for _, _, fields in records]):
+        (left_kind, left, left_fields), (right_kind, right, right_fields) = records[index], records[other]
+        if left_kind == COMPLAINT and right_kind == COMPLAINT and sources[left.id] == sources[right.id]:
+            continue
+        pair = frozenset({(left_kind, left.id), (right_kind, right.id)})
+        if pair in decided:
+            continue
+        a, b = group.get((left_kind, left.id)), group.get((right_kind, right.id))
+        if a is not None and a == b:
+            continue
+        reasons = rules.duplicate_reasons(left_fields, right_fields)
+        if reasons:
+            found.append(
+                {
+                    "left": _side(left_kind, left, products),
+                    "right": _side(right_kind, right, products),
+                    "reasons": reasons,
+                }
+            )
     return found[:100]
 
 

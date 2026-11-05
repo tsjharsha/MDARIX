@@ -116,7 +116,22 @@ export const takeMarkProblem = () => {
   return found;
 };
 
-/** Open a step: its own mark saved where the step is the person's (the call, the report, Records, Trends). */
+/** A step opened from the story whose screen has not loaded yet (0.10.88, P0 of the review of 0.10.87): it counts
+ * only once its own screen has read the right record successfully. */
+type PendingVisit = { run: string; step: string; complaintId: string; reportId: string | null; product: string | null };
+let pendingVisit: PendingVisit | null = null;
+
+/** What a destination loaded: the complaint (step 1), the report (step 5), the finished record (step 9) or the trend
+ * check of a product (step 10). */
+export type Visit =
+  | { step: "call"; complaintId: string | undefined }
+  | { step: "form"; reportId: string | undefined }
+  | { step: "records"; complaintId: string | undefined }
+  | { step: "trends"; product: string | undefined };
+
+/** Open a step's screen at once (0.10.85: waiting read as a dead click). A step ticked by the visit itself (the call,
+ * the report, Records, Trends) is remembered, and its mark is saved by the screen once it has loaded (``visited``):
+ * a screen that failed to load ticks nothing. */
 export async function openStep(
   run: StoryRun,
   index: number,
@@ -124,15 +139,50 @@ export async function openStep(
 ): Promise<void> {
   const mark = MARKED[index];
   const place = stepPlace(run, index);
-  // The screen opens at once (0.10.85: waiting for the mark read as a dead click). The mark names the complaint the
-  // person opened, so it never lands on another one; a refusal is kept and shown on Getting started, never dropped.
+  pendingVisit =
+    mark && !(index === 4 && !run.report_id)
+      ? {
+          run: run.run,
+          step: mark,
+          complaintId: run.complaint.id,
+          reportId: run.report_id,
+          product: new URLSearchParams(place.tab?.split("?")[1] ?? "").get("product"),
+        }
+      : null;
   open(place.section, place.tab);
-  if (!mark || (index === 4 && !run.report_id)) return;
+}
+
+/** Called by a destination when its data has loaded: saves the pending step's mark when the screen shows the record
+ * the step opened, once; a refusal (STEP_NOT_YET, STORY_MOVED) is kept and shown on Getting started. */
+export async function visited(visit: Visit): Promise<void> {
+  const pending = pendingVisit;
+  if (!pending || pending.step !== visit.step) return;
+  const matches =
+    visit.step === "form"
+      ? !!visit.reportId && visit.reportId === pending.reportId
+      : visit.step === "trends"
+        ? !pending.product || visit.product === pending.product
+        : !!visit.complaintId && visit.complaintId === pending.complaintId;
+  if (!matches) return;
+  pendingVisit = null;
   try {
-    await send(`${ONE_STORY_PATH}/marks`, "POST", { run: run.run, step: mark, complaint_id: run.complaint.id });
+    await send(`${ONE_STORY_PATH}/marks`, "POST", {
+      run: pending.run,
+      step: pending.step,
+      complaint_id: pending.complaintId,
+    });
   } catch (reason) {
+    const index = Number(Object.keys(MARKED).find((key) => MARKED[Number(key)] === pending.step) ?? 0);
     markProblem = errorText(reason, `Step ${index + 1} was not saved. Open it again from Getting started.`);
   }
+}
+
+/** For a destination: once ``loaded`` (its data read successfully), count the pending step it is. */
+export function useVisited(visit: Visit, loaded: boolean) {
+  const key = JSON.stringify(visit);
+  useEffect(() => {
+    if (loaded) void visited(visit);
+  }, [loaded, key]);
 }
 
 /** "Step 4 of 10", or "All ten steps done". */
