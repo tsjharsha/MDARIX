@@ -10,6 +10,7 @@ import {
   Inbox,
   Lock,
   LogOut,
+  MessageSquare,
   Network,
   PanelLeftClose,
   PanelLeftOpen,
@@ -584,6 +585,14 @@ const TAB_ICON: Record<string, LucideIcon> = {
   next: Signpost,
 };
 
+/** A page's emblem in its head: its destination's icon; Settings, Account, Import your data and feedback their own. */
+export const sectionIcon = (section: string): LucideIcon =>
+  ({ Settings: Settings2, "My Account": UserRound, "Import your data": Upload, "Share feedback": MessageSquare })[
+    section
+  ] ??
+  TAB_ICON[tabOfSection(section) ?? ""] ??
+  House;
+
 /** The rail's groups (the hero design): the work, then the plan; Getting started heads it and Next steps is pinned at
  * its foot. */
 export const RAIL_GROUPS: ReadonlyArray<{ label: string; tabs: readonly string[] }> = [
@@ -703,13 +712,13 @@ export function NavRail({
   );
   const groups = RAIL_GROUPS.map((group) => ({ ...group, tabs: group.tabs.filter((tab) => tabs.includes(tab)) }));
   return (
-    <nav className={`uw-rail${folded ? " is-folded" : ""}`} aria-label="Destinations">
-      <div className="uw-rail-brand">
+    <nav className={`uw-navrail${folded ? " is-folded" : ""}`} aria-label="Destinations">
+      <div className="uw-navrail-brand">
         <BrandMark />
-        <b className="uw-rail-word">MDARIX</b>
+        <b className="uw-navrail-word">MDARIX</b>
         <button
           type="button"
-          className="uw-rail-fold"
+          className="uw-navrail-fold"
           aria-label={folded ? "Expand the menu" : "Collapse the menu"}
           aria-expanded={!folded}
           onClick={() => setFolded((value) => !value)}
@@ -720,7 +729,7 @@ export function NavRail({
       {tabs.includes("start") && (
         <button
           type="button"
-          className={extra === "start" ? "uw-rail-story is-extra" : "uw-rail-story"}
+          className={extra === "start" ? "uw-navrail-story is-extra" : "uw-navrail-story"}
           aria-current={current === "start" ? "page" : undefined}
           title="Getting started"
           onClick={() => open(PERSONA_TABS.start.section)}
@@ -735,14 +744,14 @@ export function NavRail({
       {groups
         .filter((group) => group.tabs.length)
         .map((group) => (
-          <div className="uw-rail-group" key={group.label}>
-            <p className="uw-rail-grp" aria-hidden="true">
+          <div className="uw-navrail-group" key={group.label}>
+            <p className="uw-navrail-grp" aria-hidden="true">
               {group.label}
             </p>
             {group.tabs.map(button)}
           </div>
         ))}
-      {tabs.includes("next") && <div className="uw-rail-foot">{button("next")}</div>}
+      {tabs.includes("next") && <div className="uw-navrail-foot">{button("next")}</div>}
     </nav>
   );
 }

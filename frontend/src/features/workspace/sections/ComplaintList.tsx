@@ -13,7 +13,10 @@ import {
   useWorkspace,
 } from "../workspaceContext";
 import { StatusBadge, countOf, listTitle } from "./common";
-import { DeadlineChip, HarmChip } from "../../../app/chips";
+import { DeadlineChip } from "../../../app/chips";
+import { AlertCircle, Triangle } from "lucide-react";
+import { HarmBadge } from "../../shared/hero/HeroVisuals";
+import { ClockPill, CountryCell, OwnerCell, ProductCell, StageCell, listGlance } from "../heroBits";
 import { problemCodeParts, problemCodeText, useImdrfLinks, type ImdrfLinks } from "./ProblemCode";
 import { isLegalDeadline } from "../home";
 import {
@@ -119,6 +122,9 @@ export function ComplaintList({
           onChange={set}
           sourceChosen={!!dataSource}
         />
+      )}
+      {(sixColumns || view) && list.data && pages === 1 && listOf(list.data.items).length > 0 && (
+        <ListGlance rows={listOf(list.data.items)} />
       )}
       <Table
         caption={view?.name ?? "Complaint list"}
@@ -228,6 +234,56 @@ export function ComplaintList({
         </div>
       )}
     </Panel>
+  );
+}
+
+/**
+ * The list at a glance (0.10.90, the hero design): its complaints by legal clock as one bar, with the late replies and
+ * the serious injuries beside it. Only when the whole list is on the page, so every count is the list's own.
+ */
+export function ListGlance({ rows }: { rows: any[] }) {
+  const g = listGlance(rows);
+  const parts = [
+    { key: "w", n: g.soon, label: "Legal clock, 7 days or less" },
+    { key: "g", n: g.later, label: "Legal clock, more than 7 days" },
+    { key: "n", n: g.none, label: "No deadline" },
+  ];
+  return (
+    <div className="hx-glance" role="group" aria-label="This list by legal clock">
+      <div className="hx-segbar" aria-hidden="true">
+        {parts
+          .filter((part) => part.n)
+          .map((part) => (
+            <i key={part.key} className={`is-${part.key}`} style={{ flex: part.n }} />
+          ))}
+      </div>
+      <div className="hx-seglegend">
+        {parts.map((part) => (
+          <span key={part.key}>
+            <i className={`is-${part.key}`} aria-hidden="true" />
+            <b>{part.n}</b> {part.label}
+          </span>
+        ))}
+        {g.lateReplies > 0 && (
+          <span className="hx-pill hx-pill-crit">
+            <AlertCircle size={14} aria-hidden="true" />
+            {g.lateReplies} {g.lateReplies === 1 ? "communication" : "communications"} overdue
+          </span>
+        )}
+        {g.deaths > 0 && (
+          <span className="hx-pill hx-pill-harm">
+            <Triangle size={12} fill="currentColor" aria-hidden="true" />
+            {g.deaths} {g.deaths === 1 ? "death" : "deaths"}
+          </span>
+        )}
+        {g.serious > 0 && (
+          <span className="hx-pill hx-pill-harm">
+            <Triangle size={12} fill="currentColor" aria-hidden="true" />
+            {g.serious} serious injury
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -408,9 +464,17 @@ export function workColumns(links: ImdrfLinks, onOpen: (row: any) => void) {
         const harm = harmOf(row);
         return (
           <span className="uw-urgency">
-            {nearest ? <DeadlineChip item={nearest} /> : <span className="ac-muted">No deadline</span>}
+            {/* 0.10.90, the hero design: the legal clock as a ring beside its words. */}
+            {nearest ? (
+              <ClockPill item={nearest} />
+            ) : (
+              <span className="ac-muted hx-nodl">
+                <span className="hx-nodl-dash" aria-hidden="true" />
+                No deadline
+              </span>
+            )}
             {late && <DeadlineChip item={late} prefix={late.category_label ?? "Target"} />}
-            {harm && <HarmChip harm={harm.harm} label={harm.label} />}
+            {harm && <HarmBadge harm={harm.harm === "critical" ? "DEATH" : "SERIOUS_INJURY"} label={harm.label} />}
           </span>
         );
       },
@@ -420,11 +484,14 @@ export function workColumns(links: ImdrfLinks, onOpen: (row: any) => void) {
       label: "What happened",
       render: (row: any) => (
         <span className="uw-what">
-          <button type="button" className="ac-link" onClick={() => onOpen(row)}>
-            <strong>{row.complaint_identifier ?? row.business_id}</strong>
-          </button>{" "}
+          {/* The reference and its problem on one line, the description under them (0.10.90, the hero design). */}
+          <span className="uw-what-top">
+            <button type="button" className="ac-link" onClick={() => onOpen(row)}>
+              <strong>{row.complaint_identifier ?? row.business_id}</strong>
+            </button>{" "}
+            <ImdrfTerm code={row.problem_code} links={links} />
+          </span>
           <span className="uw-what-text">{row.description ?? "No description recorded"}</span>
-          <ImdrfTerm code={row.problem_code} links={links} />
         </span>
       ),
     },
@@ -432,19 +499,24 @@ export function workColumns(links: ImdrfLinks, onOpen: (row: any) => void) {
       key: "product",
       label: "Product, version, lot",
       render: (row: any) => (
-        <>
+        <ProductCell name={row.product_name}>
           {[row.product_name, row.version].filter(Boolean).join(" · ") || "—"}
           {row.lot && <span className="uw-lot"> · Lot {row.lot}</span>}
-        </>
+        </ProductCell>
       ),
     },
     {
       key: "country",
       label: "Incident country",
-      render: (row: any) => String(row.country ?? "").trim() || <span className="ac-muted">Asked at the tree</span>,
+      render: (row: any) =>
+        String(row.country ?? "").trim() ? (
+          <CountryCell country={row.country}>{String(row.country).trim()}</CountryCell>
+        ) : (
+          <span className="ac-muted">Asked at the tree</span>
+        ),
     },
-    { key: "owner", label: "Owner", render: (row: any) => work(row)?.owner_name ?? "Not named" },
-    { key: "stage", label: "Stage", render: (row: any) => work(row)?.stage ?? "—" },
+    { key: "owner", label: "Owner", render: (row: any) => <OwnerCell name={work(row)?.owner_name} /> },
+    { key: "stage", label: "Stage", render: (row: any) => <StageCell stage={work(row)?.stage} /> },
   ];
 }
 

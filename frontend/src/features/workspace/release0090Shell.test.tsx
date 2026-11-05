@@ -36,7 +36,7 @@ describe("the rail", () => {
         progress={3}
       />,
     );
-    expect(rail).toContain('<nav class="uw-rail" aria-label="Destinations">');
+    expect(rail).toContain('<nav class="uw-navrail" aria-label="Destinations">');
     expect(rail.indexOf("<strong>Getting started</strong>")).toBeLessThan(rail.indexOf(">Work<"));
     expect(labels(rail)).toEqual([
       "Home",
@@ -51,7 +51,7 @@ describe("the rail", () => {
       "Next steps",
     ]);
     expect(rail.indexOf(">Work<")).toBeLessThan(rail.indexOf(">Plan<"));
-    expect(rail).toMatch(/class="uw-rail-foot">.*Next steps/);
+    expect(rail).toMatch(/class="uw-navrail-foot">.*Next steps/);
     expect(RAIL_GROUPS.flatMap((group) => group.tabs).sort()).toEqual(
       Object.keys(PERSONA_TABS)
         .filter((key) => !["start", "next"].includes(key))
@@ -90,7 +90,7 @@ describe("the rail", () => {
     expect(rail).toMatch(/title="Home"><svg[^>]*aria-hidden="true"/);
     // Icon-only below 1240 px: the names are hidden visually, never removed.
     const narrow = shellCss.slice(shellCss.indexOf("@media (max-width: 1240px)"));
-    expect(narrow).toMatch(/\.uw-rail \.uw-tab-label \{\s*position: absolute;[^}]*clip-path: inset\(50%\)/);
+    expect(narrow).toMatch(/\.uw-navrail \.uw-tab-label \{\s*position: absolute;[^}]*clip-path: inset\(50%\)/);
     expect(narrow.slice(0, narrow.indexOf("}\n}"))).not.toMatch(/uw-tab-label[^{]*\{\s*display: none/);
   });
 });
@@ -120,7 +120,7 @@ describe("the phone's bottom bar", () => {
   it("shows only on a phone; the rail only above it", () => {
     const phone = shellCss.slice(shellCss.indexOf("@media (max-width: 640px)"));
     expect(shellCss).toMatch(/\.uw-phonebar \{\s*display: none;/);
-    expect(phone).toMatch(/\.uw-hybrid > \.uw-rail \{\s*display: none;/);
+    expect(phone).toMatch(/\.uw-hybrid > \.uw-navrail \{\s*display: none;/);
     expect(phone).toMatch(/\.uw-phonebar \.uw-tab \{[^}]*min-height: 62px/);
   });
 });

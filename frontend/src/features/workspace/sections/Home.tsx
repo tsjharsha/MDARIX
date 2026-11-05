@@ -1,5 +1,23 @@
 import type { RefObject } from "react";
-import { ChevronRight } from "lucide-react";
+import {
+  AlertCircle,
+  CalendarClock,
+  Check,
+  ChevronRight,
+  Clock,
+  FileText,
+  GitFork,
+  MessageCircle,
+  PenLine,
+  Phone,
+  SearchCheck,
+  Send,
+  Stethoscope,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
+import { MonitorBand, ProgressArc } from "../../shared/hero/HeroVisuals";
+import { DeadlineRuler, ringOf } from "../heroBits";
 import { DeadlineChip } from "../../../app/chips";
 import { formatDateTime, formatDay, zoneName, zoneless } from "../../../app/dates";
 import { marketLabel } from "../../../app/labels";
@@ -82,52 +100,57 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
         </span>
       </header>
 
-      {/* The story (0.10.82, D1.6): a slim banner on the sample, the hero of your most urgent complaint on your data,
+      {/* The hero design's monitor band (0.10.90): the story beside the three readouts. */}
+      <MonitorBand className={`uw-home-band${isTrial && hero ? "" : " is-stats-only"}`}>
+        {/* The story (0.10.82, D1.6): a slim banner on the sample, the hero of your most urgent complaint on your data,
           "Story complete" once its ten steps are done. Never a second retelling of Getting started. */}
-      {isTrial && <HomeStory story={story} />}
+        {isTrial && <HomeStory story={story} />}
 
-      {/* Each tile is the count of the complaint list it opens (0.10.82, D1.6): one number, one list. */}
-      <section className="uw-home-stats" aria-label="What needs attention">
-        <Stat
-          tone="over"
-          value={overdue.state === "loading" ? null : (overdue.data?.total ?? null)}
-          onOpen={() => open("Complaints", OVERDUE_VIEW)}
-          title="Overdue"
-          short={overdue.data?.total ? "Act on these first" : "Nothing late"}
-          // Never an all-clear before the data has arrived (0.10.81, U-07).
-          detail={
-            overdue.state === "loading"
-              ? "Reading…"
-              : overdue.data?.total
-                ? "Complaints past a deadline or target: act on these first"
-                : "Nothing past its time"
-          }
-        />
-        <Stat
-          tone="soon"
-          value={dueWeek.state === "loading" ? null : (dueWeek.data?.total ?? null)}
-          onOpen={() => open("Complaints", DUE_WEEK_VIEW)}
-          title="Due this week"
-          short="Next 7 days"
-          detail={dueWeek.state === "loading" ? "Reading…" : "Complaints with a deadline or target in the next 7 days"}
-        />
-        <Stat
-          tone="risk"
-          value={trends.state === "loading" ? null : rising.length}
-          // The trend check, where the count is (0.10.84, L3): the signal inbox lists a signal's own complaints.
-          onOpen={() => open("Trends", "Trend check")}
-          title="At risk"
-          short={rising.length ? "A product rising" : "Nothing rising"}
-          detail={
-            trends.state === "loading"
-              ? "Reading…"
-              : rising.length
-                ? // The Trends card below names the product and its rise (0.10.87): the tile says only how many.
-                  "Products rising against their history"
-                : "No product rising against its history"
-          }
-        />
-      </section>
+        {/* Each tile is the count of the complaint list it opens (0.10.82, D1.6): one number, one list. */}
+        <section className="uw-home-stats" aria-label="What needs attention">
+          <Stat
+            tone="over"
+            value={overdue.state === "loading" ? null : (overdue.data?.total ?? null)}
+            onOpen={() => open("Complaints", OVERDUE_VIEW)}
+            title="Overdue"
+            short={overdue.data?.total ? "Act on these first" : "Nothing late"}
+            // Never an all-clear before the data has arrived (0.10.81, U-07).
+            detail={
+              overdue.state === "loading"
+                ? "Reading…"
+                : overdue.data?.total
+                  ? "Complaints past a deadline or target: act on these first"
+                  : "Nothing past its time"
+            }
+          />
+          <Stat
+            tone="soon"
+            value={dueWeek.state === "loading" ? null : (dueWeek.data?.total ?? null)}
+            onOpen={() => open("Complaints", DUE_WEEK_VIEW)}
+            title="Due this week"
+            short="Next 7 days"
+            detail={
+              dueWeek.state === "loading" ? "Reading…" : "Complaints with a deadline or target in the next 7 days"
+            }
+          />
+          <Stat
+            tone="risk"
+            value={trends.state === "loading" ? null : rising.length}
+            // The trend check, where the count is (0.10.84, L3): the signal inbox lists a signal's own complaints.
+            onOpen={() => open("Trends", "Trend check")}
+            title="At risk"
+            short={rising.length ? "A product rising" : "Nothing rising"}
+            detail={
+              trends.state === "loading"
+                ? "Reading…"
+                : rising.length
+                  ? // The Trends card below names the product and its rise (0.10.87): the tile says only how many.
+                    "Products rising against their history"
+                  : "No product rising against its history"
+            }
+          />
+        </section>
+      </MonitorBand>
 
       <div className="uw-home-grid">
         {persona === "executive" ? (
@@ -143,27 +166,36 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
                 Reading what needs attention…
               </p>
             ) : actions.length ? (
-              <ul className="uw-home-list">
-                {actions.map((item) => (
-                  <li key={item.key}>
-                    <button type="button" className="uw-home-row" onClick={() => go(item)} disabled={!item.opens}>
-                      <DeadlineChip item={item} />
-                      <span className="uw-home-what">
-                        <b>
-                          {item.ref ? `${item.ref} · ` : ""}
-                          {/* The reference once (U-21): "Reply due from Reporter of SAMPLE-RV-08" repeated it. */}
-                          {item.ref ? item.title.replace(` of ${item.ref}`, "") : item.title}
-                        </b>
-                        <small>
-                          {item.category_label} · {item.owner ? `Owner: ${item.owner}` : "No owner yet"} · Due{" "}
-                          {item.due_label ? zoneless(item.due_label) : formatDateTime(item.due_at)}
-                        </small>
-                      </span>
-                      <ChevronRight size={16} aria-hidden="true" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <DeadlineRuler items={actions} />
+                <ul className="uw-home-list">
+                  {actions.map((item) => (
+                    <li key={item.key}>
+                      <button
+                        type="button"
+                        className={`uw-home-row is-${ringOf(item).status}`}
+                        onClick={() => go(item)}
+                        disabled={!item.opens}
+                      >
+                        <ActionIcon item={item} />
+                        <DeadlineChip item={item} />
+                        <span className="uw-home-what">
+                          <b>
+                            {item.ref ? `${item.ref} · ` : ""}
+                            {/* The reference once (U-21): "Reply due from Reporter of SAMPLE-RV-08" repeated it. */}
+                            {item.ref ? item.title.replace(` of ${item.ref}`, "") : item.title}
+                          </b>
+                          <small>
+                            {item.category_label} · {item.owner ? `Owner: ${item.owner}` : "No owner yet"} · Due{" "}
+                            {item.due_label ? zoneless(item.due_label) : formatDateTime(item.due_at)}
+                          </small>
+                        </span>
+                        <ChevronRight size={16} aria-hidden="true" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
             ) : (
               <p className="ac-muted uw-card-pad">Nothing waits for this persona. New work appears here first.</p>
             )}
@@ -244,6 +276,9 @@ function Stat({
       <strong>{title}</strong>
       <span className="uw-home-long">{detail}</span>
       {short && value !== null && <span className="uw-home-short">{short}</span>}
+      <span className="uw-home-vis" aria-hidden="true">
+        {tone === "over" ? <AlertCircle size={22} /> : tone === "soon" ? <Clock size={22} /> : <TrendingUp size={22} />}
+      </span>
     </button>
   );
 }
@@ -266,6 +301,7 @@ export function HomeStory({ story }: { story: Resource<OneStory> }) {
   if (run.run === "sample" && !run.finished)
     return (
       <section className="uw-card uw-home-banner" aria-label="The sample story">
+        <ProgressArc done={run.steps.filter((step) => step.done || step.skipped).length} size={56} decorative />
         <span>
           <span className="ms-chip is-sample">Sample story</span>{" "}
           <b>
@@ -291,6 +327,7 @@ export function HomeStory({ story }: { story: Resource<OneStory> }) {
                 }.`}
           </h2>
           <p className="ac-muted">Every missing fact was asked at the step that needed it. Nothing was guessed.</p>
+          {run.run === "sample" && <StoryTrack />}
           <div className="ca-action-row">
             {run.run === "sample" && story.data?.yours ? (
               <button type="button" className="ac-primary" onClick={() => chooseDataSource?.(IMPORTED_SOURCE)}>
@@ -362,6 +399,54 @@ export function HomeStory({ story }: { story: Resource<OneStory> }) {
         </ol>
       </aside>
     </section>
+  );
+}
+
+/** The finished sample story's five moments, all done (the hero design's story track). */
+const TRACK: ReadonlyArray<[LucideIcon, string]> = [
+  [Phone, "The call"],
+  [GitFork, "Decision tree"],
+  [PenLine, "Signed"],
+  [Send, "Recorded"],
+  [TrendingUp, "Trend check"],
+];
+
+function StoryTrack() {
+  return (
+    <ol className="uw-strack" aria-label="Story steps, all done">
+      {TRACK.map(([Icon, label]) => (
+        <li key={label}>
+          <span className="uw-strack-n">
+            <Icon size={18} aria-hidden="true" />
+            <span className="uw-strack-ok">
+              <Check size={11} strokeWidth={3} aria-hidden="true" />
+            </span>
+          </span>
+          {label}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** A next action's kind as an icon in its deadline's colour: a reply, a triage, a report, an investigation. */
+function ActionIcon({ item }: { item: OversightItem }) {
+  const kind = `${item.category} ${item.category_label}`;
+  const Icon = /communicat|reply/i.test(kind)
+    ? MessageCircle
+    : /triage|first contact/i.test(kind)
+      ? /CALL/.test(item.ref ?? "")
+        ? Phone
+        : Stethoscope
+      : /report/i.test(kind)
+        ? FileText
+        : /investigat/i.test(kind)
+          ? SearchCheck
+          : CalendarClock;
+  return (
+    <span className={`uw-home-aic is-${ringOf(item).status}`} aria-hidden="true">
+      <Icon size={18} />
+    </span>
   );
 }
 

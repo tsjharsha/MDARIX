@@ -4,22 +4,22 @@
  * five slots. The classic navigation keeps its own shell (workspace.css).
  * ---------------------------------------------------------------------------------------------------------------- */
 .uw-hybrid {
-  --uw-rail-w: 252px;
+  --uw-navrail-w: 252px;
   display: grid;
-  grid-template-columns: var(--uw-rail-w) minmax(0, 1fr);
+  grid-template-columns: var(--uw-navrail-w) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   min-height: 100vh;
   /* The rail's colour runs the page's full height, past the sticky rail itself. */
-  background: linear-gradient(90deg, var(--ms-rail) var(--uw-rail-w), var(--ms-ground) var(--uw-rail-w));
+  background: linear-gradient(90deg, var(--ms-rail) var(--uw-navrail-w), var(--ms-ground) var(--uw-navrail-w));
 }
-.uw-hybrid:has(> .uw-rail.is-folded) {
-  --uw-rail-w: 76px;
+.uw-hybrid:has(> .uw-navrail.is-folded) {
+  --uw-navrail-w: 76px;
 }
 .uw-hybrid > * {
   grid-column: 2;
   min-width: 0;
 }
-.uw-hybrid > .uw-rail {
+.uw-hybrid > .uw-navrail {
   grid-row: 1 / span 2;
   grid-column: 1;
 }
@@ -37,7 +37,7 @@
 }
 
 /* The rail */
-.uw-rail {
+.uw-navrail {
   position: sticky;
   top: 0;
   display: flex;
@@ -52,16 +52,16 @@
   scrollbar-width: thin;
   scrollbar-color: var(--ms-rail-2) transparent;
 }
-.uw-rail-brand {
+.uw-navrail-brand {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 2px 6px;
 }
-.uw-rail-brand > svg {
+.uw-navrail-brand > svg {
   flex: none;
 }
-.uw-rail-word {
+.uw-navrail-word {
   font-family: var(--ms-font-display);
   font-size: var(--ms-fs-20);
   font-stretch: 125%;
@@ -69,7 +69,7 @@
   letter-spacing: 0.03em;
   color: var(--ms-surface);
 }
-.uw-rail-fold {
+.uw-navrail-fold {
   display: grid;
   place-items: center;
   width: 34px;
@@ -81,15 +81,15 @@
   color: var(--ms-rail-muted);
   cursor: pointer;
 }
-.uw-rail-fold:hover {
+.uw-navrail-fold:hover {
   background: var(--ms-rail-2);
   color: var(--ms-surface);
 }
-.uw-rail :focus-visible {
+.uw-navrail :focus-visible {
   outline: 2px solid var(--ms-glow);
   outline-offset: 2px;
 }
-.uw-rail-story {
+.uw-navrail-story {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr);
   gap: 10px;
@@ -104,35 +104,35 @@
   text-align: left;
   cursor: pointer;
 }
-.uw-rail-story:hover {
+.uw-navrail-story:hover {
   border-color: rgb(63 224 214 / 50%);
 }
-.uw-rail-story[aria-current="page"] {
+.uw-navrail-story[aria-current="page"] {
   border-color: var(--ms-glow);
 }
-.uw-rail-story strong {
+.uw-navrail-story strong {
   display: block;
   color: var(--ms-surface);
   font-size: var(--ms-fs-14);
   font-weight: var(--ms-fw-semibold);
   line-height: 1.3;
 }
-.uw-rail-story small {
+.uw-navrail-story small {
   display: block;
   color: var(--ms-rail-muted);
   font-size: var(--ms-fs-12);
   line-height: 1.3;
 }
-.uw-rail-group,
-.uw-rail-foot {
+.uw-navrail-group,
+.uw-navrail-foot {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.uw-rail-foot {
+.uw-navrail-foot {
   margin-top: auto;
 }
-.uw-rail-grp {
+.uw-navrail-grp {
   margin: 0;
   padding: 10px 10px 4px;
   color: var(--ms-rail-muted);
@@ -141,7 +141,7 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-.uw-rail .uw-tab {
+.uw-navrail .uw-tab {
   position: relative;
   display: flex;
   align-items: center;
@@ -159,15 +159,15 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.uw-rail .uw-tab:hover {
+.uw-navrail .uw-tab:hover {
   background: var(--ms-rail-2);
   color: var(--ms-surface);
 }
-.uw-rail .uw-tab[aria-current="page"] {
+.uw-navrail .uw-tab[aria-current="page"] {
   background: linear-gradient(90deg, rgb(63 224 214 / 18%), rgb(63 224 214 / 4%));
   color: var(--ms-surface);
 }
-.uw-rail .uw-tab[aria-current="page"]::before {
+.uw-navrail .uw-tab[aria-current="page"]::before {
   content: "";
   position: absolute;
   top: 10px;
@@ -177,16 +177,16 @@
   border-radius: 0 3px 3px 0;
   background: var(--ms-glow);
 }
-.uw-rail .uw-tab[aria-current="page"] > svg {
+.uw-navrail .uw-tab[aria-current="page"] > svg {
   color: var(--ms-glow);
 }
 /* A destination the persona does not list, open from Getting started or a link (0.10.85): marked, never hidden. */
-.uw-rail .uw-tab.is-extra {
+.uw-navrail .uw-tab.is-extra {
   outline: 1px dashed rgb(63 224 214 / 55%);
   outline-offset: -1px;
   font-style: italic;
 }
-.uw-rail .uw-tab.is-extra::after {
+.uw-navrail .uw-tab.is-extra::after {
   content: "";
   width: 8px;
   height: 8px;
@@ -197,12 +197,12 @@
 }
 
 /* Icons only: on request, and below 1240 px. Each name stays for screen readers, and as the tooltip. */
-.uw-rail.is-folded {
+.uw-navrail.is-folded {
   align-items: center;
   padding-inline: 12px;
 }
-.uw-rail.is-folded :is(.uw-rail-word, .uw-rail-grp),
-.uw-rail.is-folded .uw-tab-label {
+.uw-navrail.is-folded :is(.uw-navrail-word, .uw-navrail-grp),
+.uw-navrail.is-folded .uw-tab-label {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -210,40 +210,40 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.uw-rail.is-folded .uw-rail-brand {
+.uw-navrail.is-folded .uw-navrail-brand {
   flex-direction: column;
 }
-.uw-rail.is-folded .uw-rail-fold {
+.uw-navrail.is-folded .uw-navrail-fold {
   margin: 0;
 }
-.uw-rail.is-folded .uw-rail-story {
+.uw-navrail.is-folded .uw-navrail-story {
   grid-template-columns: 44px;
   width: auto;
   padding: 4px;
 }
-.uw-rail.is-folded .uw-tab {
+.uw-navrail.is-folded .uw-tab {
   justify-content: center;
   width: 48px;
   padding: 0;
 }
-.uw-rail.is-folded .uw-tab.is-extra::after {
+.uw-navrail.is-folded .uw-tab.is-extra::after {
   position: absolute;
   top: 6px;
   right: 6px;
 }
-.uw-rail.is-folded .uw-rail-group {
+.uw-navrail.is-folded .uw-navrail-group {
   align-items: center;
 }
 @media (max-width: 1240px) {
   .uw-hybrid {
-    --uw-rail-w: 76px;
+    --uw-navrail-w: 76px;
   }
-  .uw-rail {
+  .uw-navrail {
     align-items: center;
     padding-inline: 12px;
   }
-  .uw-rail :is(.uw-rail-word, .uw-rail-grp),
-  .uw-rail .uw-tab-label {
+  .uw-navrail :is(.uw-navrail-word, .uw-navrail-grp),
+  .uw-navrail .uw-tab-label {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -251,25 +251,25 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .uw-rail-fold {
+  .uw-navrail-fold {
     display: none;
   }
-  .uw-rail-story {
+  .uw-navrail-story {
     grid-template-columns: 44px;
     width: auto;
     padding: 4px;
   }
-  .uw-rail .uw-tab {
+  .uw-navrail .uw-tab {
     justify-content: center;
     width: 48px;
     padding: 0;
   }
-  .uw-rail .uw-tab.is-extra::after {
+  .uw-navrail .uw-tab.is-extra::after {
     position: absolute;
     top: 6px;
     right: 6px;
   }
-  .uw-rail-group {
+  .uw-navrail-group {
     align-items: center;
   }
   .uw-hybrid .ac-main {
@@ -429,14 +429,14 @@
 }
 @media (max-width: 640px) {
   .uw-hybrid,
-  .uw-hybrid:has(> .uw-rail.is-folded) {
-    --uw-rail-w: 0px;
+  .uw-hybrid:has(> .uw-navrail.is-folded) {
+    --uw-navrail-w: 0px;
     grid-template-columns: minmax(0, 1fr);
   }
   .uw-hybrid > * {
     grid-column: 1;
   }
-  .uw-hybrid > .uw-rail {
+  .uw-hybrid > .uw-navrail {
     display: none;
   }
   .uw-hybrid .ac-main {

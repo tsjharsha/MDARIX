@@ -34,6 +34,7 @@ import "../admin/console/admin-console.css";
 import "../customer-admin/customer-admin.css";
 import "./workspace.css";
 import "./heroShell.css";
+import "./heroPages.css";
 import { shownRun, useOneStory } from "./oneStory";
 import { signOut } from "../shared/session";
 import { useFocusOnChange } from "../shared/focus";
@@ -105,6 +106,7 @@ import {
   PhoneBar,
   initials,
   storyProgress,
+  sectionIcon,
   readDataChoice,
   saveDataChoice,
   tabOfSection,
@@ -375,6 +377,11 @@ const navText = (section: WorkspaceSection, mvp: boolean, fresh = false) =>
 /** Former and current addresses (/app/<view>) map onto sections, so existing links and bookmarks keep working (the
  * old -> new link table, app/linkTable.json). */
 export const VIEW_TO_SECTION = OLD_VIEWS as Record<string, [WorkspaceSection, string?]>;
+
+function HeadIcon({ section }: { section: string }) {
+  const Icon = sectionIcon(section);
+  return <Icon size={34} />;
+}
 
 export function UserWorkspace({
   session,
@@ -981,16 +988,22 @@ export function UserWorkspace({
                     {fresh ? (
                       // The new navigation (0.10.82, U-15): the section as eyebrow, the question as heading; the
                       // time zone only on pages that show times (0.10.87).
-                      <div>
-                        <p className="ac-eyebrow">{placeLabel(section, navigation)}</p>
-                        <h1 ref={heading} tabIndex={-1}>
-                          {NEW_HEADS[section] ?? placeLabel(section, navigation)}
-                        </h1>
-                        <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
-                        {zoneLineShown(section, fresh) && (
-                          <p className="ac-page-zone">Times are in {zoneName()}, your organization's time zone.</p>
-                        )}
-                      </div>
+                      <>
+                        <div>
+                          <p className="ac-eyebrow">{placeLabel(section, navigation)}</p>
+                          <h1 ref={heading} tabIndex={-1}>
+                            {NEW_HEADS[section] ?? placeLabel(section, navigation)}
+                          </h1>
+                          <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
+                          {zoneLineShown(section, fresh) && (
+                            <p className="ac-page-zone">Times are in {zoneName()}, your organization's time zone.</p>
+                          )}
+                        </div>
+                        {/* The page's emblem (0.10.90, the hero design): its destination's icon on the monitor's navy. */}
+                        <span className="uw-head-art" aria-hidden="true">
+                          <HeadIcon section={section} />
+                        </span>
+                      </>
                     ) : (
                       <div>
                         <p className="ac-eyebrow">{tenantName}</p>

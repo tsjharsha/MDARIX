@@ -71,7 +71,8 @@ describe("D3.3 the complaint page is a record with a hero", () => {
   it("leads with the reporter's words, the harm, one clock line and one Next step; the rest folds", () => {
     resources.data[eventPath("SAMPLE-RV-11")] = rv11();
     const html = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />);
-    const hero = html.slice(html.indexOf('class="uw-card uw-highlights"'), html.indexOf("</header>"));
+    // 0.10.90: the header opens with the hero design's monitor band.
+    const hero = html.slice(html.indexOf('class="uw-card uw-highlights uw-cp-head"'), html.indexOf("</header>"));
     expect(hero).toMatch(/<blockquote>“Biomedical engineering/);
     expect(hero).toContain("No harm reported");
     expect(hero.match(/ms-chip-deadline/g)).toHaveLength(1);
