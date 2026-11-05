@@ -556,7 +556,7 @@
   font-weight: 400;
 }
 .ca-mfa-form input:focus {
-  outline: 3px solid #087b7833;
+  outline: 3px solid color-mix(in srgb, var(--ms-teal) 20%, transparent);
   border-color: var(--ac-teal);
 }
 .ca-mfa-codes .mfa-recovery-codes {

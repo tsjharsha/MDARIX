@@ -138,8 +138,8 @@
   cursor: pointer;
 }
 .dt-modes button[aria-pressed="true"] {
-  background: var(--ms-navy);
-  color: var(--ms-surface);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
 }
 .dt-locked {
   display: inline-flex;
@@ -741,7 +741,7 @@
   display: grid;
   gap: 14px;
   padding: 20px 22px;
-  border-top: 4px solid var(--ms-navy);
+  border-top: 4px solid var(--ms-navy-fill);
 }
 .rp-doc-head h2 {
   margin: 4px 0;

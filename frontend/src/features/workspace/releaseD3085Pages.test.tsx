@@ -71,7 +71,8 @@ describe("D3.3 the complaint page is a record with a hero", () => {
   it("leads with the reporter's words, the harm, one clock line and one Next step; the rest folds", () => {
     resources.data[eventPath("SAMPLE-RV-11")] = rv11();
     const html = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />);
-    const hero = html.slice(html.indexOf('class="uw-card uw-highlights"'), html.indexOf("</header>"));
+    // 0.10.90: the header opens with the hero design's monitor band.
+    const hero = html.slice(html.indexOf('class="uw-card uw-highlights uw-cp-head"'), html.indexOf("</header>"));
     expect(hero).toMatch(/<blockquote>“Biomedical engineering/);
     expect(hero).toContain("No harm reported");
     expect(hero.match(/ms-chip-deadline/g)).toHaveLength(1);
@@ -84,6 +85,28 @@ describe("D3.3 the complaint page is a record with a hero", () => {
     expect(html).toMatch(/<details class="uw-card uw-card-pad uw-rail-signs uw-cp-fold"/);
     expect(html).not.toContain("<dt>What happened</dt>");
     expect(html).not.toContain("Also known as");
+  });
+
+  it("says the service work's heading and its state once, above its form (0.10.91: they were said twice)", () => {
+    const view = rv11();
+    resources.data[eventPath("SAMPLE-RV-11")] = {
+      ...view,
+      service: {
+        reference: "SVC-24-1107 (sample service ticket)",
+        status: "IN_PROGRESS",
+        status_label: "In progress",
+        status_at: "2026-11-03T12:18:00Z",
+        owner_id: null,
+        owner_name: null,
+        header: null,
+      },
+    };
+    const html = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />);
+    const card = html.slice(html.indexOf("uw-rail-service"));
+    expect(card.match(/> ?Service work</g)).toHaveLength(1);
+    expect(card.match(/SVC-24-1107 \(sample service ticket\) · owner not named yet/g)).toHaveLength(1);
+    // The heading and the state come before the form's first field.
+    expect(card.indexOf(">Service work<")).toBeLessThan(card.indexOf("Service reference"));
   });
 
   it("folds the triage form while the story is on another step", () => {

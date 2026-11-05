@@ -17,6 +17,9 @@ export function setDisplayZone(zone: string | null | undefined): void {
   displayZone = zone || undefined;
 }
 
+/** The zone times are shown in (the organization's, once set; else undefined: the browser's). */
+export const displayTimeZone = (): string | undefined => displayZone;
+
 /** A deadline label without its trailing zone ("Wed 2 Dec 2026, 23:59 IST" -> "Wed 2 Dec 2026, 23:59"), once the
  * page names the organization's zone; as it is otherwise. */
 export const zoneless = (label: string): string =>

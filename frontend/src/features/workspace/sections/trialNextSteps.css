@@ -274,7 +274,7 @@
   padding: 28px;
   border-radius: var(--ms-radius);
   background: var(--ms-navy-deep);
-  color: var(--ms-surface);
+  color: var(--ms-white);
 }
 .uw-ns-talk:focus {
   outline: 3px solid var(--ms-teal-bright);

@@ -1,16 +1,44 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronRight, Lock, LogOut, Search, Settings2, Upload, UserRound } from "lucide-react";
+import {
+  CalendarClock,
+  Check,
+  ChevronDown,
+  Ellipsis,
+  Eye,
+  FileText,
+  House,
+  Inbox,
+  ListChecks,
+  Lock,
+  LogOut,
+  MessageSquare,
+  Network,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  SearchCheck,
+  Settings2,
+  ShieldCheck,
+  Signpost,
+  TrendingUp,
+  Upload,
+  UserRound,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { recordPlace } from "../../app/linkTable";
 import { signOut } from "../shared/session";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { IMPORTED_SOURCE, SAMPLE_SOURCE, complaintListTab } from "./complaintList";
 import { canImportOwnData, type SessionContext, type WorkspaceSection } from "./workspaceContext";
+import type { StoryRun } from "./oneStory";
+import { ProgressArc } from "../shared/hero/HeroVisuals";
 
 /*
- * The new navigation's shell (0.10.73, Release C part C1; the approved design `mdarix-hybrid-mockup.html`): a top bar
- * with the organization, one search, "Viewing as [persona]", the bell, help and the avatar; then a tab bar with only
- * the persona's destinations. The persona changes what a person sees, never what they may sign: every action keeps
+ * The new navigation's shell (0.10.73, Release C part C1; since 0.10.90 the owner-approved hero design
+ * `mdarix-hero-ui.html`): a slim top bar with the organization, one search, "Viewing as [persona]", the bell, help and
+ * the avatar; a left icon rail with only the persona's destinations, a bottom bar on a phone. The persona changes what a person sees, never what they may sign: every action keeps
  * the server's own check, and the persona never reaches the server as a permission.
  */
 
@@ -143,6 +171,7 @@ export function PersonaSwitch({
         onClick={() => setOpen((value) => !value)}
       >
         {/* One avatar on the top bar (0.10.82): the persona is named here, its circle only in the menu. */}
+        <Eye size={14} aria-hidden="true" className="uw-persona-eye" />
         <small className="uw-persona-hint">Viewing as</small>
         <span>{label}</span>
         <ChevronDown size={14} aria-hidden="true" />
@@ -543,67 +572,315 @@ export function AvatarMenu({
   );
 }
 
-/** The tab bar: only the persona's destinations, the current one marked. */
-export function TabBar({
+/** Each destination's icon on the rail and the phone's bar (0.10.90, the hero design). */
+const TAB_ICON: Record<string, LucideIcon> = {
+  home: House,
+  complaints: Inbox,
+  trees: Network,
+  reports: FileText,
+  investigations: SearchCheck,
+  trends: TrendingUp,
+  records: ShieldCheck,
+  team: Users,
+  ahead: CalendarClock,
+  next: Signpost,
+};
+
+/** A page's emblem in its head: its destination's icon; Settings, Account, Import your data and feedback their own. */
+export const sectionIcon = (section: string): LucideIcon =>
+  ({ Settings: Settings2, "My Account": UserRound, "Import your data": Upload, "Share feedback": MessageSquare })[
+    section
+  ] ??
+  TAB_ICON[tabOfSection(section) ?? ""] ??
+  House;
+
+/** The rail's groups (the hero design): the work, then the plan; Getting started heads it and Next steps is pinned at
+ * its foot. */
+export const RAIL_GROUPS: ReadonlyArray<{ label: string; tabs: readonly string[] }> = [
+  { label: "Work", tabs: ["home", "complaints", "trees", "reports", "investigations", "trends", "records"] },
+  { label: "Plan", tabs: ["team", "ahead"] },
+];
+
+/** The phone's bottom bar: these four, where the persona has them; "More" opens the rest. */
+export const PHONE_SLOTS: readonly string[] = ["start", "home", "complaints", "trends"];
+
+/** The tabs the rail and the phone's bar show: the persona's, and a screen they do not list (opened from the story or
+ * a link) while it is open, marked so (0.10.85; the approved design): the person always sees where they are. */
+export const shownTabs = (listed: readonly string[], current: string | null) => {
+  const extra = current && current in PERSONA_TABS && !listed.includes(current) ? current : null;
+  return { tabs: extra ? [...listed, extra] : [...listed], extra };
+};
+
+/** The phone's bar: the slots the persona has, and the rest behind "More". */
+export const phoneBar = (tabs: readonly string[]) => ({
+  slots: PHONE_SLOTS.filter((key) => tabs.includes(key)),
+  more: tabs.filter((key) => !PHONE_SLOTS.includes(key)),
+});
+
+/** The destinations that have something new for the person (owner, 5 Nov 2026: a dot, never a count): Complaints
+ * while a complaint is overdue, Trends while a product is rising against its history. */
+export const railAlerts = (overdue: number | null | undefined, rising: number | null | undefined) =>
+  new Set([...(overdue ? ["complaints"] : []), ...(rising ? ["trends"] : [])]);
+
+/** A destination's dot: a mark beside its name, and the words "New items" for screen readers and as its tooltip. */
+function AlertDot() {
+  return (
+    <>
+      <i className="uw-tab-dot" aria-hidden="true" title="New items" />
+      <span className="sr-only"> · New items</span>
+    </>
+  );
+}
+
+/** The walkthrough's progress for the rail's ring: steps done or not needed, of ten, from the story's own read. */
+export const storyProgress = (run: StoryRun | null | undefined) =>
+  run ? run.steps.filter((step) => step.done || step.skipped).length : null;
+
+function TabButton({
+  tab,
+  current,
+  extra,
+  personaLabel,
+  open,
+  className = "uw-tab",
+  alert = false,
+}: {
+  tab: string;
+  current: string | null;
+  extra: string | null;
+  personaLabel?: string;
+  open: (section: WorkspaceSection) => void;
+  className?: string;
+  /** Something new there: the dot. */
+  alert?: boolean;
+}) {
+  const Icon = TAB_ICON[tab] ?? House;
+  const label = PERSONA_TABS[tab].label;
+  return (
+    <button
+      type="button"
+      className={tab === extra ? `${className} is-extra` : className}
+      aria-current={current === tab ? "page" : undefined}
+      title={
+        tab === extra
+          ? `Opened from Getting started or a link: not one of ${personaLabel ?? "this view"}'s tabs`
+          : label
+      }
+      onClick={() => open(PERSONA_TABS[tab].section)}
+    >
+      <Icon size={20} aria-hidden="true" />
+      <span className="uw-tab-label">{label}</span>
+      {alert && <AlertDot />}
+      {tab === extra && <span className="sr-only"> (opened from Getting started; not one of your tabs)</span>}
+    </button>
+  );
+}
+
+/** The MDARIX mark: a ring with the ECG trace, as the hero design draws it. */
+function BrandMark() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 30 30" aria-hidden="true">
+      <rect width="30" height="30" rx="9" fill="#0f2240" />
+      <circle cx="15" cy="15" r="8.5" fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="3" />
+      <circle
+        cx="15"
+        cy="15"
+        r="8.5"
+        fill="none"
+        stroke="#3fe0d6"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray="40 53.4"
+        transform="rotate(-90 15 15)"
+      />
+      <path
+        d="M10.5 15.5h2.4l1.3-3 1.8 6 1.3-3h2.2"
+        fill="none"
+        stroke="#fff"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * The left icon rail (0.10.90, the owner-approved hero design), in place of the eleven tabs across the top: the brand,
+ * Getting started with its progress ring, the persona's destinations in two groups, and Next steps pinned at the foot.
+ * It folds to icons on request, and by itself below 1240 px; each icon keeps its name for screen readers and as a
+ * tooltip. On a phone the bottom bar (PhoneBar) stands in for it.
+ */
+export function NavRail({
   tabs: listed,
   current,
   open,
   personaLabel,
+  progress = null,
+  alerts = new Set<string>(),
 }: {
   tabs: readonly string[];
   current: string | null;
   open: (section: WorkspaceSection) => void;
   personaLabel?: string;
+  /** Getting started's steps done of ten, when the story is read. */
+  progress?: number | null;
+  /** The destinations with something new (railAlerts). */
+  alerts?: ReadonlySet<string>;
 }) {
-  // A screen the persona's tabs do not list (opened from the story or a link) shows as a tab of its own while it is
-  // open, marked so (0.10.85; the approved design): the person always sees where they are.
-  const extra = current && current in PERSONA_TABS && !listed.includes(current) ? current : null;
-  const tabs = extra ? [...listed, extra] : listed;
-  // On a phone the bar scrolls: a fade and an arrow say more tabs exist, until the last one is in view (0.10.82).
-  const row = useRef<HTMLDivElement>(null);
-  const [more, setMore] = useState(false);
-  const measure = () => {
-    const el = row.current;
-    setMore(!!el && el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
-  };
-  useEffect(() => {
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [tabs.length]);
-  // The current tab is always in view on a phone (U-12).
-  useEffect(() => {
-    row.current
-      ?.querySelector<HTMLElement>("[aria-current='page']")
-      ?.scrollIntoView?.({ block: "nearest", inline: "center" });
-    measure();
-  }, [current, tabs.length]);
+  const [folded, setFolded] = useState(false);
+  const { tabs, extra } = shownTabs(listed, current);
+  const button = (tab: string) => (
+    <TabButton
+      key={tab}
+      tab={tab}
+      current={current}
+      extra={extra}
+      personaLabel={personaLabel}
+      open={open}
+      alert={alerts.has(tab)}
+    />
+  );
+  const groups = RAIL_GROUPS.map((group) => ({ ...group, tabs: group.tabs.filter((tab) => tabs.includes(tab)) }));
   return (
-    <nav className={`uw-tabs${more ? " has-more" : ""}`} aria-label="Destinations">
-      <div className="uw-tabs-in" ref={row} onScroll={measure}>
-        {tabs.map((key) => (
-          <button
-            key={key}
-            type="button"
-            className={key === extra ? "uw-tab is-extra" : "uw-tab"}
-            aria-current={current === key ? "page" : undefined}
-            title={
-              key === extra
-                ? `Opened from Getting started or a link: not one of ${personaLabel ?? "this view"}'s tabs`
-                : undefined
-            }
-            onClick={() => open(PERSONA_TABS[key].section)}
-          >
-            {PERSONA_TABS[key].label}
-            {key === extra && <span className="sr-only"> (opened from Getting started; not one of your tabs)</span>}
-          </button>
-        ))}
+    <nav className={`uw-navrail${folded ? " is-folded" : ""}`} aria-label="Destinations">
+      <div className="uw-navrail-brand">
+        <BrandMark />
+        <b className="uw-navrail-word">MDARIX</b>
+        <button
+          type="button"
+          className="uw-navrail-fold"
+          aria-label={folded ? "Expand the menu" : "Collapse the menu"}
+          aria-expanded={!folded}
+          onClick={() => setFolded((value) => !value)}
+        >
+          {folded ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}
+        </button>
       </div>
-      {more && (
-        <span className="uw-tabs-more" aria-hidden="true">
-          <ChevronRight size={16} />
-        </span>
+      {tabs.includes("start") && (
+        <button
+          type="button"
+          className={extra === "start" ? "uw-navrail-story is-extra" : "uw-navrail-story"}
+          aria-current={current === "start" ? "page" : undefined}
+          title="Getting started"
+          onClick={() => open(PERSONA_TABS.start.section)}
+        >
+          {/* Until the story is read, the step's icon, not an empty ring that reads as loading. */}
+          {progress === null ? (
+            <span className="uw-navrail-ring-wait" aria-hidden="true">
+              <ListChecks size={22} />
+            </span>
+          ) : (
+            <ProgressArc done={progress} size={44} decorative />
+          )}
+          <span className="uw-tab-label">
+            <strong>Getting started</strong>
+            {progress !== null && <small>{progress} of 10 completed</small>}
+          </span>
+        </button>
       )}
+      {groups
+        .filter((group) => group.tabs.length)
+        .map((group) => (
+          <div className="uw-navrail-group" key={group.label}>
+            <p className="uw-navrail-grp" aria-hidden="true">
+              {group.label}
+            </p>
+            {group.tabs.map(button)}
+          </div>
+        ))}
+      {tabs.includes("next") && <div className="uw-navrail-foot">{button("next")}</div>}
+    </nav>
+  );
+}
+
+/** A phone's bottom bar (0.10.90): Getting started, Home, Complaints and Trends where the persona has them, and
+ * "More", which opens the persona's other destinations above the bar. */
+export function PhoneBar({
+  tabs: listed,
+  current,
+  open,
+  personaLabel,
+  progress = null,
+  alerts = new Set<string>(),
+}: {
+  tabs: readonly string[];
+  current: string | null;
+  open: (section: WorkspaceSection) => void;
+  personaLabel?: string;
+  progress?: number | null;
+  alerts?: ReadonlySet<string>;
+}) {
+  const [shown, setShown] = useState(false);
+  const root = useRef<HTMLElement>(null);
+  useDismiss(shown, () => setShown(false), root);
+  const { tabs, extra } = shownTabs(listed, current);
+  const { slots, more } = phoneBar(tabs);
+  const go = (section: WorkspaceSection) => {
+    setShown(false);
+    open(section);
+  };
+  return (
+    <nav className="uw-phonebar" aria-label="Destinations" ref={root}>
+      {shown && (
+        <div className="uw-phonebar-more" id="uw-phonebar-more">
+          {more.map((tab) => (
+            <TabButton
+              key={tab}
+              tab={tab}
+              current={current}
+              extra={extra}
+              personaLabel={personaLabel}
+              open={go}
+              className="uw-tab uw-more-item"
+              alert={alerts.has(tab)}
+            />
+          ))}
+        </div>
+      )}
+      <div className="uw-phonebar-in">
+        {slots.map((tab) =>
+          tab === "start" ? (
+            <button
+              key={tab}
+              type="button"
+              className={extra === "start" ? "uw-tab is-extra" : "uw-tab"}
+              aria-current={current === "start" ? "page" : undefined}
+              onClick={() => go(PERSONA_TABS.start.section)}
+            >
+              {progress === null ? (
+                <ListChecks size={20} aria-hidden="true" />
+              ) : (
+                <ProgressArc done={progress} size={22} tone="light" decorative />
+              )}
+              <span className="uw-tab-label">Getting started</span>
+            </button>
+          ) : (
+            <TabButton
+              key={tab}
+              tab={tab}
+              current={current}
+              extra={extra}
+              personaLabel={personaLabel}
+              open={go}
+              alert={alerts.has(tab)}
+            />
+          ),
+        )}
+        {more.length > 0 && (
+          <button
+            type="button"
+            className={`uw-tab${current && more.includes(current) ? " is-within" : ""}`}
+            aria-expanded={shown}
+            aria-controls={shown ? "uw-phonebar-more" : undefined}
+            onClick={() => setShown((value) => !value)}
+          >
+            <Ellipsis size={20} aria-hidden="true" />
+            <span className="uw-tab-label">More</span>
+            {more.some((tab) => alerts.has(tab)) && <AlertDot />}
+          </button>
+        )}
+      </div>
     </nav>
   );
 }

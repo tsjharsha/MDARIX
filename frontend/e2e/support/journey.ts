@@ -158,12 +158,16 @@ export async function namedControls(page: Page, where: string) {
   expect.soft(unnamed, `controls without an accessible name on ${where}`).toEqual([]);
 }
 
-/** Tab through the screen: focus is always visible, never lost to <body>, and never trapped. */
+/** Tab through the screen: focus is always visible, never lost to <body>, and never trapped. Past the page's last
+ * control the browser leaves the page and the next Tab starts again at its first: that wrap is the page's end, not a
+ * lost focus (0.10.90: the phone's five-slot bar made short pages end within the walk). */
 export async function keyboardWalk(page: Page, where: string, presses = 40) {
   await page.locator("body").click({ position: { x: 1, y: 1 } });
   const seen = new Set<string>();
   const problems: string[] = [];
-  for (let i = 0; i < presses; i++) {
+  let first: string | null = null;
+  let leftAt = 0;
+  for (let i = 0; i < presses || leftAt; i++) {
     await page.keyboard.press("Tab");
     const focus = await page.evaluate(() => {
       const element = document.activeElement as HTMLElement | null;
@@ -177,7 +181,14 @@ export async function keyboardWalk(page: Page, where: string, presses = 40) {
       const id = `${element.tagName}:${element.getAttribute("aria-label") ?? element.textContent?.trim().slice(0, 40)}`;
       return { id, visible: rect.width > 0 && rect.height > 0, outline };
     });
-    if (focus.id === "body") problems.push(`focus fell to the page after ${i + 1} Tab presses`);
+    if (leftAt) {
+      // Focus left the page: fine only if this Tab came back to the page's first control.
+      if (focus.id !== first) problems.push(`focus fell to the page after ${leftAt} Tab presses`);
+      leftAt = 0;
+      if (i >= presses) break;
+    }
+    first ??= focus.id;
+    if (focus.id === "body") leftAt = i + 1;
     else if (!focus.visible) problems.push(`focus on something not visible: ${focus.id}`);
     else if (!focus.outline) problems.push(`no visible focus indicator: ${focus.id}`);
     seen.add(focus.id);

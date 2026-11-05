@@ -212,7 +212,9 @@ describe("the record page: highlights, path, Details · Related · Activity, and
     expect(html).toContain("SAMPLE-PULSE-410-LOT-002");
     // 0.10.85, D3.12: no internal id where the record has a name.
     expect(html).not.toContain("CMP000038");
-    for (const field of ["Owner", "Markets", "Lot"]) expect(html).toContain(`<dt>${field}</dt>`);
+    // 0.10.90: each field's name follows its icon.
+    for (const field of ["Owner", "Markets", "Lot"])
+      expect(html).toMatch(new RegExp(`<dt>(<svg.*?</svg>)?${field}</dt>`));
     // The path: each stage as a chevron, the current one marked.
     expect(html).toMatch(/<li class="is-done"[^>]*>.*Triage/);
     expect(html).toMatch(/<li class="is-now" aria-current="step">.*Market assessment/);

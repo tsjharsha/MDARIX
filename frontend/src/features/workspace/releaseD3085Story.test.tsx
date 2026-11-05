@@ -2,7 +2,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoryView } from "./sections/OneStory";
-import { TabBar } from "./HybridShell";
+import { NavRail } from "./HybridShell";
 import { ONE_STORY_PATH, openStep, takeMarkProblem, visited, type StoryRun } from "./oneStory";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import gettingStarted from "./sections/GettingStarted.tsx?raw";
@@ -109,7 +109,7 @@ describe("The story always works (owner report on 0.10.84)", () => {
 
   it("shows the open screen as a tab of its own when the persona's tabs do not list it", () => {
     const bar = renderToStaticMarkup(
-      <TabBar
+      <NavRail
         tabs={["start", "home", "trends", "records"]}
         current="complaints"
         open={vi.fn()}
@@ -117,9 +117,9 @@ describe("The story always works (owner report on 0.10.84)", () => {
       />,
     );
     expect(bar).toMatch(
-      /class="uw-tab is-extra" aria-current="page" title="Opened from Getting started or a link: not one of Executive&#x27;s tabs">Complaints/,
+      /class="uw-tab is-extra" aria-current="page" title="Opened from Getting started or a link: not one of Executive&#x27;s tabs">.*?<span class="uw-tab-label">Complaints</,
     );
-    const listed = renderToStaticMarkup(<TabBar tabs={["start", "home"]} current="home" open={vi.fn()} />);
+    const listed = renderToStaticMarkup(<NavRail tabs={["start", "home"]} current="home" open={vi.fn()} />);
     expect(listed).not.toContain("is-extra");
   });
 });

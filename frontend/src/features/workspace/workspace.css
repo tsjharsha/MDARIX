@@ -305,7 +305,7 @@
   cursor: pointer;
 }
 .uw-trial-upload label:focus-within {
-  outline: 3px solid #087b7840;
+  outline: 3px solid color-mix(in srgb, var(--ms-teal) 25%, transparent);
 }
 .uw-trial-message {
   display: flex;
@@ -548,13 +548,13 @@
 }
 .uw-ins button:focus-visible,
 .uw-ins summary:focus-visible {
-  outline: 3px solid #087b7866;
+  outline: 3px solid color-mix(in srgb, var(--ms-teal) 40%, transparent);
   outline-offset: 2px;
 }
 
 /* The monthly trend as the panel's hero (sections/TrendHero.tsx), on the navy of the Readiness hero (qualityLoop.css):
    one teal series, the earlier months a muted step and the last three a brighter step with a band behind them (steps
-   checked with the dataviz palette validator, ordinal, on #0d2238 / #183249 / #0d3b4a). Text uses the text tokens on
+   checked with the dataviz palette validator, ordinal, on var(--ms-navy-deep) / var(--ms-navy-fill) / var(--ms-navy-fill)). Text uses the text tokens on
    navy, never the series colour. The line draws itself, the points pop as it reaches them, the callout follows; under
    reduced motion (.is-still or the system setting) everything is drawn at once. */
 .uw-ins-hero {
@@ -572,7 +572,7 @@
   background:
     radial-gradient(ellipse 55% 70% at 82% 30%, rgba(8, 123, 120, 0.42), transparent 70%),
     radial-gradient(ellipse 40% 60% at 8% 0%, rgba(94, 234, 212, 0.08), transparent 70%),
-    linear-gradient(135deg, var(--ms-navy-deep) 0%, var(--ms-navy) 60%, var(--ms-navy) 100%);
+    linear-gradient(135deg, var(--ms-navy-deep) 0%, var(--ms-navy-fill) 60%, var(--ms-navy-fill) 100%);
   box-shadow: var(--ms-shadow-2);
   color: var(--uw-hero-ink-2);
 }
@@ -1556,7 +1556,7 @@
 .uw-fb select:focus,
 .uw-fb input:focus,
 .uw-fb textarea:focus {
-  outline: 3px solid #087b7833;
+  outline: 3px solid color-mix(in srgb, var(--ms-teal) 20%, transparent);
   border-color: var(--ac-teal);
 }
 .uw-fb-optional,
@@ -1752,7 +1752,7 @@
   font-weight: 400;
 }
 .uw-password-form input:focus {
-  outline: 3px solid #087b7833;
+  outline: 3px solid color-mix(in srgb, var(--ms-teal) 20%, transparent);
   border-color: var(--ac-teal);
 }
 .uw-password-form small {
@@ -3795,7 +3795,7 @@ div.uw-task-count:hover {
   color: var(--ac-ink);
   font-size: var(--ms-fs-14);
 }
-/* The link on the tinted line reaches 4.5:1 (0.10.84; #087b78 on #e3f2f1 was 4.43:1). */
+/* The link on the tinted line reaches 4.5:1 (0.10.84; var(--ms-teal) on var(--ms-mint) was 4.43:1). */
 .uw-cited-line > .ac-link {
   color: var(--ms-teal-dark);
 }
@@ -3972,7 +3972,7 @@ div.uw-task-count:hover {
   border-left-color: var(--ac-critical);
 }
 .uw-ma-levels li.chosen {
-  outline: 2px solid var(--ac-navy);
+  outline: 2px solid var(--ms-navy-fill);
 }
 .uw-ma-threshold {
   justify-self: start;
@@ -4875,9 +4875,9 @@ div.uw-task-count:hover {
   background: var(--ac-ground, var(--ms-ground));
 }
 .uw-ov-stages li.stage-current {
-  border-color: var(--ac-navy);
-  background: var(--ac-navy);
-  color: var(--ms-surface);
+  border-color: var(--ms-navy-fill);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
   font-weight: 600;
 }
 .uw-ov-checks,
@@ -5400,7 +5400,7 @@ div.uw-task-count:hover {
   color: var(--ms-good);
 }
 .uw-case-progress li.state-current button {
-  border-color: var(--ms-navy);
+  border-color: var(--ms-navy-fill);
   border-top-color: var(--ms-navy);
 }
 .uw-case-progress > .ac-primary {
@@ -5450,7 +5450,7 @@ div.uw-task-count:hover {
   margin: var(--ms-space-2) 0;
   padding: var(--ms-space-3) var(--ms-space-4);
   border: 1px solid var(--ms-line);
-  border-left: 4px solid var(--ms-navy);
+  border-left: 4px solid var(--ms-navy-fill);
   border-radius: 6px;
   background: var(--ms-subtle);
 }
@@ -5707,7 +5707,7 @@ div.uw-task-count:hover {
   border-left: 3px solid var(--ms-crit);
 }
 .uw-wow-today {
-  border-left: 2px solid var(--ms-navy);
+  border-left: 2px solid var(--ms-navy-fill);
 }
 .uw-wow-clock {
   position: absolute;
@@ -5735,7 +5735,7 @@ div.uw-task-count:hover {
   vertical-align: middle;
 }
 .uw-wow-key-today {
-  border-left: 2px solid var(--ms-navy);
+  border-left: 2px solid var(--ms-navy-fill);
 }
 .uw-wow-key-due {
   border-left: 3px solid var(--ms-crit);
@@ -5796,7 +5796,7 @@ div.uw-task-count:hover {
   max-width: 640px;
   padding: var(--ms-space-4) var(--ms-space-5);
   border: 1px solid var(--ms-line-strong);
-  border-top: 6px solid var(--ms-navy);
+  border-top: 6px solid var(--ms-navy-fill);
   border-radius: 6px;
   background: var(--ms-surface);
   box-shadow: var(--ms-shadow-1);
@@ -6204,7 +6204,7 @@ section[aria-label="What blocks the decision"] h3 {
 .uw-trend-lead li {
   padding: 12px 14px;
   border: 1px solid var(--ac-line);
-  border-left: 3px solid var(--ms-critical, #b42318);
+  border-left: 3px solid var(--ms-critical, var(--ms-crit));
   border-radius: var(--ms-radius-md);
 }
 .uw-trend-lead li p {
@@ -6238,7 +6238,7 @@ section[aria-label="What blocks the decision"] h3 {
 
 /* ------------------------------------------------------------------------------------------------------------------
  * The new navigation's shell and Home (0.10.73, Release C part C1; the approved design mdarix-hybrid-mockup.html):
- * a navy top bar with "Viewing as", a white tab bar of the persona's destinations, then the work canvas.
+ * a top bar with "Viewing as", then the work canvas; since 0.10.90 the rail and the bar's own look are heroShell.css.
  * ---------------------------------------------------------------------------------------------------------------- */
 .uw-hybrid .ac-body {
   grid-template-columns: minmax(0, 1fr);
@@ -6485,43 +6485,6 @@ button.uw-org:hover {
 .uw-avatar-who small {
   color: var(--ms-muted);
 }
-.uw-tabs {
-  position: sticky;
-  top: 56px;
-  z-index: 15;
-  border-bottom: 1px solid var(--ms-line);
-  background: var(--ms-surface);
-}
-.uw-tabs-in {
-  display: flex;
-  gap: var(--ms-space-1);
-  max-width: 1272px;
-  margin: 0 auto;
-  padding: 0 var(--ms-space-4);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.uw-tabs-in::-webkit-scrollbar {
-  display: none;
-}
-.uw-tab {
-  padding: 14px 14px 11px;
-  border: 0;
-  border-bottom: 3px solid transparent;
-  background: transparent;
-  color: var(--ms-ink-2);
-  font: inherit;
-  font-weight: var(--ms-fw-semibold);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.uw-tab:hover {
-  color: var(--ms-ink);
-}
-.uw-tab[aria-current="page"] {
-  border-bottom-color: var(--ms-teal);
-  color: var(--ms-teal-dark);
-}
 .uw-never-submits {
   padding: var(--ms-space-3) var(--ms-space-4);
   border-left: 3px solid var(--ms-info-line);
@@ -6614,8 +6577,8 @@ button.uw-org:hover {
   align-content: start;
   gap: var(--ms-space-3);
   padding: 24px 22px;
-  background: linear-gradient(160deg, var(--ms-navy) 0%, var(--ms-navy-deep) 100%);
-  color: var(--ms-surface);
+  background: linear-gradient(160deg, var(--ms-navy-fill) 0%, var(--ms-navy-deep) 100%);
+  color: var(--ms-white);
 }
 .uw-home-hero-side .ac-eyebrow {
   margin: 0;
@@ -7530,7 +7493,7 @@ button.uw-org:hover {
   cursor: pointer;
 }
 .ac-table tr.is-clickable:hover td {
-  background: var(--ms-surface-2, #f4f8f8);
+  background: var(--ms-surface-2, var(--ms-subtle));
 }
 .tc-more {
   display: flex;
@@ -7604,7 +7567,7 @@ button.uw-org:hover {
   padding: var(--ms-space-3) var(--ms-space-4);
   border-left: 4px solid var(--ms-teal);
   border-radius: 0 var(--ms-radius-md) var(--ms-radius-md) 0;
-  background: var(--ms-surface-2, #f4f8f8);
+  background: var(--ms-surface-2, var(--ms-subtle));
   color: var(--ms-ink);
   font-size: var(--ms-fs-20);
   line-height: 1.5;
@@ -7714,12 +7677,12 @@ button.uw-org:hover {
   justify-self: start;
 }
 .uw-trend-verdict.is-significant {
-  background: var(--ms-critical-bg, #fdecec);
-  color: var(--ms-critical-ink, #9b1c1c);
+  background: var(--ms-critical-bg, var(--ms-crit-bg));
+  color: var(--ms-critical-ink, var(--ms-crit));
 }
 .uw-trend-verdict.is-elevated {
-  background: var(--ms-warning-bg, #fff4e0);
-  color: var(--ms-warning-ink, #7a4a00);
+  background: var(--ms-warning-bg, var(--ms-warn-bg));
+  color: var(--ms-warning-ink, var(--ms-warn));
 }
 .uw-trend-note {
   margin: 0;
@@ -7853,7 +7816,7 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
     z-index: 40;
     gap: var(--ms-space-2);
     padding: var(--ms-space-2) 12px;
-    background: var(--ms-navy);
+    background: var(--ms-navy-fill);
   }
   .uw-top .uw-search.is-open > input {
     display: block;
@@ -7951,7 +7914,7 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
   font-weight: var(--ms-fw-bold);
 }
 .uw-data-choice button:focus-visible {
-  outline: 2px solid var(--ms-navy);
+  outline: 2px solid var(--ms-navy-fill);
   outline-offset: -2px;
 }
 .uw-avatar-data {
@@ -8071,15 +8034,15 @@ main[data-navigation="new"] :is(input[type="date"], input[type="datetime-local"]
   transition: width 0.3s ease;
 }
 .ms-chip.is-sample {
-  border-color: #f2c46d;
-  background: #f2c46d;
-  color: #3b2a08;
+  border-color: var(--ms-warn-line);
+  background: var(--ms-warn-line);
+  color: var(--ms-ink);
   font-size: var(--ms-fs-12);
 }
 .ms-chip.is-yours {
-  border-color: #73d6cb;
-  background: #73d6cb;
-  color: #06201f;
+  border-color: var(--ms-teal-bright);
+  background: var(--ms-teal-bright);
+  color: var(--ms-glow-ink);
   font-size: var(--ms-fs-12);
 }
 .ms-chip.is-soon {
@@ -8732,22 +8695,6 @@ details.uw-team-change[open] {
 .uw-load-list li.is-loaded .uw-load-mark {
   border-color: transparent;
 }
-/* On a phone the tab bar says more tabs exist (0.10.82): a fade and an arrow at its right edge while it scrolls. */
-.uw-tabs.has-more .uw-tabs-in {
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
-}
-.uw-tabs-more {
-  position: absolute;
-  top: 0;
-  right: 4px;
-  bottom: 0;
-  display: inline-flex;
-  align-items: center;
-  color: var(--ms-teal);
-  pointer-events: none;
-}
-
 /* The record a story just finished, on Records (0.10.84, M4): what was signed, the report and who signed. */
 .uw-finished {
   display: grid;
@@ -8762,7 +8709,7 @@ details.uw-team-change[open] {
   border-bottom: 1px solid var(--ms-line);
 }
 .uw-finished dt {
-  color: var(--ms-muted, #5b6770);
+  color: var(--ms-muted, var(--ms-muted));
   font-weight: 600;
 }
 .uw-finished dd {
@@ -8784,11 +8731,6 @@ details.uw-team-change[open] {
   }
 }
 
-/* 0.10.85: a tab the persona does not list while its screen is open (the approved design). */
-.uw-tab.is-extra {
-  border-bottom-style: dashed;
-  font-style: italic;
-}
 .uw-gs-more-head {
   display: grid;
   gap: 6px;

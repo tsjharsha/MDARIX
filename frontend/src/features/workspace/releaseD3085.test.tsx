@@ -170,7 +170,9 @@ const css: string = fs.readFileSync(new URL("./workspace.css", import.meta.url),
 
 describe("D3.7 the phone keeps where you are and what each number means", () => {
   it("scrolls the current tab into view, and gives each Home tile one short line on a phone", () => {
-    expect(hybridShell).toMatch(/querySelector<HTMLElement>\("\[aria-current='page'\]"\)\s*\?\.scrollIntoView/);
+    // 0.10.90: the phone's bottom bar never scrolls; where you are is its marked slot, or More when the screen is
+    // behind it.
+    expect(hybridShell).toContain('current && more.includes(current) ? " is-within" : ""');
     expect(home).toContain('className="uw-home-short"');
     const sheet = css.replace(/\r\n/g, "\n");
     expect(sheet).toContain(".uw-home-stat .uw-home-short {\n    display: block;");
@@ -197,7 +199,10 @@ describe("D3.8 accessibility on the new navigation", () => {
     expect(read("../customer-admin/customer-admin.css")).toMatch(
       /\.ca-chips button\.selected \{[^}]*color: var\(--ms-teal-dark\)/,
     );
-    expect(read("./sections/qualityLoop.css")).toContain("background: #d18f12;");
+    // 0.10.91: the dot's amber and its ink are tokens; tokens.test.ts checks the pair at 4.5:1 in both themes.
+    expect(read("./sections/qualityLoop.css")).toMatch(
+      /\.ql-dot\.tone-serious \{\s*background: var\(--ms-warn-mark\);\s*color: var\(--ms-glow-ink\);/,
+    );
   });
   it("says why a main button is disabled", () => {
     expect(read("./sections/TreeEdit.tsx")).toContain('title={!password ? "Enter your password first" : undefined}');
