@@ -253,9 +253,12 @@ def _registration(context, types: tuple[str, ...], column: str, label: str):
 
 
 def _event_type(context):
+    """US B1 and India B2: "Adverse event" only for harm the record states (death or serious injury, the injury
+    fields a complaint holds), "Product problem" for a recorded malfunction (0.10.89). A patient merely involved, or an
+    outcome not recorded, ticks neither: the field then stays empty for a person to give."""
     complaint = context["complaint"]
     found = []
-    if complaint.death or complaint.serious_injury or complaint.patient_involved:
+    if complaint.death or complaint.serious_injury:
         found.append("Adverse event")
     if complaint.malfunction:
         found.append("Product problem (e.g., defects/malfunctions)")

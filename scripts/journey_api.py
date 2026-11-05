@@ -7,6 +7,10 @@ journey reads its activation link from the e-mail as a person would). The SMTP s
 nothing; no message ever leaves the machine. ``<folder>/control.json`` is read on every send, so a journey can change
 it while the server runs: ``{"delay": 20}`` holds each message that many seconds (a slow provider), ``{"fail": true}``
 refuses it (the provider is down). Refuses a production or staging environment.
+
+Activation and reset links are limited per network address (``token:ip``, 20 an hour): every journey activates its
+accounts from 127.0.0.1, so back-to-back runs would wait for the next window. This process alone raises that limit
+(``raise_activation_limit``); the API's own setting, in every other process and in production, is unchanged.
 """
 
 from __future__ import annotations
@@ -67,6 +71,17 @@ def install_capture(folder: Path) -> None:
     smtplib.SMTP_SSL = CapturedSMTP
 
 
+JOURNEY_ACTIVATION_LIMIT = 1000  # activation and reset-link attempts per address per hour, in this process only
+
+
+def raise_activation_limit() -> None:
+    """Back-to-back journeys activate many accounts from one address: lift ``token:ip`` for this process only."""
+    from backend.app import rate_limit
+
+    window = rate_limit.LIMITS["token:ip"].window_seconds
+    rate_limit.LIMITS["token:ip"] = rate_limit.Limit(JOURNEY_ACTIVATION_LIMIT, window)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", type=int, default=8121)
@@ -97,6 +112,7 @@ def main() -> int:
         os.environ[name] = value
     install_capture(Path(folder))
     sys.path.insert(0, str(ROOT))
+    raise_activation_limit()
     import uvicorn
 
     uvicorn.run("backend.app.main:app", host="127.0.0.1", port=args.port, log_level="warning")
