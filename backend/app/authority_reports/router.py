@@ -16,7 +16,8 @@
   submitted content and the difference review; ``.../evidence``: receipts, acknowledgements, acceptance or rejection;
 - ``POST /api/v1/reports/{id}/follow-up``, ``/complete`` and ``/requests`` (a request for information creates a
   separate response obligation);
-- ``GET /api/v1/reports/{id}/worksheet.pdf`` and ``.docx`` (``snapshot`` for an approved one), and an evidence file.
+- ``GET /api/v1/reports/{id}/worksheet.pdf`` and ``.docx`` (``snapshot`` for an approved one; an approved US report's
+  PDF is FDA's own Form 3500A, filled), ``/emdr.xml`` (an approved US report as FDA's eMDR file), and an evidence file.
 
 MDARIX never submits: no route here sends anything anywhere. Snapshots, attempts and evidence are never edited or
 deleted through the API. Reading is open to every signed-in member; changes need regulatory.review or
@@ -484,7 +485,18 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "codes_confirmed": context["confirm_codes"],
         "never_submits": rules.NEVER_SUBMITS,
         "sample": is_sample(obligation.source_system),
+        # What the eMDR file still needs, and what it leaves out, read from the approved report (or the draft).
+        "emdr": _emdr_check((approved.fields or {}).get("sections") if approved else sections, context)
+        if form.code == forms.FDA_3500A.code
+        else None,
     }
+
+
+def _emdr_check(sections, context) -> dict:
+    from backend.app.authority_reports import emdr
+
+    missing, left_out = emdr.check(sections or [], context["parties"])
+    return {"missing": missing, "left_out": left_out}
 
 
 # --------------------------------------------------------------------------------------------- the list
@@ -1967,7 +1979,16 @@ def export(
             "snapshot": _snapshot_view(frozen, {}),
             "signature": signature,
         }
-    body = render.render(view, kind, organization=_organization_name(control_db, tenant_id))
+    organization = _organization_name(control_db, tenant_id)
+    if kind == "pdf" and view.get("signature") and obligation.form_code == forms.FDA_3500A.code:
+        # An approved US report: FDA's own Form 3500A, filled, with MDARIX's record page last.
+        from backend.app.authority_reports import emdr, fda_3500a
+
+        g1 = fda_3500a.values(view["sections"]).get("G1")
+        contact = emdr.office(_context(db, control_db, obligation)["parties"], emdr.OFFICE_ROLES, g1)
+        body = fda_3500a.render(view, organization, contact)
+    else:
+        body = render.render(view, kind, organization=organization)
     db.add(
         make_audit_event(
             tenant_id=tenant_id,
@@ -1986,4 +2007,63 @@ def export(
         content=body,
         media_type=MEDIA[kind],
         headers={"Content-Disposition": attachment(f"{stem}.{kind}")},
+    )
+
+
+@router.get("/{obligation_id}/emdr.xml", dependencies=[Depends(require_permission(DATA_EXPORT))])
+def emdr_file(
+    obligation_id: uuid.UUID,
+    snapshot: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """An approved US report as FDA's eMDR file (HL7 ICSR XML), validated against FDA's published schema. Refused,
+    naming each block, while anything FDA requires is missing. MDARIX never submits: the customer sends the file
+    through their own ESG account or eSubmitter, and records the submission here."""
+    from backend.app.authority_reports import emdr
+    from backend.app.stage3_workflow_router import _organization_name
+
+    tenant_id = _tenant(ctx)
+    obligation = _obligation(db, tenant_id, obligation_id)
+    if obligation.form_code != forms.FDA_3500A.code:
+        raise _error(404, "NOT_A_US_REPORT", "The eMDR file is for a US report (Form FDA 3500A)")
+    frozen = next((row for row in _snapshots(db, obligation) if row.id == snapshot), None)
+    if frozen is None:
+        raise _error(404, "SNAPSHOT_NOT_FOUND", "No such snapshot of this report")
+    if not frozen.signed_record_id:
+        raise _error(409, "APPROVE_FIRST", "The eMDR file is made once the report is approved")
+    context = _context(db, control_db, obligation)
+    sections, parties = frozen.fields["sections"], context["parties"]
+    missing, _ = emdr.check(sections, parties)
+    if missing:
+        raise _error(409, "EMDR_MISSING", "Before the eMDR file: " + "; ".join(missing), missing=missing)
+    body = emdr.build(
+        sections,
+        parties,
+        sender=_organization_name(control_db, tenant_id) or "-",
+        now=_now(),
+        practice=_trial(control_db, tenant_id),
+    )
+    errors = emdr.validate(body)
+    if errors:  # never a file FDA's schema refuses
+        logger.error("eMDR file of report %s does not validate: %s", obligation.id, errors[:3])
+        raise _error(409, "EMDR_INVALID", "The eMDR file did not validate against FDA's schema", errors=errors[:10])
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=ctx.user_id,
+            action="REPORT_EMDR_DOWNLOADED",
+            entity_type="ReportObligation",
+            entity_id=obligation.id,
+            correlation_id=ctx.correlation_id,
+            details={"snapshot": frozen.version},
+        )
+    )
+    db.commit()
+    ref = complaint_ref(context["record"])
+    return Response(
+        content=body,
+        media_type="application/xml",
+        headers={"Content-Disposition": attachment(f"mdarix-emdr-{ref}-snapshot-{frozen.version}.xml")},
     )
