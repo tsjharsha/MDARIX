@@ -72,6 +72,7 @@ No migration. Only the web image changes. No operator step. No sample number or 
   Next steps, Settings, Account, Import your data, Help) takes the same headings in the display face, an emblem
   beside its question, and the design's cards, buttons, chips, tables, fields and folds; Next steps opens on the band.
 - Getting started's ring on the rail is read a moment after the page's own data, so it never delays the page.
+- Whatever is scrolled into view stops clear of the top bar and, on a phone, of the bottom bar, so neither covers it.
 - The browser journeys' keyboard check tells the end of a page (the browser leaves it and the next Tab starts again
   at the top) from focus lost in the middle of it.
 
