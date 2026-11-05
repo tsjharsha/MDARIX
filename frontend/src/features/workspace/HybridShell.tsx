@@ -8,6 +8,7 @@ import {
   FileText,
   House,
   Inbox,
+  ListChecks,
   Lock,
   LogOut,
   MessageSquare,
@@ -734,7 +735,14 @@ export function NavRail({
           title="Getting started"
           onClick={() => open(PERSONA_TABS.start.section)}
         >
-          <ProgressArc done={progress ?? 0} size={44} decorative />
+          {/* Until the story is read, the step's icon, not an empty ring that reads as loading. */}
+          {progress === null ? (
+            <span className="uw-navrail-ring-wait" aria-hidden="true">
+              <ListChecks size={22} />
+            </span>
+          ) : (
+            <ProgressArc done={progress} size={44} decorative />
+          )}
           <span className="uw-tab-label">
             <strong>Getting started</strong>
             {progress !== null && <small>{progress} of 10 completed</small>}
@@ -807,7 +815,11 @@ export function PhoneBar({
               aria-current={current === "start" ? "page" : undefined}
               onClick={() => go(PERSONA_TABS.start.section)}
             >
-              <ProgressArc done={progress ?? 0} size={22} tone="light" decorative />
+              {progress === null ? (
+                <ListChecks size={20} aria-hidden="true" />
+              ) : (
+                <ProgressArc done={progress} size={22} tone="light" decorative />
+              )}
               <span className="uw-tab-label">Getting started</span>
             </button>
           ) : (

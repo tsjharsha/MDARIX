@@ -63,10 +63,15 @@ describe("the rail", () => {
     const rail = renderToStaticMarkup(<NavRail tabs={trial(["home"])} current="home" open={vi.fn()} progress={3} />);
     expect(rail).toContain("3 of 10 completed");
     expect(rail.match(/class="hx-seg is-done"/g)).toHaveLength(3);
-    // Unknown until the story is read: no count, an empty ring.
-    expect(renderToStaticMarkup(<NavRail tabs={trial(["home"])} current="home" open={vi.fn()} />)).not.toContain(
-      "of 10 completed",
-    );
+    // Unknown until the story is read: no count, and the step's icon rather than an empty ring that reads as loading.
+    const unread = renderToStaticMarkup(<NavRail tabs={trial(["home"])} current="home" open={vi.fn()} />);
+    expect(unread).not.toContain("of 10 completed");
+    expect(unread).toContain("uw-navrail-ring-wait");
+    expect(unread).not.toContain("hx-seg");
+    // Read, even at nothing done, it is the ring: "0 of 10 completed".
+    expect(
+      renderToStaticMarkup(<NavRail tabs={trial(["home"])} current="home" open={vi.fn()} progress={0} />),
+    ).toContain("0 of 10 completed");
   });
 
   it("keeps only the persona's destinations, and marks a screen opened from Getting started", () => {
@@ -165,5 +170,13 @@ describe("the shell around it", () => {
     expect([...at].sort((a, b) => a - b)).toEqual(at);
     expect(userWorkspace).toContain("<NavRail");
     expect(userWorkspace).toContain("<PhoneBar");
+  });
+});
+
+describe("the fixed bars never cover what is scrolled into view", () => {
+  it("pads scrolling by the top bar, and on a phone by the bottom bar", () => {
+    expect(shellCss).toMatch(/html:has\(\.uw-hybrid\) \{\s*scroll-padding-top: 72px;/);
+    const phone = shellCss.slice(shellCss.lastIndexOf("@media (max-width: 640px)"));
+    expect(phone).toMatch(/scroll-padding-bottom: 96px/);
   });
 });
