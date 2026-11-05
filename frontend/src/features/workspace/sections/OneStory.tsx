@@ -1,5 +1,23 @@
 import { useState, type ReactNode, type RefObject } from "react";
-import { Check, ChevronRight, Eye, Minus } from "lucide-react";
+import {
+  Archive,
+  Check,
+  ChevronRight,
+  Eye,
+  FileText,
+  GitFork,
+  ListChecks,
+  Minus,
+  PenLine,
+  Phone,
+  Send,
+  Stethoscope,
+  TrendingUp,
+  UserCheck,
+  type LucideIcon,
+} from "lucide-react";
+import { MonitorBand, ProgressArc } from "../../shared/hero/HeroVisuals";
+import { BedsideScene, SignedSeal } from "../../shared/hero/HeroArt";
 import { useResource } from "../../customer-admin/shared";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { IMPORTED_SOURCE } from "../complaintList";
@@ -277,19 +295,33 @@ export function StoryView({
     startStory?.(null);
     open(section as WorkspaceSection, tab);
   };
+  const ticked = run ? run.steps.filter((step) => step.done || step.skipped).length : 0;
+  // The hero design's monitor band (0.10.90): the page's words, the ten-step arc and the bedside scene.
   const header = (
-    <header className="uw-gs-head">
-      <h1 ref={heading} tabIndex={-1}>
-        Getting started
-      </h1>
-      <p>
-        {run && !sample
-          ? "Follow your most urgent complaint from first call to reporting."
-          : "Follow one sample complaint from first call to reporting."}
-      </p>
-      {/* Said once, after the read, so it never says "Fictional data" over your own records. */}
-      {run && <p className="uw-gs-practice">{practiceLine(sample)}</p>}
-    </header>
+    <MonitorBand className="uw-gs-band">
+      <header className="uw-gs-head">
+        <h1 ref={heading} tabIndex={-1}>
+          Getting started
+        </h1>
+        <p>
+          {run && !sample
+            ? "Follow your most urgent complaint from first call to reporting."
+            : "Follow one sample complaint from first call to reporting."}
+        </p>
+        {/* Said once, after the read, so it never says "Fictional data" over your own records. */}
+        {run && <p className="uw-gs-practice">{practiceLine(sample)}</p>}
+        {run && (
+          <div className="uw-gs-prog" aria-hidden="true">
+            <ProgressArc done={ticked} size={64} decorative />
+            <b className="uw-num">
+              {ticked}
+              <small>/{STORY_STEPS}</small>
+            </b>
+          </div>
+        )}
+      </header>
+      <BedsideScene className="uw-gs-scene" />
+    </MonitorBand>
   );
   if (!run) {
     const failed = state === "error" || state === "forbidden";
@@ -343,8 +375,13 @@ export function StoryView({
   if (finished) {
     body = (
       <>
-        <p className="uw-wt-label">All ten steps done</p>
-        <h3 id="uw-os-title">{sample ? "The sample walkthrough is complete" : "Your walkthrough is complete"}</h3>
+        <div className="uw-os-art">
+          <SignedSeal size={76} />
+          <div>
+            <p className="uw-wt-label">All ten steps done</p>
+            <h3 id="uw-os-title">{sample ? "The sample walkthrough is complete" : "Your walkthrough is complete"}</h3>
+          </div>
+        </div>
         <p className="uw-wt-lead">
           {sample
             ? "From the call to a recorded submission and the trend check. Now the same ten steps on your own most urgent complaint."
@@ -380,9 +417,14 @@ export function StoryView({
     const then = selected < STORY_STEPS - 1 ? run.steps[selected + 1] : null;
     body = (
       <>
-        <p className="uw-wt-label">
-          Step {selected + 1} · {step.label}
-        </p>
+        <div className="uw-os-art">
+          <span className="uw-os-art-ic" aria-hidden="true">
+            <StepIcon index={selected} size={36} />
+          </span>
+          <p className="uw-wt-label">
+            Step {selected + 1} · {step.label}
+          </p>
+        </div>
         {previewing && (
           <p className="uw-wt-preview">
             <Eye size={15} aria-hidden="true" />
@@ -469,7 +511,15 @@ export function StoryView({
             aria-valuenow={done + skipped}
             aria-valuetext={`${done} of ${STORY_STEPS} completed`}
           >
-            <span style={{ width: `${Math.round(((done + skipped) / STORY_STEPS) * 100)}%` }} />
+            {/* Ten segments, one per step (0.10.90, the hero design). */}
+            {run.steps.map((step, index) => (
+              <i
+                key={step.key}
+                className={
+                  step.done || step.skipped ? "is-on" : !run.finished && index === run.current ? "is-cur" : undefined
+                }
+              />
+            ))}
           </div>
         </div>
         {problem && (
@@ -501,9 +551,15 @@ export function StoryView({
                     onClick={() => setPicked(pickOn(run, index))}
                   >
                     <span className="uw-os-k" aria-hidden="true">
-                      {step.done ? <Check size={13} /> : step.skipped ? <Minus size={13} /> : index + 1}
+                      <StepIcon index={index} />
+                      {(step.done || step.skipped) && (
+                        <span className="uw-os-ok">{step.done ? <Check size={11} /> : <Minus size={11} />}</span>
+                      )}
                     </span>
                     <span className="uw-os-t">
+                      <span className="uw-os-num" aria-hidden="true">
+                        Step {index + 1}
+                      </span>
                       <span className="sr-only">Step {index + 1}: </span>
                       {step.label}
                     </span>
@@ -518,6 +574,25 @@ export function StoryView({
       </section>
     </div>
   );
+}
+
+/** Each step's icon, in the walkthrough's order (0.10.90, the hero design). */
+const STEP_ICONS: readonly LucideIcon[] = [
+  Phone,
+  Stethoscope,
+  GitFork,
+  PenLine,
+  FileText,
+  ListChecks,
+  UserCheck,
+  Send,
+  Archive,
+  TrendingUp,
+];
+
+function StepIcon({ index, size = 18 }: { index: number; size?: number }) {
+  const Icon = STEP_ICONS[index] ?? ListChecks;
+  return <Icon size={size} aria-hidden="true" />;
 }
 
 /**

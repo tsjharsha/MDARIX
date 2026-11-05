@@ -1,5 +1,8 @@
 import { useEffect, useState, type ReactNode, type RefObject } from "react";
-import { Check, ChevronRight, History, MoreHorizontal, Send } from "lucide-react";
+import { Check, ChevronRight, Clock, Globe, History, MoreHorizontal, Package, Send, UserRound } from "lucide-react";
+import { ClockRing, Flag, deviceKind } from "../../shared/hero/HeroVisuals";
+import { InfusionPumpArt, PatientMonitorArt } from "../../shared/hero/HeroArt";
+import { ringOf } from "../heroBits";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { errorText, formatDate, notFound, send, useResource } from "../../customer-admin/shared";
 import { DeadlineChip, HarmChip } from "../../../app/chips";
@@ -250,128 +253,156 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           {storyRun && !story && <StoryPill run={storyRun} />}
         </span>
       </div>
-      <header className="uw-card uw-highlights" aria-label="The complaint at a glance">
-        <div className="uw-hl-top">
-          <div className="uw-hl-title">
-            <p className="ac-eyebrow">
-              Complaint · {[event.product, event.version].filter(Boolean).join(" · ") || "product not recorded"}
-            </p>
-            <h1 ref={heading} tabIndex={-1}>
-              {event.ref}
-            </h1>
-          </div>
-          <div className="uw-cp-chips">
-            <HarmChip harm={harm.harm} label={harm.label} />
+      <header className="uw-card uw-highlights uw-cp-head" aria-label="The complaint at a glance">
+        {/* The hero design's monitor band (0.10.90): the reference, the harm and the reporter's words, the device, and
+            the one legal clock as a ring with its line beneath. */}
+        <div className="hx-monitor uw-cp-band">
+          <div className="hx-monitor-in uw-cp-bandgrid">
+            <div className="uw-cp-bandmain">
+              <div className="uw-hl-top">
+                <div className="uw-hl-title">
+                  <p className="ac-eyebrow">
+                    Complaint · {[event.product, event.version].filter(Boolean).join(" · ") || "product not recorded"}
+                  </p>
+                  <h1 ref={heading} tabIndex={-1}>
+                    {event.ref}
+                  </h1>
+                </div>
+              </div>
+              {/* The record's hero (0.10.85, D3.3): the reporter's words and the harm. */}
+              <figure className="uw-cp-words">
+                <blockquote>“{event.description || "No description recorded."}”</blockquote>
+                <figcaption>
+                  {event.sample ? "The reporter's words (fictional sample)" : "The reporter's words, from your record"}
+                </figcaption>
+              </figure>
+              <div className="uw-cp-chips">
+                <HarmChip harm={harm.harm} label={harm.label} />
+              </div>
+            </div>
+            <DeviceArt product={event.product} />
             {/* One clock line (0.10.82, D1.7): the nearest legal clock, its time left and its day; a clock waiting
                 for the country or the awareness date is the shortest possible one, never a market's (0.10.81). */}
             {clock && (
-              <DeadlineChip
-                item={clock}
-                prefix={clockPrefix(clock, needed("COUNTRY") ? null : event.market)}
-                suffix={`due ${dueDay(clock)}`}
-              />
+              <BigClock item={clock} market={needed("COUNTRY") ? null : event.market}>
+                <DeadlineChip
+                  item={clock}
+                  prefix={clockPrefix(clock, needed("COUNTRY") ? null : event.market)}
+                  suffix={`due ${dueDay(clock)}`}
+                />
+              </BigClock>
             )}
           </div>
         </div>
-        {/* The record's hero (0.10.85, D3.3): the reporter's words, the harm and the one clock line above, the one
-            Next step beside them. */}
-        <div className="uw-cp-hero">
-          <figure className="uw-cp-words">
-            <blockquote>“{event.description || "No description recorded."}”</blockquote>
-            <figcaption>
-              {event.sample ? "The reporter's words (fictional sample)" : "The reporter's words, from your record"}
-            </figcaption>
-          </figure>
-          <NextStepCard
-            view={view}
-            step={step}
-            triageHere={triageHere}
-            storyShown={storyShown}
-            storyRun={storyRun}
-            onStory={(run) => {
-              startStory?.(null);
-              void openStep(run, run.current, open);
-            }}
-            onStep={() => {
-              if (step?.opens) return go(step.opens);
-              choose("Summary");
-              document.getElementById("cp-ready")?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
-            onShowTriage={active === "Summary" ? undefined : () => choose("Summary")}
-          />
-        </div>
-        {view.service?.header && (
-          // Completing the service never closes the complaint (0.10.71, A5): the quality work is still open.
-          <p className="uw-cp-service" role="status">
-            {/* The owner and the next step are the fields and the card below (0.10.87). */}
-            <strong>{view.service.header}</strong>
-          </p>
-        )}
-        <dl className="uw-hl-fields">
-          <div>
-            <dt>Owner</dt>
-            <dd>{work?.owner_name ?? event.owner_name ?? "Not named yet"}</dd>
-          </div>
-          <div>
-            <dt>Markets</dt>
-            <dd>
-              {needed("COUNTRY") ? (
-                // The rail's Legal clocks say where the missing facts are asked (0.10.87).
-                <span className="ac-muted">Not recorded</span>
-              ) : (
-                markets.map(marketLabel).join(", ") || "—"
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Awareness</dt>
-            <dd>
-              {needed("AWARENESS_DATE") ? (
-                <span className="ac-muted">Not recorded</span>
-              ) : (
-                awarenessText(event.awareness_at, event.awareness_date_only)
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>Lot</dt>
-            <dd className="uw-mono">{event.lot ?? "—"}</dd>
-          </div>
-        </dl>
-        {/* The progress steps are links (0.10.82, D1.8): Market assessment opens the tree, Report the report. */}
-        <StagePath
-          stages={view.stages}
-          links={{
-            TRIAGE: triageHere ? () => openHere(step?.opens ?? null) : undefined,
-            MARKETS: reportStage
-              ? () => {
-                  const place = reportPlace(reports[0].id);
-                  open(place.section, place.tab);
-                }
-              : markets[0]
+        <div className="uw-card uw-cp-facts">
+          {view.service?.header && (
+            // Completing the service never closes the complaint (0.10.71, A5): the quality work is still open.
+            <p className="uw-cp-service" role="status">
+              {/* The owner and the next step are the fields and the card below (0.10.87). */}
+              <strong>{view.service.header}</strong>
+            </p>
+          )}
+          <dl className="uw-hl-fields">
+            <div>
+              <dt>
+                <UserRound size={16} aria-hidden="true" />
+                Owner
+              </dt>
+              <dd>{work?.owner_name ?? event.owner_name ?? "Not named yet"}</dd>
+            </div>
+            <div>
+              <dt>
+                <Globe size={16} aria-hidden="true" />
+                Markets
+              </dt>
+              <dd>
+                {needed("COUNTRY") ? (
+                  // The rail's Legal clocks say where the missing facts are asked (0.10.87).
+                  <span className="ac-muted">Not recorded</span>
+                ) : (
+                  <>
+                    {markets.map((market) => (
+                      <Flag key={market} country={market} decorative />
+                    ))}{" "}
+                    {markets.map(marketLabel).join(", ") || "—"}
+                  </>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>
+                <Clock size={16} aria-hidden="true" />
+                Awareness
+              </dt>
+              <dd>
+                {needed("AWARENESS_DATE") ? (
+                  <span className="ac-muted">Not recorded</span>
+                ) : (
+                  awarenessText(event.awareness_at, event.awareness_date_only)
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt>
+                <Package size={16} aria-hidden="true" />
+                Lot
+              </dt>
+              <dd className="uw-mono">{event.lot ?? "—"}</dd>
+            </div>
+          </dl>
+          {/* The progress steps are links (0.10.82, D1.8): Market assessment opens the tree, Report the report. */}
+          <StagePath
+            stages={view.stages}
+            links={{
+              TRIAGE: triageHere ? () => openHere(step?.opens ?? null) : undefined,
+              MARKETS: reportStage
                 ? () => {
-                    const place = treePlace(markets[0], event.complaint_id);
+                    const place = reportPlace(reports[0].id);
                     open(place.section, place.tab);
                   }
-                : undefined,
-          }}
-          after={{
-            MARKETS:
-              reports.length && !reportStage ? (
-                <span className="uw-stageline-extra">
-                  <button
-                    type="button"
-                    className="ac-link"
-                    onClick={() => {
-                      const place = reportPlace(reports[0].id);
+                : markets[0]
+                  ? () => {
+                      const place = treePlace(markets[0], event.complaint_id);
                       open(place.section, place.tab);
-                    }}
-                  >
-                    Report
-                  </button>
-                </span>
-              ) : null,
+                    }
+                  : undefined,
+            }}
+            after={{
+              MARKETS:
+                reports.length && !reportStage ? (
+                  <span className="uw-stageline-extra">
+                    <button
+                      type="button"
+                      className="ac-link"
+                      onClick={() => {
+                        const place = reportPlace(reports[0].id);
+                        open(place.section, place.tab);
+                      }}
+                    >
+                      Report
+                    </button>
+                  </span>
+                ) : null,
+            }}
+          />
+        </div>
+        {/* The record's one Next step, under its facts (0.10.90, the hero design). */}
+        <NextStepCard
+          view={view}
+          step={step}
+          triageHere={triageHere}
+          storyShown={storyShown}
+          storyRun={storyRun}
+          onStory={(run) => {
+            startStory?.(null);
+            void openStep(run, run.current, open);
           }}
+          onStep={() => {
+            if (step?.opens) return go(step.opens);
+            choose("Summary");
+            document.getElementById("cp-ready")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+          onShowTriage={active === "Summary" ? undefined : () => choose("Summary")}
         />
       </header>
       {/* The short story's step to do now (0.10.71, A4), from what was saved on this record. */}
@@ -599,6 +630,49 @@ export function StagePath({
   );
 }
 
+/** The device's illustration in the band: the patient monitor or the infusion pump; none for another device. */
+function DeviceArt({ product }: { product: string | null | undefined }) {
+  const kind = deviceKind(product);
+  if (kind !== "monitor" && kind !== "pump") return null;
+  return <div className="uw-cp-devart">{kind === "monitor" ? <PatientMonitorArt /> : <InfusionPumpArt />}</div>;
+}
+
+/** The legal clock as the band's big ring: one tick per day of the window, the days left in the middle, its line and
+ * its market's flag beneath (the hero design). */
+function BigClock({
+  item,
+  market,
+  children,
+}: {
+  item: { hours_left: number; state: string };
+  market: string | null;
+  children: ReactNode;
+}) {
+  const ring = ringOf(item);
+  const unit = ring.total === 24 ? "hours left" : ring.left < 0 ? "days overdue" : "days left";
+  return (
+    <div className="uw-cp-bigclock">
+      <ClockRing
+        left={ring.left}
+        total={ring.total}
+        status={ring.status}
+        size={210}
+        stroke={14}
+        ticks
+        label=""
+        decorative
+      >
+        <b className="uw-num">{Math.abs(ring.left)}</b>
+        <span className="uw-cp-bigclock-u">{unit}</span>
+      </ClockRing>
+      <p className="uw-cp-clockcap">
+        {market && <Flag country={market} decorative />}
+        {children}
+      </p>
+    </div>
+  );
+}
+
 /** The record's one Next step (one main button), in its hero (0.10.85, D3.3; the rail's first card before). */
 function NextStepCard({
   view,
@@ -737,7 +811,8 @@ function Rail({ view, onChanged }: { view: EventView; onChanged: (view: EventVie
           <h2>Service work</h2>
           <span className="ac-muted">{serviceText(view)}</span>
         </summary>
-        <ServiceWork view={view} onChanged={onChanged} title="Service work" />
+        {/* The fold's summary says the heading and the state once (0.10.91: they were said twice). */}
+        <ServiceWork view={view} onChanged={onChanged} title="Service work" headless />
       </details>
     </aside>
   );

@@ -322,9 +322,9 @@ textarea {
 
 .side-nav {
   background: linear-gradient(180deg, var(--ms-ink) 0%, var(--ms-navy-deep) 100%);
-  color: var(--ms-surface);
+  color: var(--ms-white);
   padding: 20px 16px;
-  border-right: 1px solid var(--ms-navy);
+  border-right: 1px solid var(--ms-navy-fill);
   display: flex;
   flex-direction: column;
 }
@@ -342,7 +342,7 @@ textarea {
 
 .brand-block {
   padding: 4px 10px 24px;
-  border-bottom: 1px solid #ffffff17;
+  border-bottom: 1px solid color-mix(in srgb, var(--ms-white) 9%, transparent);
   margin-bottom: 20px;
 }
 .brand-block .brand {
@@ -368,7 +368,7 @@ textarea {
 .side-nav-footer {
   margin-top: auto;
   padding: 20px 10px 4px;
-  border-top: 1px solid #ffffff17;
+  border-top: 1px solid color-mix(in srgb, var(--ms-white) 9%, transparent);
 }
 .side-nav-footer p {
   margin-top: 10px;
@@ -402,8 +402,8 @@ textarea {
 }
 .quality-shell .side-nav .nav-link:hover,
 .customer-admin-shell .side-nav .nav-link:hover {
-  background: var(--ms-navy);
-  color: var(--ms-surface);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
 }
 .customer-admin-shell .content {
   max-width: 1440px;
@@ -414,8 +414,8 @@ textarea {
 
 .side-nav .nav-link:hover,
 .side-nav .nav-link.active {
-  background: var(--ms-navy);
-  color: var(--ms-surface);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
 }
 
 .side-nav .disabled-nav {
@@ -430,8 +430,8 @@ textarea {
 }
 
 .side-nav .active {
-  background: var(--ms-navy);
-  color: var(--ms-surface);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
 }
 
 main,
@@ -669,7 +669,7 @@ h3 {
 
 .segmented .selected {
   background: var(--ms-teal-dark);
-  color: white;
+  color: var(--ms-surface);
 }
 
 .primary-action {
@@ -705,7 +705,7 @@ h3 {
   gap: 36px;
   padding: 42px;
   background: linear-gradient(135deg, var(--ms-navy-deep) 0%, var(--ms-teal-dark) 100%);
-  color: var(--ms-surface);
+  color: var(--ms-white);
   border-radius: var(--ms-radius);
   box-shadow: var(--ms-shadow-2);
 }
@@ -714,13 +714,13 @@ h3 {
   position: absolute;
   width: 360px;
   height: 360px;
-  border: 1px solid #ffffff1a;
+  border: 1px solid color-mix(in srgb, var(--ms-white) 10%, transparent);
   border-radius: 50%;
   right: -120px;
   top: -190px;
   box-shadow:
-    0 0 0 65px #ffffff08,
-    0 0 0 130px #ffffff05;
+    0 0 0 65px color-mix(in srgb, var(--ms-white) 3%, transparent),
+    0 0 0 130px color-mix(in srgb, var(--ms-white) 2%, transparent);
 }
 .app-story-hero > div {
   position: relative;
@@ -761,8 +761,8 @@ h3 {
 .story-context {
   align-self: center;
   padding: 24px;
-  background: #ffffff12;
-  border: 1px solid #ffffff26;
+  background: color-mix(in srgb, var(--ms-white) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ms-white) 15%, transparent);
   border-radius: var(--ms-radius);
   backdrop-filter: blur(8px);
 }
@@ -783,7 +783,7 @@ h3 {
 .story-context > div {
   margin-top: 22px;
   padding-top: 18px;
-  border-top: 1px solid #ffffff24;
+  border-top: 1px solid color-mix(in srgb, var(--ms-white) 14%, transparent);
   color: var(--ms-on-dark-muted);
 }
 .story-context > div span {
@@ -1053,8 +1053,8 @@ h3 {
 }
 .customer-admin-menu button:hover,
 .customer-admin-menu button.selected {
-  background: var(--ms-navy);
-  color: var(--ms-surface);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
 }
 .customer-admin-workspace {
   display: grid;
@@ -1856,7 +1856,7 @@ th {
   font: inherit;
 }
 .auth-card input:focus {
-  outline: 3px solid #157b7533;
+  outline: 3px solid color-mix(in srgb, var(--ms-teal) 20%, transparent);
   border-color: var(--ms-teal-dark);
 }
 .auth-links {
@@ -1997,7 +1997,7 @@ th {
   background: var(--ms-surface);
 }
 .pricing-card-featured {
-  border: 2px solid var(--ms-navy);
+  border: 2px solid var(--ms-navy-fill);
   box-shadow: var(--ms-shadow-2);
 }
 .pricing-badge {
@@ -2006,8 +2006,8 @@ th {
   right: 18px;
   padding: 4px 10px;
   border-radius: var(--ms-radius-pill);
-  background: var(--ms-navy);
-  color: var(--ms-surface);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
   font-size: var(--ms-fs-12);
   font-weight: 700;
 }
@@ -2058,7 +2058,7 @@ th {
   font-weight: 700;
 }
 .secondary-action:hover {
-  border-color: var(--ms-navy);
+  border-color: var(--ms-navy-fill);
   color: var(--ms-navy);
 }
 @media (max-width: 900px) {
@@ -2102,30 +2102,52 @@ th {
   border-radius: var(--ms-radius);
   background-color: var(--ms-ground);
   background-image:
-    linear-gradient(90deg, transparent 49%, #ffffff99 50%, transparent 51%),
-    linear-gradient(0deg, transparent 49%, #ffffff99 50%, transparent 51%);
+    linear-gradient(90deg, transparent 49%, color-mix(in srgb, var(--ms-white) 60%, transparent) 50%, transparent 51%),
+    linear-gradient(0deg, transparent 49%, color-mix(in srgb, var(--ms-white) 60%, transparent) 50%, transparent 51%);
   background-size: 72px 72px;
-  box-shadow: inset 0 0 0 18px #ffffff55;
+  box-shadow: inset 0 0 0 18px color-mix(in srgb, var(--ms-white) 33%, transparent);
 }
 [data-public-path^="/platform"] .public-hero:after {
   background-color: var(--ms-mint);
   background-image:
-    radial-gradient(circle at 22% 50%, #217b7633 0 24px, transparent 25px),
-    radial-gradient(circle at 50% 50%, #526d8333 0 34px, transparent 35px),
-    radial-gradient(circle at 78% 50%, #16324a33 0 25px, transparent 26px),
-    linear-gradient(90deg, transparent 23%, #217b7666 24% 49%, transparent 50% 77%, #217b7666 78% 79%, transparent 80%);
+    radial-gradient(circle at 22% 50%, color-mix(in srgb, var(--ms-teal) 20%, transparent) 0 24px, transparent 25px),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--ms-ink-2) 20%, transparent) 0 34px, transparent 35px),
+    radial-gradient(
+      circle at 78% 50%,
+      color-mix(in srgb, var(--ms-navy-fill) 20%, transparent) 0 25px,
+      transparent 26px
+    ),
+    linear-gradient(
+      90deg,
+      transparent 23%,
+      color-mix(in srgb, var(--ms-teal) 40%, transparent) 24% 49%,
+      transparent 50% 77%,
+      color-mix(in srgb, var(--ms-teal) 40%, transparent) 78% 79%,
+      transparent 80%
+    );
 }
 [data-public-path="/solutions"] .public-hero:after {
   background-color: var(--ms-warn-bg);
   background-image:
-    linear-gradient(135deg, transparent 42%, #b37a2a66 43% 45%, transparent 46%),
-    linear-gradient(45deg, transparent 42%, #217b7666 43% 45%, transparent 46%),
-    radial-gradient(circle at 50% 50%, #fff9 0 34px, transparent 35px);
+    linear-gradient(
+      135deg,
+      transparent 42%,
+      color-mix(in srgb, var(--ms-warn-fill) 40%, transparent) 43% 45%,
+      transparent 46%
+    ),
+    linear-gradient(
+      45deg,
+      transparent 42%,
+      color-mix(in srgb, var(--ms-teal) 40%, transparent) 43% 45%,
+      transparent 46%
+    ),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--ms-white) 60%, transparent) 0 34px, transparent 35px);
 }
 [data-public-path="/product-lifecycle"] .public-hero:after {
   background-color: var(--ms-info-bg);
   background-image:
-    linear-gradient(90deg, #526d8333 2px, transparent 2px), linear-gradient(#526d8333 2px, transparent 2px);
+    linear-gradient(90deg, color-mix(in srgb, var(--ms-ink-2) 20%, transparent) 2px, transparent 2px),
+    linear-gradient(color-mix(in srgb, var(--ms-ink-2) 20%, transparent) 2px, transparent 2px);
   background-size:
     25% 100%,
     100% 50%;
@@ -2133,19 +2155,23 @@ th {
 [data-public-path="/why-mdarix"] .public-hero:after {
   background-color: var(--ms-ai-bg);
   background-image:
-    radial-gradient(circle at 25% 50%, #79559b55 0 26px, transparent 27px),
-    radial-gradient(circle at 50% 50%, #217b7655 0 36px, transparent 37px),
-    radial-gradient(circle at 75% 50%, #16324a55 0 26px, transparent 27px);
+    radial-gradient(circle at 25% 50%, color-mix(in srgb, var(--ms-ai) 33%, transparent) 0 26px, transparent 27px),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--ms-teal) 33%, transparent) 0 36px, transparent 37px),
+    radial-gradient(
+      circle at 75% 50%,
+      color-mix(in srgb, var(--ms-navy-fill) 33%, transparent) 0 26px,
+      transparent 27px
+    );
 }
 [data-public-path="/resources"] .public-hero:after {
   background-color: var(--ms-good-bg);
   background-image: linear-gradient(
     135deg,
-    #217b7644 12%,
+    color-mix(in srgb, var(--ms-teal) 27%, transparent) 12%,
     transparent 12% 24%,
-    #526d8344 24% 36%,
+    color-mix(in srgb, var(--ms-ink-2) 27%, transparent) 24% 36%,
     transparent 36% 48%,
-    #b37a2a44 48% 60%,
+    color-mix(in srgb, var(--ms-warn-fill) 27%, transparent) 48% 60%,
     transparent 60%
   );
 }
@@ -2153,19 +2179,29 @@ th {
   background-color: var(--ms-mint);
   background-image: linear-gradient(
     90deg,
-    #217b7633 0 25%,
+    color-mix(in srgb, var(--ms-teal) 20%, transparent) 0 25%,
     transparent 25% 27%,
-    #526d8333 27% 50%,
+    color-mix(in srgb, var(--ms-ink-2) 20%, transparent) 27% 50%,
     transparent 50% 52%,
-    #b37a2a55 52% 75%,
+    color-mix(in srgb, var(--ms-warn-fill) 33%, transparent) 52% 75%,
     transparent 75%
   );
 }
 [data-public-path="/roadmap"] .public-hero:after {
   background-color: var(--ms-warn-bg);
   background-image:
-    linear-gradient(135deg, transparent 44%, #b37a2a88 45% 47%, transparent 48%),
-    linear-gradient(45deg, transparent 44%, #526d8388 45% 47%, transparent 48%);
+    linear-gradient(
+      135deg,
+      transparent 44%,
+      color-mix(in srgb, var(--ms-warn-fill) 53%, transparent) 45% 47%,
+      transparent 48%
+    ),
+    linear-gradient(
+      45deg,
+      transparent 44%,
+      color-mix(in srgb, var(--ms-ink-2) 53%, transparent) 45% 47%,
+      transparent 48%
+    );
 }
 [data-public-path]:not([data-public-path="/"]) .public-hero:after {
   height: 190px;
@@ -2347,8 +2383,8 @@ th {
   background: var(--ms-ground);
 }
 .workflow-storyline span.active {
-  background: var(--ms-navy);
-  color: var(--ms-surface);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
 }
 .workflow-storyline i {
   font-style: normal;
@@ -3254,7 +3290,7 @@ th {
 }
 .visual-orbit {
   position: absolute;
-  border: 1px solid #217b7666;
+  border: 1px solid color-mix(in srgb, var(--ms-teal) 40%, transparent);
   border-radius: 50%;
   z-index: 1;
 }
@@ -3271,7 +3307,7 @@ th {
   left: 50%;
   top: 52px;
   transform: translateX(-50%);
-  border-color: #526d8366;
+  border-color: color-mix(in srgb, var(--ms-ink-2) 40%, transparent);
 }
 .visual-node {
   position: absolute;
@@ -3681,8 +3717,8 @@ th {
   cursor: pointer;
 }
 .admin-form-toolbar button.selected {
-  background: var(--ms-navy);
-  color: var(--ms-surface);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
 }
 .admin-form-grid {
   display: grid;
@@ -4773,7 +4809,7 @@ th {
   background: var(--ms-surface);
 }
 .public-shell .capability-visual {
-  background: linear-gradient(145deg, var(--ms-navy), var(--ms-teal));
+  background: linear-gradient(145deg, var(--ms-navy-fill), var(--ms-teal));
 }
 .public-shell .public-footer {
   margin-top: 84px;
@@ -5924,8 +5960,8 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 }
 .platform-admin-command-card.primary {
   padding: 25px 27px;
-  background: linear-gradient(135deg, var(--ms-navy), var(--ms-teal-dark));
-  color: var(--ms-surface);
+  background: linear-gradient(135deg, var(--ms-navy-fill), var(--ms-teal-dark));
+  color: var(--ms-white);
 }
 .platform-admin-command-card.primary .eyebrow {
   color: var(--ms-teal-bright);
@@ -6363,7 +6399,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   gap: 24px;
   padding: 16px 20px;
   background: var(--ms-navy-deep);
-  color: var(--ms-surface);
+  color: var(--ms-white);
   border: 1px solid var(--ms-muted);
   border-radius: var(--ms-radius);
   box-shadow: var(--ms-shadow-2);
@@ -6431,7 +6467,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   gap: 10px;
   padding: 9px 10px 9px 14px;
   background: var(--ms-navy-deep);
-  color: var(--ms-surface);
+  color: var(--ms-white);
   border: 1px solid var(--ms-muted);
   border-radius: var(--ms-radius);
   box-shadow: var(--ms-shadow-2);
@@ -6562,7 +6598,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   padding: 22px;
   border: 1px solid var(--ms-mint-line);
   border-radius: var(--ms-radius);
-  background: #ffffffb8;
+  background: color-mix(in srgb, var(--ms-white) 72%, transparent);
   color: var(--ms-teal-dark);
 }
 .platform-admin-hero-status strong {
@@ -7243,7 +7279,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   min-height: 150px;
   border-radius: var(--ms-radius);
   background:
-    radial-gradient(circle at 25% 50%, #fff8 0 10px, transparent 11px),
+    radial-gradient(circle at 25% 50%, color-mix(in srgb, var(--ms-white) 53%, transparent) 0 10px, transparent 11px),
     linear-gradient(135deg, var(--ms-mint), var(--ms-info-bg));
   overflow: hidden;
 }
@@ -7254,7 +7290,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   left: 18%;
   right: 18%;
   height: 1px;
-  background: #7eb7b5aa;
+  background: color-mix(in srgb, var(--ms-mint-line) 67%, transparent);
   transform: rotate(18deg);
   top: 42%;
 }
@@ -9488,7 +9524,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .investigator-metrics button:hover,
 .investigator-metrics button:focus-visible {
   border-color: var(--ms-teal);
-  box-shadow: 0 0 0 3px #087b7320;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ms-teal) 13%, transparent);
 }
 .investigator-metrics span,
 .investigator-metrics small {
@@ -9579,8 +9615,8 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   gap: 14px;
   padding: 18px 22px;
   border-radius: var(--ms-radius);
-  background: var(--ms-navy);
-  color: var(--ms-surface);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
 }
 .investigator-next div {
   flex: 1;
@@ -10091,8 +10127,13 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(60% 70% at 85% 40%, #ffffffcc, transparent 70%),
-    linear-gradient(115deg, #f3f6faf2 0%, #f3f6fab3 45%, #eef5f5cc 100%);
+    radial-gradient(60% 70% at 85% 40%, color-mix(in srgb, var(--ms-white) 80%, transparent), transparent 70%),
+    linear-gradient(
+      115deg,
+      color-mix(in srgb, var(--ms-ground) 95%, transparent) 0%,
+      color-mix(in srgb, var(--ms-ground) 70%, transparent) 45%,
+      color-mix(in srgb, var(--ms-subtle) 80%, transparent) 100%
+    );
 }
 .auth-page-top,
 .auth-page-foot {
@@ -10192,7 +10233,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   width: 100%;
   padding: 36px;
   gap: 14px;
-  background: #ffffffeb;
+  background: color-mix(in srgb, var(--ms-white) 92%, transparent);
   backdrop-filter: blur(6px);
   border: 1px solid var(--auth-line);
   border-top: 4px solid var(--auth-teal);
@@ -10327,7 +10368,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .auth-page .auth-card .auth-field select:focus,
 .auth-page .auth-card .auth-field textarea:focus,
 .auth-page .auth-card .auth-check input:focus-visible {
-  outline: 3px solid #157b7533;
+  outline: 3px solid color-mix(in srgb, var(--ms-teal) 20%, transparent);
   border-color: var(--ms-teal-dark);
 }
 .auth-page .auth-card .auth-checks {
@@ -10369,8 +10410,8 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   padding: clamp(24px, 3vw, 40px);
   border-radius: var(--ms-radius);
   background:
-    radial-gradient(120% 80% at 100% 0%, #0f6f6b55, transparent 60%),
-    linear-gradient(160deg, var(--ms-navy-deep) 0%, var(--ms-navy) 55%, var(--ms-navy) 100%);
+    radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--ms-teal) 33%, transparent), transparent 60%),
+    linear-gradient(160deg, var(--ms-navy-deep) 0%, var(--ms-navy-fill) 55%, var(--ms-navy-fill) 100%);
   box-shadow: var(--ms-shadow-2);
   color: var(--ms-mint);
 }
@@ -10381,7 +10422,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   color: var(--ms-surface);
 }
 .auth-page.is-signup .auth-aside li > span {
-  background: #ffffff14;
+  background: color-mix(in srgb, var(--ms-white) 8%, transparent);
   color: var(--ms-teal-bright);
 }
 .auth-page.is-signup .auth-aside strong {
@@ -10395,9 +10436,9 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .su-motion {
   margin: 20px 0 26px;
   padding: 14px 14px 10px;
-  border: 1px solid #ffffff1f;
+  border: 1px solid color-mix(in srgb, var(--ms-white) 12%, transparent);
   border-radius: var(--ms-radius);
-  background: #0a1d2ecc;
+  background: color-mix(in srgb, var(--ms-navy-deep) 80%, transparent);
 }
 .su-motion svg {
   display: block;
@@ -10464,7 +10505,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   animation: su-lit-3 9s ease-in-out infinite both;
 }
 .su-link {
-  stroke: #ffffff55;
+  stroke: color-mix(in srgb, var(--ms-white) 33%, transparent);
   stroke-width: 1.5;
 }
 @keyframes su-dot-in {
@@ -10528,8 +10569,8 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 @keyframes su-lit-1 {
   0%,
   4% {
-    fill: #ffffff10;
-    stroke: #ffffff30;
+    fill: color-mix(in srgb, var(--ms-white) 6%, transparent);
+    stroke: color-mix(in srgb, var(--ms-white) 19%, transparent);
   }
   9%,
   86% {
@@ -10538,15 +10579,15 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   }
   94%,
   100% {
-    fill: #ffffff10;
-    stroke: #ffffff30;
+    fill: color-mix(in srgb, var(--ms-white) 6%, transparent);
+    stroke: color-mix(in srgb, var(--ms-white) 19%, transparent);
   }
 }
 @keyframes su-lit-2 {
   0%,
   50% {
-    fill: #ffffff10;
-    stroke: #ffffff30;
+    fill: color-mix(in srgb, var(--ms-white) 6%, transparent);
+    stroke: color-mix(in srgb, var(--ms-white) 19%, transparent);
   }
   55%,
   86% {
@@ -10555,15 +10596,15 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   }
   94%,
   100% {
-    fill: #ffffff10;
-    stroke: #ffffff30;
+    fill: color-mix(in srgb, var(--ms-white) 6%, transparent);
+    stroke: color-mix(in srgb, var(--ms-white) 19%, transparent);
   }
 }
 @keyframes su-lit-3 {
   0%,
   63% {
-    fill: #ffffff10;
-    stroke: #ffffff30;
+    fill: color-mix(in srgb, var(--ms-white) 6%, transparent);
+    stroke: color-mix(in srgb, var(--ms-white) 19%, transparent);
   }
   68%,
   86% {
@@ -10572,8 +10613,8 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   }
   94%,
   100% {
-    fill: #ffffff10;
-    stroke: #ffffff30;
+    fill: color-mix(in srgb, var(--ms-white) 6%, transparent);
+    stroke: color-mix(in srgb, var(--ms-white) 19%, transparent);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -10937,7 +10978,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   display: grid;
   place-items: center;
   padding: 16px;
-  background: #0f223366;
+  background: color-mix(in srgb, var(--ms-navy-deep) 40%, transparent);
 }
 .trial-queue-dialog > div,
 .trial-queue-dialog > form {
@@ -11349,8 +11390,8 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   z-index: 100;
   padding: 8px 14px;
   border-radius: var(--ms-radius-md);
-  background: var(--ms-navy);
-  color: var(--ms-surface);
+  background: var(--ms-navy-fill);
+  color: var(--ms-white);
   font-weight: 600;
 }
 .app-skip:focus {
@@ -11481,7 +11522,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   color: var(--ms-navy);
 }
 .auth-password-toggle:focus-visible {
-  outline: 3px solid #157b7533;
+  outline: 3px solid color-mix(in srgb, var(--ms-teal) 20%, transparent);
 }
 
 /* The authenticator setup's QR code (features/auth/AuthPage.tsx, app/QrCodeSvg.tsx). */

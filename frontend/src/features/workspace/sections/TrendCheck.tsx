@@ -22,6 +22,7 @@ import {
   TREND_BASIS,
   comparisonLine,
   risingSentence,
+  lotsText,
 } from "../signalAi";
 import { ChipFilter, Hero, InlineError, ProductFilter } from "./boardParts";
 import { BasisLine } from "../../shared/Basis";
@@ -29,6 +30,7 @@ import { Bars, BarsTable, ChartOrTable, type BarRow } from "./WowCharts";
 import { IMPORTED_SOURCE } from "../complaintList";
 import { inData } from "../home";
 import { useVisited } from "../oneStory";
+import { DeviceIcon, deviceKind } from "../../shared/hero/HeroVisuals";
 
 /**
  * Signals › Trend check: every product version (or version and problem, or complaint type) against its own history,
@@ -68,7 +70,8 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
   );
   const summary = board.data?.summary;
   // The one action on a group: open its trend, or raise one (the table and the lead sentences share it).
-  const action = (row: TrendItem) =>
+  // On the trend's hero Raise a trend is the main action, filled (owner, 5 Nov 2026); in the table it stays secondary.
+  const action = (row: TrendItem, lead = false) =>
     row.open_signals.length ? (
       <button
         type="button"
@@ -78,7 +81,12 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
         {row.open_signals[0].business_id ?? "Open trend"}
       </button>
     ) : canTriage && canRaiseFromTrend(row) ? (
-      <button type="button" className="ac-secondary" disabled={busy === row.key} onClick={() => void raise(row)}>
+      <button
+        type="button"
+        className={lead ? "ac-primary" : "ac-secondary"}
+        disabled={busy === row.key}
+        onClick={() => void raise(row)}
+      >
         <Plus size={14} aria-hidden="true" /> {busy === row.key ? "Raising…" : "Raise a trend"}
       </button>
     ) : null;
@@ -275,6 +283,20 @@ export function TrendPerUnit({ items }: { items: TrendItem[] }) {
   );
 }
 
+/** The observed count's lots, when their counts add up to it: each lot's short name and count, for the split bar. */
+export function lotParts(row: Pick<TrendItem, "lots" | "lot_counts" | "recent">) {
+  const lots = row.lots ?? [];
+  const counts = row.lot_counts ?? {};
+  const parts = lots.map((lot) => ({ lot, n: counts[lot] ?? 0 })).filter((part) => part.n > 0);
+  if (!parts.length || parts.reduce((sum, part) => sum + part.n, 0) !== row.recent) return [];
+  const short = lotsText(lots, {}).split(", ");
+  return parts.map((part) => ({ ...part, short: short[lots.indexOf(part.lot)] ?? part.lot }));
+}
+
+/** A product's name without its "(Sample)" mark and model words after the number, for the device's caption. */
+const shortName = (name: string | null | undefined) =>
+  (name ?? "").replace(/\s*\(Sample\)/, "").replace(/^(\S+ \d+).*$/, "$1");
+
 /** The version before, or the group's own history, as complaints in the same window as the recent count. */
 export function beforeRate(row: Pick<TrendItem, "history" | "history_days" | "recent_days">): number {
   return row.history_days > 0 ? (row.history / row.history_days) * row.recent_days : 0;
@@ -292,7 +314,7 @@ export function TrendHeroes({
   source,
 }: {
   board: TrendBoard;
-  action: (row: TrendItem) => React.ReactNode;
+  action: (row: TrendItem, lead?: boolean) => React.ReactNode;
   /** The Sample · Your data switch: on your data, your products only (never the sample's rise). */
   source?: string;
 }) {
@@ -314,8 +336,30 @@ export function TrendHeroes({
         ];
         return (
           <section key={row.key} className="uw-card uw-trend-hero" aria-label={row.name}>
-            <span className={`ms-chip uw-trend-verdict is-${row.result.toLowerCase()}`}>{trendResultLabel(row)}</span>
-            <h2>{risingSentence(row)}</h2>
+            {/* The hero design (0.10.90): the verdict and the sentence beside the device, three figures, then the bars,
+                the observed one split by lot. */}
+            <div className="uw-trend-top">
+              <div>
+                <span className={`ms-chip uw-trend-verdict is-${row.result.toLowerCase()}`}>
+                  <TrendingUp size={14} aria-hidden="true" /> {trendResultLabel(row)}
+                </span>
+                <h2>{risingSentence(row)}</h2>
+                <div className="uw-trend-figs" aria-hidden="true">
+                  {bars.map(([label, value, tone]) => (
+                    <span key={label} className={tone === "is-over" ? "is-hot" : undefined}>
+                      <b className="uw-num">{label === "Observed" ? value : value.toFixed(1)}</b>
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <span className="uw-trend-dev" aria-hidden="true">
+                <DeviceIcon kind={deviceKind(row.product.name)} size={110} decorative />
+                <span>
+                  {[shortName(row.product.name), row.product_version?.version_identifier].filter(Boolean).join(" · ")}
+                </span>
+              </span>
+            </div>
             <div
               className="uw-bars"
               role="img"
@@ -326,14 +370,39 @@ export function TrendHeroes({
                   <span>{label}</span>
                   <span className="uw-bar-track">
                     <span
-                      className={`uw-bar-fill ${tone}`}
+                      className={`uw-bar-fill ${tone}${label === "Observed" && lotParts(row).length ? " is-lots" : ""}`}
                       style={{ width: `${Math.max(3, Math.round((value / top) * 100))}%` }}
-                    />
+                    >
+                      {label === "Observed" &&
+                        lotParts(row).map((part, index) => (
+                          <i key={part.lot} className={`uw-lot-${(index % 3) + 1}`} style={{ flex: part.n }}>
+                            {part.n}
+                          </i>
+                        ))}
+                    </span>
                   </span>
                   <b className="uw-num">{label === "Observed" ? value : value.toFixed(1)}</b>
                 </div>
               ))}
             </div>
+            {lotParts(row).length > 0 && (
+              <p className="uw-lotleg" aria-hidden="true">
+                {lotParts(row).map((part, index) => (
+                  <span key={part.lot}>
+                    <i className={`uw-lot-${(index % 3) + 1}`} />
+                    Lot {part.short} ({part.n})
+                  </span>
+                ))}
+                <span>
+                  <i className="is-exp" />
+                  Expected
+                </span>
+                <span>
+                  <i className="is-before" />
+                  {bars[2][0]}
+                </span>
+              </p>
+            )}
             <p className="uw-trend-note">
               {/* The bars name what they compare with; "How we compared" says how (0.10.87). */}
               Each bar counts complaints in the last {row.recent_days} days.
@@ -344,7 +413,7 @@ export function TrendHeroes({
               <p>{chanceText(row)}</p>
               {perUnitHint(board) && <p>{perUnitHint(board)}</p>}
             </details>
-            <div className="ca-action-row">{action(row)}</div>
+            <div className="ca-action-row">{action(row, true)}</div>
           </section>
         );
       })}

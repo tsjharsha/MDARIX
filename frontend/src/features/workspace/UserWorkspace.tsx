@@ -33,6 +33,10 @@ import {
 import "../admin/console/admin-console.css";
 import "../customer-admin/customer-admin.css";
 import "./workspace.css";
+import "./heroShell.css";
+import "./heroPages.css";
+import { ThemeMenu, useTheme } from "./theme";
+import { shownRun, useOneStory } from "./oneStory";
 import { signOut } from "../shared/session";
 import { useFocusOnChange } from "../shared/focus";
 import { SessionTimeoutWarning, useIdleSignOut } from "../shared/SessionTimeout";
@@ -82,6 +86,8 @@ import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext
 import { signalFromSearch, signalLinkStart } from "./signals";
 import { setDisplayZone, zoneName } from "../../app/dates";
 import { useResource } from "../customer-admin/shared";
+import { OVERDUE_PATH, inData, withSource } from "./home";
+import { trendPath, type TrendBoard } from "./signalAi";
 import { PARKED_SECTIONS, featureSetOf, routeFor } from "../../app/featureSet";
 import { NEW_MENU, NEW_PLACES, OLD_VIEWS, navigationOf, placeLabel, placeOf, tabParts } from "../../app/linkTable";
 import { TrendsSection } from "./sections/Trends";
@@ -99,7 +105,12 @@ import {
   importOwnDataAction,
   PERSONA_TABS,
   PersonaSwitch,
-  TabBar,
+  NavRail,
+  PhoneBar,
+  initials,
+  storyProgress,
+  railAlerts,
+  sectionIcon,
   readDataChoice,
   saveDataChoice,
   tabOfSection,
@@ -370,6 +381,11 @@ const navText = (section: WorkspaceSection, mvp: boolean, fresh = false) =>
 /** Former and current addresses (/app/<view>) map onto sections, so existing links and bookmarks keep working (the
  * old -> new link table, app/linkTable.json). */
 export const VIEW_TO_SECTION = OLD_VIEWS as Record<string, [WorkspaceSection, string?]>;
+
+function HeadIcon({ section }: { section: string }) {
+  const Icon = sectionIcon(section);
+  return <Icon size={34} />;
+}
 
 export function UserWorkspace({
   session,
@@ -677,6 +693,26 @@ export function UserWorkspace({
   // "Import your data" beside the Sample data label, and in the avatar menu on a phone (0.10.79).
   const importOwn = importOwnDataAction(!!trial?.is_trial, session, open);
   const shell = trialShellShows(section, fresh, dataBar);
+  // Getting started's progress on the rail's ring (0.10.90): the story's own read, on a trial's new navigation only,
+  // asked once the page's own reads have had their turn, so the ring never slows the page's first content.
+  // Light, dark or the system's (0.10.91): applied by the new navigation's shell only.
+  const look = useTheme(session, fresh);
+  const [ringRead, setRingRead] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setRingRead(true), 1500);
+    return () => window.clearTimeout(timer);
+  }, []);
+  // The rail's dots (owner, 5 Nov 2026): the overdue count and the trend check, read with the ring, after the page.
+  const overdueRead = useResource<{ total: number }>(fresh && ringRead ? withSource(OVERDUE_PATH, dataSource) : null);
+  const trendRead = useResource<TrendBoard>(fresh && ringRead ? trendPath("version") : null);
+  const alerts = railAlerts(
+    overdueRead.data?.total,
+    (trendRead.data?.items ?? []).filter(
+      (row) =>
+        (row.result === "SIGNIFICANT" || row.result === "ELEVATED") && inData(row.product.identifier, dataSource),
+    ).length,
+  );
+  const progress = storyProgress(shownRun(useOneStory(fresh && !!trial?.is_trial && ringRead).data, dataSource));
 
   return (
     <WorkspaceContext.Provider value={api}>
@@ -688,12 +724,7 @@ export function UserWorkspace({
               <a className="app-skip" href="#app-main">
                 Skip to content
               </a>
-              <div className="ac-brand">
-                <i className="ac-brand-tile" aria-hidden="true">
-                  M
-                </i>
-                <b className="ac-brand-word">MDARIX</b>
-              </div>
+              {/* The brand is on the rail (0.10.90, the hero design); the organization leads the top bar. */}
               {trial?.is_trial ? (
                 <button
                   type="button"
@@ -702,11 +733,23 @@ export function UserWorkspace({
                   // The trial's dates and limits are in Getting started's settings (0.10.87); the tab opens the page.
                   onClick={() => open("Getting started", "Your trial")}
                 >
-                  {tenantName} · Free trial · {trial.days_left} {trial.days_left === 1 ? "day" : "days"} left
+                  <span className="uw-org-logo" aria-hidden="true">
+                    {initials(tenantName)}
+                  </span>
+                  <span className="uw-org-name">
+                    {tenantName}
+                    <small>
+                      <span className="sr-only"> · </span>Free trial · {trial.days_left}{" "}
+                      {trial.days_left === 1 ? "day" : "days"} left
+                    </small>
+                  </span>
                 </button>
               ) : (
                 <span className="uw-org" title="Every screen shows only this organization's data">
-                  {tenantName}
+                  <span className="uw-org-logo" aria-hidden="true">
+                    {initials(tenantName)}
+                  </span>
+                  <span className="uw-org-name">{tenantName}</span>
                 </span>
               )}
               {/* The trial's data (0.10.80): the sample's label, the choice beside the imported data, or nothing once the
@@ -718,8 +761,8 @@ export function UserWorkspace({
                 </span>
               )}
               {dataBar === "choice" && <DataChoice source={dataSource} onChoose={chooseDataSource} />}
-              {importOwn && shell.importButton && <ImportOwnData onOpen={importOwn} />}
               <GlobalSearch open={open} />
+              {importOwn && shell.importButton && <ImportOwnData onOpen={importOwn} />}
               <PersonaSwitch
                 persona={persona}
                 options={personaOptions}
@@ -727,6 +770,7 @@ export function UserWorkspace({
                 colleague={!!trial?.is_trial && !trial?.is_owner}
                 onChoose={(code) => void choosePersona(code)}
               />
+              <ThemeMenu choice={look.choice} theme={look.theme} onChoose={look.choose} />
               <span className="uw-top-bell">
                 {/* Home holds the reminders on the new navigation (0.10.81, H1): opened there, at them. */}
                 <AlertsBell
@@ -768,11 +812,13 @@ export function UserWorkspace({
                 data={dataBar === "choice" ? { source: dataSource, onChoose: chooseDataSource } : undefined}
               />
             </header>
-            <TabBar
+            <NavRail
               tabs={tabs}
               current={tabOfSection(section)}
               open={open}
               personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
+              progress={progress}
+              alerts={alerts}
             />
           </>
         )}
@@ -966,16 +1012,22 @@ export function UserWorkspace({
                     {fresh ? (
                       // The new navigation (0.10.82, U-15): the section as eyebrow, the question as heading; the
                       // time zone only on pages that show times (0.10.87).
-                      <div>
-                        <p className="ac-eyebrow">{placeLabel(section, navigation)}</p>
-                        <h1 ref={heading} tabIndex={-1}>
-                          {NEW_HEADS[section] ?? placeLabel(section, navigation)}
-                        </h1>
-                        <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
-                        {zoneLineShown(section, fresh) && (
-                          <p className="ac-page-zone">Times are in {zoneName()}, your organization's time zone.</p>
-                        )}
-                      </div>
+                      <>
+                        <div>
+                          <p className="ac-eyebrow">{placeLabel(section, navigation)}</p>
+                          <h1 ref={heading} tabIndex={-1}>
+                            {NEW_HEADS[section] ?? placeLabel(section, navigation)}
+                          </h1>
+                          <p>{navText(section, featureSet === "mvp", fresh).guide}</p>
+                          {zoneLineShown(section, fresh) && (
+                            <p className="ac-page-zone">Times are in {zoneName()}, your organization's time zone.</p>
+                          )}
+                        </div>
+                        {/* The page's emblem (0.10.90, the hero design): its destination's icon on the monitor's navy. */}
+                        <span className="uw-head-art" aria-hidden="true">
+                          <HeadIcon section={section} />
+                        </span>
+                      </>
                     ) : (
                       <div>
                         <p className="ac-eyebrow">{tenantName}</p>
@@ -1062,6 +1114,16 @@ export function UserWorkspace({
             )}
           </main>
         </div>
+        {fresh && (
+          <PhoneBar
+            tabs={tabs}
+            current={tabOfSection(section)}
+            open={open}
+            personaLabel={personaOption?.label ?? session?.persona_label ?? undefined}
+            progress={progress}
+            alerts={alerts}
+          />
+        )}
         <SessionTimeoutWarning session={idle} />
       </div>
     </WorkspaceContext.Provider>
