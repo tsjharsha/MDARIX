@@ -12,7 +12,7 @@
   border-radius: var(--ms-radius);
   background:
     radial-gradient(circle at 62% 38%, rgba(8, 123, 120, 0.45), transparent 55%),
-    linear-gradient(135deg, var(--ms-navy-deep) 0%, var(--ms-navy) 60%, var(--ms-navy) 100%);
+    linear-gradient(135deg, var(--ms-navy-deep) 0%, var(--ms-navy-fill) 60%, var(--ms-navy-fill) 100%);
   color: var(--ms-mint);
 }
 .ql-copy {
@@ -250,7 +250,8 @@
 /* The amber dots carry dark text at 4.5:1 or more (0.10.85, D3.8: 4.2:1 on the warning fill). */
 .ql-dot.tone-warning,
 .ql-dot.tone-serious {
-  background: #d18f12;
+  background: var(--ms-warn-mark);
+  color: var(--ms-glow-ink);
 }
 .ql-dot.tone-critical {
   background: var(--ms-crit);

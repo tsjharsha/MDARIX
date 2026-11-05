@@ -43,8 +43,13 @@ const session = (persona: string, locked: boolean, navigation = "new") =>
     persona_options: OPTIONS,
   }) as unknown as SessionContext;
 
+// The rail's destinations (0.10.90; the phone's bar repeats some of them).
 const tabLabels = (markup: string) =>
-  [...markup.matchAll(/<button type="button" class="uw-tab"[^>]*>([^<]*)<\/button>/g)].map((match) => match[1]);
+  [
+    ...(markup.match(/<nav class="uw-navrail"[\s\S]*?<\/nav>/)?.[0] ?? "").matchAll(
+      /<span class="uw-tab-label">([^<]*)<\/span>/g,
+    ),
+  ].map((match) => match[1]);
 
 describe("the shell and its tab bar", () => {
   beforeEach(() => {

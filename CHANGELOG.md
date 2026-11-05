@@ -10,6 +10,106 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.91] - 2026-11-05
+
+On the trial maintenance line (`release/0.10`), released together with 0.10.90: dark mode on the new navigation, and
+one fix. Presentation only: no page's words, fields, numbers, steps or buttons change, and no API or rule changes. No
+migration. Only the web image changes. No operator step. No sample number or label changes.
+
+### Added: dark mode
+
+- **Light, Dark or System** from a sun or moon on the top bar. System, the default, follows the device's setting
+  and changes with it. Each person's choice is kept in their browser; a browser that refuses storage simply follows
+  the system.
+- The hero design's dark theme: deep navy grounds, the bright teal action colour, and the deadline, harm and lot
+  colours tuned for a dark ground. Every text colour is 4.5:1 or more on its ground, focus stays visible, and status
+  is still never shown by colour alone.
+- Only the new navigation turns dark. The website, the sign-in pages and the classic navigation stay light.
+- The application's last hard-coded colours (about 120, in the shared style sheets) now come from the design tokens,
+  so no surface, chip, table, fold, form field or dialog stays light by accident.
+
+### Changed: the owner's design decisions (5 Nov 2026)
+
+- **Log a call** on Complaints and **Raise a trend** on the trend's hero are filled primary buttons (in the table of
+  every group, Raise a trend stays secondary).
+- **The complaint list's big count** ("27 complaints") leads its summary bar, as the design shows it.
+- **The side menu's alerts are a dot, never a count**: Complaints while a complaint is overdue, Trends while a product
+  is rising; on a phone the dot is on the slot, or on More. Screen readers hear "New items".
+- **The browser journeys' keyboard check** keeps telling the end of a page from focus lost in the middle of it.
+- **The report's Next step** with 0.10.89's eMDR file takes the design's next card in both themes: what the eMDR XML
+  still needs is a callout beside the button it holds back, and that button stays legible while it waits.
+
+### Fixed
+
+- **Service work on the complaint page said its heading and its state twice** (since before 0.10.90): once in the
+  card's fold and again above the form. It now says each once, above the form, on a desktop and on a phone.
+
+## [0.10.90] - 2026-11-05
+
+On the trial maintenance line (`release/0.10`): the owner-approved hero design (`mdarix-hero-ui.html`) on the new
+navigation. Presentation only: no page's words, fields, numbers, steps or buttons change, and no API or rule changes.
+No migration. Only the web image changes. No operator step. No sample number or label changes.
+
+### Changed: the new navigation's shell
+
+- **A left icon rail replaces the eleven tabs across the top.** The rail is dark, with the MDARIX mark, Getting
+  started and its ten-step progress ring at the head (a trial only), the persona's destinations in two groups (Work:
+  Home, Complaints, Decision trees, Reports, Investigations, Trends, Records; Plan: Team, Look ahead) and Next steps
+  pinned at the foot. It folds to icons with its button, and by itself below 1240 px; every icon keeps its name for
+  screen readers and as a tooltip. It lists only the persona's destinations, as the tabs did; a screen opened from
+  Getting started or a link that the persona does not list shows as a marked rail item while it is open.
+- **A slim, light top bar**: the organization with its trial status, Sample data, the search, Import your data,
+  Viewing as, the bell, Help and the avatar. The MDARIX mark moves to the rail.
+- **On a phone, a bottom bar of five**: Getting started, Home, Complaints, Trends and More, which opens the persona's
+  other destinations above the bar.
+- The classic navigation is unchanged.
+
+### Changed: the design tokens and fonts
+
+- `tokens.css` takes the hero design's palette (ink, surfaces, lines, the teal action colour, the deadline and harm
+  colours, the rail and the dark monitor band), its type scale (12 to 64 px) and its radii (8, 12, 16, 20). Every text
+  colour still meets 4.5:1 on its grounds (`tokens.test.ts`).
+- The dark theme's tokens are written but switched off: nothing turns them on until the dark-mode release.
+- **Archivo** (headings and big numbers) and **IBM Plex Mono** (references and codes) are self-hosted beside Inter,
+  with their SIL Open Font Licence texts in `/fonts/`; no font is loaded from another site.
+
+### Added: the shared visuals
+
+- Clock rings, status and harm pills, flags (the United States, the United Kingdom, Canada, India, Germany, France, the
+  European Union, and a coded tile for any other country), device icons (patient monitor, infusion pump, respiratory
+  controller, and a generic device for imported products), stage dots, the ten-step progress arc, the dark monitor band
+  with its ECG-paper grid, and four illustrations (a hospital bedside, a patient monitor, an infusion pump and a signed
+  record's seal). Each has an accessible name, and no status is shown by colour alone. Motion stops for readers who
+  ask for reduced motion.
+
+### Changed: the pages
+
+- **Home** opens on the dark band: the story (with its five moments once the sample is done, or its ten-step ring
+  while it runs) beside the three counts, Overdue, Due this week and At risk, each with its icon. The next actions
+  sit under a ten-day deadline ruler ("Now", the day names, the overdue stretch shaded), each with an icon in its
+  deadline's colour; the reminders move beside them, under the trends card, which gains its device and the rise as
+  one big figure.
+- **Complaints**: each legal clock is a ring beside its words, with "Due soon" or "On track"; the row's edge takes the
+  clock's colour. The reference reads in the mono face beside its problem; the product shows its device, the country
+  its flag, the owner initials and the stage its dots, stacked in one column as the design shows. Above the list,
+  one bar shows it by legal clock (7 days or less, more, no deadline) with the late communications and the deaths
+  and serious injuries beside it, when the whole list is on the page.
+- **Getting started**: the dark band with the ten-step ring, the count and the bedside illustration; the progress in
+  ten segments; each step with its icon and "Step N"; the chosen step beside its icon, or the signed seal once all
+  ten are done; picture tiles on "Explore at your own pace". Two columns of steps on a phone.
+- **The complaint page**: the band with the reference, the reporter's words, the harm, the device and the legal clock
+  as a large ring with its line and flag; the facts with icons and flags; the stages as a stepper; the one Next step
+  under them. A report's and an investigation's header open on the same band.
+- **Trends**: the verdict and the sentence beside the device, three figures, the observed bar split by lot with a
+  legend, the expected hatched.
+- **Every other page** on the new navigation (Decision trees, Reports, Investigations, Records, Team, Look ahead,
+  Next steps, Settings, Account, Import your data, Help) takes the same headings in the display face, an emblem
+  beside its question, and the design's cards, buttons, chips, tables, fields and folds; Next steps opens on the band.
+- Getting started's ring on the rail is read a moment after the page's own data, so it never delays the page.
+- Whatever is scrolled into view stops clear of the top bar and, on a phone, of the bottom bar, so neither covers it.
+- The browser journeys' keyboard check tells the end of a page (the browser leaves it and the next Tab starts again
+  at the top) from focus lost in the middle of it.
+
 ## [0.10.89] - 2026-11-05
 
 A US report's two files: FDA's own Form 3500A, filled, and FDA's eMDR XML. No migration. The API and web images
