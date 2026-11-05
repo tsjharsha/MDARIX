@@ -1,174 +1,46 @@
+dateAdvEvent: <DATE>
+dateReport: <DATE>
+prodProblem: /1
+advEvDesc: Biomedical engineering checked a monitor against a reference oximeter: its SpO2 read 4 to 6 points high on two patients. No harm was reported. The monitor is out of use and sent for service.
+mfr: Test value (sample)
+proCode: FRN
+brandName: PulseWatch 410 Patient Monitor (Sample)
+manuNameAddr: Test value (sample)
+lotNum: SAMPLE-PULSE-410-LOT-002
+modelNum: SAMPLE-PULSE-410 Rev A
+expDate: <DATE>
+udi: 04000000041016
+reportManuRecDate: <DATE>
+numPMA: Test value (sample)
+manuName: Test value (sample)
+rep30: /Yes
+repInit: /Yes
+manuRepNum: Test value (sample)
+eventMal: /Yes
+singleUseN2: /Yes
+healthClinCode2: 4401
+healthImpCode2: 2271
+devProbCode2: 2682
+invConc: 4301
 PRACTICE RECORD - NOT YOUR REGULATORY RECORD MDARIX complaint handling and post-market vigilance
-MDARIX Form FDA 3500A worksheet (eMDR)
+MDARIX record - not part of Form FDA 3500A
+Practice record: free trial. Made with sample or de-identified data; not your regulatory record.
+This page is MDARIX's record of the report. It is not part of FDA's form and is not sent to FDA.
 Organization: Trial Devices Inc
-Form version: Form FDA 3500A (09/2025)
-Authority: U.S. Food and Drug Administration (CDRH)
+Form: Form FDA 3500A (09/2025), FDA's fillable form, filled from approved snapshot 1
 Complaint SAMPLE-RV-11: PulseWatch 410 Patient Monitor (Sample) Rev A
-Market: United States (FDA); approved snapshot 1
-Deadline: <MOMENT>
-DRAFT - MDARIX NEVER SUBMITS. Enter this report in the authority's route yourself.
-Practice record: made in a free trial with sample or de-identified data. Not your regulatory record.
-Field order: Form FDA 3500A MedWatch (09/2025) and Form FDA 3500A Supplement (09/2025) - Form Instructions,
-fda.gov.
-Clauses: 21 CFR 803.50: 30-day reports by manufacturers; 21 CFR 803.53: 5-day reports; 21 CFR 803.3: Definitions:
-serious injury, caused or contributed, malfunction, remedial action (pending approval)
-Starter, for your consultant to confirm.
-Prepared by MDARIX, submitted by you: MDARIX never submits a report. You enter it in the authority's route.
-Front page
-The same number as G8.
-Manufacturer report number: Test value (sample)
-[Entered by a person: Taylor Quality]
-A. Patient information
-FDA: do not use the patient's name, medical record number or social security number.
-A1 Patient identifier (in confidence): -
-[Missing: may be unknown in an initial report]
-A2 Age or date of birth: -
-[Missing: may be unknown in an initial report]
-A3 Sex: -
-[Missing: may be unknown in an initial report]
-A4 Weight: -
-[Missing: may be unknown in an initial report]
-A5 Race and/or ethnicity: -
-[Missing: may be unknown in an initial report]
-B. Adverse event or product problem
-B1 Type of report (adverse event, product problem): Adverse event; Product problem (e.g., defects/malfunctions)
-[From record] The complaint's harm and malfunction fields (SAMPLE-RV-11)
-B2 Outcome attributed to adverse event: -
-[Missing: may be unknown in an initial report]
-B3 Date of event: <DATE>
-[From record] The complaint's event date (SAMPLE-RV-11)
-B4 Date of this report: <DATE>
-[Entered by a person: Taylor Quality]
-B5 Describe event or problem: Biomedical engineering checked a monitor against a reference oximeter: its SpO2 read 4
-to 6 points high on two patients. No harm was reported. The monitor is out of use and sent for service.
-[From record] The complaint's description, as recorded (SAMPLE-RV-11)
-B6 Relevant test/laboratory data, including dates: -
-[Missing: may be unknown in an initial report]
-B7 Other relevant history, including preexisting medical conditions: -
-[Missing: may be unknown in an initial report]
-C. Suspect products
-For drugs, biologics and other products: not filled for a device report (section D).
-D. Suspect medical device
-SAMPLE-RV-11 - Form FDA 3500A (09/2025) - MDARIX never submits Page 1 of 5
-PRACTICE RECORD - NOT YOUR REGULATORY RECORD MDARIX complaint handling and post-market vigilance
-MDARIX Form FDA 3500A worksheet (eMDR)
-D1 Brand name: PulseWatch 410 Patient Monitor (Sample)
-[From record] The product's name (SAMPLE-PULSE-410)
-D2a Procode: FRN
-[Entered by a person: Taylor Quality]
-D2b Common device name: Multiple-parameter patient monitor
-[From record] The product's GMDN term (SAMPLE-PULSE-410)
-D3 Manufacturer name, city, state and country: Test value (sample)
-[Entered by a person: Taylor Quality]
-D4 Model #: SAMPLE-PULSE-410 Rev A
-[From record] The product identifier and version (SAMPLE-PULSE-410)
-D4 Lot #: SAMPLE-PULSE-410-LOT-002
-[From record] The complaint's lot (SAMPLE-PULSE-410-LOT-002)
-D4 Catalog #: -
-[Missing: may be unknown in an initial report]
-D4 Expiration date: <DATE>
-[From record] The lot's expiry date (SAMPLE-PULSE-410-LOT-002)
-D4 Serial #: -
-[Missing: may be unknown in an initial report]
-D4 Unique Device Identifier (UDI) #: 04000000041016
-[From record] The product's UDI-DI (the device identifier only: add the production identifier) (SAMPLE-PULSE-410)
-D5 Operator of device: -
-[Missing: may be unknown in an initial report]
-D6a If implanted, give date: -
-[Missing: may be unknown in an initial report]
-D6b If explanted, give date: -
-[Missing: may be unknown in an initial report]
-D7a Is this a single-use device that was reprocessed and reused on a patient?: -
-[Missing: may be unknown in an initial report]
-D7b If yes, enter the name and address of the reprocessor: -
-[Missing: may be unknown in an initial report]
-D8 Was this device ever serviced by a third-party servicer?: -
-[Missing: may be unknown in an initial report]
-D9 Is this device available for evaluation?: -
-[Missing: follow up later]
-D10 Concomitant medical products and therapy dates: -
-[Missing: may be unknown in an initial report]
-E. Initial reporter
-E1 Name and address (phone, email): -
-[Missing: may be unknown in an initial report]
-E2 Health professional?: -
-[Missing: may be unknown in an initial report]
-E3 Occupation: -
-[Missing: may be unknown in an initial report]
-E4 Initial reporter also sent report to FDA?: -
-[Missing: may be unknown in an initial report]
-F. For use by user facility/importer (devices only)
-Filled by a user facility or an importer, not by the manufacturer.
-G. All manufacturers
-G5 and G7 are for drug, biologic and cosmetic reports (FDA's instructions).
-G1 Contact office (and manufacturing site for devices): Test value (sample)
-[Entered by a person: Taylor Quality]
-G2 Report source: Test value (sample)
-[Entered by a person: Taylor Quality]
-SAMPLE-RV-11 - Form FDA 3500A (09/2025) - MDARIX never submits Page 2 of 5
-PRACTICE RECORD - NOT YOUR REGULATORY RECORD MDARIX complaint handling and post-market vigilance
-MDARIX Form FDA 3500A worksheet (eMDR)
-G3 Date received by manufacturer: <DATE>
-[From record] Awareness: the earliest awareness, received or recorded date (SAMPLE-RV-11)
-G4 PMA/510(k) #: Test value (sample)
-[Entered by a person: Taylor Quality]
-G5 If IND/Pre-ANDA, give protocol #: -
-[Not used in this report]
-G6 Type of report: 30-day; Initial
-[From record] The signed US conclusion's report type (SAMPLE-RV-11 United States (FDA) v1 (signed))
-G7 Adverse event term(s): -
-[Not used in this report]
-G8 Manufacturer report number: Test value (sample)
-[From record] This worksheet's front page
-H. Device manufacturers only
-H6 codes are suggested from your approved IMDRF mappings of the complaint's problem code; you confirm or change
-each one in the code picker (IMDRF and FDA codes).
-H1 Type of reportable event: Malfunction
-[From record] The US assessment: death, serious injury and malfunction (SAMPLE-RV-11 United States (FDA) v1
-(signed))
-H2 If follow-up, what type?: -
-[Not used in this report]
-H3 Device evaluated by manufacturer?: -
-[Missing: follow up later]
-H4 Device manufacture date: -
-[Missing: may be unknown in an initial report]
-H5 Labeled for single use?: No
-[From record] The product's single-use field (SAMPLE-PULSE-410)
-H6 Medical device problem code: A0101 Patient-Device Incompatibility (FDA 2682)
-[Changed from the suggestion: Taylor Quality]
-H6 Health effect - clinical code: E0101 Balance Problems (FDA 4401)
-[Entered by a person: Taylor Quality]
-H6 Health effect - impact code: F0101 Therapeutic Response Decreased (FDA 2271)
-[Entered by a person: Taylor Quality]
-H6 Component code: -
-[Missing: follow up later]
-H6 Type of investigation code: -
-[Missing: follow up later]
-H6 Investigation findings code: -
-[Missing: follow up later]
-H6 Investigation conclusions code: D0101 Design Inadequate for Purpose (FDA 4301)
-[Entered by a person: Taylor Quality]
-H7 If remedial action initiated, check type: -
-[Missing: follow up later]
-H8 Usage of device: -
-[Missing: may be unknown in an initial report]
-H9 If action reported to FDA under 21 USC 360i(g), FDA-assigned recall number: -
-[Missing: may be unknown in an initial report]
-H10 Related report number: -
-[Missing: may be unknown in an initial report]
-H11 Additional manufacturer narrative: -
-[Missing: follow up later]
+MDARIX never submits. You submit the report through FDA's eSubmitter or your ESG account.
+Prepared by
+Taylor Quality
 Source records
 Complaints: SAMPLE-RV-11
 Lots: SAMPLE-PULSE-410-LOT-002
 Market assessments: SAMPLE-RV-11 United States (FDA) v1 (signed)
-SAMPLE-RV-11 - Form FDA 3500A (09/2025) - MDARIX never submits Page 3 of 5
-PRACTICE RECORD - NOT YOUR REGULATORY RECORD MDARIX complaint handling and post-market vigilance
-MDARIX Form FDA 3500A worksheet (eMDR)
 Products: SAMPLE-PULSE-410
-SAMPLE-RV-11 - Form FDA 3500A (09/2025) - MDARIX never submits Page 4 of 5
-PRACTICE RECORD - NOT YOUR REGULATORY RECORD MDARIX complaint handling and post-market vigilance
-MDARIX Form FDA 3500A worksheet (eMDR)
+Approved values the form has no place for
+Give these in eSubmitter, or attach them, as you decide.
+D2b Common device name: Multiple-parameter patient monitor (longer than the form's 32 characters)
+G2 Report source: Test value (sample) (not one of the form's choices)
 Approval
 Taylor Quality · <MOMENT> · meaning: signed reportable
 Taylor Quality · <MOMENT> · meaning: prepared
@@ -179,4 +51,4 @@ not submit it.
 Signature record: <BUSINESS-ID>.
 Content checksum (SHA-256 of the snapshot):
 <SHA256>
-SAMPLE-RV-11 - Form FDA 3500A (09/2025) - MDARIX never submits Page 5 of 5
+SAMPLE-RV-11 - Form FDA 3500A (09/2025) - MDARIX's record, not part of FDA's form Page 1 of 1

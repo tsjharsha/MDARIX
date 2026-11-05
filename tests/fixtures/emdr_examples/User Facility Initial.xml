@@ -1,0 +1,697 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PORR_IN040001UV01 ITSVersion="XML_1.0" xsi:schemaLocation="urn:hl7-org:v3 ../../../../eMDRHL7/Impl_Files/Con170227.xsd" xmlns="urn:hl7-org:v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+   <id assigningAuthorityName="MessageSender" extension="-20230824140718" root="1.1"/>
+   <!--Created element Id with attributes root , assigningAuthName and extension-->
+   <creationTime value="20230824"/>
+   <!--Created element creationTime-->
+   <responseModeCode/>
+   <!--Created element responseModeCode-->
+   <versionCode code="V3NORMED_2016"/>
+   <!--Created element versionCode-->
+   <interactionId/>
+   <!--Created element interactionId-->
+   <batchTotalNumber value="1"/>
+   <!--Created element batchTotalNumber-->
+   <receiver>
+      <telecom/>
+      <device>
+         <id nullFlavor="NA"/>
+         <asAgent>
+            <representedOrganization>
+               <id nullFlavor="NA"/>
+               <name>CDRH</name>
+            </representedOrganization>
+         </asAgent>
+      </device>
+   </receiver>
+   <!--Created receiver: Message Receiver Identifier-->
+   <sender>
+      <telecom/>
+      <device>
+         <id nullFlavor="NA"/>
+         <softwareName>emdr_esub</softwareName>
+         <asAgent>
+            <representedOrganization>
+               <id nullFlavor="NA"/>
+               <name>USA Device Manufacturer</name>
+            </representedOrganization>
+         </asAgent>
+      </device>
+   </sender>
+   <!--Created sender: Message Sender Identifier-->
+   <message>
+      <id extension="1"/>
+      <!--adding id under message tag: Message Identifier-->
+      <creationTime nullFlavor="NA"/>
+      <!--N.2.r.4: Date of Message Creation-->
+      <interactionId root="2.16.840.1.113883.1.6" extension="PORR_IN04001" assigningAuthorityName="HL7"/>
+      <!--Created element interactionId-->
+      <processingCode nullFlavor="NA"/>
+      <processingModeCode nullFlavor="NA"/>
+      <acceptAckCode nullFlavor="NA"/>
+      <receiver>
+         <telecom/>
+         <device>
+            <id nullFlavor="NA"/>
+         </device>
+      </receiver>
+      <!--N.2.r.3: Message Receiver Identifier-->
+      <sender>
+         <telecom/>
+         <device>
+            <id nullFlavor="NA"/>
+         </device>
+      </sender>
+      <!--N.2.r.2: Message Sender Identifier-->
+      <attachment>
+         <!--adding attachment tag: Attachment Tag-->
+         <id nullFlavor="NA"/>
+         <!--Id under Attachment: Date of Message Creation-->
+         <!--Created attachment text node: Created attachment text node-->
+         <text representation="B64" mediaType="text/plain">JVBERi0xLjQNJeLjz9MNCjYgMCBvYmo8PC9IWzQ3NiAxMzNdL0xpbmVhcml6ZWQgMS9FIDE3OTAv&#13;
+TCA1NzM0L04gMS9PIDkvVCA1NTY4Pj4NZW5kb2JqDSAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+DQp4cmVmDQo2IDkNCjAwMDAwMDAwMTYgMDAwMDAgbg0KMDAwMDAwMDYwOSAwMDAwMCBuDQowMDAw&#13;
+MDAwNDc2IDAwMDAwIG4NCjAwMDAwMDA2ODUgMDAwMDAgbg0KMDAwMDAwMDgxMiAwMDAwMCBuDQow&#13;
+MDAwMDAwODk2IDAwMDAwIG4NCjAwMDAwMDEyNjEgMDAwMDAgbg0KMDAwMDAwMTQ3NSAwMDAwMCBu&#13;
+DQowMDAwMDAxNzE0IDAwMDAwIG4NCnRyYWlsZXINCjw8L1NpemUgMTUvUHJldiA1NTU4L1Jvb3Qg&#13;
+NyAwIFIvSW5mbyA1IDAgUi9JRFs8YmYyNWQwY2RjZWVjMTUzM2ZmODBmMWE2NDA0YTAyNDk+PGVm&#13;
+YzYzYzZkNTVjYzU5NDBhMjFmMjJjNjhiYTk5YjFlPl0+Pg0Kc3RhcnR4cmVmDQowDQolJUVPRg0K&#13;
+ICAgICAgICAgICAgICAgICAgDQo4IDAgb2JqPDwvTGVuZ3RoIDU2L0ZpbHRlci9GbGF0ZURlY29k&#13;
+ZS9MIDcwL1MgMzg+PnN0cmVhbQ0KeNpiYGBgY2Bg0mAAApZABlTACBJk4GhAFmODYgYGHwZOySYV&#13;
+jaUSMLVslUCaCYgtAAIMAHWNA9INCmVuZHN0cmVhbQ1lbmRvYmoNNyAwIG9iajw8L1BhZ2VzIDMg&#13;
+MCBSL1R5cGUvQ2F0YWxvZy9QYWdlTGFiZWxzIDEgMCBSL01ldGFkYXRhIDQgMCBSPj4NZW5kb2Jq&#13;
+DTkgMCBvYmo8PC9Db250ZW50cyAxMiAwIFIvVHlwZS9QYWdlL1BhcmVudCAzIDAgUi9Sb3RhdGUg&#13;
+MC9NZWRpYUJveFswIDAgNjEyIDc5Ml0vQ3JvcEJveFswIDAgNjEyIDc5Ml0vUmVzb3VyY2VzIDEw&#13;
+IDAgUj4+DWVuZG9iag0xMCAwIG9iajw8L0ZvbnQ8PC9UVDIgMTEgMCBSPj4vUHJvY1NldFsvUERG&#13;
+L1RleHRdL0V4dEdTdGF0ZTw8L0dTMSAxNCAwIFI+Pj4+DWVuZG9iag0xMSAwIG9iajw8L1R5cGUv&#13;
+Rm9udC9FbmNvZGluZy9XaW5BbnNpRW5jb2RpbmcvQmFzZUZvbnQvVGltZXNOZXdSb21hblBTTVQv&#13;
+Rmlyc3RDaGFyIDMyL0xhc3RDaGFyIDExNi9TdWJ0eXBlL1RydWVUeXBlL0ZvbnREZXNjcmlwdG9y&#13;
+IDEzIDAgUi9XaWR0aHNbMjUwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMjUwIDAgMCAwIDAg&#13;
+MCA1MDAgMCA1MDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAw&#13;
+IDAgMCAwIDAgMCAwIDYxMSAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCA0NDQgNTAwIDQ0NCA1MDAg&#13;
+NDQ0IDMzMyA1MDAgNTAwIDI3OCAwIDAgMCA3NzggNTAwIDUwMCAwIDAgMzMzIDM4OSAyNzhdPj4N&#13;
+ZW5kb2JqDTEyIDAgb2JqPDwvTGVuZ3RoIDE0NS9GaWx0ZXIvRmxhdGVEZWNvZGU+PnN0cmVhbQ0K&#13;
+SIk0is0KwjAQhO/7FHNMhKSbYGt7FUXw6t7EQ639UWgKNtDXN0VlmJmPYbLTxaGfaS+UiXg4SEfO&#13;
+g5NSVYwdl7YqICMx+mRp1lhIQcsroXHW5ZDDb5ANsWVmvx7NHxe6KmnniDrGuhlGXapWG6dCRDe9&#13;
+ca9nbXJbfMdiizY00+MZegt9kzMdhT4CDABYuyfnCg0KZW5kc3RyZWFtDWVuZG9iag0xMyAwIG9i&#13;
+ajw8L1R5cGUvRm9udERlc2NyaXB0b3IvRm9udEJCb3hbLTU2OCAtMzA3IDIwMDAgMTAwN10vRm9u&#13;
+dE5hbWUvVGltZXNOZXdSb21hblBTTVQvRmxhZ3MgMzQvU3RlbVYgODIvQ2FwSGVpZ2h0IDY1Ni9Y&#13;
+SGVpZ2h0IDAvQXNjZW50IDg5MS9EZXNjZW50IC0yMTYvSXRhbGljQW5nbGUgMC9Gb250RmFtaWx5&#13;
+KFRpbWVzIE5ldyBSb21hbikvRm9udFN0cmV0Y2gvTm9ybWFsL0ZvbnRXZWlnaHQgNDAwPj4NZW5k&#13;
+b2JqDTE0IDAgb2JqPDwvVHlwZS9FeHRHU3RhdGUvU0EgZmFsc2UvT1AgZmFsc2UvU00gMC4wMi9v&#13;
+cCBmYWxzZS9PUE0gMT4+DWVuZG9iag0xIDAgb2JqPDwvTnVtc1swIDIgMCBSXT4+DWVuZG9iag0y&#13;
+IDAgb2JqPDwvUy9EPj4NZW5kb2JqDTMgMCBvYmo8PC9Db3VudCAxL0tpZHNbOSAwIFJdL1R5cGUv&#13;
+UGFnZXM+Pg1lbmRvYmoNNCAwIG9iajw8L0xlbmd0aCAzMzcwL1R5cGUvTWV0YWRhdGEvU3VidHlw&#13;
+ZS9YTUw+PnN0cmVhbQ0KPD94cGFja2V0IGJlZ2luPSfvu78nIGlkPSdXNU0wTXBDZWhpSHpyZVN6&#13;
+TlRjemtjOWQnPz4KPD9hZG9iZS14YXAtZmlsdGVycyBlc2M9IkNSTEYiPz4NCjx4OnhtcG1ldGEg&#13;
+eG1sbnM6eD0nYWRvYmU6bnM6bWV0YS8nIHg6eG1wdGs9J1hNUCB0b29sa2l0IDIuOS4xLTEzLCBm&#13;
+cmFtZXdvcmsgMS42Jz4NCjxyZGY6UkRGIHhtbG5zOnJkZj0naHR0cDovL3d3dy53My5vcmcvMTk5&#13;
+OS8wMi8yMi1yZGYtc3ludGF4LW5zIycgeG1sbnM6aVg9J2h0dHA6Ly9ucy5hZG9iZS5jb20vaVgv&#13;
+MS4wLyc+DQo8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0ndXVpZDpiYmE3NDAwMC0zNWY2LTQ0&#13;
+ZmEtYWFlNi0yMTA5ZmFhMTViM2QnIHhtbG5zOnBkZj0naHR0cDovL25zLmFkb2JlLmNvbS9wZGYv&#13;
+MS4zLycgcGRmOlByb2R1Y2VyPSdBY3JvYmF0IERpc3RpbGxlciA2LjAgKFdpbmRvd3MpJz48L3Jk&#13;
+ZjpEZXNjcmlwdGlvbj4NCjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSd1dWlkOmJiYTc0MDAw&#13;
+LTM1ZjYtNDRmYS1hYWU2LTIxMDlmYWExNWIzZCcgeG1sbnM6eGFwPSdodHRwOi8vbnMuYWRvYmUu&#13;
+Y29tL3hhcC8xLjAvJyB4YXA6Q3JlYXRlRGF0ZT0nMjAwNi0wNy0xOVQyMjowMDozMC0wNDowMCcg&#13;
+eGFwOkNyZWF0b3JUb29sPSdQU2NyaXB0NS5kbGwgVmVyc2lvbiA1LjIuMicgeGFwOk1vZGlmeURh&#13;
+dGU9JzIwMDYtMDctMjNUMjE6NTA6MzAtMDQ6MDAnIHhhcDpNZXRhZGF0YURhdGU9JzIwMDYtMDct&#13;
+MjNUMjE6NTA6MzAtMDQ6MDAnPjwvcmRmOkRlc2NyaXB0aW9uPg0KPHJkZjpEZXNjcmlwdGlvbiBy&#13;
+ZGY6YWJvdXQ9J3V1aWQ6YmJhNzQwMDAtMzVmNi00NGZhLWFhZTYtMjEwOWZhYTE1YjNkJyB4bWxu&#13;
+czp4YXBNTT0naHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLycgeGFwTU06RG9jdW1lbnRJ&#13;
+RD0ndXVpZDpkNDkwNDMxZi0wZGExLTQyNjMtYmE4Ny01YTQ2ZDc1YmU1YjknLz4NCjxyZGY6RGVz&#13;
+Y3JpcHRpb24gcmRmOmFib3V0PSd1dWlkOmJiYTc0MDAwLTM1ZjYtNDRmYS1hYWU2LTIxMDlmYWEx&#13;
+NWIzZCcgeG1sbnM6ZGM9J2h0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvJyBkYzpmb3Jt&#13;
+YXQ9J2FwcGxpY2F0aW9uL3BkZic+PGRjOnRpdGxlPjxyZGY6QWx0PjxyZGY6bGkgeG1sOmxhbmc9&#13;
+J3gtZGVmYXVsdCc+TWljcm9zb2Z0IFdvcmQgLSBEb2N1bWVudDE8L3JkZjpsaT48L3JkZjpBbHQ+&#13;
+PC9kYzp0aXRsZT48ZGM6Y3JlYXRvcj48cmRmOlNlcT48cmRmOmxpPkxlbjwvcmRmOmxpPjwvcmRm&#13;
+OlNlcT48L2RjOmNyZWF0b3I+PC9yZGY6RGVzY3JpcHRpb24+DQo8L3JkZjpSREY+DQo8L3g6eG1w&#13;
+bWV0YT4NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAog&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAKPD94cGFja2V0IGVuZD0ndyc/Pg0KZW5kc3RyZWFtDWVuZG9iag01IDAgb2JqPDwvTW9kRGF0&#13;
+ZShEOjIwMDYwNzIzMjE1MDMwLTA0JzAwJykvQ3JlYXRpb25EYXRlKEQ6MjAwNjA3MTkyMjAwMzAt&#13;
+MDQnMDAnKS9UaXRsZShNaWNyb3NvZnQgV29yZCAtIERvY3VtZW50MSkvQ3JlYXRvcihQU2NyaXB0&#13;
+NS5kbGwgVmVyc2lvbiA1LjIuMikvQXV0aG9yKExlbikvUHJvZHVjZXIoQWNyb2JhdCBEaXN0aWxs&#13;
+ZXIgNi4wIFwoV2luZG93c1wpKT4+DWVuZG9iag14cmVmDQowIDYNCjAwMDAwMDAwMDAgNjU1MzUg&#13;
+Zg0KMDAwMDAwMTc5MCAwMDAwMCBuDQowMDAwMDAxODIzIDAwMDAwIG4NCjAwMDAwMDE4NDYgMDAw&#13;
+MDAgbg0KMDAwMDAwMTg5NiAwMDAwMCBuDQowMDAwMDA1MzQyIDAwMDAwIG4NCnRyYWlsZXINCjw8&#13;
+L1NpemUgNj4+DQpzdGFydHhyZWYNCjExNg0KJSVFT0YNCjQgMCBvYmoNPDwvTGVuZ3RoIDM2Njkv&#13;
+U3VidHlwZS9YTUwvVHlwZS9NZXRhZGF0YT4+c3RyZWFtDQo8P3hwYWNrZXQgYmVnaW49Iu+7vyIg&#13;
+aWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/Pgo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2Jl&#13;
+Om5zOm1ldGEvIiB4OnhtcHRrPSJBZG9iZSBYTVAgQ29yZSA1LjItYzAwMSA2My4xMzk0MzksIDIw&#13;
+MTAvMDkvMjctMTM6Mzc6MjYgICAgICAgICI+CiAgIDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDov&#13;
+L3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+CiAgICAgIDxyZGY6RGVzY3Jp&#13;
+cHRpb24gcmRmOmFib3V0PSIiCiAgICAgICAgICAgIHhtbG5zOnBkZj0iaHR0cDovL25zLmFkb2Jl&#13;
+LmNvbS9wZGYvMS4zLyI+CiAgICAgICAgIDxwZGY6UHJvZHVjZXI+QWNyb2JhdCBEaXN0aWxsZXIg&#13;
+Ni4wIChXaW5kb3dzKTwvcGRmOlByb2R1Y2VyPgogICAgICA8L3JkZjpEZXNjcmlwdGlvbj4KICAg&#13;
+ICAgPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIKICAgICAgICAgICAgeG1sbnM6eG1wPSJo&#13;
+dHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIj4KICAgICAgICAgPHhtcDpDcmVhdGVEYXRlPjIw&#13;
+MDYtMDctMTlUMjI6MDA6MzAtMDQ6MDA8L3htcDpDcmVhdGVEYXRlPgogICAgICAgICA8eG1wOkNy&#13;
+ZWF0b3JUb29sPlBTY3JpcHQ1LmRsbCBWZXJzaW9uIDUuMi4yPC94bXA6Q3JlYXRvclRvb2w+CiAg&#13;
+ICAgICAgIDx4bXA6TW9kaWZ5RGF0ZT4yMDEyLTAxLTIwVDEyOjI5OjUzLTA1OjAwPC94bXA6TW9k&#13;
+aWZ5RGF0ZT4KICAgICAgICAgPHhtcDpNZXRhZGF0YURhdGU+MjAxMi0wMS0yMFQxMjoyOTo1My0w&#13;
+NTowMDwveG1wOk1ldGFkYXRhRGF0ZT4KICAgICAgPC9yZGY6RGVzY3JpcHRpb24+CiAgICAgIDxy&#13;
+ZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiCiAgICAgICAgICAgIHhtbG5zOnhtcE1NPSJodHRw&#13;
+Oi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIj4KICAgICAgICAgPHhtcE1NOkRvY3VtZW50SUQ+&#13;
+dXVpZDpkNDkwNDMxZi0wZGExLTQyNjMtYmE4Ny01YTQ2ZDc1YmU1Yjk8L3htcE1NOkRvY3VtZW50&#13;
+SUQ+CiAgICAgICAgIDx4bXBNTTpJbnN0YW5jZUlEPnV1aWQ6YjE0ZGI3NjItZmZmZS00YmZkLWJj&#13;
+MWMtMDgzOTBiZjUyNzY2PC94bXBNTTpJbnN0YW5jZUlEPgogICAgICA8L3JkZjpEZXNjcmlwdGlv&#13;
+bj4KICAgICAgPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIKICAgICAgICAgICAgeG1sbnM6&#13;
+ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIj4KICAgICAgICAgPGRjOmZvcm1h&#13;
+dD5hcHBsaWNhdGlvbi9wZGY8L2RjOmZvcm1hdD4KICAgICAgICAgPGRjOnRpdGxlPgogICAgICAg&#13;
+ICAgICA8cmRmOkFsdD4KICAgICAgICAgICAgICAgPHJkZjpsaSB4bWw6bGFuZz0ieC1kZWZhdWx0&#13;
+Ij5NaWNyb3NvZnQgV29yZCAtIERvY3VtZW50MTwvcmRmOmxpPgogICAgICAgICAgICA8L3JkZjpB&#13;
+bHQ+CiAgICAgICAgIDwvZGM6dGl0bGU+CiAgICAgICAgIDxkYzpjcmVhdG9yPgogICAgICAgICAg&#13;
+ICA8cmRmOlNlcT4KICAgICAgICAgICAgICAgPHJkZjpsaT5DRFJIXE9TQlxEUFM8L3JkZjpsaT4K&#13;
+ICAgICAgICAgICAgPC9yZGY6U2VxPgogICAgICAgICA8L2RjOmNyZWF0b3I+CiAgICAgIDwvcmRm&#13;
+OkRlc2NyaXB0aW9uPgogICA8L3JkZjpSREY+CjwveDp4bXBtZXRhPgogICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+IAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAog&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg&#13;
+ICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgCjw/eHBhY2tldCBlbmQ9InciPz4N&#13;
+CmVuZHN0cmVhbQ1lbmRvYmoNMTUgMCBvYmoNPDwvQXV0aG9yKENEUkhcXE9TQlxcRFBTKS9DcmVh&#13;
+dGlvbkRhdGUoRDoyMDA2MDcxOTIyMDAzMC0wNCcwMCcpL0NyZWF0b3IoUFNjcmlwdDUuZGxsIFZl&#13;
+cnNpb24gNS4yLjIpL01vZERhdGUoRDoyMDEyMDEyMDEyMjk1My0wNScwMCcpL1Byb2R1Y2VyKEFj&#13;
+cm9iYXQgRGlzdGlsbGVyIDYuMCBcKFdpbmRvd3NcKSkvVGl0bGUoTWljcm9zb2Z0IFdvcmQgLSBE&#13;
+b2N1bWVudDEpPj4NZW5kb2JqDXhyZWYNCjAgMQ0KMDAwMDAwMDAwMCA2NTUzNSBmDQo0IDENCjAw&#13;
+MDAwMDU3MzQgMDAwMDAgbg0KMTUgMQ0KMDAwMDAwOTQ4MCAwMDAwMCBuDQp0cmFpbGVyDQo8PC9T&#13;
+aXplIDE2L1Jvb3QgNyAwIFIvSW5mbyAxNSAwIFIvSURbPEJGMjVEMENEQ0VFQzE1MzNGRjgwRjFB&#13;
+NjQwNEEwMjQ5PjxCMjdCNEYwMzZEOTIxNzRDQTRENzc4ODNCREIxREU5ND5dL1ByZXYgMTE2Pj4N&#13;
+CnN0YXJ0eHJlZg0KOTcwOQ0KJSVFT0YNCg==<reference value="sample_attachment.pdf"/>
+         </text>
+      </attachment>
+      <!--adding attachment end tag: Attachment end Tag-->
+      <controlActProcess moodCode="EVN">
+         <code code="PORR_TE040001UV01" codeSystem="HL7" codeSystemName="HL7 Trigger Event Id"/>
+         <!--HL7 Trigger Event ID-->
+         <effectiveTime value="20230801"/>
+         <!--Report Creation date: Date of Creation-->
+         <subject>
+            <investigationEvent>
+               <id assigningAuthorityName="FDA" extension="NI" root="2.16.840.1.113883.3.24"/>
+               <!--C.1.1: Sender's Safety Report Unique Identifier-->
+               <code code="C41331" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Adverse_Event_Or_Product_Problem_Report"/>
+               <!--Adverse_Event_Or_Product_Problem_Report-->
+               <code code="C53054" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Adverse_Event_Or_Product_Problem_Report"/>
+               <!--Adverse_Event_Or_Product_Problem_Report-->
+               <!--Created  text node for H10: Created  text node for H10-->
+               <statusCode/>
+               <activityTime/>
+               <availabilityTime/>
+               <authorOrPerformer typeCode="AUT">
+                  <assignedEntity/>
+               </authorOrPerformer>
+               <trigger>
+                  <reaction>
+                     <text mediaType="text/plain">Sample event narrative.</text>
+                     <!--Created  text node for B5: Created  text node for B5-->
+                     <term mediaType="text/plain"/>
+                     <!--Created  text node for B5: Created  text node for B5-->
+                     <effectiveTime value="20230701"/>
+                     <!--Effective time under trigger: Effective time under trigger-->
+                     <subject>
+                        <investigativeSubject>
+                           <subjectAffectedPerson>
+                              <name>JD</name>
+                              <administrativeGenderCode code="C20197" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Sex"/>
+                              <birthTime value="19730501"/>
+                              <!--Birth Time: Date of Birth-->
+                              <deceasedTime value="20230702"/>
+                              <!--Deceased Time: Date of Death-->
+                              <raceCode code="C41260" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Race"/>
+                              <raceCode code="C41261" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Race"/>
+                              <ethnicGroupCode code="C41222" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Ethnicity"/>
+                           </subjectAffectedPerson>
+                           <subjectOf>
+                              <observation moodCode="EVN">
+                                 <code code="C25150" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Age"/>
+                                 <value xsi:type="PQ" value="50" unit="YR"/>
+                              </observation>
+                           </subjectOf>
+                           <!--Age: Patient Age-->
+                           <subjectOf>
+                              <observation moodCode="EVN">
+                                 <code code="C25208" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Weight"/>
+                                 <value xsi:type="PQ" value="180" unit="LBS"/>
+                              </observation>
+                           </subjectOf>
+                           <!--Weight: Patient Weight-->
+                           <subjectOf>
+								<observation moodCode="EVN">
+									<code code="C17357" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Gender"/>
+									<value xsi:type="CE" code="C154420"/>
+								</observation>
+							</subjectOf>
+							<subjectOf>
+								<observation moodCode="EVN">
+									<code code="C17357" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Gender"/>
+									<value xsi:type="ED">Other gender description</value>
+								</observation>
+							</subjectOf>
+                           <subjectOf>
+                              <observation moodCode="EVN">
+                                 <code code="C36292" codeSystem="NCI" codeSystemName="Test_Result"/>
+                                 <value mediaType="text/plain" xsi:type="ED">Sample lab test narrative.</value>
+                              </observation>
+                           </subjectOf>
+                           <!--Relevant Data: Relevant Data - B6-->
+                           <subjectOf>
+                              <observation moodCode="EVN">
+                                 <code code="C53263" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Other_Personal_Medical_History"/>
+                                 <value mediaType="text/plain" xsi:type="ED">Sample medical history narrative.</value>
+                              </observation>
+                           </subjectOf>
+                           <!--Other Relevant Data: Relevant Data - B7-->
+                           <!--H6: Health Effect - Clinical Code-->
+                           <!--H6: Health Effect - Impact Code-->
+                           <subjectOf>
+                              <observation moodCode="EVN">
+                                 <code code="C53983" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Patient_Problem_Code"/>
+                                 <value xsi:type="CE" code="1708" codeSystem="2.16.840.1.113883.3.26.1.1"/>
+                              </observation>
+                           </subjectOf>
+                           <subjectOf>
+                              <observation moodCode="EVN">
+                                 <code code="C53983" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Patient_Problem_Code"/>
+                                 <value xsi:type="CE" code="1884" codeSystem="2.16.840.1.113883.3.26.1.1"/>
+                              </observation>
+                           </subjectOf>
+                           <!--F10: Health Effect Impact Code-->
+                           <subjectOf>
+                              <observation moodCode="EVN">
+                                 <code code="C122929" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Patient_Impact_Code"/>
+                                 <value xsi:type="CE" code="1802" codeSystem="2.16.840.1.113883.3.26.1.1"/>
+                              </observation>
+                           </subjectOf>
+                           <subjectOf>
+                              <observation moodCode="EVN">
+                                 <code code="C122929" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Patient_Impact_Code"/>
+                                 <value xsi:type="CE" code="4634" codeSystem="2.16.840.1.113883.3.26.1.1"/>
+                              </observation>
+                           </subjectOf>
+                        </investigativeSubject>
+                     </subject>
+                     <location>
+                        <locatedEntity>
+                           <location>
+                              <code code="C17649" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Location">
+                                 <originalText>Other location description</originalText>
+                              </code>
+                           </location>
+                        </locatedEntity>
+                     </location>
+                     <pertinentInformation>
+                        <primarySourceReport>
+                           <id nullFlavor="ASKU"/>
+                           <code nullFlavor="ASKU"/>
+                           <receiver negationInd="false">
+                              <assignedEntity>
+                                 <assignedOrganization>
+                                    <name>FDA</name>
+                                 </assignedOrganization>
+                              </assignedEntity>
+                           </receiver>
+                           <author>
+                              <assignedEntity>
+                                 <code code="C25741" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Occupation">
+                                    <originalText mediaType="text/plain"/>
+                                 </code>
+                                 <assignedPerson>
+                                    <name>
+                                       <prefix>Mr.</prefix>
+                                       <given>John</given>
+                                       <given>Alan</given>
+                                       <family>Doe</family>
+                                    </name>
+                                    <telecom value="tel:+1(410)737-9001x12345"/>
+                                    <telecom value="mailto:jad@gmail.com"/>
+                                    <telecom value="fax:+1(410)737-9002"/>
+                                    <addr>
+                                       <streetAddressLine>1900 Orleans St</streetAddressLine>
+                                       <streetAddressLine>Unit 901</streetAddressLine>
+                                       <city>Baltimore</city>
+                                       <state>MD</state>
+                                       <postalCode>21287-0400</postalCode>
+                                       <country>USA</country>
+                                    </addr>
+                                 </assignedPerson>
+                                 <representedOrganization>
+                                    <name>John's Hospital</name>
+                                 </representedOrganization>
+                              </assignedEntity>
+                           </author>
+                        </primarySourceReport>
+                     </pertinentInformation>
+                  </reaction>
+               </trigger>
+               <pertinentInformation1>
+                  <sequenceNumber nullFlavor="NI"/>
+                  <secondaryCaseNotification>
+                     <id assigningAuthorityName="FDA" extension="1234567890-2023-0001" root="2.16.840.1.113883.3.24"/>
+                     <code code="C53620" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Type_of_Report"/>
+                     <effectiveTime value="20230702"/>
+                     <receiver negationInd="false">
+                        <time value="20230801"/>
+                        <assignedEntity>
+                           <assignedOrganization>
+                              <code code="C17237" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Report_Receiver"/>
+                           </assignedOrganization>
+                        </assignedEntity>
+                     </receiver>
+                     <!--F3-5: Contact Person-->
+                     <author>
+                        <assignedEntity>
+                           <code code="C53567" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Type_of_Reporter"/>
+                           <assignedOrganization>
+                              <name nullFlavor="NA"/>
+                              <addr>
+                                 <additionalLocator>John's Healthcare System</additionalLocator>
+                                 <streetAddressLine>1901 Orleans St</streetAddressLine>
+                                 <streetAddressLine>Unit 501</streetAddressLine>
+                                 <city>Baltimore</city>
+                                 <state>MD</state>
+                                 <postalCode>21287-0400</postalCode>
+                                 <country>USA</country>
+                              </addr>
+                              <contactParty>
+                                 <contactPerson>
+                                    <name>
+                                       <prefix>Mr.</prefix>
+                                       <given>Tom</given>
+                                       <given>Robin</given>
+                                       <family>Brooks</family>
+                                    </name>
+                                    <telecom value="tel:+1(410)737-2001x12345"/>
+                                    <telecom value="fax:+1(410)737-2001"/>
+                                    <telecom value="mailto:trbrooks@johnshospital.com"/>
+                                 </contactPerson>
+                              </contactParty>
+                           </assignedOrganization>
+                        </assignedEntity>
+                     </author>
+                  </secondaryCaseNotification>
+               </pertinentInformation1>
+               <pertinentInformation1>
+                  <secondaryCaseNotification>
+                     <id nullFlavor="NA"/>
+                     <code nullFlavor="NI"/>
+                     <receiver negationInd="false">
+                        <time>
+                           <low value="20230801"/>
+                           <high/>
+                        </time>
+                        <assignedEntity>
+                           <!--F14: Manufacturer Name/Address-->
+                           <assignedOrganization>
+                              <code code="C53616" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Report_Receiver"/>
+                              <name>BYPASS Mfr</name>
+                              <telecom value="fax:+1(703)925-3201"/>
+                              <telecom value="mailto:support@bypassmfr.com"/>
+                              <addr>
+                                 <streetAddressLine>1000 N Glebe Rd</streetAddressLine>
+                                 <streetAddressLine>Unit 101</streetAddressLine>
+                                 <city>Arlington</city>
+                                 <state>VA</state>
+                                 <postalCode>22203-3760</postalCode>
+                                 <country>USA</country>
+                              </addr>
+                           </assignedOrganization>
+                        </assignedEntity>
+                     </receiver>
+                  </secondaryCaseNotification>
+               </pertinentInformation1>
+               <pertinentInformation2>
+                  <caseSeriousness>
+                     <code code="C49489" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Adverse_Event_Outcome"/>
+                     <value code="C28554" codeSystem="2.16.840.1.113883.3.26.1.1" xsi:type="CE"/>
+                  </caseSeriousness>
+               </pertinentInformation2>
+               <pertinentInformation2>
+                  <caseSeriousness>
+                     <code code="C49489" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Adverse_Event_Outcome"/>
+                     <value code="C17649" codeSystem="2.16.840.1.113883.3.26.1.1" xsi:type="CE"/>
+                  </caseSeriousness>
+               </pertinentInformation2>
+               <pertainsTo>
+                  <procedureEvent>
+                     <code nullFlavor="ASKU"/>
+                     <device>
+                        <identifiedDevice>
+                           <id nullFlavor="NI"/>
+                           <identifiedDevice>
+                              <id extension="S100012345"/>
+                              <existenceTime nullFlavor="NI"/>
+                              <lotNumberText mediaType="text/plain">L000001234</lotNumberText>
+                              <expirationTime value="20250101"/>
+                              <asManufacturedProduct>
+                                 <id extension="C4512"/>
+                                 <code code="(01)51022222233336(11)141231(17)150707(10)A213B1(21)1234"/>
+                                 <manufacturerOrReprocessor>
+                                    <code code="C53616" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Type_of_Manufacturer"/>
+                                    <name>BYPASS Mfr D3</name>
+                                    <telecom value="fax:+1(703)925-3201"/>
+                                    <telecom value="mailto:support@bypassmfr.com"/>
+                                    <addr>
+                                       <streetAddressLine>1000 N Glebe Rd</streetAddressLine>
+                                       <streetAddressLine>Unit 101</streetAddressLine>
+                                       <city>Arlington</city>
+                                       <state>VA</state>
+                                       <postalCode>22203-3760</postalCode>
+                                       <country>USA</country>
+                                    </addr>
+                                    <asRole>
+                                       <performance>
+                                          <investigationEvent/>
+                                       </performance>
+                                    </asRole>
+                                 </manufacturerOrReprocessor>
+                              </asManufacturedProduct>
+                              <asManufacturedProduct>
+                                 <manufacturerOrReprocessor>
+                                    <code code="C53614" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Type_of_Manufacturer"/>
+                                    <name>Reproccessor Name</name>
+                                    <telecom value="fax:+3336158540"/>
+                                    <telecom value=""/>
+                                    <telecom value="mailto:support@reprocessor.com"/>
+                                    <addr>
+                                       <streetAddressLine>IGNACIO ZARAGOZA NO. 10</streetAddressLine>
+                                       <streetAddressLine>MARIA ISABEL</streetAddressLine>
+                                       <city>CHIHUAHUA, CUIDAD JUAREZ</city>
+                                       <state/>
+                                       <postalCode>32560</postalCode>
+                                       <country>MEX</country>
+                                    </addr>
+                                 </manufacturerOrReprocessor>
+                              </asManufacturedProduct>
+                              <inventoryItem>
+                                 <manufacturedDeviceModel>
+                                    <id extension="M2000"/>
+                                    <code code="DSQ" codeSystemName="Type_of_Device" codeSystem="2.16.840.1.113883.3.26.1.1">
+                                       <originalText mediaType="text/plain">VENTRICULAR (ASSIST) BYPASS</originalText>
+                                    </code>
+                                    <manufacturerModelName mediaType="text/plain">BYPASS BRAND</manufacturerModelName>
+                                    <!--G4: PMA/510k number-->
+                                    <asRegulatedProduct>
+                                       <id nullFlavor="NI"/>
+                                    </asRegulatedProduct>
+                                    <!--G4: BLA Number-->
+                                    <asRegulatedProduct>
+                                       <id nullFlavor="NI"/>
+                                    </asRegulatedProduct>
+                                 </manufacturedDeviceModel>
+                              </inventoryItem>
+                           </identifiedDevice>
+                           <!--D9: Device available for evaluation-->
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53449" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Device_available_for_evaluation"/>
+                                 <effectiveTime value="20230702"/>
+                                 <value xsi:type="BL" value="false"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53451" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Approximate_Age_of_Device"/>
+                                 <value xsi:type="PQ" value="2" unit="YR"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <!--H6: Device Problem Code-->
+                           <!--H6: Component Code-->
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53982" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Device_Problem_Code"/>
+                                 <value xsi:type="CE" code="2896" codeSystem="2.16.840.1.113883.3.26.1.1"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53982" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Device_Problem_Code"/>
+                                 <value xsi:type="CE" code="1384" codeSystem="2.16.840.1.113883.3.26.1.1"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <!--Start: F10 Component Code-->
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C54577" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Component_Code"/>
+                                 <value xsi:type="CE" code="765" codeSystem="2.16.840.1.113883.3.26.1.1"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C54577" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Component_Code"/>
+                                 <value xsi:type="CE" code="527" codeSystem="2.16.840.1.113883.3.26.1.1"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53629" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Device_Evaluated_By_Manufacturer"/>
+                                 <value nullFlavor="NI" xsi:type="BL"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53602" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Device_Labeled_for_single_use"/>
+                                 <value nullFlavor="NI" xsi:type="BL"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <!--H8: Usage of Device-->
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53645" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Usage_of_Device"/>
+                                 <value nullFlavor="NI" xsi:type="CE" codeSystem="2.16.840.1.113883.3.26.1.1"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53619" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Corrective_Action_Number"/>
+                                 <value xsi:type="ED" mediaType="text/plain"/>
+                              </deviceObservation>
+                           </subjectOf>
+                        </identifiedDevice>
+                     </device>
+                     <authorOrPerformer typeCode="AUT">
+                        <assignedEntity>
+                           <code code="C17649" codeSystemName="Operator_of_Medical_Device" codeSystem="2.16.840.1.113883.3.26.1.1">
+                              <originalText mediaType="text/plain">Technician</originalText>
+                           </code>
+                        </assignedEntity>
+                     </authorOrPerformer>
+                     <pertinentInformation1>
+                        <observation moodCode="EVN">
+                           <code code="C53563" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Single-Use_Device_Reprocessed_and_Reused_on_Patient"/>
+                           <value xsi:type="BL" value="true"/>
+                        </observation>
+                     </pertinentInformation1>
+                     <!--D8: Serviced by Third Party-->
+                     <pertinentInformation1>
+                        <observation moodCode="EVN">
+                           <code code="C85488" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Device_Serviced_By_Third_Party"/>
+                           <value xsi:type="BL" value="true"/>
+                        </observation>
+                     </pertinentInformation1>
+                     <!--D10: Concomitant medical products-->
+                     <pertinentInformation1>
+                        <observation moodCode="EVN">
+                           <code code="C53630" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Concomitant_Therapy"/>
+                           <effectiveTime value="20220101"/>
+                           <value xsi:type="ED" mediaType="text/plain">Concomitant Product 1</value>
+                        </observation>
+                     </pertinentInformation1>
+                     <pertinentInformation1>
+                        <observation moodCode="EVN">
+                           <code code="C53630" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Concomitant_Therapy"/>
+                           <effectiveTime value="20220201"/>
+                           <value xsi:type="ED" mediaType="text/plain">Concomitant Product 2</value>
+                        </observation>
+                     </pertinentInformation1>
+                     <component1>
+                        <implantation>
+                           <effectiveTime value="20230630"/>
+                        </implantation>
+                     </component1>
+                     <component2>
+                        <explantation>
+                           <effectiveTime value="20230701"/>
+                        </explantation>
+                     </component2>
+                  </procedureEvent>
+               </pertainsTo>
+               <component>
+                  <adverseEventAssessment>
+                     <subject1>
+                        <primaryRole/>
+                     </subject1>
+                  </adverseEventAssessment>
+               </component>
+            </investigationEvent>
+         </subject>
+         <!--end of item subject content: end of item subject content-->
+         <!--H1: Type of Reportable Event (Death, Malfunction, etc)-->
+      </controlActProcess>
+   </message>
+</PORR_IN040001UV01>

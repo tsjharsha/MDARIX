@@ -259,6 +259,8 @@ export type ReportDetail = {
   sample: boolean;
   /** Mapped codes are suggestions a person confirms or changes (the new navigation, 0.10.77). */
   codes_confirmed?: boolean;
+  /** A US report: what FDA's eMDR file still needs (blocks it), and the approved values it leaves out. */
+  emdr?: { missing: string[]; left_out: string[] } | null;
 };
 
 /** The tab name that opens Reports on one complaint ("Reports?complaint=<id>"), and its reading. */

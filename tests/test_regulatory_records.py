@@ -3,8 +3,9 @@
 - Provenance runs from the source to the conclusion, the report and the PDF: the complaint's record value is the
   answer's source, the signed conclusion is bound to its checksum, the report is created from that signed version and
   each field names its source, and the approved snapshot's PDF prints the sources, the form version and the approval.
-- The worksheet PDF matches its snapshot (tests/snapshots/worksheet_us_3500a.txt), with only what changes per run
-  (dates, times, checksums, generated references) replaced by placeholders.
+- The approved report's PDF (FDA's own Form 3500A, filled, then MDARIX's record page) matches its snapshot
+  (tests/snapshots/worksheet_us_3500a.txt), with only what changes per run (dates, times, checksums, generated
+  references) replaced by placeholders.
 - An amendment is a new version: the prior signed version stays as it was signed, with its rationale, signer, time and
   checksum, and its signature record still verifies.
 
@@ -14,6 +15,7 @@ qualification.
 
 from __future__ import annotations
 
+import io
 import os
 import re
 import uuid
@@ -25,7 +27,7 @@ from backend.app.db.models.foundation import AuditEvent, SignedApprovalRecord
 from backend.app.db.models.market_assessment import ComplaintMarketAssessment
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system, bind_tenant
-from reports.pdf import text_of
+from pypdf import PdfReader
 from tests.report_fill import fill
 from tests.test_free_trial import PASSWORD, _approved_trial_client
 from tests.test_release_c3_0_10_75 import REPORTS, _flagship, _ok, _purge, _reports, _sign_us
@@ -72,6 +74,7 @@ def _normalized(text: str) -> str:
         (r"\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2} [A-Z+0-9]+", "<MOMENT>"),
         (r"\b\d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2} UTC", "<MOMENT>"),
         (r"\b\d{4}-\d{2}-\d{2}\b", "<DATE>"),
+        (r"\b\d{2}-[A-Z][a-z]{2}-\d{4}\b", "<DATE>"),  # as FDA's form writes a date (01-Jan-1900)
         # Business IDs come from counters (CMP000038, ESIG000012).
         (r"\b[A-Z]{2,5}\d{6}\b", "<BUSINESS-ID>"),
     )
@@ -113,23 +116,105 @@ def test_provenance_runs_from_the_complaint_to_the_conclusion_the_report_and_its
     snapshot = done["approved_snapshot"]
     pdf = user.get(f"{REPORTS}/{report['id']}/worksheet.pdf", params={"snapshot": snapshot["id"]})
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
-    text = text_of(pdf.content)
-    assert "Form version: Form FDA 3500A (09/2025)" in text
+    # An approved US report's PDF is FDA's own Form 3500A, filled, then MDARIX's record page.
+    text = _form_text(pdf.content)
+    assert "mfr: Test value (sample)" in text and "Form: Form FDA 3500A (09/2025)" in text
+    # B1 (0.10.89): a patient connected with no harm recorded is no adverse event; the malfunction is a product problem.
+    assert "prodProblem: /1" in text and "adverse: /1" not in text
     assert "United States (FDA) v1 (signed)" in text  # the conclusion as the source of its fields
     assert "Source records" in text and "Approval" in text
     assert "PRACTICE RECORD" in text or "Practice record" in text
-    trial["state"].update(report=report["id"], snapshot=snapshot["id"], pdf=pdf.content)
+    trial["state"].update(report=report["id"], snapshot=snapshot["id"], pdf=text)
     print("\n----PDF----\n" + text + "\n----END----")
+
+
+def _form_text(pdf: bytes) -> str:
+    """The filled form's fields in page order ("field: value"), then the record page's text."""
+    reader = PdfReader(io.BytesIO(pdf))
+    filled = [
+        f"{str(widget['/T'])[:-3]}: {widget['/V']}"
+        for page in reader.pages[:-1]
+        for widget in (annotation.get_object() for annotation in page.get("/Annots") or [])
+        if widget.get("/T") and widget.get("/V") not in (None, "", "/Off", "--")
+    ]
+    return "\n".join([*filled, reader.pages[-1].extract_text()])
 
 
 def test_the_worksheet_pdf_matches_its_snapshot(trial):
     state = trial["state"]
     assert state.get("pdf"), "runs after the provenance test"
-    found = _normalized(text_of(state["pdf"]))
+    found = _normalized(state["pdf"])
     if os.environ.get("MDARIX_UPDATE_SNAPSHOTS") == "1":
         SNAPSHOT.parent.mkdir(exist_ok=True)
         SNAPSHOT.write_text(found, encoding="utf-8")
     assert found == SNAPSHOT.read_text(encoding="utf-8")
+
+
+def _fda_mapped_code(annex: str) -> str:
+    """A selectable IMDRF code of the annex that FDA's published FDA-IMDRF mapping gives an FDA code."""
+    from backend.app import regulatory_reference as reference
+    from backend.app.db.models.regulatory_reference import ImdrfCode, ReferenceCode
+
+    with SessionLocal() as db:
+        release = reference.newest_release(db)
+        mapped = {row.imdrf_code for row in db.query(ReferenceCode).filter(ReferenceCode.list == "FDA_CDRH")}
+        rows = (
+            db.query(ImdrfCode).filter(ImdrfCode.release == release, ImdrfCode.annex == annex).order_by(ImdrfCode.code)
+        )
+        return next(row.code for row in rows if row.code in mapped and reference.selectable(row.status))
+
+
+def test_the_emdr_file_waits_for_what_fda_requires_then_validates(trial):  # eMDR, 0.10.89
+    from backend.app.authority_reports import emdr
+
+    user, state = trial["user"], trial["state"]
+    report = state["report"]
+    detail = _ok(user.get(f"{REPORTS}/{report}"))
+    refused = user.get(f"{REPORTS}/{report}/emdr.xml", params={"snapshot": state["snapshot"]})
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "EMDR_MISSING"
+    # The screen and the refusal name the same blocks: the report number's format, G1 and the H6 codes still owed.
+    missing = refused.json()["detail"]["missing"]
+    assert missing == detail["emdr"]["missing"]
+    assert [item.split(":")[0] for item in missing] == [
+        "G8 Manufacturer report number",
+        "G1 Contact office (and manufacturing site for devices)",
+        "H6 Component code",
+        "H6 Type of investigation code",
+        "H6 Investigation findings code",
+    ]
+    # The organization's US contact office in Settings, the report reopened, completed and approved again.
+    party = {
+        "market": "US",
+        "role": "MANUFACTURER",
+        "organisation": "Trial Devices Inc",
+        "address": "1 Sample Way, Springfield, MA 01101, US",
+        "contact_name": "Taylor Quality",
+        "contact_email": "mdr@example.invalid",
+        "contact_phone": "+1(240)276-0001",
+    }
+    _ok(user.put("/api/v1/regulatory-reference/responsible-parties", json=party))
+    _ok(user.post(f"{REPORTS}/{report}/reopen", json={"reason": "Complete the blocks the eMDR file needs"}))
+    _ok(user.put(f"{REPORTS}/{report}/fields/MFR_REPORT", json={"value": "1234567-2026-00001"}))
+    for field in ("G1", "D3"):
+        _ok(user.put(f"{REPORTS}/{report}/fields/{field}", json={"clear": True}))
+    for field, annex in (("H6_COMPONENT", "G"), ("H6_TYPE", "B"), ("H6_FINDINGS", "C")):
+        _ok(user.put(f"{REPORTS}/{report}/fields/{field}", json={"codes": [_fda_mapped_code(annex)]}))
+    detail = _ok(user.get(f"{REPORTS}/{report}"))
+    assert detail["emdr"]["missing"] == [] and detail["mandatory"]["missing"] == []
+    pending = _ok(user.post(f"{REPORTS}/{report}/snapshots"))["pending_snapshot"]["id"]
+    done = _ok(user.post(f"{REPORTS}/{report}/snapshots/{pending}/approve", json={"password": PASSWORD}))
+    snapshot = done["approved_snapshot"]["id"]
+    state["snapshot"] = snapshot
+    found = user.get(f"{REPORTS}/{report}/emdr.xml", params={"snapshot": snapshot})
+    assert found.status_code == 200, found.text
+    assert found.headers["content-type"].startswith("application/xml")
+    assert "mdarix-emdr-SAMPLE-RV-11-snapshot-2.xml" in found.headers["content-disposition"]
+    assert emdr.validate(found.content) == []
+    assert b'extension="1234567-2026-00001"' in found.content and b"mailto:mdr@example.invalid" in found.content
+    assert b"Practice record: free trial" in found.content  # a trial's file is a practice record
+    # The PDF's G1 boxes come from the same contact office.
+    fields = _form_text(user.get(f"{REPORTS}/{report}/worksheet.pdf", params={"snapshot": snapshot}).content)
+    assert "manuEmail: mdr@example.invalid" in fields and "manuPhone: +1(240)276-0001" in fields
 
 
 def test_an_amended_conclusion_keeps_the_prior_version_with_its_rationale_actor_and_time(trial):

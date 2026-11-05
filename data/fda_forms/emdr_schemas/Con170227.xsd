@@ -1,0 +1,1162 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!-- edited with XMLSpy v2013 rel. 2 (x64) (http://www.altova.com) by Marc Wilson (FDA) -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="urn:hl7-org:v3" xmlns:mif="urn:hl7-org:v3/mif" targetNamespace="urn:hl7-org:v3" elementFormDefault="qualified">
+	<xs:annotation>
+		<xs:documentation>Source Information
+     Rendered by: RoseTree 3.0.8
+     Rendered on: 
+This document was rendered into XML using software provided to HL7 by Beeler Consulting LLC.
+ PubDB to MIF Transform: $RCSfile: PubDbXmlToMIF.xsl,v $ $Revision: 1.8 $ $Date: 2005/07/09 20:19:24 $
+  Fix names transform: $Id: FixMifNames.xsl,v 1.6 2005/04/17 03:20:15 lmckenzi Exp $
+  HTML to MIF Markup transform: $Id: HtmlToMIFMarkup.xsl,v 1.2 2005/04/17 03:20:15 lmckenzi Exp $
+  Base transform: $Id: ConvertBase.xsl,v 1.2 2005/04/17 03:20:15 lmckenzi Exp $
+  Package Id Conversion: $Id: TransformPackageIds.xsl,v 1.3 2005/07/31 05:19:52 lmckenzi Exp $
+ Generated using schema builder version: 2.0 and DynamicMifToXSD.xsl version: 1.4
+ Dynamic MIF to Schema Transform: $Id: DynamicMifToXsd.xsl,v 1.9 2005/07/09 20:18:36 lmckenzi Exp $
+  Static MIF to Schema Transform: $Id: StaticMifToXsd.xsl,v 1.25 2005/07/09 20:20:15 lmckenzi Exp $
+  Package Id Conversion: $Id: TransformPackageIds.xsl,v 1.3 2005/07/31 05:19:52 lmckenzi Exp $</xs:documentation>
+	</xs:annotation>
+	<xs:include schemaLocation="coreschemas/infrastructureRoot.xsd"/>
+	<xs:element name="PORR_IN040001UV01">
+		<xs:complexType>
+			<xs:complexContent>
+				<xs:extension base="MCCI_MT000100UV01.Batch">
+					<xs:attribute name="ITSVersion" type="xs:string" use="required" fixed="XML_1.0"/>
+				</xs:extension>
+			</xs:complexContent>
+		</xs:complexType>
+	</xs:element>
+	<xs:complexType name="MCCI_MT000100UV01.Batch">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="id" type="II"/>
+			<xs:element name="creationTime" type="TS"/>
+			<xs:element name="securityText" type="ST" minOccurs="0"/>
+			<xs:element name="responseModeCode" type="CS"/>
+			<xs:element name="versionCode" type="CS" minOccurs="1"/>
+			<xs:element name="interactionId" type="II"/>
+			<xs:element name="referenceControlId" type="II" minOccurs="0"/>
+			<xs:element name="name" type="SC" minOccurs="0"/>
+			<xs:element name="batchComment" type="ST" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="transmissionQuantity" type="INT" minOccurs="0"/>
+			<xs:element name="batchTotalNumber" type="INT" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="receiver" type="MCCI_MT000100UV01.Receiver"/>
+			<xs:element name="sender" type="MCCI_MT000100UV01.Sender"/>
+			<xs:element name="message" type="PORR_IN040001UV01.MCCI_MT000100UV01.Message" nillable="true" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+	</xs:complexType>
+	<!--The contents of the MCCI include are pasted in here. BEGIN-->
+	<xs:complexType name="MCCI_MT000100UV01.Agent">
+		<xs:sequence>
+			<xs:element name="representedOrganization" type="MCCI_MT000100UV01.Organization" nillable="true" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClassAgent" use="optional" default="AGNT"/>
+	</xs:complexType>
+	<xs:complexType name="MCCI_MT002100.Attachment">
+		<xs:sequence>
+			<xs:element name="id" type="II"/>
+			<xs:element name="text" type="ED"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+	</xs:complexType>
+	<xs:complexType name="MCCI_MT000100UV01.Device">
+		<xs:sequence>
+			<xs:element name="id" type="II" maxOccurs="unbounded"/>
+			<xs:element name="name" type="EN" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="desc" type="ED" minOccurs="0"/>
+			<xs:element name="existenceTime" type="IVL_TS" minOccurs="0"/>
+			<xs:element name="telecom" type="TEL" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="manufacturerModelName" type="SC" minOccurs="0"/>
+			<xs:element name="softwareName" type="SC" minOccurs="0"/>
+			<xs:element name="asAgent" type="MCCI_MT000100UV01.Agent" nillable="true" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClassDevice" use="optional" default="DEV"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="MCCI_MT000100UV01.EntityRsp">
+		<xs:sequence>
+			<xs:element name="id" type="II"/>
+			<xs:element name="name" type="EN" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="telecom" type="TEL" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClassRoot" use="optional" default="ENT"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="MCCI_MT000100UV01.Organization">
+		<xs:sequence>
+			<xs:element name="id" type="II" maxOccurs="unbounded"/>
+			<xs:element name="name" type="EN" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="telecom" type="TEL" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClassOrganization" use="optional" default="ORG"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="MCCI_MT000100UV01.Receiver">
+		<xs:sequence>
+			<xs:element name="telecom" type="TEL" maxOccurs="unbounded"/>
+			<xs:element name="device" type="MCCI_MT000100UV01.Device"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="CommunicationFunctionType" use="optional" fixed="RCV"/>
+	</xs:complexType>
+	<xs:complexType name="MCCI_MT000100UV01.Sender">
+		<xs:sequence>
+			<xs:element name="telecom" type="TEL" maxOccurs="unbounded"/>
+			<xs:element name="device" type="MCCI_MT000100UV01.Device"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="CommunicationFunctionType" use="optional" fixed="SND"/>
+	</xs:complexType>
+	<!--The contents of the MCCI include are pasted in here.  END-->
+	<xs:complexType name="PORR_IN040001UV01.MCAI_MT700201UV01.ControlActProcess">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="code" type="CD" minOccurs="0"/>
+			<xs:element name="text" type="ED" minOccurs="0"/>
+			<xs:element name="effectiveTime" type="IVL_TS" minOccurs="0"/>
+			<xs:element name="priorityCode" type="CE" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="reasonCode" type="CE" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="authorOrPerformer" type="MCAI_MT700201UV01.AuthorOrPerformer" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="informationRecipient" type="MCAI_MT700201UV01.InformationRecipient" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="subject" type="PORR_IN040001UV01.MCAI_MT700201UV01.Subject2" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="reasonOf" type="MCAI_MT700201UV01.Reason" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassControlAct" use="optional" default="CACT"/>
+		<xs:attribute name="moodCode" type="x_ActMoodIntentEvent" use="required"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_IN040001UV01.MCCI_MT000100UV01.Message">
+		<xs:sequence>
+			<xs:element name="id" type="II"/>
+			<xs:element name="creationTime" type="TS"/>
+			<xs:element name="securityText" type="ST" minOccurs="0"/>
+			<xs:element name="versionCode" type="CS" minOccurs="0"/>
+			<xs:element name="interactionId" type="II"/>
+			<xs:element name="profileId" type="II" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="processingCode" type="CS"/>
+			<xs:element name="processingModeCode" type="CS"/>
+			<xs:element name="acceptAckCode" type="CS"/>
+			<xs:element name="sequenceNumber" type="INT" minOccurs="0"/>
+			<xs:element name="receiver" type="MCCI_MT000100UV01.Receiver" maxOccurs="unbounded"/>
+			<xs:element name="sender" type="MCCI_MT000100UV01.Sender"/>
+			<xs:element name="attachment" type="MCCI_MT002100.Attachment" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="controlActProcess" type="PORR_IN040001UV01.MCAI_MT700201UV01.ControlActProcess"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+	</xs:complexType>
+	<!--The contents of the MCAI include are pasted in here.  BEGIN-->
+	<xs:complexType name="MCAI_MT700201UV01.AuthorOrPerformer">
+		<xs:sequence>
+			<xs:element name="noteText" type="ED" minOccurs="0"/>
+			<xs:element name="time" type="IVL_TS" minOccurs="0"/>
+			<xs:element name="modeCode" type="CE" minOccurs="0"/>
+			<xs:choice>
+				<xs:element name="assignedPerson" type="COCT_MT090100UV01.AssignedPerson" nillable="true"/>
+			</xs:choice>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="x_ParticipationAuthorPerformer" use="required"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional" default="AP"/>
+	</xs:complexType>
+	<xs:complexType name="MCAI_MT700201UV01.InformationRecipient">
+		<xs:sequence>
+			<xs:element name="time" type="IVL_TS" minOccurs="0"/>
+			<xs:element name="assignedPerson" type="COCT_MT090100UV01.AssignedPerson" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ParticipationInformationRecipient" use="required"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional" default="AP"/>
+	</xs:complexType>
+	<xs:complexType name="MCAI_MT700201UV01.Reason">
+		<xs:sequence>
+			<xs:element name="detectedIssueEvent" type="MCAI_MT900001UV01.DetectedIssueEvent" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipReason" use="optional" default="RSON"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<!--The contents of the MCAI include are pasted in here.  END-->
+	<xs:complexType name="PORR_IN040001UV01.MCAI_MT700201UV01.Subject2">
+		<xs:sequence>
+			<xs:element name="sequenceNumber" type="INT" minOccurs="0"/>
+			<xs:element name="investigationEvent" type="PORR_MT040001UV01.InvestigationEvent" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipType" use="optional" fixed="SUBJ"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional" default="false"/>
+	</xs:complexType>
+	<!--The contents of the PORR ICSR Base Model include are pasted in here.  BEGIN-->
+	<xs:complexType name="PORR_MT040001UV01.AffectedPerson">
+		<xs:sequence>
+			<xs:element name="name" type="EN" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="telecom" type="TEL" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="administrativeGenderCode" type="CE" minOccurs="0"/>
+			<xs:element name="birthTime" type="TS" minOccurs="0"/>
+			<xs:element name="deceasedTime" type="TS" minOccurs="0"/>
+			<xs:element name="addr" type="AD" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="raceCode" type="CE" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="ethnicGroupCode" type="CE" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClass" use="optional" fixed="PSN"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.AssignedEntity">
+		<xs:sequence>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:choice>
+				<xs:element name="assignedPerson" type="PORR_MT040001UV01.Person" nillable="true" minOccurs="0"/>
+				<xs:element name="assignedOrganization" type="PORR_MT040001UV01.Organization" nillable="true" minOccurs="0"/>
+			</xs:choice>
+			<xs:element name="representedOrganization" type="PORR_MT040001UV01.Organization" nillable="true" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClassAssignedEntity" use="optional" default="ASSIGNED"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Author1">
+		<xs:sequence>
+			<xs:element name="assignedEntity" type="PORR_MT040001UV01.AssignedEntity" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ParticipationType" use="optional" fixed="AUT"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Author2">
+		<xs:sequence>
+			<xs:element name="assignedEntity" type="PORR_MT040001UV01.AssignedEntity" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ParticipationType" use="optional" fixed="AUT"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.AuthorOrPerformer">
+		<xs:sequence>
+			<xs:element name="assignedEntity" type="PORR_MT040001UV01.AssignedEntity" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="x_ParticipationAuthorPerformer" use="required"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.CaseSeriousness">
+		<xs:sequence>
+			<xs:element name="code" type="CD" minOccurs="0"/>
+			<xs:element name="value" type="CE" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassObservation" use="optional" default="OBS"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.ContactParty">
+		<xs:sequence>
+			<xs:element name="contactPerson" type="PORR_MT040001UV01.Person" nillable="true" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClassContact" use="optional" default="CON"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.DirectTarget2">
+		<xs:sequence>
+			<xs:element name="functionCode" type="CE" minOccurs="0"/>
+			<xs:choice>
+				<xs:element name="identifiedDevice" type="PORR_MT040005UV01.IdentifiedDevice" nillable="true"/>
+			</xs:choice>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ParticipationTargetDirect" use="optional" default="DIR"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Document">
+		<xs:sequence>
+			<xs:element name="code" type="CD" minOccurs="0"/>
+			<xs:element name="title" type="ST" minOccurs="0"/>
+			<xs:element name="text" type="ED" minOccurs="0"/>
+			<xs:element name="bibliographicDesignationText" type="ED" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassDocument" use="optional" default="DOC"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.InvestigationEvent">
+		<xs:sequence>
+			<xs:element name="id" type="II"/>
+			<xs:element name="code" type="CE" maxOccurs="2"/>
+			<xs:element name="text" type="ST" minOccurs="0"/>
+			<xs:element name="statusCode" type="CS"/>
+			<xs:element name="activityTime" type="IVL_TS" minOccurs="0"/>
+			<xs:element name="availabilityTime" type="TS" minOccurs="0"/>
+			<xs:element name="directTarget" type="PORR_MT040001UV01.DirectTarget2" nillable="true" minOccurs="0"/>
+			<xs:element name="authorOrPerformer" type="PORR_MT040001UV01.AuthorOrPerformer" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="trigger" type="PORR_MT040001UV01.Trigger" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="pertinentInformation1" type="PORR_MT040001UV01.PertinentInformation2" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="pertinentInformation2" type="PORR_MT040001UV01.PertinentInformation4" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="pertinentInformation3" type="PORR_MT040001UV01.PertinentInformation9" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="pertainsTo" type="PORR_MT040001UV01.PertinentInformation3" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="component" type="PORR_MT049006UV01.Component3" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClass" use="optional" fixed="INVSTG"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.InvestigativeSubject">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0"/>
+			<xs:element name="subjectAffectedPerson" type="PORR_MT040001UV01.AffectedPerson" nillable="true"/>
+			<xs:element name="subjectOf" type="PORR_MT040001UV01.Subject2" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClassInvestigationSubject" use="optional" default="INVSBJ"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Location">
+		<xs:sequence>
+			<xs:element name="locatedEntity" type="COCT_MT070000UV01.LocatedEntity" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ParticipationTargetLocation" use="optional" default="LOC"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Observation">
+		<xs:sequence>
+			<xs:element name="code" type="CD"/>
+			<xs:element name="text" type="ED" minOccurs="0"/>
+			<xs:element name="effectiveTime" type="SXCM_TS" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="value" type="ANY" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassObservation" use="optional" default="OBS"/>
+		<xs:attribute name="moodCode" type="x_ActMoodOrdPrmsEvn" use="required"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Organization">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0"/>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="name" type="ON" minOccurs="0"/>
+			<xs:element name="telecom" type="TEL" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="addr" type="AD" minOccurs="0"/>
+			<xs:element name="contactParty" type="PORR_MT040001UV01.ContactParty" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClassOrganization" use="optional" default="ORG"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Person">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="name" type="PN" minOccurs="0"/>
+			<xs:element name="telecom" type="TEL" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="addr" type="AD" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClass" use="optional" fixed="PSN"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.PertinentInformation1">
+		<xs:sequence>
+			<xs:element name="primarySourceReport" type="PORR_MT040001UV01.PrimarySourceReport" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipPertains" use="optional" default="PERT"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.PertinentInformation2">
+		<xs:sequence>
+			<xs:element name="sequenceNumber" type="INT" minOccurs="0"/>
+			<xs:element name="secondaryCaseNotification" type="PORR_MT040001UV01.SecondaryCaseNotification" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipPertains" use="optional" default="PERT"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.PertinentInformation3">
+		<xs:sequence>
+			<xs:element name="priorityNumber" type="INT" minOccurs="0"/>
+			<xs:choice>
+				<xs:element name="procedureEvent" type="PORR_MT040003UV01.ProcedureEvent" nillable="true"/>
+			</xs:choice>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipPertains" use="optional" default="PERT"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.PertinentInformation4">
+		<xs:sequence>
+			<xs:element name="caseSeriousness" type="PORR_MT040001UV01.CaseSeriousness" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipPertains" use="optional" default="PERT"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.PertinentInformation9">
+		<xs:sequence>
+			<xs:element name="document" type="PORR_MT040001UV01.Document" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipPertains" use="optional" default="PERT"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.PrimarySourceReport">
+		<xs:sequence>
+			<xs:element name="id" type="II"/>
+			<xs:element name="code" type="CE"/>
+			<xs:element name="title" type="ST" minOccurs="0"/>
+			<xs:element name="text" type="ED" minOccurs="0"/>
+			<xs:element name="statusCode" type="CS" minOccurs="0"/>
+			<xs:element name="effectiveTime" type="IVL_TS" minOccurs="0"/>
+			<xs:element name="receiver" type="PORR_MT040001UV01.Receiver1" nillable="true" minOccurs="0"/>
+			<xs:element name="author" type="PORR_MT040001UV01.Author1" nillable="true" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassObservation" use="optional" default="OBS"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Reaction">
+		<xs:sequence>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="text" type="ED" minOccurs="0"/>
+			<xs:element name="term" type="ED" minOccurs="0"/>
+			<xs:element name="effectiveTime" type="SXCM_TS" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="value" type="CE" minOccurs="0"/>
+			<xs:element name="interpretationCode" type="CE" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="subject" type="PORR_MT040001UV01.Subject1" nillable="true"/>
+			<xs:element name="location" type="PORR_MT040001UV01.Location" nillable="true" minOccurs="0"/>
+			<xs:element name="pertinentInformation" type="PORR_MT040001UV01.PertinentInformation1" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassObservation" use="optional" default="OBS"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Receiver1">
+		<xs:sequence>
+			<xs:element name="time" type="IVL_TS" minOccurs="0"/>
+			<xs:element name="assignedEntity" type="PORR_MT040001UV01.AssignedEntity" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ParticipationType" use="optional" fixed="RCV"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="negationInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Receiver2">
+		<xs:sequence>
+			<xs:element name="time" type="IVL_TS" minOccurs="0"/>
+			<xs:element name="assignedEntity" type="PORR_MT040001UV01.AssignedEntity" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ParticipationType" use="optional" fixed="RCV"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="negationInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.SecondaryCaseNotification">
+		<xs:sequence>
+			<xs:element name="id" type="II"/>
+			<xs:element name="code" type="CE"/>
+			<xs:element name="title" type="ST" minOccurs="0"/>
+			<xs:element name="text" type="ED" minOccurs="0"/>
+			<xs:element name="statusCode" type="CS" minOccurs="0"/>
+			<xs:element name="effectiveTime" type="IVL_TS" minOccurs="0"/>
+			<xs:element name="receiver" type="PORR_MT040001UV01.Receiver2" nillable="true" minOccurs="0"/>
+			<xs:element name="author" type="PORR_MT040001UV01.Author2" nillable="true" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassObservation" use="optional" default="OBS"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Subject1">
+		<xs:sequence>
+			<xs:element name="investigativeSubject" type="PORR_MT040001UV01.InvestigativeSubject" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ParticipationTargetSubject" use="optional" default="SBJ"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Subject2">
+		<xs:sequence>
+			<xs:choice>
+				<xs:element name="observation" type="PORR_MT040001UV01.Observation" nillable="true"/>
+			</xs:choice>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ParticipationTargetSubject" use="optional" default="SBJ"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040001UV01.Trigger">
+		<xs:sequence>
+			<xs:element name="priorityNumber" type="INT" minOccurs="0"/>
+			<xs:element name="reaction" type="PORR_MT040001UV01.Reaction" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipType" use="optional" fixed="TRIG"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<!--The contents of the PORR ICSR include are pasted in here.  END-->
+	<!--The contents of the PORR ICSR AProcedure include are pasted in here.  BEGIN-->
+	<xs:complexType name="PORR_MT040003UV01.ActionTaken">
+		<xs:sequence>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="value" type="CE" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassObservation" use="optional" default="OBS"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040003UV01.AuthorOrPerformer">
+		<xs:sequence>
+			<xs:element name="assignedEntity" type="COCT_MT090000UV01.AssignedEntity" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="x_ParticipationAuthorPerformer" use="required"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040003UV01.Component2">
+		<xs:sequence>
+			<xs:element name="implantation" type="PORR_MT040003UV01.Implantation" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipHasComponent" use="optional" default="COMP"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040003UV01.Component3">
+		<xs:sequence>
+			<xs:element name="explantation" type="PORR_MT040003UV01.Explantation" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipHasComponent" use="optional" default="COMP"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040003UV01.Device">
+		<xs:sequence>
+			<xs:element name="identifiedDevice" type="PORR_MT040005UV01.IdentifiedDevice" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ParticipationTargetDevice" use="optional" default="DEV"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040003UV01.Explantation">
+		<xs:sequence>
+			<xs:element name="code" type="CD" minOccurs="0"/>
+			<xs:element name="effectiveTime" type="TS" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClass" use="optional" default="PROC"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040003UV01.Implantation">
+		<xs:sequence>
+			<xs:element name="code" type="CD" minOccurs="0"/>
+			<xs:element name="effectiveTime" type="TS" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClass" use="optional" default="PROC"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040003UV01.Observation">
+		<xs:sequence>
+			<xs:element name="code" type="CD"/>
+			<xs:element name="effectiveTime" type="TS" minOccurs="0"/>
+			<xs:element name="value" type="ANY" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassObservation" use="optional" default="OBS"/>
+		<xs:attribute name="moodCode" type="x_ActMoodOrdPrmsEvn" use="required"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040003UV01.PertinentInformation1">
+		<xs:sequence>
+			<xs:choice>
+				<xs:element name="observation" type="PORR_MT040003UV01.Observation" nillable="true"/>
+			</xs:choice>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipPertains" use="optional" default="PERT"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040003UV01.PertinentInformation2">
+		<xs:sequence>
+			<xs:element name="actionTaken" type="PORR_MT040003UV01.ActionTaken" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipPertains" use="optional" default="PERT"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040003UV01.ProcedureEvent">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0"/>
+			<xs:element name="code" type="CE"/>
+			<xs:element name="text" type="ED" minOccurs="0"/>
+			<xs:element name="effectiveTime" type="SXCM_TS" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="device" type="PORR_MT040003UV01.Device" nillable="true" minOccurs="0"/>
+			<xs:element name="authorOrPerformer" type="PORR_MT040003UV01.AuthorOrPerformer" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="pertinentInformation1" type="PORR_MT040003UV01.PertinentInformation1" nillable="true" maxOccurs="unbounded"/>
+			<xs:element name="pertinentInformation2" type="PORR_MT040003UV01.PertinentInformation2" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="component1" type="PORR_MT040003UV01.Component2" nillable="true" minOccurs="0"/>
+			<xs:element name="component2" type="PORR_MT040003UV01.Component3" nillable="true" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClass" use="optional" default="PROC"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<!--The contents of the PORR AProcedure include are pasted in here.  END-->
+	<!--The contents of the PORR ICSR RDevice Model include are pasted in here.  BEGIN-->
+	<xs:complexType name="PORR_MT040005UV01.Component1">
+		<xs:sequence>
+			<xs:element name="evaluationResult" type="PORR_MT040005UV01.EvaluationResult" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipHasComponent" use="optional" default="COMP"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.Component2">
+		<xs:sequence>
+			<xs:element name="evaluationConclusion" type="PORR_MT040005UV01.EvaluationConclusion" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipHasComponent" use="optional" default="COMP"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.Component3">
+		<xs:sequence>
+			<xs:element name="evaluationMethod" type="PORR_MT040005UV01.EvaluationMethod" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ActRelationshipHasComponent" use="optional" default="COMP"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="bl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.ContactParty2">
+		<xs:sequence>
+			<xs:element name="addr" type="AD" minOccurs="0"/>
+			<xs:element name="telecom" type="TEL" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="contactManufacturerContact" type="PORR_MT040005UV01.ManufacturerContact" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClassContact" use="optional" default="CON"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.Device">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0"/>
+			<xs:element name="existenceTime" type="IVL_TS" minOccurs="0"/>
+			<xs:element name="lotNumberText" type="ST" minOccurs="0"/>
+			<xs:element name="expirationTime" type="TS"/>
+			<xs:element name="asManufacturedProduct" type="PORR_MT040005UV01.ManufacturedProduct" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="asLocatedEntity" type="COCT_MT070000UV01.LocatedEntity" nillable="true" minOccurs="0"/>
+			<xs:element name="inventoryItem" type="PORR_MT040005UV01.InventoryItem" nillable="true" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClassDevice" use="optional" default="DEV"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.DeviceModel">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="manufacturerModelName" type="SC" minOccurs="0"/>
+			<xs:element name="asRegulatedProduct" type="PORR_MT040005UV01.RegulatedProduct2" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClassDevice" use="optional" default="DEV"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminerDetermined" use="optional" default="KIND"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.DeviceObservation">
+		<xs:sequence>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="effectiveTime" type="TS" minOccurs="0"/>
+			<xs:element name="value" type="ANY" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassObservation" use="optional" default="OBS"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.EvaluationConclusion">
+		<xs:sequence>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="value" type="ANY" minOccurs="0"/>
+			<xs:element name="interpretationCode" type="CE" minOccurs="0"/>
+			<xs:element name="methodCode" type="CE" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassObservation" use="optional" default="OBS"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.EvaluationMethod">
+		<xs:sequence>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="value" type="ANY" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassObservation" use="optional" default="OBS"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.EvaluationResult">
+		<xs:sequence>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="value" type="ANY" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassObservation" use="optional" default="OBS"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.IdentifiedDevice">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="identifiedDevice" type="PORR_MT040005UV01.Device" nillable="true"/>
+			<xs:element name="subjectOf" type="PORR_MT040005UV01.Subject" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClass" use="optional" fixed="IDENT"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.IdentifiedOrganization">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="assigningManufacturerIdentifierIssuer" type="PORR_MT040005UV01.ManufacturerIdentifierIssuer" nillable="true" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClass" use="optional" fixed="IDENT"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.InventoryItem">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="manufacturedDeviceModel" type="PORR_MT040005UV01.DeviceModel" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClassManufacturedProduct" use="optional" default="MANU"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.InvestigationEvent">
+		<xs:sequence>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="text" type="ED" minOccurs="0"/>
+			<xs:element name="effectiveTime" type="SXCM_TS" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="component1" type="PORR_MT040005UV01.Component1" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="component2" type="PORR_MT040005UV01.Component2" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="component3" type="PORR_MT040005UV01.Component3" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClass" use="optional" fixed="INVSTG"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.ManufacturedProduct">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="manufacturerOrReprocessor" type="PORR_MT040005UV01.ManufacturerOrReprocessor" nillable="true" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClassManufacturedProduct" use="optional" default="MANU"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.ManufacturerContact">
+		<xs:sequence>
+			<xs:element name="name" type="PN" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClass" use="optional" fixed="PSN"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.ManufacturerIdentifierIssuer">
+		<xs:sequence>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="name" type="ON" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attribute name="classCode" type="EntityClassOrganization" use="optional" default="ORG"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.ManufacturerOrReprocessor">
+		<xs:sequence>
+			<xs:element name="code" type="CE"/>
+			<xs:element name="name" type="EN"/>
+			<xs:element name="telecom" type="TEL" maxOccurs="unbounded"/>
+			<xs:element name="addr" type="AD" minOccurs="0"/>
+			<xs:element name="asRole" type="PORR_MT040005UV01.Role" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="asIdentifiedOrganization" type="PORR_MT040005UV01.IdentifiedOrganization" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="contactParty" type="PORR_MT040005UV01.ContactParty2" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClassOrganization" use="optional" default="ORG"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.PrimaryPerformer">
+		<xs:sequence>
+			<xs:element name="investigationEvent" type="PORR_MT040005UV01.InvestigationEvent" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ParticipationType" use="optional" fixed="PPRF"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.Role">
+		<xs:sequence>
+			<xs:element name="performance" type="PORR_MT040005UV01.PrimaryPerformer" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClassRoot" use="optional" default="ROL"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.RegulatedProduct2">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="regulatoryAuthority" type="PORR_MT040005UV01.RegulatoryAuthority" nillable="true" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClass" use="optional" fixed="RGPR"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.RegulatoryAuthority">
+		<xs:sequence>
+			<xs:element name="name" type="ON"/>
+			<xs:element name="addr" type="AD" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClassOrganization" use="optional" default="ORG"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT040005UV01.Subject">
+		<xs:sequence>
+			<xs:element name="deviceObservation" type="PORR_MT040005UV01.DeviceObservation" nillable="true"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="typeCode" type="ParticipationTargetSubject" use="optional" default="SBJ"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+	</xs:complexType>
+	<!--The contents of the PORR ICSR RDevice include are pasted in here.  END-->
+	<!--The contents of the COCT Assigned Person include are pasted in here.  BEGIN-->
+	<xs:complexType name="COCT_MT090100UV01.AssignedPerson">
+		<xs:sequence>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="addr" type="AD" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="telecom" type="TEL" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:choice>
+				<xs:element name="assignedPerson" type="COCT_MT090100UV01.Person" nillable="true" minOccurs="0"/>
+			</xs:choice>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClassAssignedEntity" use="optional" default="ASSIGNED"/>
+	</xs:complexType>
+	<xs:complexType name="COCT_MT090100UV01.Person">
+		<xs:sequence>
+			<xs:element name="name" type="EN" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClass" use="optional" fixed="PSN"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<!--The contents of the COCT Assigned Person include are pasted in here.  END-->
+	<!--The contents of the COCT Assigned Entity include are pasted in here.  BEGIN-->
+	<xs:complexType name="COCT_MT090000UV01.AssignedEntity">
+		<xs:sequence>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClassAssignedEntity" use="optional" default="ASSIGNED"/>
+	</xs:complexType>
+	<!--The contents of the COCT Assigned Entity include are pasted in here.  END-->
+	<!--The contents of the COCT Located Location include are pasted in here.  BEGIN-->
+	<xs:complexType name="COCT_MT070000UV01.LocatedEntity">
+		<xs:sequence>
+			<xs:element name="location" type="COCT_MT710000UV01.Place" nillable="true" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClassLocatedEntity" use="optional" default="LOCE"/>
+	</xs:complexType>
+	<!--The contents of the COCT Located Location include are pasted in here.  END-->
+	<!--The contents of the COCT Place include are pasted in here.  BEGIN-->
+	<xs:complexType name="COCT_MT710000UV01.Place">
+		<xs:sequence>
+			<xs:element name="code" type="CE" minOccurs="0"/>
+			<xs:element name="name" type="EN" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="desc" type="ED" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClassPlace" use="optional" default="PLC"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminer" use="optional" fixed="INSTANCE"/>
+	</xs:complexType>
+	<!--The contents of the COCT Place include are pasted in here.  END-->
+	<!--The contents of the MCAI Detected issues include are pasted in here.  BEGIN-->
+	<xs:complexType name="MCAI_MT900001UV01.DetectedIssueEvent">
+		<xs:sequence>
+			<xs:element name="code" type="CD"/>
+			<xs:element name="text" type="ED" minOccurs="0"/>
+			<xs:element name="value" type="ANY" minOccurs="0"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClass" use="optional" fixed="ALRT"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<!--The contents of the MCAI Detected issues include are pasted in here.  END-->
+	<!-- DRUG Related Elements -->
+	<xs:complexType name="PORR_MT049006UV01.Component3">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:choice>
+				<xs:choice>
+					<xs:element name="adverseEventAssessment" type="PORR_MT049006UV01.AdverseEventAssessment" nillable="true" minOccurs="1" maxOccurs="1"/>
+				</xs:choice>
+			</xs:choice>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="typeCode" type="ActRelationshipHasComponent" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT049006UV01.AdverseEventAssessment">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="code" type="CD" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="text" type="ED" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="subject1" type="PORR_MT049006UV01.Subject1" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT049006UV01.Subject1">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="primaryRole" type="PORR_MT049006UV01.PrimaryRole" nillable="true" minOccurs="1" maxOccurs="1"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="typeCode" type="ParticipationTargetSubject" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT049006UV01.PrimaryRole">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="subjectOf2" type="PORR_MT049006UV01.Subject13" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="classCode" type="RoleClassICSRInvestigationSubject" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT049006UV01.Subject13">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:choice>
+				<xs:element name="organizer" type="PORR_MT049013UV01.Organizer" nillable="true" minOccurs="1" maxOccurs="1"/>
+			</xs:choice>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="drugSeqNo" type="int" use="required"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="typeCode" type="ParticipationTargetSubject" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT049013UV01.Organizer">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="component" type="PORR_MT049013UV01.Component" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClass" use="optional" fixed="CATEGORY"/>
+		<xs:attribute name="moodCode" type="ActMood" use="optional" fixed="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT049013UV01.Component">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:choice>
+				<xs:choice>
+					<xs:element name="substanceAdministration" type="PORR_MT049013UV01.SubstanceAdministration" nillable="true" minOccurs="1" maxOccurs="1"/>
+				</xs:choice>
+			</xs:choice>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="typeCode" type="ActRelationshipHasComponent" use="optional"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="xs:boolean" use="optional" default="true"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT049013UV01.SubstanceAdministration">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="text" type="ED" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="statusCode" type="CS" minOccurs="0" maxOccurs="1"/>
+			<!--			<xs:element name="effectiveTime" type="QSET_TS" minOccurs="0" maxOccurs="1"/> -->
+			<xs:element name="numDosage" type="IVL_REAL" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="effectiveTime" type="PIVL_TS" minOccurs="0" maxOccurs="2"/>
+			<xs:element name="confidentialityCode" type="DSET_CD" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="approachSiteCode" type="DSET_CD" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="routeCode" type="CD" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="doseQuantity" type="PQ" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="rateQuantity" type="PQ" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="doseCheckQuantity" type="DSET_RTO" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="maxDoseQuantity" type="RTO" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="administrationUnitCode" type="CD" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="consumable" type="PORR_MT049013UV01.Consumable" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="outboundRelationship2" type="PORR_MT049013UV01.SourceOf2" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="inboundRelationship" type="PORR_MT049013UV01.SourceOf" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClass" use="optional" fixed="SBADM"/>
+		<xs:attribute name="moodCode" type="x_ActMoodIntentEvent" use="optional"/>
+		<xs:attribute name="negationInd" type="xs:boolean" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT049013UV01.SourceOf">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="sequenceNumber" type="INT" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="pauseQuantity" type="PQ" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="conjunctionCode" type="CS" minOccurs="0" maxOccurs="1"/>
+			<xs:choice>
+				<xs:element name="observation" type="PORR_MT049013UV01.Observation" nillable="true" minOccurs="1" maxOccurs="1"/>
+			</xs:choice>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="typeCode" type="ActRelationshipType" use="optional"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+		<xs:attribute name="contextConductionInd" type="xs:boolean" use="optional"/>
+		<xs:attribute name="negationInd" type="xs:boolean" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT049013UV01.Observation">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="code" type="CD" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="effectiveTime" type="PIVL_TS" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="value" type="ANY" minOccurs="0" maxOccurs="1"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClass" use="optional" fixed="OBS"/>
+		<xs:attribute name="moodCode" type="x_ActMoodIntentEvent" use="required"/>
+		<xs:attribute name="negationInd" type="xs:boolean" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT049013UV01.SourceOf2">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="sequenceNumber" type="INT" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="pauseQuantity" type="PQ" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="conjunctionCode" type="CS" minOccurs="0" maxOccurs="1"/>
+			<xs:choice>
+				<xs:element name="observation" type="PORR_MT049013UV01.Observation" nillable="true" minOccurs="1" maxOccurs="unbounded"/>
+			</xs:choice>
+			<xs:element name="substanceAdministration" type="PORR_MT049013UV01.SubstanceAdministration" nillable="true" minOccurs="1" maxOccurs="1"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="PORR_MT049013UV01.Consumable">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="instanceOfKind" type="POCP_MT020200UV.InstanceOfKind" nillable="true" minOccurs="1" maxOccurs="1"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="typeCode" type="ParticipationType" use="optional" fixed="CSM"/>
+		<xs:attribute name="contextControlCode" type="ContextControl" use="optional"/>
+	</xs:complexType>
+	<xs:complexType name="POCP_MT020200UV.InstanceOfKind">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="productInstance" type="POCP_MT020200UV.ProductInstance" nillable="true" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="kindOfProduct" type="POCP_MT010200UV.Product" nillable="true" minOccurs="0" maxOccurs="1"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="RoleClassInstance" use="optional" default="INST"/>
+	</xs:complexType>
+	<xs:complexType name="POCP_MT020200UV.ProductInstance">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="quantity" type="PQ" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="desc" type="ED" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="lotNumberText" type="ED" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="existenceTime" type="IVL_TS" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="expirationTime" type="IVL_TS" minOccurs="0" maxOccurs="1"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="classCode" type="EntityClassManufacturedMaterial" use="optional" default="MMAT"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminerSpecific" use="optional" default="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="POCP_MT010200UV.Product">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="code" type="ED" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="name" type="ED" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="desc" type="ED" minOccurs="0" maxOccurs="1"/>
+			<!--			<xs:element name="riskCode" type="DSET_CD" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="handlingCode" type="DSET_CD" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="formCode" type="CD" minOccurs="0" maxOccurs="1"/> -->
+			<xs:element name="expirationTime" type="IVL_TS" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="asManufacturedProduct" type="POCP_MT010200UV.ManufacturedProduct3" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="ingredient" type="POCP_MT010200UV.Ingredient" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="classCode" type="EntityClassManufacturedMaterial" use="optional" default="MMAT"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminerDetermined" use="optional" default="KIND"/>
+	</xs:complexType>
+	<xs:complexType name="POCP_MT010200UV.ManufacturedProduct3">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="subjectOf" type="POCP_MT010200UV.Subject" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element name="approval" type="POCP_MT050100UV.Approval" nillable="true" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="manufacturerOrganization" type="POCP_MT030200UV.Organization" nillable="true" minOccurs="0" maxOccurs="1"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="classCode" type="RoleClassManufacturedProduct" use="optional" default="MANU"/>
+	</xs:complexType>
+	<xs:complexType name="POCP_MT030200UV.Organization">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="id" type="DSET_II" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="name" type="EN" minOccurs="0" maxOccurs="1"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="EntityClassOrganization" use="optional" default="ORG"/>
+		<xs:attribute name="determinerCode" type="EntityDeterminerSpecific" use="optional" default="INSTANCE"/>
+	</xs:complexType>
+	<xs:complexType name="POCP_MT010200UV.Ingredient">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="effectiveTime" type="IVL_TS" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="confidentialityCode" type="CD" minOccurs="0" maxOccurs="1"/>
+			<!--			<xs:element name="quantity" type="PQ" minOccurs="0" maxOccurs="1"/> -->
+			<xs:element name="quantity" type="RTO" minOccurs="0" maxOccurs="1"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="classCode" type="RoleClassIngredientEntity" use="optional" default="INGR"/>
+	</xs:complexType>
+	<xs:complexType name="POCP_MT010200UV.Subject">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="characteristic" type="POCP_MT050100UV.Characteristic" nillable="true" minOccurs="1" maxOccurs="1"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="typeCode" type="ParticipationTargetSubject" use="optional" default="SBJ"/>
+		<xs:attribute name="negationInd" type="xs:boolean" use="optional" default="false"/>
+	</xs:complexType>
+	<xs:complexType name="POCP_MT050100UV.Characteristic">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="code" type="CD" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="text" type="ED" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="effectiveTime" type="IVL_TS" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="value" type="ANY" minOccurs="0" maxOccurs="1"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="classCode" type="ActClassObservation" use="optional" default="OBS"/>
+		<xs:attribute name="moodCode" type="ActMoodEventOccurrence" use="optional" default="EVN"/>
+	</xs:complexType>
+	<xs:complexType name="POCP_MT050100UV.Approval">
+		<xs:sequence>
+			<xs:group ref="InfrastructureRootElements"/>
+			<xs:element name="id" type="II" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="code" type="CD" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="text" type="ST" minOccurs="0" maxOccurs="1"/>
+		</xs:sequence>
+		<xs:attributeGroup ref="InfrastructureRootAttributes"/>
+		<xs:attribute name="nullFlavor" type="NullFlavor" use="optional"/>
+		<xs:attribute name="classCode" type="ActClassContract" use="optional" default="CNTRCT"/>
+		<xs:attribute name="moodCode" type="ActMoodEventOccurrence" use="optional" default="EVN"/>
+	</xs:complexType>
+</xs:schema>
