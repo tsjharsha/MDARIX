@@ -36,6 +36,8 @@ migration. Only the web image changes. No operator step. No sample number or lab
 - **The side menu's alerts are a dot, never a count**: Complaints while a complaint is overdue, Trends while a product
   is rising; on a phone the dot is on the slot, or on More. Screen readers hear "New items".
 - **The browser journeys' keyboard check** keeps telling the end of a page from focus lost in the middle of it.
+- **The report's Next step** with 0.10.89's eMDR file takes the design's next card in both themes: what the eMDR XML
+  still needs is a callout beside the button it holds back, and that button stays legible while it waits.
 
 ### Fixed
 

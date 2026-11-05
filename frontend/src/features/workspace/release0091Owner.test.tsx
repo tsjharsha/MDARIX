@@ -108,3 +108,24 @@ describe("4. the keyboard walk kept", () => {
     );
   });
 });
+
+// Read as a file: the test run does not load stylesheets.
+const fs = await import(/* @vite-ignore */ ["node", "fs"].join(":"));
+
+describe("the report's Next step with 0.10.89's eMDR file, in the hero design", () => {
+  const css: string = fs.readFileSync(new URL("./heroPages.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+
+  it("is the design's next card, with what the eMDR XML needs as a callout and its held-back button still legible", () => {
+    expect(css).toMatch(
+      /\.uw-hybrid \.ac-main \.uw-rail-next \{[^}]*background: linear-gradient\(160deg, var\(--ms-mint\)/,
+    );
+    expect(css).toMatch(
+      /\.uw-rail-next #rp-emdr-needs \{[^}]*border-left: 3px solid var\(--ms-warn-mark\);[^}]*background: var\(--ms-warn-bg\);/,
+    );
+    expect(css).toMatch(/\.uw-rail-next > \.ac-secondary:disabled \{[^}]*color: var\(--ms-ink-2\);\s*opacity: 1;/);
+    // Tokens only, so the dark theme carries it.
+    const start = css.indexOf("/* The report's Next step");
+    expect(start).toBeGreaterThan(0);
+    expect(css.slice(start, start + 1600)).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+  });
+});

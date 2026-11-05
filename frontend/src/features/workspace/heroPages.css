@@ -1951,3 +1951,49 @@
     font-size: var(--ms-fs-34);
   }
 }
+/* The report's Next step (0.10.91 with 0.10.89's eMDR file): the design's next card, its title in the display face;
+   what the eMDR XML still needs as a callout beside the button it holds back; the two files stacked. */
+.uw-hybrid .ac-main .uw-rail-next {
+  display: grid;
+  gap: 10px;
+  border-color: color-mix(in srgb, var(--ms-teal-mark) 50%, var(--ms-line));
+  background: linear-gradient(160deg, var(--ms-mint), var(--ms-surface) 55%);
+}
+.uw-hybrid .uw-rail-next > h2 {
+  color: var(--ms-teal);
+  font-size: var(--ms-fs-12);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.uw-hybrid .uw-rail-next > b {
+  font-family: var(--ms-font-display);
+  font-size: var(--ms-fs-20);
+  font-stretch: 108%;
+  font-weight: 720;
+  line-height: 1.25;
+}
+.uw-hybrid .uw-rail-next #rp-emdr-needs {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--ms-warn-mark);
+  border-radius: 0 var(--ms-radius-sm) var(--ms-radius-sm) 0;
+  background: var(--ms-warn-bg);
+  color: var(--ms-ink);
+  font-size: var(--ms-fs-13);
+}
+.uw-hybrid .uw-rail-next > :is(.ac-primary, .ac-secondary) {
+  justify-content: center;
+  width: 100%;
+  white-space: normal;
+}
+.uw-hybrid .uw-rail-next > .ac-secondary:disabled {
+  border-style: dashed;
+  color: var(--ms-ink-2);
+  opacity: 1;
+  cursor: not-allowed;
+}
+.uw-hybrid .uw-rail-next > .ac-note {
+  margin: 0;
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-13);
+}
