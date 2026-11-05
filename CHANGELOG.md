@@ -10,7 +10,6 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
-<<<<<<< HEAD
 ## [0.10.91] - 2026-11-05
 
 On the trial maintenance line (`release/0.10`), released together with 0.10.90: dark mode on the new navigation, and
@@ -108,7 +107,7 @@ No migration. Only the web image changes. No operator step. No sample number or 
 - Whatever is scrolled into view stops clear of the top bar and, on a phone, of the bottom bar, so neither covers it.
 - The browser journeys' keyboard check tells the end of a page (the browser leaves it and the next Tab starts again
   at the top) from focus lost in the middle of it.
-=======
+
 ## [0.10.89] - 2026-11-05
 
 A US report's two files: FDA's own Form 3500A, filled, and FDA's eMDR XML. No migration. The API and web images
@@ -152,7 +151,6 @@ India) keep their worksheet PDF unchanged.
 - `scripts/journey_api.py` raises the per-address limit on activation and reset links (`token:ip`, 20 an hour) to
   1,000 in its own process, so back-to-back journeys from 127.0.0.1 do not wait for the next window. The API's own
   limit, and production's, are unchanged.
->>>>>>> v0.10.89
 
 ## [0.10.88] - 2026-11-04
 
