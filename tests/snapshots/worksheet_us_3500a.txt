@@ -1,7 +1,6 @@
 dateAdvEvent: <DATE>
 dateReport: <DATE>
 prodProblem: /1
-adverse: /1
 advEvDesc: Biomedical engineering checked a monitor against a reference oximeter: its SpO2 read 4 to 6 points high on two patients. No harm was reported. The monitor is out of use and sent for service.
 mfr: Test value (sample)
 proCode: FRN

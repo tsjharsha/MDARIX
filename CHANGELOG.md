@@ -37,6 +37,23 @@ India) keep their worksheet PDF unchanged.
   FDA wants in parts) are listed, never dropped in silence.
 - Sample: the flagship US report's PDF is now the filled form; its fields and the report page's numbers do not change.
 
+### Fixed: "Adverse event" only for recorded harm (owner-approved, regulatory)
+
+- **US B1 and India B2 ("Type of report / event: adverse event, product problem")** ticked "Adverse event" whenever a
+  patient was involved, even with no harm recorded. Now "Adverse event" comes only from a recorded death or serious
+  injury, and "Product problem" from a recorded malfunction. A patient merely involved, or an outcome not recorded,
+  ticks neither; the field then stays empty for a person to give (and the eMDR XML waits for it). The worksheet, the
+  filled Form 3500A and the eMDR XML read the same rule.
+- Sample: SAMPLE-RV-11 (US, the flagship) and SAMPLE-RV-08 (US) read "Product problem" instead of "Adverse event;
+  Product problem". Approved snapshots are never edited: a trial that already approved RV-11 keeps its approved
+  values; its next report reads the new rule.
+
+### Changed: browser journeys only
+
+- `scripts/journey_api.py` raises the per-address limit on activation and reset links (`token:ip`, 20 an hour) to
+  1,000 in its own process, so back-to-back journeys from 127.0.0.1 do not wait for the next window. The API's own
+  limit, and production's, are unchanged.
+
 ## [0.10.88] - 2026-11-04
 
 On the trial maintenance line (`release/0.10`): R3 of the external code review's plan, DEV-10 (the trial's journeys

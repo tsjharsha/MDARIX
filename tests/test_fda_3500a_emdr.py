@@ -483,3 +483,33 @@ def test_the_examples_kept_here_are_fdas_files(name):
     manifest = json.loads((EXAMPLES / "manifest.json").read_text(encoding="utf-8"))
     assert hashlib.sha256((EXAMPLES / name).read_bytes()).hexdigest() == manifest[name]
     assert re.search(rb"V3NORMED_2016", (EXAMPLES / name).read_bytes())
+
+
+# --------------------------------------------------------------------------------------------- B1 (0.10.89)
+
+
+def _event(**flags):
+    from backend.app.authority_reports.worksheet import SOURCES
+
+    blank = dict(id=None, death=None, serious_injury=None, patient_involved=None, malfunction=None)
+    complaint = SimpleNamespace(**blank | flags)
+    record = {"complaint_identifier": "SAMPLE-RV-11", "business_id": "C-1"}
+    found = SOURCES["event_type"]({"complaint": complaint, "record": record})
+    return found[0] if found else None
+
+
+def test_b1_ticks_adverse_event_only_for_recorded_harm_never_for_a_patient_merely_involved():
+    # SAMPLE-RV-11: a patient connected, no harm, a malfunction: only Product problem (both boxes before 0.10.89).
+    assert _event(patient_involved=True, death=False, serious_injury=False, malfunction=True) == (
+        "Product problem (e.g., defects/malfunctions)"
+    )
+    assert _event(death=True) == "Adverse event"
+    assert _event(serious_injury=True, malfunction=True) == (
+        "Adverse event; Product problem (e.g., defects/malfunctions)"
+    )
+    # A patient involved with the outcome unknown is no basis for either box: B1 stays empty, never guessed.
+    assert _event(patient_involved=True) is None
+    # The same rule reaches the form and the eMDR file.
+    pages, _ = fda_3500a.placements(_sections({"B1": "Product problem (e.g., defects/malfunctions)"}))
+    assert pages[1] == {"prodProblem[0]": fda_3500a.ON}
+    assert "B1: adverse event, product problem or both" in emdr.check(_sections({}), [])[0]

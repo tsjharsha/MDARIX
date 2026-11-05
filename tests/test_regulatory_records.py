@@ -119,6 +119,8 @@ def test_provenance_runs_from_the_complaint_to_the_conclusion_the_report_and_its
     # An approved US report's PDF is FDA's own Form 3500A, filled, then MDARIX's record page.
     text = _form_text(pdf.content)
     assert "mfr: Test value (sample)" in text and "Form: Form FDA 3500A (09/2025)" in text
+    # B1 (0.10.89): a patient connected with no harm recorded is no adverse event; the malfunction is a product problem.
+    assert "prodProblem: /1" in text and "adverse: /1" not in text
     assert "United States (FDA) v1 (signed)" in text  # the conclusion as the source of its fields
     assert "Source records" in text and "Approval" in text
     assert "PRACTICE RECORD" in text or "Practice record" in text
