@@ -182,6 +182,8 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
         raise _error(404, "COMPLAINT_NOT_FOUND", "The complaint of this report no longer exists")
     # On the new navigation a mapped code is a suggestion a person confirms (0.10.77, C5).
     context["confirm_codes"] = new_navigation(control_db, obligation.tenant_id)
+    # Before approval freezes it, the contact office (G1) is checked as the eMDR file needs it (0.10.92, A5).
+    context["check_contact_office"] = obligation.state in rules.EDITABLE
     return context
 
 
