@@ -9,7 +9,7 @@ import { DeadlineChip, HarmChip } from "../../../app/chips";
 import { marketLabel } from "../../../app/labels";
 import { tabParts } from "../../../app/linkTable";
 import { offeredTab } from "../../../app/featureSet";
-import { chooseCase, renamed, useCan, useOpenTarget, useWorkspace } from "../workspaceContext";
+import { chooseCase, renamed, useCan, useIsTrial, useOpenTarget, useWorkspace } from "../workspaceContext";
 import { tabParam, withTabParam } from "../workspaceAddress";
 import {
   CHECK_TONES,
@@ -745,7 +745,15 @@ function NextStepCard({
 }
 
 /** The right rail: the legal clocks, who signs and the service work (the last two fold on a phone's long page). */
+/** Nobody may sign the step yet: who changes that. A free trial has no administrator; its owner invites a colleague
+ * (0.10.92, A12). */
+export const noSignerYet = (isTrial: boolean) =>
+  isTrial
+    ? "nobody in your organization yet: invite a colleague in Team"
+    : "nobody in your organization yet: an administrator gives a colleague the role";
+
 function Rail({ view, onChanged }: { view: EventView; onChanged: (view: EventView) => void }) {
+  const isTrial = useIsTrial();
   const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
   const lanes = legalLanes(view);
   const clocked = new Set((view.work?.due ?? []).filter((item) => isLegalDeadline(item)).map((item) => item.market));
@@ -801,7 +809,7 @@ function Rail({ view, onChanged }: { view: EventView; onChanged: (view: EventVie
             ))}
           </ul>
         ) : (
-          <p className="ac-muted">Nobody in your organization yet: an administrator gives a colleague the role.</p>
+          <p className="ac-muted">{noSignerYet(isTrial).replace(/^n/, "N")}.</p>
         )}
         {signers?.second_person && <p className="ac-note">Never the person who prepared it.</p>}
         {view.record_people?.practice_note && <p className="ac-note">{view.record_people.practice_note}</p>}
@@ -1000,16 +1008,14 @@ function CheckRow({
 
 /** "Who signs: Asha Rao, Ravi K (you)": the colleagues who may sign this step, told before the work starts (7.8). */
 export function WhoSigns({ view, code }: { view: Pick<EventView, "signers">; code: string }) {
+  const isTrial = useIsTrial();
   const signers = view.signers?.[code];
   if (!signers) return null;
   const names = signers.people.map((person) => person.name);
   return (
     <small className="uw-who-signs">
       {" "}
-      Who signs:{" "}
-      {names.length
-        ? `${names.join(", ")}${signers.you ? " (you among them)" : ""}`
-        : "nobody in your organization yet: an administrator gives a colleague the role"}
+      Who signs: {names.length ? `${names.join(", ")}${signers.you ? " (you among them)" : ""}` : noSignerYet(isTrial)}
       {signers.second_person && ", never the person who prepared it"}.
     </small>
   );

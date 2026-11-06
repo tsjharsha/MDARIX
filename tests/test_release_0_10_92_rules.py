@@ -5,6 +5,8 @@ while the report is a draft, as a mandatory field with its reason, so Send for a
 report before, and only the XML then said it was missing.
 
 1.6 (A7): a report sent back for correction says one status on its chip, its path and its next step.
+
+1.8 (A11): SAMPLE-RV-11's chapter asks what its walkthrough answers, the US only.
 """
 
 from __future__ import annotations
@@ -83,3 +85,11 @@ def test_a_report_sent_back_for_correction_says_so_on_its_path_as_its_status_doe
     again = rules.stage_view(rules.CORRECTION, 0, True)
     assert again["stages"][0]["label"] == "Created" and again["stages"][2]["state"] == "CURRENT"
     assert rules.stage_view(rules.DRAFT, 2, False)["stages"][0]["label"] == "Created"
+
+
+def test_the_flagship_chapter_asks_about_the_us_as_its_walkthrough_does():
+    from backend.app.trial import story
+
+    promise = next(chapter[2] for chapter in story.CHAPTERS if chapter[0] == "REPORTING_CLOCKS")
+    assert "Try it on SAMPLE-RV-11" in promise and "Is it reportable in the US, and by when?" in promise
+    assert "India" not in promise.split("Try it on SAMPLE-RV-11")[1]

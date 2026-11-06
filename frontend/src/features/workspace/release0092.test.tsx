@@ -13,6 +13,10 @@ import { workColumns } from "./sections/ComplaintList";
 import { TrendHeroes } from "./sections/TrendCheck";
 import type { TrendBoard, TrendItem } from "./signalAi";
 import { SAMPLE_SOURCE } from "./complaintList";
+import { WhoSigns } from "./sections/ComplaintPage";
+import { NeedsProduct } from "./sections/common";
+import userGuide from "../help/userGuide.ts?raw";
+import caseAuditSource from "./caseAudit.ts?raw";
 
 const heroCss: string = fs.readFileSync(new URL("./heroPages.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
@@ -165,5 +169,31 @@ describe("1.7: the Complaints list's headings and the change behind a trend", ()
       "SAMPLE-CHG-014 (supplier change): OrbitCare 300 Rev B: pressure sensor sourced from NovaSense",
     );
     expect(html.indexOf("SAMPLE-CHG-014")).toBeGreaterThan(html.indexOf("Lot 003"));
+  });
+});
+
+describe("1.8 (A12): a trial has no administrator to ask", () => {
+  const signers = { signers: { READY: { people: [], you: false, second_person: true } } } as never;
+
+  it("tells a trial to invite a colleague, and a pilot that an administrator gives the role", () => {
+    const trial = render(<WhoSigns view={signers} code="READY" />, api({}));
+    expect(trial).toContain("nobody in your organization yet: invite a colleague in Team");
+    expect(trial).not.toContain("administrator");
+    const pilot = render(<WhoSigns view={signers} code="READY" />, { ...api({}), isTrial: false } as WorkspaceApi);
+    expect(pilot).toContain("an administrator gives a colleague the role");
+  });
+
+  it("sends a trial with no products to its own import, never to an administrator", () => {
+    const html = render(
+      <NeedsProduct>{() => null}</NeedsProduct>,
+      api({ state: "empty", view: null } as Partial<WorkspaceApi["work"]>),
+    );
+    expect(html).toContain("Import your data");
+    expect(html).not.toContain("administrator");
+  });
+
+  it("says in the user guide who resets a lost authenticator in a trial", () => {
+    expect(userGuide).toContain("In a free trial, the person who invited you resets it in Team");
+    expect(caseAuditSource).toContain("or in a free trial to support@mdarix.in");
   });
 });
