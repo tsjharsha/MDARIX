@@ -86,6 +86,7 @@ export function CaseDecisionBriefPanel({
   readOnly = false,
   focusReview = false,
   onOpenDecision,
+  onChanged,
 }: {
   investigationId: string;
   caseLabel: string;
@@ -94,6 +95,9 @@ export function CaseDecisionBriefPanel({
   focusReview?: boolean;
   /** Opens the case's Decision tab, offered once the brief has been accepted for decision here. */
   onOpenDecision?: () => void;
+  /** The brief's status changed here (submitted, review started, accepted, returned): the screens beside it that show
+   * it (the decision form, the case's status) read it again, without a reload (0.10.92, A3). */
+  onChanged?: () => void;
 }) {
   const { notify } = useWorkspace();
   const canRunAi = useCanRunAi();
@@ -362,7 +366,10 @@ export function CaseDecisionBriefPanel({
           version={current}
           canStart={reviewControls.startReview}
           canReview={reviewControls.review}
-          onDone={() => brief.reload()}
+          onDone={() => {
+            brief.reload();
+            onChanged?.();
+          }}
           onAccepted={() => setAccepted(true)}
           onOpenDecision={accepted ? onOpenDecision : undefined}
         />
@@ -379,6 +386,7 @@ export function CaseDecisionBriefPanel({
             setSubmitting(false);
             if (refused) setMessage({ text: refused, tone: "warning" });
             brief.reload();
+            onChanged?.();
           }}
         />
       )}
