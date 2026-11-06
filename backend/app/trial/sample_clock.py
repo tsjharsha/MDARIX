@@ -3,7 +3,8 @@
 The sample is dated from the moment it is seeded (its **anchor**, kept in the trial request's profile as
 ``sample_anchor``; a trial approved before 0.10.64 has its approval time). The sample's events **move with the trial's
 clock**: every hour the scheduler (``keep_current``) moves every sample record, and everything hanging off one (the
-records ``sample_removal.plan`` would delete), forward by the time since the anchor, and sets the anchor to now. So
+sample records ``sample_removal.plan`` reaches through sample records only), forward by the time since the anchor, and
+sets the anchor to now. So
 the deadlines stay ahead of the reader, the triage targets stay due within the day, the OrbitCare rise stays inside
 the trend check's last 30 days, and the alerts, labels and next steps stay the same. (The alternative, a trend read
 "as of" the sample's own date, would have left every deadline and alert ageing.)
@@ -12,9 +13,12 @@ the trend check's last 30 days, and the alerts, labels and next steps stay the s
   organization's calendar. Dates written inside a record's text or a signed record's content stay as written.
 - **The clock stops once a person works on the sample** (a signed disposition, market conclusion, decision, review,
   document, question to MDARIX, case from a signal or effectiveness check: ``story.acted_counts``, own uploads
-  excluded): signed practice records are never re-dated. "Restart the sample story" (``restart``) then seeds the
-  sample again at the current time.
-- The audit trail is never changed; the trial's own records are never moved.
+  excluded; 0.10.92, D11: also a call logged, a first-contact check or a triage record): signed
+  practice records are never re-dated. "Restart the sample story" (``restart``) then seeds the sample again at the
+  current time.
+- The audit trail is never changed; the trial's own records are never moved (0.10.92, H10: a row from any other source
+  than the sample, such as a call logged on a sample product, is neither moved nor followed, so its awareness and
+  signed times stay as written).
 
 ``restart`` removes the sample (``sample_removal``) and seeds it again now, for the person who started the trial; with
 ``own=True`` it also removes the organization's own uploaded records and everything done with them ("also remove my
@@ -107,10 +111,36 @@ def anchor_of(request) -> datetime | None:
 
 
 def worked_on(data: Session, tenant_id) -> bool:
-    """Whether a person has acted on the sample (``story.acted_counts``; the organization's own uploads excluded)."""
-    from backend.app.trial import story
+    """Whether a person has acted on the sample (``story.acted_counts``, the organization's own uploads excluded, or
+    any work on calls)."""
+    from sqlalchemy import and_, or_
 
-    return any(count for code, count in story.acted_counts(data, tenant_id).items() if code != "YOUR_DATA")
+    from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, TriageRecord
+    from backend.app.trial import story
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
+
+    if any(count for code, count in story.acted_counts(data, tenant_id).items() if code != "YOUR_DATA"):
+        return True
+    # Work on calls (D11): a call, first-contact check or triage record of a person, or a sample one a person signed,
+    # reviewed, escalated or completed (it keeps the sample's source; the sample author made and signed the others).
+    work = (
+        (IntakeEvent, ()),
+        (FirstContactCheck, (FirstContactCheck.signed_by, FirstContactCheck.reviewed_by)),
+        (TriageRecord, (TriageRecord.completed_by, TriageRecord.escalated_by)),
+    )
+    return any(
+        data.query(model.id)
+        .filter(
+            model.tenant_id == tenant_id,
+            or_(
+                model.source_system.is_distinct_from(SAMPLE_SOURCE),
+                *(and_(person.isnot(None), person != model.created_by) for person in people),
+            ),
+        )
+        .first()
+        is not None
+        for model, people in work
+    )
 
 
 def _date_and_time_columns(data: Session) -> dict[str, tuple[list[str], list[str]]]:
@@ -131,7 +161,7 @@ def move(data: Session, tenant_id, by: timedelta, days: int) -> dict[str, int]:
     rows moved per table. Flushes; the caller commits."""
     from backend.app.trial import sample_removal
 
-    planned = sample_removal.plan(data, tenant_id)
+    planned = sample_removal.plan(data, tenant_id, owned_only=True)
     columns = _date_and_time_columns(data)
     moved: dict[str, int] = {}
     for table, ids in planned["rows"].items():

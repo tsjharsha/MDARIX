@@ -246,6 +246,7 @@ def _record_intelligence(db: Session, case, person, now: datetime) -> dict:
     from backend.app.case_intelligence import router as intelligence
     from backend.app.case_intelligence import rules
     from backend.app.db.models.foundation import Evidence, Hypothesis, HypothesisEvidence, Unknown
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
 
     ctx = SimpleNamespace(correlation_id=None)
     evidence = {
@@ -274,6 +275,8 @@ def _record_intelligence(db: Session, case, person, now: datetime) -> dict:
             created_by=person.user_id,
             created_at=created,
             updated_at=created,
+            # The sample's own, so its clock moves it (sample_clock.py moves only rows of the sample's source).
+            source_system=SAMPLE_SOURCE,
         )
         db.add(row)
         db.flush()
