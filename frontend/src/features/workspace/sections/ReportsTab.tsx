@@ -46,6 +46,10 @@ export const NEVER_SUBMITS =
   "channel: eMDR for the FDA, EUDAMED or the national authority for the EU, MHRA's portal for Great Britain, Health " +
   "Canada, and MvPI for India. MDARIX never submits to an authority.";
 
+/** How many mandatory fields are still empty. */
+const meterMissing = (detail: Pick<ReportDetail, "mandatory">) =>
+  (detail.mandatory?.total ?? 0) - (detail.mandatory?.filled ?? 0);
+
 /** "18 of 24 mandatory": the meter's words, and its share filled. */
 export function meterText(mandatory: Mandatory | undefined): { text: string; share: number } {
   const total = mandatory?.total ?? 0;
@@ -58,17 +62,25 @@ export function reportNext(detail: Pick<ReportDetail, "stage" | "state" | "manda
   title: string;
   detail: string;
 } {
-  const missing = (detail.mandatory?.total ?? 0) - (detail.mandatory?.filled ?? 0);
-  const correction = detail.state === "CORRECTION_REQUIRED" ? " A correction is required after a rejection." : "";
+  const missing = meterMissing(detail);
+  // Sent back for correction: the status the chip and the path say (0.10.92, A7: "Ready for approval" beside
+  // "Draft: correction required" and "Created").
+  if (detail.state === "CORRECTION_REQUIRED" && detail.stage === "CREATED")
+    return {
+      title: detail.state_label,
+      detail: missing
+        ? "Give what is missing, then send it for approval again."
+        : "Correct what the authority rejected, then send it for approval again.",
+    };
   switch (detail.stage) {
     case "CREATED":
       // The count is said once, on the page (0.10.83, D2.7).
       return {
         title: missing ? "Give what is missing" : "Ready for approval",
-        detail: `Send for approval opens when every mandatory field is filled.${correction}`,
+        detail: "Send for approval opens when every mandatory field is filled.",
       };
     case "COMPLETE":
-      return { title: "Ready for approval", detail: `Every mandatory field is filled.${correction}` };
+      return { title: "Ready for approval", detail: "Every mandatory field is filled." };
     case "APPROVAL":
       return { title: "Sent for approval", detail: "A second person approves it with their password." };
     case "APPROVED":
@@ -285,6 +297,9 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   const meter = meterText(mandatory);
   const missing = mandatory.total - mandatory.filled;
   const next = reportNext(detail);
+  // A report sent back for correction, every mandatory field filled, is sent for approval again (0.10.92, A7: its
+  // path stays at the first stage, which kept the button shut).
+  const resend = detail.state === "CORRECTION_REQUIRED" && detail.stage === "CREATED" && !meterMissing(detail);
   const due = deadlineDue(detail.deadline, detail.state);
   const ref = detail.complaint.ref;
   const approved = detail.approved_snapshot;
@@ -466,7 +481,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                 The eMDR XML also needs: {emdrNeeds.join("; ")}.
               </p>
             )}
-            {write && detail.stage === "CREATED" && (
+            {write && detail.stage === "CREATED" && !resend && (
               <>
                 <button type="button" className="ac-secondary" disabled aria-describedby="rp-why-send">
                   <Send size={15} aria-hidden="true" /> Send for approval
@@ -476,7 +491,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                 </p>
               </>
             )}
-            {write && detail.stage === "COMPLETE" && (
+            {write && (detail.stage === "COMPLETE" || resend) && (
               <>
                 <p className="ac-muted">{askNote(detail.approval)}</p>
                 <button

@@ -308,6 +308,31 @@ describe("a report's page: the record page's shape, the status path and the rail
     expect(html).not.toContain("rp-why-send");
   });
 
+  it("says one status for a report sent back for correction, and sends it again once filled (0.10.92, A7)", () => {
+    // SAMPLE-RV-10 as the server answers it: the first stage carries the status (backend rules.stage_view).
+    const corrected = (missing: number) =>
+      report(0, {
+        state: "CORRECTION_REQUIRED",
+        state_label: "Draft: correction required",
+        stage: "CREATED",
+        stage_label: "Draft: correction required",
+        stages: stages(0).map((step, index) => (index ? step : { ...step, label: "Draft: correction required" })),
+        mandatory: { total: 14, filled: 14 - missing, missing: missing ? ["MVPI_7"] : [] },
+      });
+    expect(reportNext(corrected(0))).toEqual({
+      title: "Draft: correction required",
+      detail: "Correct what the authority rejected, then send it for approval again.",
+    });
+    expect(reportNext(corrected(1)).detail).toBe("Give what is missing, then send it for approval again.");
+    resources.data[`${REPORTS}/r1`] = corrected(0);
+    const html = render(<ReportsSection />, api("?report=r1"));
+    expect(html).not.toContain("Ready for approval");
+    expect(html).not.toContain(">Created<");
+    expect(html).toMatch(/<button type="button" class="ac-primary"><svg[^>]*>.*?<\/svg> Send for approval<\/button>/);
+    resources.data[`${REPORTS}/r1`] = corrected(1);
+    expect(render(<ReportsSection />, api("?report=r1"))).toContain("rp-why-send");
+  });
+
   it("keeps the practice label at the approve button when the preparer approves alone in a trial", () => {
     resources.data[`${REPORTS}/r1`] = report(2);
     const html = render(<ReportsSection />, api("?report=r1"));
