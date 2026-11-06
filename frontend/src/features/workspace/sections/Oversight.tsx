@@ -17,6 +17,7 @@ import {
   WEEKDAY_SHORT,
   eventPath,
   exportPath,
+  openItemsText,
   oversightPath,
   readyProblem,
   stateTone,
@@ -296,7 +297,7 @@ function EventsPanel({ events, onOpen }: { events: EventRow[]; onOpen: (id: stri
     {
       key: "next",
       label: "Open items",
-      render: (row) => (row.blocked ? `${row.blocked} open. Next: ${row.next}` : "None"),
+      render: (row) => openItemsText(row),
       sortValue: (row) => row.blocked,
     },
     {

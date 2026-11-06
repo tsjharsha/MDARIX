@@ -1,10 +1,14 @@
-"""0.10.92 (development cycle 1, step 1.1; call intake D11, H10, C2) against the database, as the trial user.
+"""0.10.92 (development cycle 1, step 1) against the database, as the trial user: the fixes only a database proves.
+
+1.1 (call intake D11, H10, C2):
 
 - The sample's clock moves the sample and never a row the organization made: a call logged on a sample product
   hung off that product, so the hourly move re-dated its awareness and times (H10).
 - Work on calls stops the clock, as a signed disposition does: a call logged, or a sample contact a person reviewed.
 - C2, confirmed and left for step 2: an urgent call's provisional reporting deadline leaves Oversight once its triage
   is completed (strict expected failure, so the fix in step 2 flips it).
+
+1.2 (A2): before the person signs anything, Records has the sample's newest signed record to show.
 """
 
 from __future__ import annotations
@@ -147,3 +151,13 @@ def test_an_urgent_calls_provisional_deadline_stays_after_its_triage(fresh):
         )
     )
     assert provisional(), "C2: the provisional deadline left Oversight once triage was completed"
+
+
+def test_records_has_the_samples_newest_signed_record_before_the_person_signs_one(fresh):
+    user, _tenant_id = fresh
+    found = _ok(user.get("/api/v1/oversight/latest-signed"))
+    assert found["record"] is None  # the person's own: nothing signed yet
+    theirs = found["organization"]
+    assert theirs and theirs["signed_at_time"] and theirs["meaning_label"]
+    assert theirs["signed_by"] and theirs["signed_by"] != "Signed"
+    assert (theirs["complaint"] or theirs["investigation"])["ref"].startswith("SAMPLE-")

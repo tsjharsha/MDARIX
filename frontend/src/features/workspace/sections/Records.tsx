@@ -102,8 +102,13 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
   const finished = story.data?.available && story.data.steps[3]?.done ? story.data.complaint : null;
   // The latest record this person signed leads, for every organization (0.10.74, C2); the short story's intake
   // decision summary leads while the person has signed nothing yet.
-  const signed = useResource<{ record: SignedRecord | null }>("/api/v1/oversight/latest-signed");
+  // While the person has signed nothing, the organization's newest signed record (a trial's sample signatures,
+  // 0.10.92, A2) comes after the short story's summary, before "No signed record yet".
+  const signed = useResource<{ record: SignedRecord | null; organization?: SignedRecord | null }>(
+    "/api/v1/oversight/latest-signed",
+  );
   const latest = signed.data?.record ?? null;
+  const theirs = signed.data?.organization ?? null;
   // The record one story just finished (?complaint=<ref>, 0.10.84, M4): it leads, whoever signed it.
   const storyRef = tabParam(tab, "complaint");
   const all = (
@@ -138,6 +143,8 @@ export function NewRecordsSection({ tab }: { tab?: string }) {
         <LatestSigned record={latest} />
       ) : finished ? (
         <LatestRecord complaintId={finished.id} reference={finished.ref} />
+      ) : theirs ? (
+        <LatestSigned record={theirs} mine={false} />
       ) : (
         signed.data && <NoRecordYet />
       )}
@@ -166,7 +173,7 @@ export type SignedRecord = {
  * The record the person signed last (0.10.74, C2): what it is, when, and the record it belongs to, with its decision
  * record to download (a complaint) or its page to open.
  */
-export function LatestSigned({ record }: { record: SignedRecord }) {
+export function LatestSigned({ record, mine = true }: { record: SignedRecord; mine?: boolean }) {
   const { open, work, notify } = useWorkspace();
   const canExport = useCan("data.export");
   const [error, setError] = useState("");
@@ -182,7 +189,11 @@ export function LatestSigned({ record }: { record: SignedRecord }) {
     open("Records", "Decision records");
   };
   return (
-    <Panel eyebrow="Your latest record" title={reference ? `${record.what} · ${reference}` : record.what}>
+    <Panel
+      eyebrow={mine ? "Your latest record" : "Latest signed record"}
+      title={reference ? `${record.what} · ${reference}` : record.what}
+    >
+      {!mine && <p className="ac-muted">You have signed nothing yet: this is the newest record signed here.</p>}
       <p className="ac-muted">
         {record.signed_by ?? "Signed"} ·{" "}
         {record.signed_at_time ? formatDateTime(record.signed_at_time) : formatDate(record.signed_at)}
