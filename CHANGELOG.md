@@ -10,6 +10,52 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.92] - 2026-11-07
+
+On the trial maintenance line (`release/0.10`): development cycle 1, step 1, the bug and trust fixes found while
+recording the presentation videos. No migration. The API and web images change. No operator step. No sample number
+changes; the sample author's hypotheses now carry the sample's source (new and restarted trials).
+
+### Fixed: trust
+
+- **The sample's clock never moves the organization's own records** (call intake H10, D11). The hourly move followed
+  every link from sample records, so a call logged on a sample product had its awareness and times moved. It now
+  moves only the sample's own records and what hangs off them. Logging a call, or signing, reviewing, escalating or
+  completing a call or its triage, now stops the clock, as any other work on the sample does.
+- **Records shows the sample's signatures** before a person signs anything: "Latest signed record" (who signed,
+  when, what it means) instead of "No signed record yet". Verify a signature says an investigation has no signed
+  decision yet, and where the signed conclusions and approved reports are.
+- **The eMDR's contact office is asked for before approval.** A US report's G1 (the US responsible party, with an
+  e-mail of up to 50 characters) is a thing to give while the report is a draft, so Send for approval waits for it;
+  the e-mail can be given beside the field or in Settings › Products. Before, approval froze the report and only the
+  eMDR XML then said it was missing. A typed G1 that differs from the responsible party is asked for too.
+
+### Fixed: screens
+
+- **Decision records** said "1 open. Next: null" for a finished event; it says "1 open, signed with its reason".
+- **The decision form appears right after "Accept for decision"**, and the case's status changes with it, without a
+  reload.
+- **A direct link to an investigation** (`/app/investigations?case=…&step=Summary`) says it is opening instead of
+  "No investigation open", and a link whose products cannot be read says so instead of waiting for ever.
+- **A report sent back for correction says one status**: its chip, the first stage of its path and its next step all
+  read "Draft: correction required", and Send for approval opens again once every mandatory field is filled.
+- **The Complaints list** gives Incident country, Owner and Stage their headings, over their cells.
+- **The administrator's Home** shows the Legal clocks, as the Regulatory Leader's does.
+- **Trends** names the change recorded on a rising version under its lots (SAMPLE-CHG-014, the supplier change, for
+  OrbitCare 300 Rev B).
+- **Wording**: SAMPLE-RV-11's chapter asks "Is it reportable in the US, and by when?", as its walkthrough does; the
+  lines a trial user reaches no longer send them to an administrator (a trial has none): invite a colleague in Team,
+  import your data, or write to support@mdarix.in.
+- **The new design's leftovers**: dropdowns take the field style with the design's chevron; every "Starter" label is
+  one amber chip that reads in both themes; a legal clock's lane is amber only within seven days ("29 days left" is
+  calm); the column-resize mark shows on the light and the dark heading.
+
+### Tests
+
+- The Getting started journey's helper answers each decision-tree question by its number, checks it took and waits
+  for the outcome, instead of a fixed pause and a place in the list (the US tree once came out as a 5-day report). It
+  gives the contact office's e-mail. Unverified until the next browser run.
+
 ## [0.10.91] - 2026-11-05
 
 On the trial maintenance line (`release/0.10`), released together with 0.10.90: dark mode on the new navigation, and
