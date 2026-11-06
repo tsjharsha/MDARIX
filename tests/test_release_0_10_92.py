@@ -188,3 +188,19 @@ def test_the_emdr_contact_email_is_asked_for_before_send_for_approval_and_given_
     assert user.put(f"{url}/once", json={"contact_email": "other@example.invalid"}).status_code == 409
     parties = _ok(user.get("/api/v1/regulatory-reference/responsible-parties"))
     assert [item["contact_email"] for item in parties["parties"] if item["market"] == "US"] == ["mdr@example.invalid"]
+
+
+def test_the_trend_names_the_supplier_change_behind_its_lots(fresh):
+    """1.7 (A10): the OrbitCare 300 Rev B rise shows the change recorded against its pressure sensor."""
+    user, _tenant_id = fresh
+    items = _ok(user.get("/api/v1/triage/trends"))["items"]
+    orbit = next(
+        item
+        for item in items
+        if item["product_version"] and item["name"].startswith("OrbitCare 300") and item["name"].endswith("Rev B")
+    )
+    assert orbit["lots"] and [change["identifier"] for change in orbit["changes"]] == ["SAMPLE-CHG-014"]
+    assert orbit["changes"][0]["change_type"] == "Supplier change" and "NovaSense" in orbit["changes"][0]["title"]
+    # Rev A's sensor did not change: no change is shown beside its lots.
+    others = [item for item in items if item["name"].startswith("OrbitCare 300") and item["name"].endswith("Rev A")]
+    assert others and all(not item["changes"] for item in others)

@@ -72,7 +72,9 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
   // The complaint the hero names is always in the list, first among those due at the same time.
   const hero = shownRun(story.data, dataSource);
   const actions = nextActions(items, 5, hero?.run === "yours" ? hero.complaint.id : null);
-  const clocks = persona === "regulatory" ? legalClocks(items) : [];
+  // The Regulatory Leader's legal clocks, and the administrator's (the trial's owner sees every clock; 0.10.92, A9).
+  const showsClocks = persona === "regulatory" || persona === "admin";
+  const clocks = showsClocks ? legalClocks(items) : [];
   const name = (session?.display_name ?? "").split(/\s+/)[0];
   const go = (item: OversightItem) => {
     if (!item.opens) return;
@@ -202,7 +204,7 @@ export function HomeSection({ tab, heading }: { tab?: string; heading: RefObject
           </section>
         )}
         <div className="uw-home-side">
-          {persona === "regulatory" && <LegalClocks clocks={clocks} onOpen={go} reading={reading} />}
+          {showsClocks && <LegalClocks clocks={clocks} onOpen={go} reading={reading} />}
           {(persona === "investigator" || persona === "risk") && <OpenInvestigations />}
           <section className="uw-card uw-card-pad uw-home-trend" aria-labelledby="home-trend">
             <span className="ac-eyebrow" id="home-trend">

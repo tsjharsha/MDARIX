@@ -1,4 +1,5 @@
 // 0.10.92 (development cycle 1, step 1): the bug and trust fixes the screens show, without a browser.
+import fs from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -8,6 +9,12 @@ import { ThingsToGive } from "./sections/ReportBody";
 import type { ReportDetail } from "./authorityReports";
 import caseSections from "./sections/CaseSections.tsx?raw";
 import caseBrief from "./sections/CaseDecisionBrief.tsx?raw";
+import { workColumns } from "./sections/ComplaintList";
+import { TrendHeroes } from "./sections/TrendCheck";
+import type { TrendBoard, TrendItem } from "./signalAi";
+import { SAMPLE_SOURCE } from "./complaintList";
+
+const heroCss: string = fs.readFileSync(new URL("./heroPages.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 vi.mock("../customer-admin/shared", async (original) => ({
   ...(await original<typeof import("../customer-admin/shared")>()),
@@ -96,5 +103,67 @@ describe("1.5 (A5): the eMDR's contact office is asked for before approval", () 
     expect(html).toContain("Save the e-mail for your organization");
     // The one-line box that cannot carry an e-mail is not offered for it.
     expect(html).not.toContain("Save for your organization");
+  });
+});
+
+describe("1.7: the Complaints list's headings and the change behind a trend", () => {
+  it("gives the country, owner and stage columns their headings, placed over their cells (A8)", () => {
+    // The hero list stacks the last four columns in its third; their headings were display: none.
+    expect(heroCss).not.toMatch(/thead th:nth-child\(n \+ 4\)\s*\{\s*display: none/);
+    expect(heroCss).toMatch(
+      /:is\(th:nth-child\(4\), td\[data-label="Incident country"\]\)\s*\{\s*grid-column: 3;\s*grid-row: 2;/,
+    );
+    expect(heroCss).toMatch(/:is\(th:nth-child\(5\), td\[data-label="Owner"\]\)\s*\{\s*grid-column: 4;\s*grid-row: 2;/);
+    expect(heroCss).toMatch(
+      /:is\(th:nth-child\(6\), td\[data-label="Stage"\]\)\s*\{\s*grid-column: 3 \/ span 2;\s*grid-row: 3;/,
+    );
+    // The six columns, in the order the positions above assume.
+    expect(workColumns({}, () => undefined).map((column) => column.label)).toEqual([
+      "Legal clock",
+      "What happened",
+      "Product, version, lot",
+      "Incident country",
+      "Owner",
+      "Stage",
+    ]);
+  });
+
+  it("names the supplier change recorded on the rising version, beside its lots (A10)", () => {
+    const rising = {
+      key: "g1",
+      name: "OrbitCare 300 Infusion Pump (Sample) Rev B",
+      result: "SIGNIFICANT",
+      recent: 9,
+      recent_days: 30,
+      expected: 1,
+      ratio: 9.3,
+      history: 6,
+      history_days: 180,
+      baseline: "PREVIOUS_VERSION",
+      p_value: 0.0001,
+      lots: ["SAMPLE-ORBIT-300-LOT-003", "SAMPLE-ORBIT-300-LOT-004"],
+      lot_counts: { "SAMPLE-ORBIT-300-LOT-003": 5, "SAMPLE-ORBIT-300-LOT-004": 4 },
+      open_signals: [],
+      product: { id: "p1", business_id: null, identifier: "SAMPLE-ORBIT-300", name: "OrbitCare 300 (Sample)" },
+      product_version: { id: "v1", business_id: null, version_identifier: "Rev B" },
+      changes: [
+        {
+          id: "c1",
+          identifier: "SAMPLE-CHG-014",
+          change_type: "Supplier change",
+          title: "OrbitCare 300 Rev B: pressure sensor sourced from NovaSense Components.",
+          event_at: "2026-08-18T10:00:00Z",
+        },
+      ],
+    } as unknown as TrendItem;
+    const board = { items: [rising], recent_days: 30, history_days: 180, min_complaints: 3, summary: {} };
+    const html = renderToStaticMarkup(
+      <TrendHeroes board={board as unknown as TrendBoard} action={() => null} source={SAMPLE_SOURCE} />,
+    );
+    expect(html).toContain("Recorded change on this version:");
+    expect(html).toContain(
+      "SAMPLE-CHG-014 (supplier change): OrbitCare 300 Rev B: pressure sensor sourced from NovaSense",
+    );
+    expect(html.indexOf("SAMPLE-CHG-014")).toBeGreaterThan(html.indexOf("Lot 003"));
   });
 });

@@ -1656,8 +1656,9 @@
   color: var(--ms-warn);
 }
 /* The complaint list as the design's three columns: the clock, what happened, then the product, the country, the
-   owner and the stage stacked. shortcut: the header cells are placed by position, so a column the field chooser hides
-   shifts the header (the cells keep their place); move to named header cells if the chooser is used on this list. */
+   owner and the stage stacked, each under its own heading stacked the same way (0.10.92, A8: the last three had none).
+   shortcut: the header cells are placed by position, so a column the field chooser hides shifts the header (the cells
+   keep their place); move to named header cells if the chooser is used on this list. */
 @media (min-width: 641px) {
   .uw-hybrid .ac-table.uw-clist,
   .uw-hybrid .ac-table.uw-clist :is(thead, tbody) {
@@ -1694,14 +1695,9 @@
   .uw-hybrid .ac-table.uw-clist thead th {
     background: none;
   }
-  .uw-hybrid .ac-table.uw-clist thead th:nth-child(n + 4) {
-    display: none;
-  }
-  .uw-hybrid .ac-table.uw-clist td[data-label="Incident country"],
-  .uw-hybrid .ac-table.uw-clist td[data-label="Owner"] {
-    padding-left: 50px;
-  }
-  .uw-hybrid .ac-table.uw-clist td[data-label="Stage"] {
+  .uw-hybrid .ac-table.uw-clist :is(th:nth-child(4), td[data-label="Incident country"]),
+  .uw-hybrid .ac-table.uw-clist :is(th:nth-child(5), td[data-label="Owner"]),
+  .uw-hybrid .ac-table.uw-clist :is(th:nth-child(6), td[data-label="Stage"]) {
     padding-left: 50px;
   }
   .uw-hybrid .uw-clist .hx-prod,
@@ -1730,16 +1726,17 @@
   .uw-hybrid .ac-table.uw-clist :is(th:nth-child(3), td[data-label="Product, version, lot"], td[data-label="Stage"]) {
     grid-column: 3 / span 2;
   }
-  .uw-hybrid .ac-table.uw-clist td[data-label="Incident country"] {
+  .uw-hybrid .ac-table.uw-clist :is(th:nth-child(4), td[data-label="Incident country"]) {
     grid-column: 3;
     grid-row: 2;
   }
-  .uw-hybrid .ac-table.uw-clist td[data-label="Owner"] {
+  .uw-hybrid .ac-table.uw-clist :is(th:nth-child(5), td[data-label="Owner"]) {
     grid-column: 4;
     grid-row: 2;
     padding-left: 0;
   }
-  .uw-hybrid .ac-table.uw-clist td[data-label="Stage"] {
+  .uw-hybrid .ac-table.uw-clist :is(th:nth-child(6), td[data-label="Stage"]) {
+    grid-column: 3 / span 2;
     grid-row: 3;
   }
   .uw-hybrid .ac-table.uw-clist .hx-stagecell {

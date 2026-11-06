@@ -7688,6 +7688,11 @@ button.uw-org:hover {
   margin: 0;
   color: var(--ms-ink-2);
 }
+/* The change recorded on the version, beside its lots (0.10.92, A10). */
+.uw-trend-change {
+  margin: 0;
+  color: var(--ms-ink);
+}
 .uw-trend-hero .uw-bar-row {
   grid-template-columns: 120px minmax(0, 1fr) 48px;
 }
