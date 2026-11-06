@@ -44,7 +44,8 @@ def _g1(parties, entries=None, draft=True) -> tuple[dict, list[str], list[dict]]
 def test_a_contact_office_without_an_email_holds_send_for_approval_and_says_where_to_add_it():
     field, missing, sections = _g1([_party(contact_email=None)])
     assert field["value"] and "e-mail" in field["problem"] and "Settings › Products" in field["problem"]
-    assert "G1" in missing
+    assert "G1" in missing and field["ask"] == worksheet.CONTACT_EMAIL  # asked for beside the field
+    assert "ask" not in worksheet.frozen(sections)[0]["fields"][0]
     # The same thing the eMDR check would have said after approval.
     assert [line for line in emdr.check(sections, [_party(contact_email=None)])[0] if "needs an email" in line]
     # An e-mail longer than FDA's 50 characters is no better.
@@ -61,6 +62,7 @@ def test_a_typed_contact_office_that_differs_from_the_responsible_party_is_asked
     typed = {"G1": {"value": "Someone else, somewhere; contact: nobody", "by": "u1", "at": "2026-11-07T10:00:00Z"}}
     field, missing, _ = _g1([_party()], typed)
     assert field["status"] == "ENTERED" and field["problem"].startswith("Differs from your US responsible party")
+    assert field["ask"] is None  # an e-mail alone would not make the two read the same
     assert "G1" in missing
     # Typed with no responsible party at all: the file has nowhere to take it from either.
     assert "G1" in _g1([], typed)[1]

@@ -1067,7 +1067,9 @@ def set_field(
 
 class OnceRequest(BaseModel):
     # A product's or the organization's facts, by field id (the US product code and its 510(k) number go together).
-    values: dict[str, str] = Field(max_length=10)
+    values: dict[str, str] = Field(default_factory=dict, max_length=10)
+    # The US contact office's e-mail (G1), added to the responsible party the eMDR file reads it from (0.10.92, A5).
+    contact_email: str = Field(default="", max_length=254)
 
 
 _PARTY_MARKET = {"US": "US", "EU_NI": "EU", "GB": "GB", "IN": "IN", "CA": "CA"}
@@ -1093,8 +1095,11 @@ def enter_once(
         raise _error(409, "NOT_A_DRAFT", "Only a draft is changed: reopen it first")
     fields = {item.id: item for item in _form(obligation).fields()}
     values = {key: _text(value, 200) for key, value in payload.values.items() if _text(value, 200)}
-    if not values:
+    email = _text(payload.contact_email, 254)
+    if not values and not email:
         raise _error(422, "NOTHING_TO_SAVE", "Enter the value")
+    if email and len(email) > 50:
+        raise _error(422, "EMAIL_TOO_LONG", "FDA's eMDR takes a contact e-mail of up to 50 characters")
     sources = {}
     for field_id in values:
         field = fields.get(field_id)
@@ -1149,6 +1154,24 @@ def enter_once(
             )
         reference.set_party(db, tenant_id, {"market": market, "role": role, "organisation": organisation})
         done.append({"market": market, "role": role, "organisation": organisation})
+    if email:
+        # G1 reads the US manufacturer, else the importer (worksheet us_contact_office): the e-mail goes there, never
+        # over one already given.
+        held = next(
+            (
+                item
+                for role in ("MANUFACTURER", "IMPORTER")
+                for item in reference.responsible_parties(db, tenant_id)
+                if market == "US" and item["market"] == market and item["role"] == role
+            ),
+            None,
+        )
+        if held is None:
+            raise _error(409, "NO_CONTACT_OFFICE", "Set your US responsible party first, in Settings › Products")
+        if held["contact_email"]:
+            raise _error(409, "PARTY_EXISTS", "The contact office has an e-mail: change it in Settings › Products")
+        reference.set_party(db, tenant_id, {**held, "contact_email": email})
+        done.append({"market": market, "role": held["role"], "contact_email": email})
     _audit(db, ctx, "REPORT_FACT_ENTERED_ONCE", obligation, None, {"saved": done}, fields=sorted(values))
     db.commit()
     return detail(db, control_db, ctx, obligation)

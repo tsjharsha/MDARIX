@@ -56,10 +56,10 @@ describe("1.4 (A4): a direct link to an investigation opens it", () => {
 });
 
 describe("1.5 (A5): the eMDR's contact office is asked for before approval", () => {
-  it("says what the eMDR needs and where to set it, instead of a one-line box that cannot give an e-mail", () => {
+  it("says what the eMDR needs, asks for the e-mail beside it, and links where the party is set", () => {
     const problem =
-      "The eMDR file needs the contact office's e-mail (up to 50 characters): add it to your US responsible party in " +
-      "Settings › Products";
+      "The eMDR file needs the contact office's e-mail (up to 50 characters): add it here, or to your US " +
+      "responsible party in Settings › Products";
     const detail = {
       id: "r1",
       editable: true,
@@ -81,6 +81,7 @@ describe("1.5 (A5): the eMDR's contact office is asked for before approval", () 
               once: true,
               once_key: "G1",
               problem,
+              ask: "CONTACT_EMAIL",
             },
           ],
         },
@@ -90,6 +91,10 @@ describe("1.5 (A5): the eMDR's contact office is asked for before approval", () 
     expect(html).toContain("1 thing to give");
     expect(html).toContain(problem.replace(/'/g, "&#x27;"));
     expect(html).toContain("Set a responsible party in Settings › Products");
+    expect(html).toContain('type="email"');
+    expect(html).toContain('aria-label="G1 Contact office: e-mail"');
+    expect(html).toContain("Save the e-mail for your organization");
+    // The one-line box that cannot carry an e-mail is not offered for it.
     expect(html).not.toContain("Save for your organization");
   });
 });

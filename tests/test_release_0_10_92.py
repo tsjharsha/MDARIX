@@ -161,3 +161,30 @@ def test_records_has_the_samples_newest_signed_record_before_the_person_signs_on
     assert theirs and theirs["signed_at_time"] and theirs["meaning_label"]
     assert theirs["signed_by"] and theirs["signed_by"] != "Signed"
     assert (theirs["complaint"] or theirs["investigation"])["ref"].startswith("SAMPLE-")
+
+
+def test_the_emdr_contact_email_is_asked_for_before_send_for_approval_and_given_beside_it(fresh):
+    """1.5 (A5): the G1 contact office the eMDR file needs holds Send for approval while the report is a draft."""
+    from tests.test_release_c3_0_10_75 import REPORTS, _flagship, _reports, _sign_us
+
+    user, _tenant_id = fresh
+    complaint = _flagship(user)
+    assert _sign_us(user, complaint, "REPORTABLE").status_code == 200
+    (report,) = _reports(user, complaint)
+    url = f"{REPORTS}/{report['id']}"
+
+    def g1(detail: dict) -> dict:
+        return next(item for part in detail["sections"] for item in part["fields"] if item["id"] == "G1")
+
+    # The manufacturer, entered once (D3): G1 reads it, but it has no e-mail.
+    given = _ok(user.put(f"{url}/once", json={"values": {"D3": "Orbit Devices, Pune, India"}}))
+    assert g1(given)["value"] and g1(given)["ask"] == "CONTACT_EMAIL" and "G1" in given["mandatory"]["missing"]
+    refused = user.post(f"{url}/snapshots")
+    assert refused.status_code == 422 and "G1" in refused.json()["detail"]["missing"]
+    # The e-mail, given beside the field, goes to the responsible party; never over one already there.
+    assert user.put(f"{url}/once", json={"contact_email": "x" * 45 + "@example.invalid"}).status_code == 422
+    done = _ok(user.put(f"{url}/once", json={"contact_email": "mdr@example.invalid"}))
+    assert g1(done)["problem"] is None and "G1" not in done["mandatory"]["missing"]
+    assert user.put(f"{url}/once", json={"contact_email": "other@example.invalid"}).status_code == 409
+    parties = _ok(user.get("/api/v1/regulatory-reference/responsible-parties"))
+    assert [item["contact_email"] for item in parties["parties"] if item["market"] == "US"] == ["mdr@example.invalid"]

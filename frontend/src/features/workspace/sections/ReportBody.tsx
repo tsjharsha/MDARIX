@@ -111,8 +111,10 @@ function OnceRow({
   const whom = product ? (detail.complaint.product_name ?? "this product") : "your organization";
   const ready = fields.every((item) => (values[item.id] ?? "").trim());
   // What a value given needs before approval (0.10.92, A5: the eMDR's contact office e-mail): said here, with the
-  // place it is set, the responsible party in Settings › Products. One line of text cannot give it.
+  // place it is set, the responsible party in Settings › Products. The e-mail alone is asked for here too.
   const problems = fields.map((item) => item.problem).filter((text): text is string => !!text);
+  const askEmail = fields.find((item) => item.ask === "CONTACT_EMAIL");
+  const [email, setEmail] = useState("");
   return (
     <li className="uw-rp-field rp-once">
       <div className="uw-rp-field-head">
@@ -124,10 +126,31 @@ function OnceRow({
           {problems.join(" ")}
         </p>
       )}
-      {!product && (
+      {problems.length > 0 && !product && (
         <button type="button" className="ac-link" onClick={() => open("Settings", "Products")}>
           Set a responsible party in Settings › Products
         </button>
+      )}
+      {canEdit && askEmail && (
+        <form
+          className="uw-rp-edit"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (email.trim()) void action.run(`${REPORTS}/${detail.id}/once`, "PUT", { contact_email: email.trim() });
+          }}
+        >
+          <input
+            type="email"
+            maxLength={50}
+            aria-label={`${askEmail.number} ${askEmail.label}: e-mail`.trim()}
+            placeholder="Contact e-mail"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+          <button type="submit" className="ac-secondary" disabled={action.busy || !email.trim()}>
+            Save the e-mail for {whom}
+          </button>
+        </form>
       )}
       {canEdit && !problems.length && (
         <form
