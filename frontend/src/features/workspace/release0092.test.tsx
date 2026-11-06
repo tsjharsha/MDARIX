@@ -1,5 +1,4 @@
 // 0.10.92 (development cycle 1, step 1): the bug and trust fixes the screens show, without a browser.
-import fs from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -13,11 +12,16 @@ import { workColumns } from "./sections/ComplaintList";
 import { TrendHeroes } from "./sections/TrendCheck";
 import type { TrendBoard, TrendItem } from "./signalAi";
 import { SAMPLE_SOURCE } from "./complaintList";
-import { WhoSigns } from "./sections/ComplaintPage";
+import { WhoSigns, legalLanes } from "./sections/ComplaintPage";
 import { NeedsProduct } from "./sections/common";
 import userGuide from "../help/userGuide.ts?raw";
 import caseAuditSource from "./caseAudit.ts?raw";
+import reportsTab from "./sections/ReportsTab.tsx?raw";
+import { ClockLanes } from "./sections/WowCharts";
+import type { EventView } from "./oversight";
 
+// Node's fs, as the other style-sheet tests read it (the app has no Node types).
+const fs = await import(/* @vite-ignore */ ["node", "fs"].join(":"));
 const heroCss: string = fs.readFileSync(new URL("./heroPages.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 vi.mock("../customer-admin/shared", async (original) => ({
@@ -195,5 +199,52 @@ describe("1.8 (A12): a trial has no administrator to ask", () => {
   it("says in the user guide who resets a lost authenticator in a trial", () => {
     expect(userGuide).toContain("In a free trial, the person who invited you resets it in Team");
     expect(caseAuditSource).toContain("or in a free trial to support@mdarix.in");
+  });
+});
+
+describe("1.9: the new design's leftovers (A13-A16)", () => {
+  const workspaceCss = fs.readFileSync(new URL("./workspace.css", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+
+  it("draws every dropdown in the field style with the theme's chevron, never the browser's arrow (A13)", () => {
+    const rule = heroCss.slice(heroCss.indexOf(".uw-hybrid .ac-main select:not([multiple]) {"));
+    expect(rule).toMatch(/^[^}]*appearance: none;/);
+    expect(rule).toMatch(/^[^}]*var\(--ms-muted\) 50%/);
+  });
+
+  it("gives every Starter label one look, in the warning tokens both themes check at 4.5:1 (A14)", () => {
+    expect(workspaceCss).toMatch(
+      /\.ms-chip\.is-starter,\n\.dt-tag\.is-starter \{\n {2}border: 1px solid var\(--ms-warn-line\);\n {2}background: var\(--ms-warn-bg\);\n {2}color: var\(--ms-warn\);/,
+    );
+    expect(reportsTab).not.toContain('<ToneBadge tone="neutral" label={STARTER_LABEL} />');
+    expect(reportsTab.match(/className="ms-chip is-starter">\{STARTER_LABEL\}/g)).toHaveLength(2);
+  });
+
+  it("keeps a legal clock's lane calm while on track, amber only within seven days (A15)", () => {
+    const due = (market: string, hours: number) => ({
+      key: market,
+      category: "REPORTING",
+      title: `${market} report`,
+      market,
+      due_at: "2026-12-01T04:59:00Z",
+      state: "LATER",
+      hours_left: hours,
+    });
+    const view = {
+      event: { awareness_at: "2026-11-01T09:00:00Z" },
+      work: { due: [due("US", 29 * 24 + 5), due("IN", 3 * 24)], markets: ["US", "IN"] },
+    } as unknown as EventView;
+    const lanes = legalLanes(view);
+    expect(lanes.map((lane) => [lane.stateText, !!lane.soon])).toEqual([
+      ["29 days left", false],
+      ["3 days left", true],
+    ]);
+    const html = renderToStaticMarkup(<ClockLanes lanes={lanes} now={new Date("2026-11-02T09:00:00Z")} />);
+    expect(html.match(/<li class="is-soon">/g)).toHaveLength(1);
+    expect(workspaceCss).toMatch(/\.uw-wow-clock \{[^}]*background: var\(--ms-good-bg\);/);
+    expect(workspaceCss).toMatch(/\.is-soon \.uw-wow-clock \{[^}]*background: var\(--ms-warn-bg\);/);
+  });
+
+  it("shows the column-resize mark on the design's heading in both themes (A16)", () => {
+    expect(heroCss).toMatch(/\.uw-hybrid \.ac-table \.col-grip::after \{\s*background: var\(--ms-line-control\);/);
   });
 });

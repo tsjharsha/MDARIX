@@ -496,7 +496,8 @@ export function LegalClocks({
                   <DeadlineChip item={item} />
                 </span>
                 <span
-                  className={`uw-home-lane${item.state === "OVERDUE" ? " is-over" : ""}`}
+                  // Amber only within seven days, as the clock ring says "Due soon" (0.10.92, A15).
+                  className={`uw-home-lane is-${item.state === "OVERDUE" ? "over" : ringOf(item).status}`}
                   role="img"
                   aria-label={`${laneShare(item)}% of a 30-day window used`}
                 >

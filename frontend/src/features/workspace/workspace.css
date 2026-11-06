@@ -3873,6 +3873,13 @@ div.uw-task-count:hover {
   background: var(--ac-page);
   font-weight: 600;
 }
+/* A starter text's label (consultant to confirm) looks the same on every page and in both themes (0.10.92, A14). */
+.ms-chip.is-starter,
+.dt-tag.is-starter {
+  border: 1px solid var(--ms-warn-line);
+  background: var(--ms-warn-bg);
+  color: var(--ms-warn);
+}
 .uw-ma-starter-chip {
   display: inline-block;
   margin-left: 6px;
@@ -5709,13 +5716,19 @@ div.uw-task-count:hover {
 .uw-wow-today {
   border-left: 2px solid var(--ms-navy-fill);
 }
+/* A legal clock's lane is calm while it is on track, amber within seven days and red once overdue, as its ring says
+   (0.10.92, A15: every lane was amber, "29 days left" included). */
 .uw-wow-clock {
   position: absolute;
   top: 0;
   bottom: 0;
   border-radius: var(--ms-radius-pill);
+  background: var(--ms-good-bg);
+  border: 1px solid var(--ms-good-line);
+}
+.is-soon .uw-wow-clock {
   background: var(--ms-warn-bg);
-  border: 1px solid var(--ms-warn-line);
+  border-color: var(--ms-warn-line);
 }
 .is-overdue .uw-wow-clock {
   background: var(--ms-crit-bg);
@@ -6749,6 +6762,9 @@ button.uw-org:hover {
 }
 .uw-home-lane.is-over i {
   background: var(--ms-crit);
+}
+.uw-home-lane.is-good i {
+  background: var(--ms-good-mark);
 }
 .uw-home-ready h2 {
   margin: 6px 0 0;

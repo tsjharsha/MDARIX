@@ -1106,5 +1106,6 @@ export function legalLanes(view: Pick<EventView, "event" | "work">): Lane[] {
             ? `${Math.max(0, Math.round(item.hours_left))} hours left`
             : `${Math.floor(item.hours_left / 24)} days left`,
       overdue: item.state === "OVERDUE",
+      soon: ringOf(item).status === "warn",
     }));
 }

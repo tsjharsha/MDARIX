@@ -803,7 +803,7 @@ describe("D2.9: the starter mark only on starter content, in one wording", () =>
     expect(isStarterVersion("US-starter-1")).toBe(true);
     expect(isStarterVersion("US-v2")).toBe(false);
     expect(questionMark({ starter: true, extra: false })).toBe(STARTER_LABEL);
-    expect(show(usItem())).toContain(`<span class="dt-tag"> ${STARTER_LABEL}</span>`);
+    expect(show(usItem())).toContain(`<span class="dt-tag is-starter"> ${STARTER_LABEL}</span>`);
     const approved = usItem();
     approved.question_set = { ...approved.question_set, version: "US-v2" };
     expect(show(approved)).not.toContain(STARTER_LABEL);

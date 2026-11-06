@@ -296,7 +296,7 @@ describe("a report's page: the record page's shape, the status path and the rail
     resources.data[`${REPORTS}/r1`] = { ...starter, form: { ...starter.form, starter: true } };
     const html = render(<ReportsSection />, api("?report=r1"));
     const chips = html.slice(html.indexOf('class="uw-cp-chips"'));
-    expect(chips).toContain('<span class="ms-chip">Starter, for your consultant to confirm</span>');
+    expect(chips).toContain('<span class="ms-chip is-starter">Starter, for your consultant to confirm</span>');
     expect(html).not.toContain("Starter form, for your consultant to confirm");
   });
 

@@ -238,7 +238,7 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
                 <span>{form.title.replace(/ worksheet$/, "")}</span>
                 <span className="ac-muted">{versionWords(form.version)}</span>
                 {form.starter ? (
-                  <ToneBadge tone="neutral" label={STARTER_LABEL} />
+                  <span className="ms-chip is-starter">{STARTER_LABEL}</span>
                 ) : (
                   <ToneBadge tone="good" label="In MDARIX today" />
                 )}
@@ -371,7 +371,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
             {/* The count of what is missing is the "things to give" head while any is (0.10.87). */}
             {meter.share === 100 && <span className="ms-chip">{meter.text} fields</span>}
             {detail.form.report_kind && <span className="ms-chip">{detail.form.report_kind} report</span>}
-            {detail.form.starter && <span className="ms-chip">{STARTER_LABEL}</span>}
+            {detail.form.starter && <span className="ms-chip is-starter">{STARTER_LABEL}</span>}
             {(detail.state === "CORRECTION_REQUIRED" || detail.state === "CANCELLED") && (
               <StateChip label={detail.state_label} />
             )}
