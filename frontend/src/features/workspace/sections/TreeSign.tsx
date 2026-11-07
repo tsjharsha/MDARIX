@@ -1,3 +1,4 @@
+import { SampleDates } from "../../../app/chips";
 import { useState } from "react";
 import { ChevronRight, PenLine } from "lucide-react";
 import { deadlineLabel, formatDateTime, timeLeft } from "../../../app/dates";
@@ -219,6 +220,7 @@ export function SignCard({
           {signedMeaning(item.current.conclusion)}
           {item.current.override_reason ? ` · overrode the outcome: ${item.current.override_reason}` : ""}
           {item.current.change_reason ? ` · why it changed: ${item.current.change_reason}` : ""}
+          <SampleDates sample={item.current.sample} />
         </p>
       )}
       {!signed && !canDecide && (
@@ -405,7 +407,7 @@ export function FormCard({
         <>
           <p className="dt-form-name">
             <b>{formName(tree.form.title)}</b>
-            {tree.form.starter && <span className="dt-tag">{STARTER_LABEL}</span>}
+            {tree.form.starter && <span className="dt-tag is-starter">{STARTER_LABEL}</span>}
           </p>
           {report ? (
             <button
@@ -431,7 +433,7 @@ export function FormCard({
               {others.map((other) => (
                 <span key={other.market}>{other.foreign}</span>
               ))}
-              <span className="dt-tag">{STARTER_LABEL} · no second report is created</span>
+              <span className="dt-tag is-starter">{STARTER_LABEL} · no second report is created</span>
             </div>
           )}
         </>

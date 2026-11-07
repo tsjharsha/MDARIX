@@ -95,6 +95,16 @@ describe("H1: Home's legal clocks are the legal deadlines only", () => {
     expect(clocks).toContain("Due Wed 2 Dec 2026, 23:59 IST");
     expect(clocks).not.toContain("Wed 4 Nov");
   });
+
+  it("shows the legal clocks on the administrator's Home too, never on the investigator's (0.10.92, A9)", () => {
+    resources.data[OVERSIGHT] = { items: [approval, item({})] };
+    const admin = render(<HomeSection heading={{ current: null }} />, api({ persona: "admin" }));
+    expect(admin).toContain('id="home-clocks"');
+    expect(admin.slice(admin.indexOf('id="home-clocks"'))).toContain("Due Wed 2 Dec 2026, 23:59 IST");
+    expect(render(<HomeSection heading={{ current: null }} />, api({ persona: "investigator" }))).not.toContain(
+      'id="home-clocks"',
+    );
+  });
 });
 
 const LABELS = ["The call", "Triage", "Tree", "Decide", "Form", "Fill", "Approval", "Submit", "Records", "Trends"];

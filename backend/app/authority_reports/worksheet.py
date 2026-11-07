@@ -243,6 +243,31 @@ def _party(context, roles: tuple[str, ...], label: str):
     return None
 
 
+CONTACT_EMAIL = "CONTACT_EMAIL"
+EMAIL_NEEDED = "The eMDR file needs the contact office's e-mail"
+
+
+def contact_office_problem(context, value: str) -> str | None:
+    """Why FDA's eMDR file could not carry this contact office (G1), said while the report is a draft (0.10.92, A5:
+    approval froze the report and only then the XML said it was missing): the file takes G1 from the US responsible
+    party, with its e-mail of up to 50 characters, only while the report reads exactly as that party
+    (authority_reports/emdr.py ``check``). None when it can."""
+    roles = ("MANUFACTURER", "IMPORTER")
+    found = _party(context, roles, "")
+    if found is None or found[0] != value:
+        return (
+            "Differs from your US responsible party in Settings › Products: the eMDR file takes the contact office "
+            "from it, so set it there and clear this value"
+        )
+    party = next(item for role in roles for item in context["parties"] if item.role == role)
+    email = party.contact_email or ""
+    if not email or len(email) > 50:
+        return (
+            f"{EMAIL_NEEDED} (up to 50 characters): add it here, or to your US responsible party in Settings › Products"
+        )
+    return None
+
+
 def _registration(context, types: tuple[str, ...], column: str, label: str):
     for item in context["registrations"]:
         if item.registration_type in types and getattr(item, column):
@@ -831,6 +856,11 @@ def build(
                 problem = forms.value_problem(item, value)
                 if item.source == "front_page" and found and found[0] != value:
                     problem = "Differs from the front page's manufacturer report number: clear it to use that one"
+            ask = None
+            if item.source == "us_contact_office" and value and not problem and context.get("check_contact_office"):
+                problem = contact_office_problem(context, value)
+                # Only the e-mail is missing: it is asked for here, beside the field (PUT .../once contact_email).
+                ask = CONTACT_EMAIL if problem and problem.startswith(EMAIL_NEEDED) else None
             if status is None:
                 status = (
                     OUTSIDE
@@ -853,6 +883,7 @@ def build(
                     "note": item.note or None,
                     "kind": item.kind,
                     "problem": problem,
+                    "ask": ask,
                     "by": names.get(entry.get("by")) if entry else None,
                     "at": entry.get("at") if entry else None,
                     # Codes (0.10.77): the annex the field codes, the suggestion waiting, what was suggested before a
@@ -890,7 +921,7 @@ def frozen(sections: list[dict]) -> list[dict]:
                 {
                     key: value
                     for key, value in item.items()
-                    if key not in ("editable", "suggestion", "scope", "once", "once_key")
+                    if key not in ("editable", "suggestion", "scope", "once", "once_key", "ask")
                 }
                 for item in section["fields"]
             ],

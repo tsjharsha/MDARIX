@@ -81,6 +81,8 @@ export function CaseSections({
   const [reviewCase] = useState(() => work.investigationId);
   const [reviewFocus, setReviewFocus] = useState(false);
   const [scopeRound, setScopeRound] = useState(0);
+  // The brief's status changed (accepted for decision...): the decision form and the case's header read it again.
+  const [briefRound, setBriefRound] = useState(0);
   const [lotRound, setLotRound] = useState(0);
   const scope = useResource<{ current?: { version: number; included_complaints?: Array<{ id: string }> } | null }>(
     work.investigationId ? `/api/v1/investigations/${encodeURIComponent(work.investigationId)}/scope` : null,
@@ -125,6 +127,16 @@ export function CaseSections({
   useEffect(() => {
     if (part) document.getElementById(partId(part))?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [part, active]);
+  // A link to an investigation (?case=INV000001&step=Summary) is still being opened: say so, never "No investigation
+  // open" (0.10.92, A4).
+  if (!work.investigationId && work.caseLink?.state === "resolving")
+    return (
+      <Panel title="Opening the investigation…">
+        <p className="ac-muted" role="status">
+          Finding {work.caseLink.id} and its product.
+        </p>
+      </Panel>
+    );
   if (!work.investigationId)
     return (
       <Panel title="No investigation open">
@@ -153,7 +165,7 @@ export function CaseSections({
   return (
     <div className="uw-case-sections">
       <CaseHeader
-        key={id}
+        key={`${id}:${briefRound}`}
         investigationId={id}
         row={selected}
         onManage={onManage && selected ? () => onManage(selected) : undefined}
@@ -259,11 +271,17 @@ export function CaseSections({
                 readOnly={readOnly}
                 focusReview={reviewFocus}
                 onOpenDecision={() => go("Decisions & actions", "decision")}
+                onChanged={() => {
+                  setBriefRound((round) => round + 1);
+                  readiness.reload();
+                  brief.reload();
+                  onChanged();
+                }}
               />
             </div>
             <div className="uw-case-part" id={partId("decision")} hidden={isQuiet("decision")}>
               <CaseDecisionPanel
-                key={id}
+                key={`${id}:${briefRound}`}
                 investigationId={id}
                 caseLabel={caseLabel}
                 initialFollowUp={id === reviewCase ? requestedDecision.followUp : null}

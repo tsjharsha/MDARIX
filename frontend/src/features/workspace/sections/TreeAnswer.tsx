@@ -277,7 +277,7 @@ export function MarketTree({
             {tree?.version_label ?? item.question_set.version}
             {/* The starter mark once: a version label that says it already gets no second chip (0.10.84). */}
             {isStarterVersion(item.question_set.version) && !/consultant/i.test(tree?.version_label ?? "") && (
-              <span className="dt-tag"> {STARTER_LABEL}</span>
+              <span className="dt-tag is-starter"> {STARTER_LABEL}</span>
             )}
             {item.question_set_current === false ? " · started on an earlier version: it keeps that one" : ""}
           </span>

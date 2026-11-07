@@ -1065,7 +1065,9 @@ export function auditChainView(chain: IntegrityResponse["audit_chain"] | unknown
       state: "broken",
       label: where ? `Break found at ${where}` : "Break found",
       tone: "critical",
-      detail: "An audit event no longer matches the chain. Report this to your administrator.",
+      // A free trial has no administrator (0.10.92, A12).
+      detail:
+        "An audit event no longer matches the chain. Report this to your administrator, or in a free trial to support@mdarix.in.",
     };
   if (["VERIFIED", "VALID", "OK", "INTACT", "PASS"].includes(status))
     return {

@@ -121,6 +121,8 @@ export type Lane = {
   dueText: string;
   stateText: string;
   overdue: boolean;
+  /** Seven days or less left (0.10.92, A15): only then is the lane amber, as the clock ring's "Due soon". */
+  soon?: boolean;
 };
 
 /**
@@ -135,7 +137,7 @@ export function ClockLanes({ lanes, now = new Date() }: { lanes: Lane[]; now?: D
   return (
     <ul className="uw-wow-lanes" aria-label="Legal clocks, one lane per market">
       {lanes.map((lane) => (
-        <li key={lane.key} className={lane.overdue ? "is-overdue" : undefined}>
+        <li key={lane.key} className={lane.overdue ? "is-overdue" : lane.soon ? "is-soon" : undefined}>
           <span className="uw-wow-label">
             <strong>{lane.market}</strong>
             {lane.note && <small className="uw-wow-sub">{lane.note}</small>}

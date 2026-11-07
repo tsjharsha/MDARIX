@@ -1197,10 +1197,18 @@ def latest_signed(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     """The newest record the signed-in person signed in this organization (Records leads with it, 0.10.74), or
-    ``{"record": null}``."""
+    ``{"record": null}``; while it is null, ``organization`` is the newest anyone signed there (a trial's sample
+    signatures, 0.10.92, A2), or null."""
     tenant_id = _tenant(ctx)
-    me = str(ctx.user_id)
-    return {"record": record_page.latest_signed(db, tenant_id, me, lambda refs: _names(control_db, tenant_id, refs))}
+
+    def names(refs):
+        return _names(control_db, tenant_id, refs)
+
+    record = record_page.latest_signed(db, tenant_id, str(ctx.user_id), names)
+    return {
+        "record": record,
+        "organization": None if record else record_page.latest_signed(db, tenant_id, None, names),
+    }
 
 
 @router.get("/events/{complaint_id}/activity")

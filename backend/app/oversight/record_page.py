@@ -261,29 +261,29 @@ def _meaning_label(row) -> str:
     return "signed"
 
 
-def latest_signed(db, tenant_id, me: str, names_of) -> dict | None:
-    """The newest record this person signed in this organization, with what it is and where it opens."""
+def latest_signed(db, tenant_id, me: str | None, names_of) -> dict | None:
+    """The newest record this person signed in this organization, with what it is and where it opens; with ``me``
+    None, the newest anyone signed (a trial's sample signatures, before the person signs one: 0.10.92, A2)."""
     from backend.app.db.models.authority_reports import ReportObligation, ReportSnapshot
     from backend.app.db.models.complaint_disposition import ComplaintDisposition
     from backend.app.db.models.foundation import Complaint, Decision, Investigation
     from backend.app.db.models.market_assessment import ComplaintMarketAssessment
     from backend.app.db.models.oversight import EventClosure
     from backend.app.reportability import markets as market_rules
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
 
-    row = (
-        db.query(SignedApprovalRecord)
-        .filter(
-            SignedApprovalRecord.tenant_id == tenant_id,
-            SignedApprovalRecord.signer_user_id == me,
-            SignedApprovalRecord.invalidated_at.is_(None),
-        )
-        .order_by(SignedApprovalRecord.signed_at.desc())
-        .first()
+    query = db.query(SignedApprovalRecord).filter(
+        SignedApprovalRecord.tenant_id == tenant_id, SignedApprovalRecord.invalidated_at.is_(None)
     )
+    if me is not None:
+        query = query.filter(SignedApprovalRecord.signer_user_id == me)
+    row = query.order_by(SignedApprovalRecord.signed_at.desc(), SignedApprovalRecord.id).first()
     if row is None:
         return None
+    signer = str(row.signer_user_id)
     what = SIGNED_WHAT.get(row.object_type) or audit_rules.readable(row.object_type)
     complaint_id = investigation_id = None
+    found = None
     if row.object_type == "ComplaintMarketAssessment":
         found = db.get(ComplaintMarketAssessment, row.object_id)
         if found is not None:
@@ -318,11 +318,14 @@ def latest_signed(db, tenant_id, me: str, names_of) -> dict | None:
     return {
         "what": what,
         "signed_at": _day(row.signed_at),
-        "signed_by": names_of({me}).get(me),
+        "signed_by": names_of({signer}).get(signer),
         "meaning": row.signature_meaning,
         # The moment and the meaning in a few words, as every signature shows them (21 CFR 11.50; 0.10.83, D2.8).
         "signed_at_time": row.signed_at.isoformat() if row.signed_at else None,
         "meaning_label": _meaning_label(row),
+        # The sample's own signed record (0.10.92, A1): its dates follow the trial's day ("Sample: dates follow your
+        # trial day" beside it); a person's own signature never is.
+        "sample": getattr(found, "source_system", None) == SAMPLE_SOURCE,
         "complaint": {"id": str(complaint.id), "ref": complaint.complaint_identifier or complaint.business_id}
         if complaint is not None
         else None,

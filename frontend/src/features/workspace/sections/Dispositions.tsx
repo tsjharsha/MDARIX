@@ -1,3 +1,4 @@
+import { SampleDates } from "../../../app/chips";
 import { useState } from "react";
 import { WhyAsked } from "../../shared/Basis";
 import { DISPOSITION_WHY } from "../whyAsked";
@@ -201,6 +202,7 @@ export function DispositionCard({ item, onOpen }: { item: BoardItem; onOpen: () 
             Version {signed.version} · {signed.signed_by} · {formatDate(signed.signed_at)}
             {signed.investigation_ref ? ` · investigation ${signed.investigation_ref}` : ""}
             {signed.attribution_label ? ` · ${signed.attribution_label}` : ""}
+            <SampleDates sample={signed.sample} />
           </p>
         )}
         <div className="ca-action-row">

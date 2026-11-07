@@ -8,6 +8,14 @@ from datetime import date
 from backend.app.db.session import SessionLocal
 
 TEXT = "Test value (sample)"
+# The US contact office (G1) comes from the US responsible party with its e-mail (0.10.92, A5): set there, as a person
+# does in Settings › Products, never typed on the report.
+US_PARTY = {
+    "market": "US",
+    "role": "MANUFACTURER",
+    "organisation": "Test Devices (sample)",
+    "contact_email": "mdr@example.invalid",
+}
 LIST_VALUES = {"D2A": "FRN"}  # an FDA product code (infusion pump); GMDN and EMDN fields: their patterns
 
 
@@ -49,6 +57,13 @@ def fill(client, reports: str, report_id: str, fields: list[str]):
     for field in fields:
         if field == "G8":
             continue  # follows the front page's manufacturer report number (MFR_REPORT), never typed
+        if field == "G1":
+            party = client.put("/api/v1/regulatory-reference/responsible-parties", json=US_PARTY)
+            assert party.status_code == 200, party.text
+            if items[field]["status"] == "ENTERED":  # a typed value that differs from the party: cleared
+                cleared = client.put(f"{reports}/{report_id}/fields/{field}", json={"clear": True})
+                assert cleared.status_code == 200, cleared.text
+            continue
         response = client.put(f"{reports}/{report_id}/fields/{field}", json=body(items[field]))
         if response.status_code == 422 and items[field].get("kind") == "LIST_CODE":
             response = client.put(f"{reports}/{report_id}/fields/{field}", json={"value": "12345"})  # GMDN
