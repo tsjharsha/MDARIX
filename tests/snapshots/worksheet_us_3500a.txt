@@ -12,7 +12,8 @@ expDate: <DATE>
 udi: 04000000041016
 reportManuRecDate: <DATE>
 numPMA: Test value (sample)
-manuName: Test value (sample)
+manuName: Test Devices (sample)
+manuEmail: mdr@example.invalid
 rep30: /Yes
 repInit: /Yes
 manuRepNum: Test value (sample)
@@ -37,6 +38,7 @@ Complaints: SAMPLE-RV-11
 Lots: SAMPLE-PULSE-410-LOT-002
 Market assessments: SAMPLE-RV-11 United States (FDA) v1 (signed)
 Products: SAMPLE-PULSE-410
+Your organization's responsible parties: US manufacturer
 Approved values the form has no place for
 Give these in eSubmitter, or attach them, as you decide.
 D2b Common device name: Multiple-parameter patient monitor (longer than the form's 32 characters)
