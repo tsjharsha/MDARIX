@@ -11579,6 +11579,13 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .ms-chip-deadline.is-later {
   color: var(--ms-ink-2);
 }
+/* A sample signature's note (0.10.92, A1): its dates follow the trial's day. Muted text, 4.5:1 in both themes. */
+.ms-sample-dates {
+  color: var(--ms-muted);
+  font-size: var(--ms-fs-12);
+  font-weight: 600;
+  white-space: nowrap;
+}
 .ms-chip-state {
   border-color: transparent;
   background: var(--ms-ground);

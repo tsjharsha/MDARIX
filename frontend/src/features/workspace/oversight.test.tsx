@@ -12,6 +12,7 @@ import {
   filterQuery,
   groupAlerts,
   hoursText,
+  openItemsText,
   oversightPath,
   parseReadinessTab,
   readyProblem,
@@ -128,6 +129,15 @@ describe("the oversight rules", () => {
     );
     expect(readyProblem({ you_are_owner: true, blocked: 2, reason_min: 20 }, "x".repeat(20))).toBeNull();
     expect(readyProblem({ you_are_owner: true, blocked: 0, reason_min: 20 }, "")).toBeNull();
+  });
+
+  it("says an event's open items and its next step, never a missing one (A6)", () => {
+    expect(openItemsText({ blocked: 0, next: null })).toBe("None");
+    expect(openItemsText({ blocked: 2, next: "Sign the US market assessment" })).toBe(
+      "2 open. Next: Sign the US market assessment",
+    );
+    // A finished event (SAMPLE-RV-09): its open item was signed with its reason, so there is no next step.
+    expect(openItemsText({ blocked: 1, next: null })).toBe("1 open, signed with its reason");
   });
 
   it("checks an absence before it is sent", () => {

@@ -4,6 +4,7 @@ import { formatDateTime } from "../../../app/dates";
 import { formName } from "./TreeSign";
 import { FieldRow, useAction } from "./Reports";
 import { InlineError } from "./boardParts";
+import { useWorkspace } from "../workspaceContext";
 import "./decide.css";
 
 export type GiveGroup = { scope: "PRODUCT" | "ORGANIZATION" | "EVENT"; title: string; things: WorksheetField[][] };
@@ -103,18 +104,55 @@ function OnceRow({
   onChanged: (detail: ReportDetail) => void;
   canEdit: boolean;
 }) {
+  const { open } = useWorkspace();
   const [values, setValues] = useState<Record<string, string>>({});
   const action = useAction(onChanged, "It was not saved.");
   const product = fields[0].scope === "PRODUCT";
   const whom = product ? (detail.complaint.product_name ?? "this product") : "your organization";
   const ready = fields.every((item) => (values[item.id] ?? "").trim());
+  // What a value given needs before approval (0.10.92, A5: the eMDR's contact office e-mail): said here, with the
+  // place it is set, the responsible party in Settings › Products. The e-mail alone is asked for here too.
+  const problems = fields.map((item) => item.problem).filter((text): text is string => !!text);
+  const askEmail = fields.find((item) => item.ask === "CONTACT_EMAIL");
+  const [email, setEmail] = useState("");
   return (
     <li className="uw-rp-field rp-once">
       <div className="uw-rp-field-head">
         <span className="uw-rp-number">{fields.map((item) => item.number).join(" · ")}</span>
         <span className="uw-rp-label">{fields.map((item) => item.label).join(" and ")}</span>
       </div>
-      {canEdit && (
+      {problems.length > 0 && (
+        <p className="ac-message tone-warning" role="status">
+          {problems.join(" ")}
+        </p>
+      )}
+      {problems.length > 0 && !product && (
+        <button type="button" className="ac-link" onClick={() => open("Settings", "Products")}>
+          Set a responsible party in Settings › Products
+        </button>
+      )}
+      {canEdit && askEmail && (
+        <form
+          className="uw-rp-edit"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (email.trim()) void action.run(`${REPORTS}/${detail.id}/once`, "PUT", { contact_email: email.trim() });
+          }}
+        >
+          <input
+            type="email"
+            maxLength={50}
+            aria-label={`${askEmail.number} ${askEmail.label}: e-mail`.trim()}
+            placeholder="Contact e-mail"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+          <button type="submit" className="ac-secondary" disabled={action.busy || !email.trim()}>
+            Save the e-mail for {whom}
+          </button>
+        </form>
+      )}
+      {canEdit && !problems.length && (
         <form
           className="uw-rp-edit"
           onSubmit={(event) => {

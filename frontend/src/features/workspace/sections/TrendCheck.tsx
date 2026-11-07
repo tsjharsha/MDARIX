@@ -403,6 +403,16 @@ export function TrendHeroes({
                 </span>
               </p>
             )}
+            {(row.changes ?? []).length > 0 && (
+              // What changed behind the lots, as recorded (0.10.92, A10): a fact beside the rise, never its cause.
+              <p className="uw-trend-change">
+                <b>Recorded change on this version:</b>{" "}
+                {(row.changes ?? [])
+                  .slice(0, 2)
+                  .map((change) => `${change.identifier} (${change.change_type.toLowerCase()}): ${change.title}`)
+                  .join(" · ")}
+              </p>
+            )}
             <p className="uw-trend-note">
               {/* The bars name what they compare with; "How we compared" says how (0.10.87). */}
               Each bar counts complaints in the last {row.recent_days} days.

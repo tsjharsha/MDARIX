@@ -45,6 +45,8 @@ export type TrendItem = {
   lots?: string[];
   /** How many recent complaints each lot has (0.10.77). */
   lot_counts?: Record<string, number>;
+  /** 0.10.92 (A10): the changes recorded against a component of the version, newest first (a supplier change). */
+  changes?: Array<{ id: string; identifier: string; change_type: string; title: string; event_at: string | null }>;
 };
 
 /** "003 and 004" from "SAMPLE-ORBIT-300-LOT-003", "SAMPLE-ORBIT-300-LOT-004": the part that differs (0.10.72); with

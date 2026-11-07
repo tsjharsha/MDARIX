@@ -8,6 +8,7 @@ import { ToneBadge } from "../../admin/console/charts";
 import { ReportingFacts } from "./ReportingFacts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { deadlineLabel, formatDay } from "../../../app/dates";
+import { SampleDates } from "../../../app/chips";
 import { WorkspaceContext, useCan, useWorkspace } from "../workspaceContext";
 import { reportsTab, worksheetMarkets } from "../authorityReports";
 import { communicationsTab } from "../communications";
@@ -857,7 +858,7 @@ export function SignedVersion({
         <span className="uw-cr-meta">
           Signed by {version.signed_by} · {formatDate(version.signed_at)} · guide {versionWords(version.question_set)} ·
           scale {versionWords(version.scale_version)}
-          {version.sample ? " · sample" : ""}
+          <SampleDates sample={version.sample} />
         </span>
         {originWords(version.answers) && <span className="uw-cr-meta">{originWords(version.answers)}</span>}
         {version.override_reason && (

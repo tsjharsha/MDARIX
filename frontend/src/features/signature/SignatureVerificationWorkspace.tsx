@@ -107,6 +107,12 @@ const SUMMARY_BADGE = {
   problem: "platform-admin-badge warning",
 };
 
+/** An investigation without a signed decision yet (0.10.92, A2): the other signatures are elsewhere, never "none". */
+export const NO_DECISION = "No signed decision on this investigation yet";
+export const NO_DECISION_HINT =
+  "This page checks the signatures on an investigation's decisions. Signed market conclusions and approved reports " +
+  "are in Records › Decision records and Your latest record, each with who signed, when and what it means.";
+
 export function SignatureVerificationWorkspace() {
   // Inside the workspace the case chosen in the context bar is used; on its own the person chooses a case here.
   const workspace = useContext(WorkspaceContext);
@@ -218,7 +224,7 @@ export function SignatureVerificationWorkspace() {
           >
             {!decisions?.length && (
               <option value="">
-                {!caseId ? "Choose an investigation first" : decisions ? "No decisions recorded yet" : "Loading…"}
+                {!caseId ? "Choose an investigation first" : decisions ? NO_DECISION : "Loading…"}
               </option>
             )}
             {decisions?.map((decision) => (
@@ -239,6 +245,7 @@ export function SignatureVerificationWorkspace() {
           )}
         </div>
       </section>
+      {decisions?.length === 0 && <p className="muted">{NO_DECISION_HINT}</p>}
       {message && (
         <p className="state-panel" role="status">
           {message}

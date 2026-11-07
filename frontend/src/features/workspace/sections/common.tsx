@@ -6,7 +6,7 @@ import { Table, formatDate, idColumn, type Column } from "../../customer-admin/s
 import { hideUuid, isUuid, safeText } from "../../../app/displayId";
 import { formatDay } from "../../../app/dates";
 import type { Product360 } from "../../../app/types";
-import { sectionAllowed, useWorkspace } from "../workspaceContext";
+import { sectionAllowed, useIsTrial, useWorkspace } from "../workspaceContext";
 import { Upload } from "lucide-react";
 
 /** A count with en-US grouping, whatever the browser's language: "4,993" (DEV-025). */
@@ -23,6 +23,8 @@ export const countOf = (count: number, noun: string, plural = `${noun}s`) =>
 /** Render children only once the shared Product 360 context is available; otherwise say why not. */
 export function NeedsProduct({ children }: { children: (view: Product360) => ReactNode }) {
   const { work, session, open } = useWorkspace();
+  // A free trial has no administrator to connect systems (0.10.92, A12): its own import is the way.
+  const isTrial = useIsTrial();
   const canImport = sectionAllowed(
     "Import data",
     session?.allowed_menu,
@@ -42,9 +44,11 @@ export function NeedsProduct({ children }: { children: (view: Product360) => Rea
         <Empty
           title="No products are connected"
           detail={
-            canImport
-              ? "Import your products, lots and complaints as CSV files, or ask your administrator to connect your systems."
-              : "Products appear once your administrator connects your systems or imports your data."
+            isTrial
+              ? "Import your products, lots and complaints as CSV files in Import your data."
+              : canImport
+                ? "Import your products, lots and complaints as CSV files, or ask your administrator to connect your systems."
+                : "Products appear once your administrator connects your systems or imports your data."
           }
         />
         {canImport && (

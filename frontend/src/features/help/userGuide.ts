@@ -192,7 +192,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           },
         ],
         tips: [
-          "Lost your phone? Sign in with a recovery code, then replace the authenticator app in My Account. Lost your recovery codes too? Ask your administrator to reset your multi-factor authentication.",
+          "Lost your phone? Sign in with a recovery code, then replace the authenticator app in My Account. Lost your recovery codes too? In a free trial, the person who invited you resets it in Team, and the person who started the trial writes to support@mdarix.in; otherwise ask your administrator to reset your multi-factor authentication.",
         ],
       },
       {
@@ -1330,7 +1330,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           {
             title: "See your access and settings",
             steps: [
-              "Profile shows your name, email, role and organization, which your administrator manages. Tick Send me the weekly readiness email to receive it.",
+              "Profile shows your name, email, role and organization, which your administrator manages (in a free trial, write to support@mdarix.in to change them). Tick Send me the weekly readiness email to receive it.",
               "Access shows the sections you can open and what your role allows you to do.",
             ],
           },

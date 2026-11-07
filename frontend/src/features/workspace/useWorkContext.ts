@@ -135,6 +135,8 @@ export function useWorkContext(caseLink?: string | null): WorkContext {
       .catch((reason) => {
         setState("error");
         setError(reason instanceof Error ? reason.message : "Products could not be loaded");
+        // A case link never stays "opening" when the products could not be read (0.10.92, A4): it is said to fail.
+        if (first && caseLink) setCaseLinkState({ id: caseLink, state: "failed" });
       });
   }, [productsVersion]);
 

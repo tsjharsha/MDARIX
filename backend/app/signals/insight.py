@@ -231,6 +231,53 @@ def _version_rows(db: Session, tenant_id: uuid.UUID, version_id: uuid.UUID, star
     )
 
 
+def version_changes(db: Session, tenant_id: uuid.UUID, version_ids) -> dict[str, list[dict]]:
+    """``{version id: changes}``: the changes recorded as affecting a component of each version (a supplier change is
+    recorded against the component it affects, as signals/service.py ``_related`` reads it), newest first.
+    shortcut: a change linked to the whole product is left out, as it would show on every version; add it if a
+    product-level change ever needs to show here."""
+    from backend.app.db.models.foundation import Change, ProductComponent, RealityRelationship
+    from backend.app.workflow.tasks import shorten
+
+    if not version_ids:
+        return {}
+    rows = (
+        db.query(ProductComponent.product_version_id, Change)
+        .join(
+            RealityRelationship,
+            (RealityRelationship.tenant_id == ProductComponent.tenant_id)
+            & (RealityRelationship.target_entity_type == "Component")
+            & (RealityRelationship.target_entity_id == ProductComponent.component_id)
+            & (RealityRelationship.source_entity_type == "Change"),
+        )
+        .join(
+            Change,
+            (Change.tenant_id == RealityRelationship.tenant_id) & (Change.id == RealityRelationship.source_entity_id),
+        )
+        .filter(
+            ProductComponent.tenant_id == tenant_id,
+            ProductComponent.product_version_id.in_([uuid.UUID(str(item)) for item in version_ids]),
+        )
+        .order_by(Change.event_timestamp.desc().nulls_last(), Change.change_identifier)
+        .all()
+    )
+    found: dict[str, list[dict]] = defaultdict(list)
+    for version_id, change in rows:
+        listed = found[str(version_id)]
+        if any(item["id"] == str(change.id) for item in listed):
+            continue
+        listed.append(
+            {
+                "id": str(change.id),
+                "identifier": change.change_identifier,
+                "change_type": change.change_type,
+                "title": shorten(change.description, 200),
+                "event_at": change.event_timestamp.isoformat() if change.event_timestamp else None,
+            }
+        )
+    return dict(found)
+
+
 def _scale(recent_units: float | None, baseline_units: float | None) -> float | None:
     """The recent window's unit-days over the baseline's, when both are known."""
     return recent_units / baseline_units if recent_units and baseline_units else None
@@ -477,11 +524,16 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
         if wanted
         else {}
     )
+    behind = version_changes(
+        db, tenant_id, {item["product_version"]["id"] for item in items if item["product_version"]}
+    )
     for item in items:
         named = [lot_of[key] for key in item.pop("_recent_ids") if key in lot_of]
         item["lots"] = sorted(set(named))
         # How many of the recent complaints each lot has (0.10.77: "003 (4), 004 (4), 005 (1)").
         item["lot_counts"] = {lot: named.count(lot) for lot in item["lots"]}
+        # The recorded changes to a component of the version (0.10.92, A10: the supplier change behind the lots).
+        item["changes"] = behind.get(item["product_version"]["id"], []) if item["product_version"] else []
     items.sort(
         key=lambda item: (
             trend_rules.RESULT_ORDER[item["result"]],

@@ -100,6 +100,15 @@ export type EventRow = {
   sample: boolean;
 };
 
+/**
+ * An event's open items in Records › Decision records: the count and the next step. A finished event's open items
+ * were signed with their reason, so it has no next step (it read "Next: null" before 0.10.92, A6).
+ */
+export function openItemsText(row: Pick<EventRow, "blocked" | "next">): string {
+  if (!row.blocked) return "None";
+  return row.next ? `${row.blocked} open. Next: ${row.next}` : `${row.blocked} open, signed with its reason`;
+}
+
 export type OversightSettings = {
   time_zone: string;
   work_days: number[];
