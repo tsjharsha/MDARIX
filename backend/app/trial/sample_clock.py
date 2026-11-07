@@ -2,15 +2,19 @@
 
 The sample is dated from the moment it is seeded (its **anchor**, kept in the trial request's profile as
 ``sample_anchor``; a trial approved before 0.10.64 has its approval time). The sample's events **move with the trial's
-clock**: every hour the scheduler (``keep_current``) moves every sample record, and everything hanging off one (the
-sample records ``sample_removal.plan`` reaches through sample records only), forward by the time since the anchor, and
-sets the anchor to now. So
-the deadlines stay ahead of the reader, the triage targets stay due within the day, the OrbitCare rise stays inside
-the trend check's last 30 days, and the alerts, labels and next steps stay the same. (The alternative, a trend read
-"as of" the sample's own date, would have left every deadline and alert ageing.)
+day**: the first time the hourly scheduler (``keep_current``) runs after midnight in the organization's time zone, it
+moves every sample record, and everything hanging off one (the sample records ``sample_removal.plan`` reaches through
+sample records only), forward by the whole days passed since the anchor, and moves the anchor by the same days. So
+the deadlines stay ahead of the reader, the OrbitCare rise stays inside the trend check's last 30 days, and the
+alerts, labels and next steps stay the same on day 0, 7, 15 or 29. (The alternative, a trend read "as of" the
+sample's own date, would have left every deadline and alert ageing.)
 
-- Times move by the exact time passed; dates (an absence's days, a report's due day) by the days passed on the
-  organization's calendar. Dates written inside a record's text or a signed record's content stay as written.
+- **Never during the day** (0.10.92, owner decision on A1, option C): a time of day never changes, so a signed time
+  or an awareness time read twice in a session reads the same (it moved hourly before, 16:33 then 17:27). Times move
+  by whole days, dates (an absence's days, a report's due day) by the same days. The sample's signatures and signed
+  records say so: "Sample: dates follow your trial day" (``DATES_NOTE``). Dates written inside a record's text or a
+  signed record's content stay as written. A target shorter than a day (a triage target) can come due late in the
+  day, as it would on the day the sample was seeded.
 - **The clock stops once a person works on the sample** (a signed disposition, market conclusion, decision, review,
   document, question to MDARIX, case from a signal or effectiveness check: ``story.acted_counts``, own uploads
   excluded; 0.10.92, D11: also a call logged, a first-contact check or a triage record): signed
@@ -36,7 +40,8 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger("mdarix.trial.sample_clock")
 ANCHOR = "sample_anchor"
 # Move the sample once at least this much time has passed (the scheduler runs hourly).
-STEP = timedelta(minutes=30)
+# What the sample's signatures and signed records say (owner's wording, 0.10.92): their dates move by whole days.
+DATES_NOTE = "Sample: dates follow your trial day"
 _MOMENTS = ("timestamp with time zone", "timestamp without time zone")
 
 
@@ -200,19 +205,23 @@ def keep_current(control: Session, data: Session, tenant_id, now: datetime | Non
     now = now or datetime.now(timezone.utc)
     request = team.trial_request(control, tenant_id)
     since = anchor_of(request)
-    if request is None or since is None or now - since < STEP:
+    if request is None or since is None:
+        return {"moved": False, "why": "CURRENT"}
+    # Whole days on the organization's calendar: nothing moves until its next day has begun (A1, option C).
+    calendar = calendar_of(data, tenant_id)
+    days = (calendar.local_day(now) - calendar.local_day(since)).days
+    if days < 1:
         return {"moved": False, "why": "CURRENT"}
     if not has_sample_data(data, tenant_id):
         return {"moved": False, "why": "NO_SAMPLE"}
     if worked_on(data, tenant_id):
         return {"moved": False, "why": "WORKED_ON"}
-    calendar = calendar_of(data, tenant_id)
-    days = (calendar.local_day(now) - calendar.local_day(since)).days
-    moved = move(data, tenant_id, now - since, days)
+    moved = move(data, tenant_id, timedelta(days=days), days)
     data.commit()
-    request.profile = {**(request.profile or {}), ANCHOR: now.isoformat()}
+    # The anchor moves by the same days, so its time of day, and every sample time's, stays as seeded.
+    request.profile = {**(request.profile or {}), ANCHOR: (since + timedelta(days=days)).isoformat()}
     control.commit()
-    return {"moved": True, "by_hours": round((now - since).total_seconds() / 3600, 1), "rows": sum(moved.values())}
+    return {"moved": True, "by_days": days, "rows": sum(moved.values())}
 
 
 def run_for_all_trials(control: Session) -> dict:

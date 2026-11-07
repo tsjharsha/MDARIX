@@ -270,6 +270,7 @@ def latest_signed(db, tenant_id, me: str | None, names_of) -> dict | None:
     from backend.app.db.models.market_assessment import ComplaintMarketAssessment
     from backend.app.db.models.oversight import EventClosure
     from backend.app.reportability import markets as market_rules
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
 
     query = db.query(SignedApprovalRecord).filter(
         SignedApprovalRecord.tenant_id == tenant_id, SignedApprovalRecord.invalidated_at.is_(None)
@@ -282,6 +283,7 @@ def latest_signed(db, tenant_id, me: str | None, names_of) -> dict | None:
     signer = str(row.signer_user_id)
     what = SIGNED_WHAT.get(row.object_type) or audit_rules.readable(row.object_type)
     complaint_id = investigation_id = None
+    found = None
     if row.object_type == "ComplaintMarketAssessment":
         found = db.get(ComplaintMarketAssessment, row.object_id)
         if found is not None:
@@ -321,6 +323,9 @@ def latest_signed(db, tenant_id, me: str | None, names_of) -> dict | None:
         # The moment and the meaning in a few words, as every signature shows them (21 CFR 11.50; 0.10.83, D2.8).
         "signed_at_time": row.signed_at.isoformat() if row.signed_at else None,
         "meaning_label": _meaning_label(row),
+        # The sample's own signed record (0.10.92, A1): its dates follow the trial's day ("Sample: dates follow your
+        # trial day" beside it); a person's own signature never is.
+        "sample": getattr(found, "source_system", None) == SAMPLE_SOURCE,
         "complaint": {"id": str(complaint.id), "ref": complaint.complaint_identifier or complaint.business_id}
         if complaint is not None
         else None,

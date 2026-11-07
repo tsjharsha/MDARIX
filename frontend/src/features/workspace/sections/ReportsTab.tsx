@@ -4,7 +4,7 @@ import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Table, errorText, notFound, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
 import { marketLabel, versionWords } from "../../../app/labels";
-import { DeadlineChip, StateChip } from "../../../app/chips";
+import { DeadlineChip, SampleDates, StateChip } from "../../../app/chips";
 import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import {
   REPORTS,
@@ -511,7 +511,12 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
               ) : (
                 <Approval detail={detail} onChanged={changed} />
               ))}
-            {approvedBy && <p className="dt-success">✓ {signatureLine(approvedBy)}</p>}
+            {approvedBy && (
+              <p className="dt-success">
+                ✓ {signatureLine(approvedBy)}
+                <SampleDates sample={detail.sample} />
+              </p>
+            )}
             {detail.stage === "APPROVED" && approved && (
               <>
                 {canExport ? (
@@ -562,7 +567,10 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
             <h2>Who signs</h2>
             <ul className="rp-signatures">
               {(detail.signatures ?? []).map((item) => (
-                <li key={`${item.meaning}-${item.at}`}>{signatureLine(item)}</li>
+                <li key={`${item.meaning}-${item.at}`}>
+                  {signatureLine(item)}
+                  <SampleDates sample={detail.sample} />
+                </li>
               ))}
             </ul>
             <ul className="uw-rail-signers">

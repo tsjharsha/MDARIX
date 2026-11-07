@@ -1,3 +1,4 @@
+import { SampleDates } from "../../../app/chips";
 import { useState } from "react";
 import { ChevronRight, PenLine } from "lucide-react";
 import { deadlineLabel, formatDateTime, timeLeft } from "../../../app/dates";
@@ -219,6 +220,7 @@ export function SignCard({
           {signedMeaning(item.current.conclusion)}
           {item.current.override_reason ? ` · overrode the outcome: ${item.current.override_reason}` : ""}
           {item.current.change_reason ? ` · why it changed: ${item.current.change_reason}` : ""}
+          <SampleDates sample={item.current.sample} />
         </p>
       )}
       {!signed && !canDecide && (

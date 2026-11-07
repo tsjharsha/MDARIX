@@ -1,3 +1,4 @@
+import { SampleDates } from "../../../app/chips";
 import { useState } from "react";
 import { zoneLabel } from "../../../app/labels";
 import {
@@ -758,6 +759,7 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
                 {version.review_outcome
                   ? ` · QA review ${version.review_outcome.toLowerCase()} by ${version.reviewed_by}${version.same_person ? " (same person)" : ""}`
                   : ""}
+                <SampleDates sample={item.sample} />
                 {version.superseded ? " · superseded" : ""}
               </li>
             ))}

@@ -18,6 +18,13 @@ changes; the sample author's hypotheses now carry the sample's source (new and r
 
 ### Fixed: trust
 
+- **The sample's times never change during the day** (owner decision on A1, 7 Nov 2026). The sample's clock moved
+  every sample record every hour, so a signed time or an awareness time read twice in a session changed (16:33, then
+  17:27). It now moves the sample only once a day, the first time the hourly job runs after midnight in the
+  organization's time zone, by whole days: every time of day stays as seeded, and day 0, 7, 15 or 29 tells the same
+  story. The sample's signatures and signed records say "Sample: dates follow your trial day"; the organization's own
+  records never do. A sample target shorter than a day (a triage target) can come due late in the day, as on the day
+  the sample was seeded.
 - **The sample's clock never moves the organization's own records** (call intake H10, D11). The hourly move followed
   every link from sample records, so a call logged on a sample product had its awareness and times moved. It now
   moves only the sample's own records and what hangs off them. Logging a call, or signing, reviewing, escalating or

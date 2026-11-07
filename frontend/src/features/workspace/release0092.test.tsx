@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { CaseSections } from "./sections/CaseSections";
 import { ThingsToGive } from "./sections/ReportBody";
+import { LatestSigned, type SignedRecord } from "./sections/Records";
+import { SAMPLE_DATES } from "../../app/chips";
 import type { ReportDetail } from "./authorityReports";
 import caseSections from "./sections/CaseSections.tsx?raw";
 import caseBrief from "./sections/CaseDecisionBrief.tsx?raw";
@@ -246,5 +248,26 @@ describe("1.9: the new design's leftovers (A13-A16)", () => {
 
   it("shows the column-resize mark on the design's heading in both themes (A16)", () => {
     expect(heroCss).toMatch(/\.uw-hybrid \.ac-table \.col-grip::after \{\s*background: var\(--ms-line-control\);/);
+  });
+});
+
+describe("A1, option C: a sample signature says its dates follow the trial's day", () => {
+  const record = (sample: boolean): SignedRecord => ({
+    what: "European Union / Northern Ireland conclusion: reportable",
+    signed_at: "2026-11-05",
+    signed_at_time: "2026-11-05T16:33:00Z",
+    signed_by: sample ? "Sample Author" : "Asha Quality",
+    meaning: "SIGNED_REPORTABLE",
+    meaning_label: "signed reportable",
+    complaint: { id: "c7", ref: sample ? "SAMPLE-RV-07" : "FIC-2001" },
+    investigation: null,
+    sample,
+  });
+
+  it("labels the sample's signed record, in words a screen reader reads, and never the organization's own", () => {
+    expect(SAMPLE_DATES).toBe("Sample: dates follow your trial day");
+    const sample = render(<LatestSigned record={record(true)} mine={false} />, api({}));
+    expect(sample).toContain(`<small class="ms-sample-dates">${SAMPLE_DATES}</small>`);
+    expect(render(<LatestSigned record={record(false)} />, api({}))).not.toContain(SAMPLE_DATES);
   });
 });

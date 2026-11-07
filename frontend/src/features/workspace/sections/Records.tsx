@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SampleDates } from "../../../app/chips";
 import {
   AlarmClock,
   BadgeCheck,
@@ -167,6 +168,8 @@ export type SignedRecord = {
   meaning_label?: string | null;
   complaint: { id: string; ref: string } | null;
   investigation: { id: string; ref: string } | null;
+  /** 0.10.92 (A1): a sample record, whose dates follow the trial's day. */
+  sample?: boolean;
 };
 
 /**
@@ -198,7 +201,7 @@ export function LatestSigned({ record, mine = true }: { record: SignedRecord; mi
         {record.signed_by ?? "Signed"} ·{" "}
         {record.signed_at_time ? formatDateTime(record.signed_at_time) : formatDate(record.signed_at)}
         {/* What a record is for is the page's guide (0.10.87). */}
-        {record.meaning_label ? ` · ${record.meaning_label}` : ""}.
+        {record.meaning_label ? ` · ${record.meaning_label}` : ""}.<SampleDates sample={record.sample} />
       </p>
       <div className="ca-action-row">
         {canExport && record.complaint && (

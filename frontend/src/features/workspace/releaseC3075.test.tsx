@@ -308,6 +308,15 @@ describe("a report's page: the record page's shape, the status path and the rail
     expect(html).not.toContain("rp-why-send");
   });
 
+  it("says beside a sample report's signatures that its dates follow the trial's day, never on your own (A1)", () => {
+    const signatures = [{ name: "Sample Author", at: "2026-11-02T09:02:00Z", meaning: "prepared" }];
+    resources.data[`${REPORTS}/r1`] = report(1, { sample: true, signatures } as Partial<ReportDetail>);
+    const sample = render(<ReportsSection />, api("?report=r1"));
+    expect(sample).toContain('<small class="ms-sample-dates">Sample: dates follow your trial day</small>');
+    resources.data[`${REPORTS}/r1`] = report(1, { sample: false, signatures } as Partial<ReportDetail>);
+    expect(render(<ReportsSection />, api("?report=r1"))).not.toContain("Sample: dates follow your trial day");
+  });
+
   it("says one status for a report sent back for correction, and sends it again once filled (0.10.92, A7)", () => {
     // SAMPLE-RV-10 as the server answers it: the first stage carries the status (backend rules.stage_view).
     const corrected = (missing: number) =>

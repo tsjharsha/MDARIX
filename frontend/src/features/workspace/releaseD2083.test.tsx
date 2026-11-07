@@ -774,8 +774,12 @@ describe("D2.8: approval in plain words", () => {
     );
     expect(html).not.toMatch(/snapshot|fingerprint|checksum/i);
     // Every signature: full name, date and time, meaning.
-    expect(html).toMatch(/<li>Asha Menon · 2 Nov 2026, \d\d:\d\d · signed reportable<\/li>/);
-    expect(html).toMatch(/<li>Asha Menon · 2 Nov 2026, \d\d:\d\d · prepared<\/li>/);
+    expect(html).toMatch(
+      /<li>Asha Menon · 2 Nov 2026, \d\d:\d\d · signed reportable <small class="ms-sample-dates">Sample: dates follow your trial day<\/small><\/li>/,
+    );
+    expect(html).toMatch(
+      /<li>Asha Menon · 2 Nov 2026, \d\d:\d\d · prepared <small class="ms-sample-dates">Sample: dates follow your trial day<\/small><\/li>/,
+    );
   });
 
   it("shows a success panel with the approval's name, time and meaning", () => {
@@ -793,7 +797,9 @@ describe("D2.8: approval in plain words", () => {
       },
     };
     const html = render(<ReportsSection />, api(undefined, "regulatory", "?report=r1"));
-    expect(html).toMatch(/<p class="dt-success">✓ Rahul Iyer · 2 Nov 2026, \d\d:\d\d · approved for submission<\/p>/);
+    expect(html).toMatch(
+      /<p class="dt-success">✓ Rahul Iyer · 2 Nov 2026, \d\d:\d\d · approved for submission <small class="ms-sample-dates">Sample: dates follow your trial day<\/small><\/p>/,
+    );
   });
 });
 

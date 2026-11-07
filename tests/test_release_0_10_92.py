@@ -186,6 +186,8 @@ def test_the_emdr_contact_email_is_asked_for_before_send_for_approval_and_given_
     done = _ok(user.put(f"{url}/once", json={"contact_email": "mdr@example.invalid"}))
     assert g1(done)["problem"] is None and "G1" not in done["mandatory"]["missing"]
     assert user.put(f"{url}/once", json={"contact_email": "other@example.invalid"}).status_code == 409
+    # The person's own signature is never labelled as the sample's (its dates never move).
+    assert _ok(user.get("/api/v1/oversight/latest-signed"))["record"]["sample"] is False
     parties = _ok(user.get("/api/v1/regulatory-reference/responsible-parties"))
     assert [item["contact_email"] for item in parties["parties"] if item["market"] == "US"] == ["mdr@example.invalid"]
 
@@ -204,3 +206,58 @@ def test_the_trend_names_the_supplier_change_behind_its_lots(fresh):
     # Rev A's sensor did not change: no change is shown beside its lots.
     others = [item for item in items if item["name"].startswith("OrbitCare 300") and item["name"].endswith("Rev A")]
     assert others and all(not item["changes"] for item in others)
+
+
+def test_the_sample_moves_only_overnight_in_whole_days_and_its_times_of_day_never_change(fresh):
+    """A1, option C (owner, 7 Nov 2026): never during the day, then by whole days, so a signed time read twice in a
+    session reads the same; the sample's signed record says its dates follow the trial's day."""
+    from datetime import datetime as moment
+    from datetime import time
+
+    from backend.app.db.models.market_assessment import ComplaintMarketAssessment
+    from backend.app.db.models.stage2 import OnboardingRequest
+    from backend.app.oversight.service import calendar_of
+    from backend.app.trial import sample_clock
+
+    user, tenant_id = fresh
+
+    def signed_sample():
+        with _data(tenant_id) as db:
+            row = (
+                db.query(ComplaintMarketAssessment)
+                .filter(
+                    ComplaintMarketAssessment.tenant_id == tenant_id,
+                    ComplaintMarketAssessment.source_system == "MDARIX_SAMPLE",
+                    ComplaintMarketAssessment.signed_at.isnot(None),
+                )
+                .order_by(ComplaintMarketAssessment.id)
+                .first()
+            )
+            return row.signed_at
+
+    with _data(tenant_id) as db:
+        zone = calendar_of(db, tenant_id).tz
+    day = moment.now(zone).date() - timedelta(days=3)
+    nine = moment.combine(day, time(9), tzinfo=zone)
+    with SessionLocal() as control:
+        request = control.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).one()
+        request.profile = {**request.profile, sample_clock.ANCHOR: nine.isoformat()}
+        control.commit()
+    before = signed_sample()
+
+    def keep(at):
+        with SessionLocal() as control, _data(tenant_id) as data:
+            return sample_clock.keep_current(control, data, tenant_id, now=at)
+
+    # Six hours later the same day: nothing moves (it moved every hour before).
+    assert keep(moment.combine(day, time(15), tzinfo=zone)) == {"moved": False, "why": "CURRENT"}
+    assert signed_sample() == before
+    # Two days later, early in the morning: two whole days, the time of day kept, the anchor moved by the same days.
+    done = keep(moment.combine(day + timedelta(days=2), time(1, 30), tzinfo=zone))
+    assert done["moved"] and done["by_days"] == 2, done
+    assert signed_sample() == before + timedelta(days=2)
+    with SessionLocal() as control:
+        request = control.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).one()
+        assert moment.fromisoformat(request.profile[sample_clock.ANCHOR]) == nine + timedelta(days=2)
+    # The sample's signed record says so; Records shows it on the organization's latest signed record.
+    assert _ok(user.get("/api/v1/oversight/latest-signed"))["organization"]["sample"] is True

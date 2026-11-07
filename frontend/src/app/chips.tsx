@@ -60,3 +60,18 @@ export function HarmChip({ harm, label }: { harm: Harm; label: string }) {
     </span>
   );
 }
+
+/** What a sample signature or signed record says (owner's wording, 0.10.92, A1): the sample's dates move by whole days
+ * with the trial (backend/app/trial/sample_clock.py DATES_NOTE). Never on the organization's own records. */
+export const SAMPLE_DATES = "Sample: dates follow your trial day";
+
+/** The sample's dates label, as text a screen reader reads with the signature, beside a sample's signature only. */
+export function SampleDates({ sample }: { sample?: boolean | null }) {
+  // The space before it belongs to it: nothing is added beside an own record's signature.
+  return sample ? (
+    <>
+      {" "}
+      <small className="ms-sample-dates">{SAMPLE_DATES}</small>
+    </>
+  ) : null;
+}
