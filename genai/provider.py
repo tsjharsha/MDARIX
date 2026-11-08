@@ -32,6 +32,9 @@ OPENAI_COMPATIBLE = {
     # (genai/policy.py, docs/compliance/AI_PROVIDER_REGISTER.md).
     "anthropic": ("https://api.anthropic.com/v1/messages", "claude-sonnet-5-5"),
     "ollama": (OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL),
+    # OmniRoute: a self-hosted gateway that forwards each request to the upstream providers configured in it. The model
+    # name is an OmniRoute model or combo; set MDARIX_GENAI_OMNIROUTE_MODEL to the one you configured.
+    "omniroute": ("http://127.0.0.1:20128/v1/chat/completions", "auto"),
 }
 # Providers in OPENAI_COMPATIBLE that speak their own Messages API instead of chat completions.
 ANTHROPIC_MESSAGES_API = frozenset({"anthropic"})

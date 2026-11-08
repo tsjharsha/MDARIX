@@ -44,3 +44,17 @@ def test_self_hosted_and_development_need_no_retention_flag(monkeypatch):
     assert policy.allowed("ollama")
     monkeypatch.setenv("MDARIX_ENV", "development")
     assert policy.allowed("anthropic") and policy.configuration_problems() == []
+
+
+def test_omniroute_is_a_router_so_production_needs_contract_and_retention_like_any_provider(monkeypatch):
+    from genai.provider import OPENAI_COMPATIBLE
+
+    assert "omniroute" in OPENAI_COMPATIBLE and "omniroute" not in policy.SELF_HOSTED
+    _production(monkeypatch, "anthropic")
+    monkeypatch.setenv("MDARIX_GENAI_ANTHROPIC_ZDR", "true")
+    assert not policy.allowed("omniroute")  # not under contract
+    _production(monkeypatch, "omniroute")
+    monkeypatch.delenv("MDARIX_GENAI_OMNIROUTE_ZDR", raising=False)
+    assert not policy.allowed("omniroute")  # under contract, retention not cleared
+    monkeypatch.setenv("MDARIX_GENAI_OMNIROUTE_ZDR", "true")
+    assert policy.allowed("omniroute")

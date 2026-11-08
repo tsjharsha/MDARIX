@@ -86,6 +86,18 @@ Supported provider names:
 | Mistral (paid plan, EU) | `mistral` | `https://api.mistral.ai/v1/chat/completions` | `mistral-small-latest` |
 | Google Gemini API (paid tier) | `gemini` | Gemini's OpenAI-compatible endpoint | `gemini-flash-latest` |
 | Ollama (self-hosted) | `ollama` | `http://127.0.0.1:11434/v1/chat/completions` | `llama3.2` |
+| OmniRoute (self-hosted gateway) | `omniroute` | `http://127.0.0.1:20128/v1/chat/completions` (override with `MDARIX_GENAI_OMNIROUTE_BASE_URL`) | `auto` (set `MDARIX_GENAI_OMNIROUTE_MODEL` to your OmniRoute model or combo) |
+
+OmniRoute is a router, not a model provider: the request goes on to whichever upstream providers are configured in it.
+It is **not** treated as self-hosted. In staging and production, name `omniroute` in `MDARIX_GENAI_CONTRACTED_PROVIDERS`
+and set `MDARIX_GENAI_OMNIROUTE_ZDR=true` **only when every upstream it can route to** is under contract with zero data
+retention and recorded in `docs/compliance/AI_PROVIDER_REGISTER.md`. With free upstreams, use synthetic data only.
+
+```dotenv
+MDARIX_GENAI_PROVIDER=omniroute
+MDARIX_GENAI_OMNIROUTE_API_KEY=<key created in the OmniRoute dashboard>
+MDARIX_GENAI_OMNIROUTE_MODEL=<model or combo name>
+```
 
 Anthropic example (`.env` on the server):
 
