@@ -112,8 +112,9 @@ def test_a_reclassified_contact_keeps_the_contact_time_as_awareness(trial):  # T
         received_at=contact_time.isoformat(),
         reporter_words="A clinic asked for a copy of the instructions for use.",
     )
-    signed = _ok(_sign(user, event, "SERVICE_ONLY", reason="Information request only; nothing wrong."))
-    assert signed["signed"]["classification"] == "SERVICE_ONLY"
+    # 0.10.93 (OD-5): information asked for, nothing wrong alleged: an Inquiry, reviewed like "service only".
+    signed = _ok(_sign(user, event, "INQUIRY", reason="Information request only; nothing wrong."))
+    assert signed["signed"]["classification"] == "INQUIRY" and signed["status"] == "IN_REVIEW"
     review = _ok(
         user.post(
             f"{INTAKE}/{event['id']}/check/review",
@@ -123,7 +124,8 @@ def test_a_reclassified_contact_keeps_the_contact_time_as_awareness(trial):  # T
     assert review["signed"]["classification"] == "COMPLAINT" and review["signed"]["version"] == 2
     assert review["history"][0]["review_outcome"] == "RECLASSIFIED" and review["history"][0]["same_person"]
     assert datetime.fromisoformat(review["awareness"]["at"]) == contact_time
-    assert review["qms_task"]["state"] == "OPEN"
+    # 0.10.93 (D1): the reclassified Case becomes the Complaint at once; nothing waits for a QMS import.
+    assert review["status"] == "ESCALATED" and review["complaint_id"] and review["qms_task"] is None
 
 
 def test_an_urgent_intake_creates_a_triage_item_at_once_with_its_clock(trial):  # TA-19.1, TA-19.5
@@ -265,7 +267,9 @@ def _upload(user, csv: str) -> dict:
     )
 
 
-def test_a_reupload_keeps_field_changes_and_closes_the_qms_task(trial):  # TA-20.1, TA-20.4
+def test_a_reupload_keeps_field_changes(trial):  # TA-20.1
+    # 0.10.93 (D1): a Case signed a complaint becomes the Complaint at once, so the trial (complaints owned in MDARIX)
+    # has no QMS task. The QMS ID task and the import's merge by QMS ID (TA-20.4) belong to the Connect escalation step.
     user = trial["user"]
     first = _upload(user, "complaint_id,product_id,product_name,description\nQMS-77,OWN-PUMP,Own Pump,Alarm at start\n")
     assert first["field_changes"] == 0
@@ -275,27 +279,22 @@ def test_a_reupload_keeps_field_changes_and_closes_the_qms_task(trial):  # TA-20
         reporter_words="Caller says the own pump alarmed at start-up and would not run.",
     )
     event = _ok(_sign(user, event, "COMPLAINT"))
-    assert event["qms_task"]["state"] == "OPEN"
-    waiting = _ok(user.post(f"{INTAKE}/{event['id']}/qms", json={"qms_ref": "QMS-78"}))
-    assert (
-        waiting["qms_task"]["state"] == "AWAITING_IMPORT"
-        and waiting["qms_task"]["label"] == "Awaiting import confirmation"
-    )
+    assert event["status"] == "ESCALATED" and event["qms_task"] is None
     second = _upload(
         user,
         "complaint_id,product_id,product_name,description\n"
         "QMS-77,OWN-PUMP,Own Pump,Alarm at start; device returned\n"
         "QMS-78,OWN-PUMP,Own Pump,Pump would not run after the start-up alarm\n",
     )
-    assert second["field_changes"] == 1 and second["qms_tasks_closed"] == 1
+    assert second["field_changes"] == 1 and second["qms_tasks_closed"] == 0
     (change,) = _ok(user.get(f"{INTAKE}/changes", params={"import_ref": second["import_ref"]}))["items"]
     assert (change["field"], change["before"], change["after"]) == (
         "description",
         "Alarm at start",
         "Alarm at start; device returned",
     )
-    closed = _ok(user.get(f"{INTAKE}/{event['id']}"))
-    assert closed["qms_task"]["state"] == "CLOSED" and closed["links"][0]["other"]["ref"]
+    escalated = _ok(user.get(f"{INTAKE}/{event['id']}"))
+    assert escalated["links"][0]["other"]["ref"] and escalated["complaint_id"] == event["complaint_id"]
 
 
 def test_another_organization_reads_none_of_it(trial):  # TA-32.5, TA-20 isolation

@@ -32,7 +32,7 @@ from backend.app.db.models.foundation import AuthUser, Complaint, InvestigationC
 from backend.app.db.models.ingestion import ImportQuarantineRow
 from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordFieldChange, RecordLink, TriageRecord
 from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
-from backend.app.intake import rules
+from backend.app.intake import case_rules, rules
 from backend.app.reportability import markets
 from backend.app.reportability.deadlines import day_only
 from backend.app.business_ids import complaint_ref
@@ -213,7 +213,7 @@ def ensure_follow_up(db, tenant_id, event: IntakeEvent, answers: dict, suggestio
     event, due at the end of the next working day (T9), naming the questions it asks."""
     from backend.app.workflow.tasks import create_task
 
-    asks = rules.follow_up_questions(answers)
+    asks = case_rules.follow_up_questions(answers)
     if suggestion == rules.PENDING_CONFIRM:
         asks = ["NO_DEFICIENCY"]
     if not asks:
@@ -1068,3 +1068,226 @@ def add_link(db: Session, tenant_id, left: tuple, right: tuple, actor: str, now:
 
 def today_of(now: datetime) -> date:
     return now.astimezone(timezone.utc).date()
+
+
+# --------------------------------------------------------------------------------------------- the Case (0.10.93, B2)
+
+
+class CaseStateRefused(ValueError):
+    """A move the Case's state rules do not allow (case_rules.TRANSITIONS)."""
+
+
+def _audit(audit_db, tenant_id, actor, action: str, event: IntakeEvent, now, correlation_id, **details) -> None:
+    from backend.app.enterprise_audit import make_audit_event
+
+    audit_db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=actor,
+            action=action,
+            entity_type=SOURCE_TYPE,
+            entity_id=event.id,
+            correlation_id=correlation_id,
+            details={"reference": event.reference, **details},
+            created_at=now,
+        )
+    )
+
+
+def set_case_status(
+    _db: Session,
+    audit_db,
+    tenant_id,
+    event: IntakeEvent,
+    target: str,
+    actor,
+    now,
+    correlation_id=None,
+    why=None,
+    *,
+    classification: str | None = None,
+) -> None:
+    """The only writer of a Case's state. An allowed move bumps the Case's row version and is audited; any other
+    move is refused, audited as refused, and raises CaseStateRefused (B2-08). ``classification``: the signed outcome,
+    for the rule that a service-only Case closes only with its resolution summary (S-2)."""
+    current = event.status or case_rules.OPEN
+    if current == target:
+        return
+    problem = case_rules.transition_problem(current, target)
+    if problem is None and target == case_rules.CLOSED:
+        problem = case_rules.close_problem(classification, event.resolution_summary)
+    if problem:
+        _audit(
+            audit_db,
+            tenant_id,
+            actor,
+            "CASE_STATE_REFUSED",
+            event,
+            now,
+            correlation_id,
+            **{"from": current, "to": target, "problem": problem},
+        )
+        raise CaseStateRefused(problem)
+    event.status, event.version, event.updated_at = target, (event.version or 1) + 1, now
+    _audit(
+        audit_db,
+        tenant_id,
+        actor,
+        "CASE_STATE_CHANGED",
+        event,
+        now,
+        correlation_id,
+        **{"from": current, "to": target, "why": why or case_rules.TRANSITIONS[(current, target)]},
+    )
+
+
+def linked_complaint(db: Session, tenant_id, event: IntakeEvent) -> Complaint | None:
+    """The complaint a person linked this Case to (the earliest LINKED link), if any."""
+    for link in links_of(db, tenant_id):
+        if link.state != "LINKED" or event.id not in (link.left_id, link.right_id):
+            continue
+        kind, other = (link.right_kind, link.right_id) if link.left_id == event.id else (link.left_kind, link.left_id)
+        if kind == COMPLAINT:
+            found = db.get(Complaint, other)
+            if found is not None and found.tenant_id == tenant_id:
+                return found
+    return None
+
+
+def case_setup(db: Session, tenant_id, trial: bool) -> tuple[str, str]:
+    """(record owner of a new complaint, case flow): the organization's system of record for complaints (no row: a
+    trial is MDARIX, a pilot EXTERNAL, M3) and how Cases become complaints (default one record)."""
+    from backend.app.db.models.oversight import OversightSettings, RecordOwnership
+
+    row = (
+        db.query(RecordOwnership)
+        .filter(RecordOwnership.tenant_id == tenant_id, RecordOwnership.domain == "COMPLAINTS")
+        .first()
+    )
+    owner = row.owner if row else ("MDARIX" if trial else "EXTERNAL")
+    settings = db.query(OversightSettings).filter(OversightSettings.tenant_id == tenant_id).first()
+    return owner, (settings.case_flow if settings else "ONE_RECORD")
+
+
+def _flag(answers: dict, question: str) -> bool | None:
+    """An answer carried to a complaint's harm field: Yes -> true, No -> false, anything else -> unknown (never false)."""
+    answer = rules.answer_of(answers, question)
+    return True if answer == rules.YES else False if answer == rules.NO else None
+
+
+def escalate_case(
+    db: Session,
+    audit_db,
+    tenant_id,
+    event: IntakeEvent,
+    check: FirstContactCheck,
+    actor,
+    now: datetime,
+    *,
+    record_owner: str,
+    flow: str = "ONE_RECORD",
+    attach_to: Complaint | None = None,
+    correlation_id=None,
+) -> Complaint:
+    """D1: a Case signed a complaint becomes the Complaint at once, in the same transaction as the signature. "Create"
+    copies each fact once (the Case keeps what came in; from now on the Complaint is where a shared fact is corrected);
+    in one-record mode the Complaint takes the Case's reference. "Attach" joins an existing Complaint. Either way the
+    Case and the Complaint are linked (one event, the earliest awareness) and the Case is ESCALATED. Idempotent: a Case
+    that already became a Complaint returns it and creates nothing (A4)."""
+    if event.complaint_id is not None:
+        existing = db.get(Complaint, event.complaint_id)
+        if existing is not None:
+            return existing
+    aware = event_awareness(event)
+    # A Case a person already linked to a complaint (a duplicate, an imported service record's complaint) joins it.
+    linked = linked_complaint(db, tenant_id, event)
+    attach_to = attach_to or linked
+    if attach_to is not None:
+        complaint, mode = attach_to, "ATTACHED"
+    else:
+        answers = check.answers or {}
+        complaint = Complaint(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            complaint_identifier=event.reference if flow == "ONE_RECORD" else f"CMP-{event.reference}",
+            product_id=event.product_id,
+            product_version_id=event.product_version_id,
+            lot_batch_id=event.lot_batch_id,
+            product_text=event.product_text,
+            lot_text=event.lot_text,
+            software_version=event.software_version,
+            event_timestamp=event.event_at,
+            complaint_timestamp=event.received_at,
+            awareness_timestamp=aware["at"],
+            description=event.reporter_words,
+            status="open",
+            country=event.country,
+            reporter_type=event.reporter_type,
+            serial_number=event.serial_number,
+            udi=event.udi,
+            patient_involved=_flag(answers, "Q4"),
+            # Question 5 asks "a death or a serious injury": a Yes says which only after follow-up, so death stays
+            # unknown; a No rules out both.
+            serious_injury=_flag(answers, "Q5"),
+            death=False if rules.answer_of(answers, "Q5") == rules.NO else None,
+            malfunction=_flag(answers, "Q6"),
+            service_reference=event.service_ticket,
+            qms_ref=event.qms_ref,
+            record_owner=record_owner,
+            source_system="MDARIX_CASE",
+            source_identifier=event.reference,
+            recorded_timestamp=event.received_at,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(complaint)
+        db.flush()
+        mode = "CREATED"
+        _audit(
+            audit_db,
+            tenant_id,
+            actor,
+            "COMPLAINT_CREATED_FROM_CASE",
+            event,
+            now,
+            correlation_id,
+            complaint_id=str(complaint.id),
+            flow=flow,
+            check_version=check.version,
+        )
+    if linked is None or linked.id != complaint.id:
+        add_link(
+            db,
+            tenant_id,
+            (INTAKE, event.id),
+            (COMPLAINT, complaint.id),
+            str(actor),
+            now,
+            f"Escalated from case {event.reference}",
+        )
+    event.complaint_id, event.escalation, event.escalated_at, event.escalated_by = complaint.id, mode, now, str(actor)
+    set_case_status(
+        db,
+        audit_db,
+        tenant_id,
+        event,
+        case_rules.ESCALATED,
+        actor,
+        now,
+        correlation_id,
+        f"Signed {check.classification.lower()} (check version {check.version})",
+    )
+    _audit(
+        audit_db,
+        tenant_id,
+        actor,
+        "CASE_ESCALATED",
+        event,
+        now,
+        correlation_id,
+        complaint_id=str(complaint.id),
+        escalation=mode,
+        flow=flow,
+        awareness_at=_iso(aware["at"]),
+    )
+    return complaint

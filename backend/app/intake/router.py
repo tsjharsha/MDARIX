@@ -31,6 +31,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import exists
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.app.trial.sample_source import is_sample
@@ -45,7 +46,7 @@ from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordL
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import current_person, require_any_permission
-from backend.app.intake import rules, service
+from backend.app.intake import case_rules, rules, service
 from backend.app.paging import open_first
 from backend.app.reportability import markets
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -101,6 +102,14 @@ class IntakeIn(BaseModel):
     service_ticket: str = Field(default="", max_length=120)
     answers: dict[str, AnswerIn] = Field(default_factory=dict, max_length=12)
     unknowns: str = Field(default="", max_length=rules.TEXT_MAX)
+    # 0.10.93 (B2): ID-1 and S-3 identifiers with their status and source, S-1 category, idempotent create (A4).
+    udi: str = Field(default="", max_length=120)
+    software_version: str = Field(default="", max_length=60)
+    hardware_revision: str = Field(default="", max_length=60)
+    firmware_version: str = Field(default="", max_length=60)
+    identifiers: dict[str, dict] = Field(default_factory=dict, max_length=8)
+    issue_category: str = Field(default="", max_length=20)
+    request_key: str = Field(default="", max_length=80)
 
 
 class CheckIn(BaseModel):
@@ -124,6 +133,8 @@ class ReviewIn(BaseModel):
     note: str = Field(default="", max_length=rules.TEXT_MAX)
     password: str = Field(min_length=1, max_length=128)
     mfa_code: str | None = Field(default=None, max_length=12)
+    # S-2: what was done for the customer; required before a service-only Case is closed.
+    resolution_summary: str = Field(default="", max_length=rules.TEXT_MAX)
 
 
 class FollowUpIn(BaseModel):
@@ -178,7 +189,7 @@ def guide(_ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     from backend.app.oversight.rules import LEGACY_ZONES, zone_names
 
     return {
-        "version": rules.GUIDE_VERSION,
+        "version": case_rules.GUIDE_VERSION,
         "questions": [
             {
                 "id": question,
@@ -190,7 +201,14 @@ def guide(_ctx: AuthenticatedRequestContext = Depends(get_request_context)):
         ],
         "answers": [{"code": code, "label": rules.ANSWER_LABELS[code]} for code in rules.ANSWERS],
         "note": rules.GUIDE_NOTE,
-        "outcomes": [{"code": code, "label": rules.OUTCOME_LABELS[code]} for code in rules.OUTCOMES],
+        "outcomes": [{"code": code, "label": case_rules.OUTCOME_LABELS[code]} for code in case_rules.OUTCOMES],
+        "states": [{"code": code, "label": case_rules.STATE_LABELS[code]} for code in case_rules.STATES],
+        "issue_categories": [{"code": code, "label": label} for code, label in case_rules.ISSUE_CATEGORIES.items()],
+        "identifiers": {
+            "keys": [{"code": key, "label": case_rules.IDENTIFIER_LABELS[key]} for key in case_rules.IDENTIFIERS],
+            "not_sure": list(case_rules.NOT_SURE_ALLOWED),
+            "sources": [{"code": code, "label": label} for code, label in case_rules.SOURCE_LABELS.items()],
+        },
         "table": [{"row": row, "answers": answers, "outcome": result} for row, answers, result in rules.OUTCOME_TABLE],
         "requests": [{"code": code, "label": rules.REQUEST_LABELS[code]} for code in rules.REQUESTS],
         "use_environments": [{"code": c, "label": label} for c, label in coding.USE_ENVIRONMENT_LABELS.items()],
@@ -210,7 +228,12 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
     signed = service.current_signed(versions)
     unresolved = any(t.task_type == service.FOLLOW_UP and t.completion_outcome == "UNRESOLVED" for t in tasks)
     answers = latest.answers if latest else {}
-    suggestion = rules.outcome(answers, unresolved) if latest else None
+    v2 = bool(latest and latest.guide_version == case_rules.GUIDE_VERSION)
+    suggestion = (
+        (case_rules.case_outcome(answers, event.requested, unresolved) if v2 else rules.outcome(answers, unresolved))
+        if latest
+        else None
+    )
     flags = rules.intake_flags(event.kind, event.reporter_words, answers)
     awareness = service.event_awareness(event, record)
     product = db.get(Product, event.product_id) if event.product_id else None
@@ -218,7 +241,12 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
     people = service.names_of(
         control_db,
         tenant_id,
-        {event.created_by, *(row.signed_by for row in versions), *(row.reviewed_by for row in versions)},
+        {
+            event.created_by,
+            event.owner_id,
+            *(row.signed_by for row in versions),
+            *(row.reviewed_by for row in versions),
+        },
     )
 
     def name(ref):
@@ -271,8 +299,23 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
         "answers": answers,
         "unknowns": latest.unknowns if latest else None,
         "suggestion": suggestion,
-        "suggestion_label": rules.OUTCOME_LABELS.get(suggestion or "", None),
-        "outcome_row": rules.outcome_row(answers) if latest else None,
+        "suggestion_label": case_rules.OUTCOME_LABELS.get(suggestion or "", None),
+        "outcome_row": rules.outcome_row(answers) if latest and suggestion != case_rules.UNANSWERED else None,
+        "unanswered": case_rules.unanswered(answers) if latest else [],
+        # 0.10.93 (B2): the Case's state, owner, Complaint, identifiers (ID-1, S-3), category (S-1), resolution (S-2)
+        # and what it still needs (A3).
+        "status": event.status,
+        "status_label": case_rules.STATE_LABELS.get(event.status),
+        "row_version": event.version,
+        "owner": name(event.owner_id),
+        "complaint_id": str(event.complaint_id) if event.complaint_id else None,
+        "escalation": event.escalation,
+        "escalated_at": service._iso(event.escalated_at),
+        "identifiers": event.identifiers or {},
+        "issue_category": event.issue_category,
+        "issue_category_label": case_rules.ISSUE_CATEGORIES.get(event.issue_category or ""),
+        "resolution_summary": event.resolution_summary,
+        "missing": case_rules.missing_information(event.identifiers or {}, answers),
         "draft": bool(latest and latest.signed_at is None),
         "signed": _check_view(signed, name) if signed else None,
         "check_due_at": service._iso(
@@ -303,7 +346,7 @@ def _check_view(row: FirstContactCheck, name) -> dict:
         "guide_version": row.guide_version,
         "suggestion": row.suggestion,
         "classification": row.classification,
-        "classification_label": rules.OUTCOME_LABELS.get(row.classification or "", None),
+        "classification_label": case_rules.OUTCOME_LABELS.get(row.classification or "", None),
         "override_reason": row.override_reason,
         "reason": row.reason,
         "signed_by": name(row.signed_by),
@@ -600,6 +643,12 @@ def log_intake(
     words = payload.reporter_words.strip()
     if len(words) < rules.REASON_MIN:
         raise _error(422, "WORDS_NEEDED", "Write down the reporter's words, as they said them")
+    # A4: a retried request with the same key returns the Case it created, never a second one.
+    request_key = rules.clean(payload.request_key, 80) or None
+    if request_key:
+        known = _by_request_key(db, tenant_id, request_key)
+        if known is not None:
+            return intake_detail(known, db, control_db, ctx)
     product = None
     if payload.product_id is not None:
         product = db.query(Product).filter(Product.tenant_id == tenant_id, Product.id == payload.product_id).first()
@@ -610,7 +659,29 @@ def log_intake(
     received = _at(payload.received_at, zone) or now
     if received > now + _SKEW:
         raise _error(422, "TIME_IN_FUTURE", "The contact cannot be received in the future")
-    awareness = received if kind == "CONTACT" else _at(payload.awareness_at, _zone(payload.awareness_zone, zone))
+    first_at = _at(payload.first_knowledge_at, _zone(payload.first_knowledge_zone, zone))
+    basis = _choice(payload.first_knowledge_basis, rules.FIRST_KNOWLEDGE_BASES)
+    # H1 (B2): a Case's awareness is the earliest of its receipt and a first knowledge that counts.
+    awareness = (
+        case_rules.case_awareness(received, first_at, basis)
+        if kind == "CONTACT"
+        else _at(payload.awareness_at, _zone(payload.awareness_zone, zone))
+    )
+    requested = _choice(payload.requested, rules.REQUESTS, "NONE")
+    serial = rules.clean(payload.serial_number, 120) or None
+    values = {
+        "udi": rules.clean(payload.udi, 120) or None,
+        "software_version": rules.clean(payload.software_version, 60) or None,
+        "hardware_revision": rules.clean(payload.hardware_revision, 60) or None,
+        "firmware_version": rules.clean(payload.firmware_version, 60) or None,
+    }
+    given = {
+        "product": product is not None,
+        "version": bool(lot and lot.product_version_id),
+        "lot": lot is not None,
+        "serial": bool(serial),
+        **{key: bool(value) for key, value in values.items()},
+    }
     event = IntakeEvent(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
@@ -623,39 +694,51 @@ def log_intake(
         product_id=product.id if product else None,
         product_version_id=lot.product_version_id if lot else None,
         lot_batch_id=lot.id if lot else None,
-        serial_number=rules.clean(payload.serial_number, 120) or None,
-        requested=_choice(payload.requested, rules.REQUESTS, "NONE"),
+        serial_number=serial,
+        requested=requested,
         use_environment=_choice(payload.use_environment, coding.USE_ENVIRONMENT_LABELS, "UNKNOWN"),
         user_type=_choice(payload.user_type, coding.USER_TYPE_LABELS, "UNKNOWN"),
         event_at=_at(payload.event_at, _zone(payload.event_zone, zone)),
         event_zone=_zone(payload.event_zone, zone) if payload.event_at else None,
-        first_knowledge_at=_at(payload.first_knowledge_at, _zone(payload.first_knowledge_zone, zone)),
+        first_knowledge_at=first_at,
         first_knowledge_zone=_zone(payload.first_knowledge_zone, zone) if payload.first_knowledge_at else None,
         first_knowledge_party=_choice(payload.first_knowledge_party, rules.FIRST_KNOWLEDGE_PARTIES),
-        first_knowledge_basis=_choice(payload.first_knowledge_basis, rules.FIRST_KNOWLEDGE_BASES),
+        first_knowledge_basis=basis,
         received_at=received,
         received_zone=zone,
         awareness_at=awareness,
-        awareness_zone=_zone(payload.awareness_zone, zone) if awareness else None,
+        awareness_zone=(
+            _zone(payload.first_knowledge_zone, zone)
+            if kind == "CONTACT" and awareness != received
+            else _zone(payload.awareness_zone, zone)
+        )
+        if awareness
+        else None,
         service_ticket=rules.clean(payload.service_ticket, 120) or None,
         created_by=str(ctx.user_id),
         created_at=now,
         updated_at=now,
+        owner_id=str(ctx.user_id),
+        request_key=request_key,
+        identifiers=case_rules.clean_identifiers(payload.identifiers, given),
+        issue_category=case_rules.issue_category(payload.issue_category),
+        **values,
     )
     db.add(event)
     db.flush()
-    answers = rules.clean_answers({key: value.model_dump() for key, value in payload.answers.items()})
+    answers = case_rules.clean_answers({key: value.model_dump() for key, value in payload.answers.items()})
+    suggestion = case_rules.case_outcome(answers, requested) if kind == "CONTACT" else None
     if kind == "CONTACT":
-        suggestion = rules.outcome(answers)
         db.add(
             FirstContactCheck(
                 tenant_id=tenant_id,
                 intake_event_id=event.id,
                 version=1,
-                guide_version=rules.GUIDE_VERSION,
+                guide_version=case_rules.GUIDE_VERSION,
                 answers=answers,
                 unknowns=rules.clean(payload.unknowns) or None,
                 suggestion=suggestion,
+                history=[case_rules.recalculation(None, answers, None, suggestion, ctx.user_id, now)],
                 created_by=str(ctx.user_id),
                 created_at=now,
                 updated_at=now,
@@ -678,14 +761,33 @@ def log_intake(
                 "reference": event.reference,
                 "kind": kind,
                 "flags": [item["code"] for item in flags],
-                "suggestion": rules.outcome(answers) if kind == "CONTACT" else None,
+                "suggestion": suggestion,
                 "awareness_at": service._iso(awareness),
+                "issue_category": event.issue_category,
+                "identifiers": event.identifiers,
             },
             created_at=now,
         )
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # The same request key raced in at the same moment: return the Case the other request created.
+        db.rollback()
+        known = _by_request_key(db, tenant_id, request_key) if request_key else None
+        if known is None:
+            raise
+        return intake_detail(known, db, control_db, ctx)
     return intake_detail(event.id, db, control_db, ctx)
+
+
+def _by_request_key(db, tenant_id, request_key: str):
+    row = (
+        db.query(IntakeEvent.id)
+        .filter(IntakeEvent.tenant_id == tenant_id, IntakeEvent.request_key == request_key)
+        .first()
+    )
+    return row.id if row else None
 
 
 @router.put("/intake/{event_id}/check", dependencies=[WRITERS])
@@ -707,12 +809,17 @@ def save_check(
     latest = versions[-1] if versions else None
     if (latest.version if latest else 0) != payload.seen_version:
         raise _error(409, "CHANGED_MEANWHILE", "A colleague changed this check a moment ago; reload to see it")
-    answers = rules.clean_answers({key: value.model_dump() for key, value in payload.answers.items()})
+    answers = case_rules.clean_answers({key: value.model_dump() for key, value in payload.answers.items()})
     tasks = service.tasks_of(db, tenant_id, [event.id]).get(event.id, [])
     unresolved = any(t.task_type == service.FOLLOW_UP and t.completion_outcome == "UNRESOLVED" for t in tasks)
-    suggestion = rules.outcome(answers, unresolved)
+    suggestion = case_rules.case_outcome(answers, event.requested, unresolved)
+    # X1: every recalculation is kept (which answers changed, the suggestion before and after).
+    entry = case_rules.recalculation(
+        latest.answers if latest else None, answers, latest.suggestion if latest else None, suggestion, ctx.user_id, now
+    )
     if latest is not None and latest.signed_at is None:
-        latest.answers, latest.suggestion = answers, suggestion
+        latest.answers, latest.suggestion, latest.guide_version = answers, suggestion, case_rules.GUIDE_VERSION
+        latest.history = [*(latest.history or []), entry]
         latest.unknowns = rules.clean(payload.unknowns) or None
         latest.updated_at = now
     else:
@@ -721,10 +828,11 @@ def save_check(
                 tenant_id=tenant_id,
                 intake_event_id=event.id,
                 version=(latest.version if latest else 0) + 1,
-                guide_version=rules.GUIDE_VERSION,
+                guide_version=case_rules.GUIDE_VERSION,
                 answers=answers,
                 unknowns=rules.clean(payload.unknowns) or None,
                 suggestion=suggestion,
+                history=[entry],
                 created_by=str(ctx.user_id),
                 created_at=now,
                 updated_at=now,
@@ -821,14 +929,14 @@ def _after_classification(db, tenant_id, event, check, previous, actor, now) -> 
         )
         if not linked:
             service.ensure_qms_task(db, tenant_id, event, actor, now)
-    elif check.classification == rules.SERVICE_ONLY:
+    elif check.classification in case_rules.REVIEWED_OUTCOMES:
         service.ensure_review_task(db, tenant_id, event, check, actor, now)
     else:
         service.ensure_follow_up(db, tenant_id, event, check.answers, check.classification, actor, now)
     if (
         previous is not None
-        and previous.classification == rules.SERVICE_ONLY
-        and check.classification != rules.SERVICE_ONLY
+        and previous.classification in case_rules.REVIEWED_OUTCOMES
+        and check.classification not in case_rules.REVIEWED_OUTCOMES
     ):
         record = (
             db.query(TriageRecord)
@@ -898,7 +1006,8 @@ def sign_check(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     """The coordinator signs the classification: the guide's suggestion, or another outcome with a reason. "Service
-    only" needs a written reason and is offered only when the answers give it."""
+    only", "Inquiry" and "Not a complaint" need a written reason and are offered only when the answers give them. A
+    complaint is escalated in the same transaction (D1): the Case becomes, or joins, the Complaint."""
     tenant_id = _tenant(ctx)
     event = _event_or_404(db, tenant_id, event_id)
     versions = service.checks_of(db, tenant_id, [event.id]).get(event.id, [])
@@ -910,13 +1019,22 @@ def sign_check(
     problem = rules.answers_problem(latest.answers)
     tasks = service.tasks_of(db, tenant_id, [event.id]).get(event.id, [])
     unresolved = any(t.task_type == service.FOLLOW_UP and t.completion_outcome == "UNRESOLVED" for t in tasks)
-    suggestion = rules.outcome(latest.answers, unresolved)
     classification = rules.clean(payload.classification, 30).upper()
     override = rules.clean(payload.override_reason)
     reason = rules.clean(payload.reason)
-    problem = problem or rules.classification_problem(suggestion, classification, override, reason)
+    # A version saved under the Case check v2 is signed by its rules; an older draft keeps the guide it was saved with.
+    if latest.guide_version == case_rules.GUIDE_VERSION:
+        suggestion = case_rules.case_outcome(latest.answers, event.requested, unresolved)
+        problem = problem or case_rules.classification_problem(
+            suggestion, classification, override, reason, no_deficiency_confirmed=_no_deficiency(tasks)
+        )
+    else:
+        suggestion = rules.outcome(latest.answers, unresolved)
+        problem = problem or rules.classification_problem(suggestion, classification, override, reason)
     if problem:
         raise _error(422, "CHECK_INCOMPLETE", problem)
+    target = case_rules.state_after(classification)
+    _move_allowed(control_db, ctx, event, target)
     role = _signer_role(control_db, ctx)
     _verify(control_db, ctx, event, payload.password, payload.mfa_code, "FIRST_CONTACT_SIGN")
     now = service.now_utc()
@@ -943,12 +1061,13 @@ def sign_check(
         latest.id,
         latest.version,
         classification,
-        reason or override or rules.OUTCOME_LABELS[classification],
+        reason or override or case_rules.OUTCOME_LABELS[classification],
         role,
         material,
         now,
-        f"I have checked first contact {event.reference} with guide {latest.guide_version} and classify it: "
-        f"{rules.OUTCOME_LABELS[classification].lower()}.",
+        f"I have checked case {event.reference} with guide {latest.guide_version} and classify it: "
+        f"{case_rules.OUTCOME_LABELS[classification].lower()}."
+        + (" It becomes a complaint in MDARIX now." if target == case_rules.ESCALATED else ""),
     )
     latest.suggestion, latest.classification = suggestion, classification
     latest.override_reason, latest.reason = override or None, reason or None
@@ -959,6 +1078,7 @@ def sign_check(
     if previous is not None:
         previous.superseded_by = latest.id
     db.flush()
+    complaint = _move(db, control_db, ctx, event, latest, target, now)
     _after_classification(db, tenant_id, event, latest, previous, ctx.user_id, now)
     _second_look(db, tenant_id, event, latest, ctx.user_id, now)
     control_db.add(
@@ -978,12 +1098,65 @@ def sign_check(
                 "reclassified_from": previous.classification if previous else None,
                 "signature_id": str(record_id),
                 "signer_role": role,
+                "case_state": event.status,
+                "complaint_id": str(complaint.id) if complaint else None,
             },
             created_at=now,
         )
     )
     _commit(db, control_db)
     return intake_detail(event.id, db, control_db, ctx)
+
+
+def _no_deficiency(tasks) -> bool:
+    """The reporter's "confirm no deficiency" follow-up closed answered (Not a complaint may then be signed)."""
+    return any(
+        task.task_type == service.FOLLOW_UP
+        and task.completion_outcome == "ANSWERED"
+        and (task.details or {}).get("questions") == ["NO_DEFICIENCY"]
+        for task in tasks
+    )
+
+
+def _move_allowed(control_db, ctx, event, target: str) -> None:
+    """Refuse, before anything is signed, a move the Case's states do not allow; the refusal is audited (B2-08)."""
+    current = event.status or case_rules.OPEN
+    problem = None if current == target else case_rules.transition_problem(current, target)
+    if problem:
+        service._audit(
+            control_db,
+            _tenant(ctx),
+            ctx.user_id,
+            "CASE_STATE_REFUSED",
+            event,
+            service.now_utc(),
+            ctx.correlation_id,
+            **{"from": current, "to": target, "problem": problem},
+        )
+        control_db.commit()
+        raise _error(409, "CASE_STATE_REFUSED", problem)
+
+
+def _move(db, control_db, ctx, event, check, target: str, now):
+    """Move the Case after a signed classification: a complaint escalates it (create or attach); any other outcome
+    sets its state. Returns the Complaint when it escalated."""
+    tenant_id = _tenant(ctx)
+    if target != case_rules.ESCALATED:
+        service.set_case_status(db, control_db, tenant_id, event, target, ctx.user_id, now, ctx.correlation_id)
+        return None
+    owner, flow = service.case_setup(db, tenant_id, is_trial(control_db, tenant_id))
+    return service.escalate_case(
+        db,
+        control_db,
+        tenant_id,
+        event,
+        check,
+        ctx.user_id,
+        now,
+        record_owner=owner,
+        flow=flow,
+        correlation_id=ctx.correlation_id,
+    )
 
 
 @router.post("/intake/{event_id}/check/review", dependencies=[WRITERS])
@@ -1000,14 +1173,25 @@ def review_check(
     event = _event_or_404(db, tenant_id, event_id)
     versions = service.checks_of(db, tenant_id, [event.id]).get(event.id, [])
     signed = service.current_signed(versions)
-    if signed is None or signed.classification != rules.SERVICE_ONLY or signed.review_outcome is not None:
-        raise _error(409, "NOTHING_TO_REVIEW", 'Only an unreviewed "service only" decision is reviewed')
+    if signed is None or signed.classification not in case_rules.REVIEWED_OUTCOMES or signed.review_outcome is not None:
+        raise _error(
+            409, "NOTHING_TO_REVIEW", 'Only an unreviewed "service only", "inquiry" or "not a complaint" is reviewed'
+        )
     outcome = rules.clean(payload.outcome, 20).upper()
     note = rules.clean(payload.note)
     if outcome not in ("AGREED", "RECLASSIFIED"):
         raise _error(422, "UNKNOWN_OUTCOME", "Agree, or reclassify it as a complaint")
     if len(note) < rules.REASON_MIN:
         raise _error(422, "NOTE_NEEDED", f"Say in at least {rules.REASON_MIN} characters what you checked")
+    if rules.clean(payload.resolution_summary):
+        event.resolution_summary = rules.clean(payload.resolution_summary)
+    # Cases signed before 0.10.93 keep their state until the data script sets it: only an IN_REVIEW Case closes.
+    closes = outcome == "AGREED" and event.status == case_rules.IN_REVIEW
+    if closes:
+        problem = case_rules.close_problem(signed.classification, event.resolution_summary)
+        if problem:
+            raise _error(422, "RESOLUTION_SUMMARY_NEEDED", problem)
+    _move_allowed(control_db, ctx, event, case_rules.CLOSED if closes else event.status)
     role = _signer_role(control_db, ctx)
     _verify(control_db, ctx, event, payload.password, payload.mfa_code, "FIRST_CONTACT_REVIEW")
     now = service.now_utc()
@@ -1076,7 +1260,20 @@ def review_check(
         db.add(new)
         db.flush()
         signed.superseded_by = new.id
+        _move(db, control_db, ctx, event, new, case_rules.ESCALATED, now)
         _after_classification(db, tenant_id, event, new, signed, ctx.user_id, now)
+    elif closes:
+        service.set_case_status(
+            db,
+            control_db,
+            tenant_id,
+            event,
+            case_rules.CLOSED,
+            ctx.user_id,
+            now,
+            ctx.correlation_id,
+            classification=signed.classification,
+        )
     control_db.add(
         make_audit_event(
             tenant_id=tenant_id,
@@ -1136,6 +1333,10 @@ def close_follow_up(
     from backend.app.communications.service import close_for_intake
 
     close_for_intake(db, tenant_id, event.id, outcome, note, str(ctx.user_id), service.now_utc())
+    if event.status == case_rules.PENDING:
+        service.set_case_status(
+            db, db, tenant_id, event, case_rules.OPEN, ctx.user_id, service.now_utc(), ctx.correlation_id
+        )
     db.add(
         make_audit_event(
             tenant_id=tenant_id,
@@ -1266,9 +1467,9 @@ def check_service_record(
             tenant_id=tenant_id,
             intake_event_id=event.id,
             version=1,
-            guide_version=rules.GUIDE_VERSION,
-            answers=rules.clean_answers({}),
-            suggestion=rules.outcome({}),
+            guide_version=case_rules.GUIDE_VERSION,
+            answers=case_rules.clean_answers({}),
+            suggestion=case_rules.UNANSWERED,
             created_by=str(ctx.user_id),
             created_at=now,
             updated_at=now,
