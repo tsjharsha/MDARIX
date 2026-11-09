@@ -27,6 +27,7 @@ MOCKUP_TABS = {
     "admin": ["home", "complaints", "trees", "reports", "investigations", "trends", "records", "team"],
     "quality": ["home", "complaints", "reports", "investigations", "trends", "records"],
     "regulatory": ["home", "complaints", "trees", "reports", "records"],
+    "servicedesk": ["home", "complaints"],  # 0.10.93 (B2, spec 6.2)
     "handler": ["home", "complaints"],
     "investigator": ["home", "investigations", "trends"],
     "risk": ["home", "investigations", "records"],
@@ -84,6 +85,7 @@ def test_the_personas_match_the_approved_design_and_each_persona_is_a_real_role(
         "admin": "LEADER",
         "quality": "LEADER",
         "regulatory": "REGULATORY_REVIEWER",
+        "servicedesk": "SERVICE_DESK",
         "handler": "TRIAGE_LEAD",
         "investigator": "INVESTIGATOR",
         "risk": "RISK_REVIEWER",

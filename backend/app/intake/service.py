@@ -1247,7 +1247,7 @@ def escalate_case(
     audit_db,
     tenant_id,
     event: IntakeEvent,
-    check: FirstContactCheck,
+    check: FirstContactCheck | None,
     actor,
     now: datetime,
     *,
@@ -1272,7 +1272,7 @@ def escalate_case(
     if attach_to is not None:
         complaint, mode = attach_to, "ATTACHED"
     else:
-        answers = check.answers or {}
+        answers = (check.answers if check else None) or {}
         complaint = Complaint(
             id=uuid.uuid4(),
             tenant_id=tenant_id,
@@ -1320,7 +1320,7 @@ def escalate_case(
             correlation_id,
             complaint_id=str(complaint.id),
             flow=flow,
-            check_version=check.version,
+            check_version=check.version if check else None,
         )
     if linked is None or linked.id != complaint.id:
         add_link(
@@ -1344,7 +1344,9 @@ def escalate_case(
         actor,
         now,
         correlation_id,
-        f"Signed {check.classification.lower()} (check version {check.version})",
+        f"Signed {check.classification.lower()} (check version {check.version})"
+        if check
+        else "Urgent case: a complaint by definition",
     )
     _audit(
         audit_db,
@@ -1359,7 +1361,28 @@ def escalate_case(
         flow=flow,
         awareness_at=_iso(aware["at"]),
     )
+    if record_owner == "EXTERNAL":
+        ensure_qms_id_task(db, tenant_id, event, actor, now)
     return complaint
+
+
+def ensure_qms_id_task(db, tenant_id, event: IntakeEvent, actor, now) -> None:
+    """Connect (spec 3.3 step 6, 5.4): the Complaint exists in MDARIX; its QMS complaint ID is entered by hand or
+    filled by the next import, due in 5 working days. Complete organizations get no task."""
+    from backend.app.workflow.tasks import create_task
+
+    create_task(
+        db,
+        tenant_id,
+        task_type=QMS,
+        title=f"Enter the QMS complaint ID for {event.reference} (optional: your import fills it)",
+        source_type=SOURCE_TYPE,
+        source_id=event.id,
+        assigned_user_id=_user_or_none(actor),
+        due_at=working_day_end(now, 5, calendar(db, tenant_id)),
+        created_by=actor,
+        details={"reference": event.reference, "complaint_id": str(event.complaint_id)},
+    )
 
 
 # --------------------------------------------------------------------------------------------- triage versions (B2)

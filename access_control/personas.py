@@ -89,6 +89,10 @@ WORKSPACE_PERSONAS = (
         "REGULATORY_REVIEWER",
         ("home", "complaints", "trees", "reports", "records"),
     ),
+    # B2 (spec 6.2): the Service Desk logs, checks and classifies Cases.
+    WorkspacePersona(
+        "servicedesk", "Service Desk", "Cases: log, check and classify", "SERVICE_DESK", ("home", "complaints")
+    ),
     WorkspacePersona(
         "handler", "Complaint Handler", "Calls, triage, second look", "TRIAGE_LEAD", ("home", "complaints")
     ),
@@ -126,6 +130,7 @@ _ROLE_PERSONA = {
     "LEADER": "quality",
     "REVIEWER": "quality",
     "REGULATORY_REVIEWER": "regulatory",
+    "SERVICE_DESK": "servicedesk",
     "TRIAGE_LEAD": "handler",
     "INVESTIGATOR": "investigator",
     "RISK_REVIEWER": "risk",

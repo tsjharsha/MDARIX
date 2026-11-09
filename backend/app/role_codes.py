@@ -14,6 +14,7 @@ CUSTOMER_ADMIN_ALIASES = frozenset({CUSTOMER_ADMIN, "CUSTOMER_ADMINISTRATOR"})
 CANONICAL_SYSTEM_ROLES = frozenset(
     {
         "VIEWER",
+        "SERVICE_DESK",
         "TRIAGE_LEAD",
         "INVESTIGATOR",
         "RISK_REVIEWER",
@@ -28,6 +29,7 @@ CANONICAL_SYSTEM_ROLES = frozenset(
 
 # What people see for each standard role (the codes above never change).
 ROLE_LABELS: dict[str, str] = {
+    "SERVICE_DESK": "Service Desk Agent",
     "TRIAGE_LEAD": "PMS / Signal Triage Lead",
     "INVESTIGATOR": "Quality Investigator",
     "RISK_REVIEWER": "Risk Reviewer",

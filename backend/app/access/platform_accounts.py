@@ -210,6 +210,9 @@ PERMISSION_TEXT: dict[str, tuple[str, str]] = {
         "Sign the human decision on an approved brief. Also needs approval authority, and never on a brief the "
         "person helped write.",
     ),
+    "case.log": ("Log cases", "Log a case, correct its facts, add what was said later and close a follow-up."),
+    "case.classify": ("Classify cases", "Answer and sign the Case check, which escalates a complaint."),
+    "complaint.triage": ("Triage complaints", "Routine and fast-track triage, its updates and signed exclusions."),
 }
 
 # What each role is for, and where it works.
@@ -224,6 +227,7 @@ ROLE_TEXT: dict[str, tuple[str, str]] = {
         "Manages their organization's people, roles and settings. Can work on cases with an investigator's rights; "
         "never signs decisions.",
     ),
+    "SERVICE_DESK": ("Workspace", "Logs cases, answers and signs the Case check; never triages or reviews."),
     "TRIAGE_LEAD": ("Workspace", "Triages signals, decides what needs an investigation, and opens and assigns cases."),
     "INVESTIGATOR": (
         "Workspace",

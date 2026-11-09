@@ -147,7 +147,8 @@ def test_an_urgent_intake_creates_a_triage_item_at_once_with_its_clock(trial):  
     assert datetime.fromisoformat(item["awareness"]["at"]) == aware and not item["awareness"]["unresolved"]
     assert item["triage_clock"]["target_hours"] == 4 and item["speed"] == "FAST" and item["deadlines"]  # B2: fast track
     assert item["delay"]["text"] == "3 hours"
-    assert event["qms_task"]["state"] == "OPEN"
+    # B2: the urgent Case is the Complaint at once; a trial (Complete) has no QMS-complaint task.
+    assert event["status"] == "ESCALATED" and event["complaint_id"] and event["qms_task"] is None
 
 
 def test_without_awareness_the_clock_runs_from_first_knowledge(trial):  # TA-19.2

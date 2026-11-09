@@ -45,6 +45,11 @@ RISK_REVIEW = "risk.review"
 REGULATORY_REVIEW = "regulatory.review"
 QUALITY_REVIEW = "quality.review"
 DECISION_SIGN = "decision.sign"
+# Cases and triage (0.10.93, B2, spec 6.1): log a Case and keep its facts; save the answers and sign the Case check
+# (and so escalate); triage a complaint at either speed.
+CASE_LOG = "case.log"
+CASE_CLASSIFY = "case.classify"
+COMPLAINT_TRIAGE = "complaint.triage"
 ALL = frozenset(
     {
         RECORDS_WRITE,
@@ -61,19 +66,28 @@ ALL = frozenset(
         REGULATORY_REVIEW,
         QUALITY_REVIEW,
         DECISION_SIGN,
+        CASE_LOG,
+        CASE_CLASSIFY,
+        COMPLAINT_TRIAGE,
     }
 )
 
 _WORK = frozenset({RECORDS_WRITE, AI_RUN, DATA_EXPORT})
 _EVIDENCE = frozenset({EVIDENCE_REVIEW, EVIDENCE_REQUEST})
+_CASES = frozenset({CASE_LOG, CASE_CLASSIFY})
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "VIEWER": frozenset(),
-    "TRIAGE_LEAD": _WORK | {SIGNAL_TRIAGE, INVESTIGATION_CREATE, INVESTIGATION_ASSIGN},
-    "INVESTIGATOR": _WORK | _EVIDENCE | {INVESTIGATION_CREATE, INVESTIGATION_WORK},
+    # B2 (OD-4): the Service Desk logs, checks and classifies Cases; it never triages or reviews.
+    "SERVICE_DESK": _CASES | {RECORDS_WRITE},
+    "TRIAGE_LEAD": _WORK | _CASES | {SIGNAL_TRIAGE, INVESTIGATION_CREATE, INVESTIGATION_ASSIGN, COMPLAINT_TRIAGE},
+    # B2 (OD-4): an Investigator logs a Case but no longer classifies or triages one.
+    "INVESTIGATOR": _WORK | _EVIDENCE | {INVESTIGATION_CREATE, INVESTIGATION_WORK, CASE_LOG},
     # Reviewers of risk and regulatory content read, ask and export; they do not change case records.
     "RISK_REVIEWER": frozenset({AI_RUN, DATA_EXPORT, RISK_REVIEW}) | _EVIDENCE,
-    "REGULATORY_REVIEWER": frozenset({AI_RUN, DATA_EXPORT, REGULATORY_REVIEW, REGULATORY_APPROVE}) | _EVIDENCE,
-    "REVIEWER": _WORK | _EVIDENCE | {QUALITY_REVIEW, INVESTIGATION_ASSIGN},
+    # B2 (OD-4, T-D10): a Regulatory Reviewer triages.
+    "REGULATORY_REVIEWER": frozenset({AI_RUN, DATA_EXPORT, REGULATORY_REVIEW, REGULATORY_APPROVE, COMPLAINT_TRIAGE})
+    | _EVIDENCE,
+    "REVIEWER": _WORK | _EVIDENCE | _CASES | {QUALITY_REVIEW, INVESTIGATION_ASSIGN, COMPLAINT_TRIAGE},
     "APPROVER": _WORK | {REGULATORY_APPROVE, DECISION_SIGN},
     "LEADER": ALL,
     # Platform administrators (MDARIX staff) keep full access to their own tenant's records.

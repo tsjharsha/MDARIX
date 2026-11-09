@@ -41,6 +41,7 @@ pytestmark = pytest.mark.unit
 
 WORK = {RECORDS_WRITE, AI_RUN, DATA_EXPORT}
 EVIDENCE = {EVIDENCE_REVIEW, EVIDENCE_REQUEST}
+CASES = {"case.log", "case.classify"}
 
 
 # ------------------------------------------------------------------------------------------- codes and labels
@@ -73,11 +74,15 @@ def test_the_new_roles_are_standard_roles_with_labels():
     ("role", "allowed"),
     [
         ("Viewer", set()),
-        ("TRIAGE_LEAD", WORK | {SIGNAL_TRIAGE, INVESTIGATION_CREATE, INVESTIGATION_ASSIGN}),
-        ("Investigator", WORK | EVIDENCE | {INVESTIGATION_CREATE, INVESTIGATION_WORK}),
+        # 0.10.93 (B2, OD-4): case.log, case.classify and complaint.triage.
+        ("TRIAGE_LEAD", WORK | CASES | {SIGNAL_TRIAGE, INVESTIGATION_CREATE, INVESTIGATION_ASSIGN, "complaint.triage"}),
+        ("Investigator", WORK | EVIDENCE | {INVESTIGATION_CREATE, INVESTIGATION_WORK, "case.log"}),
         ("Risk Reviewer", {AI_RUN, DATA_EXPORT, RISK_REVIEW} | EVIDENCE),
-        ("REGULATORY_REVIEWER", {AI_RUN, DATA_EXPORT, REGULATORY_REVIEW, REGULATORY_APPROVE} | EVIDENCE),
-        ("Reviewer", WORK | EVIDENCE | {QUALITY_REVIEW, INVESTIGATION_ASSIGN}),
+        (
+            "REGULATORY_REVIEWER",
+            {AI_RUN, DATA_EXPORT, REGULATORY_REVIEW, REGULATORY_APPROVE, "complaint.triage"} | EVIDENCE,
+        ),
+        ("Reviewer", WORK | EVIDENCE | CASES | {QUALITY_REVIEW, INVESTIGATION_ASSIGN, "complaint.triage"}),
         ("Approver", WORK | {REGULATORY_APPROVE, DECISION_SIGN}),
         ("Leader", set(ALL)),
         ("PLATFORM_ADMIN", set(ALL)),
@@ -99,7 +104,7 @@ def test_existing_roles_keep_every_permission_they_had():
     }
     for role, granted in before.items():
         assert granted <= permissions_for_role(role), role
-    assert len(ALL) == 14
+    assert len(ALL) == 17  # 0.10.93 (B2): case.log, case.classify, complaint.triage
 
 
 def test_permissions_of_several_roles_are_their_union():

@@ -29,14 +29,21 @@ import uuid
 from types import SimpleNamespace
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import exists
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.app.trial.sample_source import is_sample
-from backend.app.access.permissions import INVESTIGATION_CREATE, QUALITY_REVIEW, SIGNAL_TRIAGE
+from backend.app.access.permissions import (
+    ALL as ALL_PERMISSIONS,
+    CASE_CLASSIFY,
+    CASE_LOG,
+    COMPLAINT_TRIAGE,
+    QUALITY_REVIEW,
+    effective_permissions,
+)
 from backend.app.complaint_classification import rules as coding
 from backend.app import signing_commit
 from backend.app.db.data_plane import get_data_plane_db
@@ -46,7 +53,7 @@ from backend.app.db.models.ingestion import ImportQuarantineRow
 from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordLink, TriageRecord
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
-from backend.app.evidence_workflow.people import current_person, require_any_permission
+from backend.app.evidence_workflow.people import current_person
 from backend.app.intake import case_rules, rules, service, triage_rules
 from backend.app.paging import open_first
 from backend.app.reportability import markets
@@ -60,8 +67,54 @@ router = APIRouter(prefix="/api/v1", tags=["First contact and triage"])
 OBJECT_TYPE = "FirstContactCheck"
 DECISION_TYPE = "FIRST_CONTACT_CHECK"
 ADMINISTRATOR_ROLES = frozenset({"PLATFORM_ADMIN", "ADMIN", "ADMINISTRATOR", "CUSTOMER_ADMIN"})
-WRITERS = Depends(require_any_permission(SIGNAL_TRIAGE, INVESTIGATION_CREATE, QUALITY_REVIEW))
-TRIAGERS = WRITERS
+
+
+def _refused(control_db, ctx, what: str, needs, **details) -> None:
+    """Audit a refused action (B2 step 4: deny by default, and every refusal is on the record)."""
+    control_db.add(
+        make_audit_event(
+            tenant_id=_tenant(ctx),
+            actor_ref=ctx.user_id,
+            action="ACTION_REFUSED",
+            entity_type="Permission",
+            correlation_id=ctx.correlation_id,
+            details={"action": what, "needs": list(needs), **details},
+        )
+    )
+    control_db.commit()
+
+
+def require_any_permission_audited(*permissions: str):
+    """Deny by default, decided on the server from the person's roles (never from the request): the person holds one
+    of ``permissions``, else 403 and the refusal is audited. A direct API call gets no more than the screens do."""
+    unknown = [permission for permission in permissions if permission not in ALL_PERMISSIONS]
+    if not permissions or unknown:
+        raise ValueError(f"Unknown permission {unknown}")
+
+    def dependency(
+        request: Request,
+        ctx: AuthenticatedRequestContext = Depends(get_request_context),
+        control_db: Session = Depends(get_db),
+    ) -> None:
+        if any(permission in effective_permissions(control_db, ctx) for permission in permissions):
+            return
+        _refused(control_db, ctx, f"{request.method} {request.url.path}", permissions)
+        raise _error(
+            403, "PERMISSION_DENIED", "Your role does not allow this action", permission=" or ".join(permissions)
+        )
+
+    return Depends(dependency)
+
+
+# Who may do what (spec 6.1 and 6.3, OD-4): log a Case (case.log), save the answers and sign the Case check
+# (case.classify), the QA review, withdraw and "QMS complaint not expected" (quality.review), triage
+# (complaint.triage). Any workspace role (every role but a viewer) may log an urgent Case and escalate to triage.
+ANY_ROLE = require_any_permission_audited(*sorted(ALL_PERMISSIONS))
+LOGGERS = require_any_permission_audited(CASE_LOG)
+CLASSIFIERS = require_any_permission_audited(CASE_CLASSIFY)
+REVIEWERS = require_any_permission_audited(QUALITY_REVIEW)
+TRIAGERS = require_any_permission_audited(COMPLAINT_TRIAGE)
+LINKERS = require_any_permission_audited(CASE_LOG, COMPLAINT_TRIAGE)
 # Clock skew allowed for a time entered as "now".
 _SKEW = timedelta(minutes=5)
 
@@ -128,6 +181,9 @@ class SignIn(BaseModel):
     seen_version: int = Field(ge=1)
     password: str = Field(min_length=1, max_length=128)
     mfa_code: str | None = Field(default=None, max_length=12)
+    # B2 (spec 2.4, 3.3 step 2): the duplicate choice at escalation when a likely match exists.
+    attach_to: uuid.UUID | None = None
+    create_new: bool = False
 
 
 class ReviewIn(BaseModel):
@@ -596,7 +652,7 @@ def intake_detail(
     tenant_id = _tenant(ctx)
     event = _event_or_404(db, tenant_id, event_id)
     records = service.triage_records(db, tenant_id)
-    return _event_view(
+    view = _event_view(
         db,
         control_db,
         tenant_id,
@@ -607,6 +663,8 @@ def intake_detail(
         records.get((service.INTAKE, event.id)),
         detail=True,
     )
+    view["contact"] = contact_view(db, control_db, ctx, event)
+    return view
 
 
 # --------------------------------------------------------------------------------------------- logging a contact
@@ -649,7 +707,7 @@ def _resolve_lot(db, tenant_id, product_id, value: str):
     return lot
 
 
-@router.post("/intake", dependencies=[WRITERS])
+@router.post("/intake", dependencies=[ANY_ROLE])
 def log_intake(
     payload: IntakeIn,
     db: Session = Depends(get_data_plane_db),
@@ -663,6 +721,9 @@ def log_intake(
     kind = _choice(payload.kind, ("CONTACT", "URGENT"))
     if kind is None:
         raise _error(422, "UNKNOWN_KIND", "Log a contact or an urgent intake")
+    if kind == "CONTACT" and CASE_LOG not in effective_permissions(control_db, ctx):
+        _refused(control_db, ctx, "POST /api/v1/intake (CONTACT)", [CASE_LOG])
+        raise _error(403, "PERMISSION_DENIED", "Your role may log an urgent case only", permission=CASE_LOG)
     words = payload.reporter_words.strip()
     if len(words) < rules.REASON_MIN:
         raise _error(422, "WORDS_NEEDED", "Write down the reporter's words, as they said them")
@@ -769,8 +830,21 @@ def log_intake(
         )
         service.ensure_follow_up(db, tenant_id, event, answers, suggestion, ctx.user_id, now)
     else:
-        # Urgent intake: a complaint by definition; triaged at once, its QMS complaint to create or link (G20).
-        service.ensure_qms_task(db, tenant_id, event, ctx.user_id, now)
+        # Urgent Case: a complaint by definition. B2: it becomes the Complaint at once and is triaged on the fast track;
+        # a Connect organization gets the task to enter its QMS complaint ID (escalate_case).
+        owner, flow = service.case_setup(db, tenant_id, is_trial(control_db, tenant_id))
+        service.escalate_case(
+            db,
+            control_db,
+            tenant_id,
+            event,
+            None,
+            ctx.user_id,
+            now,
+            record_owner=owner,
+            flow=flow,
+            correlation_id=ctx.correlation_id,
+        )
     flags = rules.intake_flags(kind, words, answers)
     db.add(
         make_audit_event(
@@ -813,7 +887,7 @@ def _by_request_key(db, tenant_id, request_key: str):
     return row.id if row else None
 
 
-@router.put("/intake/{event_id}/check", dependencies=[WRITERS])
+@router.put("/intake/{event_id}/check", dependencies=[CLASSIFIERS])
 def save_check(
     event_id: uuid.UUID,
     payload: CheckIn,
@@ -887,7 +961,7 @@ def save_check(
 
 def _signer_role(control_db, ctx) -> str | None:
     person = current_person(control_db, ctx)
-    role = person.role_for(QUALITY_REVIEW) or person.role_for(SIGNAL_TRIAGE) or person.role_for(INVESTIGATION_CREATE)
+    role = person.role_for(CASE_CLASSIFY) or person.role_for(QUALITY_REVIEW) or person.role_for(COMPLAINT_TRIAGE)
     if (role or "").upper() in ADMINISTRATOR_ROLES:
         raise _error(403, "ADMINISTRATOR_CANNOT_SIGN", "Administrators cannot sign a first-contact check")
     return role
@@ -1037,7 +1111,7 @@ def _second_look(db, tenant_id, event, check, actor, now) -> None:
         )
 
 
-@router.post("/intake/{event_id}/check/sign", dependencies=[WRITERS])
+@router.post("/intake/{event_id}/check/sign", dependencies=[CLASSIFIERS])
 def sign_check(
     event_id: uuid.UUID,
     payload: SignIn,
@@ -1075,6 +1149,7 @@ def sign_check(
         raise _error(422, "CHECK_INCOMPLETE", problem)
     target = case_rules.state_after(classification)
     _move_allowed(control_db, ctx, event, target)
+    attach = _duplicate_choice(db, tenant_id, event, payload) if target == case_rules.ESCALATED else None
     role = _signer_role(control_db, ctx)
     _verify(control_db, ctx, event, payload.password, payload.mfa_code, "FIRST_CONTACT_SIGN")
     now = service.now_utc()
@@ -1118,7 +1193,7 @@ def sign_check(
     if previous is not None:
         previous.superseded_by = latest.id
     db.flush()
-    complaint = _move(db, control_db, ctx, event, latest, target, now)
+    complaint = _move(db, control_db, ctx, event, latest, target, now, attach)
     _after_classification(db, tenant_id, event, latest, previous, ctx.user_id, now)
     _second_look(db, tenant_id, event, latest, ctx.user_id, now)
     control_db.add(
@@ -1177,7 +1252,40 @@ def _move_allowed(control_db, ctx, event, target: str) -> None:
         raise _error(409, "CASE_STATE_REFUSED", problem)
 
 
-def _move(db, control_db, ctx, event, check, target: str, now):
+def _likely_complaints(db, tenant_id, event) -> list[dict]:
+    """The complaints the duplicate check pairs with this Case (same product and lot or serial, near dates, ...)."""
+    found = []
+    for pair in service.duplicates(db, tenant_id):
+        for mine, other in ((pair["left"], pair["right"]), (pair["right"], pair["left"])):
+            if mine["kind"] == service.INTAKE and mine["id"] == str(event.id) and other["kind"] == service.COMPLAINT:
+                found.append({"id": other["id"], "ref": other["ref"], "reasons": pair["reasons"]})
+    return found
+
+
+def _duplicate_choice(db, tenant_id, event, payload) -> Complaint | None:
+    """Escalation never silently duplicates: a Case not linked yet, with a likely duplicate, needs "attach to ..." or
+    "create new" (spec 2.4). Returns the complaint to attach to, or None to create one."""
+    if service.linked_complaint(db, tenant_id, event) is not None:
+        return None
+    if payload.attach_to is not None:
+        complaint = (
+            db.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.id == payload.attach_to).first()
+        )
+        if complaint is None:
+            raise _error(404, "RECORD_NOT_FOUND", "No such complaint in your organization")
+        return complaint
+    likely = [] if payload.create_new else _likely_complaints(db, tenant_id, event)
+    if likely:
+        raise _error(
+            422,
+            "DUPLICATE_CHOICE_NEEDED",
+            "A likely duplicate exists: attach this case to it, or create a new complaint",
+            candidates=likely,
+        )
+    return None
+
+
+def _move(db, control_db, ctx, event, check, target: str, now, attach_to=None):
     """Move the Case after a signed classification: a complaint escalates it (create or attach); any other outcome
     sets its state. Returns the Complaint when it escalated."""
     tenant_id = _tenant(ctx)
@@ -1195,11 +1303,12 @@ def _move(db, control_db, ctx, event, check, target: str, now):
         now,
         record_owner=owner,
         flow=flow,
+        attach_to=attach_to,
         correlation_id=ctx.correlation_id,
     )
 
 
-@router.post("/intake/{event_id}/check/review", dependencies=[WRITERS])
+@router.post("/intake/{event_id}/check/review", dependencies=[REVIEWERS])
 def review_check(
     event_id: uuid.UUID,
     payload: ReviewIn,
@@ -1223,6 +1332,9 @@ def review_check(
         raise _error(422, "UNKNOWN_OUTCOME", "Agree, or reclassify it as a complaint")
     if len(note) < rules.REASON_MIN:
         raise _error(422, "NOTE_NEEDED", f"Say in at least {rules.REASON_MIN} characters what you checked")
+    if signed.signed_by == str(ctx.user_id) and not is_trial(control_db, tenant_id):
+        _refused(control_db, ctx, "QA review", [QUALITY_REVIEW], why="REVIEWER_IS_SIGNER", case=event.reference)
+        raise _error(403, "REVIEWER_IS_SIGNER", "The QA review is done by someone other than the person who signed")
     if rules.clean(payload.resolution_summary):
         event.resolution_summary = rules.clean(payload.resolution_summary)
     # Cases signed before 0.10.93 keep their state until the data script sets it: only an IN_REVIEW Case closes.
@@ -1336,7 +1448,7 @@ def review_check(
     return intake_detail(event.id, db, control_db, ctx)
 
 
-@router.post("/intake/{event_id}/follow-up", dependencies=[WRITERS])
+@router.post("/intake/{event_id}/follow-up", dependencies=[LOGGERS])
 def close_follow_up(
     event_id: uuid.UUID,
     payload: FollowUpIn,
@@ -1394,7 +1506,7 @@ def close_follow_up(
     return intake_detail(event.id, db, control_db, ctx)
 
 
-@router.post("/intake/{event_id}/qms", dependencies=[WRITERS])
+@router.post("/intake/{event_id}/qms", dependencies=[require_any_permission_audited(CASE_LOG, QUALITY_REVIEW)])
 def qms_complaint(
     event_id: uuid.UUID,
     payload: QmsIn,
@@ -1424,6 +1536,17 @@ def qms_complaint(
         service.confirm_by_import(db, tenant_id, [ref], str(ctx.user_id), now)
         action = "QMS_COMPLAINT_ENTERED"
     elif len(reason) >= rules.REASON_MIN:
+        if QUALITY_REVIEW not in effective_permissions(control_db, ctx):
+            _refused(control_db, ctx, "QMS complaint not expected", [QUALITY_REVIEW], case=event.reference)
+            raise _error(403, "PERMISSION_DENIED", "A quality reviewer records that no QMS complaint is expected")
+        signer = service.current_signed(service.checks_of(db, tenant_id, [event.id]).get(event.id, []))
+        if signer is not None and signer.signed_by == str(ctx.user_id) and not is_trial(control_db, tenant_id):
+            _refused(
+                control_db, ctx, "QMS complaint not expected", [QUALITY_REVIEW], why="SIGNER", case=event.reference
+            )
+            raise _error(
+                403, "SAME_PERSON", "Someone other than the Case's signer records that no QMS complaint is expected"
+            )
         complete_tasks(
             db,
             tenant_id,
@@ -1458,7 +1581,7 @@ def qms_complaint(
     return intake_detail(event.id, db, control_db, ctx)
 
 
-@router.post("/intake/from-complaint/{complaint_id}", dependencies=[WRITERS])
+@router.post("/intake/from-complaint/{complaint_id}", dependencies=[CLASSIFIERS])
 def check_service_record(
     complaint_id: uuid.UUID,
     db: Session = Depends(get_data_plane_db),
@@ -1554,7 +1677,7 @@ def _record_exists(db, tenant_id, kind: str, record_id: uuid.UUID) -> bool:
     return db.query(model.id).filter(model.tenant_id == tenant_id, model.id == record_id).first() is not None
 
 
-@router.post("/intake/links", dependencies=[WRITERS])
+@router.post("/intake/links", dependencies=[LINKERS])
 def decide_link(
     payload: LinkIn,
     db: Session = Depends(get_data_plane_db),
@@ -1677,7 +1800,7 @@ def _signed_since(db, tenant_id, link: RecordLink) -> list[str]:
     return found
 
 
-@router.post("/intake/links/{link_id}/undo", dependencies=[WRITERS])
+@router.post("/intake/links/{link_id}/undo", dependencies=[LINKERS])
 def undo_link(
     link_id: uuid.UUID,
     payload: UndoIn,
@@ -1775,7 +1898,7 @@ def _record_for(db, tenant_id, kind, record_id, actor, now, opened=None) -> Tria
     return record
 
 
-@router.post("/triage/escalate", dependencies=[WRITERS])
+@router.post("/triage/escalate", dependencies=[ANY_ROLE])
 def escalate(
     payload: EscalateIn,
     db: Session = Depends(get_data_plane_db),
@@ -2412,3 +2535,259 @@ def triage_versions(
             for row in rows
         ]
     }
+
+
+# --------------------------------------------------------------------------------------------- Case actions (B2 step 4)
+
+
+class VoidIn(BaseModel):
+    reason: str = Field(default="", max_length=rules.TEXT_MAX)
+    password: str = Field(min_length=1, max_length=128)
+    mfa_code: str | None = Field(default=None, max_length=12)
+
+
+class WaitingIn(BaseModel):
+    waiting: bool = True
+    reason: str = Field(default="", max_length=rules.TEXT_MAX)
+
+
+class ContactIn(BaseModel):
+    organisation: str = Field(default="", max_length=200)
+    contact_role: str = Field(default="", max_length=120)
+    phone: str = Field(default="", max_length=40)
+    email: str = Field(default="", max_length=254)
+    preferred_channel: str = Field(default="", max_length=20)
+    name: str = Field(default="", max_length=200)
+    no_contact_reason: str = Field(default="", max_length=rules.TEXT_MAX)
+
+
+CONTACT_CHANNELS = ("PHONE", "EMAIL", "LETTER", "DISTRIBUTOR")
+# OD-1: who sees the contact itself; everyone else reads "Contact held".
+CONTACT_READERS = frozenset({"SERVICE_DESK", "TRIAGE_LEAD", "REVIEWER", "REGULATORY_REVIEWER", "LEADER"})
+
+
+@router.post("/intake/{event_id}/void", dependencies=[REVIEWERS])
+def void_case(
+    event_id: uuid.UUID,
+    payload: VoidIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Withdraw a Case entered in error (spec 2.5, 3.2): only before it became a complaint, signed with a reason;
+    outside the trial by someone other than the person who logged it (spec 6.4)."""
+    tenant_id = _tenant(ctx)
+    event = _event_or_404(db, tenant_id, event_id, lock=True)
+    reason = rules.clean(payload.reason)
+    if len(reason) < rules.REASON_MIN:
+        raise _error(422, "REASON_NEEDED", f"Say in at least {rules.REASON_MIN} characters why it was entered in error")
+    if event.created_by == str(ctx.user_id) and not is_trial(control_db, tenant_id):
+        _refused(control_db, ctx, "Withdraw a case", [QUALITY_REVIEW], why="LOGGER", case=event.reference)
+        raise _error(403, "SAME_PERSON", "Someone other than the person who logged the case withdraws it")
+    if event.status == case_rules.VOIDED:
+        raise _error(409, "CASE_STATE_REFUSED", "This case is withdrawn already")
+    _move_allowed(control_db, ctx, event, case_rules.VOIDED)
+    role = _signer_role(control_db, ctx)
+    _verify(control_db, ctx, event, payload.password, payload.mfa_code, "CASE_VOID")
+    now = service.now_utc()
+    signed_id, _ = _signature(
+        control_db,
+        ctx,
+        tenant_id,
+        event.id,
+        event.version or 1,
+        "VOIDED",
+        reason,
+        role,
+        {"case": event.reference, "reason": reason, "status": event.status},
+        now,
+        f"I withdraw case {event.reference}: entered in error.",
+        object_type="IntakeEvent",
+        decision_type="CASE_VOID",
+    )
+    event.voided_at, event.voided_by, event.void_reason = now, str(ctx.user_id), reason
+    event.void_signed_record_id = signed_id
+    service.set_case_status(
+        db, control_db, tenant_id, event, case_rules.VOIDED, ctx.user_id, now, ctx.correlation_id, reason
+    )
+    service._audit(
+        control_db,
+        tenant_id,
+        ctx.user_id,
+        "CASE_VOIDED",
+        event,
+        now,
+        ctx.correlation_id,
+        reason=reason,
+        signature_id=str(signed_id),
+        same_person=event.created_by == str(ctx.user_id),
+    )
+    _commit(db, control_db)
+    return intake_detail(event.id, db, control_db, ctx)
+
+
+@router.post("/intake/{event_id}/waiting", dependencies=[LOGGERS])
+def wait_internal(
+    event_id: uuid.UUID,
+    payload: WaitingIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """S-2: send a Case to the internal team (engineering, technical support), or take it back when they answered:
+    back to the QA review or the reporter's follow-up its signed outcome started, else To check."""
+    tenant_id = _tenant(ctx)
+    event = _event_or_404(db, tenant_id, event_id, lock=True)
+    reason = rules.clean(payload.reason)
+    if len(reason) < rules.REASON_MIN:
+        raise _error(422, "REASON_NEEDED", f"Say in at least {rules.REASON_MIN} characters what the team is asked")
+    if payload.waiting:
+        target = case_rules.WAITING_INTERNAL
+    elif event.status != case_rules.WAITING_INTERNAL:
+        raise _error(409, "NOT_WAITING", "This case is not waiting for the internal team")
+    else:
+        signed = service.current_signed(service.checks_of(db, tenant_id, [event.id]).get(event.id, []))
+        after = case_rules.state_after(signed.classification) if signed is not None else case_rules.OPEN
+        target = after if after in (case_rules.PENDING, case_rules.IN_REVIEW) else case_rules.OPEN
+    _move_allowed(control_db, ctx, event, target)
+    now = service.now_utc()
+    service.set_case_status(db, control_db, tenant_id, event, target, ctx.user_id, now, ctx.correlation_id, reason)
+    _commit(db, control_db)
+    return intake_detail(event.id, db, control_db, ctx)
+
+
+def _reporter(db, tenant_id, event_id):
+    from backend.app.db.models.guides_communications import ExternalParty
+
+    return (
+        db.query(ExternalParty)
+        .filter(
+            ExternalParty.tenant_id == tenant_id,
+            ExternalParty.intake_event_id == event_id,
+            ExternalParty.party_type == "REPORTER",
+        )
+        .first()
+    )
+
+
+def contact_view(db, control_db, ctx, event) -> dict:
+    """OD-1: the contact for those who need it (Service Desk, Complaint Handler, Quality Reviewer, Regulatory
+    Reviewer, Leader); everyone else reads "Contact held". Plain views are not audited (too frequent to be useful)."""
+    from backend.app.access.permissions import effective_roles
+    from backend.app.role_codes import role_code
+
+    party = _reporter(db, _tenant(ctx), event.id)
+    held = party is not None and party.contact_erased_at is None
+    base = {
+        "held": held,
+        "erased": bool(party is not None and party.contact_erased_at),
+        "no_contact_reason": event.no_contact_reason,
+    }
+    if not held or not {role_code(role) for role in effective_roles(control_db, ctx)} & CONTACT_READERS:
+        return {**base, "label": "Contact held" if held else "No contact held"}
+    return {
+        **base,
+        "label": "Contact held",
+        "organisation": party.name,
+        "contact_role": party.contact_role,
+        "name": party.primary_name,
+        "phone": party.contact_phone,
+        "email": party.contact_email,
+        "preferred_channel": party.preferred_channel,
+    }
+
+
+@router.put("/intake/{event_id}/contact", dependencies=[LOGGERS])
+def set_contact(
+    event_id: uuid.UUID,
+    payload: ContactIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """OD-1: the Case's customer contact, structured (organisation, job role, phone, e-mail, preferred way to reply),
+    or "No contact" with why. The trial holds an organisation contact only, never a personal name. A Connect
+    organization keeps the contact in its QMS. Every edit is audited by field name, never by value."""
+    from backend.app.db.models.guides_communications import ExternalParty
+
+    tenant_id = _tenant(ctx)
+    event = _event_or_404(db, tenant_id, event_id, lock=True)
+    trial = is_trial(control_db, tenant_id)
+    owner, _ = service.case_setup(db, tenant_id, trial)
+    if owner == "EXTERNAL":
+        raise _error(409, "CONTACT_IN_QMS", "Contact: in your QMS. MDARIX holds no contact for this organization")
+    if trial and rules.clean(payload.name):
+        raise _error(422, "NO_PERSONAL_NAME", "The trial holds an organisation contact only: no personal name")
+    values = {
+        "name": rules.clean(payload.organisation, 200),
+        "contact_role": rules.clean(payload.contact_role, 120),
+        "primary_name": rules.clean(payload.name, 200),
+        "contact_phone": rules.clean(payload.phone, 40),
+        "contact_email": rules.clean(payload.email, 254),
+        "preferred_channel": _choice(payload.preferred_channel, CONTACT_CHANNELS) if payload.preferred_channel else "",
+    }
+    if values["preferred_channel"] is None:
+        raise _error(422, "UNKNOWN_CHANNEL", "Reply by phone, e-mail, letter or through the distributor")
+    if values["contact_email"] and "@" not in values["contact_email"]:
+        raise _error(422, "EMAIL_INVALID", "Enter an e-mail address, or leave it empty")
+    no_contact = rules.clean(payload.no_contact_reason)
+    if not any(values.values()) and len(no_contact) < rules.REASON_MIN:
+        raise _error(422, "CONTACT_OR_REASON", "Enter the contact, or say why there is none (anonymous or refused)")
+    now = service.now_utc()
+    party = _reporter(db, tenant_id, event.id)
+    if party is None:
+        party = ExternalParty(
+            tenant_id=tenant_id,
+            party_type="REPORTER",
+            name=values["name"] or event.reporter_site or "Reporter",
+            intake_event_id=event.id,
+            complaint_id=event.complaint_id,
+            source_system="MDARIX_CASE",
+            created_by=str(ctx.user_id),
+            created_at=now,
+            updated_by=str(ctx.user_id),
+            updated_at=now,
+        )
+        db.add(party)
+    changed = sorted(field for field, value in values.items() if (getattr(party, field) or "") != value)
+    for field, value in values.items():
+        if field != "name" or value:
+            setattr(party, field, value or None)
+    party.contact_erased_at = party.contact_erased_by = party.contact_erase_reason = None
+    party.updated_by, party.updated_at = str(ctx.user_id), now
+    event.no_contact_reason, event.updated_at = no_contact or None, now
+    service._audit(
+        control_db, tenant_id, ctx.user_id, "CASE_CONTACT_SET", event, now, ctx.correlation_id, fields=changed
+    )
+    _commit(db, control_db)
+    return intake_detail(event.id, db, control_db, ctx)
+
+
+@router.post("/intake/{event_id}/contact/erase", dependencies=[REVIEWERS])
+def erase_contact(
+    event_id: uuid.UUID,
+    payload: UndoIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """OD-1: erase the contact on a data-subject request, with a reason; the Case then says "contact erased on
+    request". The record of the complaint itself stays."""
+    tenant_id = _tenant(ctx)
+    event = _event_or_404(db, tenant_id, event_id, lock=True)
+    reason = rules.clean(payload.reason)
+    if len(reason) < rules.REASON_MIN:
+        raise _error(422, "REASON_NEEDED", f"Say in at least {rules.REASON_MIN} characters why it is erased")
+    party = _reporter(db, tenant_id, event.id)
+    if party is None or party.contact_erased_at is not None:
+        raise _error(404, "NO_CONTACT", "No contact is held on this case")
+    now = service.now_utc()
+    party.contact_role = party.contact_phone = party.contact_email = party.preferred_channel = None
+    party.primary_name, party.primary_details = None, None
+    party.contact_erased_at, party.contact_erased_by, party.contact_erase_reason = now, str(ctx.user_id), reason
+    party.updated_by, party.updated_at = str(ctx.user_id), now
+    service._audit(
+        control_db, tenant_id, ctx.user_id, "CASE_CONTACT_ERASED", event, now, ctx.correlation_id, reason=reason
+    )
+    _commit(db, control_db)
+    return intake_detail(event.id, db, control_db, ctx)

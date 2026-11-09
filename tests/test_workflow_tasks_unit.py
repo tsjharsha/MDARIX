@@ -48,6 +48,11 @@ CONTRACT = {
     "EXTERNAL_REPLY_DUE": ("signal.triage", "TRIAGE_LEAD"),
     # A step sent from a complaint's page to a colleague who may sign it (0.10.68).
     "COMPLAINT_STEP": ("signal.triage", "TRIAGE_LEAD"),
+    # 0.10.93 (B2) triage: harm follow-up, containment tasks, the second person's downgrade approval.
+    "TRIAGE_HARM_FOLLOW_UP": ("signal.triage", "TRIAGE_LEAD"),
+    "LOT_HOLD": ("signal.triage", "TRIAGE_LEAD"),
+    "FIELD_ACTION_DECISION": ("signal.triage", "TRIAGE_LEAD"),
+    "TRIAGE_DOWNGRADE_APPROVAL": ("signal.triage", "LEADER"),
 }
 
 

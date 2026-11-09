@@ -286,6 +286,7 @@ def _call(client: TestClient, method: str, path: str):
                 "investigation.work",
                 "evidence.review",
                 "evidence.request",
+                "case.log",  # 0.10.93 (B2, OD-4): logs a Case, never classifies or triages
             },
         ),
         # Investigator-level rights in the workspace; never regulatory approval (decision of 2026-10).
