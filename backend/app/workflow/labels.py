@@ -58,6 +58,12 @@ TASK_TYPES: dict[str, TaskType] = {
     # A step of a complaint sent to a colleague from its page (0.10.68, "Send to"): always for a named person who
     # may sign that step; finished when that person has done it, or by hand.
     "COMPLAINT_STEP": TaskType("A step on a complaint", SIGNAL_TRIAGE_PERMISSION, "TRIAGE_LEAD"),
+    # 0.10.93 (B2) triage: a "Not known yet" harm to find out (1 working day), the containment tasks (T-D11) and the
+    # second person's approval of a downgrade of a fast-track triage (A6, the escalation role's queue).
+    "TRIAGE_HARM_FOLLOW_UP": TaskType("Find out the harm", SIGNAL_TRIAGE_PERMISSION, "TRIAGE_LEAD"),
+    "LOT_HOLD": TaskType("Lot impact: hold the lot?", SIGNAL_TRIAGE_PERMISSION, "TRIAGE_LEAD"),
+    "FIELD_ACTION_DECISION": TaskType("Field action decision", SIGNAL_TRIAGE_PERMISSION, "TRIAGE_LEAD"),
+    "TRIAGE_DOWNGRADE_APPROVAL": TaskType("Approve a triage downgrade", SIGNAL_TRIAGE_PERMISSION, "LEADER"),
 }
 
 # Task types a person finishes by hand (POST /api/v1/tasks/{id}/complete); every other type is finished by the

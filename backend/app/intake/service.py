@@ -32,7 +32,7 @@ from backend.app.db.models.foundation import AuthUser, Complaint, InvestigationC
 from backend.app.db.models.ingestion import ImportQuarantineRow
 from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordFieldChange, RecordLink, TriageRecord
 from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
-from backend.app.intake import case_rules, rules
+from backend.app.intake import case_rules, rules, triage_rules
 from backend.app.reportability import markets
 from backend.app.reportability.deadlines import day_only
 from backend.app.business_ids import complaint_ref
@@ -441,6 +441,7 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
             "available_at": rules.utc(event.created_at),
             "awareness": event_awareness(event, record),
             "classification": signed.classification if signed else None,
+            "signed_by": signed.signed_by if signed else None,
             "suggestion": latest.suggestion if latest else None,
             "sample": is_sample(event.source_system),
         }
@@ -471,6 +472,8 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
             "available_at": rules.utc(complaint.ingestion_timestamp or complaint.created_at),
             "awareness": complaint_awareness(complaint, record),
             "sample": complaint.source_system == "MDARIX_SAMPLE",
+            # B2: a Complaint a Case became is triaged, routine or fast (spec 3.4).
+            "case_complaint": complaint.source_system == "MDARIX_CASE",
         }
     excluded = _excluded_complaints(db, tenant_id, [key[1] for key in found if key[0] == COMPLAINT])
     for complaint_id in excluded:
@@ -525,6 +528,8 @@ def _listed(subject: dict, record: TriageRecord | None) -> bool:
     if record is not None and record.escalated_at is not None:
         return True
     if subject["kind"] == INTAKE and subject.get("intake_kind") == "URGENT":
+        return True
+    if subject.get("case_complaint"):
         return True
     return bool(subject["flags"]) and not subject.get("taken_up")
 
@@ -653,7 +658,20 @@ def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datet
         row.id: markets.product_is_ivd(row)
         for row in db.query(Product).filter(Product.tenant_id == tenant_id).limit(READ_LIMIT)
     }
-    return {"org_zone": zone, "signed": signed, "products": products}
+    return {
+        "org_zone": zone,
+        "signed": signed,
+        "products": products,
+        "fast_hours": fast_hours(db, tenant_id),
+        "calendar": calendar(db, tenant_id),
+    }
+
+
+def fast_hours(db: Session, tenant_id) -> int:
+    from backend.app.db.models.oversight import OversightSettings
+
+    row = db.query(OversightSettings.triage_fast_hours).filter(OversightSettings.tenant_id == tenant_id).first()
+    return row.triage_fast_hours if row else 4
 
 
 def _starter() -> str:
@@ -716,6 +734,21 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
     opened = rules.utc(record.opened_at) if record is not None else primary["available_at"]
     # A link that brought an earlier awareness reopens triage: its target counts from the link (G19's reopening).
     opened = max([opened, *(rules.utc(link.decided_at) for link in conflict)])
+    # B2: two speeds, the floor and the acknowledgement of a fast-track item (triage_rules).
+    found_facts = triage_rules.facts(flags, threat)
+    reopened = bool(record is not None and record.reopened_at is not None and record.completed_at is None)
+    pace = triage_rules.speed(
+        found_facts,
+        record.potential_severity if record is not None else None,
+        record.severity if record is not None else None,
+        reopened or bool(conflict),
+    )
+    target = triage_rules.due(pace, opened, context["fast_hours"], context["calendar"])
+    least, floor_reasons = triage_rules.floor(found_facts)
+    acked = rules.utc(record.acknowledged_at) if record is not None and record.acknowledged_at else None
+    acked = acked if acked is not None and acked >= opened else None
+    ack_due = triage_rules.ack_due(opened, target)
+    signer = next((found[key].get("signed_by") for key in members if found[key].get("signed_by")), None)
     return {
         "key": f"{primary['kind']}:{primary['id']}",
         "kind": primary["kind"],
@@ -752,7 +785,29 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
         },
         "available_at": primary["available_at"].isoformat(),
         "delay": rules.delay_text(awareness["at"], primary["available_at"]),
-        "triage_clock": rules.triage_clock(opened, now, record.target_hours if record else rules.TRIAGE_TARGET_HOURS),
+        "triage_clock": triage_rules.clock(opened, target, now),
+        "speed": pace,
+        "speed_label": triage_rules.SPEED_LABELS[pace],
+        "speed_why": triage_rules.why_fast(
+            found_facts,
+            record.potential_severity if record is not None else None,
+            record.severity if record is not None else None,
+            reopened or bool(conflict),
+        ),
+        "facts": found_facts,
+        "severity_floor": least,
+        "floor_note": floor_reasons[0] if floor_reasons else None,
+        "acknowledgement": {
+            "required": pace == triage_rules.FAST,
+            "done": acked is not None,
+            "due_at": ack_due.isoformat(),
+            "overdue": pace == triage_rules.FAST and acked is None and ack_due < now,
+            "acknowledged_at": _iso(acked),
+            "acknowledged_by": (names.get(record.acknowledged_by) or "A colleague") if acked else None,
+        },
+        "routine_prefill": {**triage_rules.ROUTINE_PREFILL, "triage_owner": signer, "event_owner": signer}
+        if pace == triage_rules.ROUTINE
+        else None,
         "deadlines": deadlines,
         "own_market": own,
         "earliest_due": deadlines[0]["due_at"] if deadlines else None,
@@ -797,6 +852,18 @@ def record_view(record: TriageRecord, names: dict) -> dict:
         "awareness_note": record.awareness_note,
         "completed_by": name(record.completed_by),
         "completed_at": _iso(record.completed_at),
+        # B2 (tr19): versions, two speeds, the floor, containment, reopening, the signed threat exclusion.
+        "version": record.version,
+        "speed": record.speed,
+        "potential_severity": record.potential_severity,
+        "severity_floor": record.severity_floor,
+        "containment": record.containment,
+        "change_reason": record.change_reason,
+        "reopened_at": _iso(record.reopened_at),
+        "reopen_trigger": record.reopen_trigger,
+        "threat_excluded_at": _iso(record.threat_excluded_at),
+        "threat_exclusion_reason": record.threat_exclusion_reason,
+        "inherited_from": str(record.inherited_from) if record.inherited_from else None,
     }
 
 
@@ -1266,6 +1333,8 @@ def escalate_case(
             f"Escalated from case {event.reference}",
         )
     event.complaint_id, event.escalation, event.escalated_at, event.escalated_by = complaint.id, mode, now, str(actor)
+    # T-D8: a Case triaged before signing (flagged) hands its triage to the Complaint.
+    inherit_triage(db, audit_db, tenant_id, (INTAKE, event.id), (COMPLAINT, complaint.id), actor, now, correlation_id)
     set_case_status(
         db,
         audit_db,
@@ -1291,3 +1360,202 @@ def escalate_case(
         awareness_at=_iso(aware["at"]),
     )
     return complaint
+
+
+# --------------------------------------------------------------------------------------------- triage versions (B2)
+
+# The fields a triage version keeps (spec 3.4: "Versions": who changed what, old -> new).
+TRACKED = (
+    "severity",
+    "potential_severity",
+    "speed",
+    "public_health_threat",
+    "remedial_action",
+    "event_owner",
+    "triage_owner",
+    "backup_owner",
+    "immediate_action",
+    "no_action_reason",
+    "containment",
+    "awareness_confirmed_at",
+    "threat_excluded_at",
+)
+
+
+def triage_snapshot(record: TriageRecord) -> dict:
+    found = {}
+    for name in TRACKED:
+        value = getattr(record, name)
+        found[name] = value.isoformat() if isinstance(value, datetime) else value
+    return found
+
+
+def add_triage_version(
+    db: Session, tenant_id, record: TriageRecord, before: dict | None, actor, now, reason=None, signed=None
+) -> dict:
+    """Keep the record's current state as a new version (never overwritten); returns the changed fields old -> new.
+    The first version is 1; each later one adds 1 to the record's ``version``."""
+    from backend.app.db.models.intake import TriageRecordVersion
+
+    after = triage_snapshot(record)
+    changed = {
+        name: {"old": (before or {}).get(name), "new": after[name]}
+        for name in TRACKED
+        if (before or {}).get(name) != after[name]
+    }
+    has_versions = (
+        db.query(TriageRecordVersion.id)
+        .filter(TriageRecordVersion.tenant_id == tenant_id, TriageRecordVersion.triage_record_id == record.id)
+        .first()
+        is not None
+    )
+    if has_versions:
+        record.version = (record.version or 1) + 1
+    db.add(
+        TriageRecordVersion(
+            tenant_id=tenant_id,
+            triage_record_id=record.id,
+            version=record.version or 1,
+            snapshot=after,
+            changed_fields=changed,
+            change_reason=reason,
+            changed_by=str(actor),
+            changed_at=now,
+            signed_record_id=signed,
+        )
+    )
+    return changed
+
+
+def triage_versions(db: Session, tenant_id, record_id) -> list:
+    from backend.app.db.models.intake import TriageRecordVersion
+
+    return (
+        db.query(TriageRecordVersion)
+        .filter(TriageRecordVersion.tenant_id == tenant_id, TriageRecordVersion.triage_record_id == record_id)
+        .order_by(TriageRecordVersion.version)
+        .all()
+    )
+
+
+_INHERITED = (
+    "opened_at",
+    "target_hours",
+    "severity",
+    "public_health_threat",
+    "remedial_action",
+    "event_owner",
+    "triage_owner",
+    "backup_owner",
+    "immediate_action",
+    "no_action_reason",
+    "awareness_confirmed_at",
+    "awareness_note",
+    "completed_by",
+    "completed_at",
+    "speed",
+    "potential_severity",
+    "severity_floor",
+    "floor_reasons",
+    "flags_at_completion",
+    "containment",
+    "acknowledged_at",
+    "acknowledged_by",
+)
+
+
+def inherit_triage(db: Session, audit_db, tenant_id, source: tuple, target: tuple, actor, now, correlation_id=None):
+    """T-D8: triage belongs to the event. A record joining an event already triaged gets an INHERITED copy (version 1,
+    ``inherited_from`` set). Nothing happens when the source is not triaged or the target has its own record."""
+    from backend.app.enterprise_audit import make_audit_event
+
+    rows = {
+        (row.subject_kind, row.subject_id): row
+        for row in db.query(TriageRecord).filter(
+            TriageRecord.tenant_id == tenant_id,
+            or_(
+                (TriageRecord.subject_kind == source[0]) & (TriageRecord.subject_id == source[1]),
+                (TriageRecord.subject_kind == target[0]) & (TriageRecord.subject_id == target[1]),
+            ),
+        )
+    }
+    origin = rows.get(source)
+    if origin is None or origin.completed_at is None or target in rows:
+        return None
+    copy = TriageRecord(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        subject_kind=target[0],
+        subject_id=target[1],
+        created_by=str(actor),
+        created_at=now,
+        updated_at=now,
+        inherited_from=origin.id,
+        version=1,
+        **{name: getattr(origin, name) for name in _INHERITED},
+    )
+    db.add(copy)
+    db.flush()
+    add_triage_version(db, tenant_id, copy, None, actor, now, f"Inherited from the event's triage {origin.id}")
+    audit_db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=actor,
+            action="TRIAGE_INHERITED",
+            entity_type="TriageRecord",
+            entity_id=copy.id,
+            correlation_id=correlation_id,
+            details={"from": str(origin.id), "subject": f"{target[0]}:{target[1]}"},
+            created_at=now,
+        )
+    )
+    return copy
+
+
+def reopen_raised(db: Session, control_db, tenant_id, actor, now, correlation_id=None, why: str = "") -> list[str]:
+    """T-D7: a finished triage whose facts now hold a death, a serious injury or a threat it did not hold at completion,
+    or a higher floor, reopens on the fast track; its target counts from now and it must be acknowledged again (A1).
+    Returns the reopened items' references. Flushes; the caller commits."""
+    from backend.app.enterprise_audit import make_audit_event
+
+    records = triage_records(db, tenant_id)
+    reopened = []
+    hours = fast_hours(db, tenant_id)
+    for item in triage(db, control_db, tenant_id, "all", now)["items"]:
+        for member in item["members"]:
+            kind, member_id = member.split(":")
+            record = records.get((kind, uuid.UUID(member_id)))
+            if record is None or record.completed_at is None or not record.flags_at_completion:
+                continue
+            trigger = triage_rules.reopen_trigger(
+                record.flags_at_completion.get("facts"), item["facts"], record.severity_floor, item["severity_floor"]
+            )
+            if trigger is None:
+                continue
+            record.completed_at = record.completed_by = None
+            record.opened_at = record.reopened_at = record.updated_at = now
+            record.reopen_trigger, record.speed = trigger, triage_rules.FAST
+            record.due_at = now + timedelta(hours=hours)
+            record.acknowledge_due_at = triage_rules.ack_due(now, record.due_at)
+            db.add(
+                make_audit_event(
+                    tenant_id=tenant_id,
+                    actor_ref=actor,
+                    action="TRIAGE_REOPENED",
+                    entity_type="TriageRecord",
+                    entity_id=record.id,
+                    correlation_id=correlation_id,
+                    reason=why or None,
+                    details={
+                        "trigger": trigger,
+                        "before": record.flags_at_completion.get("facts"),
+                        "after": item["facts"],
+                        "floor_before": record.severity_floor,
+                        "floor_after": item["severity_floor"],
+                    },
+                    created_at=now,
+                )
+            )
+            reopened.append(item["ref"])
+    db.flush()
+    return reopened

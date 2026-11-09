@@ -178,6 +178,10 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
             f"/api/v1/triage/COMPLAINT/{complaint}/record",
             json={
                 "severity": "NEGLIGIBLE",
+                "potential_severity": "MINOR",
+                "backup_owner": next(
+                    person["id"] for person in me if person["name"] == "Rahul Colleague"
+                ),  # B2: fast track with two people
                 "event_owner": owner,
                 "triage_owner": owner,
                 "immediate_action": "Monitor out of use and sent for service.",

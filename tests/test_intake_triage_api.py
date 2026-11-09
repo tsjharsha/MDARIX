@@ -145,7 +145,7 @@ def test_an_urgent_intake_creates_a_triage_item_at_once_with_its_clock(trial):  
     item = _triage(user)[event["reference"]]
     assert {flag["code"] for flag in item["flags"]} >= {"URGENT_INTAKE", "HARM_WORDS"}
     assert datetime.fromisoformat(item["awareness"]["at"]) == aware and not item["awareness"]["unresolved"]
-    assert item["triage_clock"]["target_hours"] == 24 and item["deadlines"]
+    assert item["triage_clock"]["target_hours"] == 4 and item["speed"] == "FAST" and item["deadlines"]  # B2: fast track
     assert item["delay"]["text"] == "3 hours"
     assert event["qms_task"]["state"] == "OPEN"
 

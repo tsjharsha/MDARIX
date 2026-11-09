@@ -799,6 +799,12 @@ def _alert_view(alert: DueAlert, now: datetime, hours: int, names: dict, zone: s
         "raised_at": alert.raised_at.isoformat(),
         "read": alert.read_at is not None,
         "opens": alert.opens,
+        # A2 (B2): how it was delivered; a failure shows and the alert stays.
+        "channel": alert.channel,
+        "attempts": alert.attempts,
+        "last_attempt_at": alert.last_attempt_at.isoformat() if alert.last_attempt_at else None,
+        "delivery": alert.delivery,
+        "delivery_error": alert.delivery_error,
     }
 
 

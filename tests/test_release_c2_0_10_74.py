@@ -167,6 +167,7 @@ def test_signing_puts_the_complaint_in_signed_this_month_its_activity_and_the_pe
             f"/api/v1/triage/COMPLAINT/{complaint}/record",
             json={
                 "severity": "NEGLIGIBLE",
+                "potential_severity": "MINOR",
                 "event_owner": owner,
                 "triage_owner": owner,
                 "immediate_action": "Sent for service.",

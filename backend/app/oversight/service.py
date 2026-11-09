@@ -278,6 +278,21 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
                 **common,
             )
         )
+        # A1 (B2): a fast-track item waits for a named owner's acknowledgement; overdue, the sweep escalates it to the
+        # backup and the escalation role (the next authorised role).
+        ack = item.get("acknowledgement") or {}
+        # shortcut: the sample's fast items (the story's triage steps) raise no acknowledgement alert, so day 0 stays
+        # calm (0.10.64); revisit with Getting started Part 1 (B2 step 7).
+        if ack.get("required") and not ack.get("done") and not item.get("sample"):
+            found.append(
+                _item(
+                    f"ack:{item['key']}",
+                    "TRIAGE",
+                    f"Acknowledge the fast-track triage of {item['ref']}",
+                    datetime.fromisoformat(ack["due_at"]),
+                    **common,
+                )
+            )
         # An urgent intake is not a complaint yet: its provisional deadline is on no other list.
         if item["kind"] == intake.INTAKE and item["deadlines"] and item["deadlines"][0]["due_at"]:
             first = item["deadlines"][0]
@@ -548,6 +563,50 @@ def _trial_owner(control_db: Session | None, tenant_id) -> str | None:
     return str(found) if found else None
 
 
+DELIVERED, FAILED, RETRYING = "DELIVERED", "FAILED", "RETRYING"
+# shortcut: a fixed number of delivery attempts per alert; a setting when out-of-app channels arrive (B7).
+MAX_ATTEMPTS = 5
+
+
+def deliver(alert: DueAlert, now: datetime) -> None:
+    """Deliver one alert on its channel. In-app the alert row is the message, so it cannot fail here; the opt-in
+    e-mail and SMS channels (B7) raise on failure."""
+
+
+def attempt(db: Session, tenant_id, alert: DueAlert, now: datetime, first: bool = False) -> None:
+    """A2: one delivery attempt, recorded on the alert (channel, attempts, time, result). A failure is kept and shown,
+    is audited, and never resolves or cancels the alert or its escalation."""
+    from backend.app.enterprise_audit import make_audit_event
+
+    alert.channel = alert.channel or "IN_APP"
+    alert.attempts = 1 if first else (alert.attempts or 1) + 1
+    alert.last_attempt_at = now
+    try:
+        deliver(alert, now)
+    except Exception as exc:  # any channel failure: keep the alert, show the failure, retry on the next sweep
+        alert.delivery = FAILED if alert.attempts >= MAX_ATTEMPTS else RETRYING
+        alert.delivery_error = f"{type(exc).__name__}: {exc}"[:500]
+        db.add(
+            make_audit_event(
+                tenant_id=tenant_id,
+                actor_ref=ACTOR,
+                action="ALERT_DELIVERY_FAILED",
+                entity_type="DueAlert",
+                entity_id=alert.id,
+                details={
+                    "item": alert.item_key,
+                    "recipient": alert.recipient_id,
+                    "channel": alert.channel,
+                    "attempt": alert.attempts,
+                    "error": alert.delivery_error,
+                },
+                created_at=now,
+            )
+        )
+        return
+    alert.delivery, alert.delivery_error = DELIVERED, None
+
+
 def sweep(db: Session, control_db: Session | None, tenant_id, now: datetime | None = None) -> dict:
     """Raise and resolve the organization's alerts (see the module docstring). Flushes; the caller commits."""
     from backend.app.enterprise_audit import make_audit_event
@@ -615,7 +674,11 @@ def sweep(db: Session, control_db: Session | None, tenant_id, now: datetime | No
         else:
             for name, value in fields.items():
                 setattr(alert, name, value)
+            # A2: a failed delivery is retried on the next sweep, on the same alert (never a second one).
+            if alert.delivery != DELIVERED and (alert.attempts or 1) < MAX_ATTEMPTS:
+                attempt(db, tenant_id, alert, now)
             continue
+        attempt(db, tenant_id, alert, now, first=True)
         raised += 1
         if alert.tier == rules.ESCALATION:
             db.add(

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from types import SimpleNamespace
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -46,7 +47,7 @@ from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordL
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import current_person, require_any_permission
-from backend.app.intake import case_rules, rules, service
+from backend.app.intake import case_rules, rules, service, triage_rules
 from backend.app.paging import open_first
 from backend.app.reportability import markets
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -60,6 +61,7 @@ OBJECT_TYPE = "FirstContactCheck"
 DECISION_TYPE = "FIRST_CONTACT_CHECK"
 ADMINISTRATOR_ROLES = frozenset({"PLATFORM_ADMIN", "ADMIN", "ADMINISTRATOR", "CUSTOMER_ADMIN"})
 WRITERS = Depends(require_any_permission(SIGNAL_TRIAGE, INVESTIGATION_CREATE, QUALITY_REVIEW))
+TRIAGERS = WRITERS
 # Clock skew allowed for a time entered as "now".
 _SKEW = timedelta(minutes=5)
 
@@ -177,6 +179,27 @@ class TriageIn(BaseModel):
     no_action_reason: str = Field(default="", max_length=rules.TEXT_MAX)
     awareness_confirmed_at: datetime | None = None
     awareness_note: str = Field(default="", max_length=rules.TEXT_MAX)
+    # 0.10.93 (B2): potential harm, the threat answer, containment, versions, and the signature a one-person trial
+    # gives for a downgrade or a later awareness.
+    potential_severity: str = Field(default="", max_length=20)
+    threat_reason: str = Field(default="", max_length=rules.TEXT_MAX)
+    remedial_reason: str = Field(default="", max_length=rules.TEXT_MAX)
+    containment: list[str] = Field(default_factory=list, max_length=6)
+    change_reason: str = Field(default="", max_length=rules.TEXT_MAX)
+    seen_version: int = Field(default=0, ge=0)
+    password: str = Field(default="", max_length=128)
+    mfa_code: str | None = Field(default=None, max_length=12)
+
+
+class SeenIn(BaseModel):
+    seen_version: int = Field(default=0, ge=0)
+
+
+class SignedReasonIn(BaseModel):
+    reason: str = Field(default="", max_length=rules.TEXT_MAX)
+    decision: str = Field(default="APPROVE", max_length=10)
+    password: str = Field(min_length=1, max_length=128)
+    mfa_code: str | None = Field(default=None, max_length=12)
 
 
 # --------------------------------------------------------------------------------------------- reading
@@ -839,6 +862,9 @@ def save_check(
             )
         )
     service.ensure_follow_up(db, tenant_id, event, answers, suggestion, ctx.user_id, now)
+    db.flush()
+    # T-D7: re-answered with a death, a serious injury or a higher floor, a finished triage reopens on the fast track.
+    service.reopen_raised(db, control_db, tenant_id, ctx.user_id, now, ctx.correlation_id, "Case check re-answered")
     db.add(
         make_audit_event(
             tenant_id=tenant_id,
@@ -886,7 +912,21 @@ def _verify(control_db, ctx, event, password, mfa_code, attempt: str) -> None:
     verify_signing_credentials(control_db, ctx, password=password, mfa_code=mfa_code, record_refusal=refused)
 
 
-def _signature(control_db, ctx, tenant_id, check_id, version, decision, remarks, role, material, now, meaning):
+def _signature(
+    control_db,
+    ctx,
+    tenant_id,
+    check_id,
+    version,
+    decision,
+    remarks,
+    role,
+    material,
+    now,
+    meaning,
+    object_type=OBJECT_TYPE,
+    decision_type=DECISION_TYPE,
+):
     from backend.app.human_decision.rules import fingerprint, signature_hash
 
     content = fingerprint(material)
@@ -895,10 +935,10 @@ def _signature(control_db, ctx, tenant_id, check_id, version, decision, remarks,
         SignedApprovalRecord(
             id=record_id,
             tenant_id=tenant_id,
-            object_type=OBJECT_TYPE,
+            object_type=object_type,
             object_id=check_id,
             object_version=str(version),
-            decision_type=DECISION_TYPE,
+            decision_type=decision_type,
             decision=decision,
             remarks=remarks[:2000],
             signer_user_id=str(ctx.user_id),
@@ -1518,6 +1558,7 @@ def _record_exists(db, tenant_id, kind: str, record_id: uuid.UUID) -> bool:
 def decide_link(
     payload: LinkIn,
     db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     """Link two records into one event, or dismiss the warning, with a reason. Sources are kept. A link to an imported
@@ -1594,6 +1635,13 @@ def decide_link(
             created_at=now,
         )
     )
+    if decision == "LINKED":
+        db.flush()
+        # T-D8: triage belongs to the event; the record joining it inherits a finished triage.
+        for source, target in ((left, right), (right, left)):
+            service.inherit_triage(db, db, tenant_id, source, target, str(ctx.user_id), now, ctx.correlation_id)
+        # T-D7: a link that brings more harm reopens a finished triage on the fast track.
+        service.reopen_raised(db, control_db, tenant_id, ctx.user_id, now, ctx.correlation_id, "Records linked")
     db.commit()
     return {
         "id": str(link.id),
@@ -1703,7 +1751,7 @@ def _subject_exists(db, tenant_id, kind: str, record_id: uuid.UUID) -> bool:
     return _record_exists(db, tenant_id, kind, record_id)
 
 
-def _record_for(db, tenant_id, kind, record_id, actor, now) -> TriageRecord:
+def _record_for(db, tenant_id, kind, record_id, actor, now, opened=None) -> TriageRecord:
     record = (
         db.query(TriageRecord)
         .filter(
@@ -1717,7 +1765,7 @@ def _record_for(db, tenant_id, kind, record_id, actor, now) -> TriageRecord:
             tenant_id=tenant_id,
             subject_kind=kind,
             subject_id=record_id,
-            opened_at=now,
+            opened_at=opened or now,
             target_hours=rules.TRIAGE_TARGET_HOURS,
             created_by=str(actor),
             created_at=now,
@@ -1768,7 +1816,7 @@ def escalate(
     return {"id": str(record.id), "subject_kind": kind, "subject_id": str(payload.id), "escalated_at": now.isoformat()}
 
 
-@router.post("/triage/{kind}/{record_id}/record", dependencies=[WRITERS])
+@router.post("/triage/{kind}/{record_id}/record", dependencies=[TRIAGERS])
 def complete_triage(
     kind: str,
     record_id: uuid.UUID,
@@ -1777,35 +1825,115 @@ def complete_triage(
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """The triage record of an event (every record linked into it): the severity, the event owner and triage owner
-    (with a backup where there is a second person), the immediate action or why none is needed, and the awareness
-    time confirmed. A possible public health threat, once marked, is not excluded here (a signed triage decision does
-    that in the MVP)."""
-    tenant_id = _tenant(ctx)
+    """The triage record of an event (every record linked into it), at its speed (B2, spec 3.4): the harm now ("Not
+    known yet" or a level, never below the floor), the harm if it happened again (whenever a malfunction is alleged),
+    the owners (a backup on the fast track when two or more people are active), the containment, the immediate action
+    or why none is needed, and the awareness confirmed. Every save is a new version; an update needs a reason.
+    Lowering a fast-track triage, or a later awareness, needs a second person outside the trial (A6, T-H4)."""
+    return _save_triage(db, control_db, ctx, kind, record_id, payload)
+
+
+def _subject_or_404(db, tenant_id, kind: str, record_id) -> str:
     kind = kind.upper()
     if kind not in (service.INTAKE, service.COMPLAINT, service.QUARANTINE) or not _subject_exists(
         db, tenant_id, kind, record_id
     ):
         raise _error(404, "RECORD_NOT_FOUND", "No such record in your organization")
+    return kind
+
+
+def _triage_item(db, control_db, tenant_id, kind, record_id, now) -> dict | None:
+    found = service.triage(db, control_db, tenant_id, "all", now)
+    return next((entry for entry in found["items"] if f"{kind}:{record_id}" in entry["members"]), None)
+
+
+def _members(item, kind, record_id) -> list[tuple[str, uuid.UUID]]:
+    keys = item["members"] if item else [f"{kind}:{record_id}"]
+    return [(key.split(":")[0], uuid.UUID(key.split(":")[1])) for key in keys]
+
+
+def _opened(item, now) -> datetime:
+    return datetime.fromisoformat(item["triage_clock"]["from"]) if item else now
+
+
+def _subject_ref(item, record_id) -> SimpleNamespace:
+    """What a refused signature is audited against (``_verify``): the triage subject."""
+    return SimpleNamespace(id=record_id, reference=item["ref"] if item else str(record_id))
+
+
+def _triage_audit(db, ctx, action, entity_id, now, reason=None, **details) -> None:
+    db.add(
+        make_audit_event(
+            tenant_id=_tenant(ctx),
+            actor_ref=ctx.user_id,
+            action=action,
+            entity_type="TriageRecord",
+            entity_id=entity_id,
+            correlation_id=ctx.correlation_id,
+            reason=reason,
+            details=details,
+            created_at=now,
+        )
+    )
+
+
+def _save_triage(db, control_db, ctx, kind, record_id, payload: TriageIn, *, approval=None, action="TRIAGE_RECORDED"):
+    tenant_id = _tenant(ctx)
+    kind = _subject_or_404(db, tenant_id, kind, record_id)
+    now = service.now_utc()
+    item = _triage_item(db, control_db, tenant_id, kind, record_id, now)
+    members = _members(item, kind, record_id)
+    facts = {**(item["facts"] if item else triage_rules.facts([])), "threat": payload.public_health_threat}
+    least = item["severity_floor"] if item else None
+    record = _record_for(db, tenant_id, kind, record_id, ctx.user_id, now, _opened(item, now))
+    saved = bool(record.flags_at_completion)
+    if saved and payload.seen_version != record.version:
+        raise _error(409, "TRIAGE_CHANGED", "A colleague changed this triage a moment ago; reload to see it")
     severity = rules.clean(payload.severity, 20).upper()
-    if severity not in markets.LEVELS:
-        raise _error(422, "SEVERITY_NEEDED", "Assess the severity on the harm-severity scale")
-    people = {item["id"] for item in service.colleagues(control_db, tenant_id)}
+    potential = rules.clean(payload.potential_severity, 20).upper() or None
+    reason = rules.clean(payload.change_reason)
+    problem = triage_rules.severity_problem(severity, least, record.severity if saved else None, reason)
+    if problem:
+        raise _error(422, *problem)
+    if potential and potential not in triage_rules.SCALE:
+        raise _error(422, "POTENTIAL_UNKNOWN", "Choose the harm if it happened again on the harm scale")
+    if facts["malfunction"] and not potential:
+        raise _error(
+            422,
+            "POTENTIAL_NEEDED",
+            "Harm if it happened again: asked whenever a malfunction is alleged (worst credible)",
+        )
+    if (
+        facts["death"]
+        and not payload.public_health_threat
+        and len(rules.clean(payload.threat_reason)) < rules.REASON_MIN
+    ):
+        raise _error(
+            422,
+            "THREAT_ANSWER_NEEDED",
+            "A death is recorded: answer 'Possible serious public health threat' with a reason",
+        )
+    people = {entry["id"] for entry in service.colleagues(control_db, tenant_id)}
     if payload.event_owner not in people or payload.triage_owner not in people:
         raise _error(422, "OWNERS_NEEDED", "Name the event owner and the triage owner from your team")
     if payload.backup_owner and payload.backup_owner not in people:
         raise _error(422, "BACKUP_UNKNOWN", "Name the backup from your team")
-    action, no_action = rules.clean(payload.immediate_action), rules.clean(payload.no_action_reason)
-    if len(action) < rules.REASON_MIN and len(no_action) < rules.REASON_MIN:
+    reopened = record.reopened_at is not None and record.completed_at is None
+    pace = triage_rules.speed(facts, potential, severity, reopened)
+    backup = triage_rules.backup_problem(pace, len(people), payload.backup_owner)
+    if backup:
+        raise _error(422, "BACKUP_NEEDED", backup)
+    action_text, no_action = rules.clean(payload.immediate_action), rules.clean(payload.no_action_reason)
+    if len(action_text) < rules.REASON_MIN and len(no_action) < rules.REASON_MIN:
         raise _error(
             422,
             "ACTION_OR_REASON",
             f"Record the immediate action, or why none is needed (at least {rules.REASON_MIN} characters)",
         )
-    now = service.now_utc()
-    found = service.triage(db, control_db, tenant_id, "all", now)
-    item = next((entry for entry in found["items"] if f"{kind}:{record_id}" in entry["members"]), None)
-    members = [tuple(key.split(":")) for key in (item["members"] if item else [f"{kind}:{record_id}"])]
+    choices = triage_rules.containment(payload.containment)
+    if not choices:
+        # A form that sends only the text (before the B2 screens): the choice follows from it, "Other" for an action.
+        choices = ["OTHER"] if len(action_text) >= rules.REASON_MIN else ["NONE_NEEDED"]
     needs_awareness = bool(item and (item["awareness"]["unresolved"] or item["conflict"]))
     confirmed = rules.utc(payload.awareness_confirmed_at)
     if needs_awareness and confirmed is None:
@@ -1816,39 +1944,129 @@ def complete_triage(
         )
     if confirmed is not None and confirmed > now + _SKEW:
         raise _error(422, "TIME_IN_FUTURE", "Awareness cannot be in the future")
-    if (
-        confirmed is not None
-        and item
-        and confirmed > datetime.fromisoformat(item["awareness"]["at"])
-        and len(rules.clean(payload.awareness_note)) < rules.REASON_MIN
-    ):
+    later = bool(confirmed is not None and item and confirmed > datetime.fromisoformat(item["awareness"]["at"]))
+    if later and len(rules.clean(payload.awareness_note)) < rules.REASON_MIN:
         raise _error(
             422, "AWARENESS_REASON", "A later awareness than the earliest known needs a reason (who knew, and for whom)"
         )
-    for member_kind, member_id in members:
-        record = _record_for(db, tenant_id, member_kind, uuid.UUID(member_id), ctx.user_id, now)
-        if record.public_health_threat and not payload.public_health_threat:
+    if record.remedial_action and not payload.remedial_action and len(rules.clean(payload.remedial_reason)) < 10:
+        raise _error(422, "REMEDIAL_REASON", "Say why remedial action is no longer thought to be needed")
+    if saved and record.completed_at is not None and len(reason) < rules.REASON_MIN:
+        raise _error(
+            422, "CHANGE_REASON_NEEDED", f"Say in at least {rules.REASON_MIN} characters why the triage changes"
+        )
+    rows = [
+        record
+        if (k, i) == (kind, record_id)
+        else _record_for(db, tenant_id, k, i, ctx.user_id, now, _opened(item, now))
+        for k, i in members
+    ]
+    if any(row.public_health_threat and not payload.public_health_threat for row in rows):
+        raise _error(
+            409,
+            "THREAT_NOT_EXCLUDED_HERE",
+            "A possible public health threat stays until a signed triage decision excludes it",
+        )
+    downgrade = saved and triage_rules.is_downgrade(
+        {"speed": record.speed, "severity": record.severity, "potential_severity": record.potential_severity},
+        {"speed": pace, "severity": severity, "potential_severity": potential},
+    )
+    signed_id, one_person = (approval or {}).get("signed"), False
+    if (downgrade or later) and approval is None:
+        what = "a later awareness" if later and not downgrade else "lowering a fast-track triage"
+        if not is_trial(control_db, tenant_id):
+            from backend.app.workflow.tasks import create_task
+
+            task = create_task(
+                db,
+                tenant_id,
+                task_type=triage_rules.DOWNGRADE_TASK,
+                title=f"Approve {what} for {item['ref'] if item else record_id}",
+                source_type="TriageRecord",
+                source_id=record.id,
+                assigned_role=service_role_for_downgrade(db, tenant_id),
+                due_at=now + timedelta(hours=service.fast_hours(db, tenant_id)),
+                created_by=ctx.user_id,
+            )
+            task.details = {
+                "payload": payload.model_dump(mode="json", exclude={"password", "mfa_code"}),
+                "kind": kind,
+                "record_id": str(record_id),
+                "requested_by": str(ctx.user_id),
+                "ref": item["ref"] if item else None,
+                "what": what,
+            }
+            _triage_audit(
+                db,
+                ctx,
+                "TRIAGE_DOWNGRADE_REFUSED",
+                record.id,
+                now,
+                reason or None,
+                why="SECOND_PERSON",
+                task=str(task.id),
+            )
+            db.commit()
             raise _error(
                 409,
-                "THREAT_NOT_EXCLUDED_HERE",
-                "A possible public health threat stays until a signed triage decision excludes it",
+                "SECOND_PERSON_NEEDED",
+                f"{what[0].upper()}{what[1:]} needs the approval of a second person: a request is open",
+                task_id=str(task.id),
             )
-        record.severity = severity
-        record.public_health_threat = payload.public_health_threat
-        record.remedial_action = payload.remedial_action
-        record.event_owner, record.triage_owner = payload.event_owner, payload.triage_owner
-        record.backup_owner = payload.backup_owner or None
-        record.immediate_action, record.no_action_reason = action or None, no_action or None
+        # A one-person trial may do it, signed with the password; the record says "one person" (spec 6.4).
+        if not payload.password:
+            raise _error(422, "SIGNATURE_NEEDED", f"Sign {what} with your password")
+        role = _signer_role(control_db, ctx)
+        _verify(control_db, ctx, _subject_ref(item, record_id), payload.password, payload.mfa_code, "TRIAGE_DOWNGRADE")
+        signed_id, _ = _signature(
+            control_db,
+            ctx,
+            tenant_id,
+            record.id,
+            record.version,
+            "LATER_AWARE" if later and not downgrade else "DOWNGRADE",
+            reason or rules.clean(payload.awareness_note),
+            role,
+            {"severity": severity, "potential": potential, "awareness": service._iso(confirmed), "speed": pace},
+            now,
+            f"I approve {what} for {item['ref'] if item else record_id} (one person, trial).",
+            object_type="TriageRecord",
+            decision_type="TRIAGE_DOWNGRADE",
+        )
+        one_person = True
+    target = datetime.fromisoformat(item["triage_clock"]["due_at"]) if item else now
+    codes = [flag["code"] for flag in item["flags"]] if item else []
+    changed: dict = {}
+    for row in rows:
+        before = service.triage_snapshot(row) if row.flags_at_completion else None
+        row.severity, row.potential_severity, row.speed, row.due_at = severity, potential, pace, target
+        row.public_health_threat = payload.public_health_threat
+        row.remedial_action = payload.remedial_action
+        row.event_owner, row.triage_owner = payload.event_owner, payload.triage_owner
+        row.backup_owner = payload.backup_owner or None
+        row.immediate_action, row.no_action_reason = action_text or None, no_action or None
+        row.severity_floor, row.floor_reasons = least, [item["floor_note"]] if item and item["floor_note"] else []
+        row.flags_at_completion = {"facts": facts, "codes": codes}
+        row.containment = {"choices": choices, "text": action_text or no_action}
+        row.change_reason = reason or None
         if confirmed is not None:
-            record.awareness_confirmed_at = confirmed
-            record.awareness_note = rules.clean(payload.awareness_note) or None
-        record.completed_by, record.completed_at, record.updated_at = str(ctx.user_id), now, now
-        if confirmed is not None and member_kind == service.COMPLAINT:
+            row.awareness_confirmed_at = confirmed
+            row.awareness_note = rules.clean(payload.awareness_note) or None
+            if later:
+                row.awareness_signed_record_id = signed_id
+        if row.acknowledged_at is None or rules.utc(row.acknowledged_at) < rules.utc(row.opened_at):
+            row.acknowledged_at, row.acknowledged_by = now, str(ctx.user_id)  # saving the triage acknowledges it
+        row.completed_by, row.completed_at, row.updated_at = str(ctx.user_id), now, now
+        db.flush()
+        found = service.add_triage_version(db, tenant_id, row, before, ctx.user_id, now, reason or None, signed_id)
+        if row is record:
+            changed = found
+        if confirmed is not None and row.subject_kind == service.COMPLAINT:
             # A complaint with no awareness or received date keeps the confirmed time as its awareness, so the
             # watch and the market assessment count from it and do not ask again (0.10.81, F4).
             complaint = (
                 db.query(Complaint)
-                .filter(Complaint.tenant_id == tenant_id, Complaint.id == uuid.UUID(member_id))
+                .filter(Complaint.tenant_id == tenant_id, Complaint.id == row.subject_id)
                 .one_or_none()
             )
             if (
@@ -1857,24 +2075,340 @@ def complete_triage(
                 and complaint.complaint_timestamp is None
             ):
                 complaint.awareness_timestamp, complaint.updated_at = confirmed, now
-    db.flush()
-    db.add(
-        make_audit_event(
-            tenant_id=tenant_id,
-            actor_ref=ctx.user_id,
-            action="TRIAGE_RECORDED",
-            entity_type="TriageRecord",
-            entity_id=record_id,
-            correlation_id=ctx.correlation_id,
-            details={
-                "members": ["%s:%s" % member for member in members],
-                "severity": severity,
-                "public_health_threat": payload.public_health_threat,
-                "awareness_confirmed_at": service._iso(confirmed),
-                "deadlines": [(d["market"], d["due_date"]) for d in (item["deadlines"] if item else [])],
-            },
-            created_at=now,
-        )
+    _triage_tasks(db, ctx, record, item, severity, choices, payload.triage_owner, now)
+    _triage_audit(
+        db,
+        ctx,
+        action,
+        record.id,
+        now,
+        reason or None,
+        members=["%s:%s" % member for member in members],
+        severity=severity,
+        potential_severity=potential,
+        speed=pace,
+        public_health_threat=payload.public_health_threat,
+        threat_reason=rules.clean(payload.threat_reason) or None,
+        awareness_confirmed_at=service._iso(confirmed),
+        deadlines=[(d["market"], d["due_date"]) for d in (item["deadlines"] if item else [])],
+        changed=changed,
+        owners={"event": payload.event_owner, "triage": payload.triage_owner, "backup": payload.backup_owner or None},
+        containment=choices,
+        version=record.version,
+        one_person=one_person,
+        approved_by=(approval or {}).get("by"),
+        requested_by=(approval or {}).get("requested_by"),
+        signature_id=str(signed_id) if signed_id else None,
     )
-    db.commit()
+    if signed_id:
+        signing_commit.commit(db, control_db, "triage")
+    else:
+        db.commit()
     return service.triage(db, control_db, tenant_id, "all")
+
+
+def service_role_for_downgrade(db, tenant_id) -> str:
+    """The queue a downgrade request goes to: the organization's escalation role (Leader by default)."""
+    from backend.app.oversight.service import settings_row
+
+    row = settings_row(db, tenant_id)
+    return row.escalation_role if row is not None else "LEADER"
+
+
+def _triage_tasks(db, ctx, record, item, severity, choices, owner, now) -> None:
+    """The tasks a triage save opens: the follow-up of a "Not known yet" harm (1 working day, TR-01) and the
+    containment tasks (Hold the lot, Consider a field action; T-D11)."""
+    from backend.app.workflow.tasks import create_task
+
+    tenant_id = _tenant(ctx)
+    ref = item["ref"] if item else str(record.subject_id)
+    due = service.working_day_end(now, 1, service.calendar(db, tenant_id))
+    wanted = [(code, title) for choice, (code, title) in triage_rules.CONTAINMENT_TASKS.items() if choice in choices]
+    if severity == triage_rules.NOT_KNOWN:
+        wanted.insert(0, (triage_rules.FOLLOW_UP_TASK, "Find out the harm for {ref}: triage said Not known yet"))
+    for code, title in wanted:
+        task = create_task(
+            db,
+            tenant_id,
+            task_type=code,
+            title=title.format(ref=ref),
+            source_type="TriageRecord",
+            source_id=record.id,
+            assigned_user_id=owner,
+            due_at=due,
+            created_by=ctx.user_id,
+            details={"reference": ref, "triage_record": str(record.id)},
+        )
+        if code != triage_rules.FOLLOW_UP_TASK:
+            _triage_audit(db, ctx, "CONTAINMENT_TASK_OPENED", record.id, now, task=str(task.id), type=code)
+
+
+@router.post("/triage/{kind}/{record_id}/confirm", dependencies=[TRIAGERS])
+def confirm_routine(
+    kind: str,
+    record_id: uuid.UUID,
+    payload: SeenIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Routine triage in one click (TR-25): the three pre-filled facts (owner: the Case's signer; harm now: no health
+    consequence; immediate action: none needed). Anything else is the full form ("Change something")."""
+    tenant_id = _tenant(ctx)
+    kind = _subject_or_404(db, tenant_id, kind, record_id)
+    item = _triage_item(db, control_db, tenant_id, kind, record_id, service.now_utc())
+    if item is None or item["speed"] != triage_rules.ROUTINE:
+        raise _error(409, "NOT_ROUTINE", "Only a routine triage is confirmed in one click: use the full form")
+    prefill = item["routine_prefill"]
+    people = {entry["id"] for entry in service.colleagues(control_db, tenant_id)}
+    owner = prefill["triage_owner"] if prefill["triage_owner"] in people else str(ctx.user_id)
+    body = TriageIn(
+        severity=prefill["severity"],
+        event_owner=owner,
+        triage_owner=owner,
+        no_action_reason=prefill["no_action_reason"],
+        containment=prefill["containment"],
+        seen_version=payload.seen_version,
+        change_reason="Routine triage confirmed",
+    )
+    return _save_triage(db, control_db, ctx, kind, record_id, body, action="TRIAGE_ROUTINE_CONFIRMED")
+
+
+@router.post("/triage/{kind}/{record_id}/acknowledge", dependencies=[TRIAGERS])
+def acknowledge_triage(
+    kind: str,
+    record_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """A1: a named owner acknowledges a fast-track triage before its acknowledgement is due; the person who
+    acknowledges becomes its triage owner when it has none. Unacknowledged, the alert sweep escalates it."""
+    tenant_id = _tenant(ctx)
+    kind = _subject_or_404(db, tenant_id, kind, record_id)
+    now = service.now_utc()
+    item = _triage_item(db, control_db, tenant_id, kind, record_id, now)
+    if item is None or item["speed"] != triage_rules.FAST:
+        raise _error(409, "NOT_FAST", "Only a fast-track triage is acknowledged")
+    if not item["acknowledgement"]["done"]:
+        for member_kind, member_id in _members(item, kind, record_id):
+            row = _record_for(db, tenant_id, member_kind, member_id, ctx.user_id, now, _opened(item, now))
+            row.acknowledged_at, row.acknowledged_by = now, str(ctx.user_id)
+            row.acknowledge_due_at = datetime.fromisoformat(item["acknowledgement"]["due_at"])
+            row.triage_owner = row.triage_owner or str(ctx.user_id)
+            row.speed, row.updated_at = triage_rules.FAST, now
+        db.flush()
+        _triage_audit(
+            db,
+            ctx,
+            "TRIAGE_ACKNOWLEDGED",
+            row.id,
+            now,
+            ref=item["ref"],
+            due_at=item["acknowledgement"]["due_at"],
+            late=item["acknowledgement"]["overdue"],
+        )
+        db.commit()
+    return service.triage(db, control_db, tenant_id, "all")
+
+
+def _ticked_by(db, tenant_id, record) -> str | None:
+    """Who marked the threat: the first version that holds it."""
+    for version in service.triage_versions(db, tenant_id, record.id):
+        if (version.snapshot or {}).get("public_health_threat"):
+            return version.changed_by
+    return record.completed_by
+
+
+@router.post("/triage/{kind}/{record_id}/exclude-threat", dependencies=[TRIAGERS])
+def exclude_threat(
+    kind: str,
+    record_id: uuid.UUID,
+    payload: SignedReasonIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Exclude a possible public health threat (TR-06, T-H3): a reason, password and code; outside the trial a person
+    other than the one who marked it. The history keeps the threat and its exclusion."""
+    tenant_id = _tenant(ctx)
+    kind = _subject_or_404(db, tenant_id, kind, record_id)
+    now = service.now_utc()
+    item = _triage_item(db, control_db, tenant_id, kind, record_id, now)
+    rows = [
+        row
+        for row in (
+            db.query(TriageRecord)
+            .filter(
+                TriageRecord.tenant_id == tenant_id,
+                TriageRecord.subject_id.in_([i for _, i in _members(item, kind, record_id)]),
+            )
+            .with_for_update()
+            .all()
+        )
+        if row.public_health_threat
+    ]
+    if not rows:
+        raise _error(409, "NO_THREAT", "No possible public health threat is marked on this triage")
+    reason = rules.clean(payload.reason)
+    if len(reason) < rules.REASON_MIN:
+        raise _error(422, "REASON_NEEDED", f"Say in at least {rules.REASON_MIN} characters why it is not a threat")
+    ticked = _ticked_by(db, tenant_id, rows[0])
+    if ticked == str(ctx.user_id) and not is_trial(control_db, tenant_id):
+        _triage_audit(db, ctx, "TRIAGE_THREAT_EXCLUSION_REFUSED", rows[0].id, now, reason, why="SAME_PERSON")
+        db.commit()
+        raise _error(403, "SAME_PERSON", "The person who marked the threat cannot exclude it: a second person signs")
+    role = _signer_role(control_db, ctx)
+    _verify(control_db, ctx, _subject_ref(item, record_id), payload.password, payload.mfa_code, "TRIAGE_THREAT")
+    signed_id, _ = _signature(
+        control_db,
+        ctx,
+        tenant_id,
+        rows[0].id,
+        rows[0].version,
+        "EXCLUDED",
+        reason,
+        role,
+        {"ref": item["ref"] if item else None, "reason": reason, "marked_by": ticked},
+        now,
+        f"I exclude the possible public health threat for {item['ref'] if item else record_id}.",
+        object_type="TriageRecord",
+        decision_type="TRIAGE_THREAT_EXCLUSION",
+    )
+    for row in rows:
+        before = service.triage_snapshot(row)
+        row.public_health_threat = False
+        row.threat_excluded_at, row.threat_excluded_by, row.threat_exclusion_reason = now, str(ctx.user_id), reason
+        row.threat_signed_record_id, row.updated_at = signed_id, now
+        service.add_triage_version(db, tenant_id, row, before, ctx.user_id, now, reason, signed_id)
+    _triage_audit(
+        db,
+        ctx,
+        "TRIAGE_THREAT_EXCLUDED",
+        rows[0].id,
+        now,
+        reason,
+        signature_id=str(signed_id),
+        marked_by=ticked,
+        same_person=ticked == str(ctx.user_id),
+    )
+    signing_commit.commit(db, control_db, "triage")
+    return service.triage(db, control_db, tenant_id, "all")
+
+
+@router.post("/triage/downgrades/{task_id}", dependencies=[TRIAGERS])
+def decide_downgrade(
+    task_id: uuid.UUID,
+    payload: SignedReasonIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """A6: the second person approves or rejects a requested downgrade of a fast-track triage (or a later awareness),
+    signed. The person who asked can never approve it; a refused attempt is audited."""
+    from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
+    from backend.app.workflow.tasks import complete_tasks
+
+    tenant_id = _tenant(ctx)
+    task = (
+        db.query(WorkflowTask)
+        .filter(
+            WorkflowTask.tenant_id == tenant_id,
+            WorkflowTask.id == task_id,
+            WorkflowTask.task_type == triage_rules.DOWNGRADE_TASK,
+        )
+        .with_for_update()
+        .first()
+    )
+    if task is None or task.status not in OPEN_TASK_STATUSES:
+        raise _error(404, "NO_REQUEST", "No open downgrade request with this id")
+    details = task.details or {}
+    decision = rules.clean(payload.decision, 10).upper()
+    if decision not in ("APPROVE", "REJECT"):
+        raise _error(422, "UNKNOWN_DECISION", "Approve or reject the request")
+    now = service.now_utc()
+    if details.get("requested_by") == str(ctx.user_id):
+        _triage_audit(
+            db, ctx, "TRIAGE_DOWNGRADE_REFUSED", task.source_entity_id, now, None, why="SAME_PERSON", task=str(task.id)
+        )
+        db.commit()
+        raise _error(403, "SAME_PERSON", "The person who asked for the downgrade cannot approve it")
+    reason = rules.clean(payload.reason)
+    if len(reason) < rules.REASON_MIN:
+        raise _error(422, "REASON_NEEDED", f"Say in at least {rules.REASON_MIN} characters what you checked")
+    role = _signer_role(control_db, ctx)
+    subject = SimpleNamespace(id=task.source_entity_id, reference=details.get("ref") or str(task.source_entity_id))
+    _verify(control_db, ctx, subject, payload.password, payload.mfa_code, "TRIAGE_DOWNGRADE")
+    signed_id, _ = _signature(
+        control_db,
+        ctx,
+        tenant_id,
+        task.source_entity_id,
+        (details.get("payload") or {}).get("seen_version", 0),
+        decision,
+        reason,
+        role,
+        {"request": details, "decision": decision, "reason": reason},
+        now,
+        f"I {decision.lower()} {details.get('what', 'the downgrade')} for {subject.reference}.",
+        object_type="TriageRecord",
+        decision_type="TRIAGE_DOWNGRADE",
+    )
+    complete_tasks(
+        db,
+        tenant_id,
+        source_type="TriageRecord",
+        source_id=task.source_entity_id,
+        task_types=[triage_rules.DOWNGRADE_TASK],
+        outcome=decision,
+        actor_ref=ctx.user_id,
+        reason=reason,
+    )
+    if decision == "REJECT":
+        _triage_audit(db, ctx, "TRIAGE_DOWNGRADE_REJECTED", task.source_entity_id, now, reason, task=str(task.id))
+        signing_commit.commit(db, control_db, "triage")
+        return service.triage(db, control_db, tenant_id, "all")
+    return _save_triage(
+        db,
+        control_db,
+        ctx,
+        details["kind"],
+        uuid.UUID(details["record_id"]),
+        TriageIn(**details["payload"]),
+        approval={"by": str(ctx.user_id), "signed": signed_id, "requested_by": details.get("requested_by")},
+    )
+
+
+@router.get("/triage/{kind}/{record_id}/versions")
+def triage_versions(
+    kind: str,
+    record_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Every version of a triage record: who changed what, old -> new, and why (spec 4.7 "Versions")."""
+    tenant_id = _tenant(ctx)
+    kind = _subject_or_404(db, tenant_id, kind, record_id)
+    record = (
+        db.query(TriageRecord)
+        .filter(
+            TriageRecord.tenant_id == tenant_id, TriageRecord.subject_kind == kind, TriageRecord.subject_id == record_id
+        )
+        .first()
+    )
+    rows = service.triage_versions(db, tenant_id, record.id) if record is not None else []
+    names = service.names_of(control_db, tenant_id, {row.changed_by for row in rows})
+    return {
+        "items": [
+            {
+                "version": row.version,
+                "changed_by": names.get(row.changed_by) or "A colleague",
+                "changed_at": service._iso(row.changed_at),
+                "change_reason": row.change_reason,
+                "changed_fields": row.changed_fields,
+                "signed": row.signed_record_id is not None,
+            }
+            for row in rows
+        ]
+    }

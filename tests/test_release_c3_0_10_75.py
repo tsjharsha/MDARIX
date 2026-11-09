@@ -74,6 +74,7 @@ def _flagship(user) -> str:
             f"/api/v1/triage/COMPLAINT/{complaint}/record",
             json={
                 "severity": "NEGLIGIBLE",
+                "potential_severity": "MINOR",
                 "event_owner": person,
                 "triage_owner": person,
                 "immediate_action": "Out of use, sent for service.",

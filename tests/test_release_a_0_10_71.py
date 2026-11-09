@@ -417,6 +417,9 @@ def test_the_short_story_counts_what_was_saved_not_the_screen(story_trial):
             f"/api/v1/triage/COMPLAINT/{complaint}/record",
             json={
                 "severity": "NEGLIGIBLE",
+                "potential_severity": "MINOR",
+                # B2: a fast-track triage names a backup when two people are active.
+                "backup_owner": next((p["id"] for p in _ok(user.get("/api/v1/triage"))["people"] if p["id"] != me), ""),
                 "event_owner": me,
                 "triage_owner": me,
                 "immediate_action": "Monitor out of use and sent for service (SVC-24-1107).",
