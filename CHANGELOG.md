@@ -10,6 +10,17 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Added
+
+- **OmniRoute as an AI provider option** (`MDARIX_GENAI_PROVIDER=omniroute`, an OpenAI-compatible gateway; see
+  `docs/runbooks/AI_PROVIDERS.md`). Code only: AI stays off in the trial. Staging and production still need the
+  contracted-provider list and a retention clearance before any AI call.
+
+### Security
+
+- Dependency updates: pypdf 6.21.4, pillow 13.0.0 (with fastembed 0.9.1, which allows it), filelock 4.2.1,
+  certifi 2026.10.18; vite 8.3.7, now a development dependency only.
+
 ## [0.10.92] - 2026-11-07
 
 On the trial maintenance line (`release/0.10`): development cycle 1, step 1, the bug and trust fixes found while
