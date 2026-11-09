@@ -231,9 +231,10 @@ def risks(db, t, product, version) -> list[dict]:
     return [_row(row) for row in rows]
 
 
-def monthly(db, t, product, versions, now: datetime | None = None) -> dict[str, Any]:
-    """Complaints per month of each version over the last twelve months (by event date), with each version's release
-    as a marker. Months without complaints read 0."""
+def monthly(db, t, versions, now: datetime | None = None) -> dict[str, Any]:
+    """Complaints per month of each version (``id``, ``version_identifier``, ``release_timestamp``, optionally
+    ``product_name``) over the last twelve months (by event date), with each version's release as a marker. Months
+    without complaints read 0."""
     now = now or datetime.now(timezone.utc)
     year, month = divmod(now.year * 12 + now.month - 1 - (MONTHS - 1), 12)
     start = datetime(year, month + 1, 1, tzinfo=timezone.utc)
@@ -246,10 +247,11 @@ def monthly(db, t, product, versions, now: datetime | None = None) -> dict[str, 
     for row in db.execute(
         text(
             "SELECT product_version_id, to_char(date_trunc('month', event_timestamp AT TIME ZONE 'UTC'), 'YYYY-MM') AS m, "
-            "count(*) AS n FROM complaints WHERE tenant_id=:t AND product_id=:p AND event_timestamp >= :since "
+            "count(*) AS n FROM complaints WHERE tenant_id=:t AND product_version_id = ANY(CAST(:v AS uuid[])) "
+            "AND event_timestamp >= :since "
             "GROUP BY 1, 2"
         ),
-        {"t": t, "p": product["id"], "since": start},
+        {"t": t, "v": [str(v["id"]) for v in versions], "since": start},
     ).mappings():
         counts[(str(row["product_version_id"]), row["m"])] = int(row["n"])
     return {
@@ -258,6 +260,7 @@ def monthly(db, t, product, versions, now: datetime | None = None) -> dict[str, 
             {
                 "version_id": str(v["id"]),
                 "version_identifier": v["version_identifier"],
+                "product_name": v.get("product_name"),
                 "counts": [counts.get((str(v["id"]), month), 0) for month in months],
             }
             for v in versions
@@ -309,7 +312,7 @@ def tiles(db: Session, tenant_id: str, product_ref: str, version_ref: str | None
         ("risks", risks(db, tenant_id, product, version)),
     ):
         found[kind] = {"count": len(rows), "items": rows[:TILE_ITEMS]}
-    return {**_head(product, version), "tiles": found, "monthly": monthly(db, tenant_id, product, versions)}
+    return {**_head(product, version), "tiles": found, "monthly": monthly(db, tenant_id, versions)}
 
 
 def one_list(

@@ -474,7 +474,7 @@ class Product360Service:
             result.append(item)
         return result
 
-    def _split(self, conn, tenant_id: str, product_id: str, changes) -> dict[str, tuple[int, int]]:
+    def _split(self, conn, tenant_id: str, product_id: str | None, changes) -> dict[str, tuple[int, int]]:
         """``{change id: (before, after)}`` in one grouped count: the complaints on each change's affected versions
         (every version of the product for a change on the whole product), by whether the event came before the change
         took effect. A complaint with no event date is in neither."""
@@ -489,7 +489,8 @@ class Product360Service:
                 "SELECT ch.id, count(c.id) FILTER (WHERE c.event_timestamp < coalesce(ch.effective_timestamp, "
                 "ch.event_timestamp)) AS before, count(c.id) FILTER (WHERE c.event_timestamp >= "
                 "coalesce(ch.effective_timestamp, ch.event_timestamp)) AS after "
-                "FROM changes ch JOIN complaints c ON c.tenant_id=ch.tenant_id AND c.product_id=:product_id "
+                "FROM changes ch JOIN complaints c ON c.tenant_id=ch.tenant_id "
+                "AND (CAST(:product_id AS uuid) IS NULL OR c.product_id=CAST(:product_id AS uuid)) "
                 "WHERE ch.tenant_id=:tenant_id AND ch.id = ANY(CAST(:ids AS uuid[])) AND (ch.id = ANY(CAST(:whole AS uuid[])) "
                 "OR (ch.id::text || '/' || c.product_version_id::text) = ANY(CAST(:pairs AS text[]))) GROUP BY ch.id"
             ),

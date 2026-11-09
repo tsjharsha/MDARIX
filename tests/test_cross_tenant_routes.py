@@ -19,6 +19,7 @@ from backend.app.db.models.foundation import (
     Investigation,
     Product,
     ProductVersion,
+    Supplier,
     Tenant,
     TenantMembership,
 )
@@ -118,6 +119,8 @@ def tenants():
             "investigation_id": str(investigation.id),
             "evidence_id": str(db.query(Evidence.id).filter(Evidence.tenant_id == tenant_b.id).first()[0]),
             "complaint_id": str(db.query(Complaint.id).filter(Complaint.tenant_id == tenant_b.id).first()[0]),
+            # W1: Supplier 360 routes are called with Tenant B's real supplier.
+            "supplier_id": str(db.query(Supplier.id).filter(Supplier.tenant_id == tenant_b.id).first()[0]),
             "decision_id": str(decision.id),
             "tenant_id": str(tenant_b.id),
         }
