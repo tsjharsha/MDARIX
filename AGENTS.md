@@ -40,6 +40,27 @@ the verified current state and known issues.
 - Never commit secrets or personal data. `.env` stays local; tests and e2e
   specs read credentials from environment variables.
 
+## Database rules (every new migration and model)
+
+- Timestamps are `DateTime(timezone=True)`; JSON is `JSONB`.
+- A reference between tenant tables is composite, `(tenant_id, x_id) -> (tenant_id, id)`, and the target has
+  `UniqueConstraint("tenant_id", "id")`. The tenant reference column is always named `tenant_id`.
+- Every foreign key has an index led by its columns; every tenant table has an index that starts with `tenant_id`.
+- Business uniqueness on a tenant table starts with `tenant_id`.
+- A new tenant table gets the forced `mdarix_tenant_isolation` row-level security policy in the same migration.
+- A new numbered object goes in `LATER_OBJECTS` with `scope="tenant"`; never `allocate_business_id`.
+- A column default satisfies the column's CHECK.
+- Migrations are expand-only; a downgrade removes only what its migration added; `alembic heads` shows one head.
+- Imports commit in batches; never hold a business-ID counter or audit-chain lock across a long loop.
+
+## Regulated records and approvals
+
+- Regulated records are never hard-deleted outside the retention policy.
+- No production data in tests, fixtures or samples; sample data stays synthetic.
+- Never commit, push or deploy without the owner's approval.
+- A test or check is reported PASS only when it was executed and seen to pass.
+- AI suggests; a person decides and signs.
+
 ## Tests
 
 - Every behaviour change ships with a test that fails without the change.
