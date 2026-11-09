@@ -4,8 +4,8 @@ name: CodeQL
 # rated high or critical (security severity 7.0 or above).
 on:
   pull_request:
-  push:
-    branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**']
+  # No run on push to main: every change to main was already analysed in its pull request.
   schedule:
     - cron: '17 3 * * 1'
 permissions:
@@ -14,6 +14,7 @@ permissions:
 jobs:
   analyze:
     runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:

@@ -318,10 +318,23 @@ WORKFLOW = yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml").read_text(
 HEAVY_JOBS = ("dedicated-plane", "dataplane-tests", "deployment-roles", "container-validation", "integration")
 
 
-def test_pull_requests_run_the_fast_checks_and_the_heavy_ones_run_after_merge_and_nightly():
+def test_pull_requests_run_the_fast_checks_and_the_heavy_ones_run_after_merge_and_weekly():
     jobs = WORKFLOW["jobs"]
     triggers = WORKFLOW[True] if True in WORKFLOW else WORKFLOW["on"]
-    assert triggers["schedule"] == [{"cron": "41 2 * * *"}]
+    assert triggers["schedule"] == [{"cron": "41 2 * * 1"}]
+    # Documentation-only changes do not start CI; evidence is uploaded only when something failed or on a manual run.
+    assert triggers["pull_request"]["paths-ignore"] == triggers["push"]["paths-ignore"] == ["**/*.md", "docs/**"]
+    uploads = {
+        step["name"]: step["if"]
+        for job in ("browser", "integration")
+        for step in jobs[job]["steps"]
+        if step.get("name", "").startswith("Upload")
+    }
+    assert uploads == dict.fromkeys(
+        ("Upload browser evidence", "Upload integration evidence"),
+        "failure() || github.event_name == 'workflow_dispatch'",
+    )
+    assert all("timeout-minutes" in job for job in jobs.values())
     for name in HEAVY_JOBS:
         assert jobs[name]["if"] == "github.event_name != 'pull_request'", name
     for name in ("backend", "frontend", "browser", "security", "image-scan", "prod-compose-config", "prod-stack"):
