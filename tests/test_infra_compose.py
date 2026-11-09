@@ -358,3 +358,14 @@ def test_dependabot_proposes_monthly_grouped_updates():
     assert all(update["schedule"] == {"interval": "monthly"} for update in config["updates"])
     grouped = {update["package-ecosystem"] for update in config["updates"] if update.get("groups")}
     assert {"pip", "npm", "github-actions"} <= grouped
+
+
+def test_release_pushes_and_signs_images_only_when_publishing_is_switched_on():
+    release = yaml.safe_load((ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8"))
+    steps = release["jobs"]["release"]["steps"]
+    gated = [s for s in steps if "login-action" in s.get("uses", "") or "cosign" in s.get("uses", "")]
+    gated += [
+        s for s in steps if s.get("name") in ("Push the images and record their digests", "Sign the images by digest")
+    ]
+    assert len(gated) == 4 and all(s["if"] == "vars.MDARIX_PUBLISH_IMAGES == 'true'" for s in gated)
+    assert any(s.get("if") == "vars.MDARIX_PUBLISH_IMAGES != 'true'" for s in steps)

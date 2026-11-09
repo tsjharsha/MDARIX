@@ -156,8 +156,10 @@ secret and fails unless every golden scenario passes with model-written analyses
 (`scripts/run_real_evaluation.py --gate --require-model`). Do not promote a release whose gate failed.
 
 A release is a git tag `vX.Y.Z` (matching `VERSION`). `.github/workflows/release.yml` builds the api, web and backup
-images, scans them, pushes them to `ghcr.io/<owner>/<repo>/{api,web,backup}:<tag>` and lists their digests in the
-GitHub release. The VM never builds: it pulls exactly those images. Read the release's CHANGELOG entry first; it
+images, scans them and attaches each image's SBOM to the GitHub release. It pushes and signs them in
+`ghcr.io/<owner>/<repo>/{api,web,backup}:<tag>` only when the repository variable `MDARIX_PUBLISH_IMAGES` is `true`
+(off since 9 Nov 2026: the production VM builds its images itself with `docker compose build` in the upgrade script).
+Set it before any server is switched to pulling images. Read the release's CHANGELOG entry first; it
 names new settings and migrations.
 
 ```bash

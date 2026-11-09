@@ -1,9 +1,10 @@
 name: Release
 # A release is a git tag vX.Y.Z matching the VERSION file. This builds the three production images (api, web, backup),
 # scans each with Trivy (a HIGH or CRITICAL finding not reviewed in .trivyignore.yaml stops the release before anything
-# is pushed), pushes them to GitHub Container Registry as ghcr.io/<owner>/<repo>/{api,web,backup}:<tag> and publishes a
-# GitHub release whose notes record each image's digest. Servers pull exactly these images (docs/runbooks/DEPLOYMENT.md); rolling back
-# means running the previous tag.
+# is pushed) and publishes a GitHub release with each image's SBOM. Pushing and signing the images in GitHub Container
+# Registry (ghcr.io/<owner>/<repo>/{api,web,backup}:<tag>) runs only when the repository variable MDARIX_PUBLISH_IMAGES
+# is 'true': production builds its images on its own server, so unused registry copies only filled package storage
+# (owner decision 9 Nov 2026). Set the variable again before a server pulls images (cells, docs/runbooks/CELL_LINK.md).
 on:
   push:
     tags: ['v*.*.*']
@@ -49,12 +50,28 @@ jobs:
               --exit-code 1 --severity CRITICAL,HIGH --ignorefile /review/.trivyignore.yaml --no-progress \
               "$REPOSITORY/$image:$GITHUB_REF_NAME"
           done
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+      - name: Release notes when the images are not published
+        if: vars.MDARIX_PUBLISH_IMAGES != 'true'
+        run: |
+          {
+            echo "## Images"
+            echo
+            echo "Built and scanned; not published to the registry (MDARIX_PUBLISH_IMAGES is not 'true')."
+            echo "The software bill of materials of each image (SPDX) is attached to this release."
+            echo
+            echo "## Changes"
+            echo
+            echo "See CHANGELOG.md for ${GITHUB_REF_NAME#v}."
+          } > release-notes.md
+          cat release-notes.md >> "$GITHUB_STEP_SUMMARY"
+      - if: vars.MDARIX_PUBLISH_IMAGES == 'true'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Push the images and record their digests
+        if: vars.MDARIX_PUBLISH_IMAGES == 'true'
         env:
           REPOSITORY: ${{ steps.names.outputs.repository }}
         run: |
@@ -81,8 +98,10 @@ jobs:
           cat release-notes.md >> "$GITHUB_STEP_SUMMARY"
       # A cell operator verifies an image before upgrading (docs/runbooks/CELL_LINK.md): the signature names this
       # workflow and this repository as the signer, through GitHub's OIDC identity; no key to lose or rotate.
-      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+      - if: vars.MDARIX_PUBLISH_IMAGES == 'true'
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
       - name: Sign the images by digest
+        if: vars.MDARIX_PUBLISH_IMAGES == 'true'
         env:
           REPOSITORY: ${{ steps.names.outputs.repository }}
         run: |
