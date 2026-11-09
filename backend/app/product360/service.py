@@ -267,7 +267,7 @@ class Product360Service:
                 light_counts.get("missing_lot", sum(1 for row in complaints if row["lot_batch_id"] is None)),
                 light_counts.get("late_evidence", self.late(evidence)),
             )
-            provenance = self.provenance(conn, tenant_id, product_id, selected_id)
+            provenance = [] if light else self.provenance(conn, tenant_id, product_id, selected_id)
             lot_details = self.lot_details(conn, tenant_id, lots)
         overview = {
             "version_count": len(versions),
