@@ -97,6 +97,8 @@ export type WorksheetField = {
    * not fit it (flagged, counted as missing, never deleted). */
   kind?: string;
   problem?: string | null;
+  /** 0.10.92 (A5): what is asked for beside the field (CONTACT_EMAIL: the eMDR's contact office e-mail). */
+  ask?: "CONTACT_EMAIL" | null;
   /** 0.10.83 (D2.7): who knows it (the product, the organization, or this event), and whether it is entered once
    * for every report (``once_key`` groups fields entered together). */
   scope?: "PRODUCT" | "ORGANIZATION" | "EVENT";

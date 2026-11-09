@@ -1,6 +1,6 @@
 import { PracticeApproval } from "./PracticeApproval";
 import { useState } from "react";
-import { DeadlineChip } from "../../../app/chips";
+import { DeadlineChip, SampleDates } from "../../../app/chips";
 import { DecideAndSign, shortPrint } from "./common";
 import { marketLabel } from "../../../app/labels";
 import { WhyAssessed, otherMarketLine } from "./MarketAssessment";
@@ -17,6 +17,7 @@ import {
   WEEKDAY_SHORT,
   eventPath,
   exportPath,
+  openItemsText,
   oversightPath,
   readyProblem,
   stateTone,
@@ -296,7 +297,7 @@ function EventsPanel({ events, onOpen }: { events: EventRow[]; onOpen: (id: stri
     {
       key: "next",
       label: "Open items",
-      render: (row) => (row.blocked ? `${row.blocked} open. Next: ${row.next}` : "None"),
+      render: (row) => openItemsText(row),
       sortValue: (row) => row.blocked,
     },
     {
@@ -520,6 +521,7 @@ export function ReadyForm({ view, onChanged }: { view: EventView; onChanged: (vi
         <p className={view.ready.state === "READY" ? "tone-good" : "tone-warning"}>
           Signed by {view.ready.signed_by} {formatDate(view.ready.signed_at)} (version {view.ready.version})
           {view.ready.state === "READY" ? ": checklist clear." : `, with items open: ${view.ready.reason}`}
+          <SampleDates sample={view.event.sample} />
         </p>
       )}
       {!signedNow && (
@@ -640,6 +642,7 @@ export function DecisionRecord({ view, onChanged }: { view: EventView; onChanged
               {otherMarketLine(entry.kind, view.event.market) && <WhyAssessed />}
               <small>
                 Signed by {entry.signer}, {formatDate(entry.signed_at)}. {entry.meaning}
+                <SampleDates sample={view.event.sample} />
               </small>
             </li>
           ))}

@@ -172,12 +172,12 @@ def test_the_emdr_file_waits_for_what_fda_requires_then_validates(trial):  # eMD
     detail = _ok(user.get(f"{REPORTS}/{report}"))
     refused = user.get(f"{REPORTS}/{report}/emdr.xml", params={"snapshot": state["snapshot"]})
     assert refused.status_code == 409 and refused.json()["detail"]["code"] == "EMDR_MISSING"
-    # The screen and the refusal name the same blocks: the report number's format, G1 and the H6 codes still owed.
+    # The screen and the refusal name the same blocks: the report number's format and the H6 codes still owed. G1 is
+    # not among them: since 0.10.92 (A5) the contact office with its e-mail is asked for before approval.
     missing = refused.json()["detail"]["missing"]
     assert missing == detail["emdr"]["missing"]
     assert [item.split(":")[0] for item in missing] == [
         "G8 Manufacturer report number",
-        "G1 Contact office (and manufacturing site for devices)",
         "H6 Component code",
         "H6 Type of investigation code",
         "H6 Investigation findings code",

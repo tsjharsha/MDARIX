@@ -161,6 +161,29 @@ describe("D3.4 Records opens on your latest record", () => {
     expect(html).toContain("No signed record yet");
     expect(html.indexOf("No signed record yet")).toBeLessThan(html.indexOf("Inspection readiness"));
   });
+
+  it("before the person signs anything, shows the newest record signed here: the sample's (0.10.92, A2)", () => {
+    resources.data["/api/v1/oversight/latest-signed"] = {
+      record: null,
+      organization: {
+        what: "Authority report approved: United States (FDA)",
+        signed_at: "2026-11-05",
+        signed_at_time: "2026-11-05T16:33:00Z",
+        signed_by: "Sample Author",
+        meaning: "APPROVED_FOR_SUBMISSION",
+        meaning_label: "approved for submission",
+        complaint: { id: "c-rv09", ref: "SAMPLE-RV-09" },
+        investigation: null,
+      },
+    };
+    const html = render(<NewRecordsSection />);
+    expect(html).toContain("Latest signed record");
+    expect(html).not.toContain("Your latest record");
+    expect(html).toContain("You have signed nothing yet");
+    expect(html).toContain("Sample Author");
+    expect(html).toContain("SAMPLE-RV-09");
+    expect(html).not.toContain("No signed record yet");
+  });
 });
 
 describe("D3.5 Trends in plain words, with a hero", () => {

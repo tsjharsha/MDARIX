@@ -115,7 +115,8 @@ def stage_view(state: str, missing: int, pending: bool) -> dict:
         "stages": [
             {
                 "code": code,
-                "label": label,
+                # Sent back for correction, its first stage says so, as its status and next step do (0.10.92, A7).
+                "label": STATE_LABELS[CORRECTION] if state == CORRECTION and code == now == "CREATED" else label,
                 "state": "DONE"
                 if index < at or (now == "ACKNOWLEDGED" and index == at)
                 else "CURRENT"

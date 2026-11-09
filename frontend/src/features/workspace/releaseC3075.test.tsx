@@ -296,7 +296,7 @@ describe("a report's page: the record page's shape, the status path and the rail
     resources.data[`${REPORTS}/r1`] = { ...starter, form: { ...starter.form, starter: true } };
     const html = render(<ReportsSection />, api("?report=r1"));
     const chips = html.slice(html.indexOf('class="uw-cp-chips"'));
-    expect(chips).toContain('<span class="ms-chip">Starter, for your consultant to confirm</span>');
+    expect(chips).toContain('<span class="ms-chip is-starter">Starter, for your consultant to confirm</span>');
     expect(html).not.toContain("Starter form, for your consultant to confirm");
   });
 
@@ -306,6 +306,40 @@ describe("a report's page: the record page's shape, the status path and the rail
     expect(reportNext(report(1)).title).toBe("Ready for approval");
     expect(html).toMatch(/<button type="button" class="ac-primary"><svg[^>]*>.*?<\/svg> Send for approval<\/button>/);
     expect(html).not.toContain("rp-why-send");
+  });
+
+  it("says beside a sample report's signatures that its dates follow the trial's day, never on your own (A1)", () => {
+    const signatures = [{ name: "Sample Author", at: "2026-11-02T09:02:00Z", meaning: "prepared" }];
+    resources.data[`${REPORTS}/r1`] = report(1, { sample: true, signatures } as Partial<ReportDetail>);
+    const sample = render(<ReportsSection />, api("?report=r1"));
+    expect(sample).toContain('<small class="ms-sample-dates">Sample: dates follow your trial day</small>');
+    resources.data[`${REPORTS}/r1`] = report(1, { sample: false, signatures } as Partial<ReportDetail>);
+    expect(render(<ReportsSection />, api("?report=r1"))).not.toContain("Sample: dates follow your trial day");
+  });
+
+  it("says one status for a report sent back for correction, and sends it again once filled (0.10.92, A7)", () => {
+    // SAMPLE-RV-10 as the server answers it: the first stage carries the status (backend rules.stage_view).
+    const corrected = (missing: number) =>
+      report(0, {
+        state: "CORRECTION_REQUIRED",
+        state_label: "Draft: correction required",
+        stage: "CREATED",
+        stage_label: "Draft: correction required",
+        stages: stages(0).map((step, index) => (index ? step : { ...step, label: "Draft: correction required" })),
+        mandatory: { total: 14, filled: 14 - missing, missing: missing ? ["MVPI_7"] : [] },
+      });
+    expect(reportNext(corrected(0))).toEqual({
+      title: "Draft: correction required",
+      detail: "Correct what the authority rejected, then send it for approval again.",
+    });
+    expect(reportNext(corrected(1)).detail).toBe("Give what is missing, then send it for approval again.");
+    resources.data[`${REPORTS}/r1`] = corrected(0);
+    const html = render(<ReportsSection />, api("?report=r1"));
+    expect(html).not.toContain("Ready for approval");
+    expect(html).not.toContain(">Created<");
+    expect(html).toMatch(/<button type="button" class="ac-primary"><svg[^>]*>.*?<\/svg> Send for approval<\/button>/);
+    resources.data[`${REPORTS}/r1`] = corrected(1);
+    expect(render(<ReportsSection />, api("?report=r1"))).toContain("rp-why-send");
   });
 
   it("keeps the practice label at the approve button when the preparer approves alone in a trial", () => {

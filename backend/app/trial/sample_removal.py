@@ -122,32 +122,47 @@ def _ids(db: Session, sql: str, params: dict) -> set[uuid.UUID]:
     return {row[0] for row in db.execute(text(sql), params)}
 
 
-def _ids_by_table(db: Session, tenant_id, asks: list[tuple[str, str, list]]) -> dict[str, set[uuid.UUID]]:
+def _ids_by_table(
+    db: Session, tenant_id, asks: list[tuple[str, str, list]], owned: tuple[tuple, set] | None = None
+) -> dict[str, set[uuid.UUID]]:
     """Several "the ids of <table> whose <column> is one of <values>" in one round trip each 40 (UNION ALL), by table
     (0.10.85, D3.13: one query per table and key made a trial's preview about 300 queries). Every tenant table's id is
-    a UUID, so the parts union."""
+    a UUID, so the parts union. ``owned`` (sources, the tables with ``source_system``): a row of such a table is found
+    only when it carries one of the sources."""
     found: dict[str, set[uuid.UUID]] = defaultdict(set)
     for start in range(0, len(asks), 40):
         chunk = asks[start : start + 40]
-        params: dict = {"tenant": tenant_id}
+        params: dict = {"tenant": tenant_id, "owned": list(owned[0]) if owned else []}
         parts = []
         for index, (table, column, values) in enumerate(chunk):
             params[f"v{index}"] = values
+            mine = " AND source_system = ANY(:owned)" if owned and table in owned[1] else ""
             parts.append(
-                f"SELECT {index} AS part, id FROM {table} WHERE tenant_id = :tenant AND {column} = ANY(:v{index})"
+                f"SELECT {index} AS part, id FROM {table} WHERE tenant_id = :tenant AND {column} = ANY(:v{index}){mine}"
             )
         for part, row_id in db.execute(text(" UNION ALL ".join(parts)), params):
             found[chunk[part][0]].add(row_id)
     return found
 
 
-def plan(db: Session, tenant_id: uuid.UUID, *, sources: tuple = (SAMPLE_SOURCE,), marked: dict | None = None) -> dict:
+def plan(
+    db: Session,
+    tenant_id: uuid.UUID,
+    *,
+    sources: tuple = (SAMPLE_SOURCE,),
+    marked: dict | None = None,
+    owned_only: bool = False,
+) -> dict:
     """Every row the removal deletes, by table (``rows``), and the rows without an ``id`` column that go with them
     (``links``: table -> [(column, parent table)]): the records of ``sources`` (the sample by default; the
-    organization's own uploads for ``OWN_SOURCES``) and everything that depends on them. Reads only."""
+    organization's own uploads for ``OWN_SOURCES``) and everything that depends on them. Reads only.
+
+    ``owned_only`` (the sample's clock, D11): a row of a table with ``source_system`` from any other source (a call
+    the organization logged on a sample product, a conclusion it signed) is neither listed nor followed."""
     marked = SAMPLE_MARKED if marked is None else marked
     tables = set(_tenant_tables(db))
     columns = _columns(db)
+    owned = (sources, {table for table in tables if "source_system" in columns[table]}) if owned_only else None
     doomed: dict[str, set[uuid.UUID]] = defaultdict(set)
     asks = [
         (table, "source_system", list(sources)) for table in sorted(tables) if {"source_system", "id"} <= columns[table]
@@ -173,15 +188,16 @@ def plan(db: Session, tenant_id: uuid.UUID, *, sources: tuple = (SAMPLE_SOURCE,)
         ]
         asks += [(table, column, list(every)) for table, column in generic if "id" in columns[table]]
         added: dict[str, set[uuid.UUID]] = defaultdict(set)
-        for table, ids in _ids_by_table(db, tenant_id, asks).items():
+        for table, ids in _ids_by_table(db, tenant_id, asks, owned).items():
             added[table] |= ids - doomed[table]
         # A document version (T-G35) made on sample records cites them in its context's source_ids, not by a key.
         if "report_jobs" in tables:
+            mine = " AND source_system = ANY(:owned)" if owned and "report_jobs" in owned[1] else ""
             added["report_jobs"] |= (
                 _ids(
                     db,
-                    "SELECT id FROM report_jobs WHERE tenant_id = :tenant AND context -> 'source_ids' ?| :ids",
-                    {"tenant": tenant_id, "ids": [str(item) for item in every]},
+                    f"SELECT id FROM report_jobs WHERE tenant_id = :tenant AND context -> 'source_ids' ?| :ids{mine}",
+                    {"tenant": tenant_id, "ids": [str(item) for item in every], "owned": list(sources)},
                 )
                 - doomed["report_jobs"]
             )

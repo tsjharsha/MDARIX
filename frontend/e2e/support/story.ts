@@ -136,27 +136,36 @@ export async function triageForm(page: Page) {
 export async function answerTree(page: Page, answers: Record<string, string>) {
   const questions = page.getByRole("region", { name: /questions$/ });
   await expect(questions).toBeVisible({ timeout: 60_000 });
+  // Each answer settles before the next is read (0.10.92, A17): an answer re-renders the rows after it (a question
+  // folds, a fact turns into a given answer), so the outcome must have updated first.
+  const settled = () =>
+    expect(page.locator("#dt-outcome")).not.toContainText("updating from your answers", { timeout: 60_000 });
   for (let round = 0; round < 20; round++) {
     const confirm = questions.getByRole("button", { name: /^Confirm (Yes|No)$/ });
     if (await confirm.count()) {
       await confirm.first().click();
-      await page.waitForTimeout(300);
+      await settled();
       continue;
     }
     const groups = questions.getByRole("group", { name: /^Answer to question / });
     let clicked = false;
     for (let i = 0; i < (await groups.count()); i++) {
-      const group = groups.nth(i);
-      if (await group.locator("[aria-pressed=true]").count()) continue;
-      const id = ((await group.getAttribute("aria-label")) ?? "").replace("Answer to question ", "");
-      await group.getByRole("button", { name: answers[id] ?? "No", exact: true }).click();
-      await page.waitForTimeout(300);
+      const id = ((await groups.nth(i).getAttribute("aria-label")) ?? "").replace("Answer to question ", "");
+      // The question pinned by its number, never by its place in the list: a row that folded or turned into a
+      // given answer meanwhile shifted the list, and the "Yes" meant for question 5 once landed on question 6 (the
+      // 5-day report instead of the 30-day one).
+      const group = questions.getByRole("group", { name: `Answer to question ${id}`, exact: true });
+      if (!id || (await group.locator("[aria-pressed=true]").count())) continue;
+      const choice = group.getByRole("button", { name: answers[id] ?? "No", exact: true });
+      await choice.click();
+      await expect(choice).toHaveAttribute("aria-pressed", "true", { timeout: 30_000 });
+      await settled();
       clicked = true;
       break;
     }
     if (!clicked) break;
   }
-  await expect(page.locator("#dt-outcome")).not.toContainText("updating from your answers", { timeout: 60_000 });
+  await settled();
   const whys = questions.getByRole("textbox", { name: /^Why\? One line/ });
   for (let i = 0; i < (await whys.count()); i++) await whys.nth(i).fill("Per the record and the service report.");
 }
@@ -259,11 +268,13 @@ export async function prepareAndComplete(page: Page, lose = false, run: Run = "s
     // An uploaded product has no common device name (the sample's has one).
     [/^D2b Common device name/, "Infusion pump"],
     [/^D3 Manufacturer/, "Journey Devices, Pune, MH, India"],
-    [/^G1 Contact office/, "Journey Devices QA office, Pune, India"],
+    // The eMDR's contact office (G1) reads the manufacturer just given; its e-mail is asked for beside it (0.10.92).
+    [/^G1 Contact office.*: e-mail$/, "qa@journey-devices.example"],
+    [/^G1 Contact office(?!.*e-mail)/, "Journey Devices QA office, Pune, India"],
   ] as const) {
     if (!(await item(name).count())) continue;
     await item(name).getByRole("textbox").fill(value);
-    await item(name).getByRole("button").click();
+    await item(name).getByRole("button", { name: /^Save/ }).click();
     await expect(item(name)).toHaveCount(0, { timeout: 60_000 });
   }
   // A reload in the middle of the form: what was saved stays saved.
