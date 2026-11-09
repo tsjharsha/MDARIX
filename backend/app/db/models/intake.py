@@ -43,21 +43,40 @@ from sqlalchemy.orm import Mapped, mapped_column
 from backend.app.db.base import Base
 
 __all__ = [
+    "CASE_STATES",
     "FIRST_CONTACT_OUTCOMES",
     "INTAKE_KINDS",
     "LINK_STATES",
     "TRIAGE_SUBJECTS",
+    "CaseAddendum",
     "FirstContactCheck",
     "IntakeEvent",
     "RecordFieldChange",
     "RecordLink",
     "TriageRecord",
+    "TriageRecordVersion",
 ]
 
 INTAKE_KINDS = ("CONTACT", "URGENT", "SERVICE_RECORD")
-FIRST_CONTACT_OUTCOMES = ("COMPLAINT", "BOTH", "SERVICE_ONLY", "PENDING", "PENDING_CONFIRM")
+FIRST_CONTACT_OUTCOMES = (
+    "COMPLAINT",
+    "BOTH",
+    "SERVICE_ONLY",
+    "PENDING",
+    "PENDING_CONFIRM",
+    "INQUIRY",
+    "NOT_A_COMPLAINT",
+)
+# tr19: an incomplete draft's suggestion (an unanswered question is never Unknown); never a classification.
+UNANSWERED = "UNANSWERED"
 TRIAGE_SUBJECTS = ("INTAKE", "COMPLAINT", "QUARANTINE")
 LINK_STATES = ("LINKED", "DISMISSED", "UNLINKED")
+CASE_STATES = ("OPEN", "PENDING", "IN_REVIEW", "CLOSED", "ESCALATED", "VOIDED")
+ESCALATIONS = ("CREATED", "ATTACHED")
+RECORD_OWNERS = ("MDARIX", "EXTERNAL")
+PATIENTS = ("NONE", "ONE", "SEVERAL", "NOT_KNOWN")
+TRIAGE_SPEEDS = ("FAST", "ROUTINE")
+ADDENDUM_KINDS = ("STATEMENT", "WITHDRAWAL", "TECHNICIAN_FINDING", "CORRECTION_BY_REPORTER")
 
 
 def _in(column: str, values) -> str:
@@ -109,14 +128,69 @@ class IntakeEvent(Base):
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at = _tz(False)
     updated_at = _tz(False)
+    # tr19 (0.10.93, B2): the Case. Its state is set only by intake.service.set_case_status.
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="OPEN")
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    request_key: Mapped[str | None] = mapped_column(String(80))
+    owner_id: Mapped[str | None] = mapped_column(String(255))
+    channel: Mapped[str | None] = mapped_column(String(40))
+    channel_ref: Mapped[str | None] = mapped_column(String(200))
+    product_text: Mapped[str | None] = mapped_column(String(200))
+    lot_text: Mapped[str | None] = mapped_column(String(120))
+    udi: Mapped[str | None] = mapped_column(String(120))
+    software_version: Mapped[str | None] = mapped_column(String(60))
+    # ID-1: per device identifier, "Not sure", its status (confirmed / unconfirmed) and its source.
+    identifiers = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    reporter_country: Mapped[str | None] = mapped_column(String(2))
+    country_text: Mapped[str | None] = mapped_column(String(80))
+    late_entry_reason: Mapped[str | None] = mapped_column(Text)
+    no_contact_reason: Mapped[str | None] = mapped_column(Text)
+    patients: Mapped[str | None] = mapped_column(String(12))
+    harm_text: Mapped[str | None] = mapped_column(Text)
+    troubleshooting: Mapped[str | None] = mapped_column(Text)
+    service_status: Mapped[str | None] = mapped_column(String(20))
+    service_status_at = _tz()
+    masked = mapped_column(JSONB)
+    complaint_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    escalation: Mapped[str | None] = mapped_column(String(10))
+    escalated_at = _tz()
+    escalated_by: Mapped[str | None] = mapped_column(String(255))
+    voided_at = _tz()
+    voided_by: Mapped[str | None] = mapped_column(String(255))
+    void_reason: Mapped[str | None] = mapped_column(Text)
+    void_signed_record_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    source_identifier: Mapped[str | None] = mapped_column(String(255))
+    last_synced_at = _tz()
+    record_owner: Mapped[str | None] = mapped_column(String(10))
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "reference", name="uq_intake_events_reference"),
+        UniqueConstraint("tenant_id", "id", name="uq_intake_events_tenant_id_id"),
         ForeignKeyConstraint(
             ["tenant_id", "product_id"], ["products.tenant_id", "products.id"], name="fk_intake_events_product"
         ),
+        ForeignKeyConstraint(
+            ["tenant_id", "complaint_id"], ["complaints.tenant_id", "complaints.id"], name="fk_intake_events_complaint"
+        ),
         CheckConstraint(_in("kind", INTAKE_KINDS), name="kind_known"),
+        CheckConstraint(_in("status", CASE_STATES), name="status_known"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        CheckConstraint(f"escalation IS NULL OR {_in('escalation', ESCALATIONS)}", name="escalation_known"),
+        CheckConstraint("status <> 'ESCALATED' OR complaint_id IS NOT NULL", name="escalated_complaint"),
+        CheckConstraint(f"record_owner IS NULL OR {_in('record_owner', RECORD_OWNERS)}", name="record_owner_known"),
+        CheckConstraint(f"patients IS NULL OR {_in('patients', PATIENTS)}", name="patients_known"),
+        CheckConstraint("voided_at IS NULL OR void_reason IS NOT NULL", name="void_reason"),
         Index("ix_intake_events_tenant_created", "tenant_id", "created_at"),
+        Index("ix_intake_events_tenant_status", "tenant_id", "status"),
+        Index("ix_intake_events_tenant_owner", "tenant_id", "owner_id"),
+        Index("ix_intake_events_tenant_complaint", "tenant_id", "complaint_id"),
+        Index(
+            "ix_intake_events_request_key",
+            "tenant_id",
+            "request_key",
+            unique=True,
+            postgresql_where=text("request_key IS NOT NULL"),
+        ),
     )
 
 
@@ -146,13 +220,15 @@ class FirstContactCheck(Base):
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at = _tz(False)
     updated_at = _tz(False)
+    # tr19: each recalculation of this version's suggestion (when, by whom, the answers changed, before -> after).
+    history = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
 
     __table_args__ = (
         ForeignKeyConstraint(
             ["intake_event_id"], ["intake_events.id"], name="fk_first_contact_checks_event", ondelete="CASCADE"
         ),
         UniqueConstraint("intake_event_id", "version", name="uq_first_contact_checks_version"),
-        CheckConstraint(_in("suggestion", FIRST_CONTACT_OUTCOMES), name="suggestion"),
+        CheckConstraint(_in("suggestion", (*FIRST_CONTACT_OUTCOMES, UNANSWERED)), name="suggestion"),
         CheckConstraint(
             f"classification IS NULL OR {_in('classification', FIRST_CONTACT_OUTCOMES)}", name="classification"
         ),
@@ -189,11 +265,98 @@ class TriageRecord(Base):
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at = _tz(False)
     updated_at = _tz(False)
+    # tr19 (0.10.93, B2): two speeds, versions, the floor, containment, signed exclusions, inheritance, QMS triage and
+    # the acknowledgement of a fast-track item (A1).
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    speed: Mapped[str | None] = mapped_column(String(10))
+    due_at = _tz()
+    potential_severity: Mapped[str | None] = mapped_column(String(20))
+    severity_floor: Mapped[str | None] = mapped_column(String(20))
+    floor_reasons = mapped_column(JSONB)
+    flags_at_completion = mapped_column(JSONB)
+    containment = mapped_column(JSONB)
+    change_reason: Mapped[str | None] = mapped_column(Text)
+    reopened_at = _tz()
+    reopen_trigger: Mapped[str | None] = mapped_column(String(30))
+    threat_excluded_at = _tz()
+    threat_excluded_by: Mapped[str | None] = mapped_column(String(255))
+    threat_exclusion_reason: Mapped[str | None] = mapped_column(Text)
+    threat_signed_record_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    awareness_signed_record_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    inherited_from: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    qms_triaged_at = _tz()
+    qms_owner_text: Mapped[str | None] = mapped_column(String(255))
+    confirmed_by: Mapped[str | None] = mapped_column(String(255))
+    confirmed_at = _tz()
+    source_identifier: Mapped[str | None] = mapped_column(String(255))
+    acknowledged_at = _tz()
+    acknowledged_by: Mapped[str | None] = mapped_column(String(255))
+    acknowledge_due_at = _tz()
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "subject_kind", "subject_id", name="uq_triage_records_subject"),
+        UniqueConstraint("tenant_id", "id", name="uq_triage_records_tenant_id_id"),
         CheckConstraint(_in("subject_kind", TRIAGE_SUBJECTS), name="subject_known"),
         CheckConstraint("target_hours BETWEEN 1 AND 168", name="target_range"),
+        CheckConstraint(f"speed IS NULL OR {_in('speed', TRIAGE_SPEEDS)}", name="speed_known"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index("ix_triage_records_tenant_speed_completed", "tenant_id", "speed", "completed_at"),
+    )
+
+
+class TriageRecordVersion(Base):
+    """Every version of a triage record (tr19): never overwritten."""
+
+    __tablename__ = "triage_record_versions"
+    id = _pk()
+    tenant_id: Mapped[uuid.UUID] = _tenant()
+    triage_record_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot = mapped_column(JSONB, nullable=False)
+    changed_fields = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    change_reason: Mapped[str | None] = mapped_column(Text)
+    changed_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    changed_at = _tz(False)
+    signed_record_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "triage_record_id"],
+            ["triage_records.tenant_id", "triage_records.id"],
+            name="fk_triage_record_versions_record",
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("tenant_id", "triage_record_id", "version", name="uq_triage_record_versions_version"),
+        CheckConstraint("version >= 1", name="version_positive"),
+    )
+
+
+class CaseAddendum(Base):
+    """What was said about a Case later, and by whom (tr19); the reporter's words are never edited."""
+
+    __tablename__ = "case_addenda"
+    id = _pk()
+    tenant_id: Mapped[uuid.UUID] = _tenant()
+    intake_event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    said_by_role: Mapped[str] = mapped_column(String(30), nullable=False)
+    said_at = _tz()
+    said_zone: Mapped[str | None] = mapped_column(String(60))
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    masked = mapped_column(JSONB)
+    source_system: Mapped[str | None] = mapped_column(String(40))
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at = _tz(False)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["tenant_id", "intake_event_id"],
+            ["intake_events.tenant_id", "intake_events.id"],
+            name="fk_case_addenda_case",
+            ondelete="CASCADE",
+        ),
+        CheckConstraint(_in("kind", ADDENDUM_KINDS), name="kind_known"),
+        Index("ix_case_addenda_tenant_case", "tenant_id", "intake_event_id", "created_at"),
     )
 
 

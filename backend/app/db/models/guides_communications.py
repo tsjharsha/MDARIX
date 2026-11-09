@@ -24,6 +24,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -147,6 +148,19 @@ class ExternalParty(Base):
     created_at = _tz(False)
     updated_by: Mapped[str] = mapped_column(String(255), nullable=False)
     updated_at = _tz(False)
+    # tr19 (0.10.93, B2): a party of a Case before there is a Complaint; whether it acts for the manufacturer; its
+    # country; the structured contact (OD-1) and its erasure on request. Roles are validated in code (PARTY_TYPES and
+    # later ones), so the old check constraint is gone.
+    intake_event_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    acts_for_manufacturer: Mapped[bool | None] = mapped_column(Boolean)
+    country: Mapped[str | None] = mapped_column(String(2))
+    contact_role: Mapped[str | None] = mapped_column(String(120))
+    contact_email: Mapped[str | None] = mapped_column(String(254))
+    contact_phone: Mapped[str | None] = mapped_column(String(40))
+    preferred_channel: Mapped[str | None] = mapped_column(String(20))
+    contact_erased_at = _tz()
+    contact_erased_by: Mapped[str | None] = mapped_column(String(255))
+    contact_erase_reason: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
         ForeignKeyConstraint(
@@ -155,8 +169,13 @@ class ExternalParty(Base):
             name="fk_external_parties_complaint",
             ondelete="CASCADE",
         ),
-        CheckConstraint(_in("party_type", PARTY_TYPES), name="party_type_known"),
+        ForeignKeyConstraint(
+            ["tenant_id", "intake_event_id"],
+            ["intake_events.tenant_id", "intake_events.id"],
+            name="fk_external_parties_case",
+        ),
         Index("ix_external_parties_tenant_type", "tenant_id", "party_type"),
+        Index("ix_external_parties_tenant_case", "tenant_id", "intake_event_id"),
     )
 
 

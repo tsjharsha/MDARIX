@@ -5,7 +5,8 @@ tr04 to tr08 (the trial line's intake, reports, guides, oversight and lot impact
 reference, a lot's expiry date, a product's device category and a complaint's other lots), tr10 (a set-aside import
 row dismissed with a reason), tr11 (each organization's navigation, classic or new) and tr12 (a sample-only trial,
 a complaint's linked service work) tr13 (each person's workspace persona), tr14 (a cancelled authority report), tr15 (a Canada assessment), tr16 (a product's Basic UDI-DI and EMDN code, a
-registration's risk class, a responsible party's SRN) and tr18 (a re-signed market conclusion's change reason).
+registration's risk class, a responsible party's SRN), tr18 (a re-signed market conclusion's change reason) and
+tr19 (Cases, escalation to a Complaint, triage at two speeds).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -305,6 +306,21 @@ STEPS = (
         done_sql=(
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
             "AND table_name = 'complaint_market_assessments' AND column_name = 'change_reason')"
+        ),
+    ),
+    Step(
+        "tr19",
+        "tr19_trial_cases_escalation.py",
+        "add_cases_escalation",
+        ("triage_record_versions", "case_addenda", "record_ownership"),
+        (
+            "intake_events",
+            "first_contact_checks",
+            "triage_records",
+            "complaints",
+            "external_parties",
+            "oversight_settings",
+            "due_alerts",
         ),
     ),
 )

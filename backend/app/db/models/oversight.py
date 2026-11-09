@@ -39,6 +39,8 @@ from backend.app.db.base import Base
 __all__ = ["ALERT_TIERS", "READY_STATES", "DueAlert", "EventClosure", "OversightSettings", "UserAbsence"]
 
 ALERT_TIERS = ("REMINDER", "ESCALATION")
+CASE_FLOWS = ("ONE_RECORD", "SERVICE_FIRST")
+DELIVERIES = ("DELIVERED", "FAILED", "RETRYING")
 READY_STATES = ("READY", "READY_WITH_REASON")
 
 
@@ -71,9 +73,38 @@ class OversightSettings(Base):
     updated_by: Mapped[str | None] = mapped_column(String(255))
     updated_at = _tz(False)
 
+    # tr19 (0.10.93, B2): the fast-track triage target in clock hours (1-24, OD-7), how Cases become complaints, and
+    # the imported-backlog rule (OD-12).
+    triage_fast_hours: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("4"))
+    case_flow: Mapped[str] = mapped_column(String(20), nullable=False, server_default="ONE_RECORD")
+    backlog_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("30"))
+    backlog_target_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("10"))
+
     __table_args__ = (
         UniqueConstraint("tenant_id", name="uq_oversight_settings_tenant"),
         CheckConstraint("reminder_hours BETWEEN 1 AND 168", name="reminder_range"),
+        CheckConstraint("triage_fast_hours BETWEEN 1 AND 24", name="fast_hours_range"),
+        CheckConstraint(_in("case_flow", CASE_FLOWS), name="case_flow_known"),
+        CheckConstraint("backlog_days >= 1 AND backlog_target_days >= 1", name="backlog_range"),
+    )
+
+
+class RecordOwnership(Base):
+    """The system of record per domain (tr19, operating modes M3): MDARIX or the customer's own system. No row: a
+    trial reads MDARIX, a pilot EXTERNAL."""
+
+    __tablename__ = "record_ownership"
+    id = _pk()
+    tenant_id: Mapped[uuid.UUID] = _tenant()
+    domain: Mapped[str] = mapped_column(String(40), nullable=False)
+    owner: Mapped[str] = mapped_column(String(10), nullable=False)
+    system_name: Mapped[str | None] = mapped_column(String(120))
+    set_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    set_at = _tz(False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "domain", name="uq_record_ownership_domain"),
+        CheckConstraint("owner IN ('MDARIX', 'EXTERNAL')", name="owner_known"),
     )
 
 
@@ -117,10 +148,18 @@ class DueAlert(Base):
     raised_at = _tz(False)
     read_at = _tz()
     resolved_at = _tz()
+    # tr19 (A2): the channel, the attempts and the delivery result; a failed delivery never resolves the alert.
+    channel: Mapped[str] = mapped_column(String(20), nullable=False, server_default="IN_APP")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    last_attempt_at = _tz()
+    delivery: Mapped[str] = mapped_column(String(20), nullable=False, server_default="DELIVERED")
+    delivery_error: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "item_key", "tier", "recipient_id", name="uq_due_alerts_item"),
         CheckConstraint(_in("tier", ALERT_TIERS), name="tier_known"),
+        CheckConstraint(_in("delivery", DELIVERIES), name="delivery_known"),
+        CheckConstraint("attempts >= 1", name="attempts_positive"),
         Index("ix_due_alerts_tenant_recipient", "tenant_id", "recipient_id"),
     )
 

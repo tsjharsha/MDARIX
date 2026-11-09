@@ -317,10 +317,26 @@ class Complaint(TenantOwned, Base):
     service_owner: Mapped[str | None] = mapped_column(String(255))
     service_status: Mapped[str | None] = mapped_column(String(20))
     service_status_at = tz()
+    # tr19 (0.10.93, B2): the QMS complaint ID (unique per organization when set), the product and lot as typed, the
+    # software version, the last sync from the QMS and who owns the record (MDARIX or EXTERNAL).
+    qms_ref: Mapped[str | None] = mapped_column(String(120))
+    product_text: Mapped[str | None] = mapped_column(String(200))
+    lot_text: Mapped[str | None] = mapped_column(String(120))
+    software_version: Mapped[str | None] = mapped_column(String(60))
+    last_synced_at = tz()
+    record_owner: Mapped[str | None] = mapped_column(String(10))
     __table_args__ = (
         CheckConstraint(
             "service_status IS NULL OR service_status IN ('OPEN','IN_PROGRESS','COMPLETE')",
             name="complaint_service_status_known",
+        ),
+        CheckConstraint("record_owner IS NULL OR record_owner IN ('MDARIX', 'EXTERNAL')", name="record_owner_known"),
+        Index(
+            "ix_complaints_tenant_qms_ref",
+            "tenant_id",
+            "qms_ref",
+            unique=True,
+            postgresql_where=text("qms_ref IS NOT NULL"),
         ),
         ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
         ForeignKeyConstraint(
