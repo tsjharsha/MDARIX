@@ -4,7 +4,8 @@
 #   schtasks /create /tn "MDARIX CI runners" /sc onlogon /rl limited /tr "powershell -NoProfile -WindowStyle Hidden -File C:\Users\user\Srinivas\MDARIX-R1\infrastructure\ci\self-hosted\start-runners.ps1"
 $ErrorActionPreference = 'Stop'
 
-$linuxListening = (wsl -d Ubuntu -u runner -- pgrep -f Runner.Listener 2>$null)
+# The [R] keeps pgrep from matching the shell that wsl runs it in (that shell's command line names Runner.Listener).
+$linuxListening = (wsl -d Ubuntu -u runner -- pgrep -f '[R]unner.Listener' 2>$null)
 if (-not $linuxListening) {
   Start-Process -WindowStyle Hidden -FilePath wsl.exe -ArgumentList '-d', 'Ubuntu', '-u', 'runner', '--', 'bash', '-lc', 'cd ~/actions-runner && ./run.sh'
   Write-Host 'Linux runner started'
