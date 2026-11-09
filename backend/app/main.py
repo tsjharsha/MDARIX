@@ -503,7 +503,7 @@ def graph_error(exc: GraphError) -> HTTPException:
 
 
 def product_error(exc: Product360Error) -> HTTPException:
-    status = 404 if exc.code == "PRODUCT_NOT_FOUND" else 400
+    status = 404 if exc.code in {"PRODUCT_NOT_FOUND", "VERSION_NOT_FOUND"} else 400
     return HTTPException(status_code=status, detail={"code": exc.code, "message": exc.message})
 
 
@@ -641,6 +641,7 @@ def get_path(
 def list_products(
     response: Response,
     page: Page = Depends(),
+    counts: bool = Query(False, description="W1: the newest version's open records per product"),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     data_db: Session = Depends(get_data_plane_db),
 ) -> list[ProductSummary]:
@@ -650,7 +651,9 @@ def list_products(
     response.headers["X-Total-Count"] = str(total)
     following = page.offset + page.limit
     response.headers["X-Next-Offset"] = str(following) if following < total else ""
-    return product360_service.list_products(ctx.tenant_id, db_engine=source, limit=page.limit, offset=page.offset)
+    return product360_service.list_products(
+        ctx.tenant_id, db_engine=source, limit=page.limit, offset=page.offset, with_counts=counts
+    )
 
 
 @app.get("/api/v1/products/{product_id}/investigations")
@@ -701,16 +704,38 @@ def get_product360(
     version_id: str | None = None,
     as_of: datetime | None = None,
     mode: str = Query("current", pattern="^(current|event|known)$"),
+    light: bool = Query(False, description="W1: counts instead of complaint rows, evidence and the timeline"),
     db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     data_db: Session = Depends(get_data_plane_db),
 ) -> Product360Response:
     try:
         result = product360_service.product360(
-            product_id, version_id, as_of, mode, ctx.tenant_id, db_engine=scoped_bind(data_db)
+            product_id, version_id, as_of, mode, ctx.tenant_id, db_engine=scoped_bind(data_db), light=light
         )
         _product360_audit(db, result, mode, as_of, ctx)
         return result
+    except Product360Error as exc:
+        raise product_error(exc) from exc
+
+
+@app.get("/api/v1/products/{product_id}/links")
+def get_product_links(
+    product_id: str,
+    response: Response,
+    version: str | None = None,
+    kind: str | None = Query(None, pattern="^(complaints|investigations|signals|capas|risks|reports)$"),
+    page: Page = Depends(),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    data_db: Session = Depends(get_data_plane_db),
+):
+    """W1: the product's connected records, as six tiles (no ``kind``) or one list, paged (backend/app/product360/links.py)."""
+    from backend.app.product360 import links
+
+    try:
+        if kind is None:
+            return links.tiles(data_db, ctx.tenant_id, product_id, version)
+        return links.one_list(data_db, ctx.tenant_id, product_id, version, kind, page.limit, page.offset, response)
     except Product360Error as exc:
         raise product_error(exc) from exc
 
