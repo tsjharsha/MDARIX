@@ -426,7 +426,7 @@ def _evidence(db, t, supplier_id, part_ids) -> list[dict]:
             "LEFT JOIN investigations i ON i.tenant_id=e.tenant_id AND i.id=e.investigation_id "
             "WHERE l.tenant_id=:t AND ((l.entity_type='Supplier' AND l.entity_id=:s) "
             "OR (l.entity_type='Component' AND l.entity_id = ANY(CAST(:c AS uuid[])))) "
-            "ORDER BY e.evidence_identifier, l.entity_type"
+            "ORDER BY e.evidence_identifier, l.entity_type DESC"  # the supplier before its part
         ),
         {"t": t, "s": supplier_id, "c": part_ids},
     ).mappings()

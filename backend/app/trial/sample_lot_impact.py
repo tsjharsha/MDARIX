@@ -103,7 +103,10 @@ def stage_sample_lot_impact(db: Session, tenant_id, now: datetime) -> dict:
     components = {
         row.component_identifier: row
         for row in db.query(Component).filter(
-            Component.tenant_id == tenant_id, Component.component_identifier.in_([SENSOR, BOARD])
+            Component.tenant_id == tenant_id,
+            Component.component_identifier.in_([SENSOR, BOARD]),
+            # Rev B's parts: since 0.10.94 OrbitCare Rev A has a sensor of its own with the same identifier.
+            Component.revision == "Rev B",
         )
     }
     if base is None or set(components) != {SENSOR, BOARD}:

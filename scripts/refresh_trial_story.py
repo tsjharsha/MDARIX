@@ -98,6 +98,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from sqlalchemy import or_
     from backend.app.signals.hooks import seed_demo_signals
     from backend.app.trial import open_deadlines, reports_0_10_75, sample_0_10_72, sample_0_10_77, sample_0_10_79
+    from backend.app.trial import sample_supply
     from backend.app.trial.sample_calm import has_calm_story, rerecord_rv09, stage_calm_story
     from backend.app.trial.sample_clock import _absence_to_trial_end
     from backend.app.trial.sample_data import (
@@ -199,6 +200,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             codes_owed = sample_0_10_77.refresh(session, tenant_id, apply=False)
             # 0.10.79: the two sample problem codes that had no IMDRF link.
             links_owed = sample_0_10_79.refresh(session, tenant_id, apply=False)
+            # 0.10.94 (W1): Rev A configurations and the evidence linked to NovaSense (Product 360, Supplier 360).
+            supply_owed = sample_supply.refresh(session, tenant_id, apply=False, now=datetime.now(timezone.utc))
             if not (
                 story_missing
                 or flagship_missing
@@ -222,6 +225,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or reports_owed
                 or codes_owed
                 or links_owed
+                or supply_owed
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -265,6 +269,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                         else []
                     ),
                     *([f"{links_owed} sample IMDRF links (0.10.79)"] if links_owed else []),
+                    *([f"{supply_owed} sample supply-chain rows (0.10.94)"] if supply_owed else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -316,6 +321,9 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["codes_0_10_77"] = sample_0_10_77.refresh(session, tenant_id, apply=True, now=now)
             if links_owed:
                 added["links_0_10_79"] = sample_0_10_79.refresh(session, tenant_id, apply=True, now=now)
+            if supply_owed:
+                # After the lot genealogy above, as in a new trial (sample_clock.seed_sample).
+                added["supply_0_10_94"] = sample_supply.refresh(session, tenant_id, apply=True, now=now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,
