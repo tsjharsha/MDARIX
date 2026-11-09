@@ -5,7 +5,8 @@ needed none). Expand-only: new nullable columns or columns with a default, new t
 check constraint dropped (``external_parties.party_type_known``: party roles are validated in code, so later roles
 need no migration). No column is dropped or renamed; the 0.10.92 images run on this schema.
 
-- ``intake_events`` (the Case): its state (one function sets it), owner, channel, the product and lot as typed, the
+- ``intake_events`` (the Case): its state (one function sets it; WAITING_INTERNAL, S-2), owner, channel, the
+  service issue category (S-1), the resolution summary (S-2), hardware revision and firmware version (S-3), the product and lot as typed, the
   device identifiers' status and source (ID-1, ``identifiers``), the Complaint it became (composite reference), the
   withdrawal, the origin, a row version for optimistic concurrency and a request key for idempotent create (A4).
 - ``first_contact_checks``: outcomes ``INQUIRY`` and ``NOT_A_COMPLAINT``; an incomplete draft's suggestion is
@@ -40,7 +41,27 @@ branch_labels = None
 depends_on = None
 
 NEW_TABLES = ("triage_record_versions", "case_addenda", "record_ownership")
-CASE_STATES = ("OPEN", "PENDING", "IN_REVIEW", "CLOSED", "ESCALATED", "VOIDED")
+CASE_STATES = ("OPEN", "PENDING", "WAITING_INTERNAL", "IN_REVIEW", "CLOSED", "ESCALATED", "VOIDED")
+# S-1 (owner 10 Nov): the service issue category, operational only (never a regulatory decision).
+ISSUE_CATEGORIES = (
+    "MALFUNCTION",
+    "PERFORMANCE",
+    "SOFTWARE",
+    "FIRMWARE",
+    "HARDWARE",
+    "CONNECTIVITY",
+    "INSTALLATION",
+    "CONFIGURATION",
+    "USAGE_HELP",
+    "MAINTENANCE",
+    "ACCESSORIES",
+    "CONSUMABLES",
+    "TRAINING",
+    "DELIVERY",
+    "DOCUMENTATION",
+    "WARRANTY",
+    "OTHER",
+)
 ESCALATIONS = ("CREATED", "ATTACHED")
 OWNERS = ("MDARIX", "EXTERNAL")
 PATIENTS = ("NONE", "ONE", "SEVERAL", "NOT_KNOWN")
@@ -93,6 +114,10 @@ def _cases() -> None:
         sa.Column("lot_text", sa.String(120)),
         sa.Column("udi", sa.String(120)),
         sa.Column("software_version", sa.String(60)),
+        sa.Column("hardware_revision", sa.String(60)),
+        sa.Column("firmware_version", sa.String(60)),
+        sa.Column("issue_category", sa.String(20)),
+        sa.Column("resolution_summary", sa.Text()),
         sa.Column("identifiers", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
         sa.Column("reporter_country", sa.String(2)),
         sa.Column("country_text", sa.String(80)),
@@ -123,6 +148,7 @@ def _cases() -> None:
     _check(table, "record_owner_known", f"record_owner IS NULL OR record_owner IN ({quoted(OWNERS)})")
     _check(table, "patients_known", f"patients IS NULL OR patients IN ({quoted(PATIENTS)})")
     _check(table, "void_reason", "voided_at IS NULL OR void_reason IS NOT NULL")
+    _check(table, "issue_category_known", f"issue_category IS NULL OR issue_category IN ({quoted(ISSUE_CATEGORIES)})")
     op.create_unique_constraint("uq_intake_events_tenant_id_id", table, ["tenant_id", "id"])
     op.create_foreign_key(
         "fk_intake_events_complaint",
@@ -426,6 +452,7 @@ def downgrade():
     op.drop_constraint("fk_intake_events_complaint", "intake_events", type_="foreignkey")
     op.drop_constraint("uq_intake_events_tenant_id_id", "intake_events", type_="unique")
     for name in (
+        "issue_category_known",
         "void_reason",
         "patients_known",
         "record_owner_known",
@@ -458,6 +485,10 @@ def downgrade():
         "country_text",
         "reporter_country",
         "identifiers",
+        "resolution_summary",
+        "issue_category",
+        "firmware_version",
+        "hardware_revision",
         "software_version",
         "udi",
         "lot_text",

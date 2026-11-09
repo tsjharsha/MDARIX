@@ -71,7 +71,27 @@ FIRST_CONTACT_OUTCOMES = (
 UNANSWERED = "UNANSWERED"
 TRIAGE_SUBJECTS = ("INTAKE", "COMPLAINT", "QUARANTINE")
 LINK_STATES = ("LINKED", "DISMISSED", "UNLINKED")
-CASE_STATES = ("OPEN", "PENDING", "IN_REVIEW", "CLOSED", "ESCALATED", "VOIDED")
+CASE_STATES = ("OPEN", "PENDING", "WAITING_INTERNAL", "IN_REVIEW", "CLOSED", "ESCALATED", "VOIDED")
+# S-1: the service issue category (operational only); the code list and labels are in intake/case_rules.py.
+ISSUE_CATEGORIES = (
+    "MALFUNCTION",
+    "PERFORMANCE",
+    "SOFTWARE",
+    "FIRMWARE",
+    "HARDWARE",
+    "CONNECTIVITY",
+    "INSTALLATION",
+    "CONFIGURATION",
+    "USAGE_HELP",
+    "MAINTENANCE",
+    "ACCESSORIES",
+    "CONSUMABLES",
+    "TRAINING",
+    "DELIVERY",
+    "DOCUMENTATION",
+    "WARRANTY",
+    "OTHER",
+)
 ESCALATIONS = ("CREATED", "ATTACHED")
 RECORD_OWNERS = ("MDARIX", "EXTERNAL")
 PATIENTS = ("NONE", "ONE", "SEVERAL", "NOT_KNOWN")
@@ -139,6 +159,11 @@ class IntakeEvent(Base):
     lot_text: Mapped[str | None] = mapped_column(String(120))
     udi: Mapped[str | None] = mapped_column(String(120))
     software_version: Mapped[str | None] = mapped_column(String(60))
+    hardware_revision: Mapped[str | None] = mapped_column(String(60))
+    firmware_version: Mapped[str | None] = mapped_column(String(60))
+    issue_category: Mapped[str | None] = mapped_column(String(20))
+    # S-2: required before a Case signed service only is closed.
+    resolution_summary: Mapped[str | None] = mapped_column(Text)
     # ID-1: per device identifier, "Not sure", its status (confirmed / unconfirmed) and its source.
     identifiers = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
     reporter_country: Mapped[str | None] = mapped_column(String(2))
@@ -180,6 +205,9 @@ class IntakeEvent(Base):
         CheckConstraint(f"record_owner IS NULL OR {_in('record_owner', RECORD_OWNERS)}", name="record_owner_known"),
         CheckConstraint(f"patients IS NULL OR {_in('patients', PATIENTS)}", name="patients_known"),
         CheckConstraint("voided_at IS NULL OR void_reason IS NOT NULL", name="void_reason"),
+        CheckConstraint(
+            f"issue_category IS NULL OR {_in('issue_category', ISSUE_CATEGORIES)}", name="issue_category_known"
+        ),
         Index("ix_intake_events_tenant_created", "tenant_id", "created_at"),
         Index("ix_intake_events_tenant_status", "tenant_id", "status"),
         Index("ix_intake_events_tenant_owner", "tenant_id", "owner_id"),
