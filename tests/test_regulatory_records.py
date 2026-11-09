@@ -266,3 +266,11 @@ def test_an_amended_conclusion_keeps_the_prior_version_with_its_rationale_actor_
     assert detail["state"] == "CANCELLED" and "version 2" in detail["cancelled_reason"]
     snapshot = next(row for row in detail["snapshots"] if row["id"] == trial["state"]["snapshot"])
     assert snapshot["state"] == "SUPERSEDED" and snapshot["approved_by"]
+
+
+def test_a_superseded_snapshot_gives_no_emdr_file_and_no_pdf(trial):  # code audit 9 Nov 2026, fix 5
+    user, state = trial["user"], trial["state"]
+    for path in ("emdr.xml", "worksheet.pdf"):
+        refused = user.get(f"{REPORTS}/{state['report']}/{path}", params={"snapshot": state["snapshot"]})
+        assert refused.status_code == 409, (path, refused.text)
+        assert refused.json()["detail"]["code"] == "SNAPSHOT_NOT_APPROVED"

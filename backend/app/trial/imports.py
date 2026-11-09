@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import csv
 import io
+import itertools
 import re
 import uuid
 from dataclasses import dataclass
@@ -878,11 +879,12 @@ def _table(
     margin), within the policy's unpacked size."""
     from backend.app.trial import xlsx
 
+    max_rows = min(policy.row_limit or MAX_ROWS_PER_FILE, MAX_ROWS_PER_FILE)
     if xlsx.is_xlsx(raw):
         try:
             with xlsx.Workbook(
                 raw,
-                max_rows=min(policy.row_limit or MAX_ROWS_PER_FILE, MAX_ROWS_PER_FILE),
+                max_rows=max_rows,
                 max_bytes=policy.xlsx_max_bytes,
             ) as book:
                 rows = book.rows(_choose_sheet(book, entity, reading or FileReading(), report))
@@ -896,7 +898,14 @@ def _table(
         return None
     report.epoch = EXCEL_EPOCH
     report.delimited = True
-    return list(csv.reader(io.StringIO(text, newline=""), delimiter=_delimiter(text)))
+    # Read no further than a workbook would (header + the rows taken + the margin), so an oversized file is refused
+    # without building every row in memory.
+    row_cap = 1 + max_rows + xlsx.ROW_MARGIN
+    rows = list(itertools.islice(csv.reader(io.StringIO(text, newline=""), delimiter=_delimiter(text)), row_cap + 1))
+    if len(rows) > row_cap:
+        report.add(None, None, xlsx.too_many_rows(max_rows))
+        return None
+    return rows
 
 
 def _delimiter(text: str) -> str:

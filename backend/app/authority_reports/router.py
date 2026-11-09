@@ -76,6 +76,16 @@ def _error(status: int, code: str, message: str, **extra) -> HTTPException:
     return HTTPException(status, detail={"code": code, "message": message, **extra})
 
 
+def _approved_only(frozen) -> None:
+    """A file sent to an authority comes only from the snapshot that is approved now, never from a superseded one."""
+    if frozen.state != "APPROVED":
+        raise _error(
+            409,
+            "SNAPSHOT_NOT_APPROVED",
+            "This snapshot is not the approved report (pending, or superseded by a later version): use the approved one",
+        )
+
+
 def _text(value, limit: int = rules.NOTE_MAX) -> str | None:
     text = " ".join(str(value or "").split())
     if len(text) > limit:
@@ -1980,6 +1990,7 @@ def export(
         frozen = next((row for row in _snapshots(db, obligation) if row.id == snapshot), None)
         if frozen is None:
             raise _error(404, "SNAPSHOT_NOT_FOUND", "No such snapshot of this report")
+        _approved_only(frozen)
     if new_navigation(control_db, tenant_id) and (frozen is None or not frozen.signed_record_id):
         # 0.10.75 (C3): the PDF is the approved report, in the form's field order with its approval on the last page.
         raise _error(409, "APPROVE_FIRST", "The PDF is generated once the report is approved")
@@ -2058,6 +2069,7 @@ def emdr_file(
         raise _error(404, "SNAPSHOT_NOT_FOUND", "No such snapshot of this report")
     if not frozen.signed_record_id:
         raise _error(409, "APPROVE_FIRST", "The eMDR file is made once the report is approved")
+    _approved_only(frozen)
     context = _context(db, control_db, obligation)
     sections, parties = frozen.fields["sections"], context["parties"]
     missing, _ = emdr.check(sections, parties)
