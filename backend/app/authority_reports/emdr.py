@@ -89,6 +89,22 @@ def required(kind: str = "M-I") -> frozenset[str]:
     return frozenset(RULE_FIELDS[row["block"], row["label"]] for row in rows)
 
 
+def next_number(numbers: list[str], year: int, practice: bool) -> str | None:
+    """The next manufacturer report number (G8; decision D5, owner Q2 and Q5): the CFN or FEI of the organization's
+    last number, the year, and the last sequence of that year plus one (5 digits, from 00001 each year). A practice
+    report's sequence starts with 7, as FDA's test reports do (70001). None before the organization's first number,
+    which a person types once. ``numbers``: every number the organization has used, oldest first."""
+    found = [number.split("-") for number in numbers if REPORT_NUMBER.match(number)]
+    if not found:
+        return None
+    prefix = found[-1][0]
+    used = [
+        int(seq) for cfn, yyyy, seq in found if cfn == prefix and yyyy == str(year) and seq.startswith("7") == practice
+    ]
+    # shortcut: no guard past 69999 (a real organization's) or 79999 (practice) a year; add one if anyone nears it.
+    return f"{prefix}-{year}-{(max(used) + 1 if used else 70001 if practice else 1):05d}"
+
+
 def office(parties, roles: tuple[str, ...], text: str | None) -> dict | None:
     """The responsible party behind a block's approved text (G1, D3), in parts: only while it reads exactly as the
     approved report does (the worksheet writes the same text from it)."""
@@ -479,6 +495,14 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
     for _, code in pick("H1"):
         reason("C53570", "Type_of_Reportable_Event", code)
     return etree.tostring(root, xml_declaration=True, encoding="UTF-8", pretty_print=True)
+
+
+def prepare(sections: list[dict], parties, *, kind: str, sender: str, now: datetime, practice: bool) -> dict:
+    """The file as Send for approval checks it (0.10.96): the blocks FDA requires that are missing or not in its
+    format; when none, the file itself and its schema errors (none: FDA's schema takes it)."""
+    missing, left = check(sections, parties, kind)
+    xml = None if missing else build(sections, parties, sender=sender, now=now, practice=practice)
+    return {"missing": missing, "left_out": left, "errors": validate(xml) if xml else [], "xml": xml}
 
 
 @lru_cache(maxsize=1)

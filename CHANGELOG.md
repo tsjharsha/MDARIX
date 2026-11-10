@@ -28,6 +28,21 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
   An initial report needs FDA's 12 required blocks (B5, D2 procode, G1 email, G8, H1, the seven H6 code kinds), a
   follow-up needs G6 "Follow-up" with its number, and G8. The sheet already carries spot-check fixes 1 (H1's codes)
   and 3 (B4 is "required if known"; MDARIX fills it), approved by the owner on 10 Nov 2026 (Q8).
+- Send for approval checks a US report's eMDR file first (A2): while a block FDA requires is missing or not in FDA's
+  format, or the file would not validate against FDA's schema, it is refused (422 `EMDR_MISSING` or `EMDR_INVALID`)
+  naming each block, on both navigations. The report page shows the check and the schema result on the draft. On the
+  new navigation the mandatory-fields meter now counts all seven H6 code kinds FDA requires (it counted three).
+- The US report number is given at Send for approval (A3, decision D5): a blank number becomes the organization's
+  next one (the registration number of its last number, the year, the last sequence plus one; a free trial's start
+  with 7, FDA's test numbers). The organization's first number is typed once (422 `REPORT_NUMBER_FIRST` until then).
+  A number is never reused, a cancelled report's included: a typed number another US report holds is refused (409
+  `REPORT_NUMBER_IN_USE`). Two reports sent at the same moment get different numbers.
+- B4 "Date of this report" is no longer typed (A4, owner Q3): it is the organization's day the report is sent for
+  approval, and sending again refreshes it. A B4 typed before 0.10.96 is replaced by that day.
+- The eMDR file is made at Send for approval and frozen with the snapshot (A4, decision D6): its text, its SHA-256 and
+  the contact office and manufacturer it was built from are part of what the approval signs. "Download the eMDR XML"
+  serves exactly those bytes, whatever changes in Settings later. Reports approved before 0.10.96 keep no file and
+  still download one built from the snapshot, as before.
 
 ## [0.10.95] - not released yet (ships in the big-bang release)
 

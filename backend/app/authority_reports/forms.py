@@ -86,9 +86,20 @@ def value_problem(field: "Field", value: str | None) -> str | None:
 
 
 # Codes a form needs beyond its own classes, on the new navigation (0.10.77, C5; starter, for your consultant to
-# confirm): an initial 3500A needs the device problem and both health effect codes (H6). The EU and GB MIR already
-# need Annex A, E and F, and B, C, D (and G) in a final report (``must_in``).
-CODES_REQUIRED = {"FDA_3500A": ("H6_CLINICAL", "H6_IMPACT")}
+# confirm). An initial 3500A needs a code of each of FDA's seven H6 kinds (0.10.96: FDA's "Required 3500A fields", as
+# the rule book authority_reports/rules/us_emdr.csv lists them; Send for approval checks the eMDR file), so the
+# meter shows what blocks it. The EU and GB MIR already need Annex A, E and F, and B, C, D (and G) in a final report
+# (``must_in``).
+CODES_REQUIRED = {
+    "FDA_3500A": (
+        "H6_CLINICAL",
+        "H6_IMPACT",
+        "H6_COMPONENT",
+        "H6_TYPE",
+        "H6_FINDINGS",
+        "H6_CONCLUSIONS",
+    )
+}
 
 
 @dataclass(frozen=True)
@@ -194,7 +205,14 @@ FDA_3500A = Form(
                 Field("B1", "B1", "Type of report (adverse event, product problem)", "event_type", MUST),
                 Field("B2", "B2", "Outcome attributed to adverse event", "us_outcome", INITIAL),
                 Field("B3", "B3", "Date of event", "event_date", INITIAL),
-                Field("B4", "B4", "Date of this report", None, MUST, note="The day you submit."),
+                Field(
+                    "B4",
+                    "B4",
+                    "Date of this report",
+                    "sent_day",
+                    INITIAL,
+                    note="Filled in with the day you send the report for approval.",
+                ),
                 Field("B5", "B5", "Describe event or problem", "description", MUST),
                 Field("B6", "B6", "Relevant test/laboratory data, including dates", personal=PATIENT),
                 Field("B7", "B7", "Other relevant history, including preexisting medical conditions", personal=PATIENT),

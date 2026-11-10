@@ -117,6 +117,16 @@ def _start_rv06(trial) -> dict:
     return _ok(trial["user"].post(REPORTS, json={"complaint_id": complaint, "market": "US"}))
 
 
+def _ready_us(client, report_id: str, number: str | None = "1234567-2026-00001") -> dict:
+    """A US draft its eMDR file can be made from (0.10.96: Send for approval checks the file): the report number
+    when given, FDA's required blocks filled as a person does."""
+    from tests.report_fill import US_EMDR, fill
+
+    if number:
+        _ok(client.put(f"{REPORTS}/{report_id}/fields/MFR_REPORT", json={"value": number}))
+    return fill(client, REPORTS, report_id, US_EMDR)
+
+
 def test_rv06_drafts_a_3500a_worksheet_in_field_order_with_a_status_on_every_field(trial):  # TA-2c.1
     # Before the conclusion is signed, the obligation is listed with its provisional deadline (pending information).
     before = _items(trial["user"])
@@ -260,7 +270,7 @@ def test_the_preparer_and_the_conclusion_signer_cannot_approve_and_a_colleague_c
     user, colleague = trial["user"], trial["colleague"]
     detail = _start_rv06(trial)
     if detail["state"] == "DRAFT":
-        _ok(user.put(f"{REPORTS}/{detail['id']}/fields/MFR_REPORT", json={"value": "1234567-2026-00001"}))
+        _ready_us(user, detail["id"])
         detail = _ok(user.post(f"{REPORTS}/{detail['id']}/snapshots"))
         snapshot = detail["pending_snapshot"]
         assert snapshot and detail["state"] == "DRAFT"

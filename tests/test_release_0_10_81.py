@@ -256,16 +256,17 @@ def test_f6_report_fields_take_dates_and_codes_only_and_a_bad_stored_value_is_fl
         row = db.get(ReportObligation, uuid.UUID(report["id"]))
         # A draft again, holding a value typed before 0.10.81 into a date field.
         row.state = "DRAFT"
-        row.entries = {**(row.entries or {}), "B4": {"value": "next tuesday", "by": "test", "at": "2026-11-03"}}
+        row.entries = {**(row.entries or {}), "G3": {"value": "next tuesday", "by": "test", "at": "2026-11-03"}}
         db.commit()
     path = f"{REPORTS}/{report['id']}/fields"
     detail = _ok(user.get(f"{REPORTS}/{report['id']}"))
-    b4 = next(item for section in detail["sections"] for item in section["fields"] if item["id"] == "B4")
+    b4 = next(item for section in detail["sections"] for item in section["fields"] if item["id"] == "G3")
     # Flagged, not deleted, and counted as missing.
     assert (b4["value"], b4["kind"], b4["problem"]) == ("next tuesday", "DATE", "Enter a date as YYYY-MM-DD")
-    assert "B4" in detail["mandatory"]["missing"]
+    assert "G3" in detail["mandatory"]["missing"]
     for field, value, code in (
-        ("B4", "next tuesday", "NOT_A_DATE"),
+        ("G3", "next tuesday", "NOT_A_DATE"),
+        ("B4", "2026-11-03", "FILLED_AT_SEND"),  # 0.10.96: the day sent for approval
         ("H6_CLINICAL", "headache, probably", "NOT_A_IMDRF_CODE"),
         ("G8", "1234567-2026-00011", "FOLLOWS_FRONT_PAGE"),
         ("D2A", "ZZ1", "NOT_A_LIST_CODE"),
@@ -273,8 +274,8 @@ def test_f6_report_fields_take_dates_and_codes_only_and_a_bad_stored_value_is_fl
     ):
         refused = user.put(f"{path}/{field}", json={"value": value})
         assert refused.status_code == 422 and refused.json()["detail"]["code"] == code, (field, refused.text)
-    detail = _ok(user.put(f"{path}/B4", json={"value": "2026-11-03"}))
-    assert "B4" not in detail["mandatory"]["missing"]
+    detail = _ok(user.put(f"{path}/G3", json={"value": "2026-11-03"}))
+    assert "G3" not in detail["mandatory"]["missing"]
     assert _ok(user.put(f"{path}/D2A", json={"value": "frn"}))["sections"]
 
 
@@ -301,12 +302,12 @@ def test_f7_report_fields_product_identity_registrations_and_parties_are_audited
         bind_tenant(db, tenant_id)
         db.get(ReportObligation, uuid.UUID(report["id"])).state = "DRAFT"
         db.commit()
-    path = f"{REPORTS}/{report['id']}/fields/B4"
+    path = f"{REPORTS}/{report['id']}/fields/G3"
     _ok(user.put(path, json={"value": "2026-11-02"}))
     _ok(user.put(path, json={"value": "2026-11-04"}))
     changed = _audit(tenant_id, "REPORT_FIELD_SET")[-1]
-    assert changed.old_values == {"B4": {"value": "2026-11-02"}} and changed.new_values == {
-        "B4": {"value": "2026-11-04"}
+    assert changed.old_values == {"G3": {"value": "2026-11-02"}} and changed.new_values == {
+        "G3": {"value": "2026-11-04"}
     }
 
     with SessionLocal() as db:

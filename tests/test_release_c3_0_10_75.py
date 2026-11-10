@@ -24,7 +24,7 @@ from backend.app.authority_reports import rules
 from backend.app.db.models.foundation import AuditEvent
 from backend.app.db.session import SessionLocal
 from backend.app.main import app
-from tests.report_fill import fill
+from tests.report_fill import US_EMDR, fill
 from tests.conftest import authenticated_client
 from tests.test_flagship_walkthrough import _answers_from_record
 from tests.test_free_trial import PASSWORD, _activation_token, _approved_trial_client
@@ -295,11 +295,14 @@ def test_the_classic_navigation_keeps_its_rules_and_the_refresh_adds_the_report_
         complaint = _flagship(user)
         _ok(_sign_us(user, complaint, "REPORTABLE"))
         # Classic: nothing created on signing; the worksheet is started by a person, approval asked with fields
-        # missing, and the working draft downloads, as before.
+        # missing, and the working draft downloads, as before. A US report still needs what its eMDR file needs
+        # (0.10.96: classic pilots get the same US files): the first report number and FDA's required blocks.
         assert _reports(user, complaint) == []
         started = _ok(user.post(REPORTS, json={"complaint_id": complaint, "market": "US"}))
         assert started["mandatory"]["missing"]
         assert user.get(f"{REPORTS}/{started['id']}/worksheet.pdf").content.startswith(b"%PDF")
+        fill(user, REPORTS, started["id"], ["MFR_REPORT", *US_EMDR])
+        assert _ok(user.get(f"{REPORTS}/{started['id']}"))["mandatory"]["missing"]
         _ok(user.post(f"{REPORTS}/{started['id']}/snapshots"))
         # A trial moved to the new navigation with a conclusion signed before the upgrade and no report: the refresh
         # adds it once (dry run first), as the signing would have.

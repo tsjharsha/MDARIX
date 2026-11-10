@@ -12,7 +12,7 @@ from backend.app.db.models.foundation import AuditEvent, AuthUser, PlanDefinitio
 from backend.app.db.models.stage2 import SubscriptionLifecycle
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system, bind_tenant
-from tests.test_authority_reports_api import REPORTS, _ok, _start_rv06, trial  # noqa: F401 (trial is a fixture)
+from tests.test_authority_reports_api import REPORTS, _ok, _ready_us, _start_rv06, trial  # noqa: F401 (trial is a fixture)
 from tests.conftest import authenticated_client
 from tests.support_grants import grant_support_access
 from tests.test_platform_customer_admins import _activate, _add_admin
@@ -28,7 +28,7 @@ def test_a_cancellation_committed_before_the_lock_refuses_the_approval(trial, mo
     user, colleague = trial["user"], trial["colleague"]
     detail = _start_rv06(trial)
     assert detail["state"] == "DRAFT", detail["state"]
-    _ok(user.put(f"{REPORTS}/{detail['id']}/fields/MFR_REPORT", json={"value": "1234567-2026-00001"}))
+    _ready_us(user, detail["id"])
     snapshot = _ok(user.post(f"{REPORTS}/{detail['id']}/snapshots"))["pending_snapshot"]
     real = governance_router.verify_signing_credentials
 

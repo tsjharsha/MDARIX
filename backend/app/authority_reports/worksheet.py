@@ -593,7 +593,15 @@ def _immediate_action(context):
     return (text, _source("Triage", _ref(context), "The triage record's immediate action", triage.id)) if text else None
 
 
+def _sent_day(context):
+    """FDA's B4, "date of this report": the organization's day the report is sent for approval (0.10.96, owner Q3), so
+    the approver signs the exact file; sending again refreshes it. Blank on a draft."""
+    day = context.get("sent_day")
+    return (day, _source("Worksheet", None, "The day the report was sent for approval")) if day else None
+
+
 SOURCES = {
+    "sent_day": _sent_day,
     "description": lambda c: (c["complaint"].description, _complaint(c, "The complaint's description, as recorded")),
     "event_date": lambda c: (
         (c["complaint"].event_timestamp.date().isoformat(), _complaint(c, "The complaint's event date"))
@@ -854,7 +862,7 @@ def build(
             if annex and confirm and value and not entry.get("value") and not entry.get("confirmed"):
                 # A code the mapping supplies waits for a person (0.10.77): never filed unconfirmed.
                 suggestion, value, status = value, None, SUGGESTED
-            if not item.personal and entry.get("value"):
+            if not item.personal and entry.get("value") and item.source != "sent_day":  # B4 typed before 0.10.96
                 value, status = (
                     entry["value"],
                     {CONFIRMED: CONFIRMED, CHANGED: CHANGED}.get(entry.get("code_state"), ENTERED),
@@ -891,7 +899,7 @@ def build(
                     "source": source,
                     "personal": item.personal,
                     "missing_class": missing,
-                    "editable": not item.personal and missing != forms.NOT_USED,
+                    "editable": not item.personal and missing != forms.NOT_USED and item.source != "sent_day",
                     "options": list(item.options) or None,
                     "note": item.note or None,
                     "kind": item.kind,

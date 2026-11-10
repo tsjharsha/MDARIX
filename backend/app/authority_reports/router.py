@@ -497,18 +497,44 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "codes_confirmed": context["confirm_codes"],
         "never_submits": rules.NEVER_SUBMITS,
         "sample": is_sample(obligation.source_system),
-        # What the eMDR file still needs, and what it leaves out, read from the approved report (or the draft).
-        "emdr": _emdr_check((approved.fields or {}).get("sections") if approved else sections, context)
+        # What the eMDR file still needs, and what it leaves out, read from the approved report (or the draft); on a
+        # draft also whether FDA's schema takes the file (0.10.96: Send for approval refuses otherwise).
+        "emdr": _emdr_check(
+            (approved.fields or {}).get("sections") if approved else sections, context, _emdr_kind(obligation)
+        )
         if form.code == forms.FDA_3500A.code
         else None,
     }
 
 
-def _emdr_check(sections, context) -> dict:
+def _emdr_kind(obligation: ReportObligation) -> str:
+    """The eMDR report type: a manufacturer's initial report, or a follow-up in its chain."""
+    return "M-I" if obligation.kind == "INITIAL" else "M-F"
+
+
+def _emdr_check(sections, context, kind: str = "M-I") -> dict:
     from backend.app.authority_reports import emdr
 
-    missing, left_out = emdr.check(sections or [], context["parties"])
-    return {"missing": missing, "left_out": left_out}
+    found = emdr.prepare(sections or [], context["parties"], kind=kind, sender="-", now=_now(), practice=False)
+    return {"missing": found["missing"], "left_out": found["left_out"], "schema_errors": found["errors"]}
+
+
+def _emdr_gate(found: dict) -> None:
+    """Send for approval refuses a US report whose eMDR file FDA would refuse, naming each block (0.10.96, A2)."""
+    if found["missing"]:
+        raise _error(
+            422,
+            "EMDR_MISSING",
+            "Before sending for approval, the eMDR file needs: " + "; ".join(found["missing"]),
+            missing=found["missing"],
+        )
+    if found["errors"]:
+        raise _error(
+            422,
+            "EMDR_INVALID",
+            "The eMDR file does not validate against FDA's schema: " + "; ".join(found["errors"][:3]),
+            errors=found["errors"][:10],
+        )
 
 
 # --------------------------------------------------------------------------------------------- the list
@@ -1041,6 +1067,8 @@ def set_field(
         raise _error(
             422, "FOLLOWS_FRONT_PAGE", "This field follows the front page's manufacturer report number: change it there"
         )
+    if value and field.source == "sent_day":
+        raise _error(422, "FILLED_AT_SEND", "This date is filled in with the day the report is sent for approval")
     problem = forms.value_problem(field, value)
     if problem:
         raise _error(422, f"NOT_A_{field.kind}", problem)
@@ -1213,12 +1241,128 @@ def _conclusion(context: dict, market: str):
     return current
 
 
-def request_snapshot(db, control_db, obligation: ReportObligation, actor: str, now: datetime, source_system=None):
-    """Freeze the worksheet as the next snapshot, pending approval (shared with the sample)."""
+NUMBER_LOCK = "mdarix-us-report-number:"
+NUMBER_AUDIT = (("report_number", "value"), ("number_assigned", "assigned"))
+
+
+def assign_number(db, control_db, obligation: ReportObligation, actor: str, now: datetime) -> None:
+    """The US report number at Send for approval (0.10.96, D5): a blank number becomes the organization's next
+    (emdr.next_number), a typed one is kept. Either is unique across every US report of the organization, cancelled
+    ones included, so a number is never reused; a follow-up shares its initial report's. Numbers are read under an
+    advisory lock held until the transaction ends, so two reports sent at once get different numbers."""
+    from sqlalchemy import text
+
+    from backend.app.authority_reports import emdr
+
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": f"{NUMBER_LOCK}{obligation.tenant_id}"})
+    value = ReportObligation.entries["MFR_REPORT"]["value"].astext
+    chain = {obligation.id, obligation.parent_id} - {None}
+    used = [
+        number
+        for row_id, parent_id, number in db.query(ReportObligation.id, ReportObligation.parent_id, value)
+        .filter(
+            ReportObligation.tenant_id == obligation.tenant_id,
+            ReportObligation.form_code == forms.FDA_3500A.code,
+            value.isnot(None),
+        )
+        .order_by(ReportObligation.created_at, ReportObligation.id)
+        if row_id not in chain and parent_id not in chain
+    ]
+    entries = dict(obligation.entries or {})
+    typed = (entries.get("MFR_REPORT") or {}).get("value")
+    if typed:
+        if typed in used:
+            raise _error(
+                409, "REPORT_NUMBER_IN_USE", f"Report number {typed} is already used by another US report: clear it"
+            )
+        return
+    year = _org_day(db, obligation.tenant_id, now).year
+    number = emdr.next_number(used, year, _trial(control_db, obligation.tenant_id))
+    if number is None:
+        return  # the organization's first number: a person types it once (FIRST_NUMBER, after the mandatory fields)
+    entries["MFR_REPORT"] = {"value": number, "by": actor, "at": _iso(now), "assigned": True}
+    obligation.entries = entries
+
+
+def _first_number(obligation: ReportObligation) -> None:
+    if not ((obligation.entries or {}).get("MFR_REPORT") or {}).get("value"):
+        raise _error(
+            422,
+            "REPORT_NUMBER_FIRST",
+            "Type your first manufacturer report number once (your CFN or FEI, the year and a 5-digit number, "
+            "1234567-2026-00001): MDARIX numbers every later report from it",
+        )
+
+
+def _org_day(db, tenant_id, now: datetime) -> date:
+    """The organization's own day of ``now`` (its working calendar's time zone)."""
+    from backend.app.oversight.rules import zone_info
+
+    return now.astimezone(zone_info(deadlines.org_zone(db, tenant_id)) or timezone.utc).date()
+
+
+def frozen_emdr(xml: bytes, parties, sections: list[dict]) -> dict:
+    """What a US snapshot keeps of its eMDR file (0.10.96, D6): the file's text, its SHA-256, and the G1 contact
+    office and D3 manufacturer it was built from, in parts (the official form reads them, never Settings later)."""
+    from backend.app.authority_reports import emdr, fda_3500a
+
+    values = fda_3500a.values(sections)
+    return {
+        "emdr_xml": xml.decode("utf-8"),
+        "emdr_sha256": hashlib.sha256(xml).hexdigest(),
+        "emdr_parties": {
+            "G1": emdr.office(parties, emdr.OFFICE_ROLES, values.get("G1")),
+            "D3": emdr.office(parties, emdr.MAKER_ROLES, values.get("D3")),
+        },
+    }
+
+
+def snapshot_material(obligation, complaint: str, conclusion_id, sections: list[dict], frozen_file: dict) -> dict:
+    """What a snapshot's fingerprint (and so its approval signature) covers: the report, its form, the conclusion,
+    the sections and, for a US report, the eMDR file's SHA-256 and the parties it was built from (0.10.96, D6)."""
+    return {
+        "obligation": str(obligation.id),
+        "form": obligation.form_code,
+        "form_version": obligation.form_version,
+        "complaint": complaint,
+        "market": obligation.market,
+        "conclusion": str(conclusion_id),
+        "sections": sections,
+        **{key: frozen_file[key] for key in ("emdr_sha256", "emdr_parties") if key in frozen_file},
+    }
+
+
+def request_snapshot(
+    db, control_db, obligation: ReportObligation, actor: str, now: datetime, source_system=None, *, strict=False
+):
+    """Freeze the worksheet as the next snapshot, pending approval (shared with the sample). ``strict``: a US report
+    whose eMDR file FDA would refuse is refused (Send for approval, 0.10.96)."""
     from backend.app.human_decision.rules import fingerprint
 
     context = _context(db, control_db, obligation)
     current = _conclusion(context, obligation.market)
+    context["sent_day"] = _org_day(db, obligation.tenant_id, now).isoformat()  # B4 (0.10.96, Q3)
+    names = _names(control_db, obligation.tenant_id, _preparers(obligation))
+    frozen_file: dict = {}
+    sections = worksheet.frozen(
+        worksheet.build(_form(obligation), context, obligation.entries or {}, names, obligation.request_text)
+    )
+    if obligation.form_code == forms.FDA_3500A.code:
+        from backend.app.authority_reports import emdr
+        from backend.app.stage3_workflow_router import _organization_name
+
+        found = emdr.prepare(
+            sections,
+            context["parties"],
+            kind=_emdr_kind(obligation),
+            sender=_organization_name(control_db, obligation.tenant_id) or "-",
+            now=now,
+            practice=_trial(control_db, obligation.tenant_id),
+        )
+        if strict:
+            _emdr_gate(found)
+        if found["xml"] and not found["errors"]:
+            frozen_file = frozen_emdr(found["xml"], context["parties"], sections)
     if obligation.kind == "INITIAL":
         obligation.assessment_id, obligation.report_type = current.id, current.report_type
         if obligation.due_provisional:
@@ -1227,26 +1371,25 @@ def request_snapshot(db, control_db, obligation: ReportObligation, actor: str, n
     for row in snapshots:
         if row.state == "PENDING":
             row.state = "SUPERSEDED"
-    names = _names(control_db, obligation.tenant_id, _preparers(obligation))
-    sections = worksheet.frozen(
-        worksheet.build(_form(obligation), context, obligation.entries or {}, names, obligation.request_text)
+    material = snapshot_material(
+        obligation,
+        context["record"]["business_id"] or context["record"]["complaint_identifier"],
+        current.id,
+        sections,
+        frozen_file,
     )
-    material = {
-        "obligation": str(obligation.id),
-        "form": obligation.form_code,
-        "form_version": obligation.form_version,
-        "complaint": context["record"]["business_id"] or context["record"]["complaint_identifier"],
-        "market": obligation.market,
-        "conclusion": str(current.id),
-        "sections": sections,
-    }
     snapshot = ReportSnapshot(
         id=uuid.uuid4(),
         tenant_id=obligation.tenant_id,
         obligation_id=obligation.id,
         version=max((row.version for row in snapshots), default=0) + 1,
         form_version=obligation.form_version,
-        fields={"sections": sections, "complaint": material["complaint"], "conclusion_signer": current.signed_by},
+        fields={
+            "sections": sections,
+            "complaint": material["complaint"],
+            "conclusion_signer": current.signed_by,
+            **frozen_file,
+        },
         content_fingerprint=fingerprint(material),
         preparers=sorted(_preparers(obligation, actor)),
         state="PENDING",
@@ -1270,6 +1413,8 @@ def ask_for_approval(
     obligation = _obligation(db, _tenant(ctx), obligation_id, lock=True)
     if obligation.state not in rules.EDITABLE:
         raise _error(409, "NOT_A_DRAFT", "Only a draft is frozen for approval")
+    if obligation.form_code == forms.FDA_3500A.code:
+        assign_number(db, control_db, obligation, str(ctx.user_id), _now())
     if new_navigation(control_db, obligation.tenant_id):
         sections = worksheet.build(
             _form(obligation),
@@ -1291,8 +1436,10 @@ def ask_for_approval(
                 + ")",
                 missing=missing,
             )
+    if obligation.form_code == forms.FDA_3500A.code:
+        _first_number(obligation)
     replaced = [row.id for row in _snapshots(db, obligation) if row.state == "PENDING"]
-    snapshot = request_snapshot(db, control_db, obligation, str(ctx.user_id), _now())
+    snapshot = request_snapshot(db, control_db, obligation, str(ctx.user_id), _now(), strict=True)
     _audit(
         db,
         ctx,
@@ -1300,6 +1447,12 @@ def ask_for_approval(
         obligation,
         version=snapshot.version,
         fingerprint=snapshot.content_fingerprint,
+        # The US report number, and whether MDARIX assigned it at this send (0.10.96, D5).
+        **(
+            {key: (obligation.entries.get("MFR_REPORT") or {}).get(name) for key, name in NUMBER_AUDIT}
+            if obligation.form_code == forms.FDA_3500A.code
+            else {}
+        ),
     )
     db.commit()
     run_hook(db, "report snapshot approval task", _approval_tasks, control_db, ctx, obligation, snapshot, replaced)
@@ -2082,18 +2235,28 @@ def emdr_file(
         raise _error(409, "APPROVE_FIRST", "The eMDR file is made once the report is approved")
     _approved_only(frozen)
     context = _context(db, control_db, obligation)
-    sections, parties = frozen.fields["sections"], context["parties"]
-    missing, _ = emdr.check(sections, parties)
-    if missing:
-        raise _error(409, "EMDR_MISSING", "Before the eMDR file: " + "; ".join(missing), missing=missing)
-    body = emdr.build(
-        sections,
-        parties,
-        sender=_organization_name(control_db, tenant_id) or "-",
-        now=_now(),
-        practice=_trial(control_db, tenant_id),
-    )
-    errors = emdr.validate(body)
+    stored = (frozen.fields or {}).get("emdr_xml")
+    if stored is not None:
+        # The file frozen at Send for approval and signed with it (0.10.96, D6): the same bytes, whatever changed since.
+        body = stored.encode("utf-8")
+        if hashlib.sha256(body).hexdigest() != frozen.fields.get("emdr_sha256"):
+            logger.error("eMDR file of report %s does not match its approval", obligation.id)
+            raise _error(409, "EMDR_CHANGED", "The stored eMDR file does not match the approved one")
+        errors = []
+    else:
+        # A snapshot approved before 0.10.96 keeps no file: it is built now, from the snapshot and today's parties.
+        sections, parties = frozen.fields["sections"], context["parties"]
+        missing, _ = emdr.check(sections, parties)
+        if missing:
+            raise _error(409, "EMDR_MISSING", "Before the eMDR file: " + "; ".join(missing), missing=missing)
+        body = emdr.build(
+            sections,
+            parties,
+            sender=_organization_name(control_db, tenant_id) or "-",
+            now=_now(),
+            practice=_trial(control_db, tenant_id),
+        )
+        errors = emdr.validate(body)
     if errors:  # never a file FDA's schema refuses
         logger.error("eMDR file of report %s does not validate: %s", obligation.id, errors[:3])
         raise _error(409, "EMDR_INVALID", "The eMDR file did not validate against FDA's schema", errors=errors[:10])
