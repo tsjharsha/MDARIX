@@ -32,7 +32,7 @@ from backend.app.access.authz import _authenticated_user, _is_customer_admin, _i
 from backend.app.access.permissions import normalize_role, permissions_for_roles, role_of_user, roles_of_user
 from backend.app.cell_link import licence_state
 from backend.app.deployment_role import deployment_role
-from backend.app.feature_set import for_tenant, routine_path
+from backend.app.feature_set import challenge, for_tenant, routine_path
 from backend.app import mail_in
 from backend.app.role_codes import role_label
 from backend.app.runtime_env import environment
@@ -299,6 +299,7 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         "email_intake": mail_in.enabled(),
         # B7a (MDARIX_ROUTINE_PATH, on unless off): Resolve and close, the Cases exports, files and the urgent e-mail.
         "routine_path": routine_path(),
+        "challenge": challenge(),
         # classic or new (tenants.navigation, set in Tenant 360): the workspace's navigation; nothing shows it yet.
         "navigation": (tenant.navigation if tenant is not None else None) or "classic",
         # An evaluation on the sample only (tenants.sample_only, 0.10.71): the screens hide every upload and import

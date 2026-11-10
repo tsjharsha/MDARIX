@@ -19,6 +19,10 @@ call, so a process never caches a wrong answer and tests can set it.
 close, the Cases exports, adding a file to a Case, the alerts-and-files setting), the session's ``routine_path`` is
 false so its screens and next-step wording hide, and the closure checklist has no CUSTOMER_TOLD item (closing behaves
 as before B7). Records already signed stay readable, and a complaint MDARIX closed can still reopen.
+
+``MDARIX_CHALLENGE`` (B5a): on unless ``off``. Off, the investigation challenge routes answer 404, the session's
+``challenge`` is false so the Challenge view and the brief's Challenge section hide, and unanswered challenge questions
+no longer block submitting a brief. Briefs already signed keep their sections.
 """
 
 from __future__ import annotations
@@ -67,6 +71,15 @@ _ROUTINE_PATH_API = tuple(
 )
 
 
+# B5a routes refused while MDARIX_CHALLENGE is off.
+_CHALLENGE_API = (re.compile(r"^/api/v1/investigations/[^/]+/challenge(/|$)"),)
+
+
+def challenge() -> bool:
+    """B5a is on unless ``MDARIX_CHALLENGE=off`` (read on every call)."""
+    return os.getenv("MDARIX_CHALLENGE", "").strip().lower() not in ("off", "0", "false", "no")
+
+
 def routine_path() -> bool:
     """B7a is on unless ``MDARIX_ROUTINE_PATH=off`` (read on every call)."""
     return os.getenv("MDARIX_ROUTINE_PATH", "").strip().lower() not in ("off", "0", "false", "no")
@@ -98,10 +111,12 @@ def for_tenant(db, tenant_id) -> str:
 
 def serves_path(path: str, method: str = "GET") -> bool:
     """Whether this deployment's feature set serves the request path: always under ``full``; under ``mvp``,
-    everything except the parked routes; with B7a off, nothing of B7a's."""
+    everything except the parked routes; with B7a or B5a off, nothing of theirs."""
     if not routine_path() and any(
         pattern.match(path) and verb in (None, method.upper()) for verb, pattern in _ROUTINE_PATH_API
     ):
+        return False
+    if not challenge() and any(pattern.match(path) for pattern in _CHALLENGE_API):
         return False
     if not is_mvp():
         return True

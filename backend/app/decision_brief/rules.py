@@ -186,6 +186,13 @@ def normalize_narrative(data: dict | None) -> dict:
             source.get("ai_draft_source") if isinstance(source.get("ai_draft_source"), dict) else None
         )
     narrative["contributors"] = sorted({_clean(item) for item in source.get("contributors") or () if _clean(item)})
+    # B5a: the author's answers to the challenge questions, by question key, signed with the brief (content hash).
+    # Kept only when there are some, so a brief without answers reads and hashes as before.
+    answers = source.get("challenge_answers")
+    if isinstance(answers, dict) and answers:
+        narrative["challenge_answers"] = {
+            str(key): dict(value) for key, value in answers.items() if isinstance(value, dict)
+        }
     return narrative
 
 
