@@ -58,6 +58,7 @@ from backend.app.standards import STARTER_MARK, chips
 from backend.app.workflow import approvals
 from backend.app.workflow.tasks import run_hook
 from backend.app.business_ids import complaint_ref
+from object_storage.service import ObjectStorageService
 
 logger = logging.getLogger("mdarix.authority_reports")
 router = APIRouter(prefix="/api/v1/reports", tags=["Authority reports"])
@@ -1585,9 +1586,12 @@ def _file(payload: FileIn | None) -> dict:
         raise _error(422, "FILE_UNREADABLE", "The file could not be read") from exc
     if not data or len(data) > rules.FILE_MAX:
         raise _error(422, "FILE_TOO_LARGE", f"Attach a file of at most {rules.FILE_MAX // (1024 * 1024)} MB")
+    content_type = _text(payload.content_type, 120) or "application/octet-stream"
+    if not ObjectStorageService().scan(data, content_type):
+        raise _error(422, "MALWARE_SCAN_REJECTED", "The file failed the malware safety scan")
     return {
         "file_name": _text(payload.name, 200) or "evidence",
-        "content_type": _text(payload.content_type, 120) or "application/octet-stream",
+        "content_type": content_type,
         "size": len(data),
         "sha256": hashlib.sha256(data).hexdigest(),
         "content": data,

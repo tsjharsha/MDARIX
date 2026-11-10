@@ -19,6 +19,11 @@ Hardening: code-audit fixes 6-12. No migration. The API image changes.
 - Approving a report or signing a market conclusion re-reads the record after locking it, so a cancellation or edit
   made a moment earlier is no longer overwritten (a cancelled report can no longer turn back to approved).
 
+### Security
+
+- Files attached to an authority submission or its evidence (acknowledgements, receipts) are virus-scanned like every
+  other upload; a file the scan refuses is not kept.
+
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 
 Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The API and web images change. Operator step:
