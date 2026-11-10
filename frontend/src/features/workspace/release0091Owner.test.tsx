@@ -16,7 +16,7 @@ const ALL = Object.values(PERSONA_TABS).map((tab) => tab.section);
 describe("1. Log a call and Raise a trend are the pages' filled primary buttons", () => {
   it("fills Log a call on Complaints", () => {
     expect(complaintViews).toMatch(
-      /className="ac-primary"[\s\S]{0,200}<PhoneCall size=\{15\} aria-hidden="true" \/> Log a call/,
+      /className="ac-primary"[\s\S]{0,200}<PhoneCall size=\{15\} aria-hidden="true" \/> Log a case/,
     );
   });
 

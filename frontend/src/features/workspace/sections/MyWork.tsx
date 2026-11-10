@@ -384,7 +384,7 @@ export function NextStep({ secondary = false }: { secondary?: boolean } = {}) {
       {/* A call that may be a complaint is logged from here (click path a: four clicks to a signed check). */}
       {canLog && (
         <button type="button" className="ac-secondary" onClick={() => open("Complaints", "First contact?log=CONTACT")}>
-          Log a call
+          Log a case
         </button>
       )}
     </section>

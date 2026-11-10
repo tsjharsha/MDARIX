@@ -1,5 +1,5 @@
 import { SampleDates } from "../../../app/chips";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { zoneLabel } from "../../../app/labels";
 import {
   CheckCircle2,
@@ -27,7 +27,10 @@ import {
   REASON_MIN,
   STATE_LABELS,
   INTAKE_SHOWS,
+  FIRST_KNOWLEDGE_BASES,
+  NEW_IDENTIFIER,
   answerChoices,
+  identifierChip,
   blankAnswers,
   daysEarlier,
   startingZone,
@@ -40,6 +43,8 @@ import {
   type Guide,
   type IntakeItem,
   type IntakeList,
+  type IdentifierEntry,
+  type Identifiers,
   type IntakeState,
   type Outcome,
 } from "../intake";
@@ -100,10 +105,10 @@ export function FirstContact({
         {canWrite && (
           <div className="uw-entry-actions">
             <button type="button" className="ac-primary" onClick={() => setLogging("CONTACT")}>
-              <PhoneCall size={15} aria-hidden="true" /> Log a call
+              <PhoneCall size={15} aria-hidden="true" /> Log a case
             </button>
             <button type="button" className="ac-secondary" onClick={() => setLogging("URGENT")}>
-              <Siren size={15} aria-hidden="true" /> Urgent intake
+              <Siren size={15} aria-hidden="true" /> Urgent: death or serious injury
             </button>
             {onOpenTab && (
               <button type="button" className="ac-link" onClick={() => onOpenTab("Triage")}>
@@ -162,7 +167,7 @@ export function FirstContact({
             ))}
           </ul>
         ) : (
-          <Empty title="Nothing here" detail="Log a call or an urgent intake to see the check at work." />
+          <Empty title="Nothing here" detail="Log a case or an urgent case to see the Case check at work." />
         )}
         {guide.data && (
           <p className="uw-ma-starter" role="note">
@@ -236,30 +241,127 @@ function IntakeCard({ item, onOpen, onChanged }: { item: IntakeItem; onOpen: () 
 // Logging a call or an urgent intake ---------------------------------------------------------------------------------
 
 type LogForm = {
+  kind: "CONTACT" | "URGENT";
   words: string;
   reporterType: string;
   site: string;
   country: string;
   product: string;
+  productText: string;
   lot: string;
   serial: string;
+  udi: string;
+  software: string;
+  hardware: string;
+  firmware: string;
+  ids: Identifiers;
+  category: string;
   requested: string;
+  ticket: string;
   environment: string;
   userType: string;
   received: string;
   event: string;
   firstKnowledge: string;
   party: string;
+  basis: string;
   awareness: string;
   zone: string;
-  /** Whether the person typed the call's time: until then it follows "now" in the zone chosen. */
+  /** Whether the person typed the case's time: until then it follows "now" in the zone chosen. */
   receivedTyped: boolean;
   answers: Answers;
   unknowns: string;
 };
 
+/** One device identifier (ID-1, S-3): the value, "Not sure" where allowed, its source and whether it is confirmed. */
+function IdentifierField({
+  code,
+  label,
+  value,
+  onValue,
+  entry,
+  onEntry,
+  guide,
+  children,
+}: {
+  code: string;
+  label: string;
+  value?: string;
+  onValue?: (value: string) => void;
+  entry: IdentifierEntry;
+  onEntry: (entry: IdentifierEntry) => void;
+  guide: Guide;
+  children?: ReactNode;
+}) {
+  const notSureAllowed = guide.identifiers?.not_sure.includes(code) ?? false;
+  const given = !!value?.trim();
+  const chip = identifierChip(entry, given);
+  return (
+    <div className="ca-field uw-id-field">
+      <span>
+        {label} {chip && <span className={`uw-cr-chip tone-${chip.tone}`}>{chip.label}</span>}
+      </span>
+      {children ??
+        (onValue && (
+          <input
+            aria-label={label}
+            value={value ?? ""}
+            disabled={entry.not_sure}
+            onChange={(event) => onValue(event.target.value)}
+          />
+        ))}
+      <span className="uw-id-meta">
+        {notSureAllowed && (
+          <label className="ca-check">
+            <input
+              type="checkbox"
+              checked={entry.not_sure}
+              onChange={(event) => {
+                onEntry({ ...entry, not_sure: event.target.checked, status: "UNCONFIRMED" });
+                if (event.target.checked) onValue?.("");
+              }}
+            />
+            Not sure
+          </label>
+        )}
+        {given && !entry.not_sure && (
+          <>
+            <select
+              aria-label={`${label}: source`}
+              value={entry.source}
+              onChange={(event) =>
+                onEntry({
+                  ...entry,
+                  source: event.target.value,
+                  // As told by the caller stays unconfirmed until a record or label confirms it.
+                  status: event.target.value === "CALLER" ? "UNCONFIRMED" : entry.status,
+                })
+              }
+            >
+              {(guide.identifiers?.sources ?? []).map((source) => (
+                <option key={source.code} value={source.code}>
+                  {source.label}
+                </option>
+              ))}
+            </select>
+            <label className="ca-check">
+              <input
+                type="checkbox"
+                checked={entry.status === "CONFIRMED"}
+                disabled={entry.source === "CALLER"}
+                onChange={(event) => onEntry({ ...entry, status: event.target.checked ? "CONFIRMED" : "UNCONFIRMED" })}
+              />
+              Confirmed
+            </label>
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
 function LogDrawer({
-  kind,
+  kind: startKind,
   guide,
   onClose,
   onLogged,
@@ -270,48 +372,80 @@ function LogDrawer({
   onLogged: (id: string) => void;
 }) {
   const { work } = useWorkspace();
+  // A4: one key per drawer, so a retried save returns the Case it made, never a second one.
+  const [requestKey] = useState(() => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`);
   const [form, setForm] = useState<LogForm>({
+    kind: startKind,
     words: "",
     reporterType: "",
     site: "",
     country: "",
     product: "",
+    productText: "",
     lot: "",
     serial: "",
+    udi: "",
+    software: "",
+    hardware: "",
+    firmware: "",
+    ids: {},
+    category: "",
     requested: "NONE",
+    ticket: "",
     environment: "UNKNOWN",
     userType: "UNKNOWN",
     received: zonedInput(new Date(), startingZone(guide, ZONE)),
     event: "",
     firstKnowledge: "",
     party: "",
+    basis: "",
     awareness: "",
     zone: startingZone(guide, ZONE),
     receivedTyped: false,
     answers: blankAnswers(guide.questions),
     unknowns: "",
   });
+  const [typeProduct, setTypeProduct] = useState(false);
+  const [earlier, setEarlier] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const set = (patch: Partial<LogForm>) => setForm((current) => ({ ...current, ...patch }));
-  const problem = form.words.trim().length < REASON_MIN ? "Write down the caller's words, as they said them" : null;
+  const entry = (code: string) => form.ids[code] ?? NEW_IDENTIFIER;
+  const setEntry = (code: string) => (value: IdentifierEntry) => set({ ids: { ...form.ids, [code]: value } });
+  const urgent = form.kind === "URGENT";
+  const problem = form.words.trim().length < REASON_MIN ? "Write down the reporter's words, as they said them" : null;
+  const idProps = (code: string) => ({
+    code,
+    label: guide.identifiers?.keys.find((key) => key.code === code)?.label ?? code,
+    entry: entry(code),
+    onEntry: setEntry(code),
+    guide,
+  });
   const submit = async () => {
     setBusy(true);
     setError("");
     try {
       const saved = await send<IntakeItem>(INTAKE, "POST", {
-        kind,
+        kind: form.kind,
         reporter_words: form.words,
         reporter_type: form.reporterType,
         reporter_site: form.site,
         country: form.country,
-        product_id: form.product || null,
+        product_id: typeProduct ? null : form.product || null,
+        product_text: typeProduct ? form.productText : "",
         lot: form.lot,
         serial_number: form.serial,
+        udi: form.udi,
+        software_version: form.software,
+        hardware_revision: form.hardware,
+        firmware_version: form.firmware,
+        identifiers: form.ids,
+        issue_category: form.category,
         requested: form.requested,
+        service_ticket: form.ticket,
         use_environment: form.environment,
         user_type: form.userType,
-        // Wall-clock times in the call's time zone: the server converts them in it (J28: Chicago 09:00 is 15:00 UTC).
+        // Wall-clock times in the case's time zone: the server converts them in it (J28: Chicago 09:00 is 15:00 UTC).
         received_at: form.received || null,
         received_zone: form.zone,
         event_at: form.event || null,
@@ -319,10 +453,12 @@ function LogDrawer({
         first_knowledge_at: form.firstKnowledge || null,
         first_knowledge_zone: form.firstKnowledge ? form.zone : "",
         first_knowledge_party: form.party,
-        awareness_at: kind === "URGENT" ? form.awareness || null : null,
+        first_knowledge_basis: form.basis,
+        awareness_at: urgent ? form.awareness || null : null,
         awareness_zone: form.zone,
-        answers: kind === "CONTACT" ? form.answers : {},
+        answers: urgent ? {} : form.answers,
         unknowns: form.unknowns,
+        request_key: requestKey,
       });
       onLogged(saved.id);
     } catch (reason) {
@@ -332,7 +468,7 @@ function LogDrawer({
     }
   };
   return (
-    <Drawer title={kind === "CONTACT" ? "Log a call" : "Urgent intake"} onClose={onClose}>
+    <Drawer title="Log a case" onClose={onClose}>
       <form
         className="uw-dp"
         onSubmit={(event) => {
@@ -340,96 +476,37 @@ function LogDrawer({
           if (!problem) void submit();
         }}
       >
-        {kind === "URGENT" ? (
-          <p className="uw-hint">
-            An urgent intake is a complaint by definition. It goes to triage at once, with its clock running from
-            awareness; the QMS complaint follows. Leave awareness empty if nobody has confirmed it: the clock then runs
-            from first knowledge or receipt, marked provisional.
-          </p>
-        ) : (
-          <p className="uw-hint">
-            Awareness is the time of the call. It never moves, even if the call is reclassified.
-          </p>
-        )}
-        <label className="ca-field">
-          The caller's words, as they said them
-          <textarea rows={4} value={form.words} onChange={(event) => set({ words: event.target.value })} />
-        </label>
-        <div className="ca-form-grid">
-          <label className="ca-field">
-            Product
-            <select value={form.product} onChange={(event) => set({ product: event.target.value })}>
-              <option value="">Not named</option>
-              {work.products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="ca-field">
-            Lot
-            <input value={form.lot} onChange={(event) => set({ lot: event.target.value })} />
-          </label>
-          <label className="ca-field">
-            What was asked for
-            <select value={form.requested} onChange={(event) => set({ requested: event.target.value })}>
-              {guide.requests.map((item) => (
-                <option key={item.code} value={item.code}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="ca-field">
-            Country
-            <input value={form.country} onChange={(event) => set({ country: event.target.value })} />
-          </label>
+        <div className="uw-entry-actions" role="radiogroup" aria-label="Kind of case">
+          {(
+            [
+              ["CONTACT", "Case"],
+              ["URGENT", "Urgent: death or serious injury"],
+            ] as const
+          ).map(([code, label]) => (
+            <label key={code} className="ca-check">
+              <input type="radio" name="case-kind" checked={form.kind === code} onChange={() => set({ kind: code })} />
+              {label}
+            </label>
+          ))}
         </div>
-        {/* The rest of the call folds (0.10.85, D3.10): the short form is the words, product, lot, what was asked,
-            country and the time of the call. */}
-        <details className="uw-more uw-log-more">
-          <summary>More about the call (optional)</summary>
-          <div className="ca-form-grid">
-            <label className="ca-field">
-              Serial number
-              <input value={form.serial} onChange={(event) => set({ serial: event.target.value })} />
-            </label>
-            <label className="ca-field">
-              Who called (hospital, distributor, user…)
-              <input value={form.reporterType} onChange={(event) => set({ reporterType: event.target.value })} />
-            </label>
-            <label className="ca-field">
-              Site (no person's name)
-              <input value={form.site} onChange={(event) => set({ site: event.target.value })} />
-            </label>
-            <label className="ca-field">
-              Use environment
-              <select value={form.environment} onChange={(event) => set({ environment: event.target.value })}>
-                {guide.use_environments.map((item) => (
-                  <option key={item.code} value={item.code}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="ca-field">
-              User type
-              <select value={form.userType} onChange={(event) => set({ userType: event.target.value })}>
-                {guide.user_types.map((item) => (
-                  <option key={item.code} value={item.code}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+        <p className="uw-hint">
+          {urgent
+            ? "An urgent case is a complaint at once. It goes to triage now, its clock running from awareness. Leave awareness empty if nobody has confirmed it: the clock then runs from first knowledge or receipt, marked provisional."
+            : "Awareness is when the case was received, or earlier when someone acting for you knew first. It never moves, even if the case is reclassified."}
+        </p>
+        <details className="ca-drawer-section uw-more" open>
+          <summary>What was said</summary>
+          <label className="ca-field">
+            The reporter's words, as they said them
+            <textarea rows={4} value={form.words} onChange={(event) => set({ words: event.target.value })} />
+            <small>Names, phone numbers and e-mail addresses are masked when you save.</small>
+          </label>
         </details>
-        <section className="ca-drawer-section">
-          <h3>Times ({zoneLabel(form.zone)})</h3>
+        <details className="ca-drawer-section uw-more" open>
+          <summary>How it came in ({zoneLabel(form.zone)})</summary>
           <div className="ca-form-grid">
             <label className="ca-field">
-              {kind === "CONTACT" ? "Time of the call (awareness)" : "Received"}
+              Received
               <input
                 type="datetime-local"
                 value={form.received}
@@ -440,44 +517,7 @@ function LogDrawer({
               <small id="log-received-reads">{wallClockText(form.received)}</small>
             </label>
             <label className="ca-field">
-              Event
-              <input
-                type="datetime-local"
-                value={form.event}
-                onChange={(event) => set({ event: event.target.value })}
-              />
-            </label>
-            {kind === "URGENT" && (
-              <>
-                <label className="ca-field">
-                  First knowledge (anyone acting for you)
-                  <input
-                    type="datetime-local"
-                    value={form.firstKnowledge}
-                    onChange={(event) => set({ firstKnowledge: event.target.value })}
-                  />
-                </label>
-                <label className="ca-field">
-                  Who knew first
-                  <select value={form.party} onChange={(event) => set({ party: event.target.value })}>
-                    <option value="">Not known</option>
-                    <option value="MANUFACTURER">Our own staff</option>
-                    <option value="DISTRIBUTOR">A distributor</option>
-                    <option value="SERVICE_AGENT">A service agent</option>
-                  </select>
-                </label>
-                <label className="ca-field">
-                  Awareness (if confirmed)
-                  <input
-                    type="datetime-local"
-                    value={form.awareness}
-                    onChange={(event) => set({ awareness: event.target.value })}
-                  />
-                </label>
-              </>
-            )}
-            <label className="ca-field">
-              Time zone of the call
+              Time zone
               <select
                 value={form.zone}
                 onChange={(event) =>
@@ -496,15 +536,190 @@ function LogDrawer({
               </select>
             </label>
           </div>
-        </section>
-        {kind === "CONTACT" && (
-          // The ten questions fold in the log (0.10.85, D3.10): they can be answered now or at the call's check.
+          {!earlier ? (
+            <button type="button" className="ac-link" onClick={() => setEarlier(true)}>
+              Someone acting for you knew earlier
+            </button>
+          ) : (
+            <div className="ca-form-grid">
+              <label className="ca-field">
+                Who knew first
+                <select value={form.party} onChange={(event) => set({ party: event.target.value })}>
+                  <option value="">Not known</option>
+                  <option value="MANUFACTURER">Our own staff</option>
+                  <option value="DISTRIBUTOR">A distributor</option>
+                  <option value="SERVICE_AGENT">A service agent</option>
+                </select>
+              </label>
+              <label className="ca-field">
+                Acting for you?
+                <select value={form.basis} onChange={(event) => set({ basis: event.target.value })}>
+                  <option value="">Not known</option>
+                  {FIRST_KNOWLEDGE_BASES.map(([code, label]) => (
+                    <option key={code} value={code}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="ca-field">
+                When they knew
+                <input
+                  type="datetime-local"
+                  value={form.firstKnowledge}
+                  onChange={(event) => set({ firstKnowledge: event.target.value })}
+                />
+              </label>
+            </div>
+          )}
+          {urgent && (
+            <label className="ca-field">
+              Awareness (if confirmed)
+              <input
+                type="datetime-local"
+                value={form.awareness}
+                onChange={(event) => set({ awareness: event.target.value })}
+              />
+            </label>
+          )}
+        </details>
+        <details className="ca-drawer-section uw-more">
+          <summary>Customer</summary>
+          <div className="ca-form-grid">
+            <label className="ca-field">
+              Reporter type
+              <input value={form.reporterType} onChange={(event) => set({ reporterType: event.target.value })} />
+            </label>
+            <label className="ca-field">
+              Site or organisation (no person's name)
+              <input value={form.site} onChange={(event) => set({ site: event.target.value })} />
+            </label>
+            <label className="ca-field">
+              Reporter's country
+              <input value={form.country} onChange={(event) => set({ country: event.target.value })} />
+            </label>
+          </div>
+        </details>
+        <details className="ca-drawer-section uw-more" open>
+          <summary>Product</summary>
+          <div className="ca-form-grid">
+            <IdentifierField {...idProps("product")} value={typeProduct ? form.productText : form.product}>
+              {typeProduct ? (
+                <input
+                  aria-label="Product, as typed"
+                  value={form.productText}
+                  onChange={(event) => set({ productText: event.target.value })}
+                />
+              ) : (
+                <select value={form.product} onChange={(event) => set({ product: event.target.value })}>
+                  <option value="">Not named</option>
+                  {work.products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </IdentifierField>
+            <IdentifierField {...idProps("version")} value="">
+              <small className="uw-cr-meta">From the lot, when the lot is loaded</small>
+            </IdentifierField>
+            <IdentifierField {...idProps("lot")} value={form.lot} onValue={(lot) => set({ lot })} />
+            <IdentifierField {...idProps("serial")} value={form.serial} onValue={(serial) => set({ serial })} />
+            <IdentifierField {...idProps("udi")} value={form.udi} onValue={(udi) => set({ udi })} />
+            <IdentifierField
+              {...idProps("software_version")}
+              value={form.software}
+              onValue={(software) => set({ software })}
+            />
+            <IdentifierField
+              {...idProps("hardware_revision")}
+              value={form.hardware}
+              onValue={(hardware) => set({ hardware })}
+            />
+            <IdentifierField
+              {...idProps("firmware_version")}
+              value={form.firmware}
+              onValue={(firmware) => set({ firmware })}
+            />
+          </div>
+          <button type="button" className="ac-link" onClick={() => setTypeProduct((typed) => !typed)}>
+            {typeProduct ? "Choose from your products" : "Not in your products: type it"}
+          </button>
+          <p className="uw-cr-meta">A lot not in your lots is kept as typed and flagged.</p>
+        </details>
+        <details className="ca-drawer-section uw-more">
+          <summary>Event</summary>
+          <div className="ca-form-grid">
+            <label className="ca-field">
+              When it happened (leave empty if not known)
+              <input
+                type="datetime-local"
+                value={form.event}
+                onChange={(event) => set({ event: event.target.value })}
+              />
+            </label>
+            <label className="ca-field">
+              Where it was used
+              <select value={form.environment} onChange={(event) => set({ environment: event.target.value })}>
+                {guide.use_environments.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ca-field">
+              Who used it
+              <select value={form.userType} onChange={(event) => set({ userType: event.target.value })}>
+                {guide.user_types.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </details>
+        <details className="ca-drawer-section uw-more">
+          <summary>Service</summary>
+          <div className="ca-form-grid">
+            <label className="ca-field">
+              Issue category
+              <select value={form.category} onChange={(event) => set({ category: event.target.value })}>
+                <option value="">Not chosen</option>
+                {(guide.issue_categories ?? []).map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+              <small>For the service team only: it never decides a complaint or a report.</small>
+            </label>
+            <label className="ca-field">
+              What they asked for
+              <select value={form.requested} onChange={(event) => set({ requested: event.target.value })}>
+                {guide.requests.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ca-field">
+              Service ticket (optional)
+              <input value={form.ticket} onChange={(event) => set({ ticket: event.target.value })} />
+            </label>
+          </div>
+        </details>
+        {!urgent && (
+          // The ten questions fold in the log (0.10.85, D3.10): they can be answered now or at the Case check.
           <details className="ca-drawer-section uw-more">
-            <summary>The ten first-contact questions (now, or at the check)</summary>
+            <summary>The ten questions: answer now, or at the Case check</summary>
             <p className="uw-hint">{guide.note}</p>
             <Questions guide={guide} answers={form.answers} onChange={(answers) => set({ answers })} />
             <label className="ca-field">
-              10. What is still unknown and needs a follow-up with the caller?
+              10. What is still unknown and needs a follow-up with the reporter?
               <textarea rows={2} value={form.unknowns} onChange={(event) => set({ unknowns: event.target.value })} />
             </label>
           </details>
@@ -512,7 +727,7 @@ function LogDrawer({
         {problem && <p className="uw-hint">{problem}</p>}
         <div className="ca-action-row">
           <button type="submit" className="ac-primary" disabled={busy || !!problem}>
-            {busy ? "Saving…" : kind === "CONTACT" ? "Save the call" : "Send to triage"}
+            {busy ? "Saving…" : urgent ? "Send to triage now" : "Save the case"}
           </button>
         </div>
         <InlineError text={error} />

@@ -150,9 +150,9 @@ describe("the triage and first-contact screens", () => {
   it("open while reading, and offer the entry points to people who may write", () => {
     expect(render(<Triage onOpenTab={vi.fn()} />)).toContain("The triage list");
     const writer = render(<FirstContact />, ["case.log"]);
-    expect(writer).toContain("Log a call");
-    expect(writer).toContain("Urgent intake");
-    expect(render(<FirstContact />)).not.toContain("Log a call</button>");
+    expect(writer).toContain("Log a case");
+    expect(writer).toContain("Urgent: death or serious injury");
+    expect(render(<FirstContact />)).not.toContain("Log a case</button>");
   });
 
   it("lets anyone who may write escalate a record by hand, and nobody else", () => {

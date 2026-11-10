@@ -103,7 +103,7 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
       >
         {onOpenTab && (
           <button type="button" className="ac-secondary" onClick={() => onOpenTab("First contact")}>
-            Log a call or an urgent intake
+            Log a case or an urgent case
           </button>
         )}
       </Hero>
@@ -160,7 +160,7 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
             action={
               onOpenTab && (
                 <button type="button" className="ac-secondary" onClick={() => onOpenTab("First contact")}>
-                  Log a call or an urgent intake
+                  Log a case or an urgent case
                 </button>
               )
             }

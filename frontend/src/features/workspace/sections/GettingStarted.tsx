@@ -335,7 +335,7 @@ export function GettingStartedSection({
             </div>
             <div className="uw-story-partner-actions">
               <button type="button" className="ac-secondary" onClick={() => open("Complaints", "First contact")}>
-                Log a call
+                Log a case
               </button>
               <button type="button" className="ac-secondary" onClick={() => open("Complaints", "Triage")}>
                 Triage list

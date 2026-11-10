@@ -435,12 +435,12 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           "A service call can hide a complaint. Log the caller's words and answer the ten starter questions: the fixed table gives complaint, service only, both or pending. Urgent intakes, harm answers and harm words reach the triage list at once, before every other queue, with each market's provisional deadline counted from awareness.",
         tasks: [
           {
-            title: "Log a call and sign the check",
+            title: "Log a case and sign the Case check",
             who: "Leader, and anyone who triages trends, opens investigations or reviews quality.",
             steps: [
-              "Open Complaints › First contact and choose Log a call. Write the caller's words as they said them, the product, lot or serial number, what was asked for and the time of the call (that is the awareness time; it never moves).",
+              "Open Complaints › First contact and choose Log a case. Write the reporter's words as they said them, the product, lot or serial number, what was asked for and the time of the call (that is the awareness time; it never moves).",
               "Answer questions 1 to 9: Yes, No, Unknown or Not applicable (with a reason); questions 4 to 6 may be Not stated. No means not alleged. Unknown and Not stated are never No.",
-              "Choose Save the call. The table's outcome shows at once; a Yes or Unknown on question 4, 5 or 6, or a harm word, puts the call on the triage list before anyone signs.",
+              "Choose Save the case. The table's outcome shows at once; a Yes or Unknown on question 4, 5 or 6, or a harm word, puts the call on the triage list before anyone signs.",
               "Open the call, check the classification (or choose another, with your reason), enter Your password and the Authenticator code and choose Sign the check.",
             ],
             result:

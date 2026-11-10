@@ -165,6 +165,8 @@ class IntakeIn(BaseModel):
     identifiers: dict[str, dict] = Field(default_factory=dict, max_length=8)
     issue_category: str = Field(default="", max_length=20)
     request_key: str = Field(default="", max_length=80)
+    # Spec 4.2: a product not in the organization's products is typed and kept as typed, flagged.
+    product_text: str = Field(default="", max_length=200)
 
 
 class CheckIn(BaseModel):
@@ -341,8 +343,10 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
         "reporter_site": event.reporter_site,
         "country": event.country,
         "product_id": str(event.product_id) if event.product_id else None,
-        "product_name": product.name if product else None,
-        "lot": lot.lot_identifier if lot else None,
+        "product_name": product.name if product else event.product_text,
+        "lot": lot.lot_identifier if lot else event.lot_text,
+        # Spec 4.2/4.3: typed, not in the organization's products or lots (kept as typed and flagged).
+        "not_in_master": [key for key, typed in (("product", event.product_text), ("lot", event.lot_text)) if typed],
         "serial_number": event.serial_number,
         "requested": event.requested,
         "requested_label": rules.REQUEST_LABELS.get(event.requested or "", None),
@@ -728,13 +732,11 @@ def _at(value: datetime | None, zone: str) -> datetime | None:
 
 
 def _resolve_lot(db, tenant_id, product_id, value: str):
+    """The loaded lot of that number, or None: a lot not in the organization's lots is kept as typed (spec 4.2)."""
     text = rules.clean(value, 120)
     if not text:
         return None
-    lot = db.query(LotBatch).filter(LotBatch.tenant_id == tenant_id, LotBatch.lot_identifier == text).first()
-    if lot is None:
-        raise _error(422, "LOT_NOT_FOUND", f"No lot {text} in your organization: leave it blank, or name a loaded lot")
-    return lot
+    return db.query(LotBatch).filter(LotBatch.tenant_id == tenant_id, LotBatch.lot_identifier == text).first()
 
 
 @router.post("/intake", dependencies=[ANY_ROLE])
@@ -769,6 +771,8 @@ def log_intake(
         if product is None:
             raise _error(422, "PRODUCT_NOT_FOUND", "No such product in your organization")
     lot = _resolve_lot(db, tenant_id, payload.product_id, payload.lot)
+    lot_text = None if lot is not None else (rules.clean(payload.lot, 120) or None)
+    product_text = None if product is not None else (rules.clean(payload.product_text, 200) or None)
     zone = _zone(payload.received_zone)
     received = _at(payload.received_at, zone) or now
     if received > now + _SKEW:
@@ -790,9 +794,9 @@ def log_intake(
         "firmware_version": rules.clean(payload.firmware_version, 60) or None,
     }
     given = {
-        "product": product is not None,
+        "product": product is not None or bool(product_text),
         "version": bool(lot and lot.product_version_id),
-        "lot": lot is not None,
+        "lot": lot is not None or bool(lot_text),
         "serial": bool(serial),
         **{key: bool(value) for key, value in values.items()},
     }
@@ -836,6 +840,8 @@ def log_intake(
         request_key=request_key,
         identifiers=case_rules.clean_identifiers(payload.identifiers, given),
         issue_category=case_rules.issue_category(payload.issue_category),
+        product_text=product_text,
+        lot_text=lot_text,
         **values,
     )
     db.add(event)

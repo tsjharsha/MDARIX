@@ -330,11 +330,12 @@ describe("D3.10 Log a call opens in place, shorter, in the product's date format
       zones: ["Asia/Kolkata"],
     };
     const html = render(<FirstContact part="calls" startLogging="CONTACT" />);
-    const shortForm = html.slice(html.indexOf("The caller&#x27;s words"), html.indexOf("More about the call"));
-    for (const field of ["Product", "Lot", "What was asked for", "Country"]) expect(shortForm).toContain(field);
-    expect(shortForm).not.toContain("Serial number");
-    expect(html).toContain("<summary>More about the call (optional)</summary>");
-    expect(html).toContain("<summary>The ten first-contact questions (now, or at the check)</summary>");
+    // 0.10.93 (B2, spec 4.2): "Log a case" in groups; what was said, how it came in and the product open first.
+    expect(html).toContain("The reporter&#x27;s words, as they said them");
+    expect(html).toContain('<details class="ca-drawer-section uw-more" open=""><summary>What was said</summary>');
+    expect(html).toContain("<summary>Customer</summary>");
+    expect(html).toContain("<summary>The ten questions: answer now, or at the Case check</summary>");
+    expect(html).toContain("Not in your products: type it");
     expect(wallClockText("2026-11-03T21:50")).toBe("Reads: 3 Nov 2026, 21:50");
   });
 });

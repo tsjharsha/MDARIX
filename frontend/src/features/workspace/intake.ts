@@ -26,6 +26,14 @@ export type Guide = {
   harm_words: { version: string; words: string[] };
   fault_words: { version: string; words: string[] };
   levels: { code: string; label: string }[];
+  // 0.10.93 (B2): S-1 issue categories, ID-1 identifiers (labels, which allow Not sure, sources), the Case states.
+  issue_categories?: { code: string; label: string }[];
+  identifiers?: {
+    keys: { code: string; label: string }[];
+    not_sure: string[];
+    sources: { code: string; label: string }[];
+  };
+  states?: { code: string; label: string }[];
   /** The time zones a call's times are entered in (current names), and old names with their current one. */
   zones?: string[];
   zone_aliases?: Record<string, string>;
@@ -513,4 +521,30 @@ export function triageBody(form: TriageForm, record: TriageRecordView | null, aw
     password: form.password,
     mfa_code: form.mfa.trim() || null,
   };
+}
+
+// ------------------------------------------------------------------ the Case's device identifiers (ID-1, S-3)
+
+/** One identifier's entry as the server keeps it (case_rules.clean_identifiers). */
+export type IdentifierEntry = { not_sure: boolean; status: "CONFIRMED" | "UNCONFIRMED"; source: string };
+export type Identifiers = Record<string, IdentifierEntry>;
+export const NEW_IDENTIFIER: IdentifierEntry = { not_sure: false, status: "UNCONFIRMED", source: "CALLER" };
+
+/** "Acting for you?" (rules.FIRST_KNOWLEDGE_BASES), with the spec's labels. */
+export const FIRST_KNOWLEDGE_BASES: readonly [string, string][] = [
+  ["ACTS_FOR_MANUFACTURER", "Yes, they act for us"],
+  ["PROCEDURE_DEEMS", "Our procedure counts them"],
+  ["NOT_ACTING_FOR", "No"],
+];
+
+/** The chip an identifier shows: Not sure, Confirmed or Unconfirmed; none while it has no value. */
+export function identifierChip(
+  entry: IdentifierEntry | undefined,
+  given: boolean,
+): { label: string; tone: Tone } | null {
+  if (entry?.not_sure) return { label: "Not sure", tone: "warning" };
+  if (!given) return null;
+  return entry?.status === "CONFIRMED"
+    ? { label: "Confirmed", tone: "good" }
+    : { label: "Unconfirmed", tone: "warning" };
 }

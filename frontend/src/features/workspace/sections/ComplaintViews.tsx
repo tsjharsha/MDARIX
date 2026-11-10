@@ -84,7 +84,7 @@ export function ComplaintViews({ tab }: { tab?: string }) {
               setLogged((count) => count + 1);
             }}
           >
-            <PhoneCall size={15} aria-hidden="true" /> Log a call
+            <PhoneCall size={15} aria-hidden="true" /> Log a case
           </button>
         )}
         {/* In a trial the top bar's Import your data is the one way in (0.10.87). */}
