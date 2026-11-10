@@ -1109,6 +1109,52 @@ def set_field(
     return detail(db, control_db, ctx, obligation)
 
 
+@router.post("/{obligation_id}/codes/confirm", dependencies=[DECIDERS])
+def confirm_all_codes(
+    obligation_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Confirm all codes (0.10.96, D8): every code field whose suggested code waits for a person is confirmed as
+    suggested, each through the same step as its own Confirm and with its own audit event. A code a person chose, and
+    a field with no suggestion, stay as they are (a draft only; suggestions wait only on the new navigation)."""
+    obligation = _obligation(db, _tenant(ctx), obligation_id, lock=True)
+    if obligation.state not in rules.EDITABLE:
+        raise _error(409, "NOT_A_DRAFT", "Only a draft is changed: reopen it first")
+    form = _form(obligation)
+    sections = worksheet.build(
+        form, _context(db, control_db, obligation), obligation.entries or {}, {}, obligation.request_text
+    )
+    waiting = [item["id"] for part in sections for item in part["fields"] if item["status"] == worksheet.SUGGESTED]
+    if not waiting:
+        raise _error(422, "NOTHING_SUGGESTED", "No suggested code waits for confirmation")
+    fields = {item.id: item for item in form.fields()}
+    entries = dict(obligation.entries or {})
+    for field_id in waiting:
+        before = entries.get(field_id)
+        entries[field_id] = _code_entry(
+            db, control_db, obligation, fields[field_id], FieldRequest(confirmed=True), str(ctx.user_id)
+        )
+        _audit(
+            db,
+            ctx,
+            "REPORT_FIELD_SET",
+            obligation,
+            _entry_values(field_id, before),
+            _entry_values(field_id, entries[field_id]),
+            field=field_id,
+            cleared=False,
+            confirmed=True,
+            code_state=worksheet.CONFIRMED,
+            codes=None,
+            all_codes=True,
+        )
+    obligation.entries, obligation.updated_at = entries, _now()
+    db.commit()
+    return detail(db, control_db, ctx, obligation)
+
+
 class OnceRequest(BaseModel):
     # A product's or the organization's facts, by field id (the US product code and its 510(k) number go together).
     values: dict[str, str] = Field(default_factory=dict, max_length=10)

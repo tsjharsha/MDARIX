@@ -53,6 +53,10 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
   Settings). Both PDFs come only from the approved snapshot or, marked DRAFT, the one awaiting approval; never from a
   superseded or cancelled one. A report approved before 0.10.96 gets the new PDF when its file can be built, and the
   official form otherwise, as before.
+- Confirm all codes (A7, decision D8): `POST /authority-reports/{id}/codes/confirm` confirms every code the approved
+  mapping suggests and no one has entered yet, each through the same step as its own Confirm and with its own audit
+  event (marked `all_codes`). A code a person chose and a field with no suggestion stay as they are; only a draft is
+  changed (409 `NOT_A_DRAFT`), and with nothing waiting it says so (422 `NOTHING_SUGGESTED`).
 
 ## [0.10.95] - not released yet (ships in the big-bang release)
 
