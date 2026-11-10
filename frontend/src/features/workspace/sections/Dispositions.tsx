@@ -8,7 +8,7 @@ import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { ImdrfCodes, RecordOrigin } from "./ImportReports";
 import { formatDay } from "../../../app/dates";
-import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
+import { useCan, useRoutinePath, useTabParam, useWorkspace } from "../workspaceContext";
 import { countOf, DecideAndSign } from "./common";
 import { ComplaintNextStep } from "./ComplaintNextStep";
 import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
@@ -243,14 +243,18 @@ export function DispositionDrawer({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  // B7: the Resolve and close screen carries the disposition screen; it opens first on the routine path.
-  const resolve = useResource<ResolveScreen>(resolvePath(complaintId));
+  // B7: the Resolve and close screen carries the disposition screen; it opens first on the routine path. With B7a
+  // switched off (session routine_path false) the drawer reads the disposition alone, as before B7.
+  const routine = useRoutinePath();
+  const resolve = useResource<ResolveScreen>(routine ? resolvePath(complaintId) : null);
+  const plain = useResource<DispositionScreen>(routine ? null : dispositionPath(complaintId));
+  const source = routine ? resolve : plain;
   const [tree, setTree] = useState(false);
   const data = resolve.data;
-  const screen = data?.disposition;
-  const oneScreen = !!data && !tree && !needsTree(data);
+  const screen = routine ? data?.disposition : plain.data;
+  const oneScreen = routine && !!data && !tree && !needsTree(data);
   const done = () => {
-    resolve.reload();
+    source.reload();
     onChanged();
   };
   return (
@@ -259,7 +263,7 @@ export function DispositionDrawer({
       title={`${screen?.complaint.ref ?? title}: ${data && oneScreen ? data.button.toLowerCase() : "disposition"}`}
       onClose={onClose}
     >
-      {resolve.state === "error" && <InlineError text="The disposition could not be read." />}
+      {source.state === "error" && <InlineError text="The disposition could not be read." />}
       {data && oneScreen && (
         <ResolveClosePanel
           key={`${data.disposition.version}-${data.closed}`}
@@ -274,7 +278,7 @@ export function DispositionDrawer({
           key={`${screen.version}-${screen.trigger_codes.join()}`}
           screen={screen}
           onSigned={done}
-          onTrained={resolve.reload}
+          onTrained={source.reload}
         />
       )}
       {screen && (

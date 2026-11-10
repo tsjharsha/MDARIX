@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
-import { AlertsAndFiles, SETTING_PERMISSIONS, SETTINGS_TABS } from "./sections/Settings";
+import { AlertsAndFiles, SETTING_PERMISSIONS, SETTINGS_TABS, SettingsSection } from "./sections/Settings";
 import { moreCasePlace } from "./oneStory";
 import { CaseExports } from "./sections/CasesList";
 import { CaseFiles } from "./sections/FirstContact";
@@ -92,5 +92,23 @@ describe("More cases to try: the routine sample complaint (B7a)", () => {
       section: "Complaints",
       tab: "First contact?check=e-1",
     });
+  });
+});
+
+describe("B7a switched off (session routine_path false)", () => {
+  const off = (permissions: string[]) => {
+    const value = api(permissions);
+    (value.session as Record<string, unknown>).routine_path = false;
+    return value;
+  };
+
+  it("hides the exports, the upload and the Alerts and files tab; files already on a Case stay readable", () => {
+    expect(render(off(["data.export"]), <CaseExports view="all" q="" />)).toBe("");
+    const files = render(off(["case.log"]), <CaseFiles caseId="e1" canAdd />);
+    expect(files).toContain("alarm-log.pdf");
+    expect(files).not.toContain('type="file"');
+    expect(render(off(["case.log"]), <CaseFiles caseId="e2" canAdd />)).toBe("");
+    expect(render(off(["quality.review"]), <SettingsSection />)).not.toContain("Alerts and files");
+    expect(render(api(["quality.review"]), <SettingsSection />)).toContain("Alerts and files");
   });
 });

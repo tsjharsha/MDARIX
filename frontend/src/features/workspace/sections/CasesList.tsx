@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CheckCircle2, ClipboardList, Download, Hourglass, Users } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { useCan } from "../workspaceContext";
+import { useCan, useRoutinePath } from "../workspaceContext";
 import { downloadFile } from "../../reports/download";
 import { ChipFilter, InlineError } from "./boardParts";
 import { CASE_VIEWS_FIRST, INTAKE, casesPath, type CaseHeader, type CasePage, type CaseRow } from "../intake";
@@ -19,8 +19,9 @@ const BULK_MAX = 200;
  */
 export function CaseExports({ view, q }: { view: string; q: string }) {
   const canExport = useCan("data.export");
+  const routine = useRoutinePath();
   const [error, setError] = useState("");
-  if (!canExport) return null;
+  if (!canExport || !routine) return null;
   const get = async (path: string, fallbackName: string) => {
     setError("");
     try {

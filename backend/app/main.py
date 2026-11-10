@@ -340,7 +340,7 @@ async def deployment_role_gate(request: Request, call_next):
 async def feature_set_gate(request: Request, call_next):
     """Under MDARIX_FEATURE_SET=mvp the routes of the parked areas answer 404 here, before any handler runs
     (backend/app/feature_set.py); under ``full`` (the default) every route is served."""
-    if not feature_set.serves_path(request.url.path):
+    if not feature_set.serves_path(request.url.path, request.method):
         return JSONResponse(
             status_code=404,
             content={

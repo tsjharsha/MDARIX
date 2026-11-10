@@ -161,6 +161,10 @@ TRIAL_ONLY = frozenset({"distribution"})
 
 
 def offered(entity: str, policy: "ImportPolicy") -> bool:
+    from backend.app.feature_set import routine_path
+
+    if entity == "cases" and not routine_path():  # B7a switched off: no Cases template
+        return False
     return entity not in TRIAL_ONLY or policy.source == UPLOAD_SOURCE
 
 

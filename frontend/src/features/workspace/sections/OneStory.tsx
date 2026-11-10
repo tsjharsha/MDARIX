@@ -18,7 +18,7 @@ import {
 import { MonitorBand, ProgressArc } from "../../shared/hero/HeroVisuals";
 import { BedsideScene, SignedSeal } from "../../shared/hero/HeroArt";
 import { errorText, send, useResource } from "../../customer-admin/shared";
-import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { useRoutinePath, useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { IMPORTED_SOURCE } from "../complaintList";
 import { TEAM_PATH } from "./TrialTeam";
 import { chanceText, trendCountText, trendResultLabel, type TrendItem } from "../signalAi";
@@ -683,6 +683,7 @@ function StepIcon({ index, size = 18 }: { index: number; size?: number }) {
  * SAMPLE-CALL references), so nothing is shown once the sample is removed.
  */
 export function MoreCases({ cases, onOpen }: { cases: MoreCase[]; onOpen: (section: string, tab?: string) => void }) {
+  const routine = useRoutinePath();
   if (!cases.length) return null;
   return (
     <div id="trial-first-contact" className="uw-story-partner uw-anchor">
@@ -692,8 +693,8 @@ export function MoreCases({ cases, onOpen }: { cases: MoreCase[]; onOpen: (secti
         </strong>
         <p>
           Each opens its own case check: an inquiry, a pending case waiting for the reporter, one to confirm no
-          deficiency, and an urgent case triaged at once. The routine complaint opens Resolve and close: one screen, one
-          signature.
+          deficiency, and an urgent case triaged at once.
+          {routine && " The routine complaint opens Resolve and close: one screen, one signature."}
         </p>
       </div>
       <div className="uw-story-partner-actions">

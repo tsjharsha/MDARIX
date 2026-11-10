@@ -572,34 +572,38 @@ def checklist(found: dict) -> list[dict]:
             links.target("Complaints", "Communications", record=("complaint", complaint.id)) if requests else None,
         )
     )
-    told = ((disposition.service_record or {}).get("customer_told") if disposition is not None else None) or {}
-    if told.get("how") == "NOT_POSSIBLE":
-        items.append(
-            _check("CUSTOMER_TOLD", "The customer was told", NOT_REQUIRED, f"Not possible: {told.get('reason')}")
-        )
-    elif told or found.get("responses"):
-        how = str(told.get("how") or "").replace("_", " ").lower()
-        items.append(
-            _check(
-                "CUSTOMER_TOLD",
-                "The customer was told",
-                PASS,
-                (f"Told by {how}" if how else "Recorded")
-                + (f", QMS letter {told['qms_letter_id']}" if told.get("qms_letter_id") else "")
-                if told
-                else f"{_n(found['responses'], 'reply')} sent, in the communications log",
+    from backend.app.feature_set import routine_path
+
+    # B7-D5; with B7a switched off, closing behaves as before B7 (no CUSTOMER_TOLD item).
+    if routine_path():
+        told = ((disposition.service_record or {}).get("customer_told") if disposition is not None else None) or {}
+        if told.get("how") == "NOT_POSSIBLE":
+            items.append(
+                _check("CUSTOMER_TOLD", "The customer was told", NOT_REQUIRED, f"Not possible: {told.get('reason')}")
             )
-        )
-    else:
-        items.append(
-            _check(
-                "CUSTOMER_TOLD",
-                "The customer was told",
-                BLOCKED,
-                "No reply to the customer is recorded",
-                links.target("Complaints", "Communications", record=("complaint", complaint.id)),
+        elif told or found.get("responses"):
+            how = str(told.get("how") or "").replace("_", " ").lower()
+            items.append(
+                _check(
+                    "CUSTOMER_TOLD",
+                    "The customer was told",
+                    PASS,
+                    (f"Told by {how}" if how else "Recorded")
+                    + (f", QMS letter {told['qms_letter_id']}" if told.get("qms_letter_id") else "")
+                    if told
+                    else f"{_n(found['responses'], 'reply')} sent, in the communications log",
+                )
             )
-        )
+        else:
+            items.append(
+                _check(
+                    "CUSTOMER_TOLD",
+                    "The customer was told",
+                    BLOCKED,
+                    "No reply to the customer is recorded",
+                    links.target("Complaints", "Communications", record=("complaint", complaint.id)),
+                )
+            )
     tasks = [task for task in found["tasks"] if task.task_type != REPLY_TASK]
     if len(tasks) > 1:
         actions["TASKS"] = f"Finish the {len(tasks)} open tasks in My Work"

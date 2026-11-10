@@ -480,8 +480,11 @@ def _routine_try(data: Session, tenant_id) -> dict | None:
     from backend.app.db.models.complaint_disposition import ComplaintDisposition
     from backend.app.db.models.oversight import EventClosure
     from backend.app.trial.sample_data import SAMPLE_SOURCE
+    from backend.app.feature_set import routine_path
     from backend.app.trial.sample_dispositions import MARKER
 
+    if not routine_path():
+        return None
     complaint = (
         data.query(Complaint.id)
         .filter(

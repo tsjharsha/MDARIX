@@ -14,6 +14,11 @@ screens the MVP is built around, not every screen as built. Its API routes follo
 A route is parked only when no screen the MVP keeps calls it. The failure-chain route, for example, stays served:
 the investigation panel's "unknowns and chain" step still calls it. The value is read from the environment on every
 call, so a process never caches a wrong answer and tests can set it.
+
+``MDARIX_ROUTINE_PATH`` (B7a, owner decision 11 Nov): on unless ``off``. Off, the B7a routes answer 404 (Resolve and
+close, the Cases exports, adding a file to a Case, the alerts-and-files setting), the session's ``routine_path`` is
+false so its screens and next-step wording hide, and the closure checklist has no CUSTOMER_TOLD item (closing behaves
+as before B7). Records already signed stay readable, and a complaint MDARIX closed can still reopen.
 """
 
 from __future__ import annotations
@@ -50,6 +55,23 @@ _PARKED_API = tuple(
 )
 
 
+# B7a routes refused while MDARIX_ROUTINE_PATH is off: (method or None for every method, path).
+_ROUTINE_PATH_API = tuple(
+    (method, re.compile(pattern))
+    for method, pattern in (
+        (None, r"^/api/v1/complaints/[^/]+/resolve-and-close/?$"),
+        (None, r"^/api/v1/intake/(cases|qms-entry)/export\.csv$"),
+        ("POST", r"^/api/v1/intake/[^/]+/attachments/?$"),
+        (None, r"^/api/v1/oversight/settings/alerts-and-files/?$"),
+    )
+)
+
+
+def routine_path() -> bool:
+    """B7a is on unless ``MDARIX_ROUTINE_PATH=off`` (read on every call)."""
+    return os.getenv("MDARIX_ROUTINE_PATH", "").strip().lower() not in ("off", "0", "false", "no")
+
+
 def feature_set() -> str:
     """The configured feature set, ``full`` when unset. An unknown value is refused here (and reported by
     config_check)."""
@@ -74,9 +96,13 @@ def for_tenant(db, tenant_id) -> str:
     return MVP if trial_subscription(db, tenant_id) is not None else configured
 
 
-def serves_path(path: str) -> bool:
+def serves_path(path: str, method: str = "GET") -> bool:
     """Whether this deployment's feature set serves the request path: always under ``full``; under ``mvp``,
-    everything except the parked routes."""
+    everything except the parked routes; with B7a off, nothing of B7a's."""
+    if not routine_path() and any(
+        pattern.match(path) and verb in (None, method.upper()) for verb, pattern in _ROUTINE_PATH_API
+    ):
+        return False
     if not is_mvp():
         return True
     return not any(pattern.match(path) for pattern in _PARKED_API)

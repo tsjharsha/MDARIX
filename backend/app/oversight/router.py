@@ -1080,7 +1080,9 @@ def harm_words(complaint) -> str:
 def _resolve_label(db, control_db, tenant_id, complaint: Complaint, found: dict, blocked: list[dict]) -> str | None:
     """B7: the next step after triage is "Resolve and close" (its Connect wording) when the disposition is next and no
     escalation trigger is met; with a trigger it stays "Sign the disposition" (the decision tree escalates)."""
-    if not blocked or blocked[0]["code"] != "DECISION" or found["disposition"] is not None:
+    from backend.app.feature_set import routine_path
+
+    if not routine_path() or not blocked or blocked[0]["code"] != "DECISION" or found["disposition"] is not None:
         return None
     if ((blocked[0]["opens"] or {}).get("target") or {}).get("tab") != "Dispositions":
         return None  # decided in an investigation

@@ -9,6 +9,7 @@ import {
   useFeatureSet,
   useIsTrial,
   useReportedTab,
+  useRoutinePath,
   useWorkspace,
   type BusinessPermission,
 } from "../workspaceContext";
@@ -47,7 +48,10 @@ export const SETTING_PERMISSIONS: Record<SettingsTab, readonly BusinessPermissio
 export function SettingsSection({ tab }: { tab?: string }) {
   // A sample-only trial imports nothing, so it has no import templates (0.10.71).
   const sampleOnly = !!useWorkspace().session?.sample_only;
-  const tabs = SETTINGS_TABS.filter((item) => !(sampleOnly && item === "Import templates"));
+  const routine = useRoutinePath();
+  const tabs = SETTINGS_TABS.filter(
+    (item) => !(sampleOnly && item === "Import templates") && !(!routine && item === "Alerts and files"),
+  );
   const [chosen, setActive] = useReportedTab<SettingsTab>(() => offeredTab(tab, tabs, "Complaint review rules"));
   const active = tabs.includes(chosen) ? chosen : tabs[0];
   return (

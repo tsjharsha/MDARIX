@@ -6,7 +6,7 @@ import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { requestJson } from "../../../app/apiClient";
 import { downloadFile } from "../../reports/download";
-import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
+import { useCan, useRoutinePath, useTabParam, useWorkspace } from "../workspaceContext";
 import { DecideAndSign } from "./common";
 import { WhyAsked } from "../../shared/Basis";
 import { FIRST_CONTACT_WHY } from "../whyAsked";
@@ -905,6 +905,7 @@ type CaseFile = { id: string; file_name: string; size: number; created_at: strin
 export function CaseFiles({ caseId, canAdd }: { caseId: string; canAdd: boolean }) {
   const path = `${INTAKE}/${caseId}/attachments`;
   const files = useResource<{ items: CaseFile[] }>(path);
+  const routine = useRoutinePath();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const add = async (file: File | undefined) => {
@@ -923,6 +924,8 @@ export function CaseFiles({ caseId, canAdd }: { caseId: string; canAdd: boolean 
     }
   };
   const items = files.data?.items ?? [];
+  // B7a switched off: files already on the case stay readable; none is added.
+  if (!routine && !items.length) return null;
   return (
     <section className="ca-drawer-section">
       <h3>Files</h3>
@@ -950,7 +953,7 @@ export function CaseFiles({ caseId, canAdd }: { caseId: string; canAdd: boolean 
       ) : (
         <p className="ac-muted">No files on this case.</p>
       )}
-      {canAdd && (
+      {canAdd && routine && (
         <label className="ca-field">
           Add a file (PDF, text, CSV, PNG or JPEG, up to 10 MB; virus-scanned)
           <input

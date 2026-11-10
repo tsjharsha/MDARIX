@@ -58,11 +58,12 @@ def queue(
     were queued. Flushes nothing itself; the caller commits both sessions."""
     from backend.app.db.models.stage2 import OutboxEvent
     from backend.app.enterprise_audit import make_audit_event
+    from backend.app.feature_set import routine_path
     from backend.app.notifications import _queue
     from backend.app.oversight import service
     from backend.app.reportability.deadlines import org_zone
 
-    if control_db is None:
+    if control_db is None or not routine_path():  # B7a switched off: no urgent e-mail
         return 0
     settings = service.settings_row(db, tenant_id)
     if settings is None or not settings.urgent_email:

@@ -129,6 +129,8 @@ export type SessionContext = {
   feature_set?: string;
   /** B7b: whether e-mail intake is switched on (MDARIX_EMAIL_INTAKE); off, "E-mail to check" is not shown. */
   email_intake?: boolean;
+  /** B7a (MDARIX_ROUTINE_PATH): Resolve and close, the Cases exports, files on a Case and Alerts and files. */
+  routine_path?: boolean;
   /** classic or new (tenants.navigation, 0.10.67): the organization's menu (app/linkTable.ts). */
   navigation?: string;
   /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
@@ -379,6 +381,11 @@ export function useIsTrial(): boolean {
 export function useFeatureSet(): FeatureSet {
   const value = useContext(WorkspaceContext);
   return featureSetOf(value?.session?.feature_set);
+}
+
+/** B7a: on unless the server says it is switched off (an older server says nothing: on). */
+export function useRoutinePath(): boolean {
+  return useContext(WorkspaceContext)?.session?.routine_path !== false;
 }
 
 /** B7b: "E-mail to check" shows only while the server has e-mail intake switched on. */
