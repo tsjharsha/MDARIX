@@ -484,6 +484,21 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             ],
             note: "It is sent for an urgent case, a case escalated with a death or serious injury, and a triage reopened on one; one reminder follows when the acknowledgement is overdue. The in-app alert stays either way.",
           },
+          {
+            title: "Turn an e-mail into a case: E-mail to check",
+            who: "Anyone who logs cases. Not a case on a message with harm or fault words: a quality reviewer.",
+            steps: [
+              "E-mail intake stays switched off until your customer administrator sets up your organization's intake address (see Set up the e-mail intake address). From then on, Complaints › First contact shows E-mail to check above the Cases: each message sent to that address, one card at a time, due by the end of the working day.",
+              "Each card shows when MDARIX received the message, the sender's domain marked unverified (nobody checks who sent it), the subject and first lines with personal data masked, and its chips: harm or fault words, May not be English, Possible duplicate, Possibly known earlier, and the product, lot, serial number or UDI found in it (unconfirmed, source: E-mail). Every attachment is virus-scanned; a refused one says why.",
+              "Make it a case opens Log a case filled in from the e-mail: its words, channel E-mail with its Message-ID, and Received as the time our server received the message, not the time of your click. When the sender's domain matches a site you know, the site is only suggested, unconfirmed: choose Use it, or type another. Save the case and sign its check as for a call; the clean attachments move to the Case.",
+              "Add to CALL-… shows when the e-mail answers a Case (a reply to it, or its reference in the subject): the e-mail's words are added to that Case as said by the reporter. A reply never makes a new Case by itself.",
+              "Not a case asks why: Spam, Auto-reply, Setup message, Internal, Duplicate or Other (in your words). On a message with harm or fault words only a quality reviewer may choose it and, outside a free trial, not the person who opened the message first; a refusal is in the audit trail.",
+              "Open the original downloads the message as received, with its headers and attachments. Only the contact roles (Service Desk, Triage Lead, Quality Reviewer, Regulatory Reviewer, Leader) may open it, and every opening is in the audit trail.",
+            ],
+            result:
+              "An e-mail is never a complaint by itself: at most it becomes a Case that a person classifies and signs. Auto-replies and bounces go to Not a case by themselves, with the reason.",
+            note: "A message marked Not a case is deleted 30 days after the decision (a line saying it was there stays); a message made into a Case is kept as long as the Case. A free trial has no real address: one SAMPLE e-mail shows the flow. MDARIX never replies to a sender.",
+          },
         ],
       },
       {
@@ -1498,6 +1513,17 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Choose Turn AI on or Turn AI off, give a Reason for the change and, to switch on, acknowledge where the records go.",
             ],
             note: "AI is off for a new organization, and stays off in free trials during the product validation phase.",
+          },
+          {
+            title: "Set up the e-mail intake address (customer administrators)",
+            who: "Customer Administrator.",
+            steps: [
+              "In the Admin console open Organization › E-mail intake. E-mail intake is off until you choose Turn on: MDARIX then makes your organization's own address, an unguessable code that never shows your name, and accepts mail sent to it.",
+              "Choose Copy and set your complaints mailbox to forward to that address. Many mail systems block forwarding to outside addresses until their administrator allows it; a confirmation message they send appears in E-mail to check as a setup message.",
+              "Optionally list the sender domains to accept (empty: anyone), and set Messages a day, at most (200 unless you change it). Over the limit, senders are asked to try again later, and you get one e-mail about it that day.",
+              "Rotate makes a new address when the old one attracts spam; the old one keeps working for 30 days. Turn off refuses new mail; messages already received stay.",
+            ],
+            note: "The panel shows only where MDARIX runs e-mail intake. A free trial has no real address: the SAMPLE e-mail under Complaints › First contact shows the flow.",
           },
         ],
       },

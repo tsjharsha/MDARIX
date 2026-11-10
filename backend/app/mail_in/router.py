@@ -75,6 +75,7 @@ def view(row: InboundMessage) -> dict:
         "subject": row.subject_masked,
         "words": (row.draft or {}).get("words") or "",
         "identifiers": (row.draft or {}).get("identifiers") or {},
+        "site_suggestion": (row.draft or {}).get("site"),
         "note": (row.draft or {}).get("note"),
         "checked": bool(flags.get("checked")),
         "harm_words": flags.get("harm_words") or [],

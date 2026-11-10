@@ -136,7 +136,8 @@ def test_every_new_email_has_text_and_html_and_escapes_names(company, outbox):
     emailer.send_demo_request_acknowledgement("a@x.test", display_name=hostile)
     emailer.send_trial_request_acknowledgement("a@x.test", display_name="Ann", organization="Acme")
     emailer.send_trial_request_declined("a@x.test", display_name="Ann", organization="Acme")
-    assert len(outbox) == 10
+    emailer.send_mail_intake_limit_notice("a@x.test", organization="Acme", limit=200, day="11 November 2026")
+    assert len(outbox) == 11
     for message in outbox:
         assert message["text"] and message["html"] and "Example Labs Ltd" in message["text"]
         assert "<b>Eve</b>" not in message["html"]
@@ -144,6 +145,7 @@ def test_every_new_email_has_text_and_html_and_escapes_names(company, outbox):
     assert outbox[2]["subject"] == "The decision on INV-7 was rejected"
     assert "800 of 1,000 tokens" in outbox[5]["text"]
     assert "support@example.com" in outbox[9]["text"]
+    assert "200 e-mails arrived" in outbox[10]["text"] and "at most once a day" in outbox[10]["text"]
 
 
 def test_the_approval_email_opens_the_approvals_queue(company, outbox):
@@ -229,6 +231,7 @@ def sent(monkeypatch):
         "send_risk_review_requested_notice",
         "send_connector_sync_failed_notice",
         "send_ai_budget_notice",
+        "send_mail_intake_limit_notice",
         "send_feedback_alert",
         "send_trial_request_declined",
         "send_subscription_reminder",
@@ -373,6 +376,20 @@ def test_connector_failures_and_ai_budget_reach_customer_administrators(db, tena
         notifications.notify_ai_budget_threshold(db, tenant_id, percent=50)
     assert _deliver(db, first)
     assert sent[0][1] == admin.username and sent[0][2]["month"] == "January 2031" and sent[0][2]["percent"] == 80
+
+
+@pytest.mark.db
+def test_the_mail_intake_limit_reaches_customer_administrators_once_a_day(db, tenant_id, sent):
+    admin = _user(db, tenant_id, "CUSTOMER_ADMIN")
+    _user(db, tenant_id, "INVESTIGATOR")
+    day = "2031-02-03"  # a day no other test touches
+    first = notifications.notify_mail_intake_limit(db, tenant_id, limit=200, day=day)
+    db.flush()
+    assert notifications.notify_mail_intake_limit(db, tenant_id, limit=200, day=day) is None  # once a day
+    assert notifications.notify_mail_intake_limit(db, tenant_id, limit=200, day="2031-02-04") is not None
+    assert _deliver(db, first)
+    assert [(name, recipient) for name, recipient, _ in sent] == [("send_mail_intake_limit_notice", admin.username)]
+    assert sent[0][2]["limit"] == 200 and sent[0][2]["day"] == "3 February 2031"
 
 
 @pytest.mark.db

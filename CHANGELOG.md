@@ -108,6 +108,14 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   address works 30 days), and its screen: Customer administration › Organization › **E-mail intake** (the address
   with Copy, on/off, Rotate, allowed sender domains, messages a day, how to forward a mailbox). Shown only while
   e-mail intake is on; a free trial is pointed to its SAMPLE e-mail.
+- Making a Case from an e-mail suggests the site known for the sender's domain (an organization party with a contact
+  address at that domain, else the site of the newest Case made from an e-mail of that domain), marked unconfirmed:
+  Log a case shows it with "Use it" and never fills the field by itself; no suggestion for personal mail providers.
+- When an organization's intake address reaches its daily limit, its customer administrators get one e-mail that day
+  (outbox event `MAIL_INTAKE_LIMIT_REACHED`, at most one per organization and UTC day).
+- User guide: "Turn an e-mail into a case: E-mail to check" (the list, Make it a case, Add to the Case, Not a case,
+  the original message, intake off until the address is set up) and "Set up the e-mail intake address" for customer
+  administrators.
 
 ### Added (B7a on/off switch)
 
