@@ -2,7 +2,7 @@ dateAdvEvent: <DATE>
 dateReport: <DATE>
 prodProblem: /1
 advEvDesc: Biomedical engineering checked a monitor against a reference oximeter: its SpO2 read 4 to 6 points high on two patients. No harm was reported. The monitor is out of use and sent for service.
-mfr: Test value (sample)
+mfr: <REPORT-NUMBER>
 proCode: FRN
 brandName: PulseWatch 410 Patient Monitor (Sample)
 manuNameAddr: Test value (sample)
@@ -16,12 +16,15 @@ manuName: Test Devices (sample)
 manuEmail: mdr@example.invalid
 rep30: /Yes
 repInit: /Yes
-manuRepNum: Test value (sample)
+manuRepNum: <REPORT-NUMBER>
 eventMal: /Yes
 singleUseN2: /Yes
 healthClinCode2: 4401
 healthImpCode2: 2271
 devProbCode2: 2682
+compCode2: 3028
+investCodes: 10
+invFindings: 3203
 invConc: 4301
 PRACTICE RECORD - NOT YOUR REGULATORY RECORD MDARIX complaint handling and post-market vigilance
 MDARIX record - not part of Form FDA 3500A

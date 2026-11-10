@@ -69,6 +69,7 @@ def _normalized(text: str) -> str:
     """The PDF's text with what changes per run replaced: checksums, generated references, dates and times (the
     sample's dates are relative to the day it is staged)."""
     rules = (
+        (r"\b\d{7}-\d{4}-\d{5}\b", "<REPORT-NUMBER>"),  # FDA's format, a new number per run (0.10.96)
         (r"\b[0-9a-f]{64}\b", "<SHA256>"),
         (r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", "<UUID>"),
         (r"\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2} [A-Z+0-9]+", "<MOMENT>"),
@@ -114,11 +115,13 @@ def test_provenance_runs_from_the_complaint_to_the_conclusion_the_report_and_its
     pending = _ok(user.post(f"{REPORTS}/{report['id']}/snapshots"))["pending_snapshot"]["id"]
     done = _ok(user.post(f"{REPORTS}/{report['id']}/snapshots/{pending}/approve", json={"password": PASSWORD}))
     snapshot = done["approved_snapshot"]
-    pdf = user.get(f"{REPORTS}/{report['id']}/worksheet.pdf", params={"snapshot": snapshot["id"]})
+    query = {"snapshot": snapshot["id"], "form": "official"}
+    pdf = user.get(f"{REPORTS}/{report['id']}/worksheet.pdf", params=query)
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
-    # An approved US report's PDF is FDA's own Form 3500A, filled, then MDARIX's record page.
+    # An approved US report's official PDF (0.10.96: the second one) is FDA's own Form 3500A, filled, then MDARIX's
+    # record page; the report number is the one Send for approval kept (FDA's format).
     text = _form_text(pdf.content)
-    assert "mfr: Test value (sample)" in text and "Form: Form FDA 3500A (09/2025)" in text
+    assert re.search(r"^mfr: \d{7}-\d{4}-\d{5}$", text, re.M) and "Form: Form FDA 3500A (09/2025)" in text
     # B1 (0.10.89): a patient connected with no harm recorded is no adverse event; the malfunction is a product problem.
     assert "prodProblem: /1" in text and "adverse: /1" not in text
     assert "United States (FDA) v1 (signed)" in text  # the conclusion as the source of its fields
@@ -164,57 +167,21 @@ def _fda_mapped_code(annex: str) -> str:
         return next(row.code for row in rows if row.code in mapped and reference.selectable(row.status))
 
 
-def test_the_emdr_file_waits_for_what_fda_requires_then_validates(trial):  # eMDR, 0.10.89
+def test_the_approved_reports_emdr_file_validates_and_the_official_form_reads_its_contact_office(trial):
+    # eMDR, 0.10.89. Since 0.10.96 (A2) Send for approval waits for what FDA requires, so the approved file is ready.
     from backend.app.authority_reports import emdr
 
     user, state = trial["user"], trial["state"]
-    report = state["report"]
-    detail = _ok(user.get(f"{REPORTS}/{report}"))
-    refused = user.get(f"{REPORTS}/{report}/emdr.xml", params={"snapshot": state["snapshot"]})
-    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "EMDR_MISSING"
-    # The screen and the refusal name the same blocks: the report number's format and the H6 codes still owed. G1 is
-    # not among them: since 0.10.92 (A5) the contact office with its e-mail is asked for before approval.
-    missing = refused.json()["detail"]["missing"]
-    assert missing == detail["emdr"]["missing"]
-    assert [item.split(":")[0] for item in missing] == [
-        "G8 Manufacturer report number",
-        "H6 Component code",
-        "H6 Type of investigation code",
-        "H6 Investigation findings code",
-    ]
-    # The organization's US contact office in Settings, the report reopened, completed and approved again.
-    party = {
-        "market": "US",
-        "role": "MANUFACTURER",
-        "organisation": "Trial Devices Inc",
-        "address": "1 Sample Way, Springfield, MA 01101, US",
-        "contact_name": "Taylor Quality",
-        "contact_email": "mdr@example.invalid",
-        "contact_phone": "+1(240)276-0001",
-    }
-    _ok(user.put("/api/v1/regulatory-reference/responsible-parties", json=party))
-    _ok(user.post(f"{REPORTS}/{report}/reopen", json={"reason": "Complete the blocks the eMDR file needs"}))
-    _ok(user.put(f"{REPORTS}/{report}/fields/MFR_REPORT", json={"value": "1234567-2026-00001"}))
-    for field in ("G1", "D3"):
-        _ok(user.put(f"{REPORTS}/{report}/fields/{field}", json={"clear": True}))
-    for field, annex in (("H6_COMPONENT", "G"), ("H6_TYPE", "B"), ("H6_FINDINGS", "C")):
-        _ok(user.put(f"{REPORTS}/{report}/fields/{field}", json={"codes": [_fda_mapped_code(annex)]}))
-    detail = _ok(user.get(f"{REPORTS}/{report}"))
-    assert detail["emdr"]["missing"] == [] and detail["mandatory"]["missing"] == []
-    pending = _ok(user.post(f"{REPORTS}/{report}/snapshots"))["pending_snapshot"]["id"]
-    done = _ok(user.post(f"{REPORTS}/{report}/snapshots/{pending}/approve", json={"password": PASSWORD}))
-    snapshot = done["approved_snapshot"]["id"]
-    state["snapshot"] = snapshot
-    found = user.get(f"{REPORTS}/{report}/emdr.xml", params={"snapshot": snapshot})
+    found = user.get(f"{REPORTS}/{state['report']}/emdr.xml", params={"snapshot": state["snapshot"]})
     assert found.status_code == 200, found.text
     assert found.headers["content-type"].startswith("application/xml")
-    assert "mdarix-emdr-SAMPLE-RV-11-snapshot-2.xml" in found.headers["content-disposition"]
     assert emdr.validate(found.content) == []
-    assert b'extension="1234567-2026-00001"' in found.content and b"mailto:mdr@example.invalid" in found.content
     assert b"Practice record: free trial" in found.content  # a trial's file is a practice record
-    # The PDF's G1 boxes come from the same contact office.
-    fields = _form_text(user.get(f"{REPORTS}/{report}/worksheet.pdf", params={"snapshot": snapshot}).content)
-    assert "manuEmail: mdr@example.invalid" in fields and "manuPhone: +1(240)276-0001" in fields
+    # The official form's G1 boxes come from the contact office the file was built from.
+    email = re.search(rb'value="mailto:([^"]+)"', found.content).group(1).decode()
+    query = {"snapshot": state["snapshot"], "form": "official"}
+    fields = _form_text(user.get(f"{REPORTS}/{state['report']}/worksheet.pdf", params=query).content)
+    assert f"manuEmail: {email}" in fields
 
 
 def test_an_amended_conclusion_keeps_the_prior_version_with_its_rationale_actor_and_time(trial):
@@ -270,8 +237,13 @@ def test_an_amended_conclusion_keeps_the_prior_version_with_its_rationale_actor_
 
 def test_a_superseded_snapshot_gives_no_emdr_file_and_no_pdf(trial):  # code audit 9 Nov 2026, fix 5
     user, state = trial["user"], trial["state"]
-    for path in ("emdr.xml", "worksheet.pdf", "worksheet.docx"):
-        refused = user.get(f"{REPORTS}/{state['report']}/{path}", params={"snapshot": state["snapshot"]})
+    for path, form in (
+        ("emdr.xml", {}),
+        ("worksheet.pdf", {}),
+        ("worksheet.pdf", {"form": "official"}),
+        ("worksheet.docx", {}),
+    ):
+        refused = user.get(f"{REPORTS}/{state['report']}/{path}", params={"snapshot": state["snapshot"], **form})
         assert refused.status_code == 409, (path, refused.text)
         assert refused.json()["detail"]["code"] == "SNAPSHOT_NOT_APPROVED"
     # D7: no draft preview of a cancelled report either.

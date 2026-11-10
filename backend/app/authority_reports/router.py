@@ -1301,9 +1301,10 @@ def _org_day(db, tenant_id, now: datetime) -> date:
     return now.astimezone(zone_info(deadlines.org_zone(db, tenant_id)) or timezone.utc).date()
 
 
-def frozen_emdr(xml: bytes, parties, sections: list[dict]) -> dict:
+def frozen_emdr(xml: bytes, parties, sections: list[dict], left: list[str] = ()) -> dict:
     """What a US snapshot keeps of its eMDR file (0.10.96, D6): the file's text, its SHA-256, and the G1 contact
-    office and D3 manufacturer it was built from, in parts (the official form reads them, never Settings later)."""
+    office and D3 manufacturer it was built from, in parts (the official form reads them, never Settings later); and,
+    for the PDF's record page, the approved values the file leaves out as they read at Send."""
     from backend.app.authority_reports import emdr, fda_3500a
 
     values = fda_3500a.values(sections)
@@ -1314,6 +1315,7 @@ def frozen_emdr(xml: bytes, parties, sections: list[dict]) -> dict:
             "G1": emdr.office(parties, emdr.OFFICE_ROLES, values.get("G1")),
             "D3": emdr.office(parties, emdr.MAKER_ROLES, values.get("D3")),
         },
+        "emdr_left_out": list(left),
     }
 
 
@@ -1362,7 +1364,7 @@ def request_snapshot(
         if strict:
             _emdr_gate(found)
         if found["xml"] and not found["errors"]:
-            frozen_file = frozen_emdr(found["xml"], context["parties"], sections)
+            frozen_file = frozen_emdr(found["xml"], context["parties"], sections, found["left_out"])
     if obligation.kind == "INITIAL":
         obligation.assessment_id, obligation.report_type = current.id, current.report_type
         if obligation.due_provisional:
@@ -2132,6 +2134,7 @@ def export(
     obligation_id: uuid.UUID,
     kind: str,
     snapshot: uuid.UUID | None = Query(default=None),
+    form: str | None = Query(default=None),
     db: Session = Depends(get_data_plane_db),
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
@@ -2139,7 +2142,11 @@ def export(
     """The worksheet as a PDF or DOCX: the approved snapshot exactly as frozen (the record copy) or, before approval,
     the draft as it is now or the snapshot awaiting approval, marked DRAFT - NOT APPROVED (D7). Never a superseded
     snapshot or a cancelled report. "MDARIX never submits", with its form version, the starter-text mark and, in a
-    trial, the practice label."""
+    trial, the practice label.
+
+    A US report's PDF (0.10.96, D1 and D2) is its eMDR file laid out as Form FDA 3500A (emdr_pdf: the file frozen at
+    Send for approval; for the draft, the file as it builds now); form=official gives FDA's own fillable form, filled
+    from the approved snapshot and the parties frozen with it."""
     from backend.app.authority_reports import render
     from backend.app.stage3_workflow_router import _organization_name
 
@@ -2148,6 +2155,9 @@ def export(
         raise _error(404, "FORMAT_NOT_SUPPORTED", "Download the PDF or the DOCX")
     tenant_id = _tenant(ctx)
     obligation = _obligation(db, tenant_id, obligation_id)
+    us_pdf = kind == "pdf" and obligation.form_code == forms.FDA_3500A.code
+    if form is not None and (form != "official" or not us_pdf):
+        raise _error(404, "FORMAT_NOT_SUPPORTED", "The official form is a US report's PDF (Form FDA 3500A)")
     view = detail(db, control_db, ctx, obligation)
     frozen = None
     if snapshot is not None:
@@ -2180,14 +2190,20 @@ def export(
             "signature": signature,
         }
     organization = _organization_name(control_db, tenant_id)
-    if kind == "pdf" and view.get("signature") and obligation.form_code == forms.FDA_3500A.code:
-        # An approved US report: FDA's own Form 3500A, filled, with MDARIX's record page last.
-        from backend.app.authority_reports import emdr, fda_3500a
+    body = None
+    if us_pdf and form == "official":
+        if not view.get("signature"):
+            raise _error(409, "APPROVE_FIRST", "FDA's official form is filled once the report is approved")
+        body = _official_form(db, control_db, obligation, frozen, view, organization)
+    elif us_pdf:
+        from backend.app.authority_reports import emdr_pdf
 
-        g1 = fda_3500a.values(view["sections"]).get("G1")
-        contact = emdr.office(_context(db, control_db, obligation)["parties"], emdr.OFFICE_ROLES, g1)
-        body = fda_3500a.render(view, organization, contact)
-    else:
+        found = _file_for_pdf(db, control_db, obligation, frozen, view, organization)
+        if found:
+            body = emdr_pdf.render(found[0], view, organization, found[1], note=found[2])
+        elif view.get("signature"):  # approved before 0.10.96, and no file builds from it: today's form, as before
+            body = _official_form(db, control_db, obligation, frozen, view, organization)
+    if body is None:
         body = render.render(view, kind, organization=organization)
     db.add(
         make_audit_event(
@@ -2197,17 +2213,87 @@ def export(
             entity_type="ReportObligation",
             entity_id=obligation.id,
             correlation_id=ctx.correlation_id,
-            details={"format": kind.upper(), "snapshot": frozen.version if frozen else None},
+            details={"format": kind.upper(), "snapshot": frozen.version if frozen else None, "form": form or "default"},
         )
     )
     db.commit()
     stem = f"mdarix-{obligation.form_code.lower().replace('_', '-')}-{view['complaint']['ref']}"
     stem += f"-snapshot-{frozen.version}" if frozen else "-draft"
+    stem += "-official-form" if form else ""
     return Response(
         content=body,
         media_type=MEDIA[kind],
         headers={"Content-Disposition": attachment(f"{stem}.{kind}")},
     )
+
+
+def snapshot_file(frozen: ReportSnapshot, parties, organization: str | None, practice: bool):
+    """A snapshot's eMDR file, its left-out values and how it was made: the file frozen at Send for approval and
+    signed with it (0.10.96, D6), the same bytes whatever changed since; for a snapshot approved before 0.10.96, which
+    keeps no file, built now from the snapshot and today's parties. Refused (409) rather than a file FDA would refuse."""
+    from backend.app.authority_reports import emdr
+
+    stored = (frozen.fields or {}).get("emdr_xml")
+    if stored is not None:
+        body = stored.encode("utf-8")
+        if hashlib.sha256(body).hexdigest() != frozen.fields.get("emdr_sha256"):
+            logger.error("eMDR file of snapshot %s does not match its approval", frozen.id)
+            raise _error(409, "EMDR_CHANGED", "The stored eMDR file does not match the approved one")
+        note = "The file frozen at Send for approval: the approval signature covers it."
+        return body, frozen.fields.get("emdr_left_out") or [], note
+    sections = frozen.fields["sections"]
+    missing, left = emdr.check(sections, parties)
+    if missing:
+        raise _error(409, "EMDR_MISSING", "Before the eMDR file: " + "; ".join(missing), missing=missing)
+    body = emdr.build(sections, parties, sender=organization or "-", now=_now(), practice=practice)
+    errors = emdr.validate(body)
+    if errors:  # never a file FDA's schema refuses
+        logger.error("eMDR file of snapshot %s does not validate: %s", frozen.id, errors[:3])
+        raise _error(409, "EMDR_INVALID", "The eMDR file did not validate against FDA's schema", errors=errors[:10])
+    return body, left, "Built at download from the approved snapshot and your Settings today (approved before 0.10.96)."
+
+
+def _file_for_pdf(db, control_db, obligation, frozen, view, organization):
+    """The eMDR file the US PDF lays out, its left-out values and how it was made; None when there is none to read (a
+    draft or a pending snapshot whose file does not build, or an older approval whose file cannot be built)."""
+    from backend.app.authority_reports import emdr
+
+    parties = _context(db, control_db, obligation)["parties"]
+    practice = _trial(control_db, obligation.tenant_id)
+    if frozen is None:  # the working draft, as its file builds now (D7: a preview, marked DRAFT)
+        found = emdr.prepare(
+            view["sections"],
+            parties,
+            kind=_emdr_kind(obligation),
+            sender=organization or "-",
+            now=_now(),
+            practice=practice,
+        )
+        if not found["xml"] or found["errors"]:
+            return None
+        return found["xml"], found["left_out"], "Built from the working draft: Send for approval freezes the file."
+    if "emdr_xml" not in (frozen.fields or {}) and frozen.state == "PENDING":
+        return None
+    try:
+        return snapshot_file(frozen, parties, organization, practice)
+    except HTTPException as refused:
+        if refused.detail["code"] == "EMDR_CHANGED":
+            raise
+        return None
+
+
+def _official_form(db, control_db, obligation, frozen, view, organization) -> bytes:
+    """FDA's own Form 3500A (09/2025), filled from the approved snapshot, with MDARIX's record page last (D2). The G1
+    boxes read the contact office frozen with the file; an approval before 0.10.96 reads today's Settings."""
+    from backend.app.authority_reports import emdr, fda_3500a
+
+    fields = (frozen.fields if frozen is not None else None) or {}
+    if "emdr_parties" in fields:
+        contact = fields["emdr_parties"]["G1"]
+    else:
+        g1 = fda_3500a.values(view["sections"]).get("G1")
+        contact = emdr.office(_context(db, control_db, obligation)["parties"], emdr.OFFICE_ROLES, g1)
+    return fda_3500a.render(view, organization, contact)
 
 
 @router.get("/{obligation_id}/emdr.xml", dependencies=[Depends(require_permission(DATA_EXPORT))])
@@ -2221,7 +2307,6 @@ def emdr_file(
     """An approved US report as FDA's eMDR file (HL7 ICSR XML), validated against FDA's published schema. Refused,
     naming each block, while anything FDA requires is missing. MDARIX never submits: the customer sends the file
     through their own ESG account or eSubmitter, and records the submission here."""
-    from backend.app.authority_reports import emdr
     from backend.app.stage3_workflow_router import _organization_name
 
     tenant_id = _tenant(ctx)
@@ -2235,31 +2320,8 @@ def emdr_file(
         raise _error(409, "APPROVE_FIRST", "The eMDR file is made once the report is approved")
     _approved_only(frozen)
     context = _context(db, control_db, obligation)
-    stored = (frozen.fields or {}).get("emdr_xml")
-    if stored is not None:
-        # The file frozen at Send for approval and signed with it (0.10.96, D6): the same bytes, whatever changed since.
-        body = stored.encode("utf-8")
-        if hashlib.sha256(body).hexdigest() != frozen.fields.get("emdr_sha256"):
-            logger.error("eMDR file of report %s does not match its approval", obligation.id)
-            raise _error(409, "EMDR_CHANGED", "The stored eMDR file does not match the approved one")
-        errors = []
-    else:
-        # A snapshot approved before 0.10.96 keeps no file: it is built now, from the snapshot and today's parties.
-        sections, parties = frozen.fields["sections"], context["parties"]
-        missing, _ = emdr.check(sections, parties)
-        if missing:
-            raise _error(409, "EMDR_MISSING", "Before the eMDR file: " + "; ".join(missing), missing=missing)
-        body = emdr.build(
-            sections,
-            parties,
-            sender=_organization_name(control_db, tenant_id) or "-",
-            now=_now(),
-            practice=_trial(control_db, tenant_id),
-        )
-        errors = emdr.validate(body)
-    if errors:  # never a file FDA's schema refuses
-        logger.error("eMDR file of report %s does not validate: %s", obligation.id, errors[:3])
-        raise _error(409, "EMDR_INVALID", "The eMDR file did not validate against FDA's schema", errors=errors[:10])
+    organization = _organization_name(control_db, tenant_id)
+    body, _, _ = snapshot_file(frozen, context["parties"], organization, _trial(control_db, tenant_id))
     db.add(
         make_audit_event(
             tenant_id=tenant_id,

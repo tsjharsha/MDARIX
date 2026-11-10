@@ -48,6 +48,11 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
   order, every value read back from the file itself, then MDARIX's record page (preparers, source records, the
   approved values the file does not carry, the approval and the file's SHA-256). Before approval it is a preview
   marked DRAFT - NOT APPROVED (D7). The same file always renders the same PDF.
+- FDA's official fillable Form 3500A (09/2025) stays as the second PDF (A6, decision D2): `worksheet.pdf?form=official`,
+  filled from the approved snapshot, its G1 boxes from the contact office frozen with the file (no longer today's
+  Settings). Both PDFs come only from the approved snapshot or, marked DRAFT, the one awaiting approval; never from a
+  superseded or cancelled one. A report approved before 0.10.96 gets the new PDF when its file can be built, and the
+  official form otherwise, as before.
 
 ## [0.10.95] - not released yet (ships in the big-bang release)
 

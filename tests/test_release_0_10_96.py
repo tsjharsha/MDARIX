@@ -267,6 +267,50 @@ def test_b3_a_snapshot_approved_before_b3_still_downloads(trial):
             db.commit()
 
 
+# --------------------------------------------------------------------------------------------- A5 and A6
+
+
+def test_b3_the_default_pdf_is_the_esubmitter_layout_and_the_official_form_is_second(trial):
+    import hashlib
+
+    from backend.app.authority_reports import emdr_pdf
+    from backend.app.db.models.authority_reports import ReportSnapshot
+    from reports.pdf import text_of
+    from tests.report_fill import US_PARTY
+    from tests.test_fda_3500a_emdr import _fields
+
+    user = trial["user"]
+    detail = _approved(trial)
+    snapshot = detail["approved_snapshot"]["id"]
+    url = f"{REPORTS}/{detail['id']}/worksheet.pdf"
+    xml = _xml(user, detail, snapshot).content
+    # The default PDF lays out the approved file itself: its number, its blocks, and its SHA-256 on the record page.
+    default = user.get(url, params={"snapshot": snapshot})
+    assert default.status_code == 200, default.text
+    text = text_of(default.content)
+    assert emdr_pdf.TITLE in text and "NOT APPROVED" not in text and "eSubmitter Generated" not in text
+    assert f"Mfr Report #: {emdr_pdf.read(xml)['G8'][0]}" in text
+    assert f"SHA-256 of the eMDR file: {hashlib.sha256(xml).hexdigest()}" in text
+    # Settings change after approval: the official form, second, still reads the parties frozen with the file.
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        frozen = db.get(ReportSnapshot, uuid.UUID(snapshot)).fields["emdr_parties"]["G1"]
+    moved = {**US_PARTY, "contact_email": "other@example.invalid", "organisation": "Renamed Devices (sample)"}
+    _ok(user.put("/api/v1/regulatory-reference/responsible-parties", json=moved))
+    try:
+        official = user.get(url, params={"snapshot": snapshot, "form": "official"})
+        assert official.status_code == 200, official.text
+        assert "official-form" in official.headers["content-disposition"]
+        assert _fields(official.content)["manuEmail"] == frozen["email"] != "other@example.invalid"
+        assert user.get(url, params={"snapshot": snapshot}).content == default.content  # the same bytes again
+    finally:
+        _ok(user.put("/api/v1/regulatory-reference/responsible-parties", json=US_PARTY))
+    # Only a US report's PDF has an official form.
+    for path, form in (("worksheet.pdf", "other"), ("worksheet.docx", "official")):
+        refused = user.get(f"{REPORTS}/{detail['id']}/{path}", params={"snapshot": snapshot, "form": form})
+        assert refused.status_code == 404 and refused.json()["detail"]["code"] == "FORMAT_NOT_SUPPORTED"
+
+
 def test_b3_a_pending_or_superseded_snapshot_never_gives_its_xml(trial):
     user = trial["user"]
     detail = _approved(trial)
@@ -281,3 +325,22 @@ def test_b3_a_pending_or_superseded_snapshot_never_gives_its_xml(trial):
     second = _ok(user.post(f"{REPORTS}/{detail['id']}/snapshots"))["pending_snapshot"]["id"]
     for snapshot in (first, second):
         assert _xml(user, detail, snapshot).status_code == 409
+
+
+def test_b3_neither_pdf_comes_from_a_superseded_snapshot(trial):
+    from reports.pdf import text_of
+
+    user = trial["user"]
+    detail = _start_rv06(trial)  # reopened and sent again by the test before: one approval superseded, one pending
+    url = f"{REPORTS}/{detail['id']}/worksheet.pdf"
+    superseded = [row for row in detail["snapshots"] if row["state"] == "SUPERSEDED" and row["approved_by"]]
+    assert superseded and detail["pending_snapshot"], [row["state"] for row in detail["snapshots"]]
+    for form in ({}, {"form": "official"}):
+        refused = user.get(url, params={"snapshot": superseded[0]["id"], **form})
+        assert refused.status_code == 409 and refused.json()["detail"]["code"] == "SNAPSHOT_NOT_APPROVED", form
+    # The snapshot awaiting approval: its frozen file previews as a DRAFT; the official form waits for approval (D7).
+    pending = detail["pending_snapshot"]["id"]
+    preview = user.get(url, params={"snapshot": pending})
+    assert preview.status_code == 200 and "DRAFT - NOT APPROVED" in text_of(preview.content)
+    refused = user.get(url, params={"snapshot": pending, "form": "official"})
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "APPROVE_FIRST"
