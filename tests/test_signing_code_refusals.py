@@ -20,7 +20,8 @@ from tests.route_inventory import api_routes
 from tests.test_mfa_mvp import PASSWORD, _enroll, _make_user, _next_code, _sign_in
 
 # Every route whose signature or controlled approval goes through verify_signing_credentials. A new signing route
-# must be added here, and so to the browser's signing forms that show the refusal in place.
+# must be added here, and so to the browser's signing forms that show the refusal in place. B2's Case and triage
+# routes (0.10.93) are tested route by route in test_triage_signing_refusals.py; /confirm carries no credential.
 SIGNING_ROUTES = {
     ("POST", "/api/v1/capas/{capa_id}/effectiveness/result"),
     ("POST", "/api/v1/complaints/{complaint_id}/disposition/sign"),
@@ -30,11 +31,17 @@ SIGNING_ROUTES = {
     ("POST", "/api/v1/governance/decisions/{decision_id}/sign"),
     ("POST", "/api/v1/intake/{event_id}/check/review"),
     ("POST", "/api/v1/intake/{event_id}/check/sign"),
+    ("POST", "/api/v1/intake/{event_id}/void"),
     ("POST", "/api/v1/investigations/{investigation_id}/decision/sign"),
     ("POST", "/api/v1/investigations/{investigation_id}/lot-impact/sign"),
     ("POST", "/api/v1/oversight/events/{complaint_id}/ready"),
     ("POST", "/api/v1/regulatory/documents/{document_id}/status"),
     ("POST", "/api/v1/reports/{obligation_id}/snapshots/{snapshot_id}/approve"),
+    ("POST", "/api/v1/triage/downgrades/{task_id}"),
+    ("POST", "/api/v1/triage/{kind}/{record_id}/confirm"),
+    ("POST", "/api/v1/triage/{kind}/{record_id}/confirm-qms"),
+    ("POST", "/api/v1/triage/{kind}/{record_id}/exclude-threat"),
+    ("POST", "/api/v1/triage/{kind}/{record_id}/record"),
 }
 
 
