@@ -321,6 +321,28 @@ export function ShippedPicker({ site, onPick }: { site: string; onPick: (item: S
   );
 }
 
+/** B7b: the site known for the e-mail sender's domain. Only a suggestion: the field stays as typed until the person
+ * chooses Use it. */
+export function SiteSuggestion({
+  site,
+  current,
+  onUse,
+}: {
+  site?: string | null;
+  current: string;
+  onUse: (site: string) => void;
+}) {
+  if (!site || current === site) return null;
+  return (
+    <p className="ca-field uw-hint" role="note">
+      Suggested from the sender&apos;s domain (unconfirmed): {site}{" "}
+      <button type="button" className="ac-link" onClick={() => onUse(site)}>
+        Use it
+      </button>
+    </p>
+  );
+}
+
 function LogDrawer({
   kind: startKind,
   guide,
@@ -458,7 +480,8 @@ function LogDrawer({
         {email && (
           <p className="uw-ma-starter" role="note">
             From an e-mail received {formatDate(email.received_at)}: channel E-mail, its Message-ID as the reference,
-            and Received is our server's receipt time. Product, lot, serial and UDI found in it are unconfirmed.
+            and Received is our server's receipt time. Product, lot, serial and UDI found in it are unconfirmed; a site
+            known for the sender&apos;s domain is only suggested.
           </p>
         )}
         <div className="uw-entry-actions" role="radiogroup" aria-label="Kind of case">
@@ -585,7 +608,7 @@ function LogDrawer({
             </label>
           )}
         </details>
-        <details className="ca-drawer-section uw-more">
+        <details className="ca-drawer-section uw-more" open={!!email?.site_suggestion}>
           <summary>Customer</summary>
           <div className="ca-form-grid">
             <label className="ca-field">
@@ -600,6 +623,14 @@ function LogDrawer({
                 onBlur={() => setSiteAsked(form.site)}
               />
             </label>
+            <SiteSuggestion
+              site={email?.site_suggestion?.text}
+              current={form.site}
+              onUse={(site) => {
+                set({ site });
+                setSiteAsked(site);
+              }}
+            />
             <label className="ca-field">
               Reporter's country
               <input value={form.country} onChange={(event) => set({ country: event.target.value })} />

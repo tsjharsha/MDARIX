@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { EmailToCheck, firstLines, type EmailItem } from "./sections/EmailToCheck";
+import { SiteSuggestion } from "./sections/FirstContact";
 
 // B7b (0.10.97): Cases › E-mail to check. Shown only while the server has e-mail intake switched on; each card shows
 // the sender's domain marked unverified, the masked words, the flags and the files, and offers Make it a case, Add to
@@ -86,6 +87,16 @@ describe("E-mail to check (B7b)", () => {
     const html = render(api(["records.write"], true));
     expect(html).toContain("E-mail to check");
     expect(html).not.toContain("Make it a case");
+  });
+
+  it("suggests the site known for the sender's domain, unconfirmed, and never once it is in the field", () => {
+    const suggest = (site: string | null, current: string) =>
+      renderToStaticMarkup(<SiteSuggestion site={site} current={current} onUse={() => undefined} />);
+    const html = suggest("Northgate Clinic (Sample)", "");
+    expect(html).toContain("Suggested from the sender&#x27;s domain (unconfirmed): Northgate Clinic (Sample)");
+    expect(html).toContain("Use it");
+    expect(suggest("Northgate Clinic (Sample)", "Northgate Clinic (Sample)")).toBe("");
+    expect(suggest(null, "")).toBe("");
   });
 
   it("cuts long words for the card", () => {

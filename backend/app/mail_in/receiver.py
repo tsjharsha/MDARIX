@@ -72,10 +72,31 @@ def recipient_check(local_part: str, sender: str, now: datetime) -> tuple[str | 
             .filter(InboundMessage.tenant_id == tenant_id, InboundMessage.received_at > now - timedelta(days=1))
             .count()
         )
-        if today >= limit:
-            logger.warning("mail-in: organization %s reached its daily limit (%s)", tenant_id, limit)
-            return TOO_MANY, None
+    if today >= limit:
+        logger.warning("mail-in: organization %s reached its daily limit (%s)", tenant_id, limit)
+        tell_limit_reached(tenant_id, limit)
+        return TOO_MANY, None
     return None, tenant_id
+
+
+def tell_limit_reached(tenant_id: uuid.UUID, limit: int) -> None:
+    """Spec 4.5: the Customer Admin is told, at most once a day, through the notifications outbox. Never in the way of
+    the refusal itself."""
+    from sqlalchemy.exc import IntegrityError
+
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.notifications import notify_mail_intake_limit
+
+    try:
+        with SessionLocal() as control:
+            bind_tenant(control, tenant_id)
+            if notify_mail_intake_limit(control, tenant_id, limit=limit) is not None:
+                control.commit()
+    except IntegrityError:
+        pass  # another receiver thread queued today's notice at the same moment
+    except Exception:
+        logger.exception("mail-in: the daily-limit notice for %s could not be queued", tenant_id)
 
 
 def store(tenant_id: uuid.UUID, content: bytes, sender: str, now: datetime) -> uuid.UUID | None:

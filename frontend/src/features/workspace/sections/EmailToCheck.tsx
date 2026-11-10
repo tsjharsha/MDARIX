@@ -17,6 +17,8 @@ export type EmailItem = {
   subject: string | null;
   words: string;
   identifiers: Record<string, { text: string; id?: string }>;
+  /** A known site of the sender's domain: only a suggestion, unconfirmed. */
+  site_suggestion?: { text: string } | null;
   note: string | null;
   checked: boolean;
   harm_words: string[];

@@ -1321,6 +1321,27 @@ def send_connector_sync_failed_notice(recipient: str, *, organization: str, conn
     )
 
 
+def send_mail_intake_limit_notice(recipient: str, *, organization: str, limit: int, day: str) -> str:
+    """The organization's e-mail intake address reached its daily limit (B7b); at most one a day."""
+    return _send(
+        recipient,
+        Message(
+            subject=f"{organization}: the e-mail intake limit was reached",
+            heading="Your intake address reached its daily limit",
+            paragraphs=(
+                f"{limit} e-mails arrived at your organization's intake address within 24 hours. Further senders are "
+                "asked to try again later; their mail systems keep trying for some days, so a short peak loses "
+                "nothing.",
+                "If this is real complaint mail, raise Messages a day, at most under Organization › E-mail intake. If "
+                "it is spam, rotate the address there. You get this email at most once a day.",
+            ),
+            details=(("Day", day), ("Messages a day, at most", str(limit))),
+            button=("Open Customer Administration", f"{company().app_url}/app/customer-admin"),
+            reason=f"You are receiving this email as an administrator of {organization} in MDARIX.",
+        ),
+    )
+
+
 def _support_decider(organization: str, trial: bool) -> tuple[str, tuple[str, str], str]:
     """Who decides on support access, where, and why they get the email: a free trial's owner in Getting started ›
     Team; elsewhere the organization's administrators in Customer Administration."""
