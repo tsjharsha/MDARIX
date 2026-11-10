@@ -270,7 +270,10 @@ def test_an_amended_conclusion_keeps_the_prior_version_with_its_rationale_actor_
 
 def test_a_superseded_snapshot_gives_no_emdr_file_and_no_pdf(trial):  # code audit 9 Nov 2026, fix 5
     user, state = trial["user"], trial["state"]
-    for path in ("emdr.xml", "worksheet.pdf"):
+    for path in ("emdr.xml", "worksheet.pdf", "worksheet.docx"):
         refused = user.get(f"{REPORTS}/{state['report']}/{path}", params={"snapshot": state["snapshot"]})
         assert refused.status_code == 409, (path, refused.text)
         assert refused.json()["detail"]["code"] == "SNAPSHOT_NOT_APPROVED"
+    # D7: no draft preview of a cancelled report either.
+    refused = user.get(f"{REPORTS}/{state['report']}/worksheet.pdf")
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "REPORT_CANCELLED"

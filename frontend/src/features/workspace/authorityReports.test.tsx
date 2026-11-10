@@ -277,7 +277,7 @@ describe("the reports screens", () => {
     expect(html).toContain("Not allowed to approve: Priya");
     // The drawer says it once, at the submission (DecideAndSign), not as a note at its top (0.10.66, V5).
     expect(html).not.toContain("MDARIX never submits a report.");
-    expect(html).toContain("PDF (working draft)");
+    expect(html).toContain("PDF (draft preview, not approved)");
   });
 
   it("tells who approves before any password: the names in place of the form, or the trial's practice note", () => {

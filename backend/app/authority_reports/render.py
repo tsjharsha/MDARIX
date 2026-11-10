@@ -12,6 +12,8 @@ from backend.app.qms_documents.render import SOURCE_LABELS
 from reports.pdf import PAGE_BREAK
 
 DRAFT_LINE = "DRAFT - MDARIX NEVER SUBMITS. Enter this report in the authority's route yourself."
+PREVIEW_LINE = "DRAFT PREVIEW - NOT APPROVED. Not the record copy: the approved snapshot is."
+PREVIEW_MARK = "DRAFT - NOT APPROVED"
 LABELS = {
     **SOURCE_LABELS,
     "Classification": "Classifications",
@@ -46,6 +48,8 @@ def header_lines(view: dict, organization: str | None) -> list[str]:
         + (" (provisional)" if view["deadline"]["provisional"] else ""),
         DRAFT_LINE,
     ]
+    if not view.get("signature"):  # D7: a preview before approval is visibly a draft
+        lines.insert(0, PREVIEW_LINE)
     if view.get("practice_label"):
         lines.append(view["practice_label"])
     return lines
@@ -147,7 +151,11 @@ def render_pdf(view: dict, organization: str | None) -> bytes:
     from reports import pdf
 
     watermark = (
-        "PRACTICE RECORD - NOT YOUR REGULATORY RECORD" if view.get("practice_label") else "DRAFT - MDARIX NEVER SUBMITS"
+        PREVIEW_MARK
+        if not view.get("signature")
+        else "PRACTICE RECORD - NOT YOUR REGULATORY RECORD"
+        if view.get("practice_label")
+        else "DRAFT - MDARIX NEVER SUBMITS"
     )
     footer = f"{view['complaint']['ref']} - {view['form']['version']} - MDARIX never submits"
     return pdf.render(
@@ -164,7 +172,7 @@ def render_docx(view: dict, organization: str | None) -> bytes:
     document.add_heading(_title(view), level=0)
     for line in header_lines(view, organization):
         paragraph = document.add_paragraph()
-        paragraph.add_run(line).bold = line == DRAFT_LINE
+        paragraph.add_run(line).bold = line in (DRAFT_LINE, PREVIEW_LINE)
     for text, style in lines(view):
         if style == PAGE_BREAK:
             document.add_page_break()

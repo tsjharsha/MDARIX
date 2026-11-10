@@ -82,7 +82,7 @@ def _approved_only(frozen) -> None:
         raise _error(
             409,
             "SNAPSHOT_NOT_APPROVED",
-            "This snapshot is not the approved report (pending, or superseded by a later version): use the approved one",
+            "This snapshot is not the approved report (superseded by a later version, or cancelled): use the approved one",
         )
 
 
@@ -1974,8 +1974,10 @@ def export(
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """The worksheet as a PDF or DOCX: the draft as it is now, or an approved snapshot exactly as frozen. Marked
-    draft, "MDARIX never submits", with its form version, the starter-text mark and, in a trial, the practice label."""
+    """The worksheet as a PDF or DOCX: the approved snapshot exactly as frozen (the record copy) or, before approval,
+    the draft as it is now or the snapshot awaiting approval, marked DRAFT - NOT APPROVED (D7). Never a superseded
+    snapshot or a cancelled report. "MDARIX never submits", with its form version, the starter-text mark and, in a
+    trial, the practice label."""
     from backend.app.authority_reports import render
     from backend.app.stage3_workflow_router import _organization_name
 
@@ -1990,10 +1992,10 @@ def export(
         frozen = next((row for row in _snapshots(db, obligation) if row.id == snapshot), None)
         if frozen is None:
             raise _error(404, "SNAPSHOT_NOT_FOUND", "No such snapshot of this report")
-        _approved_only(frozen)
-    if new_navigation(control_db, tenant_id) and (frozen is None or not frozen.signed_record_id):
-        # 0.10.75 (C3): the PDF is the approved report, in the form's field order with its approval on the last page.
-        raise _error(409, "APPROVE_FIRST", "The PDF is generated once the report is approved")
+        if frozen.state != "PENDING":  # D7: a snapshot awaiting approval previews as DRAFT; a superseded one never
+            _approved_only(frozen)
+    elif obligation.state == rules.CANCELLED:
+        raise _error(409, "REPORT_CANCELLED", "This report was cancelled: there is no draft to preview")
     if frozen is not None:
         signature = None
         if frozen.signed_record_id:

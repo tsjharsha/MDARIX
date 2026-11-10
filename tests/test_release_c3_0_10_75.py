@@ -68,7 +68,8 @@ def _classic(tenant_id) -> None:
 def _flagship(user) -> str:
     """SAMPLE-RV-11 triaged and the US training acknowledged, ready for its US assessment: its id."""
     complaint = _ok(user.get("/api/v1/oversight/events/SAMPLE-RV-11"))["event"]["complaint_id"]
-    person = _ok(user.get("/api/v1/triage"))["people"][0]["id"]
+    people = _ok(user.get("/api/v1/triage"))["people"]
+    person = people[0]["id"]
     _ok(
         user.post(
             f"/api/v1/triage/COMPLAINT/{complaint}/record",
@@ -77,6 +78,7 @@ def _flagship(user) -> str:
                 "potential_severity": "MINOR",
                 "event_owner": person,
                 "triage_owner": person,
+                "backup_owner": people[-1]["id"],  # T-D12: fast track with two or more people active
                 "immediate_action": "Out of use, sent for service.",
             },
         )
@@ -166,14 +168,23 @@ def test_send_for_approval_stays_blocked_until_every_mandatory_field_is_filled(t
     assert detail["stage"] == "APPROVAL" and detail["pending_snapshot"]
 
 
-def test_the_pdf_comes_only_after_approval_and_alone_the_practice_label_shows(trial):
+def test_the_pdf_before_approval_is_a_draft_preview_and_alone_the_practice_label_shows(trial):
+    from io import BytesIO
+
+    from pypdf import PdfReader
+
     user, complaint = trial["user"], trial["complaint"]
     (report,) = _reports(user, complaint)
     detail = _ok(user.get(f"{REPORTS}/{report['id']}"))
     pending = detail["pending_snapshot"]["id"]
+    # D7 (authority forms): before approval the draft and the snapshot awaiting approval preview, marked DRAFT.
     for query in ({}, {"snapshot": pending}):
-        refused = user.get(f"{REPORTS}/{report['id']}/worksheet.pdf", params=query)
-        assert refused.status_code == 409 and refused.json()["detail"]["code"] == "APPROVE_FIRST"
+        preview = user.get(f"{REPORTS}/{report['id']}/worksheet.pdf", params=query)
+        assert preview.status_code == 200 and preview.content.startswith(b"%PDF")
+        text = PdfReader(BytesIO(preview.content)).pages[0].extract_text()
+        assert "DRAFT PREVIEW - NOT APPROVED" in text
+    xml = user.get(f"{REPORTS}/{report['id']}/emdr.xml", params={"snapshot": pending})
+    assert xml.status_code == 409 and xml.json()["detail"]["code"] == "APPROVE_FIRST"
     # Working alone in the trial: the preparer approves the practice report, and the practice label shows.
     assert detail["approval"]["same_person"] and detail["approval"]["may_approve"]
     assert detail["practice_label"] and "Not your regulatory record" in detail["practice_label"]
@@ -185,6 +196,7 @@ def test_the_pdf_comes_only_after_approval_and_alone_the_practice_label_shows(tr
     assert snapshot["same_person"]
     pdf = user.get(f"{REPORTS}/{report['id']}/worksheet.pdf", params={"snapshot": snapshot["id"]})
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+    assert "NOT APPROVED" not in PdfReader(BytesIO(pdf.content)).pages[0].extract_text()
 
 
 def test_a_colleague_approves_a_report_prepared_by_someone_else():

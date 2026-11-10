@@ -824,8 +824,9 @@ export function AfterAcceptance({
 
 function Downloads({ detail }: { detail: ReportDetail }) {
   const canExport = useCan("data.export");
-  // The new navigation generates the PDF once the report is approved (0.10.75, C3): no working-draft download.
-  const fresh = useNavigation() === "new";
+  // D7: before approval the working draft downloads as a preview marked DRAFT - NOT APPROVED; the approved snapshot
+  // is the record copy. A cancelled report has no draft to preview.
+  const preview = detail.state !== "CANCELLED";
   const [error, setError] = useState("");
   if (!canExport) return null;
   const approved = detail.snapshots.find((row) => row.state === "APPROVED");
@@ -841,10 +842,10 @@ function Downloads({ detail }: { detail: ReportDetail }) {
   };
   return (
     <div className="ca-action-row uw-doc-downloads">
-      {!fresh && (
+      {preview && (
         <>
           <button type="button" className="ac-secondary" onClick={() => void get("pdf")}>
-            <Download size={15} aria-hidden="true" /> PDF (working draft)
+            <Download size={15} aria-hidden="true" /> PDF (draft preview, not approved)
           </button>
           <button type="button" className="ac-secondary" onClick={() => void get("docx")}>
             <Download size={15} aria-hidden="true" /> DOCX
