@@ -1670,6 +1670,8 @@ def _check_rows(
         )
     if rows and not oversized:
         _check_values(entity, rows, report, date_format, mask_personal_data)
+        if entity == "complaints":
+            _claimed_twice(db, tenant_id, rows, report)
         create = policy.create_references
         if skip_problem_rows:
             if not report.file_problems:
@@ -2283,26 +2285,44 @@ def _add_named_references(
     return added
 
 
-def _qms_matches(db: Session, tenant_id, known: dict, identifiers: list[str]) -> dict:
-    """The file's complaint IDs that are the QMS ID of a complaint MDARIX created (its ``qms_ref``, or the ``qms_ref``
-    typed on the Case it escalated from): ID -> that complaint, so the row updates it instead of making a second one.
-    An ID two complaints claim is left out (spec 3.3, IN-14)."""
+def _qms_claims(db: Session, tenant_id, known: dict, identifiers) -> dict[str, set]:
+    """QMS ID -> the complaints MDARIX created that claim it (their ``qms_ref``, or the ``qms_ref`` typed on the Case
+    they escalated from), for the file's IDs that are not a complaint's own identifier already (``known``)."""
     from backend.app.db.models.intake import IntakeEvent
 
     wanted = sorted({value for value in identifiers if value and value not in known})
-    if not wanted:
-        return {}
     claims: dict[str, set] = {}
-    for complaint in db.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.qms_ref.in_(wanted)):
-        claims.setdefault(complaint.qms_ref, set()).add(complaint.id)
-    cases = db.query(IntakeEvent.qms_ref, IntakeEvent.complaint_id).filter(
-        IntakeEvent.tenant_id == tenant_id, IntakeEvent.qms_ref.in_(wanted), IntakeEvent.complaint_id.isnot(None)
-    )
-    for qms_ref, complaint_id in cases:
-        claims.setdefault(qms_ref, set()).add(complaint_id)
-    # shortcut: an ID two complaints claim is not merged (a new complaint is made, as before) instead of being set
-    # aside with "Two complaints claim QMS ID X: reconcile them" (IN-14); build the set-aside with the import work.
+    for start in range(0, len(wanted), 1000):
+        chunk = wanted[start : start + 1000]
+        for qms_ref, complaint_id in db.query(Complaint.qms_ref, Complaint.id).filter(
+            Complaint.tenant_id == tenant_id, Complaint.qms_ref.in_(chunk)
+        ):
+            claims.setdefault(qms_ref, set()).add(complaint_id)
+        for qms_ref, complaint_id in db.query(IntakeEvent.qms_ref, IntakeEvent.complaint_id).filter(
+            IntakeEvent.tenant_id == tenant_id, IntakeEvent.qms_ref.in_(chunk), IntakeEvent.complaint_id.isnot(None)
+        ):
+            claims.setdefault(qms_ref, set()).add(complaint_id)
+    return claims
+
+
+def _claimed_twice(db: Session, tenant_id, rows, report: _Report) -> None:
+    """IN-14 (spec 3.3): a row whose ID two complaints claim as their QMS ID is set aside, never merged into one of
+    them nor made a third complaint."""
+    ids = [row.get("complaint_id") for _, row in rows]
+    claims = _qms_claims(db, tenant_id, _Lookup(db, tenant_id).complaints(value for value in ids if value), ids)
+    for line, row in rows:
+        if len(claims.get(row.get("complaint_id"), ())) > 1:
+            report.add(line, "complaint_id", f"Two complaints claim QMS ID {row['complaint_id']}: reconcile them")
+
+
+def _qms_matches(db: Session, tenant_id, known: dict, identifiers: list[str]) -> dict:
+    """The file's complaint IDs that are the QMS ID of a complaint MDARIX created: ID -> that complaint, so the row
+    updates it instead of making a second one (TA-20.4). An ID two complaints claim was set aside at the check (IN-14)
+    and is left out here too."""
+    claims = _qms_claims(db, tenant_id, known, identifiers)
     single = {qms_ref: next(iter(ids)) for qms_ref, ids in claims.items() if len(ids) == 1}
+    if not single:
+        return {}
     rows = db.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.id.in_(list(single.values())))
     by_id = {row.id: row for row in rows}
     return {qms_ref: by_id[complaint_id] for qms_ref, complaint_id in single.items() if complaint_id in by_id}
