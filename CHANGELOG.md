@@ -55,6 +55,10 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
 - A Customer Administrator cannot reactivate an administrator that MDARIX support suspended (the suspension's audit
   record says who made it), by status or by membership; adding a membership is refused for their own account and is
   recorded in the audit trail (`MEMBERSHIP_GRANTED`).
+- Under row-level security an organization could not read the MDARIX staff accounts named in its own records: its
+  support-access requests and their activity showed no person, and its audit history showed a staff action as a bare
+  account id instead of "MDARIX platform administrator". Staff accounts are now read apart in system scope, staff
+  accounts only (another organization's accounts never). Tests run API requests under the runtime role (`SET ROLE`).
 
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 

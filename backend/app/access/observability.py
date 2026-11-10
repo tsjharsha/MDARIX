@@ -2,7 +2,6 @@
 
 import io
 import json
-import uuid
 import zipfile
 from datetime import datetime, timedelta, timezone
 
@@ -40,7 +39,7 @@ from backend.app.access.authz import (
     _admin_tenant,
     _is_platform_admin,
     _require_platform_admin,
-    platform_account_clause,
+    staff_accounts,
     visible_user_filters,
 )
 from backend.app.access.trends import daily, per_day, run_outcome, window
@@ -59,13 +58,6 @@ def admin_smtp_status(request: Request, db: Session = Depends(get_db)):
 PLATFORM_ACTOR_LABEL = "MDARIX platform administrator"
 
 
-def _as_uuid(value):
-    try:
-        return uuid.UUID(str(value))
-    except (TypeError, ValueError):
-        return None
-
-
 @router.get("/admin/audit-history")
 def audit_history(
     request: Request, action: str | None = None, entity_type: str | None = None, db: Session = Depends(get_db)
@@ -79,16 +71,8 @@ def audit_history(
     rows = query.order_by(AuditEvent.created_at.desc()).limit(200).all()
     # Actions by MDARIX staff stay visible to the customer, attributed to the platform rather than to a person.
     actor_business_ids = business_id_map(db, AuthUser, (row.actor_ref for row in rows))
-    platform_actors = (
-        set()
-        if _is_platform_admin(admin)
-        else {
-            str(user_id)
-            for (user_id,) in db.query(AuthUser.id).filter(
-                AuthUser.id.in_({_as_uuid(row.actor_ref) for row in rows} - {None}), platform_account_clause()
-            )
-        }
-    )
+    # Staff accounts live in the platform's organization, which this organization's session cannot read.
+    platform_actors = set() if _is_platform_admin(admin) else set(staff_accounts(row.actor_ref for row in rows))
     return [
         {
             "id": str(row.id),
