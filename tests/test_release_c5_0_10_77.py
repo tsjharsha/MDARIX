@@ -243,6 +243,11 @@ def test_nothing_is_filed_unconfirmed_and_one_choice_fills_fda_and_imdrf(trial):
     # The conclusion code FDA asks on every report (Annex D), chosen in the picker (a test choice).
     detail = _ok(user.put(f"{REPORTS}/{report['id']}/fields/H6_CONCLUSIONS", json={"codes": ["D0101"]}))
     assert _fields(detail)["H6_CONCLUSIONS"]["value"].startswith("D0101 Design Inadequate for Purpose (FDA ")
+    # 0.10.96 (B3): the meter counts all seven H6 kinds FDA requires; the other three, chosen in the picker.
+    from tests.test_regulatory_records import _fda_mapped_code
+
+    for field, annex in (("H6_COMPONENT", "G"), ("H6_TYPE", "B"), ("H6_FINDINGS", "C")):
+        detail = _ok(user.put(f"{REPORTS}/{report['id']}/fields/{field}", json={"codes": [_fda_mapped_code(annex)]}))
     # Changing a suggestion records what was suggested.
     changed = _fields(_ok(user.put(f"{REPORTS}/{report['id']}/fields/H6_PROBLEM", json={"codes": ["A090805"]})))
     assert (changed["H6_PROBLEM"]["status"], changed["H6_PROBLEM"]["suggested"]) == (
