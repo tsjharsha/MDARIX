@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { CheckCircle2, ClipboardList, Hourglass, Users } from "lucide-react";
+import { CheckCircle2, ClipboardList, Download, Hourglass, Users } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { useCan } from "../workspaceContext";
+import { downloadFile } from "../../reports/download";
 import { ChipFilter, InlineError } from "./boardParts";
 import { CASE_VIEWS_FIRST, INTAKE, casesPath, type CaseHeader, type CasePage, type CaseRow } from "../intake";
 
@@ -12,6 +13,44 @@ const BULK_MAX = 200;
  * The Cases list (0.10.93, B2 step 5; spec 4.3, A5): one page at a time, filtered and searched on the server; each row
  * says its owner, next action and due time (A3). Flat (G-2): no decoration beyond the tiles and the state chips.
  */
+/**
+ * B7 (spec 3.3): the Cases on show as CSV, and the export for QMS entry (complaints made from Cases with no QMS ID yet).
+ * Contacts are masked (OD-1); each export is audited with its row count and checksum. People with data.export only.
+ */
+export function CaseExports({ view, q }: { view: string; q: string }) {
+  const canExport = useCan("data.export");
+  const [error, setError] = useState("");
+  if (!canExport) return null;
+  const get = async (path: string, fallbackName: string) => {
+    setError("");
+    try {
+      await downloadFile(path, { fallbackName });
+    } catch (reason) {
+      setError(errorText(reason, "The export was not made."));
+    }
+  };
+  return (
+    <div className="uw-cr-toolbar">
+      <button
+        type="button"
+        className="ac-secondary"
+        onClick={() => void get(`${INTAKE}/cases/export.csv?${new URLSearchParams({ view, q })}`, "mdarix-cases.csv")}
+      >
+        <Download size={15} aria-hidden="true" /> Export these cases (CSV)
+      </button>
+      <button
+        type="button"
+        className="ac-secondary"
+        onClick={() => void get(`${INTAKE}/qms-entry/export.csv`, "mdarix-qms-entry.csv")}
+      >
+        <Download size={15} aria-hidden="true" /> Export for QMS entry (CSV)
+      </button>
+      <span className="ac-muted">Contacts are masked; every export is recorded in the audit trail.</span>
+      {error && <InlineError text={error} />}
+    </div>
+  );
+}
+
 export function CasesList({ onOpen, reloadKey = 0 }: { onOpen: (id: string) => void; reloadKey?: number }) {
   const [view, setView] = useState("to_check");
   const [q, setQ] = useState("");
@@ -62,6 +101,7 @@ export function CasesList({ onOpen, reloadKey = 0 }: { onOpen: (id: string) => v
           onOpen={() => choose("waiting_internal")}
         />
       </div>
+      <CaseExports view={view} q={search} />
       <Panel eyebrow="Cases" title={views.find((item) => item.code === view)?.label ?? "Cases"} source={list}>
         <div className="uw-cr-toolbar">
           <ChipFilter

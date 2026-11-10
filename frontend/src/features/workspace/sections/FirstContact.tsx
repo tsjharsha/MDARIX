@@ -4,6 +4,8 @@ import { zoneLabel } from "../../../app/labels";
 import { CheckCircle2, Copy, FileWarning, Hourglass, Link2, PhoneCall, Siren, Unlink, Wrench } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
+import { requestJson } from "../../../app/apiClient";
+import { downloadFile } from "../../reports/download";
 import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import { DecideAndSign } from "./common";
 import { WhyAsked } from "../../shared/Basis";
@@ -870,6 +872,73 @@ function CheckDrawer({
   );
 }
 
+type CaseFile = { id: string; file_name: string; size: number; created_at: string | null };
+
+/** B7 (G15): files on a Case (photos, logs): virus-scanned, 10 MB each, counted in the organization's file storage. */
+export function CaseFiles({ caseId, canAdd }: { caseId: string; canAdd: boolean }) {
+  const path = `${INTAKE}/${caseId}/attachments`;
+  const files = useResource<{ items: CaseFile[] }>(path);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const add = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      await requestJson(path, { method: "POST", body, timeoutMs: 120_000 });
+      files.reload();
+    } catch (reason) {
+      setError(errorText(reason, "The file was not added."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const items = files.data?.items ?? [];
+  return (
+    <section className="ca-drawer-section">
+      <h3>Files</h3>
+      {items.length ? (
+        <ul className="uw-case-addenda" aria-label="Files">
+          {items.map((file) => (
+            <li key={file.id}>
+              <button
+                type="button"
+                className="ac-link"
+                onClick={() =>
+                  void downloadFile(`${path}/${file.id}`, { fallbackName: file.file_name }).catch((reason) =>
+                    setError(errorText(reason, "The file could not be opened.")),
+                  )
+                }
+              >
+                {file.file_name}
+              </button>{" "}
+              <small className="ac-muted">
+                {Math.max(1, Math.round(file.size / 1024))} KB, {formatDate(file.created_at)}
+              </small>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="ac-muted">No files on this case.</p>
+      )}
+      {canAdd && (
+        <label className="ca-field">
+          Add a file (PDF, text, CSV, PNG or JPEG, up to 10 MB; virus-scanned)
+          <input
+            type="file"
+            accept=".pdf,.txt,.csv,.png,.jpg,.jpeg"
+            disabled={busy}
+            onChange={(event) => void add(event.target.files?.[0])}
+          />
+        </label>
+      )}
+      {error && <InlineError text={error} />}
+    </section>
+  );
+}
+
 const ADDENDUM_KINDS: readonly [string, string][] = [
   ["STATEMENT", "Something more they said"],
   ["TECHNICIAN_FINDING", "A technician's finding"],
@@ -987,6 +1056,7 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
         {adding === "addendum" && <AddendumForm id={item.id} onCancel={() => setAdding(null)} onDone={onChanged} />}
         {adding === "correct" && <CorrectForm item={item} onCancel={() => setAdding(null)} onDone={onChanged} />}
       </section>
+      <CaseFiles caseId={item.id} canAdd={canLog && !voided} />
       <section className="ca-drawer-section">
         <h3>Times</h3>
         <ul>

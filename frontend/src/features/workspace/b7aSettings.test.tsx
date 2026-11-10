@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { AlertsAndFiles, SETTING_PERMISSIONS, SETTINGS_TABS } from "./sections/Settings";
 import { moreCasePlace } from "./oneStory";
+import { CaseExports } from "./sections/CasesList";
+import { CaseFiles } from "./sections/FirstContact";
 
 // B7a (0.10.97): Settings › Alerts and files (the urgent e-mail switch and the file storage; the server's
 // PUT /oversight/settings/alerts-and-files checks the same permissions), and the routine sample complaint under
@@ -28,12 +30,8 @@ const api = (permissions: string[], isTrial = false) =>
     isTrial,
   }) as unknown as WorkspaceApi;
 
-const render = (value: WorkspaceApi) =>
-  renderToStaticMarkup(
-    <WorkspaceContext.Provider value={value}>
-      <AlertsAndFiles />
-    </WorkspaceContext.Provider>,
-  );
+const render = (value: WorkspaceApi, node: React.ReactNode = <AlertsAndFiles />) =>
+  renderToStaticMarkup(<WorkspaceContext.Provider value={value}>{node}</WorkspaceContext.Provider>);
 
 describe("Settings › Alerts and files (B7-D12, D16)", () => {
   resources.data["/api/v1/oversight/settings"] = { urgent_email: false, attachment_quota_mb: 250 };
@@ -59,6 +57,29 @@ describe("Settings › Alerts and files (B7-D12, D16)", () => {
     const trial = render(api(["quality.review"], true));
     expect(trial).toContain("A free trial keeps 100 MB");
     expect(trial).not.toContain("Save file storage");
+  });
+});
+
+describe("Cases export and files on a Case (spec 3.3, G15)", () => {
+  it("offers both exports only to people with data.export, contacts masked", () => {
+    expect(render(api(["case.log"]), <CaseExports view="all" q="" />)).toBe("");
+    const html = render(api(["data.export"]), <CaseExports view="all" q="" />);
+    expect(html).toContain("Export these cases (CSV)");
+    expect(html).toContain("Export for QMS entry (CSV)");
+    expect(html).toContain("Contacts are masked");
+  });
+
+  it("lists a Case's files and offers the upload to those who log cases", () => {
+    resources.data["/api/v1/intake/e1/attachments"] = {
+      items: [{ id: "f1", file_name: "alarm-log.pdf", size: 20480, created_at: "2026-11-10T09:00:00Z" }],
+    };
+    const html = render(api(["case.log"]), <CaseFiles caseId="e1" canAdd />);
+    expect(html).toContain("alarm-log.pdf");
+    expect(html).toContain("20 KB");
+    expect(html).toContain('type="file"');
+    expect(render(api(["quality.review"]), <CaseFiles caseId="e1" canAdd={false} />)).not.toContain('type="file"');
+    resources.data["/api/v1/intake/e2/attachments"] = { items: [] };
+    expect(render(api(["case.log"]), <CaseFiles caseId="e2" canAdd />)).toContain("No files on this case.");
   });
 });
 
