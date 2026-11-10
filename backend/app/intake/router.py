@@ -413,9 +413,35 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
             for item in service.duplicates(db, tenant_id)
             if str(event.id) in (item["left"]["id"], item["right"]["id"])
         ]
+        found["addenda"] = _addenda_view(db, tenant_id, event.id, name)
         found["fault_words"] = rules.fault_words(event.reporter_words)
         found["harm_words"] = rules.harm_words(event.reporter_words)
     return found
+
+
+def _addenda_view(db, tenant_id, event_id, name) -> list[dict]:
+    """What was said later, oldest first, each with who said it and when (IN-17)."""
+    from backend.app.db.models.intake import CaseAddendum
+
+    rows = (
+        db.query(CaseAddendum)
+        .filter(CaseAddendum.tenant_id == tenant_id, CaseAddendum.intake_event_id == event_id)
+        .order_by(CaseAddendum.created_at)
+        .limit(service.READ_LIMIT)
+    )
+    return [
+        {
+            "id": str(row.id),
+            "kind": row.kind,
+            "said_by_role": row.said_by_role,
+            "said_at": service._iso(row.said_at),
+            "text": row.text,
+            "masked": bool(row.masked),
+            "added_by": name(row.created_by),
+            "added_at": service._iso(row.created_at),
+        }
+        for row in rows
+    ]
 
 
 def _check_view(row: FirstContactCheck, name) -> dict:
@@ -451,8 +477,12 @@ def _qms_state(tasks, now) -> dict | None:
         if view["open"]
         else ("NOT_NEEDED" if task.completion_outcome == "NOT_NEEDED" else "CLOSED")
     )
+    decide_by = (task.details or {}).get("decide_by")
+    if state == "OPEN" and decide_by and datetime.fromisoformat(decide_by) <= now:
+        state = "DECIDE"  # Connect, 10 working days without the QMS ID (spec 5.4, L3)
     labels = {
         "OPEN": "QMS complaint to create or link",
+        "DECIDE": "Link the QMS complaint by hand, or sign QMS complaint not expected",
         "AWAITING_IMPORT": service.AWAITING_IMPORT,
         "CLOSED": "QMS complaint linked",
         "NOT_NEEDED": "No QMS complaint needed",
@@ -1253,13 +1283,9 @@ def _move_allowed(control_db, ctx, event, target: str) -> None:
 
 
 def _likely_complaints(db, tenant_id, event) -> list[dict]:
-    """The complaints the duplicate check pairs with this Case (same product and lot or serial, near dates, ...)."""
-    found = []
-    for pair in service.duplicates(db, tenant_id):
-        for mine, other in ((pair["left"], pair["right"]), (pair["right"], pair["left"])):
-            if mine["kind"] == service.INTAKE and mine["id"] == str(event.id) and other["kind"] == service.COMPLAINT:
-                found.append({"id": other["id"], "ref": other["ref"], "reasons": pair["reasons"]})
-    return found
+    """The complaints the duplicate check pairs with this Case (same product and lot or serial, near dates, ...):
+    one product's newest complaints, bounded (service.DUPLICATE_SCAN), not the whole organization's scan."""
+    return service.likely_complaints(db, tenant_id, event)
 
 
 def _duplicate_choice(db, tenant_id, event, payload) -> Complaint | None:
@@ -2789,5 +2815,233 @@ def erase_contact(
     service._audit(
         control_db, tenant_id, ctx.user_id, "CASE_CONTACT_ERASED", event, now, ctx.correlation_id, reason=reason
     )
+    _commit(db, control_db)
+    return intake_detail(event.id, db, control_db, ctx)
+
+
+# --------------------------------------------------------------------------------------------- B2: addenda, facts, bulk
+
+SAID_BY = ("REPORTER", "TECHNICIAN", "DISTRIBUTOR", "OUR_STAFF")
+# Facts a person may correct (spec 2.5), with their stored length; the reporter's words are never edited.
+CORRECTABLE = {
+    "serial_number": 120,
+    "lot_text": 120,
+    "product_text": 200,
+    "udi": 120,
+    "software_version": 60,
+    "hardware_revision": 60,
+    "firmware_version": 60,
+    "reporter_site": 120,
+    "country_text": 80,
+    "harm_text": rules.TEXT_MAX,
+    "troubleshooting": rules.TEXT_MAX,
+}
+MASKED_FACTS = ("harm_text", "troubleshooting", "reporter_site")
+BULK_MAX = 200
+
+
+class AddendumIn(BaseModel):
+    kind: str = Field(max_length=30)
+    said_by_role: str = Field(max_length=30)
+    said_at: datetime | None = None
+    said_zone: str = Field(default="", max_length=60)
+    text: str = Field(max_length=rules.TEXT_MAX)
+
+
+class CorrectIn(BaseModel):
+    field: str = Field(max_length=60)
+    value: str = Field(default="", max_length=rules.TEXT_MAX)
+    reason: str = Field(max_length=rules.TEXT_MAX)
+    seen_version: int | None = None
+
+
+class BulkAssignIn(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=BULK_MAX)
+    owner_id: str = Field(max_length=64)
+
+
+def _masked_text(value: str) -> tuple[str, dict | None]:
+    """Free text masked on save with the import's masking (spec 2.5); what was masked is counted, never kept."""
+    from backend.app.trial.imports import _mask
+
+    masked = _mask(value)
+    return masked, ({"personal_data": 1} if masked != value else None)
+
+
+def _new_information(db, control_db, ctx, event, words: str, now, why: str) -> None:
+    """New information on a Case (T-D7, spec 3.1): a closed Case with a harm or fault word reopens, and a finished
+    triage whose facts it raises reopens on the fast track (the sweep then alerts the escalation role)."""
+    if event.status == case_rules.CLOSED and (rules.harm_words(words) or rules.fault_words(words)):
+        service.set_case_status(
+            db, control_db, event.tenant_id, event, case_rules.OPEN, ctx.user_id, now, ctx.correlation_id, why
+        )
+    db.flush()
+    service.reopen_raised(db, control_db, event.tenant_id, ctx.user_id, now, ctx.correlation_id, why)
+
+
+@router.post("/intake/bulk-assign", dependencies=[LOGGERS])
+def bulk_assign(
+    payload: BulkAssignIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """CI-36: set the owner of up to 200 Cases at once. Assignment only: there is no bulk signature."""
+    from backend.app.enterprise_audit import make_audit_event
+
+    tenant_id = _tenant(ctx)
+    if payload.owner_id not in {entry["id"] for entry in service.colleagues(control_db, tenant_id)}:
+        raise _error(422, "OWNER_UNKNOWN", "Name the owner from your team")
+    ids = list(dict.fromkeys(payload.ids))
+    events = (
+        db.query(IntakeEvent)
+        .filter(IntakeEvent.tenant_id == tenant_id, IntakeEvent.id.in_(ids))
+        .order_by(IntakeEvent.id)
+        .with_for_update()
+        .all()
+    )
+    if len(events) != len(ids):
+        raise _error(404, "INTAKE_NOT_FOUND", "One or more cases are not in your organization")
+    now = service.now_utc()
+    changed = [event for event in events if event.owner_id != payload.owner_id]
+    for event in changed:
+        event.owner_id, event.version, event.updated_at = payload.owner_id, event.version + 1, now
+    control_db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=ctx.user_id,
+            action="CASE_BULK_ASSIGNED",
+            entity_type="IntakeEvent",
+            entity_id=None,
+            correlation_id=ctx.correlation_id,
+            details={"ids": [str(event.id) for event in changed], "count": len(changed), "owner": payload.owner_id},
+            created_at=now,
+        )
+    )
+    _commit(db, control_db)
+    return {"assigned": len(changed), "unchanged": len(events) - len(changed)}
+
+
+@router.post("/intake/{event_id}/addenda", dependencies=[LOGGERS])
+def add_addendum(
+    event_id: uuid.UUID,
+    payload: AddendumIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """What was said later and by whom (IN-17, IN-18): a new row, the reporter's first words never edited. A
+    withdrawal is an addendum only: an escalated Complaint stands."""
+    from backend.app.db.models.intake import ADDENDUM_KINDS, CaseAddendum
+
+    tenant_id = _tenant(ctx)
+    event = _event_or_404(db, tenant_id, event_id, lock=True)
+    if event.status == case_rules.VOIDED:
+        raise _error(409, "CASE_VOIDED", "This case was withdrawn: entered in error")
+    kind = _choice(payload.kind.upper(), ADDENDUM_KINDS)
+    said_by = _choice(payload.said_by_role.upper(), SAID_BY)
+    if kind is None or said_by is None:
+        raise _error(422, "ADDENDUM_INCOMPLETE", "Choose what kind of addendum it is and who said it")
+    text = rules.clean(payload.text)
+    if len(text) < rules.REASON_MIN:
+        raise _error(422, "WORDS_NEEDED", f"Write what was said, in at least {rules.REASON_MIN} characters")
+    now = service.now_utc()
+    zone = _zone(payload.said_zone)
+    said_at = _at(payload.said_at, zone) or now
+    if said_at > now + _SKEW:
+        raise _error(422, "TIME_IN_FUTURE", "It cannot have been said in the future")
+    text, masked = _masked_text(text)
+    row = CaseAddendum(
+        tenant_id=tenant_id,
+        intake_event_id=event.id,
+        kind=kind,
+        said_by_role=said_by,
+        said_at=said_at,
+        said_zone=zone,
+        text=text,
+        masked=masked,
+        source_system="MDARIX",
+        created_by=str(ctx.user_id),
+        created_at=now,
+    )
+    db.add(row)
+    db.flush()
+    service._audit(
+        control_db,
+        tenant_id,
+        ctx.user_id,
+        "CASE_ADDENDUM_ADDED",
+        event,
+        now,
+        ctx.correlation_id,
+        addendum=str(row.id),
+        kind=kind,
+        said_by=said_by,
+    )
+    _new_information(db, control_db, ctx, event, text, now, f"Addendum added ({kind.lower()})")
+    _commit(db, control_db)
+    return intake_detail(event.id, db, control_db, ctx)
+
+
+@router.post("/intake/{event_id}/correct", dependencies=[LOGGERS])
+def correct_fact(
+    event_id: uuid.UUID,
+    payload: CorrectIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Correct or add a fact (spec 2.5): the new value, a field-change row (source CORRECTION) with the reason, and
+    the audit (field, old, new, reason). The reporter's words are never edited."""
+    from backend.app.db.models.intake import RecordFieldChange
+
+    tenant_id = _tenant(ctx)
+    event = _event_or_404(db, tenant_id, event_id, lock=True)
+    field = payload.field.strip().lower()
+    if field not in CORRECTABLE:
+        raise _error(422, "FIELD_NOT_CORRECTABLE", "This fact cannot be corrected here", fields=sorted(CORRECTABLE))
+    if event.status == case_rules.VOIDED:
+        raise _error(409, "CASE_VOIDED", "This case was withdrawn: entered in error")
+    if payload.seen_version is not None and payload.seen_version != event.version:
+        raise _error(409, "CASE_CHANGED", "A colleague changed this case a moment ago; reload to see it")
+    reason = rules.clean(payload.reason)
+    if len(reason) < rules.REASON_MIN:
+        raise _error(422, "REASON_NEEDED", f"Say why, in at least {rules.REASON_MIN} characters")
+    value = rules.clean(payload.value, CORRECTABLE[field]) or None
+    if value and field in MASKED_FACTS:
+        value, _ = _masked_text(value)
+    before = getattr(event, field)
+    if value == before:
+        raise _error(422, "NO_CHANGE", "The value is the same as recorded")
+    now = service.now_utc()
+    setattr(event, field, value)
+    event.version, event.updated_at = event.version + 1, now
+    db.add(
+        RecordFieldChange(
+            tenant_id=tenant_id,
+            entity="IntakeEvent",
+            record_id=event.id,
+            record_key=event.reference,
+            field=field,
+            before=before,
+            after=value,
+            source="CORRECTION",
+            changed_at=now,
+        )
+    )
+    service._audit(
+        control_db,
+        tenant_id,
+        ctx.user_id,
+        "CASE_FACT_CORRECTED",
+        event,
+        now,
+        ctx.correlation_id,
+        reason=reason,
+        field=field,
+        old=before,
+        new=value,
+    )
+    _new_information(db, control_db, ctx, event, value or "", now, f"Fact corrected ({field})")
     _commit(db, control_db)
     return intake_detail(event.id, db, control_db, ctx)

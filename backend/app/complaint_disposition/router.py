@@ -334,6 +334,18 @@ def _seconds_since(opened_at: str | None, now: datetime) -> float | None:
     return (now - opened).total_seconds()
 
 
+def _triage_first(db, tenant_id, complaint_id) -> bool:
+    """TR-22 (B2): a flagged complaint (or its event) whose triage is open is triaged before its disposition."""
+    from backend.app.intake import rules as intake_rules
+    from backend.app.intake import service as intake
+
+    key = f"{intake.COMPLAINT}:{complaint_id}"
+    return any(
+        key in item["members"] and item["tier"] != intake_rules.UNFLAGGED
+        for item in intake.triage(db, None, tenant_id, "open")["items"]
+    )
+
+
 def _classification_problem(payload: ClassificationIn, latest: ComplaintClassification | None, reason: str):
     """``(problem, the classification as it is signed, whether it is a change of a confirmed one)``."""
     values = {
@@ -385,6 +397,8 @@ def sign_disposition(
     if facts is None:
         raise _error(404, "COMPLAINT_NOT_FOUND", "No such complaint in your organization")
     complaint = facts["complaint"]
+    if _triage_first(db, tenant_id, complaint_id):
+        raise _error(422, "TRIAGE_FIRST", "Triage first: this complaint is flagged and its triage is not done yet")
     ref = service.ref_of(complaint)
     met = facts["triggers"]
     new = [code for code in triggers.codes(met) if code not in set(payload.seen_triggers)]

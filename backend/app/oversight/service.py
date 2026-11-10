@@ -293,6 +293,19 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
                     **common,
                 )
             )
+        # T-D7 (B2): an automatic reopening is due at once, so the next sweep tells the owners, the backup and the
+        # escalation role (one alert per reopening: the key carries its moment).
+        if record.get("reopened_at") and record.get("reopen_trigger") and not item.get("sample"):
+            why = record["reopen_trigger"].replace("_", " ").lower()
+            found.append(
+                _item(
+                    f"reopened:{item['key']}:{record['reopened_at']}",
+                    "TRIAGE",
+                    f"Triage of {item['ref']} reopened on the fast track ({why})",
+                    datetime.fromisoformat(record["reopened_at"]),
+                    **common,
+                )
+            )
         # An urgent intake is not a complaint yet: its provisional deadline is on no other list.
         if item["kind"] == intake.INTAKE and item["deadlines"] and item["deadlines"][0]["due_at"]:
             first = item["deadlines"][0]

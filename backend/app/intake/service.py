@@ -100,6 +100,23 @@ def names_of(control_db: Session | None, tenant_id: uuid.UUID, refs) -> dict[str
 # --------------------------------------------------------------------------------------------- events and checks
 
 
+def later_words(db: Session, tenant_id: uuid.UUID, event_ids) -> dict[uuid.UUID, list[str]]:
+    """The addenda's (masked) words of each Case, oldest first."""
+    from backend.app.db.models.intake import CaseAddendum
+
+    found: dict[uuid.UUID, list[str]] = {}
+    if not event_ids:
+        return found
+    rows = (
+        db.query(CaseAddendum.intake_event_id, CaseAddendum.text)
+        .filter(CaseAddendum.tenant_id == tenant_id, CaseAddendum.intake_event_id.in_(list(event_ids)))
+        .order_by(CaseAddendum.created_at)
+    )
+    for event_id, text in rows:
+        found.setdefault(event_id, []).append(text)
+    return found
+
+
 def checks_of(db: Session, tenant_id: uuid.UUID, event_ids) -> dict[uuid.UUID, list[FirstContactCheck]]:
     found: dict[uuid.UUID, list[FirstContactCheck]] = {}
     ids = list(event_ids)
@@ -420,11 +437,14 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
         .all()
     )
     checks = checks_of(db, tenant_id, [event.id for event in events])
+    later = later_words(db, tenant_id, [event.id for event in events])
     for event in events:
         versions = checks.get(event.id, [])
         latest = versions[-1] if versions else None
         record = records.get((INTAKE, event.id))
-        flags = rules.intake_flags(event.kind, event.reporter_words, latest.answers if latest else {})
+        # T-D7: what was said later (addenda) and a corrected harm text flag the Case too; the words stay as said.
+        said = " ".join(filter(None, [event.reporter_words, event.harm_text, *later.get(event.id, [])]))
+        flags = rules.intake_flags(event.kind, said, latest.answers if latest else {})
         signed = current_signed(versions)
         found[(INTAKE, event.id)] = {
             "kind": INTAKE,
@@ -965,6 +985,50 @@ def duplicates(db: Session, tenant_id: uuid.UUID) -> list[dict]:
     return found[:100]
 
 
+DUPLICATE_SCAN = 200  # one product's newest complaints compared with a Case at escalation
+
+
+def same_product_complaints(db: Session, tenant_id: uuid.UUID, product_id):
+    """The complaints the duplicate check at escalation compares with a Case: one product's newest, read by the index
+    (tenant_id, product_id, event_timestamp) and at most DUPLICATE_SCAN, never every record of the organization."""
+    return (
+        db.query(Complaint)
+        .filter(Complaint.tenant_id == tenant_id, Complaint.product_id == product_id)
+        .order_by(Complaint.event_timestamp.desc().nullslast(), Complaint.id)
+        .limit(DUPLICATE_SCAN)
+    )
+
+
+def likely_complaints(db: Session, tenant_id: uuid.UUID, event: IntakeEvent) -> list[dict]:
+    """The complaints that may be this Case's event (same product and lot or serial, near dates, same site or
+    country), not yet decided on by a person: each with its reasons."""
+    if not event.product_id:
+        return []
+    complaints = same_product_complaints(db, tenant_id, event.product_id).all()
+    lot_ids = {row.lot_batch_id for row in complaints if row.lot_batch_id} | {event.lot_batch_id} - {None}
+    lots = {
+        row.id: row.lot_identifier
+        for row in db.query(LotBatch.id, LotBatch.lot_identifier).filter(
+            LotBatch.tenant_id == tenant_id, LotBatch.id.in_(lot_ids)
+        )
+    }
+    links = links_of(db, tenant_id)
+    decided = {frozenset({(l.left_kind, l.left_id), (l.right_kind, l.right_id)}) for l in links}
+    group = groups(links)
+    mine = _duplicate_fields(INTAKE, event, lots)
+    found = []
+    for complaint in complaints:
+        if frozenset({(INTAKE, event.id), (COMPLAINT, complaint.id)}) in decided:
+            continue
+        a, b = group.get((INTAKE, event.id)), group.get((COMPLAINT, complaint.id))
+        if a is not None and a == b:
+            continue
+        reasons = rules.duplicate_reasons(mine, _duplicate_fields(COMPLAINT, complaint, lots))
+        if reasons:
+            found.append({"id": str(complaint.id), "ref": complaint_ref(complaint), "reasons": reasons})
+    return found
+
+
 def _side(kind: str, row, products: dict) -> dict:
     if kind == INTAKE:
         aware = event_awareness(row)
@@ -1381,7 +1445,12 @@ def ensure_qms_id_task(db, tenant_id, event: IntakeEvent, actor, now) -> None:
         assigned_user_id=_user_or_none(actor),
         due_at=working_day_end(now, 5, calendar(db, tenant_id)),
         created_by=actor,
-        details={"reference": event.reference, "complaint_id": str(event.complaint_id)},
+        details={
+            "reference": event.reference,
+            "complaint_id": str(event.complaint_id),
+            # Spec 5.4 (L3): at 10 working days it asks "link by hand, or sign QMS complaint not expected".
+            "decide_by": _iso(working_day_end(now, 10, calendar(db, tenant_id))),
+        },
     )
 
 
