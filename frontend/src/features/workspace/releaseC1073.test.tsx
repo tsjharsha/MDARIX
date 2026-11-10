@@ -13,14 +13,18 @@ import type { SessionContext } from "./workspaceContext";
 
 // The approved design's PERSONAS (mdarix-hybrid-mockup.html), as the server sends them (access_control/personas.py).
 const OPTIONS = [
-  ["admin", "Admin", ["home", "complaints", "trees", "reports", "investigations", "trends", "records", "team"]],
-  ["quality", "Quality Leader", ["home", "complaints", "reports", "investigations", "trends", "records"]],
+  [
+    "admin",
+    "Admin",
+    ["home", "complaints", "trees", "reports", "investigations", "trends", "products", "records", "team"],
+  ],
+  ["quality", "Quality Leader", ["home", "complaints", "reports", "investigations", "trends", "products", "records"]],
   ["regulatory", "Regulatory Leader", ["home", "complaints", "trees", "reports", "records"]],
   ["handler", "Complaint Handler", ["home", "complaints"]],
-  ["investigator", "Investigator", ["home", "investigations", "trends"]],
-  ["risk", "Risk Reviewer", ["home", "investigations", "records"]],
+  ["investigator", "Investigator", ["home", "investigations", "trends", "products"]],
+  ["risk", "Risk Reviewer", ["home", "investigations", "products", "records"]],
   ["decision", "Decision Maker", ["home", "complaints", "reports", "records"]],
-  ["executive", "Executive", ["home", "trends", "records"]],
+  ["executive", "Executive", ["home", "trends", "products", "records"]],
 ].map(([code, label, tabs]) => ({
   code: code as string,
   label: label as string,

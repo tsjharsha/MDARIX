@@ -29,6 +29,7 @@ export type AppView =
   | "decision-trees"
   | "reports"
   | "import"
+  | "product-360"
   | "customer-admin"
   | "admin"
   | "admin-stage2"
@@ -106,6 +107,8 @@ export const APP_ROUTES: Record<AppView, string> = {
   reports: "/app/reports",
   // A trial's own import on the new navigation (0.10.80).
   import: "/app/import",
+  // Work › Products on the new navigation (0.10.94): Product 360 and Supplier 360.
+  "product-360": "/app/product-360",
   "customer-admin": "/app/customer-admin",
   admin: "/app/admin",
   "admin-stage2": "/app/admin/stage2",

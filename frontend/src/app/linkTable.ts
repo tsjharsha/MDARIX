@@ -129,9 +129,14 @@ export function routeFor(
 ): { section: string; tab: string | undefined } {
   if (featureSet !== "mvp") return { section, tab };
   const classic = classicRoute(section, tab);
-  // The new navigation (stage 7) moves every classic place to its new home; a place already on it stays.
-  if (navigation === "new")
-    return onNewPlace(section, tab) ? { section, tab } : homeOf(NEW_HOMES, classic.section, classic.tab);
+  // The new navigation (stage 7) moves every classic place to its new home; a place already on it stays. A parked
+  // section with a home of its own there (Products: Product 360, 0.10.94) goes there before its classic parking.
+  if (navigation === "new") {
+    if (onNewPlace(section, tab)) return { section, tab };
+    return NEW_HOMES.some((row) => row.section === section && row.section !== classic.section)
+      ? homeOf(NEW_HOMES, section, tab)
+      : homeOf(NEW_HOMES, classic.section, classic.tab);
+  }
   return CLASSIC_HOMES.some((row) => row.section === classic.section)
     ? homeOf(CLASSIC_HOMES, classic.section, classic.tab)
     : classic;

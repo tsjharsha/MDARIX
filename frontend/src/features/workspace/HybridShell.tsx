@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  Boxes,
   CalendarClock,
   Check,
   ChevronDown,
@@ -55,6 +56,8 @@ export const PERSONA_TABS: Record<string, { label: string; section: WorkspaceSec
   reports: { label: "Reports", section: "Reports" },
   investigations: { label: "Investigations", section: "Investigations" },
   trends: { label: "Trends", section: "Trends" },
+  // Product 360 and Supplier 360 (0.10.94, W1).
+  products: { label: "Products", section: "Product 360" },
   records: { label: "Records", section: "Records" },
   team: { label: "Team", section: "Team" },
   // A trial's previews and its way to a pilot, right of the persona's tabs, for every persona (0.10.87; trialTabs).
@@ -580,6 +583,7 @@ const TAB_ICON: Record<string, LucideIcon> = {
   reports: FileText,
   investigations: SearchCheck,
   trends: TrendingUp,
+  products: Boxes,
   records: ShieldCheck,
   team: Users,
   ahead: CalendarClock,
@@ -597,7 +601,10 @@ export const sectionIcon = (section: string): LucideIcon =>
 /** The rail's groups (the hero design): the work, then the plan; Getting started heads it and Next steps is pinned at
  * its foot. */
 export const RAIL_GROUPS: ReadonlyArray<{ label: string; tabs: readonly string[] }> = [
-  { label: "Work", tabs: ["home", "complaints", "trees", "reports", "investigations", "trends", "records"] },
+  {
+    label: "Work",
+    tabs: ["home", "complaints", "trees", "reports", "investigations", "trends", "products", "records"],
+  },
   { label: "Plan", tabs: ["team", "ahead"] },
 ];
 
@@ -954,8 +961,10 @@ export function pageHeadShown(section: string, fresh: boolean, isTrial: boolean,
   if (section === "Complaint") return false;
   if (!fresh) return true;
   if (section === "My Work" || section === "Next steps" || (section === "Getting started" && isTrial)) return false;
-  // One report has its own head (its form, reference and chips).
-  return !(section === "Reports" && new URLSearchParams(tab?.split("?")[1] ?? "").has("report"));
+  // One report has its own head (its form, reference and chips); so have one product and one supplier (0.10.94).
+  const carried = new URLSearchParams(tab?.split("?")[1] ?? "");
+  if (section === "Product 360") return !carried.has("product") && !carried.has("supplier");
+  return !(section === "Reports" && carried.has("report"));
 }
 
 /** Whether the head says the organization's time zone (the classic head always does). */

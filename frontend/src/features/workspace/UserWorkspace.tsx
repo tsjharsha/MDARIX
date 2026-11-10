@@ -5,6 +5,7 @@ import {
   Bot,
   Briefcase,
   BadgeCheck,
+  Boxes,
   Building2,
   ClipboardList,
   FileSearch,
@@ -124,6 +125,7 @@ import {
   type PersonaOption,
 } from "./HybridShell";
 import { ImportYourDataSection } from "./sections/YourData";
+import { ProductHubSection } from "./sections/ProductHub";
 import { StoryBar } from "./sections/Entrance";
 import { liveStory, savedStory, saveStory } from "./entrance";
 import { carryOverColumnChoices, columnScopeFor } from "../tables/columnViews";
@@ -310,6 +312,14 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
     guide: "Upload your export in the template's columns.",
     context: false,
   },
+  // Work › Products on the new navigation (0.10.94, W1).
+  "Product 360": {
+    icon: Boxes,
+    description: "Products and suppliers",
+    guide:
+      "Each product version and each supplier, with every complaint, investigation, trend, CAPA, risk and report linked to it. MDARIX lists what was recorded; it does not infer a cause.",
+    context: false,
+  },
 };
 
 /** The new navigation's menu lines and page purposes (0.10.68), where they differ from the classic ones. */
@@ -358,6 +368,7 @@ export const NEW_HEADS: Partial<Record<WorkspaceSection, string>> = {
   "Share feedback": "What should we improve?",
   "Next steps": "What comes after the trial?",
   "Look ahead": "What will your partners see?",
+  "Product 360": "What is linked to each product and supplier?",
 };
 
 /** Under the MVP feature set Records and My Work also hold what the parked sections did (app/featureSet.ts). */
@@ -1107,6 +1118,7 @@ export function UserWorkspace({
                       {section === "Decision trees" && <DecisionTreesSection />}
                       {section === "Reports" && <ReportsSection />}
                       {section === "Import your data" && <ImportYourDataSection focus={tab} />}
+                      {section === "Product 360" && <ProductHubSection tab={tab} heading={heading} />}
                     </div>
                   </SectionErrorBoundary>
                 </ColumnScopeProvider>

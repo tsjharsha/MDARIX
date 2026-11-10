@@ -363,6 +363,7 @@ describe("the new navigation (stage 7, 0.10.68)", () => {
       "Reports",
       "Investigations",
       "Trends",
+      "Product 360",
       "Records",
       "Team",
     ]);
@@ -374,6 +375,7 @@ describe("the new navigation (stage 7, 0.10.68)", () => {
       "Reports",
       "Investigations",
       "Trends",
+      "Products",
       "Records",
       "Team",
     ]);
@@ -496,8 +498,21 @@ describe("the new navigation (stage 7, 0.10.68)", () => {
   });
 
   it("opens the new navigation's own addresses on the classic one too", () => {
-    for (const section of ["Trends", "Settings", "Team"])
+    for (const section of ["Trends", "Settings", "Team", "Product 360"])
       expect(landsOn(section, undefined, "classic").ok, section).toBe(true);
+  });
+
+  it("opens a former Products link on Product 360 on the new navigation, Readiness on the classic (P360-14)", () => {
+    expect(routeFor("Products", undefined, "mvp", "new")).toEqual({ section: "Product 360", tab: "Products" });
+    expect(routeFor("Products", "Configuration", "mvp", "new")).toEqual({ section: "Product 360", tab: "Products" });
+    expect(OLD_VIEWS.products).toEqual(["Products"]);
+    expect(routeFor("Products", undefined, "mvp", "classic").section).toBe("Readiness");
+    expect(routeFor("Product 360", "Suppliers?supplier=SAMPLE-SUP-B", "mvp", "new")).toEqual({
+      section: "Product 360",
+      tab: "Suppliers?supplier=SAMPLE-SUP-B",
+    });
+    expect(recordPlace("case", "x", {}, "new").section).toBe("Investigations");
+    expect(NEW_RECORD_PLACES.product).toEqual({ section: "Product 360", tab: "Products", param: "product" });
   });
 
   it("puts no setting on a daily screen (7.7)", () => {

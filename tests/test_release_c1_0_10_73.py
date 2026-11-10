@@ -24,14 +24,14 @@ pytestmark = pytest.mark.db
 
 TEAM = "/api/v1/trial/team"
 MOCKUP_TABS = {
-    "admin": ["home", "complaints", "trees", "reports", "investigations", "trends", "records", "team"],
-    "quality": ["home", "complaints", "reports", "investigations", "trends", "records"],
+    "admin": ["home", "complaints", "trees", "reports", "investigations", "trends", "products", "records", "team"],
+    "quality": ["home", "complaints", "reports", "investigations", "trends", "products", "records"],
     "regulatory": ["home", "complaints", "trees", "reports", "records"],
     "handler": ["home", "complaints"],
-    "investigator": ["home", "investigations", "trends"],
-    "risk": ["home", "investigations", "records"],
+    "investigator": ["home", "investigations", "trends", "products"],
+    "risk": ["home", "investigations", "products", "records"],
     "decision": ["home", "complaints", "reports", "records"],
-    "executive": ["home", "trends", "records"],
+    "executive": ["home", "trends", "products", "records"],
 }
 
 
