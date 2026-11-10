@@ -10,6 +10,19 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.98] - not released yet
+
+B5a: the investigation challenge. Migration `tr26challengeloop` (chained from `tr25routinepath`; DB-1 (tr21-tr24) is
+not built yet, and the chain is re-ordered at the release join). The API and web images change.
+
+### Database
+
+- Migration `tr26challengeloop`, expand-only, six nullable columns, no new table (row-level security unchanged):
+  `hypotheses` gains `draft_rule` and `draft_rule_version` (the rule and version behind a draft a person adopted);
+  `decision_follow_ups` gains `action_reference`, `action_kind` (correction, removal, advisory notice, software
+  update, other; checked), `action_effective_on` and `action_scope` (for the closed loop, B5b). Legacy organization
+  databases get the same from `scripts/add_workflow_tables_to_legacy_planes.py` (step `tr26`).
+
 ## [0.10.97] - not released yet (after the WHIF freeze)
 
 B7a: the routine complaint path. Migration `tr25routinepath` (chained from `tr19casesescalation`; it moves onto

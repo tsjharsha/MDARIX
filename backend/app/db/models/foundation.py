@@ -483,6 +483,9 @@ class Hypothesis(TenantOwned, Base):
     status_changed_by: Mapped[str | None] = mapped_column(String(255))
     status_changed_at = tz()
     created_by: Mapped[str | None] = mapped_column(String(255))
+    # B5 (tr26): the rule (H-1..H-5) and its version behind a draft a person adopted; NULL when a person wrote it.
+    draft_rule: Mapped[str | None] = mapped_column(String(10))
+    draft_rule_version: Mapped[int | None] = mapped_column(Integer)
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         CheckConstraint("origin in ('ai','human','system')", name="hypothesis_origin_allowed"),
