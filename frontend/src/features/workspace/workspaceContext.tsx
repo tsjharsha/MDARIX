@@ -131,6 +131,8 @@ export type SessionContext = {
   email_intake?: boolean;
   /** B7a (MDARIX_ROUTINE_PATH): Resolve and close, the Cases exports, files on a Case and Alerts and files. */
   routine_path?: boolean;
+  /** B5a (MDARIX_CHALLENGE): the Challenge view and the brief's Challenge and Sources sections. */
+  challenge?: boolean;
   /** classic or new (tenants.navigation, 0.10.67): the organization's menu (app/linkTable.ts). */
   navigation?: string;
   /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
@@ -386,6 +388,11 @@ export function useFeatureSet(): FeatureSet {
 /** B7a: on unless the server says it is switched off (an older server says nothing: on). */
 export function useRoutinePath(): boolean {
   return useContext(WorkspaceContext)?.session?.routine_path !== false;
+}
+
+/** B5a: shown only while the server says it is on (an older server has no challenge API). */
+export function useChallenge(): boolean {
+  return useContext(WorkspaceContext)?.session?.challenge === true;
 }
 
 /** B7b: "E-mail to check" shows only while the server has e-mail intake switched on. */

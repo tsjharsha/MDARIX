@@ -295,7 +295,7 @@ export function RowView({ row }: { row: Row }) {
   );
 }
 
-function SourceLink({ source }: { source: Source }) {
+export function SourceLink({ source }: { source: Source }) {
   const { open, work } = useWorkspace();
   const target = sourceTarget(source);
   if (!target) return <span className="uw-doc-chip">{source.ref}</span>;

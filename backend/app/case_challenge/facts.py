@@ -243,17 +243,18 @@ def _entity_evidence(db: Session, t: str, entity_ids: list[str]) -> dict[str, li
     return dict(found)
 
 
-def _brief_conclusion(db: Session, case) -> str | None:
+def _latest_brief(db: Session, case) -> dict:
+    """The latest brief version's narrative and whether it is a draft (the conclusion C-9 reads, the answers)."""
     from backend.app.db.models.reviews import DecisionBriefVersion
 
     row = (
-        db.query(DecisionBriefVersion.narrative)
+        db.query(DecisionBriefVersion.narrative, DecisionBriefVersion.status)
         .filter(DecisionBriefVersion.tenant_id == case.tenant_id, DecisionBriefVersion.investigation_id == case.id)
         .order_by(DecisionBriefVersion.version.desc())
         .first()
     )
     narrative = brief_rules.normalize_narrative(row[0] if row else None)
-    return narrative.get("proposed_conclusion") or None
+    return {"narrative": narrative, "draft": row is not None and row[1] == brief_rules.DRAFT}
 
 
 def _evidence_links(db: Session, case, hypotheses: list[dict]) -> list[dict]:
@@ -299,8 +300,12 @@ def read(db: Session, case, now: datetime) -> dict:
     included = _ids(data["included_complaint_ids"])
     complaints = _complaints(db, case.tenant_id, [Complaint.id.in_(included)]) if included else []
     product_ids = sorted({str(case.product_id)})
-    product = db.query(Product.name).filter(Product.tenant_id == case.tenant_id, Product.id == case.product_id).scalar()
     versions = _versions(db, t, product_ids)
+    product = next((v["product"] for v in versions.values() if v["product_id"] == str(case.product_id)), None)
+    if product is None:
+        product = (
+            db.query(Product.name).filter(Product.tenant_id == case.tenant_id, Product.id == case.product_id).scalar()
+        )
     for version_id in data["product_version_ids"]:
         if version_id in versions:
             versions[version_id]["in_scope"] = True
@@ -347,6 +352,7 @@ def read(db: Session, case, now: datetime) -> dict:
         }
         for row in db.query(Unknown).filter(Unknown.tenant_id == case.tenant_id, Unknown.investigation_id == case.id)
     ]
+    brief = _latest_brief(db, case)
     return {
         "as_of": now,
         "case": {
@@ -370,7 +376,8 @@ def read(db: Session, case, now: datetime) -> dict:
         "hypotheses": hypotheses,
         "links": _evidence_links(db, case, hypotheses),
         "unknowns": unknowns,
-        "conclusion": _brief_conclusion(db, case),
+        "conclusion": brief["narrative"].get("proposed_conclusion") or None,
+        "brief": brief,
     }
 
 

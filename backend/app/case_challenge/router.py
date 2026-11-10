@@ -92,30 +92,14 @@ def _actions(db: Session, case) -> dict[str, dict]:
     return found
 
 
-def _brief_answers(db: Session, case) -> tuple[dict, bool]:
-    """The answers kept in the latest brief version's narrative, and whether that version is a draft."""
-    from backend.app.db.models.reviews import DecisionBriefVersion
-
-    row = (
-        db.query(DecisionBriefVersion)
-        .filter(DecisionBriefVersion.tenant_id == case.tenant_id, DecisionBriefVersion.investigation_id == case.id)
-        .order_by(DecisionBriefVersion.version.desc())
-        .first()
-    )
-    if row is None:
-        return {}, False
-    return brief_rules.normalize_narrative(row.narrative).get(
-        "challenge_answers"
-    ) or {}, row.status == brief_rules.DRAFT
-
-
 def challenge_view(db: Session, case, now) -> dict:
     """Drafts, questions and what people did with them (also read by the brief composer)."""
     facts = facts_module.read(db, case, now)
     found = rules.drafts(facts)
     asked = question_rules.questions(facts, found)
     actions = _actions(db, case)
-    answers, editable = _brief_answers(db, case)
+    # The answers kept in the latest brief version's narrative, changeable while that version is a draft.
+    answers, editable = facts["brief"]["narrative"].get("challenge_answers") or {}, facts["brief"]["draft"]
     for draft in found:
         draft["action"] = actions.get(draft["key"])
     for item in asked:

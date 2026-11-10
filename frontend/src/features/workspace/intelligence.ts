@@ -22,6 +22,8 @@ const isObject = (value: unknown): value is Record<string, any> =>
 
 export const INTELLIGENCE_VIEWS = [
   "Hypotheses",
+  // B5a: drafts and questions drawn by rule from the records (hidden while the switch is off).
+  "Challenge",
   "Contradictions",
   "Unknowns",
   "Failure chain",

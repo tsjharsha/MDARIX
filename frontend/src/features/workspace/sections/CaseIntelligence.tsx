@@ -1,11 +1,13 @@
 import { Tabs } from "../../customer-admin/shared";
 import { INTELLIGENCE_VIEWS, type IntelligenceView } from "../intelligence";
+import { ChallengeView } from "./caseIntelligence/Challenge";
 import { ContradictionsView } from "./caseIntelligence/Contradictions";
 import { FailureChainView } from "./caseIntelligence/FailureChain";
 import { HistoryView } from "./caseIntelligence/History";
 import { HypothesesView } from "./caseIntelligence/Hypotheses";
 import { ObservationsView } from "./caseIntelligence/Observations";
 import { UnknownsView } from "./caseIntelligence/Unknowns";
+import { useChallenge } from "../workspaceContext";
 
 // The views live in ./caseIntelligence/, one file per view; the chain drawing stays importable from here.
 export { ChainDiagram, ChainLegend } from "./caseIntelligence/FailureChain";
@@ -34,6 +36,8 @@ export function CaseIntelligencePanel({
   /** A closed or cancelled case: its intelligence can be read, not changed. */
   readOnly?: boolean;
 }) {
+  const challenge = useChallenge();
+  const views = challenge ? INTELLIGENCE_VIEWS : INTELLIGENCE_VIEWS.filter((item) => item !== "Challenge");
   return (
     <>
       <p className="ac-note">
@@ -45,7 +49,7 @@ export function CaseIntelligencePanel({
           This investigation is closed: its intelligence can be read but not changed.
         </p>
       )}
-      <Tabs tabs={INTELLIGENCE_VIEWS} active={view} onChange={onView} label="Investigation intelligence views">
+      <Tabs tabs={views} active={view} onChange={onView} label="Investigation intelligence views">
         {view === "Hypotheses" && (
           <HypothesesView
             investigationId={investigationId}
@@ -54,6 +58,9 @@ export function CaseIntelligencePanel({
             startAdding={adding}
             onAddingShown={onAddingShown}
           />
+        )}
+        {view === "Challenge" && challenge && (
+          <ChallengeView investigationId={investigationId} caseLabel={caseLabel} readOnly={readOnly} />
         )}
         {view === "Contradictions" && (
           <ContradictionsView investigationId={investigationId} caseLabel={caseLabel} onView={onView} />

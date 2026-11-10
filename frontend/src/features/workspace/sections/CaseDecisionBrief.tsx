@@ -6,7 +6,8 @@ import { Drawer, Table, errorText, formatDate, send, useResource } from "../../c
 import { safeText } from "../../../app/displayId";
 import { roleNote } from "../../../app/roles";
 import { AiInterpretationNote, StatementKind } from "../../shared/StatementKind";
-import { useCanRunAi, usePanelFlag, useWorkspace } from "../workspaceContext";
+import { useCanRunAi, useChallenge, usePanelFlag, useWorkspace } from "../workspaceContext";
+import { BriefChallengeSections } from "./caseIntelligence/Challenge";
 import {
   ACTION_MAX,
   BRIEF_REVIEW_ACTIONS,
@@ -359,7 +360,7 @@ export function CaseDecisionBriefPanel({
           onSave={() => void save()}
         />
       )}
-      {current && <ComposedSections version={current} />}
+      {current && <ComposedSections version={current} caseId={investigationId} />}
       {current && (
         <QualityReviewPanel
           investigationId={investigationId}
@@ -618,7 +619,8 @@ function lotsLine(lots: unknown[]): string {
 }
 
 /** The sections MDARIX composed from the case's records, each statement with its kind and who made it. */
-function ComposedSections({ version }: { version: BriefVersion }) {
+function ComposedSections({ version, caseId }: { version: BriefVersion; caseId: string }) {
+  const challenge = useChallenge();
   const content = record(version.content);
   const investigation = record(content.investigation);
   const product = record(content.product);
@@ -717,6 +719,7 @@ function ComposedSections({ version }: { version: BriefVersion }) {
         <ReviewSummary title="Risk review" value={content.risk_review} />
         <ReviewSummary title="Regulatory review" value={content.regulatory_review} />
       </div>
+      {challenge && <BriefChallengeSections content={content} caseId={caseId} />}
       <Section title="AI assistance disclosure" count={ai.executions.length}>
         {ai.executions.length ? (
           <>
