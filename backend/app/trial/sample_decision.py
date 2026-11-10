@@ -428,6 +428,44 @@ def _record_intelligence(db: Session, case, person, now: datetime) -> dict:
     }
 
 
+# B5a: the sample author's answers to the material challenge questions the sample case raises, by rule (the
+# questions' keys hold record IDs, so they are matched by rule). A question of another rule stays unanswered, and the
+# gate then refuses the sample brief, so a new material rule cannot slip through unanswered.
+SAMPLE_CHALLENGE_ANSWERS = {
+    "C-1": (
+        "The Rev A pressure-alarm complaints came before the change, on the earlier supplier's sensors: they are the "
+        "base rate of 0.8 a month that the rise after Rev B is measured against. (Sample)"
+    ),
+    "C-5": (
+        "The bench test of returned pumps is still open. Containment of lots 003 and 004 and the restored inspection "
+        "go ahead now; the bench test result is a condition of this decision. (Sample)"
+    ),
+}
+
+
+def _answer_challenge(content: dict, text: dict, author_ref: str, now: datetime) -> None:
+    """The sample author answers the material challenge questions, in the narrative (signed with the brief) and in
+    the composed challenge section. Nothing when the challenge is off."""
+    challenge = content.get("challenge")
+    if not challenge:
+        return
+    answers = {}
+    for item in challenge["questions"]:
+        if item["material"] and item["rule"] in SAMPLE_CHALLENGE_ANSWERS:
+            item["answer"] = answers[item["key"]] = {
+                "rule": item["rule"],
+                "rule_version": item["rule_version"],
+                "question": item["text"],
+                "text": SAMPLE_CHALLENGE_ANSWERS[item["rule"]],
+                "not_applicable": False,
+                "answered_by": author_ref,
+                "answered_at": now.isoformat(),
+            }
+    challenge["blocking"] = [key for key in challenge["blocking"] if key not in answers]
+    if answers:
+        text["challenge_answers"] = answers
+
+
 def _submit_brief(db: Session, case, person, now: datetime):
     """Version 1 of the brief, composed from the case and submitted for quality review, as ``POST
     .../decision-brief`` and ``.../submit`` write it. Returns (row, gate)."""
@@ -442,7 +480,9 @@ def _submit_brief(db: Session, case, person, now: datetime):
     role = person.role_for(INVESTIGATION_WORK)
     text = brief_rules.with_contributor(dict(NARRATIVE), person.user_id)
     content, state = composer.compose(db, db, case, now=now)
+    _answer_challenge(content, text, person.user_id, now)
     gate = brief_rules.evaluate_gate(state.get("checks") or [], text, content_complete=not content.get("unavailable"))
+    gate = brief_api._with_challenge(gate, content.get("challenge"))
     row = DecisionBriefVersion(
         id=uuid.uuid4(),
         tenant_id=case.tenant_id,

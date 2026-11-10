@@ -31,6 +31,7 @@ from sqlalchemy import case as sql_case
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.app import feature_set
 from backend.app.access.permissions import INVESTIGATION_WORK, QUALITY_REVIEW, require_permission
 from backend.app.case_workflow import states
 from backend.app.db.data_plane import get_data_plane_db
@@ -108,6 +109,21 @@ def _latest(db: Session, case: Investigation, *, lock: bool = False) -> Decision
     if lock:
         query = query.with_for_update()
     return query.first()
+
+
+def _with_challenge(gate: dict, challenge: dict | None) -> dict:
+    """B5a: the material challenge questions not answered block submitting (B5-D3)."""
+    from backend.app.case_challenge.brief import gate_items
+
+    blocking = [*gate["blocking"], *gate_items(challenge)]
+    return {**gate, "blocking": blocking, "can_submit": gate["can_submit"] and not blocking}
+
+
+def _live_challenge(db: Session, case: Investigation) -> dict | None:
+    from backend.app.case_challenge.brief import challenge_section
+    from backend.app.case_challenge.router import challenge_view
+
+    return challenge_section(challenge_view(db, case, states.now_utc()))
 
 
 def _draft(db: Session, case: Investigation) -> DecisionBriefVersion:
@@ -302,6 +318,8 @@ def _brief_payload(db: Session, control_db: Session, person: Person, case: Inves
     checks = composer.case_readiness(db, case).get("checks") or []
     # The narrative is judged only on a draft (the version that can be submitted); without one nothing is submitted.
     gate = rules.evaluate_gate(checks, current.narrative if is_draft else None, check_narrative=is_draft)
+    if is_draft and feature_set.challenge():
+        gate = _with_challenge(gate, _live_challenge(db, case))
     if not is_draft:
         gate["can_submit"] = False
     return {
@@ -574,6 +592,7 @@ def submit_decision_brief(
     now = states.now_utc()
     content, state = composer.compose(db, control_db, case, now=now, ai_draft_used=narrative["ai_draft_used"])
     gate = rules.evaluate_gate(state.get("checks") or [], narrative, content_complete=not content.get("unavailable"))
+    gate = _with_challenge(gate, content.get("challenge"))
     if not gate["can_submit"]:
         raise error(
             409,

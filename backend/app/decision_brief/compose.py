@@ -14,6 +14,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
+from backend.app import feature_set
 from backend.app.business_ids import as_uuid
 from backend.app.case_intelligence import rules as intelligence
 from backend.app.case_workflow import readiness, states
@@ -649,6 +650,16 @@ def compose(db: Session, control_db, case, *, now: datetime, ai_draft_used: bool
                 (row["id"], row["review_status"], row["relationship"]) for row in rows
             ),
         },
-        "unavailable": sorted(set(unavailable)),
+        "unavailable": [],
     }
+    if feature_set.challenge():
+        # B5a: the challenge (drafts, questions, answers) and every record the brief relies on.
+        from backend.app.case_challenge import brief as challenge_brief
+        from backend.app.case_challenge.router import challenge_view
+
+        view = read("challenge", lambda session: challenge_view(session, case, now), None)
+        if view is not None:
+            content["challenge"] = challenge_brief.challenge_section(view)
+            content["sources"] = challenge_brief.sources_section(view, rows, content["signals"], now)
+    content["unavailable"] = sorted(set(unavailable))
     return rules.jsonable(content), rules.jsonable(state)

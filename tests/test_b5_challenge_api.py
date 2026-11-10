@@ -83,7 +83,8 @@ def test_the_sample_reads_drafts_and_questions_viewed_once(trial):
     rules_asked = {item["rule"] for item in view["questions"]}
     assert {"C-1", "C-5", "C-7"} <= rules_asked
     c1 = next(item for item in view["questions"] if item["rule"] == "C-1")
-    assert c1["material"] and c1["key"] in view["blocking"]
+    # The sample author answered the material questions in the submitted brief, so nothing blocks.
+    assert c1["material"] and c1["answer"]["text"].endswith("(Sample)") and view["blocking"] == []
     assert trial["user"].get(trial["base"]).status_code == 200
     assert _audits(trial, "CHALLENGE_VIEWED") == 1
 
@@ -130,7 +131,7 @@ def test_adopt_makes_a_tagged_hypothesis_with_unreviewed_record_summaries(trial)
 def test_answers_live_in_the_brief_draft_and_change_its_hash(trial):
     user, base = trial["user"], trial["base"]
     view = user.get(base).json()
-    key = view["blocking"][0]
+    key = next(item["key"] for item in view["questions"] if item["rule"] == "C-7")
     text = "The Rev A complaints predate the change; they are the base rate."
     # The sample brief is in review: answers wait for a draft.
     refused = user.post(f"{base}/questions/answer", json={"key": key, "text": text})
@@ -147,7 +148,6 @@ def test_answers_live_in_the_brief_draft_and_change_its_hash(trial):
         brief = db.query(DecisionBriefVersion).filter(DecisionBriefVersion.investigation_id == trial["case_id"]).one()
         assert brief.narrative["challenge_answers"][key]["text"] == text and brief.content_hash != before
     view = user.get(base).json()
-    assert key not in view["blocking"]
     assert next(item for item in view["questions"] if item["key"] == key)["answer"]["text"] == text
     assert _audits(trial, "CHALLENGE_ANSWERED") == 1
 

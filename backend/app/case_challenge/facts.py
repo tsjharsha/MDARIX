@@ -95,6 +95,7 @@ def _versions(db: Session, t: str, product_ids: list[str]) -> dict[str, dict]:
             "predecessor_id": None,
             "in_scope": False,
             "components": [],
+            "origin": origin(r["source_system"])["kind"],
         }
         for r in rows
     }
@@ -143,7 +144,7 @@ def _lots(db: Session, t: str, version_ids: list[str]) -> dict[str, dict]:
     reads it; its units released, its units shipped when it has distribution rows, and its genealogy components."""
     rows = db.execute(
         text(
-            "SELECT l.id, l.lot_identifier, l.product_version_id, coalesce(l.effective_timestamp, l.created_at) AS made, "
+            "SELECT l.id, l.lot_identifier, l.product_version_id, l.source_system, l.source_identifier, coalesce(l.effective_timestamp, l.created_at) AS made, "
             "l.quantity, (SELECT sum(d.quantity) FROM lot_distributions d WHERE d.tenant_id = l.tenant_id "
             "AND d.lot_batch_id = l.id) AS shipped, (SELECT array_agg(DISTINCT lc.component_id::text) "
             "FROM lot_components lc WHERE lc.tenant_id = l.tenant_id AND lc.lot_batch_id = l.id) AS genealogy "
@@ -160,6 +161,7 @@ def _lots(db: Session, t: str, version_ids: list[str]) -> dict[str, dict]:
             "units_released": r["quantity"],
             "units_shipped": int(r["shipped"]) if r["shipped"] is not None else None,
             "genealogy": sorted(r["genealogy"] or []),
+            "origin": origin(r["source_system"], r["source_identifier"])["kind"],
         }
         for r in rows
     }
@@ -169,7 +171,7 @@ def _changes(db: Session, t: str, product_id: str, component_ids: list[str], pai
     """Changes recorded as affecting a component of the versions (the W1 join), or the whole product (every version)."""
     rows = db.execute(
         text(
-            "SELECT ch.id, ch.change_identifier, ch.change_type, ch.description, "
+            "SELECT ch.id, ch.change_identifier, ch.change_type, ch.description, ch.source_system, ch.source_identifier, "
             "coalesce(ch.event_timestamp, r.effective_timestamp) AS effective, r.target_entity_type, "
             "r.target_entity_id FROM reality_relationships r JOIN changes ch ON ch.tenant_id = r.tenant_id "
             "AND ch.id = r.source_entity_id WHERE r.tenant_id = :t AND r.source_entity_type = 'Change' AND "
@@ -190,6 +192,7 @@ def _changes(db: Session, t: str, product_id: str, component_ids: list[str], pai
                 "effective_on": _day(r["effective"]),
                 "component_ids": [],
                 "whole_product": False,
+                "origin": origin(r["source_system"], r["source_identifier"])["kind"],
             },
         )
         if r["target_entity_type"] == "Product":
