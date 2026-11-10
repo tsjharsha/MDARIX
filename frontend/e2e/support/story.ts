@@ -1,4 +1,4 @@
-import { expect, type Browser, type Page } from "@playwright/test";
+import { expect, type Browser, type Locator, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import {
   ACTIVATION,
@@ -18,15 +18,16 @@ import {
  * getting-started-journey.spec.ts (the sample, solo and team) and your-data-journey.spec.ts (uploaded data).
  */
 
+// Part 1's ten steps (0.10.93, B2 spec 4.8): steps 1 and 2 are the story's Case and its signed Case check.
 export const STEPS = [
-  "Review the call",
+  "Review the case",
+  "Classify service or complaint",
   "Triage",
   "Assess reportability",
-  "Sign conclusion",
-  "Prepare report",
-  "Complete details",
-  "Approve report",
-  "Record submission",
+  "Sign the conclusion",
+  "Prepare the report",
+  "Complete and approve",
+  "Record the submission",
   "Review records",
   "Explore trends",
 ] as const;
@@ -35,6 +36,8 @@ export type Run = "sample" | "yours";
 export type StoryStep = { key: string; label: string; done: boolean; skipped: boolean; earlier?: boolean };
 export type StoryRun = {
   complaint: { id: string; ref: string };
+  /** The story's Case (null on your data when the complaint has none: steps 1 and 2 "Classified in your QMS"). */
+  case: { id: string; ref: string; classification: string | null; state: string | null } | null;
   steps: StoryStep[];
   current: number;
   conclusion: string | null;
@@ -128,8 +131,26 @@ export async function triageForm(page: Page) {
     .first()
     .waitFor({ timeout: 60_000 });
   if (!(await form.isVisible())) await page.getByRole("button", { name: /^Open the triage/ }).click();
-  await expect(form.getByRole("combobox", { name: /^Severity/ })).toBeVisible({ timeout: 60_000 });
+  await expect(form.getByRole("combobox", { name: /^Harm now/ })).toBeVisible({ timeout: 60_000 });
   return form;
+}
+
+/** Fills the triage form of 0.10.93 (two speeds): the harm now and if it happened again, a backup when the form asks
+ * for one (fast track with two or more people), the containment and what was done. The caller saves. */
+export async function fillTriage(form: Locator, harm: string, containment: string, text: string) {
+  await form.getByRole("combobox", { name: /^Harm now/ }).selectOption({ label: harm });
+  await form.getByRole("combobox", { name: /^Harm if it happened again/ }).selectOption({ label: harm });
+  // "Backup" alone is the required one; "Backup (where you have a second person)" is optional.
+  const backup = form.getByRole("combobox", { name: "Backup", exact: true });
+  if (await backup.count()) await backup.selectOption({ index: 1 });
+  await form.getByRole("checkbox", { name: containment, exact: true }).check();
+  await form.getByRole("textbox", { name: /^What was done, or why nothing is needed/ }).fill(text);
+}
+
+/** Saves the triage form and waits until it is saved (the form folds into the saved record). */
+export async function saveTriage(form: Locator) {
+  await form.getByRole("button", { name: "Save the triage", exact: true }).click();
+  await expect(form.getByRole("button", { name: "Save the triage", exact: true })).toHaveCount(0, { timeout: 60_000 });
 }
 
 /** Answers a decision tree: each fact from the record confirmed, each judgement ``answers[id]`` (else No). */
@@ -186,56 +207,85 @@ export async function signTree(page: Page, who: Person, outcome: RegExp) {
   await expect(page.locator("#dt-outcome")).toContainText("Signed conclusion", { timeout: 90_000 });
 }
 
-/** The complaint read the journey fails on purpose, once (its 503 is expected). */
-export const FAILED_ONCE = /\/api\/v1\/oversight\/events\/SAMPLE-RV-11$/;
+/** The Case read the journey fails on purpose, once (its 503 is expected): the Case check drawer's GET. */
+export const FAILED_ONCE = /\/api\/v1\/intake\/[0-9a-f-]{36}$/;
 
-/** Steps 1 to 4 on the sample: the call, the triage, the tree (reportable, a 30-day report) and its signature. */
+/** The story Case's check drawer (steps 1 and 2 open it). */
+export const caseCheck = (page: Page, ref = "SAMPLE-CASE-11") =>
+  page.getByRole("dialog", { name: `Case check · ${ref}` });
+
+/** Steps 1 to 5 on the sample: SAMPLE-CASE-11's check (question 6 answered and saved), signed "Complaint and service"
+ * and escalated onto SAMPLE-RV-11, the triage, the tree (reportable, a 30-day report) and its signature. */
 export async function sampleToSigned(page: Page, who: Person, reloadMidway = false) {
-  // The complaint's read fails once (0.10.88, P0): the step is not ticked, and no mark is sent. Retry loads it, and
-  // then the step ticks, once.
+  // Steps 1 and 2 tick from the saved records (OD-2), never from a visit: no mark is ever sent for them.
   const marks: string[] = [];
   page.on("request", (request) => {
     if (request.url().includes("/one-story/marks")) marks.push(request.method());
   });
-  await page.route("**/api/v1/oversight/events/SAMPLE-RV-11", (route) => route.fulfill({ status: 503, json: {} }), {
-    times: 1,
-  });
-  await openStep(page, "Review the call");
-  await expect(page).toHaveURL(/\/app\/complaints\/SAMPLE-RV-11/);
-  await expect(page.getByRole("button", { name: "Retry" })).toBeVisible({ timeout: 60_000 });
+  // The Case's read fails once (P0 of 0.10.88): nothing ticks; reading it again opens the check.
+  await page.route(FAILED_ONCE, (route) => route.fulfill({ status: 503, json: {} }), { times: 1 });
+  await openStep(page, "Review the case");
+  await expect(page.getByText("This case could not be read")).toBeVisible({ timeout: 60_000 });
   expect(await ticksInOrder(page, "sample")).toBe(0);
-  expect(marks).toEqual([]);
-  await page.getByRole("button", { name: "Retry" }).click();
+  await page.reload();
+  const check = caseCheck(page);
+  await expect(check).toBeVisible({ timeout: 60_000 });
+  // The pre-filled answers do not count: step 1 ticks once a person saves all nine (question 6 was left Unknown).
+  expect(await ticksInOrder(page, "sample")).toBe(0);
+  await check
+    .getByRole("radiogroup", { name: "Question 6", exact: true })
+    .getByRole("radio", { name: "Yes", exact: true })
+    .check();
+  await check.getByRole("button", { name: "Save the answers" }).click();
   await ticksInOrder(page, "sample", 1);
-  expect(marks).toEqual(["POST"]);
+
+  // Step 2: the suggestion is "Complaint and service"; the duplicate rule pre-selects RV-11 (same event day).
+  await openStep(page, "Classify service or complaint");
+  await expect(check).toBeVisible({ timeout: 60_000 });
+  await check
+    .getByRole("radiogroup", { name: "Your classification" })
+    .getByRole("radio", { name: /^Complaint and service \(suggested\)/ })
+    .check();
+  const escalation = check.getByRole("region", { name: "This case becomes a complaint" });
+  await expect(escalation.getByRole("radio", { name: "Attach this case to SAMPLE-RV-11" })).toBeChecked();
+  await check.getByLabel("Your password").fill(who.password);
+  await check.getByLabel("Authenticator code").fill(await freshCode(page, who));
+  await check.getByRole("button", { name: "Sign and escalate" }).click();
+  await expect(check.getByText("SAMPLE-CASE-11 is now a complaint")).toBeVisible({ timeout: 90_000 });
+  await ticksInOrder(page, "sample", 2);
+  const escalated = await story(page, "sample");
+  expect(escalated.complaint.ref).toBe("SAMPLE-RV-11");
+  expect(escalated.case).toMatchObject({ ref: "SAMPLE-CASE-11", classification: "BOTH", state: "ESCALATED" });
+  expect(marks).toEqual([]);
+
+  // Step 3: RV-11 is on the fast track now.
   await openStep(page, "Triage");
   const triage = await triageForm(page);
-  await triage.getByRole("combobox", { name: /^Severity/ }).selectOption({ label: "Serious" });
-  await triage.getByRole("textbox", { name: /^Immediate action/ }).fill("Monitor quarantined and sent for service.");
-  await triage.getByRole("button", { name: "Save the triage record" }).click();
-  await expect(triage.getByRole("button", { name: "Save the triage record" })).toHaveCount(0, { timeout: 60_000 });
-  await ticksInOrder(page, "sample", 2);
+  await fillTriage(triage, "Serious", "Device taken out of use", "Monitor quarantined and sent for service.");
+  await saveTriage(triage);
+  await ticksInOrder(page, "sample", 3);
   if (reloadMidway) {
-    // A person closes the browser after the triage and comes back: the story resumes at step 3 from the records.
+    // A person closes the browser after the triage and comes back: the story resumes at step 4 from the records.
     await page.goto("/app/getting-started");
     await page.reload();
     await expect(stepButton(page, "Triage", "Completed")).toBeVisible({ timeout: 60_000 });
-    expect(await screenTicks(page)).toEqual([true, true, false, false, false, false, false, false, false, false]);
+    expect(await screenTicks(page)).toEqual([true, true, true, false, false, false, false, false, false, false]);
     await expect(stepButton(page, "Assess reportability")).toHaveAttribute("aria-current", "step");
   }
   await openStep(page, "Assess reportability");
   await answerTree(page, { "5": "Yes" });
-  await ticksInOrder(page, "sample", 3);
-  await signTree(page, who, /30-calendar-day report/);
   await ticksInOrder(page, "sample", 4);
+  await signTree(page, who, /30-calendar-day report/);
+  await ticksInOrder(page, "sample", 5);
 }
 
-/** Steps 5 and 6: the report opened, its missing fields given (the first save lost once when ``lose`` is set). */
+/** Steps 6 and 7's first half: the report opened, its missing fields given and sent for approval (the first save
+ * lost once when ``lose`` is set). Step 7 ticks only at the approval. */
 export async function prepareAndComplete(page: Page, lose = false, run: Run = "sample") {
-  await openStep(page, "Prepare report", run);
+  await openStep(page, "Prepare the report", run);
   await expect(page).toHaveURL(/\/app\/reports\?report=/);
-  await ticksInOrder(page, run, 5);
-  await openStep(page, "Complete details", run);
+  await ticksInOrder(page, run, 6);
+  await openStep(page, "Complete and approve", run);
   const give = page.getByRole("region", { name: /things? to give/ });
   await expect(give).toBeVisible({ timeout: 60_000 });
   const item = (name: RegExp) => give.getByRole("listitem").filter({ has: page.getByRole("textbox", { name }) });
@@ -324,9 +374,10 @@ export async function prepareAndComplete(page: Page, lose = false, run: Run = "s
   await ticksInOrder(page, run, 6);
 }
 
-/** Step 7 from the story: the approval with the password and a fresh code (a wrong password first when asked). */
+/** Step 7 from the story ("Complete and approve"): the approval with the password and a fresh code (a wrong password
+ * first when asked). */
 export async function approve(page: Page, who: Person, refuseFirst = false, run: Run = "sample") {
-  await openStep(page, "Approve report", run);
+  await openStep(page, "Complete and approve", run);
   const form = page.getByRole("form", { name: "Approve the report" });
   await expect(form).toBeVisible({ timeout: 60_000 });
   if (refuseFirst) {
@@ -345,7 +396,7 @@ export async function approve(page: Page, who: Person, refuseFirst = false, run:
 
 /** Step 8: the PDF, then the submission recorded. */
 export async function recordSubmission(page: Page, run: Run = "sample") {
-  await openStep(page, "Record submission", run);
+  await openStep(page, "Record the submission", run);
   const next = page.getByRole("complementary", { name: "What to do next" });
   const pdf = page.waitForResponse((response) => /\/worksheet\.pdf/.test(response.url()), { timeout: 60_000 });
   const download = page.waitForEvent("download", { timeout: 60_000 });

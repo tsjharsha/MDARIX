@@ -17,6 +17,7 @@ import {
 import {
   answerTree,
   approve,
+  fillTriage,
   at,
   exportOf,
   importFile,
@@ -25,6 +26,7 @@ import {
   prepareAndComplete,
   recordSubmission,
   recordsAndTrends,
+  saveTriage,
   screenTicks,
   showYourData,
   signTree,
@@ -43,12 +45,13 @@ import {
  * - A team's owner uploads a file whose most urgent complaint gives no incident country and no awareness date.
  *   Getting started, switched to Your data, follows that complaint; its complaint page asks for both facts, and they
  *   are entered (the first save is lost on the way, said in place, and saved once on retry).
- * - Step 1's complaint fails to load once (P0): the step is not ticked and no mark is sent; Retry loads it and ticks it.
+ * - The imported complaint has no Case, so steps 1 and 2 read "Classified in your QMS" (0.10.93). Step 1's complaint
+ *   page fails to load once (P0): nothing ticks and no mark is sent; Retry loads it.
  * - A reload in the middle resumes at the right step. The reportable branch through the real forms: triage, the US
  *   tree, the signature with password and authenticator, the form's missing fields, a colleague's approval (on a
  *   phone), the PDF (a real one: served as application/pdf, a non-empty file starting %PDF-), the submission,
  *   Records, Trends.
- * - A second upload's complaint, now the most urgent, is concluded not reportable (on a phone): steps 5 to 8 read
+ * - A second upload's complaint, now the most urgent, is concluded not reportable (on a phone): steps 6 to 8 read
  *   "Not needed", no report is made for it, and the first complaint still has exactly one.
  * - Throughout: no page error and no 5xx (the one 503 on purpose excepted), ticks only in order.
  * Run it like getting-started-journey.spec.ts (scripts/journey_api.py with E2E_MAIL_DIR).
@@ -125,7 +128,9 @@ test.describe("Your own data through Getting started's ten steps", () => {
     );
     await shot(page, "yd-walkthrough-start");
 
-    // Step 1, with the complaint's read failing once: not ticked, no mark sent; Retry loads it and ticks it once.
+    // Steps 1 and 2 are not needed (no Case: classified in your QMS). Step 1 opens the complaint, whose read fails
+    // once: nothing more ticks, no mark is sent; Retry loads it.
+    expect(yours.case).toBeNull();
     const marks: string[] = [];
     page.on("request", (request) => {
       if (request.url().includes("/one-story/marks")) marks.push(request.method());
@@ -135,13 +140,11 @@ test.describe("Your own data through Getting started's ten steps", () => {
       (route) => route.fulfill({ status: 503, json: {} }),
       { times: 1 },
     );
-    await openStep(page, "Review the call", "yours");
+    await openStep(page, "Review the case", "yours");
     await expect(page.getByRole("button", { name: "Retry" })).toBeVisible({ timeout: 60_000 });
-    expect(await ticksInOrder(page, "yours")).toBe(0);
+    expect(await ticksInOrder(page, "yours")).toBe(2);
     expect(marks).toEqual([]);
     await page.getByRole("button", { name: "Retry" }).click();
-    await ticksInOrder(page, "yours", 1);
-    expect(marks).toEqual(["POST"]);
 
     // The complaint page asks for the country (the awareness date is asked in its triage form, below); the first
     // save is lost on the way, said in place, and saved once on retry.
@@ -160,6 +163,7 @@ test.describe("Your own data through Getting started's ten steps", () => {
     await facts.getByRole("button", { name: "Save" }).click();
     await expect(facts).toHaveCount(0, { timeout: 60_000 });
     expect(factSaves).toEqual([200]);
+    expect(marks).toEqual([]);
     const needsNow = async () =>
       (await (await page.request.get(at(page, "/api/v1/trial/one-story"))).json()).yours as {
         needs: { fact: string }[];
@@ -168,35 +172,33 @@ test.describe("Your own data through Getting started's ten steps", () => {
     expect((await needsNow()).needs.map((need) => need.fact)).toEqual(["AWARENESS_DATE"]);
     expect((await needsNow()).market).toBe("US");
 
-    // Step 2, the triage, which asks for the awareness date the file did not give.
+    // Step 3, the triage, which asks for the awareness date the file did not give.
     await openStep(page, "Triage", "yours");
     const triage = await triageForm(page);
-    await triage.getByRole("combobox", { name: /^Severity/ }).selectOption({ label: "Serious" });
-    await triage.getByRole("textbox", { name: /^Immediate action/ }).fill("Pump quarantined and sent for service.");
+    await fillTriage(triage, "Serious", "Device taken out of use", "Pump quarantined and sent for service.");
     const aware = triage.getByLabel(/^Awareness (date|time)/);
     await aware.fill((await aware.getAttribute("type")) === "date" ? "2026-11-03" : "2026-11-03T10:00");
     const later = triage.getByRole("textbox", { name: /^Why is it later than the earliest known/ });
     if (await later.count()) await later.fill("The distributor told us on 3 November, two days after the event.");
-    await triage.getByRole("button", { name: "Save the triage record" }).click();
-    await expect(triage.getByRole("button", { name: "Save the triage record" })).toHaveCount(0, { timeout: 60_000 });
-    await ticksInOrder(page, "yours", 2);
+    await saveTriage(triage);
+    await ticksInOrder(page, "yours", 3);
     expect((await needsNow()).needs).toEqual([]);
 
-    // A reload in the middle: Getting started resumes at step 3, on Your data, read from the records.
+    // A reload in the middle: Getting started resumes at step 4, on Your data, read from the records.
     await page.goto("/app/getting-started");
     await page.reload();
     await expect(walkthrough(page)).toHaveAccessibleName("Your data walkthrough", { timeout: 60_000 });
     await expect(stepButton(page, "Triage", "Completed")).toBeVisible({ timeout: 60_000 });
-    expect(await screenTicks(page)).toEqual([true, true, false, false, false, false, false, false, false, false]);
+    expect(await screenTicks(page)).toEqual(["skip", "skip", true, false, false, false, false, false, false, false]);
     await expect(stepButton(page, "Assess reportability")).toHaveAttribute("aria-current", "step");
 
-    // Steps 3 and 4: the US tree (a malfunction that could cause a death if it recurred), signed with the
+    // Steps 4 and 5: the US tree (a malfunction that could cause a death if it recurred), signed with the
     // authenticator; then the report and its missing fields.
     await openStep(page, "Assess reportability", "yours");
     await answerTree(page, { "5": "Yes" });
-    await ticksInOrder(page, "yours", 3);
-    await signTree(page, owner, /30-calendar-day report/);
     await ticksInOrder(page, "yours", 4);
+    await signTree(page, owner, /30-calendar-day report/);
+    await ticksInOrder(page, "yours", 5);
     await prepareAndComplete(page, false, "yours");
     await shot(page, "yd-sent-for-approval");
     expect(problems).toEqual([]);
@@ -232,7 +234,7 @@ test.describe("Your own data through Getting started's ten steps", () => {
     await page.context().close();
   });
 
-  test("a second upload's complaint, concluded not reportable on a phone: steps 5 to 8 are not needed", async ({
+  test("a second upload's complaint, concluded not reportable on a phone: steps 6 to 8 are not needed", async ({
     browser,
   }) => {
     test.setTimeout(900_000);
@@ -242,30 +244,25 @@ test.describe("Your own data through Getting started's ten steps", () => {
     await importFile(page, SECOND);
     const second = await story(page, "yours");
     expect(second.complaint.ref).toContain("YD-2001");
-    await ticksInOrder(page, "yours", 0);
-    await openStep(page, "Review the call", "yours");
-    await ticksInOrder(page, "yours", 1);
+    // No Case: steps 1 and 2 are not needed.
+    await ticksInOrder(page, "yours", 2);
     await openStep(page, "Triage", "yours");
     const triage = await triageForm(page);
-    await triage.getByRole("combobox", { name: /^Severity/ }).selectOption({ label: "Negligible" });
-    await triage
-      .getByRole("textbox", { name: /^Or why none is needed/ })
-      .fill("Cosmetic display flicker; no effect on therapy.");
-    await triage.getByRole("button", { name: "Save the triage record" }).click();
-    await expect(triage.getByRole("button", { name: "Save the triage record" })).toHaveCount(0, { timeout: 60_000 });
-    await ticksInOrder(page, "yours", 2);
+    await fillTriage(triage, "Negligible", "None needed", "Cosmetic display flicker; no effect on therapy.");
+    await saveTriage(triage);
+    await ticksInOrder(page, "yours", 3);
     await openStep(page, "Assess reportability", "yours");
     await answerTree(page, { "5": "No" });
-    await ticksInOrder(page, "yours", 3);
+    await ticksInOrder(page, "yours", 4);
     await signTree(page, owner, /Not reportable/);
     const after = await story(page, "yours");
     expect(after.conclusion).toBe("NOT_REPORTABLE");
-    expect(after.steps.slice(4, 8).map((step) => step.skipped)).toEqual([true, true, true, true]);
+    expect(after.steps.slice(5, 8).map((step) => step.skipped)).toEqual([true, true, true]);
     await ticksInOrder(page, "yours", 8);
     await walkthroughOnYourData(page);
-    expect(await screenTicks(page)).toEqual([true, true, true, true, "skip", "skip", "skip", "skip", false, false]);
-    await stepButton(page, "Prepare report", "Not needed").click();
-    await expect(page.getByText("Not needed: the signed conclusion is “not reportable”")).toBeVisible();
+    expect(await screenTicks(page)).toEqual(["skip", "skip", true, true, true, "skip", "skip", "skip", false, false]);
+    await stepButton(page, "Prepare the report", "Not needed").click();
+    await expect(page.getByText("Not needed: not reportable").first()).toBeVisible();
     await shot(page, "yd-not-needed-phone");
     await recordsAndTrends(page, "yours", 8);
     // No report for the not-reportable complaint; exactly one for the first.

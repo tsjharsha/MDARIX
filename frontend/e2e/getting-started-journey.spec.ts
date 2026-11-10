@@ -36,6 +36,8 @@ import {
   steps,
   story,
   ticksInOrder,
+  fillTriage,
+  saveTriage,
   triageForm,
 } from "./support/story";
 
@@ -43,18 +45,20 @@ import {
  * The owner's top priority (DEV-10, 0.10.88): Getting started's ten steps, through the real forms, as an acceptance
  * test in the browser.
  *
- * - A solo trial on the sample, at 1440: the ten steps with the authenticator for every signature, a reload and a
- *   resume in the middle, a step opened out of turn (refused: 409 STEP_NOT_YET, said on Getting started), a save lost
- *   on the way (an API error) and saved once on retry, and the labelled practice approval.
- * - A team, at 390 for the colleague and the imported data: the owner takes the sample to "Approve report", a colleague
- *   approves it as the second person, the owner records the submission and finishes; then the team's own imported
- *   complaint is concluded "not reportable", so steps 5 to 8 read "Not needed"; a newer, more urgent import moves the
- *   story, and a step opened from the page that still showed the old complaint is refused (409 STORY_MOVED).
+ * - A solo trial on the sample, at 1440: the ten steps with the authenticator for every signature (0.10.93: steps 1
+ *   and 2 on SAMPLE-CASE-11's Case check, signed "Complaint and service" and escalated onto SAMPLE-RV-11), a reload
+ *   and a resume in the middle, a step opened out of turn (refused: 409 STEP_NOT_YET, said on Getting started), a
+ *   save lost on the way (an API error) and saved once on retry, and the labelled practice approval.
+ * - A team, at 390 for the colleague and the imported data: the owner takes the sample to "Complete and approve", a
+ *   colleague approves it as the second person, the owner records the submission and finishes; then the team's own
+ *   imported complaint (no Case: steps 1 and 2 "Classified in your QMS") is concluded "not reportable", so steps 6 to
+ *   8 read "Not needed"; a newer, more urgent import moves the story, and Records opened from the page that still
+ *   showed the old complaint is refused (409 STORY_MOVED).
  * - Throughout: no page error and no 5xx (the two 409s are expected), the ticks only ever in order (read from the API
  *   and from the step list's names), and no work lost or made twice (one report, one approval of each kind).
  *
  * Selectors are the step names and roles, never the layout: "Walkthrough steps" is the list of the ten steps, each a
- * button named "Step 2: Triage" and its status ("Completed", "Next", "Not needed"); the walkthrough is the region named
+ * button named "Step 3: Triage" and its status ("Completed", "Next", "Not needed"); the walkthrough is the region named
  * "Your sample walkthrough" or "Your data walkthrough", and the step's main button is its button that is neither a step
  * of the list nor a "Back to step" or "Then: step" link (0.10.87).
  * Run it like trial-journeys.spec.ts (scripts/journey_api.py with E2E_MAIL_DIR).
@@ -63,7 +67,7 @@ import {
 // ------------------------------------------------------------------------------------------------- a solo trial
 
 const SOLO = randomBytes(3).toString("hex");
-// E2E_OWNER_JSON: carry on with a solo owner an earlier run saved (after steps 1 to 4; the first test is skipped).
+// E2E_OWNER_JSON: carry on with a solo owner an earlier run saved (after steps 1 to 5; the first test is skipped).
 const REUSED = process.env.E2E_OWNER_JSON;
 const solo: Person = REUSED
   ? { ...JSON.parse(readFileSync(REUSED, "utf-8")), lastStep: 0 }
@@ -74,7 +78,7 @@ test.describe("Getting started's ten steps: a solo trial on the sample, desktop"
   test.skip(!MAIL_DIR, "Set E2E_MAIL_DIR to the journey API's mail folder (scripts/journey_api.py).");
   test.afterAll(() => rmSync(solo.state, { force: true }));
 
-  test("steps 1 to 4, with a reload and a resume after the triage", async ({ browser }) => {
+  test("steps 1 to 5, with a reload and a resume after the triage", async ({ browser }) => {
     test.skip(!!REUSED, "E2E_OWNER_JSON: an owner from an earlier run carries on");
     test.setTimeout(900_000);
     const page = await signedUpOwner(browser, solo, `Story Devices ${SOLO.toUpperCase()}`);
@@ -86,7 +90,7 @@ test.describe("Getting started's ten steps: a solo trial on the sample, desktop"
     await page.context().close();
   });
 
-  test("a step opened out of turn is refused and said; steps 5 to 8 with a lost save and the practice approval", async ({
+  test("a step opened out of turn is refused and said; steps 6 to 8 with a lost save and the practice approval", async ({
     browser,
   }) => {
     test.setTimeout(1_200_000);
@@ -106,8 +110,8 @@ test.describe("Getting started's ten steps: a solo trial on the sample, desktop"
     await expect(page.getByRole("status").filter({ hasText: /Step 9 counts once steps 1 to 8 are done/ })).toBeVisible({
       timeout: 60_000,
     });
-    // Records was not credited: the story is where it was (4 done; an owner carried on may be further).
-    await ticksInOrder(page, "sample", REUSED ? undefined : 4);
+    // Records was not credited: the story is where it was (5 done; an owner carried on may be further).
+    await ticksInOrder(page, "sample", REUSED ? undefined : 5);
 
     await prepareAndComplete(page, true);
     // Working alone, the owner approves the practice report, and it is marked so.
@@ -143,7 +147,7 @@ test.describe("Getting started's ten steps: a team, a second person approving, a
     rmSync(colleague.state, { force: true });
   });
 
-  test("the owner takes the sample to Approve report and invites an approver", async ({ browser }) => {
+  test("the owner takes the sample to Complete and approve and invites an approver", async ({ browser }) => {
     test.skip(!!REUSED_TEAM, "E2E_TEAM_OWNER_JSON: only the own-data test runs");
     test.setTimeout(1_200_000);
     const page = await signedUpOwner(browser, owner, `Team Story ${TEAM.toUpperCase()}`);
@@ -192,7 +196,7 @@ test.describe("Getting started's ten steps: a team, a second person approving, a
     await page.context().close();
   });
 
-  test("its own complaint, triaged and not reportable: steps 5 to 8 are not needed; a moved story refuses a stale step", async ({
+  test("its own complaint, triaged and not reportable: steps 6 to 8 are not needed; a moved story refuses a stale step", async ({
     browser,
   }) => {
     test.setTimeout(900_000);
@@ -215,30 +219,29 @@ test.describe("Getting started's ten steps: a team, a second person approving, a
     );
     const yours = await story(page, "yours");
     expect(yours.complaint.ref).toContain("GT-0001");
-    await openStep(page, "Review the call", "yours");
-    await ticksInOrder(page, "yours", 1);
+    // An imported complaint with no Case was classified in the QMS: steps 1 and 2 are not needed.
+    expect(yours.case).toBeNull();
+    await ticksInOrder(page, "yours", 2);
     await openStep(page, "Triage", "yours");
     const triage = await triageForm(page);
-    await triage.getByRole("combobox", { name: /^Severity/ }).selectOption({ label: "Negligible" });
-    await triage
-      .getByRole("textbox", { name: /^Or why none is needed/ })
-      .fill("Cosmetic display flicker; no effect on therapy.");
-    await triage.getByRole("button", { name: "Save the triage record" }).click();
-    await expect(triage.getByRole("button", { name: "Save the triage record" })).toHaveCount(0, { timeout: 60_000 });
-    await ticksInOrder(page, "yours", 2);
+    // A malfunction is the fast track; two people are active, so a backup is named.
+    await fillTriage(triage, "Negligible", "None needed", "Cosmetic display flicker; no effect on therapy.");
+    await saveTriage(triage);
+    await ticksInOrder(page, "yours", 3);
     await openStep(page, "Assess reportability", "yours");
     // A malfunction not likely to cause a death or serious injury if it recurred: not reportable in the US.
     await answerTree(page, { "5": "No" });
-    await ticksInOrder(page, "yours", 3);
+    await ticksInOrder(page, "yours", 4);
     await signTree(page, owner, /Not reportable/);
-    // Not reportable: no report, so Prepare report to Record submission are not needed, and read so.
+    // Not reportable: no report, so Prepare the report to Record the submission are not needed, and read so.
     const after = await story(page, "yours");
     expect(after.conclusion).toBe("NOT_REPORTABLE");
-    expect(after.steps.slice(4, 8).map((step) => step.skipped)).toEqual([true, true, true, true]);
+    expect(after.steps.slice(5, 8).map((step) => step.skipped)).toEqual([true, true, true]);
     await ticksInOrder(page, "yours", 8);
     await page.goto("/app/getting-started");
-    await stepButton(page, "Prepare report", "Not needed").click();
-    await expect(page.getByText("Not needed: the signed conclusion is “not reportable”")).toBeVisible();
+    await expect(stepButton(page, "Review the case", "Not needed")).toBeVisible({ timeout: 60_000 });
+    await stepButton(page, "Prepare the report", "Not needed").click();
+    await expect(page.getByText("Not needed: not reportable").first()).toBeVisible();
     await recordsAndTrends(page, "yours", 8);
 
     // A newer, more urgent import moves the story; a step opened from the page that still showed the old complaint
@@ -265,7 +268,8 @@ test.describe("Getting started's ten steps: a team, a second person approving, a
       ]),
     );
     await other.close();
-    await stepButton(page, "Review the call").click();
+    // Records is a step whose opening is recorded (a mark): sent for the old complaint, it is refused.
+    await stepButton(page, "Review records").click();
     await mainButton(page).click();
     await expect.poll(() => refusals, { timeout: 30_000 }).toContain("STORY_MOVED");
     await page.unroute("**/api/v1/trial/one-story");
@@ -274,7 +278,7 @@ test.describe("Getting started's ten steps: a team, a second person approving, a
       timeout: 60_000,
     });
     expect((await story(page, "yours")).complaint.ref).toContain("GT-0002");
-    await ticksInOrder(page, "yours", 0);
+    await ticksInOrder(page, "yours", 2);
     await shot(page, "gs-team-story-moved");
     expect(problems).toEqual([]);
     await page.context().close();

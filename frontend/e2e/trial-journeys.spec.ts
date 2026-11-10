@@ -21,6 +21,7 @@ import {
   watch,
   type Person,
 } from "./support/journey";
+import { fillTriage } from "./support/story";
 
 /*
  * DEV-10: the free trial's journeys on the new navigation, as people live them, at 1440 (desktop) and 390 (phone).
@@ -98,8 +99,7 @@ test.describe("a solo owner, desktop", () => {
     await page.goto("/app/complaints/SAMPLE-URG-01");
     await page.getByRole("button", { name: "Triage it" }).click();
     const triage = page.getByRole("dialog", { name: /^Triage SAMPLE-URG-01/ });
-    await triage.getByRole("combobox", { name: /^Severity/ }).selectOption({ label: "Minor" });
-    await triage.getByRole("textbox", { name: /^Immediate action/ }).fill("Device swapped, ward informed.");
+    await fillTriage(triage, "Minor", "Device taken out of use", "Device swapped, ward informed.");
     await page.context().clearCookies();
     await triage.getByRole("button", { name: /^Save the triage/ }).click();
     await expect(page).toHaveURL(/\/signin\?reason=unsaved/, { timeout: 30_000 });
