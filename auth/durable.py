@@ -8,6 +8,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.stage2 import (
@@ -150,16 +151,17 @@ def peek(db: Session, raw: str, kind: str) -> str:
 
 
 def consume(db: Session, raw: str, kind: str):
+    """Spend a link once: one conditional UPDATE, so of two uses at the same moment only one wins (code audit 17)."""
     model = UserInvitation if kind == "activation" else PasswordResetRequest
-    row = (
-        db.query(model)
-        .filter(
-            model.token_hash == hash_token(raw), model.used_at.is_(None), model.expires_at > datetime.now(timezone.utc)
-        )
-        .first()
-    )
-    if not row:
+    now = datetime.now(timezone.utc)
+    user_id = db.execute(
+        update(model)
+        .where(model.token_hash == hash_token(raw), model.used_at.is_(None), model.expires_at > now)
+        .values(used_at=now)
+        .returning(model.user_id)
+        .execution_options(synchronize_session=False)
+    ).scalar_one_or_none()
+    if user_id is None:
         raise ValueError(f"INVALID_{kind.upper()}_TOKEN")
-    row.used_at = datetime.now(timezone.utc)
     db.commit()
-    return str(row.user_id)
+    return str(user_id)

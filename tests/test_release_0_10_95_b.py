@@ -161,3 +161,35 @@ def test_an_export_over_the_size_limit_is_refused_before_work_starts(monkeypatch
         row = db.get(tenant_export.TenantExport, export_id)
         assert (row.error, row.object_key) == ("ExportTooLarge", None)
     assert storage.list_tenant_objects(str(small)) == []
+
+
+def test_a_reset_link_used_twice_at_the_same_moment_works_once(tenant_id):  # audit 17
+    import threading
+
+    from auth import durable
+
+    with SessionLocal() as db:
+        bind_system(db, "test: one link, two uses")
+        user_id = str(_user(db, tenant_id, "INVESTIGATOR").id)
+        db.commit()
+        raw = durable.issue_reset(db, user_id, tenant_id)
+    first_at_commit, second_done, outcomes = threading.Event(), threading.Event(), {}
+
+    def use(name):
+        with SessionLocal() as db:
+            bind_system(db, "test: use the link")
+            if name == "first":  # holds its commit until the second use has finished (or 3 s, if that one waits)
+                real = db.commit
+                db.commit = lambda: (first_at_commit.set(), second_done.wait(3), real())[2]
+            try:
+                outcomes[name] = durable.consume(db, raw, "reset")
+            except ValueError as exc:
+                outcomes[name] = str(exc)
+
+    first = threading.Thread(target=use, args=("first",))
+    first.start()
+    assert first_at_commit.wait(10)
+    use("second")
+    second_done.set()
+    first.join(10)
+    assert outcomes == {"first": user_id, "second": "INVALID_RESET_TOKEN"}, outcomes

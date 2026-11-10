@@ -36,6 +36,7 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
 - A full data export has a size limit of 1 GB (`MDARIX_EXPORT_MAX_BYTES`): an organization whose files are larger is
   told so when it asks (413, "contact support to receive it in parts"), and an export whose zip is larger ends
   FAILED (`ExportTooLarge`) without retrying, instead of failing in memory after hours of retries.
+- A password-reset or activation link used twice at the same moment works only once.
 
 ### Security
 
