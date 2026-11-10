@@ -195,6 +195,13 @@ class SignIn(BaseModel):
     create_new: bool = False
 
 
+class SignedEscalateIn(BaseModel):
+    """Spec 9.3: the duplicate choice for a Case signed a complaint before 0.10.93 and never escalated."""
+
+    attach_to: uuid.UUID | None = None
+    create_new: bool = False
+
+
 class ReviewIn(BaseModel):
     outcome: str = Field(max_length=20)
     note: str = Field(default="", max_length=rules.TEXT_MAX)
@@ -463,6 +470,7 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
             if open_case and service.linked_complaint(db, tenant_id, event) is None
             else []
         )
+        found["escalate_signed"] = signed_unescalated(db, tenant_id, event, signed)
     return found
 
 
@@ -1430,6 +1438,73 @@ def _move(db, control_db, ctx, event, check, target: str, now, attach_to=None):
         attach_to=attach_to,
         correlation_id=ctx.correlation_id,
     )
+
+
+def signed_unescalated(db, tenant_id, event, signed) -> bool:
+    """Spec 9.3: a Case signed "complaint" or "complaint and service" before 0.10.93 (signing escalates since) that
+    never became or joined a complaint: it offers "Signed before 0.10.93: escalate"."""
+    return (
+        signed is not None
+        and signed.classification in rules.COMPLAINT_OUTCOMES
+        and event.status not in (case_rules.ESCALATED, case_rules.VOIDED)
+        and event.complaint_id is None
+        and service.linked_complaint(db, tenant_id, event) is None
+    )
+
+
+@router.post("/intake/{event_id}/escalate", dependencies=[CLASSIFIERS])
+def escalate_signed(
+    event_id: uuid.UUID,
+    payload: SignedEscalateIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """ "Signed before 0.10.93: escalate" (spec 9.3): the signed classification is carried out now, with the duplicate
+    choice (attach or create new). Nothing is signed again: the signed check is the decision. Its old "Awaiting
+    import" task is completed (Complete: owned in MDARIX; Connect: the escalation's QMS-ID task replaces it)."""
+    from backend.app.workflow.tasks import complete_tasks
+
+    tenant_id = _tenant(ctx)
+    event = _event_or_404(db, tenant_id, event_id, lock=True)
+    signed = service.current_signed(service.checks_of(db, tenant_id, [event.id]).get(event.id, []))
+    if not signed_unescalated(db, tenant_id, event, signed):
+        raise _error(
+            409, "NOTHING_TO_ESCALATE", "Only a case signed a complaint and not yet escalated is escalated here"
+        )
+    _move_allowed(control_db, ctx, event, case_rules.ESCALATED)
+    attach = _duplicate_choice(db, tenant_id, event, payload)
+    now = service.now_utc()
+    owner, _ = service.case_setup(db, tenant_id, is_trial(control_db, tenant_id))
+    complete_tasks(
+        db,
+        tenant_id,
+        source_type=service.SOURCE_TYPE,
+        source_id=event.id,
+        task_types=[service.QMS],
+        outcome="NOT_NEEDED",
+        actor_ref=ctx.user_id,
+        reason="Not needed: owned in MDARIX"
+        if owner == "MDARIX"
+        else "Replaced by the QMS complaint ID task of the escalation",
+        correlation_id=ctx.correlation_id,
+    )
+    complaint = _move(db, control_db, ctx, event, signed, case_rules.ESCALATED, now, attach)
+    service._audit(
+        control_db,
+        tenant_id,
+        ctx.user_id,
+        "CASE_ESCALATED_SIGNED_BEFORE",
+        event,
+        now,
+        ctx.correlation_id,
+        complaint_id=str(complaint.id),
+        check_version=signed.version,
+        signed_at=service._iso(signed.signed_at),
+        escalation=event.escalation,
+    )
+    _commit(db, control_db)
+    return intake_detail(event.id, db, control_db, ctx)
 
 
 @router.post("/intake/{event_id}/check/review", dependencies=[REVIEWERS])

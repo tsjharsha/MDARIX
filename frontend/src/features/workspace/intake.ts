@@ -170,6 +170,8 @@ export type IntakeItem = {
   choices?: Choice[] | null;
   clock?: Deadline | null;
   likely_complaints?: { id: string; ref: string; reasons: string[]; same_day?: boolean }[];
+  /** Spec 9.3: signed a complaint before 0.10.93 and never escalated: "Signed before 0.10.93: escalate". */
+  escalate_signed?: boolean;
   complaint_id?: string | null;
   complaint_ref?: string | null;
   row_version?: number;

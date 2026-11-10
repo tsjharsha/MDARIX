@@ -193,6 +193,27 @@ describe("the Case check drawer (spec 4.4)", () => {
     expect(html).not.toContain("Waiting for internal team");
   });
 
+  it("offers 'Signed before 0.10.93: escalate' on a Case signed a complaint and never linked (SAMPLE-CALL-02)", () => {
+    const signedBefore = item({
+      reference: "SAMPLE-CALL-02",
+      draft: false,
+      signed: { classification_label: "Complaint and service" } as IntakeItem["signed"],
+      escalate_signed: true,
+      likely_complaints: [{ id: "c5", ref: "SAMPLE-RT-05", reasons: ["same product", "same lot"], same_day: true }],
+    });
+    const html = render(<CheckBody item={signedBefore} guide={guide} onChanged={vi.fn()} />, ALL);
+    expect(html).toContain("Signed before 0.10.93: escalate");
+    expect(html).toMatch(/name="attach" checked=""\/>Attach this case to SAMPLE-RT-05/);
+    expect(html).toContain(">Escalate</button>");
+    expect(html).not.toContain("Sign and escalate");
+    // Without case.classify, or once escalated, nothing is offered.
+    expect(render(<CheckBody item={signedBefore} guide={guide} onChanged={vi.fn()} />, ["case.log"])).not.toContain(
+      "Signed before 0.10.93",
+    );
+    const done = { ...signedBefore, escalate_signed: false };
+    expect(render(<CheckBody item={done} guide={guide} onChanged={vi.fn()} />, ALL)).not.toContain("Signed before");
+  });
+
   it("refuses a disabled classification in its own words, and names the clock chip", () => {
     const form = { classification: "INQUIRY" as const, override: "", reason: "", password: "x" };
     expect(signProblem({ suggestion: "BOTH", choices: CHOICES }, form, [])).toMatch(/only when the answers give it/);

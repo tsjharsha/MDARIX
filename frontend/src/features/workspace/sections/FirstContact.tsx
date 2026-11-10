@@ -984,6 +984,7 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
       {canWrite && item.draft && item.version > 0 && !voided && (
         <SignForm item={item} guide={guide} answers={answers} onSigned={onChanged} />
       )}
+      {canWrite && item.escalate_signed && !item.draft && !voided && <SignedBefore item={item} onDone={onChanged} />}
       {followUp && canLog && <FollowUp item={item} dueAt={followUp.due_at} onDone={onChanged} />}
       {item.qms_task && (
         <section className="ca-drawer-section">
@@ -1294,15 +1295,12 @@ function SignForm({
   onSigned: () => void;
 }) {
   const likely = item.likely_complaints ?? [];
-  const sameDay = likely.filter((candidate) => candidate.same_day);
   const [form, setForm] = useState({
     classification: (item.suggestion ?? "") as Outcome | "",
     override: "",
     reason: "",
     ticket: item.service_ticket ?? "",
-    // Spec 3.3 step 2: one strong match (the only one, or the only one on the case's event day) is pre-selected
-    // "Attach to …"; otherwise the signer chooses.
-    attach: likely.length === 1 ? likely[0].id : sameDay.length === 1 ? sameDay[0].id : "",
+    attach: preselected(likely),
     password: "",
     code: "",
   });
@@ -1445,6 +1443,59 @@ function SignForm({
 }
 
 const NEW = "new";
+
+/** Spec 3.3 step 2: one strong match (the only one, or the only one on the case's event day) is pre-selected
+ * "Attach to …"; otherwise the signer chooses. */
+function preselected(likely: NonNullable<IntakeItem["likely_complaints"]>): string {
+  const sameDay = likely.filter((candidate) => candidate.same_day);
+  return likely.length === 1 ? likely[0].id : sameDay.length === 1 ? sameDay[0].id : "";
+}
+
+/** "Signed before 0.10.93: escalate" (spec 9.3): a Case signed a complaint before signing escalated, never linked.
+ * The signed check is the decision, so nothing is signed again; only the duplicate choice is made. */
+function SignedBefore({ item, onDone }: { item: IntakeItem; onDone: () => void }) {
+  const likely = item.likely_complaints ?? [];
+  const [attach, setAttach] = useState(preselected(likely));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const problem =
+    likely.length > 0 && !attach ? "Attach this case to the complaint it may be, or create a new complaint" : null;
+  const escalate = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await send(
+        `${INTAKE}/${item.id}/escalate`,
+        "POST",
+        attach === NEW ? { create_new: true } : attach ? { attach_to: attach } : {},
+      );
+      onDone();
+    } catch (reason) {
+      setError(errorText(reason, "Not escalated"));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="ca-drawer-section" aria-label="Signed before 0.10.93: escalate">
+      <h3>
+        <Siren size={15} aria-hidden="true" /> Signed before 0.10.93: escalate
+      </h3>
+      <p>
+        Signed {item.signed?.classification_label?.toLowerCase() ?? "a complaint"} before a signature made the complaint
+        at once. Escalate it now: the signed check stands, nothing is signed again.
+      </p>
+      <EscalationPanel item={item} likely={likely} attach={attach} onAttach={setAttach} />
+      {problem && <p className="uw-hint">{problem}</p>}
+      <div className="ca-action-row">
+        <button type="button" className="ac-primary" disabled={busy || !!problem} onClick={() => void escalate()}>
+          {busy ? "Escalating…" : "Escalate"}
+        </button>
+      </div>
+      <InlineError text={error} />
+    </section>
+  );
+}
 
 /** The escalation panel inside the sign step (spec 4.5): what is carried, and the duplicate choice (attach or new). */
 function EscalationPanel({
