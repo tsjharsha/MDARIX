@@ -415,7 +415,9 @@ def complaint_work(db, control_db, tenant_id, complaints: list, reads=None) -> d
         mine = [view for view in due if view["complaint_id"] == key]
         # A market not assessed yet runs the reportability watch's provisional clock, which Oversight does not list
         # (it lists a market's clock once its assessment is started): shown here, so the page says what the watch says.
-        dated = {view["market"] for view in mine if view["category"] in ("REPORTING", "OBLIGATION")}
+        # A line with no market (Home's "Enter the ..." line) dates no market, so it never hides the Imported backlog
+        # target of a complaint that has no country yet (gap matrix S): the page shows both, as with a known country.
+        dated = {view["market"] for view in mine if view["category"] in ("REPORTING", "OBLIGATION") and view["market"]}
         listed = {view["key"] for view in mine}
         mine += [clock for clock in clocks.get(key, []) if clock["market"] not in dated and clock["key"] not in listed]
         mine.sort(key=lambda view: view["due_at"])
