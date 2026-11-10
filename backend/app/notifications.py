@@ -17,6 +17,8 @@ email could not be sent, so the outbox retries (and finally dead-letters and ale
 * ``RISK_REVIEW_REQUESTED`` (``notify_risk_review_requested``): the named reviewer, else every approver.
 * ``CONNECTOR_SYNC_FAILED`` (``notify_connector_sync_failed``): the organization's customer administrators.
 * ``AI_BUDGET_THRESHOLD`` (``notify_ai_budget_threshold``): the customer administrators, once per month at 80% and at 100%.
+* ``MAIL_INTAKE_LIMIT_REACHED`` (``notify_mail_intake_limit``, the mail-in receiver): the customer administrators, at
+  most once a day, when the organization's e-mail intake address reached its daily limit.
 * ``FEEDBACK_SUBMITTED`` (``notify_feedback_submitted``): the MDARIX team (``MDARIX_TRIAL_ALERT_EMAIL``, else
   ``MDARIX_SUPPORT_EMAIL``).
 * ``SECURITY_NOTICE`` (``notify_security_notice``): the account's owner (auth/security_notices.py builds it).
@@ -59,6 +61,7 @@ SIGNOFF_COMPLETED = "SIGNOFF_COMPLETED"
 RISK_REVIEW_REQUESTED = "RISK_REVIEW_REQUESTED"
 CONNECTOR_SYNC_FAILED = "CONNECTOR_SYNC_FAILED"
 AI_BUDGET_THRESHOLD = "AI_BUDGET_THRESHOLD"
+MAIL_INTAKE_LIMIT_REACHED = "MAIL_INTAKE_LIMIT_REACHED"
 FEEDBACK_SUBMITTED = "FEEDBACK_SUBMITTED"
 TRIAL_REQUEST_DECLINED = "TRIAL_REQUEST_DECLINED"
 # A trial invitation the mail provider refused, sent again (backend/app/trial/service.py retry_invitation).
@@ -433,6 +436,31 @@ def notify_ai_budget_threshold(
 
 
 notify_ai_budget = notify_ai_budget_threshold  # shorter name, same function
+
+
+def notify_mail_intake_limit(
+    db: Session, tenant_id, *, limit: int, day: str | None = None, **_refs
+) -> OutboxEvent | None:
+    """Tell the customer administrators the organization's e-mail intake address reached its daily limit (B7b, spec
+    4.5): senders get a temporary refusal and retry. At most once a day (UTC, ``YYYY-MM-DD``) per organization; None
+    when already queued. The event's id comes from the organization and the day, so two receivers refusing at the same
+    moment cannot both queue it (the second insert fails)."""
+    tenant = _uuid(tenant_id)
+    day = day or datetime.now(timezone.utc).date().isoformat()
+    already = (
+        db.query(OutboxEvent.id)
+        .filter(
+            OutboxEvent.tenant_id == tenant,
+            OutboxEvent.event_name == MAIL_INTAKE_LIMIT_REACHED,
+            OutboxEvent.payload["day"].as_string() == day,
+        )
+        .first()
+    )
+    if already:
+        return None
+    event = _queue(db, tenant, MAIL_INTAKE_LIMIT_REACHED, "Tenant", tenant, {"day": day, "limit": int(limit)})
+    event.id = uuid.uuid5(tenant, f"{MAIL_INTAKE_LIMIT_REACHED}|{day}")
+    return event
 
 
 def notify_feedback_submitted(db: Session, tenant_id, *, feedback_id, **_refs) -> OutboxEvent:
@@ -891,6 +919,17 @@ def _ai_budget(db: Session, payload: dict, emailer) -> None:
     )
 
 
+def _mail_intake_limit(db: Session, payload: dict, emailer) -> None:
+    tenant_id = _uuid(payload["tenant_id"])
+    _deliver(
+        lambda recipient, **kw: emailer.send_mail_intake_limit_notice(recipient, **kw),
+        customer_admin_emails(db, tenant_id),
+        organization=_organization(db, tenant_id),
+        limit=int(payload["limit"]),
+        day=_long_date(datetime.strptime(str(payload["day"]), "%Y-%m-%d")),
+    )
+
+
 def _personal(db: Session, tenant_id, user_id) -> list[str]:
     user = _active_user(db, tenant_id, user_id)
     return [user.username] if user and user.username else []
@@ -985,6 +1024,9 @@ def _handle_event(db: Session, event_name: str, payload: dict) -> bool:
         return True
     if event_name == AI_BUDGET_THRESHOLD:
         _ai_budget(db, payload, emailer)
+        return True
+    if event_name == MAIL_INTAKE_LIMIT_REACHED:
+        _mail_intake_limit(db, payload, emailer)
         return True
     if event_name == FEEDBACK_SUBMITTED:
         _feedback(db, payload, emailer)

@@ -150,9 +150,23 @@ def test_em10_over_a_limit_the_sender_is_told_to_retry_451(orgs, smtp, monkeypat
         settings.mail_daily_limit = len(_stored(orgs[1])) + 1
         db.commit()
     _send(smtp, to)
-    with pytest.raises(smtplib.SMTPRecipientsRefused) as refused:
-        _send(smtp, to)
-    assert refused.value.recipients[to][0] == 451
+    for _ in range(2):
+        with pytest.raises(smtplib.SMTPRecipientsRefused) as refused:
+            _send(smtp, to)
+        assert refused.value.recipients[to][0] == 451
+    # The Customer Admin is told once a day, through the notifications outbox, however often senders are refused.
+    from backend.app.notifications import MAIL_INTAKE_LIMIT_REACHED
+
+    with SessionLocal() as control:
+        bind_system(control, "test:mail-in")
+        notices = (
+            control.query(OutboxEvent)
+            .filter(OutboxEvent.tenant_id == orgs[1], OutboxEvent.event_name == MAIL_INTAKE_LIMIT_REACHED)
+            .all()
+        )
+    assert len(notices) == 1
+    assert notices[0].payload["day"] == datetime.now(timezone.utc).date().isoformat()
+    assert "@" not in str(notices[0].payload)
     # Per sending IP: 30 an hour.
     monkeypatch.setattr(receiver, "PER_IP_PER_HOUR", 0)
     with pytest.raises(smtplib.SMTPRecipientsRefused) as refused:
