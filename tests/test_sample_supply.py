@@ -1,4 +1,4 @@
-"""W1 (0.10.94), the sample's supply chain (backend/app/trial/sample_supply.py, spec 5.2 S1-S2) on a new free trial:
+"""W1 (0.10.94), the sample's supply chain (backend/app/trial/sample_supply.py, spec 5.2 S1-S3) on a new free trial:
 Rev A configurations (the OrbitCare sensor from Precision Sensors, NovaSense on Rev B), no change on any Rev A, the
 inspection evidence on Supplier 360, idempotence, sample removal and the clock reaching the new rows, and the refresh
 of a running trial adding only what is missing (P360-05 data, P360-13, S360-10, S360-11)."""
@@ -137,7 +137,7 @@ def test_the_seed_is_idempotent_and_removal_and_the_clock_reach_its_rows(trial):
 
 def test_a_running_trial_gets_only_the_missing_rows(trial):
     from backend.app.db.models.evidence_intelligence import EvidenceEntityLink
-    from backend.app.db.models.foundation import ProductComponent, ProductVersion
+    from backend.app.db.models.foundation import Capa, ProductComponent, ProductVersion
     from backend.app.trial import sample_supply
 
     tenant_id = trial["tenant_id"]
@@ -157,11 +157,77 @@ def test_a_running_trial_gets_only_the_missing_rows(trial):
         )
         db.delete(one_link)
         db.delete(one_evidence)
+        capa = db.query(Capa).filter(Capa.tenant_id == tenant_id, Capa.capa_identifier == "SAMPLE-CAPA-02").one()
+        capa.investigation_id = None
         db.flush()
         now = datetime.now(timezone.utc)
-        assert sample_supply.refresh(db, tenant_id, apply=False, now=now) == 2
-        assert sample_supply.refresh(db, tenant_id, apply=True, now=now) == 2
+        assert sample_supply.refresh(db, tenant_id, apply=False, now=now) == 3
+        assert sample_supply.refresh(db, tenant_id, apply=True, now=now) == 3
+        assert capa.investigation_id is not None
         assert sample_supply.refresh(db, tenant_id, apply=False, now=now) == 0
         db.commit()
     finally:
         db.close()
+
+
+def test_capa_02_comes_from_inv_001_and_every_reader_of_the_link_agrees(trial):
+    """S3 (owner, 10 Nov 2026): SAMPLE-CAPA-02 is SAMPLE-INV-001's. The closure check of a complaint in the case lists
+    it (information, never blocking), the report worksheet pre-fills it, Readiness no longer counts the case's trends
+    as without action, and the CAPA's effectiveness measure keeps its outcome (narrowed to the case's problem codes)."""
+    from datetime import date
+
+    from backend.app.authority_reports.worksheet import _capas, load
+    from backend.app.capa_effectiveness import service as effectiveness
+    from backend.app.db.models.foundation import Capa, Complaint, Investigation, InvestigationComplaint
+    from backend.app.db.models.signals import InvestigationSignal
+    from backend.app.db.session import SessionLocal
+    from backend.app.oversight.closure import checklist, facts
+    from backend.app.readiness_home.service import trends_without_action_rows
+
+    tenant_id = trial["tenant_id"]
+    db = _session(tenant_id)
+    control = SessionLocal()
+    try:
+        capa = db.query(Capa).filter(Capa.tenant_id == tenant_id, Capa.capa_identifier == "SAMPLE-CAPA-02").one()
+        case = (
+            db.query(Investigation)
+            .filter(Investigation.tenant_id == tenant_id, Investigation.investigation_identifier == "SAMPLE-INV-001")
+            .one()
+        )
+        assert capa.investigation_id == case.id
+        complaint = (
+            db.query(Complaint)
+            .join(
+                InvestigationComplaint,
+                (InvestigationComplaint.tenant_id == Complaint.tenant_id)
+                & (InvestigationComplaint.complaint_id == Complaint.id),
+            )
+            .filter(InvestigationComplaint.tenant_id == tenant_id, InvestigationComplaint.investigation_id == case.id)
+            .order_by(Complaint.complaint_identifier)
+            .first()
+        )
+        (item,) = [row for row in checklist(facts(db, tenant_id, complaint)) if row["code"] == "CAPA"]
+        assert item["result"] == "INFO" and (capa.business_id or capa.capa_identifier) in item["detail"]
+        worksheet = load(db, control, tenant_id, complaint.id, "US")
+        assert [row.capa_identifier for row in worksheet["capas"]] == ["SAMPLE-CAPA-02"]
+        assert "SAMPLE-CAPA-02" in _capas(worksheet)[0]
+        decided, _rising = trends_without_action_rows(db, tenant_id, date.today())
+        case_signals = {
+            row.signal_id
+            for row in db.query(InvestigationSignal).filter(
+                InvestigationSignal.tenant_id == tenant_id, InvestigationSignal.investigation_id == case.id
+            )
+        }
+        assert not case_signals & {row.id for row in decided}
+        today = effectiveness.today_utc()
+        start = effectiveness.suggested_start(capa, today)
+        linked = effectiveness.measure(db, capa, start, today)
+        assert linked["available"] and linked["problem_codes"]
+        capa.investigation_id = None
+        db.flush()
+        unlinked = effectiveness.measure(db, capa, start, today)
+        assert (linked["direction"], linked["too_early"]) == (unlinked["direction"], unlinked["too_early"])
+    finally:
+        db.rollback()
+        db.close()
+        control.close()

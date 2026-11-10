@@ -274,3 +274,16 @@ def test_an_unknown_or_another_organizations_supplier_is_not_found(trial):
             response = user.get(f"/api/v1/suppliers/{other}{path}")
             assert response.status_code == 404 and other not in response.text
             assert response.json()["detail"]["code"] == "SUPPLIER_NOT_FOUND"
+
+
+def test_a_pilot_is_not_offered_the_supplier_lots():
+    """Owner, 10 Nov 2026: the lots sharing a supplier are a free trial's only, like a case's Lot impact. A pilot reads
+    the supplier list but its lots answer 404 NOT_A_TRIAL_WORKSPACE, before the supplier is even looked up."""
+    import uuid
+
+    from tests.conftest import authenticated_client
+
+    admin = authenticated_client()
+    assert admin.get("/api/v1/suppliers").status_code == 200
+    response = admin.get(f"/api/v1/suppliers/{uuid.uuid4()}/lots")
+    assert response.status_code == 404 and response.json()["detail"]["code"] == "NOT_A_TRIAL_WORKSPACE"

@@ -9,8 +9,11 @@
 - **S2, evidence links.** SAMPLE-EV-001 (the supplier change record) and SAMPLE-EV-002 (the incoming inspection
   results) are linked to NovaSense Components and to the Rev B pressure sensor, so Supplier 360 lists them.
 
-Not seeded (OD-6): a second product with NovaSense parts, and Rev A lot genealogy. Not seeded yet (OD-4, held for the
-owner): SAMPLE-CAPA-02's link to SAMPLE-INV-001, which closure checks, Readiness and report worksheets also read.
+- **S3, the CAPA's investigation** (owner, 10 Nov 2026). SAMPLE-CAPA-02 (restore incoming inspection) comes from
+  SAMPLE-INV-001, so both pages say "CAPA from SAMPLE-INV-001"; the investigation's closure check, its report
+  worksheets and Readiness's "trends without action" read the CAPA too.
+
+Not seeded (OD-6): a second product with NovaSense parts, and Rev A lot genealogy.
 
 Every new row is reached from sample rows through its foreign keys (components, versions, suppliers, evidence), so
 sample removal, restart and the sample clock take it. Idempotent; flushes but never commits.
@@ -25,9 +28,11 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models.evidence_intelligence import EvidenceEntityLink
 from backend.app.db.models.foundation import (
+    Capa,
     Component,
     ComponentSupplier,
     Evidence,
+    Investigation,
     Product,
     ProductComponent,
     ProductVersion,
@@ -40,6 +45,7 @@ PRODUCTS = (ORBIT, "SAMPLE-PULSE-410", "SAMPLE-VENTRA-250")
 SENSOR, REV_A, REV_B = f"{ORBIT}-C1", "Rev A", "Rev B"
 REV_A_DAYS = 360
 EVIDENCE = ("SAMPLE-EV-001", "SAMPLE-EV-002")
+CAPA, INVESTIGATION = "SAMPLE-CAPA-02", "SAMPLE-INV-001"
 
 
 def refresh(db: Session, tenant_id, apply: bool, now: datetime) -> int:
@@ -159,6 +165,25 @@ def refresh(db: Session, tenant_id, apply: bool, now: datetime) -> int:
                         resolution_status="RESOLVED",
                     )
                 )
+    capa = (
+        db.query(Capa)
+        .filter(Capa.tenant_id == tenant_id, Capa.source_system == SAMPLE_SOURCE, Capa.capa_identifier == CAPA)
+        .first()
+    )
+    case = (
+        db.query(Investigation)
+        .filter(
+            Investigation.tenant_id == tenant_id,
+            Investigation.source_system == SAMPLE_SOURCE,
+            Investigation.investigation_identifier == INVESTIGATION,
+        )
+        .first()
+    )
+    # A CAPA the trial linked elsewhere itself is left as it is.
+    if capa is not None and case is not None and capa.investigation_id is None:
+        owed += 1
+        if apply:
+            capa.investigation_id = case.id
     if apply:
         db.flush()
     return owed
