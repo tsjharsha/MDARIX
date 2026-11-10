@@ -158,6 +158,8 @@ not list.
 | Variable | Required | Meaning |
 |---|---|---|
 | `MDARIX_ALERT_WEBHOOK`, `MDARIX_ALERT_EMAIL`, `MDARIX_ALERT_TIMEOUT_SECONDS` | recommended | Where operational alerts go (dead letters, stopped worker, failing jobs). |
+| `MDARIX_ALERT_FALLBACK_WEBHOOK` | recommended | An independent webhook that receives an alert only when the usual e-mail and webhook channels both failed to deliver it. Off when unset. |
+| `MDARIX_EXPORT_MAX_BYTES` | no | Largest full organisation export, in bytes (default 1073741824 = 1 GiB). A larger export is refused before work starts. |
 | `MDARIX_SENTRY_DSN`, `MDARIX_SENTRY_TRACES_SAMPLE_RATE` | no | Error reporting. Only the shape of an error leaves: its type, the stack frames (file, function, line) and the request method and path. Exception messages, local variables, log breadcrumbs, request bodies, headers, cookies, query strings and user details are not sent (`backend/app/logging_setup.py`). |
 | `MDARIX_LOG_LEVEL`, `MDARIX_LOG_FORMAT` | no | `INFO`; `json` (default in production) or `text`. |
 | `MDARIX_OUTBOX_INTERVAL_SECONDS`, `MDARIX_OUTBOX_BATCH_SIZE`, `MDARIX_OUTBOX_MAX_ATTEMPTS` | no | Worker cycle: every 5 s, up to 50 events, 12 delivery attempts before an event is dead-lettered (OUTBOX_AND_SCHEDULER.md). |
