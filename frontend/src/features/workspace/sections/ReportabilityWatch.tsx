@@ -30,6 +30,7 @@ import {
   TRIGGER_LABELS,
   WATCH_SHOWS,
   clockText,
+  legalOf,
   timelinessOf,
   watchHeadline,
   watchPath,
@@ -264,6 +265,11 @@ export function WatchCard({
               <span>
                 Due by {deadlineLabel(item.binding)} · {item.binding.window}{" "}
                 <BasisChips ids={item.binding.basis} label="Basis of the window" />
+              </span>
+            )}
+            {legalOf(item) && (
+              <span className="uw-rw-legal">
+                The law: due by {deadlineLabel(legalOf(item))} Â· {legalOf(item)?.label}. Your window ends later.
               </span>
             )}
             {item.aware_date && (

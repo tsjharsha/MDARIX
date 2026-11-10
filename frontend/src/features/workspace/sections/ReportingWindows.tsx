@@ -53,8 +53,16 @@ export function WindowsBody({ settings, onSaved }: { settings: ReportabilitySett
     setBusy(true);
     setError("");
     try {
-      await send("/api/v1/complaints/reportability-settings", "PUT", windowsBody(forms, lookback, reason));
-      notify("The reporting windows were saved.");
+      const saved = await send<ReportabilitySettings>(
+        "/api/v1/complaints/reportability-settings",
+        "PUT",
+        windowsBody(forms, lookback, reason),
+      );
+      notify(
+        saved?.longer_than_law?.length
+          ? "The reporting windows were saved. A window ends after the law's period: see the warning."
+          : "The reporting windows were saved.",
+      );
       onSaved();
     } catch (failure) {
       setError(errorText(failure, "The reporting windows were not saved."));
@@ -90,6 +98,11 @@ export function WindowsBody({ settings, onSaved }: { settings: ReportabilitySett
           </dd>
         </div>
       </dl>
+      {(settings.longer_than_law ?? []).map((warning) => (
+        <p key={`${warning.window}-${warning.market}`} className="ac-message tone-warning" role="status">
+          {warning.message} The assessment and triage already use the law's deadline.
+        </p>
+      ))}
       {!canEdit &&
         (settings.windows.length ? (
           <ul className="uw-rw-windows">

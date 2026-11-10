@@ -8881,3 +8881,40 @@ details.uw-team-change[open] {
   align-items: end;
   gap: 8px;
 }
+
+/* B4: Decision trees › Rules and "Rules used" (flat, G-2). FG-1: the law's deadline beside a longer window. */
+.uw-rw-clock span.uw-rw-legal {
+  color: var(--ac-critical);
+  font-weight: 600;
+}
+.rr-page {
+  display: grid;
+  gap: 16px;
+}
+.rr-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.rr-table td {
+  vertical-align: top;
+}
+.rr-table small {
+  display: block;
+  color: var(--ac-ink-2);
+  font-size: var(--ms-fs-12);
+}
+.rr-detail h3 {
+  margin: 16px 0 6px;
+  font-size: var(--ms-fs-14, 14px);
+}
+.rr-logic {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+.rr-used {
+  margin-top: 12px;
+}

@@ -40,6 +40,7 @@ import {
   type Version,
 } from "../marketAssessment";
 import { InlineError } from "./boardParts";
+import { RulesUsedPanel } from "./RuleRegister";
 import { WhyAsked, BasisChips } from "../../shared/Basis";
 import { STARTER_LABEL, isStarterVersion } from "../../shared/standards";
 
@@ -97,6 +98,7 @@ export function MarketAssessmentDrawer({
           onChange={(label) => setMarket(shown.find((item) => MARKET_SHORT[item.market] === label)?.market ?? null)}
         >
           <MarketPanel key={active.market} detail={data} item={active} onSaved={reload} />
+          <RulesUsedPanel used={active.rules_used} />
         </Tabs>
       )}
       {data && active && (

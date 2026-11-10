@@ -32,6 +32,7 @@ import { InlineError } from "./boardParts";
 import { TREE_NAMES, type TreeMarket, type TreePath, type Trees } from "../decisionTrees";
 import { inData } from "../home";
 import { FormCard, SignCard } from "./TreeSign";
+import { RulesUsedPanel } from "./RuleRegister";
 import { STARTER_LABEL, isStarterVersion } from "../../shared/standards";
 import "./decide.css";
 
@@ -371,6 +372,7 @@ export function MarketTree({
           path={path}
           enabled={detail.enabled_markets}
         />
+        <RulesUsedPanel used={latest.rules_used} />
       </aside>
     </div>
   );

@@ -4,6 +4,7 @@ import type { FactNeed } from "./sections/ReportingFacts";
 // a signature send, and when they may be sent. The server decides the suggestion and refuses what it must; these
 // checks only say early what it would refuse. A person answers and signs; MDARIX never answers and never submits.
 import type { Tone } from "../admin/console/dashboardModel";
+import type { RulesUsed } from "./ruleRegister";
 import { collapsed } from "./complaintReview";
 import { marketLabel, questionNumber } from "../../app/labels";
 
@@ -160,6 +161,8 @@ export type MarketItem = {
   clock: MarketClock | null;
   training: TrainingDocument[];
   trained_colleagues: string[];
+  /** B4: the rules in force at the event, today's, and those decided; null while the rule register is off. */
+  rules_used?: RulesUsed | null;
 };
 
 export type ScaleLevel = {

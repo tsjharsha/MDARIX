@@ -135,6 +135,8 @@ export type SessionContext = {
   challenge?: boolean;
   /** B5b (MDARIX_CLOSED_LOOP): Did it work? after a signed decision. */
   closed_loop?: boolean;
+  /** B4 (MDARIX_RULE_REGISTER): Decision trees â€º Rules and the "Rules used" panel. */
+  rule_register?: boolean;
   /** classic or new (tenants.navigation, 0.10.67): the organization's menu (app/linkTable.ts). */
   navigation?: string;
   /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
@@ -400,6 +402,11 @@ export function useChallenge(): boolean {
 /** B5b: shown only while the server says it is on (an older server has no Did it work? API). */
 export function useClosedLoop(): boolean {
   return useContext(WorkspaceContext)?.session?.closed_loop === true;
+}
+
+/** B4: shown only while the server says it is on (an older server has no rule register API). */
+export function useRuleRegister(): boolean {
+  return useContext(WorkspaceContext)?.session?.rule_register === true;
 }
 
 /** B7b: "E-mail to check" shows only while the server has e-mail intake switched on. */

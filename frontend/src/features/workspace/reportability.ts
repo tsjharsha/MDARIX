@@ -49,6 +49,8 @@ export type ReportabilitySettings = {
   version: number;
   updated_by_name: string | null;
   updated_at: string | null;
+  /** B4 FG-1: windows that can end after the law's longest period for a market they cover (a warning, never refused). */
+  longer_than_law?: Array<{ window: string; market: string; market_label: string; legal: string; message: string }>;
 };
 
 export type Clock = {
@@ -67,6 +69,8 @@ export type Clock = {
   triggers: Trigger[];
   /** The basis of the window the clock counts against (catalog ids). */
   basis?: string[];
+  /** B4 FG-1: the law's deadline, present only when this window ends after it. */
+  legal?: { label: string; due_date: string; due_at?: string; due_label?: string };
 };
 
 export type WatchState = "OVERDUE" | "DUE_SOON" | "IN_REVIEW" | "RUNNING" | "NO_WINDOW" | "FOLLOW_UP" | "DECIDED";
@@ -338,6 +342,13 @@ export function windowsProblem(forms: WindowForm[], lookback: string, reason: st
 export function windowsChanged(settings: ReportabilitySettings, forms: WindowForm[], lookback: string): boolean {
   if (Number(lookback) !== settings.lookback_days) return true;
   return JSON.stringify(forms.map(windowOf)) !== JSON.stringify(settings.windows);
+}
+
+/** B4 FG-1: the earliest legal deadline of a window that ends after the law, or null (shown beside the clock). */
+export function legalOf(item: { clocks: Clock[] }): NonNullable<Clock["legal"]> | null {
+  const found = item.clocks.flatMap((clock) => (clock.legal ? [clock.legal] : []));
+  found.sort((a, b) => (a.due_at ?? a.due_date).localeCompare(b.due_at ?? b.due_date));
+  return found[0] ?? null;
 }
 
 export function windowsBody(forms: WindowForm[], lookback: string, reason: string) {
