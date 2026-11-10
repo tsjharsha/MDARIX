@@ -22,6 +22,7 @@ anything stored.
 from __future__ import annotations
 
 import re
+from datetime import date, timedelta
 from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -925,6 +926,46 @@ def enabled_markets(windows: list[dict]) -> list[str]:
     """The markets the organization enabled: those it entered a reporting window for."""
     covered = set().union(*(window_markets(window) for window in windows)) if windows else set()
     return [market for market in MARKETS if market in covered]
+
+
+def legal_limit(market: str, aware=None, org_zone: str | None = None) -> ReportType | None:
+    """FG-1 (B4 step 13): the market's longest legal period, the latest any of its reports may be due, from the floor
+    in force at awareness (today's without one); None where the law gives no period in code (India, FG-2)."""
+    floor = register.floor_at(market, aware, org_zone) if feature_set.rule_register() else None
+    types = _in_force(str(register._DIRECTORY), (floor["code"],))[1] if floor else REPORT_TYPES
+    prefix = market.split("_")[0] + "_"
+    found = [kind for code, kind in types.items() if code.startswith(prefix) and kind.days]
+    # A work day spans at most 7/5 calendar days (no holidays are counted, F7).
+    return max(found, key=lambda kind: kind.days * (1.4 if kind.day_basis == rules.WORK else 1), default=None)
+
+
+def longer_than_law(windows: list[dict]) -> list[dict]:
+    """FG-1: each window that can end after the law's longest period for a market it covers (a warning on saving;
+    such windows are never refused or changed). Compared over a week of awareness days, so work days count right."""
+    start = date(2026, 1, 5)  # any Monday: seven awareness days cover every weekday
+    found = []
+    for window in windows:
+        for market in sorted(window_markets(window)):
+            limit = legal_limit(market)
+            if limit is None or not isinstance(window.get("days"), int):
+                continue
+            longer = any(
+                deadlines.count(day, window["days"], window["day_basis"], market, None).day
+                > deadlines.count(day, limit.days, limit.day_basis, market, None).day
+                for day in (start + timedelta(days=offset) for offset in range(7))
+            )
+            if longer:
+                found.append(
+                    {
+                        "window": window["name"],
+                        "market": market,
+                        "market_label": MARKET_LABELS[market],
+                        "legal": limit.label,
+                        "message": f"“{window['name']}” can end after the legal period for {MARKET_LABELS[market]} "
+                        f"({limit.label}). The watch shows the legal deadline beside it.",
+                    }
+                )
+    return found
 
 
 def _clock(

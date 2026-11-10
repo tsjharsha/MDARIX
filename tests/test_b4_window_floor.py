@@ -1,0 +1,45 @@
+"""B4 step 13 (FG-1, R-D10): an organization window longer than the law warns on saving and shows the legal deadline
+beside it on the watch; such windows are never refused or changed. No database."""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+import pytest
+
+from backend.app.reportability import markets, rules
+
+pytestmark = pytest.mark.unit
+
+
+def _window(name: str, days: int, basis: str = rules.CALENDAR, markets_: list[str] | None = None) -> dict:
+    raw = {"name": name, "markets": markets_ or [], "triggers": ["DEATH"], "days": days, "day_basis": basis}
+    return rules.clean_window(raw)
+
+
+@pytest.mark.parametrize(
+    ("window", "warned"),
+    [
+        (_window("US 60 days", 60, markets_=["US"]), ["US"]),
+        (_window("US 30 days", 30, markets_=["US"]), []),
+        (_window("US 20 work days", 20, rules.WORK, ["US"]), []),  # 28 calendar days at most
+        (_window("US 23 work days", 23, rules.WORK, ["US"]), ["US"]),  # 31 or more calendar days
+        (_window("India 60 days", 60, markets_=["India"]), []),  # no legal period in code (FG-2)
+        (_window("Everywhere 20 days", 20), ["EU_NI", "GB"]),  # longer than 15 days; US and Canada allow 30
+    ],
+)
+def test_a_window_longer_than_the_law_is_named_with_the_legal_period(window, warned):
+    found = markets.longer_than_law([window])
+    assert [item["market"] for item in found] == warned
+    assert all(item["window"] == window["name"] and item["legal"] in item["message"] for item in found)
+
+
+def test_the_watch_shows_the_legal_deadline_beside_a_longer_window_only():
+    aware = datetime(2027, 1, 4, 15, tzinfo=timezone.utc)
+    record = {"country": "US", "death": True}
+    (clock,) = rules.clocks(record, [_window("US 60 days", 60, markets_=["US"])], aware, aware)
+    legal = clock.as_dict()["legal"]
+    assert legal["label"] == markets.REPORT_TYPES["US_30_DAY"].label
+    assert legal["due_date"] == "2027-02-03" and clock.due.isoformat() == "2027-03-05"
+    (same,) = rules.clocks(record, [_window("US 30 days", 30, markets_=["US"])], aware, aware)
+    assert "legal" not in same.as_dict()  # unchanged on the wire when the window is within the law

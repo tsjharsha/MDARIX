@@ -222,6 +222,11 @@ def test_the_organization_enters_its_own_windows(org, windows):
     bad = org["regulatory"].put(SETTINGS, json={**body, "windows": [{**windows["windows"][0], "triggers": []}]})
     assert bad.status_code == 422 and bad.json()["detail"]["code"] == "WINDOWS_INVALID"
     assert org["regulatory"].put(SETTINGS, json={**body, "reason": "short"}).status_code == 422
+    # B4 step 13 (FG-1): the templates keep within the law; a window longer than it is saved with a warning.
+    assert windows["longer_than_law"] == []
+    longer = org["regulatory"].put(SETTINGS, json={**body, "windows": [{**windows["windows"][0], "days": 60}]})
+    assert longer.status_code == 200 and [item["market"] for item in longer.json()["longer_than_law"]] == ["US"]
+    assert org["regulatory"].put(SETTINGS, json=body).status_code == 200  # back to the module's windows
     # Another organization has none.
     assert org["other"].get(SETTINGS).json()["configured"] is False
 

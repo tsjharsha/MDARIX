@@ -372,6 +372,7 @@ class Clock:
     due_zone: str | None = None
     due_label: str | None = None
     market: str | None = None
+    legal: dict | None = None  # FG-1: the law's deadline, when this window ends after it
 
     def as_dict(self) -> dict:
         return {
@@ -387,6 +388,7 @@ class Clock:
             "days_left": self.days_left,
             "triggers": list(self.triggers),
             "basis": list(self.basis),
+            **({"legal": self.legal} if self.legal else {}),
         }
 
 
@@ -395,7 +397,7 @@ def clocks(
 ) -> list[Clock]:
     """The clocks the complaint's windows start, the earliest end first; none without awareness. Each counts by the
     market the window covers (of a complaint naming several countries) and the organization's time zone (deadlines.py)."""
-    from backend.app.reportability.markets import market_of
+    from backend.app.reportability.markets import legal_limit, market_of
 
     if aware is None:
         return []
@@ -410,6 +412,12 @@ def clocks(
         window_market = market_of(covered) if covered else market
         due = deadlines.count(aware, window["days"], window["day_basis"], window_market, org_zone)
         seen = deadlines.view(due, now, window["days"])
+        # FG-1 (B4 step 13): a window longer than the law shows the law's deadline beside it.
+        limit = legal_limit(window_market, aware, org_zone) if window_market else None
+        legal = deadlines.count(aware, limit.days, limit.day_basis, window_market, org_zone) if limit else None
+        legal = (
+            {"label": limit.label, **deadlines.view(legal, now, limit.days)} if legal and legal.at < due.at else None
+        )
         found.append(
             Clock(
                 name=window["name"],
@@ -424,6 +432,7 @@ def clocks(
                 due_zone=seen["due_zone"],
                 due_label=seen["due_label"],
                 market=window_market,
+                legal=legal,
             )
         )
     return sorted(found, key=lambda clock: (clock.due_at or "", clock.name))

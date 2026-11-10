@@ -124,7 +124,14 @@ def reportability_settings(
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    return service.settings_of(db, uuid.UUID(ctx.tenant_id), control_db)
+    return _with_warnings(service.settings_of(db, uuid.UUID(ctx.tenant_id), control_db))
+
+
+def _with_warnings(settings: dict) -> dict:
+    """FG-1 (B4 step 13): the windows that can end after the law's period, as warnings; never a refusal."""
+    from backend.app.reportability.markets import longer_than_law
+
+    return {**settings, "longer_than_law": longer_than_law(settings["windows"])}
 
 
 @router.put("/reportability-settings", dependencies=[Depends(require_permission(REGULATORY_APPROVE))])
@@ -176,4 +183,4 @@ def update_reportability_settings(
     except IntegrityError as exc:
         db.rollback()
         raise _error(409, "CHANGED_MEANWHILE", "The settings were changed a moment ago; reload and try again") from exc
-    return service.settings_of(db, tenant_id, control_db)
+    return _with_warnings(service.settings_of(db, tenant_id, control_db))
