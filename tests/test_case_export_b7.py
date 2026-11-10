@@ -97,3 +97,26 @@ def test_export_for_qms_entry_lists_case_complaints_without_a_qms_id(trial):  # 
     assert row["complaint_id"] == "" and row["description"] == "Pump stopped mid-dose."
     audit = _last_audit(tenant_id, "QMS_ENTRY_EXPORTED")
     assert audit["sha256"] == hashlib.sha256(response.content).hexdigest()
+
+
+def test_outside_a_trial_contacts_are_unmasked_only_with_data_export_and_a_reason(trial, monkeypatch):  # BK-10
+    from tests.test_release_c1_0_10_73 import _invite
+
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    monkeypatch.setattr(case_export, "is_trial", lambda *_: False)  # as a pilot or paying organisation
+    event = _ok(user.post(INTAKE, json={"kind": "CONTACT", "reporter_words": "The monitor display went blank twice"}))
+    _ok(user.put(f"{INTAKE}/{event['id']}/contact", json={"organisation": "Ravi Clinic", "phone": "+91 98450 67890"}))
+    masked = user.get(f"{INTAKE}/cases/export.csv")
+    assert "67890" not in masked.text  # still masked without a reason
+    short = user.get(f"{INTAKE}/cases/export.csv", params={"unmask_reason": "QMS"})
+    assert short.status_code == 422 and short.json()["detail"]["code"] == "REASON_TOO_SHORT"
+    reason = "The QMS complaint needs the reporter's phone for the reply"
+    rows = _rows(user.get(f"{INTAKE}/cases/export.csv", params={"unmask_reason": reason}))
+    row = next(item for item in rows if item["reference"] == event["reference"])
+    assert "+91 98450 67890" in row["contact"]
+    audit = _last_audit(tenant_id, "CASES_EXPORTED")
+    assert audit["contacts"] == "UNMASKED" and audit["unmask_reason"] == reason
+    # Without data.export the export is refused, reason or not.
+    _, executive, _ = _invite(user, "executive", "Esha Executive")
+    refused = executive.get(f"{INTAKE}/cases/export.csv", params={"unmask_reason": reason})
+    assert refused.status_code == 403, refused.text
