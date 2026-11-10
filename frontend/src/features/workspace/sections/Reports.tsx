@@ -461,7 +461,7 @@ export function RecordSubmission({
 }: {
   detail: ReportDetail;
   onChanged: (detail: ReportDetail) => void;
-  /** Its button is secondary where the page's one main button is elsewhere (the report page's Generate the PDF). */
+  /** Its button is secondary where the page's one main button is elsewhere (the report page's Download PDF). */
   quiet?: boolean;
 }) {
   const [form, setForm] = useState<SubmissionForm>({
@@ -830,11 +830,12 @@ function Downloads({ detail }: { detail: ReportDetail }) {
   const [error, setError] = useState("");
   if (!canExport) return null;
   const approved = detail.snapshots.find((row) => row.state === "APPROVED");
-  const get = async (kind: "pdf" | "docx", snapshot?: string) => {
+  const stem = `mdarix-${detail.form.code.toLowerCase()}-${detail.complaint.ref}`;
+  const get = async (kind: "pdf" | "docx", snapshot?: string, path = `worksheet.${kind}`, name = `${stem}.${kind}`) => {
     setError("");
     try {
-      await downloadFile(`${REPORTS}/${detail.id}/worksheet.${kind}${snapshot ? `?snapshot=${snapshot}` : ""}`, {
-        fallbackName: `mdarix-${detail.form.code.toLowerCase()}-${detail.complaint.ref}.${kind}`,
+      await downloadFile(`${REPORTS}/${detail.id}/${path}${snapshot ? `?snapshot=${snapshot}` : ""}`, {
+        fallbackName: name,
       });
     } catch (reason) {
       setError(errorText(reason, "The file could not be downloaded."));
@@ -856,6 +857,27 @@ function Downloads({ detail }: { detail: ReportDetail }) {
         <button type="button" className="ac-secondary" onClick={() => void get("pdf", approved.id)}>
           <FileText size={15} aria-hidden="true" /> Approved snapshot {approved.version} (PDF)
         </button>
+      )}
+      {/* 0.10.96 (Q7): a US report's files on the classic navigation too: the eMDR XML and FDA's official form. */}
+      {approved && detail.emdr && (
+        <>
+          <button
+            type="button"
+            className="ac-secondary"
+            onClick={() => void get("pdf", approved.id, "emdr.xml", `mdarix-emdr-${detail.complaint.ref}.xml`)}
+          >
+            <Download size={15} aria-hidden="true" /> eMDR XML
+          </button>
+          <button
+            type="button"
+            className="ac-secondary"
+            onClick={() =>
+              void get("pdf", `${approved.id}&form=official`, "worksheet.pdf", `${stem}-official-form.pdf`)
+            }
+          >
+            <FileText size={15} aria-hidden="true" /> Official Form 3500A (PDF)
+          </button>
+        </>
       )}
       <InlineError text={error} />
     </div>

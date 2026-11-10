@@ -92,6 +92,43 @@ export function ThingsToGive({
   );
 }
 
+/** Confirm all codes (0.10.96, D8): every code the mapping suggests, confirmed as suggested in one click; each one
+ * confirmed is listed after. A code a person chose stays as chosen. */
+export function ConfirmAllCodes({
+  detail,
+  onChanged,
+}: {
+  detail: ReportDetail;
+  onChanged: (detail: ReportDetail) => void;
+}) {
+  const action = useAction(onChanged, "The codes were not confirmed.");
+  const [done, setDone] = useState<string[]>([]);
+  const waiting = detail.sections.flatMap((section) => section.fields).filter((item) => item.status === "SUGGESTED");
+  if (!detail.editable || (!waiting.length && !done.length)) return null;
+  const names = waiting.map((item) => `${item.number ? `${item.number} ` : ""}${item.label}: ${item.suggestion}`);
+  const confirm = async () => {
+    if (await action.run(`${REPORTS}/${detail.id}/codes/confirm`, "POST")) setDone(names);
+  };
+  return (
+    <section className="uw-card uw-card-pad rp-confirm-all" aria-label="Suggested codes">
+      {waiting.length > 0 && (
+        <>
+          <p className="ac-muted">Suggested from your approved mapping: {names.join("; ")}.</p>
+          <button type="button" className="ac-primary" disabled={action.busy} onClick={() => void confirm()}>
+            Confirm all codes ({waiting.length})
+          </button>
+        </>
+      )}
+      {done.length > 0 && (
+        <p className="dt-success" role="status">
+          ✓ Confirmed as suggested: {done.join("; ")}.
+        </p>
+      )}
+      <InlineError text={action.error} />
+    </section>
+  );
+}
+
 /** A product's or the organization's fact, entered once and reused on every report for that product. */
 function OnceRow({
   detail,

@@ -284,7 +284,7 @@ describe("a report's page: the record page's shape, the status path and the rail
     expect(html).toContain("Give what is missing");
     expect(html).toMatch(/<button type="button" class="ac-secondary" disabled="" aria-describedby="rp-why-send">/);
     expect(html).toContain('id="rp-why-send">Send for approval opens when every mandatory field is filled.');
-    expect(html).not.toContain("Generate the PDF");
+    expect(html).not.toContain("Download PDF");
     // Each field says where its value comes from.
     expect(html).toContain("From the complaint record");
     // MDARIX never submits: said once, where it matters.
@@ -347,7 +347,7 @@ describe("a report's page: the record page's shape, the status path and the rail
     const html = render(<ReportsSection />, api("?report=r1"));
     expect(html).toContain("Approve the United States report for SAMPLE-RV-11.");
     expect(html).toContain(PRACTICE_APPROVAL);
-    expect(html).not.toContain("Generate the PDF");
+    expect(html).not.toContain("Download PDF");
     // A colleague approves: named in Who signs, never the preparer; no practice label.
     resources.data[`${REPORTS}/r1`] = report(2, {
       approval: {
@@ -363,30 +363,31 @@ describe("a report's page: the record page's shape, the status path and the rail
     expect(colleague).not.toContain(PRACTICE_APPROVAL);
   });
 
-  it("generates the PDF only after approval", () => {
+  it("offers the PDF only after approval", () => {
     for (const at of [0, 1, 2, 4, 5]) {
       resources.data[`${REPORTS}/r1`] = report(at);
-      expect(render(<ReportsSection />, api("?report=r1")), `stage ${at}`).not.toContain("Generate the PDF");
+      expect(render(<ReportsSection />, api("?report=r1")), `stage ${at}`).not.toContain("Download PDF");
     }
     resources.data[`${REPORTS}/r1`] = report(3);
     const html = render(<ReportsSection />, api("?report=r1"));
-    expect(html).toContain("Generate the PDF");
+    expect(html).toContain("Download PDF");
     expect(html).toContain("Approved: Rahul Colleague");
     expect(html).toContain("Record the submission");
-    // One main button: Generate the PDF; "Mark as submitted" is secondary on this page.
+    // One main button: Download PDF; "Mark as submitted" is secondary on this page.
     expect(html.match(/class="ac-primary"/g)?.length).toBe(1);
     // Without the export right, a colleague generates it.
-    expect(render(<ReportsSection />, api("?report=r1", ["regulatory.review"]))).not.toContain("Generate the PDF");
+    expect(render(<ReportsSection />, api("?report=r1", ["regulatory.review"]))).not.toContain("Download PDF");
   });
 
   it("offers FDA's eMDR XML beside the PDF on a US report, and names what it still needs", () => {
     resources.data[`${REPORTS}/r1`] = report(3, { emdr: { missing: [], left_out: [] } });
     const ready = render(<ReportsSection />, api("?report=r1"));
-    expect(ready).toContain("Generate the PDF");
-    expect(ready).toMatch(/<button type="button" class="ac-secondary">.*Download the eMDR XML<\/button>/);
+    expect(ready).toContain("Download PDF");
+    expect(ready).toMatch(/<button type="button" class="ac-secondary">.*Download XML<\/button>/);
     expect(ready).toContain(
-      "MDARIX prepares it; you submit it through your own ESG or eSubmitter account and record the submission here.",
+      "MDARIX never submits: you send the XML through your own ESG account or eSubmitter and record the submission here.",
     );
+    expect(ready).toContain("Official Form 3500A (PDF)");
     expect(ready.match(/class="ac-primary"/g)?.length).toBe(1);
     resources.data[`${REPORTS}/r1`] = report(3, {
       emdr: {
@@ -396,12 +397,90 @@ describe("a report's page: the record page's shape, the status path and the rail
     });
     const waiting = render(<ReportsSection />, api("?report=r1"));
     expect(waiting).toContain("The eMDR XML also needs: H6 Component code; G8 Manufacturer report number.");
-    expect(waiting).toMatch(/disabled="" aria-describedby="rp-emdr-needs">.*Download the eMDR XML/);
+    expect(waiting).toMatch(/disabled="" aria-describedby="rp-emdr-needs">.*Download XML/);
     // Before approval the page says it too; another market's report has no eMDR file.
     resources.data[`${REPORTS}/r1`] = report(0, { emdr: { missing: ["H6 Component code: x"], left_out: [] } });
     expect(render(<ReportsSection />, api("?report=r1"))).toContain("The eMDR XML also needs: H6 Component code.");
     resources.data[`${REPORTS}/r1`] = report(3, { emdr: null });
-    expect(render(<ReportsSection />, api("?report=r1"))).not.toContain("eMDR XML");
+    const other = render(<ReportsSection />, api("?report=r1"));
+    expect(other).not.toContain("eMDR XML");
+    expect(other).not.toContain("Official Form 3500A");
+  });
+
+  // 0.10.96 (B3, A7 and A8): the 3-click page.
+  const suggested = (id: string, label: string, code: string) => ({
+    ...field(id, "H6", label, "SUGGESTED"),
+    status_label: "Suggested from your approved mapping",
+    suggestion: code,
+  });
+  const withCodes = (stage: number) =>
+    report(stage, {
+      sections: [
+        {
+          code: "H",
+          title: "H. Device manufacturers only",
+          note: null,
+          fields: [
+            suggested("H6_PROBLEM", "Medical device problem code", "A090807 High Readings (FDA 2459)"),
+            suggested("H6_COMPONENT", "Component code", "G04 Sensor (FDA 3028)"),
+            field("H6_TYPE", "H6", "Type of investigation code", "ENTERED", "B01 Testing of device (FDA 10)"),
+          ],
+        },
+      ],
+    });
+
+  it("confirms every suggested code in one click and lists each", () => {
+    resources.data[`${REPORTS}/r1`] = withCodes(0);
+    const html = render(<ReportsSection />, api("?report=r1"));
+    expect(html).toContain("Confirm all codes (2)");
+    expect(html).toContain(
+      "Suggested from your approved mapping: H6 Medical device problem code: A090807 High Readings (FDA 2459); " +
+        "H6 Component code: G04 Sensor (FDA 3028).",
+    );
+    // A code a person chose is not among them; nothing waits, no button; an approved report is not changed.
+    expect(html).not.toContain("Type of investigation code: B01");
+    expect(render(<ReportsSection />, api("?report=r1")).match(/Confirm all codes/g)?.length).toBe(1);
+    resources.data[`${REPORTS}/r1`] = report(0);
+    expect(render(<ReportsSection />, api("?report=r1"))).not.toContain("Confirm all codes");
+    resources.data[`${REPORTS}/r1`] = withCodes(3);
+    expect(render(<ReportsSection />, api("?report=r1"))).not.toContain("Confirm all codes");
+  });
+
+  it("offers both files at once after approval, with no generate step", () => {
+    resources.data[`${REPORTS}/r1`] = report(3, { emdr: { missing: [], left_out: [] } });
+    const html = render(<ReportsSection />, api("?report=r1"));
+    for (const label of ["Download PDF", "Download XML", "Official Form 3500A (PDF)"]) expect(html).toContain(label);
+    expect(html).not.toContain("Generate");
+    expect(html).toContain("The files were made when the report was approved.");
+  });
+
+  it("offers no XML before approval", () => {
+    for (const at of [0, 1, 2]) {
+      resources.data[`${REPORTS}/r1`] = report(at, { emdr: { missing: [], left_out: [] } });
+      const html = render(<ReportsSection />, api("?report=r1"));
+      expect(html, `stage ${at}`).not.toContain("Download XML");
+      expect(html, `stage ${at}`).not.toContain("Official Form 3500A");
+    }
+  });
+
+  it("reaches both files in 3 clicks from reportable", () => {
+    // Click 1: Confirm all codes. Click 2: Send for approval. Click 3: Approve. Then the files are there.
+    const clicks: string[] = [];
+    resources.data[`${REPORTS}/r1`] = withCodes(0);
+    if (render(<ReportsSection />, api("?report=r1")).includes("Confirm all codes (2)")) clicks.push("confirm");
+    resources.data[`${REPORTS}/r1`] = report(1, { emdr: { missing: [], left_out: [] } });
+    if (
+      /<button type="button" class="ac-primary">.*Send for approval/.test(render(<ReportsSection />, api("?report=r1")))
+    )
+      clicks.push("send");
+    resources.data[`${REPORTS}/r1`] = report(2, { emdr: { missing: [], left_out: [] } });
+    if (render(<ReportsSection />, api("?report=r1")).includes('aria-label="Approve the report"'))
+      clicks.push("approve");
+    resources.data[`${REPORTS}/r1`] = report(3, { emdr: { missing: [], left_out: [] } });
+    const files = render(<ReportsSection />, api("?report=r1"));
+    expect(clicks).toEqual(["confirm", "send", "approve"]);
+    expect(files).toContain("Download PDF");
+    expect(files).toContain("Download XML");
   });
 
   it("says why a cancelled report is off the path", () => {

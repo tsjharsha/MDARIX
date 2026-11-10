@@ -38,7 +38,7 @@ import {
 } from "./Reports";
 import { ListViewPicker } from "./Views";
 import { STARTER_LABEL } from "../../shared/standards";
-import { ApprovingDoc, ThingsToGive, signatureLine } from "./ReportBody";
+import { ApprovingDoc, ConfirmAllCodes, ThingsToGive, signatureLine } from "./ReportBody";
 
 /** What MDARIX does with an authority report, said once where it matters (Release C guardrail 3). */
 export const NEVER_SUBMITS =
@@ -313,10 +313,10 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
               : ""
           }.`
         : "Started while the market was still being assessed.";
-  const fetchFile = async (path: string, name: string, failed: string) => {
+  const fetchFile = async (path: string, name: string, failed: string, query = "") => {
     setPdfError("");
     try {
-      await downloadFile(`${REPORTS}/${detail.id}/${path}?snapshot=${approved!.id}`, { fallbackName: name });
+      await downloadFile(`${REPORTS}/${detail.id}/${path}?snapshot=${approved!.id}${query}`, { fallbackName: name });
     } catch (reason) {
       setPdfError(errorText(reason, failed));
     }
@@ -325,7 +325,15 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
     fetchFile(
       "worksheet.pdf",
       `mdarix-${detail.form.code.toLowerCase()}-${ref}.pdf`,
-      "The PDF could not be generated.",
+      "The PDF could not be downloaded.",
+    );
+  // 0.10.96 (A6): FDA's own fillable form, the second US PDF.
+  const official = () =>
+    fetchFile(
+      "worksheet.pdf",
+      `mdarix-fda-3500a-${ref}-official-form.pdf`,
+      "The official form could not be downloaded.",
+      "&form=official",
     );
   // A US report also as FDA's eMDR file: the blocks it still needs, by their names ("H6 Component code").
   const emdrNeeds = (detail.emdr?.missing ?? []).map((item) => item.split(":")[0]);
@@ -398,6 +406,8 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
       <div className="uw-rec">
         <div className="rp-main">
           {/* 0.10.83 (D2.7): what is missing first, grouped by who knows it; the full report folds away meanwhile. */}
+          {/* 0.10.96 (A7): every suggested code confirmed in one click, over the list of what to give. */}
+          {write && <ConfirmAllCodes detail={detail} onChanged={changed} />}
           {write && <ThingsToGive detail={detail} onChanged={changed} canEdit={write} />}
           {/* 0.10.83 (D2.8): the approver reads what they approve, then approves below it. */}
           {approving && (
@@ -521,8 +531,9 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
               <>
                 {canExport ? (
                   <>
+                    {/* 0.10.96 (A8): the files are ready at approval, no generate step. */}
                     <button type="button" className="ac-primary" onClick={() => void pdf()}>
-                      <FileText size={15} aria-hidden="true" /> Generate the PDF
+                      <FileText size={15} aria-hidden="true" /> Download PDF
                     </button>
                     {detail.emdr && (
                       <>
@@ -532,20 +543,27 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                           disabled={emdrNeeds.length > 0}
                           aria-describedby={emdrNeeds.length ? "rp-emdr-needs" : undefined}
                           onClick={() =>
-                            void fetchFile("emdr.xml", `mdarix-emdr-${ref}.xml`, "The eMDR XML could not be made.")
+                            void fetchFile(
+                              "emdr.xml",
+                              `mdarix-emdr-${ref}.xml`,
+                              "The eMDR XML could not be downloaded.",
+                            )
                           }
                         >
-                          <Download size={15} aria-hidden="true" /> Download the eMDR XML
+                          <Download size={15} aria-hidden="true" /> Download XML
+                        </button>
+                        <button type="button" className="ac-secondary" onClick={() => void official()}>
+                          <FileText size={15} aria-hidden="true" /> Official Form 3500A (PDF)
                         </button>
                         <p className="ac-note">
-                          MDARIX prepares it; you submit it through your own ESG or eSubmitter account and record the
-                          submission here.
+                          The files were made when the report was approved. MDARIX never submits: you send the XML
+                          through your own ESG account or eSubmitter and record the submission here.
                         </p>
                       </>
                     )}
                   </>
                 ) : (
-                  <p className="ac-muted">A colleague with export rights generates the PDF.</p>
+                  <p className="ac-muted">A colleague with export rights downloads the files.</p>
                 )}
                 {write && (
                   <button

@@ -57,6 +57,10 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
   mapping suggests and no one has entered yet, each through the same step as its own Confirm and with its own audit
   event (marked `all_codes`). A code a person chose and a field with no suggestion stay as they are; only a draft is
   changed (409 `NOT_A_DRAFT`), and with nothing waiting it says so (422 `NOTHING_SUGGESTED`).
+- The US report page reaches both files in three clicks from reportable (A8): "Confirm all codes (n)" above what
+  is left to give, listing each suggested code; Send for approval; Approve. After approval "Download PDF", "Download
+  XML" and "Official Form 3500A (PDF)" are there at once (the "Generate the PDF" step is gone). The classic report
+  panel offers the same US files (owner Q7); "Confirm all" stays on the new navigation.
 
 ## [0.10.95] - not released yet (ships in the big-bang release)
 
