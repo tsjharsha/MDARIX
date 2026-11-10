@@ -45,6 +45,29 @@ SECRET_COLUMN = re.compile(
     r"(?i)(password|secret|token|encrypted|api_key|private_key|recovery_hashes|session_hash|key_hash|code_hash|signing)"
 )
 SCHEMAS = ("public", "md_master")
+# OD-1 (B2): customer contacts are masked in exports by default ("Contact held: yes"); unmasked only on request by a
+# person with data.export, with a reason, audited; a trial's export is always masked.
+CONTACT_COLUMNS = {
+    "external_parties": (
+        "primary_name",
+        "primary_details",
+        "second_name",
+        "second_details",
+        "contact_role",
+        "contact_email",
+        "contact_phone",
+    )
+}
+CONTACT_HELD = "Contact held: yes"
+MASKED, UNMASKED = "MASKED", "UNMASKED"
+
+
+def masked_row(table: str, row: dict) -> dict:
+    """The row as a masked export writes it: each contact value held is replaced by "Contact held: yes"."""
+    columns = CONTACT_COLUMNS.get(table, ())
+    return {key: (CONTACT_HELD if key in columns and value else value) for key, value in row.items()}
+
+
 FETCH_ROWS = 1000
 # The quality records a reader opens first, as spreadsheets: table -> (file name, columns in reading order). Each
 # starts with the record's MDARIX identifier (business_id), then the customer's own number for it.
@@ -140,8 +163,11 @@ class ExportInProgress(RuntimeError):
     pass
 
 
-def request_export(db: Session, tenant_id, requested_by: str, reason: str) -> TenantExport:
-    """Queue a full export (one at a time per organization). Does not commit."""
+def request_export(
+    db: Session, tenant_id, requested_by: str, reason: str, unmask_contacts: bool = False
+) -> TenantExport:
+    """Queue a full export (one at a time per organization). Does not commit. Contacts are masked unless the caller
+    (who checked data.export) asks to unmask them; a trial's export stays masked whatever is asked (OD-1)."""
     tenant_id = uuid.UUID(str(tenant_id))
     busy = (
         db.query(TenantExport)
@@ -151,8 +177,15 @@ def request_export(db: Session, tenant_id, requested_by: str, reason: str) -> Te
     if busy is not None:
         raise ExportInProgress(str(busy.id))
     now = datetime.now(timezone.utc)
+    contacts = UNMASKED if unmask_contacts and not _trial(db, tenant_id) else MASKED
     row = TenantExport(
-        id=uuid.uuid4(), tenant_id=tenant_id, requested_by=requested_by, reason=reason, status="QUEUED", created_at=now
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        requested_by=requested_by,
+        reason=reason,
+        status="QUEUED",
+        created_at=now,
+        summary={"contacts": contacts},
     )
     db.add(row)
     db.flush()
@@ -175,11 +208,17 @@ def request_export(db: Session, tenant_id, requested_by: str, reason: str) -> Te
             entity_type="TenantExport",
             entity_id=row.id,
             reason=reason,
-            details={},
+            details={"contacts": contacts},
             created_at=now,
         )
     )
     return row
+
+
+def _trial(db: Session, tenant_id) -> bool:
+    from backend.app.trial.service import trial_subscription
+
+    return trial_subscription(db, tenant_id) is not None
 
 
 def describe(row: TenantExport) -> dict:
@@ -230,7 +269,9 @@ class _HashingWriter:
         return len(chunk)
 
 
-def _write_tables(db: Session, archive: zipfile.ZipFile, tenant_id, prefix: str, manifest: dict) -> None:
+def _write_tables(
+    db: Session, archive: zipfile.ZipFile, tenant_id, prefix: str, manifest: dict, unmask: bool = False
+) -> None:
     for schema, table in _tables(db):
         result = db.execute(
             text(f'SELECT * FROM "{schema}"."{table}" WHERE tenant_id = :tenant'), {"tenant": tenant_id}
@@ -242,7 +283,9 @@ def _write_tables(db: Session, archive: zipfile.ZipFile, tenant_id, prefix: str,
             writer = _HashingWriter(handle)
             while rows := result.fetchmany(FETCH_ROWS):
                 for row in rows:
-                    writer.write(json.dumps({key: row._mapping[key] for key in columns}, default=str) + "\n")
+                    values = {key: row._mapping[key] for key in columns}
+                    values = values if unmask else masked_row(table, values)
+                    writer.write(json.dumps(values, default=str) + "\n")
                     count += 1
         # Tables from a dedicated data plane are listed as "plane:<schema>.<table>" beside the control database's.
         key = f"{schema}.{table}" if prefix == "data/" else f"plane:{schema}.{table}"
@@ -296,7 +339,7 @@ def _cell(value):
     return value
 
 
-def _build_archive(db: Session, tenant_id, tenant: Tenant | None, storage, path: Path) -> dict:
+def _build_archive(db: Session, tenant_id, tenant: Tenant | None, storage, path: Path, unmask: bool = False) -> dict:
     """Write the export zip to ``path`` and return its manifest."""
     from backend.app.audit_chain import verify_tenant_chain
     from backend.app.db.data_plane import open_tenant_data_session
@@ -318,12 +361,12 @@ def _build_archive(db: Session, tenant_id, tenant: Tenant | None, storage, path:
         "files": {},
     }
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        _write_tables(db, archive, tenant_id, "data/", manifest)
+        _write_tables(db, archive, tenant_id, "data/", manifest, unmask)
         # A dedicated data plane holds the business records in its own database; the shared plane is the control
         # database. The readable bundle always comes from wherever the business records live.
         with open_tenant_data_session(tenant_id) as data:
             if str(data.get_bind().url) != str(db.get_bind().url):
-                _write_tables(data, archive, tenant_id, "data/plane/", manifest)
+                _write_tables(data, archive, tenant_id, "data/plane/", manifest, unmask)
             _write_readable(data, archive, tenant_id, manifest)
         for key in storage.list_tenant_objects(str(tenant_id)):
             relative = key.split("/", 1)[1]
@@ -362,13 +405,15 @@ def run_export(export_id) -> dict:
             return {"status": row.status if row else "MISSING"}
         tenant_id = row.tenant_id
         tenant = db.get(Tenant, tenant_id)
+        contacts = (row.summary or {}).get("contacts", MASKED)
+        unmask = contacts == UNMASKED and not _trial(db, tenant_id)  # a trial is masked even if it became one later
         row.status, row.error = "RUNNING", None
         db.commit()
         storage = ObjectStorageService()
         bind_system(db, f"tenant export {export_id}")
         with tempfile.NamedTemporaryFile(prefix="mdarix-export-", suffix=".zip", delete=False) as handle:
             temp = Path(handle.name)
-        manifest = _build_archive(db, tenant_id, tenant, storage, temp)
+        manifest = _build_archive(db, tenant_id, tenant, storage, temp, unmask)
         stored = _store_archive(storage, tenant_id, export_id, temp)
         bind_system(db, f"tenant export {export_id}: done")
         row = db.get(TenantExport, uuid.UUID(str(export_id)))
@@ -381,6 +426,7 @@ def run_export(export_id) -> dict:
             "rows": sum(item["rows"] for item in manifest["tables"].values()),
             "files": len(manifest["files"]),
             "readable": {table: item["rows"] for table, item in manifest["readable"].items()},
+            "contacts": UNMASKED if unmask else MASKED,
         }
         row.completed_at = datetime.now(timezone.utc)
         row.expires_at = row.completed_at + timedelta(days=EXPORT_DAYS)

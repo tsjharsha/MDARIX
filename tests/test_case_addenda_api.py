@@ -215,3 +215,48 @@ def test_an_automatic_reopening_is_an_item_due_at_once_for_the_escalation_chain(
     assert oversight_rules.state_of(alert["due_at"], now, 4) == oversight_rules.OVERDUE
     item["sample"] = True
     assert not [entry for entry in oversight._triage_items(None, None, uuid.uuid4(), now) if "reopened" in entry["key"]]
+
+
+def test_an_export_masks_contacts_unless_unmasked_and_a_trial_always_masks():  # OD-1, CI-43
+    from backend.app.tenant_export import CONTACT_HELD, masked_row
+
+    row = {"id": 1, "party_type": "REPORTER", "contact_email": "biomed@example.invalid", "contact_phone": None}
+    assert masked_row("external_parties", row) == {**row, "contact_email": CONTACT_HELD}
+    assert masked_row("complaints", row) == row
+
+
+def test_a_closed_service_cases_contact_is_erased_twelve_months_later(trial):  # OD-1
+    from datetime import timedelta
+
+    from backend.app.db.models.guides_communications import ExternalParty
+    from backend.app.db.models.intake import IntakeEvent
+    from backend.app.intake import service
+    from backend.app.tenant_export import MASKED, request_export
+
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    event = _log(user, answers=_all_no(Q7="YES"), requested="CALIBRATION")
+    contact = {"organisation": "City Hospital", "contact_role": "Biomedical engineer", "email": "bm@example.invalid"}
+    _ok(user.put(f"{INTAKE}/{event['id']}/contact", json=contact))
+    _ok(_sign(user, event, "SERVICE_ONLY", reason="Annual calibration due; nothing wrong with it."))
+    review = {
+        "outcome": "AGREED",
+        "note": "Checked: routine calibration only.",
+        "password": PASSWORD,
+        "resolution_summary": "Calibrated on site; within limits.",
+    }
+    _ok(user.post(f"{INTAKE}/{event['id']}/check/review", json=review))
+    with SessionLocal() as db:
+        bind_system(db, "test:case-addenda")
+        now = service.now_utc()
+        assert service.erase_expired_contacts(db, tenant_id, now) == 0  # closed today: kept
+        row = db.get(IntakeEvent, uuid.UUID(event["id"]))
+        row.updated_at = now - timedelta(days=service.CONTACT_KEEP_DAYS + 1)
+        db.flush()
+        assert service.erase_expired_contacts(db, tenant_id, now) == 1
+        party = db.query(ExternalParty).filter(ExternalParty.intake_event_id == row.id).one()
+        assert party.contact_email is None and party.contact_erased_by == service.RETENTION_ACTOR
+        assert service.erase_expired_contacts(db, tenant_id, now) == 0
+        # A trial's export stays masked even when unmasking is asked.
+        export = request_export(db, tenant_id, "test", "Test: OD-1 trial export", unmask_contacts=True)
+        assert export.summary == {"contacts": MASKED}
+        db.rollback()

@@ -1454,6 +1454,66 @@ def ensure_qms_id_task(db, tenant_id, event: IntakeEvent, actor, now) -> None:
     )
 
 
+# --------------------------------------------------------------------------------------------- OD-1 contact retention
+
+# shortcut: the OD-1 proposal (12 months after closure), not yet checked against the customer's SOP; make it an
+# organization setting when OD-1's retention values are confirmed.
+CONTACT_KEEP_DAYS = 365
+RETENTION_ACTOR = "system:contact-retention"
+
+
+def erase_expired_contacts(db: Session, tenant_id, now: datetime) -> int:
+    """OD-1: a Case closed as Service only, Inquiry or Not a complaint (the only Cases that reach CLOSED) keeps its
+    contact for 12 months after closure, then the contact is erased and audited; the Case record stays. The last
+    change of a closed Case counts as its closure, so a later correction only ever keeps the contact longer."""
+    from backend.app.db.models.guides_communications import ExternalParty
+    from backend.app.enterprise_audit import make_audit_event
+
+    held = or_(
+        ExternalParty.contact_email.isnot(None),
+        ExternalParty.contact_phone.isnot(None),
+        ExternalParty.contact_role.isnot(None),
+        ExternalParty.primary_name.isnot(None),
+        ExternalParty.primary_details.isnot(None),
+    )
+    rows = (
+        db.query(ExternalParty, IntakeEvent)
+        .join(
+            IntakeEvent,
+            (IntakeEvent.tenant_id == ExternalParty.tenant_id) & (IntakeEvent.id == ExternalParty.intake_event_id),
+        )
+        .filter(
+            ExternalParty.tenant_id == tenant_id,
+            ExternalParty.contact_erased_at.is_(None),
+            held,
+            IntakeEvent.status == case_rules.CLOSED,
+            IntakeEvent.updated_at < now - timedelta(days=CONTACT_KEEP_DAYS),
+        )
+        .limit(READ_LIMIT)
+        .all()
+    )
+    reason = "Retention: 12 months after a service-only, inquiry or not-a-complaint case closed (OD-1)"
+    for party, event in rows:
+        party.contact_role = party.contact_phone = party.contact_email = party.preferred_channel = None
+        party.primary_name, party.primary_details = None, None
+        party.contact_erased_at, party.contact_erased_by, party.contact_erase_reason = now, RETENTION_ACTOR, reason
+        party.updated_by, party.updated_at = RETENTION_ACTOR, now
+        db.add(
+            make_audit_event(
+                tenant_id=tenant_id,
+                actor_ref=RETENTION_ACTOR,
+                action="CASE_CONTACT_ERASED",
+                entity_type=SOURCE_TYPE,
+                entity_id=event.id,
+                reason=reason,
+                details={"reference": event.reference},
+                created_at=now,
+            )
+        )
+    db.flush()
+    return len(rows)
+
+
 # --------------------------------------------------------------------------------------------- triage versions (B2)
 
 # The fields a triage version keeps (spec 3.4: "Versions": who changed what, old -> new).

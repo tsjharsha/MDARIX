@@ -737,6 +737,8 @@ def run_for_all_tenants(control_db: Session) -> dict:
     committed on its own; a failing organization is logged and the job then fails so the scheduler alerts."""
     from backend.app.reportability.reminders import active_tenant_ids
     from backend.app.db.data_plane import open_tenant_data_session
+    from backend.app.intake import service as intake
+    from backend.app.intake.service import now_utc
 
     totals = {"tenants": 0, "raised": 0, "resolved": 0}
     failed = []
@@ -745,6 +747,10 @@ def run_for_all_tenants(control_db: Session) -> dict:
             with open_tenant_data_session(tenant_id) as data:
                 try:
                     done = sweep(data, control_db, tenant_id)
+                    # OD-1 (B2): contacts past their retention are erased on the same 15-minute pass.
+                    totals["contacts_erased"] = totals.get("contacts_erased", 0) + intake.erase_expired_contacts(
+                        data, tenant_id, now_utc()
+                    )
                     data.commit()
                 except Exception:
                     data.rollback()

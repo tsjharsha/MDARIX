@@ -45,6 +45,8 @@ class ExportRequest(BaseModel):
     reason: str = Field(min_length=10, max_length=1000)
     # A current code from the administrator's authenticator app (confirm_with_authenticator).
     mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
+    # OD-1: contacts are masked unless asked; the reason above is the reason for unmasking, audited with the export.
+    unmask_contacts: bool = False
 
 
 def confirm_with_authenticator(
@@ -95,9 +97,9 @@ def confirm_with_authenticator(
     mfa.record_success(db, user)
 
 
-def _queue(db: Session, tenant_id, actor_ref: str, reason: str) -> dict:
+def _queue(db: Session, tenant_id, actor_ref: str, reason: str, unmask_contacts: bool = False) -> dict:
     try:
-        row = request_export(db, tenant_id, actor_ref, reason.strip())
+        row = request_export(db, tenant_id, actor_ref, reason.strip(), unmask_contacts)
     except ExportInProgress:
         raise HTTPException(
             409, detail={"code": "EXPORT_IN_PROGRESS", "message": "An export is already being prepared"}
@@ -160,7 +162,14 @@ def request_own_export(payload: ExportRequest, request: Request, db: Session = D
     confirm_with_authenticator(
         db, admin, payload.mfa_code, tenant_id=admin.tenant_id, action="TENANT_EXPORT", request=request
     )
-    return _queue(db, admin.tenant_id, str(admin.id), payload.reason)
+    if payload.unmask_contacts:
+        from backend.app.access.permissions import DATA_EXPORT, permissions_for_roles, roles_of_user
+
+        if DATA_EXPORT not in permissions_for_roles(roles_of_user(db, admin)):
+            raise HTTPException(
+                403, detail={"code": "PERMISSION_DENIED", "message": "Unmasking contacts needs data.export"}
+            )
+    return _queue(db, admin.tenant_id, str(admin.id), payload.reason, payload.unmask_contacts)
 
 
 @router.get("/admin/exports")
