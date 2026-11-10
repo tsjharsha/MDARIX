@@ -42,9 +42,15 @@ def storage(monkeypatch, tmp_path):
         monkeypatch.delenv(name, raising=False)  # the built-in check: an executable or a script is refused
 
 
-def eml(body: str, subject: str = "Pump alarm", attachments=(), **headers) -> bytes:
+def eml(
+    body: str,
+    subject: str = "Pump alarm",
+    attachments=(),
+    sender: str = "Ward Nurse <nurse@hospital.example>",
+    **headers,
+) -> bytes:
     message = EmailMessage()
-    message["From"] = "Ward Nurse <nurse@hospital.example>"
+    message["From"] = sender
     message["To"] = "cases-test@intake.mdarix.com"
     message["Subject"] = subject
     message["Message-ID"] = f"<{uuid.uuid4().hex}@hospital.example>"
@@ -187,6 +193,54 @@ def test_em13_em17_non_english_flagged_and_a_forwarded_earlier_date_offered(org)
     )
     assert row.flags["may_not_be_english"] is True
     assert row.header_dates == ["2026-11-02T09:00:00+00:00"]
+
+
+def test_a_known_site_of_the_sender_domain_is_only_suggested(org):
+    from backend.app.db.models.guides_communications import ExternalParty
+
+    words = "The display froze twice during the morning round."
+    domain, other = f"site-{uuid.uuid4().hex[:8]}.example", f"lab-{uuid.uuid4().hex[:8]}.example"
+    assert received(org, eml(words, sender=f"Desk <desk@{domain}>")).draft["site"] is None  # nothing known yet
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        bind_system(db, "test:mail-processing")
+        db.add(
+            ExternalParty(
+                tenant_id=org["tenant_id"],
+                party_type="HOSPITAL",
+                name="Northgate Clinic (SAMPLE)",
+                contact_email=f"Biomed@{domain.upper()}",
+                created_by="test",
+                created_at=now,
+                updated_by="test",
+                updated_at=now,
+            )
+        )
+        db.commit()
+    known = received(org, eml(words + " Again.", sender=f"Desk <desk@{domain}>"))
+    assert known.draft["site"] == {
+        "text": "Northgate Clinic (SAMPLE)",
+        "status": "UNCONFIRMED",
+        "source": "EMAIL_DOMAIN",
+    }
+    # A site typed on an earlier Case made from an e-mail of the same domain.
+    case = _ok(
+        org["user"].post(
+            INTAKE, json={"kind": "CONTACT", "reporter_words": "Screen went dark", "reporter_site": "Eastside Lab"}
+        )
+    )
+    first = received(org, eml("Screen went dark on the analyser.", sender=f"Lab <lab@{other}>"))
+    with SessionLocal() as db:
+        bind_system(db, "test:mail-processing")
+        db.query(InboundMessage).filter(InboundMessage.id == first.id).update(
+            {"intake_event_id": uuid.UUID(case["id"]), "state": "MADE_CASE"}
+        )
+        db.commit()
+    assert received(org, eml("It went dark again.", sender=f"Lab <lab@{other}>")).draft["site"]["text"] == (
+        "Eastside Lab"
+    )
+    # A personal mail provider's domain is many unrelated senders: no suggestion.
+    assert received(org, eml("Alarm again tonight.", sender="Someone <someone@gmail.com>")).draft["site"] is None
 
 
 def test_an_encrypted_mail_cannot_be_read(org):

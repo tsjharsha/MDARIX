@@ -10,7 +10,8 @@
   "possible duplicate".
 - The draft: the body as text (HTML reduced, quoted lines and the signature cut), personal data masked; the subject
   masked; the sender's domain only. Product, lot, serial and UDI matched against master data and the GS1 pattern, each
-  "unconfirmed, source: E-mail" (ID-1). Harm and fault words, and "may not be English", flagged.
+  "unconfirmed, source: E-mail" (ID-1). A known site of the sender's domain is suggested, unconfirmed. Harm and
+  fault words, and "may not be English", flagged.
 - Awareness: an earlier date in a forwarded message's header lines is offered as "possibly known earlier" (H1).
 - Death or injury words: the in-app alert at once (the oversight sweep's e-mail item is due on receipt) and the urgent
   e-mail when the organization opted in.
@@ -120,6 +121,51 @@ def identifiers(db: Session, tenant_id, text: str) -> dict:
     if udi:
         found["udi"] = {"text": "(01)" + (udi.group(1) or udi.group(2))}
     return {key: {**value, "status": "UNCONFIRMED", "source": "EMAIL"} for key, value in found.items()}
+
+
+def site_suggestion(db: Session, tenant_id, domain: str | None) -> dict | None:
+    """The customer site whose known domain matches the sender's (spec 4.4 step 4): a site, distributor or service
+    partner of the organization with a contact address at that domain, else the site of the newest Case made from an
+    e-mail of that domain. Only a suggestion, unconfirmed: the person chooses to use it. None for a personal mail
+    provider, where one domain is many unrelated senders."""
+    from sqlalchemy import func
+
+    from backend.app.db.models.guides_communications import ExternalParty
+    from backend.app.db.models.intake import InboundMessage, IntakeEvent
+    from backend.app.trial.auto_approval import PERSONAL_MAIL_DOMAINS
+
+    if not domain or domain in PERSONAL_MAIL_DOMAINS:
+        return None
+    party = (
+        db.query(ExternalParty.name)
+        .filter(
+            ExternalParty.tenant_id == tenant_id,
+            ExternalParty.party_type != "REPORTER",
+            ExternalParty.contact_erased_at.is_(None),
+            func.lower(func.split_part(ExternalParty.contact_email, "@", 2)) == domain,
+        )
+        .order_by(ExternalParty.updated_at.desc())
+        .first()
+    )
+    site = party[0] if party else None
+    if site is None:
+        earlier = (
+            db.query(IntakeEvent.reporter_site)
+            .join(
+                InboundMessage,
+                (InboundMessage.tenant_id == IntakeEvent.tenant_id)
+                & (InboundMessage.intake_event_id == IntakeEvent.id),
+            )
+            .filter(
+                InboundMessage.tenant_id == tenant_id,
+                InboundMessage.from_domain == domain,
+                func.coalesce(IntakeEvent.reporter_site, "") != "",
+            )
+            .order_by(InboundMessage.received_at.desc())
+            .first()
+        )
+        site = earlier[0] if earlier else None
+    return {"text": site[:120], "status": "UNCONFIRMED", "source": "EMAIL_DOMAIN"} if site else None
 
 
 def _leaf_parts(message: EmailMessage, body) -> list[EmailMessage]:
@@ -307,6 +353,7 @@ def analyse(db: Session, control_db: Session | None, tenant_id, row, content: by
     row.draft = {
         "words": words if not encrypted else "",
         "identifiers": identifiers(db, tenant_id, text) if text else {},
+        "site": site_suggestion(db, tenant_id, row.from_domain),
         "note": "Cannot be read: encrypted" if encrypted else None,
     }
     reason = auto_reply_reason(message, bool((row.flags or {}).get("empty_sender")))
