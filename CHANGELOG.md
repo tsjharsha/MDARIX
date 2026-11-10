@@ -44,6 +44,27 @@ stays "starter, for your consultant to confirm". On unless `MDARIX_RULE_REGISTER
   IF ... THEN lines, the version history), read-only for every signed-in member. The session gains `rule_register`.
 - Version pins: a pinned regulatory function or the eMDR rule book changed without a new register version fails the
   build test (`tests/test_rule_pins_unit.py`).
+- Decision trees â€º Rules: a read-only view for every signed-in member, with a header (rules, markets, held as data,
+  starter mark) and a flat table (rule, kind, market, version with its code, source and clause, in force, approved,
+  held as, fingerprint). It filters by market, kind and "As at" day. A drawer shows the floor's logic, report types
+  and periods, how days are counted, and the version history.
+- "Rules used" on a market conclusion (the Decision trees answer and the watch's assessment drawer): the floor in force
+  at the event, today's floor, and what was decided, kept apart. Both screens are hidden while the register is off.
+- FG-1: an organisation window longer than the law. Saving it gives a warning (the settings return
+  `longer_than_law`), and the watch shows the law's deadline beside that window's clock. Saved windows are never
+  refused or changed. India has no legal period in code (FG-2) and is not compared.
+
+### Fixed
+
+- A draft saved with the register on and signed with it off no longer keeps the floor, the rules and the date
+  calculation from the earlier save.
+- Every clock counts by the floor in force at awareness (or the floor the conclusion was signed under), never today's:
+  the watch, triage's earliest report and signed clocks, and the sample refreshes. Version 1 is the only version, so
+  outcomes are the same today.
+- The register refuses floor versions of one market that name different authority time zones.
+- The routine path stores no floor when there is no awareness moment, and keeps how the awareness day was found.
+- Tests on the B7 line: the signer-training statement test reads version 2 of the disposition rules (the stored
+  statements of version-1 records are unchanged), and the 0.10.97 RT-03 refresh test looks up its own trial's record.
 
 ### Changed
 
