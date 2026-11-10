@@ -18,6 +18,9 @@ Hardening: code-audit fixes 6-12. No migration. The API image changes.
 
 - Approving a report or signing a market conclusion re-reads the record after locking it, so a cancellation or edit
   made a moment earlier is no longer overwritten (a cancelled report can no longer turn back to approved).
+- The old single reportability decision (before per-market assessment) no longer accepts a new unsigned "Not
+  reportable": that is concluded only by a signed market assessment. Single decisions recorded earlier are still shown
+  and still settle their complaint.
 
 ### Security
 

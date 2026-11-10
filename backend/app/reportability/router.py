@@ -120,27 +120,33 @@ def decide_reportability(
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """A person's reportability decision on a complaint: REPORTED (with the report's reference and the day it was
-    filed) or NOT_REPORTABLE, with the rationale. A revision replaces it; both are in the audit trail."""
+    """The single decision recorded before per-market assessment (0.10.52): it still records that a report was filed
+    (REPORTED, with the report's reference and the day it was filed, and the rationale). A revision replaces it; both
+    are in the audit trail. "Not reportable" is concluded only by a signed market assessment (code audit 9): rows
+    recorded here before are still read."""
     tenant_id = uuid.UUID(ctx.tenant_id)
+    if payload.decision == rules.NOT_REPORTABLE:
+        raise _error(
+            409,
+            "SIGNED_ASSESSMENT_REQUIRED",
+            "Not reportable is concluded by a signed market assessment: open the complaint's market assessment and "
+            "sign each market's conclusion",
+        )
     today = service.today_utc()
     found = service.one(db, tenant_id, complaint_id, today)
     if found is None:
         raise _error(404, "COMPLAINT_NOT_FOUND", "No such complaint in your organization")
     complaint, record, seen, second_look = found
-    if payload.decision == rules.REPORTED:
-        if not payload.report_reference or payload.reported_on is None:
-            raise _error(422, "REPORT_DETAILS_REQUIRED", "Give the report's reference and the day it was filed")
-        if payload.reported_on > today:
-            raise _error(422, "REPORTED_IN_FUTURE", "The day the report was filed cannot be in the future")
-        aware = date.fromisoformat(seen["aware_date"]) if seen["aware_date"] else None
-        if aware is not None and payload.reported_on < aware:
-            raise _error(
-                422, "REPORTED_BEFORE_AWARENESS", "The report cannot be filed before the organization became aware"
-            )
-        reference, reported_on = payload.report_reference, payload.reported_on
-    else:
-        reference, reported_on = None, None
+    if not payload.report_reference or payload.reported_on is None:
+        raise _error(422, "REPORT_DETAILS_REQUIRED", "Give the report's reference and the day it was filed")
+    if payload.reported_on > today:
+        raise _error(422, "REPORTED_IN_FUTURE", "The day the report was filed cannot be in the future")
+    aware = date.fromisoformat(seen["aware_date"]) if seen["aware_date"] else None
+    if aware is not None and payload.reported_on < aware:
+        raise _error(
+            422, "REPORTED_BEFORE_AWARENESS", "The report cannot be filed before the organization became aware"
+        )
+    reference, reported_on = payload.report_reference, payload.reported_on
     existing = (
         db.query(ComplaintReportability)
         .filter(ComplaintReportability.tenant_id == tenant_id, ComplaintReportability.complaint_id == complaint_id)

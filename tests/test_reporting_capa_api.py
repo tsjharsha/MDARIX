@@ -289,15 +289,18 @@ def test_a_person_decides_reportability_and_its_timeliness_is_kept(org, windows)
     assert decision["window"] == watch_rules.TEMPLATES[0]["name"]
     again = org["regulatory"].post(path, json=reported)
     assert again.status_code == 422 and again.json()["detail"]["code"] == "NOTHING_TO_CHANGE"
-    revised = org["approver"].post(
+    # "Not reportable" is concluded only by a signed market assessment (0.10.95, code audit 9).
+    unsigned = org["approver"].post(
         path, json={"decision": "NOT_REPORTABLE", "rationale": "Death unrelated to the device per autopsy report"}
     )
-    assert revised.status_code == 200 and revised.json()["decision"]["report_reference"] is None
+    assert unsigned.status_code == 409 and unsigned.json()["detail"]["code"] == "SIGNED_ASSESSMENT_REQUIRED"
+    revised = org["approver"].post(path, json={**reported, "report_reference": "MDR-3004-2026-00018"})
+    assert revised.status_code == 200 and revised.json()["decision"]["report_reference"] == "MDR-3004-2026-00018"
     assert _actions(tenant, due_soon) == ["COMPLAINT_REPORTABILITY_DECIDED", "COMPLAINT_REPORTABILITY_REVISED"]
 
     late = org["regulatory"].post(
         f"/api/v1/complaints/{overdue}/reportability",
-        json={"decision": "NOT_REPORTABLE", "rationale": "Malfunction could not cause or contribute to harm"},
+        json={**reported, "rationale": "Malfunction: the MDR was filed after the window"},
     )
     assert late.status_code == 200 and late.json()["decision"]["on_time"] is False
 
@@ -392,7 +395,12 @@ def test_the_sweep_reminds_the_regulatory_reviewers_and_settles_their_tasks(org,
     assert len(tasks_of(urgent)) == 1
     decided = org["regulatory"].post(
         f"/api/v1/complaints/{urgent}/reportability",
-        json={"decision": "NOT_REPORTABLE", "rationale": "The death was not device related per the coroner"},
+        json={
+            "decision": "REPORTED",
+            "rationale": "Death: an MDR was filed under 21 CFR 803",
+            "report_reference": "MDR-3004-2026-00019",
+            "reported_on": TODAY.isoformat(),
+        },
     )
     assert decided.status_code == 200
     assert [task.status for task in tasks_of(urgent)] == ["COMPLETED"]

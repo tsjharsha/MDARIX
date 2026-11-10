@@ -17,6 +17,7 @@ from backend.app.db.models.market_assessment import (
     ComplaintMarketAssessment,
     SignerTrainingRecord,
 )
+from backend.app.db.models.reportability import ComplaintReportability
 from backend.app.db.models.stage2 import SubscriptionLifecycle
 from backend.app.db.session import RuntimeSessionLocal, SessionLocal, runtime_role_active
 from backend.app.db.tenant_scope import bind_system, bind_tenant
@@ -371,11 +372,24 @@ def test_only_watched_complaints_and_enabled_markets_and_the_single_decision_sta
     off = regulatory.put(_url(harm, "GB"), json={"answers": {}})
     assert off.status_code == 409 and off.json()["detail"]["code"] == "MARKET_NOT_ENABLED"
     assert regulatory.put(_url(harm, "XX"), json={"answers": {}}).status_code == 404
-    # An earlier single decision is still read, marked as such, and still settles the complaint.
+    # A new unsigned "not reportable" is refused (0.10.95, code audit 9): the signed market assessment concludes it.
     single = regulatory.post(
         f"/api/v1/complaints/{harm}/reportability", json={"decision": "NOT_REPORTABLE", "rationale": REASON}
     )
-    assert single.status_code == 200, single.text
+    assert single.status_code == 409 and single.json()["detail"]["code"] == "SIGNED_ASSESSMENT_REQUIRED"
+    # An earlier single decision is still read, marked as such, and still settles the complaint.
+    with SessionLocal() as db:
+        bind_tenant(db, org["tenant_id"])
+        db.add(
+            ComplaintReportability(
+                tenant_id=uuid.UUID(str(org["tenant_id"])),
+                complaint_id=uuid.UUID(harm),
+                decision="NOT_REPORTABLE",
+                rationale=REASON,
+                decided_by=str(uuid.uuid4()),
+            )
+        )
+        db.commit()
     detail = regulatory.get(_url(harm)).json()
     assert detail["legacy_decision"]["note"] == "Single decision, recorded before per-market assessment"
     watched = next(item for item in regulatory.get(f"{WATCH}?show=all").json()["items"] if item["id"] == harm)
