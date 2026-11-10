@@ -10,6 +10,20 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.97] - not released yet (after the WHIF freeze)
+
+B7a: the routine complaint path. Migration `tr25routinepath` (chained from `tr19casesescalation`; it moves onto
+DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
+
+### Database
+
+- Migration `tr25routinepath`, expand-only: new tables `inbound_messages` (e-mail waiting for a person) and
+  `case_attachments` (files on a Case), both with forced row-level security; `event_closures` gains the native
+  closure and reopening (`closed_at`, `closed_by`, `reopened_at`, `reopened_by`, `reopen_reason`);
+  `oversight_settings` gains `urgent_email` (off by default), `mail_allowed_domains` and `mail_daily_limit`; Case
+  addenda accept the kinds `TRANSLATION` and `EMAIL`; a Case import's key is unique per organization. Legacy
+  organization databases get the same from `scripts/add_workflow_tables_to_legacy_planes.py` (step `tr25`).
+
 ## [0.10.96] - not released yet (ships in the big-bang release)
 
 B3: the US eMDR complete for manufacturers (initial report). No migration. The API and web images change.

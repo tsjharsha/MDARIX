@@ -19,6 +19,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -79,6 +80,10 @@ class OversightSettings(Base):
     case_flow: Mapped[str] = mapped_column(String(20), nullable=False, server_default="ONE_RECORD")
     backlog_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("30"))
     backlog_target_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("10"))
+    # tr25 (B7): the opt-in urgent e-mail alert (off by default), the allowed sender domains, the daily e-mail limit.
+    urgent_email: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    mail_allowed_domains = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    mail_daily_limit: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("200"))
 
     __table_args__ = (
         UniqueConstraint("tenant_id", name="uq_oversight_settings_tenant"),
@@ -86,6 +91,7 @@ class OversightSettings(Base):
         CheckConstraint("triage_fast_hours BETWEEN 1 AND 24", name="fast_hours_range"),
         CheckConstraint(_in("case_flow", CASE_FLOWS), name="case_flow_known"),
         CheckConstraint("backlog_days >= 1 AND backlog_target_days >= 1", name="backlog_range"),
+        CheckConstraint("mail_daily_limit BETWEEN 1 AND 5000", name="mail_limit_range"),
     )
 
 
@@ -185,6 +191,12 @@ class EventClosure(Base):
     filed_at = _tz()
     source_system: Mapped[str | None] = mapped_column(String(40))
     updated_at = _tz(False)
+    # tr25 (B7): MDARIX Complete closes the complaint by the Resolve and close signature; reopening needs a reason.
+    closed_at = _tz()
+    closed_by: Mapped[str | None] = mapped_column(String(255))
+    reopened_at = _tz()
+    reopened_by: Mapped[str | None] = mapped_column(String(255))
+    reopen_reason: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
         UniqueConstraint("tenant_id", "complaint_id", name="uq_event_closures_complaint"),
@@ -200,4 +212,8 @@ class EventClosure(Base):
             name="ready_signed",
         ),
         CheckConstraint("ready_state <> 'READY_WITH_REASON' OR ready_reason IS NOT NULL", name="reason_given"),
+        CheckConstraint(
+            "closed_at IS NULL OR (closed_by IS NOT NULL AND ready_state IS NOT NULL)", name="closed_signed"
+        ),
+        CheckConstraint("reopened_at IS NULL OR reopen_reason IS NOT NULL", name="reopen_reason"),
     )

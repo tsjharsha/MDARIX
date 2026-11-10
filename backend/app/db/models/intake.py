@@ -49,6 +49,8 @@ __all__ = [
     "LINK_STATES",
     "TRIAGE_SUBJECTS",
     "CaseAddendum",
+    "CaseAttachment",
+    "InboundMessage",
     "FirstContactCheck",
     "IntakeEvent",
     "RecordFieldChange",
@@ -96,7 +98,10 @@ ESCALATIONS = ("CREATED", "ATTACHED")
 RECORD_OWNERS = ("MDARIX", "EXTERNAL")
 PATIENTS = ("NONE", "ONE", "SEVERAL", "NOT_KNOWN")
 TRIAGE_SPEEDS = ("FAST", "ROUTINE")
-ADDENDUM_KINDS = ("STATEMENT", "WITHDRAWAL", "TECHNICIAN_FINDING", "CORRECTION_BY_REPORTER")
+ADDENDUM_KINDS = ("STATEMENT", "WITHDRAWAL", "TECHNICIAN_FINDING", "CORRECTION_BY_REPORTER", "TRANSLATION", "EMAIL")
+# tr25 (B7): an e-mail waiting for a person, and where a Case file came from.
+MESSAGE_STATES = ("NEW", "MADE_CASE", "ADDED_TO_CASE", "NOT_A_CASE", "PURGED")
+ATTACHMENT_SOURCES = ("EMAIL", "UPLOAD")
 
 
 def _in(column: str, values) -> str:
@@ -218,6 +223,14 @@ class IntakeEvent(Base):
             "request_key",
             unique=True,
             postgresql_where=text("request_key IS NOT NULL"),
+        ),
+        # tr25 (B7): a Case import's key, source + case_id, is unique per organization.
+        Index(
+            "ix_intake_events_case_import_key",
+            "tenant_id",
+            "source_identifier",
+            unique=True,
+            postgresql_where=text("source_system = 'CASE_IMPORT'"),
         ),
     )
 
@@ -438,4 +451,92 @@ class RecordFieldChange(Base):
     __table_args__ = (
         Index("ix_record_field_changes_record", "tenant_id", "entity", "record_id"),
         Index("ix_record_field_changes_import", "import_ref"),
+    )
+
+
+class InboundMessage(Base):
+    """One e-mail received on an organization's intake address (tr25, B7b), waiting for a person's decision. An e-mail
+    is never a complaint by itself: at most it becomes a Case that a person classifies and signs."""
+
+    __tablename__ = "inbound_messages"
+    id = _pk()
+    tenant_id: Mapped[uuid.UUID] = _tenant()
+    message_id: Mapped[str] = mapped_column(String(998), nullable=False)
+    in_reply_to: Mapped[str | None] = mapped_column(String(998))
+    references = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    subject_masked: Mapped[str | None] = mapped_column(Text)
+    from_domain: Mapped[str | None] = mapped_column(String(255))
+    received_at = _tz(False)
+    header_dates = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    body_sha256: Mapped[str | None] = mapped_column(String(64))
+    raw_object_key: Mapped[str | None] = mapped_column(String(500))
+    raw_size: Mapped[int | None] = mapped_column(Integer)
+    attachments = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    flags = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    draft = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    state: Mapped[str] = mapped_column(String(20), nullable=False, server_default="NEW")
+    reason: Mapped[str | None] = mapped_column(Text)
+    intake_event_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    decided_by: Mapped[str | None] = mapped_column(String(255))
+    decided_at = _tz()
+    purge_after = _tz()
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    created_at = _tz(False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_inbound_messages_tenant_id_id"),
+        UniqueConstraint("tenant_id", "message_id", name="uq_inbound_messages_message"),
+        ForeignKeyConstraint(
+            ["tenant_id", "intake_event_id"],
+            ["intake_events.tenant_id", "intake_events.id"],
+            name="fk_inbound_messages_case",
+        ),
+        CheckConstraint(_in("state", MESSAGE_STATES), name="state_known"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        CheckConstraint("raw_size IS NULL OR raw_size >= 0", name="raw_size_positive"),
+        Index("ix_inbound_messages_tenant_state", "tenant_id", "state", "received_at"),
+        Index("ix_inbound_messages_tenant_case", "tenant_id", "intake_event_id"),
+    )
+
+
+class CaseAttachment(Base):
+    """A file on a Case (tr25, B7): uploaded or from an e-mail, virus-scanned. An unusable file (infected, refused) is
+    recorded without its content, with the reason."""
+
+    __tablename__ = "case_attachments"
+    id = _pk()
+    tenant_id: Mapped[uuid.UUID] = _tenant()
+    intake_event_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    inbound_message_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    object_key: Mapped[str | None] = mapped_column(String(500))
+    filename_masked: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    size: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    usable: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    unusable_reason: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(10), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at = _tz(False)
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "id", name="uq_case_attachments_tenant_id_id"),
+        ForeignKeyConstraint(
+            ["tenant_id", "intake_event_id"],
+            ["intake_events.tenant_id", "intake_events.id"],
+            name="fk_case_attachments_case",
+        ),
+        ForeignKeyConstraint(
+            ["tenant_id", "inbound_message_id"],
+            ["inbound_messages.tenant_id", "inbound_messages.id"],
+            name="fk_case_attachments_message",
+        ),
+        CheckConstraint(_in("source", ATTACHMENT_SOURCES), name="source_known"),
+        CheckConstraint("size >= 0", name="size_positive"),
+        CheckConstraint(
+            "(usable AND object_key IS NOT NULL) OR (NOT usable AND unusable_reason IS NOT NULL)", name="usable_stored"
+        ),
+        CheckConstraint("intake_event_id IS NOT NULL OR inbound_message_id IS NOT NULL", name="has_owner"),
+        Index("ix_case_attachments_tenant_case", "tenant_id", "intake_event_id"),
+        Index("ix_case_attachments_tenant_message", "tenant_id", "inbound_message_id"),
     )

@@ -6,7 +6,8 @@ reference, a lot's expiry date, a product's device category and a complaint's ot
 row dismissed with a reason), tr11 (each organization's navigation, classic or new) and tr12 (a sample-only trial,
 a complaint's linked service work) tr13 (each person's workspace persona), tr14 (a cancelled authority report), tr15 (a Canada assessment), tr16 (a product's Basic UDI-DI and EMDN code, a
 registration's risk class, a responsible party's SRN), tr18 (a re-signed market conclusion's change reason) and
-tr19 (Cases, escalation to a Complaint, triage at two speeds).
+tr19 (Cases, escalation to a Complaint, triage at two speeds) and tr25 (the routine path, Case attachments,
+e-mail intake).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -322,6 +323,13 @@ STEPS = (
             "oversight_settings",
             "due_alerts",
         ),
+    ),
+    Step(
+        "tr25",
+        "tr25_trial_routine_path.py",
+        "add_routine_path",
+        ("inbound_messages", "case_attachments"),
+        ("intake_events", "case_addenda", "event_closures", "oversight_settings"),
     ),
 )
 
