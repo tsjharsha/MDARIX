@@ -97,3 +97,47 @@ def test_b2_signing_routes_refuse_a_wrong_or_missing_code_and_change_nothing(tri
     attempts = {row.details.get("attempt") for row in _actions(tenant_id, "SIGNATURE_MFA_FAILED")}
     assert {"TRIAGE_DOWNGRADE", "TRIAGE_THREAT", "CASE_VOID"} <= attempts
     assert len(_actions(tenant_id, "SIGNATURE_MFA_FAILED")) == 8  # every refusal audited
+
+
+def test_a_refused_first_save_leaves_no_triage_record_behind(monkeypatch):
+    """B3 run 5: the first save of a later awareness in a one-person trial is signed; refused, it changes nothing
+    (no empty triage record) except the refusal audit. Then the same save, correctly signed, works."""
+    import uuid
+    from datetime import datetime, timedelta, timezone
+
+    from backend.app.db.models.intake import TriageRecord
+    from backend.app.trial.retention import purge_trial
+    from tests.test_free_trial import _approved_trial_client
+    from tests.test_mfa_mvp import _next_code
+
+    user, approval, _ = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    try:
+        me = _ok(user.get(TRIAGE))["people"][0]["id"]
+        secret, _ = _enroll(user)
+        monkeypatch.setenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "true")
+        now = datetime.now(timezone.utc)
+        event = _log(user, answers=_all_no(Q2="YES", Q4="YES"), received_at=(now - timedelta(hours=1)).isoformat())
+        item = _find(user, f"INTAKE:{event['id']}")
+        assert item["record"] is None
+        later = {
+            "awareness_confirmed_at": (now - timedelta(minutes=30)).isoformat(),
+            "awareness_note": "The clinic's biomed team knew first; we heard from them later.",
+            "password": PASSWORD,
+        }
+
+        refused = _save(user, item, me, **later, mfa_code="000000")
+        assert refused.status_code == 403 and refused.json()["detail"]["code"] == "SIGNATURE_CODE_INVALID"
+        with SessionLocal() as db:
+            bind_system(db, "test: no triage record after a refused signature")
+            assert db.query(TriageRecord).filter(TriageRecord.subject_id == uuid.UUID(event["id"])).count() == 0
+        assert [row.details.get("attempt") for row in _actions(tenant_id, "SIGNATURE_MFA_FAILED")] == [
+            "TRIAGE_DOWNGRADE"
+        ]
+
+        saved = _ok(_save(user, item, me, **later, mfa_code=_next_code(secret)))
+        row = next(entry for entry in saved["items"] if f"INTAKE:{event['id']}" in entry["members"])
+        assert row["record"]["version"] == 1 and row["record"]["completed_at"]
+    finally:
+        with SessionLocal() as db:
+            purge_trial(db, tenant_id, "test:triage-refusal-clean")
