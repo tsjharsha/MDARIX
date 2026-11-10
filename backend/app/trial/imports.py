@@ -2093,10 +2093,10 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
     changes: list[dict] = []  # each field a re-upload changes on a complaint already there (G20)
     file_lots: dict[str, list[str]] = {}  # complaint id -> the lots its rows name, in file order (a kit's, J32)
     if entity in business_imports.TEMPLATES:
-        created, updated = business_imports.write(
+        created, updated, changes = business_imports.write(
             entity, rows, db, tenant_id, lookup, lambda when: _stamp(now, when, source), _date, now, source
         )
-        return {"entity": entity, "created": created, "updated": updated, "rows": len(rows)}
+        return {"entity": entity, "created": created, "updated": updated, "rows": len(rows), "_changes": changes}
     for _, row in rows:
         if entity == "products":
             product = lookup.product(row["product_id"])
@@ -2441,15 +2441,18 @@ def _field_changes(complaint: Complaint, values: dict, identifier: str) -> list[
 
 
 def _after_complaints(db: Session, tenant_id, entity: str, rows, result: dict, import_ref, source: str) -> None:
-    """A complaints file: its field changes are stored with the run, and each QMS-complaint task whose complaint ID
-    the file brings is closed (T-G20)."""
+    """A file's field changes are stored with the run (a complaint's fields; the product and version of a risk,
+    requirement, investigation or CAPA, PV-1 F7), and each QMS-complaint task whose complaint ID a complaints file
+    brings is closed (T-G20)."""
     changes = result.pop("_changes", [])
-    if entity != "complaints":
+    if entity != "complaints" and not changes:
         return
     from backend.app.intake import service as intake
 
     now = datetime.now(timezone.utc)
     result["field_changes"] = intake.record_changes(db, tenant_id, changes, import_ref, source, now)
+    if entity != "complaints":
+        return
     result["qms_tasks_closed"] = intake.confirm_by_import(
         db, tenant_id, [row.get("complaint_id") for _, row in rows], "system:import", now
     )

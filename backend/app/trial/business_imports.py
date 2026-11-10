@@ -307,12 +307,43 @@ def check(entity: str, rows, lookup, report) -> int:
         if entity in KEYED:
             model, column, key = KEYED[entity]
             if row.get("investigation_id") and entity == "capas":
-                if not need(records.investigation(row["investigation_id"]), "investigation_id", "Investigation"):
+                case = records.investigation(row["investigation_id"])
+                if not need(case, "investigation_id", "Investigation"):
+                    continue
+                # PV-1 F8: a CAPA raised from a case is for the case's product.
+                if product is not None and case.product_id != product.id:
+                    report.add(
+                        line,
+                        "product_id",
+                        f"Investigation '{row['investigation_id']}' is for another product than '{row['product_id']}'.",
+                    )
                     continue
             if entity == "investigations":
                 missing = [cid for cid in split_ids(row.get("complaint_ids")) if records.complaint(cid) is None]
                 if missing:
                     report.add(line, "complaint_ids", f"Complaints not loaded yet: {', '.join(missing[:5])}.")
+                    continue
+                # PV-1 F8: a case links complaints of its own product only (as opening a case does).
+                other = [
+                    cid
+                    for cid in split_ids(row.get("complaint_ids"))
+                    if records.complaint(cid).product_id != product.id
+                ]
+                if other:
+                    report.add(
+                        line,
+                        "complaint_ids",
+                        f"Complaints of another product than '{row['product_id']}': {', '.join(other[:5])}.",
+                    )
+                    continue
+                # PV-1 F7: a file never moves a case to another product.
+                held = records.get(model, column, row[key])
+                if held is not None and held.product_id != product.id:
+                    report.add(
+                        line,
+                        "product_id",
+                        f"Investigation '{row[key]}' is held for another product; a file cannot change its product.",
+                    )
                     continue
             if entity == "changes":
                 unknown = [
@@ -489,9 +520,11 @@ def _relate(db: Session, tenant_id, source: tuple[str, uuid.UUID], target: tuple
 def write(
     entity: str, rows, db: Session, tenant_id, lookup, stamp, parse_date, now: datetime, source: str
 ) -> tuple[int, int]:
-    """Write one checked batch. stamp(row_date) gives the source and timestamp columns; parse_date reads a date."""
+    """Write one checked batch. stamp(row_date) gives the source and timestamp columns; parse_date reads a date.
+    Returns the counts and the product and version changes made to records already held (PV-1 F7: their history)."""
     records = Records(db, tenant_id)
     created = updated = 0
+    changes: list[dict] = []
     evidence: list[RecordEvidence] = []
     for _, row in rows:
         product = lookup.product(row["product_id"]) if row.get("product_id") else None
@@ -518,6 +551,18 @@ def write(
                 # A re-upload sets only what its file holds: an optional column it leaves out keeps the stored value
                 # (a CAPA's or an investigation's status is not reset to open), and "updated" counts real changes (J9).
                 kept = {name: value for name, value in values.items() if _given(name, row, key)}
+                changes += [
+                    {
+                        "entity": entity,
+                        "record_id": record.id,
+                        "record_key": row[key],
+                        "field": name,
+                        "before": str(getattr(record, name)) if getattr(record, name) else None,
+                        "after": str(kept[name]) if kept[name] else None,
+                    }
+                    for name in ("product_id", "product_version_id")
+                    if name in kept and getattr(record, name) != kept[name]
+                ]
                 if apply_values(record, kept):
                     record.updated_at = now
                     updated += 1
@@ -624,7 +669,7 @@ def write(
                 updated += 1
         db.flush()
     upsert_record_evidences(db, tenant_id, evidence)
-    return created, updated
+    return created, updated, changes
 
 
 # The optional column each record field comes from (a required column is always in the row).
