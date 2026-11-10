@@ -248,7 +248,8 @@ def test_unknown_stays_pending_and_an_override_needs_a_reason(org):
     )
     item = _save(regulatory, complaint, "US", pending, harm_level="MINOR")
     assert item["evaluation"]["suggested"] == "PENDING_INFORMATION"
-    assert item["clock"]["window"].startswith("FDA MDR")  # still counting
+    # Still counting: an unanswered question 6 keeps the 5-work-day report, the earliest (code audit 3, fix 3).
+    assert item["clock"]["window"] == "5-work-day report (21 CFR 803.53)"
     refused = _sign(regulatory, complaint, "US", item, "NOT_REPORTABLE", override_reason="We are sure it is fine")
     assert refused.status_code == 422 and "Unknown is never No" in refused.json()["detail"]["message"]
     no_reason = _sign(regulatory, complaint, "US", item, "REPORTABLE")
