@@ -134,6 +134,14 @@ export type IntakeItem = {
   duplicates?: Duplicate[];
   fault_words?: string[];
   harm_words?: string[];
+  // 0.10.93 (B2): the stored state, the identifiers (ID-1, S-3), what is missing and the header (A3).
+  status?: string;
+  status_label?: string | null;
+  identifiers?: Identifiers;
+  issue_category_label?: string | null;
+  missing?: { code: string; label: string }[];
+  header?: CaseHeader;
+  not_in_master?: string[];
 };
 export type IntakeState = "to_sign" | "pending" | "review" | "service_only" | "complaint";
 export type IntakeList = {
@@ -548,3 +556,61 @@ export function identifierChip(
     ? { label: "Confirmed", tone: "good" }
     : { label: "Unconfirmed", tone: "warning" };
 }
+
+// ------------------------------------------------------------------ the Cases list (A5) and the Case header (A3)
+
+export type CaseHeader = {
+  owner: string | null;
+  next_action: string | null;
+  due_at: string | null;
+  overdue: boolean;
+  reason: string | null;
+  missing: { code: string; label: string }[];
+  escalation: {
+    state: "ESCALATED" | "URGENT" | "TRIAGE" | "TRIAGED" | "NONE";
+    label: string;
+    complaint_id: string | null;
+  };
+};
+export type CaseRow = {
+  id: string;
+  reference: string;
+  kind: IntakeItem["kind"];
+  sample: boolean;
+  received_at: string;
+  words: string;
+  product_name: string | null;
+  lot: string | null;
+  not_in_master: string[];
+  status: string;
+  status_label: string | null;
+  classification_label: string | null;
+  suggestion_label: string | null;
+  issue_category_label: string | null;
+  flagged: boolean;
+  complaint_ref: string | null;
+  header: CaseHeader;
+};
+export type CasePage = {
+  items: CaseRow[];
+  total: number;
+  page: number;
+  size: number;
+  view: string;
+  views: { code: string; label: string }[];
+  counts: Record<string, number>;
+  people: { id: string; name: string }[];
+};
+/** The views "Which cases" offers first (spec 4.3); the rest (A5) are under More views. */
+export const CASE_VIEWS_FIRST = [
+  "to_check",
+  "waiting_reporter",
+  "qa_review",
+  "became_complaints",
+  "closed",
+  "withdrawn",
+  "all",
+];
+/** The address of one page of the Cases list. */
+export const casesPath = (view: string, q: string, page: number, size = 25) =>
+  `${INTAKE}/cases?view=${encodeURIComponent(view)}&q=${encodeURIComponent(q.trim())}&page=${page}&size=${size}`;

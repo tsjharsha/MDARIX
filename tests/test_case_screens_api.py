@@ -8,8 +8,10 @@ import uuid
 import pytest
 
 from backend.app.db.session import SessionLocal
+from backend.app.db.tenant_scope import bind_system
 from tests.test_case_addenda_api import _log
 from tests.test_free_trial import _approved_trial_client
+from tests.test_intake_triage_api import INTAKE, _ok
 
 pytestmark = pytest.mark.db
 
@@ -43,3 +45,50 @@ def test_a_typed_product_and_an_unknown_lot_are_kept_as_typed_and_flagged(trial)
     missing = {item["code"] for item in event["missing"]}
     assert {"IDENTIFIER_NOT_SURE:serial", "IDENTIFIER_UNCONFIRMED:product"} <= missing
     assert "IDENTIFIER_UNCONFIRMED:lot" not in missing
+
+
+def test_the_cases_list_pages_filters_and_searches_on_the_server(trial):  # A5, spec 4.3
+    user = trial["user"]
+    made = [_log(user, serial_number=f"SN-PAGE-{index}") for index in range(4)]
+    first = _ok(user.get(f"{INTAKE}/cases?size=2"))
+    second = _ok(user.get(f"{INTAKE}/cases?size=2&page=2"))
+    assert first["total"] >= 4 and len(first["items"]) == len(second["items"]) == 2
+    assert not {row["id"] for row in first["items"]} & {row["id"] for row in second["items"]}
+    found = _ok(user.get(f"{INTAKE}/cases?q=SN-PAGE-1"))
+    assert [row["reference"] for row in found["items"]] == [made[1]["reference"]]
+    header = found["items"][0]["header"]  # A3
+    assert header["owner"] and header["next_action"] == "Answer and sign the Case check" and header["due_at"]
+    assert header["escalation"]["state"] in ("NONE", "TRIAGE")
+    assert _ok(user.get(f"{INTAKE}/cases?view=mine&q=SN-PAGE"))["total"] == 4
+    assert _ok(user.get(f"{INTAKE}/cases?view=closed&q=SN-PAGE"))["total"] == 0
+    assert _ok(user.get(f"{INTAKE}/cases?view=to_check&q=SN-PAGE"))["counts"]["OPEN"] == 4
+    refused = user.get(f"{INTAKE}/cases?view=everything")
+    assert refused.status_code == 422 and refused.json()["detail"]["code"] == "UNKNOWN_VIEW"
+    detail = _ok(user.get(f"{INTAKE}/{made[0]['id']}"))
+    assert detail["header"]["next_action"] == header["next_action"]
+
+
+def test_the_cases_list_reads_the_same_number_of_queries_whatever_the_page_size(trial):  # A5, B2-15 (budget)
+    from sqlalchemy import event
+
+    from backend.app.intake import cases_list
+
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    for index in range(3):
+        _log(user, serial_number=f"SN-BUDGET-{index}")
+
+    def statements(size: int) -> int:
+        seen = []
+        with SessionLocal() as db:
+            bind_system(db, "test:case-screens-budget")
+            engine = db.get_bind()
+            listener = lambda *args, **kwargs: seen.append(1)  # noqa: E731
+            event.listen(engine, "before_cursor_execute", listener)
+            try:
+                page = cases_list.cases_page(db, None, tenant_id, "nobody", "all", "SN-BUDGET", 1, size)
+            finally:
+                event.remove(engine, "before_cursor_execute", listener)
+        assert len(page["items"]) == min(size, 3)
+        return len(seen)
+
+    assert statements(1) == statements(3) <= 12

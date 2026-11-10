@@ -1,32 +1,19 @@
 import { SampleDates } from "../../../app/chips";
 import { useState, type ReactNode } from "react";
 import { zoneLabel } from "../../../app/labels";
-import {
-  CheckCircle2,
-  ClipboardList,
-  Copy,
-  FileWarning,
-  Hourglass,
-  Link2,
-  PhoneCall,
-  Siren,
-  Unlink,
-  Wrench,
-} from "lucide-react";
-import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
+import { CheckCircle2, Copy, FileWarning, Hourglass, Link2, PhoneCall, Siren, Unlink, Wrench } from "lucide-react";
+import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
-import { countOf, DecideAndSign } from "./common";
+import { DecideAndSign } from "./common";
 import { WhyAsked } from "../../shared/Basis";
 import { FIRST_CONTACT_WHY } from "../whyAsked";
-import { ChipFilter, Hero, InlineError } from "./boardParts";
+import { Hero, InlineError } from "./boardParts";
 import { EscalateButton } from "./Triage";
+import { CaseHeaderView, CasesList } from "./CasesList";
 import {
   INTAKE,
-  OUTCOME_TONES,
   REASON_MIN,
-  STATE_LABELS,
-  INTAKE_SHOWS,
   FIRST_KNOWLEDGE_BASES,
   NEW_IDENTIFIER,
   answerChoices,
@@ -42,10 +29,8 @@ import {
   type Duplicate,
   type Guide,
   type IntakeItem,
-  type IntakeList,
   type IdentifierEntry,
   type Identifiers,
-  type IntakeState,
   type Outcome,
 } from "../intake";
 
@@ -77,30 +62,23 @@ export function FirstContact({
   /** A link's "Log a call" (Complaints' header action): the log opens at once. */
   startLogging?: "CONTACT" | "URGENT" | null;
 }) {
-  const [show, setShow] = useState<"all" | IntakeState>("all");
   const [logging, setLogging] = useState<"CONTACT" | "URGENT" | null>(startLogging);
-  // The call or intake whose check is open is part of the address (First contact?check=<id>).
+  // The Case whose check is open is part of the address (First contact?check=<id>).
   const [open, setOpen] = useTabParam("check");
-  const list = useResource<IntakeList>(`${INTAKE}?show=${show}`);
+  // A save in a drawer reads the list again (the Cases list pages on the server, A5).
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = () => setReloadKey((key) => key + 1);
   const guide = useResource<Guide>(`${INTAKE}/guide`);
   const canWrite = useCan("case.log");
-  const summary = list.data?.summary;
-  const items = list.data?.items ?? [];
-  if (part === "duplicates") return <Duplicates onChanged={list.reload} />;
+  if (part === "duplicates") return <Duplicates onChanged={reload} />;
   return (
     <div className="ac-overview">
       <Hero
-        tone={summary ? (summary.to_sign + summary.pending + summary.review ? "warning" : "good") : "neutral"}
+        tone="neutral"
         icon={<PhoneCall size={28} />}
         eyebrow="First contact"
-        title={
-          summary
-            ? summary.all
-              ? `${countOf(summary.all, "call")} and urgent intakes`
-              : "No call logged yet"
-            : "Calls and urgent intakes"
-        }
-        detail="A service call can hide a complaint. Log the caller's words, answer the ten questions, and the table gives complaint, service only, both or pending. A harm answer or a harm word goes to triage at once. Awareness is the time of the call."
+        title="Cases"
+        detail="A service call can hide a complaint. Log the reporter's words, answer the ten questions, and the table gives complaint, complaint and service, service only, inquiry, pending or not a complaint. A harm answer or a harm word goes to triage at once."
       >
         {canWrite && (
           <div className="uw-entry-actions">
@@ -118,64 +96,13 @@ export function FirstContact({
           </div>
         )}
       </Hero>
-      <div className="uw-cr-stats">
-        <StatTile
-          label="To sign"
-          value={summary ? summary.to_sign : null}
-          detail="Due the same working day"
-          icon={<ClipboardList size={18} />}
-          tone={summary?.to_sign ? "warning" : undefined}
-          onOpen={() => setShow("to_sign")}
-        />
-        <StatTile
-          label="Pending"
-          value={summary ? summary.pending : null}
-          detail="Waiting on a follow-up with the caller"
-          icon={<Hourglass size={18} />}
-          onOpen={() => setShow("pending")}
-        />
-        <StatTile
-          label="QA review due"
-          value={summary ? summary.review : null}
-          detail="Every service only is reviewed in the trial"
-          icon={<CheckCircle2 size={18} />}
-          onOpen={() => setShow("review")}
-        />
-        <StatTile
-          label="Possible duplicates"
-          value={list.data ? list.data.duplicates : null}
-          detail="The same event from two sources"
-          icon={<Copy size={18} />}
-          tone={list.data?.duplicates ? "warning" : undefined}
-          onOpen={() => document.getElementById("first-contact-duplicates")?.scrollIntoView({ behavior: "smooth" })}
-        />
-      </div>
-      <Panel eyebrow="First contact" title="Calls and urgent intakes, newest first" source={list}>
-        <div className="uw-cr-toolbar">
-          <ChipFilter
-            label="Which calls"
-            options={INTAKE_SHOWS}
-            value={show}
-            counts={summary as Record<string, number> | undefined}
-            onChange={setShow}
-          />
-        </div>
-        {items.length ? (
-          <ul className="uw-cr-list">
-            {items.map((item) => (
-              <IntakeCard key={item.id} item={item} onOpen={() => setOpen(item.id)} onChanged={list.reload} />
-            ))}
-          </ul>
-        ) : (
-          <Empty title="Nothing here" detail="Log a case or an urgent case to see the Case check at work." />
-        )}
-        {guide.data && (
-          <p className="uw-ma-starter" role="note">
-            <FileWarning size={15} aria-hidden="true" /> Guide {guide.data.version}. {guide.data.starter_mark}
-          </p>
-        )}
-      </Panel>
-      {part === "all" && <Duplicates onChanged={list.reload} />}
+      <CasesList onOpen={setOpen} reloadKey={reloadKey} />
+      {guide.data && (
+        <p className="uw-ma-starter" role="note">
+          <FileWarning size={15} aria-hidden="true" /> Guide {guide.data.version}. {guide.data.starter_mark}
+        </p>
+      )}
+      {part === "all" && <Duplicates onChanged={reload} />}
       {logging && guide.data && (
         <LogDrawer
           kind={logging}
@@ -183,58 +110,15 @@ export function FirstContact({
           onClose={() => setLogging(null)}
           onLogged={(id) => {
             setLogging(null);
-            list.reload();
+            reload();
             setOpen(id);
           }}
         />
       )}
       {open && guide.data && (
-        <CheckDrawer id={open} guide={guide.data} onClose={() => setOpen(null)} onChanged={list.reload} />
+        <CheckDrawer id={open} guide={guide.data} onClose={() => setOpen(null)} onChanged={reload} />
       )}
     </div>
-  );
-}
-
-function IntakeCard({ item, onOpen, onChanged }: { item: IntakeItem; onOpen: () => void; onChanged: () => void }) {
-  const outcome = item.signed?.classification ?? item.suggestion;
-  const tone = item.kind === "URGENT" ? "critical" : outcome ? OUTCOME_TONES[outcome] : "neutral";
-  const followUp = item.tasks.find((task) => task.type === "FIRST_CONTACT_FOLLOW_UP" && task.open);
-  return (
-    <li className="uw-cr-card">
-      <span className={`uw-cr-rail tone-${tone}`} aria-hidden="true" />
-      <div className="uw-cr-body">
-        <div className="uw-cr-head">
-          <strong className="uw-cr-id">{item.reference}</strong>
-          <span className="uw-cr-meta">
-            {item.kind_label}
-            {item.product_name ? ` · ${item.product_name}` : ""}
-            {item.lot ? ` · ${item.lot}` : ""} · {formatDate(item.created_at)}
-          </span>
-          {item.kind === "URGENT" ? (
-            <ToneBadge tone="critical" label="Urgent intake: a complaint" />
-          ) : item.signed ? (
-            <ToneBadge tone={tone} label={item.signed.classification_label ?? ""} />
-          ) : (
-            <ToneBadge tone="warning" label={`Suggested: ${item.suggestion_label ?? "answer the questions"}`} />
-          )}
-          {item.state && item.state !== "complaint" && <span className="uw-cr-meta">{STATE_LABELS[item.state]}</span>}
-          {item.flagged && <ToneBadge tone="serious" label="Triage flag" />}
-        </div>
-        <q className="uw-cr-text uw-cr-clip">{item.reporter_words}</q>
-        <p className="uw-cr-meta">
-          Aware {formatDate(item.awareness.at)} ({item.awareness.source_label})
-          {item.awareness.label ? ` · ${item.awareness.label}` : ""}
-          {followUp ? ` · follow-up due ${formatDate(followUp.due_at)}${followUp.overdue ? " (overdue)" : ""}` : ""}
-          {item.qms_task ? ` · ${item.qms_task.label}${item.qms_task.overdue ? " (overdue)" : ""}` : ""}
-        </p>
-        <div className="ca-action-row">
-          <button type="button" className="ac-secondary" onClick={onOpen}>
-            {item.kind === "URGENT" ? "Open" : item.signed ? "Open the check" : "Check and sign"}
-          </button>
-          {!item.flagged && item.kind !== "URGENT" && <EscalateButton kind="INTAKE" id={item.id} onDone={onChanged} />}
-        </div>
-      </div>
-    </li>
   );
 }
 
@@ -847,6 +731,10 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
   const review = item.signed?.classification === "SERVICE_ONLY" && !item.signed.review_outcome;
   return (
     <div className="uw-dp">
+      {item.header && <CaseHeaderView header={item.header} status={item.status_label ?? null} />}
+      {!item.flagged && item.kind !== "URGENT" && item.status !== "ESCALATED" && (
+        <EscalateButton kind="INTAKE" id={item.id} onDone={onChanged} />
+      )}
       <q className="uw-cr-text">{item.reporter_words}</q>
       <p className="uw-cr-meta">
         {[

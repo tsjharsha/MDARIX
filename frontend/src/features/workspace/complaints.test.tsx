@@ -72,7 +72,7 @@ describe("the Complaints section", () => {
     ]);
     // Triage before every other queue (T-G19); then routine first: the complaints waiting for a disposition (T-G36).
     expect(render(<ComplaintsSection />)).toContain("The triage list");
-    expect(render(<ComplaintsSection tab="First contact" />)).toContain("Calls and urgent intakes");
+    expect(render(<ComplaintsSection tab="First contact" />)).toContain("A service call can hide a complaint");
     expect(render(<ComplaintsSection tab="Dispositions" />)).toContain("Complaints waiting, newest first");
     expect(render(<ComplaintsSection tab="Second look" />)).toContain("Possible hidden complaints");
     expect(render(<ComplaintsSection tab="Backlog" />)).toContain("Open complaints against your target");

@@ -54,7 +54,7 @@ from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordL
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import current_person
-from backend.app.intake import case_rules, rules, service, triage_rules
+from backend.app.intake import case_rules, cases_list, rules, service, triage_rules
 from backend.app.paging import open_first
 from backend.app.reportability import markets
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -319,6 +319,7 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
     awareness = service.event_awareness(event, record)
     product = db.get(Product, event.product_id) if event.product_id else None
     lot = db.get(LotBatch, event.lot_batch_id) if event.lot_batch_id else None
+    complaint = db.get(Complaint, event.complaint_id) if event.complaint_id else None
     people = service.names_of(
         control_db,
         tenant_id,
@@ -399,6 +400,20 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
         "issue_category_label": case_rules.ISSUE_CATEGORIES.get(event.issue_category or ""),
         "resolution_summary": event.resolution_summary,
         "missing": case_rules.missing_information(event.identifiers or {}, answers),
+        # A3: owner, next action, due, reason, missing information and escalation state, as the Cases list shows it.
+        "header": cases_list.header(
+            event,
+            signed,
+            answers,
+            tasks,
+            name(event.owner_id),
+            complaint.complaint_identifier if complaint else None,
+            record,
+            service.working_day_end(rules.utc(event.created_at), 0, service.calendar(db, event.tenant_id))
+            if signed is None
+            else None,
+            now,
+        ),
         "draft": bool(latest and latest.signed_at is None),
         "signed": _check_view(signed, name) if signed else None,
         "check_due_at": service._iso(
@@ -633,6 +648,22 @@ def intake_list(
         if show == "all" or item["state"] == show or (show == "service_only" and item["state"] == "review")
     ]
     return {"items": shown, "summary": summary, "duplicates": len(service.duplicates(db, tenant_id))}
+
+
+@router.get("/intake/cases")
+def cases(
+    view: str = Query("all", max_length=30),
+    q: str = Query("", max_length=80),
+    page: int = Query(1, ge=1, le=10_000),
+    size: int = Query(25, ge=1, le=cases_list.PAGE_MAX),
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The Cases list (A5, spec 4.3): one page, filtered and searched on the server, each row with its header (A3)."""
+    if view not in cases_list.VIEWS:
+        raise _error(422, "UNKNOWN_VIEW", f"Show one of {', '.join(cases_list.VIEWS)}")
+    return cases_list.cases_page(db, control_db, _tenant(ctx), str(ctx.user_id), view, q, page, size)
 
 
 @router.get("/intake/duplicates")
