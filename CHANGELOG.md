@@ -64,6 +64,14 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   check due and no overdue alarm, with the note "Imported: check what was decided in your source system".
 - The complaints template takes an optional `mdarix_ref`: a row naming a complaint MDARIX made from a Case, with no
   QMS ID yet, merges into it and records the row's ID as its QMS ID.
+- Cases export (`GET /api/v1/intake/cases/export.csv`): one row per Case with its times and zones, channel, masked
+  words, product, version and lot, identifiers, state, owner, due, classification and signer, QA review, complaint,
+  QMS ID, triage speed and severity, issue category and flagged; filtered like the Cases list and by received dates,
+  channel, product, state and flagged. Contacts read "Contact held: yes" unless a person with `data.export` gives a
+  reason (never in a free trial). Export for QMS entry (`GET /api/v1/intake/qms-entry/export.csv`, MDARIX Connect):
+  the complaints made from Cases with no QMS ID, in the complaints template's columns plus `mdarix_ref`. Both are
+  UTF-8 CSV with formula cells escaped, at most 20,000 rows, the export ID in the file name, audited
+  `CASES_EXPORTED` / `QMS_ENTRY_EXPORTED` with the filter, the row count and the file's SHA-256.
 
 ### Changed
 
