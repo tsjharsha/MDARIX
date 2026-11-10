@@ -43,6 +43,11 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
   the contact office and manufacturer it was built from are part of what the approval signs. "Download the eMDR XML"
   serves exactly those bytes, whatever changes in Settings later. Reports approved before 0.10.96 keep no file and
   still download one built from the snapshot, as before.
+- A US report's PDF is now its eMDR file laid out as Form FDA 3500A (A5, decision D1): titled "Form FDA 3500A -
+  eMDR content, prepared by MDARIX" (never claiming FDA made it), FDA's blocks A to H with FDA's labels and in FDA's
+  order, every value read back from the file itself, then MDARIX's record page (preparers, source records, the
+  approved values the file does not carry, the approval and the file's SHA-256). Before approval it is a preview
+  marked DRAFT - NOT APPROVED (D7). The same file always renders the same PDF.
 
 ## [0.10.95] - not released yet (ships in the big-bang release)
 

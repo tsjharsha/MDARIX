@@ -16,7 +16,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from lxml import etree
 from pypdf import PdfReader
 
 from backend.app.authority_reports import emdr, fda_3500a
@@ -258,73 +257,8 @@ def test_a_block_fda_requires_stops_the_file_and_is_named():
 # --------------------------------------------------------------------------------------------- FDA's examples
 
 EXAMPLES = ROOT / "tests" / "fixtures" / "emdr_examples"
-# FDA's XPaths (HL7Medwatch.xlsx, 3500A_HL7_Pointers) of the blocks MDARIX carries, namespace left out.
-IE = "//message/controlActProcess/subject/investigationEvent"
-DEV = IE + "/pertainsTo/procedureEvent/device/identifiedDevice"
-POINTERS = {
-    "version": "//versionCode/@code",
-    "G8": IE + "/id/@extension",
-    "B1": IE + "/code/@code",
-    "B2": IE + "/pertinentInformation2/caseSeriousness/code[@code='C49489']/../value/@code",
-    "B3": IE + "/trigger/reaction/effectiveTime/@value",
-    "B4": "//message/controlActProcess/effectiveTime/@value",
-    "B5": IE + "/trigger/reaction/text/text()",
-    "B6": IE
-    + "/trigger/reaction/subject/investigativeSubject/subjectOf/observation/code[@code='C36292']/../value/text()",
-    "B7": IE
-    + "/trigger/reaction/subject/investigativeSubject/subjectOf/observation/code[@code='C53263']/../value/text()",
-    "A3": IE + "/trigger/reaction/subject/investigativeSubject/subjectAffectedPerson/administrativeGenderCode/@code",
-    "A2": IE
-    + "/trigger/reaction/subject/investigativeSubject/subjectOf/observation/code[@code='C25150']/../value/@value",
-    "A4": IE
-    + "/trigger/reaction/subject/investigativeSubject/subjectOf/observation/code[@code='C25208']/../value/@value",
-    "D1": DEV + "/identifiedDevice/inventoryItem/manufacturedDeviceModel/manufacturerModelName/text()",
-    "D2 procode": DEV + "/identifiedDevice/inventoryItem/manufacturedDeviceModel/code/@code",
-    "D2 common name": DEV + "/identifiedDevice/inventoryItem/manufacturedDeviceModel/code/originalText/text()",
-    "D4 model": DEV + "/identifiedDevice/inventoryItem/manufacturedDeviceModel/id/@extension",
-    "D4 lot": DEV + "/identifiedDevice/lotNumberText/text()",
-    "D4 catalog": DEV + "/identifiedDevice/asManufacturedProduct/id/@extension",
-    "D4 expiry": DEV + "/identifiedDevice/expirationTime/@value",
-    "D4 serial": DEV + "/identifiedDevice/id/@extension",
-    "D4 UDI": DEV + "/identifiedDevice/asManufacturedProduct/code/@code",
-    "D5": IE + "/pertainsTo/procedureEvent/authorOrPerformer/assignedEntity/code/@code",
-    "D6A": IE + "/pertainsTo/procedureEvent/component1/implantation/effectiveTime/@value",
-    "D6B": IE + "/pertainsTo/procedureEvent/component2/explantation/effectiveTime/@value",
-    "D7A": IE + "/pertainsTo/procedureEvent/pertinentInformation1/observation/code[@code='C53563']/../value/@value",
-    "D8": IE + "/pertainsTo/procedureEvent/pertinentInformation1/observation/code[@code='C85488']/../value/@value",
-    "D9": DEV + "/subjectOf/deviceObservation/code[@code='C53449']/../value/@value",
-    "D10": IE + "/pertainsTo/procedureEvent/pertinentInformation1/observation/code[@code='C53630']/../value/text()",
-    "E3": IE + "/trigger/reaction/pertinentInformation/primarySourceReport/author/assignedEntity/code/@code",
-    "E4": IE + "/trigger/reaction/pertinentInformation/primarySourceReport/receiver/@negationInd",
-    "G1 email": DEV + "/identifiedDevice/asManufacturedProduct/manufacturerOrReprocessor/contactParty[1]/telecom"
-    "[starts-with(@value, 'mailto:')]/@value",
-    "G1 phone": DEV + "/identifiedDevice/asManufacturedProduct/manufacturerOrReprocessor/contactParty[1]/telecom"
-    "[starts-with(@value, 'tel:')]/@value",
-    "G2": "//message/controlActProcess/reasonOf/detectedIssueEvent/code[@code='C53566']/../value/@code",
-    "G3": IE + "/pertinentInformation1/secondaryCaseNotification/receiver/time/high/@value",
-    "G6": "//message/controlActProcess/reasonOf/detectedIssueEvent/code[@code='C53571']/../value/@code",
-    "H1": "//message/controlActProcess/reasonOf/detectedIssueEvent/code[@code='C53570']/../value/@code",
-    "H3": DEV + "/subjectOf/deviceObservation/code[@code='C53629']/../value/@value",
-    "H4": DEV + "/identifiedDevice/existenceTime/@value",
-    "H5": DEV + "/subjectOf/deviceObservation/code[@code='C53602']/../value/@value",
-    "H6 clinical": IE
-    + "/trigger/reaction/subject/investigativeSubject/subjectOf/observation/code[@code='C53983']/../value/@code",
-    "H6 impact": IE
-    + "/trigger/reaction/subject/investigativeSubject/subjectOf/observation/code[@code='C122929']/../value/@code",
-    "H6 problem": DEV + "/subjectOf/deviceObservation/code[@code='C53982']/../value/@code",
-    "H6 component": DEV + "/subjectOf/deviceObservation/code[@code='C54577']/../value/@code",
-    "H6 type": DEV + "/identifiedDevice/asManufacturedProduct/manufacturerOrReprocessor/asRole/performance"
-    "/investigationEvent/component3/evaluationMethod/code[@code='C53984']/../value/@code",
-    "H6 findings": DEV + "/identifiedDevice/asManufacturedProduct/manufacturerOrReprocessor/asRole/performance"
-    "/investigationEvent/component1/evaluationResult/code[@code='C53985']/../value/@code",
-    "H6 conclusions": DEV + "/identifiedDevice/asManufacturedProduct/manufacturerOrReprocessor/asRole/performance"
-    "/investigationEvent/component2/evaluationConclusion/code[@code='C53986']/../value/@code",
-    "H7": DEV + "/subjectOf/deviceObservation/code[@code='C53603']/../value/@code",
-    "H8": DEV + "/subjectOf/deviceObservation/code[@code='C53645']/../value/@code",
-    "H9": DEV + "/subjectOf/deviceObservation/code[@code='C53619']/../value/text()",
-    "H10": DEV + "/subjectOf/deviceObservation/code[@code='C103162']/../value/text()",
-    "H11": IE + "/text/text()",
-}
+# FDA's XPaths of the blocks MDARIX carries: one table, in emdr.py, for the code and the tests.
+POINTERS, IE = emdr.POINTERS, emdr.IE
 # FDA's "Manufacturer Initial - Typical", as MDARIX holds it once approved (the example's PDF, block by block).
 TYPICAL = {
     "MFR_REPORT": "1234567-2023-00001",
@@ -399,14 +333,7 @@ NOT_SENT = {
 }
 
 
-def _plain(xml: bytes):
-    """The document with its namespace left out, so FDA's XPaths read it as written."""
-    doc = etree.fromstring(xml)
-    for element in doc.iter():
-        if isinstance(element.tag, str):
-            element.tag = etree.QName(element).localname
-    etree.cleanup_namespaces(doc)
-    return doc.getroottree()
+_plain = emdr.plain
 
 
 def _paths(doc) -> set[str]:

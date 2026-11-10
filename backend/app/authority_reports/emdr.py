@@ -79,6 +79,70 @@ RULE_FIELDS = {
 }
 KINDS = {"M-I": "m_i", "M-F": "m_f"}  # manufacturer initial, manufacturer follow-up
 FOLLOW_UP = re.compile(r"\bfollow-up #?(\d+)\b", re.IGNORECASE)  # G6 on a follow-up: "30-day; Follow-up #2"
+# FDA's XPaths (HL7Medwatch.xlsx, 3500A_HL7_Pointers) of the blocks MDARIX carries, namespace left out (``plain``):
+# the eSubmitter-layout PDF reads the file back through them, and the tests compare the file with FDA's examples.
+IE = "//message/controlActProcess/subject/investigationEvent"
+DEV = IE + "/pertainsTo/procedureEvent/device/identifiedDevice"
+_PERSON = IE + "/trigger/reaction/subject/investigativeSubject"
+_MAKER = DEV + "/identifiedDevice/asManufacturedProduct/manufacturerOrReprocessor"
+_REASON = "//message/controlActProcess/reasonOf/detectedIssueEvent/code[@code='{}']/../value/@code"
+POINTERS = {
+    "version": "//versionCode/@code",
+    "G8": IE + "/id/@extension",
+    "B1": IE + "/code/@code",
+    "B2": IE + "/pertinentInformation2/caseSeriousness/code[@code='C49489']/../value/@code",
+    "B3": IE + "/trigger/reaction/effectiveTime/@value",
+    "B4": "//message/controlActProcess/effectiveTime/@value",
+    "B5": IE + "/trigger/reaction/text/text()",
+    "B6": _PERSON + "/subjectOf/observation/code[@code='C36292']/../value/text()",
+    "B7": _PERSON + "/subjectOf/observation/code[@code='C53263']/../value/text()",
+    "A1": _PERSON + "/subjectAffectedPerson/name/text()",
+    "A3": _PERSON + "/subjectAffectedPerson/administrativeGenderCode/@code",
+    "A2": _PERSON + "/subjectOf/observation/code[@code='C25150']/../value/@value",
+    "A4": _PERSON + "/subjectOf/observation/code[@code='C25208']/../value/@value",
+    "D1": DEV + "/identifiedDevice/inventoryItem/manufacturedDeviceModel/manufacturerModelName/text()",
+    "D2 procode": DEV + "/identifiedDevice/inventoryItem/manufacturedDeviceModel/code/@code",
+    "D2 common name": DEV + "/identifiedDevice/inventoryItem/manufacturedDeviceModel/code/originalText/text()",
+    "D4 model": DEV + "/identifiedDevice/inventoryItem/manufacturedDeviceModel/id/@extension",
+    "D4 lot": DEV + "/identifiedDevice/lotNumberText/text()",
+    "D4 catalog": DEV + "/identifiedDevice/asManufacturedProduct/id/@extension",
+    "D4 expiry": DEV + "/identifiedDevice/expirationTime/@value",
+    "D4 serial": DEV + "/identifiedDevice/id/@extension",
+    "D4 UDI": DEV + "/identifiedDevice/asManufacturedProduct/code/@code",
+    "D5": IE + "/pertainsTo/procedureEvent/authorOrPerformer/assignedEntity/code/@code",
+    "D6A": IE + "/pertainsTo/procedureEvent/component1/implantation/effectiveTime/@value",
+    "D6B": IE + "/pertainsTo/procedureEvent/component2/explantation/effectiveTime/@value",
+    "D7A": IE + "/pertainsTo/procedureEvent/pertinentInformation1/observation/code[@code='C53563']/../value/@value",
+    "D8": IE + "/pertainsTo/procedureEvent/pertinentInformation1/observation/code[@code='C85488']/../value/@value",
+    "D9": DEV + "/subjectOf/deviceObservation/code[@code='C53449']/../value/@value",
+    "D10": IE + "/pertainsTo/procedureEvent/pertinentInformation1/observation/code[@code='C53630']/../value/text()",
+    "E3": IE + "/trigger/reaction/pertinentInformation/primarySourceReport/author/assignedEntity/code/@code",
+    "E4": IE + "/trigger/reaction/pertinentInformation/primarySourceReport/receiver/@negationInd",
+    "G1 email": _MAKER + "/contactParty[1]/telecom[starts-with(@value, 'mailto:')]/@value",
+    "G1 phone": _MAKER + "/contactParty[1]/telecom[starts-with(@value, 'tel:')]/@value",
+    "G2": _REASON.format("C53566"),
+    "G3": IE + "/pertinentInformation1/secondaryCaseNotification/receiver/time/high/@value",
+    "G6": _REASON.format("C53571"),
+    "H1": _REASON.format("C53570"),
+    "H3": DEV + "/subjectOf/deviceObservation/code[@code='C53629']/../value/@value",
+    "H4": DEV + "/identifiedDevice/existenceTime/@value",
+    "H5": DEV + "/subjectOf/deviceObservation/code[@code='C53602']/../value/@value",
+    "H6 clinical": _PERSON + "/subjectOf/observation/code[@code='C53983']/../value/@code",
+    "H6 impact": _PERSON + "/subjectOf/observation/code[@code='C122929']/../value/@code",
+    "H6 problem": DEV + "/subjectOf/deviceObservation/code[@code='C53982']/../value/@code",
+    "H6 component": DEV + "/subjectOf/deviceObservation/code[@code='C54577']/../value/@code",
+    "H6 type": _MAKER
+    + "/asRole/performance/investigationEvent/component3/evaluationMethod/code[@code='C53984']/../value/@code",
+    "H6 findings": _MAKER
+    + "/asRole/performance/investigationEvent/component1/evaluationResult/code[@code='C53985']/../value/@code",
+    "H6 conclusions": _MAKER
+    + "/asRole/performance/investigationEvent/component2/evaluationConclusion/code[@code='C53986']/../value/@code",
+    "H7": DEV + "/subjectOf/deviceObservation/code[@code='C53603']/../value/@code",
+    "H8": DEV + "/subjectOf/deviceObservation/code[@code='C53645']/../value/@code",
+    "H9": DEV + "/subjectOf/deviceObservation/code[@code='C53619']/../value/text()",
+    "H10": DEV + "/subjectOf/deviceObservation/code[@code='C103162']/../value/text()",
+    "H11": IE + "/text/text()",
+}
 
 
 @lru_cache(maxsize=len(KINDS))
@@ -503,6 +567,16 @@ def prepare(sections: list[dict], parties, *, kind: str, sender: str, now: datet
     missing, left = check(sections, parties, kind)
     xml = None if missing else build(sections, parties, sender=sender, now=now, practice=practice)
     return {"missing": missing, "left_out": left, "errors": validate(xml) if xml else [], "xml": xml}
+
+
+def plain(xml: bytes):
+    """The file with its namespace left out, so FDA's XPaths (``POINTERS``) read it as written."""
+    doc = etree.fromstring(xml)
+    for element in doc.iter():
+        if isinstance(element.tag, str):
+            element.tag = etree.QName(element).localname
+    etree.cleanup_namespaces(doc)
+    return doc.getroottree()
 
 
 @lru_cache(maxsize=1)
