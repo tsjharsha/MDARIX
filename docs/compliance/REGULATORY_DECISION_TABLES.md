@@ -344,17 +344,30 @@ signed before keep the version they were signed with.
 | VR-4 | India question set | IN-starter-1 |
 | VR-5 | Canada question set | CA-starter-1 |
 | VR-6 | Harm-severity scale | scale-starter-1 |
-| VR-7 | Disposition rules | disposition-starter-1 |
+| VR-7 | Disposition rules | disposition-starter-2 |
 | VR-8 | Classification coding criteria | coding-starter-1 |
 | VR-9 | US form | Form FDA 3500A (09/2025) |
 | VR-10 | India form | MDAE Reporting Form, Version 1.2 |
 | VR-11 | EU form | MIR form 7.3.1 (SB-11154, 06-05-2026) |
 | VR-12 | Great Britain form | GB MIR 7.2.1 (04/06/2025) |
 | VR-13 | Canada form | HC Pub. 110180 (April 2018) |
+| VR-14 | US reportability floor (rule register) | US-floor-1 |
+| VR-15 | EU and Northern Ireland reportability floor (rule register) | EU-floor-1 |
+| VR-16 | Great Britain reportability floor (rule register) | GB-floor-1 |
+| VR-17 | India reportability floor (rule register) | IN-floor-1 |
+| VR-18 | Canada reportability floor (rule register) | CA-floor-1 |
 
 Assumptions the deadlines rest on, starter text: the authority time zones (US America/New_York, EU and NI
 Europe/Brussels, GB Europe/London, India Asia/Kolkata); day 1 on the awareness day for GB and India; no weekend or
 holiday extension; India's period from the organization's window.
+
+**The rule register (0.10.99, B4).** The rows above are held in the rule register (`backend/app/rule_register/data`,
+one file per rule version; read-only on Decision trees > Rules). Each market's questions, logic, report types and
+periods, counting zone and day-1 rule and triage tiers form its floor (VR-14 to VR-18), version 1 being exactly this
+document's logic (`tests/test_b4_equivalence.py`). A market conclusion keeps the floor in force on its awareness day;
+a later version never changes a signed record. The owner decisions below (OD-1, OD-3) and the India period are
+carried unchanged in version 1, starter, for your consultant to confirm. `MDARIX_RULE_REGISTER=off` returns to the
+same logic held in code (`reportability/legacy_v1.py`).
 
 ## Owner decisions these tables raise
 

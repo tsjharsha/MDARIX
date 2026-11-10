@@ -19,6 +19,7 @@ from backend.app.authority_reports import forms
 from backend.app.complaint_classification.rules import CODING_CRITERIA_VERSION
 from backend.app.complaint_disposition import rules as disposition
 from backend.app.complaint_disposition.service import routine_offer
+from backend.app.rule_register import register
 from backend.app.reportability import deadlines, facts, markets
 
 pytestmark = pytest.mark.unit
@@ -187,6 +188,8 @@ VERSIONS = {
         f"VR-{index}": forms.BY_MARKET[market].version
         for index, market in enumerate((markets.US, markets.IN, markets.EU_NI, markets.GB, markets.CA), 9)
     },
+    # B4: each market's floor in the rule register (market order, as VR-1 to VR-5).
+    **{f"VR-{index}": register.floor(market)["code"] for index, market in enumerate(markets.MARKETS, 14)},
 }
 
 

@@ -17,6 +17,39 @@ floors of the five markets held as data and read by one small engine; the floor 
 of every rule is today's logic, unchanged (proved case by case against today's code). Every legal citation and law date
 stays "starter, for your consultant to confirm". On unless `MDARIX_RULE_REGISTER=off`.
 
+### Database
+
+- Migration `tr27ruleregister` (chained from `tr26challengeloop`), expand-only, three nullable columns on
+  `complaint_market_assessments`, no new table (row-level security unchanged): `floor_code` (the floor version in force
+  on the awareness day), `rules_applied` (the rules that applied or could apply, and the report-type row) and
+  `date_calc` (how the due date was counted). Never backfilled: conclusions signed before 0.10.99 show "Signed before
+  the rule register". Legacy organization databases get the same from
+  `scripts/add_workflow_tables_to_legacy_planes.py` (step `tr27`).
+
+### Added (B4, the rule register; on unless `MDARIX_RULE_REGISTER=off`)
+
+- The rule register: every rule MDARIX applies (the five reportability floors, the US eMDR rule book and the rules
+  held in code), one file per version with its source, dates in force, approval and fingerprint. Version 1 of every
+  rule is in force from the start and is today's logic.
+- The five markets' floors held as data and read by one small engine; `tests/test_b4_equivalence.py` proves version 1
+  gives exactly today's suggestion, report type, notes, questions not asked, question sets, pre-fill, deadlines and
+  triage provisional deadlines for every case (every Yes/No/Unknown combination of every market, 177,147 for EU/NI
+  and GB; every daylight-saving change 2026-2028).
+- Effective dating: a market's floor is picked by the awareness day in the authority's time zone; each saved and
+  signed market conclusion keeps its floor code, the rules applied and the date calculation, and what is signed
+  includes them (the signature meaning text is unchanged). Signing a draft whose floor changed since it was saved is
+  refused (`409 FLOOR_CHANGED`: save the answers again); a signed record never changes. The routine path keeps each
+  market's floor and `routine-basis-1`.
+- `GET /api/v1/rule-register` (market, kind, as-at day) and `GET /api/v1/rule-register/{code}` (the floor's logic as
+  IF ... THEN lines, the version history), read-only for every signed-in member. The session gains `rule_register`.
+- Version pins: a pinned regulatory function or the eMDR rule book changed without a new register version fails the
+  build test (`tests/test_rule_pins_unit.py`).
+
+### Changed
+
+- Decision tables (`docs/compliance/REGULATORY_DECISION_TABLES.md` section 7) list the five floors (VR-14 to VR-18)
+  and name the disposition rules' current version (`disposition-starter-2`, from 0.10.97).
+
 ## [0.10.98] - not released yet
 
 B5a: the investigation challenge. Migration `tr26challengeloop` (chained from `tr25routinepath`; DB-1 (tr21-tr24) is
