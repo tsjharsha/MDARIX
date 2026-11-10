@@ -70,6 +70,40 @@ def test_every_challenge_statement_has_a_source_and_the_sample_hash_verifies(tri
     assert brief_rules.content_hash(content, narrative) == stored_hash
 
 
+def test_the_case_record_and_the_investigation_report_show_challenge_and_sources(trial):
+    from backend.app.qms_documents.content import investigation_report
+    from reports.content import investigation_record
+    from reports.service import render_investigation_record
+
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        record = investigation_record(db, trial["tenant_id"], trial["case_id"])
+        case = db.query(Investigation).filter(Investigation.id == trial["case_id"]).one()
+        report = investigation_report(db, trial["tenant_id"], case=case)
+        content = _brief(db, trial).content
+    material = [item for item in record["challenge"]["questions"] if item["material"]]
+    assert material and all(item["answer"]["text"] for item in material)
+    assert record["sources"]["summary"] == content["sources"]["summary"]
+    assert render_investigation_record(record, str(trial["tenant_id"]), output_format="PDF")["content"][:4] == b"%PDF"
+    sections = {section["key"]: section for section in report["sections"]}
+    challenge_rows = sections["CHALLENGE"]["rows"]
+    assert len(challenge_rows) == len(content["challenge"]["drafts"]) + len(content["challenge"]["questions"])
+    assert all(row["text"].startswith(("Drafted by rule H-", "Question from rule C-")) for row in challenge_rows)
+    assert all(row["sources"] for row in challenge_rows if row["text"].startswith("Drafted"))
+    assert any("Answer: " in row["text"] for row in challenge_rows)
+    assert sections["SOURCES"]["rows"][-1]["text"].startswith("Rules: ")
+    complaints = next(row for row in sections["SOURCES"]["rows"] if row["text"].startswith("Complaints ("))
+    assert {source["type"] for source in complaints["sources"]} == {"Complaint"}
+
+
+@pytest.mark.unit
+def test_a_brief_composed_before_b5_adds_no_sections():
+    from backend.app.case_challenge.brief import document_sections, with_answers
+
+    assert with_answers({"investigation": {}}, {}) == {}
+    assert document_sections({"investigation": {}}, {}, None, None, None, None) == []
+
+
 def test_an_unanswered_material_question_blocks_submit_until_answered(trial):
     user = trial["user"]
     with SessionLocal() as db:

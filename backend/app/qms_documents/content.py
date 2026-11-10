@@ -415,6 +415,19 @@ def investigation_report(db: Session, tenant_id: uuid.UUID, *, case: Investigati
             decision_rows.append(
                 row(f"Decision {decision_ref} is {label(decision.decision_status)}; not signed yet.", decision_source)
             )
+    # B5: the Challenge and Sources of the brief the decision signed (else the latest brief), when it has them.
+    from backend.app.case_challenge.brief import document_sections
+    from backend.app.db.models.reviews import DecisionBriefVersion
+
+    briefs = db.query(DecisionBriefVersion).filter(
+        DecisionBriefVersion.tenant_id == tenant_id, DecisionBriefVersion.investigation_id == case.id
+    )
+    brief = (
+        briefs.filter(DecisionBriefVersion.id == decision.brief_version_id).first()
+        if decision is not None and decision.brief_version_id
+        else None
+    ) or briefs.order_by(DecisionBriefVersion.version.desc()).first()
+    challenge_sections = document_sections(brief.content, brief.narrative, case.id, src, row, data) if brief else []
     return {
         "scope": {"case": {"id": str(case.id), "ref": ref, "question": case.investigation_question}},
         "sections": [
@@ -423,6 +436,7 @@ def investigation_report(db: Session, tenant_id: uuid.UUID, *, case: Investigati
             data("HYPOTHESES", "Hypotheses and their support states", hypothesis_rows or [row("No hypothesis yet.")]),
             data("ROOT_CAUSE", "Root cause and the signed decision", decision_rows),
             data("ATTRIBUTION", "Root-cause attribution", attribution_rows),
+            *challenge_sections,
             judgement("INVESTIGATION_REPORT", "ROOT_CAUSE_CATEGORY"),
         ],
     }

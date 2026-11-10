@@ -266,10 +266,10 @@ def test_the_investigation_report_carries_scope_hypotheses_and_the_decision(tria
     missing = _generate(trial["user"], "INVESTIGATION_REPORT")
     assert missing.status_code == 422 and missing.json()["detail"]["code"] == "CASE_REQUIRED"
     view = _generate(trial["user"], "INVESTIGATION_REPORT", case_id=case["id"]).json()
-    assert view["scope_ref"] == f"case SAMPLE-INV-001 ({case['ref']})" and view["period"] is None
+    assert view["scope_ref"] == f"investigation SAMPLE-INV-001 ({case['ref']})" and view["period"] is None
     assert [clause["state"] for clause in view["clauses"]] == ["pending approval", "pending approval"]
     scope = _texts(_section(view, "SCOPE"))
-    assert scope[0].startswith(f"Case SAMPLE-INV-001 ({case['ref']}) on OrbitCare 300") and any(
+    assert scope[0].startswith(f"Investigation SAMPLE-INV-001 ({case['ref']}) on OrbitCare 300") and any(
         t.startswith("Scope version 1") for t in scope
     )
     assert _section(view, "HYPOTHESES")["rows"] and _section(view, "EVIDENCE")["rows"][0]["sources"]

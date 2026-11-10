@@ -70,6 +70,7 @@ def challenge_section(view: dict) -> dict:
     asked = [
         {
             **{key: item[key] for key in ("rule", "rule_version", "key", "label", "text", "material")},
+            "records": item.get("records") or [],
             "answer": item.get("answer"),
         }
         for item in view["questions"]
@@ -140,6 +141,108 @@ def sources_section(view: dict, evidence_rows: list[dict], signals: list[dict], 
         "groups": {name: {"count": len(items), "items": items[:GROUP_MAX]} for name, items in listed.items()},
         "rules": rule_rows,
     }
+
+
+def with_answers(content: dict, narrative: dict | None) -> dict:
+    """The brief's ``challenge`` (each question with its answer from the narrative) and ``sources``, for the case
+    record download; empty for a brief composed before B5 (its content is left as it was signed)."""
+    if "challenge" not in (content or {}):
+        return {}
+    answers = (narrative or {}).get("challenge_answers") or {}
+    challenge = {
+        **content["challenge"],
+        "questions": [
+            {**item, "answer": answers.get(item["key"]) or item.get("answer")}
+            for item in content["challenge"].get("questions") or ()
+        ],
+    }
+    return {"challenge": challenge, "sources": content.get("sources") or {}}
+
+
+KINDS = {group: kind for kind, group in GROUPS.items()}
+
+
+def _kind(kind: str) -> str:
+    """The document's source type ("Complaint", "Lot"...), which the screen opens."""
+    return str(kind).capitalize()
+
+
+ACTION_WORDS = {
+    "ADOPTED": "adopted as {hypothesis}",
+    "DISMISSED": "dismissed: {reason}",
+    "NOT_ACTED_ON": "not acted on",
+}
+
+
+def document_sections(content: dict, narrative: dict | None, case_id, src, row, data) -> list[dict]:
+    """The Challenge and Sources sections of the investigation report document (qms_documents), each row with the
+    records it cites; none for a brief composed before B5. ``src``/``row``/``data`` are that module's builders."""
+    found = with_answers(content, narrative)
+    if not found:
+        return []
+    challenge, sources = found["challenge"], found["sources"]
+
+    def cited(records) -> list[dict]:
+        return [src(_kind(record["type"]), record["id"], record["ref"], case_id) for record in records]
+
+    rows = []
+    for draft in challenge["drafts"]:
+        action = draft.get("action") or {}
+        done = ACTION_WORDS.get(action.get("state") or "NOT_ACTED_ON", "not acted on").format(
+            hypothesis=action.get("hypothesis") or "a hypothesis", reason=action.get("reason") or "no reason"
+        )
+        records = [
+            record for fact in [*draft["for"], *draft["against"], *draft["missing"]] for record in fact["records"]
+        ]
+        rows.append(
+            row(
+                f"Drafted by rule {draft['rule']} (version {draft['rule_version']}), {draft['label']}: "
+                f"{draft['statement']} For: {len(draft['for'])}; against: {len(draft['against'])}; missing: "
+                f"{len(draft['missing'])}. {done[0].upper()}{done[1:]}.",
+                cited(records),
+            )
+        )
+    for item in challenge["questions"]:
+        answer = item.get("answer") or {}
+        reply = (
+            ("Not applicable: " if answer.get("not_applicable") else "Answer: ") + answer["text"]
+            if answer.get("text")
+            else "Not answered."
+        )
+        rows.append(
+            row(
+                f"Question from rule {item['rule']} (version {item['rule_version']})"
+                + (", material" if item["material"] else "")
+                + f": {item['text']} {reply}",
+                cited(item.get("records") or ()),
+            )
+        )
+    source_rows = [
+        row(
+            f"{name.replace('_', ' ').capitalize()} ({group['count']}): "
+            + ", ".join(f"{item['ref']} ({item['origin']})" for item in group["items"])
+            + ".",
+            [src(_kind(KINDS.get(name, name)), item["id"], item["ref"], case_id) for item in group["items"]],
+        )
+        for name, group in (sources.get("groups") or {}).items()
+    ]
+    source_rows.append(
+        row("Rules: " + "; ".join(f"{r['rule']} v{r['version']} {r['name']}" for r in sources.get("rules") or ()) + ".")
+    )
+    return [
+        data(
+            "CHALLENGE",
+            "Challenge",
+            rows or [row("No draft or question followed from the records.")],
+            note=challenge.get("notice"),
+        ),
+        data(
+            "SOURCES",
+            f"Sources ({sources.get('summary') or ''})",
+            source_rows,
+            note=f"Records as of {sources.get('as_of') or 'composition'}.",
+        ),
+    ]
 
 
 def gate_items(challenge: dict | None) -> list[dict]:

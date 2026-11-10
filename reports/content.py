@@ -1058,6 +1058,17 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
         .limit(50)
         .all()
     )
+    from backend.app.case_challenge.brief import with_answers
+    from backend.app.db.models.reviews import DecisionBriefVersion
+
+    decision_brief = (
+        db.query(DecisionBriefVersion)
+        .filter(DecisionBriefVersion.tenant_id == tenant, DecisionBriefVersion.investigation_id == case.id)
+        .order_by(DecisionBriefVersion.version.desc())
+        .first()
+    )
+    # B5: the latest Decision Brief's Challenge and Sources (only briefs composed with them).
+    challenge = with_answers(decision_brief.content, decision_brief.narrative) if decision_brief else {}
     return {
         "investigation": {
             "id": str(case.id),
@@ -1213,4 +1224,5 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
             if control_db is not None
             else ["Signatures and the control-plane audit trail were not available in this rendering."]
         ),
+        **challenge,
     }
