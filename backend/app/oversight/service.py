@@ -256,6 +256,8 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
         # item and it alerts. Drop this if the sample ever links the two at seeding.
         if item.get("sample") and item["ref"] == "SAMPLE-CASE-11" and not item.get("linked"):
             continue
+        if item.get("backlog"):  # OD-12 + 3a: Imported backlog work, in its own view, raises no alert
+            continue
         record = item.get("record") or {}
         owner = record.get("triage_owner") or record.get("event_owner")
         complaint_id = item["id"] if item["kind"] == intake.COMPLAINT else None
@@ -339,7 +341,7 @@ def _watch_items(db: Session, control_db, tenant_id, now: datetime) -> list[dict
     found = []
     for item in reportability.watch(db, control_db, tenant_id, show="open", page_size=10_000, today=now)["items"]:
         binding = item.get("binding")
-        if not binding or not binding.get("due_at"):
+        if not binding or not binding.get("due_at") or binding.get("backlog"):
             continue
         market = binding.get("market")
         needs = item.get("needs") or []

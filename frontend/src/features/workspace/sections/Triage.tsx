@@ -70,13 +70,15 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const { reportTab, shownTab } = useWorkspace();
   const list = useResource<TriageList>(`${TRIAGE}?show=${show}`);
   const summary = list.data?.summary;
-  const items = list.data?.items ?? [];
+  // An old flagged import is Imported backlog work (OD-12 + 3a): not listed here, but its form opens from the backlog.
+  const every = list.data?.items ?? [];
+  const items = every.filter((item) => !item.backlog);
   const wanted =
     openKey ??
     (complaint ? `COMPLAINT:${complaint}` : null) ??
     (intake ? `INTAKE:${intake}` : null) ??
-    (ref ? (items.find((item) => item.ref === ref || item.identifier === ref)?.key ?? null) : null);
-  const open = wanted ? (items.find((item) => item.key === wanted) ?? null) : null;
+    (ref ? (every.find((item) => item.ref === ref || item.identifier === ref)?.key ?? null) : null);
+  const open = wanted ? (every.find((item) => item.key === wanted) ?? null) : null;
   const setOpen = (item: TriageItem | null) => {
     if (item || !reportTab || !shownTab) return setOpenKey(item ? item.key : null);
     // Closing clears every parameter that opens the panel, in one address change: complaint= or ref= left behind
@@ -440,41 +442,48 @@ function TriageDrawer({
               Every deadline below now counts from {formatDate(conflict.after)}. Confirm the awareness time to clear it.
             </p>
           ))}
-          <div className="uw-tr-scroll">
-            <table className="uw-tr-table">
-              <thead>
-                <tr>
-                  <th scope="col">Market</th>
-                  <th scope="col">Category</th>
-                  <th scope="col">Deadline</th>
-                </tr>
-              </thead>
-              <tbody>
-                {item.deadlines.map((deadline) => (
-                  <tr key={deadline.market}>
-                    <td>
-                      {deadline.label}
-                      <small className="ac-muted uw-tr-role">{deadline.role_label}</small>
-                    </td>
-                    <td>
-                      {deadline.not_reportable
-                        ? deadline.basis
-                        : deadline.role === "SIGNED"
-                          ? `${deadline.basis}, signed`
-                          : deadline.earliest_note
-                            ? `Earliest possible: ${deadline.earliest_note} (${deadline.basis})`
-                            : `${deadline.tier_label}: ${deadline.basis}`}
-                    </td>
-                    <td>
-                      <span className={`uw-clock tone-${clockTone(deadline.state ?? "")}`}>
-                        {deadlineText(deadline)}
-                      </span>
-                    </td>
+          {item.backlog_note ? (
+            <p className="uw-hint">
+              {item.backlog_note}: its reporting clock ran there. Due {formatDate(item.triage_clock.due_at)}, the
+              Imported backlog target.
+            </p>
+          ) : (
+            <div className="uw-tr-scroll">
+              <table className="uw-tr-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Market</th>
+                    <th scope="col">Category</th>
+                    <th scope="col">Deadline</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {item.deadlines.map((deadline) => (
+                    <tr key={deadline.market}>
+                      <td>
+                        {deadline.label}
+                        <small className="ac-muted uw-tr-role">{deadline.role_label}</small>
+                      </td>
+                      <td>
+                        {deadline.not_reportable
+                          ? deadline.basis
+                          : deadline.role === "SIGNED"
+                            ? `${deadline.basis}, signed`
+                            : deadline.earliest_note
+                              ? `Earliest possible: ${deadline.earliest_note} (${deadline.basis})`
+                              : `${deadline.tier_label}: ${deadline.basis}`}
+                      </td>
+                      <td>
+                        <span className={`uw-clock tone-${clockTone(deadline.state ?? "")}`}>
+                          {deadlineText(deadline)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
         {record?.completed_at ? (
           <section className="ca-drawer-section">
@@ -951,8 +960,9 @@ export function EscalateButton({
 
 /**
  * "Imported backlog" (OD-12, TR-21): imported complaints known of more than the organization's backlog days before
- * their import, with no harm flag. Routine triage, one click each, due their own target after the import. A flagged
- * one is on "To triage" instead.
+ * their import, due their own target after the import. Routine ones are confirmed in one click; flagged ones (owner,
+ * 10 Nov: OD-12 + 3a) come first, keep their flags and open the full triage form, with the note to check the
+ * reportability decision in the QMS, where their regulatory clock ran.
  */
 export function ImportedBacklog() {
   const [page, setPage] = useState(1);
@@ -978,7 +988,11 @@ export function ImportedBacklog() {
   return (
     <Panel
       eyebrow="Imported backlog"
-      title={summary ? `${countOf(summary.total, "complaint")} to triage, routine` : "Imported backlog"}
+      title={
+        summary
+          ? `${countOf(summary.total, "complaint")} to triage${summary.flagged ? `, ${summary.flagged} flagged first` : ", routine"}`
+          : "Imported backlog"
+      }
       source={list}
     >
       {summary && (
@@ -996,6 +1010,7 @@ export function ImportedBacklog() {
               <div className="uw-cr-body">
                 <div className="uw-cr-head">
                   <strong className="uw-cr-id">{item.ref}</strong>
+                  {item.qms_to_confirm && <ToneBadge tone="warning" label="From your QMS: confirm" />}
                   <span className="uw-cr-meta">
                     {item.product_name ?? "Product not given"} · aware {formatDate(item.awareness_at)} · imported{" "}
                     {formatDate(item.imported_at)}
@@ -1006,8 +1021,33 @@ export function ImportedBacklog() {
                   />
                 </div>
                 {item.words && <q className="uw-cr-text uw-cr-clip">{item.words}</q>}
+                {item.flags?.length ? (
+                  <>
+                    <ul className="uw-cr-chips" aria-label="Why it is flagged">
+                      {item.flags.map((flag, index) => (
+                        <li key={`${flag.code}-${index}`}>
+                          {flagHarm(flag.code) ? (
+                            <HarmChip harm={flagHarm(flag.code)!} label={flag.label} />
+                          ) : (
+                            <StateChip label={flag.label} />
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    {item.note && <p className="uw-hint">{item.note}</p>}
+                  </>
+                ) : null}
                 <div className="ca-action-row">
-                  {canWrite && (
+                  {canWrite && item.flags?.length ? (
+                    <button
+                      type="button"
+                      className="ac-primary"
+                      onClick={() => open("Complaints", `To triage?${new URLSearchParams({ complaint: item.id })}`)}
+                    >
+                      {item.qms_to_confirm ? "Confirm QMS triage" : "Open the triage form"}
+                    </button>
+                  ) : null}
+                  {canWrite && !item.flags?.length && (
                     <button
                       type="button"
                       className="ac-primary"
@@ -1032,7 +1072,7 @@ export function ImportedBacklog() {
       ) : (
         <Empty
           title="No imported backlog"
-          detail="Old complaints you import with no harm flag wait here for a routine triage."
+          detail="Complaints you import long after your organization knew of them wait here for triage."
         />
       )}
       {list.data && list.data.pages > 1 && (

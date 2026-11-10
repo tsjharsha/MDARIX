@@ -575,6 +575,13 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
             and (
                 record is None or record.source_system != "QMS"
             ),  # TR-37: a QMS triage accepted at import is not listed
+            # OD-12 + 3a (owner, 10 Nov): known of more than backlog_days before the import and never triaged here,
+            # flagged or not, it is Imported backlog work (imported_backlog): its regulatory clock ran in the QMS. A QMS
+            # triage still to confirm is no triage here yet (owner, 10 Nov, section Q decision 2).
+            "backlog": (record is None or qms_waiting(record))
+            and complaint.ingestion_timestamp is not None
+            and complaint.source_system not in ("MDARIX_SAMPLE", "MDARIX_CASE")
+            and awareness["at"] < imported_at - timedelta(days=backlog_days),
         }
     excluded = _excluded_complaints(db, tenant_id, [key[1] for key in found if key[0] == COMPLAINT])
     for complaint_id in excluded:
@@ -636,6 +643,12 @@ def _listed(subject: dict, record: TriageRecord | None) -> bool:
 
 
 BACKLOG_READ = 20_000  # shortcut: one read of this many candidates; page it in the database if an import is larger
+BACKLOG_NOTE = "Imported: check the reportability decision in your QMS"
+
+
+def qms_waiting(record: TriageRecord) -> bool:
+    """T-D9: a triage imported from the QMS on a flagged complaint that no person has confirmed or escalated yet."""
+    return record.source_system == "QMS" and record.completed_at is None and record.escalated_at is None
 
 
 def imported_backlog(
@@ -648,16 +661,31 @@ def imported_backlog(
     now: datetime | None = None,
 ) -> dict:
     """OD-12 / TR-21 (0.10.93, B2): imported complaints whose awareness was more than ``backlog_days`` before their
-    import, open, with no harm flag, never triaged and not taken up: routine triage in their own "Imported backlog"
-    view, due ``backlog_target_days`` working days after the import. Read by query (every one, oldest first), not from
-    the triage list's newest 2,000. A flagged one is on "To triage" at its own speed: safety never waits."""
+    import, open, never triaged and not taken up: their own "Imported backlog" view, due ``backlog_target_days``
+    working days after the import. Read by query (flagged first, then oldest first), not from the triage list's newest
+    2,000. A flagged one (owner, 10 Nov: OD-12 + 3a) keeps its flag and its fast-track form, with the note to check the
+    reportability decision in the QMS, where its regulatory clock ran; an unflagged one is confirmed in one click. A
+    flagged one imported with its QMS triage (T-D9, not yet confirmed) is here too, its "Confirm QMS triage" offered."""
     now = now or now_utc()
     days, target_days = backlog_settings(db, tenant_id)
+    record_of = (
+        TriageRecord.tenant_id == tenant_id,
+        TriageRecord.subject_kind == COMPLAINT,
+        TriageRecord.subject_id == Complaint.id,
+    )
+    waiting = (  # qms_waiting, in SQL
+        TriageRecord.source_system == "QMS",
+        TriageRecord.completed_at.is_(None),
+        TriageRecord.escalated_at.is_(None),
+    )
     taken = (
         exists().where(
-            TriageRecord.tenant_id == tenant_id,
-            TriageRecord.subject_kind == COMPLAINT,
-            TriageRecord.subject_id == Complaint.id,
+            *record_of,
+            or_(
+                TriageRecord.source_system.is_distinct_from("QMS"),
+                TriageRecord.completed_at.isnot(None),
+                TriageRecord.escalated_at.isnot(None),
+            ),
         ),
         exists().where(
             InvestigationComplaint.tenant_id == tenant_id, InvestigationComplaint.complaint_id == Complaint.id
@@ -692,6 +720,7 @@ def imported_backlog(
         Complaint.recorded_timestamp,
         Complaint.ingestion_timestamp,
         Complaint.created_at,
+        exists().where(*record_of, *waiting).label("qms_to_confirm"),
     ).filter(
         Complaint.tenant_id == tenant_id,
         Complaint.source_system.notin_(("MDARIX_SAMPLE", "MDARIX_CASE")),
@@ -707,8 +736,9 @@ def imported_backlog(
     products = {row.id: row.name for row in db.query(Product.id, Product.name).filter(Product.tenant_id == tenant_id)}
     items = []
     for row in rows[:BACKLOG_READ]:
-        if review_rules.is_closed(row.status) or rules.complaint_flags(_complaint_record(row)):
+        if review_rules.is_closed(row.status):
             continue
+        flags = rules.complaint_flags(_complaint_record(row))
         aware = complaint_awareness(SimpleNamespace(**row._asdict()))["at"]
         imported = rules.utc(row.ingestion_timestamp)
         if aware >= imported - timedelta(days=days):
@@ -726,12 +756,18 @@ def imported_backlog(
                 "imported_at": imported.isoformat(),
                 "due_at": due.isoformat(),
                 "overdue": due < now,
+                "flags": flags,
+                "note": BACKLOG_NOTE if flags else None,
+                # Section Q decision 2: a QMS triage to confirm is confirmed from here ("Confirm QMS triage").
+                "qms_to_confirm": row.qms_to_confirm,
             }
         )
+    items.sort(key=lambda item: not item["flags"])  # flagged first; stable, so oldest first within each
     start = (max(page, 1) - 1) * page_size
     return {
         "summary": {
             "total": len(items),
+            "flagged": sum(1 for item in items if item["flags"]),
             "overdue": sum(1 for item in items if item["overdue"]),
             "backlog_days": days,
             "target_days": target_days,
@@ -874,6 +910,7 @@ def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datet
         "products": products,
         "fast_hours": fast_hours(db, tenant_id),
         "calendar": calendar(db, tenant_id),
+        "backlog_target_days": backlog_settings(db, tenant_id)[1],
     }
 
 
@@ -894,7 +931,7 @@ def _summary(db, tenant_id, records, found, group, links) -> dict:
     open_count = 0
     for key, subject in found.items():
         record = records.get(key)
-        if _listed(subject, record) and (record is None or record.completed_at is None):
+        if _listed(subject, record) and (record is None or record.completed_at is None) and not subject.get("backlog"):
             open_count += 1
     return {
         "open": open_count,
@@ -957,6 +994,12 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
         reopened or bool(conflict),
     )
     target = triage_rules.due(pace, opened, context["fast_hours"], context["calendar"])
+    # OD-12 + 3a (owner, 10 Nov): an old flagged import is Imported backlog work: the backlog target from the import and
+    # no market clock (it ran in the customer's QMS), so nothing reads overdue or alerts; its flags and form stay.
+    backlog = bool(listed) and not conflict and all(found[key].get("backlog") for key in listed)
+    if backlog:
+        target = working_day_end(primary["available_at"], context["backlog_target_days"], context["calendar"])
+        deadlines = []
     least, floor_reasons = triage_rules.floor(found_facts)
     acked = rules.utc(record.acknowledged_at) if record is not None and record.acknowledged_at else None
     acked = acked if acked is not None and acked >= opened else None
@@ -1015,10 +1058,10 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
         "severity_floor": least,
         "floor_note": floor_reasons[0] if floor_reasons else None,
         "acknowledgement": {
-            "required": pace == triage_rules.FAST,
+            "required": pace == triage_rules.FAST and not backlog,
             "done": acked is not None,
             "due_at": ack_due.isoformat(),
-            "overdue": pace == triage_rules.FAST and acked is None and ack_due < now,
+            "overdue": pace == triage_rules.FAST and not backlog and acked is None and ack_due < now,
             "acknowledged_at": _iso(acked),
             "acknowledged_by": (names.get(record.acknowledged_by) or "A colleague") if acked else None,
         },
@@ -1026,6 +1069,8 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
         if pace == triage_rules.ROUTINE and not qms_to_confirm
         else None,
         "qms_to_confirm": qms_to_confirm,
+        "backlog": backlog,
+        "backlog_note": BACKLOG_NOTE if backlog else None,
         "deadlines": deadlines,
         "own_market": own,
         "earliest_due": deadlines[0]["due_at"] if deadlines else None,

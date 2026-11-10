@@ -289,6 +289,9 @@ export type TriageItem = {
   };
   /** T-D9: a triage imported from the QMS on a flagged record, waiting for a person ("From your QMS: confirm"). */
   qms_to_confirm?: boolean;
+  /** OD-12 + 3a: an old flagged import, Imported backlog work: off "To triage", the backlog target, no market clock. */
+  backlog?: boolean;
+  backlog_note?: string | null;
   routine_prefill?: {
     severity: string;
     harm_now_label: string;
@@ -299,7 +302,7 @@ export type TriageItem = {
 };
 /** GET /intake/triage/backlog (OD-12, TR-21): the "Imported backlog" view. */
 export type ImportedBacklogList = {
-  summary: { total: number; overdue: number; backlog_days: number; target_days: number };
+  summary: { total: number; flagged?: number; overdue: number; backlog_days: number; target_days: number };
   page: number;
   pages: number;
   truncated: boolean;
@@ -314,6 +317,11 @@ export type ImportedBacklogList = {
     imported_at: string;
     due_at: string;
     overdue: boolean;
+    /** Owner, 10 Nov (OD-12 + 3a): an old flagged import keeps its flags, listed first, with the QMS note. */
+    flags?: Flag[];
+    note?: string | null;
+    /** Section Q decision 2: an old flagged import whose QMS triage waits for a person ("Confirm QMS triage"). */
+    qms_to_confirm?: boolean;
   }[];
 };
 export type TriageList = {

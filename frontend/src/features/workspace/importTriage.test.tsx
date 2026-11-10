@@ -42,13 +42,49 @@ const ITEM = {
     version: 1,
   },
 } as unknown as TriageItem;
-const LIST = { items: [ITEM], summary: { open: 1, done: 0, conflicts: 0 }, people: [] } as unknown as TriageList;
+// Owner, 10 Nov (OD-12 + 3a): an old flagged import is Imported backlog work, not on "To triage".
+const OLD_FLAGGED = { ...ITEM, key: "COMPLAINT:c2", id: "c2", ref: "OB-01", identifier: "OB-01", backlog: true };
+const LIST = {
+  items: [ITEM, OLD_FLAGGED],
+  summary: { open: 1, done: 0, conflicts: 0 },
+  people: [],
+} as unknown as TriageList;
 const BACKLOG: ImportedBacklogList = {
-  summary: { total: 1, overdue: 0, backlog_days: 30, target_days: 10 },
+  summary: { total: 2, flagged: 1, overdue: 0, backlog_days: 30, target_days: 10 },
   page: 1,
   pages: 1,
   truncated: false,
   items: [
+    {
+      kind: "COMPLAINT",
+      id: "c2",
+      ref: "OB-01",
+      identifier: "OB-01",
+      product_name: "OB Pump",
+      words: "Pump stopped during the infusion",
+      awareness_at: "2025-11-10T00:00:00Z",
+      imported_at: "2026-11-10T00:00:00Z",
+      due_at: "2026-11-24T23:59:00Z",
+      overdue: false,
+      flags: [{ code: "MALFUNCTION", label: "Malfunction alleged" }],
+      note: "Imported: check the reportability decision in your QMS",
+    },
+    // Section Q decision 2: an old flagged import with its QMS triage still to confirm.
+    {
+      kind: "COMPLAINT",
+      id: "c3",
+      ref: "QB-OLD",
+      identifier: "QB-OLD",
+      product_name: "QB Pump",
+      words: "Patient died after the pump stopped",
+      awareness_at: "2026-07-10T00:00:00Z",
+      imported_at: "2026-11-10T00:00:00Z",
+      due_at: "2026-11-24T23:59:00Z",
+      overdue: false,
+      flags: [{ code: "DEATH", label: "Death recorded" }],
+      note: "Imported: check the reportability decision in your QMS",
+      qms_to_confirm: true,
+    },
     {
       kind: "COMPLAINT",
       id: "b1",
@@ -108,5 +144,24 @@ describe("QMS triage and the imported backlog (0.10.93)", () => {
     expect(html).toContain("BL-OLD");
     expect(html).toContain("Known of more than 30 days before the import");
     expect(html).toContain("Confirm triage");
+  });
+
+  it("lists an old flagged import first, flag kept, with the QMS note and the full form, not on To triage", () => {
+    const html = render(<ImportedBacklog />);
+    expect(html).toContain("2 complaints to triage, 1 flagged first");
+    expect(html.indexOf("OB-01")).toBeLessThan(html.indexOf("BL-OLD"));
+    expect(html).toContain("Malfunction alleged");
+    expect(html).toContain("Imported: check the reportability decision in your QMS");
+    expect(html.match(/Open the triage form/g)).toHaveLength(1);
+    expect(html.match(/Confirm triage</g)).toHaveLength(1);
+    expect(render(<Triage />)).not.toContain("OB-01");
+  });
+
+  it("offers Confirm QMS triage on an old flagged import whose QMS triage waits for a person", () => {
+    const html = render(<ImportedBacklog />);
+    const card = html.slice(html.indexOf("QB-OLD"), html.indexOf("BL-OLD"));
+    expect(card).toContain("From your QMS: confirm");
+    expect(card).toContain("Confirm QMS triage");
+    expect(card).not.toContain("Open the triage form");
   });
 });
