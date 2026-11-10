@@ -141,6 +141,10 @@ def test_a_purge_needs_the_password_and_then_the_current_code():
     wrong_password = admin.post(url, json={**body, "password": "not the password", "mfa_code": _next_code(secret)})
     assert wrong_password.status_code == 403
     assert wrong_password.json()["detail"]["code"] == "INVALID_REAUTHENTICATION"
+    assert _refusals(organization["tenant_id"], "TENANT_PURGE_REAUTHENTICATION_FAILED") == 1
+    with SessionLocal() as db:
+        bind_system(db, "test: nothing deleted after a wrong password")
+        assert db.get(Tenant, organization["tenant_id"]).status == "SUSPENDED"
 
     purged = admin.post(url, json={**body, "mfa_code": _next_code(secret)})
     assert purged.status_code == 200, purged.text
