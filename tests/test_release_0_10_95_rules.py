@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import uuid
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
@@ -51,3 +52,27 @@ def test_fda_h1_says_death_only_when_the_device_caused_or_contributed():  # audi
     assert event_type(_us_context(US1="YES", US3="YES"))[0] == "Death"
     assert event_type(_us_context(US1="YES", US2A="YES", US3="YES"))[0] == "Death; Serious injury"
     assert event_type(_us_context(US1="YES", US3="NO", US4="YES", US5="YES"))[0] == "Malfunction"
+
+
+def _aware(market: str, at: str, org_zone: str) -> str:
+    context = {
+        "market": market,
+        "seen": {"aware_at": at, "org_zone": org_zone},
+        "complaint": SimpleNamespace(id=uuid.uuid4()),
+        "record": {"complaint_identifier": "C-1", "business_id": None},
+    }
+    return worksheet.SOURCES["aware_date"](context)[0]
+
+
+def test_the_awareness_box_prints_the_local_day_the_deadline_counts_from():  # audit 11
+    from backend.app.reportability import deadlines
+
+    # 23:30 in New York is the next day in UTC: FDA box G3 prints the New York day.
+    assert _aware("US", "2026-11-10T04:30:00+00:00", "America/New_York") == "2026-11-09"
+    # 00:30 IST is the previous day in UTC: India's form prints the India day.
+    assert _aware("IN", "2026-11-09T19:00:00+00:00", "Asia/Kolkata") == "2026-11-10"
+    # The day printed is the day the deadline counts from.
+    moment = datetime.fromisoformat("2026-11-09T19:00:00+00:00")
+    assert deadlines.count(moment, 1, "CALENDAR", "IN", "Asia/Kolkata").day.isoformat() == "2026-11-10"
+    # A day given without a time stays that day.
+    assert _aware("US", "2026-11-10T12:00:00+00:00", "Asia/Kolkata") == "2026-11-10"

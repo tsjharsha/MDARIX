@@ -134,16 +134,21 @@ def end_of(day: date, market: str | None, org_zone: str | None) -> Deadline:
     return Deadline(day, at, zone, market, org_zone)
 
 
-def count(aware: datetime | date, days: int, day_basis: str, market: str | None, org_zone: str | None) -> Deadline:
-    """The deadline ``days`` (calendar or work) days from awareness, by the market's counting rule (module docstring).
-    A day without a time (an older stored day, or a day-only awareness: ``day_only``) is taken as that day everywhere:
-    the conservative start of that day under the counting rule (0.10.81, U-06)."""
+def start_day(aware: datetime | date, market: str | None, org_zone: str | None) -> date:
+    """The local day of awareness a market's deadline counts from: the earliest of its day in the authority's and the
+    organization's time zones. A day without a time (an older stored day, or a day-only awareness: ``day_only``) is
+    taken as that day everywhere: the conservative start of that day under the counting rule (0.10.81, U-06)."""
     if isinstance(aware, datetime) and day_only(aware):
-        start = _utc(aware).astimezone(timezone.utc).date()
-    elif isinstance(aware, datetime):
-        start = min(_utc(aware).astimezone(zone_info(zone) or timezone.utc).date() for zone in _zones(market, org_zone))
-    else:
-        start = aware
+        return _utc(aware).astimezone(timezone.utc).date()
+    if isinstance(aware, datetime):
+        return min(_utc(aware).astimezone(zone_info(zone) or timezone.utc).date() for zone in _zones(market, org_zone))
+    return aware
+
+
+def count(aware: datetime | date, days: int, day_basis: str, market: str | None, org_zone: str | None) -> Deadline:
+    """The deadline ``days`` (calendar or work) days from awareness, by the market's counting rule (module docstring),
+    from the local day of awareness (``start_day``)."""
+    start = start_day(aware, market, org_zone)
     if day_basis == WORK:
         day = add_work_days(start, days)
     else:

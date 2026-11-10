@@ -19,12 +19,13 @@ from __future__ import annotations
 
 import re
 import uuid
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
 from backend.app import product_facts
 from backend.app.authority_reports import forms
-from backend.app.reportability import markets
+from backend.app.reportability import deadlines, markets
 
 FROM_RECORD, ENTERED, CONFIRMED, OUTSIDE = "FROM_RECORD", "ENTERED", "CONFIRMED", "OUTSIDE"
 SUGGESTED, CHANGED = "SUGGESTED", "CHANGED"
@@ -179,6 +180,7 @@ def load(db: Session, control_db: Session, tenant_id: uuid.UUID, complaint_id: u
         else {}
     ).get(complaint.problem_code or "", [])
     return {
+        "market": market,
         "complaint": complaint,
         "record": record,
         "seen": seen,
@@ -288,6 +290,16 @@ def _event_type(context):
     if complaint.malfunction:
         found.append("Product problem (e.g., defects/malfunctions)")
     return ("; ".join(found), _complaint(context, "The complaint's harm and malfunction fields")) if found else None
+
+
+def _aware_day(context):
+    """The local day of awareness the market's deadline counts from (deadlines.start_day; code audit 11), not the
+    UTC day: an awareness at 00:30 IST is that day in India."""
+    seen = context["seen"]
+    if not seen.get("aware_at"):
+        return None
+    day = deadlines.start_day(datetime.fromisoformat(seen["aware_at"]), context.get("market"), seen.get("org_zone"))
+    return day.isoformat(), _complaint(context, "Awareness: the earliest awareness, received or recorded date")
 
 
 def _us_outcome(context):
@@ -587,11 +599,7 @@ SOURCES = {
         if c["complaint"].event_timestamp
         else None
     ),
-    "aware_date": lambda c: (
-        (c["seen"]["aware_date"], _complaint(c, "Awareness: the earliest awareness, received or recorded date"))
-        if c["seen"].get("aware_date")
-        else None
-    ),
+    "aware_date": _aware_day,
     "event_type": _event_type,
     "us_outcome": _us_outcome,
     "us_event_type": _us_event_type,
