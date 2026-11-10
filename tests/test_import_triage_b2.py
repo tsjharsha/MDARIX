@@ -155,9 +155,37 @@ def test_old_unflagged_imports_go_to_the_imported_backlog_with_one_click(trial):
     assert record.completed_at is not None and record.severity == "NEGLIGIBLE"
     after = _ok(user.get(f"{TRIAGE}/backlog", params={"page_size": 100}))
     assert "BL-OLD" not in {item["ref"] for item in after["items"]}
-    # A recent unflagged one is in neither queue, so the one click refuses it.
-    recent = user.post(f"{TRIAGE}/COMPLAINT/{_complaint_id(tenant_id, 'BL-NEW')}/confirm", json={"seen_version": 0})
-    assert recent.status_code == 409 and recent.json()["detail"]["code"] == "NOT_ROUTINE"
+    # A recent unflagged one is not backlog: it is routine on "To triage" (owner Q3, below).
+    assert _triage(user)["BL-NEW"]["speed"] == "ROUTINE"
+
+
+def test_recent_unflagged_imports_are_routine_on_to_triage_from_0_10_93_only(trial):  # owner Q3, 10 Nov
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    _upload(
+        user,
+        HEADER
+        + "RQ-NEW,RQ-PUMP,RQ Pump,Label smudged on the tray,open,2026-11-05,N,,,,\n"
+        + "RQ-OLD,RQ-PUMP,RQ Pump,Label smudged on the cover,open,2026-11-05,N,,,,\n",
+    )
+    # RQ-OLD as a 0.10.92 import holds it: before 0.10.93 no import set last_synced_at.
+    with SessionLocal() as db:
+        bind_system(db, "test:import-triage")
+        db.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.complaint_identifier == "RQ-OLD").update(
+            {"last_synced_at": None}
+        )
+        db.commit()
+    listed = _triage(user)
+    assert "RQ-OLD" not in _triage(user, "all")  # an existing trial's list does not change
+    item = listed["RQ-NEW"]
+    assert item["speed"] == "ROUTINE" and item["routine_prefill"] and not item["flags"]
+    # A re-upload keeps the older one off the list.
+    _upload(user, HEADER + "RQ-OLD,RQ-PUMP,RQ Pump,Label smudged on the cover,open,2026-11-05,N,,,,\n")
+    assert "RQ-OLD" not in _triage(user, "all")
+    old = user.post(f"{TRIAGE}/COMPLAINT/{_complaint_id(tenant_id, 'RQ-OLD')}/confirm", json={"seen_version": 0})
+    assert old.status_code == 409 and old.json()["detail"]["code"] == "NOT_ROUTINE"
+    _ok(user.post(f"{TRIAGE}/COMPLAINT/{item['id']}/confirm", json={"seen_version": 0}))
+    assert "RQ-NEW" not in _triage(user) and "RQ-NEW" in _triage(user, "done")
+    assert _record(tenant_id, "RQ-NEW").severity == "NEGLIGIBLE"
 
 
 def test_a_closed_qms_complaint_with_harm_gets_a_second_look(trial):  # TR-23, T-D13

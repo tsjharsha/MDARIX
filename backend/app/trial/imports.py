@@ -2134,6 +2134,8 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                 "other_lots": None,
                 **values,
                 **_stamp(now, received or event, source),
+                # Owner Q3: set only by 0.10.93 and later, so it tells which imports go on "To triage" (intake/service).
+                "last_synced_at": now,
             }
             # Not added to the session: the new complaints are inserted together after the rows (db/bulk.py).
             complaint = Complaint(**fields)
@@ -2155,6 +2157,8 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                     "EXTERNAL",
                     now,
                 )
+            elif complaint.last_synced_at is not None:  # imported from 0.10.93 on: the file was read again now
+                complaint.last_synced_at = now
             if found:  # "updated" counts the rows that changed a field, not every row seen again
                 complaint.updated_at = now
                 updated += 1

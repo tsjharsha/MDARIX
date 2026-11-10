@@ -59,6 +59,9 @@ trials' existing Cases; nothing is written until the owner approves the list), t
   QMS, with no click; one with a death, an injury, a malfunction or harm words shows "From your QMS: confirm" on the
   triage list, and a person checks it and presses **Confirm QMS triage** (one at a time). A re-upload never changes a
   triage a person saved.
+- **Recent imported complaints on "To triage".** A complaint imported from this version on, with no harm flag and no
+  triage from your QMS, now waits on "To triage" as routine (one click to confirm). Complaints imported before this
+  version stay where they were. The complaint page shows "From your QMS · last synced" with the date of the import.
 - **Imported backlog** (Complaints › More views): imported complaints known of more than 30 days before their import,
   with no harm flag and no triage yet. Routine triage, one click each, due 10 working days after the import (both
   organization settings). Read in full, oldest first, however large the import.

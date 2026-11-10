@@ -419,10 +419,23 @@ def _complaint_record(complaint: Complaint) -> dict:
     }
 
 
+def backlog_settings(db: Session, tenant_id: uuid.UUID) -> tuple[int, int]:
+    """The imported-backlog rule (OD-12): ``backlog_days`` and ``backlog_target_days``, 30 and 10 by default."""
+    from backend.app.db.models.oversight import OversightSettings
+
+    settings = (
+        db.query(OversightSettings.backlog_days, OversightSettings.backlog_target_days)
+        .filter(OversightSettings.tenant_id == tenant_id)
+        .first()
+    )
+    return (settings.backlog_days, settings.backlog_target_days) if settings else (30, 10)
+
+
 def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) -> dict[tuple, dict]:
     """Every record the triage list may show, by ``(kind, id)``: intake events, open imported complaints and open
     set-aside rows, each with its flags, availability and awareness."""
     found: dict[tuple, dict] = {}
+    backlog_days = backlog_settings(db, tenant_id)[0]
     products = {
         row.id: row.name
         for row in db.query(Product.id, Product.name).filter(Product.tenant_id == tenant_id).limit(READ_LIMIT)
@@ -478,6 +491,8 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
         if review_rules.is_closed(complaint.status):
             continue
         record = records.get((COMPLAINT, complaint.id))
+        awareness = complaint_awareness(complaint, record)
+        imported_at = rules.utc(complaint.ingestion_timestamp or complaint.created_at)
         found[(COMPLAINT, complaint.id)] = {
             "kind": COMPLAINT,
             "id": complaint.id,
@@ -491,11 +506,19 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
             "lot": lots.get(complaint.lot_batch_id),
             "words": complaint.description,
             "flags": rules.complaint_flags(_complaint_record(complaint)),
-            "available_at": rules.utc(complaint.ingestion_timestamp or complaint.created_at),
-            "awareness": complaint_awareness(complaint, record),
+            "available_at": imported_at,
+            "awareness": awareness,
             "sample": complaint.source_system == "MDARIX_SAMPLE",
             # B2: a Complaint a Case became is triaged, routine or fast (spec 3.4).
             "case_complaint": complaint.source_system == "MDARIX_CASE",
+            # Owner Q3 (10 Nov): imported from 0.10.93 on (only those imports set last_synced_at), known of recently
+            # (an older one is the imported backlog's): routine triage on "To triage". Earlier imports stay off it.
+            "routine_import": complaint.last_synced_at is not None
+            and complaint.source_system not in ("MDARIX_SAMPLE", "MDARIX_CASE")
+            and awareness["at"] >= imported_at - timedelta(days=backlog_days)
+            and (
+                record is None or record.source_system != "QMS"
+            ),  # TR-37: a QMS triage accepted at import is not listed
         }
     excluded = _excluded_complaints(db, tenant_id, [key[1] for key in found if key[0] == COMPLAINT])
     for complaint_id in excluded:
@@ -546,14 +569,14 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
 
 def _listed(subject: dict, record: TriageRecord | None) -> bool:
     """Whether a record calls for triage: flagged (an imported complaint a person has not yet taken up), an urgent
-    intake, or escalated by hand."""
+    intake, escalated by hand, a complaint a Case became, or a recent complaint imported from 0.10.93 on (routine)."""
     if record is not None and record.escalated_at is not None:
         return True
     if subject["kind"] == INTAKE and subject.get("intake_kind") == "URGENT":
         return True
     if subject.get("case_complaint"):
         return True
-    return bool(subject["flags"]) and not subject.get("taken_up")
+    return (bool(subject["flags"]) or bool(subject.get("routine_import"))) and not subject.get("taken_up")
 
 
 BACKLOG_READ = 20_000  # shortcut: one read of this many candidates; page it in the database if an import is larger
@@ -572,15 +595,8 @@ def imported_backlog(
     import, open, with no harm flag, never triaged and not taken up: routine triage in their own "Imported backlog"
     view, due ``backlog_target_days`` working days after the import. Read by query (every one, oldest first), not from
     the triage list's newest 2,000. A flagged one is on "To triage" at its own speed: safety never waits."""
-    from backend.app.db.models.oversight import OversightSettings
-
     now = now or now_utc()
-    settings = (
-        db.query(OversightSettings.backlog_days, OversightSettings.backlog_target_days)
-        .filter(OversightSettings.tenant_id == tenant_id)
-        .first()
-    )
-    days, target_days = (settings.backlog_days, settings.backlog_target_days) if settings else (30, 10)
+    days, target_days = backlog_settings(db, tenant_id)
     taken = (
         exists().where(
             TriageRecord.tenant_id == tenant_id,
