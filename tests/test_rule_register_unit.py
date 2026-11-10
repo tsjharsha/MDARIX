@@ -115,6 +115,15 @@ def test_overlaps_gaps_and_an_end_before_a_start_are_refused(use, us1, periods, 
         register.load()
 
 
+def test_a_floor_version_may_not_move_the_authority_zone(use, us1):
+    """Review finding 3: floor_day dates events in today's version's zone, so a version naming another zone is refused."""
+    moved = copy.deepcopy(us1["content"]["counting"])
+    moved["authority_zone"] = "America/Chicago"
+    use([_version(us1, 1, None, "2027-03-01", kind="INITIAL"), _version(us1, 2, "2027-03-01", None, counting=moved)])
+    with pytest.raises(register.RegisterError, match="US-floor versions name different authority zones"):
+        register.load()
+
+
 def test_a_correction_must_keep_the_period_of_the_version_it_corrects(use, us1):
     v1 = _version(us1, 1, None, "2027-03-01", kind="INITIAL")
     v2 = _version(us1, 2, "2027-03-01", None)

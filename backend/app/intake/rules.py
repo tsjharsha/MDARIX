@@ -562,19 +562,21 @@ RULED_OUT = {
 }
 
 
-def earliest_report(market: str) -> markets.ReportType | None:
+def earliest_report(market: str, aware=None, org_zone: str | None = None) -> markets.ReportType | None:
     """The report the market's rules start when no question is answered yet (US 5 work days, EU/NI and GB 2 days,
     Canada 10 days); None for a market without one (India: the tier date already is its only window). From the
-    market's floor in force today (B4)."""
+    market's floor in force at awareness (B4; today's without one)."""
     if market not in RULED_OUT:
         return None
-    floor = register.floor(market) if feature_set.rule_register() else None
+    floor = register.floor_at(market, utc(aware), org_zone) if feature_set.rule_register() else None
     return _earliest(market, floor["code"] if floor else None, str(register._DIRECTORY))
 
 
 @functools.cache
 def _earliest(market: str, floor_code: str | None, directory: str) -> markets.ReportType | None:
-    kind = markets.REPORT_TYPES.get(markets.evaluate(market, {})["report_type_if_reportable"] or "")
+    floor = register.get(floor_code) if floor_code else None
+    types = markets._in_force(directory, (floor_code,))[1] if floor else markets.REPORT_TYPES
+    kind = types.get(markets.evaluate(market, {}, floor)["report_type_if_reportable"] or "")
     return kind if kind and kind.days else None
 
 
@@ -652,7 +654,7 @@ def provisional_deadlines(
             continue
         days, basis, label, ruled_out = _provisional(market, level, remedial, aware, org_zone)
         due = deadlines.count(utc(aware), days, basis, market, org_zone)
-        note, kind = None, None if answered else earliest_report(market)
+        note, kind = None, None if answered else earliest_report(market, aware, org_zone)
         if kind is not None:
             sooner = deadlines.count(utc(aware), kind.days, kind.day_basis, market, org_zone)
             if sooner.at < due.at:

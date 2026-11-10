@@ -102,16 +102,25 @@ def _complaints(db: Session, tenant_id) -> dict:
 
 def _row(db: Session, tenant_id, complaint, market: str, answers: dict, level, term, author_id: str, now, **fields):
     from backend.app.db.models.market_assessment import ComplaintMarketAssessment
-    from backend.app.reportability import deadlines, markets, service
+    from backend.app.reportability import assessments, deadlines, markets, service
 
-    evaluation = markets.evaluate(market, answers)
     windows = service.settings_of(db, tenant_id)["windows"]
     aware, _ = service.awareness(complaint)
-    state = fields.get("conclusion") or evaluation["suggested"]
     zone = deadlines.org_zone(db, tenant_id)
+    floor = assessments.floor_at(market, aware, zone)  # B4: the floor at awareness, as a person's save picks it
+    evaluation = markets.evaluate(market, answers, floor)
+    state = fields.get("conclusion") or evaluation["suggested"]
     # The rule's own date (code audit 3): a pending draft counts the report a signed "reportable" would start.
     clock = markets.market_clock(
-        market, state, evaluation["report_type"], windows, aware, now, zone, evaluation["report_type_if_reportable"]
+        market,
+        state,
+        evaluation["report_type"],
+        windows,
+        aware,
+        now,
+        zone,
+        evaluation["report_type_if_reportable"],
+        floor,
     )
     row = ComplaintMarketAssessment(
         id=uuid.uuid4(),

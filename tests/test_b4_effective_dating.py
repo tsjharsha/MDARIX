@@ -187,3 +187,31 @@ def test_switched_off_nothing_is_recorded_and_signing_is_never_refused_for_a_flo
     monkeypatch.setenv("MDARIX_RULE_REGISTER", "on")
     assert _sign(regulatory, complaint, "US", item, "REPORTABLE").status_code == 200
     assert _row(org["tenant_id"], complaint).floor_code == "US-floor-1"
+
+
+def test_a_draft_saved_on_then_signed_off_keeps_no_floor_from_the_earlier_save(org, monkeypatch):
+    """Review finding 1: saved with the register on, signed with it off: the signed row holds no floor, rules or
+    date calculation from the earlier save (the signed material holds none either)."""
+    regulatory = org["regulatory"]
+    _acknowledge(regulatory)
+    complaint = _complaint(org["tenant_id"], org["product"], country="US", malfunction=True)
+    item = _save(regulatory, complaint, "US", _answers(**US_SERIOUS), harm_level="SERIOUS")
+    assert _row(org["tenant_id"], complaint).floor_code == "US-floor-1"
+    monkeypatch.setenv("MDARIX_RULE_REGISTER", "off")
+    assert _sign(regulatory, complaint, "US", item, "REPORTABLE").status_code == 200
+    row = _row(org["tenant_id"], complaint)
+    assert row.conclusion and (row.floor_code, row.rules_applied, row.date_calc) == (None, None, None)
+
+
+def test_the_watch_clock_counts_by_the_floor_at_awareness_not_today_s(org, fixture_register):
+    """Review finding 2, ED-10 for the watch: aware before a law change that shortens the 30-day report to 20 days,
+    the market's clock still counts 30 days (version 1), as the draft's own due date does."""
+    regulatory = org["regulatory"]
+    _law_change(fixture_register)
+    complaint = _complaint(org["tenant_id"], org["product"], country="US", malfunction=True)
+    item = _save(regulatory, complaint, "US", _answers(**US_SERIOUS), harm_level="SERIOUS")
+    assert _row(org["tenant_id"], complaint).floor_code == "US-floor-1"
+    assert (
+        item["clock"]["days"] == 30
+        and item["clock"]["due_date"] == _row(org["tenant_id"], complaint).due_on.isoformat()
+    )

@@ -193,6 +193,11 @@ def test_the_routine_complaint_closes_at_service_level_on_one_screen_with_one_si
             (f"{prefix}-floor-1", "routine-basis-1") if on else (None, None)
             for prefix in ("CA", "EU", "GB", "IN", "US")
         ]
+        # How the awareness day was found, with no clock ("not reportable").
+        assert all(
+            (row.date_calc["floor_day"] and row.date_calc["source"] is None) if on else row.date_calc is None
+            for row in markets
+        )
         bind_system(db, "test: the audit trail")
         actions = [
             row.details

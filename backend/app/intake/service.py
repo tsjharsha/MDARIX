@@ -894,6 +894,7 @@ def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datet
     """What triage's deadlines need besides the records: the organization's time zone, each complaint's signed market
     conclusions with their clocks (J3; None for "not reportable"), and the products' words (an IVD cites the IVDR)."""
     from backend.app.reportability import assessments
+    from backend.app.rule_register import register
     from backend.app.reportability import service as reporting_service
     from backend.app.reportability.deadlines import org_zone as zone_of
 
@@ -908,8 +909,13 @@ def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datet
             current, _ = assessments.current_and_draft(versions)
             if current is None or current.conclusion is None:
                 continue
+            aware = found[key]["awareness"]["at"]
+            # B4: the floor the conclusion was signed under, else the one in force at awareness (never today's).
+            floor = assessments.floor_at(market, aware, zone)
+            if floor is not None and current.floor_code:
+                floor = register.get(current.floor_code) or floor
             clock = markets.market_clock(
-                market, current.conclusion, current.report_type, windows, found[key]["awareness"]["at"], now, zone
+                market, current.conclusion, current.report_type, windows, aware, now, zone, floor=floor
             )
             signed.setdefault(key, {})[market] = clock
     products = {

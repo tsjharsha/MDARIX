@@ -139,9 +139,10 @@ def _deadline_changes(db: Session, tenant_id, apply: bool, now: datetime) -> lis
             current, draft = assessments.current_and_draft(rows)
             label = markets.MARKET_LABELS.get(market, market)
             if draft is not None and draft.answers:
-                evaluation = markets.evaluate(market, draft.answers)
                 seen = service.one(db, tenant_id, complaint_id, now)[2]
                 aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
+                floor = assessments.floor_at(market, aware, seen["org_zone"])
+                evaluation = markets.evaluate(market, draft.answers, floor)
                 clock = markets.market_clock(
                     market,
                     evaluation["suggested"],
@@ -151,6 +152,7 @@ def _deadline_changes(db: Session, tenant_id, apply: bool, now: datetime) -> lis
                     now,
                     seen["org_zone"],
                     evaluation["report_type_if_reportable"],
+                    floor,
                 )
                 due = date.fromisoformat(clock["due_date"]) if clock else None
                 old = {

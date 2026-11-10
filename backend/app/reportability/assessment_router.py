@@ -224,8 +224,10 @@ def _rules_used(market: str, at_event: dict | None, aware, seen: dict, draft, cu
 
 def _record_floor(row, market: str, floor: dict | None, answers: dict, clock: dict | None, aware, seen) -> None:
     """B4: keep on the row the floor in force on the awareness day, the rules that applied and how the due date was
-    counted (nothing while the register is off)."""
+    counted. Off: cleared, so a draft saved with it on never carries rules the signer did not see (only drafts
+    come here; signed rows are never touched)."""
     if floor is None:
+        row.floor_code = row.rules_applied = row.date_calc = None
         return
     row.floor_code = floor["code"]
     row.rules_applied = engine.applied(floor["content"], answers)

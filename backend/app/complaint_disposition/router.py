@@ -104,16 +104,32 @@ class SignRequest(BaseModel):
 ROUTINE_RULES_APPLIED = {"rules": [{"id": "routine-basis-1", "state": "APPLIES"}], "type_row": None}
 
 
-def _routine_floors(db: Session, tenant_id: uuid.UUID, complaint_id, routine_markets: list[str], today) -> dict:
-    """Each routine market's floor in force on its awareness day (B4); nothing while the rule register is off."""
+def _routine_floors(
+    db: Session, tenant_id: uuid.UUID, complaint_id, routine_markets: list[str], today
+) -> tuple[dict, dict]:
+    """Each routine market's floor in force on its awareness day, and how that day was found (B4, ED-15); nothing
+    while the rule register is off or without an awareness moment (never today's floor in its place)."""
     from backend.app.reportability import service as reporting
 
     if not routine_markets or not feature_set.rule_register():
-        return {}
+        return {}, {}
     found = reporting.one(db, tenant_id, complaint_id, today)
     seen = found[2] if found else {}
     aware = datetime.fromisoformat(seen["aware_at"]) if seen.get("aware_at") else None
-    return {market: register.floor_at(market, aware, seen.get("org_zone")) for market in routine_markets}
+    if aware is None:
+        return {}, {}
+    floors, calcs = {}, {}
+    for market in routine_markets:
+        day = register.floor_day(market, aware, seen.get("org_zone"))
+        floors[market] = register.floor(market, day)
+        calcs[market] = {
+            "aware_at": seen.get("aware_at"),
+            "aware_source": seen.get("aware_source"),
+            "floor_day": day.isoformat() if day else None,
+            "org_zone": seen.get("org_zone"),
+            "source": None,  # "not reportable": no clock
+        }
+    return floors, calcs
 
 
 def _reportability(db: Session, tenant_id: uuid.UUID, complaint_id, today: date) -> dict:
@@ -507,7 +523,7 @@ def sign(
             row.market for row in facts["facts"].assessments if row.conclusion is not None and row.superseded_by is None
         }
         routine_markets = [market for market in _routine_markets(facts) if market not in concluded]
-    floors = _routine_floors(db, tenant_id, complaint_id, routine_markets, today)
+    floors, calcs = _routine_floors(db, tenant_id, complaint_id, routine_markets, today)
     person = current_person(control_db, ctx)
     role = person.role_for(QUALITY_REVIEW) or person.role_for(SIGNAL_TRIAGE) or person.role_for(INVESTIGATION_CREATE)
     if (role or "").upper() in ADMINISTRATOR_ROLES:
@@ -752,6 +768,7 @@ def sign(
                 answers={"BASIS": {"answer": "NO", "rationale": rules.ROUTINE_BASIS, "evidence": []}},
                 floor_code=floors[market]["code"] if floors.get(market) else None,
                 rules_applied=ROUTINE_RULES_APPLIED if floors.get(market) else None,
+                date_calc=calcs.get(market) if floors.get(market) else None,
                 scale_version=markets.SCALE_VERSION,
                 suggested_conclusion=markets.NOT_REPORTABLE,
                 conclusion=markets.NOT_REPORTABLE,

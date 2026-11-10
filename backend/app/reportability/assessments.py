@@ -117,6 +117,14 @@ def required_markets(country: object, enabled: list[str], assessed) -> list[str]
     return [market for market in markets.MARKETS if market in wanted]
 
 
+def floor_at(market: str, aware, org_zone: str | None) -> dict | None:
+    """The market's floor in force at awareness (B4; None while the register is off or without awareness)."""
+    from backend.app import feature_set
+    from backend.app.rule_register import register
+
+    return register.floor_at(market, aware, org_zone) if aware is not None and feature_set.rule_register() else None
+
+
 def markets_summary(
     record: dict, windows: list[dict], versions_by_market: dict, aware, today, org_zone: str | None = None
 ) -> list[dict]:
@@ -134,12 +142,24 @@ def markets_summary(
         _, draft = current_and_draft(versions_by_market.get(market, []))
         # A draft's pending clock also counts the report a signed "reportable" would start (code audit 3).
         if_reportable = (
-            markets.evaluate(market, draft.answers or {})["report_type_if_reportable"]
+            markets.evaluate(market, draft.answers or {}, floor_at(market, aware, org_zone))[
+                "report_type_if_reportable"
+            ]
             if draft is not None and seen["state"] == DRAFT
             else None
         )
         clock = (
-            markets.market_clock(market, clock_state, report_type, windows, aware, today, org_zone, if_reportable)
+            markets.market_clock(
+                market,
+                clock_state,
+                report_type,
+                windows,
+                aware,
+                today,
+                org_zone,
+                if_reportable,
+                floor_at(market, aware, org_zone),
+            )
             if started
             else None
         )

@@ -134,6 +134,11 @@ def _period_problems(rule: str, items: list[tuple[str, dict]]) -> list[str]:
     has exactly the period of the lower version it corrects."""
     problems: list[str] = []
     periods = {entry["code"]: (entry["effective_from"], entry["effective_to"]) for _, entry in items}
+    # shortcut: floor_day dates every event in today's version's zone, so versions may not change it; lift this when
+    # a law moves a market's authority zone (then pick the day per candidate version).
+    zones = {str((entry.get("content") or {}).get("counting", {}).get("authority_zone")) for _, entry in items}
+    if items[0][1]["kind"] == "REPORTABILITY_FLOOR" and len(zones) > 1:
+        problems.append(f"{items[-1][0]}: {rule} versions name different authority zones ({', '.join(sorted(zones))})")
     chain = []
     for name, entry in items:
         if entry["change"]["kind"] == "CORRECTION":
@@ -236,7 +241,9 @@ def floor_at(market: str, aware, org_zone: str | None = None) -> dict | None:
     return floor(market, floor_day(market, aware, org_zone))
 
 
-def code_hash(implementation: str) -> str:  # shortcut: ast.dump can differ across Python minor versions; re-pin on an upgrade
+def code_hash(
+    implementation: str,
+) -> str:  # shortcut: ast.dump can differ across Python minor versions; re-pin on an upgrade
     """sha256 of a code-held rule's syntax tree (``module:function``), without comments and docstrings: a pinned
     regulatory function's code may not change without a new register version (B4 step 7, DT-33)."""
     import ast
