@@ -20,7 +20,7 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
 - **Product 360** (Work › Products): one page per product with its versions, the product's own changes, six link
   tiles with a monthly series, and the lists of its complaints and investigations. A chosen version is respected in
   every section. The product list shows counts.
-- **Supplier 360** (the Suppliers tab): the supplier list, a page per supplier with its complaints, its lots (in a free trial) and the
+- **Supplier 360** (Work › Products, the Supplier 360 tab): the supplier list, a page per supplier with its complaints, its lots (in a free trial) and the
   pattern box. From a pattern, "Open an investigation" starts one with all its complaints ticked and keeps where it
   came from.
 - A trend check card and an investigation open their product version on Product 360.
