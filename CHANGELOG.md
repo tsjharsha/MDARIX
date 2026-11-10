@@ -23,6 +23,20 @@ not built yet, and the chain is re-ordered at the release join). The API and web
   update, other; checked), `action_effective_on` and `action_scope` (for the closed loop, B5b). Legacy organization
   databases get the same from `scripts/add_workflow_tables_to_legacy_planes.py` (step `tr26`).
 
+### Added (B5a, investigation challenge; on unless `MDARIX_CHALLENGE=off`)
+
+- `GET /api/v1/investigations/{id}/challenge`: explanations drafted by rule (H-1 change, H-2 lot, H-3 design of the
+  version, H-4 use or setting, H-5 supplier part; H-0 "not enough records") from the records the investigation
+  links, each with the records for and against it and what is missing, labelled "Drafted by rule H-n v1 from your
+  records. Not a finding."; never ranked or scored. Challenge questions C-1 to C-9. A complaint with no version stays
+  "version unknown"; nothing is borrowed (PV-1).
+- Adopt a draft (a hypothesis tagged with its rule; ticked facts become unreviewed record summaries linked for or
+  against), dismiss it with a reason, answer a question (kept in the brief draft, covered by its content hash).
+  Audited: `CHALLENGE_VIEWED` (once per scope version), `DRAFT_ADOPTED`, `DRAFT_DISMISSED`, `CHALLENGE_ANSWERED`.
+- The Decision Brief gains a Challenge section and a Sources section (every record cited, with origin, and the rules
+  with their versions). Material questions (C-1, C-2, C-3, C-4 above 20%, C-5) block "Submit for review" until
+  answered or marked not applicable. The sample brief carries the sample author's answers.
+
 ## [0.10.97] - not released yet (after the WHIF freeze)
 
 B7a: the routine complaint path. Migration `tr25routinepath` (chained from `tr19casesescalation`; it moves onto
