@@ -1,0 +1,63 @@
+"""B4 step 8 (RR-19, RR-20): the rule register's read-only API. Every signed-in member reads it; it holds no
+organization's data; an unknown code is 404; there is no write route; switched off it answers 404."""
+
+from __future__ import annotations
+
+import pytest
+
+from tests.test_reporting_capa_api import _client, _organization
+
+pytestmark = pytest.mark.db
+
+URL = "/api/v1/rule-register"
+
+
+@pytest.fixture(scope="module")
+def viewer():
+    from backend.app.db.session import SessionLocal
+    from backend.app.trial.retention import purge_trial
+
+    tenant_id = _organization("RR")
+    try:
+        yield {"client": _client(tenant_id, "VIEWER"), "tenant_id": tenant_id}
+    finally:
+        with SessionLocal() as db:
+            purge_trial(db, tenant_id, "test:rule-register-cleanup")
+
+
+def test_every_member_reads_every_rule_with_its_source_and_starter_mark(viewer):
+    found = viewer["client"].get(URL)
+    assert found.status_code == 200, found.text
+    body = found.json()
+    assert body["summary"]["markets"] == 5 and body["summary"]["rules"] == len({item["rule"] for item in body["items"]})
+    floors = [item for item in body["items"] if item["kind"] == "REPORTABILITY_FLOOR"]
+    assert [item["code"] for item in floors] == ["CA-floor-1", "EU-floor-1", "GB-floor-1", "IN-floor-1", "US-floor-1"]
+    assert all(item["starter_mark"] == body["summary"]["starter_mark"] for item in body["items"])
+    assert all(item["state"] == "IN_FORCE" and item["source"] is not None for item in body["items"])
+    # No organization's data, and no implementation detail for customers.
+    assert str(viewer["tenant_id"]) not in found.text and "implementation" not in found.text
+    us = viewer["client"].get(f"{URL}?market=US&kind=REPORTABILITY_FLOOR").json()["items"]
+    assert [item["code"] for item in us] == ["US-floor-1"]
+
+
+def test_one_floor_reads_as_if_then_lines_with_its_history(viewer):
+    found = viewer["client"].get(f"{URL}/US-floor-1").json()
+    assert found["logic"]["reportable"][0].startswith("F-US-1: IF ((US1 (")
+    assert "THEN reportable (21 CFR 803.50(a)(1))" in found["logic"]["reportable"][0]
+    assert found["logic"]["report_type"][-1] == "T-US-2: OTHERWISE 5-work-day report (21 CFR 803.53)"
+    assert [item["code"] for item in found["history"]] == ["US-floor-1"]
+    assert viewer["client"].get(f"{URL}/routine-basis-1").json()["logic"] is None
+
+
+def test_as_at_a_day_unknown_codes_and_no_write_route(viewer):
+    dated = viewer["client"].get(f"{URL}?as_at=2020-01-01").json()
+    assert dated["as_at"] == "2020-01-01" and len(dated["items"]) == dated["summary"]["rules"]
+    assert viewer["client"].get(f"{URL}/NOPE-1").status_code == 404
+    assert viewer["client"].post(URL, json={}).status_code == 405
+    assert viewer["client"].put(f"{URL}/US-floor-1", json={}).status_code == 405
+
+
+def test_switched_off_the_register_answers_404(viewer, monkeypatch):
+    monkeypatch.setenv("MDARIX_RULE_REGISTER", "off")
+    assert viewer["client"].get(URL).status_code == 404
+    assert viewer["client"].get(f"{URL}/US-floor-1").status_code == 404
