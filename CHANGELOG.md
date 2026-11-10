@@ -61,6 +61,9 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
   accounts only (another organization's accounts never). Tests run API requests under the runtime role (`SET ROLE`).
 - A test reads the modules that build SQL with table or column names (data-plane lists, analytics, export, purge) and
   fails when a name could come from anything but a fixed list or the database catalogue, such as a request field.
+- New tests ask, as one organization and under row-level security, for another organization's complaints,
+  investigations, evidence and its download, CAPAs, exports, audit trail and signed decisions, by id, through list
+  filters and through every export: each answer is a refusal or holds none of the other organization's data.
 
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 
