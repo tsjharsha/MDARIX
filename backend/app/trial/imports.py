@@ -54,6 +54,7 @@ from backend.app.trial.columns import examples as column_examples
 from backend.app.trial.columns import match as columns_match
 from backend.app.trial.sample_data import SAMPLE_SOURCE
 from backend.app.trial.service import TRIAL_FILE_LIMIT_BYTES, TRIAL_ROW_LIMIT
+from backend.app.intake import case_import
 
 UPLOAD_SOURCE = "TRIAL_UPLOAD"
 WORKSPACE_UPLOAD_SOURCE = "CSV_IMPORT"
@@ -230,6 +231,8 @@ TEMPLATES: dict[str, dict] = {
             "triage_severity",
             "triage_owner",
             "immediate_action",
+            # B7 (spec 3.3, BK-12): the MDARIX ID of a complaint exported for QMS entry; the row merges into it.
+            "mdarix_ref",
         ],
         "example": [
             [
@@ -261,6 +264,7 @@ TEMPLATES: dict[str, dict] = {
                 "Minor",
                 "Complaint unit",
                 "Infusion moved to a backup pump; device taken out of use",
+                "",
             ],
             # The investigations example links both complaints, so the templates load in the order they are offered
             # (FUN-10).
@@ -293,11 +297,15 @@ TEMPLATES: dict[str, dict] = {
                 "",
                 "",
                 "",
+                "",
             ],
         ],
     },
     **business_imports.TEMPLATES,
+    # B7 step 5: call logs from a call centre or CRM, each row a Case to check (backend/app/intake/case_import.py).
+    "cases": case_import.TEMPLATE,
 }
+COLUMN_HELP["cases"] = case_import.HELP
 # Yes/no columns, and columns that hold longer text than the 255-character default.
 FLAG_COLUMNS = {"device_returned", "patient_involved", "serious_injury", "death", "malfunction"}
 FLAG_VALUES = {"y": True, "yes": True, "true": True, "1": True, "n": False, "no": False, "false": False, "0": False}
@@ -436,8 +444,8 @@ def column_limit(entity: str, column: str) -> int:
 def _free_text(column: str) -> bool:
     """A column of free text, checked (and stored) for personal data; identifiers, codes, dates and counts are not."""
     return not (
-        column.endswith(("_id", "_ids", "_date"))
-        or column == "version"
+        column.endswith(("_id", "_ids", "_date", "_at"))
+        or column in ("version", "received_zone", "mdarix_ref")
         or column in FLAG_COLUMNS
         or column in COUNT_COLUMNS
         or column in DEVICE_IDS
@@ -674,6 +682,15 @@ def _strict_iso(value: str) -> bool:
     """Whether ``value`` is a real YYYY-MM-DD date (what is stored)."""
     try:
         return bool(_ISO_DATE.match(value)) and bool(date.fromisoformat(value))
+    except ValueError:
+        return False
+
+
+def _is_time(value: str) -> bool:
+    """Whether ``value`` is an ISO date and time (what a Cases file's times are read into)."""
+    try:
+        datetime.fromisoformat(value)
+        return True
     except ValueError:
         return False
 
@@ -1134,6 +1151,9 @@ def _parse(
     report.mapping = matched["mapping"]
     report.ignored = matched["ignored"] + [item["header"] for item in matched["duplicates"]]
     report.duplicates = matched["duplicates"]
+    if entity == "cases":
+        for name in case_import.contact_headers(matched["ignored"]):
+            report.notes.append(f"Column '{name}' is not read: {case_import.CONTACT_NOTE} (nothing from it is saved).")
     for column in spec["required"]:
         if column not in fields:
             names = column_examples(entity, column)
@@ -1183,6 +1203,8 @@ def _parse(
             if column.endswith("_date"):
                 read = iso_date(value, order, report.epoch)
                 day_numbers += bool(read and _EXCEL_DAY.match(value.strip()))
+            elif column.endswith("_at"):
+                read = case_import.iso_time(value, order)
             elif column in COUNT_COLUMNS:
                 number = whole_number(value, reading.numbers)
                 read = str(number) if number is not None else None
@@ -1259,6 +1281,9 @@ def _check_values(
             elif column in COUNT_COLUMNS:
                 if _count(value) is None:
                     report.add(line, column, count_problem(value, report.numbers))
+            elif column.endswith("_at"):
+                if not _is_time(value):
+                    report.add(line, column, f"'{value[:40]}' is not a date and time (YYYY-MM-DD HH:MM).")
             elif column.endswith("_date"):
                 typed = report.typed.get((line, column))
                 if not _strict_iso(value):
@@ -1408,6 +1433,8 @@ def _check_references(entity: str, rows, lookup: _Lookup, report: _Report, creat
         new = business_imports.check(entity, rows, lookup, report)
         report.new_rows = new  # one record per row
         return new
+    if entity == "cases":
+        return case_import.check(rows, lookup, report)
     if create and entity == "complaints":
         return _check_complaints_creating(rows, lookup, report)
     new = 0
@@ -1654,6 +1681,11 @@ def upload_counters(source: str = UPLOAD_SOURCE) -> list[tuple]:
         elif model is LotBatch:
             conditions.append(~_named_by_a_complaint(LotBatch, Complaint.lot_batch_id, source))
         counters.append((model, tuple(conditions)))
+    if source == UPLOAD_SOURCE:
+        # B7: a free trial's imported Cases count in its row allowance (every CASE_IMPORT Case of a trial is one).
+        from backend.app.db.models.intake import IntakeEvent
+
+        counters.append((IntakeEvent, (IntakeEvent.source_system == case_import.SOURCE,)))
     return counters
 
 
@@ -1780,12 +1812,15 @@ def _check_rows(
     sets only that row aside; a problem of the file itself (columns, encoding, size, limits) still stops it all."""
     new_rows = 0
     kept = rows
-    oversized = len(rows) > MAX_ROWS_PER_FILE
+    # B7 (spec 3.2): a Cases file is masked always (call notes are full of names) and holds up to 5,000 rows.
+    mask_personal_data = mask_personal_data or entity == "cases"
+    most = case_import.MAX_ROWS if entity == "cases" else MAX_ROWS_PER_FILE
+    oversized = len(rows) > most
     if oversized:
         report.add(
             None,
             None,
-            f"This file has {len(rows):,} rows; one file can have up to {MAX_ROWS_PER_FILE:,}. Split it into smaller files.",
+            f"This file has {len(rows):,} rows; one file can have up to {most:,}. Split it into smaller files.",
         )
     if rows and not oversized:
         _check_values(entity, rows, report, date_format, mask_personal_data)
@@ -1950,7 +1985,7 @@ def import_file(
             422, detail={"code": "IMPORT_CHECK_FAILED", "message": "Fix the listed problems first", "report": report}
         )
     # The checked rows themselves: masked where asked, without the rows set aside.
-    result = _write_rows(db, tenant_id, entity, rows, policy)
+    result = _write_rows(db, tenant_id, entity, rows, policy, actor)
     import_ref = uuid.uuid4()
     _after_complaints(db, tenant_id, entity, rows, result, import_ref if policy.quarantine else None, policy.source)
     if policy.quarantine:
@@ -2003,7 +2038,7 @@ def import_file(
         rejected_rows=report["rejected_rows"],
         masked_values=report["masked_values"],
         skip_problem_rows=skip_problem_rows,
-        mask_personal_data=mask_personal_data,
+        mask_personal_data=report["mask_personal_data"],
     )
     if report.get("rejects_csv"):
         result["rejects_csv"] = report["rejects_csv"]
@@ -2074,10 +2109,12 @@ def import_records(db: Session, tenant_id, entity: str, records: list[dict], pol
     return result
 
 
-def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy) -> dict:
+def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy, actor: str | None = None) -> dict:
     source = policy.source
     lookup = _Lookup(db, tenant_id)
     now = datetime.now(timezone.utc)
+    if entity == "cases":
+        return {"entity": entity, "rows": len(rows), **case_import.write(db, tenant_id, rows, lookup, now, actor)}
     created = updated = 0
     also_created: dict[str, int] = {}
     # A complaints file: its complaints that exist already, read at once; their evidence written in one batch after
@@ -2085,7 +2122,13 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
     complaints = lookup.complaints(row["complaint_id"] for _, row in rows) if entity == "complaints" else {}
     # TA-20.4 / CI-31 (B2, Connect): a QMS ID that an MDARIX complaint (or its Case) holds updates that complaint.
     merged = (
-        _qms_matches(db, tenant_id, complaints, [row["complaint_id"] for _, row in rows])
+        _qms_matches(
+            db,
+            tenant_id,
+            complaints,
+            [row["complaint_id"] for _, row in rows],
+            {row["complaint_id"]: row.get("mdarix_ref") for _, row in rows},
+        )
         if entity == "complaints"
         else {}
     )
@@ -2516,13 +2559,28 @@ def _add_named_references(
     return added
 
 
-def _qms_claims(db: Session, tenant_id, known: dict, identifiers) -> dict[str, set]:
+def _qms_claims(db: Session, tenant_id, known: dict, identifiers, refs: dict | None = None) -> dict[str, set]:
     """QMS ID -> the complaints MDARIX created that claim it (their ``qms_ref``, or the ``qms_ref`` typed on the Case
-    they escalated from), for the file's IDs that are not a complaint's own identifier already (``known``)."""
+    they escalated from), for the file's IDs that are not a complaint's own identifier already (``known``). B7: a row
+    whose ``mdarix_ref`` (``refs``: QMS ID -> MDARIX ID) is a complaint MDARIX made from a Case, with no QMS ID yet,
+    claims that complaint too (the export for QMS entry coming back)."""
     from backend.app.db.models.intake import IntakeEvent
 
     wanted = sorted({value for value in identifiers if value and value not in known})
     claims: dict[str, set] = {}
+    named = {qms: ref for qms, ref in (refs or {}).items() if qms in wanted and ref}
+    if named:
+        found = dict(
+            db.query(Complaint.business_id, Complaint.id).filter(
+                Complaint.tenant_id == tenant_id,
+                Complaint.business_id.in_(sorted(set(named.values()))),
+                Complaint.source_system == "MDARIX_CASE",
+                Complaint.qms_ref.is_(None),
+            )
+        )
+        for qms, ref in named.items():
+            if ref in found:
+                claims.setdefault(qms, set()).add(found[ref])
     for start in range(0, len(wanted), 1000):
         chunk = wanted[start : start + 1000]
         for qms_ref, complaint_id in db.query(Complaint.qms_ref, Complaint.id).filter(
@@ -2540,17 +2598,18 @@ def _claimed_twice(db: Session, tenant_id, rows, report: _Report) -> None:
     """IN-14 (spec 3.3): a row whose ID two complaints claim as their QMS ID is set aside, never merged into one of
     them nor made a third complaint."""
     ids = [row.get("complaint_id") for _, row in rows]
-    claims = _qms_claims(db, tenant_id, _Lookup(db, tenant_id).complaints(value for value in ids if value), ids)
+    refs = {row.get("complaint_id"): row.get("mdarix_ref") for _, row in rows if row.get("mdarix_ref")}
+    claims = _qms_claims(db, tenant_id, _Lookup(db, tenant_id).complaints(value for value in ids if value), ids, refs)
     for line, row in rows:
         if len(claims.get(row.get("complaint_id"), ())) > 1:
             report.add(line, "complaint_id", f"Two complaints claim QMS ID {row['complaint_id']}: reconcile them")
 
 
-def _qms_matches(db: Session, tenant_id, known: dict, identifiers: list[str]) -> dict:
+def _qms_matches(db: Session, tenant_id, known: dict, identifiers: list[str], refs: dict | None = None) -> dict:
     """The file's complaint IDs that are the QMS ID of a complaint MDARIX created: ID -> that complaint, so the row
     updates it instead of making a second one (TA-20.4). An ID two complaints claim was set aside at the check (IN-14)
     and is left out here too."""
-    claims = _qms_claims(db, tenant_id, known, identifiers)
+    claims = _qms_claims(db, tenant_id, known, identifiers, refs)
     single = {qms_ref: next(iter(ids)) for qms_ref, ids in claims.items() if len(ids) == 1}
     if not single:
         return {}

@@ -52,6 +52,18 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
 - The complaint's next step after triage reads "Resolve and close" (Connect: "Resolve and mark ready to close in
   your QMS") when no trigger is met; with a trigger it stays "Sign the disposition". A complaint closed in MDARIX
   shows "Closed in MDARIX" with a Reopen button on its page and in its drawer.
+- Case import, the "Cases (call logs)" template (`/api/v1/data/import/cases`): a call centre's or CRM's call log
+  becomes Cases to check, unsigned; nothing is classified, signed or escalated by the import. The words and what was
+  tried are always masked; contact columns (name, phone, e-mail) and the ten answers are never read. Times keep
+  their zone (a row's `received_zone`, else the organization's); awareness follows first knowledge acting for you,
+  never the import. A product or lot not in master data is kept as typed and flagged; each identifier is
+  "unconfirmed, source: Imported". A re-upload (key: the file's `case_id`) fills only empty facts, recorded as field
+  changes, and sets aside a row that would change the words or the received time. Up to 5,000 rows per file; a
+  free trial counts them in its allowance. Needs the permission to change records and to log a case; audited
+  `CASES_IMPORTED` (counts only). A Case received more than `backlog_days` before its import is imported backlog: no
+  check due and no overdue alarm, with the note "Imported: check what was decided in your source system".
+- The complaints template takes an optional `mdarix_ref`: a row naming a complaint MDARIX made from a Case, with no
+  QMS ID yet, merges into it and records the row's ID as its QMS ID.
 
 ### Changed
 

@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.downloads import attachment
 from backend.app import import_lineage, import_quarantine
-from backend.app.access.permissions import RECORDS_WRITE, require_permission
+from backend.app.access.permissions import CASE_LOG, RECORDS_WRITE, effective_permissions, require_permission
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import AuditEvent, Tenant
 from backend.app.db.session import get_db
@@ -55,6 +55,35 @@ def refuse_sample_only(
 
 # Every route that brings records in: the permission to change records, and never in a sample-only trial.
 IMPORTING = [Depends(require_permission(RECORDS_WRITE)), Depends(refuse_sample_only)]
+
+
+def _cases_allowed(entity: str, db: Session, ctx: AuthenticatedRequestContext) -> None:
+    """B7 (spec 3.2): importing Cases needs the permission to log a case besides the one to change records."""
+    if entity == "cases" and CASE_LOG not in effective_permissions(db, ctx):
+        raise HTTPException(
+            403,
+            detail={"code": "PERMISSION_DENIED", "message": "Importing Cases needs the permission to log a case"},
+        )
+
+
+def _cases_audit(tenant_id, ctx, result: dict) -> AuditEvent:
+    """CASES_IMPORTED: the counts only (new Cases to check, filled, flagged, imported backlog, set aside)."""
+    return AuditEvent(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        actor_ref=str(ctx.user_id),
+        action="CASES_IMPORTED",
+        entity_type="DataImport",
+        details={
+            "import_ref": result.get("import_ref"),
+            "to_check": result.get("created", 0),
+            "filled": result.get("updated", 0),
+            "flagged": result.get("flagged", 0),
+            "backlog": result.get("backlog", 0),
+            "set_aside": result.get("quarantined_rows", 0),
+        },
+        created_at=datetime.now(timezone.utc),
+    )
 
 
 def _policy(db: Session, ctx: AuthenticatedRequestContext) -> imports.ImportPolicy:
@@ -162,8 +191,9 @@ def _import_and_audit(
             else {**details, "source": policy.source, "file_name": imports.file_label(file_name)},
             created_at=datetime.now(timezone.utc),
         )
+        cases = _cases_audit(tenant_id, ctx, result) if entity == "cases" else None
         if trial:
-            db.add(event)
+            db.add_all([event, cases] if cases else [event])
         data.commit()
         if trial and db is not data:
             db.commit()
@@ -174,7 +204,7 @@ def _import_and_audit(
         data.rollback()
         raise HTTPException(500, detail={"code": failure[0], "message": failure[1]}) from exc
     if not trial:
-        db.add(event)
+        db.add_all([event, cases] if cases else [event])
         db.commit()
     return result
 
@@ -209,6 +239,7 @@ async def check_import(
     order = imports.date_format_or_422(date_format)
     options = imports.import_options(on_problems, personal_data)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
+    await run_in_threadpool(_cases_allowed, entity, db, ctx)
     policy = await run_in_threadpool(_policy, db, ctx)
     reading = await run_in_threadpool(_reading, data, tenant_id, sheet, number_format, date_column)
     raw = await _body(request, policy)
@@ -236,6 +267,7 @@ async def run_import(
 ):
     order = imports.date_format_or_422(date_format)
     options = imports.import_options(on_problems, personal_data)
+    await run_in_threadpool(_cases_allowed, entity, db, ctx)
     policy = await run_in_threadpool(_policy, db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     reading = await run_in_threadpool(_reading, data, tenant_id, sheet, number_format, date_column)

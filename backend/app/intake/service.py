@@ -33,7 +33,7 @@ from backend.app.db.models.foundation import AuthUser, Complaint, InvestigationC
 from backend.app.db.models.ingestion import ImportQuarantineRow
 from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordFieldChange, RecordLink, TriageRecord
 from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
-from backend.app.intake import case_rules, rules, triage_rules
+from backend.app.intake import case_import, case_rules, rules, triage_rules
 from backend.app.reportability import markets
 from backend.app.reportability.deadlines import day_only
 from backend.app.business_ids import complaint_ref
@@ -535,6 +535,9 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
             "signed_by": signed.signed_by if signed else None,
             "suggestion": latest.suggestion if latest else None,
             "sample": is_sample(event.source_system),
+            # RT-30 (B7): an imported Case known of more than backlog_days before its import, never triaged here, is
+            # imported backlog work: no alert, on the Cases list with its note.
+            "backlog": record is None and case_import.is_backlog(event, backlog_days),
         }
     complaints = (
         db.query(Complaint)

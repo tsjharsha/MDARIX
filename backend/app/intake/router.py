@@ -55,7 +55,7 @@ from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordL
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import current_person
-from backend.app.intake import case_rules, cases_list, rules, service, triage_rules
+from backend.app.intake import case_import, case_rules, cases_list, rules, service, triage_rules
 from backend.app.paging import open_first
 from backend.app.reportability import markets
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -333,6 +333,13 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
     )
     flags = rules.intake_flags(event.kind, event.reporter_words, answers)
     awareness = service.event_awareness(event, record)
+    # RT-30: an imported Case known of long before its import: no check due (no overdue alarm), with a note.
+    backlog = case_import.is_backlog(event, service.backlog_settings(db, tenant_id)[0])
+    check_due = (
+        service.working_day_end(rules.utc(event.created_at), 0, service.calendar(db, event.tenant_id))
+        if signed is None and not backlog
+        else None
+    )
     product = db.get(Product, event.product_id) if event.product_id else None
     lot = db.get(LotBatch, event.lot_batch_id) if event.lot_batch_id else None
     complaint = db.get(Complaint, event.complaint_id) if event.complaint_id else None
@@ -433,18 +440,13 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
             name(event.owner_id),
             complaint.complaint_identifier if complaint else None,
             record,
-            service.working_day_end(rules.utc(event.created_at), 0, service.calendar(db, event.tenant_id))
-            if signed is None
-            else None,
+            check_due,
             now,
         ),
+        "backlog_note": case_import.BACKLOG_NOTE if backlog else None,
         "draft": bool(latest and latest.signed_at is None),
         "signed": _check_view(signed, name) if signed else None,
-        "check_due_at": service._iso(
-            service.working_day_end(rules.utc(event.created_at), 0, service.calendar(db, event.tenant_id))
-        )
-        if latest and signed is None
-        else None,
+        "check_due_at": service._iso(check_due) if latest and check_due else None,
         "tasks": [service.task_view(task, now) for task in tasks],
         "qms_task": _qms_state(tasks, now),
     }

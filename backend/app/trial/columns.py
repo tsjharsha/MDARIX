@@ -204,6 +204,19 @@ _COMPLAINT_SYNONYMS: dict[str, tuple[str, ...]] = {
 
 _SYNONYMS: dict[str, dict[str, tuple[str, ...]]] = {
     "complaints": _COMPLAINT_SYNONYMS,
+    # B7 step 5: a call centre's or CRM's call log.
+    "cases": {
+        "case_id": ("case id", "call id", "case number", "case no", "call number", "interaction id", "call reference"),
+        "received_at": ("received", "date received", "received date", "call date", "call time", "created at"),
+        "words": ("description", "call notes", "notes", "issue description", "problem description", "comments"),
+        "troubleshooting": ("troubleshooting steps", "what was tried", "steps taken", "resolution steps"),
+        "channel": ("contact channel", "call channel", "origin"),
+        "service_ticket": ("service ticket number", "work order", "service order"),
+        **{
+            column: _COMPLAINT_SYNONYMS[column]
+            for column in ("product_id", "product_name", "version", "lot_id", "serial_number", "udi", "event_date")
+        },
+    },
     "products": {
         "product_id": _COMPLAINT_SYNONYMS["product_id"],
         "product_name": (

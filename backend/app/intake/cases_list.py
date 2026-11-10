@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from backend.app.db.models.foundation import Complaint, LotBatch, Product
 from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, TriageRecord
 from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
-from backend.app.intake import case_rules, rules, service, triage_rules
+from backend.app.intake import case_import, case_rules, rules, service, triage_rules
 from backend.app.trial.sample_source import is_sample
 
 C = case_rules
@@ -58,7 +58,7 @@ def _signed(event_id):
     )
 
 
-def _condition(view: str, user_id: str, now: datetime):
+def _condition(view: str, user_id: str, now: datetime, backlog_days: int = 30):
     """The SQL condition of a view, on IntakeEvent (a correlated EXISTS where it needs another table)."""
     E = IntakeEvent
     triage = exists().where(
@@ -102,6 +102,12 @@ def _condition(view: str, user_id: str, now: datetime):
             )
             # An unsigned Case check is due the same working day: an OPEN Case logged before today is late.
             unsigned = and_(E.status == C.OPEN, E.created_at < now.replace(hour=0, minute=0, second=0, microsecond=0))
+            # RT-30: an imported Case known of more than backlog_days before its import raises no overdue alarm.
+            backlog = and_(
+                E.source_system == case_import.SOURCE,
+                E.awareness_at < E.created_at - func.make_interval(0, 0, 0, backlog_days),
+            )
+            unsigned = and_(unsigned, ~backlog)
             return and_(E.status.in_(LIVE), or_(late, unsigned))
         case "service_only":
             return exists().where(
@@ -211,7 +217,8 @@ def cases_page(
     q = rules.clean(q, 80)
     if q:
         base = base.filter(_search(q))
-    condition = _condition(view, user_id, now)
+    backlog_days = service.backlog_settings(db, tenant_id)[0]
+    condition = _condition(view, user_id, now, backlog_days)
     shown = base.filter(condition) if condition is not None else base
     total = shown.order_by(None).count()
     events = shown.order_by(E.created_at.desc(), E.id.desc()).offset((max(page, 1) - 1) * size).limit(size).all()
@@ -244,7 +251,12 @@ def cases_page(
             lots.get(event.lot_batch_id),
             complaints.get(event.complaint_id),
         )
-        check_due = service.working_day_end(rules.utc(event.created_at), 0, calendar) if signed is None else None
+        backlog = case_import.is_backlog(event, backlog_days)
+        check_due = (
+            service.working_day_end(rules.utc(event.created_at), 0, calendar)
+            if signed is None and not backlog
+            else None
+        )
         owner = names.get(event.owner_id) if event.owner_id else None
         items.append(
             {
@@ -268,6 +280,7 @@ def cases_page(
                 "flagged": bool(rules.intake_flags(event.kind, event.reporter_words, answers)),
                 "complaint_ref": complaint.complaint_identifier if complaint else None,
                 "row_version": event.version,
+                "backlog_note": case_import.BACKLOG_NOTE if backlog else None,
                 "header": header(
                     event,
                     signed,

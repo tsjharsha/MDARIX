@@ -68,7 +68,7 @@ def _record(tenant_id, identifier: str) -> TriageRecord | None:
 
 def test_the_template_offers_the_qms_triage_columns():
     spec = TEMPLATES["complaints"]
-    assert spec["optional"][-4:] == ["triage_date", "triage_severity", "triage_owner", "immediate_action"]
+    assert spec["optional"][-5:] == ["triage_date", "triage_severity", "triage_owner", "immediate_action", "mdarix_ref"]
     assert all(len(row) == len(spec["required"]) + len(spec["optional"]) for row in spec["example"])
 
 
