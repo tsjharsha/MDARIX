@@ -22,12 +22,25 @@ def test_an_over_limit_csv_is_refused_without_reading_every_row(monkeypatch):
     read = []
     real_reader = csv.reader
 
-    def counting_reader(*args, **kwargs):
-        for row in real_reader(*args, **kwargs):
-            read.append(1)
-            yield row
+    class CountingReader:
+        """Counts the rows read and keeps the real reader's line_num, which the import names in its errors."""
 
-    monkeypatch.setattr(imports.csv, "reader", counting_reader)
+        def __init__(self, *args, **kwargs):
+            self._reader = real_reader(*args, **kwargs)
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            row = next(self._reader)
+            read.append(1)
+            return row
+
+        @property
+        def line_num(self):
+            return self._reader.line_num
+
+    monkeypatch.setattr(imports.csv, "reader", CountingReader)
     report = imports._Report()
 
     assert imports._table(_csv(cap * 20), report, policy) is None
