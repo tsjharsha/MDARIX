@@ -5,7 +5,7 @@ import { tabParts } from "../../app/linkTable";
 import { SAMPLE_SOURCE } from "./complaintList";
 
 /** The tabs of Work › Products (linkTable.json newPlaces["Product 360"]). */
-export const HUB_TABS = ["Products", "Suppliers"] as const;
+export const HUB_TABS = ["Product 360", "Supplier 360"] as const;
 export type HubTab = (typeof HUB_TABS)[number];
 
 /** One product's sections; the Records tab holds the full lists. */
@@ -52,7 +52,7 @@ export function hubPlace(tab: string | undefined | null): HubPlace {
   const get = (key: string) => params.get(key)?.trim() || null;
   const list = get("list");
   return {
-    tab: name === "Suppliers" ? "Suppliers" : "Products",
+    tab: name === "Supplier 360" ? "Supplier 360" : "Product 360",
     product: get("product"),
     version: get("version"),
     supplier: get("supplier"),
@@ -73,13 +73,13 @@ export function hubTab(place: Partial<HubPlace> & { tab: HubTab }): string {
   return rest ? `${place.tab}?${rest}` : place.tab;
 }
 
-/** A product's page: its tab ("Products?product=…&version=…"). */
+/** A product's page: its tab ("Product 360?product=…&version=…"). */
 export const productTab = (product: string, version?: string | null, view?: ProductView | null) =>
-  hubTab({ tab: "Products", product, version: version ?? null, view: view && view !== "Overview" ? view : null });
+  hubTab({ tab: "Product 360", product, version: version ?? null, view: view && view !== "Overview" ? view : null });
 
-/** A supplier's page: its tab ("Suppliers?supplier=…"). */
+/** A supplier's page: its tab ("Supplier 360?supplier=…"). */
 export const supplierTab = (supplier: string, view?: SupplierView | null) =>
-  hubTab({ tab: "Suppliers", supplier, view: view && view !== "Overview" ? view : null });
+  hubTab({ tab: "Supplier 360", supplier, view: view && view !== "Overview" ? view : null });
 
 /** A section named in the address, if the page offers it; else its first. */
 export const chosenView = <T extends string>(views: readonly T[], named: string | null): T =>

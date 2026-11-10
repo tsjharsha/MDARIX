@@ -93,24 +93,24 @@ beforeEach(() => {
 describe("the page's address", () => {
   it("names the product, its version, section and list, or the supplier, in words people read", () => {
     const tab = hubTab({
-      tab: "Products",
+      tab: "Product 360",
       product: "SAMPLE-ORBIT-300",
       version: "Rev B",
       view: "Records",
       list: "capas",
     });
-    expect(tab).toBe("Products?product=SAMPLE-ORBIT-300&version=Rev+B&view=Records&list=capas");
+    expect(tab).toBe("Product 360?product=SAMPLE-ORBIT-300&version=Rev+B&view=Records&list=capas");
     expect(hubPlace(tab)).toMatchObject({
-      tab: "Products",
+      tab: "Product 360",
       product: "SAMPLE-ORBIT-300",
       version: "Rev B",
       list: "capas",
     });
-    expect(productTab("SAMPLE-PULSE-410", "Rev A")).toBe("Products?product=SAMPLE-PULSE-410&version=Rev+A");
-    expect(supplierTab("SAMPLE-SUP-B")).toBe("Suppliers?supplier=SAMPLE-SUP-B");
-    expect(hubPlace("Suppliers?supplier=X").tab).toBe("Suppliers");
+    expect(productTab("SAMPLE-PULSE-410", "Rev A")).toBe("Product 360?product=SAMPLE-PULSE-410&version=Rev+A");
+    expect(supplierTab("SAMPLE-SUP-B")).toBe("Supplier 360?supplier=SAMPLE-SUP-B");
+    expect(hubPlace("Supplier 360?supplier=X").tab).toBe("Supplier 360");
     // An unknown list is ignored rather than trusted.
-    expect(hubPlace("Products?product=P&list=passwords").list).toBeNull();
+    expect(hubPlace("Product 360?product=P&list=passwords").list).toBeNull();
   });
 });
 
@@ -183,7 +183,7 @@ describe("the product list", () => {
         },
       },
     ];
-    const html = render(<ProductHubSection />, api("Products"));
+    const html = render(<ProductHubSection />, api("Product 360"));
     expect(html).toContain("OrbitCare 300 (Sample)");
     expect(html).toContain("<strong>14</strong> open complaints");
     expect(html).toContain("trends to review");
@@ -191,7 +191,7 @@ describe("the product list", () => {
     expect(html.indexOf("Rev B")).toBeLessThan(html.indexOf("Rev A"));
     expect(html).not.toMatch(/>(Edit|Delete|Save)</);
     resources.data["/api/v1/products"] = [];
-    expect(render(<ProductHubSection />, api("Products"))).toContain(
+    expect(render(<ProductHubSection />, api("Product 360"))).toContain(
       "Import your products, lots and complaints in Import your data.",
     );
   });
@@ -223,7 +223,14 @@ describe("one product's page", () => {
     resources.data["/api/v1/products/SAMPLE-ORBIT-300/links"] = {
       tiles: {
         complaints: { count: 0, items: [] },
-        investigations: { count: 1, items: [{ id: "i1", investigation_identifier: "SAMPLE-INV-001", status: "Open" }] },
+        investigations: {
+          count: 2,
+          items: [
+            { id: "i1", investigation_identifier: "SAMPLE-INV-001", status: "Open" },
+            // PV-1: one recording no version is under every version, as the whole product's.
+            { id: "i2", investigation_identifier: "INV-0002", status: "Open", versions: [], applies_to: "PRODUCT" },
+          ],
+        },
         signals: { count: 0, items: [] },
         capas: { count: 0, items: [] },
         risks: { count: 0, items: [] },
@@ -231,13 +238,14 @@ describe("one product's page", () => {
       },
       monthly: { months: [], series: [], markers: [] },
     };
-    const html = render(<ProductHubSection />, api("Products?product=SAMPLE-ORBIT-300"));
+    const html = render(<ProductHubSection />, api("Product 360?product=SAMPLE-ORBIT-300"));
     expect(html).toContain('class="hx-monitor');
     expect(html).toContain("<h1");
     expect(html).toContain("Compare with Rev A");
     expect(html.indexOf(">Rev B<")).toBeLessThan(html.indexOf(">Rev A<"));
     expect(html).toContain("No complaints recorded for this version");
     expect(html).toContain("SAMPLE-INV-001");
+    expect(html).toContain("Open · applies to the whole product");
     expect(html).toContain("No risks recorded in MDARIX for this product");
     expect(html).toContain("Sample");
     // G-2: the operational parts are flat (no hero band below the head).
@@ -252,7 +260,7 @@ describe("one product's page", () => {
     });
     const html = render(
       <ProductHubSection />,
-      api("Products?product=SAMPLE-ORBIT-300&version=Rev+B&view=Configuration&compare=Rev+A"),
+      api("Product 360?product=SAMPLE-ORBIT-300&version=Rev+B&view=Configuration&compare=Rev+A"),
     );
     expect(html).toContain("Precision Sensors Ltd");
     expect(html).toContain("NovaSense Components");
@@ -260,13 +268,37 @@ describe("one product's page", () => {
     expect(html).toContain("SAMPLE-CHG-014");
   });
 
+  it("tells the version story as flat cards from the same read as before (spec 3.3, G-2)", () => {
+    resources.data["/api/v1/products/SAMPLE-ORBIT-300/product-360"] = light();
+    resources.data["/api/v1/products/p1/versions/v-b/story"] = {
+      status: "READY_FOR_REVIEW",
+      version: { version_identifier: "Rev B", lifecycle_status: "active", release_timestamp: "2026-08-27T00:00:00Z" },
+      counts: { complaints: 14, investigations: 1, evidence: 0 },
+      complaints: [{ business_id: "CMP-1", complaint_identifier: "SAMPLE-CMP-1", status: "Open" }],
+      investigations: [{ business_id: "INV-1", investigation_identifier: "SAMPLE-INV-001", status: "Open" }],
+      evidence: [],
+    };
+    const html = render(
+      <ProductHubSection />,
+      api("Product 360?product=SAMPLE-ORBIT-300&version=Rev+B&view=Version+story"),
+    );
+    expect(html).toContain("Investigations with a complaint on Rev B");
+    expect(html).toContain("SAMPLE-CMP-1");
+    expect(html).toContain("SAMPLE-INV-001");
+    expect(html).toContain("None recorded for Rev B");
+    expect(html).toContain("See all on Records");
+    expect(html).toContain("it does not infer a cause");
+    expect(html).not.toContain("Product Version Story");
+    expect(html.match(/hx-monitor"/g)?.length ?? 0).toBeLessThanOrEqual(1);
+  });
+
   it("says plainly when a version has no lots, and when a product has no versions (P360-02, P360-03)", () => {
     resources.data["/api/v1/products/SAMPLE-ORBIT-300/product-360"] = light();
-    expect(render(<ProductHubSection />, api("Products?product=SAMPLE-ORBIT-300&view=Lots"))).toContain(
+    expect(render(<ProductHubSection />, api("Product 360?product=SAMPLE-ORBIT-300&view=Lots"))).toContain(
       "No lots recorded for Rev B.",
     );
     resources.data["/api/v1/products/SAMPLE-ORBIT-300/product-360"] = light({ selected_version: null, versions: [] });
-    const none = render(<ProductHubSection />, api("Products?product=SAMPLE-ORBIT-300&view=Configuration"));
+    const none = render(<ProductHubSection />, api("Product 360?product=SAMPLE-ORBIT-300&view=Configuration"));
     expect(none).toContain("No versions recorded");
     expect(none).toContain("a configuration belongs to a version");
   });
@@ -279,7 +311,7 @@ describe("a chosen version is respected (PV-1)", () => {
     );
     expect(
       recordLine("investigations", { investigation_identifier: "I2", versions: [], applies_to: "PRODUCT" }).text,
-    ).toBe("no version recorded (the product's)");
+    ).toBe("applies to the whole product");
     expect(recordLine("risks", { risk_identifier: "R1", description: "Alarm", applies_to: "PRODUCT" }).text).toBe(
       "Alarm · whole product (no version recorded)",
     );
@@ -320,6 +352,6 @@ describe("links into Product 360 (7a, P360-08)", () => {
     expect(
       renderToStaticMarkup(<TrendHeroes board={board as unknown as TrendBoard} action={() => null} />),
     ).not.toContain("Product 360:");
-    expect(productTab(rising.product.identifier!, "Rev B")).toBe("Products?product=SAMPLE-ORBIT-300&version=Rev+B");
+    expect(productTab(rising.product.identifier!, "Rev B")).toBe("Product 360?product=SAMPLE-ORBIT-300&version=Rev+B");
   });
 });

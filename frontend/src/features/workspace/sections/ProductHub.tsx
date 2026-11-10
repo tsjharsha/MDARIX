@@ -3,7 +3,6 @@ import { ArrowLeftRight, Upload } from "lucide-react";
 import { Empty, Panel } from "../../admin/console/charts";
 import { Tabs, useResource, type Resource } from "../../customer-admin/shared";
 import { DeviceIcon, MonitorBand, StatusPill, deviceKind } from "../../shared/hero/HeroVisuals";
-import { ProductVersionStory } from "../../investigator/ProductVersionStory";
 import { formatDay } from "../../../app/dates";
 import { chooseCase, useWorkspace } from "../workspaceContext";
 import { countOf } from "./common";
@@ -51,9 +50,9 @@ export function ProductHubSection({ tab, heading }: { tab?: string; heading?: Re
       onChange={(next: HubTab) => go(hubTab({ tab: next }))}
       label="Products and suppliers"
     >
-      {place.tab === "Products" &&
+      {place.tab === "Product 360" &&
         (place.product ? <ProductPage place={place} go={go} heading={heading} /> : <ProductList go={go} />)}
-      {place.tab === "Suppliers" && <SuppliersTab place={place} go={go} heading={heading} />}
+      {place.tab === "Supplier 360" && <SuppliersTab place={place} go={go} heading={heading} />}
     </Tabs>
   );
 }
@@ -192,13 +191,14 @@ export function recordLine(kind: RecordKind, row: Row): { ref: string; text: str
     case "investigations":
       return {
         ref: row.investigation_identifier ?? row.business_id,
-        // PV-1: an investigation spanning several versions names them all.
+        // PV-1 (owner, 10 Nov 2026): one spanning several versions names them all; one recording no version is listed
+        // under every version as the whole product's, never given a version it does not have.
         text: [
           row.status,
           row.versions?.length
             ? row.versions.join(", ")
             : row.applies_to === "PRODUCT"
-              ? "no version recorded (the product's)"
+              ? "applies to the whole product"
               : row.version_identifier,
           row.investigation_question,
         ]
@@ -265,7 +265,7 @@ function ProductCard({ row, go }: { row: ProductSummary; go: Go }) {
   const version = counts?.version_identifier ?? null;
   const versions = [...((row.available_versions as string[]) ?? [])].reverse();
   const list = (kind: RecordKind) =>
-    go(hubTab({ tab: "Products", product: ref, version, view: "Records", list: kind }));
+    go(hubTab({ tab: "Product 360", product: ref, version, view: "Records", list: kind }));
   const count = (kind: RecordKind, value: number, noun: string, dot = false) => (
     <button type="button" className="ac-link" onClick={() => list(kind)}>
       <strong>{value}</strong> {noun}
@@ -331,7 +331,7 @@ function ProductPage({
   );
   const active = chosenView(PRODUCT_VIEWS, place.view);
   const at = (next: Partial<HubPlace>, how: "push" | "replace" = "push") =>
-    go(hubTab({ ...place, version, ...next, tab: "Products" }), how);
+    go(hubTab({ ...place, version, ...next, tab: "Product 360" }), how);
   if (!view)
     return (
       <Panel title="The product" source={light}>
@@ -349,8 +349,8 @@ function ProductPage({
             <DeviceIcon kind={deviceKind(info.name)} size={64} decorative />
             <div className="uw-ph-headmain">
               <p className="ac-eyebrow">
-                <button type="button" className="ac-link" onClick={() => go("Products")}>
-                  Products
+                <button type="button" className="ac-link" onClick={() => go("Product 360")}>
+                  Product 360
                 </button>{" "}
                 · {info.product_family ?? info.product_identifier}
               </p>
@@ -415,12 +415,113 @@ function ProductPage({
         )}
         {active === "Version story" &&
           (selected ? (
-            <ProductVersionStory productId={String(info.id)} versionId={String(selected.id)} />
+            <VersionStory productId={String(info.id)} version={selected} at={at} />
           ) : (
             <p className="ac-muted">No versions recorded, so there is no version story.</p>
           ))}
       </Tabs>
     </>
+  );
+}
+
+/** The version story (spec 3.3): the same read as the classic ProductVersionStory (/versions/{id}/story), as flat
+ * cards: the release, then its complaints, the investigations holding one of them and their evidence (G-2). */
+export function VersionStory({
+  productId,
+  version,
+  at,
+}: {
+  productId: string;
+  version: Row;
+  at: (next: Partial<HubPlace>, how?: "push" | "replace") => void;
+}) {
+  const openRecord = useRecordOpener();
+  const story = useResource<Row>(
+    `/api/v1/products/${encodeURIComponent(productId)}/versions/${encodeURIComponent(String(version.id))}/story`,
+  );
+  const data = story.data;
+  const name = version.version_identifier;
+  if (!data || data.status === "NOT_FOUND")
+    return (
+      <Panel title={`The story of ${name}`} source={story}>
+        {data && <p className="ac-muted">This version is not available in your organization.</p>}
+      </Panel>
+    );
+  const release: Row = data.version ?? {};
+  const cards: Array<[string, number, Row[], (row: Row) => { ref: string; text: string }, RecordKind | null]> = [
+    [
+      "Complaints",
+      data.counts?.complaints ?? 0,
+      data.complaints ?? [],
+      (row) => recordLine("complaints", row),
+      "complaints",
+    ],
+    [
+      `Investigations with a complaint on ${name}`,
+      data.counts?.investigations ?? 0,
+      data.investigations ?? [],
+      (row) => recordLine("investigations", row),
+      "investigations",
+    ],
+    [
+      "Evidence in those investigations",
+      data.counts?.evidence ?? 0,
+      data.evidence ?? [],
+      (row) => ({
+        ref: row.evidence_identifier ?? row.business_id,
+        text: [row.title, row.reliability_status].filter(Boolean).join(" · "),
+      }),
+      null,
+    ],
+  ];
+  return (
+    <section className="uw-ph-section" aria-label={`The story of ${name}`}>
+      <p className="ac-muted">
+        {[
+          `${name} · ${release.lifecycle_status ?? "lifecycle not recorded"}`,
+          release.release_timestamp ? `released ${formatDay(release.release_timestamp)}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        . MDARIX lists what was recorded; it does not infer a cause.
+      </p>
+      <ul className="uw-ph-tiles">
+        {cards.map(([title, count, rows, line, kind]) => (
+          <li key={title} className="uw-ph-tile">
+            <div className="uw-ph-tile-head">
+              <h3>{title}</h3>
+              <span className="uw-ph-tile-count">{count}</span>
+            </div>
+            {rows.length ? (
+              <ul>
+                {rows.slice(0, 3).map((row) => {
+                  const shown = line(row);
+                  return (
+                    <li key={shown.ref}>
+                      {kind ? (
+                        <button type="button" className="ac-link" onClick={() => openRecord(kind, row)}>
+                          {shown.ref}
+                        </button>
+                      ) : (
+                        <strong>{shown.ref}</strong>
+                      )}
+                      {shown.text && <small>{shown.text}</small>}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="ac-muted">None recorded for {name}</p>
+            )}
+            {kind && count > 3 && (
+              <button type="button" className="ac-link" onClick={() => at({ view: "Records", list: kind })}>
+                See all on Records
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

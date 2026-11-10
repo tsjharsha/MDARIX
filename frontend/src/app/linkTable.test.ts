@@ -503,27 +503,25 @@ describe("the new navigation (stage 7, 0.10.68)", () => {
   });
 
   it("opens a former Products link on Product 360 on the new navigation, Readiness on the classic (P360-14)", () => {
-    expect(routeFor("Products", undefined, "mvp", "new")).toEqual({ section: "Product 360", tab: "Products" });
-    expect(routeFor("Products", "Configuration", "mvp", "new")).toEqual({ section: "Product 360", tab: "Products" });
+    expect(routeFor("Products", undefined, "mvp", "new")).toEqual({ section: "Product 360", tab: "Product 360" });
+    expect(routeFor("Products", "Configuration", "mvp", "new")).toEqual({ section: "Product 360", tab: "Product 360" });
     expect(OLD_VIEWS.products).toEqual(["Products"]);
     expect(routeFor("Products", undefined, "mvp", "classic").section).toBe("Readiness");
-    expect(routeFor("Product 360", "Suppliers?supplier=SAMPLE-SUP-B", "mvp", "new")).toEqual({
+    expect(routeFor("Product 360", "Supplier 360?supplier=SAMPLE-SUP-B", "mvp", "new")).toEqual({
       section: "Product 360",
-      tab: "Suppliers?supplier=SAMPLE-SUP-B",
+      tab: "Supplier 360?supplier=SAMPLE-SUP-B",
     });
     expect((NEW_RECORD_PLACES as Record<string, unknown>).product).toEqual({
       section: "Product 360",
-      tab: "Products",
+      tab: "Product 360",
       param: "product",
     });
   });
 
   it("puts no setting on a daily screen (7.7)", () => {
-    // Product 360's "Products" tab is the product list, not Settings › Products (the product settings).
-    expect(NEW_PLACES["Product 360"].tabs).toEqual(["Products", "Suppliers"]);
-    const daily = NEW_MENU.main
-      .filter((section) => section !== "Product 360")
-      .flatMap((section) => NEW_PLACES[section].tabs);
+    // Work › Products' tabs are Product 360 and Supplier 360 (owner, 10 Nov 2026): no clash with Settings › Products.
+    expect(NEW_PLACES["Product 360"].tabs).toEqual(["Product 360", "Supplier 360"]);
+    const daily = NEW_MENU.main.flatMap((section) => NEW_PLACES[section].tabs);
     for (const setting of [
       "Review settings",
       "Reporting windows",
