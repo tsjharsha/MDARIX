@@ -986,6 +986,34 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         ],
       },
       {
+        id: "challenge",
+        title: "Challenge: drafts and questions from your records",
+        where: "Investigations › Intelligence › Challenge",
+        purpose:
+          "MDARIX drafts competing explanations from the records the investigation links (complaints, lots, versions, changes, suppliers) and asks the questions a reviewer would ask. Drafts are explanations to test, never findings: they are listed in rule order, never ranked, and each says which rule drew it.",
+        tasks: [
+          {
+            title: "Adopt or dismiss a draft",
+            who: "Quality Investigator, Leader.",
+            steps: [
+              "Read each draft's Records for, Records against and Missing; every record opens where MDARIX shows it.",
+              "Choose Adopt as a hypothesis and tick the facts that become record summaries (unreviewed evidence, reviewed like any other), or choose Dismiss and say why the records speak against it.",
+              '"You may already have this" points to a hypothesis you recorded about the same thing; MDARIX never merges them.',
+            ],
+          },
+          {
+            title: "Answer the challenge questions",
+            who: "The brief's author.",
+            steps: [
+              "Answer each question, or mark it Not applicable with a reason.",
+              "Material questions (marked) block Submit for review until answered; the others are warnings.",
+            ],
+            result:
+              "The answers and every record the brief relies on (its Sources) are part of the brief content, so the decision maker's signature covers them.",
+          },
+        ],
+      },
+      {
         id: "ask",
         title: "Ask MDARIX",
         where: "Investigations › Ask MDARIX",
@@ -1182,6 +1210,32 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             steps: [
               "Choose Return to the investigator and write what is missing. This is not a decision and needs no signature.",
             ],
+          },
+        ],
+      },
+      {
+        id: "did-it-work",
+        title: "Did it work?",
+        where:
+          "Investigations › Decision (Decisions & actions on the new navigation), Records › Effectiveness checks and a version's story on Products",
+        purpose:
+          "After the decision is signed: the later complaints with the same problem on the same versions, and for each action date (a CAPA, a field action's effective date, a new version) the counts before and after, by version and by the lots released before and after it. Counts from your records, never a verdict: only your signed effectiveness check says an action worked.",
+        tasks: [
+          {
+            title: "Read the before and after",
+            steps: [
+              "Each row says Too early, Too few to tell, Fewer, More, No change seen, or Counts only when units are unknown.",
+              "The Denominator column says where the units came from (shipped, else released) or Units unknown for some lots: then no rate is shown, only counts by calendar days.",
+              "Complaints with no version or no lot are listed apart, never put under a version. Open Limits of these counts before you judge.",
+            ],
+          },
+          {
+            title: "When MDARIX asks for an impact assessment",
+            steps: [
+              "Once an hour MDARIX checks the signed decision: a CAPA signed not effective, More after an action, complaints again after a CAPA was signed effective, the problem on the new version, a complaint on a lot a field action covered, or a later death or serious injury.",
+              "Each opens one impact assessment and a task for the investigation owner. Conclude it as for late evidence: No impact, or Material impact (the investigation reopens and a new decision supersedes the signed one).",
+            ],
+            note: "MDARIX never reopens or changes a signed decision by itself.",
           },
         ],
       },

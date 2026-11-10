@@ -99,6 +99,23 @@ def test_nothing_signed_reads_no_decision(trial):
     assert body["decision"] is None and body["notice"].startswith("Counts from your records; not a verdict")
 
 
+def test_the_sample_decision_signed_today_reads_too_early_with_no_later_complaints(trial):
+    """B5-D10: signing stops the sample clock and the sample seeds no after-action complaints, so SAMPLE-CAPA-02 reads
+    "Too early" with nothing after the decision (step 13 sample check)."""
+    decision_id = _sign(trial, datetime.now(timezone.utc))
+    try:
+        body = _read(trial)
+        assert body["later"]["count"] == 0 and body["later"]["version_unknown"]["count"] == 0
+        (action,) = body["actions"]
+        assert action["ref"] == "SAMPLE-CAPA-02" and action["measured_from"] == "decision"
+        assert [row["result"] for row in action["by_version"]] == ["TOO_EARLY"]
+    finally:
+        with SessionLocal() as db:
+            bind_tenant(db, trial["tenant_id"])
+            db.query(Decision).filter(Decision.id == decision_id).delete()
+            db.commit()
+
+
 def test_the_signed_decision_reads_its_scope_and_the_capa_is_too_early(trial):
     _sign(trial, datetime.now(timezone.utc) - timedelta(days=20))
     body = _read(trial)

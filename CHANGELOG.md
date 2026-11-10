@@ -63,6 +63,10 @@ not built yet, and the chain is re-ordered at the release join). The API and web
   denominator or "units unknown for X of Y lots", and opens its complaints; version-unknown and lot-unknown complaints
   are listed apart; the limits are always one click away; per-lot rows only when the server sends them (a trial).
   Hidden while the session says `closed_loop` is off.
+- User guide: "Challenge: drafts and questions from your records" (Investigations › Intelligence › Challenge) and
+  "Did it work?" (how to read the words and the denominator; what the hourly triggers ask of a person).
+- Sample: once the sample decision is signed, Did it work? on SAMPLE-CAPA-02 reads "Too early" with no later
+  complaints; no after-action complaints are seeded (B5-D10).
 
 ## [0.10.97] - not released yet (after the WHIF freeze)
 
