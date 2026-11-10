@@ -646,6 +646,9 @@ function ComposedSections({ version }: { version: BriefVersion }) {
               </li>
             )}
             {Array.isArray(scope.product_versions) && <li>Product versions: {scope.product_versions.length}</li>}
+            {Number(scope.unknown_version_count) > 0 && (
+              <li>Complaints with no known version: {String(scope.unknown_version_count)}</li>
+            )}
             {Array.isArray(scope.included_complaints) && (
               <li>Complaints in scope: {scope.included_complaints.length}</li>
             )}

@@ -236,11 +236,14 @@ def test_scope_warnings_for_versions_and_dates():
     ]
     warnings = scope.scope_warnings(complaints, [v1], date(2026, 1, 1), date(2026, 2, 1))
     assert warnings == [
+        # PV-1 F10: a complaint with an unknown version is counted, never hidden.
+        "1 included complaint has no product version",
         "CMP000001 is dated 2026-03-01, after the scope ends (2026-02-01)",
         "CMP000002 is on a product version outside the chosen versions",
         "CMP000002 is dated 2025-12-01, before the scope starts (2026-01-01)",
     ]
-    assert scope.scope_warnings(complaints, [], None, None) == []
+    assert scope.scope_warnings(complaints, [], None, None) == ["1 included complaint has no product version"]
+    assert scope.scope_warnings(complaints[:2], [], None, None) == []
 
 
 def test_the_creator_of_a_version_is_named():

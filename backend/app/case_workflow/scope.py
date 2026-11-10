@@ -130,6 +130,10 @@ def scope_warnings(complaints: list[dict], version_ids, date_from, date_to) -> l
     versions = set(id_list(version_ids))
     start, end = _as_date(date_from), _as_date(date_to)
     warnings: list[str] = []
+    # PV-1 F10: complaints with an unknown version are counted, never hidden behind the chosen versions.
+    unknown = sum(1 for complaint in complaints if as_uuid(complaint.get("product_version_id")) is None)
+    if unknown:
+        warnings.append(f"{unknown} included complaint{'s have' if unknown > 1 else ' has'} no product version")
     for complaint in complaints:
         label = complaint.get("label") or "A complaint"
         version = as_uuid(complaint.get("product_version_id"))
@@ -492,6 +496,23 @@ def check_references(db: Session, case, data: dict) -> list[dict]:
         }
         if len(found) != len(ids):
             raise refuse(422, code, f"Every {label} must be one of your organization's records")
+    lots = id_list(data.get("lot_ids"))
+    # PV-1 F9: a lot of another product is refused; a lot whose version is unknown stays allowed.
+    if (
+        lots
+        and db.query(LotBatch.id)
+        .join(
+            ProductVersion,
+            (ProductVersion.tenant_id == LotBatch.tenant_id) & (ProductVersion.id == LotBatch.product_version_id),
+        )
+        .filter(
+            LotBatch.tenant_id == tenant_id,
+            LotBatch.id.in_([uuid.UUID(item) for item in lots]),
+            ProductVersion.product_id != case.product_id,
+        )
+        .first()
+    ):
+        raise refuse(422, "LOT_NOT_FOR_PRODUCT", "Every lot must be a lot of this investigation's product")
     return [
         {
             "id": complaint_id,

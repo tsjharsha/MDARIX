@@ -96,3 +96,52 @@ def test_a_one_version_case_keeps_its_version_and_the_legacy_brief_stores_it(org
         brief = BriefService().generate(db, org["tenant_id"], uuid.UUID(case["id"]), BriefCreateRequest())
         assert brief["provenance"]["product_version_id"] == seed["version_a"]
         db.rollback()
+
+
+def test_a_scope_lot_of_another_product_is_refused(org):  # F9
+    from backend.app.db.models.foundation import LotBatch
+    from tests.test_case_workflow import REASON, _code, _put_scope
+
+    investigator, _ = org["investigator"]
+    seed = _seed(org["tenant_id"])
+    case = _open(investigator, seed, seed["complaints"][:2])
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        bind_tenant(db, org["tenant_id"])
+        foreign = LotBatch(
+            id=uuid.uuid4(),
+            tenant_id=org["tenant_id"],
+            lot_identifier=f"PV-L-{uuid.uuid4().hex[:8]}",
+            product_version_id=uuid.UUID(seed["other_version"]),
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(foreign)
+        db.commit()
+        foreign_id = str(foreign.id)
+    refused = _put_scope(investigator, case["id"], lot_ids=[foreign_id], change_reason=REASON)
+    assert refused.status_code == 422 and _code(refused) == "LOT_NOT_FOR_PRODUCT", refused.text
+    kept = _put_scope(
+        investigator,
+        case["id"],
+        lot_ids=[seed["lot_id"]],
+        included_complaint_ids=seed["complaints"][:2],
+        change_reason=REASON,
+    )
+    assert kept.status_code == 200, kept.text
+
+
+def test_the_brief_scope_counts_the_complaints_of_unknown_version(org):  # F10
+    from backend.app.case_workflow import scope
+    from backend.app.db.models.foundation import Investigation
+    from backend.app.decision_brief.compose import scope_section
+
+    investigator, _ = org["investigator"]
+    seed = _seed(org["tenant_id"])
+    unknown = _unknown_version_complaints(org["tenant_id"], seed["product_id"])
+    case = _open(investigator, seed, [*seed["complaints"][:2], *unknown])
+    with SessionLocal() as db:
+        bind_tenant(db, org["tenant_id"])
+        row = db.get(Investigation, uuid.UUID(case["id"]))
+        section = scope_section(db, row, scope.current_scope(db, row))
+    assert section["included_count"] == 4 and section["unknown_version_count"] == 2

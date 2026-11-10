@@ -59,6 +59,9 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - An investigations import refuses complaints of another product and a change of a held investigation's product; a
   CAPA naming an investigation must name the investigation's product. A re-upload that changes the product or version
   of a risk, requirement, investigation or CAPA is kept in the history of field changes, like a complaint's.
+- A case scope refuses a lot of another product (422 `LOT_NOT_FOR_PRODUCT`; a lot with an unknown version is still
+  allowed). Saving a scope warns "N included complaints have no product version", and the decision brief's scope
+  section counts them (`unknown_version_count`, shown as "Complaints with no known version").
 
 ### Security
 

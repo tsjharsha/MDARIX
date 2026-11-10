@@ -127,6 +127,10 @@ def scope_section(db: Session, case, data: dict) -> dict:
         "version": data.get("version") or 0,
         "question": data.get("question"),
         "included_count": len(included),
+        # PV-1 F10: the included complaints whose version is not known, so "Versions: Rev D" is never read as all.
+        "unknown_version_count": sum(
+            1 for item in included if (row := complaints.get(str(item))) is not None and row.product_version_id is None
+        ),
         "included": [complaint(item) for item in included[:COMPLAINTS_MAX]],
         "excluded_count": len(excluded),
         "excluded": [
