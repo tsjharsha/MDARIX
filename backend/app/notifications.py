@@ -975,6 +975,11 @@ def _handle_event(db: Session, event_name: str, payload: dict) -> bool:
     if event_name in WORK_EVENTS:
         _work_notice(db, event_name, payload, emailer)
         return True
+    from backend.app.oversight import urgent_alert
+
+    if event_name in urgent_alert.EVENTS:
+        urgent_alert.deliver(db, event_name, payload, emailer)
+        return True
     if event_name == CONNECTOR_SYNC_FAILED:
         _connector_failed(db, payload, emailer)
         return True

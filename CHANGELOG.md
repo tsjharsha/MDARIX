@@ -81,6 +81,12 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   `attachment_quota_mb`, 100 MB by default; a free trial keeps 100 MB), and evidence, supplier and Case files count
   against it together. The same route switches the urgent e-mail alert (`urgent_email`). Both audited
   `OVERSIGHT_SETTINGS_CHANGED`.
+- The urgent e-mail alert, opt-in per organization (off by default): "An urgent case (URG-…) was received at 14:20
+  Asia/Kolkata. Open MDARIX to see it." No product, words or patient data. Queued at once through the notifications
+  outbox (its delivery record: attempts, retries, dead-letter) for an urgent Case, a Case escalated with a death or
+  serious injury, and a triage that reopens on one; to the escalation role and the Triage Leads, once per item per
+  person. People without an address are recorded in `URGENT_EMAIL_QUEUED`. One reminder when the fast-track
+  acknowledgement is overdue. A failed e-mail never cancels the in-app escalation.
 
 ### Changed
 

@@ -728,6 +728,9 @@ def sweep(db: Session, control_db: Session | None, tenant_id, now: datetime | No
         row = OversightSettings(id=uuid.uuid4(), tenant_id=tenant_id, updated_at=now)
         db.add(row)
     row.swept_at = now
+    from backend.app.oversight import urgent_alert
+
+    urgent_alert.remind_overdue(db, control_db, tenant_id, now)  # B7 (UA-04): one reminder e-mail, when opted in
     db.flush()
     return {"raised": raised, "resolved": resolved}
 

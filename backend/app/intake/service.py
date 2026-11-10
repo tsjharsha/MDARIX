@@ -1742,6 +1742,21 @@ def escalate_case(
     )
     if record_owner == "EXTERNAL":
         ensure_qms_id_task(db, tenant_id, event, actor, now)
+    if check is not None and rules.answer_of(check.answers or {}, "Q5") == rules.YES:
+        # B7 (spec 5): a death or serious injury reaches the fast track: the opt-in urgent e-mail (audit_db is the
+        # control session at both callers).
+        from backend.app.oversight import urgent_alert
+
+        urgent_alert.queue(
+            db,
+            audit_db,
+            tenant_id,
+            reference=event.reference,
+            subject_id=event.id,
+            received_at=event.received_at,
+            actor=actor,
+            correlation_id=correlation_id,
+        )
     return complaint
 
 
@@ -2024,6 +2039,19 @@ def reopen_raised(db: Session, control_db, tenant_id, actor, now, correlation_id
                 )
             )
             reopened.append(item["ref"])
+            if trigger in ("DEATH", "SERIOUS_INJURY"):  # B7 (UA-05): the opt-in urgent e-mail
+                from backend.app.oversight import urgent_alert
+
+                urgent_alert.queue(
+                    db,
+                    control_db,
+                    tenant_id,
+                    reference=item["ref"],
+                    subject_id=uuid.UUID(member_id),
+                    received_at=now,
+                    actor=actor,
+                    correlation_id=correlation_id,
+                )
             if kind == COMPLAINT:
                 # B7 (RT-26): a complaint MDARIX closed reopens with its triage; the closure is superseded.
                 from backend.app.complaint_disposition.resolve import reopen_closed

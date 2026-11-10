@@ -1168,6 +1168,24 @@ def send_trial_request_declined(recipient: str, *, display_name: str, organizati
 # ------------------------------------------------------------------------------------------- workspace work
 
 
+def send_urgent_case_alert(
+    recipient: str, *, organization: str, reference: str, received: str | None, reminder: bool = False
+) -> str:
+    """B7 (spec 5): an urgent case arrived, open MDARIX. Only the reference and the time: never a product, the
+    reporter's words or patient data; the link needs sign-in and MFA."""
+    at = f" at {received}" if received else ""
+    return _send(
+        recipient,
+        Message(
+            subject="MDARIX: urgent case not acknowledged" if reminder else "MDARIX: urgent case received",
+            heading="An urgent case still waits for acknowledgement" if reminder else "An urgent case was received",
+            paragraphs=(f"An urgent case ({reference}) was received{at}. Open MDARIX to see it.",),
+            button=("Open MDARIX", _app_link("Complaints", "Triage")),
+            reason=_work_reason(organization),
+        ),
+    )
+
+
 def _work_reason(organization: str) -> str:
     return f"You are receiving this email because of your work in MDARIX for {organization}."
 

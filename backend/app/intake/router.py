@@ -1027,6 +1027,18 @@ def log_intake(
             flow=flow,
             correlation_id=ctx.correlation_id,
         )
+        from backend.app.oversight import urgent_alert
+
+        urgent_alert.queue(
+            db,
+            control_db,
+            tenant_id,
+            reference=event.reference,
+            subject_id=event.id,
+            received_at=event.received_at,
+            actor=ctx.user_id,
+            correlation_id=ctx.correlation_id,
+        )
     flags = rules.intake_flags(kind, words, answers)
     db.add(
         make_audit_event(
