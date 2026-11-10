@@ -64,6 +64,10 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
 - New tests ask, as one organization and under row-level security, for another organization's complaints,
   investigations, evidence and its download, CAPAs, exports, audit trail and signed decisions, by id, through list
   filters and through every export: each answer is a refusal or holds none of the other organization's data.
+- New screen tests show that markup typed or imported into a complaint, an imported record or an evidence record's
+  name appears as text on the complaint page, triage, the imported backlog and the case's evidence, never as markup;
+  a test also fails if any screen starts writing raw HTML (the one reviewed, escaped exception is the public
+  questions page's structured data).
 
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 
