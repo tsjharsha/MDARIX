@@ -38,7 +38,7 @@ from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from communication.email.inbound import classify_inbound_event, verify_resend_webhook
-from object_storage.service import ObjectStorageService
+from object_storage.service import ObjectStorageService, StorageError, refused_upload
 from backend.app.access.permissions import AI_RUN, DATA_EXPORT, RECORDS_WRITE, require_permission
 
 logger = logging.getLogger("mdarix.stage3")
@@ -807,7 +807,10 @@ def upload_supplier_attachment(
         )
     filename = safe_filename(file.filename)
     # The stored key never contains the uploaded name, so a name cannot steer where the file is written.
-    metadata = ObjectStorageService().put(ctx.tenant_id, f"{request_id}-{uuid.uuid4().hex}", content)
+    try:
+        metadata = ObjectStorageService().put(ctx.tenant_id, f"{request_id}-{uuid.uuid4().hex}", content)
+    except StorageError as exc:
+        raise refused_upload(exc) from exc
     now = NOW()
     attachment = EvidenceAttachment(
         id=uuid.uuid4(),

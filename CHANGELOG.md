@@ -31,6 +31,8 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
   genealogy link, shipment), no longer every set-aside row that shares the first column.
 - When one address refuses a notification email, the retry sends it to that address only; the others are no longer
   emailed again on every retry.
+- An organization's file-storage quota counts only the files people upload, not the exports, reports and documents
+  MDARIX makes; an upload over the quota is refused with "storage is full" (413) instead of a server error.
 
 ### Security
 

@@ -15,6 +15,7 @@ from backend.app.db.tenant_scope import bind_system, bind_tenant
 from backend.app.trial import imports
 from outbox.worker import OutboxWorker
 from tests.test_customer_admin_account_security import _tenant
+from tests.test_evidence_workflow import PDF, _case, _internal, _unknown, org  # noqa: F401 (org is a fixture)
 from tests.test_notifications_delivery import _user
 
 pytestmark = pytest.mark.db
@@ -113,3 +114,17 @@ def test_a_retry_after_one_refused_address_emails_only_that_address(tenant_id, m
         db.commit()
         worker._deliver_one(db, event_id, stats)
         assert stats["published"] == 1 and sent == [good, bad]
+
+
+def test_an_upload_over_the_storage_quota_is_refused_with_413_not_500(org, monkeypatch):  # noqa: F811 (audit 15)
+    requester, colleague = org["investigator"][0], org["colleague"]
+    case = _case(org)
+    made = _internal(
+        case["id"], requester, recipient_user_id=colleague[1], unknown_id=_unknown(org["tenant_id"], case["id"])["id"]
+    )
+    base = f"/api/v1/evidence-requests/{made.json()['id']}"
+    assert colleague[0].post(f"{base}/acknowledge").status_code == 200
+    monkeypatch.setenv("MDARIX_OBJECT_STORAGE_TENANT_QUOTA_BYTES", "4")
+    refused = colleague[0].post(f"{base}/attachments", files={"file": ("batch-record.pdf", PDF, "application/pdf")})
+    assert refused.status_code == 413, refused.text
+    assert refused.json()["detail"]["code"] == "TENANT_STORAGE_QUOTA_EXCEEDED"

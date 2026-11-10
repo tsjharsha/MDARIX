@@ -35,6 +35,20 @@ class StorageError(RuntimeError):
     pass
 
 
+# Folders of files MDARIX makes itself (put(internal=True)): they do not count against an organization's upload quota.
+INTERNAL_FOLDERS = frozenset({"exports", "reports", "documents"})
+
+
+def refused_upload(exc: StorageError):
+    """The answer to an upload the store refused: 413 when the organization's storage is full, else 422; never 500."""
+    from fastapi import HTTPException
+
+    code = str(exc) if str(exc).replace("_", "").isalpha() and str(exc).isupper() else "STORAGE_REFUSED"
+    if code.endswith("QUOTA_EXCEEDED"):
+        return HTTPException(413, detail={"code": code, "message": "Your organization's file storage is full"})
+    return HTTPException(422, detail={"code": code, "message": "The file could not be stored"})
+
+
 def object_keyring(environ=None) -> keys.Keyring | None:
     """The current file key, its ID and the older keys still readable (from the environment, or ``environ``); None
     without a key."""
@@ -139,7 +153,13 @@ class ObjectStorageService:
     def _tenant_usage(self, tenant_id: str) -> int:
         if self.provider == "local":
             base = self.root / str(tenant_id)
-            return sum(p.stat().st_size for p in base.rglob("*") if p.is_file()) if base.exists() else 0
+            if not base.exists():
+                return 0
+            return sum(
+                p.stat().st_size
+                for p in base.rglob("*")
+                if p.is_file() and p.relative_to(base).parts[0] not in INTERNAL_FOLDERS
+            )
         return 0  # S3 quota is enforced by the durable attachment metadata layer.
 
     def _audit(self, action: str, tenant_id: str, object_key: str, **details):

@@ -912,7 +912,7 @@ def upload_evidence_request_attachment(
     """Store one file of a request (its requester, or the person or role asked). The checks are those of supplier
     attachments: permitted type, size, the organization's quota, the malware scan, and content matching its type.
     A plain ``def``: the database, the scan and the storage write all block."""
-    from object_storage.service import ObjectStorageService
+    from object_storage.service import ObjectStorageService, StorageError, refused_upload
 
     from backend.app.stage3_workflow_router import (
         ALLOWED_ATTACHMENT_TYPES,
@@ -949,7 +949,10 @@ def upload_evidence_request_attachment(
         raise error(415, "ATTACHMENT_CONTENT_MISMATCH", "The file content does not match its type")
     filename = safe_filename(file.filename)
     # The stored key never contains the uploaded name, so a name cannot steer where the file is written.
-    metadata = ObjectStorageService().put(str(tenant_id), f"{row.id}-{uuid.uuid4().hex}", content)
+    try:
+        metadata = ObjectStorageService().put(str(tenant_id), f"{row.id}-{uuid.uuid4().hex}", content)
+    except StorageError as exc:
+        raise refused_upload(exc) from exc
     now = now_utc()
     attachment = EvidenceAttachment(
         id=uuid.uuid4(),

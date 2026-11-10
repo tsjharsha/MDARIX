@@ -93,3 +93,20 @@ def test_each_window_counts_by_the_market_it_covers():  # audit 12
     assert india.day < us.day  # India counts the awareness day as day 1
     assert (found["India window"].due, found["India window"].market) == (india.day, "IN")
     assert (found["US window"].due, found["US window"].market) == (us.day, "US")
+
+
+def test_files_mdarix_makes_do_not_count_against_the_upload_quota(monkeypatch, tmp_path):  # audit 15
+    from object_storage.service import ObjectStorageService, StorageError, refused_upload
+
+    monkeypatch.setenv("MDARIX_OBJECT_STORAGE_TENANT_QUOTA_BYTES", "100")
+    storage = ObjectStorageService(root=str(tmp_path))
+    monkeypatch.setattr(storage, "scan", lambda *_: True)
+    for folder in ("exports", "reports", "documents"):
+        storage.put("t1", f"{folder}/big.bin", b"x" * 500, internal=True)
+    storage.put("t1", "upload-1", b"x" * 60)
+    with pytest.raises(StorageError) as full:
+        storage.put("t1", "upload-2", b"x" * 60)
+    assert (refused_upload(full.value).status_code, refused_upload(StorageError("Invalid key")).status_code) == (
+        413,
+        422,
+    )
