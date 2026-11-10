@@ -4,7 +4,14 @@ import { Empty, Panel } from "../../admin/console/charts";
 import { Tabs, useResource } from "../../customer-admin/shared";
 import { MonitorBand, StatusPill } from "../../shared/hero/HeroVisuals";
 import { formatDay } from "../../../app/dates";
-import { chooseCase, useIsTrial, useOpenInvestigation, useWorkspace } from "../workspaceContext";
+import {
+  chooseCase,
+  useIsTrial,
+  useOpenInvestigation,
+  useWorkspace,
+  type OpenInvestigationRequest,
+  type RequestedComplaint,
+} from "../workspaceContext";
 import { countOf } from "./common";
 import {
   Changes,
@@ -77,6 +84,31 @@ export function SupplierList({ go }: { go: Go }) {
   );
 }
 
+/**
+ * "Open an investigation" from a found pattern: every complaint of the pattern on the top version's product ticked (a
+ * case links its own product's complaints only), and where it came from, kept with the new case (its opening's audit
+ * reason). Null when the pattern names none of that product's complaints.
+ */
+export function patternRequest(box: Row, version: Row | undefined): OpenInvestigationRequest | null {
+  const ticked: RequestedComplaint[] = (box.complaints ?? [])
+    .filter((row: Row) => version && String(row.product_id) === String(version.product_id))
+    .map((row: Row) => ({
+      id: String(row.id),
+      business_id: row.business_id ?? null,
+      complaint_identifier: row.complaint_identifier ?? null,
+      description: row.description ?? null,
+    }));
+  if (!version || !ticked.length) return null;
+  const [complaint, ...also] = ticked;
+  return {
+    productId: String(version.product_id),
+    version: version.version_identifier,
+    complaint,
+    also,
+    openedFrom: `Opened from Supplier 360: pattern ${box.rule} v${box.rule_version}`,
+  };
+}
+
 /** The pattern box (spec 4.3, rule P-1 v1): the server's own words, the rule printed, never a confirmed signal. */
 export function PatternBox({ page, go }: { page: Row; go: Go }) {
   const box: Row = page.pattern;
@@ -85,8 +117,7 @@ export function PatternBox({ page, go }: { page: Row; go: Go }) {
   const covering: Row | undefined = box.investigations?.[0];
   const top: Row | undefined = box.found ? box.versions?.[0] : undefined;
   const version: Row | undefined = top && page.versions.find((item: Row) => item.version_id === top.version_id);
-  const complaint: Row | undefined =
-    top && page.complaints?.items?.find((row: Row) => row.product_version_id === top.version_id);
+  const request = patternRequest(box, version);
   return (
     <section className={`uw-ph-pattern${box.found ? "" : " is-quiet"}`} aria-label="Pattern to review">
       <h2>{box.found ? "Pattern to review" : "Patterns across versions"}</h2>
@@ -113,24 +144,9 @@ export function PatternBox({ page, go }: { page: Row; go: Go }) {
               <FileSearch size={15} aria-hidden="true" /> Open {covering.ref} (covers {covering.held} of these
               complaints)
             </button>
-          ) : openInvestigation && version && complaint ? (
+          ) : openInvestigation && request ? (
             // A person confirms on the investigation form; nothing is opened from here by itself.
-            <button
-              type="button"
-              className="ac-primary"
-              onClick={() =>
-                openInvestigation({
-                  productId: String(version.product_id),
-                  version: version.version_identifier,
-                  complaint: {
-                    id: String(complaint.id),
-                    business_id: complaint.business_id ?? null,
-                    complaint_identifier: complaint.complaint_identifier ?? null,
-                    description: null,
-                  },
-                })
-              }
-            >
+            <button type="button" className="ac-primary" onClick={() => openInvestigation(request)}>
               <FileSearch size={15} aria-hidden="true" /> Open an investigation
             </button>
           ) : (
@@ -194,8 +210,8 @@ export function SupplierPage({
         <MonitorBand label={`${supplier.name} at a glance`}>
           <div className="uw-ph-headmain">
             <p className="ac-eyebrow">
-              <button type="button" className="ac-link" onClick={() => go("Suppliers")}>
-                Suppliers
+              <button type="button" className="ac-link" onClick={() => go("Supplier 360")}>
+                Supplier 360
               </button>{" "}
               · {supplier.supplier_identifier}
             </p>

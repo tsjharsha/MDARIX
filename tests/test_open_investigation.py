@@ -44,6 +44,31 @@ def test_an_investigator_opens_a_case_and_works_on_it():
     assert any(row["id"] == body["id"] and row["owner_ref"] == body["owner_ref"] for row in listed)
 
 
+def test_a_case_keeps_where_it_was_opened_from():
+    """Owner, 10 Nov 2026: a case opened from a Supplier 360 pattern keeps its source as its opening's audit reason."""
+    from backend.app.db.models.foundation import AuditEvent
+
+    product_id, complaints, _ = _product_with_complaints()
+    made = _client_with_role("INVESTIGATOR").post(
+        "/api/v1/investigations",
+        json={
+            "product_id": product_id,
+            "investigation_question": "Why does the flow sensor read high on two versions?",
+            "complaint_ids": complaints,
+            "opened_from": "Opened from Supplier 360: pattern P-1 v1",
+        },
+    )
+    assert made.status_code == 201, made.text
+    with SessionLocal() as db:
+        bind_system(db, "test: the opening's audit event")
+        event = (
+            db.query(AuditEvent)
+            .filter(AuditEvent.entity_id == uuid.UUID(made.json()["id"]), AuditEvent.action == "INVESTIGATION_OPENED")
+            .one()
+        )
+    assert event.reason == "Opened from Supplier 360: pattern P-1 v1"
+
+
 def test_opening_a_case_is_checked():
     product_id, _, other_complaint = _product_with_complaints()
     question = "A question long enough to be accepted"

@@ -41,6 +41,9 @@ class OpenInvestigationRequest(BaseModel):
         default=None, min_length=3, max_length=60, pattern=r"^[A-Za-z0-9][A-Za-z0-9._/-]*$"
     )
     assign_to_me: bool = True
+    # Where the case was opened from (e.g. "Opened from Supplier 360: pattern P-1 v1"): kept as the reason of its
+    # INVESTIGATION_OPENED audit event, which the case's audit timeline shows. The opener's own words, like the question.
+    opened_from: str | None = Field(default=None, min_length=3, max_length=200)
 
 
 @router.post("", status_code=201, dependencies=[Depends(require_permission(RECORDS_WRITE))])
@@ -66,6 +69,7 @@ def open_investigation(
         owner_ref=owner,
         assigned_to_opener=owner is not None,
         actor_role=_acting_role(control_db, tenant_id, ctx.user_id),
+        opened_from=(payload.opened_from or "").strip() or None,
     )
     db.commit()
     result = {
@@ -103,6 +107,7 @@ def open_case(
     assigned_to_opener: bool | None = None,
     actor_role: str | None = None,
     with_lots: bool = False,
+    opened_from: str | None = None,
 ) -> tuple[Investigation, Product, list]:
     """Open a case for one of the tenant's products: checks the product and the complaints (all of that product),
     the identifier (generated when none is given; refused when taken), then writes the investigation, its complaint
@@ -111,7 +116,8 @@ def open_case(
     commit.
 
     The case starts IN_PROGRESS when the opener takes it (``assigned_to_opener``; by default when it has an owner),
-    else OPEN. Its priority (the signal's when opened from one, else MEDIUM) sets its due date."""
+    else OPEN. Its priority (the signal's when opened from one, else MEDIUM) sets its due date. ``opened_from`` (where
+    the case was opened from) is the reason of the INVESTIGATION_OPENED audit event."""
     from backend.app.case_workflow import scope as case_scope
     from backend.app.case_workflow import states as case_states
 
@@ -201,6 +207,7 @@ def open_case(
             action="INVESTIGATION_OPENED",
             entity_type="Investigation",
             entity_id=investigation.id,
+            reason=opened_from,
             details={
                 "identifier": identifier,
                 "product": product.product_identifier,

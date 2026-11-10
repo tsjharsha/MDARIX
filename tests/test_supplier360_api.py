@@ -241,6 +241,11 @@ def test_no_parts_two_suppliers_of_one_part_a_pattern_under_investigation_and_re
     )
     assert "not a confirmed signal" in box["text"]
     assert [(c["ref"], c["held"]) for c in box["investigations"]] == [("T-INV-42", 4)]
+    # Owner, 10 Nov 2026: the pattern names its complaints, each with its product, for "Open an investigation" to tick.
+    assert sorted(c["complaint_identifier"] for c in box["complaints"]) == [
+        f"T-{product}-{n}" for product in ("SAMPLE-ORBIT-300", "SAMPLE-PULSE-410") for n in range(2)
+    ]
+    assert len({c["product_id"] for c in box["complaints"]}) == 2
     flow = next(p for p in page["parts"] if p["component_identifier"] == "T-KS-1")
     assert {u["product_identifier"] for u in flow["used_in"]} == {"SAMPLE-ORBIT-300", "SAMPLE-PULSE-410"}
     # S360-04: both recorded suppliers of the control board are named on the part.

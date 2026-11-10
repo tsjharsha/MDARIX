@@ -290,6 +290,40 @@ def _problems(db, t, version_ids, since) -> list[dict]:
     ]
 
 
+# The open-case form takes at most 200 complaints (investigation_open_router.OpenInvestigationRequest).
+PATTERN_COMPLAINTS_MAX = 200
+
+
+def _pattern_complaints(db, t, box: dict, since) -> list[dict]:
+    """The complaints a found pattern speaks of (its problem code, on its versions, in the window), newest first, each
+    with its product: "Open an investigation" ticks those of one product, as a case links its own product's only."""
+    rows = db.execute(
+        text(
+            "SELECT id, business_id, complaint_identifier, description, product_id, product_version_id FROM complaints "
+            "WHERE tenant_id=:t AND product_version_id = ANY(CAST(:v AS uuid[])) AND problem_code=:p "
+            "AND event_timestamp >= :since ORDER BY event_timestamp DESC, complaint_identifier LIMIT :n"
+        ),
+        {
+            "t": t,
+            "v": [row["version_id"] for row in box["versions"]],
+            "p": box["problem"],
+            "since": since,
+            "n": PATTERN_COMPLAINTS_MAX,
+        },
+    ).mappings()
+    return [
+        {
+            "id": str(r["id"]),
+            "business_id": r["business_id"],
+            "complaint_identifier": r["complaint_identifier"],
+            "description": r["description"],
+            "product_id": str(r["product_id"]),
+            "version_id": str(r["product_version_id"]),
+        }
+        for r in rows
+    ]
+
+
 def _units(db, t, version_ids) -> dict[str, dict]:
     rows = db.execute(
         text(
@@ -518,6 +552,8 @@ def page(db: Session, t: str, ref: str, now: datetime | None = None) -> dict[str
         ],
         signals,
     )
+    if box["found"]:
+        box["complaints"] = _pattern_complaints(db, t, box, since)
     trend = links.monthly(db, t, versions, now)
     start = trend["months"][0] if trend["months"] else None
     for part in parts:

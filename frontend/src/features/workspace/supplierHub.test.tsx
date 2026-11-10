@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import { ProductHubSection } from "./sections/ProductHub";
-import { supplierViews } from "./sections/SupplierHub";
+import { patternRequest, supplierViews } from "./sections/SupplierHub";
 import { PERSONA_TABS, shownTabs, tabOfSection, visibleTabs } from "./HybridShell";
 
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
@@ -114,7 +114,7 @@ describe("the supplier list", () => {
         open_investigations: 1,
       },
     ];
-    const html = render(<ProductHubSection />, api("Suppliers"));
+    const html = render(<ProductHubSection />, api("Supplier 360"));
     expect(html).toContain("Kestrel Sensors");
     expect(html).toContain("From SAP S/4");
     expect(html).toContain("2 · 3");
@@ -128,7 +128,7 @@ describe("one supplier's page", () => {
       case: "ONE_VERSION",
       text: "NovaSense parts are in 1 product version: OrbitCare 300 Rev B. ... No other product or version uses these parts, so a cross-product pattern cannot be seen.",
     });
-    const html = render(<ProductHubSection />, api("Suppliers?supplier=SAMPLE-SUP-B"));
+    const html = render(<ProductHubSection />, api("Supplier 360?supplier=SAMPLE-SUP-B"));
     expect(html).toContain("<h1");
     expect(html).toContain("Patterns across versions");
     expect(html).toContain("a cross-product pattern cannot be seen");
@@ -144,21 +144,42 @@ describe("one supplier's page", () => {
       case: "PATTERN",
       text: "Pattern to review: pressure reading high on 2 versions of 2 products that contain Kestrel parts. This is a pattern to review, not a confirmed signal.",
       versions: [{ version_id: "v-b", product: "OrbitCare 300", version: "Rev B", recent: 3 }],
+      complaints: [{ id: "c1", complaint_identifier: "SAMPLE-RV-01", product_id: "p1", version_id: "v-b" }],
     };
     resources.data[PATH] = page(found);
-    const html = render(<ProductHubSection />, api("Suppliers?supplier=SAMPLE-SUP-B"));
+    const html = render(<ProductHubSection />, api("Supplier 360?supplier=SAMPLE-SUP-B"));
     expect(html).toContain("Pattern to review");
     expect(html).toContain("not a confirmed signal");
     expect(html).toContain("Open an investigation");
     resources.data[PATH] = page({ ...found, investigations: [{ ref: "INV-0042", held: 12 }] });
-    expect(render(<ProductHubSection />, api("Suppliers?supplier=SAMPLE-SUP-B"))).toContain(
+    expect(render(<ProductHubSection />, api("Supplier 360?supplier=SAMPLE-SUP-B"))).toContain(
       "Open INV-0042 (covers 12 of these complaints)",
     );
   });
 
+  it("ticks all the pattern's complaints of the product and records where the case came from (owner, 10 Nov 2026)", () => {
+    const version = { version_id: "v-b", version_identifier: "Rev B", product_id: "p1" };
+    const complaints = [
+      { id: "c1", complaint_identifier: "RV-01", description: "Reads high", product_id: "p1", version_id: "v-b" },
+      { id: "c2", complaint_identifier: "RV-02", description: null, product_id: "p1", version_id: "v-a" },
+      { id: "c9", complaint_identifier: "PW-09", description: null, product_id: "p2", version_id: "v-x" },
+    ];
+    const request = patternRequest(box({ found: true, complaints }), version);
+    expect(request).toMatchObject({
+      productId: "p1",
+      version: "Rev B",
+      openedFrom: "Opened from Supplier 360: pattern P-1 v1",
+    });
+    expect([request!.complaint, ...request!.also!].map((item) => item.id)).toEqual(["c1", "c2"]);
+    expect(request!.complaint.description).toBe("Reads high");
+    // Another product's complaints only: nothing to open here (a case links its own product's complaints).
+    expect(patternRequest(box({ found: true, complaints: complaints.slice(2) }), version)).toBeNull();
+    expect(patternRequest(box({ found: true, complaints }), undefined)).toBeNull();
+  });
+
   it("names SCAR as a later release, nothing more (S360-12)", () => {
     resources.data[PATH] = page({ case: "ONE_VERSION", text: "One version." });
-    const html = render(<ProductHubSection />, api("Suppliers?supplier=SAMPLE-SUP-B&view=CAPAs"));
+    const html = render(<ProductHubSection />, api("Supplier 360?supplier=SAMPLE-SUP-B&view=CAPAs"));
     expect(html).toContain("Supplier corrective action requests (SCAR): planned for a later release.");
     expect(html).not.toMatch(/>\s*(Raise|Send|Create) (a )?SCAR/i);
   });
@@ -167,10 +188,13 @@ describe("one supplier's page", () => {
     expect(supplierViews(true)).toContain("Lots");
     expect(supplierViews(false)).not.toContain("Lots");
     resources.data[PATH] = page({ case: "ONE_VERSION", text: "One version." });
-    const pilot = render(<ProductHubSection />, api("Suppliers?supplier=SAMPLE-SUP-B&view=Lots", { isTrial: false }));
+    const pilot = render(
+      <ProductHubSection />,
+      api("Supplier 360?supplier=SAMPLE-SUP-B&view=Lots", { isTrial: false }),
+    );
     expect(pilot).not.toMatch(/role="tab"[^>]*>Lots</);
     expect(pilot).not.toContain("Lot genealogy not imported");
-    const trial = render(<ProductHubSection />, api("Suppliers?supplier=SAMPLE-SUP-B"));
+    const trial = render(<ProductHubSection />, api("Supplier 360?supplier=SAMPLE-SUP-B"));
     expect(trial).toMatch(/role="tab"[^>]*>Lots</);
   });
 });

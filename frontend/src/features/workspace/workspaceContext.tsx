@@ -176,12 +176,18 @@ export type CaseLinkState = { id: string; state: "resolving" | "applied" | "not-
 export type OpenInvestigationRequest = {
   productId: string;
   version: string | null;
-  complaint: {
-    id: string;
-    business_id: string | null;
-    complaint_identifier: string | null;
-    description: string | null;
-  };
+  complaint: RequestedComplaint;
+  /** More complaints of the same product to tick (a Supplier 360 pattern's). */
+  also?: RequestedComplaint[];
+  /** Where it was opened from, kept with the new case ("Opened from Supplier 360: pattern P-1 v1"). */
+  openedFrom?: string;
+};
+
+export type RequestedComplaint = {
+  id: string;
+  business_id: string | null;
+  complaint_identifier: string | null;
+  description: string | null;
 };
 
 export type WorkspaceApi = {
