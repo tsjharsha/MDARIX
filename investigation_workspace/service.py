@@ -108,10 +108,14 @@ class InvestigationWorkspaceService:
         if investigation is None:
             raise InvestigationWorkspaceError("INVESTIGATION_NOT_FOUND", "Investigation not found")
 
+        from backend.app.case_workflow import scope as case_scope
+
+        # PV-1 F3: the version asked for, or the case's one version; never a version nobody recorded.
+        scope = case_scope.current_scope(db, investigation)
         product_version_id = (
             str(request.product_version_id)
             if request.product_version_id
-            else self._select_product_version_id(db, request.tenant_id, investigation.id)
+            else case_scope.single_version(db, investigation, scope)
         )
         if product_version_id:
             version = (
@@ -128,6 +132,20 @@ class InvestigationWorkspaceService:
                     "PRODUCT_VERSION_NOT_FOUND", "ProductVersion is not available for this investigation product"
                 )
         product_context = self._product_context(investigation, product_version_id, request, data_plane_engine)
+        product_context["scope_product_version_ids"] = scope["product_version_ids"]
+        if not product_version_id:
+            product_context["limitations"] = [
+                *product_context["limitations"],
+                {
+                    "code": "VERSION_UNKNOWN",
+                    "severity": "WARNING",
+                    "description": (
+                        "The case has no single known product version (unknown, or several): the context is the whole "
+                        "product, with no bill of materials."
+                    ),
+                    "product_version_ids": scope["product_version_ids"],
+                },
+            ]
         relationship_context = self._relationship_context(db, request.tenant_id, investigation.id)
         evidence_context = self._evidence_context(
             db, request.tenant_id, investigation, request.temporal_mode, request.as_of
@@ -176,6 +194,7 @@ class InvestigationWorkspaceService:
             mode=request.temporal_mode,
             tenant_id=str(request.tenant_id),
             db_engine=data_plane_engine,
+            pick_version=False,
         )
         return {
             "product": view.product,
@@ -451,21 +470,3 @@ class InvestigationWorkspaceService:
             }
         )
         return limitations
-
-    def _select_product_version_id(self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID) -> str | None:
-        """The version most of the case's complaints concern (ties: the one with the latest complaint).
-
-        A case can include a few baseline complaints from an older version; the earliest complaint would pick that
-        older version and hide the evidence about the version under investigation.
-        """
-        value = db.execute(
-            text(
-                "SELECT c.product_version_id FROM investigation_complaints ic "
-                "JOIN complaints c ON c.tenant_id=ic.tenant_id AND c.id=ic.complaint_id "
-                "WHERE ic.tenant_id=:tenant_id AND ic.investigation_id=:investigation_id AND c.product_version_id IS NOT NULL "
-                "GROUP BY c.product_version_id "
-                "ORDER BY count(*) DESC, max(c.event_timestamp) DESC NULLS LAST LIMIT 1"
-            ),
-            {"tenant_id": tenant_id, "investigation_id": investigation_id},
-        ).scalar_one_or_none()
-        return str(value) if value else None

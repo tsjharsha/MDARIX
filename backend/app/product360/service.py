@@ -169,6 +169,7 @@ class Product360Service:
         tenant_id: str | None = None,
         db_engine=None,
         light: bool = False,
+        pick_version: bool = True,
     ) -> Product360Response:
         """The product's page. ``light`` (W1) leaves out the complaint rows, evidence, failure modes, controls and the
         timeline, and gives their counts in ``overview`` instead: the read for the Product 360 page at any size."""
@@ -191,7 +192,8 @@ class Product360Service:
                 .all()
             )
             visible_versions = self.filter_rows_by_time(versions, as_of, mode, "release_timestamp")
-            selected = self.select_version(versions, version_id, as_of)
+            # PV-1 F3: a caller that knows the version is unknown (a case workspace) never gets one picked for it.
+            selected = self.select_version(versions, version_id, as_of) if version_id or pick_version else None
             if version_id and selected is None:
                 # PV-1: an unknown version is never read as another one (or as none).
                 raise Product360Error("VERSION_NOT_FOUND", "Version not found")

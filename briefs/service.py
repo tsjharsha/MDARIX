@@ -162,7 +162,8 @@ class BriefService:
         except InvestigationWorkspaceError as exc:
             raise BriefError(exc.code, exc.message) from exc
         product = db.query(Product).filter(Product.tenant_id == tenant_id, Product.id == inv.product_id).first()
-        version_id = ws.product_context.get("product_version_id")
+        # PV-1 F3c: the workspace's selected version is the case's one version, or none.
+        version_id = (ws.product_context.get("selected_version") or {}).get("id")
         version = (
             db.query(ProductVersion)
             .filter(ProductVersion.tenant_id == tenant_id, ProductVersion.id == version_id)

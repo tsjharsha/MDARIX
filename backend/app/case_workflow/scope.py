@@ -273,6 +273,29 @@ def current_scope(db: Session, case) -> dict:
     return as_data(row) if row is not None else derived_scope(db, case)
 
 
+def single_version(db: Session, case, data: dict | None = None) -> str | None:
+    """PV-1 F3: the case's one product version, or None. Only when the scope names exactly one version and every
+    included complaint carries it; an unknown version or several versions are never collapsed to one."""
+    from backend.app.db.models.foundation import Complaint
+
+    data = data if data is not None else current_scope(db, case)
+    versions = id_list(data["product_version_ids"])
+    if len(versions) != 1:
+        return None
+    ids = wanted_ids(data["included_complaint_ids"])
+    other = (
+        ids
+        and db.query(Complaint.id)
+        .filter(
+            Complaint.tenant_id == case.tenant_id,
+            Complaint.id.in_(list(ids)),
+            Complaint.product_version_id.is_distinct_from(as_uuid(versions[0])),
+        )
+        .first()
+    )
+    return None if other else versions[0]
+
+
 def write_version(
     db: Session, case, data: dict, *, actor_ref: str, actor_role: str | None, now: datetime
 ) -> InvestigationScopeVersion:

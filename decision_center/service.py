@@ -279,6 +279,8 @@ class DecisionCenterService:
                 "hypotheses": context["hypotheses"],
                 "unknowns": context["unknowns"],
                 "failure_chains": context["failure_chains"],
+                # PV-1 F3: the version is stored only for a one-version case; the scope's versions are kept here.
+                "scope_product_version_ids": context["product_context"].get("scope_product_version_ids", []),
             },
         )
         db.add(row)
