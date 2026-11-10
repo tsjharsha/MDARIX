@@ -1195,7 +1195,7 @@ def _after_classification(db, tenant_id, event, check, previous, actor, now) -> 
 
 def _second_look(db, tenant_id, event, check, actor, now) -> None:
     """An imported service record's check is its second-look decision: complaint or both confirms it; "service only"
-    dismisses it, with the written reason (one decision path)."""
+    dismisses it, as do inquiry and "not a complaint" (outcomes v2), with the written reason (one decision path)."""
     if event.kind != "SERVICE_RECORD":
         return
     link = next(
@@ -1211,7 +1211,7 @@ def _second_look(db, tenant_id, event, check, actor, now) -> None:
     complaint_id = link.right_id if link.left_id == event.id else link.left_id
     if check.classification in rules.PENDING_OUTCOMES:
         return
-    decision = "DISMISSED" if check.classification == rules.SERVICE_ONLY else "CONFIRMED"
+    decision = "DISMISSED" if check.classification in case_rules.REVIEWED_OUTCOMES else "CONFIRMED"
     reason = check.reason or check.override_reason or f"First-contact check {event.reference}: {check.classification}"
     existing = (
         db.query(ComplaintSecondLook)

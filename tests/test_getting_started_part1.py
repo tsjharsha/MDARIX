@@ -289,6 +289,12 @@ def test_your_data_branches_pending_waits_and_an_inquiry_skips_to_the_qa_review(
         assert {step["note"] for step in yours["steps"][2:8]} == {"Not needed: not a complaint"}
         assert yours["branch"]["label"] == "QA review" and yours["branch"]["who"] == "Quality Leader"
         assert yours["branch"]["done"] is False
+        # The check of an imported record is its second look: an inquiry dismisses it, never confirms a complaint.
+        from backend.app.db.models.complaint_review import ComplaintSecondLook
+
+        with _data(tenant_id) as db:
+            look = db.query(ComplaintSecondLook).filter_by(complaint_id=uuid.UUID(yours["complaint"]["id"])).one()
+            assert look.decision == "DISMISSED"
     finally:
         _purge(tenant_id)
 
