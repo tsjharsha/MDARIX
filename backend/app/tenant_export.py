@@ -15,6 +15,7 @@ it (``expire_exports``).
 
 from __future__ import annotations
 
+import base64
 import csv
 import hashlib
 import io
@@ -283,6 +284,13 @@ class _HashingWriter:
         return len(chunk)
 
 
+def _json_default(value):
+    """What JSON cannot write: a binary column (a submitted PDF) as base64, anything else as its text."""
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return base64.b64encode(bytes(value)).decode()
+    return str(value)
+
+
 def _write_tables(
     db: Session, archive: zipfile.ZipFile, tenant_id, prefix: str, manifest: dict, unmask: bool = False
 ) -> None:
@@ -299,7 +307,7 @@ def _write_tables(
                 for row in rows:
                     values = {key: row._mapping[key] for key in columns}
                     values = values if unmask else masked_row(table, values)
-                    writer.write(json.dumps(values, default=str) + "\n")
+                    writer.write(json.dumps(values, default=_json_default) + "\n")
                     count += 1
         # Tables from a dedicated data plane are listed as "plane:<schema>.<table>" beside the control database's.
         key = f"{schema}.{table}" if prefix == "data/" else f"plane:{schema}.{table}"

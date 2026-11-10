@@ -110,3 +110,30 @@ def test_files_mdarix_makes_do_not_count_against_the_upload_quota(monkeypatch, t
         413,
         422,
     )
+
+
+def test_the_export_writes_a_binary_column_as_base64(monkeypatch):  # audit 18
+    import io
+    import json
+    import zipfile
+
+    from backend.app import tenant_export
+
+    pdf = b"%PDF-1.4 \x00\xff submitted copy"
+
+    class Result:
+        rows = [SimpleNamespace(_mapping={"id": "r1", "content": pdf})]
+
+        def keys(self):
+            return ["id", "content"]
+
+        def fetchmany(self, _):
+            rows, self.rows = self.rows, []
+            return rows
+
+    monkeypatch.setattr(tenant_export, "_tables", lambda db: [("public", "report_submission_copies")])
+    buffer, manifest = io.BytesIO(), {"tables": {}}
+    with zipfile.ZipFile(buffer, "w") as archive:
+        tenant_export._write_tables(SimpleNamespace(execute=lambda *a: Result()), archive, "t1", "data/", manifest)
+    line = zipfile.ZipFile(buffer).read("data/public.report_submission_copies.jsonl")
+    assert base64.b64decode(json.loads(line)["content"]) == pdf

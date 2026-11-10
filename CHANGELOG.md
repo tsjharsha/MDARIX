@@ -37,6 +37,8 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
   told so when it asks (413, "contact support to receive it in parts"), and an export whose zip is larger ends
   FAILED (`ExportTooLarge`) without retrying, instead of failing in memory after hours of retries.
 - A password-reset or activation link used twice at the same moment works only once.
+- A full data export writes binary columns (the stored copy of a submitted report) as base64 text that can be decoded
+  back to the file, instead of Python byte text.
 
 ### Security
 
