@@ -307,12 +307,11 @@ def _us_outcome(context):
 
 def _us_event_type(context):
     found = []
-    if _answer(context, "US1") == markets.YES:
+    # A death or serious injury is reportable only where the device caused or contributed (US3; code audit 10).
+    caused = _answer(context, "US3") == markets.YES
+    if _answer(context, "US1") == markets.YES and caused:
         found.append("Death")
-    if (
-        markets.YES in (_answer(context, q) for q in ("US2A", "US2B", "US2C"))
-        and _answer(context, "US3") == markets.YES
-    ):
+    if markets.YES in (_answer(context, q) for q in ("US2A", "US2B", "US2C")) and caused:
         found.append("Serious injury")
     if _answer(context, "US4") == markets.YES and _answer(context, "US5") == markets.YES:
         found.append("Malfunction")

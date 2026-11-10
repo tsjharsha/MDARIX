@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import base64
+import uuid
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
 
 from backend.app.authority_reports import router as reports
+from backend.app.authority_reports import worksheet
 from tests.test_object_storage_scan import clamd  # noqa: F401 (the scan stub, a fixture)
 
 pytestmark = pytest.mark.unit
@@ -29,3 +32,22 @@ def test_a_clean_report_file_is_kept(clamd, monkeypatch, tmp_path):  # noqa: F81
     kept = reports._file(_attached(b"Acknowledgement 1"))
     assert kept["content"] == b"Acknowledgement 1" and kept["content_type"] == "text/plain"
     assert clamd.received == b"Acknowledgement 1"
+
+
+def _us_context(**answers) -> dict:
+    current = SimpleNamespace(
+        id=uuid.uuid4(),
+        market="US",
+        version=1,
+        conclusion="REPORTABLE",
+        answers={key: {"answer": value} for key, value in answers.items()},
+    )
+    return {"current": current, "draft": None, "record": {"complaint_identifier": "C-1", "business_id": None}}
+
+
+def test_fda_h1_says_death_only_when_the_device_caused_or_contributed():  # audit 10
+    event_type = worksheet.SOURCES["us_event_type"]
+    assert event_type(_us_context(US1="YES", US3="NO")) is None
+    assert event_type(_us_context(US1="YES", US3="YES"))[0] == "Death"
+    assert event_type(_us_context(US1="YES", US2A="YES", US3="YES"))[0] == "Death; Serious injury"
+    assert event_type(_us_context(US1="YES", US3="NO", US4="YES", US5="YES"))[0] == "Malfunction"

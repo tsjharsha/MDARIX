@@ -21,6 +21,8 @@ Hardening: code-audit fixes 6-12. No migration. The API image changes.
 - The old single reportability decision (before per-market assessment) no longer accepts a new unsigned "Not
   reportable": that is concluded only by a signed market assessment. Single decisions recorded earlier are still shown
   and still settle their complaint.
+- FDA Form 3500A box H1 pre-fills "Death" only when the US assessment answers that the device caused or contributed
+  to it (question 3), as it already did for "Serious injury".
 
 ### Security
 
