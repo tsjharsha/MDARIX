@@ -930,8 +930,11 @@ def enabled_markets(windows: list[dict]) -> list[str]:
 
 def legal_limit(market: str, aware=None, org_zone: str | None = None) -> ReportType | None:
     """FG-1 (B4 step 13): the market's longest legal period, the latest any of its reports may be due, from the floor
-    in force at awareness (today's without one); None where the law gives no period in code (India, FG-2)."""
-    floor = register.floor_at(market, aware, org_zone) if feature_set.rule_register() else None
+    in force at awareness (today's without one); None where the law gives no period in code (India, FG-2), and None
+    while the rule register is off (spec 6.4: off is today's behaviour, so no FG-1 warning or legal clock)."""
+    if not feature_set.rule_register():
+        return None
+    floor = register.floor_at(market, aware, org_zone)
     types = _in_force(str(register._DIRECTORY), (floor["code"],))[1] if floor else REPORT_TYPES
     prefix = market.split("_")[0] + "_"
     found = [kind for code, kind in types.items() if code.startswith(prefix) and kind.days]
@@ -961,8 +964,8 @@ def longer_than_law(windows: list[dict]) -> list[dict]:
                         "market": market,
                         "market_label": MARKET_LABELS[market],
                         "legal": limit.label,
-                        "message": f"“{window['name']}” can end after the legal period for {MARKET_LABELS[market]} "
-                        f"({limit.label}). The watch shows the legal deadline beside it.",
+                        "message": f"“{window['name']}” can end after the longest legal period for {MARKET_LABELS[market]} "
+                        f"({limit.label}). The watch shows the latest date the law allows beside it.",
                     }
                 )
     return found

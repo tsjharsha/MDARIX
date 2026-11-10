@@ -269,7 +269,9 @@ export function WatchCard({
             )}
             {legalOf(item) && (
               <span className="uw-rw-legal">
-                The law: due by {deadlineLabel(legalOf(item))} Â· {legalOf(item)?.label}. Your window ends later.
+                Latest the law allows: due by {deadlineLabel(legalOf(item))} (longest legal period:{" "}
+                {legalOf(item)?.label}
+                ). Your window ends later; the market assessment gives the period that applies to this event.
               </span>
             )}
             {item.aware_date && (

@@ -44,7 +44,7 @@ export type RuleDetail = RuleView & {
     report_type: string[];
     not_asked: string[];
     report_types: Array<{ code: string; label: string; days: number | null; basis: string }>;
-    counting: { authority_zone: string | null; awareness_is_day_one: boolean };
+    counting: { authority_zone: string | null; awareness_is_day_one: boolean; words?: string };
     questions: Array<{ id: string; text: string; clause: string }>;
   } | null;
   history: RuleView[];
@@ -96,7 +96,8 @@ export function registerPath(filters: { market?: string; kind?: string; asAt?: s
 
 /** The rules that decided, in words: "F-US-1 applies; F-US-2 could apply". */
 export function appliedText(applied: RulesApplied | null | undefined): string {
-  if (!applied || !applied.rules.length) return "No floor rule applies to these answers";
+  if (!applied) return "Rules applied: not recorded";
+  if (!applied.rules.length) return "No floor rule applies to these answers";
   return applied.rules
     .map((rule) => `${rule.id} ${rule.state === "APPLIES" ? "applies" : "could apply (an answer is Unknown)"}`)
     .join("; ");

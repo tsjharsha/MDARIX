@@ -207,7 +207,8 @@ def _rules_used(market: str, at_event: dict | None, aware, seen: dict, draft, cu
             "code": at_event["code"],
             "title": at_event["title"],
             "day": picked.isoformat() if picked else None,
-            "rules_applied": draft.rules_applied if draft is not None else None,
+            # The open draft's rules, else the signed conclusion's (None for one signed before the register).
+            "rules_applied": draft.rules_applied if draft is not None else current.rules_applied if current else None,
         },
         "today": {"code": today["code"], "same": today["code"] == at_event["code"]},
         "decided": None
@@ -300,9 +301,9 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
                 "preselected": market in markets.markets_of(record.get("country")),
                 "required": market in summary,
                 "question_set": question_set.as_dict(),
-                "suggestions": markets.suggestions(question_set, record),
+                "suggestions": markets.suggestions(question_set, record, at_event),
                 # Beside a judgement question, what the record says, never its answer (0.10.83, D2).
-                "record_notes": markets.record_notes(question_set, record),
+                "record_notes": markets.record_notes(question_set, record, at_event),
                 "question_set_current": question_set.version == codes[market],
                 "rules_used": _rules_used(market, at_event, aware, seen, draft, current),
                 "threshold": {"level": markets.THRESHOLDS[market], "label": markets.THRESHOLD_LABELS[market]},
@@ -349,10 +350,10 @@ def market_assessments(
     return detail(db, control_db, ctx, complaint_id)
 
 
-def _clean_draft(question_set: markets.QuestionSet, payload: DraftRequest, record: dict) -> dict:
+def _clean_draft(question_set: markets.QuestionSet, payload: DraftRequest, record: dict, floor: dict | None) -> dict:
     answers = markets.clean_answers(question_set, {key: value.model_dump() for key, value in payload.answers.items()})
     confirmed = {key for key, value in payload.answers.items() if value.confirmed}
-    markets.mark_origins(answers, markets.suggestions(question_set, record), confirmed)
+    markets.mark_origins(answers, markets.suggestions(question_set, record, floor), confirmed)
     return {
         "answers": answers,
         "harm_level": (payload.harm_level or "").strip().upper() or None,
@@ -393,7 +394,10 @@ def save_draft(
         )
     draft = next((row for row in versions if row.conclusion is None), None)
     question_set = guides.by_code(db, tenant_id, market, draft.question_set if draft is not None else None)
-    clean = _clean_draft(question_set, payload, record)
+    aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
+    # The floor is re-picked from the awareness day at every save (B4; a corrected awareness re-picks it).
+    floor = _floor_at(market, aware, seen)
+    clean = _clean_draft(question_set, payload, record, floor)
     problem = markets.answers_problem(question_set, clean["answers"], complete=False) or markets.harm_problem(
         clean["harm_level"],
         clean["harm_code"],
@@ -403,9 +407,6 @@ def save_draft(
     )
     if problem:
         raise _error(422, "ASSESSMENT_INVALID", problem)
-    aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
-    # The floor is re-picked from the awareness day at every save (B4; a corrected awareness re-picks it).
-    floor = _floor_at(market, aware, seen)
     evaluation = markets.evaluate(market, clean["answers"], floor)
     clock = markets.market_clock(
         market,

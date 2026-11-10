@@ -143,6 +143,12 @@ describe("Rules used", () => {
     expect(rulesUsedLines(before)!.today).toBe("US-floor-1: the same.");
   });
 
+  it("says the rules were not recorded rather than that none applied", () => {
+    const lines = rulesUsedLines({ ...USED, at_event: { ...USED.at_event, rules_applied: null } })!;
+    expect(lines.atEvent).toContain("Rules applied: not recorded");
+    expect(lines.atEvent).not.toContain("No floor rule applies");
+  });
+
   it("is hidden while the register is off (no rules_used)", () => {
     expect(renderToStaticMarkup(<RulesUsedPanel used={null} />)).toBe("");
     expect(rulesUsedLines(undefined)).toBeNull();
@@ -174,12 +180,13 @@ describe("FG-1: a window longer than the law", () => {
           market: "US",
           market_label: "United States (FDA)",
           legal: "30-calendar-day report (21 CFR 803.50)",
-          message: "“US 60 days” can end after the legal period for United States (FDA) (30-calendar-day report).",
+          message:
+            "“US 60 days” can end after the longest legal period for United States (FDA) (30-calendar-day report).",
         },
       ],
     } as unknown as ReportabilitySettings;
     const html = render(api(true), <WindowsBody settings={settings} onSaved={() => undefined} />);
-    expect(html).toContain("can end after the legal period for United States (FDA)");
+    expect(html).toContain("can end after the longest legal period for United States (FDA)");
     expect(html).toContain("tone-warning");
   });
 

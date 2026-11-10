@@ -139,12 +139,16 @@ def markets_summary(
         kind = markets.REPORT_TYPES.get(report_type or "")
         # A market not assessed yet runs no clock of its own: the complaint's windows (by what it reports) bind it.
         started = seen["state"] != NOT_STARTED and not seen["filed"]
-        _, draft = current_and_draft(versions_by_market.get(market, []))
+        signed, draft = current_and_draft(versions_by_market.get(market, []))
+        # B4: the floor at awareness; a signed conclusion's clock counts by the floor it was signed under.
+        floor = floor_at(market, aware, org_zone)
+        if floor is not None and signed is not None and signed.floor_code and seen["state"] in markets.CONCLUSIONS:
+            from backend.app.rule_register import register
+
+            floor = register.get(signed.floor_code) or floor
         # A draft's pending clock also counts the report a signed "reportable" would start (code audit 3).
         if_reportable = (
-            markets.evaluate(market, draft.answers or {}, floor_at(market, aware, org_zone))[
-                "report_type_if_reportable"
-            ]
+            markets.evaluate(market, draft.answers or {}, floor)["report_type_if_reportable"]
             if draft is not None and seen["state"] == DRAFT
             else None
         )
@@ -158,7 +162,7 @@ def markets_summary(
                 today,
                 org_zone,
                 if_reportable,
-                floor_at(market, aware, org_zone),
+                floor,
             )
             if started
             else None

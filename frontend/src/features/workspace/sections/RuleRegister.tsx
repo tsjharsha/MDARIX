@@ -177,9 +177,11 @@ function RuleDrawer({ code, onClose }: { code: string; onClose: () => void }) {
               </ul>
               <h3>How days are counted</h3>
               <p>
-                In the authority's time zone ({rule.logic.counting.authority_zone ?? "your organization's"}), from{" "}
-                {rule.logic.counting.awareness_is_day_one ? "the awareness day as day 1" : "the day after awareness"};
-                no weekend or holiday extension.
+                {/* The floor's own words (F7): the authority's day or yours, whichever ends first. */}
+                {rule.logic.counting.words
+                  ? `${rule.logic.counting.words.charAt(0).toUpperCase()}${rule.logic.counting.words.slice(1)}.`
+                  : "As the floor's counting rule sets."}{" "}
+                Work-day periods skip weekends; no holiday extension.
               </p>
               {rule.logic.not_asked.length > 0 && (
                 <>

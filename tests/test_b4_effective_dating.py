@@ -96,8 +96,10 @@ def test_save_and_sign_keep_the_floor_the_rules_applied_and_the_date_calculation
         bind_system(db, "test:b4-audit-read")
         event = db.query(AuditEvent).filter_by(action="COMPLAINT_MARKET_CONCLUSION_SIGNED", entity_id=complaint).one()
     assert event.details["floor_code"] == "US-floor-1"
-    decided = _market(regulatory.get(_url(complaint)).json(), "US")["rules_used"]["decided"]
-    assert decided["floor_code"] == "US-floor-1" and decided["before_register"] is False
+    used = _market(regulatory.get(_url(complaint)).json(), "US")["rules_used"]
+    assert used["decided"]["floor_code"] == "US-floor-1" and used["decided"]["before_register"] is False
+    # Signed, no draft: "At the event" shows the signed rules, never none (review follow-up 1).
+    assert used["at_event"]["rules_applied"] == row.rules_applied
 
 
 def test_a_signed_conclusion_never_changes_when_a_new_floor_version_arrives(org, fixture_register):

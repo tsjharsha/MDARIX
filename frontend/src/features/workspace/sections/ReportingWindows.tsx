@@ -100,7 +100,7 @@ export function WindowsBody({ settings, onSaved }: { settings: ReportabilitySett
       </dl>
       {(settings.longer_than_law ?? []).map((warning) => (
         <p key={`${warning.window}-${warning.market}`} className="ac-message tone-warning" role="status">
-          {warning.message} The assessment and triage already use the law's deadline.
+          {warning.message} The market assessment and triage use the period that applies to each event.
         </p>
       ))}
       {!canEdit &&
