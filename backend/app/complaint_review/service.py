@@ -18,6 +18,7 @@ from backend.app.complaint_review import rules
 from backend.app.db.models.complaint_disposition import ComplaintDisposition
 from backend.app.db.models.complaint_review import ComplaintSecondLook, ComplaintSettings
 from backend.app.db.models.foundation import AuthUser, Complaint, InvestigationComplaint, Product, ProductVersion
+from backend.app.db.models.market_assessment import ComplaintMarketAssessment
 from backend.app.db.models.signals import SignalComplaint
 
 # When a complaint was received: the quality system's date, else the event date, else when MDARIX recorded it.
@@ -174,10 +175,33 @@ def _candidates(db: Session, tenant_id: uuid.UUID, product_id: uuid.UUID | None 
         for column in columns
         for pattern in rules.CANDIDATE_PATTERNS
     ]
-    query = _records(db, tenant_id).filter(or_(*patterns))
+    # T-D13: a closed record with a death or a serious injury (rules.closed_without_decision decides).
+    closed_harm = func.lower(func.trim(func.coalesce(Complaint.status, ""))).in_(rules.CLOSED_STATUSES) & or_(
+        Complaint.death.is_(True), Complaint.serious_injury.is_(True)
+    )
+    query = _records(db, tenant_id).filter(or_(*patterns, closed_harm))
     if product_id:
         query = query.filter(Complaint.product_id == product_id)
     return query
+
+
+def _mark_concluded(db: Session, tenant_id: uuid.UUID, records: list[dict]) -> None:
+    """Set ``market_concluded`` on each closed record with harm that has a signed market conclusion (T-D13)."""
+    wanted = [uuid.UUID(record["id"]) for record in records if rules.closed_without_decision(record)]
+    if not wanted:
+        return
+    concluded = {
+        str(row[0])
+        for row in db.query(ComplaintMarketAssessment.complaint_id)
+        .filter(
+            ComplaintMarketAssessment.tenant_id == tenant_id,
+            ComplaintMarketAssessment.complaint_id.in_(wanted),
+            ComplaintMarketAssessment.conclusion.isnot(None),
+        )
+        .distinct()
+    }
+    for record in records:
+        record["market_concluded"] = record["id"] in concluded
 
 
 def second_look(
@@ -198,6 +222,7 @@ def second_look(
     rows = _candidates(db, tenant_id, product_id).order_by(RECEIVED_AT.desc(), Complaint.id).limit(READ_LIMIT + 1).all()
     truncated = len(rows) > READ_LIMIT
     records = [record_of(*row) for row in rows[:READ_LIMIT]]
+    _mark_concluded(db, tenant_id, records)
     counts = _nff_counts(records, today)
     flagged = []
     for record in records:
@@ -221,7 +246,10 @@ def second_look(
         ),
         "confirmed": sum(1 for item in decided_items if item["decision"]["decision"] == "CONFIRMED"),
         "dismissed": sum(1 for item in decided_items if item["decision"]["decision"] == "DISMISSED"),
-        "by_reason": {code: by_reason.get(code, 0) for code in (rules.CANCELLED, rules.INQUIRY, rules.NFF_RECURRING)},
+        "by_reason": {
+            code: by_reason.get(code, 0)
+            for code in (rules.CANCELLED, rules.INQUIRY, rules.NFF_RECURRING, rules.CLOSED_NO_DECISION)
+        },
     }
     chosen = {
         "decided": decided_items,
@@ -248,6 +276,7 @@ def assess(db: Session, tenant_id: uuid.UUID, complaint_id: uuid.UUID, today: da
     if row is None:
         return None, None
     record = record_of(*row)
+    _mark_concluded(db, tenant_id, [record])
     words = settings_of(db, tenant_id)["second_look_words"]
     count = 0
     if rules.nff_family(record["problem_code"], record["complaint_type"], record["status"]):

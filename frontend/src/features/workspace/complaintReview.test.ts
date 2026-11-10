@@ -87,11 +87,12 @@ describe("the second look", () => {
     expect(one).toMatchObject({ title: "1 record may be a hidden complaint", tone: "warning" });
   });
 
-  it("lists the three reasons with their counts, zero when missing", () => {
+  it("lists the four reasons with their counts, zero when missing", () => {
     expect(reasonSlices({ CANCELLED: 2, NFF_RECURRING: 3 }).map((slice) => [slice.key, slice.count])).toEqual([
       ["CANCELLED", 2],
       ["INQUIRY", 0],
       ["NFF_RECURRING", 3],
+      ["CLOSED_NO_DECISION", 0],
     ]);
     expect(reasonSlices(null).every((slice) => slice.count === 0)).toBe(true);
   });

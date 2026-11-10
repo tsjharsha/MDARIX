@@ -162,7 +162,7 @@ def test_the_second_look_flags_hidden_complaints_most_serious_first(org):
     body = response.json()
     assert body["summary"]["to_review"] == 5
     assert body["summary"]["with_harm"] == 1
-    assert body["summary"]["by_reason"] == {"CANCELLED": 1, "INQUIRY": 1, "NFF_RECURRING": 3}
+    assert body["summary"]["by_reason"] == {"CANCELLED": 1, "INQUIRY": 1, "NFF_RECURRING": 3, "CLOSED_NO_DECISION": 0}
     first = body["items"][0]
     assert first["reasons"][0]["label"] == "Cancelled or rejected (status: Cancelled)"
     assert first["signs"] == [{"code": "DEATH", "label": "Death reported"}]

@@ -142,6 +142,9 @@ CANDIDATE_PATTERNS = (
 CANCELLED = "CANCELLED"
 INQUIRY = "INQUIRY"
 NFF_RECURRING = "NFF_RECURRING"
+# T-D13 (0.10.93, B2; TR-23): closed in the QMS with a death or a serious injury and no signed market conclusion.
+CLOSED_NO_DECISION = "CLOSED_NO_DECISION"
+CLOSED_NO_DECISION_LABEL = "Closed without a reportability decision?"
 NO_FAULT_FOUND, USER_ERROR = "NO_FAULT_FOUND", "USER_ERROR"
 SIGN_WEIGHTS = {
     "DEATH": 100,
@@ -152,7 +155,7 @@ SIGN_WEIGHTS = {
     "WORDS": 30,
     "PROBLEM_CODE": 20,
 }
-REASON_WEIGHTS = {NFF_RECURRING: 35, CANCELLED: 10, INQUIRY: 10}
+REASON_WEIGHTS = {CLOSED_NO_DECISION: 50, NFF_RECURRING: 35, CANCELLED: 10, INQUIRY: 10}
 
 
 def normalize(value: object) -> str:
@@ -286,6 +289,8 @@ def flag(record: dict, words: list[str] | tuple[str, ...], nff_count: int = 0) -
                 "count": nff_count,
             }
         )
+    if closed_without_decision(record):
+        reasons.append({"code": CLOSED_NO_DECISION, "label": CLOSED_NO_DECISION_LABEL})
     if not reasons:
         return None
     signs, found = signs_of(record, words)
@@ -294,6 +299,16 @@ def flag(record: dict, words: list[str] | tuple[str, ...], nff_count: int = 0) -
     if not signs and not any(item["code"] == NFF_RECURRING for item in reasons):
         return None
     return Flag(reasons=reasons, signs=signs, words=found)
+
+
+def closed_without_decision(record: dict) -> bool:
+    """A record closed with a death or a serious injury and no signed market conclusion (``market_concluded``, set by
+    the service): it is never triaged, so the second look asks whether anyone decided its reportability."""
+    return (
+        is_closed(record.get("status"))
+        and bool(record.get("death") or record.get("serious_injury"))
+        and not record.get("market_concluded")
+    )
 
 
 def counts_as_open(status: object, complaint_type: object, decision: str | None) -> bool:

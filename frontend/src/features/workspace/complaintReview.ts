@@ -244,6 +244,7 @@ export const REASON_NAMES: Record<string, string> = {
   CANCELLED: "Cancelled or rejected",
   INQUIRY: "Logged as an inquiry or service record",
   NFF_RECURRING: "Recurring No Fault Found or User Error",
+  CLOSED_NO_DECISION: "Closed without a reportability decision?",
 };
 
 export function reasonSlices(byReason: Record<string, number> | null | undefined): Slice[] {
