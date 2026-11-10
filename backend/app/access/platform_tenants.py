@@ -185,6 +185,19 @@ def transition_platform_tenant(
     actor_user = db.query(AuthUser).filter(AuthUser.id == admin.id, AuthUser.tenant_id == admin.tenant_id).first()
     if actor_user is None or not _verify(payload.password, actor_user.password_hash):
         db.rollback()
+        db.add(
+            AuditEvent(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                actor_ref=str(admin.id),
+                action="TENANT_LIFECYCLE_REAUTHENTICATION_FAILED",
+                entity_type="Tenant",
+                entity_id=tenant_id,
+                details={"from": current, "to": target},
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+        db.commit()
         raise HTTPException(
             403,
             detail={

@@ -130,6 +130,9 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
   anything the request changed before the check: the shared signing check discards it before the refusal's audit
   record is saved, for every signing route, present and future. The failed attempt still counts toward the signing
   lock.
+- A platform administrator's wrong password on a customer's or an organization's status change (suspend, reactivate,
+  terminate) is now recorded in the audit trail (`CUSTOMER_LIFECYCLE_REAUTHENTICATION_FAILED`,
+  `TENANT_LIFECYCLE_REAUTHENTICATION_FAILED`, with the status asked for); nothing else is saved.
 
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 

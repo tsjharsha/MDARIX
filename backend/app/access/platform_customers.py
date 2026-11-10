@@ -799,6 +799,19 @@ def transition_platform_customer(
     actor = db.query(AuthUser).filter(AuthUser.id == admin.id, AuthUser.tenant_id == admin.tenant_id).first()
     if actor is None or not _verify(payload.password, actor.password_hash):
         db.rollback()
+        db.add(
+            AuditEvent(
+                id=uuid.uuid4(),
+                tenant_id=admin.tenant_id,
+                actor_ref=str(admin.id),
+                action="CUSTOMER_LIFECYCLE_REAUTHENTICATION_FAILED",
+                entity_type="Customer",
+                entity_id=customer_id,
+                details={"from": current, "to": target, "customer_identifier": customer.customer_identifier},
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+        db.commit()
         raise HTTPException(
             403,
             detail={
