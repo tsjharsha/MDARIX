@@ -875,8 +875,9 @@ def follow_conclusion(db, ctx, tenant_id, complaint_id, market: str, signed, now
 
 def follow_signed(db, ctx, obligation: ReportObligation, signed, now: datetime) -> list:
     """An open report follows its market's latest signed reportable conclusion (0.10.81, F1): its report type, its due
-    date and its provisional flag, audited with before and after. A pending or approved snapshot of another report type
-    is superseded (it was approved as another report) and an approved report is a draft again. A report already
+    date and its provisional flag, audited with before and after. A pending or approved snapshot of another report type,
+    or of an earlier signed version of the conclusion, is superseded (it was approved as another report, or on the old
+    conclusion's content) and an approved report is a draft again. A report already
     submitted is never changed: the change is audited and the report page flags it, so a follow-up report can be
     considered (``conclusion_changed``). Returns the pending snapshots whose approval tasks end."""
     before = {
@@ -893,21 +894,26 @@ def follow_signed(db, ctx, obligation: ReportObligation, signed, now: datetime) 
         return []
     if obligation.state not in rules.CANCELLABLE:
         return []
+    # A conclusion signed again (a new version) also ends the snapshots of the old one, even with the same report
+    # type: their content and signer are the old conclusion's (code audit 4).
+    resigned = obligation.assessment_id is not None and obligation.assessment_id != signed.id
     obligation.assessment_id = signed.id
-    if before == after:
+    if before == after and not resigned:
         return []
-    pending = []
-    if before["report_type"] != after["report_type"]:
+    pending, superseded = [], []
+    if before["report_type"] != after["report_type"] or resigned:
         for row in _snapshots(db, obligation):
             if row.state in ("PENDING", "APPROVED"):
                 if row.state == "PENDING":
                     pending.append(row.id)
+                superseded.append(row.version)
                 row.state = "SUPERSEDED"
         if obligation.state == rules.APPROVED:
             obligation.state = rules.DRAFT
     obligation.report_type, obligation.due_on, obligation.due_provisional = signed.report_type, signed.due_on, False
     obligation.updated_at = now
-    _audit(db, ctx, "REPORT_RETYPED_BY_CONCLUSION", obligation, before, after, version=signed.version)
+    action = "REPORT_RETYPED_BY_CONCLUSION" if before != after else "REPORT_RESIGNED_BY_CONCLUSION"
+    _audit(db, ctx, action, obligation, before, after, version=signed.version, superseded=superseded)
     return pending
 
 

@@ -626,9 +626,7 @@ def sign_conclusion(
         control_db.rollback()
         raise _error(409, "SIGNED_MEANWHILE", "This market was signed a moment ago; reload to see it") from exc
     reports.end_cancelled_approvals(db, ctx, tenant_id, ended)
-    reports.end_cancelled_approvals(
-        db, ctx, tenant_id, retyped, "Replaced: the signed conclusion changed the report type"
-    )
+    reports.end_cancelled_approvals(db, ctx, tenant_id, retyped, "Replaced: the conclusion was signed again")
     if assessments.settled(
         assessments.markets_summary(
             record,

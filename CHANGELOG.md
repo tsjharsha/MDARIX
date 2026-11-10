@@ -91,6 +91,9 @@ trials' existing Cases; nothing is written until the owner approves the list), t
 - While a market assessment is still pending, its deadline is the earlier of your organisation's window and the
   report a "reportable" signature would start (for example the US 5-work-day report), so signing reportable later
   never lands on a date already past. The assessment, the watch, the report and the alerts show the same date.
+- When a market conclusion is signed again with the same report type, the report's snapshots waiting for approval or
+  approved on the old conclusion are replaced: the old text can no longer be submitted or approved by the new signer,
+  and the report goes back to draft for a new snapshot. Recorded in the audit trail.
 
 ### Security
 
