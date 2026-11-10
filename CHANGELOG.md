@@ -97,6 +97,10 @@ trials' existing Cases; nothing is written until the owner approves the list), t
 
 ### Security
 
+- Two-factor sign-in now follows every role a person holds, not only their account role: someone given Leader or
+  Approver as an additional or custom role must set up an authenticator app. It applies to open sessions too: on
+  their next step they are taken to the authenticator setup with "Your role requires two-factor sign-in", never
+  locked out; a role taken away again lets them carry on. People who already use an authenticator see no change.
 - Dependency updates: pypdf 6.21.4, pillow 13.0.0 (with fastembed 0.9.1, which allows it), filelock 4.2.1,
   certifi 2026.10.18; vite 8.3.7, now a development dependency only.
 
