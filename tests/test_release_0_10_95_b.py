@@ -8,6 +8,7 @@ import pytest
 
 from auth import emailer
 from backend.app import import_quarantine, notifications
+from backend.app.db.models.foundation import AuthUser
 from backend.app.db.models.ingestion import ImportQuarantineRow
 from backend.app.db.models.stage2 import OutboxEvent
 from backend.app.db.session import SessionLocal
@@ -193,3 +194,59 @@ def test_a_reset_link_used_twice_at_the_same_moment_works_once(tenant_id):  # au
     second_done.set()
     first.join(10)
     assert outcomes == {"first": user_id, "second": "INVALID_RESET_TOKEN"}, outcomes
+
+
+def test_a_customer_admin_cannot_lift_a_platform_suspension_and_memberships_are_guarded_and_audited():  # audit 20
+    from datetime import datetime, timezone
+
+    from backend.app.db.models.foundation import AuditEvent, TenantMembership
+    from tests.test_customer_admin_account_security import _client_for
+    from tests.test_customer_admin_account_security import _user as _account
+
+    with SessionLocal() as db:
+        bind_system(db, "test: platform suspension")
+        tenant = _tenant(db, "H95S")
+        admin, other = (
+            _account(db, tenant, "CUSTOMER_ADMIN", "h95-admin"),
+            _account(db, tenant, "CUSTOMER_ADMIN", "h95-other"),
+        )
+        member = _account(db, tenant, "Viewer", "h95-member")
+        other.status = "SUSPENDED"
+        db.flush()
+        db.query(TenantMembership).filter_by(user_id=other.id).update({"status": "SUSPENDED"})
+        # What POST /platform-admin/customer-admins/{id}/status records when a platform administrator suspends.
+        db.add(
+            AuditEvent(
+                id=uuid.uuid4(),
+                tenant_id=tenant.id,
+                actor_ref=str(uuid.uuid4()),
+                action="CUSTOMER_ADMIN_SUSPENDED",
+                entity_type="AuthUser",
+                entity_id=other.id,
+                details={"source": "PLATFORM_ADMIN"},
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+        db.commit()
+        ids = {"tenant": tenant.id, "admin": str(admin.id), "other": str(other.id), "member": str(member.id)}
+        client = _client_for(db, admin)
+        db.commit()
+    users = "/api/v1/admin/identity/users"
+    for response in (
+        client.patch(f"{users}/{ids['other']}/status", json={"status": "ACTIVE"}),
+        client.post("/api/v1/admin/identity/memberships", json={"user_id": ids["other"], "is_default": True}),
+    ):
+        assert response.status_code == 403 and response.json()["detail"]["code"] == "SUSPENDED_BY_PLATFORM", (
+            response.text
+        )
+    # Their own membership: refused like any change to their own access.
+    own = client.post("/api/v1/admin/identity/memberships", json={"user_id": ids["admin"], "is_default": True})
+    assert own.status_code == 409, own.text
+    granted = client.post("/api/v1/admin/identity/memberships", json={"user_id": ids["member"], "is_default": True})
+    assert granted.status_code == 200, granted.text
+    with SessionLocal() as db:
+        bind_system(db, "test: platform suspension")
+        assert db.get(AuthUser, uuid.UUID(ids["other"])).status == "SUSPENDED"
+        assert db.query(TenantMembership).filter_by(user_id=uuid.UUID(ids["other"]), status="ACTIVE").count() == 0
+        event = db.query(AuditEvent).filter_by(tenant_id=ids["tenant"], action="MEMBERSHIP_GRANTED").one()
+        assert (event.actor_ref, str(event.entity_id)) == (ids["admin"], granted.json()["membership_id"])

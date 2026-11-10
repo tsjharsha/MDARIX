@@ -114,12 +114,40 @@ def admin_user(user_id: uuid.UUID, request: Request, db: Session = Depends(get_d
     )
 
 
+def _guard_platform_suspension(db: Session, admin: AuthUser, user_id) -> None:
+    """Only a platform administrator lifts a suspension a platform administrator made (code audit 20). Who suspended
+    is recorded by the suspension's audit event (CUSTOMER_ADMIN_SUSPENDED, until a CUSTOMER_ADMIN_REACTIVATED)."""
+    if _is_platform_admin(admin):
+        return
+    last = (
+        db.query(AuditEvent.action)
+        .filter(
+            AuditEvent.tenant_id == admin.tenant_id,
+            AuditEvent.entity_id == user_id,
+            AuditEvent.action.in_(["CUSTOMER_ADMIN_SUSPENDED", "CUSTOMER_ADMIN_REACTIVATED"]),
+        )
+        .order_by(AuditEvent.created_at.desc())
+        .first()
+    )
+    if last is not None and last.action == "CUSTOMER_ADMIN_SUSPENDED":
+        raise HTTPException(
+            403,
+            detail={
+                "code": "SUSPENDED_BY_PLATFORM",
+                "message": "MDARIX support suspended this administrator; only MDARIX support can reactivate them",
+            },
+        )
+
+
 @router.post("/admin/identity/memberships")
 def create_membership(payload: MembershipRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
     user = db.query(AuthUser).filter(AuthUser.id == payload.user_id, AuthUser.tenant_id == admin.tenant_id).first()
     ensure_user_visible(admin, user)
+    _guard_user_administration(admin, target=user, changes_access=True)
+    _guard_platform_suspension(db, admin, user.id)
     existing = db.query(TenantMembership).filter_by(tenant_id=admin.tenant_id, user_id=user.id).first()
+    before = {"status": existing.status if existing else None}
     if existing:
         existing.status = "ACTIVE"
         existing.is_default = payload.is_default
@@ -135,6 +163,18 @@ def create_membership(payload: MembershipRequest, request: Request, db: Session 
             updated_at=datetime.now(timezone.utc),
         )
         db.add(result)
+    db.flush()
+    _audit_configuration(
+        db,
+        admin,
+        "MEMBERSHIP_GRANTED",
+        "TenantMembership",
+        result.id,
+        "v1",
+        request=request,
+        before=before,
+        after={"status": result.status, "user_id": str(user.id)},
+    )
     db.commit()
     return {
         "membership_id": str(result.id),
@@ -358,6 +398,8 @@ def update_user_status(user_id: uuid.UUID, payload: UserStatusRequest, request: 
     if user is None:
         raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available for this tenant"})
     _guard_user_administration(admin, target=user, changes_access=True)
+    if payload.status == "ACTIVE":
+        _guard_platform_suspension(db, admin, user.id)
     previous_status = user.status
     now = datetime.now(timezone.utc)
     user.status = payload.status
@@ -1057,6 +1099,8 @@ def update_membership_status(
         raise HTTPException(
             404, detail={"code": "MEMBERSHIP_NOT_FOUND", "message": "Membership is not available for this tenant"}
         )
+    if payload.status == "ACTIVE":
+        _guard_platform_suspension(db, admin, row.user_id)
     row.status = payload.status
     row.updated_at = datetime.now(timezone.utc)
     _audit_configuration(db, admin, "MEMBERSHIP_STATUS_CHANGED", "TenantMembership", row.id, "v1")
