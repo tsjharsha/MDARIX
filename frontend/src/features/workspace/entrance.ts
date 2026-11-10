@@ -106,7 +106,7 @@ export const SCENARIOS: readonly Scenario[] = [
         section: "Complaint",
         tab: "Summary",
       },
-      { label: "Triage it", button: "Save the triage record", section: "Complaints", tab: "To triage" },
+      { label: "Triage it", button: "Save the triage", section: "Complaints", tab: "To triage" },
       {
         label: "Assess the US, then India",
         button: "Save and sign",

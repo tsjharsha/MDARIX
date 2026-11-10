@@ -170,7 +170,22 @@ export type TriageRecordView = {
   escalation_reason: string | null;
   completed_by: string | null;
   completed_at: string | null;
+  // 0.10.93 (B2): owners by id (the form starts from them), versions, two speeds, containment, the threat exclusion.
+  event_owner?: string | null;
+  triage_owner?: string | null;
+  backup_owner?: string | null;
+  version?: number;
+  speed?: TriageSpeed | null;
+  potential_severity?: string | null;
+  containment?: { choices: string[]; text: string } | null;
+  threat_excluded_at?: string | null;
 };
+export type TriageSpeed = "FAST" | "ROUTINE";
+/** The facts triage decides on (backend intake/triage_rules.py ``facts``). */
+export type TriageFacts = Record<
+  "urgent" | "death" | "serious_injury" | "harm" | "harm_unknown" | "malfunction" | "serious_potential" | "threat",
+  boolean
+>;
 export type TriageItem = {
   key: string;
   kind: "INTAKE" | "COMPLAINT" | "QUARANTINE";
@@ -208,6 +223,27 @@ export type TriageItem = {
   deadlines: Deadline[];
   conflict: { link: string; before: string | null; after: string | null }[];
   record: TriageRecordView | null;
+  // 0.10.93 (B2, spec 3.4 and 4.7): the speed and why, the facts, the floor, the acknowledgement (A1), the routine card.
+  speed?: TriageSpeed;
+  speed_label?: string;
+  speed_why?: string;
+  facts?: TriageFacts;
+  severity_floor?: string | null;
+  floor_note?: string | null;
+  acknowledgement?: {
+    required: boolean;
+    done: boolean;
+    due_at: string;
+    overdue: boolean;
+    acknowledged_by: string | null;
+  };
+  routine_prefill?: {
+    severity: string;
+    harm_now_label: string;
+    containment: string[];
+    no_action_reason: string;
+    triage_owner: string | null;
+  } | null;
 };
 export type TriageList = {
   items: TriageItem[];
@@ -351,4 +387,130 @@ export function zonedInput(now: Date, zone: string): string {
 export function startingZone(guide: Pick<Guide, "zones" | "zone_aliases">, browser: string): string {
   const zone = guide.zone_aliases?.[browser] ?? browser;
   return !guide.zones || guide.zones.includes(zone) ? zone : "UTC";
+}
+
+// ------------------------------------------------------------------ triage at two speeds (0.10.93, B2 step 5)
+// These mirror backend intake/triage_rules.py so the form asks before saving instead of failing with a 422; the
+// server still decides.
+
+export const NOT_KNOWN = "NOT_KNOWN";
+/** Containment choices (triage_rules.CONTAINMENT), in the form's order. */
+export const CONTAINMENT: readonly { code: string; label: string }[] = [
+  { code: "NONE_NEEDED", label: "None needed" },
+  { code: "USER_TOLD", label: "User told how to stay safe" },
+  { code: "OUT_OF_USE", label: "Device taken out of use" },
+  { code: "HOLD_LOT", label: "Hold the lot" },
+  { code: "FIELD_ACTION", label: "Consider a field action" },
+  { code: "OTHER", label: "Other" },
+];
+
+/** The harm scale a triage chooses from: "Not known yet", then the guide's levels (lowest first). */
+export const harmScale = (levels: Guide["levels"]) => [{ code: NOT_KNOWN, label: "Not known yet" }, ...levels];
+
+/** A level's place on the scale; "Not known yet" and nothing rank below the lowest level. */
+export const harmRank = (levels: Guide["levels"], code: string | null | undefined) =>
+  levels.findIndex((level) => level.code === code);
+
+export type TriageForm = {
+  severity: string;
+  potential: string;
+  threat: boolean;
+  threatReason: string;
+  remedial: boolean;
+  remedialReason: string;
+  eventOwner: string;
+  triageOwner: string;
+  backup: string;
+  containment: string[];
+  text: string;
+  aware: string;
+  awareNote: string;
+  changeReason: string;
+  password: string;
+  mfa: string;
+};
+
+/** The speed the answers give (triage_rules.speed): fast by the facts, or by "Not known yet" or a serious potential. */
+export function triageSpeed(item: Pick<TriageItem, "speed">, levels: Guide["levels"], form: TriageForm): TriageSpeed {
+  const serious = harmRank(levels, "SERIOUS");
+  return item.speed === "FAST" ||
+    form.severity === NOT_KNOWN ||
+    (serious >= 0 && harmRank(levels, form.potential) >= serious)
+    ? "FAST"
+    : "ROUTINE";
+}
+
+/** A6: a saved fast-track triage made less severe needs a second person (outside the trial) or a signature (trial). */
+export function triageDowngrade(
+  record: TriageRecordView | null,
+  levels: Guide["levels"],
+  form: TriageForm,
+  speed: TriageSpeed,
+) {
+  if (!record?.completed_at || record.speed !== "FAST") return false;
+  return (
+    harmRank(levels, form.severity) < harmRank(levels, record.severity) ||
+    harmRank(levels, form.potential) < harmRank(levels, record.potential_severity) ||
+    speed === "ROUTINE"
+  );
+}
+
+/** Why the triage cannot be saved yet, in the server's words, or null (the order the server checks in). */
+export function triageProblem(
+  item: Pick<TriageItem, "speed" | "facts" | "severity_floor" | "record">,
+  levels: Guide["levels"],
+  form: TriageForm,
+  context: { people: number; needsAwareness: boolean; laterAware: boolean; signs: boolean },
+): string | null {
+  const floor = item.severity_floor ? harmRank(levels, item.severity_floor) : -1;
+  const floorLabel = levels.find((level) => level.code === item.severity_floor)?.label;
+  const record = item.record;
+  const updating = !!record?.completed_at;
+  const lowered = updating && harmRank(levels, form.severity) < harmRank(levels, record?.severity);
+  if (!form.severity) return "Choose the harm now: Not known yet or a level on the harm scale";
+  if (floor >= 0 && harmRank(levels, form.severity) < floor) return `At least ${floorLabel}: the facts set that floor`;
+  if (item.facts?.malfunction && !form.potential)
+    return "Harm if it happened again: asked whenever a malfunction is alleged (worst credible)";
+  if (item.facts?.death && !form.threat && form.threatReason.trim().length < REASON_MIN)
+    return "A death is recorded: answer 'Possible serious public health threat' with a reason";
+  if (!form.eventOwner || !form.triageOwner) return "Name the event owner and the triage owner";
+  if (triageSpeed(item, levels, form) === "FAST" && context.people >= 2 && !form.backup)
+    return "Name a backup: two or more people are active";
+  if (!form.containment.length) return "Choose the containment, or None needed";
+  if (form.text.trim().length < REASON_MIN)
+    return `Say what was done, or why nothing is needed (at least ${REASON_MIN} characters)`;
+  if (context.needsAwareness && !form.aware) return "Confirm the awareness time";
+  if (context.laterAware && form.awareNote.trim().length < REASON_MIN)
+    return `Say why the awareness is later than the earliest known (at least ${REASON_MIN} characters)`;
+  if (record?.remedial_action && !form.remedial && form.remedialReason.trim().length < REASON_MIN)
+    return "Say why remedial action is no longer thought to be needed";
+  if ((updating || lowered) && form.changeReason.trim().length < REASON_MIN)
+    return `Say in at least ${REASON_MIN} characters why the triage changes`;
+  if (context.signs && !form.password) return "Sign with your password";
+  return null;
+}
+
+/** The body POST /triage/{kind}/{id}/record takes. "None needed" alone sends the text as the reason for no action. */
+export function triageBody(form: TriageForm, record: TriageRecordView | null, awareness: string | null) {
+  const none = form.containment.length === 1 && form.containment[0] === "NONE_NEEDED";
+  return {
+    severity: form.severity,
+    potential_severity: form.potential,
+    public_health_threat: form.threat,
+    threat_reason: form.threat ? "" : form.threatReason.trim(),
+    remedial_action: form.remedial,
+    remedial_reason: form.remedialReason.trim(),
+    event_owner: form.eventOwner,
+    triage_owner: form.triageOwner,
+    backup_owner: form.backup,
+    containment: form.containment,
+    immediate_action: none ? "" : form.text.trim(),
+    no_action_reason: none ? form.text.trim() : "",
+    awareness_confirmed_at: awareness,
+    awareness_note: form.awareNote,
+    change_reason: form.changeReason.trim(),
+    seen_version: record?.version ?? 0,
+    password: form.password,
+    mfa_code: form.mfa.trim() || null,
+  };
 }

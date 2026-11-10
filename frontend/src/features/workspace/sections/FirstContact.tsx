@@ -15,12 +15,12 @@ import {
 } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { useTabParam, useWorkspace } from "../workspaceContext";
+import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import { countOf, DecideAndSign } from "./common";
 import { WhyAsked } from "../../shared/Basis";
 import { FIRST_CONTACT_WHY } from "../whyAsked";
 import { ChipFilter, Hero, InlineError } from "./boardParts";
-import { EscalateButton, useCanTriage } from "./Triage";
+import { EscalateButton } from "./Triage";
 import {
   INTAKE,
   OUTCOME_TONES,
@@ -78,7 +78,7 @@ export function FirstContact({
   const [open, setOpen] = useTabParam("check");
   const list = useResource<IntakeList>(`${INTAKE}?show=${show}`);
   const guide = useResource<Guide>(`${INTAKE}/guide`);
-  const canWrite = useCanTriage();
+  const canWrite = useCan("case.log");
   const summary = list.data?.summary;
   const items = list.data?.items ?? [];
   if (part === "duplicates") return <Duplicates onChanged={list.reload} />;
@@ -608,7 +608,10 @@ function CheckDrawer({
 }
 
 function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide; onChanged: () => void }) {
-  const canWrite = useCanTriage();
+  // B2 step 4 (spec 6.3): answers and signature need case.classify; follow-up case.log; the QA review quality.review.
+  const canWrite = useCan("case.classify");
+  const canLog = useCan("case.log");
+  const canReview = useCan("quality.review");
   const [answers, setAnswers] = useState<Answers>({ ...blankAnswers(guide.questions), ...item.answers });
   const [editing, setEditing] = useState(item.draft || item.version === 0);
   const [error, setError] = useState("");
@@ -730,7 +733,7 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
       {canWrite && item.draft && item.version > 0 && (
         <SignForm item={item} guide={guide} answers={answers} onSigned={onChanged} />
       )}
-      {followUp && canWrite && <FollowUp item={item} dueAt={followUp.due_at} onDone={onChanged} />}
+      {followUp && canLog && <FollowUp item={item} dueAt={followUp.due_at} onDone={onChanged} />}
       {item.qms_task && (
         <section className="ca-drawer-section">
           <h3>
@@ -742,10 +745,10 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
             {item.qms_task.open && item.qms_task.due_at ? ` · due ${formatDate(item.qms_task.due_at)}` : ""}
             {item.qms_task.overdue ? " (overdue)" : ""}. Reporting never waits for it.
           </p>
-          {item.qms_task.open && canWrite && <QmsForm id={item.id} onDone={onChanged} />}
+          {item.qms_task.open && (canLog || canReview) && <QmsForm id={item.id} onDone={onChanged} />}
         </section>
       )}
-      {review && canWrite && <ReviewForm item={item} onDone={onChanged} />}
+      {review && canReview && <ReviewForm item={item} onDone={onChanged} />}
       {item.history && item.history.length > 0 && (
         <details className="uw-ma-history" open>
           <summary>Signed versions ({item.history.length})</summary>

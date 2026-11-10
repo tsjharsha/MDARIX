@@ -16,7 +16,7 @@ const source = (name: string) => sources[`./sections/${name}.tsx`] ?? "";
 
 // [the main button, the screen that shows it]: the walk's steps after the entrance and the server's next actions.
 const BUTTONS: Array<[string, string]> = [
-  ["Save the triage record", "Triage"],
+  ["Save the triage", "Triage"],
   ["Save and sign", "MarketAssessment"],
   ["Assess India (CDSCO) too", "MarketAssessment"],
   ["Ask for approval", "Reports"],

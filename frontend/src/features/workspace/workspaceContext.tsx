@@ -381,7 +381,11 @@ export type BusinessPermission =
   | "risk.review"
   | "regulatory.review"
   | "quality.review"
-  | "decision.sign";
+  | "decision.sign"
+  // 0.10.93 (B2 step 4): log a Case, sign its Case check, triage a complaint.
+  | "case.log"
+  | "case.classify"
+  | "complaint.triage";
 
 /** Whether the signed-in role may perform a business action, from the server's own rule (session context).
  * Only hides controls the server would refuse; when permissions are unknown (outside the workspace, older

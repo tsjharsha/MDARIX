@@ -217,6 +217,8 @@ describe("the report helpers", () => {
 
 describe("the reports screens", () => {
   it("lists each obligation with its deadline and the path to follow", () => {
+    // Six days from today, so the fixture never goes stale (it read a fixed 7 Nov 2026 before).
+    const dueOn = new Date(Date.now() + 6 * 86_400_000).toISOString().slice(0, 10);
     resources.data["/api/v1/reports"] = {
       items: [
         {
@@ -233,7 +235,7 @@ describe("the reports screens", () => {
           state: "NOT_STARTED",
           state_label: "Not started",
           next_step: "Start the worksheet",
-          due_on: "2026-11-07",
+          due_on: dueOn,
           provisional: false,
           days_left: 6,
           overdue: false,
@@ -250,7 +252,7 @@ describe("the reports screens", () => {
     const html = render(<Reports />);
     expect(html).toContain("Second-person approval");
     expect(html).toContain("Start the worksheet");
-    expect(html).toMatch(/Deadline [^<]*2026 · \d+ days? (left|overdue)/);
+    expect(html).toMatch(/Deadline [^<]*\d{4} · \d+ days? left/);
     expect(render(<Reports />, [])).not.toContain("Start the worksheet</button>");
   });
 

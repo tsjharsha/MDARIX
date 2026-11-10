@@ -149,14 +149,14 @@ describe("the first-contact helpers", () => {
 describe("the triage and first-contact screens", () => {
   it("open while reading, and offer the entry points to people who may write", () => {
     expect(render(<Triage onOpenTab={vi.fn()} />)).toContain("The triage list");
-    const writer = render(<FirstContact />, ["signal.triage"]);
+    const writer = render(<FirstContact />, ["case.log"]);
     expect(writer).toContain("Log a call");
     expect(writer).toContain("Urgent intake");
     expect(render(<FirstContact />)).not.toContain("Log a call</button>");
   });
 
   it("lets anyone who may write escalate a record by hand, and nobody else", () => {
-    expect(render(<EscalateButton kind="COMPLAINT" id="x" />, ["signal.triage"])).toContain("Escalate to triage");
+    expect(render(<EscalateButton kind="COMPLAINT" id="x" />, ["complaint.triage"])).toContain("Escalate to triage");
     expect(render(<EscalateButton kind="COMPLAINT" id="x" />)).toBe("");
   });
 });

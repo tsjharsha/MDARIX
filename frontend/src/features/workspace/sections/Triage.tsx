@@ -3,18 +3,26 @@ import { WhyAsked } from "../../shared/Basis";
 import { TRIAGE_WHY } from "../whyAsked";
 import { CheckCircle2, Clock, FileWarning, Flag, Link2, Siren } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
-import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
+import { Drawer, errorText, formatDate, humanize, send, useResource } from "../../customer-admin/shared";
+import { useCan, useIsTrial, useTabParam, useWorkspace } from "../workspaceContext";
 import { withTabParam } from "../workspaceAddress";
 import { DeadlineChip, HarmChip, StateChip, type Harm } from "../../../app/chips";
 import { awarenessText, deadlineLabel } from "../../../app/dates";
 import { AlsoKnownAs, countOf } from "./common";
 import { ChipFilter, Hero, InlineError } from "./boardParts";
 import {
+  CONTAINMENT,
   INTAKE,
   REASON_MIN,
   TRIAGE,
   clockTone,
+  harmRank,
+  harmScale,
+  triageBody,
+  triageDowngrade,
+  triageProblem,
+  triageSpeed,
+  type TriageForm,
   daysEarlier,
   deadlineText,
   awarenessInput,
@@ -26,12 +34,16 @@ import {
 } from "../intake";
 import { reportsTab } from "../authorityReports";
 
-/** The second look's rule: triage, opening cases or quality review may write. */
+/** Who may triage (B2 step 4, OD-4): the server's complaint.triage permission. */
 export function useCanTriage() {
-  const triage = useCan("signal.triage");
-  const create = useCan("investigation.create");
-  const quality = useCan("quality.review");
-  return triage || create || quality;
+  return useCan("complaint.triage");
+}
+
+/** Who may escalate to triage by hand: any workspace role that may log a Case or triage (the server takes any role). */
+export function useCanEscalate() {
+  const log = useCan("case.log");
+  const triage = useCan("complaint.triage");
+  return log || triage;
 }
 
 const SHOWS = [
@@ -107,7 +119,7 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
         <StatTile
           label="Past the triage target"
           value={list.data ? (show === "open" ? overdue : null) : null}
-          detail="24 hours from when it reached MDARIX"
+          detail="Fast track within hours; routine by the end of the next working day"
           icon={<Clock size={18} />}
           tone={overdue ? "warning" : undefined}
           onOpen={() => setShow("open")}
@@ -209,6 +221,10 @@ function TriageCard({
             {item.lot ? ` · ${item.lot}` : ""}
           </span>
           <ToneBadge tone={tierTone(item.tier)} label={item.tier_label} />
+          {item.speed_label && !item.record?.completed_at && (
+            <ToneBadge tone={item.speed === "FAST" ? "critical" : "neutral"} label={item.speed_label} />
+          )}
+          {item.acknowledgement?.overdue && <ToneBadge tone="critical" label="Acknowledgement overdue" />}
           {item.awareness.unresolved && <ToneBadge tone="warning" label="Awareness unresolved" />}
           {item.conflict.length > 0 && <ToneBadge tone="critical" label="Awareness conflict" />}
           {item.record?.completed_at && <ToneBadge tone="good" label="Triaged" />}
@@ -267,19 +283,6 @@ function TriageCard({
   );
 }
 
-type RecordForm = {
-  severity: string;
-  threat: boolean;
-  remedial: boolean;
-  eventOwner: string;
-  triageOwner: string;
-  backup: string;
-  action: string;
-  noAction: string;
-  aware: string;
-  awareNote: string;
-};
-
 function TriageDrawer({
   item,
   people,
@@ -296,74 +299,110 @@ function TriageDrawer({
 }) {
   const guide = useResource<Guide>(`${INTAKE}/guide`);
   const canWrite = useCanTriage();
+  const trial = useIsTrial();
   const { navigation, open } = useWorkspace();
   const record = item.record;
+  const levels = guide.data?.levels ?? [];
+  const scale = harmScale(levels);
   const awareField = awarenessInput(item.awareness);
-  const [form, setForm] = useState<RecordForm>({
-    severity: record?.severity ?? "",
+  const prefill = item.speed === "ROUTINE" && !record?.completed_at ? (item.routine_prefill ?? null) : null;
+  // "Change something" on the routine card, or "Update triage" on a saved record, opens the full form.
+  const [editing, setEditing] = useState(!prefill && !record?.completed_at);
+  const [showVersions, setShowVersions] = useState(false);
+  // A former colleague is never pre-filled: the server takes owners from the active team only.
+  const active = (id: string | null | undefined) => (people.some((person) => person.id === id) ? id : null);
+  const owner = active(record?.triage_owner) ?? active(prefill?.triage_owner) ?? people[0]?.id ?? "";
+  const [form, setForm] = useState<TriageForm>({
+    severity: record?.severity ?? prefill?.severity ?? "",
+    potential: record?.potential_severity ?? "",
     threat: record?.public_health_threat ?? false,
+    threatReason: "",
     remedial: record?.remedial_action ?? false,
-    eventOwner: people[0]?.id ?? "",
-    triageOwner: people[0]?.id ?? "",
-    backup: "",
-    action: record?.immediate_action ?? "",
-    noAction: record?.no_action_reason ?? "",
+    remedialReason: "",
+    eventOwner: active(record?.event_owner) ?? owner,
+    triageOwner: owner,
+    backup: active(record?.backup_owner) ?? "",
+    containment: record?.containment?.choices ?? prefill?.containment ?? [],
+    text:
+      record?.containment?.text ??
+      record?.immediate_action ??
+      record?.no_action_reason ??
+      prefill?.no_action_reason ??
+      "",
     aware: awareField.initial,
     awareNote: "",
+    changeReason: "",
+    password: "",
+    mfa: "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const set = (patch: Partial<RecordForm>) => setForm((current) => ({ ...current, ...patch }));
+  const set = (patch: Partial<TriageForm>) => setForm((current) => ({ ...current, ...patch }));
   const needsAwareness = item.awareness.unresolved || item.conflict.length > 0;
   const laterAware = awareField.later(form.aware);
-  const problem = !form.severity
-    ? "Assess the severity"
-    : !form.eventOwner || !form.triageOwner
-      ? "Name the event owner and the triage owner"
-      : form.action.trim().length < REASON_MIN && form.noAction.trim().length < REASON_MIN
-        ? `Record the immediate action, or why none is needed (at least ${REASON_MIN} characters)`
-        : needsAwareness && !form.aware
-          ? "Confirm the awareness time"
-          : laterAware && form.awareNote.trim().length < REASON_MIN
-            ? `Say why the awareness is later than the earliest known (at least ${REASON_MIN} characters)`
-            : null;
-  const submit = async () => {
+  const pace = triageSpeed(item, levels, form);
+  const signs = laterAware || (trial && triageDowngrade(record, levels, form, pace));
+  const problem = triageProblem(item, levels, form, { people: people.length, needsAwareness, laterAware, signs });
+  const floor = harmRank(levels, item.severity_floor);
+  const base = `${TRIAGE}/${item.kind}/${item.id}`;
+  // The next step, always (stage 8): on the new navigation a triaged complaint opens its page, whose main button is
+  // its next action (done on that page already, it stays there).
+  const next = () => {
+    if (navigation === "new" && item.kind === "COMPLAINT" && !inline)
+      open("Complaint", `Summary?ref=${encodeURIComponent(item.ref)}`);
+  };
+  const run = async (path: string, body: unknown, failure: string, after?: () => void) => {
     setBusy(true);
     setError("");
     try {
-      await send(`${TRIAGE}/${item.kind}/${item.id}/record`, "POST", {
-        severity: form.severity,
-        public_health_threat: form.threat,
-        remedial_action: form.remedial,
-        event_owner: form.eventOwner,
-        triage_owner: form.triageOwner,
-        backup_owner: form.backup,
-        immediate_action: form.action,
-        no_action_reason: form.noAction,
-        awareness_confirmed_at:
-          needsAwareness || form.aware !== awareField.initial ? awareField.moment(form.aware) : null,
-        awareness_note: form.awareNote,
-      });
+      await send(path, "POST", body);
       onDone();
-      // The next step, always (stage 8): on the new navigation a triaged complaint opens its page, whose main button
-      // is its next action (done on that page already, it stays there).
-      if (navigation === "new" && item.kind === "COMPLAINT" && !inline)
-        open("Complaint", `Summary?ref=${encodeURIComponent(item.ref)}`);
+      after?.();
     } catch (reason) {
-      setError(errorText(reason, "The triage record was not saved"));
+      setError(errorText(reason, failure));
     } finally {
       setBusy(false);
     }
   };
+  const awareness = needsAwareness || form.aware !== awareField.initial ? awareField.moment(form.aware) : null;
+  const submit = () =>
+    run(`${base}/record`, triageBody(form, record, awareness), "The triage record was not saved", next);
   const Frame = inline ? InlineFrame : Drawer;
+  const ack = item.acknowledgement;
+  const label = (code: string | null | undefined) => scale.find((level) => level.code === code)?.label ?? code;
   return (
     <Frame title={`Triage ${item.ref}`} onClose={onClose}>
       <div className="uw-dp">
         <AlsoKnownAs id={item.business_id} shown={item.ref} />
+        {item.speed_label && (
+          <p>
+            <strong>
+              {item.speed_label} · due {hoursText(item.triage_clock)}
+            </strong>{" "}
+            <span className="uw-cr-meta">{item.speed_why}</span>
+          </p>
+        )}
         {item.words && <q className="uw-cr-text">{item.words}</q>}
         {item.problems && item.problems.length > 0 && (
           <p className="uw-hint">
             Set aside at import: {item.problems.join("; ")}. It reaches triage while still set aside.
+          </p>
+        )}
+        {ack?.required && (
+          <p className={ack.overdue ? "uw-hint" : "uw-cr-meta"} role={ack.overdue ? "alert" : undefined}>
+            {ack.done
+              ? `Acknowledged by ${ack.acknowledged_by}.`
+              : `${ack.overdue ? "Acknowledgement overdue since" : "A named owner acknowledges it by"} ${formatDate(ack.due_at)}.`}{" "}
+            {!ack.done && canWrite && (
+              <button
+                type="button"
+                className="ac-secondary"
+                disabled={busy}
+                onClick={() => void run(`${base}/acknowledge`, {}, "Not acknowledged")}
+              >
+                Acknowledge
+              </button>
+            )}
           </p>
         )}
         <section className="ca-drawer-section">
@@ -432,20 +471,72 @@ function TriageDrawer({
           <section className="ca-drawer-section">
             <h3>
               <CheckCircle2 size={15} aria-hidden="true" /> Triage record
+              {record.version ? ` · version ${record.version}` : ""}
             </h3>
             <p>
-              Severity {record.severity_label} · event owner {record.event_owner_name} · triage owner{" "}
-              {record.triage_owner_name}
+              Harm now {record.severity_label ?? label(record.severity) ?? "—"}
+              {record.potential_severity ? ` · if it happened again ${label(record.potential_severity)}` : ""} · event
+              owner {record.event_owner_name} · triage owner {record.triage_owner_name}
               {record.backup_owner_name ? ` · backup ${record.backup_owner_name}` : ""}
             </p>
-            <p>{record.immediate_action ?? `No immediate action: ${record.no_action_reason}`}</p>
+            <p>
+              {record.containment?.choices?.length
+                ? `${record.containment.choices.map((code) => CONTAINMENT.find((c) => c.code === code)?.label ?? code).join(", ")}: `
+                : ""}
+              {record.immediate_action ?? record.no_action_reason}
+            </p>
             <p className="uw-cr-meta">
               {record.completed_by} · {formatDate(record.completed_at)}
               {record.public_health_threat ? " · possible serious public health threat" : ""}
+              {record.threat_excluded_at ? ` · threat excluded ${formatDate(record.threat_excluded_at)}` : ""}
             </p>
+            <div className="ca-action-row">
+              {canWrite && !editing && (
+                <button type="button" className="ac-secondary" onClick={() => setEditing(true)}>
+                  Update triage
+                </button>
+              )}
+              <button type="button" className="ac-link" onClick={() => setShowVersions((shown) => !shown)}>
+                Versions
+              </button>
+              {canWrite && record.public_health_threat && (
+                <ExcludeThreat path={`${base}/exclude-threat`} onDone={onDone} />
+              )}
+            </div>
+            {showVersions && <TriageVersions path={`${base}/versions`} />}
           </section>
         ) : null}
-        {canWrite && (!record?.completed_at || item.conflict.length > 0) && (
+        {canWrite && prefill && !editing && (
+          <section className="ca-drawer-section">
+            <h3>Routine triage · due {formatDate(item.triage_clock.due_at)}</h3>
+            <ul>
+              <li>Owner: {people.find((person) => person.id === prefill.triage_owner)?.name ?? "you"}</li>
+              <li>Harm now: {prefill.harm_now_label}</li>
+              <li>Immediate action: {prefill.no_action_reason}</li>
+            </ul>
+            <div className="ca-action-row">
+              <button
+                type="button"
+                className="ac-primary"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    `${base}/confirm`,
+                    { seen_version: record?.version ?? 0 },
+                    "The triage was not confirmed",
+                    next,
+                  )
+                }
+              >
+                {busy ? "Saving…" : "Confirm triage"}
+              </button>
+              <button type="button" className="ac-secondary" onClick={() => setEditing(true)}>
+                Change something
+              </button>
+            </div>
+          </section>
+        )}
+        {canWrite && (editing || item.conflict.length > 0) && (
           <form
             className="ca-drawer-section"
             onSubmit={(event) => {
@@ -453,20 +544,38 @@ function TriageDrawer({
               if (!problem) void submit();
             }}
           >
-            <h3>The triage record</h3>
+            <h3>{record?.completed_at ? "Update triage" : "The triage record"}</h3>
             <div className="ca-form-grid">
               <label className="ca-field">
-                Severity (harm-severity scale)
+                Harm now
                 <WhyAsked why={TRIAGE_WHY.severity} />
                 <select value={form.severity} onChange={(event) => set({ severity: event.target.value })}>
                   <option value="">Choose…</option>
-                  {(guide.data?.levels ?? []).map((level) => (
+                  {scale.map((level) => (
+                    <option
+                      key={level.code}
+                      value={level.code}
+                      disabled={floor >= 0 && harmRank(levels, level.code) < floor}
+                    >
+                      {level.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="ca-field">
+                Harm if it happened again{item.facts?.malfunction ? "" : " (optional)"}
+                <select value={form.potential} onChange={(event) => set({ potential: event.target.value })}>
+                  <option value="">Choose…</option>
+                  {scale.map((level) => (
                     <option key={level.code} value={level.code}>
                       {level.label}
                     </option>
                   ))}
                 </select>
               </label>
+            </div>
+            {item.floor_note && <p className="uw-hint">{item.floor_note}</p>}
+            <div className="ca-form-grid">
               <PersonSelect
                 label="Event owner"
                 people={people}
@@ -480,14 +589,41 @@ function TriageDrawer({
                 onChange={(v) => set({ triageOwner: v })}
               />
               <PersonSelect
-                label="Backup (where you have a second person)"
-                people={people}
+                label={pace === "FAST" && people.length >= 2 ? "Backup" : "Backup (where you have a second person)"}
+                people={people.filter((person) => person.id !== form.triageOwner)}
                 value={form.backup}
                 optional
                 onChange={(v) => set({ backup: v })}
               />
             </div>
             <WhyAsked why={TRIAGE_WHY.owners} />
+            <fieldset className="ca-field">
+              <legend>Containment</legend>
+              {CONTAINMENT.map((choice) => (
+                <label key={choice.code} className="ca-check">
+                  <input
+                    type="checkbox"
+                    checked={form.containment.includes(choice.code)}
+                    onChange={(event) =>
+                      set({
+                        // "None needed" stands alone; choosing an action clears it.
+                        containment: !event.target.checked
+                          ? form.containment.filter((code) => code !== choice.code)
+                          : choice.code === "NONE_NEEDED"
+                            ? ["NONE_NEEDED"]
+                            : [...form.containment.filter((code) => code !== "NONE_NEEDED"), choice.code],
+                      })
+                    }
+                  />
+                  {choice.label}
+                </label>
+              ))}
+            </fieldset>
+            <label className="ca-field">
+              What was done, or why nothing is needed
+              <WhyAsked why={TRIAGE_WHY.action} />
+              <textarea value={form.text} onChange={(event) => set({ text: event.target.value })} rows={2} />
+            </label>
             <label className="ca-check">
               <input
                 type="checkbox"
@@ -496,6 +632,12 @@ function TriageDrawer({
               />
               Possible serious public health threat (its 2-day clock applies until a signed decision excludes it)
             </label>
+            {item.facts?.death && !form.threat && (
+              <label className="ca-field">
+                A death is recorded: why is it not a possible serious public health threat?
+                <input value={form.threatReason} onChange={(event) => set({ threatReason: event.target.value })} />
+              </label>
+            )}
             <label className="ca-check">
               <input
                 type="checkbox"
@@ -504,15 +646,12 @@ function TriageDrawer({
               />
               Remedial action may be needed to prevent an unreasonable risk of substantial harm (US: 5 work days)
             </label>
-            <label className="ca-field">
-              Immediate action
-              <WhyAsked why={TRIAGE_WHY.action} />
-              <textarea value={form.action} onChange={(event) => set({ action: event.target.value })} rows={2} />
-            </label>
-            <label className="ca-field">
-              Or why none is needed
-              <textarea value={form.noAction} onChange={(event) => set({ noAction: event.target.value })} rows={2} />
-            </label>
+            {record?.remedial_action && !form.remedial && (
+              <label className="ca-field">
+                Why remedial action is no longer thought to be needed
+                <input value={form.remedialReason} onChange={(event) => set({ remedialReason: event.target.value })} />
+              </label>
+            )}
             <div className="ca-form-grid">
               <label className="ca-field">
                 {awareField.day ? "Awareness date (time not recorded)" : "Awareness time"}{" "}
@@ -532,17 +671,139 @@ function TriageDrawer({
                 </label>
               )}
             </div>
+            {laterAware && <p className="uw-hint">A later awareness lengthens every clock: it is signed.</p>}
+            {record?.completed_at && (
+              <label className="ca-field">
+                Why the triage changes
+                <input value={form.changeReason} onChange={(event) => set({ changeReason: event.target.value })} />
+              </label>
+            )}
+            {signs && (
+              <div className="ca-form-grid">
+                <label className="ca-field">
+                  Your password (signature)
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={form.password}
+                    onChange={(event) => set({ password: event.target.value })}
+                  />
+                </label>
+                <label className="ca-field">
+                  Code from your authenticator app (if asked)
+                  <input
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={form.mfa}
+                    onChange={(event) => set({ mfa: event.target.value })}
+                  />
+                </label>
+              </div>
+            )}
             {problem && <p className="uw-hint">{problem}</p>}
             <div className="ca-action-row">
               <button type="submit" className="ac-primary" disabled={busy || !!problem} title={problem || undefined}>
-                {busy ? "Saving…" : "Save the triage record"}
+                {busy ? "Saving…" : "Save the triage"}
               </button>
             </div>
-            <InlineError text={error} />
           </form>
         )}
+        <InlineError text={error} />
       </div>
     </Frame>
+  );
+}
+
+type TriageVersion = {
+  version: number;
+  changed_by: string;
+  changed_at: string;
+  change_reason: string | null;
+  changed_fields: Record<string, { old: unknown; new: unknown }> | null;
+  signed: boolean;
+};
+
+/** "Versions": who changed what, old → new (spec 4.7). */
+function TriageVersions({ path }: { path: string }) {
+  const versions = useResource<{ items: TriageVersion[] }>(path);
+  const items = versions.data?.items ?? [];
+  if (!items.length) return <p className="uw-cr-meta">{versions.data ? "No versions yet." : "Loading…"}</p>;
+  return (
+    <ol>
+      {items.map((row) => (
+        <li key={row.version}>
+          <strong>Version {row.version}</strong> · {row.changed_by} · {formatDate(row.changed_at)}
+          {row.signed ? " · signed" : ""}
+          {row.change_reason ? `: ${row.change_reason}` : ""}
+          {row.changed_fields && Object.keys(row.changed_fields).length > 0 && (
+            <ul className="uw-cr-meta">
+              {Object.entries(row.changed_fields).map(([name, change]) => (
+                <li key={name}>
+                  {humanize(name)}: {humanize(change.old)} → {humanize(change.new)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** "Exclude the threat": a reason, the password and the code (TR-06); the history keeps both. */
+function ExcludeThreat({ path, onDone }: { path: string; onDone: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const [reason, setReason] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  if (!asking)
+    return (
+      <button type="button" className="ac-link" onClick={() => setAsking(true)}>
+        Exclude the threat
+      </button>
+    );
+  return (
+    <div className="ca-form-grid">
+      <label className="ca-field">
+        Why the threat is excluded
+        <input value={reason} onChange={(event) => setReason(event.target.value)} />
+      </label>
+      <label className="ca-field">
+        Your password (signature)
+        <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+      </label>
+      <label className="ca-field">
+        Code (if asked)
+        <input inputMode="numeric" value={code} onChange={(event) => setCode(event.target.value)} />
+      </label>
+      <div className="ca-action-row">
+        <button
+          type="button"
+          className="ac-primary"
+          disabled={busy || reason.trim().length < REASON_MIN || !password}
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            try {
+              await send(path, "POST", { reason: reason.trim(), password, mfa_code: code.trim() || null });
+              onDone();
+            } catch (failure) {
+              setError(errorText(failure, "The threat was not excluded"));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Sign and exclude
+        </button>
+        <button type="button" className="ac-link" onClick={() => setAsking(false)}>
+          Cancel
+        </button>
+      </div>
+      <InlineError text={error} />
+    </div>
   );
 }
 
@@ -606,7 +867,7 @@ export function EscalateButton({
   label?: string;
   onDone?: () => void;
 }) {
-  const canWrite = useCanTriage();
+  const canWrite = useCanEscalate();
   const [asking, setAsking] = useState(false);
   const [reason, setReason] = useState("");
   const [state, setState] = useState<"idle" | "busy" | "done">("idle");
