@@ -71,6 +71,9 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
 - Uploads and imports, exports and downloads, and connector syncs are rate limited per person and per organization
   (per hour: 60 and 300 uploads, 60 and 300 exports, 20 and 60 syncs); past a limit the answer is 429 "Too many
   attempts. Please try again in …" with `Retry-After`.
+- An independent alert channel: when no usual channel delivers an operational alert (for example the email provider
+  is down), it is also posted to `MDARIX_ALERT_FALLBACK_WEBHOOK`. Optional; unset, nothing changes. Operators: add the
+  setting where the alert settings are documented, and prove it with `scripts/send_test_alert.py`.
 
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 
