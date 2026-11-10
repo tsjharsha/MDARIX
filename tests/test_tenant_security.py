@@ -319,6 +319,32 @@ def test_the_decision_list_says_what_each_user_may_do_without_auditing_or_counti
     assert governance_events() == before
 
 
+def test_a_refused_signature_leaves_only_its_refusal_event(org):
+    from backend.app.db.models.foundation import AuditEvent
+
+    decision_id = _decision(org, created_by=org["ids"]["approver"])
+
+    def actions():
+        db = SessionLocal()
+        try:
+            return sorted(row.action for row in db.query(AuditEvent).filter(AuditEvent.entity_id == decision_id))
+        finally:
+            db.close()
+
+    version = _listed(org["clients"]["second_approver"], org, decision_id)["updated_at"]
+    path = f"/api/v1/governance/decisions/{decision_id}/sign"
+    body = {"decision": "APPROVE", "remarks": "Signed", "object_version": version}
+    before = actions()
+    viewer = org["clients"]["viewer"].post(path, json={**body, "password": PASSWORD})
+    assert viewer.status_code == 403 and viewer.json()["detail"]["code"] == "APPROVAL_AUTHORITY_DENIED"
+    wrong = org["clients"]["second_approver"].post(path, json={**body, "password": "not-the-password"})
+    assert wrong.status_code == 403 and wrong.json()["detail"]["code"] == "INVALID_REAUTHENTICATION"
+    assert actions() == sorted(before + ["APPROVAL_AUTHORITY_DENIED", "SIGNATURE_REAUTHENTICATION_FAILED"])
+    signed = org["clients"]["second_approver"].post(path, json={**body, "password": PASSWORD})
+    assert signed.status_code == 200, signed.text
+    assert "APPROVAL_REQUESTED" in actions()
+
+
 def test_an_approver_signs_the_listed_version_after_a_review_and_a_changed_signature_shows_invalid(org):
     from backend.app.db.models.foundation import SignedApprovalRecord
 
