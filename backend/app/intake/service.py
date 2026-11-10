@@ -2012,5 +2012,19 @@ def reopen_raised(db: Session, control_db, tenant_id, actor, now, correlation_id
                 )
             )
             reopened.append(item["ref"])
+            if kind == COMPLAINT:
+                # B7 (RT-26): a complaint MDARIX closed reopens with its triage; the closure is superseded.
+                from backend.app.complaint_disposition.resolve import reopen_closed
+
+                reopen_closed(
+                    db,
+                    tenant_id,
+                    uuid.UUID(member_id),
+                    str(actor),
+                    f"Triage reopened: {trigger}",
+                    trigger,
+                    now,
+                    correlation_id,
+                )
     db.flush()
     return reopened

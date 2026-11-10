@@ -299,6 +299,14 @@ def seed_routine_examples(db: Session, tenant_id, now: datetime | None = None) -
         proposal.signed_record_id = record_id
         answers = rules.answers_of(rules.SERVICE_LEVEL, [], [], "", "")
         record = rules.clean_service_record(RT03_RECORD)
+        # B7-D5: the sample's customer was told through the distributor, signed with the disposition.
+        record["customer_told"] = {
+            "how": "DISTRIBUTOR",
+            "at": signed_at.isoformat(),
+            "note": "The distributor told the hospital the cause and the fix.",
+            "qms_letter_id": None,
+            "reason": None,
+        }
         material = {
             "complaint_id": str(rt03.id),
             "complaint": "SAMPLE-RT-03",

@@ -11,8 +11,9 @@ disposition, the case and its decision, the communications log, My Work), so the
 - **The checklist** (a higher-risk function: each blocking item says why and where it is resolved): triage complete;
   the first-contact check signed, where the event began as a contact; every relevant market assessed and signed, no
   reassessment open; every report obligation met; the disposition or the investigation decision signed; every
-  information request answered or closed; no task on the event open. Open CAPAs are listed and do not block: they
-  close in the QMS.
+  information request answered or closed; no task on the event open; the customer told (B7-D5: a reply in the
+  communications log, or "not possible" with the reason, signed with the disposition). Open CAPAs are listed and do
+  not block: they close in the QMS.
 - **Ready to close in the QMS** is signed by the event owner with their password: when the checklist is clear, or
   with a written reason when it is not. MDARIX never closes the complaint: the QMS does, under the customer's
   procedure.
@@ -95,6 +96,28 @@ def owner_of(row: EventClosure | None, record) -> str | None:
     if row is not None and row.owner_id:
         return row.owner_id
     return record.event_owner if record is not None else None
+
+
+def responses(db: Session, tenant_id, ids) -> dict:
+    """The replies sent to a reporter (communications log, Sent / Response), counted by complaint."""
+    from sqlalchemy import func
+
+    from backend.app.communications import rules as comms
+    from backend.app.db.models.guides_communications import CommunicationEntry
+
+    if not ids:
+        return {}
+    return dict(
+        db.query(CommunicationEntry.complaint_id, func.count())
+        .filter(
+            CommunicationEntry.tenant_id == tenant_id,
+            CommunicationEntry.complaint_id.in_(list(ids)),
+            CommunicationEntry.direction == comms.SENT,
+            CommunicationEntry.purpose == comms.RESPONSE,
+        )
+        .group_by(CommunicationEntry.complaint_id)
+        .all()
+    )
 
 
 def _linked_intakes(db: Session, tenant_id, complaint_id) -> list[uuid.UUID]:
@@ -231,6 +254,7 @@ def facts(
         "requests": open_requests(db, tenant_id, [complaint.id]),
         "tasks": tasks,
         "capas": capas,
+        "responses": responses(db, tenant_id, [complaint.id]).get(complaint.id, 0),
     }
 
 
@@ -347,6 +371,7 @@ def facts_many(
     )
     assessed = rows_by_complaint(db, tenant_id, ids)
     requests = grouped(open_requests(db, tenant_id, ids), lambda row: row.complaint_id)
+    replies = responses(db, tenant_id, ids)
     out = {}
     for complaint in complaints:
         mine = [case for found in (cases.get(key, []) for key in case_ids.get(complaint.id, ())) for case in found]
@@ -369,6 +394,7 @@ def facts_many(
             "requests": requests.get(complaint.id, []),
             "tasks": tasks.get(str(complaint.id), []),
             "capas": [row for case in mine for row in capas.get(case.id, [])],
+            "responses": replies.get(complaint.id, 0),
         }
     return out
 
@@ -403,6 +429,7 @@ def checklist(found: dict) -> list[dict]:
         "FIRST_CONTACT": "Sign the first-contact check",
         "DECISION": "Sign the disposition",
         "TASKS": "Finish the open task in My Work",
+        "CUSTOMER_TOLD": "Record that the customer was told",
     }
     record = found["record"]
     if found["on_triage"] or (record is not None and record.completed_at is None):
@@ -545,6 +572,34 @@ def checklist(found: dict) -> list[dict]:
             links.target("Complaints", "Communications", record=("complaint", complaint.id)) if requests else None,
         )
     )
+    told = ((disposition.service_record or {}).get("customer_told") if disposition is not None else None) or {}
+    if told.get("how") == "NOT_POSSIBLE":
+        items.append(
+            _check("CUSTOMER_TOLD", "The customer was told", NOT_REQUIRED, f"Not possible: {told.get('reason')}")
+        )
+    elif told or found.get("responses"):
+        how = str(told.get("how") or "").replace("_", " ").lower()
+        items.append(
+            _check(
+                "CUSTOMER_TOLD",
+                "The customer was told",
+                PASS,
+                (f"Told by {how}" if how else "Recorded")
+                + (f", QMS letter {told['qms_letter_id']}" if told.get("qms_letter_id") else "")
+                if told
+                else f"{_n(found['responses'], 'reply')} sent, in the communications log",
+            )
+        )
+    else:
+        items.append(
+            _check(
+                "CUSTOMER_TOLD",
+                "The customer was told",
+                BLOCKED,
+                "No reply to the customer is recorded",
+                links.target("Complaints", "Communications", record=("complaint", complaint.id)),
+            )
+        )
     tasks = [task for task in found["tasks"] if task.task_type != REPLY_TASK]
     if len(tasks) > 1:
         actions["TASKS"] = f"Finish the {len(tasks)} open tasks in My Work"
@@ -656,10 +711,16 @@ def stage_line(found: dict, items: list[dict], row: EventClosure | None) -> list
     # B2 (spec 4.6): a complaint a Case became starts with the stage "Case", done (it escalated).
     from_case = getattr(complaint, "source_system", None) == "MDARIX_CASE"
     case = [{"code": "CASE", "label": "Case", "state": "DONE"}] if from_case else []
+    # B7: a complaint MDARIX closed itself (MDARIX Complete) reads "Closed", not "Closed in the QMS".
+    native = row is not None and getattr(row, "closed_at", None) is not None
     return case + [
         {
             "code": code,
-            "label": "Report" if code == "MARKETS" and reporting else label,
+            "label": "Report"
+            if code == "MARKETS" and reporting
+            else "Closed"
+            if code == "CLOSED" and native
+            else label,
             "state": "LATER"
             if code in later
             else "NOT_NEEDED"
@@ -789,7 +850,7 @@ def decision_record(control_db: Session, found: dict, row: EventClosure | None, 
     if row is not None and row.ready_state is not None:
         entries.append(
             {
-                "kind": "Ready to close in the QMS",
+                "kind": "Closed in MDARIX" if row.closed_at is not None else "Ready to close in the QMS",
                 "summary": f"Version {row.version}: "
                 + ("checklist clear" if row.ready_state == "READY" else "signed with items still open"),
                 "reason": row.ready_reason,
@@ -821,6 +882,14 @@ def signature_meaning(ref: str, version: int, blocked: int) -> str:
     return (
         f"I, the event owner, sign that every MDARIX decision on event {ref} (version {version}) is signed and it is "
         "ready to close in the QMS"
+    )
+
+
+def close_meaning(ref: str, version: int) -> str:
+    """B7-D1: the meaning of the closure signed with Resolve and close in MDARIX Complete."""
+    return (
+        f"I, the event owner, sign that every MDARIX decision on event {ref} (version {version}) is signed and close "
+        "the complaint in MDARIX"
     )
 
 

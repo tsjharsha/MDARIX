@@ -24,6 +24,33 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   addenda accept the kinds `TRANSLATION` and `EMAIL`; a Case import's key is unique per organization. Legacy
   organization databases get the same from `scripts/add_workflow_tables_to_legacy_planes.py` (step `tr25`).
 
+### Added
+
+- Resolve and close (`GET`/`POST /api/v1/complaints/{id}/resolve-and-close`): a routine complaint's resolution,
+  problem code, cause, classification, customer told, the routine "not reportable" conclusions (or the markets
+  already signed) and the closure are signed with one password and code. Two signed records are written, each with
+  its own meaning: the disposition and ready to close. In MDARIX Complete the complaint is closed (status `closed`,
+  stage "Closed"); in Connect it is marked ready to close in your QMS and never closed by MDARIX. It is offered only
+  when nothing else is open (triage, tasks, information requests, reports, a market started); signing over an open
+  item stays on the ready-to-close step. Another person's event is taken over only when the signer ticks it (audited
+  `EVENT_OWNER_TAKEN_OVER`); the problem code is audited `PROBLEM_CODE_SET`; the closure `COMPLAINT_CLOSED`. A reply
+  is logged in the communications log to each reporter with a contact.
+- Reopen a complaint MDARIX closed (`POST /api/v1/complaints/{id}/reopen`), with a reason of at least 20 characters
+  and no signature; the closure is superseded (`COMPLAINT_REOPENED`). A closed complaint whose triage reopens on new
+  harm reopens with it.
+- A new closure check, "The customer was told": a reply in the communications log, a "customer told" entry signed
+  with the disposition, or "not possible" with the reason (anonymous, unreachable). The sample's service-level
+  complaint records that its customer was told through the distributor.
+
+### Changed
+
+- The disposition rules are version `disposition-starter-2` (signers in a trial acknowledge it once): a service
+  ticket is needed only for a part replaced or a setting corrected; the correction "No fault found" (its cause is
+  undetermined, with a reason); why no investigation is needed is chosen from a list, with words only for "Other",
+  and "reporter withdrew" is not open on the reportability watch; "Device returned" is recorded; a new failure mode
+  may be answered "known behaviour, documented in <reference>" inside the signature (every other trigger still
+  escalates).
+
 ## [0.10.96] - not released yet (ships in the big-bang release)
 
 B3: the US eMDR complete for manufacturers (initial report). No migration. The API and web images change.

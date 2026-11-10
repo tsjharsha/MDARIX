@@ -414,7 +414,26 @@ def test_the_flagship_from_the_entrance_to_ready_to_close_by_each_screens_main_b
     )
     assert signed.status_code == 200, signed.text
 
-    # 7. Ready to close: nothing open; the event owner signs.
+    # 7. B7-D5: the customer is told before closing; the step opens the complaint's communications log.
+    label, target, view = _next(user)
+    assert label == "Record that the customer was told" and target["tab"] == "Communications", view["checklist"]
+    party = _ok(user.post("/api/v1/communications/parties", json={"type": "REPORTER", "name": "Ward nurse (test)"}))
+    _ok(
+        user.post(
+            "/api/v1/communications",
+            json={
+                "complaint_id": complaint,
+                "party_id": party["id"],
+                "direction": "SENT",
+                "purpose": "RESPONSE",
+                "subject": "The sensor is replaced; the reading was drift",
+                "channel": "PHONE",
+                "occurred_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    )
+
+    # 8. Ready to close: nothing open; the event owner signs.
     label, target, view = _next(user)
     assert label is None and view["state"] == "READY_TO_SIGN", view["checklist"]
     ready = _ok(user.post(f"/api/v1/oversight/events/{complaint}/ready", json={"password": PASSWORD, "reason": ""}))

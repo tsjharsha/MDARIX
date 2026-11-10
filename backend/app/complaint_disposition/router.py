@@ -93,6 +93,8 @@ class SignRequest(BaseModel):
     seen_version: int = Field(default=0, ge=0)
     routine: bool = False
     opened_at: str | None = Field(default=None, max_length=40)
+    # B7-D4: a new failure mode answered "known behaviour, documented in <reference>".
+    known_behaviour_ref: str = Field(default="", max_length=240)
     password: str = Field(min_length=1, max_length=128)
     mfa_code: str | None = Field(default=None, max_length=12)
 
@@ -389,6 +391,23 @@ def sign_disposition(
     """Sign the disposition: the branch with each answer's rationale, the triggers met with their facts, the
     service-level record and attribution, the confirmed classification and, on the routine path, each enabled market's
     "not reportable" conclusion on the routine basis are what is signed."""
+    sign(db, control_db, ctx, complaint_id, payload)
+    return screen(db, control_db, ctx, complaint_id)
+
+
+def sign(
+    db: Session,
+    control_db: Session,
+    ctx,
+    complaint_id: uuid.UUID,
+    payload: SignRequest,
+    extra: dict | None = None,
+    before_sign=None,
+    before_commit=None,
+) -> None:
+    """The disposition's signing, shared with Resolve and close (B7): ``extra`` is signed with the service-level record
+    (customer told); ``before_sign(facts)`` refuses by raising, before the credentials are checked;
+    ``before_commit(facts, signed_record_id, now)`` writes more records in the same transaction."""
     from backend.app.case_workflow import scope as case_scope
     from backend.app.governance_router import verify_signing_credentials
     from backend.app.human_decision.rules import fingerprint, signature_hash
@@ -414,6 +433,15 @@ def sign_disposition(
             + "; ".join(item["fact"] for item in met if item["code"] in new),
             triggers=[item for item in met if item["code"] in new],
         )
+    known_behaviour = rules.collapse(payload.known_behaviour_ref)
+    answered = rules.answered_triggers(met, known_behaviour)
+    if len(answered) < len(met):
+        # B7-D4: the new failure mode is answered; the routine offer is read again without it.
+        met = answered
+        unrecorded = rules.routine_unrecorded(service.watch_record(complaint))
+        facts["routine"] = service.routine_offer(facts["on_watch"], facts["second_look"], met, unrecorded)
+    else:
+        known_behaviour = ""
     branch = rules.collapse(payload.branch).upper()
     rationale = rules.collapse(payload.rationale)
     not_known = rules.collapse(payload.not_known_reason)
@@ -425,6 +453,7 @@ def sign_disposition(
     attribution, attribution_reason = None, None
     if not problem and branch == rules.SERVICE_LEVEL:
         record = rules.clean_service_record(payload.service_record.model_dump() if payload.service_record else None)
+        record.update(extra or {})
         attribution = rules.collapse(payload.attribution).upper() or None
         attribution_reason = rules.collapse(payload.attribution_reason) or None
         problem = (
@@ -495,6 +524,8 @@ def sign_disposition(
             )
         )
 
+    if before_sign is not None:
+        before_sign(facts)
     # Re-authenticate first: a refusal commits the control session, so nothing else may be pending in it yet.
     verify_signing_credentials(
         control_db, ctx, password=payload.password, mfa_code=payload.mfa_code, record_refusal=refused
@@ -577,6 +608,8 @@ def sign_disposition(
             )
         )
     answers = rules.answers_of(branch, met, candidates, rationale, not_known)
+    if known_behaviour:
+        answers["TRIGGER"]["known_behaviour"] = known_behaviour
     classification = None
     if latest is None or latest.state != "CONFIRMED" or changed:
         classification = ComplaintClassification(
@@ -731,6 +764,8 @@ def sign_disposition(
     for earlier in versions:
         if earlier.superseded_by is None:
             earlier.superseded_by = disposition_id
+    if before_commit is not None:
+        before_commit(facts, record_id, now)
     try:
         signing_commit.commit(db, control_db, "disposition")
     except IntegrityError as exc:
@@ -744,4 +779,3 @@ def sign_disposition(
         from backend.app.workflow.hooks import on_investigation_opened
 
         on_investigation_opened(db, control_db, case, actor_user_id=ctx.user_id, owner_user_id=ctx.user_id)
-    return screen(db, control_db, ctx, complaint_id, today)
