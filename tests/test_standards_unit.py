@@ -337,7 +337,8 @@ def test_signed_statements_and_meanings_name_documents_never_codes():
     assert standards.version_words("disposition-starter-1") == "MDARIX starter, version 1"
     assert standards.version_words("US-v2") == "your version 2"
     statements = [document.as_dict()["statement"] for document in service.documents().values()]
-    assert "I have read the complaint disposition rules, MDARIX starter, version 1" in statements
+    # The current document is disposition-starter-2 (B7); records signed on version 1 keep their stored statement.
+    assert "I have read the complaint disposition rules, MDARIX starter, version 2" in statements
     signed = [
         *statements,
         disposition_meaning("CMP000001", "SERVICE_LEVEL", ["US", "EU_NI"], True),

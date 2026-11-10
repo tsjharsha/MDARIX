@@ -35,7 +35,7 @@ def test_a_trial_made_before_0_10_97_gets_rt03_s_reply_once():
     try:
         with SessionLocal() as db:
             bind_tenant(db, tenant_id)
-            rt03 = db.query(Complaint).filter_by(complaint_identifier="SAMPLE-RT-03").one()
+            rt03 = db.query(Complaint).filter_by(tenant_id=tenant_id, complaint_identifier="SAMPLE-RT-03").one()
             assert sample_0_10_97.refresh(db, tenant_id, apply=False) == 0  # a new trial signs it with the record
             assert _told(db, rt03) != closure.BLOCKED
             # As a trial made before 0.10.97 had it: the disposition signed without customer told, nothing in the log.
