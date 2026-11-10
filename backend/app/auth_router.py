@@ -410,7 +410,7 @@ def mfa_status(request: Request, db: Session = Depends(get_db)):
         "enrolled": enrolled,
         "enrolled_at": user.mfa_enrolled_at if enrolled else None,
         "recovery_codes_left": len(user.mfa_recovery_hashes or []) if enrolled else 0,
-        "required_for_role": mfa.required_for(user),
+        "required_for_role": mfa.required_for(user, db),
         "replacement_pending": bool(enrolled and user.mfa_pending_secret_encrypted),
     }
 
@@ -928,7 +928,7 @@ def signin(data: Signin, request: Request, response: Response, db: Session = Dep
 
     # The new session owes MFA when the account is enrolled (VERIFY) or policy requires setting it up (ENROLL);
     # until then it can only use the MFA steps, and only for a few minutes.
-    mfa_state = mfa.session_state_for(row)
+    mfa_state = mfa.session_state_for(row, db)
     ttl = PENDING_MFA_SECONDS if mfa_state else SESSION_WINDOW_SECONDS
     # Audited in the transaction that creates the session (new_session commits both).
     _audit_user(db, row, "SIGN_IN_SUCCEEDED", request, {"mfa": mfa_state or "NONE"}, now)
@@ -1216,6 +1216,6 @@ def activate(data: Reset, request: Request, background: BackgroundTasks, db: Ses
         _send_welcome_quietly,
         row.username,
         _organization_name(db, row.tenant_id) or "your organization",
-        mfa.required_for(row),
+        mfa.required_for(row, db),
     )
     return {"status": "ACTIVE", "user_id": str(row.id), "business_id": row.business_id, "email": row.username}

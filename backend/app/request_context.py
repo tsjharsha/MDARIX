@@ -249,6 +249,19 @@ def get_request_context(
         # platform staff in a CELL) is no session here, whatever database it was created in.
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
     ensure_tenant_access(db, user)
+    from backend.app import mfa
+
+    if not mfa.is_enrolled(user) and mfa.required_for(user, db):
+        # A role that now needs MFA (an added or custom role, a changed account role) reaches open sessions too: the
+        # browser goes to the authenticator setup sign-in uses (/mfa/enroll accepts this session), never a dead end;
+        # nothing is stored, so a role taken away again lets the same session back in (code audit 1).
+        raise HTTPException(
+            403,
+            detail={
+                "code": "MFA_ENROLLMENT_REQUIRED",
+                "message": "Your role now requires two-factor sign-in: set up your authenticator app to continue",
+            },
+        )
     from genai.governance import set_request_tenant
 
     # Model calls made while handling this request apply this organization's AI switch and budget.

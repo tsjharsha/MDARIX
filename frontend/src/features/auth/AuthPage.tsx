@@ -403,7 +403,7 @@ export function AuthPage({ mode }: { mode: string }) {
           </h1>
           <p>
             {mfaEnrollment
-              ? "Scan the QR code with an authenticator app on your phone (Microsoft Authenticator, Google Authenticator, 1Password and others), then enter the 6-digit code it shows."
+              ? "Your role requires two-factor sign-in. Scan the QR code with an authenticator app on your phone (Microsoft Authenticator, Google Authenticator, 1Password and others), then enter the 6-digit code it shows."
               : useRecovery
                 ? "Enter one of your recovery codes. Each code works once."
                 : "Enter the 6-digit code from your authenticator app to continue."}

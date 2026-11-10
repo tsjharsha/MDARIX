@@ -100,7 +100,10 @@ def test_only_a_fully_signed_in_platform_administrator_may_set_a_hold(platform, 
     assert customer_admin.put(_hold_url(tenant_id), json=HOLD).status_code in (401, 403)
     # Where administrators must use an authenticator, one who has not enrolled cannot set a hold.
     monkeypatch.setenv("MDARIX_REQUIRE_MFA_ROLES", "PLATFORM_ADMIN")
-    assert platform.put(_hold_url(tenant_id), json=HOLD).status_code == 403
+    refused = platform.put(_hold_url(tenant_id), json=HOLD)
+    assert refused.status_code == 403 and refused.json()["detail"]["code"] == "MFA_ENROLLMENT_REQUIRED"
+    # The policy reaches the whole session (code audit 1): read the hold back without it.
+    monkeypatch.setenv("MDARIX_REQUIRE_MFA_ROLES", "")
     assert platform.get(_hold_url(tenant_id)).json()["legal_hold"] is False
 
 

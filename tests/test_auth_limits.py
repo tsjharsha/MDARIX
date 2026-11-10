@@ -178,10 +178,12 @@ def test_outside_local_development_administrators_leaders_and_approvers_must_use
         def __init__(self, role):
             self.role = role
 
+    # The account role only here; additional and custom roles: tests/test_mfa_effective_roles.py.
+    monkeypatch.setattr("backend.app.access.permissions.roles_of_user", lambda db, user: [user.role])
     for role in ("Administrator", "Customer Admin", "Leader", "approver"):
-        assert mfa.session_state_for(Account(role)) == "ENROLL", role
+        assert mfa.session_state_for(Account(role), None) == "ENROLL", role
     for role in ("Investigator", "Viewer", "Reviewer"):
-        assert mfa.session_state_for(Account(role)) is None, role
+        assert mfa.session_state_for(Account(role), None) is None, role
 
 
 def test_local_development_requires_no_mfa_unless_configured(monkeypatch):

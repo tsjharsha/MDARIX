@@ -50,17 +50,21 @@ def is_enrolled(user) -> bool:
     return bool(getattr(user, "mfa_enrolled_at", None) and getattr(user, "mfa_secret_encrypted", None))
 
 
-def required_for(user) -> bool:
-    """True when the person's role must use MFA (then nobody can switch it off for them; an administrator's reset only
-    sends them to set up a new authenticator at their next sign-in)."""
-    return _normalize(user.role) in required_roles()
+def required_for(user, db) -> bool:
+    """True when any role the person holds (``roles_of_user``: the account role, an assigned custom role and the
+    additional workflow roles) must use MFA; then nobody can switch it off for them, and an administrator's reset only
+    sends them to set up a new authenticator. ``db``: the control plane, bound to the person's organization."""
+    from backend.app.access.permissions import roles_of_user
+
+    required = required_roles()
+    return bool(required) and any(_normalize(role) in required for role in roles_of_user(db, user))
 
 
-def session_state_for(user) -> str | None:
+def session_state_for(user, db) -> str | None:
     """The MFA step a new session still owes: VERIFY (enrolled), ENROLL (policy requires it), or None."""
     if is_enrolled(user):
         return "VERIFY"
-    if required_for(user):
+    if required_for(user, db):
         return "ENROLL"
     return None
 
