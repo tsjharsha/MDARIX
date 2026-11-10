@@ -191,7 +191,18 @@ export function recordLine(kind: RecordKind, row: Row): { ref: string; text: str
     case "investigations":
       return {
         ref: row.investigation_identifier ?? row.business_id,
-        text: [row.status, row.version_identifier, row.investigation_question].filter(Boolean).join(" · "),
+        // PV-1: an investigation spanning several versions names them all.
+        text: [
+          row.status,
+          row.versions?.length
+            ? row.versions.join(", ")
+            : row.applies_to === "PRODUCT"
+              ? "no version recorded (the product's)"
+              : row.version_identifier,
+          row.investigation_question,
+        ]
+          .filter(Boolean)
+          .join(" · "),
       };
     case "signals":
       return { ref: row.business_id ?? row.id, text: [row.title, row.status].filter(Boolean).join(" · ") };
@@ -201,7 +212,12 @@ export function recordLine(kind: RecordKind, row: Row): { ref: string; text: str
         text: [row.title, row.check?.label, row.basis].filter(Boolean).join(" · "),
       };
     case "risks":
-      return { ref: row.risk_identifier ?? row.business_id, text: row.description ?? "" };
+      return {
+        ref: row.risk_identifier ?? row.business_id,
+        text: [row.description, row.applies_to === "PRODUCT" ? "whole product (no version recorded)" : null]
+          .filter(Boolean)
+          .join(" · "),
+      };
     default:
       return {
         ref: [row.market, row.form_code].filter(Boolean).join(" ") || "Report",
@@ -285,7 +301,7 @@ function ProductCard({ row, go }: { row: ProductSummary; go: Go }) {
           {count("complaints", counts.open_complaints, "open complaints")}
           {count("investigations", counts.open_investigations, "open investigations")}
           {count("signals", counts.open_signals, "trends to review", true)}
-          {count("capas", counts.open_capas, "open CAPAs")}
+          {count("capas", counts.open_capas, "open CAPAs on the product")}
         </div>
       )}
     </li>

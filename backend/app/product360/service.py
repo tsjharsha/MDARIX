@@ -192,6 +192,9 @@ class Product360Service:
             )
             visible_versions = self.filter_rows_by_time(versions, as_of, mode, "release_timestamp")
             selected = self.select_version(versions, version_id, as_of)
+            if version_id and selected is None:
+                # PV-1: an unknown version is never read as another one (or as none).
+                raise Product360Error("VERSION_NOT_FOUND", "Version not found")
             selected_id = str(selected["id"]) if selected else None
             components = self.components(conn, tenant_id, selected_id)
             suppliers = self.suppliers(conn, tenant_id, components)
@@ -199,7 +202,8 @@ class Product360Service:
             changes = self.filter_rows_by_time(changes, as_of, mode, "effective_timestamp", "event_timestamp")
             lots = self.lots(conn, tenant_id, selected_id)
             lots = self.filter_rows_by_time(lots, as_of, mode, "manufactured_timestamp")
-            investigations = self.investigations(conn, tenant_id, product_id)
+            # PV-1: the investigations covering the selected version (their evidence follows them).
+            investigations = self.investigations(conn, tenant_id, product_id, selected_id)
             investigations = self.filter_rows_by_time(investigations, as_of, mode, "opened_at")
             light_counts = self.light_counts(conn, tenant_id, product_id, selected_id, investigations) if light else {}
             complaints = [] if light else self.complaints(conn, tenant_id, product_id, selected_id, as_of, mode)
@@ -207,9 +211,13 @@ class Product360Service:
             risks = (
                 conn.execute(
                     text(
-                        "SELECT id, business_id, risk_identifier, description, status FROM risks WHERE tenant_id=:tenant_id AND product_id=:product_id ORDER BY risk_identifier"
+                        "SELECT id, business_id, risk_identifier, description, status, "
+                        "CASE WHEN product_version_id IS NULL THEN 'PRODUCT' ELSE 'VERSION' END AS applies_to "
+                        "FROM risks WHERE tenant_id=:tenant_id AND product_id=:product_id "
+                        "AND (CAST(:version_id AS uuid) IS NULL OR product_version_id IS NULL "
+                        "OR product_version_id = CAST(:version_id AS uuid)) ORDER BY risk_identifier"
                     ),
-                    {"tenant_id": tenant_id, "product_id": product_id},
+                    {"tenant_id": tenant_id, "product_id": product_id, "version_id": selected_id},
                 )
                 .mappings()
                 .all()
@@ -564,13 +572,30 @@ class Product360Service:
         sql += " ORDER BY event_timestamp NULLS LAST, complaint_identifier"
         return conn.execute(text(sql), params).mappings().all()
 
-    def investigations(self, conn, tenant_id: str, product_id: str):
+    def investigations(self, conn, tenant_id: str, product_id: str, version_id: str | None = None):
+        """The product's investigations; with ``version_id`` (PV-1) those whose complaints include one on that version,
+        so an investigation spanning several versions is under each of them, and those with no version recorded at all
+        (``applies_to`` PRODUCT: the product's, never assigned to a version)."""
+        on_version = (
+            "EXISTS (SELECT 1 FROM investigation_complaints ic JOIN complaints c ON c.tenant_id=ic.tenant_id "
+            "AND c.id=ic.complaint_id WHERE ic.tenant_id=:tenant_id AND ic.investigation_id=investigations.id "
+            "AND c.product_version_id {})"
+        )
+        covers = (
+            f" AND ({on_version.format('=CAST(:version_id AS uuid)')} OR NOT {on_version.format('IS NOT NULL')})"
+            if version_id
+            else ""
+        )
         return (
             conn.execute(
                 text(
-                    "SELECT id, business_id, investigation_identifier, investigation_question, status, opened_at, closed_at FROM investigations WHERE tenant_id=:tenant_id AND product_id=:product_id ORDER BY opened_at"
+                    "SELECT id, business_id, investigation_identifier, investigation_question, status, opened_at, closed_at, "
+                    f"CASE WHEN {on_version.format('IS NOT NULL')} THEN 'VERSION' ELSE 'PRODUCT' END AS applies_to "
+                    "FROM investigations WHERE tenant_id=:tenant_id AND product_id=:product_id"
+                    + covers
+                    + " ORDER BY opened_at"
                 ),
-                {"tenant_id": tenant_id, "product_id": product_id},
+                {"tenant_id": tenant_id, "product_id": product_id, "version_id": version_id},
             )
             .mappings()
             .all()
@@ -657,6 +682,20 @@ class Product360Service:
         for row in rows:
             found.setdefault(str(row["investigation_id"]), row["version_identifier"])
         return found
+
+    def investigation_version_sets(self, conn, tenant_id: str, product_id: str) -> dict[str, list[str]]:
+        """Each case's versions: every version one of its complaints is on (PV-1), by name."""
+        rows = conn.execute(
+            text(
+                "SELECT ic.investigation_id, array_agg(DISTINCT pv.version_identifier ORDER BY pv.version_identifier) "
+                "AS versions FROM investigation_complaints ic "
+                "JOIN complaints c ON c.tenant_id=ic.tenant_id AND c.id=ic.complaint_id "
+                "JOIN product_versions pv ON pv.tenant_id=c.tenant_id AND pv.id=c.product_version_id "
+                "WHERE ic.tenant_id=:tenant_id AND c.product_id=:product_id GROUP BY ic.investigation_id"
+            ),
+            {"tenant_id": tenant_id, "product_id": product_id},
+        ).mappings()
+        return {str(row["investigation_id"]): list(row["versions"] or []) for row in rows}
 
     def evidence(self, conn, tenant_id: str, investigations, as_of: datetime | None, mode: str):
         ids = [str(row["id"]) for row in investigations]

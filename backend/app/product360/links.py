@@ -103,8 +103,9 @@ def reports(db, t, product, version, limit, offset):
 
 
 def investigations(db, t, product, version) -> list[dict]:
-    """The product's investigations, each on its version (the one most of its complaints carry); on a chosen version,
-    those whose version it is. Newest first."""
+    """The product's investigations, each on its version (the one most of its complaints carry) and with every version
+    its complaints are on; on a chosen version (PV-1), those with a complaint on it, so an investigation spanning
+    several versions is under each, with those that record no version (``applies_to`` PRODUCT). Newest first."""
     rows = (
         db.execute(
             text(
@@ -120,12 +121,16 @@ def investigations(db, t, product, version) -> list[dict]:
         .mappings()
         .all()
     )
-    on = Product360Service().investigation_versions(db, t, str(product["id"]))
+    service = Product360Service()
+    on = service.investigation_versions(db, t, str(product["id"]))
+    spans = service.investigation_version_sets(db, t, str(product["id"]))
     found = []
     for row in rows:
         item = _row(row)
         item["version_identifier"] = on.get(str(row["id"]))
-        if version is None or item["version_identifier"] == version["version_identifier"]:
+        item["versions"] = spans.get(str(row["id"]), [])
+        item["applies_to"] = "VERSION" if item["versions"] else "PRODUCT"
+        if version is None or not item["versions"] or version["version_identifier"] in item["versions"]:
             found.append(item)
     return found
 
@@ -202,18 +207,24 @@ def capa_rows(db, t, where: str, params: dict) -> list[dict]:
     return found
 
 
-def capas(db, t, product) -> list[dict]:
-    rows = capa_rows(
-        db,
-        t,
-        "k.product_id=:p OR k.investigation_id IN (SELECT id FROM investigations WHERE tenant_id=:t AND product_id=:p)",
-        {"p": product["id"]},
+def capas(db, t, product, version=None) -> list[dict]:
+    """The product's CAPAs. On a chosen version (PV-1): those from an investigation listed on it (one with a complaint
+    on it, or one recording no version), and those with no investigation (a CAPA names a product, never a version);
+    each says whether it is the version's or the product's (``applies_to``)."""
+    cases = {row["id"]: row["applies_to"] for row in investigations(db, t, product, version)} if version else None
+    where = (
+        "k.product_id=:p OR k.investigation_id IN (SELECT id FROM investigations WHERE tenant_id=:t AND product_id=:p)"
+        if version is None
+        else "(k.investigation_id IS NULL AND k.product_id=:p) OR k.investigation_id = ANY(CAST(:cases AS uuid[]))"
     )
+    rows = capa_rows(db, t, where, {"p": product["id"], "cases": list(cases or [])})
     for row in rows:
+        case = str(row["investigation_id"]) if row["investigation_id"] else None
+        row["applies_to"] = (cases or {}).get(case, "VERSION") if case else "PRODUCT"
         row["basis"] = (
             f"CAPA from {row['investigation_identifier']}"
             if row["investigation_identifier"]
-            else f"CAPA on {product['name']}"
+            else f"CAPA on {product['name']} (product level)"
         )
     return rows
 
@@ -222,7 +233,8 @@ def risks(db, t, product, version) -> list[dict]:
     rows = db.execute(
         text(
             "SELECT r.id, r.business_id, r.risk_identifier, r.description, r.status, r.product_version_id, "
-            "r.source_system, r.source_identifier, r.ingestion_timestamp, r.created_at FROM risks r "
+            "r.source_system, r.source_identifier, r.ingestion_timestamp, r.created_at, "
+            "CASE WHEN r.product_version_id IS NULL THEN 'PRODUCT' ELSE 'VERSION' END AS applies_to FROM risks r "
             "WHERE r.tenant_id=:t AND r.product_id=:p AND (CAST(:v AS uuid) IS NULL OR r.product_version_id IS NULL "
             "OR r.product_version_id = CAST(:v AS uuid)) ORDER BY r.risk_identifier"
         ),
@@ -308,7 +320,7 @@ def tiles(db: Session, tenant_id: str, product_ref: str, version_ref: str | None
     for kind, rows in (
         ("investigations", investigations(db, tenant_id, product, version)),
         ("signals", signals(db, tenant_id, product, version)),
-        ("capas", capas(db, tenant_id, product)),
+        ("capas", capas(db, tenant_id, product, version)),
         ("risks", risks(db, tenant_id, product, version)),
     ):
         found[kind] = {"count": len(rows), "items": rows[:TILE_ITEMS]}
@@ -333,7 +345,7 @@ def one_list(
         every = {
             "investigations": lambda: investigations(db, tenant_id, product, version),
             "signals": lambda: signals(db, tenant_id, product, version),
-            "capas": lambda: capas(db, tenant_id, product),
+            "capas": lambda: capas(db, tenant_id, product, version),
             "risks": lambda: risks(db, tenant_id, product, version),
         }[kind]()
         rows, total = every[offset : offset + limit], len(every)

@@ -150,3 +150,80 @@ def test_an_unknown_or_another_organizations_product_is_not_found(trial):
         for path in (f"/api/v1/products/{other}/links", f"/api/v1/products/{other}/product-360?light=1"):
             response = user.get(path)
             assert response.status_code == 404 and other not in response.text
+
+
+def test_a_chosen_version_shows_only_the_investigations_covering_it_pv1(trial):
+    """PV-1 (owner, 10 Nov 2026): with a version chosen, the light read and the tiles list the investigations with a
+    complaint on it (one spanning both versions under each); every version lists them all; an unknown version is 404,
+    never read as another one."""
+    from datetime import datetime, timezone
+
+    from backend.app.db.models.foundation import Complaint, Investigation, InvestigationComplaint, Product
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_tenant
+
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        product = db.query(Product).filter(Product.tenant_id == tenant_id, Product.product_identifier == ORBIT).one()
+        on = {}
+        for complaint, version in db.execute(
+            text(
+                "SELECT c.id, v.version_identifier FROM complaints c JOIN product_versions v ON v.id=c.product_version_id "
+                "WHERE c.tenant_id=:t AND c.product_id=:p ORDER BY c.complaint_identifier"
+            ),
+            {"t": str(tenant_id), "p": str(product.id)},
+        ):
+            on.setdefault(version, complaint)
+        assert {"Rev A", "Rev B"} <= set(on)
+        for identifier, versions in (("T-PV1-A", ["Rev A"]), ("T-PV1-AB", ["Rev A", "Rev B"])):
+            case = Investigation(
+                tenant_id=tenant_id,
+                investigation_identifier=identifier,
+                product_id=product.id,
+                investigation_question="PV-1 test",
+                status="open",
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(case)
+            db.flush()
+            for version in versions:
+                db.add(
+                    InvestigationComplaint(
+                        tenant_id=tenant_id, investigation_id=case.id, complaint_id=on[version], created_at=now
+                    )
+                )
+        db.commit()
+        assert db.query(Complaint).filter(Complaint.id == on["Rev A"]).one()
+
+    def light(version):
+        view = _ok(user.get(f"/api/v1/products/{ORBIT}/product-360", params={"version_id": version, "light": "1"}))
+        return {row["investigation_identifier"] for row in view["investigations"]}
+
+    def tiles(version=None):
+        params = {"version": version} if version else {}
+        found = _ok(user.get(f"/api/v1/products/{ORBIT}/links", params=params))["tiles"]["investigations"]
+        listed = _ok(user.get(f"/api/v1/products/{ORBIT}/links", params={**params, "kind": "investigations"}))
+        assert {row["investigation_identifier"] for row in listed} >= {
+            i["investigation_identifier"] for i in found["items"]
+        }
+        return {row["investigation_identifier"] for row in listed}
+
+    assert {"T-PV1-A", "T-PV1-AB"} <= light("Rev A") and "SAMPLE-INV-001" not in light("Rev A")
+    assert {"SAMPLE-INV-001", "T-PV1-AB"} <= light("Rev B") and "T-PV1-A" not in light("Rev B")
+    assert tiles("Rev A") == light("Rev A") and tiles("Rev B") == light("Rev B")
+    assert {"SAMPLE-INV-001", "T-PV1-A", "T-PV1-AB"} <= tiles()
+    spanning = next(
+        row
+        for row in _ok(user.get(f"/api/v1/products/{ORBIT}/links", params={"kind": "investigations"}))
+        if row["investigation_identifier"] == "T-PV1-AB"
+    )
+    assert spanning["versions"] == ["Rev A", "Rev B"] and spanning["applies_to"] == "VERSION"
+    unknown = user.get(f"/api/v1/products/{ORBIT}/product-360", params={"version_id": "Rev Z", "light": "1"})
+    assert unknown.status_code == 404 and unknown.json()["detail"]["code"] == "VERSION_NOT_FOUND"
+    # CAPAs on a version say whether they come from its investigation or are the product's own.
+    capas = _ok(user.get(f"/api/v1/products/{ORBIT}/links", params={"version": "Rev A", "kind": "capas"}))
+    assert all(row["applies_to"] in ("PRODUCT", "VERSION") for row in capas)
+    assert "SAMPLE-CAPA-02" not in {row["capa_identifier"] for row in capas}  # from SAMPLE-INV-001, on Rev B

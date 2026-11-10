@@ -213,7 +213,7 @@ export function ProductsSection({ tab }: { tab?: string }) {
                         empty={{ title: "No risks recorded", detail: "The risk file appears here when connected." }}
                       />
                     </Panel>
-                    <Panel eyebrow="Risk" title="Controls">
+                    <Panel eyebrow="Risk" title="Controls (whole organization)">
                       <RecordTable
                         caption="Controls"
                         idLabel="Control ID"
@@ -225,7 +225,7 @@ export function ProductsSection({ tab }: { tab?: string }) {
                       />
                     </Panel>
                   </div>
-                  <Panel eyebrow="Risk" title="Failure modes">
+                  <Panel eyebrow="Risk" title="Failure modes (whole organization)">
                     <RecordTable
                       caption="Failure modes"
                       idLabel="Failure mode ID"

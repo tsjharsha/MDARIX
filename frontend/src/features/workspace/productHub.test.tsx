@@ -269,3 +269,17 @@ describe("one product's page", () => {
     expect(none).toContain("a configuration belongs to a version");
   });
 });
+
+describe("a chosen version is respected (PV-1)", () => {
+  it("names every version an investigation spans, and says when one records none", () => {
+    expect(recordLine("investigations", { investigation_identifier: "I1", versions: ["Rev A", "Rev B"] }).text).toBe(
+      "Rev A, Rev B",
+    );
+    expect(
+      recordLine("investigations", { investigation_identifier: "I2", versions: [], applies_to: "PRODUCT" }).text,
+    ).toBe("no version recorded (the product's)");
+    expect(recordLine("risks", { risk_identifier: "R1", description: "Alarm", applies_to: "PRODUCT" }).text).toBe(
+      "Alarm · whole product (no version recorded)",
+    );
+  });
+});
