@@ -141,3 +141,15 @@ def test_the_complaint_page_of_an_escalated_case_shows_its_origin_its_case_and_t
     assert case["troubleshooting"] == "Restarted the pump; the alarm came back"
     # The Case check after the escalation: no clock chip and nothing to attach to (its life continues on the page).
     assert signed["clock"] is None and signed["likely_complaints"] == []
+
+
+def test_the_old_contacts_list_is_bounded_and_names_the_paged_list(trial, monkeypatch):  # B2 step 5: N+1 bounded
+    from backend.app.intake import service
+
+    user = trial["user"]
+    for index in range(3):
+        _log(user, serial_number=f"SN-BOUND-{index}")
+    monkeypatch.setattr(service, "READ_LIMIT", 2)
+    body = _ok(user.get(INTAKE))
+    assert len(body["items"]) == 2 and body["truncated"] is True
+    assert body["cases_path"] == "/api/v1/intake/cases" and body["summary"]["all"] >= 3

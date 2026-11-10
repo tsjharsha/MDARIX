@@ -1,7 +1,8 @@
 """The first contact, urgent intake and triage, duplicates and import history (T-G32, T-G19, T-G20; MVP G32, G19, G20).
 
 - ``GET /api/v1/intake/guide``: the starter first-contact guide, its outcomes table and the starter word lists;
-- ``GET /api/v1/intake``, ``POST /api/v1/intake``: the logged contacts and urgent intakes; log one. A contact's
+- ``GET /api/v1/intake`` (bounded; the screens read ``GET /api/v1/intake/cases``), ``POST /api/v1/intake``: the logged
+  contacts and urgent intakes; log one. A contact's
   awareness is the time of the contact; an urgent intake creates a triage item at once and its QMS-complaint task;
 - ``GET /api/v1/intake/{id}``: one event with its check's versions, tasks, links and possible duplicates;
 - ``PUT /api/v1/intake/{id}/check``: save the answers (the suggestion and the triage flag follow at once, before any
@@ -640,7 +641,9 @@ def intake_list(
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """The logged contacts and urgent intakes, newest first, with what each waits for."""
+    """The logged contacts and urgent intakes, newest first, with what each waits for. Kept for API clients; the
+    screens read ``GET /intake/cases`` (paged on the server, A5). Bounded (B2): at most READ_LIMIT Cases are read,
+    the waiting ones first; ``truncated`` says when more exist."""
     if show not in SHOWS:
         raise _error(422, "UNKNOWN_SHOW", f"Show one of {', '.join(SHOWS)}")
     tenant_id = _tenant(ctx)
@@ -648,7 +651,10 @@ def intake_list(
     # Every contact still waiting (to sign, pending, the QA review of "service only"), however old; then the newest
     # 500 finished ones (0.10.86: the newest 500 were read before the waiting ones were picked out).
     mine = db.query(IntakeEvent).filter(IntakeEvent.tenant_id == tenant_id)
-    events = open_first(mine, IntakeEvent.id, _waiting(), [IntakeEvent.created_at.desc(), IntakeEvent.id.desc()], 500)
+    order = [IntakeEvent.created_at.desc(), IntakeEvent.id.desc()]
+    events = open_first(mine, IntakeEvent.id, _waiting(), order, 500, cap=service.READ_LIMIT + 1)
+    truncated = len(events) > service.READ_LIMIT
+    events = events[: service.READ_LIMIT]
     ids = [event.id for event in events]
     checks = service.checks_of(db, tenant_id, ids)
     tasks = service.tasks_of(db, tenant_id, ids)
@@ -691,7 +697,13 @@ def intake_list(
         for item in items
         if show == "all" or item["state"] == show or (show == "service_only" and item["state"] == "review")
     ]
-    return {"items": shown, "summary": summary, "duplicates": len(service.duplicates(db, tenant_id))}
+    return {
+        "items": shown,
+        "summary": summary,
+        "duplicates": len(service.duplicates(db, tenant_id)),
+        "truncated": truncated,
+        "cases_path": "/api/v1/intake/cases",
+    }
 
 
 @router.get("/intake/cases")

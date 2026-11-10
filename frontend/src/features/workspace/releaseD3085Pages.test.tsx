@@ -313,7 +313,6 @@ describe("D3.10 Log a call opens in place, shorter, in the product's date format
     expect(complaintViews).not.toContain('open("Complaints", "First contact?log=CONTACT")');
   });
   it("asks the call's essentials first, folds the rest, and reads the time back as 3 Nov 2026, 21:50", () => {
-    resources.data["/api/v1/intake"] = { summary: { all: 0, to_sign: 0, pending: 0, review: 0 }, items: [] };
     resources.data["/api/v1/intake/guide"] = {
       version: "1",
       questions: [{ id: "q1", text: "Was anyone hurt?", not_stated: true, free_text: false }],

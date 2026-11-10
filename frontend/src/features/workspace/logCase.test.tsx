@@ -60,7 +60,6 @@ const GUIDE = {
 
 describe("Log a case (B2)", () => {
   it("offers Not sure for version, lot and serial only, and the issue category in plain words", () => {
-    resources.data["/api/v1/intake"] = { summary: { all: 0, to_sign: 0, pending: 0, review: 0 }, items: [] };
     resources.data["/api/v1/intake/guide"] = GUIDE;
     const html = renderToStaticMarkup(
       <WorkspaceContext.Provider

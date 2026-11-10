@@ -151,7 +151,6 @@ export type IntakeItem = {
   check_due_at: string | null;
   tasks: Task[];
   qms_task: (Task & { state: "OPEN" | "AWAITING_IMPORT" | "CLOSED" | "NOT_NEEDED"; label: string }) | null;
-  state?: IntakeState;
   history?: CheckVersion[];
   links?: LinkView[];
   duplicates?: Duplicate[];
@@ -175,13 +174,6 @@ export type IntakeItem = {
   complaint_ref?: string | null;
   row_version?: number;
 };
-export type IntakeState = "to_sign" | "pending" | "review" | "service_only" | "complaint";
-export type IntakeList = {
-  items: IntakeItem[];
-  summary: Record<"all" | "flagged" | IntakeState, number>;
-  duplicates: number;
-};
-
 export type Deadline = {
   market: string;
   label: string;
@@ -311,22 +303,6 @@ export const OUTCOME_TONES: Record<Outcome, Tone> = {
   PENDING_CONFIRM: "warning",
   NOT_A_COMPLAINT: "good",
 };
-export const STATE_LABELS: Record<IntakeState, string> = {
-  to_sign: "To sign",
-  pending: "Pending",
-  review: "QA review due",
-  service_only: "Service only",
-  complaint: "Complaint",
-};
-export const INTAKE_SHOWS: readonly { value: "all" | IntakeState; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "to_sign", label: "To sign" },
-  { value: "pending", label: "Pending" },
-  { value: "review", label: "QA review due" },
-  { value: "complaint", label: "Complaint or both" },
-  { value: "service_only", label: "Service only" },
-];
-
 /** Every guide question answered (the server refuses to sign otherwise). */
 export const unanswered = (answers: Answers, questions: Guide["questions"]) =>
   questions.filter((q) => !q.free_text && !answers[q.id]?.answer).map((q) => q.id);
