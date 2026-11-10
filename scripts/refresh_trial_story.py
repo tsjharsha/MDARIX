@@ -42,7 +42,8 @@ from 0.10.76 the same step covers EU / NI, Great Britain and Canada, so SAMPLE-R
 EU MIR worksheet, once, and 0.10.77's code corrections (backend/app/trial/sample_0_10_77.py: the sample's IMDRF links
 re-recorded to IMDRF Release 2026's most specific terms; the code fields of the sample's frozen reports recorded as
 confirmed by the sample author, with the values they were approved with), and 0.10.79's two new sample links
-(backend/app/trial/sample_0_10_79.py: FLOW_ZERO_READING and SPO2_DROPOUT_HARM, which had none), and, in every trial
+(backend/app/trial/sample_0_10_79.py: FLOW_ZERO_READING and SPO2_DROPOUT_HARM, which had none), and 0.10.96's
+FDA-valid SAMPLE-RV-09 US report with its eMDR file (backend/app/trial/sample_0_10_96.py), and, in every trial
 with or without its sample, 0.10.81's deadline rules (backend/app/trial/open_deadlines.py: every market's starter
 reporting windows; the open reports and draft assessments whose report type or due date the fixed rules change; the
 signed conclusions they would change, listed for a person to sign again), and 0.10.93's SAMPLE-CASE-11 (the call
@@ -101,6 +102,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from sqlalchemy import or_
     from backend.app.signals.hooks import seed_demo_signals
     from backend.app.trial import open_deadlines, reports_0_10_75, sample_0_10_72, sample_0_10_77, sample_0_10_79
+    from backend.app.trial import sample_0_10_96
     from backend.app.trial import sample_supply
     from backend.app.trial.sample_calm import has_calm_story, rerecord_rv09, stage_calm_story
     from backend.app.trial.sample_clock import _absence_to_trial_end
@@ -212,6 +214,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             codes_owed = sample_0_10_77.refresh(session, tenant_id, apply=False)
             # 0.10.79: the two sample problem codes that had no IMDRF link.
             links_owed = sample_0_10_79.refresh(session, tenant_id, apply=False)
+            # 0.10.96 (B3 A9): SAMPLE-RV-09's US report FDA-valid, its approved snapshot with its eMDR file.
+            emdr_owed = sample_0_10_96.refresh(session, tenant_id, apply=False)
             # 0.10.94 (W1): Rev A configurations and the evidence linked to NovaSense (Product 360, Supplier 360).
             supply_owed = sample_supply.refresh(session, tenant_id, apply=False, now=datetime.now(timezone.utc))
             if not (
@@ -237,6 +241,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or reports_owed
                 or codes_owed
                 or links_owed
+                or emdr_owed
                 or story_case_missing
                 or supply_owed
                 or lakeside_missing
@@ -283,6 +288,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                         else []
                     ),
                     *([f"{links_owed} sample IMDRF links (0.10.79)"] if links_owed else []),
+                    *(["SAMPLE-RV-09's US report with its eMDR file (0.10.96)"] if emdr_owed else []),
                     *(
                         ["SAMPLE-CASE-11, the call behind SAMPLE-RV-11, unsigned (0.10.93)"]
                         if story_case_missing
@@ -347,6 +353,9 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["codes_0_10_77"] = sample_0_10_77.refresh(session, tenant_id, apply=True, now=now)
             if links_owed:
                 added["links_0_10_79"] = sample_0_10_79.refresh(session, tenant_id, apply=True, now=now)
+            if emdr_owed:
+                # After 0.10.77's codes and 0.10.79's links: RV-09's problem code is confirmed from the newest link.
+                added["emdr_0_10_96"] = sample_0_10_96.refresh(session, tenant_id, apply=True, now=now)
             if supply_owed:
                 # After the lot genealogy above, as in a new trial (sample_clock.seed_sample).
                 added["supply_0_10_94"] = sample_supply.refresh(session, tenant_id, apply=True, now=now)

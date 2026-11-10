@@ -344,3 +344,74 @@ def test_b3_neither_pdf_comes_from_a_superseded_snapshot(trial):
     assert preview.status_code == 200 and "DRAFT - NOT APPROVED" in text_of(preview.content)
     refused = user.get(url, params={"snapshot": pending, "form": "official"})
     assert refused.status_code == 409 and refused.json()["detail"]["code"] == "APPROVE_FIRST"
+
+
+# --------------------------------------------------------------------------------------------- A9 (the sample)
+
+
+def _sample_us(db, tenant_id):
+    from backend.app.db.models.authority_reports import ReportSnapshot
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
+
+    report = (
+        db.query(ReportObligation)
+        .filter_by(tenant_id=tenant_id, form_code="FDA_3500A", source_system=SAMPLE_SOURCE)
+        .one()
+    )
+    snapshot = db.query(ReportSnapshot).filter_by(obligation_id=report.id, state="APPROVED").one()
+    return report, snapshot
+
+
+def test_b3_the_sample_us_report_gives_both_pdfs_and_the_xml(trial):
+    """A9: the trial's finished US example (SAMPLE-RV-09) is FDA-valid, so its approval froze the eMDR file; a trial
+    made before 0.10.96 gets it once from the refresh step. The trial's own first number is still asked (the A3 test)."""
+    from backend.app.authority_reports import emdr, emdr_pdf
+    from backend.app.db.models.regulatory_reference import MarketResponsibleParty
+    from backend.app.trial import sample_0_10_96
+    from backend.app.trial.sample_reports import US_PARTY
+    from reports.pdf import text_of
+    from tests.test_fda_3500a_emdr import _fields
+
+    user, tenant_id = trial["user"], trial["tenant_id"]
+
+    def files() -> bytes:
+        with SessionLocal() as db:
+            bind_tenant(db, tenant_id)
+            report, snapshot = _sample_us(db, tenant_id)
+            report_id, snapshot_id = str(report.id), str(snapshot.id)
+        xml = _xml(user, {"id": report_id}, snapshot_id)
+        assert xml.status_code == 200, xml.text
+        url = f"{REPORTS}/{report_id}/worksheet.pdf"
+        default = user.get(url, params={"snapshot": snapshot_id})
+        official = user.get(url, params={"snapshot": snapshot_id, "form": "official"})
+        assert default.status_code == official.status_code == 200, (default.text, official.text)
+        assert emdr_pdf.TITLE in text_of(default.content)
+        assert _fields(official.content)["manuEmail"] == US_PARTY["contact_email"]
+        return xml.content
+
+    xml = files()
+    assert emdr.validate(xml) == []
+    found = emdr_pdf.read(xml)
+    assert found["G8"] == [f"0000000-{found['B4'][0][:4]}-70001"]  # a practice number (FDA's test sequences: 7)
+    for block in ("clinical", "impact", "problem", "component", "type", "findings", "conclusions"):
+        assert found[f"H6 {block}"], block  # each IMDRF code with its FDA code
+    assert found["G1 email"] == [f"mailto:{US_PARTY['contact_email']}"]
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        # The sample's US manufacturer was there only while the report was frozen: the organization's stay its own.
+        assert db.query(MarketResponsibleParty).filter_by(organisation=US_PARTY["organisation"]).first() is None
+        assert sample_0_10_96.refresh(db, tenant_id, apply=False) == 0  # a new trial has it
+        # As a trial made before 0.10.96 had it: typed values, and an approved snapshot without a file.
+        report, snapshot = _sample_us(db, tenant_id)
+        old = {"value": "SAMPLE-0000000-2026-00001 (sample)", "by": report.created_by, "at": "2026-01-01T00:00:00"}
+        report.entries = {**report.entries, "MFR_REPORT": old, "G8": old}
+        snapshot.fields = {key: value for key, value in snapshot.fields.items() if not key.startswith("emdr_")}
+        db.commit()
+        assert sample_0_10_96.refresh(db, tenant_id, apply=False) == 1
+        assert sample_0_10_96.refresh(db, tenant_id, apply=True) == 1
+        db.commit()
+        assert sample_0_10_96.refresh(db, tenant_id, apply=True) == 0  # idempotent
+        report, snapshot = _sample_us(db, tenant_id)
+        assert "G8" not in report.entries and "emdr_xml" in snapshot.fields
+    # The approval re-recorded on the new fingerprint, so the files download again.
+    assert emdr.validate(files()) == []

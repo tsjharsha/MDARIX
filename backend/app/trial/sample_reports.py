@@ -69,21 +69,41 @@ IN_EXAMPLE = {
     "IN2F": _answer("YES", "The burn needed treatment by the ward doctor to prevent permanent skin damage."),
     "IN3": _answer("YES", "Overheating at the sensor is not among the risks in the labelling."),
 }
-# The fields the sample author entered by hand (values marked as samples).
+# The fields the sample author entered by hand (values marked as samples). From 0.10.96 the US example is FDA-valid,
+# so its approval freezes an eMDR file (XML, eSubmitter-layout PDF, official form): a practice report number (FDA's
+# test sequences start with 7; CFN 0000000 is no real firm's), and B4 and G8 filled as Send for approval fills them.
 US_ENTRIES = {
-    "MFR_REPORT": "SAMPLE-0000000-2026-00001 (sample)",
-    "B4": "{submitted}",
-    # An FDA product code from the published list (0.10.81: a code field takes only a code; FRN: Pump, Infusion).
-    "D2A": "FRN",
-    "D3": "Orbit Medical Devices (Sample), Springfield, US",
-    "G1": "Orbit Medical Devices (Sample), 1 Sample Way, Springfield, US; vigilance office (sample)",
+    "MFR_REPORT": "0000000-{year}-70001",
+    # An FDA product code from the published list (0.10.81: a code field takes only a code; DQA: Oximeter).
+    "D2A": "DQA",
     "G2": "Health professional",
     "G4": "SAMPLE-510K-0001 (sample)",
-    "G8": "SAMPLE-0000000-2026-00001 (sample)",
+    # Without the IMDRF release and FDA's mapping loaded, the codes read as entered in eSubmitter (as before 0.10.96).
     "H6_CONCLUSIONS": "Entered in eSubmitter from the IMDRF Annex D release (sample)",
     # 0.10.77: an initial 3500A needs both health effect codes on the new navigation (forms.CODES_REQUIRED).
     "H6_CLINICAL": "Entered in eSubmitter from the IMDRF Annex E release (sample)",
     "H6_IMPACT": "Entered in eSubmitter from the IMDRF Annex F release (sample)",
+}
+# The IMDRF codes the sample author chose in the code picker (0.10.96), each with its FDA code from FDA's mapping:
+# low oxygen saturation, an unexpected medical intervention (oxygen therapy), the audible alarm, the returned device
+# tested, an alarm system problem found, a design inadequate for its purpose. H6_PROBLEM is the mapping's suggestion.
+US_CODES = {
+    "H6_CLINICAL": "E2203",
+    "H6_IMPACT": "F23",
+    "H6_COMPONENT": "G0600101",
+    "H6_TYPE": "B01",
+    "H6_FINDINGS": "C1202",
+    "H6_CONCLUSIONS": "D0101",
+}
+# The US manufacturer the eMDR file names (G1 contact office, D3), with the e-mail FDA requires. It exists only while
+# the sample's report is frozen (the file and its party parts stay in the approved snapshot), so the organization's own
+# US responsible party, and the trial's "give the contact office's e-mail" step, stay the person's own.
+US_PARTY = {
+    "market": "US",
+    "role": "MANUFACTURER",
+    "organisation": "Orbit Medical Devices (Sample)",
+    "address": "1 Sample Way, Springfield, US",
+    "contact_email": "vigilance@orbit-sample.invalid",
 }
 IN_ENTRIES = {
     "P1": "{submitted}",
@@ -336,9 +356,66 @@ def _approve(db, obligation, snapshot, approver_id: str, at: datetime) -> None:
 def _entries(values: dict, author_id: str, at: datetime) -> dict:
     stamp = at.isoformat()
     return {
-        key: {"value": value.replace("{submitted}", at.date().isoformat()), "by": author_id, "at": stamp}
+        key: {
+            "value": value.replace("{submitted}", at.date().isoformat()).replace("{year}", str(at.year)),
+            "by": author_id,
+            "at": stamp,
+        }
         for key, value in values.items()
     }
+
+
+# The sample's G1 and D3 as typed before 0.10.96: used when the organization has its own US responsible party, which
+# the sample never reads (its report then keeps no eMDR file; its PDF is the filled official form).
+US_TYPED_PARTY = {
+    "D3": "Orbit Medical Devices (Sample), Springfield, US",
+    "G1": "Orbit Medical Devices (Sample), 1 Sample Way, Springfield, US; vigilance office (sample)",
+}
+
+
+def _coded(db, control_db, obligation, author_id: str, at: datetime) -> dict:
+    """The US example's IMDRF codes as the code picker writes them (term and FDA code); none without the release."""
+    from fastapi import HTTPException
+
+    from backend.app.authority_reports import router
+
+    fields = {field.id: field for field in router._form(obligation).fields()}
+    try:
+        return {
+            key: {
+                **router._code_entry(
+                    db, control_db, obligation, fields[key], router.FieldRequest(codes=[code]), author_id
+                ),
+                "at": at.isoformat(),
+            }
+            for key, code in US_CODES.items()
+        }
+    except HTTPException:
+        return {}
+
+
+def _freeze_us(db, control_db, obligation, author_id: str, at: datetime):
+    """Freeze the US example for approval, its eMDR file built from the sample's US manufacturer (``US_PARTY``),
+    which is there only for this; the organization's own party, when it has one, is never read or changed."""
+    from backend.app.authority_reports import router
+    from backend.app.db.models.regulatory_reference import MarketResponsibleParty
+
+    own = (
+        db.query(MarketResponsibleParty.id)
+        .filter(MarketResponsibleParty.tenant_id == obligation.tenant_id, MarketResponsibleParty.market == "US")
+        .first()
+    )
+    if own is not None:
+        obligation.entries = {**(obligation.entries or {}), **_entries(US_TYPED_PARTY, author_id, at)}
+        return router.request_snapshot(db, control_db, obligation, author_id, at, SAMPLE_SOURCE)
+    party = MarketResponsibleParty(tenant_id=obligation.tenant_id, created_at=at, updated_at=at, **US_PARTY)
+    db.add(party)
+    db.flush()
+    try:
+        return router.request_snapshot(db, control_db, obligation, author_id, at, SAMPLE_SOURCE)
+    finally:
+        db.delete(party)
+        db.flush()
 
 
 def stage_sample_reports(
@@ -389,6 +466,7 @@ def stage_sample_reports(
         )
         us = router.start(db, tenant_id, us_complaint.id, markets.US, author_id, signed_at, SAMPLE_SOURCE)
         us.entries = _entries(US_ENTRIES, author_id, submitted - timedelta(hours=3))
+        us.entries = {**us.entries, **_coded(db, control_db, us, author_id, submitted - timedelta(hours=3))}
         # The sample author confirmed the device problem code the approved mapping suggests (0.10.77).
         us.entries = worksheet.confirm_suggestions(
             forms.FDA_3500A,
@@ -397,7 +475,7 @@ def stage_sample_reports(
             author_id,
             (submitted - timedelta(hours=3)).isoformat(),
         )
-        snapshot = router.request_snapshot(db, control_db, us, author_id, submitted - timedelta(hours=2), SAMPLE_SOURCE)
+        snapshot = _freeze_us(db, control_db, us, author_id, submitted - timedelta(hours=2))
         _approve(db, us, snapshot, approver_id, submitted - timedelta(hours=1))
         attempt = router.record_submission(
             db,

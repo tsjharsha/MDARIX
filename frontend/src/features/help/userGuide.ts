@@ -610,13 +610,14 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Choose Enter a value for what the records do not hold, or Confirm against the source. Missing fields never block a timely initial report.",
               "Choose Ask for approval: the worksheet is frozen as a snapshot. A colleague opens it, enters their password and authenticator code and chooses Approve the snapshot.",
               "Download the PDF or DOCX: a working draft, or the approved snapshot exactly as frozen.",
+              "A US report's files are made when it is sent for approval and are ready the moment it is approved: Download PDF (the eMDR content in FDA's block order, with its checksum), Download XML (the eMDR file, checked against FDA's schema before it could be sent) and Official Form 3500A (PDF). Before approval the PDF is marked DRAFT and the XML is not given.",
             ],
             result: "The report shows Approved snapshot, with the approver and the checksum of what was approved.",
           },
           {
             title: "Record the submission and the receipt",
             steps: [
-              "Enter the approved snapshot in the authority's route yourself (eSubmitter for FDA eMDR; MvPI by e-mail or online).",
+              "Enter the approved snapshot in the authority's route yourself (for FDA, send the approved eMDR XML through your ESG account or enter it in eSubmitter; MvPI by e-mail or online). MDARIX never submits.",
               "Choose the route, the time you submitted, and attach the portal's copy (or describe it). Say whether it matches the approved snapshot; a material difference needs the draft reopened and approved again. Choose Mark as submitted.",
               "As evidence arrives, record it: Ack1 and Ack2 are receipts, not acceptance; Ack3 passed (or the authority's acceptance) makes the report Accepted, and settles the market on the reportability watch. A failed Ack3, a rejection or a bounce returns the report to Draft: correction required, with its original deadline.",
               "After acceptance, Complete the obligation, or record that a follow-up is due, or that the authority asked for more information: that creates a separate response obligation with its own deadline.",

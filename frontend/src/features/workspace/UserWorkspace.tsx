@@ -301,7 +301,7 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
     description: "Authority reports",
     // "MDARIX never submits" is said once, on the report's own rail (0.10.87).
     guide:
-      'Created automatically when a decision tree concludes "reportable". You complete, approve and generate the PDF.',
+      'Created automatically when a decision tree concludes "reportable". You complete and approve it; its files are ready at approval.',
     context: false,
   },
   // A trial's own import on the new navigation (0.10.80).

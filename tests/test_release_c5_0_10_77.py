@@ -384,9 +384,9 @@ def test_a_running_trial_is_re_recorded_once():
             rv09.entries = {key: value for key, value in rv09.entries.items() if not key.startswith("H6_") or
                             key == "H6_CONCLUSIONS"}  # fmt: skip
             db.flush()
-            assert sample_0_10_77.refresh(db, tenant_id, apply=False) == len(rows) + 3
+            assert sample_0_10_77.refresh(db, tenant_id, apply=False) == len(rows) + 6  # 0.10.96: six coded H6 fields
             assert sample_0_10_72.refresh(db, tenant_id, apply=False) == 0  # 0.10.72 does not add A0908 back
-            assert sample_0_10_77.refresh(db, tenant_id, apply=True) == len(rows) + 3
+            assert sample_0_10_77.refresh(db, tenant_id, apply=True) == len(rows) + 6
             assert sample_0_10_77.refresh(db, tenant_id, apply=True) == 0  # idempotent
             links = {(row.customer_code, row.release, row.imdrf_code) for row in rows}
             assert ("SPO2_READING_HIGH", "2026", "A090807") in links
@@ -394,7 +394,7 @@ def test_a_running_trial_is_re_recorded_once():
             # RV-09 keeps the code it was approved with (A16 then), recorded as confirmed by the sample author.
             frozen = rv09.entries["H6_PROBLEM"]
             assert frozen["code_state"] == "CONFIRMED" and frozen["by"] == rv09.created_by
-            assert rv09.entries["H6_CLINICAL"]["value"].startswith("Entered in eSubmitter")
+            assert rv09.entries["H6_CLINICAL"]["value"].startswith("E2203 ")  # as approved (0.10.96: a real code)
             db.commit()
     finally:
         _purge(tenant_id)

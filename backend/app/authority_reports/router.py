@@ -1299,13 +1299,16 @@ def assign_number(db, control_db, obligation: ReportObligation, actor: str, now:
     from sqlalchemy import text
 
     from backend.app.authority_reports import emdr
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
 
     db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": f"{NUMBER_LOCK}{obligation.tenant_id}"})
     value = ReportObligation.entries["MFR_REPORT"]["value"].astext
     chain = {obligation.id, obligation.parent_id} - {None}
-    used = [
-        number
-        for row_id, parent_id, number in db.query(ReportObligation.id, ReportObligation.parent_id, value)
+    rows = [
+        (number, source == SAMPLE_SOURCE)
+        for row_id, parent_id, number, source in db.query(
+            ReportObligation.id, ReportObligation.parent_id, value, ReportObligation.source_system
+        )
         .filter(
             ReportObligation.tenant_id == obligation.tenant_id,
             ReportObligation.form_code == forms.FDA_3500A.code,
@@ -1314,6 +1317,9 @@ def assign_number(db, control_db, obligation: ReportObligation, actor: str, now:
         .order_by(ReportObligation.created_at, ReportObligation.id)
         if row_id not in chain and parent_id not in chain
     ]
+    # A trial's sample report holds a practice number (0.10.96, A9): it is never reused, but never the organization's
+    # first number either, so the person still types their own once. Sample numbers go first: the CFN is the last own.
+    used = [number for number, sample in sorted(rows, key=lambda row: not row[1])]
     entries = dict(obligation.entries or {})
     typed = (entries.get("MFR_REPORT") or {}).get("value")
     if typed:
@@ -1323,7 +1329,8 @@ def assign_number(db, control_db, obligation: ReportObligation, actor: str, now:
             )
         return
     year = _org_day(db, obligation.tenant_id, now).year
-    number = emdr.next_number(used, year, _trial(control_db, obligation.tenant_id))
+    own = any(not sample and emdr.REPORT_NUMBER.match(number) for number, sample in rows)
+    number = emdr.next_number(used, year, _trial(control_db, obligation.tenant_id)) if own else None
     if number is None:
         return  # the organization's first number: a person types it once (FIRST_NUMBER, after the mandatory fields)
     entries["MFR_REPORT"] = {"value": number, "by": actor, "at": _iso(now), "assigned": True}
