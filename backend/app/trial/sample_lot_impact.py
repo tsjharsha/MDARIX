@@ -10,6 +10,9 @@
 - **Distribution** to fictional consignees "(Sample)" in India, the US and EU countries, with units still in stock;
   lot 008 has no distribution imported (the "distribution not imported" state). A PulseWatch lot shipped more units
   than it released, so the data-quality report's flag shows.
+- **Shipments to SAMPLE-CASE-11's hospital** (0.10.93, ID-2): PulseWatch lots 001 and 002 to "Sample Lakeside Hospital
+  (Sample)", so Log a case for it offers "Products and lots shipped to this hospital". No OrbitCare lot: a case's Lot
+  impact list stays as it was. Trials staged earlier get them through the refresh step (``stage_lakeside_shipments``).
 - **One import run**, "Sample distribution export.csv": its lineage, one row set aside (a lot not loaded) and the
   shipped-beyond-released flag in its data-quality report.
 
@@ -58,6 +61,13 @@ DECCAN = ("Deccan Medical Distributors (Sample)", "IN", "Distributor", "SMP-C-20
 RHEINWALD = ("Rheinwald Clinic (Sample)", "DE", "Hospital", "SMP-C-3001")
 BELVUE = ("Centre Hospitalier Belvue (Sample)", "FR", "Hospital", "SMP-C-3002")
 BENELUX = ("MedLogistiek Benelux (Sample)", "NL", "Distributor", "SMP-C-3003")
+# SAMPLE-CASE-11's hospital (sample_intake.py), so Log a case offers "Products and lots shipped to this hospital" (ID-2).
+LAKESIDE = ("Sample Lakeside Hospital (Sample)", "US", "Hospital", "SMP-C-1003")
+# PulseWatch Rev A lots 001 and 002 (002 is SAMPLE-RV-11's lot); no OrbitCare lot, so a case's Lot impact stays.
+LAKESIDE_SHIPMENTS = {
+    "SAMPLE-PULSE-410-LOT-001": [(LAKESIDE, 40, 12)],
+    "SAMPLE-PULSE-410-LOT-002": [(LAKESIDE, 20, 14)],
+}
 # Lot -> [(consignee, units, days after the lot was made)]. Lot 008: no distribution imported.
 SHIPMENTS = {
     f"{ORBIT}-LOT-003": [(CEDAR, 60, 5), (BLUEGATE, 40, 10), (ASHOKA, 30, 15), (RHEINWALD, 20, 20)],
@@ -65,8 +75,9 @@ SHIPMENTS = {
     f"{ORBIT}-LOT-005": [(ASHOKA, 20, 6), (BENELUX, 20, 10)],
     f"{ORBIT}-LOT-006": [(RHEINWALD, 10, 8), (CEDAR, 10, 12)],
     f"{ORBIT}-LOT-007": [(DECCAN, 12, 9), (BELVUE, 8, 15)],
-    # 410 units shipped of the 400 the lot released: the data-quality report flags it.
-    "SAMPLE-PULSE-410-LOT-002": [(CEDAR, 250, 10), (ASHOKA, 160, 20)],
+    "SAMPLE-PULSE-410-LOT-001": LAKESIDE_SHIPMENTS["SAMPLE-PULSE-410-LOT-001"],
+    # 430 units shipped of the 400 the lot released: the data-quality report flags it.
+    "SAMPLE-PULSE-410-LOT-002": [(CEDAR, 250, 10), *LAKESIDE_SHIPMENTS["SAMPLE-PULSE-410-LOT-002"], (ASHOKA, 160, 20)],
 }
 # The row the sample's import set aside: a lot that is not loaded.
 SET_ASIDE = {
@@ -92,6 +103,60 @@ def _lots(db: Session, tenant_id) -> dict[str, LotBatch]:
         lot.lot_identifier: lot
         for lot in db.query(LotBatch).filter(LotBatch.tenant_id == tenant_id, LotBatch.source_system == SAMPLE_SOURCE)
     }
+
+
+def _ship(db: Session, tenant_id, lots: dict[str, LotBatch], shipments_by_lot: dict, now: datetime) -> list[dict]:
+    """Add the shipment rows of the lots that exist; return them as import rows."""
+    rows = []
+    for identifier, shipments in shipments_by_lot.items():
+        lot = lots.get(identifier)
+        if lot is None:
+            continue
+        made = lot.effective_timestamp or lot.created_at
+        for (consignee, country, kind, reference), units, after in shipments:
+            shipped = min(made + timedelta(days=after), now).date()
+            db.add(
+                LotDistribution(
+                    id=uuid.uuid4(),
+                    tenant_id=tenant_id,
+                    lot_batch_id=lot.id,
+                    consignee=consignee,
+                    consignee_type=kind,
+                    consignee_reference=reference,
+                    country=country,
+                    quantity=units,
+                    ship_date=shipped,
+                    source_system=SAMPLE_SOURCE,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            rows.append({"lot_id": identifier, "consignee": consignee, "country": country, "ship_date": str(shipped)})
+    return rows
+
+
+def has_lakeside_shipments(db: Session, tenant_id) -> bool:
+    return (
+        db.query(LotDistribution.id)
+        .filter(
+            LotDistribution.tenant_id == tenant_id,
+            LotDistribution.source_system == SAMPLE_SOURCE,
+            LotDistribution.consignee == LAKESIDE[0],
+        )
+        .first()
+        is not None
+    )
+
+
+def stage_lakeside_shipments(db: Session, tenant_id, now: datetime) -> int:
+    """For trials staged before 0.10.93: SAMPLE-CASE-11's hospital's shipments (once; only once the sample's
+    distribution is there). Not added to the sample import run, which keeps the report it was given. Flushes; returns
+    the rows added."""
+    if not has_sample_lot_impact(db, tenant_id) or has_lakeside_shipments(db, tenant_id):
+        return 0
+    rows = _ship(db, tenant_id, _lots(db, tenant_id), LAKESIDE_SHIPMENTS, now)
+    db.flush()
+    return len(rows)
 
 
 def stage_sample_lot_impact(db: Session, tenant_id, now: datetime) -> dict:
@@ -150,31 +215,7 @@ def stage_sample_lot_impact(db: Session, tenant_id, now: datetime) -> dict:
                 )
             )
             genealogy += 1
-    rows = []
-    for identifier, shipments in SHIPMENTS.items():
-        lot = lots.get(identifier)
-        if lot is None:
-            continue
-        made = lot.effective_timestamp or lot.created_at
-        for (consignee, country, kind, reference), units, after in shipments:
-            shipped = min(made + timedelta(days=after), now).date()
-            db.add(
-                LotDistribution(
-                    id=uuid.uuid4(),
-                    tenant_id=tenant_id,
-                    lot_batch_id=lot.id,
-                    consignee=consignee,
-                    consignee_type=kind,
-                    consignee_reference=reference,
-                    country=country,
-                    quantity=units,
-                    ship_date=shipped,
-                    source_system=SAMPLE_SOURCE,
-                    created_at=now,
-                    updated_at=now,
-                )
-            )
-            rows.append({"lot_id": identifier, "consignee": consignee, "country": country, "ship_date": str(shipped)})
+    rows = _ship(db, tenant_id, lots, SHIPMENTS, now)
     db.flush()
     import_ref = uuid.uuid4()
     columns = [{"header": "Ship To Name", "column": "consignee"}, {"header": "Ship Date", "column": "ship_date"}]

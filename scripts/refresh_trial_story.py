@@ -47,7 +47,8 @@ with or without its sample, 0.10.81's deadline rules (backend/app/trial/open_dea
 reporting windows; the open reports and draft assessments whose report type or due date the fixed rules change; the
 signed conclusions they would change, listed for a person to sign again), and 0.10.93's SAMPLE-CASE-11 (the call
 behind SAMPLE-RV-11, unsigned, for Getting started Part 1; backend/app/trial/sample_intake.py ``stage_story_case``)
-unless it is there; the old SAMPLE-CALL-01..04 keep their references and are never escalated here. The sample's dates themselves are brought to today by the
+unless it is there, and two PulseWatch shipments to its hospital, "Sample Lakeside Hospital (Sample)", so Log a case
+offers that hospital's products and lots (ID-2; backend/app/trial/sample_lot_impact.py) unless they are there; the old SAMPLE-CALL-01..04 keep their references and are never escalated here. The sample's dates themselves are brought to today by the
 hourly "trial-sample-clock" job (backend/app/trial/sample_clock.py) while nobody has worked on the sample. Each trial
 is committed on its own, with an audit event.
 """
@@ -122,7 +123,12 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.trial.sample_intake import has_sample_intake, has_story_case, stage_sample_intake, stage_story_case
     from backend.app.trial.sample_guides import has_sample_guides, relock_sample_drafts, stage_sample_guides
     from backend.app.trial.sample_oversight import has_sample_oversight, stage_sample_oversight
-    from backend.app.trial.sample_lot_impact import has_sample_lot_impact, stage_sample_lot_impact
+    from backend.app.trial.sample_lot_impact import (
+        has_lakeside_shipments,
+        has_sample_lot_impact,
+        stage_lakeside_shipments,
+        stage_sample_lot_impact,
+    )
     from backend.app.trial.sample_reports import has_sample_reports, stage_sample_reports
     from backend.app.trial.sample_words import reword_sample
 
@@ -190,6 +196,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             calm_missing = not has_calm_story(session, tenant_id)
             # 0.10.93: SAMPLE-CASE-11, the call behind the flagship (Getting started Part 1).
             story_case_missing = not has_story_case(session, tenant_id)
+            # 0.10.93 (ID-2): SAMPLE-CASE-11's hospital's shipments, so Log a case offers its products and lots.
+            lakeside_missing = not has_lakeside_shipments(session, tenant_id)
             old_words = reword_sample(session, tenant_id, apply=False)
             # RV-09 signed ready to close over an empty checklist before 0.10.70 (sample_calm.py).
             rv09_unrecorded = not calm_missing and rerecord_rv09(session, tenant_id, apply=False)
@@ -227,6 +235,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or codes_owed
                 or links_owed
                 or story_case_missing
+                or lakeside_missing
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -275,6 +284,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                         if story_case_missing
                         else []
                     ),
+                    *(["the shipments to SAMPLE-CASE-11's hospital (0.10.93)"] if lakeside_missing else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -303,6 +313,9 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             if lot_impact_missing:
                 # After the quantities: lot 005's units are shared with the three new lots.
                 added["lot_impact"] = stage_sample_lot_impact(session, tenant_id, now)
+            if lakeside_missing:
+                # After the distribution (a trial staged with 0.10.93's sample already has them: nothing added).
+                added["lakeside_shipments"] = stage_lakeside_shipments(session, tenant_id, now)
             # Last: every sample lot exists by now.
             added["product_facts"] = seed_product_facts(session, tenant_id)
             if flagship_missing and not story_missing:
