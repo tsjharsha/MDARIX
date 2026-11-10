@@ -108,8 +108,9 @@ def _counted(db: Session, tenant_id: uuid.UUID, since: date, today: date):
     return query.limit(READ_LIMIT + 1).all()
 
 
-def _version_ages(db: Session, tenant_id: uuid.UUID, version_ids, today: date) -> dict:
-    """Days since each version was released, else since its first complaint (it existed at least that long)."""
+def _version_ages(db: Session, tenant_id: uuid.UUID, version_ids, today: date, unknown_of=()) -> dict:
+    """Days since each version was released, else since its first complaint (it existed at least that long). PV-1 F12:
+    the unknown version's age is per product, keyed ``(None, product id)`` for each product in ``unknown_of``."""
     ids = [item for item in version_ids if item is not None]
     ages: dict = {}
     if ids:
@@ -129,11 +130,23 @@ def _version_ages(db: Session, tenant_id: uuid.UUID, version_ids, today: date) -
             rows += (
                 query.filter(Complaint.product_version_id.in_(known_ids)).group_by(Complaint.product_version_id).all()
             )
-        if None in unknown:
-            rows += query.filter(Complaint.product_version_id.is_(None)).group_by(Complaint.product_version_id).all()
         for version_id, first in rows:
             if first is not None:
                 ages[version_id] = (today - _day(first)).days
+    products = [item for item in unknown_of if item is not None]
+    if products:
+        for product_id, first in (
+            db.query(Complaint.product_id, func.min(EVENT_AT))
+            .filter(
+                Complaint.tenant_id == tenant_id,
+                Complaint.product_version_id.is_(None),
+                Complaint.product_id.in_(products),
+            )
+            .group_by(Complaint.product_id)
+            .all()
+        ):
+            if first is not None:
+                ages[(None, product_id)] = (today - _day(first)).days
     return ages
 
 
@@ -395,7 +408,7 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
         if events.get(row.id, row.id) == row.id:
             groups[key][bucket].append(row)
     version_ids = {key[1] for key in groups}
-    ages = _version_ages(db, tenant_id, version_ids, today)
+    ages = _version_ages(db, tenant_id, version_ids, today, {key[0] for key in groups if key[1] is None})
     products, versions = _names(db, tenant_id, {key[0] for key in groups}, version_ids)
     signals = _open_signals(db, tenant_id) if grouping == "problem" else {}
     lots = _lot_releases(db, tenant_id, version_ids)
@@ -404,7 +417,7 @@ def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: u
     found = []
     for key, bucket in groups.items():
         product_ref, version_ref, problem = key
-        age = ages.get(version_ref)
+        age = ages.get(version_ref if version_ref is not None else (None, product_ref))
         days_of_history = trend_rules.history_days(age)
         # S3: a version younger than the recent window is expected only the days it has existed (release day included).
         recent_days = trend_rules.RECENT_DAYS if age is None else min(trend_rules.RECENT_DAYS, age + 1)

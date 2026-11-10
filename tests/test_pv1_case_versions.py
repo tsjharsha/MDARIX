@@ -188,3 +188,25 @@ def test_a_signal_of_one_version_takes_only_that_version(org):  # F11
         json={"complaint_ids": [rev_a_2], "reason": "Same alarm on the same release"},
     )
     assert added.status_code == 200, added.text
+
+
+def test_the_unknown_version_age_is_per_product(org):  # F12
+    from datetime import timedelta
+
+    from backend.app.signals.insight import _version_ages
+
+    seed, other = _seed(org["tenant_id"]), _seed(org["tenant_id"])
+    old = _unknown_version_complaints(org["tenant_id"], seed["product_id"], 1)
+    _unknown_version_complaints(org["tenant_id"], other["product_id"], 1)
+    today = datetime.now(timezone.utc).date()
+    with SessionLocal() as db:
+        bind_tenant(db, org["tenant_id"])
+        db.query(Complaint).filter(Complaint.id == uuid.UUID(old[0])).update(
+            {"event_timestamp": datetime.now(timezone.utc) - timedelta(days=400)}
+        )
+        db.commit()
+        ages = _version_ages(
+            db, org["tenant_id"], {None}, today, {uuid.UUID(seed["product_id"]), uuid.UUID(other["product_id"])}
+        )
+    assert ages[(None, uuid.UUID(seed["product_id"]))] == 400
+    assert ages[(None, uuid.UUID(other["product_id"]))] == 0

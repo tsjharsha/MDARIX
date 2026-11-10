@@ -65,6 +65,9 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - A signal about one product version takes only complaints of that version (raising it or adding complaints:
   `COMPLAINT_NOT_FOR_VERSION`) and merges only signals of that version (`VERSION_MISMATCH`); a signal for the whole
   product still groups several versions.
+- The trend check gives each product's "unknown version" group the age of that product's own first unknown-version
+  complaint, not the organization's oldest: a product whose unknown-version complaints are new is SHORT_HISTORY
+  instead of a significant rise.
 
 ### Security
 
