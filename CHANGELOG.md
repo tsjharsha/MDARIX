@@ -62,6 +62,9 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - A case scope refuses a lot of another product (422 `LOT_NOT_FOR_PRODUCT`; a lot with an unknown version is still
   allowed). Saving a scope warns "N included complaints have no product version", and the decision brief's scope
   section counts them (`unknown_version_count`, shown as "Complaints with no known version").
+- A signal about one product version takes only complaints of that version (raising it or adding complaints:
+  `COMPLAINT_NOT_FOR_VERSION`) and merges only signals of that version (`VERSION_MISMATCH`); a signal for the whole
+  product still groups several versions.
 
 ### Security
 

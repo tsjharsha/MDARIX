@@ -145,3 +145,46 @@ def test_the_brief_scope_counts_the_complaints_of_unknown_version(org):  # F10
         row = db.get(Investigation, uuid.UUID(case["id"]))
         section = scope_section(db, row, scope.current_scope(db, row))
     assert section["included_count"] == 4 and section["unknown_version_count"] == 2
+
+
+def test_a_signal_of_one_version_takes_only_that_version(org):  # F11
+    from tests.test_case_workflow import _code
+
+    lead, _ = org["lead"]
+    seed = _seed(org["tenant_id"])
+    rev_a_1, rev_a_2, rev_b = seed["complaints"]
+
+    def raise_signal(version: str, complaints: list[str]):
+        return lead.post(
+            "/api/v1/triage/signals",
+            json={
+                "title": "Occlusion alarms rising",
+                "product_id": seed["product_id"],
+                "product_version_id": version,
+                "complaint_ids": complaints,
+                "priority": "HIGH",
+                "reason": "Customer reported alarms during infusion",
+            },
+        )
+
+    refused = raise_signal(seed["version_a"], [rev_a_1, rev_b])
+    assert refused.status_code == 422 and _code(refused) == "COMPLAINT_NOT_FOR_VERSION", refused.text
+    signal_a = raise_signal(seed["version_a"], [rev_a_1])
+    signal_b = raise_signal(seed["version_b"], [rev_b])
+    assert signal_a.status_code == 201 and signal_b.status_code == 201, (signal_a.text, signal_b.text)
+    signal_a, signal_b = signal_a.json()["id"], signal_b.json()["id"]
+    added = lead.post(
+        f"/api/v1/triage/signals/{signal_a}/complaints",
+        json={"complaint_ids": [rev_b], "reason": "Same alarm on the older release"},
+    )
+    assert added.status_code == 422 and _code(added) == "COMPLAINT_NOT_FOR_VERSION", added.text
+    merged = lead.post(
+        f"/api/v1/triage/signals/{signal_a}/merge",
+        json={"source_signal_ids": [signal_b], "reason": "Same alarm on the older release"},
+    )
+    assert merged.status_code == 422 and _code(merged) == "VERSION_MISMATCH", merged.text
+    added = lead.post(
+        f"/api/v1/triage/signals/{signal_a}/complaints",
+        json={"complaint_ids": [rev_a_2], "reason": "Same alarm on the same release"},
+    )
+    assert added.status_code == 200, added.text

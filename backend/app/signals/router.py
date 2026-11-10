@@ -496,7 +496,9 @@ def create_signal(
         if version is None:
             raise _error(422, "VERSION_NOT_FOR_PRODUCT", "The version must be one of this product's versions")
     with _refusals():
-        complaint_ids = service.complaints_of_product(db, tenant, product.id, payload.complaint_ids)
+        complaint_ids = service.complaints_of_product(
+            db, tenant, product.id, payload.complaint_ids, payload.product_version_id
+        )
         facts = (
             service.complaint_facts(
                 service.complaint_facts_query(db, tenant).filter(service.Complaint.id.in_(complaint_ids))
@@ -730,6 +732,13 @@ def merge_signals(
                 raise logic.SignalRuleError(
                     422, "PRODUCT_MISMATCH", f"{source.business_id} is about another product and cannot be merged"
                 )
+            # PV-1 F11: a signal of one version takes only signals of that version.
+            if canonical.product_version_id is not None and source.product_version_id != canonical.product_version_id:
+                raise logic.SignalRuleError(
+                    422,
+                    "VERSION_MISMATCH",
+                    f"{source.business_id} is about another product version and cannot be merged into this one",
+                )
         role = actor.role_for(SIGNAL_TRIAGE)
         now = service.now_utc()
         added_total = 0
@@ -793,7 +802,9 @@ def add_complaints(
         signal = service.load(db, actor.tenant_id, signal_id, lock=True)
         if signal.status not in OPEN_SIGNAL_STATUSES:
             raise logic.SignalRuleError(409, "SIGNAL_STATE_CONFLICT", "Complaints can only be added to an open signal")
-        wanted = service.complaints_of_product(db, actor.tenant_id, signal.product_id, payload.complaint_ids)
+        wanted = service.complaints_of_product(
+            db, actor.tenant_id, signal.product_id, payload.complaint_ids, signal.product_version_id
+        )
         added = service.link_complaints(db, signal, wanted, how="MANUAL", actor_ref=actor.user_id)
         if not added:
             raise logic.SignalRuleError(422, "NOTHING_TO_ADD", "These complaints are already part of the signal")

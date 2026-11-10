@@ -416,9 +416,10 @@ def link_complaints(db: Session, signal: Signal, complaint_ids, *, how: str, act
     return added
 
 
-def complaints_of_product(db: Session, tenant_id, product_id, complaint_ids) -> list[uuid.UUID]:
+def complaints_of_product(db: Session, tenant_id, product_id, complaint_ids, version_id=None) -> list[uuid.UUID]:
     """The ids, in the order given, when every complaint belongs to the product in this organization; else
-    COMPLAINT_NOT_FOR_PRODUCT."""
+    COMPLAINT_NOT_FOR_PRODUCT. PV-1 F11: for a signal of one version (``version_id``), every complaint must be of that
+    version; another or an unknown version is refused (COMPLAINT_NOT_FOR_VERSION)."""
     wanted = list(dict.fromkeys(as_uuid(item) for item in complaint_ids))
     if not wanted:
         return []
@@ -435,6 +436,22 @@ def complaints_of_product(db: Session, tenant_id, product_id, complaint_ids) -> 
     if len(found) != len(wanted):
         raise logic.SignalRuleError(
             422, "COMPLAINT_NOT_FOR_PRODUCT", "Every complaint must belong to this product in your organization"
+        )
+    if (
+        version_id is not None
+        and db.query(Complaint.id)
+        .filter(
+            Complaint.tenant_id == as_uuid(tenant_id),
+            Complaint.id.in_(wanted),
+            Complaint.product_version_id.is_distinct_from(version_id),
+        )
+        .first()
+    ):
+        raise logic.SignalRuleError(
+            422,
+            "COMPLAINT_NOT_FOR_VERSION",
+            "This signal is about one product version: every complaint must be of that version (raise a signal "
+            "for the whole product to group several versions)",
         )
     return wanted
 
