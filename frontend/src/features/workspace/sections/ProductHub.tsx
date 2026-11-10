@@ -28,6 +28,7 @@ import {
   type Origin,
   type RecordKind,
 } from "../productHub";
+import { SuppliersTab } from "./SupplierHub";
 import "../productHub.css";
 
 // The server's rows (backend/app/product360): plain records, each with its origin.
@@ -52,7 +53,7 @@ export function ProductHubSection({ tab, heading }: { tab?: string; heading?: Re
     >
       {place.tab === "Products" &&
         (place.product ? <ProductPage place={place} go={go} heading={heading} /> : <ProductList go={go} />)}
-      {place.tab === "Suppliers" && <p className="ac-muted">Suppliers are listed here.</p>}
+      {place.tab === "Suppliers" && <SuppliersTab place={place} go={go} heading={heading} />}
     </Tabs>
   );
 }
