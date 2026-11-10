@@ -32,12 +32,15 @@ ZERO_BOUND = -math.log(0.05)
 
 SHIPPED, RELEASED, UNKNOWN = "SHIPPED", "RELEASED", "UNKNOWN"
 TOO_EARLY, TOO_FEW, FEWER, MORE, NO_CHANGE = "TOO_EARLY", "TOO_FEW", "FEWER", "MORE", "NO_CHANGE"
+# Two cohorts over the same period with units unknown: their counts are shown, never tested by calendar days.
+COUNTS_ONLY = "COUNTS_ONLY"
 WORDS = {
     TOO_EARLY: "Too early",
     TOO_FEW: "Too few to tell",
     FEWER: "Fewer",
     MORE: "More",
     NO_CHANGE: "No change seen",
+    COUNTS_ONLY: "Counts only (units unknown)",
 }
 NOTICE = "Counts from your records; not a verdict. Only your signed effectiveness check says whether an action worked."
 LIMITS = (

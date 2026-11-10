@@ -23,6 +23,9 @@ as before B7). Records already signed stay readable, and a complaint MDARIX clos
 ``MDARIX_CHALLENGE`` (B5a): on unless ``off``. Off, the investigation challenge routes answer 404, the session's
 ``challenge`` is false so the Challenge view and the brief's Challenge section hide, and unanswered challenge questions
 no longer block submitting a brief. Briefs already signed keep their sections.
+
+``MDARIX_CLOSED_LOOP`` (B5b): on unless ``off``. Off, "Did it work?" answers 404 and the session's ``closed_loop`` is
+false so its tab hides; the follow-up fields and the reopen triggers are kept as recorded but not offered or checked.
 """
 
 from __future__ import annotations
@@ -73,11 +76,18 @@ _ROUTINE_PATH_API = tuple(
 
 # B5a routes refused while MDARIX_CHALLENGE is off.
 _CHALLENGE_API = (re.compile(r"^/api/v1/investigations/[^/]+/challenge(/|$)"),)
+# B5b routes refused while MDARIX_CLOSED_LOOP is off.
+_CLOSED_LOOP_API = (re.compile(r"^/api/v1/investigations/[^/]+/did-it-work(/|$)"),)
 
 
 def challenge() -> bool:
     """B5a is on unless ``MDARIX_CHALLENGE=off`` (read on every call)."""
     return os.getenv("MDARIX_CHALLENGE", "").strip().lower() not in ("off", "0", "false", "no")
+
+
+def closed_loop() -> bool:
+    """B5b is on unless ``MDARIX_CLOSED_LOOP=off`` (read on every call)."""
+    return os.getenv("MDARIX_CLOSED_LOOP", "").strip().lower() not in ("off", "0", "false", "no")
 
 
 def routine_path() -> bool:
@@ -111,12 +121,14 @@ def for_tenant(db, tenant_id) -> str:
 
 def serves_path(path: str, method: str = "GET") -> bool:
     """Whether this deployment's feature set serves the request path: always under ``full``; under ``mvp``,
-    everything except the parked routes; with B7a or B5a off, nothing of theirs."""
+    everything except the parked routes; with B7a, B5a or B5b off, nothing of theirs."""
     if not routine_path() and any(
         pattern.match(path) and verb in (None, method.upper()) for verb, pattern in _ROUTINE_PATH_API
     ):
         return False
     if not challenge() and any(pattern.match(path) for pattern in _CHALLENGE_API):
+        return False
+    if not closed_loop() and any(pattern.match(path) for pattern in _CLOSED_LOOP_API):
         return False
     if not is_mvp():
         return True
