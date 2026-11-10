@@ -106,7 +106,7 @@ def _complaints(db, tenant_id, marker: str) -> dict:
             value = getattr(complaint, column)
             if column in {"product_id", "product_version_id", "lot_batch_id"}:
                 value = names.get(value, value)
-            if column in {"updated_at", "recorded_timestamp", "ingestion_timestamp"}:
+            if column in {"updated_at", "recorded_timestamp", "ingestion_timestamp", "last_synced_at"}:
                 continue  # the time of the run
             row[column] = value
         out[complaint.complaint_identifier] = row
