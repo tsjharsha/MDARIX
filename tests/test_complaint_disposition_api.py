@@ -10,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from backend.app import feature_set
+
 from backend.app import mfa
 from backend.app.db.models.complaint_disposition import ComplaintDisposition
 from backend.app.db.models.foundation import AuditEvent, Complaint, Investigation, SignedApprovalRecord
@@ -185,8 +187,11 @@ def test_the_routine_complaint_closes_at_service_level_on_one_screen_with_one_si
         ]
         assert {row.signed_record_id for row in markets} == {record.id}
         # B4 (ED-15, RR-16): each market row keeps the floor in force on its awareness day and the routine basis.
-        assert [(row.floor_code, row.rules_applied["rules"][0]["id"]) for row in markets] == [
-            (f"{prefix}-floor-1", "routine-basis-1") for prefix in ("CA", "EU", "GB", "IN", "US")
+        # Switched off (MDARIX_RULE_REGISTER=off), no floor is recorded.
+        on = feature_set.rule_register()
+        assert [(row.floor_code, (row.rules_applied or {}).get("rules", [{}])[0].get("id")) for row in markets] == [
+            (f"{prefix}-floor-1", "routine-basis-1") if on else (None, None)
+            for prefix in ("CA", "EU", "GB", "IN", "US")
         ]
         bind_system(db, "test: the audit trail")
         actions = [
