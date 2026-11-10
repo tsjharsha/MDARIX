@@ -103,10 +103,10 @@ describe("D3.3 the complaint page is a record with a hero", () => {
     };
     const html = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />);
     const card = html.slice(html.indexOf("uw-rail-service"));
-    expect(card.match(/> ?Service work</g)).toHaveLength(1);
+    expect(card.match(/> ?Service</g)).toHaveLength(1);
     expect(card.match(/SVC-24-1107 \(sample service ticket\) · owner not named yet/g)).toHaveLength(1);
     // The heading and the state come before the form's first field.
-    expect(card.indexOf(">Service work<")).toBeLessThan(card.indexOf("Service reference"));
+    expect(card.indexOf(">Service<")).toBeLessThan(card.indexOf("Service reference"));
   });
 
   it("folds the triage form while the story is on another step", () => {

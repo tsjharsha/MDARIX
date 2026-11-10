@@ -157,6 +157,11 @@ type LogForm = {
   receivedTyped: boolean;
   answers: Answers;
   unknowns: string;
+  channel: string;
+  channelRef: string;
+  patients: string;
+  harmText: string;
+  tried: string;
 };
 
 /** One device identifier (ID-1, S-3): the value, "Not sure" where allowed, its source and whether it is confirmed. */
@@ -290,6 +295,11 @@ function LogDrawer({
     receivedTyped: false,
     answers: blankAnswers(guide.questions),
     unknowns: "",
+    channel: "",
+    channelRef: "",
+    patients: "",
+    harmText: "",
+    tried: "",
   });
   const [typeProduct, setTypeProduct] = useState(false);
   const [earlier, setEarlier] = useState(false);
@@ -344,6 +354,11 @@ function LogDrawer({
         awareness_zone: form.zone,
         answers: urgent ? {} : form.answers,
         unknowns: form.unknowns,
+        channel: form.channel,
+        channel_ref: form.channelRef,
+        patients: form.patients,
+        harm_text: form.harmText,
+        troubleshooting: form.tried,
         request_key: requestKey,
       });
       onLogged(saved.id);
@@ -392,6 +407,21 @@ function LogDrawer({
           <summary>How it came in ({zoneLabel(form.zone)})</summary>
           <div className="ca-form-grid">
             <label className="ca-field">
+              Channel
+              <select value={form.channel} onChange={(event) => set({ channel: event.target.value })}>
+                <option value="">Not chosen</option>
+                {(guide.channels ?? []).map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ca-field">
+              Reference in that channel (optional)
+              <input value={form.channelRef} onChange={(event) => set({ channelRef: event.target.value })} />
+            </label>
+            <label className="ca-field">
               Received
               <input
                 type="datetime-local"
@@ -434,6 +464,8 @@ function LogDrawer({
                   <option value="">Not known</option>
                   <option value="MANUFACTURER">Our own staff</option>
                   <option value="DISTRIBUTOR">A distributor</option>
+                  <option value="IMPORTER">An importer</option>
+                  <option value="AUTHORISED_REPRESENTATIVE">An authorised representative</option>
                   <option value="SERVICE_AGENT">A service agent</option>
                 </select>
               </label>
@@ -568,6 +600,27 @@ function LogDrawer({
           </div>
         </details>
         <details className="ca-drawer-section uw-more">
+          <summary>Patient and harm</summary>
+          <div className="uw-fc-answers" role="radiogroup" aria-label="Patients involved">
+            <span>Patients involved:</span>
+            {(guide.patients ?? []).map((item) => (
+              <label key={item.code}>
+                <input
+                  type="radio"
+                  name="patients"
+                  checked={form.patients === item.code}
+                  onChange={() => set({ patients: item.code })}
+                />
+                {item.label}
+              </label>
+            ))}
+          </div>
+          <label className="ca-field">
+            What happened to the patient (optional)
+            <textarea rows={2} value={form.harmText} onChange={(event) => set({ harmText: event.target.value })} />
+          </label>
+        </details>
+        <details className="ca-drawer-section uw-more">
           <summary>Service</summary>
           <div className="ca-form-grid">
             <label className="ca-field">
@@ -595,6 +648,10 @@ function LogDrawer({
             <label className="ca-field">
               Service ticket (optional)
               <input value={form.ticket} onChange={(event) => set({ ticket: event.target.value })} />
+            </label>
+            <label className="ca-field ca-wide">
+              What was tried on the call
+              <textarea rows={2} value={form.tried} onChange={(event) => set({ tried: event.target.value })} />
             </label>
           </div>
         </details>

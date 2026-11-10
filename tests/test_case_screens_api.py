@@ -11,7 +11,7 @@ from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system
 from tests.test_case_addenda_api import _log
 from tests.test_free_trial import _approved_trial_client
-from tests.test_intake_triage_api import INTAKE, _ok
+from tests.test_intake_triage_api import INTAKE, _all_no, _ok, _sign
 
 pytestmark = pytest.mark.db
 
@@ -106,3 +106,38 @@ def test_the_case_check_drawer_reads_its_six_choices_its_clock_and_the_complaint
     assert detail["clock"]["market"] and detail["clock"]["days"] and detail["clock"]["due_label"]
     # No product: nothing to attach to; not escalated: no complaint yet.
     assert detail["likely_complaints"] == [] and detail["complaint_ref"] is None and detail["row_version"] >= 1
+
+
+def test_the_complaint_page_of_an_escalated_case_shows_its_origin_its_case_and_the_stage_case(trial):  # spec 4.6
+    user = trial["user"]
+    event = _log(
+        user,
+        answers=_all_no(Q2="YES"),
+        troubleshooting="Restarted the pump; the alarm came back",
+        channel="phone",
+        channel_ref="call 4471",
+        patients="ONE",
+        harm_text="Infusion delayed; call the nurse on nurse.lee@example.com",
+        first_knowledge_party="IMPORTER",
+        first_knowledge_basis="ACTS_FOR_MANUFACTURER",
+    )
+    # Spec 4.2: channel, patients, harm (masked) and who knew first are kept.
+    assert (event["channel"], event["channel_label"], event["channel_ref"]) == ("PHONE", "Phone", "call 4471")
+    assert event["patients"] == "ONE" and "nurse.lee@example.com" not in event["harm_text"]
+    assert event["times"]["first_knowledge"]["party"] == "IMPORTER"
+    unknown = _ok(
+        user.post(INTAKE, json={"kind": "CONTACT", "reporter_words": "Display flickers on start", "channel": "pigeon"})
+    )
+    assert unknown["channel"] is None  # an unknown channel is not kept, as the other choices
+    signed = _ok(_sign(user, event, "COMPLAINT"))
+    assert signed["complaint_ref"] == event["reference"]
+    page = _ok(user.get(f"/api/v1/oversight/events/{event['reference']}"))
+    assert page["stages"][0] == {"code": "CASE", "label": "Case", "state": "DONE"}
+    assert page["origin"]["from_case"] is True and page["origin"]["case_ref"] == event["reference"]
+    assert page["origin"]["record_owner"] == "MDARIX"  # a trial: Complete
+    case = page["case"]
+    assert (case["id"], case["reference"], case["escalation"]) == (event["id"], event["reference"], "CREATED")
+    assert case["signed"]["outcome"] == "Complaint" and case["words"] == event["reporter_words"]
+    assert case["troubleshooting"] == "Restarted the pump; the alarm came back"
+    # The Case check after the escalation: no clock chip and nothing to attach to (its life continues on the page).
+    assert signed["clock"] is None and signed["likely_complaints"] == []

@@ -195,6 +195,30 @@ export type EventView = {
     next_action: { label: string; detail: string; opens: Opens } | null;
   };
   stages: Array<{ code: string; label: string; state: "DONE" | "CURRENT" | "OPEN" | "LATER" | "NOT_NEEDED" }>;
+  /** B2 (spec 4.6): where the complaint came from, a Case in MDARIX or the QMS. */
+  origin?: {
+    from_case: boolean;
+    case_ref: string | null;
+    created_at: string | null;
+    record_owner: "MDARIX" | "EXTERNAL" | null;
+    qms_ref: string | null;
+    last_synced_at: string | null;
+  };
+  /** B2 (spec 4.6): the Case that became or joined this complaint ("The case" card). */
+  case?: {
+    id: string;
+    reference: string;
+    words: string;
+    addenda: { kind: string; said_by_role: string; said_at: string | null; text: string }[];
+    channel: string | null;
+    channel_ref: string | null;
+    received_at: string | null;
+    signed: { outcome: string; by: string; at: string | null } | null;
+    escalation: "CREATED" | "ATTACHED" | null;
+    escalated_at: string | null;
+    troubleshooting: string | null;
+    service_ticket: string | null;
+  } | null;
   checklist: CheckItem[];
   blocked: number;
   state: EventState;

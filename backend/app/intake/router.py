@@ -167,6 +167,12 @@ class IntakeIn(BaseModel):
     request_key: str = Field(default="", max_length=80)
     # Spec 4.2: a product not in the organization's products is typed and kept as typed, flagged.
     product_text: str = Field(default="", max_length=200)
+    # Spec 4.2: how it came in, the patients involved, what happened to them and what was tried on the call.
+    channel: str = Field(default="", max_length=40)
+    channel_ref: str = Field(default="", max_length=200)
+    patients: str = Field(default="", max_length=12)
+    harm_text: str = Field(default="", max_length=rules.TEXT_MAX)
+    troubleshooting: str = Field(default="", max_length=rules.TEXT_MAX)
 
 
 class CheckIn(BaseModel):
@@ -285,6 +291,8 @@ def guide(_ctx: AuthenticatedRequestContext = Depends(get_request_context)):
         "outcomes": [{"code": code, "label": case_rules.OUTCOME_LABELS[code]} for code in case_rules.OUTCOMES],
         "states": [{"code": code, "label": case_rules.STATE_LABELS[code]} for code in case_rules.STATES],
         "issue_categories": [{"code": code, "label": label} for code, label in case_rules.ISSUE_CATEGORIES.items()],
+        "channels": [{"code": code, "label": label} for code, label in case_rules.CHANNELS.items()],
+        "patients": [{"code": code, "label": label} for code, label in case_rules.PATIENTS.items()],
         "identifiers": {
             "keys": [{"code": key, "label": case_rules.IDENTIFIER_LABELS[key]} for key in case_rules.IDENTIFIERS],
             "not_sure": list(case_rules.NOT_SURE_ALLOWED),
@@ -376,6 +384,12 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
         "flagged": bool(flags),
         "qms_ref": event.qms_ref,
         "service_ticket": event.service_ticket,
+        "channel": event.channel,
+        "channel_label": case_rules.CHANNELS.get(event.channel or ""),
+        "channel_ref": event.channel_ref,
+        "patients": event.patients,
+        "harm_text": event.harm_text,
+        "troubleshooting": event.troubleshooting,
         "sample": is_sample(event.source_system),
         "created_by": name(event.created_by),
         "created_at": event.created_at.isoformat(),
@@ -903,6 +917,11 @@ def log_intake(
         issue_category=case_rules.issue_category(payload.issue_category),
         product_text=product_text,
         lot_text=lot_text,
+        channel=_choice(payload.channel, case_rules.CHANNELS),
+        channel_ref=rules.clean(payload.channel_ref, 200) or None,
+        patients=_choice(payload.patients, case_rules.PATIENTS),
+        harm_text=_masked_text(rules.clean(payload.harm_text))[0] or None,
+        troubleshooting=_masked_text(rules.clean(payload.troubleshooting))[0] or None,
         **values,
     )
     db.add(event)

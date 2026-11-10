@@ -128,7 +128,14 @@ REQUEST_LABELS = {
     "INFORMATION": "Information",
     "NONE": "Nothing asked for",
 }
-FIRST_KNOWLEDGE_PARTIES = ("MANUFACTURER", "DISTRIBUTOR", "SERVICE_AGENT")
+# Spec 4.2 (H1): who knew first; an importer and an authorised representative added in 0.10.93 (B2).
+FIRST_KNOWLEDGE_PARTIES = (
+    "MANUFACTURER",
+    "DISTRIBUTOR",
+    "IMPORTER",
+    "AUTHORISED_REPRESENTATIVE",
+    "SERVICE_AGENT",
+)
 FIRST_KNOWLEDGE_BASES = ("ACTS_FOR_MANUFACTURER", "PROCEDURE_DEEMS", "NOT_ACTING_FOR")
 
 # MDARIX's starter harm words (G19), fixed in the trial: death, injury and hospitalisation, with abbreviations. One

@@ -48,6 +48,9 @@ export type Guide = {
   levels: { code: string; label: string }[];
   // 0.10.93 (B2): S-1 issue categories, ID-1 identifiers (labels, which allow Not sure, sources), the Case states.
   issue_categories?: { code: string; label: string }[];
+  // Spec 4.2 (B2): how it came in, and the patients involved.
+  channels?: { code: string; label: string }[];
+  patients?: { code: string; label: string }[];
   identifiers?: {
     keys: { code: string; label: string }[];
     not_sure: string[];

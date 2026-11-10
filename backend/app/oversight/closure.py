@@ -653,7 +653,10 @@ def stage_line(found: dict, items: list[dict], row: EventClosure | None) -> list
     # Once every market's conclusion is signed and a report is still to file, the stage reads "Report" (0.10.85, D3.2;
     # U-13: the list's Stage read "Market assessment" beside a signed conclusion).
     reporting = done("MARKETS") and not done("OBLIGATIONS")
-    return [
+    # B2 (spec 4.6): a complaint a Case became starts with the stage "Case", done (it escalated).
+    from_case = getattr(complaint, "source_system", None) == "MDARIX_CASE"
+    case = [{"code": "CASE", "label": "Case", "state": "DONE"}] if from_case else []
+    return case + [
         {
             "code": code,
             "label": "Report" if code == "MARKETS" and reporting else label,

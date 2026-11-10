@@ -34,6 +34,14 @@ const GUIDE = {
     { code: "MALFUNCTION", label: "Malfunction" },
     { code: "USAGE_HELP", label: "Usage help" },
   ],
+  channels: [
+    { code: "PHONE", label: "Phone" },
+    { code: "REGULATOR", label: "Regulator notice" },
+  ],
+  patients: [
+    { code: "NONE", label: "None" },
+    { code: "NOT_KNOWN", label: "Not known" },
+  ],
   identifiers: {
     keys: [
       { code: "product", label: "Product" },
@@ -72,6 +80,17 @@ describe("Log a case (B2)", () => {
     expect(html).toContain("Usage help");
     expect(html).toContain("it never decides a complaint or a report");
     expect(html).toContain("Save the case");
+    // Spec 4.2: the channel and its reference, patients and harm, what was tried, and who knew first.
+    for (const text of [
+      "Channel",
+      "Regulator notice",
+      "Reference in that channel (optional)",
+      "Patients involved:",
+      "What happened to the patient (optional)",
+      "What was tried on the call",
+    ])
+      expect(html).toContain(text);
+    expect(html.match(/name="patients"/g)).toHaveLength(2);
   });
 
   it("shows Not sure, Confirmed or Unconfirmed, and nothing for an empty identifier", () => {

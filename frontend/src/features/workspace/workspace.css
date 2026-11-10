@@ -4462,6 +4462,12 @@ div.uw-task-count:hover {
 .uw-case-escalation h4 {
   margin: 0;
 }
+.uw-cp-origin {
+  margin: 2px 0 0;
+  /* On the hero band: the band's own text colour, quieter. */
+  opacity: 0.85;
+  font-size: var(--ms-fs-14);
+}
 .uw-entry-actions {
   display: flex;
   flex-wrap: wrap;

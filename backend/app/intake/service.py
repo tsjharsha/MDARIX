@@ -1288,6 +1288,51 @@ def linked_complaint(db: Session, tenant_id, event: IntakeEvent) -> Complaint | 
     return None
 
 
+def case_of_complaint(db: Session, tenant_id, complaint: Complaint, names: dict) -> dict | None:
+    """The complaint page's "The case" card (spec 4.6): the Case that became or joined this complaint (the earliest),
+    what was said with the addenda, how it came in, the signed Case check, and what was tried on the call."""
+    from backend.app.db.models.intake import CaseAddendum
+
+    event = (
+        db.query(IntakeEvent)
+        .filter(IntakeEvent.tenant_id == tenant_id, IntakeEvent.complaint_id == complaint.id)
+        .order_by(IntakeEvent.created_at)
+        .first()
+    )
+    if event is None:
+        return None
+    signed = current_signed(checks_of(db, tenant_id, [event.id]).get(event.id, []))
+    addenda = (
+        db.query(CaseAddendum)
+        .filter(CaseAddendum.tenant_id == tenant_id, CaseAddendum.intake_event_id == event.id)
+        .order_by(CaseAddendum.created_at)
+        .limit(READ_LIMIT)
+    )
+    return {
+        "id": str(event.id),
+        "reference": event.reference,
+        "words": event.reporter_words,
+        "addenda": [
+            {"kind": row.kind, "said_by_role": row.said_by_role, "said_at": _iso(row.said_at), "text": row.text}
+            for row in addenda
+        ],
+        "channel": event.channel,
+        "channel_ref": event.channel_ref,
+        "received_at": _iso(event.received_at),
+        "signed": {
+            "outcome": case_rules.OUTCOME_LABELS.get(signed.classification or "", signed.classification),
+            "by": names.get(signed.signed_by or "") or "A colleague",
+            "at": _iso(signed.signed_at),
+        }
+        if signed is not None
+        else None,
+        "escalation": event.escalation,
+        "escalated_at": _iso(event.escalated_at),
+        "troubleshooting": event.troubleshooting,
+        "service_ticket": event.service_ticket,
+    }
+
+
 def case_setup(db: Session, tenant_id, trial: bool) -> tuple[str, str]:
     """(record owner of a new complaint, case flow): the organization's system of record for complaints (no row: a
     trial is MDARIX, a pilot EXTERNAL, M3) and how Cases become complaints (default one record)."""

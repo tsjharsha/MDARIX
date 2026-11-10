@@ -194,6 +194,23 @@ def classification_problem(
     return None
 
 
+# ------------------------------------------------------------------------- how it came in, patients (spec 4.2)
+
+CHANNELS = {
+    "PHONE": "Phone",
+    "EMAIL": "E-mail",
+    "WEB_FORM": "Web form",
+    "FIELD_SERVICE": "Field service visit",
+    "DISTRIBUTOR": "Distributor or agent",
+    "RETURNED_PRODUCT": "Returned product",
+    "LITERATURE": "Literature",
+    "SOCIAL_MEDIA": "Social media",
+    "REGULATOR": "Regulator notice",
+    "OTHER": "Other",
+}
+# intake_events.patients (tr19 check patients_known).
+PATIENTS = {"NONE": "None", "ONE": "One", "SEVERAL": "Several", "NOT_KNOWN": "Not known"}
+
 # The six classifications the Case check shows (spec 4.4), in order; "Pending" reads the suggestion's own wording
 # when the answers give "confirm no deficiency".
 CHOICES = (rules.COMPLAINT, rules.BOTH, rules.SERVICE_ONLY, INQUIRY, rules.PENDING, NOT_A_COMPLAINT)

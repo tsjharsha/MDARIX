@@ -267,6 +267,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                   <h1 ref={heading} tabIndex={-1}>
                     {event.ref}
                   </h1>
+                  {originText(view.origin) && <p className="uw-cp-origin">{originText(view.origin)}</p>}
                 </div>
               </div>
               {/* The record's hero (0.10.85, D3.3): the reporter's words and the harm. */}
@@ -427,6 +428,8 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
           <div className="uw-rec-body" role="tabpanel" id="cp-panel" aria-labelledby={`cp-tab-${active}`}>
             {active === "Summary" && (
               <>
+                {/* B2 (spec 4.6): the Case this complaint came from, first; folded while triage is the next step. */}
+                {view.case && <CaseCard item={view.case} folded={triageHere} />}
                 {/* Triage is done here when it is the next step (0.10.72, B3), first in Details beside the rail. */}
                 {triageHere &&
                   (storyRun && !storyRun.finished && storyRun.current !== 1 ? (
@@ -816,13 +819,95 @@ function Rail({ view, onChanged }: { view: EventView; onChanged: (view: EventVie
       </details>
       <details className="uw-card uw-card-pad uw-rail-service uw-cp-fold" open={!onPhone()}>
         <summary>
-          <h2>Service work</h2>
+          <h2>Service</h2>
           <span className="ac-muted">{serviceText(view)}</span>
         </summary>
         {/* The fold's summary says the heading and the state once (0.10.91: they were said twice). */}
-        <ServiceWork view={view} onChanged={onChanged} title="Service work" headless />
+        <ServiceWork view={view} onChanged={onChanged} title="Service" headless />
+        {view.case?.troubleshooting && (
+          <p>
+            <strong>What was tried on the call:</strong> {view.case.troubleshooting}
+          </p>
+        )}
+        {view.case && <p className="ac-note">Service work never closes the complaint.</p>}
       </details>
     </aside>
+  );
+}
+
+/**
+ * The origin line under the title (spec 4.6): "Created in MDARIX from case CASE-… on 7 Nov · QMS ID: not yet"
+ * (Connect), "Created in MDARIX from case CASE-…" (Complete), or "From your QMS · ID QMS-4411 · last synced …".
+ */
+export function originText(origin: EventView["origin"]): string | null {
+  if (!origin) return null;
+  if (origin.from_case) {
+    const made = `Created in MDARIX from case ${origin.case_ref ?? "—"}`;
+    return origin.record_owner === "EXTERNAL"
+      ? `${made} on ${formatDate(origin.created_at)} · QMS ID: ${origin.qms_ref ?? "not yet"}`
+      : made;
+  }
+  if (!origin.qms_ref && !origin.last_synced_at) return null;
+  return [
+    "From your QMS",
+    origin.qms_ref && `ID ${origin.qms_ref}`,
+    origin.last_synced_at && `last synced ${formatDate(origin.last_synced_at)}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+const SAID_BY: Record<string, string> = {
+  REPORTER: "The reporter",
+  TECHNICIAN: "A technician",
+  DISTRIBUTOR: "A distributor",
+  OUR_STAFF: "Our staff",
+};
+
+/** "The case" (spec 4.6): what was said with the addenda, how it came in, the signed Case check and its link. */
+function CaseCard({ item, folded }: { item: NonNullable<EventView["case"]>; folded: boolean }) {
+  const { open } = useWorkspace();
+  return (
+    <details className="uw-rec-part uw-cp-fold" open={!folded}>
+      <summary>
+        <h2>The case · {item.reference}</h2>
+      </summary>
+      <q className="uw-cr-text">{item.words}</q>
+      {item.addenda.length > 0 && (
+        <ul className="uw-case-addenda" aria-label="Said later">
+          {item.addenda.map((entry, index) => (
+            <li key={index}>
+              <strong>
+                {SAID_BY[entry.said_by_role] ?? entry.said_by_role} · {formatDate(entry.said_at)}
+              </strong>
+              <q className="uw-cr-text">{entry.text}</q>
+            </li>
+          ))}
+        </ul>
+      )}
+      <dl className="uw-rec-facts">
+        <dt>How it came in</dt>
+        <dd>
+          {[item.channel ? item.channel.toLowerCase().replace(/_/g, " ") : null, item.channel_ref]
+            .filter(Boolean)
+            .join(" · ") || "Not recorded"}
+          {item.received_at ? ` · received ${formatDate(item.received_at)}` : ""}
+        </dd>
+        <dt>Case check</dt>
+        <dd>
+          {item.signed
+            ? `${item.signed.outcome} · signed by ${item.signed.by} · ${formatDate(item.signed.at)}`
+            : "Not signed (an urgent case became the complaint at once)"}
+        </dd>
+      </dl>
+      <button
+        type="button"
+        className="ac-link"
+        onClick={() => open("Complaints", withTabParam("Calls to check", "check", item.id))}
+      >
+        Open the case check
+      </button>
+    </details>
   );
 }
 
@@ -834,7 +919,7 @@ const onPhone = () =>
 
 /** Each story step on the rail: what it is, one line, and its one button (Getting started's step card's action). */
 const STORY_ACTIONS: Array<[string, string, string]> = [
-  ["read the call", "The reporter's words are on this page; the awareness time starts every clock.", "Read the call"],
+  ["read the call", "The reporter's words are on this page; the awareness time starts every clock.", "Read the case"],
   ["triage", "Severity, owner and the first action.", "Open the triage"],
   ["the decision tree", "Facts from the record arrive to confirm; judgement questions are yours.", "Open the tree"],
   ["reportable or not", "Sign the conclusion: your role decides who signs, never the persona.", "Go to the outcome"],

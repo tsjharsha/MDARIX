@@ -1022,6 +1022,7 @@ def harm_words(complaint) -> str:
 
 
 def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict:
+    from backend.app.intake import service as intake_service
     from backend.app.reportability import facts, markets
     from backend.app.reportability.deadlines import day_only
     from backend.app.reportability import service as reporting_service
@@ -1087,6 +1088,16 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
             "owner_named": bool(row and row.owner_id),
             "sample": is_sample(complaint.source_system),
         },
+        # B2 (spec 4.6): where the complaint came from (a Case in MDARIX, or the QMS), and the Case's own card.
+        "origin": {
+            "from_case": complaint.source_system == "MDARIX_CASE",
+            "case_ref": complaint.source_identifier if complaint.source_system == "MDARIX_CASE" else None,
+            "created_at": _iso(complaint.created_at),
+            "record_owner": complaint.record_owner,
+            "qms_ref": complaint.qms_ref,
+            "last_synced_at": _iso(complaint.last_synced_at),
+        },
+        "case": intake_service.case_of_complaint(db, tenant_id, complaint, names),
         "summary": {
             # The nearest dated item, the reportability watch's provisional clock included (0.10.68).
             "nearest_deadline": {key: nearest[key] for key in ("title", "due_at", "opens")} if nearest else None,
