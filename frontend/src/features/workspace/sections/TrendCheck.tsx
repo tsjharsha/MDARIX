@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Activity, AlertTriangle, Plus, TrendingUp } from "lucide-react";
+import { Activity, AlertTriangle, Boxes, Plus, TrendingUp } from "lucide-react";
 import { Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Table, errorText, send, useResource } from "../../customer-admin/shared";
 import { sectionAllowed, useCan, useNavigation, useTabParam, useWorkspace } from "../workspaceContext";
@@ -28,6 +28,7 @@ import { ChipFilter, Hero, InlineError, ProductFilter } from "./boardParts";
 import { BasisLine } from "../../shared/Basis";
 import { Bars, BarsTable, ChartOrTable, type BarRow } from "./WowCharts";
 import { IMPORTED_SOURCE } from "../complaintList";
+import { productTab } from "../productHub";
 import { inData } from "../home";
 import { useVisited } from "../oneStory";
 import { DeviceIcon, deviceKind } from "../../shared/hero/HeroVisuals";
@@ -111,7 +112,23 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
   return (
     <div className="ac-overview">
       {navigation === "new" ? (
-        board.data && <TrendHeroes board={board.data} action={action} source={dataSource} />
+        board.data && (
+          <TrendHeroes
+            board={board.data}
+            action={action}
+            source={dataSource}
+            // W1 (0.10.94): the card's product and version open Product 360 in one click.
+            onProduct={(row) =>
+              open(
+                "Product 360",
+                productTab(
+                  row.product.identifier ?? row.product.business_id ?? row.product.id,
+                  row.product_version?.version_identifier ?? null,
+                ),
+              )
+            }
+          />
+        )
       ) : (
         <Hero
           tone={board.data ? headline.tone : "neutral"}
@@ -312,9 +329,12 @@ export function TrendHeroes({
   board,
   action,
   source,
+  onProduct,
 }: {
   board: TrendBoard;
   action: (row: TrendItem, lead?: boolean) => React.ReactNode;
+  /** Opens the card's product version on Product 360 (0.10.94); no link without it. */
+  onProduct?: (row: TrendItem) => void;
   /** The Sample · Your data switch: on your data, your products only (never the sample's rise). */
   source?: string;
 }) {
@@ -423,7 +443,15 @@ export function TrendHeroes({
               <p>{chanceText(row)}</p>
               {perUnitHint(board) && <p>{perUnitHint(board)}</p>}
             </details>
-            <div className="ca-action-row">{action(row, true)}</div>
+            <div className="ca-action-row">
+              {action(row, true)}
+              {onProduct && (
+                <button type="button" className="ac-secondary" onClick={() => onProduct(row)}>
+                  <Boxes size={15} aria-hidden="true" /> Product 360:{" "}
+                  {[shortName(row.product.name), row.product_version?.version_identifier].filter(Boolean).join(" · ")}
+                </button>
+              )}
+            </div>
           </section>
         );
       })}

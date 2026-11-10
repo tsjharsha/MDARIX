@@ -17,6 +17,8 @@ import {
   type Origin,
 } from "./productHub";
 import { Changes, OriginChip, ProductHubSection, recordLine } from "./sections/ProductHub";
+import { TrendHeroes } from "./sections/TrendCheck";
+import type { TrendBoard, TrendItem } from "./signalAi";
 
 const resources = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
 vi.mock("../customer-admin/shared", async (original) => ({
@@ -281,5 +283,43 @@ describe("a chosen version is respected (PV-1)", () => {
     expect(recordLine("risks", { risk_identifier: "R1", description: "Alarm", applies_to: "PRODUCT" }).text).toBe(
       "Alarm · whole product (no version recorded)",
     );
+  });
+});
+
+describe("links into Product 360 (7a, P360-08)", () => {
+  it("gives a trend check card its product version, one click away", () => {
+    const rising = {
+      key: "g1",
+      name: "OrbitCare 300 (Sample) Rev B",
+      result: "SIGNIFICANT",
+      recent: 9,
+      recent_days: 30,
+      expected: 1,
+      ratio: 9.3,
+      history: 6,
+      history_days: 180,
+      baseline: "PREVIOUS_VERSION",
+      basis: "UNITS",
+      lots: [],
+      open_signals: [],
+      product: { id: "p1", business_id: null, identifier: "SAMPLE-ORBIT-300", name: "OrbitCare 300 (Sample)" },
+      product_version: { id: "v1", business_id: null, version_identifier: "Rev B" },
+    } as unknown as TrendItem;
+    const board = { items: [rising], recent_days: 30, history_days: 180, min_complaints: 3, summary: {} };
+    const onProduct = vi.fn();
+    const html = renderToStaticMarkup(
+      <TrendHeroes
+        board={board as unknown as TrendBoard}
+        action={() => null}
+        source={SAMPLE_SOURCE}
+        onProduct={onProduct}
+      />,
+    );
+    expect(html).toContain("Product 360:");
+    expect(html).toContain("Rev B</button>");
+    expect(
+      renderToStaticMarkup(<TrendHeroes board={board as unknown as TrendBoard} action={() => null} />),
+    ).not.toContain("Product 360:");
+    expect(productTab(rising.product.identifier!, "Rev B")).toBe("Products?product=SAMPLE-ORBIT-300&version=Rev+B");
   });
 });

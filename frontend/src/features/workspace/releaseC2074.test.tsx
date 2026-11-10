@@ -284,6 +284,7 @@ describe("the record page: highlights, path, Details · Related · Activity, and
           business_id: "INV000001",
           investigation_question: "Why did pressure-alarm complaints rise after OrbitCare 300 Rev B?",
           product_id: "p1",
+          version_identifier: "Rev B",
           workflow_state: "OPEN",
           owner_name: "Asha Quality",
           priority: "HIGH",
@@ -294,7 +295,10 @@ describe("the record page: highlights, path, Details · Related · Activity, and
       />,
     );
     // 0.10.85, D3.9: the reference beside the product; the question is the heading.
-    expect(html).toContain("Investigation · INV000001 · OrbitCare 300");
+    // 0.10.94 (W1, 7a): the product and version open Product 360 in one click.
+    expect(html).toMatch(
+      /Investigation · INV000001 · <button type="button" class="ac-link">OrbitCare 300[^<]* · Rev B<\/button>/,
+    );
     expect(html).toContain("INV000001");
     for (const field of ["Owner", "Complaints in scope", "Lots in scope", "Blocking the decision"])
       expect(html).toContain(`<dt>${field}</dt>`);
