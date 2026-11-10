@@ -66,6 +66,33 @@ The remaining cost of the story and of every read that shows a complaint's work 
 items (the reportability watch and the triage list, the latter read twice), computed on each such read however few
 complaints it asks about. It needs a restructure (DEV-12), not a local fix.
 
+## Product 360 and Supplier 360 (0.10.94, W1), 10 Nov 2026
+
+`tests/test_product_supplier_load_measure.py` (opt-in, same way to repeat with that file): a new trial with its sample,
+the same synthetic 5,000-row export imported, then one part supplied by the sample's Precision Sensors linked to every
+imported version, so that supplier's page covers 5,044 complaints. Ten reads each, in-process, on the W1 branch
+(after commit 7a), no other test suite running at the start; 1 passed in 85 s. The budget of the W1 spec (6.5) is p95
+under 1 s a read; the approved read target is 500 ms.
+
+| Read | p50 | p95 | Queries | Under 1 s | Under 500 ms |
+|---|---|---|---|---|---|
+| Product list with counts (GET /products?counts=1) | 178 ms | 687 ms | 15 | Yes | No (p95) |
+| Product 360, light, newest version | 130 ms | 202 ms | 24 | Yes | Yes |
+| Product 360, light, Rev B | 171 ms | 230 ms | 24 | Yes | Yes |
+| Six tiles and the monthly series, Rev B (GET /products/{id}/links) | 349 ms | 428 ms | 26 | Yes | Yes |
+| Six tiles, every version | 172 ms | 602 ms | 23 | Yes | No (p95) |
+| One list, complaints, 20 | 108 ms | 202 ms | 15 | Yes | Yes |
+| One list, investigations, 20 | 85 ms | 122 ms | 17 | Yes | Yes |
+| Supplier list | 136 ms | 190 ms | 15 | Yes | Yes |
+| Supplier page, 5,044 complaints (Precision Sensors) | 272 ms | 342 ms | 25 | Yes | Yes |
+| Supplier complaints, 20 | 213 ms | 275 ms | 15 | Yes | Yes |
+| Supplier lots | 161 ms | 250 ms | 20 | Yes | Yes |
+| Supplier page, one version (NovaSense) | 249 ms | 276 ms | 26 | Yes | Yes |
+
+Every read is under the 1 s budget, so the fallback index migration (OD-7, `tr20p360indexes`) is not needed. Two reads
+miss 500 ms at p95 only, their p50 being under 200 ms (a slower single read among ten). Query counts include the
+request's own session and access statements, not only the reads of the spec's tables.
+
 ## Failure drills (local, 4 Nov 2026)
 
 Run with `scripts/journey_api.py`'s e-mail capture so no message left the machine, the real outbox worker loop
