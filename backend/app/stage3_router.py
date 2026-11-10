@@ -8,7 +8,7 @@ are scoped by the authenticated request context.
 import uuid
 from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
@@ -526,13 +526,11 @@ def story_view(
         if case_id
         else None
     )
-    if case is None:
-        return {
-            "status": "NOT_FOUND",
-            "investigation_id": investigation_id,
-            "tenant_id": ctx.tenant_id,
-            "message": "Investigation is not available for this tenant.",
-        }
+    if case is None:  # unknown, malformed or another organization's case: 404, like every by-id route
+        raise HTTPException(
+            404,
+            detail={"code": "INVESTIGATION_NOT_FOUND", "message": "Investigation is not available for this tenant."},
+        )
     counts = _story_counts(db, control_db, tenant_id, case)
     return {
         "status": "READY_FOR_REVIEW",

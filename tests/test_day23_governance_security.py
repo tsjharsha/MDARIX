@@ -426,7 +426,7 @@ def test_api_signing_security_matrix():
                 "object_version": version,
             },
         ).status_code in {403, 404}
-        assert foreign_client.get(f"/api/v1/governance/decisions/{first.id}/signature-history").json() == []
+        assert foreign_client.get(f"/api/v1/governance/decisions/{first.id}/signature-history").status_code == 404
     finally:
         # Audit evidence is append-only and must remain available after the test.
         db.query(SignedApprovalRecord).filter(SignedApprovalRecord.object_id.in_(ids)).delete(synchronize_session=False)

@@ -41,8 +41,9 @@ def test_a_bare_case_is_pending_where_nothing_is_recorded(cases):
 
 def test_unknown_or_malformed_ids_are_not_found():
     client = role_client("VIEWER")[0]
-    assert client.get("/api/v1/story/not-a-uuid").json()["status"] == "NOT_FOUND"
-    assert client.get("/api/v1/story/00000000-0000-0000-0000-000000000000").json()["status"] == "NOT_FOUND"
+    for case_id in ("not-a-uuid", "00000000-0000-0000-0000-000000000000"):
+        answer = client.get(f"/api/v1/story/{case_id}")
+        assert answer.status_code == 404 and answer.json()["detail"]["code"] == "INVESTIGATION_NOT_FOUND"
 
 
 def test_assurance_metrics_count_real_executions(cases):

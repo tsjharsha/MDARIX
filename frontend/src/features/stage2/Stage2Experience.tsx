@@ -34,7 +34,10 @@ export function Stage2Experience({ mode, investigationId }: { mode: Stage2Mode; 
     setError("");
     requestJson<any>(path)
       .then(setData)
-      .catch((reason) => setError(describeError(reason, "This view could not be loaded.")));
+      .catch((reason) => {
+        setData(null); // a case that is not found must not leave the previous case's story on screen
+        setError(describeError(reason, "This view could not be loaded."));
+      });
   }, [mode, investigationId, persona, signalId]);
 
   const content =

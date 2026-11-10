@@ -43,11 +43,6 @@ BY_ID = [
     "/api/v1/governance/decisions/{decision_id}/signature-history",
     "/api/v1/governance/decisions/{decision_id}/signature-verification",
 ]
-# Asked by id, these answer 200 with nothing, by design (reviewed): still never a single value of Tenant B.
-EMPTY_ANSWER = {
-    "/api/v1/story/{investigation_id}": "the story screen's own empty state: status NOT_FOUND in the body",
-    "/api/v1/governance/decisions/{decision_id}/signature-history": "a list filtered by organization: []",
-}
 # Lists and exports, with Tenant B's ids as filters: they may answer, but never with Tenant B's data.
 LISTS = [
     "/api/v1/complaints?product_id={product_id}&investigation_id={investigation_id}",
@@ -110,10 +105,6 @@ def world(tenants):  # noqa: F811
     return {"b_ids": b_ids, "markers": markers, "token": tenants["token"], "tenant_a": tenant_a_id}
 
 
-def _empty(body) -> bool:
-    return body == [] or (isinstance(body, dict) and body.get("status") == "NOT_FOUND")
-
-
 def _leaks(client: TestClient, paths: list[str], world: dict, *, refuse: bool) -> list[str]:
     problems = []
     for path in paths:
@@ -122,10 +113,8 @@ def _leaks(client: TestClient, paths: list[str], world: dict, *, refuse: bool) -
         found = sorted(marker for marker in world["markers"] if marker and marker in response.text)
         if response.status_code >= 500:
             problems.append(f"{path} -> {response.status_code}")
-        elif refuse and response.status_code not in (403, 404) and path not in EMPTY_ANSWER:
+        elif refuse and response.status_code not in (403, 404):  # the story and signature-history too (10 Nov 2026)
             problems.append(f"{path} -> {response.status_code}, expected a refusal")
-        elif path in EMPTY_ANSWER and response.status_code < 400 and not _empty(response.json()):
-            problems.append(f"{path} -> {response.status_code}, expected an empty answer")
         elif response.status_code < 400 and set(found) - {value for value in world["b_ids"].values() if value in url}:
             problems.append(f"{path} -> {response.status_code} contains {found[:3]}")
     return problems

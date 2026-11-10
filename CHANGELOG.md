@@ -102,6 +102,9 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - New tests ask, as one organization and under row-level security, for another organization's complaints,
   investigations, evidence and its download, CAPAs, exports, audit trail and signed decisions, by id, through list
   filters and through every export: each answer is a refusal or holds none of the other organization's data.
+- A case's story (`/api/v1/story/{id}`) and a decision's signature history answer 404 for an unknown or another
+  organization's id, like every other by-id route, instead of an empty answer (200); the story screen shows the
+  "not available" message and clears the previous case's stages.
 - New screen tests show that markup typed or imported into a complaint, an imported record or an evidence record's
   name appears as text on the complaint page, triage, the imported backlog and the case's evidence, never as markup;
   a test also fails if any screen starts writing raw HTML (the one reviewed, escaped exception is the public
