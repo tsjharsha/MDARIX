@@ -1,0 +1,31 @@
+{
+  "code": "may-also-apply-starter-1",
+  "rule": "may-also-apply",
+  "version": 1,
+  "kind": "REPORTABILITY",
+  "market": null,
+  "held_as": "CODE",
+  "title": "May also apply",
+  "plain": "Advice only: other markets whose rules may also apply.",
+  "source": [],
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": null,
+  "change": {
+    "kind": "INITIAL",
+    "reason": "Today's rule, listed in the register (held in MDARIX's code)."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Owner",
+    "approved_on": "2026-11-11",
+    "built_by": "MDARIX engineering",
+    "release": "0.10.99",
+    "note": "B4 spec approved 11 Nov 2026 (R-D1 to R-D14): version 1 is today's logic, unchanged."
+  },
+  "implementation": "backend.app.decision_guides.trees",
+  "pinned": false
+}

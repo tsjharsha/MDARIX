@@ -1,0 +1,31 @@
+{
+  "code": "conclusion-clock-starter-1",
+  "rule": "conclusion-clock",
+  "version": 1,
+  "kind": "DEADLINE_COUNTING",
+  "market": null,
+  "held_as": "CODE",
+  "title": "Which clock a conclusion gets",
+  "plain": "A Reportable conclusion uses the organization's window only when it matches the legal period exactly, otherwise the regulation's; a pending one takes the earliest.",
+  "source": [],
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": null,
+  "change": {
+    "kind": "INITIAL",
+    "reason": "Today's rule, listed in the register (held in MDARIX's code)."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Owner",
+    "approved_on": "2026-11-11",
+    "built_by": "MDARIX engineering",
+    "release": "0.10.99",
+    "note": "B4 spec approved 11 Nov 2026 (R-D1 to R-D14): version 1 is today's logic, unchanged."
+  },
+  "implementation": "backend.app.reportability.markets:market_clock",
+  "pinned": true
+}
