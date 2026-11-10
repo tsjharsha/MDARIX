@@ -39,6 +39,8 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
 - A password-reset or activation link used twice at the same moment works only once.
 - A full data export writes binary columns (the stored copy of a submitted report) as base64 text that can be decoded
   back to the file, instead of Python byte text.
+- A CSV import with a stray quote mark is refused with the line it is on ("Line 7: a quote mark ... is not closed"),
+  instead of reading the rest of the file as one cell or failing with a server error.
 
 ### Security
 

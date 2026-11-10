@@ -137,3 +137,21 @@ def test_the_export_writes_a_binary_column_as_base64(monkeypatch):  # audit 18
         tenant_export._write_tables(SimpleNamespace(execute=lambda *a: Result()), archive, "t1", "data/", manifest)
     line = zipfile.ZipFile(buffer).read("data/public.report_submission_copies.jsonl")
     assert base64.b64decode(json.loads(line)["content"]) == pdf
+
+
+@pytest.mark.parametrize(
+    "tail",
+    [
+        'C-2,P-1,"Alarm sounds without cause\nC-3,P-1,Screen dark\n',  # never closed: the rest would be one cell
+        "C-2,P-1," + '"' + "x" * 140_000 + "\n",  # never closed, past the reader's cell limit (was a 500)
+        'C-2,P-1,"Alarm" sounds\nC-3,P-1,Screen dark\n',  # closed, then more text in the same value
+    ],
+    ids=["unclosed", "unclosed-long", "text-after"],
+)
+def test_a_stray_quote_in_a_csv_is_refused_with_its_line(tail):  # audit 19
+    from backend.app.trial import imports
+
+    report = imports._Report()
+    raw = ("complaint_id,product_id,description\nC-1,P-1,Battery low\n" + tail).encode()
+    assert imports._parse("complaints", raw, report, imports.TRIAL_POLICY) == []
+    assert report.issues[0]["message"].startswith('Line 3: a quote mark (")'), report.issues

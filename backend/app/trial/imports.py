@@ -921,7 +921,21 @@ def _table(
     # Read no further than a workbook would (header + the rows taken + the margin), so an oversized file is refused
     # without building every row in memory.
     row_cap = 1 + max_rows + xlsx.ROW_MARGIN
-    rows = list(itertools.islice(csv.reader(io.StringIO(text, newline=""), delimiter=_delimiter(text)), row_cap + 1))
+    # strict: a stray quote mark is refused with its line, never read as one cell holding the rest of the file.
+    reader = csv.reader(io.StringIO(text, newline=""), delimiter=_delimiter(text), strict=True)
+    rows, start = [], 1
+    try:
+        for row in itertools.islice(reader, row_cap + 1):
+            rows.append(row)
+            start = reader.line_num + 1
+    except csv.Error:
+        report.add(
+            None,
+            None,
+            f'Line {start}: a quote mark (") there is not closed, or more text follows it in the same value. Remove '
+            "the stray quote (or put the whole value in quotes, doubling any quote inside it) and upload again.",
+        )
+        return None
     if len(rows) > row_cap:
         report.add(None, None, xlsx.too_many_rows(max_rows))
         return None
