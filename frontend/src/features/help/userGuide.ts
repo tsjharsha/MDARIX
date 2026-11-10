@@ -441,7 +441,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Open Complaints › First contact and choose Log a case. Write the reporter's words as they said them, the product, lot or serial number, what was asked for and the time of the call (that is the awareness time; it never moves).",
               "Answer questions 1 to 9: Yes, No, Unknown or Not applicable (with a reason); questions 4 to 6 may be Not stated. No means not alleged. Unknown and Not stated are never No.",
               "Choose Save the case. The table's outcome shows at once; a Yes or Unknown on question 4, 5 or 6, or a harm word, puts the call on the triage list before anyone signs.",
-              "Open the call, check the classification (or choose another, with your reason), enter Your password and the Authenticator code and choose Sign the check.",
+              "Open the call, check the classification (or choose another, with your reason), enter Your password and the Authenticator code and choose Sign the case check (Sign and escalate for a complaint).",
             ],
             result:
               "Complaint or both: a task to create or link the QMS complaint, then the complaint's disposition. Service only: a written reason and a QA review task (every service-only call in the trial). Pending: a dated follow-up with the caller.",

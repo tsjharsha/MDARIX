@@ -393,6 +393,7 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
         "row_version": event.version,
         "owner": name(event.owner_id),
         "complaint_id": str(event.complaint_id) if event.complaint_id else None,
+        "complaint_ref": complaint.complaint_identifier if complaint else None,
         "escalation": event.escalation,
         "escalated_at": service._iso(event.escalated_at),
         "identifiers": event.identifiers or {},
@@ -435,7 +436,36 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
         found["addenda"] = _addenda_view(db, tenant_id, event.id, name)
         found["fault_words"] = rules.fault_words(event.reporter_words)
         found["harm_words"] = rules.harm_words(event.reporter_words)
+        # Spec 4.4/4.5: the six classifications with their disabled reasons, the provisional clock chip, and the
+        # complaints the escalation panel offers to attach to (one product's newest, bounded).
+        found["choices"] = (
+            case_rules.choices(suggestion, no_deficiency_confirmed=_no_deficiency(tasks)) if v2 and latest else None
+        )
+        open_case = event.status not in (case_rules.ESCALATED, case_rules.VOIDED)
+        found["clock"] = _case_clock(db, tenant_id, event, bool(flags), awareness["at"], now) if open_case else None
+        found["likely_complaints"] = (
+            service.likely_complaints(db, tenant_id, event)
+            if open_case and service.linked_complaint(db, tenant_id, event) is None
+            else []
+        )
     return found
+
+
+def _case_clock(db, tenant_id, event, flagged: bool, aware_at, now) -> dict | None:
+    """The Case check's clock chip (spec 4.4, 5.2): the provisional clock of the Case's market from its awareness;
+    without a country, the shortest of the enabled markets."""
+    from backend.app.reportability import deadlines
+
+    found = rules.provisional_deadlines(
+        aware_at,
+        service.enabled_markets(db, tenant_id),
+        rules.tier(flagged, False),
+        now,
+        own=markets.market_of(event.country),
+        org_zone=deadlines.org_zone(db, tenant_id),
+    )
+    # provisional_deadlines sorts the own market first, then the earliest due.
+    return found[0] if found else None
 
 
 def _addenda_view(db, tenant_id, event_id, name) -> list[dict]:

@@ -32,6 +32,8 @@ import {
   type IdentifierEntry,
   type Identifiers,
   type Outcome,
+  type Choice,
+  clockTone,
 } from "../intake";
 
 const ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -696,23 +698,67 @@ function CheckDrawer({
     item.reload();
     onChanged();
   };
+  const title = !data
+    ? "Loading…"
+    : data.kind === "URGENT"
+      ? `${data.kind_label} ${data.reference}`
+      : `Case check · ${data.reference}`;
   return (
-    <Drawer title={data ? `${data.kind_label} ${data.reference}` : "Loading…"} onClose={onClose}>
+    <Drawer title={title} onClose={onClose}>
       {data ? (
-        <CheckBody key={`${data.version}-${data.signed?.id ?? ""}`} item={data} guide={guide} onChanged={reload} />
+        <CheckBody
+          key={`${data.version}-${data.row_version ?? ""}-${data.signed?.id ?? ""}`}
+          item={data}
+          guide={guide}
+          onChanged={reload}
+        />
       ) : null}
-      <InlineError text={item.state === "error" ? "This call could not be read" : ""} />
+      <InlineError text={item.state === "error" ? "This case could not be read" : ""} />
     </Drawer>
   );
 }
 
-function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide; onChanged: () => void }) {
+const ADDENDUM_KINDS: readonly [string, string][] = [
+  ["STATEMENT", "Something more they said"],
+  ["TECHNICIAN_FINDING", "A technician's finding"],
+  ["CORRECTION_BY_REPORTER", "The reporter corrects a fact"],
+  ["WITHDRAWAL", "The reporter withdraws the complaint"],
+];
+const SAID_BY: readonly [string, string][] = [
+  ["REPORTER", "The reporter"],
+  ["TECHNICIAN", "A technician"],
+  ["DISTRIBUTOR", "A distributor"],
+  ["OUR_STAFF", "Our staff"],
+];
+// The facts "Correct a fact" may change (backend intake/router.py CORRECTABLE); the reporter's words never.
+const CORRECTABLE: readonly [string, string][] = [
+  ["serial_number", "Serial number"],
+  ["lot_text", "Lot (as typed)"],
+  ["product_text", "Product (as typed)"],
+  ["udi", "UDI"],
+  ["software_version", "Software version"],
+  ["hardware_revision", "Hardware revision"],
+  ["firmware_version", "Firmware version"],
+  ["reporter_site", "Site or organisation"],
+  ["country_text", "Country where it happened (as typed)"],
+  ["harm_text", "What happened to the patient"],
+  ["troubleshooting", "What was tried on the call"],
+];
+const labelOf = (list: readonly [string, string][], code: string) =>
+  list.find(([value]) => value === code)?.[1] ?? code;
+/** The Case check's clock chip (spec 4.4, 5.2): "Provisional: US 30 days, due Mon 7 Dec 2026, 23:59 EST". */
+export const clockChip = (clock: NonNullable<IntakeItem["clock"]>) =>
+  `Provisional: ${clock.market} ${clock.days} days${clock.due_label ? `, due ${clock.due_label}` : ""}`;
+
+/** The Case check drawer's body (spec 4.4), exported for its test. */
+export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide; onChanged: () => void }) {
   // B2 step 4 (spec 6.3): answers and signature need case.classify; follow-up case.log; the QA review quality.review.
   const canWrite = useCan("case.classify");
   const canLog = useCan("case.log");
   const canReview = useCan("quality.review");
   const [answers, setAnswers] = useState<Answers>({ ...blankAnswers(guide.questions), ...item.answers });
   const [editing, setEditing] = useState(item.draft || item.version === 0);
+  const [adding, setAdding] = useState<"addendum" | "correct" | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const run = async (work: () => Promise<unknown>, fallback: string) => {
@@ -729,35 +775,70 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
   };
   const followUp = item.tasks.find((task) => task.type === "FIRST_CONTACT_FOLLOW_UP" && task.open);
   const review = item.signed?.classification === "SERVICE_ONLY" && !item.signed.review_outcome;
+  const voided = item.status === "VOIDED";
+  const row = guide.table.find((entry) => entry.row === item.outcome_row);
   return (
     <div className="uw-dp">
       {item.header && <CaseHeaderView header={item.header} status={item.status_label ?? null} />}
-      {!item.flagged && item.kind !== "URGENT" && item.status !== "ESCALATED" && (
+      {item.status === "ESCALATED" && item.kind !== "URGENT" && <Escalated item={item} />}
+      {!item.flagged && item.kind !== "URGENT" && item.status !== "ESCALATED" && !voided && (
         <EscalateButton kind="INTAKE" id={item.id} onDone={onChanged} />
       )}
-      <q className="uw-cr-text">{item.reporter_words}</q>
-      <p className="uw-cr-meta">
-        {[
-          item.product_name,
-          item.lot,
-          item.requested_label && `asked for: ${item.requested_label}`,
-          item.reporter_type,
-          item.reporter_site,
-          item.country,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-      </p>
+      <section className="ca-drawer-section">
+        <h3>What was said</h3>
+        <q className="uw-cr-text">{item.reporter_words}</q>
+        <p className="uw-cr-meta">
+          {[
+            item.product_name,
+            item.lot,
+            item.requested_label && `asked for: ${item.requested_label}`,
+            item.reporter_type,
+            item.reporter_site,
+            item.country,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+        {(item.addenda ?? []).length > 0 && (
+          <ul className="uw-case-addenda" aria-label="Said later">
+            {(item.addenda ?? []).map((entry) => (
+              <li key={entry.id}>
+                <strong>
+                  {labelOf(SAID_BY, entry.said_by_role)} · {labelOf(ADDENDUM_KINDS, entry.kind).toLowerCase()} ·{" "}
+                  {formatDate(entry.said_at)}
+                </strong>
+                <q className="uw-cr-text">{entry.text}</q>
+                <span className="uw-cr-meta">
+                  Added by {entry.added_by ?? "a colleague"}
+                  {entry.masked ? " · personal data masked" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {canLog && !voided && (
+          <div className="ca-action-row">
+            <button type="button" className="ac-secondary" onClick={() => setAdding("addendum")}>
+              Add what they said later
+            </button>
+            <button type="button" className="ac-secondary" onClick={() => setAdding("correct")}>
+              Correct a fact
+            </button>
+          </div>
+        )}
+        {adding === "addendum" && <AddendumForm id={item.id} onCancel={() => setAdding(null)} onDone={onChanged} />}
+        {adding === "correct" && <CorrectForm item={item} onCancel={() => setAdding(null)} onDone={onChanged} />}
+      </section>
       <section className="ca-drawer-section">
         <h3>Times</h3>
         <ul>
           {(
             [
-              ["Event", item.times.event],
               ["First knowledge", item.times.first_knowledge],
               ["Received", item.times.received],
               ["Awareness", item.times.awareness],
               ["Reached MDARIX", item.times.available],
+              ["Event", item.times.event],
             ] as const
           ).map(([label, time]) => (
             <li key={label}>
@@ -772,6 +853,12 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
           Clocks count from {formatDate(item.awareness.at)}: {item.awareness.source_label}.
           {item.awareness.label ? ` ${item.awareness.label}.` : ""}
         </p>
+        {item.clock && (
+          <p>
+            <ToneBadge tone={clockTone(item.clock.state ?? "RUNNING")} label={clockChip(item.clock)} />{" "}
+            <span className="uw-cr-meta">{item.clock.basis}</span>
+          </p>
+        )}
       </section>
       {item.flags.length > 0 && (
         <section className="ca-drawer-section">
@@ -790,25 +877,19 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
       )}
       {item.kind !== "URGENT" && (
         <section className="ca-drawer-section">
-          <h3>The first-contact check</h3>
-          {item.suggestion && (
-            <p className="uw-fc-outcome">
-              The table gives: <strong>{item.suggestion_label}</strong> (row {item.outcome_row}).
-              {item.signed && ` Signed: ${item.signed.classification_label}, version ${item.signed.version}.`}
-            </p>
-          )}
-          <Questions guide={guide} answers={answers} disabled={!editing || !canWrite} onChange={setAnswers} />
+          <h3>The ten questions</h3>
+          <Questions guide={guide} answers={answers} disabled={!editing || !canWrite || voided} onChange={setAnswers} />
           <details className="uw-ma-history">
             <summary>The outcomes table (fixed)</summary>
             <ol>
-              {guide.table.map((row) => (
-                <li key={row.row} className={row.row === item.outcome_row ? "is-taken" : undefined}>
-                  {row.answers}: <strong>{row.outcome}</strong>
+              {guide.table.map((entry) => (
+                <li key={entry.row} className={entry.row === item.outcome_row ? "is-taken" : undefined}>
+                  {entry.answers}: <strong>{entry.outcome}</strong>
                 </li>
               ))}
             </ol>
           </details>
-          {canWrite && (
+          {canWrite && !voided && (
             <div className="ca-action-row">
               {editing ? (
                 <button
@@ -833,7 +914,17 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
           )}
         </section>
       )}
-      {canWrite && item.draft && item.version > 0 && (
+      {item.kind !== "URGENT" && item.suggestion && (
+        <section className="ca-drawer-section">
+          <h3>Suggestion</h3>
+          <p className="uw-fc-outcome">
+            <strong>{item.suggestion_label}</strong>
+            {row ? ` (row ${row.row}: ${row.answers})` : ""}
+            {item.signed ? `. Signed: ${item.signed.classification_label}, version ${item.signed.version}.` : ""}
+          </p>
+        </section>
+      )}
+      {canWrite && item.draft && item.version > 0 && !voided && (
         <SignForm item={item} guide={guide} answers={answers} onSigned={onChanged} />
       )}
       {followUp && canLog && <FollowUp item={item} dueAt={followUp.due_at} onDone={onChanged} />}
@@ -852,6 +943,7 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
         </section>
       )}
       {review && canReview && <ReviewForm item={item} onDone={onChanged} />}
+      {item.kind !== "URGENT" && <CaseMoves item={item} canLog={canLog} canReview={canReview} onDone={onChanged} />}
       {item.history && item.history.length > 0 && (
         <details className="uw-ma-history" open>
           <summary>Signed versions ({item.history.length})</summary>
@@ -888,6 +980,251 @@ function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide;
   );
 }
 
+/** After the escalation (spec 4.5): "CASE-… is now a complaint", and the main button "Next: Triage". */
+function Escalated({ item }: { item: IntakeItem }) {
+  const { open } = useWorkspace();
+  const ref = item.complaint_ref ?? item.reference;
+  return (
+    <section className="ca-drawer-section" aria-label="Escalated">
+      <h3>
+        <CheckCircle2 size={15} aria-hidden="true" /> {item.reference} is now a complaint
+        {ref !== item.reference ? ` (${ref})` : ""}
+      </h3>
+      <div className="ca-action-row">
+        <button
+          type="button"
+          className="ac-primary"
+          onClick={() => open("Complaint", `Summary?${new URLSearchParams({ ref })}`)}
+        >
+          Next: Triage
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** "Add what they said later" (IN-17, IN-18): a new row; the reporter's first words are never edited. */
+function AddendumForm({ id, onCancel, onDone }: { id: string; onCancel: () => void; onDone: () => void }) {
+  const [form, setForm] = useState({ kind: "STATEMENT", said_by_role: "REPORTER", text: "" });
+  const [error, setError] = useState("");
+  const short = form.text.trim().length < REASON_MIN;
+  return (
+    <form
+      className="ca-form-grid"
+      aria-label="Add what they said later"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (short) return;
+        setError("");
+        try {
+          await send(`${INTAKE}/${id}/addenda`, "POST", { ...form, said_zone: ZONE });
+          onDone();
+        } catch (reason) {
+          setError(errorText(reason, "Not added"));
+        }
+      }}
+    >
+      <label className="ca-field">
+        What it is
+        <select value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value })}>
+          {ADDENDUM_KINDS.map(([code, label]) => (
+            <option key={code} value={code}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="ca-field">
+        Who said it
+        <select value={form.said_by_role} onChange={(event) => setForm({ ...form, said_by_role: event.target.value })}>
+          {SAID_BY.map(([code, label]) => (
+            <option key={code} value={code}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="ca-field ca-wide">
+        What they said, in their words
+        <textarea rows={3} value={form.text} onChange={(event) => setForm({ ...form, text: event.target.value })} />
+      </label>
+      <p className="uw-hint ca-wide">
+        Names, phone numbers and e-mail addresses are masked when you save.
+        {form.kind === "WITHDRAWAL" ? " A complaint already made stands: the withdrawal is kept beside it." : ""}
+      </p>
+      <div className="ca-action-row ca-wide">
+        <button type="submit" className="ac-primary" disabled={short}>
+          Add it
+        </button>
+        <button type="button" className="ac-link" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+      <InlineError text={error} />
+    </form>
+  );
+}
+
+/** "Correct a fact" (spec 2.5): the new value with why; the old one stays in the record's changes. */
+function CorrectForm({ item, onCancel, onDone }: { item: IntakeItem; onCancel: () => void; onDone: () => void }) {
+  const [form, setForm] = useState({ field: CORRECTABLE[0][0], value: "", reason: "" });
+  const [error, setError] = useState("");
+  const short = form.reason.trim().length < REASON_MIN;
+  return (
+    <form
+      className="ca-form-grid"
+      aria-label="Correct a fact"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (short) return;
+        setError("");
+        try {
+          await send(`${INTAKE}/${item.id}/correct`, "POST", { ...form, seen_version: item.row_version ?? null });
+          onDone();
+        } catch (reason) {
+          setError(errorText(reason, "Not corrected"));
+        }
+      }}
+    >
+      <label className="ca-field">
+        The fact
+        <select value={form.field} onChange={(event) => setForm({ ...form, field: event.target.value })}>
+          {CORRECTABLE.map(([code, label]) => (
+            <option key={code} value={code}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="ca-field">
+        The right value (empty clears it)
+        <input value={form.value} onChange={(event) => setForm({ ...form, value: event.target.value })} />
+      </label>
+      <label className="ca-field ca-wide">
+        Why it is corrected
+        <input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
+      </label>
+      <p className="uw-hint ca-wide">The reporter's words are never edited. The old value stays in the record.</p>
+      <div className="ca-action-row ca-wide">
+        <button type="submit" className="ac-primary" disabled={short}>
+          Save the correction
+        </button>
+        <button type="button" className="ac-link" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+      <InlineError text={error} />
+    </form>
+  );
+}
+
+/**
+ * S-2 and spec 3.2: "Waiting for internal team" (and back when they answered), and "Withdraw: entered in error"
+ * (signed; before escalation only; outside the trial by someone other than the logger, which the server checks).
+ */
+function CaseMoves({
+  item,
+  canLog,
+  canReview,
+  onDone,
+}: {
+  item: IntakeItem;
+  canLog: boolean;
+  canReview: boolean;
+  onDone: () => void;
+}) {
+  const status = item.status ?? "OPEN";
+  const [doing, setDoing] = useState<"wait" | "void" | null>(null);
+  const [form, setForm] = useState({ reason: "", password: "", code: "" });
+  const [error, setError] = useState("");
+  const waiting = status === "WAITING_INTERNAL";
+  const canWait = canLog && ["OPEN", "PENDING", "IN_REVIEW", "WAITING_INTERNAL"].includes(status);
+  const canVoid = canReview && ["OPEN", "PENDING", "WAITING_INTERNAL"].includes(status);
+  if (!canWait && !canVoid) return null;
+  const short = form.reason.trim().length < REASON_MIN;
+  const submit = async () => {
+    setError("");
+    try {
+      if (doing === "wait")
+        await send(`${INTAKE}/${item.id}/waiting`, "POST", { waiting: !waiting, reason: form.reason });
+      else
+        await send(`${INTAKE}/${item.id}/void`, "POST", {
+          reason: form.reason,
+          password: form.password,
+          mfa_code: form.code || null,
+        });
+      onDone();
+    } catch (reason) {
+      setError(errorText(reason, "Not saved"));
+    }
+  };
+  return (
+    <section className="ca-drawer-section" aria-label="Move the case">
+      <div className="ca-action-row">
+        {canWait && (
+          <button type="button" className="ac-secondary" onClick={() => setDoing("wait")}>
+            <Hourglass size={15} aria-hidden="true" />{" "}
+            {waiting ? "The internal team answered" : "Waiting for internal team"}
+          </button>
+        )}
+        {canVoid && (
+          <button type="button" className="ac-link" onClick={() => setDoing("void")}>
+            Withdraw: entered in error
+          </button>
+        )}
+      </div>
+      {doing && (
+        <div className="ca-form-grid">
+          <label className="ca-field ca-wide">
+            {doing === "void"
+              ? "Why it was entered in error"
+              : waiting
+                ? "What the team answered"
+                : "What the team is asked (engineering, technical support)"}
+            <input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
+          </label>
+          {doing === "void" && (
+            <>
+              <label className="ca-field">
+                Your password
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={form.password}
+                  onChange={(event) => setForm({ ...form, password: event.target.value })}
+                />
+              </label>
+              <label className="ca-field">
+                Authenticator code
+                <input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={form.code}
+                  onChange={(event) => setForm({ ...form, code: event.target.value })}
+                />
+              </label>
+            </>
+          )}
+          <div className="ca-action-row ca-wide">
+            <button
+              type="button"
+              className="ac-primary"
+              disabled={short || (doing === "void" && !form.password)}
+              onClick={() => void submit()}
+            >
+              {doing === "void" ? "Sign the withdrawal" : waiting ? "Back to the case" : "Send to the team"}
+            </button>
+            <button type="button" className="ac-link" onClick={() => setDoing(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      <InlineError text={error} />
+    </section>
+  );
+}
+
 function SignForm({
   item,
   guide,
@@ -899,18 +1236,38 @@ function SignForm({
   answers: Answers;
   onSigned: () => void;
 }) {
+  const likely = item.likely_complaints ?? [];
   const [form, setForm] = useState({
     classification: (item.suggestion ?? "") as Outcome | "",
     override: "",
     reason: "",
     ticket: item.service_ticket ?? "",
+    // Spec 3.3 step 2: one strong match is pre-selected "Attach to …"; otherwise the signer chooses.
+    attach: likely.length === 1 ? likely[0].id : "",
     password: "",
     code: "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Older drafts (the first guide) carry no choices: every outcome is listed and the server decides.
+  const choices: Choice[] =
+    item.choices ??
+    guide.outcomes.map((outcome) => ({
+      code: outcome.code,
+      label: outcome.label,
+      suggested: outcome.code === item.suggestion,
+      escalates: outcome.code === "COMPLAINT" || outcome.code === "BOTH",
+      disabled_reason: null,
+    }));
+  const chosen = choices.find((choice) => choice.code === form.classification);
+  const escalates = !!chosen?.escalates;
   const saved = JSON.stringify(answers) === JSON.stringify({ ...blankAnswers(guide.questions), ...item.answers });
-  const problem = saved ? signProblem(item, form, unanswered(item.answers, guide.questions)) : "Save the answers first";
+  const problem = !saved
+    ? "Save the answers first"
+    : (signProblem(item, form, unanswered(item.answers, guide.questions)) ??
+      (escalates && likely.length > 0 && !form.attach
+        ? "Attach this case to the complaint it may be, or create a new complaint"
+        : null));
   return (
     <form
       className="ca-drawer-section uw-dp-sign"
@@ -928,6 +1285,8 @@ function SignForm({
             seen_version: item.version,
             password: form.password,
             mfa_code: form.code || null,
+            ...(escalates && form.attach === NEW ? { create_new: true } : {}),
+            ...(escalates && form.attach && form.attach !== NEW ? { attach_to: form.attach } : {}),
           });
           onSigned();
         } catch (reason) {
@@ -938,37 +1297,37 @@ function SignForm({
       }}
     >
       <h3>
-        <CheckCircle2 size={15} aria-hidden="true" /> Sign as the coordinator
+        <CheckCircle2 size={15} aria-hidden="true" /> Your classification
       </h3>
-      <label className="ca-field">
-        Classification
-        <select
-          value={form.classification}
-          onChange={(event) => setForm({ ...form, classification: event.target.value as Outcome })}
-        >
-          {guide.outcomes
-            .filter(
-              (outcome) =>
-                (outcome.code !== "SERVICE_ONLY" && outcome.code !== "PENDING_CONFIRM") ||
-                outcome.code === item.suggestion,
-            )
-            .map((outcome) => (
-              <option key={outcome.code} value={outcome.code}>
-                {outcome.label}
-                {outcome.code === item.suggestion ? " (suggested)" : ""}
-              </option>
-            ))}
-        </select>
-      </label>
-      {form.classification !== item.suggestion && (
+      <div className="uw-fc-answers uw-case-choices" role="radiogroup" aria-label="Your classification">
+        {choices.map((choice) => (
+          <label key={choice.code} className={choice.disabled_reason ? "is-disabled" : undefined}>
+            <input
+              type="radio"
+              name="classification"
+              disabled={!!choice.disabled_reason}
+              checked={form.classification === choice.code}
+              onChange={() => setForm({ ...form, classification: choice.code })}
+            />
+            {choice.label}
+            {choice.suggested ? " (suggested)" : ""}
+            {choice.disabled_reason && <span className="uw-cr-meta"> · {choice.disabled_reason}</span>}
+          </label>
+        ))}
+      </div>
+      <p className="uw-hint">Fixed on the call is still a complaint when a deficiency was alleged.</p>
+      <p className="uw-hint">The customer calling it &lsquo;not a complaint&rsquo; does not change the answers.</p>
+      {form.classification && form.classification !== item.suggestion && (
         <label className="ca-field">
           Why you override the suggestion
           <input value={form.override} onChange={(event) => setForm({ ...form, override: event.target.value })} />
         </label>
       )}
-      {form.classification === "SERVICE_ONLY" && (
+      {(form.classification === "SERVICE_ONLY" ||
+        form.classification === "INQUIRY" ||
+        form.classification === "NOT_A_COMPLAINT") && (
         <label className="ca-field">
-          The written reason for "service only" (it goes to the QA review)
+          The written reason for &ldquo;{chosen?.label}&rdquo; (it goes to the QA review)
           <input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
         </label>
       )}
@@ -978,11 +1337,19 @@ function SignForm({
           <input value={form.ticket} onChange={(event) => setForm({ ...form, ticket: event.target.value })} />
         </label>
       )}
+      {escalates && (
+        <EscalationPanel
+          item={item}
+          likely={likely}
+          attach={form.attach}
+          onAttach={(attach) => setForm({ ...form, attach })}
+        />
+      )}
       <div className="ca-form-grid">
         <DecideAndSign
-          signs={`The first-contact check of ${item.reference}: ${
-            guide.outcomes.find((outcome) => outcome.code === form.classification)?.label ?? "your classification"
-          }.`}
+          signs={`The case check of ${item.reference}: ${chosen?.label ?? "your classification"}.${
+            escalates ? " It becomes a complaint in MDARIX now." : ""
+          }`}
           restsOn={[
             `Your answers to ${guide.questions.filter((question) => !question.free_text && item.answers?.[question.id]?.answer).length} questions, as saved.`,
             `The reporter's words as logged, and the awareness time of the call.`,
@@ -1010,11 +1377,64 @@ function SignForm({
       {problem && <p className="uw-hint">{problem}</p>}
       <div className="ca-action-row">
         <button type="submit" className="ac-primary" disabled={busy || !!problem}>
-          {busy ? "Signing…" : "Sign the check"}
+          {busy ? "Signing…" : escalates ? "Sign and escalate" : "Sign the case check"}
         </button>
       </div>
       <InlineError text={error} />
     </form>
+  );
+}
+
+const NEW = "new";
+
+/** The escalation panel inside the sign step (spec 4.5): what is carried, and the duplicate choice (attach or new). */
+function EscalationPanel({
+  item,
+  likely,
+  attach,
+  onAttach,
+}: {
+  item: IntakeItem;
+  likely: NonNullable<IntakeItem["likely_complaints"]>;
+  attach: string;
+  onAttach: (attach: string) => void;
+}) {
+  return (
+    <section className="uw-case-escalation" aria-label="This case becomes a complaint">
+      <h4>This case becomes a complaint</h4>
+      <p>
+        Nothing is typed again. {item.reference} keeps its reference and its awareness time, and its clock keeps
+        running.
+      </p>
+      <p>
+        <strong>Carried to the complaint:</strong> the words · the product, version and lot · the times · the incident
+        country · the service ticket · the answers · the parties.
+      </p>
+      {likely.length > 0 && (
+        <div className="uw-fc-answers" role="radiogroup" aria-label="Possible duplicate">
+          {likely.map((candidate) => (
+            <div key={candidate.id}>
+              <p>
+                Possibly the same event as {candidate.ref}: {candidate.reasons.join(", ")}
+              </p>
+              <label>
+                <input
+                  type="radio"
+                  name="attach"
+                  checked={attach === candidate.id}
+                  onChange={() => onAttach(candidate.id)}
+                />
+                Attach this case to {candidate.ref}
+              </label>
+            </div>
+          ))}
+          <label>
+            <input type="radio" name="attach" checked={attach === NEW} onChange={() => onAttach(NEW)} />
+            Create a new complaint
+          </label>
+        </div>
+      )}
+    </section>
   );
 }
 

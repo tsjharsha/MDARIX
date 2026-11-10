@@ -43,7 +43,7 @@ export const PATHS: Array<{
       { press: "Log a case", in: "MyWork" },
       { press: "Save the case", in: "FirstContact" },
       { press: "Save the answers", in: "FirstContact" },
-      { press: "Sign the check", in: "FirstContact" },
+      { press: "Sign the case check", in: "FirstContact" },
     ],
   },
   {

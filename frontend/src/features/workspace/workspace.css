@@ -4431,6 +4431,37 @@ div.uw-task-count:hover {
   border: 1px solid var(--ac-line);
   border-radius: var(--ac-radius);
 }
+/* The Case check (B2, spec 4.4/4.5): flat, G-2 */
+.uw-case-addenda {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-case-addenda li {
+  display: grid;
+  gap: 4px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--ac-line);
+}
+.uw-case-choices {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.uw-case-choices label.is-disabled {
+  color: var(--ac-muted);
+}
+.uw-case-escalation {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-serious);
+  border-radius: var(--ac-radius);
+}
+.uw-case-escalation h4 {
+  margin: 0;
+}
 .uw-entry-actions {
   display: flex;
   flex-wrap: wrap;

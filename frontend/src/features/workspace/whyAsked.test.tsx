@@ -81,6 +81,6 @@ describe("the summary before signing (8.3)", () => {
     expect(source("Reports")).toContain("You confirm with your password.");
     expect(source("CaseDecision")).toContain("fingerprint ${shortPrint(context.briefContentHash)}");
     expect(source("Oversight")).toContain("fingerprint ${shortPrint(view.decision_record.sha256)}");
-    expect(source("FirstContact")).toContain("The first-contact check of ${item.reference}");
+    expect(source("FirstContact")).toContain("The case check of ${item.reference}");
   });
 });

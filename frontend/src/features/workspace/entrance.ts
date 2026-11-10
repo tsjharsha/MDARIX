@@ -70,7 +70,7 @@ export const SCENARIOS: readonly Scenario[] = [
         section: "Complaints",
         tab: "To triage",
       },
-      { label: "Check the call: is it a complaint?", button: "Sign the check", section: "My Work", tab: "Queues" },
+      { label: "Check the call: is it a complaint?", button: "Sign the case check", section: "My Work", tab: "Queues" },
       { label: "Its page: what needs attention next", button: "Next step", section: "Complaint" },
     ],
   },

@@ -194,6 +194,33 @@ def classification_problem(
     return None
 
 
+# The six classifications the Case check shows (spec 4.4), in order; "Pending" reads the suggestion's own wording
+# when the answers give "confirm no deficiency".
+CHOICES = (rules.COMPLAINT, rules.BOTH, rules.SERVICE_ONLY, INQUIRY, rules.PENDING, NOT_A_COMPLAINT)
+
+
+def choices(suggestion: str | None, *, no_deficiency_confirmed: bool = False) -> list[dict]:
+    """Each classification with why it is disabled (None when it may be signed, given a reason where one is asked):
+    the same rule the signature applies, so the screen never offers what the server refuses."""
+    filled = "-" * rules.REASON_MIN
+    found = []
+    for code in CHOICES:
+        if code == rules.PENDING and suggestion == rules.PENDING_CONFIRM:
+            code = rules.PENDING_CONFIRM
+        found.append(
+            {
+                "code": code,
+                "label": OUTCOME_LABELS[code],
+                "suggested": code == suggestion,
+                "escalates": state_after(code) == ESCALATED,
+                "disabled_reason": classification_problem(
+                    suggestion or UNANSWERED, code, filled, filled, no_deficiency_confirmed=no_deficiency_confirmed
+                ),
+            }
+        )
+    return found
+
+
 def recalculation(before: dict | None, after: dict, old: str | None, new: str, actor: str, at: datetime) -> dict:
     """One entry of a check version's history: which answers changed and the suggestion before and after."""
     changed = [

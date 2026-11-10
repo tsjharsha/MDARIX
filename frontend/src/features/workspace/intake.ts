@@ -9,7 +9,27 @@ export const TRIAGE = "/api/v1/triage";
 export const REASON_MIN = 10;
 
 export type Answer = "YES" | "NO" | "UNKNOWN" | "NOT_APPLICABLE" | "NOT_STATED";
-export type Outcome = "COMPLAINT" | "BOTH" | "SERVICE_ONLY" | "PENDING" | "PENDING_CONFIRM";
+export type Outcome =
+  "COMPLAINT" | "BOTH" | "SERVICE_ONLY" | "INQUIRY" | "PENDING" | "PENDING_CONFIRM" | "NOT_A_COMPLAINT";
+/** One of the six classifications the Case check offers (spec 4.4), with why it is disabled (null: it may be signed). */
+export type Choice = {
+  code: Outcome;
+  label: string;
+  suggested: boolean;
+  escalates: boolean;
+  disabled_reason: string | null;
+};
+/** What was said later, and by whom (IN-17). */
+export type Addendum = {
+  id: string;
+  kind: string;
+  said_by_role: string;
+  said_at: string | null;
+  text: string;
+  masked: boolean;
+  added_by: string | null;
+  added_at: string | null;
+};
 export type Answers = Record<string, { answer: Answer | null; note: string }>;
 export type Flag = { code: string; label: string; question?: string; words?: string[] };
 
@@ -143,6 +163,14 @@ export type IntakeItem = {
   missing?: { code: string; label: string }[];
   header?: CaseHeader;
   not_in_master?: string[];
+  // Spec 4.4/4.5: what was said later, the six classifications, the provisional clock and the escalation's choices.
+  addenda?: Addendum[];
+  choices?: Choice[] | null;
+  clock?: Deadline | null;
+  likely_complaints?: { id: string; ref: string; reasons: string[] }[];
+  complaint_id?: string | null;
+  complaint_ref?: string | null;
+  row_version?: number;
 };
 export type IntakeState = "to_sign" | "pending" | "review" | "service_only" | "complaint";
 export type IntakeList = {
@@ -275,8 +303,10 @@ export const OUTCOME_TONES: Record<Outcome, Tone> = {
   COMPLAINT: "serious",
   BOTH: "serious",
   SERVICE_ONLY: "good",
+  INQUIRY: "good",
   PENDING: "warning",
   PENDING_CONFIRM: "warning",
+  NOT_A_COMPLAINT: "good",
 };
 export const STATE_LABELS: Record<IntakeState, string> = {
   to_sign: "To sign",
@@ -307,24 +337,32 @@ export function blankAnswers(questions: Guide["questions"]): Answers {
 export const answerChoices = (guide: Guide, question: Guide["questions"][number]) =>
   guide.answers.filter((item) => item.code !== "NOT_STATED" || question.not_stated);
 
+// The outcomes only the answers give, and those a second person reviews (backend case_rules ANSWER_ONLY, REVIEWED_OUTCOMES).
+const ANSWER_ONLY: Outcome[] = ["SERVICE_ONLY", "INQUIRY", "PENDING_CONFIRM", "NOT_A_COMPLAINT"];
+const REVIEWED: Partial<Record<Outcome, string>> = {
+  SERVICE_ONLY: "Service only",
+  INQUIRY: "Inquiry",
+  NOT_A_COMPLAINT: "Not a complaint (no deficiency confirmed)",
+};
+
 /** Why the signature cannot go yet, in the server's words, or null. */
 export function signProblem(
-  item: Pick<IntakeItem, "suggestion">,
+  item: Pick<IntakeItem, "suggestion"> & { choices?: Choice[] | null },
   form: { classification: Outcome | ""; override: string; reason: string; password: string },
   missing: string[],
 ): string | null {
   if (missing.length)
     return `Answer every question first (${missing.map((q) => q.replace("Q", "question ")).join(", ")})`;
   if (!form.classification) return "Choose the classification";
-  if (
-    (form.classification === "SERVICE_ONLY" || form.classification === "PENDING_CONFIRM") &&
-    form.classification !== item.suggestion
-  )
+  const choice = item.choices?.find((entry) => entry.code === form.classification);
+  if (choice?.disabled_reason) return choice.disabled_reason;
+  if (ANSWER_ONLY.includes(form.classification) && form.classification !== item.suggestion)
     return "That outcome is offered only when the answers give it";
   if (form.classification !== item.suggestion && form.override.trim().length < REASON_MIN)
     return `You override the suggestion: say why in at least ${REASON_MIN} characters`;
-  if (form.classification === "SERVICE_ONLY" && form.reason.trim().length < REASON_MIN)
-    return `"Service only" needs a written reason of at least ${REASON_MIN} characters`;
+  const reviewed = REVIEWED[form.classification];
+  if (reviewed && form.reason.trim().length < REASON_MIN)
+    return `"${reviewed}" needs a written reason of at least ${REASON_MIN} characters`;
   if (!form.password) return "Enter your password to sign";
   return null;
 }

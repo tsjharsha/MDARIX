@@ -248,3 +248,31 @@ def test_hardware_revision_and_firmware_version_keep_status_and_source():  # S-3
     assert found["firmware_version"] == {"not_sure": False, "status": "CONFIRMED", "source": "CALLER"}
     found["firmware_version"]["status"] = cr.UNCONFIRMED
     assert [item["label"] for item in cr.missing_information(found)] == ["Firmware version: unconfirmed"]
+
+
+def test_the_case_check_offers_six_classifications_each_with_why_it_is_disabled():
+    # Spec 4.4: Complaint, Complaint and service, Service only, Inquiry, Pending, Not a complaint, in that order; those
+    # the answers do not give are disabled with the signature's own reason, so the screen never offers a refusal.
+    found = cr.choices(rules.BOTH)
+    assert [item["code"] for item in found] == [
+        rules.COMPLAINT,
+        rules.BOTH,
+        rules.SERVICE_ONLY,
+        cr.INQUIRY,
+        rules.PENDING,
+        cr.NOT_A_COMPLAINT,
+    ]
+    open_codes = {item["code"] for item in found if item["disabled_reason"] is None}
+    assert open_codes == {rules.COMPLAINT, rules.BOTH, rules.PENDING}
+    assert [item["code"] for item in found if item["suggested"]] == [rules.BOTH]
+    assert [item["code"] for item in found if item["escalates"]] == [rules.COMPLAINT, rules.BOTH]
+    assert "only when the answers give it" in next(i for i in found if i["code"] == cr.INQUIRY)["disabled_reason"]
+    # "Pending" reads the suggestion's own wording; Not a complaint opens only after the follow-up confirmed it.
+    confirm = cr.choices(rules.PENDING_CONFIRM)
+    assert rules.PENDING_CONFIRM in [item["code"] for item in confirm]
+    assert next(i for i in confirm if i["code"] == cr.NOT_A_COMPLAINT)["disabled_reason"]
+    confirmed = cr.choices(rules.PENDING_CONFIRM, no_deficiency_confirmed=True)
+    assert next(i for i in confirmed if i["code"] == cr.NOT_A_COMPLAINT)["disabled_reason"] is None
+    # Unanswered: nothing may be signed.
+    assert all(item["disabled_reason"] for item in cr.choices(cr.UNANSWERED))
+    assert all(item["disabled_reason"] for item in cr.choices(None))

@@ -92,3 +92,17 @@ def test_the_cases_list_reads_the_same_number_of_queries_whatever_the_page_size(
         return len(seen)
 
     assert statements(1) == statements(3) <= 12
+
+
+def test_the_case_check_drawer_reads_its_six_choices_its_clock_and_the_complaints_to_attach_to(trial):  # spec 4.4/4.5
+    user = trial["user"]
+    event = _log(user)
+    detail = _ok(user.get(f"{INTAKE}/{event['id']}"))
+    codes = [item["code"] for item in detail["choices"]]
+    assert len(codes) == 6 and codes[:2] == ["COMPLAINT", "BOTH"] and codes[-1] == "NOT_A_COMPLAINT"
+    assert [item["code"] for item in detail["choices"] if item["escalates"]] == ["COMPLAINT", "BOTH"]
+    assert [item["code"] for item in detail["choices"] if item["suggested"]] in ([], [detail["suggestion"]])
+    # The provisional clock chip: a market, its days and the due time, counted from the Case's awareness.
+    assert detail["clock"]["market"] and detail["clock"]["days"] and detail["clock"]["due_label"]
+    # No product: nothing to attach to; not escalated: no complaint yet.
+    assert detail["likely_complaints"] == [] and detail["complaint_ref"] is None and detail["row_version"] >= 1
