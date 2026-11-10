@@ -260,3 +260,31 @@ def test_a_closed_service_cases_contact_is_erased_twelve_months_later(trial):  #
         export = request_export(db, tenant_id, "test", "Test: OD-1 trial export", unmask_contacts=True)
         assert export.summary == {"contacts": MASKED}
         db.rollback()
+
+
+def test_a_qms_row_with_the_cases_qms_id_updates_its_complaint_never_a_second(trial):  # TA-20.4, CI-31
+    from backend.app.db.models.foundation import Complaint
+    from backend.app.db.models.intake import IntakeEvent
+    from tests.test_intake_triage_api import _upload
+
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    event = _log(user, answers=_all_no(Q3="YES"), reporter_words="Caller says the infusion pump stopped mid-dose.")
+    event = _ok(_sign(user, event, "COMPLAINT"))
+    with SessionLocal() as db:
+        bind_system(db, "test:case-addenda")
+        db.get(IntakeEvent, uuid.UUID(event["id"])).qms_ref = "QMS-901"
+        db.commit()
+    _upload(
+        user, "complaint_id,product_id,product_name,description\nQMS-901,MRG-PUMP,Merge Pump,Pump stopped mid-dose\n"
+    )
+    with SessionLocal() as db:
+        bind_system(db, "test:case-addenda")
+        rows = db.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.complaint_identifier == "QMS-901")
+        assert rows.count() == 0  # no second complaint
+        merged = db.get(Complaint, uuid.UUID(event["complaint_id"]))
+        assert (merged.qms_ref, merged.record_owner, merged.description) == (
+            "QMS-901",
+            "EXTERNAL",
+            "Pump stopped mid-dose",
+        )
+        assert merged.last_synced_at is not None

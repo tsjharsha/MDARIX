@@ -1137,7 +1137,10 @@ def confirm_by_import(db: Session, tenant_id, identifiers, actor: str, now: date
     for event in events:
         complaint = (
             db.query(Complaint)
-            .filter(Complaint.tenant_id == tenant_id, Complaint.complaint_identifier == event.qms_ref)
+            .filter(
+                Complaint.tenant_id == tenant_id,
+                or_(Complaint.complaint_identifier == event.qms_ref, Complaint.qms_ref == event.qms_ref),
+            )
             .first()
         )
         if complaint is None:

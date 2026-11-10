@@ -1959,6 +1959,13 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
     # A complaints file: its complaints that exist already, read at once; their evidence written in one batch after
     # the rows (NEW-4). Each row used to cost about 13 statements; the result is the same.
     complaints = lookup.complaints(row["complaint_id"] for _, row in rows) if entity == "complaints" else {}
+    # TA-20.4 / CI-31 (B2, Connect): a QMS ID that an MDARIX complaint (or its Case) holds updates that complaint.
+    merged = (
+        _qms_matches(db, tenant_id, complaints, [row["complaint_id"] for _, row in rows])
+        if entity == "complaints"
+        else {}
+    )
+    complaints.update(merged)
     new_complaints: dict[str, dict] = {}
     evidence: list = []
     proposed: dict = {}  # complaint id -> (use environment, user type) as the file gives them
@@ -2120,6 +2127,12 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             changes.extend(found)
             for name, value in values.items():
                 setattr(complaint, name, value)
+            if row["complaint_id"] in merged:  # the QMS now owns it: its file wins on the master fields
+                complaint.qms_ref, complaint.record_owner, complaint.last_synced_at = (
+                    row["complaint_id"],
+                    "EXTERNAL",
+                    now,
+                )
             if found:  # "updated" counts the rows that changed a field, not every row seen again
                 complaint.updated_at = now
                 updated += 1
@@ -2268,6 +2281,31 @@ def _add_named_references(
         lookup.lots[row["lot_id"]] = lot
         added["lots"] = 1
     return added
+
+
+def _qms_matches(db: Session, tenant_id, known: dict, identifiers: list[str]) -> dict:
+    """The file's complaint IDs that are the QMS ID of a complaint MDARIX created (its ``qms_ref``, or the ``qms_ref``
+    typed on the Case it escalated from): ID -> that complaint, so the row updates it instead of making a second one.
+    An ID two complaints claim is left out (spec 3.3, IN-14)."""
+    from backend.app.db.models.intake import IntakeEvent
+
+    wanted = sorted({value for value in identifiers if value and value not in known})
+    if not wanted:
+        return {}
+    claims: dict[str, set] = {}
+    for complaint in db.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.qms_ref.in_(wanted)):
+        claims.setdefault(complaint.qms_ref, set()).add(complaint.id)
+    cases = db.query(IntakeEvent.qms_ref, IntakeEvent.complaint_id).filter(
+        IntakeEvent.tenant_id == tenant_id, IntakeEvent.qms_ref.in_(wanted), IntakeEvent.complaint_id.isnot(None)
+    )
+    for qms_ref, complaint_id in cases:
+        claims.setdefault(qms_ref, set()).add(complaint_id)
+    # shortcut: an ID two complaints claim is not merged (a new complaint is made, as before) instead of being set
+    # aside with "Two complaints claim QMS ID X: reconcile them" (IN-14); build the set-aside with the import work.
+    single = {qms_ref: next(iter(ids)) for qms_ref, ids in claims.items() if len(ids) == 1}
+    rows = db.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.id.in_(list(single.values())))
+    by_id = {row.id: row for row in rows}
+    return {qms_ref: by_id[complaint_id] for qms_ref, complaint_id in single.items() if complaint_id in by_id}
 
 
 def _propose_classifications(db: Session, tenant_id, complaints: dict, proposed: dict, now: datetime) -> None:
