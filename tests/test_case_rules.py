@@ -250,6 +250,12 @@ def test_hardware_revision_and_firmware_version_keep_status_and_source():  # S-3
     assert [item["label"] for item in cr.missing_information(found)] == ["Firmware version: unconfirmed"]
 
 
+def test_a_product_taken_from_the_lot_keeps_its_source_when_edited():  # PV-1 F2
+    found = cr.clean_identifiers({"product": {"status": "UNCONFIRMED", "source": "LOT"}}, {"product": True})
+    assert found["product"]["source"] == "LOT"
+    assert cr.SOURCE_LABELS["LOT"] == "From the lot"
+
+
 def test_the_case_check_offers_six_classifications_each_with_why_it_is_disabled():
     # Spec 4.4: Complaint, Complaint and service, Service only, Inquiry, Pending, Not a complaint, in that order; those
     # the answers do not give are disabled with the signature's own reason, so the screen never offers a refusal.

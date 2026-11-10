@@ -50,6 +50,7 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 
 - Log a case refuses a lot of another product than the one chosen (422 `LOT_NOT_FOR_PRODUCT`); a lot given without a
   product gives the Case the lot's product, shown "(from the lot)". A lot with an unknown version is still taken.
+  The identifier's source list offers "From the lot", so editing the Case later keeps that source.
 - A case's workspace (and the AI context built from it) no longer picks a version: it uses the case's one version only
   when the scope names exactly one and every included complaint carries it. Otherwise it reads the whole product and
   says "no single known product version", with the scope's versions. The old decision record and the old brief store

@@ -316,13 +316,14 @@ IDENTIFIER_LABELS = {
 }
 NOT_SURE_ALLOWED = ("version", "lot", "serial")
 CONFIRMED, UNCONFIRMED = "CONFIRMED", "UNCONFIRMED"
-SOURCES = ("CALLER", "LABEL_OR_PHOTO", "SHIPMENT_RECORD", "SERVICE_RECORD", "IMPORTED")
+SOURCES = ("CALLER", "LABEL_OR_PHOTO", "SHIPMENT_RECORD", "SERVICE_RECORD", "IMPORTED", "LOT")
 SOURCE_LABELS = {
     "CALLER": "As told by the caller",
     "LABEL_OR_PHOTO": "Label or photo",
     "SHIPMENT_RECORD": "Shipment record",
     "SERVICE_RECORD": "Service record",
     "IMPORTED": "Imported",
+    "LOT": "From the lot",  # PV-1 F2: Log a case takes the product from the lot
 }
 
 
