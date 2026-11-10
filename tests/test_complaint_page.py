@@ -183,3 +183,27 @@ def test_a_backlog_complaint_shows_the_backlog_note_and_target_not_an_overdue_ma
     assert line["title"] == "Imported: check the reportability decision in your QMS (Imported backlog target)"
     assert line["market"] == "US" and line["opens"]["target"]["tab"] == "Imported backlog"
     assert page["summary"]["nearest_deadline"]["title"] == line["title"]
+
+
+def test_a_backlog_complaint_missing_a_fact_asks_for_it_as_home_does(trial):
+    """Gap-matrix S: an old flagged import with no country keeps its backlog line and gets Home's "Enter the ..." line
+    (same key, title and date), never a market window read overdue."""
+    from datetime import date, timedelta
+
+    from tests.test_intake_triage_api import _upload
+
+    user = trial["user"]
+    aware = (date.today() - timedelta(days=200)).isoformat()
+    _upload(
+        user,
+        "complaint_id,product_id,product_name,description,status,awareness_date,country,death\n"
+        + f"CP-BL-2,CP-PUMP,CP Pump,Patient died after the pump stopped,open,{aware},,Y\n",
+    )
+    page = user.get(f"{EVENTS}/CP-BL-2").json()
+    due = page["work"]["due"]
+    assert not [item for item in due if item["state"] == "OVERDUE"], due
+    assert any(item["key"].endswith(":backlog") for item in due), due
+    (asks,) = [item for item in due if item["key"].endswith(":facts")]
+    assert asks["title"].startswith("Enter the incident country") and asks["market"] is None
+    home = {item["key"]: item for item in user.get("/api/v1/oversight", params={"show": "all"}).json()["items"]}
+    assert home[asks["key"]]["title"] == asks["title"] and home[asks["key"]]["due_at"] == asks["due_at"]

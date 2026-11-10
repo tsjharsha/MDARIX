@@ -95,7 +95,9 @@ trials' existing Cases; nothing is written until the owner approves the list), t
   in your QMS": the full triage form, the same 10-working-day target, and no regulatory clock shown overdue or
   alerted (the clock ran in your QMS). One that came with its QMS triage ("From your QMS: confirm") waits there too,
   with "Confirm QMS triage" on its card, and the complaint page shows the note and the backlog target in place of a
-  market clock. Recent imports and Cases logged in MDARIX are unchanged.
+  market clock. Recent imports and Cases logged in MDARIX are unchanged. One missing its country or awareness date
+  also shows Home's "Enter the incident country" (or awareness date) line, dated by its backlog target, on Home and
+  on the complaint page, and the page keeps its backlog note beside it.
 - **Second look: "Closed without a reportability decision?"** A complaint closed in your QMS with a death or a
   serious injury and no signed market conclusion comes to the second look.
 
