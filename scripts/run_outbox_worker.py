@@ -163,6 +163,16 @@ def publish(event_name, payload):
             bind_system(db, "outbox worker: email the support team about a reported problem")
             deliver_problem_report(db, payload)
         return
+    if event_name == "INBOUND_MAIL_RECEIVED":
+        from backend.app.mail_in.processing import process
+
+        # B7b: check one received e-mail (attachments, scan, threading, draft, flags); the urgent alert it may queue is
+        # committed with it.
+        with SessionLocal() as db:
+            bind_system(db, "outbox worker: check a received e-mail")
+            process(db, payload)
+            db.commit()
+        return
     from backend.app.notifications import handle_event
 
     with SessionLocal() as db:

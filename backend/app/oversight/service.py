@@ -462,6 +462,29 @@ def _guide_items(db: Session, tenant_id, calendar: rules.Calendar) -> list[dict]
     ]
 
 
+def _mail_items(db: Session, tenant_id, calendar: rules.Calendar) -> list[dict]:
+    """B7b: an e-mail to check is due by the end of the working day it arrived; one with death or injury words is due
+    on receipt, so its alert is raised at once and goes to the escalation role."""
+    from backend.app.db.models.intake import InboundMessage
+
+    items = []
+    for row in db.query(InboundMessage).filter(InboundMessage.tenant_id == tenant_id, InboundMessage.state == "NEW"):
+        harm = bool((row.flags or {}).get("harm_words"))
+        items.append(
+            _item(
+                f"mail:{row.id}",
+                "TRIAGE",
+                ("Urgent: an e-mail with death or injury words" if harm else "Check a received e-mail")
+                + ": make it a case, add it to one, or mark it not a case",
+                row.received_at if harm else calendar.working_day_end(row.received_at, 0),
+                ref="E-mail to check",
+                queue="Service Desk",
+                opens=links.target("Complaints", "First contact"),
+            )
+        )
+    return items
+
+
 def _capa_items(db: Session, tenant_id) -> list[dict]:
     from backend.app.db.models.foundation import Capa, Product
     from backend.app.decision_followups.rules import capa_qms_words
@@ -526,6 +549,7 @@ def due_items(db: Session, control_db: Session | None, tenant_id, now: datetime 
         ("watch", lambda: _watch_items(db, control_db, tenant_id, now)),
         ("guides", lambda: _guide_items(db, tenant_id, calendar)),
         ("capas", lambda: _capa_items(db, tenant_id)),
+        ("e-mails", lambda: _mail_items(db, tenant_id, calendar)),
     )
     items: list[dict] = []
     for name, read in sources:
