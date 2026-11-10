@@ -45,6 +45,11 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
   instead of reading the rest of the file as one cell or failing with a server error.
 - A Decision Brief's scope section shows how many complaints are in scope and how many are excluded (the
   screen read names the brief does not store, so these lines never appeared). Signed briefs are unchanged.
+- A Case escalated to a complaint takes the complaint's malfunction flag from the Case check's question 3 ("Did the
+  device malfunction or behave abnormally?"), not question 6 (serious harm if it happened again): a Case that says the
+  device malfunctioned gives a complaint flagged malfunction, on the reportability watch, so the routine basis ("no
+  death, serious injury or malfunction recorded") is not offered. Complaints and signed records made before are
+  unchanged.
 
 ### Fixed: a record's version always belongs to its product (PV-1)
 
