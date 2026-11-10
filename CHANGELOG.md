@@ -43,6 +43,8 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
   back to the file, instead of Python byte text.
 - A CSV import with a stray quote mark is refused with the line it is on ("Line 7: a quote mark ... is not closed"),
   instead of reading the rest of the file as one cell or failing with a server error.
+- A Decision Brief's scope section shows how many complaints are in scope and how many are excluded (the
+  screen read names the brief does not store, so these lines never appeared). Signed briefs are unchanged.
 
 ### Fixed: a record's version always belongs to its product (PV-1)
 

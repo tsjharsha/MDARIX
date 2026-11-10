@@ -131,6 +131,25 @@ describe("the brief's review at the top of the Decision Brief tab", () => {
     );
   });
 
+  it("shows the scope lines the brief's compose stores", () => {
+    const content = {
+      scope: {
+        version: 2,
+        included_count: 3,
+        unknown_version_count: 1,
+        included: [{ id: "a" }, { id: "b" }, { id: "c" }],
+        excluded_count: 1,
+        excluded: [{ id: "d", reason: "Duplicate" }],
+        product_versions: [{ id: "v" }],
+      },
+    };
+    answers.set(BRIEF, { current: { ...version("APPROVED_FOR_DECISION"), content }, versions: [], actions: {} });
+    const html = render(<CaseDecisionBriefPanel investigationId={CASE} caseLabel="INV000001" />);
+    expect(html).toContain("Complaints in scope: 3");
+    expect(html).toContain("Complaints excluded: 1");
+    expect(html).toContain("Complaints with no known version: 1");
+  });
+
   it("leads from the accepted brief to signing the decision", () => {
     const html = render(
       <BriefNextStepBar

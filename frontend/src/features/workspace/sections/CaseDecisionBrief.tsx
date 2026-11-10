@@ -649,13 +649,9 @@ function ComposedSections({ version }: { version: BriefVersion }) {
             {Number(scope.unknown_version_count) > 0 && (
               <li>Complaints with no known version: {String(scope.unknown_version_count)}</li>
             )}
-            {Array.isArray(scope.included_complaints) && (
-              <li>Complaints in scope: {scope.included_complaints.length}</li>
-            )}
-            {Array.isArray(scope.excluded_complaints) && (
-              <li>Complaints excluded: {scope.excluded_complaints.length}</li>
-            )}
-            {Array.isArray(scope.lots) && <li>Lots: {scope.lots.length}</li>}
+            {/* The keys the brief's compose stores (decision_brief/compose.py scope_section). */}
+            {scope.included_count !== undefined && <li>Complaints in scope: {String(scope.included_count)}</li>}
+            {scope.excluded_count !== undefined && <li>Complaints excluded: {String(scope.excluded_count)}</li>}
           </ul>
         ) : (
           <p className="ac-muted">No scope recorded.</p>
