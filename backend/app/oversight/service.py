@@ -76,6 +76,8 @@ def settings_view(row: OversightSettings | None) -> dict:
             "holidays": [],
             "reminder_hours": rules.DEFAULT_HOURS,
             "escalation_role": rules.DEFAULT_ROLE,
+            "urgent_email": False,
+            "attachment_quota_mb": 100,
             "updated_at": None,
         }
     return {
@@ -84,6 +86,9 @@ def settings_view(row: OversightSettings | None) -> dict:
         "holidays": list(row.holidays or []),
         "reminder_hours": row.reminder_hours,
         "escalation_role": row.escalation_role,
+        # B7: the opt-in urgent e-mail alert and the organization's attachment storage (B7-D12, D16).
+        "urgent_email": bool(row.urgent_email),
+        "attachment_quota_mb": row.attachment_quota_mb or 100,
         "updated_at": _iso(row.updated_at) if row.updated_by else None,
     }
 

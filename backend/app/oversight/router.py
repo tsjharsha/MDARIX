@@ -782,6 +782,53 @@ def save_settings(
     return _settings_body(db, tenant_id)
 
 
+class AlertsAndFilesIn(BaseModel):
+    urgent_email: bool | None = None
+    attachment_quota_mb: int | None = Field(default=None, ge=1, le=10240)
+
+
+@router.put("/settings/alerts-and-files", dependencies=[SETTERS])
+def save_alerts_and_files(
+    payload: AlertsAndFilesIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """B7: the opt-in urgent e-mail alert (off by default, B7-D12) and the attachment storage in MB (B7-D16; a free
+    trial keeps 100 MB). Audited OVERSIGHT_SETTINGS_CHANGED with the old and new values."""
+    from backend.app.signer_training.router import is_trial
+
+    tenant_id = _tenant(ctx)
+    if payload.attachment_quota_mb not in (None, 100) and is_trial(control_db, tenant_id):
+        raise _error(422, "SETTINGS_INVALID", "A free trial keeps 100 MB of file storage")
+    row = service.settings_row(db, tenant_id)
+    if row is None:
+        row = OversightSettings(id=uuid.uuid4(), tenant_id=tenant_id)
+        db.add(row)
+        db.flush()
+    fields = ("urgent_email", "attachment_quota_mb")
+    old = {key: service.settings_view(row)[key] for key in fields}
+    for key in fields:
+        if getattr(payload, key) is not None:
+            setattr(row, key, getattr(payload, key))
+    row.updated_by, row.updated_at = str(ctx.user_id), service.now_utc()
+    db.flush()
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=ctx.user_id,
+            action="OVERSIGHT_SETTINGS_CHANGED",
+            entity_type="OversightSettings",
+            entity_id=row.id,
+            correlation_id=ctx.correlation_id,
+            old_values=old,
+            new_values={key: service.settings_view(row)[key] for key in fields},
+        )
+    )
+    db.commit()
+    return _settings_body(db, tenant_id)
+
+
 # --------------------------------------------------------------------------------------------- my alerts
 
 

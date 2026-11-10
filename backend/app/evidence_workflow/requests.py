@@ -917,8 +917,9 @@ def upload_evidence_request_attachment(
     from backend.app.stage3_workflow_router import (
         ALLOWED_ATTACHMENT_TYPES,
         MAX_ATTACHMENT_BYTES,
-        TENANT_ATTACHMENT_QUOTA_BYTES,
         _content_matches_type,
+        attachment_bytes_used,
+        attachment_quota_bytes,
         safe_filename,
     )
 
@@ -935,13 +936,7 @@ def upload_evidence_request_attachment(
     content = file.file.read(MAX_ATTACHMENT_BYTES + 1)
     if len(content) > MAX_ATTACHMENT_BYTES:
         raise error(413, "ATTACHMENT_TOO_LARGE", "Attachment exceeds the permitted size")
-    used = int(
-        db.query(func.coalesce(func.sum(EvidenceAttachment.size), 0))
-        .filter(EvidenceAttachment.tenant_id == tenant_id)
-        .scalar()
-        or 0
-    )
-    if used + len(content) > TENANT_ATTACHMENT_QUOTA_BYTES:
+    if attachment_bytes_used(db, tenant_id) + len(content) > attachment_quota_bytes(db, tenant_id):
         raise error(413, "TENANT_ATTACHMENT_QUOTA_EXCEEDED", "Tenant attachment storage quota exceeded")
     if not ObjectStorageService().scan(content, content_type):
         raise error(422, "MALWARE_SCAN_REJECTED", "Attachment failed the malware safety scan")

@@ -84,6 +84,8 @@ class OversightSettings(Base):
     urgent_email: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     mail_allowed_domains = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     mail_daily_limit: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("200"))
+    # B7-D16: the organization's attachment storage, in MB (100 by default; a free trial keeps 100).
+    attachment_quota_mb: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("100"))
 
     __table_args__ = (
         UniqueConstraint("tenant_id", name="uq_oversight_settings_tenant"),
@@ -92,6 +94,7 @@ class OversightSettings(Base):
         CheckConstraint(_in("case_flow", CASE_FLOWS), name="case_flow_known"),
         CheckConstraint("backlog_days >= 1 AND backlog_target_days >= 1", name="backlog_range"),
         CheckConstraint("mail_daily_limit BETWEEN 1 AND 5000", name="mail_limit_range"),
+        CheckConstraint("attachment_quota_mb BETWEEN 1 AND 10240", name="attachment_quota_range"),
     )
 
 

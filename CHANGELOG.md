@@ -20,7 +20,8 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
 - Migration `tr25routinepath`, expand-only: new tables `inbound_messages` (e-mail waiting for a person) and
   `case_attachments` (files on a Case), both with forced row-level security; `event_closures` gains the native
   closure and reopening (`closed_at`, `closed_by`, `reopened_at`, `reopened_by`, `reopen_reason`);
-  `oversight_settings` gains `urgent_email` (off by default), `mail_allowed_domains` and `mail_daily_limit`; Case
+  `oversight_settings` gains `urgent_email` (off by default), `mail_allowed_domains`, `mail_daily_limit` and
+  `attachment_quota_mb` (100); Case
   addenda accept the kinds `TRANSLATION` and `EMAIL`; a Case import's key is unique per organization. Legacy
   organization databases get the same from `scripts/add_workflow_tables_to_legacy_planes.py` (step `tr25`).
 
@@ -72,6 +73,14 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   the complaints made from Cases with no QMS ID, in the complaints template's columns plus `mdarix_ref`. Both are
   UTF-8 CSV with formula cells escaped, at most 20,000 rows, the export ID in the file name, audited
   `CASES_EXPORTED` / `QMS_ENTRY_EXPORTED` with the filter, the row count and the file's SHA-256.
+- Files on a Case (`POST`/`GET /api/v1/intake/{id}/attachments`, `GET .../{attachment_id}`): a PDF, text, CSV, PNG
+  or JPEG file of up to 10 MB, virus-scanned (an infected file is never stored), its content checked against its
+  type, its name kept masked. Added by people who log Cases; listed and opened by those who log, classify or review
+  them; another organization's Case answers 404. Audited `CASE_ATTACHMENT_ADDED` and `CASE_ATTACHMENT_OPENED`.
+- The organization's file storage is a setting (`PUT /api/v1/oversight/settings/alerts-and-files`,
+  `attachment_quota_mb`, 100 MB by default; a free trial keeps 100 MB), and evidence, supplier and Case files count
+  against it together. The same route switches the urgent e-mail alert (`urgent_email`). Both audited
+  `OVERSIGHT_SETTINGS_CHANGED`.
 
 ### Changed
 

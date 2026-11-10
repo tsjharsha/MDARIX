@@ -10,7 +10,8 @@ one widened check constraint and one partial unique index. Nothing is dropped or
   (make it a Case, add it to a Case, or not a case). An e-mail is never a complaint by itself.
 - ``case_attachments``: a file on a Case (uploaded, or from an e-mail), virus-scanned; an infected file is never stored.
 - ``event_closures``: the native closure in MDARIX Complete (``closed_at``, ``closed_by``) and the reopening.
-- ``oversight_settings``: the opt-in urgent e-mail alert, the allowed sender domains and the daily e-mail limit.
+- ``oversight_settings``: the opt-in urgent e-mail alert, the allowed sender domains, the daily e-mail limit and the
+  organization's attachment quota (B7-D16; 100 MB, as before).
 - ``case_addenda``: the kinds ``TRANSLATION`` and ``EMAIL``.
 - ``intake_events``: a Case import's key (source + ``case_id``) is unique per organization.
 
@@ -37,7 +38,7 @@ ATTACHMENT_SOURCES = ("EMAIL", "UPLOAD")
 OLD_ADDENDUM_KINDS = ("STATEMENT", "WITHDRAWAL", "TECHNICIAN_FINDING", "CORRECTION_BY_REPORTER")
 ADDENDUM_KINDS = (*OLD_ADDENDUM_KINDS, "TRANSLATION", "EMAIL")
 CLOSURE_COLUMNS = ("closed_at", "closed_by", "reopened_at", "reopened_by", "reopen_reason")
-SETTINGS_COLUMNS = ("urgent_email", "mail_allowed_domains", "mail_daily_limit")
+SETTINGS_COLUMNS = ("urgent_email", "mail_allowed_domains", "mail_daily_limit", "attachment_quota_mb")
 
 
 def _uuid(name: str, nullable: bool = True) -> sa.Column:
@@ -169,6 +170,12 @@ def _settings() -> None:
     op.create_check_constraint(
         op.f("ck_oversight_settings_mail_limit_range"), table, "mail_daily_limit BETWEEN 1 AND 5000"
     )
+    op.add_column(
+        table, sa.Column("attachment_quota_mb", sa.Integer(), nullable=False, server_default=sa.text("100"))
+    )
+    op.create_check_constraint(
+        op.f("ck_oversight_settings_attachment_quota_range"), table, "attachment_quota_mb BETWEEN 1 AND 10240"
+    )
 
 
 def _addenda(kinds) -> None:
@@ -212,6 +219,7 @@ def downgrade():
         "ALTER TABLE case_addenda ADD CONSTRAINT ck_case_addenda_kind_known "
         f"CHECK (kind IN ({quoted(OLD_ADDENDUM_KINDS)})) NOT VALID"
     )
+    op.drop_constraint(op.f("ck_oversight_settings_attachment_quota_range"), "oversight_settings", type_="check")
     op.drop_constraint(op.f("ck_oversight_settings_mail_limit_range"), "oversight_settings", type_="check")
     for column in reversed(SETTINGS_COLUMNS):
         op.drop_column("oversight_settings", column)

@@ -145,6 +145,29 @@ TENANT_ATTACHMENT_QUOTA_BYTES = 100 * 1024 * 1024
 ALLOWED_ATTACHMENT_TYPES = {"application/pdf", "text/plain", "text/csv", "image/png", "image/jpeg"}
 
 
+def attachment_quota_bytes(db: Session, tenant_id) -> int:
+    """B7-D16: the organization's attachment storage (Settings › Oversight; 100 MB by default, a trial keeps 100)."""
+    from backend.app.db.models.oversight import OversightSettings
+
+    megabytes = (
+        db.query(OversightSettings.attachment_quota_mb).filter(OversightSettings.tenant_id == tenant_id).scalar()
+    )
+    return megabytes * 1024 * 1024 if megabytes else TENANT_ATTACHMENT_QUOTA_BYTES
+
+
+def attachment_bytes_used(db: Session, tenant_id) -> int:
+    """The organization's uploaded files: evidence and supplier files, and files on Cases (B7)."""
+    from backend.app.db.models.intake import CaseAttachment
+
+    evidence = db.query(func.coalesce(func.sum(EvidenceAttachment.size), 0)).filter(
+        EvidenceAttachment.tenant_id == tenant_id
+    )
+    cases = db.query(func.coalesce(func.sum(CaseAttachment.size), 0)).filter(
+        CaseAttachment.tenant_id == tenant_id, CaseAttachment.object_key.isnot(None)
+    )
+    return int(evidence.scalar() or 0) + int(cases.scalar() or 0)
+
+
 def _ensure_own_records(db: Session, tenant_id, payload: InteractionRequest) -> None:
     """The case, product and version a question refers to must belong to the signed-in tenant (404 otherwise, the
     same answer as for an id that does not exist)."""
@@ -795,13 +818,7 @@ def upload_supplier_attachment(
         raise HTTPException(
             413, detail={"code": "ATTACHMENT_TOO_LARGE", "message": "Attachment exceeds the permitted size"}
         )
-    used = int(
-        db.query(func.coalesce(func.sum(EvidenceAttachment.size), 0))
-        .filter(EvidenceAttachment.tenant_id == ctx.tenant_id)
-        .scalar()
-        or 0
-    )
-    if used + len(content) > TENANT_ATTACHMENT_QUOTA_BYTES:
+    if attachment_bytes_used(db, ctx.tenant_id) + len(content) > attachment_quota_bytes(db, ctx.tenant_id):
         raise HTTPException(
             413,
             detail={"code": "TENANT_ATTACHMENT_QUOTA_EXCEEDED", "message": "Tenant attachment storage quota exceeded"},

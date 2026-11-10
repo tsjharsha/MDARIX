@@ -71,6 +71,7 @@ from backend.app.complaint_disposition.router import router as complaint_disposi
 from backend.app.complaint_disposition.resolve import router as resolve_and_close_router
 from backend.app.intake.router import router as intake_router
 from backend.app.intake.case_export import router as case_export_router
+from backend.app.intake.case_attachments import router as case_attachments_router
 from backend.app.authority_reports.router import router as authority_reports_router
 from backend.app.communications.router import router as communications_router
 from backend.app.decision_guides.router import router as decision_guides_router
@@ -490,6 +491,7 @@ app.include_router(complaint_review_router)  # Second look and backlog board (md
 app.include_router(complaint_disposition_router)  # Complaint disposition, triggers, routine path (tr02)
 app.include_router(resolve_and_close_router)  # Resolve and close, reopen (B7, tr25)
 app.include_router(case_export_router)  # B7: Cases export and export for QMS entry (before /intake/{id})
+app.include_router(case_attachments_router)  # B7: files on a Case
 app.include_router(intake_router)  # First contact, urgent intake and triage, duplicates (tr04)
 app.include_router(authority_reports_router)  # Report worksheets, obligations and the submission record (tr05)
 app.include_router(decision_guides_router)  # The customer's own decision guide versions (tr06)
