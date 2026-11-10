@@ -200,6 +200,36 @@ async def enforce_cookie_csrf(request: Request, call_next):
 
 
 @app.middleware("http")
+async def limit_heavy_work(request: Request, call_next):
+    """Uploads, exports and connector syncs a signed-in person starts count per person and per organization; past
+    the limit the answer is 429 with a plain message and Retry-After (backend/app/rate_limit.py HEAVY_WORK)."""
+    from backend.app import rate_limit
+
+    kind = rate_limit.heavy_work(request.method, request.url.path)
+    token = read_session_token(request) if kind else None
+    if token:
+        try:
+            await run_in_threadpool(_count_heavy_work, kind, token)
+        except HTTPException as refused:
+            return JSONResponse({"detail": refused.detail}, status_code=refused.status_code, headers=refused.headers)
+    return await call_next(request)
+
+
+def _count_heavy_work(kind: str, token: str) -> None:
+    from backend.app import rate_limit
+
+    with SessionLocal() as db:
+        session = (
+            db.query(AuthSession.user_id, AuthSession.tenant_id)
+            .filter(AuthSession.session_hash == hash_token(token), AuthSession.revoked_at.is_(None))
+            .first()
+        )
+    if session is not None:  # no valid session: the route itself answers 401
+        rate_limit.enforce(f"{kind}:user", str(session.user_id))
+        rate_limit.enforce(f"{kind}:org", str(session.tenant_id))
+
+
+@app.middleware("http")
 async def audit_mutating_requests(request: Request, call_next):
     """Create a uniform request-level audit envelope for every state change.
 

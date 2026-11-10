@@ -68,6 +68,9 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
   name appears as text on the complaint page, triage, the imported backlog and the case's evidence, never as markup;
   a test also fails if any screen starts writing raw HTML (the one reviewed, escaped exception is the public
   questions page's structured data).
+- Uploads and imports, exports and downloads, and connector syncs are rate limited per person and per organization
+  (per hour: 60 and 300 uploads, 60 and 300 exports, 20 and 60 syncs); past a limit the answer is 429 "Too many
+  attempts. Please try again in …" with `Retry-After`.
 
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 
