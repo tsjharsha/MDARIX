@@ -1151,6 +1151,9 @@ def _verify(control_db, ctx, event, password, mfa_code, attempt: str) -> None:
     from backend.app.governance_router import verify_signing_credentials
 
     def refused(action: str) -> None:
+        # A refused signature changes nothing but its audit: drop what the request staged (on the shared trial plane
+        # the data session is this one, so a triage record created before the check would be committed with it).
+        control_db.rollback()
         control_db.add(
             make_audit_event(
                 tenant_id=_tenant(ctx),
@@ -2401,6 +2404,7 @@ def _save_triage(db, control_db, ctx, kind, record_id, payload: TriageIn, *, app
             raise _error(422, "SIGNATURE_NEEDED", f"Sign {what} with your password")
         role = _signer_role(control_db, ctx)
         _verify(control_db, ctx, _subject_ref(item, record_id), payload.password, payload.mfa_code, "TRIAGE_DOWNGRADE")
+        db.flush()  # a first save's record gets its id (server default) for the signature
         signed_id, _ = _signature(
             control_db,
             ctx,
