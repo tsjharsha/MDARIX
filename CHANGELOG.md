@@ -59,6 +59,8 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
   support-access requests and their activity showed no person, and its audit history showed a staff action as a bare
   account id instead of "MDARIX platform administrator". Staff accounts are now read apart in system scope, staff
   accounts only (another organization's accounts never). Tests run API requests under the runtime role (`SET ROLE`).
+- A test reads the modules that build SQL with table or column names (data-plane lists, analytics, export, purge) and
+  fails when a name could come from anything but a fixed list or the database catalogue, such as a request field.
 
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 
