@@ -76,3 +76,20 @@ def test_the_awareness_box_prints_the_local_day_the_deadline_counts_from():  # a
     assert deadlines.count(moment, 1, "CALENDAR", "IN", "Asia/Kolkata").day.isoformat() == "2026-11-10"
     # A day given without a time stays that day.
     assert _aware("US", "2026-11-10T12:00:00+00:00", "Asia/Kolkata") == "2026-11-10"
+
+
+def test_each_window_counts_by_the_market_it_covers():  # audit 12
+    from backend.app.reportability import deadlines, rules
+
+    windows = [
+        {"name": name, "markets": [country], "triggers": ["DEATH"], "days": 15, "day_basis": "CALENDAR"}
+        for name, country in (("India window", "India"), ("US window", "United States"))
+    ]
+    record = {"country": "United States, India", "death": True}
+    aware = datetime.fromisoformat("2026-11-10T06:00:00+00:00")
+    found = {clock.name: clock for clock in rules.clocks(record, windows, aware, aware, "Asia/Kolkata")}
+    india = deadlines.count(aware, 15, "CALENDAR", "IN", "Asia/Kolkata")
+    us = deadlines.count(aware, 15, "CALENDAR", "US", "Asia/Kolkata")
+    assert india.day < us.day  # India counts the awareness day as day 1
+    assert (found["India window"].due, found["India window"].market) == (india.day, "IN")
+    assert (found["US window"].due, found["US window"].market) == (us.day, "US")

@@ -335,14 +335,17 @@ def applies(window: dict, record: dict) -> bool:
     the window's markets (a window without markets covers every market, a complaint without a country included)."""
     if not set(window["triggers"]) & set(triggers_of(record)):
         return False
-    if not window["markets"]:
-        return True
+    return not window["markets"] or covered_country(window, record) is not None
+
+
+def covered_country(window: dict, record: dict) -> str | None:
+    """The complaint's country that ``window`` covers: the whole cell when the window names it, else the first country
+    of a cell naming several ("India, Germany", J41) that the window names; None when it covers none."""
     names = {normalize(market) for market in window["markets"]}
-    country = normalize(record.get("country"))
-    # A cell naming several countries ("India, Germany") is covered when one of them is (J41).
-    return bool(country) and (
-        country in names or any(normalize(part) in names for part in countries(record.get("country")))
-    )
+    cell = record.get("country")
+    if normalize(cell) and normalize(cell) in names:
+        return cell
+    return next((part for part in countries(cell) if normalize(part) in names), None)
 
 
 def due_date(aware: date, window: dict, market: str | None = None) -> date:
@@ -391,7 +394,7 @@ def clocks(
     record: dict, windows: list[dict], aware: datetime | date | None, now: datetime | date, org_zone: str | None = None
 ) -> list[Clock]:
     """The clocks the complaint's windows start, the earliest end first; none without awareness. Each counts by the
-    complaint's market (its country) and the organization's time zone (deadlines.py)."""
+    market the window covers (of a complaint naming several countries) and the organization's time zone (deadlines.py)."""
     from backend.app.reportability.markets import market_of
 
     if aware is None:
@@ -402,7 +405,10 @@ def clocks(
     for window in windows:
         if not applies(window, record):
             continue
-        due = deadlines.count(aware, window["days"], window["day_basis"], market, org_zone)
+        # Each window by the rule of the market it covers, not the first country's (code audit 12).
+        covered = covered_country(window, record) if window["markets"] else None
+        window_market = market_of(covered) if covered else market
+        due = deadlines.count(aware, window["days"], window["day_basis"], window_market, org_zone)
         seen = deadlines.view(due, now, window["days"])
         found.append(
             Clock(
@@ -417,7 +423,7 @@ def clocks(
                 due_at=seen["due_at"],
                 due_zone=seen["due_zone"],
                 due_label=seen["due_label"],
-                market=market,
+                market=window_market,
             )
         )
     return sorted(found, key=lambda clock: (clock.due_at or "", clock.name))
