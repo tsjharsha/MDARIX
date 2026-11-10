@@ -950,14 +950,17 @@ def market_clock(
     now,
     org_zone: str | None = None,
     if_reportable: str | None = None,
+    floor: dict | None = None,
 ) -> dict | None:
     """A market's clock, by its counting rule (deadlines.py). Reportable: the organization's window of the report
     type's period for that market, or the regulation's period when none matches. Pending, or not yet assessed: the
     earlier of the shortest window the organization set for that market and the clock a signed "reportable" would
     start (``if_reportable``, the answers' ``report_type_if_reportable``), still counting, so signing reportable later
-    never lands on a date already past (code audit 3). Not reportable: none."""
+    never lands on a date already past (code audit 3). Not reportable: none. ``floor``: the market's floor picked by
+    the awareness day (B4), whose report types and periods apply; today's when None."""
     if aware is None or state == NOT_REPORTABLE:
         return None
+    types = _in_force(str(register._DIRECTORY), (floor["code"],))[1] if floor else REPORT_TYPES
     mine = [window for window in windows if market in window_markets(window)]
     clocks = [_clock(w["name"], w["days"], w["day_basis"], aware, now, "WINDOW", market, org_zone) for w in mine]
 
@@ -971,10 +974,10 @@ def market_clock(
             return min(exact, key=lambda clock: clock["due_at"])
         return _clock(kind.label, kind.days, kind.day_basis, aware, now, "REGULATION", market, org_zone)
 
-    kind = REPORT_TYPES.get(report_type or "")
+    kind = types.get(report_type or "")
     if state == REPORTABLE and kind and kind.days:
         return reportable(kind)
-    later = REPORT_TYPES.get(if_reportable or "")
+    later = types.get(if_reportable or "")
     found = clocks + ([reportable(later)] if later and later.days else [])
     return min(found, key=lambda clock: clock["due_at"]) if found else None
 

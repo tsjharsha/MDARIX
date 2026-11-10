@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.app import mfa
+from backend.app import feature_set, mfa
 from backend.app.access.permissions import INVESTIGATION_CREATE, QUALITY_REVIEW, SIGNAL_TRIAGE
 from backend.app.complaint_classification import rules as coding
 from backend.app.complaint_disposition import rules, service, triggers
@@ -43,6 +43,7 @@ from backend.app.evidence_workflow.people import current_person, require_any_per
 from backend.app.reportability import markets
 from backend.app.reportability import rules as reporting_rules
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.rule_register import register
 from backend.app.signer_training import service as training
 from backend.app.signer_training.router import is_trial
 from backend.app.standards import STARTER_MARK, chips
@@ -97,6 +98,22 @@ class SignRequest(BaseModel):
     known_behaviour_ref: str = Field(default="", max_length=240)
     password: str = Field(min_length=1, max_length=128)
     mfa_code: str | None = Field(default=None, max_length=12)
+
+
+# B4 (ED-15): the routine path's "not reportable" rests on this code-held rule, recorded on each market row.
+ROUTINE_RULES_APPLIED = {"rules": [{"id": "routine-basis-1", "state": "APPLIES"}], "type_row": None}
+
+
+def _routine_floors(db: Session, tenant_id: uuid.UUID, complaint_id, routine_markets: list[str], today) -> dict:
+    """Each routine market's floor in force on its awareness day (B4); nothing while the rule register is off."""
+    from backend.app.reportability import service as reporting
+
+    if not routine_markets or not feature_set.rule_register():
+        return {}
+    found = reporting.one(db, tenant_id, complaint_id, today)
+    seen = found[2] if found else {}
+    aware = datetime.fromisoformat(seen["aware_at"]) if seen.get("aware_at") else None
+    return {market: register.floor_at(market, aware, seen.get("org_zone")) for market in routine_markets}
 
 
 def _reportability(db: Session, tenant_id: uuid.UUID, complaint_id, today: date) -> dict:
@@ -490,6 +507,7 @@ def sign(
             row.market for row in facts["facts"].assessments if row.conclusion is not None and row.superseded_by is None
         }
         routine_markets = [market for market in _routine_markets(facts) if market not in concluded]
+    floors = _routine_floors(db, tenant_id, complaint_id, routine_markets, today)
     person = current_person(control_db, ctx)
     role = person.role_for(QUALITY_REVIEW) or person.role_for(SIGNAL_TRIAGE) or person.role_for(INVESTIGATION_CREATE)
     if (role or "").upper() in ADMINISTRATOR_ROLES:
@@ -646,7 +664,12 @@ def sign(
         "case": str(case.id) if case is not None else None,
         "classification": {**values, "coding_criteria": coding.CODING_CRITERIA_VERSION},
         "routine_markets": [
-            {"market": market, "question_set": rules.ROUTINE_QUESTION_SET, "conclusion": markets.NOT_REPORTABLE}
+            {
+                "market": market,
+                "question_set": rules.ROUTINE_QUESTION_SET,
+                "conclusion": markets.NOT_REPORTABLE,
+                **({"floor_code": floors[market]["code"]} if floors.get(market) else {}),
+            }
             for market in routine_markets
         ],
         "covers": [
@@ -727,6 +750,8 @@ def sign(
                 version=max((row.version for row in existing), default=0) + 1,
                 question_set=rules.ROUTINE_QUESTION_SET,
                 answers={"BASIS": {"answer": "NO", "rationale": rules.ROUTINE_BASIS, "evidence": []}},
+                floor_code=floors[market]["code"] if floors.get(market) else None,
+                rules_applied=ROUTINE_RULES_APPLIED if floors.get(market) else None,
                 scale_version=markets.SCALE_VERSION,
                 suggested_conclusion=markets.NOT_REPORTABLE,
                 conclusion=markets.NOT_REPORTABLE,

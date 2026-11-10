@@ -112,6 +112,11 @@ class ComplaintMarketAssessment(Base):
     signed_by: Mapped[str | None] = mapped_column(String(255))
     signed_at = mapped_column(DateTime(timezone=True))
     superseded_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # B4 (tr27): the floor in force on the awareness day, the rules that applied, how the due date was counted. Empty
+    # on rows signed before the rule register (never backfilled) and while MDARIX_RULE_REGISTER is off.
+    floor_code: Mapped[str | None] = mapped_column(String(40))
+    rules_applied = mapped_column(JSONB)
+    date_calc = mapped_column(JSONB)
     source_system: Mapped[str | None] = mapped_column(String(40))
     created_by: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at = _now()

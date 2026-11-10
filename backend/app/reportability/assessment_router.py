@@ -34,7 +34,9 @@ from backend.app.db.session import get_db
 from backend.app.decision_guides import service as guides
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import current_person, require_any_permission
+from backend.app import feature_set
 from backend.app.reportability import assessments, deadlines, facts, markets, rules, service
+from backend.app.rule_register import engine, register
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.signer_training import service as training
 from backend.app.signer_training.router import is_trial
@@ -166,6 +168,70 @@ def _versions(db: Session, tenant_id, complaint_id, market: str, lock: bool = Fa
     return query.order_by(ComplaintMarketAssessment.version).all()
 
 
+def _floor_at(market: str, aware, seen: dict) -> dict | None:
+    """The market's floor in force on the awareness day (B4, R-D3); None while the rule register is off."""
+    return register.floor_at(market, aware, seen.get("org_zone")) if feature_set.rule_register() else None
+
+
+def _date_calc(market: str, floor: dict, clock: dict | None, aware, seen: dict) -> dict:
+    """How the due date was counted: the awareness moment and its source, the day that picked the floor, the counting
+    rule, and the window or regulation with its days, basis and binding time zone."""
+    counting = floor["content"]["counting"]
+    picked = register.floor_day(market, aware, seen.get("org_zone"))
+    return {
+        "aware_at": seen.get("aware_at"),
+        "aware_source": seen.get("aware_source"),
+        "floor_day": picked.isoformat() if picked else None,
+        "authority_zone": counting["authority_zone"],
+        "awareness_is_day_one": counting["awareness_is_day_one"],
+        "org_zone": seen.get("org_zone"),
+        "counting_rule": "counting-starter-1",
+        **(
+            {key: clock.get(key) for key in ("source", "window", "days", "day_basis", "due_date", "due_zone")}
+            if clock
+            else {"source": None}
+        ),
+    }
+
+
+def _rules_used(market: str, at_event: dict | None, aware, seen: dict, draft, current) -> dict | None:
+    """The "Rules used" panel (B4, C4), three lines kept apart: the floor in force on the awareness day and the rules
+    that applied; the floor in force today, same or not; and what the signed conclusion recorded ("Signed before the
+    rule register" for a row without a floor). None while the register is off."""
+    if at_event is None:
+        return None
+    today = register.floor(market)
+    picked = register.floor_day(market, aware, seen.get("org_zone"))
+    return {
+        "at_event": {
+            "code": at_event["code"],
+            "title": at_event["title"],
+            "day": picked.isoformat() if picked else None,
+            "rules_applied": draft.rules_applied if draft is not None else None,
+        },
+        "today": {"code": today["code"], "same": today["code"] == at_event["code"]},
+        "decided": None
+        if current is None
+        else {
+            "floor_code": current.floor_code,
+            "before_register": current.floor_code is None,
+            "rules_applied": current.rules_applied,
+            "date_calc": current.date_calc,
+            "fingerprint": current.content_fingerprint,
+        },
+    }
+
+
+def _record_floor(row, market: str, floor: dict | None, answers: dict, clock: dict | None, aware, seen) -> None:
+    """B4: keep on the row the floor in force on the awareness day, the rules that applied and how the due date was
+    counted (nothing while the register is off)."""
+    if floor is None:
+        return
+    row.floor_code = floor["code"]
+    row.rules_applied = engine.applied(floor["content"], answers)
+    row.date_calc = _date_calc(market, floor, clock, aware, seen)
+
+
 def _severity_level(db: Session, tenant_id, complaint_id, severity) -> dict:
     """The harm level the questions start from: the QMS severity's mapped level, else the level the triage record
     already chose on the same scale (stage 8: the harm is not asked twice), with where it came from."""
@@ -220,7 +286,8 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
     for market in shown:
         versions = by_market.get(market, [])
         current, draft = assessments.current_and_draft(versions)
-        evaluation = markets.evaluate(market, draft.answers or {}) if draft is not None else None
+        at_event = _floor_at(market, aware, seen)
+        evaluation = markets.evaluate(market, draft.answers or {}, at_event) if draft is not None else None
         # A draft keeps the guide version it was started with; a new assessment uses the one published now (T-G15).
         question_set = guides.by_code(db, tenant_id, market, draft.question_set if draft is not None else None)
         items.append(
@@ -235,6 +302,7 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
                 # Beside a judgement question, what the record says, never its answer (0.10.83, D2).
                 "record_notes": markets.record_notes(question_set, record),
                 "question_set_current": question_set.version == codes[market],
+                "rules_used": _rules_used(market, at_event, aware, seen, draft, current),
                 "threshold": {"level": markets.THRESHOLDS[market], "label": markets.THRESHOLD_LABELS[market]},
                 "current": assessments.row_view(current, names, codes[market]),
                 "draft": assessments.row_view(draft, names, codes[market]),
@@ -333,8 +401,10 @@ def save_draft(
     )
     if problem:
         raise _error(422, "ASSESSMENT_INVALID", problem)
-    evaluation = markets.evaluate(market, clean["answers"])
     aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
+    # The floor is re-picked from the awareness day at every save (B4; a corrected awareness re-picks it).
+    floor = _floor_at(market, aware, seen)
+    evaluation = markets.evaluate(market, clean["answers"], floor)
     clock = markets.market_clock(
         market,
         evaluation["suggested"],
@@ -344,6 +414,7 @@ def save_draft(
         today,
         seen.get("org_zone"),
         evaluation["report_type_if_reportable"],
+        floor,
     )
     now = datetime.now(timezone.utc)
     action = "COMPLAINT_MARKET_ASSESSMENT_SAVED"
@@ -364,6 +435,7 @@ def save_draft(
     draft.suggested_conclusion, draft.report_type = evaluation["suggested"], evaluation["report_type"]
     draft.window_name = clock["window"] if clock else None
     draft.due_on = date.fromisoformat(clock["due_date"]) if clock else None
+    _record_floor(draft, market, floor, clean["answers"], clock, aware, seen)
     draft.updated_at = now
     db.flush()
     # Each Unknown on a question that drives the conclusion raises a request to the reporter (T-G30).
@@ -388,6 +460,7 @@ def save_draft(
                 "market": market,
                 "version": draft.version,
                 "question_set": question_set.version,
+                **({"floor_code": floor["code"]} if floor else {}),
                 "suggested": evaluation["suggested"],
                 "answered": len(clean["answers"]),
                 "answer_origins": markets.origins(clean["answers"]),
@@ -442,12 +515,25 @@ def sign_conclusion(
     if draft.scale_version != markets.SCALE_VERSION:
         raise _error(409, "QUESTIONS_CHANGED", "The harm-severity scale has a new version: save the answers again")
     answers = draft.answers or {}
-    evaluation = markets.evaluate(market, answers)
+    aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
+    floor = _floor_at(market, aware, seen)
+    # D6 (R-D6): never signed on a floor other than the one the draft was saved under; a draft saved before B4 (no
+    # floor code) is never refused for having none.
+    if floor and draft.floor_code and draft.floor_code != floor["code"]:
+        raise _error(
+            409,
+            "FLOOR_CHANGED",
+            f"The rules for this event changed ({draft.floor_code} → {floor['code']}): save the answers again to see "
+            "the result.",
+            saved_under=draft.floor_code,
+            in_force=floor["code"],
+        )
+    evaluation = markets.evaluate(market, answers, floor)
     conclusion = str(payload.conclusion or "").strip().upper()
     override_reason = _collapse(payload.override_reason)
     disagreement = markets.disagreement(market, answers, draft.harm_level)
     problem = (
-        markets.answers_problem(question_set, answers, complete=True)
+        markets.answers_problem(question_set, answers, complete=True, floor=floor)
         or markets.harm_problem(
             draft.harm_level, draft.harm_code, draft.harm_level_reason or "", record.get("severity"), complete=True
         )
@@ -519,8 +605,10 @@ def sign_conclusion(
     if not disagreement:
         draft.scale_disagreement_reason = None  # a reason typed for answers since changed is not part of the record
     windows = service.settings_of(db, tenant_id)["windows"]
-    aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
-    clock = markets.market_clock(market, conclusion, report_type, windows, aware, today, seen.get("org_zone"))
+    clock = markets.market_clock(
+        market, conclusion, report_type, windows, aware, today, seen.get("org_zone"), floor=floor
+    )
+    _record_floor(draft, market, floor, answers, clock, aware, seen)
     material = {
         "complaint_id": str(complaint_id),
         "complaint": ref,
@@ -553,6 +641,17 @@ def sign_conclusion(
         "training": [document.as_dict() for document in needed if document not in untrained],
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,
+        # B4 (R-D14): the floor version and its content hash, the rules applied and the date calculation are signed
+        # too, only while the register is on; the signature meaning text is unchanged.
+        **(
+            {
+                "floor": {"code": floor["code"], "content_hash": floor["content_hash"]},
+                "rules_applied": draft.rules_applied,
+                "date_calc": draft.date_calc,
+            }
+            if floor
+            else {}
+        ),
     }
     content_fingerprint = fingerprint(material)
     object_version = str(draft.version)
@@ -590,6 +689,7 @@ def sign_conclusion(
                 "change_reason": change_reason or None,
                 "version": draft.version,
                 "question_set": draft.question_set,
+                **({"floor_code": floor["code"]} if floor else {}),
                 "scale_version": draft.scale_version,
                 "suggested": evaluation["suggested"],
                 "conclusion": conclusion,

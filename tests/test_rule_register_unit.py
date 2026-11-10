@@ -173,3 +173,39 @@ def test_the_eu_floor_is_picked_on_the_brussels_day_across_summer_time(use):
     assert register.floor_at("EU_NI", datetime(2027, 3, 31, 21, 30, tzinfo=timezone.utc))["code"] == "EU-floor-1"
     assert register.floor_at("EU_NI", datetime(2027, 3, 31, 22, 30, tzinfo=timezone.utc))["code"] == "EU-floor-2"
     assert register.floor_at("EU_NI", None)["code"] == "EU-floor-1"  # today (before 2027)
+
+
+def _tier(aware) -> dict:
+    from backend.app.intake import rules as intake
+
+    found = intake.provisional_deadlines(aware, ["US", "EU_NI"], intake.FLAGGED, aware, own="US", org_zone="UTC")
+    return {item["market"]: (item["days"], item["due_date"]) for item in found}
+
+
+def test_triage_provisional_deadlines_follow_the_floor_at_awareness(use, us1):
+    """ED-8, ED-10, ED-11, RR-08, RR-12: a law change after awareness does not move the provisional deadline; a
+    correction that shortens a tier moves it at the next read; the EU never moves for a US change."""
+    aware = datetime(2027, 2, 20, 12, tzinfo=timezone.utc)
+    use([_version(us1, 1, None, None, kind="INITIAL")])
+    before = _tier(aware)
+    assert before["US"][0] == 30
+    shorter = {**us1["content"]["provisional"], "FLAGGED": [20, "CALENDAR", "20 days (test only)"]}
+    use(
+        [
+            _version(us1, 1, None, "2027-03-01", kind="INITIAL"),
+            _version(us1, 2, "2027-03-01", None, provisional=shorter),
+        ]
+    )
+    assert _tier(aware) == before  # ED-10: awareness before v2's day
+    assert _tier(datetime(2027, 3, 2, 12, tzinfo=timezone.utc))["US"][0] == 20
+    use(
+        [
+            _version(us1, 1, None, None, kind="INITIAL"),
+            _version(us1, 3, None, None, kind="CORRECTION", corrects="US-floor-1", provisional=shorter),
+            register._load(str(register.DATA))["EU-floor-1"],
+        ]
+    )
+    after = _tier(aware)
+    assert after["US"] == (20, "2027-03-12") and after["US"][1] < before["US"][1]  # ED-11
+    assert after["EU_NI"] == before["EU_NI"]  # ED-8
+    assert register.floor_at("EU_NI", aware)["code"] == "EU-floor-1"

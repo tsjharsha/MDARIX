@@ -184,6 +184,10 @@ def test_the_routine_complaint_closes_at_service_level_on_one_screen_with_one_si
             (market, "ROUTINE-BASIS", "NOT_REPORTABLE") for market in ("CA", "EU_NI", "GB", "IN", "US")
         ]
         assert {row.signed_record_id for row in markets} == {record.id}
+        # B4 (ED-15, RR-16): each market row keeps the floor in force on its awareness day and the routine basis.
+        assert [(row.floor_code, row.rules_applied["rules"][0]["id"]) for row in markets] == [
+            (f"{prefix}-floor-1", "routine-basis-1") for prefix in ("CA", "EU", "GB", "IN", "US")
+        ]
         bind_system(db, "test: the audit trail")
         actions = [
             row.details
