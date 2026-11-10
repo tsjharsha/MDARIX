@@ -10,6 +10,17 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.96] - not released yet (ships in the big-bang release)
+
+B3: the US eMDR complete for manufacturers (initial report). No migration. The API and web images change.
+
+### Tests
+
+- FDA's "Manufacturer Follow-up" example and FDA's PDFs of the "Manufacturer Initial - Typical" and "Manufacturer
+  Follow-up" examples (eMDR Implementation Package, files dated 5 Aug 2024) are kept byte-identical in
+  `tests/fixtures/emdr_examples` with their SHA-256s. FDA's follow-up example validates against FDA's schema
+  (`Con170227.xsd`), the one MDARIX validates with.
+
 ## [0.10.95] - not released yet (ships in the big-bang release)
 
 Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migration. The API image changes.

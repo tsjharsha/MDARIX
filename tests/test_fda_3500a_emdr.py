@@ -478,11 +478,37 @@ def test_fdas_user_facility_initial_example_matches_in_the_blocks_a_manufacturer
     ), sorted(extra)
 
 
-@pytest.mark.parametrize("name", ["Manufacturer Initial - Typical.xml", "User Facility Initial.xml"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Manufacturer Initial - Typical.xml",
+        "Manufacturer Initial - Typical.pdf",
+        "Manufacturer Follow-up.xml",
+        "Manufacturer Follow-up.pdf",
+        "User Facility Initial.xml",
+    ],
+)
 def test_the_examples_kept_here_are_fdas_files(name):
     manifest = json.loads((EXAMPLES / "manifest.json").read_text(encoding="utf-8"))
-    assert hashlib.sha256((EXAMPLES / name).read_bytes()).hexdigest() == manifest[name]
-    assert re.search(rb"V3NORMED_2016", (EXAMPLES / name).read_bytes())
+    data = (EXAMPLES / name).read_bytes()
+    assert hashlib.sha256(data).hexdigest() == manifest[name]
+    assert re.search(rb"V3NORMED_2016", data) if name.endswith(".xml") else data.startswith(b"%PDF-")
+    # Every file in the folder is one of FDA's, named in the manifest.
+    assert {path.name for path in EXAMPLES.iterdir()} - {"manifest.json"} == set(manifest) - {"note"}
+
+
+def test_fdas_follow_up_example_validates_against_fdas_schema():
+    # The follow-up (supplemental) report FDA publishes passes the schema MDARIX validates with, so a follow-up built
+    # the same way (G6 "Follow-up" with its number, H2 types, nullFlavor in the parts the schema needs) will too.
+    data = (EXAMPLES / "Manufacturer Follow-up.xml").read_bytes()
+    assert emdr.validate(data) == []
+    doc = _plain(data)
+    assert doc.xpath(IE + "/id/@extension") == ["1234567-2023-00001"]  # the initial report's number (G8)
+    g6 = "//message/controlActProcess/reasonOf/detectedIssueEvent[code/@code='C53571']"
+    assert doc.xpath(g6 + "/value/@code") == ["C53577", "C53579"]  # G6: 30-day, and Follow-up
+    assert doc.xpath(g6 + "[value/@code='C53579']/text/text()") == ["1"]  # the follow-up's number
+    h2 = "//message/controlActProcess/reasonOf/detectedIssueEvent[code/@code='C53584']/value/@code"
+    assert doc.xpath(h2) == ["C53585", "C53586"]  # H2: two follow-up types ticked
 
 
 # --------------------------------------------------------------------------------------------- B1 (0.10.89)

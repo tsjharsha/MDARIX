@@ -1,5 +1,8 @@
 {
-  "note": "Two of FDA's example eMDR files (eMDR Implementation Package, MDR examples, files dated 5 Aug 2024), byte-identical, for tests/test_fda_3500a_emdr.py.",
+  "note": "FDA's example eMDR files (eMDR Implementation Package, MDR examples, files dated 5 Aug 2024), byte-identical, for tests/test_fda_3500a_emdr.py and the 0.10.96 eMDR tests. The PDFs are FDA's own renders of the two manufacturer examples; MDARIX's eSubmitter-layout PDF is compared with their blocks and order.",
   "Manufacturer Initial - Typical.xml": "525131c1a0a1b182e07ad4c051c62aed6130ee2ff3cd5f04769e4c72d3b93f3d",
+  "Manufacturer Initial - Typical.pdf": "e22d6ecbefe14f99bc7bf47ac11c5ff632d901007d69b5dc94dbebfa45e78f1f",
+  "Manufacturer Follow-up.xml": "c363dc90936bc8241b7ae02bcb41d1ab3f56baa34c14c0cd44979486c4ab3302",
+  "Manufacturer Follow-up.pdf": "930ec92503439e099990ceab455ff2d76140222ff8870edaf3e429c7ee291eed",
   "User Facility Initial.xml": "f318b119b4323fcee037e6541babc16143796650f0fbde93e280fa03cd973d9b"
 }
