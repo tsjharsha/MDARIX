@@ -616,7 +616,6 @@ def sign(
 ):
     actor = session_actor(db, ctx)
     t = tenant(db, actor)
-    audit(db, t, actor["user_id"], "APPROVAL_REQUESTED", decision_id)
     if any(is_administrator_role(role) for role in actor["roles"]):
         # Administrators never sign, whatever the plan or any authority says: refuse with that reason first.
         code, message = ADMINISTRATOR_CANNOT_SIGN
@@ -657,6 +656,8 @@ def sign(
         mfa_code=payload.mfa_code,
         record_refusal=lambda action: audit(db, t, actor["user_id"], action, decision_id),
     )
+    # Written once every check passed: a refused attempt leaves only its refusal event.
+    audit(db, t, actor["user_id"], "APPROVAL_REQUESTED", decision_id)
     material = {
         "decision_id": str(item.id),
         "version": version,
