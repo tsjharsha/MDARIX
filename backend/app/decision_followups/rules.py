@@ -47,6 +47,13 @@ TRIGGER_LABELS: dict[str, str] = {
     "EVIDENCE_REVIEWED": "Evidence reviewed",
     "EVIDENCE_REQUEST_ACCEPTED": "Evidence request answer accepted",
     "EVIDENCE_INGESTED": "Evidence received for the investigation",
+    # B5 reopen triggers (closed_loop/triggers.py): each only asks a person whether the decision still holds.
+    "CAPA_NOT_EFFECTIVE": "A CAPA from the decision was signed not effective",
+    "LATER_COMPLAINTS_MORE": "More complaints after the action",
+    "RECURRENCE_AFTER_EFFECTIVE": "Complaints again after the CAPA was signed effective",
+    "PROBLEM_ON_NEW_VERSION": "The same problem on the new version",
+    "COMPLAINT_ON_ACTIONED_LOT": "A complaint on a lot covered by a field action",
+    "LATER_SERIOUS_HARM": "A later complaint reports death or serious injury",
 }
 CONCLUSION_LABELS: dict[str, str] = {
     "NO_IMPACT": "No impact on the decision",

@@ -66,6 +66,64 @@ def _owner_id(control_db, case):
     return user.id if user is not None else None
 
 
+def open_assessment(
+    db: Session,
+    control_db,
+    case: Investigation,
+    decision: Decision,
+    *,
+    trigger: str,
+    title: str,
+    actor_ref: str,
+    evidence_id=None,
+    correlation_id: str | None = None,
+    now=None,
+) -> tuple[ImpactAssessment, object, str | None]:
+    """An OPEN impact assessment of ``decision`` and its IMPACT_ASSESSMENT task for the case owner (else the
+    investigators' queue): ``(assessment, task, acting role)``. The caller checks it is needed and audits it."""
+    now = now or rules.now_utc()
+    row = ImpactAssessment(
+        id=uuid.uuid4(),
+        tenant_id=case.tenant_id,
+        investigation_id=case.id,
+        decision_id=decision.id,
+        trigger=str(trigger).upper()[:40],
+        evidence_id=evidence_id,
+        status="OPEN",
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(row)
+    db.flush()
+    from backend.app.workflow.people import acting_role
+
+    role = acting_role(control_db, case.tenant_id, actor_ref, rules.INVESTIGATION_WORK)
+    task = task_service.create_task(
+        db,
+        case.tenant_id,
+        task_type=rules.IMPACT_TASK,
+        title=title[:300],
+        source_type=rules.IMPACT_SOURCE_TYPE,
+        source_id=row.id,
+        investigation_id=case.id,
+        assigned_user_id=_owner_id(control_db, case),
+        # Declining or releasing the owner's task hands it to the investigators' queue.
+        assigned_role=TASK_TYPES[rules.IMPACT_TASK].queue_role,
+        priority=case.priority or "MEDIUM",
+        created_by=str(actor_ref),
+        actor_role=role,
+        correlation_id=correlation_id,
+        details={
+            "impact_assessment_id": str(row.id),
+            "decision_id": str(decision.id),
+            "evidence_id": str(evidence_id) if evidence_id else None,
+            "trigger": row.trigger,
+        },
+    )
+    row.task_id = task.id
+    return row, task, role
+
+
 def on_late_evidence(
     db: Session,
     control_db,
@@ -103,48 +161,21 @@ def on_late_evidence(
     if known is not None:
         return None
     now = rules.now_utc()
-    row = ImpactAssessment(
-        id=uuid.uuid4(),
-        tenant_id=case.tenant_id,
-        investigation_id=case.id,
-        decision_id=decision.id,
-        trigger=str(trigger or "EVIDENCE_INGESTED").upper()[:40],
-        evidence_id=evidence.id,
-        status="OPEN",
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(row)
-    db.flush()
-    from backend.app.workflow.people import acting_role
-
-    role = acting_role(control_db, case.tenant_id, actor_ref, rules.INVESTIGATION_WORK)
-    task = task_service.create_task(
+    row, task, role = open_assessment(
         db,
-        case.tenant_id,
-        task_type=rules.IMPACT_TASK,
+        control_db,
+        case,
+        decision,
+        trigger=str(trigger or "EVIDENCE_INGESTED"),
         title=(
             f"Assess late evidence {evidence.business_id} on {case.business_id}: does it change decision "
             f"{decision.business_id}?"
         ),
-        source_type=rules.IMPACT_SOURCE_TYPE,
-        source_id=row.id,
-        investigation_id=case.id,
-        assigned_user_id=_owner_id(control_db, case),
-        # Declining or releasing the owner's task hands it to the investigators' queue.
-        assigned_role=TASK_TYPES[rules.IMPACT_TASK].queue_role,
-        priority=case.priority or "MEDIUM",
-        created_by=str(actor_ref),
-        actor_role=role,
+        actor_ref=actor_ref,
+        evidence_id=evidence.id,
         correlation_id=correlation_id,
-        details={
-            "impact_assessment_id": str(row.id),
-            "decision_id": str(decision.id),
-            "evidence_id": str(evidence.id),
-            "trigger": row.trigger,
-        },
+        now=now,
     )
-    row.task_id = task.id
     common.audit(
         db,
         tenant_id=case.tenant_id,
@@ -311,7 +342,12 @@ def run_for_all_tenants(control_db: Session) -> dict:
         try:
             with open_tenant_data_session(tenant_id) as data:
                 try:
-                    made = sweep_tenant(data, control_db, tenant_id)
+                    from backend.app.closed_loop import triggers
+
+                    # B5 reopen triggers ride the same hourly pass; they too only ask a person (B5-D7).
+                    made = sweep_tenant(data, control_db, tenant_id) + triggers.sweep_tenant(
+                        data, control_db, tenant_id
+                    )
                     data.commit()
                 except Exception:
                     data.rollback()
@@ -567,6 +603,7 @@ def complete_impact_assessment(
 
 __all__ = [
     "router",
+    "open_assessment",
     "on_late_evidence",
     "after_late_evidence",
     "late_evidence",

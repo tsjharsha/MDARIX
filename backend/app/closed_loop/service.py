@@ -27,6 +27,7 @@ from backend.app.db.models.decision_outcomes import DecisionFollowUp
 from backend.app.db.models.foundation import Capa, Complaint, Decision
 from backend.app.db.models.lot_impact import LotDistribution
 from backend.app.db.models.reviews import DecisionBriefVersion
+from backend.app.trial.sample_source import SAMPLE_SOURCE, is_sample
 
 # The complaints a count opens, at most (the count says how many there are).
 REFS_MAX = 200
@@ -200,6 +201,18 @@ def _refs(items: list[dict]) -> list[dict]:
     return [{"id": item["id"], "ref": item["ref"]} for item in items[:REFS_MAX]]
 
 
+def _later(item: dict, versions: dict) -> dict:
+    return {
+        **_refs([item])[0],
+        "version_id": item["version_id"],
+        "version": versions.get(item["version_id"], {}).get("ref"),
+        "lot_id": item["lot_id"],
+        "event_on": item["event_on"],
+        "harm": item["harm"],
+        "origin": item["origin"],
+    }
+
+
 def _group(name: str, before: list[dict], after: list[dict], window: dict, lots_before, lots_after, extra=None) -> dict:
     found = rules.compare(len(before), len(after), window, lots_before, lots_after)
     return {
@@ -268,15 +281,11 @@ def did_it_work(db: Session, case, today: date, *, lot_rows: bool) -> dict:
     decided_on = _day(decision.decided_at)
     windows = {id(item): rules.windows(item["on"], today, rules.SETTLING_DAYS[item["kind"]]) for item in actions}
     earliest = min([w["before"][0] for w in windows.values()] + [decided_on])
-    complaints = (
-        facts_module._complaints(
-            db,
-            case.tenant_id,
-            [Complaint.product_id == case.product_id, Complaint.problem_code.in_(problems), EVENT_AT >= earliest],
-        )
-        if problems
-        else []
-    )
+    where = [Complaint.product_id == case.product_id, Complaint.problem_code.in_(problems), EVENT_AT >= earliest]
+    if not is_sample(case.source_system):
+        # R6: sample complaints never count in a customer's numbers.
+        where.append(Complaint.source_system.is_distinct_from(SAMPLE_SOURCE))
+    complaints = facts_module._complaints(db, case.tenant_id, where) if problems else []
     later = [item for item in complaints if item["event_on"] and item["event_on"] > decided_on]
     later_known = [item for item in later if item["version_id"] in followed]
     later_unknown = [item for item in later if item["version_id"] is None]
@@ -375,17 +384,11 @@ def did_it_work(db: Session, case, today: date, *, lot_rows: bool) -> dict:
         },
         "later": {
             "count": len(later_known),
-            "complaints": [
-                {
-                    **_refs([item])[0],
-                    "version": versions.get(item["version_id"], {}).get("ref"),
-                    "event_on": item["event_on"],
-                    "harm": item["harm"],
-                    "origin": item["origin"],
-                }
-                for item in later_known[:REFS_MAX]
-            ],
-            "version_unknown": {"count": len(later_unknown), "complaints": _refs(later_unknown)},
+            "complaints": [_later(item, versions) for item in later_known[:REFS_MAX]],
+            "version_unknown": {
+                "count": len(later_unknown),
+                "complaints": [_later(item, versions) for item in later_unknown[:REFS_MAX]],
+            },
         },
         "capas": capas,
         "field_actions": field_actions,

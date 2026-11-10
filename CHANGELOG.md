@@ -52,6 +52,11 @@ not built yet, and the chain is re-ordered at the release join). The API and web
   "Fewer", "More", "No change seen", never "effective". Per-lot rows in a free trial only (B5-D9).
 - Completing a follow-up can record the customer's reference; a field action its kind, effective date, lots and
   versions; a product change its new version (checked against the investigation's product). Off, refused.
+- Reopen triggers in the hourly late-evidence pass: `CAPA_NOT_EFFECTIVE`, `LATER_COMPLAINTS_MORE`,
+  `RECURRENCE_AFTER_EFFECTIVE`, `PROBLEM_ON_NEW_VERSION`, `COMPLAINT_ON_ACTIONED_LOT`, `LATER_SERIOUS_HARM`. Each opens
+  an impact assessment and its task for the investigation owner, once per decision, trigger and group, audited
+  `REOPEN_TRIGGER_FIRED` with the counts and records as at firing. MDARIX never reopens or changes a decision; a
+  superseded decision is never read; sample complaints never count on a customer's investigation.
 
 ## [0.10.97] - not released yet (after the WHIF freeze)
 
