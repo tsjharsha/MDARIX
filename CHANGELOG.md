@@ -42,10 +42,24 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   urgent e-mail when switched on.
 - Cases › First contact shows "E-mail to check" (flat cards): Make it a case (Log a case pre-filled; channel E-mail,
   the Message-ID as reference, Received = our server's receipt), Add to the Case, Not a case with a reason (on harm
-  or fault words only a quality reviewer), the original message for the contact roles (audited). "Not a case" is
+  or fault words only a quality reviewer, and outside a trial not the one who opened it first: refused
+  `SAME_PERSON`, audited `EMAIL_NOT_A_CASE_REFUSED`), the original message for the contact roles (audited). The first
+  person to see a message to check is recorded as its opener. "Not a case" is
   purged 30 days after the decision on the 15-minute pass. A free trial gets one SAMPLE e-mail, no real address.
 - Address API for the Customer Admin (`GET`/`PUT /api/v1/email-intake/settings`, `POST .../settings/rotate`: the old
-  address works 30 days). No screen yet.
+  address works 30 days), and its screen: Customer administration › Organization › **E-mail intake** (the address
+  with Copy, on/off, Rotate, allowed sender domains, messages a day, how to forward a mailbox). Shown only while
+  e-mail intake is on; a free trial is pointed to its SAMPLE e-mail.
+
+### Added (B7a on/off switch)
+
+- `MDARIX_ROUTINE_PATH`, on unless `off`, so B7a can be turned off without a rollback. Off: Resolve and close, the
+  Cases exports, adding a file to a Case and `PUT /oversight/settings/alerts-and-files` answer 404; the session's
+  `routine_path` is false and the screens hide (the Dispositions drawer opens the disposition as before, no exports,
+  no upload, no Alerts and files tab, no routine sample under "More cases to try", no "Resolve and close" next step);
+  the Cases import template is not offered; no urgent e-mail is queued; the closure checklist has no "customer told"
+  item. Records already signed stay readable, files already on a Case stay readable, and a complaint MDARIX closed
+  can still reopen.
 
 ### Added
 
