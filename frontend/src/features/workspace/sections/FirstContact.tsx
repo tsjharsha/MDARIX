@@ -18,6 +18,8 @@ import {
   NEW_IDENTIFIER,
   answerChoices,
   identifierChip,
+  shipmentPick,
+  typedOver,
   blankAnswers,
   daysEarlier,
   startingZone,
@@ -33,6 +35,8 @@ import {
   type Identifiers,
   type Outcome,
   type Choice,
+  type ShippedItem,
+  type ShippedTo,
   clockTone,
 } from "../intake";
 
@@ -251,6 +255,54 @@ function IdentifierField({
   );
 }
 
+/** ID-2: "Products and lots shipped to this hospital", from the organization's shipment records, above the free
+ * picker. Nothing shows when the site matches no shipment or the read fails: the free picker is never blocked. */
+export function ShippedPicker({ site, onPick }: { site: string; onPick: (item: ShippedItem) => void }) {
+  const asked = site.trim();
+  const shipped = useResource<ShippedTo>(asked ? `${INTAKE}/shipped-to?site=${encodeURIComponent(asked)}` : null);
+  const [chosen, setChosen] = useState("");
+  const data = shipped.data;
+  if (!asked || shipped.state !== "ready" || !data?.items.length) return null;
+  const several = data.sites.length > 1;
+  const at = several ? chosen : data.sites[0].site;
+  // Newest shipment of each lot at that site.
+  const items = data.items.filter(
+    (item, index, all) =>
+      item.site === at && all.findIndex((other) => other.site === at && other.lot === item.lot) === index,
+  );
+  return (
+    <div className="ca-field ca-wide" role="group" aria-label="Products and lots shipped to this hospital">
+      <span>Products and lots shipped to this hospital</span>
+      {several && (
+        <select aria-label="Which site" value={chosen} onChange={(event) => setChosen(event.target.value)}>
+          <option value="">Several sites have this name: choose one</option>
+          {data.sites.map((item) => (
+            <option key={item.site} value={item.site}>
+              {item.consignee} ({item.country})
+            </option>
+          ))}
+        </select>
+      )}
+      <div className="ca-action-row">
+        {items.map((item) => (
+          <button
+            key={`${item.lot}|${item.ship_date}`}
+            type="button"
+            className="ac-secondary"
+            onClick={() => onPick(item)}
+          >
+            {[item.product_name, item.version].filter(Boolean).join(" ") || "Product not loaded"} · lot {item.lot} ·
+            shipped {formatDate(item.ship_date)}
+          </button>
+        ))}
+      </div>
+      <small className="uw-cr-meta">
+        From your shipment records: filled in as unconfirmed. You can still choose anything below, or Not sure.
+      </small>
+    </div>
+  );
+}
+
 function LogDrawer({
   kind: startKind,
   guide,
@@ -302,6 +354,9 @@ function LogDrawer({
     tried: "",
   });
   const [typeProduct, setTypeProduct] = useState(false);
+  // ID-2: the site asked for shipments (when the person leaves the field) and the shipment chosen from them.
+  const [siteAsked, setSiteAsked] = useState("");
+  const [picked, setPicked] = useState<ShippedItem | null>(null);
   const [earlier, setEarlier] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -510,7 +565,11 @@ function LogDrawer({
             </label>
             <label className="ca-field">
               Site or organisation (no person's name)
-              <input value={form.site} onChange={(event) => set({ site: event.target.value })} />
+              <input
+                value={form.site}
+                onChange={(event) => set({ site: event.target.value })}
+                onBlur={() => setSiteAsked(form.site)}
+              />
             </label>
             <label className="ca-field">
               Reporter's country
@@ -521,6 +580,14 @@ function LogDrawer({
         <details className="ca-drawer-section uw-more" open>
           <summary>Product</summary>
           <div className="ca-form-grid">
+            <ShippedPicker
+              site={siteAsked}
+              onPick={(item) => {
+                setTypeProduct(false);
+                setPicked(item);
+                set(shipmentPick(item, form.ids));
+              }}
+            />
             <IdentifierField {...idProps("product")} value={typeProduct ? form.productText : form.product}>
               {typeProduct ? (
                 <input
@@ -529,7 +596,16 @@ function LogDrawer({
                   onChange={(event) => set({ productText: event.target.value })}
                 />
               ) : (
-                <select value={form.product} onChange={(event) => set({ product: event.target.value })}>
+                <select
+                  value={form.product}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      product: event.target.value,
+                      ids: picked ? typedOver(current.ids, "product") : current.ids,
+                    }))
+                  }
+                >
                   <option value="">Not named</option>
                   {work.products.map((product) => (
                     <option key={product.id} value={product.id}>
@@ -539,10 +615,22 @@ function LogDrawer({
                 </select>
               )}
             </IdentifierField>
-            <IdentifierField {...idProps("version")} value="">
-              <small className="uw-cr-meta">From the lot, when the lot is loaded</small>
+            <IdentifierField {...idProps("version")} value={picked?.version ?? ""}>
+              <small className="uw-cr-meta">{picked?.version ?? "From the lot, when the lot is loaded"}</small>
             </IdentifierField>
-            <IdentifierField {...idProps("lot")} value={form.lot} onValue={(lot) => set({ lot })} />
+            <IdentifierField
+              {...idProps("lot")}
+              value={form.lot}
+              onValue={(lot) => {
+                // A lot typed over the pick: the lot and its version are no longer from the shipment record.
+                setForm((current) => ({
+                  ...current,
+                  lot,
+                  ids: picked ? typedOver(current.ids, "lot", "version") : current.ids,
+                }));
+                setPicked(null);
+              }}
+            />
             <IdentifierField {...idProps("serial")} value={form.serial} onValue={(serial) => set({ serial })} />
             <IdentifierField {...idProps("udi")} value={form.udi} onValue={(udi) => set({ udi })} />
             <IdentifierField
@@ -561,7 +649,14 @@ function LogDrawer({
               onValue={(firmware) => set({ firmware })}
             />
           </div>
-          <button type="button" className="ac-link" onClick={() => setTypeProduct((typed) => !typed)}>
+          <button
+            type="button"
+            className="ac-link"
+            onClick={() => {
+              setTypeProduct((typed) => !typed);
+              if (picked) setForm((current) => ({ ...current, ids: typedOver(current.ids, "product") }));
+            }}
+          >
             {typeProduct ? "Choose from your products" : "Not in your products: type it"}
           </button>
           <p className="uw-cr-meta">A lot not in your lots is kept as typed and flagged.</p>

@@ -27,6 +27,10 @@ trials' existing Cases; nothing is written until the owner approves the list), t
   to the patient, what was tried on the call, and a service issue category. A Case has one state at a time (To check,
   Waiting for the reporter, Waiting for internal team, QA review, Closed, Complaint, Withdrawn), an owner, a next
   action, a due date and the information still missing.
+- **Products and lots shipped to this hospital** (ID-2): when the caller's site matches a consignee in your shipment
+  records (exact name or customer reference), Log a case offers the products, versions and lots shipped there as a
+  quick picker; choosing one fills them as unconfirmed, source "Shipment record". No match: the usual picker, never
+  blocked.
 - **The Cases list** (Complaints › Cases): pages on the server, views (My Cases, Unassigned, Needs more information,
   Critical or High, Overdue, Awaiting customer, Awaiting Quality, Service only, Potential complaints), search by
   reference, product, serial number or customer, and bulk assign. Measured at 5,000 Cases within the one-second budget.

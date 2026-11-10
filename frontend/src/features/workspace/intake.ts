@@ -606,6 +606,42 @@ export function identifierChip(
     : { label: "Unconfirmed", tone: "warning" };
 }
 
+/** ID-2: one shipment to the caller's hospital (GET /intake/shipped-to, intake.service.shipped_to). */
+export type ShippedItem = {
+  site: string;
+  consignee: string;
+  country: string;
+  ship_date: string;
+  quantity: number;
+  lot: string;
+  version: string | null;
+  product_id: string | null;
+  product_name: string | null;
+};
+export type ShippedTo = {
+  sites: { site: string; consignee: string; country: string }[];
+  items: ShippedItem[];
+  truncated: boolean;
+};
+const FROM_SHIPMENT: IdentifierEntry = { not_sure: false, status: "UNCONFIRMED", source: "SHIPMENT_RECORD" };
+
+/** ID-2: choosing a shipment fills the lot, and the product and version it names, each unconfirmed, source: shipment
+ * record. The person can still change anything. */
+export function shipmentPick(item: ShippedItem, ids: Identifiers): { product?: string; lot: string; ids: Identifiers } {
+  const picked: Identifiers = { ...ids, lot: FROM_SHIPMENT };
+  if (item.product_id) picked.product = FROM_SHIPMENT;
+  if (item.version) picked.version = FROM_SHIPMENT;
+  return { ...(item.product_id ? { product: item.product_id } : {}), lot: item.lot, ids: picked };
+}
+
+/** A value typed over a shipment pick is no longer from the shipment record: its entry goes back to the default (a
+ * "Not sure" the person ticked stays). */
+export function typedOver(ids: Identifiers, ...codes: string[]): Identifiers {
+  const kept = { ...ids };
+  for (const code of codes) if (kept[code]?.source === "SHIPMENT_RECORD" && !kept[code].not_sure) delete kept[code];
+  return kept;
+}
+
 // ------------------------------------------------------------------ the Cases list (A5) and the Case header (A3)
 
 export type CaseHeader = {
