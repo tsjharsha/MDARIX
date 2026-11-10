@@ -21,6 +21,14 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
   `tests/fixtures/emdr_examples` with their SHA-256s. FDA's follow-up example validates against FDA's schema
   (`Con170227.xsd`), the one MDARIX validates with.
 
+### Changed
+
+- The blocks that stop a US eMDR file are read from the rule book: the mapping workbook's US manufacturer rows,
+  exported to `backend/app/authority_reports/rules/us_emdr.csv` by `scripts/export_us_emdr_rules.py` (decision D17).
+  An initial report needs FDA's 12 required blocks (B5, D2 procode, G1 email, G8, H1, the seven H6 code kinds), a
+  follow-up needs G6 "Follow-up" with its number, and G8. The sheet already carries spot-check fixes 1 (H1's codes)
+  and 3 (B4 is "required if known"; MDARIX fills it), approved by the owner on 10 Nov 2026 (Q8).
+
 ## [0.10.95] - not released yet (ships in the big-bang release)
 
 Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migration. The API image changes.

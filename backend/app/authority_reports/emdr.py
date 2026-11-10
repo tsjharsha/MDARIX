@@ -10,8 +10,9 @@ the manufacturer (D3) come from the organization's US responsible party in Setti
 reads exactly as the approved report does. IDs: the report number is G8; the batch ID is the establishment
 registration number that starts G8 with the time the file is made; the message is number 1 of 1. Nothing is invented:
 
-- ``check`` names every block FDA requires for an initial manufacturer report (B5, D2 procode, G1 email, G8, H1
-  and the seven H6 code kinds; FDA's "Required 3500A fields"), and B1, which FDA's schema needs, that is missing or
+- ``check`` names every block FDA requires for the report type, as the rule book (rules/us_emdr.csv) lists them
+  (initial: B5, D2 procode, G1 email, G8, H1 and the seven H6 code kinds; follow-up: G6 with its number and G8;
+  FDA's "Required 3500A fields"), and B1, which FDA's schema needs on an initial report, that is missing or
   does not fit FDA's format, and every required value longer than FDA's field or outside FDA's character set
   (Windows-1252). Any of these blocks the file.
 - ``left_out`` names approved values the file does not carry (not one of FDA's choices, too long for an optional
@@ -20,6 +21,7 @@ registration number that starts G8 with the time the file is made; the message i
 
 from __future__ import annotations
 
+import csv
 import re
 from datetime import datetime
 from functools import lru_cache
@@ -56,6 +58,35 @@ LENGTHS = {
 }
 _REQUIRED_TEXT = {"B5", "D2A"}  # and G8, which follows the front page's number
 _DATES = {"B3", "B4", "D4_EXPIRY", "D6A", "D6B", "G3", "H4"}
+# The rule book (decision D17): the manufacturer rows of the mapping workbook's US sheet, exported by
+# scripts/export_us_emdr_rules.py. Its block numbers are FDA's package's (D2B is the procode); the report's fields
+# follow the 09/2025 form (D2A is the procode). A required row with no field here fails at the first check.
+RULES = Path(__file__).with_name("rules") / "us_emdr.csv"
+RULE_FIELDS = {
+    ("B5", "Describe event or problem"): "B5",
+    ("D2B", "Procode"): "D2A",
+    ("G1", "Manufacturer Contact Email"): "G1",
+    ("G6", "Type of report"): "G6",
+    ("G8", "MFR Report #"): "G8",
+    ("H1", "Type of reportable event"): "H1",
+    ("H6", "Health Effect - Clinical Code"): "H6_CLINICAL",
+    ("H6", "Health Effect - Impact Code"): "H6_IMPACT",
+    ("H6", "Medical Device Problem Code"): "H6_PROBLEM",
+    ("H6", "Component Code"): "H6_COMPONENT",
+    ("H6", "Type of Investigation"): "H6_TYPE",
+    ("H6", "Investigation Findings"): "H6_FINDINGS",
+    ("H6", "Investigation Conclusions"): "H6_CONCLUSIONS",
+}
+KINDS = {"M-I": "m_i", "M-F": "m_f"}  # manufacturer initial, manufacturer follow-up
+FOLLOW_UP = re.compile(r"\bfollow-up #?(\d+)\b", re.IGNORECASE)  # G6 on a follow-up: "30-day; Follow-up #2"
+
+
+@lru_cache(maxsize=len(KINDS))
+def required(kind: str = "M-I") -> frozenset[str]:
+    """The report's fields FDA requires on this report type (its "Required 3500A fields"), read from the rule book."""
+    with RULES.open(encoding="utf-8", newline="") as handle:
+        rows = [row for row in csv.DictReader(handle) if row[KINDS[kind]] == "required"]
+    return frozenset(RULE_FIELDS[row["block"], row["label"]] for row in rows)
 
 
 def office(parties, roles: tuple[str, ...], text: str | None) -> dict | None:
@@ -76,26 +107,35 @@ def office(parties, roles: tuple[str, ...], text: str | None) -> dict | None:
     }
 
 
-def check(sections: list[dict], parties) -> tuple[list[str], list[str]]:
-    """What stops the eMDR file (missing or not in FDA's format), and the approved values it leaves out."""
+def check(sections: list[dict], parties, kind: str = "M-I") -> tuple[list[str], list[str]]:
+    """What stops the eMDR file (missing or not in FDA's format), and the approved values it leaves out.
+
+    ``kind`` is the report type (M-I manufacturer initial, M-F manufacturer follow-up): the blocks FDA requires on it
+    come from the rule book (``required``); the format of any value given is checked on both."""
     vals, names = fda.values(sections), fda.labels(sections)
     name = lambda key: names.get(key, key)  # noqa: E731
+    need = required(kind)
     missing: list[str] = []
     left: list[str] = []
-    for key in sorted(_REQUIRED_TEXT - set(vals)):
+    for key in sorted(_REQUIRED_TEXT & need - set(vals)):
         missing.append(f"{name(key)}: missing")
     number = vals.get("G8") or vals.get("MFR_REPORT")
     if not number:
-        missing.append(f"{name('G8')}: missing")
+        if "G8" in need:
+            missing.append(f"{name('G8')}: missing")
     elif not REPORT_NUMBER.match(number):
         missing.append(
             f"{name('G8')}: FDA's format is your 7-digit CFN or 10-digit FEI, the year and a 5-digit number "
             "(1234567-2026-00001)"
         )
+    if "G6" in need and not FOLLOW_UP.search(vals.get("G6", "")):
+        missing.append(f"{name('G6')}: Follow-up with its number (Follow-up #1)")
     if vals.get("D2A") and not re.fullmatch(r"[A-Z]{3}", vals["D2A"]):
         missing.append(f"{name('D2A')}: three capital letters (FDA's product code)")
     contact = office(parties, OFFICE_ROLES, vals.get("G1"))
-    if contact is None:
+    if "G1" not in need:
+        pass
+    elif contact is None:
         missing.append(
             f"{name('G1')}: set your organization's US contact office in Settings, with an email, and approve the "
             "report again so it reads the same"
@@ -109,14 +149,15 @@ def check(sections: list[dict], parties) -> tuple[list[str], list[str]]:
             left.append(f"{name('G1')} address and contact person: FDA wants them in parts; give them in eSubmitter")
     if vals.get("D3") and office(parties, MAKER_ROLES, vals["D3"]) is None:
         left.append(f"{name('D3')}: not your organization's US manufacturer as set in Settings")
-    if not fda.choices("B1", vals.get("B1", ""))[0]:  # FDA's schema needs the report's type
+    # FDA's schema needs an initial report's type (B1); a follow-up sends only what is new.
+    if kind == "M-I" and not fda.choices("B1", vals.get("B1", ""))[0]:
         missing.append(f"{name('B1')}: adverse event, product problem or both")
     found, other = fda.choices("H1", vals.get("H1", ""))
-    if not found:
+    if not found and "H1" in need:
         missing.append(f"{name('H1')}: death, serious injury or malfunction")
     for key in REQUIRED_CODES:
         codes, uncoded = fda.fda_codes(vals.get(key, ""))
-        if not codes:
+        if not codes and key in need:
             missing.append(
                 f"{name(key)}: at least one code with its FDA code" + (" (none of these has one)" * bool(uncoded))
             )
@@ -124,7 +165,7 @@ def check(sections: list[dict], parties) -> tuple[list[str], list[str]]:
             left.append(f"{name(key)}: {'; '.join(uncoded)} (no FDA code)")
     for key, text in vals.items():
         if key in LENGTHS and len(text) > LENGTHS[key]:
-            (missing if key in _REQUIRED_TEXT else left).append(
+            (missing if key in _REQUIRED_TEXT & need else left).append(
                 f"{name(key)}: longer than FDA's {LENGTHS[key]} characters"
             )
         if key in _DATES and fda.day(text) is None:
