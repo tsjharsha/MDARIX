@@ -418,14 +418,13 @@ def require_people_access(db: Session, user: AuthUser, target: AuthUser, *, cont
     return require_customer_approved_access(db, user, target.tenant_id, PEOPLE, write=True, request=request)
 
 
-def require_self_admin_access(db: Session, user: AuthUser, tenant_id, email: str, *, request=None):
-    """A platform administrator making themselves Customer Administrator (code audit 8): of an organization that
-    already has an active one, or of a free trial, it needs PEOPLE access with changes, approved by the customer (the
-    use or the refusal is audited). Anyone else, or an organization nobody administers yet, is not asked."""
+def require_admin_change_access(db: Session, user: AuthUser, tenant_id, *, request=None):
+    """A platform administrator adding or replacing a Customer Administrator (any e-mail, their own included: code
+    audit 8 and owner decision 10 Nov) of an organization that already has an active one, or of a free trial, needs
+    PEOPLE access with changes, approved by the customer (the use or the refusal is audited). An organization nobody
+    administers yet (a new customer) is not asked."""
     from backend.app.trial.service import trial_subscription
 
-    if (email or "").strip().lower() != (user.username or "").strip().lower():
-        return None
     if other_active_customer_admins(db, tenant_id) == 0 and trial_subscription(db, tenant_id) is None:
         return None
     return require_customer_approved_access(db, user, tenant_id, PEOPLE, write=True, request=request)

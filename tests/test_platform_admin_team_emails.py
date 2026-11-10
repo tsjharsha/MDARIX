@@ -116,6 +116,10 @@ def test_suspending_and_restoring_an_administrator_tells_them_and_the_other_admi
 def test_adding_an_administrator_tells_the_others_and_the_invitation_is_its_own_email(staff, mail, company):  # noqa: F811
     tenant, organization, (ada, ben, _vic) = _organization(2)
     email = f"dev-{uuid.uuid4().hex[:8]}@synthetic.invalid"
+    # The organization has active administrators: adding one needs its People grant (0.10.95, owner decision c).
+    from tests.support_grants import grant_for
+
+    grant_for(staff, tenant, areas=("PEOPLE",))
     added = staff.post(
         f"/api/v1/platform-admin/tenants/{tenant}/customer-admins",
         json={"email": email, "display_name": "Dev Admin", "reason": REASON},

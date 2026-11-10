@@ -603,7 +603,7 @@ def replace_customer_admin(
             },
         )
     email = payload.replacement_email.strip().lower()
-    support_access.require_self_admin_access(db, platform_admin, tenant_id, email, request=request)
+    support_access.require_admin_change_access(db, platform_admin, tenant_id, request=request)
     now = datetime.now(timezone.utc)
     replacement = (
         db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id, func.lower(AuthUser.username) == email).first()

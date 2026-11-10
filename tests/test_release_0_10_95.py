@@ -96,6 +96,27 @@ def test_a_platform_admin_joins_an_administered_organization_only_with_people_ac
     assert _self_add(me, tenant).status_code == 200
 
 
+def test_any_admin_a_platform_admin_adds_to_an_administered_organization_needs_people_access():  # owner (c)
+    platform, me = authenticated_client(), _platform_admin()
+    tenant = _organization(platform)
+    _activate(_add_admin(me[0], tenant)["id"])  # a new customer: its first administrator is not asked
+    colleague = {
+        "email": f"ada-{uuid.uuid4().hex[:6]}@example.invalid",
+        "display_name": "Ada",
+        "reason": "Second admin",
+    }
+    _refused(me[0].post(f"/api/v1/platform-admin/tenants/{tenant}/customer-admins", json=colleague), tenant)
+    grant_support_access(tenant, me[1], areas=("PEOPLE",))
+    added = me[0].post(f"/api/v1/platform-admin/tenants/{tenant}/customer-admins", json=colleague)
+    assert added.status_code == 200, added.text
+    with SessionLocal() as db:
+        bind_system(db, "test: the use is in the organization's audit trail")
+        used = db.query(AuditEvent).filter(
+            AuditEvent.tenant_id == uuid.UUID(tenant), AuditEvent.action == "SUPPORT_ACCESS_USED"
+        )
+        assert used.count() >= 1
+
+
 def test_a_platform_admin_joins_a_trial_only_with_people_access():  # audit 8
     platform, me = authenticated_client(), _platform_admin()
     tenant = _organization(platform, "FREE_TRIAL")

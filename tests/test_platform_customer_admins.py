@@ -107,6 +107,10 @@ def test_the_last_active_administrator_cannot_be_suspended(platform, customer):
     refused = _status(platform, first["id"], "SUSPENDED")
     assert refused.status_code == 409 and refused.json()["detail"]["code"] == "LAST_ACTIVE_CUSTOMER_ADMIN"
 
+    # Adding to an organization that has an active administrator needs its People grant (0.10.95, owner decision c).
+    from tests.support_grants import grant_for
+
+    grant_for(platform, customer["id"], areas=("PEOPLE",))
     second = _add_admin(platform, customer["id"], "Second Admin")
     _activate(second["id"])
     suspended = _status(platform, first["id"], "SUSPENDED")
