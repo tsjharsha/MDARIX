@@ -157,7 +157,8 @@ def _versions(db: Session, tenant_id, complaint_id, market: str, lock: bool = Fa
         ComplaintMarketAssessment.market == market,
     )
     if lock:
-        query = query.with_for_update()
+        # Fresh values, not the identity map's copies read before the lock (code audit 6).
+        query = query.with_for_update().populate_existing()
     return query.order_by(ComplaintMarketAssessment.version).all()
 
 

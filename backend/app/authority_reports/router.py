@@ -146,7 +146,8 @@ def _obligation(db, tenant_id, obligation_id, *, lock: bool = False) -> ReportOb
     query = db.query(ReportObligation).filter(
         ReportObligation.tenant_id == tenant_id, ReportObligation.id == obligation_id
     )
-    found = (query.with_for_update() if lock else query).one_or_none()
+    # Fresh values under the lock, not the identity map's copies read before it (code audit 6).
+    found = (query.with_for_update().populate_existing() if lock else query).one_or_none()
     if found is None:
         raise _error(404, "REPORT_NOT_FOUND", "No such report in your organization")
     return found
@@ -156,13 +157,11 @@ def _form(obligation: ReportObligation) -> forms.Form:
     return forms.FORMS[obligation.form_code]
 
 
-def _snapshots(db, obligation: ReportObligation) -> list[ReportSnapshot]:
-    return (
-        db.query(ReportSnapshot)
-        .filter(ReportSnapshot.tenant_id == obligation.tenant_id, ReportSnapshot.obligation_id == obligation.id)
-        .order_by(ReportSnapshot.version)
-        .all()
+def _snapshots(db, obligation: ReportObligation, *, fresh: bool = False) -> list[ReportSnapshot]:
+    query = db.query(ReportSnapshot).filter(
+        ReportSnapshot.tenant_id == obligation.tenant_id, ReportSnapshot.obligation_id == obligation.id
     )
+    return (query.populate_existing() if fresh else query).order_by(ReportSnapshot.version).all()
 
 
 def _submissions(db, obligation: ReportObligation) -> list[ReportSubmission]:
@@ -1462,8 +1461,8 @@ def approve_snapshot(
         control_db, ctx, password=payload.password, mfa_code=payload.mfa_code, record_refusal=refused
     )
     obligation = _obligation(db, tenant_id, obligation_id, lock=True)
-    snapshot = next((row for row in _snapshots(db, obligation) if row.id == snapshot_id), None)
-    if snapshot is None or snapshot.state != "PENDING":
+    snapshot = next((row for row in _snapshots(db, obligation, fresh=True) if row.id == snapshot_id), None)
+    if snapshot is None or snapshot.state != "PENDING" or obligation.state not in rules.EDITABLE:
         raise _error(409, "SNAPSHOT_NOT_PENDING", "This snapshot changed a moment ago; reload it")
     now = _now()
     ref = (snapshot.fields or {}).get("complaint") or str(obligation.complaint_id)

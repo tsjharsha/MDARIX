@@ -10,6 +10,15 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.95] - not released yet (ships in the big-bang release)
+
+Hardening: code-audit fixes 6-12. No migration. The API image changes.
+
+### Fixed
+
+- Approving a report or signing a market conclusion re-reads the record after locking it, so a cancellation or edit
+  made a moment earlier is no longer overwritten (a cancelled report can no longer turn back to approved).
+
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 
 Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The API and web images change. Operator step:
