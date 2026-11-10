@@ -20,6 +20,8 @@ export const BRANCH_TONES: Record<Branch, Tone> = {
 };
 /** The server's limits (backend/app/complaint_disposition/rules.py). */
 export const DISPOSITION_LIMITS = { reasonMin: 10, rationaleMin: 20, textMax: 2000, ticketMax: 120 };
+/** The corrections that need a service ticket (rules.TICKET_CORRECTIONS). */
+export const TICKET_CORRECTIONS = ["PART_REPLACED", "SETTING_CORRECTED"];
 
 export type Trigger = {
   code: string;
@@ -222,7 +224,9 @@ export function signProblem(screen: DispositionScreen, form: DispositionForm, tr
     if (!record.correction_type) return "Choose the correction.";
     if (short(record.correction, reasonMin)) return "Describe the correction.";
     if (short(record.result, 5)) return "Say what the correction achieved.";
-    if (!record.service_ticket.trim()) return "Give the service ticket reference.";
+    // B7-D3: a ticket only when service work was done on the device.
+    if (TICKET_CORRECTIONS.includes(record.correction_type) && !record.service_ticket.trim())
+      return "Give the service ticket reference.";
     if (short(record.no_investigation_rationale, rationaleMin))
       return `Write why no investigation is needed (${screen.no_investigation_clause}).`;
     if (!form.attribution) return "Choose the root-cause attribution.";

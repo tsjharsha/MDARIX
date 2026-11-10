@@ -67,6 +67,8 @@ class ServiceRecordIn(BaseModel):
     result: str = Field(default="", max_length=rules.TEXT_MAX * 2)
     service_ticket: str = Field(default="", max_length=rules.TICKET_MAX * 2)
     no_investigation_rationale: str = Field(default="", max_length=rules.TEXT_MAX * 2)
+    no_investigation_reason: str = Field(default="", max_length=40)
+    device_returned: str = Field(default="", max_length=20)
 
 
 class ClassificationIn(BaseModel):
@@ -250,6 +252,8 @@ def screen(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
         "questions": [{"key": key, "text": text} for key, text in rules.QUESTIONS],
         "branch_labels": rules.BRANCH_LABELS,
         "corrections": rules.CORRECTION_LABELS,
+        "no_investigation_reasons": rules.NO_INVESTIGATION_REASONS,
+        "device_returned": rules.DEVICE_RETURNED,
         "attributions": [
             {"code": code, "label": rules.ATTRIBUTION_LABELS[code], "definition": rules.ATTRIBUTION_DEFINITIONS[code]}
             for code in rules.ATTRIBUTION_LABELS
@@ -423,7 +427,11 @@ def sign_disposition(
         record = rules.clean_service_record(payload.service_record.model_dump() if payload.service_record else None)
         attribution = rules.collapse(payload.attribution).upper() or None
         attribution_reason = rules.collapse(payload.attribution_reason) or None
-        problem = rules.service_record_problem(record) or rules.attribution_problem(attribution, attribution_reason)
+        problem = (
+            rules.service_record_problem(record, facts["on_watch"])
+            or rules.attribution_problem(attribution, attribution_reason)
+            or rules.no_fault_problem(record, attribution)
+        )
     if not problem and branch in rules.ESCALATED and complaint.product_id is None:
         problem = (
             "This complaint names no product: an investigation needs one; record the product in your QMS export first"

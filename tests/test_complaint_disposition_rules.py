@@ -76,10 +76,13 @@ def test_the_service_level_record_needs_every_field_and_the_no_investigation_rat
     for key, message in (
         ("troubleshooting", "troubleshooting"),
         ("correction_type", "Choose the correction"),
-        ("service_ticket", "service ticket"),
         ("no_investigation_rationale", "8.2.2"),
     ):
         assert message in rules.service_record_problem(rules.clean_service_record({**full, key: ""}))
+    # B7-D3: the ticket is needed only when service work was done.
+    assert rules.service_record_problem(rules.clean_service_record({**full, "service_ticket": ""})) is None
+    replaced = rules.clean_service_record({**full, "service_ticket": "", "correction_type": "part_replaced"})
+    assert "service ticket" in rules.service_record_problem(replaced)
 
 
 def test_each_answer_is_kept_with_its_rationale_and_refused_branches_say_so():
@@ -164,7 +167,7 @@ def test_a_source_value_off_the_list_stays_unknown_and_is_kept():
 
 def test_a_disposition_relies_on_the_rules_and_the_coding_criteria_at_their_current_versions():
     assert [(item.code, item.version) for item in training.for_disposition()] == [
-        ("DISPOSITION_RULES", "disposition-starter-1"),
+        ("DISPOSITION_RULES", "disposition-starter-2"),
         ("CODING_CRITERIA", "coding-starter-1"),
     ]
     assert training.content("DISPOSITION_RULES")["rules"][0].startswith("Answer in order")

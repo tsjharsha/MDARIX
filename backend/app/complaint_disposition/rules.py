@@ -11,7 +11,8 @@ per-market assessment, whatever its disposition. The person answers in a fixed o
 3. Was it resolved at service level? The service-level record and the root-cause attribution. ``SERVICE_LEVEL``.
 4. Otherwise ``ESCALATED_BY_CHOICE``, with a reason: a case opens.
 
-The rules (``disposition-starter-1``) and the classification's coding criteria (``coding-starter-1``) are starter
+The rules (``disposition-starter-2`` since B7: the ticket rule, No fault found, the reasons list, the known-behaviour
+answer) and the classification's coding criteria (``coding-starter-1``) are starter
 text (T-B6) and documents a signer acknowledges before signing (T-G40P). MDARIX never answers, never signs and never
 submits a report. Codes are the MVP's (G36), so the MVP swaps sources without renaming anything stored.
 """
@@ -21,7 +22,7 @@ from __future__ import annotations
 from backend.app.db.models.complaint_disposition import ATTRIBUTIONS
 from backend.app.standards import version_words
 
-RULES_VERSION = "disposition-starter-1"
+RULES_VERSION = "disposition-starter-2"
 ESCALATED_BY_TRIGGER, KNOWN_ISSUE, SERVICE_LEVEL, ESCALATED_BY_CHOICE = (
     "ESCALATED_BY_TRIGGER",
     "KNOWN_ISSUE",
@@ -66,13 +67,49 @@ ATTRIBUTION_DEFINITIONS = {
     ENVIRONMENT_RELATED: "Where it was used: power, interference, temperature, cleaning agents, transport.",
     UNDETERMINED: "The evidence does not show which: say why.",
 }
-CORRECTIONS = ("PART_REPLACED", "SETTING_CORRECTED", "USER_INSTRUCTED", "OTHER")
+CORRECTIONS = ("PART_REPLACED", "SETTING_CORRECTED", "USER_INSTRUCTED", "NO_FAULT_FOUND", "OTHER")
 CORRECTION_LABELS = {
     "PART_REPLACED": "Part replaced",
     "SETTING_CORRECTED": "Setting corrected",
     "USER_INSTRUCTED": "User instructed",
+    "NO_FAULT_FOUND": "No fault found",
     "OTHER": "Other (describe it)",
 }
+# B7-D3: a service ticket is needed only when service work was done on the device.
+TICKET_CORRECTIONS = ("PART_REPLACED", "SETTING_CORRECTED")
+# The correction proposed from the Case's "What they asked for" (a person changes it); anything else: user instructed.
+DEFAULT_CORRECTIONS = {
+    "REPAIR": "PART_REPLACED",
+    "CALIBRATION": "SETTING_CORRECTED",
+    "MAINTENANCE": "SETTING_CORRECTED",
+    "INSTALLATION": "SETTING_CORRECTED",
+}
+# B7-D2: why no investigation is needed (ISO 13485:2016 clause 8.2.2), a choice; free text only for Other.
+OTHER_REASON, WITHDREW = "OTHER", "REPORTER_WITHDREW"
+NO_INVESTIGATION_REASONS = {
+    "USE_RELATED_INSTRUCTED": "Single event, use-related, resolved by instruction",
+    "KNOWN_BEHAVIOUR_IFU": "Known behaviour described in the instructions for use",
+    "SINGLE_RANDOM_FAILURE": "Single random failure, no trend",
+    "NO_FAULT_FOUND": "No fault found after evaluation",
+    WITHDREW: "Reporter withdrew, no deficiency confirmed",
+    OTHER_REASON: "Other (describe it)",
+}
+DEVICE_RETURNED = {
+    "EVALUATED": "Evaluated",
+    "NOT_RETURNED": "Not returned after the set attempts",
+    "NOT_NEEDED": "Not needed",
+}
+# B7-D5: how the customer was told, or that it was not possible (anonymous, unreachable after the set attempts).
+NOT_POSSIBLE = "NOT_POSSIBLE"
+TOLD_HOW = {
+    "PHONE": "Phone",
+    "EMAIL": "E-mail",
+    "LETTER": "Letter",
+    "DISTRIBUTOR": "Through the distributor",
+    "IN_PERSON": "In person",
+    NOT_POSSIBLE: "Not possible",
+}
+KNOWN_BEHAVIOUR_MIN = 3
 NO_INVESTIGATION_CLAUSE = "ISO 13485:2016 clause 8.2.2"
 CLAUSE_IDS = ("ISO13485_8_2_2",)
 
@@ -94,8 +131,12 @@ DISPOSITION_RULES = (
     "covers, a new failure mode) escalates the complaint: an investigation opens at once and no other branch is allowed.",
     "A known issue is an open investigation whose scope holds a complaint with the same product and problem code, or the same "
     "lot. Link the complaint to it with your reason; no second investigation is opened.",
-    "Resolved at service level: record the troubleshooting, the discrete correction, its result, the service ticket and "
-    "why no investigation is needed (ISO 13485:2016 clause 8.2.2), and the root-cause attribution.",
+    "Resolved at service level: record the troubleshooting, the discrete correction, its result, and the service ticket "
+    "when a part was replaced or a setting corrected; choose why no investigation is needed (ISO 13485:2016 clause "
+    "8.2.2), with your words for Other; and the root-cause attribution. No fault found keeps it a complaint and its "
+    "cause is undetermined, with a reason.",
+    "A new failure mode may be answered as known behaviour only with the reference of the instructions for use or the "
+    "risk file that documents it; every other trigger escalates.",
     "Otherwise escalate by choice, with your reason: an investigation opens.",
     "The disposition never replaces the reportability assessment: a complaint on the watch is still assessed for each "
     "market.",
@@ -141,14 +182,33 @@ def clean_service_record(raw: dict | None) -> dict:
         "correction": collapse(raw.get("correction")),
         "result": collapse(raw.get("result")),
         "service_ticket": collapse(raw.get("service_ticket")),
-        "no_investigation_rationale": collapse(raw.get("no_investigation_rationale")),
+        "no_investigation_reason": _reason_code(raw),
+        "no_investigation_rationale": _rationale(raw),
+        "device_returned": collapse(raw.get("device_returned")).upper() or None,
         "clause": NO_INVESTIGATION_CLAUSE,
     }
 
 
-def service_record_problem(record: dict) -> str | None:
-    """Why a service-level record is not complete: every field is needed, and the no-investigation rationale is the
-    reason ISO 13485:2016 clause 8.2.2 asks to be documented."""
+def _reason_code(raw: dict) -> str:
+    # A client from before B7 sends the rationale only: it is the Other reason, in the signer's words.
+    code = collapse(raw.get("no_investigation_reason")).upper()
+    return code or (OTHER_REASON if collapse(raw.get("no_investigation_rationale")) else "")
+
+
+def _rationale(raw: dict) -> str:
+    text = collapse(raw.get("no_investigation_rationale"))
+    code = _reason_code(raw)
+    return text or (NO_INVESTIGATION_REASONS.get(code, "") if code != OTHER_REASON else "")
+
+
+def default_correction(requested: str | None) -> str:
+    return DEFAULT_CORRECTIONS.get((requested or "").strip().upper(), "USER_INSTRUCTED")
+
+
+def service_record_problem(record: dict, on_watch: bool = False) -> str | None:
+    """Why a service-level record is not complete. The ticket is needed only for a part replaced or a setting
+    corrected (B7-D3); why no investigation is needed is a reason from the list, with words only for Other (B7-D2). The
+    withdrawal reason is not open on the reportability watch."""
     if len(record["troubleshooting"]) < REASON_MIN:
         return f"Describe the troubleshooting done in at least {REASON_MIN} characters"
     if record["correction_type"] not in CORRECTIONS:
@@ -157,16 +217,65 @@ def service_record_problem(record: dict) -> str | None:
         return f"Describe the correction in at least {REASON_MIN} characters"
     if len(record["result"]) < 5:
         return "Say what the correction achieved (for example: alarm cleared, device in use)"
-    if not record["service_ticket"] or len(record["service_ticket"]) > TICKET_MAX:
-        return f"Give the service ticket reference (at most {TICKET_MAX} characters)"
-    if len(record["no_investigation_rationale"]) < RATIONALE_MIN:
+    ticket = record["service_ticket"]
+    if len(ticket) > TICKET_MAX or (not ticket and record["correction_type"] in TICKET_CORRECTIONS):
+        return f"Give the service ticket reference (at most {TICKET_MAX} characters): service work was done"
+    reason = record.get("no_investigation_reason") or OTHER_REASON
+    if reason not in NO_INVESTIGATION_REASONS:
+        return f"Choose why no investigation is needed ({NO_INVESTIGATION_CLAUSE})"
+    if reason == WITHDREW and on_watch:
+        return "On the reportability watch a withdrawal does not settle it: choose another reason or escalate"
+    if reason == OTHER_REASON and len(record["no_investigation_rationale"]) < RATIONALE_MIN:
         return (
             f"Write why no investigation is needed ({NO_INVESTIGATION_CLAUSE}) in at least {RATIONALE_MIN} characters"
         )
+    if record.get("device_returned") and record["device_returned"] not in DEVICE_RETURNED:
+        return "Choose whether the device was returned: evaluated, not returned after the set attempts, or not needed"
     for key in ("troubleshooting", "correction", "result", "no_investigation_rationale"):
         if len(record[key]) > TEXT_MAX:
             return f"Keep each field of the service record under {TEXT_MAX} characters"
     return None
+
+
+def no_fault_problem(record: dict | None, attribution: str | None) -> str | None:
+    """No fault found never undoes the complaint and never names a cause it did not find (RT-10)."""
+    if record and record.get("correction_type") == "NO_FAULT_FOUND" and attribution != UNDETERMINED:
+        return "No fault found: the cause is undetermined; say why"
+    return None
+
+
+def customer_told_problem(told: dict | None, connect: bool = False) -> str | None:
+    """B7-D5: how and when the customer was told, or "not possible" with the reason. In MDARIX Connect the letter's ID
+    in the QMS is enough."""
+    told = told or {}
+    how = collapse(told.get("how")).upper()
+    if connect and collapse(told.get("qms_letter_id")) and how != NOT_POSSIBLE:
+        return None
+    if how not in TOLD_HOW:
+        return "Record how the customer was told, or that it was not possible and why"
+    if how == NOT_POSSIBLE and len(collapse(told.get("reason"))) < REASON_MIN:
+        return f"Say in at least {REASON_MIN} characters why the customer could not be told (anonymous, unreachable)"
+    if len(collapse(told.get("note"))) > TEXT_MAX or len(collapse(told.get("qms_letter_id"))) > TICKET_MAX:
+        return f"Keep the note under {TEXT_MAX} characters and the letter ID under {TICKET_MAX}"
+    return None
+
+
+def answered_triggers(met: list[dict], known_behaviour_ref: str | None) -> list[dict]:
+    """B7-D4: a new failure mode answered "known behaviour, documented in <reference>" no longer escalates; every other
+    trigger stays."""
+    if len(collapse(known_behaviour_ref)) < KNOWN_BEHAVIOUR_MIN:
+        return met
+    return [item for item in met if item["code"] != "NEW_FAILURE_MODE"]
+
+
+def combined_offer(route_open: bool, blocked: list[dict], routine_markets: bool) -> dict:
+    """Whether "Resolve and close" is offered in full: the route is open (the routine path, or on the watch with every
+    relevant market signed not reportable, B7-D7) and every closure check passes except what the screen settles (the
+    decision, customer told, and the markets when the routine basis concludes them). Otherwise only "Resolve" is
+    offered, with what still blocks closing. Signing over an open item is never offered here."""
+    settles = {"DECISION", "CUSTOMER_TOLD", *(("MARKETS",) if routine_markets else ())}
+    still = [item for item in blocked if item["code"] not in settles]
+    return {"full": route_open and not still, "blocking": [item["label"] for item in still]}
 
 
 def branch_problem(
