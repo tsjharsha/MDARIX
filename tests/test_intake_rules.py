@@ -126,6 +126,49 @@ def test_provisional_deadlines_by_tier():
     assert unflagged == {"US": 30, "EU_NI": 15, "GB": 15, "IN": 15, "CA": 30}
 
 
+# Where the triage tier's date is later than the earliest clock the market rules give a pending assessment (code audit
+# 3: the starter windows and the report an unanswered draft would start). Reported to the owner, 10 Nov; not changed.
+TRIAGE_LATER_THAN_MARKET_RULES = {
+    ("US", "FLAGGED"),  # 30 calendar days; an unanswered question 6 keeps the 5-work-day report (803.53)
+    ("US", "UNFLAGGED"),
+    ("EU_NI", "FLAGGED"),  # 10 days; an unanswered question 4 keeps the 2-day threat report (Art. 87(4))
+    ("EU_NI", "UNFLAGGED"),  # 15 days
+    ("GB", "FLAGGED"),
+    ("GB", "UNFLAGGED"),
+    ("CA", "UNFLAGGED"),  # 30 days; an unanswered question 3 keeps the 10-day report
+}
+
+
+def test_triage_tier_dates_against_the_earliest_market_clock():
+    """Check 3a (code audit 3 follow-up): for every market and tier, the triage tier's provisional date against the
+    clock a pending market assessment shows with no answer yet (the earlier of the starter windows and the report a
+    signed "reportable" would start). Never later, except the cases listed above."""
+    from backend.app.reportability import markets
+    from backend.app.reportability import rules as watch_rules
+
+    windows = [watch_rules.clean_window(template) for template in watch_rules.TEMPLATES]
+    later, compared = set(), 0
+    for market in markets.MARKETS:
+        if_reportable = markets.evaluate(market, {})["report_type_if_reportable"]
+        clock = markets.market_clock(market, markets.PENDING, None, windows, NOW, NOW, None, if_reportable)
+        for level, remedial in (
+            (rules.THREAT, False),
+            (rules.FLAGGED, False),
+            (rules.FLAGGED, True),
+            (rules.UNFLAGGED, False),
+        ):
+            triage = rules.provisional_deadlines(NOW, [market], level, NOW, remedial, own=market)[0]
+            compared += 1
+            if triage["due_date"] > clock["due_date"]:
+                # Remedial action shortens only the US date (to the 5-work-day report): never later there.
+                assert not (remedial and market == markets.US), (market, level)
+                later.add((market, level))
+    assert compared == 4 * len(markets.MARKETS)
+    assert later == TRIAGE_LATER_THAN_MARKET_RULES
+    # The possible-threat tier is never later anywhere.
+    assert not {pair for pair in later if pair[1] == rules.THREAT}
+
+
 def test_both_clocks_and_the_delay():
     clock = rules.triage_clock(NOW - timedelta(hours=20), NOW)
     assert clock["hours_left"] == 4.0 and clock["state"] == "DUE_SOON"
