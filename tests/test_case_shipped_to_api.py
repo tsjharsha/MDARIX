@@ -22,6 +22,7 @@ pytestmark = pytest.mark.db
 
 SHIPPED = f"{INTAKE}/shipped-to"
 CEDAR = "Cedar Plains Medical Center (Sample)"  # a sample consignee (trial/sample_lot_impact.py)
+LAKESIDE = "Sample Lakeside Hospital (Sample)"  # SAMPLE-CASE-11's hospital (trial/sample_intake.py)
 ONLY_B = "Only In B Hospital"
 
 
@@ -81,6 +82,53 @@ def test_a_sample_hospital_is_offered_its_products_and_lots_newest_first(trials)
     assert [site["consignee"] for site in found["sites"]] == [CEDAR]
     # The customer reference matches too.
     assert _ok(trials["a"].get(SHIPPED, params={"site": "smp-c-1001"}))["items"] == found["items"]
+
+
+def test_sample_case_11s_hospital_is_offered_the_flagships_lot_first(trials):  # ID-2 sample story (owner, 10 Nov)
+    from backend.app.db.models.intake import IntakeEvent
+
+    found = _ok(trials["a"].get(SHIPPED, params={"site": LAKESIDE}))
+    assert [item["lot"] for item in found["items"]] == ["SAMPLE-PULSE-410-LOT-002", "SAMPLE-PULSE-410-LOT-001"]
+    assert {item["product_name"] for item in found["items"]} == {"PulseWatch 410 Patient Monitor (Sample)"}
+    assert [(site["consignee"], site["country"]) for site in found["sites"]] == [(LAKESIDE, "US")]
+    with SessionLocal() as db:
+        bind_system(db, "test:shipped-to-lakeside")
+        case = (
+            db.query(IntakeEvent)
+            .filter(IntakeEvent.tenant_id == trials["tenant_a"], IntakeEvent.reference == "SAMPLE-CASE-11")
+            .one()
+        )
+        assert case.reporter_site == LAKESIDE
+        assert db.get(LotBatch, case.lot_batch_id).lot_identifier == found["items"][0]["lot"]
+
+
+def test_the_refresh_step_adds_the_lakeside_shipments_once(trials):  # running trials (refresh_trial_story.py)
+    from backend.app.trial.sample_lot_impact import has_lakeside_shipments, stage_lakeside_shipments
+
+    tenant_id, now = trials["tenant_a"], datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        bind_system(db, "test:shipped-to-refresh")
+        assert stage_lakeside_shipments(db, tenant_id, now) == 0  # a new trial has them from the seed
+        before = {
+            (row.lot_batch_id, row.quantity, row.ship_date)
+            for row in db.query(LotDistribution).filter(
+                LotDistribution.tenant_id == tenant_id, LotDistribution.consignee == LAKESIDE
+            )
+        }
+        db.query(LotDistribution).filter(
+            LotDistribution.tenant_id == tenant_id, LotDistribution.consignee == LAKESIDE
+        ).delete()
+        assert not has_lakeside_shipments(db, tenant_id)
+        assert stage_lakeside_shipments(db, tenant_id, now) == 2
+        assert stage_lakeside_shipments(db, tenant_id, now) == 0
+        after = {
+            (row.lot_batch_id, row.quantity, row.ship_date)
+            for row in db.query(LotDistribution).filter(
+                LotDistribution.tenant_id == tenant_id, LotDistribution.consignee == LAKESIDE
+            )
+        }
+        assert after == before and len(after) == 2
+        db.commit()
 
 
 def test_no_match_or_no_site_is_an_empty_list_never_an_error_or_a_guess(trials):  # ID-2 no match
