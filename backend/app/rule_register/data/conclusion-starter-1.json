@@ -32,5 +32,6 @@
     "note": "B4 spec approved 11 Nov 2026 (R-D1 to R-D14): version 1 is today's logic, unchanged."
   },
   "implementation": "backend.app.reportability.markets:conclusion_problem",
-  "pinned": true
+  "pinned": true,
+  "code_hash": "sha256:d7624e2db8b858514a673c87b4d6236fb5f8a812bf191714787a010cd0314a25"
 }

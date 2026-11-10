@@ -234,3 +234,39 @@ def floor_day(market: str, aware, org_zone: str | None = None) -> date | None:
 def floor_at(market: str, aware, org_zone: str | None = None) -> dict | None:
     """The market's floor in force at an awareness moment (a datetime or a day); today's floor without awareness."""
     return floor(market, floor_day(market, aware, org_zone))
+
+
+def code_hash(implementation: str) -> str:  # shortcut: ast.dump can differ across Python minor versions; re-pin on an upgrade
+    """sha256 of a code-held rule's syntax tree (``module:function``), without comments and docstrings: a pinned
+    regulatory function's code may not change without a new register version (B4 step 7, DT-33)."""
+    import ast
+    import importlib
+    import inspect
+    import textwrap
+
+    module, _, name = implementation.partition(":")
+    tree = ast.parse(textwrap.dedent(inspect.getsource(getattr(importlib.import_module(module), name))))
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if (
+            isinstance(body, list)
+            and body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+        ):
+            if isinstance(body[0].value.value, str):
+                node.body = body[1:] or [ast.Pass()]
+    return "sha256:" + hashlib.sha256(ast.dump(tree).encode("utf-8")).hexdigest()
+
+
+def pin_problems() -> list[str]:
+    """Pinned rules whose code, or the registered rule book whose file, changed without a new version (step 7)."""
+    problems = []
+    for entry in load().values():
+        if entry.get("pinned") and entry.get("code_hash") != code_hash(entry["implementation"]):
+            problems.append(f"{entry['code']}.json: {entry['implementation']} changed without a new version")
+        if entry["held_as"] == DATA_HELD and "file" in entry.get("content", {}):
+            path = Path(__file__).resolve().parents[3] / entry["content"]["file"]
+            if hashlib.sha256(path.read_bytes()).hexdigest() != entry["content"]["sha256"]:
+                problems.append(f"{entry['code']}.json: {entry['content']['file']} changed without a new version")
+    return problems
