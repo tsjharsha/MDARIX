@@ -174,9 +174,9 @@ const EMPTY_RECORD: ServiceRecord = {
   no_investigation_rationale: "",
 };
 
-/** The form as the screen opens, in the tree's order: a met trigger escalates; otherwise a matching open case is
- * pre-selected as the known issue (the board's "Link to the open case"); otherwise service level (the routine path's
- * default). The classification as proposed (Unknown when nothing is proposed, never a guess). */
+/** The form as the screen opens, in the tree's order: a met trigger escalates; otherwise a matching open
+ * investigation is pre-selected as the known issue (the board's "Link to the open investigation"); otherwise service
+ * level (the routine path's default). The classification as proposed (Unknown when nothing is proposed, never a guess). */
 export function formOf(screen: DispositionScreen): DispositionForm {
   const proposed = screen.classification;
   const known = screen.trigger_codes.length ? undefined : screen.candidates[0];
