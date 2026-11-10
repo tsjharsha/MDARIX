@@ -341,10 +341,13 @@ def _watch_items(db: Session, control_db, tenant_id, now: datetime) -> list[dict
     found = []
     for item in reportability.watch(db, control_db, tenant_id, show="open", page_size=10_000, today=now)["items"]:
         binding = item.get("binding")
-        if not binding or not binding.get("due_at") or binding.get("backlog"):
+        needs = item.get("needs") or []
+        if not binding or not binding.get("due_at"):
+            continue
+        # OD-12 + 3a: Imported backlog work raises no market clock; a missing fact is still asked for (its backlog target).
+        if binding.get("backlog") and not needs:
             continue
         market = binding.get("market")
-        needs = item.get("needs") or []
         found.append(
             _item(
                 # A complaint that needs a fact is one line, kept beside its markets' own (0.10.81, F3, F4).
