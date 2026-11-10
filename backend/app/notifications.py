@@ -35,6 +35,8 @@ email could not be sent, so the outbox retries (and finally dead-letters and ale
 
 from __future__ import annotations
 
+import contextvars
+import hashlib
 import logging
 import os
 import re
@@ -196,16 +198,33 @@ def reminder_template(
     return None
 
 
+# The emails an event already sent, kept in its payload (``SENT``) so a retry after one refused address does not
+# email everyone again (code audit 14). Each mark is a hash of the email's place in the event and the address, so the
+# queue still holds no address.
+SENT = "sent"
+_sent: contextvars.ContextVar[dict | None] = contextvars.ContextVar("notifications_sent", default=None)
+
+
 def _deliver(send, recipients: list[str], **details) -> None:
     from auth.emailer import EmailDeliveryError
 
+    sent = _sent.get()
+    call = 0
+    if sent is not None:
+        sent["call"] += 1
+        call = sent["call"]
     failures = 0
     for recipient in recipients:
+        mark = hashlib.sha256(f"{call}|{recipient.strip().lower()}".encode()).hexdigest()[:16]
+        if sent is not None and mark in sent["marks"]:
+            continue
         try:
             outcome = send(recipient, **details)
         except EmailDeliveryError:
             failures += 1
             continue
+        if sent is not None:
+            sent["marks"].append(mark)
         if outcome == "NOT_CONFIGURED":
             logger.warning("Email is not configured; notification not sent")
     if failures:
@@ -916,7 +935,16 @@ WORK_EVENTS = (INVESTIGATION_ASSIGNED, DECISION_REVIEW_PENDING, SIGNOFF_COMPLETE
 
 
 def handle_event(db: Session, event_name: str, payload: dict) -> bool:
-    """Send the notification for one outbox event. False when the event is not a notification."""
+    """Send the notification for one outbox event. False when the event is not a notification. The emails sent are
+    marked in ``payload[SENT]``; the worker keeps the payload of a failed event, so its retry skips them."""
+    token = _sent.set({"marks": payload.setdefault(SENT, []), "call": 0})
+    try:
+        return _handle_event(db, event_name, payload)
+    finally:
+        _sent.reset(token)
+
+
+def _handle_event(db: Session, event_name: str, payload: dict) -> bool:
     from auth import emailer
 
     if event_name == "SUBSCRIPTION_REMINDER":

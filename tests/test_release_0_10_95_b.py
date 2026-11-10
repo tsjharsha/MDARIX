@@ -6,12 +6,16 @@ import uuid
 
 import pytest
 
-from backend.app import import_quarantine
+from auth import emailer
+from backend.app import import_quarantine, notifications
 from backend.app.db.models.ingestion import ImportQuarantineRow
+from backend.app.db.models.stage2 import OutboxEvent
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system, bind_tenant
 from backend.app.trial import imports
+from outbox.worker import OutboxWorker
 from tests.test_customer_admin_account_security import _tenant
+from tests.test_notifications_delivery import _user
 
 pytestmark = pytest.mark.db
 
@@ -76,3 +80,36 @@ def test_a_later_import_closes_only_the_set_aside_row_of_the_record_it_wrote(ten
         assert closed == [str(stored[2].id)]
         assert (stored[2].status, stored[3].status) == ("REPROCESSED", "OPEN")
         db.rollback()
+
+
+def test_a_retry_after_one_refused_address_emails_only_that_address(tenant_id, monkeypatch):  # audit 14
+    sent, refuse = [], {"on": True}
+    with SessionLocal() as db:
+        bind_system(db, "test: one refused address")
+        good, bad = _user(db, tenant_id, "APPROVER").username, _user(db, tenant_id, "APPROVER").username
+        event_id = notifications.notify_review_pending(db, tenant_id, decision_id=uuid.uuid4()).id
+        db.commit()
+
+    def send(recipient, **_):
+        if recipient == bad and refuse["on"]:
+            raise emailer.EmailDeliveryError("mailbox refused")
+        sent.append(recipient)
+        return "SENT"
+
+    def publisher(name, payload):
+        with SessionLocal() as db:
+            bind_system(db, "test: deliver")
+            assert notifications.handle_event(db, name, payload)
+
+    monkeypatch.setattr(emailer, "send_review_pending_notice", send)
+    worker, stats = OutboxWorker(publisher), {"published": 0, "failed": 0, "dead_lettered": 0}
+    with SessionLocal() as db:
+        bind_system(db, "test: worker")
+        worker._deliver_one(db, event_id, stats)
+        row = db.get(OutboxEvent, event_id)
+        assert stats["failed"] == 1 and sent == [good]
+        assert "@" not in str(row.payload), "the queue never holds an email address"
+        row.next_attempt_at, refuse["on"] = None, False  # the retry is due, the mailbox accepts now
+        db.commit()
+        worker._deliver_one(db, event_id, stats)
+        assert stats["published"] == 1 and sent == [good, bad]

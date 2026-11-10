@@ -29,6 +29,8 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
   the first country's (an India window on a "United States, India" complaint was one day late).
 - A later import closes only the set-aside rows of the records it wrote (product version, bill-of-materials line,
   genealogy link, shipment), no longer every set-aside row that shares the first column.
+- When one address refuses a notification email, the retry sends it to that address only; the others are no longer
+  emailed again on every retry.
 
 ### Security
 

@@ -11,6 +11,7 @@ hours, long enough to ride out a mail provider outage. After the last attempt th
 alerted once (backend/app/alerts.py); platform administrators retry or discard dead letters from the console.
 """
 
+import copy
 import logging
 import os
 import threading
@@ -151,9 +152,12 @@ class OutboxWorker:
             return
         row.claimed_by = self.worker_id
         row.claimed_at = now
+        # A copy: what the publisher marks in it (the emails already sent, notifications.SENT) is kept only on failure.
+        payload = copy.deepcopy(row.payload or {})
         try:
-            self.publisher(row.event_name, row.payload)
+            self.publisher(row.event_name, payload)
         except Exception as exc:
+            row.payload = payload
             self._record_failure(row, exc, now, stats)
         else:
             row.published_at = now
