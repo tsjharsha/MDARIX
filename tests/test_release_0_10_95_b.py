@@ -128,3 +128,36 @@ def test_an_upload_over_the_storage_quota_is_refused_with_413_not_500(org, monke
     refused = colleague[0].post(f"{base}/attachments", files={"file": ("batch-record.pdf", PDF, "application/pdf")})
     assert refused.status_code == 413, refused.text
     assert refused.json()["detail"]["code"] == "TENANT_STORAGE_QUOTA_EXCEEDED"
+
+
+def test_an_export_over_the_size_limit_is_refused_before_work_starts(monkeypatch, tmp_path):  # audit 16
+    from fastapi import HTTPException
+
+    from backend.app import tenant_export, tenant_export_api
+    from object_storage.service import ObjectStorageService
+
+    monkeypatch.setenv("MDARIX_OBJECT_STORAGE_ROOT", str(tmp_path))
+    monkeypatch.setenv("MDARIX_OBJECT_STORAGE_PROVIDER", "local")
+    with SessionLocal() as db:
+        bind_system(db, "test: export size")
+        big, small = _tenant(db, "H95X").id, _tenant(db, "H95Y").id
+        db.commit()
+    storage = ObjectStorageService()
+    storage.put(str(big), "evidence/scan.pdf", b"x" * 400, internal=True)
+    storage.put(str(big), "exports/old.zip", b"x" * 5000, internal=True)  # an earlier export is not exported again
+    monkeypatch.setattr(tenant_export, "MAX_EXPORT_BYTES", 300)
+    monkeypatch.setattr(tenant_export_api, "MAX_EXPORT_BYTES", 300)
+    with SessionLocal() as db:
+        bind_system(db, "test: export size")
+        with pytest.raises(HTTPException) as refused:
+            tenant_export_api._queue(db, big, "test", "Too large")
+        assert refused.value.status_code == 413 and refused.value.detail["code"] == "EXPORT_TOO_LARGE"
+        # No files, but the zip itself (tables, manifest) is over the limit: refused before it is encrypted and stored.
+        export_id = tenant_export.request_export(db, small, "test", "Zip over the limit").id
+        db.commit()
+    assert tenant_export.run_export(export_id)["status"] == "FAILED"
+    with SessionLocal() as db:
+        bind_system(db, "test: export size")
+        row = db.get(tenant_export.TenantExport, export_id)
+        assert (row.error, row.object_key) == ("ExportTooLarge", None)
+    assert storage.list_tenant_objects(str(small)) == []

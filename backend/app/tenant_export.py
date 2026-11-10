@@ -39,6 +39,11 @@ from backend.app.db.models.stage2 import OutboxEvent, TenantExport
 logger = logging.getLogger("mdarix.tenant_export")
 
 EXPORT_DAYS = 7
+# The largest full export (code audit 16): the zip is encrypted and decrypted whole, so the worker and the download
+# hold it in memory about twice, and the encryption takes at most 2 GiB. Refused before work starts (the stored files
+# alone are larger) and again once the zip is built. shortcut: a size limit, not chunked encryption; upgrade when an
+# organization's files approach 1 GiB.
+MAX_EXPORT_BYTES = int(os.getenv("MDARIX_EXPORT_MAX_BYTES", str(1024**3)))
 EVENT = "TENANT_EXPORT_REQUESTED"
 # Columns never exported: credentials and secrets, even encrypted or hashed.
 SECRET_COLUMN = re.compile(
@@ -163,6 +168,10 @@ class ExportInProgress(RuntimeError):
     pass
 
 
+class ExportTooLarge(RuntimeError):
+    """A full export over MAX_EXPORT_BYTES (the message is the size found)."""
+
+
 def request_export(
     db: Session, tenant_id, requested_by: str, reason: str, unmask_contacts: bool = False
 ) -> TenantExport:
@@ -176,6 +185,11 @@ def request_export(
     )
     if busy is not None:
         raise ExportInProgress(str(busy.id))
+    from object_storage.service import ObjectStorageService
+
+    files = ObjectStorageService().stored_bytes(str(tenant_id), skip="exports")
+    if files > MAX_EXPORT_BYTES:
+        raise ExportTooLarge(str(files))
     now = datetime.now(timezone.utc)
     contacts = UNMASKED if unmask_contacts and not _trial(db, tenant_id) else MASKED
     row = TenantExport(
@@ -414,6 +428,13 @@ def run_export(export_id) -> dict:
         with tempfile.NamedTemporaryFile(prefix="mdarix-export-", suffix=".zip", delete=False) as handle:
             temp = Path(handle.name)
         manifest = _build_archive(db, tenant_id, tenant, storage, temp, unmask)
+        if temp.stat().st_size > MAX_EXPORT_BYTES:
+            # Not retried: the same records give the same size.
+            bind_system(db, f"tenant export {export_id}: too large")
+            row = db.get(TenantExport, uuid.UUID(str(export_id)))
+            row.status, row.error = "FAILED", ExportTooLarge.__name__
+            db.commit()
+            return describe(row)
         stored = _store_archive(storage, tenant_id, export_id, temp)
         bind_system(db, f"tenant export {export_id}: done")
         row = db.get(TenantExport, uuid.UUID(str(export_id)))

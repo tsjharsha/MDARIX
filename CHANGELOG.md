@@ -33,6 +33,9 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
   emailed again on every retry.
 - An organization's file-storage quota counts only the files people upload, not the exports, reports and documents
   MDARIX makes; an upload over the quota is refused with "storage is full" (413) instead of a server error.
+- A full data export has a size limit of 1 GB (`MDARIX_EXPORT_MAX_BYTES`): an organization whose files are larger is
+  told so when it asks (413, "contact support to receive it in parts"), and an export whose zip is larger ends
+  FAILED (`ExportTooLarge`) without retrying, instead of failing in memory after hours of retries.
 
 ### Security
 

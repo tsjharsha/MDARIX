@@ -361,6 +361,20 @@ class ObjectStorageService:
                 path.unlink()
         self._audit("OBJECT_DELETED", str(tenant_id), expected)
 
+    def stored_bytes(self, tenant_id: str, skip: str) -> int:
+        """The bytes one tenant's objects take, without those under the folder ``skip``."""
+        prefix = self._tenant_key(tenant_id, "x")[:-1]
+        if self.provider == "s3":
+            pages = self.client.get_paginator("list_objects_v2").paginate(Bucket=self.bucket, Prefix=prefix)
+            items = [item for page in pages for item in page.get("Contents", [])]
+            return sum(item["Size"] for item in items if not item["Key"][len(prefix) :].startswith(f"{skip}/"))
+        base = self.root / str(tenant_id)
+        return sum(
+            path.stat().st_size
+            for path in (base.rglob("*") if base.is_dir() else [])
+            if path.is_file() and path.relative_to(base).parts[0] != skip
+        )
+
     def list_tenant_objects(self, tenant_id: str) -> list[str]:
         """Every stored object key of one tenant (``<tenant>/...``)."""
         prefix = self._tenant_key(tenant_id, "x")[:-1]

@@ -28,7 +28,14 @@ from backend.app.db.models.stage2 import (
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.legal_hold_api import router as legal_hold_router
-from backend.app.tenant_export import ExportInProgress, describe, read_export, request_export
+from backend.app.tenant_export import (
+    MAX_EXPORT_BYTES,
+    ExportInProgress,
+    ExportTooLarge,
+    describe,
+    read_export,
+    request_export,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["Data export"])
 # The legal-hold routes already carry the /api/v1 prefix, so they are added as they are. (Nesting the router with
@@ -103,6 +110,16 @@ def _queue(db: Session, tenant_id, actor_ref: str, reason: str, unmask_contacts:
     except ExportInProgress:
         raise HTTPException(
             409, detail={"code": "EXPORT_IN_PROGRESS", "message": "An export is already being prepared"}
+        )
+    except ExportTooLarge as exc:
+        found, limit = int(str(exc)) / 1024**3, MAX_EXPORT_BYTES / 1024**3
+        raise HTTPException(
+            413,
+            detail={
+                "code": "EXPORT_TOO_LARGE",
+                "message": f"This organization's files take {found:.1f} GB; one full export can hold up to "
+                f"{limit:.1f} GB. Contact support to receive it in parts.",
+            },
         )
     db.commit()
     return describe(row)
