@@ -259,62 +259,64 @@ def test_the_watch_runs_clocks_against_the_windows_most_urgent_first(org, window
     assert _ids(org["viewer"].get(WATCH, params={"product_id": product, "show": "follow_up"})) == [follow_up]
 
 
-def test_a_person_decides_reportability_and_its_timeliness_is_kept(org, windows):
+def _earlier_decision(org, complaint_id: str, reported_on: date, reference: str) -> None:
+    """A filed report recorded by the single-decision route before it closed (0.10.95): as that route stored it, bound
+    to the complaint's window then."""
+    from backend.app.db.models.reportability import ComplaintReportability
+
+    (item,) = [i for i in org["viewer"].get(WATCH, params={"show": "all"}).json()["items"] if i["id"] == complaint_id]
+    binding = item["binding"]
+    with SessionLocal() as db:
+        bind_tenant(db, org["tenant_id"])
+        db.add(
+            ComplaintReportability(
+                tenant_id=uuid.UUID(str(org["tenant_id"])),
+                complaint_id=uuid.UUID(complaint_id),
+                window_name=binding["window"],
+                due_on=date.fromisoformat(binding["due_date"]),
+                decision="REPORTED",
+                rationale="Death: an MDR was filed under 21 CFR 803",
+                report_reference=reference,
+                reported_on=reported_on,
+                decided_by=str(uuid.uuid4()),
+                decided_at=datetime.now(timezone.utc),
+            )
+        )
+        db.commit()
+
+
+def test_the_single_decision_route_is_closed_and_earlier_decisions_are_still_read(org, windows):
     tenant, product = org["tenant_id"], _product(org["tenant_id"])
     due_soon = _complaint(tenant, product, aware_days_ago=28, country="US", death=True)
     overdue = _complaint(tenant, product, aware_days_ago=35, country="US", malfunction=True)
-    ordinary = _complaint(tenant, product, aware_days_ago=3, country="US")
     path = f"/api/v1/complaints/{due_soon}/reportability"
-    yesterday = (TODAY - timedelta(days=1)).isoformat()
     reported = {
         "decision": "REPORTED",
         "rationale": "Death: an MDR was filed under 21 CFR 803",
         "report_reference": "MDR-3004-2026-00017",
-        "reported_on": yesterday,
+        "reported_on": (TODAY - timedelta(days=1)).isoformat(),
     }
     for role in ("viewer", "investigator", "reviewer", "admin"):
         assert org[role].post(path, json=reported).status_code == 403, role
-    missing = org["regulatory"].post(path, json={**reported, "report_reference": " "})
-    assert missing.status_code == 422 and missing.json()["detail"]["code"] == "REPORT_DETAILS_REQUIRED"
-    future = org["regulatory"].post(path, json={**reported, "reported_on": (TODAY + timedelta(days=1)).isoformat()})
-    assert future.status_code == 422 and future.json()["detail"]["code"] == "REPORTED_IN_FUTURE"
-    early = org["regulatory"].post(path, json={**reported, "reported_on": (TODAY - timedelta(days=60)).isoformat()})
-    assert early.status_code == 422 and early.json()["detail"]["code"] == "REPORTED_BEFORE_AWARENESS"
+    # Reportability is decided on the signed market assessment (0.10.95, code audit 9 and owner decision 10 Nov).
+    for body in (reported, {"decision": "NOT_REPORTABLE", "rationale": "Death unrelated to the device per autopsy"}):
+        refused = org["regulatory"].post(path, json=body)
+        assert refused.status_code == 409 and refused.json()["detail"]["code"] == "SIGNED_ASSESSMENT_REQUIRED"
+        assert "Record the filing" in refused.json()["detail"]["message"]
+    assert _actions(tenant, due_soon) == []
 
-    decided = org["regulatory"].post(path, json=reported)
-    assert decided.status_code == 200, decided.text
-    decision = decided.json()["decision"]
-    assert decision["decision"] == "REPORTED" and decision["on_time"] is True
-    assert decision["report_reference"] == "MDR-3004-2026-00017" and decision["decided_by"] == "Rita Regulatory"
-    assert decision["window"] == watch_rules.TEMPLATES[0]["name"]
-    again = org["regulatory"].post(path, json=reported)
-    assert again.status_code == 422 and again.json()["detail"]["code"] == "NOTHING_TO_CHANGE"
-    # "Not reportable" is concluded only by a signed market assessment (0.10.95, code audit 9).
-    unsigned = org["approver"].post(
-        path, json={"decision": "NOT_REPORTABLE", "rationale": "Death unrelated to the device per autopsy report"}
-    )
-    assert unsigned.status_code == 409 and unsigned.json()["detail"]["code"] == "SIGNED_ASSESSMENT_REQUIRED"
-    revised = org["approver"].post(path, json={**reported, "report_reference": "MDR-3004-2026-00018"})
-    assert revised.status_code == 200 and revised.json()["decision"]["report_reference"] == "MDR-3004-2026-00018"
-    assert _actions(tenant, due_soon) == ["COMPLAINT_REPORTABILITY_DECIDED", "COMPLAINT_REPORTABILITY_REVISED"]
-
-    late = org["regulatory"].post(
-        f"/api/v1/complaints/{overdue}/reportability",
-        json={**reported, "rationale": "Malfunction: the MDR was filed after the window"},
-    )
-    assert late.status_code == 200 and late.json()["decision"]["on_time"] is False
-
+    _earlier_decision(org, due_soon, TODAY - timedelta(days=1), "MDR-3004-2026-00017")
+    _earlier_decision(org, overdue, TODAY - timedelta(days=1), "MDR-3004-2026-00018")
     response = org["viewer"].get(WATCH, params={"product_id": product})
     assert _ids(response) == []
     summary = response.json()["summary"]
     assert (summary["decided"], summary["decided_in_window"], summary["decided_late"]) == (2, 1, 1)
-    decided_list = _ids(org["viewer"].get(WATCH, params={"product_id": product, "show": "decided"}))
-    assert set(decided_list) == {due_soon, overdue}
-
-    off_watch = org["regulatory"].post(f"/api/v1/complaints/{ordinary}/reportability", json=reported)
-    assert off_watch.status_code == 409 and off_watch.json()["detail"]["code"] == "NOT_ON_WATCH"
-    missing_one = org["regulatory"].post(f"/api/v1/complaints/{uuid.uuid4()}/reportability", json=reported)
-    assert missing_one.status_code == 404
+    decided = {
+        i["id"]: i["decision"]
+        for i in org["viewer"].get(WATCH, params={"product_id": product, "show": "decided"}).json()["items"]
+    }
+    assert (decided[due_soon]["on_time"], decided[overdue]["on_time"]) == (True, False)
+    assert decided[due_soon]["report_reference"] == "MDR-3004-2026-00017"
 
 
 def test_a_completed_regulatory_review_of_its_case_settles_a_complaint(org, windows):
@@ -393,16 +395,9 @@ def test_the_sweep_reminds_the_regulatory_reviewers_and_settles_their_tasks(org,
     assert tasks_of(calm) == []
     sweep()  # idempotent
     assert len(tasks_of(urgent)) == 1
-    decided = org["regulatory"].post(
-        f"/api/v1/complaints/{urgent}/reportability",
-        json={
-            "decision": "REPORTED",
-            "rationale": "Death: an MDR was filed under 21 CFR 803",
-            "report_reference": "MDR-3004-2026-00019",
-            "reported_on": TODAY.isoformat(),
-        },
-    )
-    assert decided.status_code == 200
+    # A decision on record ends the reminder at the next sweep.
+    _earlier_decision(org, urgent, TODAY, "MDR-3004-2026-00019")
+    sweep()
     assert [task.status for task in tasks_of(urgent)] == ["COMPLETED"]
 
 

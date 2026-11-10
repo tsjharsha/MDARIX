@@ -18,9 +18,10 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
 
 - Approving a report or signing a market conclusion re-reads the record after locking it, so a cancellation or edit
   made a moment earlier is no longer overwritten (a cancelled report can no longer turn back to approved).
-- The old single reportability decision (before per-market assessment) no longer accepts a new unsigned "Not
-  reportable": that is concluded only by a signed market assessment. Single decisions recorded earlier are still shown
-  and still settle their complaint.
+- The old single reportability decision (before per-market assessment) is closed: a new "Not reportable" or "Reported"
+  is refused and points to the market assessment (sign each market's conclusion; record a filed report with "Record
+  the filing" on the signed reportable conclusion). Single decisions recorded earlier are still shown and still settle
+  their complaint.
 - FDA Form 3500A box H1 pre-fills "Death" only when the US assessment answers that the device caused or contributed
   to it (question 3), as it already did for "Serious injury".
 - The awareness date on a report form (FDA box G3, and the same box on the EU, UK, India and Canada forms) is the
