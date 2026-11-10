@@ -12,6 +12,7 @@ import { ComplaintNextStep } from "./ComplaintNextStep";
 import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
 import { CodePicker } from "./CodePicker";
+import { openFollowUp } from "./FollowUps";
 import {
   OUTCOME_LABELS,
   REASON_MIN,
@@ -813,10 +814,13 @@ export function AfterAcceptance({
               }
             }}
           >
-            {/* A US request is answered by a follow-up, H2 "Response to FDA request" (0.10.96, B3). */}
-            {detail.form.code === "FDA_3500A"
-              ? "Start the follow-up for this request"
-              : "Create the response obligation"}
+            {/* A US request is answered by a follow-up, H2 "Response to FDA request" (0.10.96, B3); while one is open,
+                the request is recorded on it (owner decision 1 after B3 run 4). */}
+            {detail.form.code !== "FDA_3500A"
+              ? "Create the response obligation"
+              : openFollowUp(detail)
+                ? `Record it on follow-up #${openFollowUp(detail)?.follow_up}`
+                : "Start the follow-up for this request"}
           </button>
         </details>
       )}

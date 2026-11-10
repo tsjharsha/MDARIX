@@ -253,6 +253,8 @@ export type ReportDetail = {
   approval?: ApprovalStanding | null;
   submissions: Submission[];
   request: { text: string; received_on: string } | null;
+  /** FDA requests recorded on this open follow-up after it was started (0.10.96, owner decision 1 after B3 run 4). */
+  fda_requests?: { text: string; received_on: string; due_on: string; h2_ticked: boolean }[];
   parent_id: string | null;
   responses: {
     id: string;

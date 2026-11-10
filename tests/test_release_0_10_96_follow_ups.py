@@ -231,6 +231,68 @@ def test_b3_an_fda_request_becomes_a_follow_up_ticking_response_to_fda_request(t
     assert detail["request"]["text"] == "FDA asks for the device evaluation result."
 
 
+def _request(trial, rv09: dict, text: str, due: date):
+    return trial["user"].post(
+        f"{REPORTS}/{rv09['id']}/requests",
+        json={"request_text": text, "received_on": date.today().isoformat(), "due_on": due.isoformat()},
+    )
+
+
+def test_b3_an_fda_request_while_a_follow_up_is_open_is_recorded_on_it(trial):
+    """Owner decision 1 after run 4: no 409 for a request; it is kept on the open follow-up, H2 ticked, audited."""
+    from backend.app.db.models.foundation import AuditEvent
+    from tests.test_reporting_capa_api import PASSWORD as COLLEAGUE_PASSWORD
+
+    user, rv09 = trial["user"], _rv09(trial)
+    third = next(row for row in rv09["responses"] if row["follow_up"] == 3 and row["state"] == "DRAFT")
+    url = f"{REPORTS}/{third['id']}"
+    _ok(user.put(f"{url}/fields/H2", json={"value": "Device evaluation"}))
+    # Approved, not sent: the request is kept and its date counts, but the frozen file is not changed (no H2 tick).
+    pending = _ok(user.post(f"{url}/snapshots"))["pending_snapshot"]["id"]
+    _ok(trial["colleague"].post(f"{url}/snapshots/{pending}/approve", json={"password": COLLEAGUE_PASSWORD}))
+    sooner = date.today() + timedelta(days=5)
+    found = _request(trial, rv09, "FDA also asks for the lot history.", sooner)
+    assert found.status_code == 200, found.text
+    held = found.json()
+    assert held["id"] == third["id"] and held["follow_up"] == 3 and held["state"] == "APPROVED"  # no new follow-up
+    assert _value(held, "H2") == "Device evaluation"
+    assert held["deadline"]["due_on"] == sooner.isoformat()  # due by the earlier date
+    (kept,) = held["fda_requests"]
+    assert kept["text"] == "FDA also asks for the lot history." and kept["h2_ticked"] is False
+    assert kept["received_on"] == date.today().isoformat() and kept["due_on"] == sooner.isoformat()
+    assert len(_rv09(trial)["responses"]) == len(rv09["responses"])
+    # Reopened to a draft: the next request ticks H2 "Response to FDA request"; a later date never moves it back.
+    _ok(user.post(f"{url}/reopen", json={"reason": "Answer FDA's request in this follow-up."}))
+    found = _request(trial, rv09, "FDA asks for the service records too.", date.today() + timedelta(days=20))
+    assert found.status_code == 200, found.text
+    detail = found.json()
+    assert detail["id"] == third["id"] and detail["state"] == "DRAFT"
+    assert _value(detail, "H2") == "Device evaluation; Response to FDA request"
+    assert detail["deadline"]["due_on"] == sooner.isoformat()
+    assert [row["h2_ticked"] for row in detail["fda_requests"]] == [False, True]
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        events = (
+            db.query(AuditEvent)
+            .filter(AuditEvent.entity_id == uuid.UUID(third["id"]), AuditEvent.action == "REPORT_REQUEST_ATTACHED")
+            .order_by(AuditEvent.chain_seq)
+            .all()
+        )
+        assert [(row.old_values["H2"], row.new_values["H2"]) for row in events] == [
+            ("Device evaluation", "Device evaluation"),
+            ("Device evaluation", "Device evaluation; Response to FDA request"),
+        ]
+        assert events[0].new_values["due_on"] == sooner.isoformat() and events[0].details["state"] == "APPROVED"
+        assert events[1].details["request_text"] == "FDA asks for the service records too."
+        asked = (
+            db.query(AuditEvent)
+            .filter(AuditEvent.entity_id == uuid.UUID(rv09["id"]), AuditEvent.action == "REPORT_INFORMATION_REQUESTED")
+            .order_by(AuditEvent.chain_seq)
+            .all()
+        )
+        assert [(row.details["response"], row.details["attached"]) for row in asked[-2:]] == [(third["id"], True)] * 2
+
+
 def test_b3_a_follow_ups_frozen_file_sends_only_what_changed(trial):
     """B2 against the database: follow-up #1's approved file is FDA's follow-up shape, with only what is new."""
     from backend.app.authority_reports import emdr, emdr_pdf

@@ -544,6 +544,8 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
             if obligation.kind == "RESPONSE"
             else None
         ),
+        # FDA requests recorded on this open follow-up after it was started (owner decision 1 after B3 run 4).
+        "fda_requests": ((obligation.entries or {}).get("FDA_REQUESTS") or {}).get("items") or [],
         "parent_id": str(obligation.parent_id) if obligation.parent_id else None,
         # A US follow-up's number in its chain (0.10.96, B3): "Follow-up #n".
         "follow_up": (context.get("follow_up") or {}).get("number"),
@@ -2396,6 +2398,34 @@ def cancel_follow_up(
     return detail(db, control_db, ctx, obligation)
 
 
+RESPONSE_TO_FDA = "Response to FDA request"
+
+
+def attach_request(db, ctx, follow: ReportObligation, text: str, received_on: date, due_on: date) -> ReportObligation:
+    """An FDA request that arrives while follow-up ``follow`` is open is kept on it, with its dates (owner decision 1
+    after B3 run 4). A draft gets H2 "Response to FDA request" ticked; one not yet sent is due by the earlier date.
+    An approved or sent follow-up keeps its file as it is: the page says to reopen it or answer in the next one.
+    ``follow`` is locked and read fresh by the caller."""
+    entries = dict(follow.entries or {})
+    now, actor = _now(), str(ctx.user_id)
+    ticks = [item.strip() for item in str((entries.get("H2") or {}).get("value") or "").split(";") if item.strip()]
+    tick = follow.state in rules.EDITABLE and RESPONSE_TO_FDA not in ticks
+    old = {"H2": "; ".join(ticks) or None, "due_on": _iso(follow.due_on)}
+    if tick:
+        entries["H2"] = {"value": "; ".join([*ticks, RESPONSE_TO_FDA]), "by": actor, "at": _iso(now)}
+    if follow.state in rules.CANCELLABLE and (follow.due_on is None or due_on < follow.due_on):
+        follow.due_on = due_on
+    # Kept beside the fields (no "by" at the top: recording a request alone does not make a preparer).
+    held = (entries.get("FDA_REQUESTS") or {}).get("items") or []
+    request = {"text": text, "received_on": _iso(received_on), "due_on": _iso(due_on), "by": actor, "at": _iso(now)}
+    entries["FDA_REQUESTS"] = {"items": [*held, {**request, "h2_ticked": RESPONSE_TO_FDA in ticks or tick}]}
+    follow.entries, follow.updated_at = entries, now
+    new = {"H2": (entries.get("H2") or {}).get("value"), "due_on": _iso(follow.due_on)}
+    _audit(db, ctx, "REPORT_REQUEST_ATTACHED", follow, old, new, request_text=text, received_on=_iso(received_on),
+           due_on=_iso(due_on), state=follow.state)  # fmt: skip
+    return follow
+
+
 class InformationRequest(BaseModel):
     request_text: str = Field(max_length=rules.NOTE_MAX * 2)
     received_on: date
@@ -2423,11 +2453,30 @@ def request_for_information(
     if payload.due_on < payload.received_on:
         raise _error(422, "DUE_BEFORE_REQUEST", "The response cannot be due before the request arrived")
     if parent.kind == "INITIAL" and parent.form_code == forms.FDA_3500A.code:
-        # A US request for information is answered by a follow-up, H2 "Response to FDA request" (0.10.96, spec 3.3).
-        child = create_follow_up(
-            db, ctx, parent, payload.received_on, text, ["Response to FDA request"], None, payload.due_on
+        # A US request for information is answered by a follow-up, H2 "Response to FDA request" (0.10.96, spec 3.3);
+        # one arriving while a follow-up is open is recorded on that one (owner decision 1 after B3 run 4).
+        def is_open(row) -> bool:
+            return row.state not in (*rules.VALID_SUBMISSION, rules.CANCELLED)
+
+        open_one = next((row for row in _follow_ups(db, parent.tenant_id, parent.id) if is_open(row)), None)
+        if open_one is not None:  # read again under its lock: it may have been accepted or cancelled meanwhile
+            open_one = _obligation(db, parent.tenant_id, open_one.id, lock=True)
+            open_one = open_one if is_open(open_one) else None
+        if open_one is not None:
+            child = attach_request(db, ctx, open_one, text, payload.received_on, payload.due_on)
+        else:
+            child = create_follow_up(
+                db, ctx, parent, payload.received_on, text, [RESPONSE_TO_FDA], None, payload.due_on
+            )
+        _audit(
+            db,
+            ctx,
+            "REPORT_INFORMATION_REQUESTED",
+            parent,
+            response=str(child.id),
+            due_on=_iso(payload.due_on),
+            attached=open_one is not None,
         )
-        _audit(db, ctx, "REPORT_INFORMATION_REQUESTED", parent, response=str(child.id), due_on=_iso(payload.due_on))
         db.commit()
         return detail(db, control_db, ctx, child)
     now = _now()

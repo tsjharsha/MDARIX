@@ -609,6 +609,34 @@ describe("US follow-ups: the chain, starting one, and what a follow-up sends", (
     expect(render(<ReportsSection />, api("?report=r1"))).not.toContain("Cancel follow-up");
   });
 
+  it("records an FDA request on the open follow-up and shows it there with its dates", () => {
+    resources.data[`${REPORTS}/r1`] = report(5, {
+      responses: [
+        response("f1", 1, "ACCEPTED", "Accepted"),
+        response("f2", 2, "APPROVED", "Approved snapshot"),
+      ] as ReportDetail["responses"],
+    });
+    const initial = render(<ReportsSection />, api("?report=r1"));
+    expect(initial).toContain("Record it on follow-up #2");
+    expect(initial).not.toContain("Start the follow-up for this request");
+    expect(initial).toContain("An FDA request that arrives meanwhile is recorded on it.");
+    resources.data[`${REPORTS}/r1`] = report(3, {
+      kind: "RESPONSE",
+      follow_up: 2,
+      sections: [h2("Device evaluation")],
+      fda_requests: [
+        { text: "FDA asks for the lot history.", received_on: "2026-11-12", due_on: "2026-11-20", h2_ticked: false },
+        { text: "FDA asks for service records.", received_on: "2026-11-14", due_on: "2026-12-01", h2_ticked: true },
+      ],
+    });
+    const html = render(<ReportsSection />, api("?report=r1"));
+    const head = html.slice(html.indexOf('aria-label="Follow-up #2"'));
+    expect(head).toContain("FDA requests recorded on this follow-up");
+    expect(head).toContain("FDA asks for the lot history.");
+    expect(head).toContain("FDA asks for service records.");
+    expect(head.match(/Reopen it to tick H2/g)).toHaveLength(1); // only the one recorded after approval
+  });
+
   it("offers a follow-up the same three files after approval, named for the follow-up", () => {
     resources.data[`${REPORTS}/r1`] = report(3, {
       kind: "RESPONSE",
