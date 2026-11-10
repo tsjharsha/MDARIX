@@ -58,7 +58,8 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - A complaints import refuses a row whose version is not its lot's version ("Lot L is of version Rev A, not 'Rev C'").
   A blank version cell no longer clears or replaces a stored version; a new complaint's version taken from its lot is
   shown "(from the lot)" in its searchable record. A re-upload cannot move a held complaint to another product (row
-  error), and a version change of a complaint in a case is noted with the case, to check its scope.
+  error), and a version change of a complaint in a case is noted with the case, to check its scope
+  (when problem rows are set aside, only for the rows still imported).
 - An investigations import refuses complaints of another product and a change of a held investigation's product; a
   CAPA naming an investigation must name the investigation's product. A re-upload that changes the product or version
   of a risk, requirement, investigation or CAPA is kept in the history of field changes, like a complaint's.
