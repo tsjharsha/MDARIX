@@ -320,6 +320,8 @@ export type ImportedBacklogList = {
     /** Owner, 10 Nov (OD-12 + 3a): an old flagged import keeps its flags, listed first, with the QMS note. */
     flags?: Flag[];
     note?: string | null;
+    /** Section Q decision 2: an old flagged import whose QMS triage waits for a person ("Confirm QMS triage"). */
+    qms_to_confirm?: boolean;
   }[];
 };
 export type TriageList = {

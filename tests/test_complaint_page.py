@@ -159,3 +159,27 @@ def test_the_dismissed_view_lists_only_records_decided_as_not_complaints(trial):
     assert all(item["decision"]["decision"] == "DISMISSED" for item in dismissed["items"])
     decided = user.get("/api/v1/complaints/second-look", params={"state": "decided"}).json()
     assert decided["total"] == decided["summary"]["dismissed"] + decided["summary"]["confirmed"]
+
+
+@pytest.mark.db
+def test_a_backlog_complaint_shows_the_backlog_note_and_target_not_an_overdue_market(trial):  # section Q decision 3
+    """Owner, 10 Nov: an old flagged import is Imported backlog work; its page's legal clocks show the backlog note
+    and target (the reportability decision was the QMS's), never its market window read overdue."""
+    from datetime import date, timedelta
+
+    from tests.test_intake_triage_api import _upload
+
+    user = trial["user"]
+    aware = (date.today() - timedelta(days=200)).isoformat()
+    _upload(
+        user,
+        "complaint_id,product_id,product_name,description,status,awareness_date,country,death\n"
+        + f"CP-BL-1,CP-PUMP,CP Pump,Patient died after the pump stopped,open,{aware},US,Y\n",
+    )
+    page = user.get(f"{EVENTS}/CP-BL-1").json()
+    due = page["work"]["due"]
+    assert due and not [item for item in due if item["state"] == "OVERDUE"], due
+    line = next(item for item in due if item["key"].endswith(":backlog"))
+    assert line["title"] == "Imported: check the reportability decision in your QMS (Imported backlog target)"
+    assert line["market"] == "US" and line["opens"]["target"]["tab"] == "Imported backlog"
+    assert page["summary"]["nearest_deadline"]["title"] == line["title"]

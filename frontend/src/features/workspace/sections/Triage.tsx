@@ -1010,6 +1010,7 @@ export function ImportedBacklog() {
               <div className="uw-cr-body">
                 <div className="uw-cr-head">
                   <strong className="uw-cr-id">{item.ref}</strong>
+                  {item.qms_to_confirm && <ToneBadge tone="warning" label="From your QMS: confirm" />}
                   <span className="uw-cr-meta">
                     {item.product_name ?? "Product not given"} · aware {formatDate(item.awareness_at)} · imported{" "}
                     {formatDate(item.imported_at)}
@@ -1043,7 +1044,7 @@ export function ImportedBacklog() {
                       className="ac-primary"
                       onClick={() => open("Complaints", `To triage?${new URLSearchParams({ complaint: item.id })}`)}
                     >
-                      Open the triage form
+                      {item.qms_to_confirm ? "Confirm QMS triage" : "Open the triage form"}
                     </button>
                   ) : null}
                   {canWrite && !item.flags?.length && (

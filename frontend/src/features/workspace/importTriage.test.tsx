@@ -69,6 +69,22 @@ const BACKLOG: ImportedBacklogList = {
       flags: [{ code: "MALFUNCTION", label: "Malfunction alleged" }],
       note: "Imported: check the reportability decision in your QMS",
     },
+    // Section Q decision 2: an old flagged import with its QMS triage still to confirm.
+    {
+      kind: "COMPLAINT",
+      id: "c3",
+      ref: "QB-OLD",
+      identifier: "QB-OLD",
+      product_name: "QB Pump",
+      words: "Patient died after the pump stopped",
+      awareness_at: "2026-07-10T00:00:00Z",
+      imported_at: "2026-11-10T00:00:00Z",
+      due_at: "2026-11-24T23:59:00Z",
+      overdue: false,
+      flags: [{ code: "DEATH", label: "Death recorded" }],
+      note: "Imported: check the reportability decision in your QMS",
+      qms_to_confirm: true,
+    },
     {
       kind: "COMPLAINT",
       id: "b1",
@@ -139,5 +155,13 @@ describe("QMS triage and the imported backlog (0.10.93)", () => {
     expect(html.match(/Open the triage form/g)).toHaveLength(1);
     expect(html.match(/Confirm triage</g)).toHaveLength(1);
     expect(render(<Triage />)).not.toContain("OB-01");
+  });
+
+  it("offers Confirm QMS triage on an old flagged import whose QMS triage waits for a person", () => {
+    const html = render(<ImportedBacklog />);
+    const card = html.slice(html.indexOf("QB-OLD"), html.indexOf("BL-OLD"));
+    expect(card).toContain("From your QMS: confirm");
+    expect(card).toContain("Confirm QMS triage");
+    expect(card).not.toContain("Open the triage form");
   });
 });
