@@ -315,7 +315,10 @@ describe("every link source resolves to an existing screen (6.10)", () => {
       const words = match[1];
       // A path's second level ("Readiness › Oversight › Ready to close"): a part of the tab, not a screen.
       if (text.slice(0, match.index).endsWith("› ")) continue;
-      const section = Object.keys(PLACES).find((name) => words.endsWith(name));
+      // A screen only the new navigation has (Settings, 0.10.97) is checked against its tabs there.
+      const find = (from: typeof PLACES) => Object.keys(from).find((name) => words.endsWith(name));
+      const places = find(PLACES) ? PLACES : NEW_PLACES;
+      const section = find(places);
       if (!section) {
         expect(
           elsewhere.some((name) => words.endsWith(name)),
@@ -326,7 +329,7 @@ describe("every link source resolves to an existing screen (6.10)", () => {
       const after = text.slice((match.index ?? 0) + match[0].length);
       // A screen without tabs names a part of itself (Import data › Distribution, a template); Getting started has
       // two parts the guide names besides its tabs (0.10.87).
-      const parts = PLACES[section].tabs.length ? [...PLACES[section].tabs, ...(PANELS[section] ?? [])] : [after];
+      const parts = places[section].tabs.length ? [...places[section].tabs, ...(PANELS[section] ?? [])] : [after];
       const tab = parts.find((name) => after.startsWith(name));
       expect(tab, `the guide's "${section} › ${after.slice(0, 30)}" names no tab of ${section}`).toBeDefined();
       checked += 1;
