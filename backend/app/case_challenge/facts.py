@@ -215,8 +215,29 @@ def _pattern(db: Session, t: str, components: dict, problems: set[str], now: dat
         rows = [row for row in supplier_service._problems(db, t, ids, since) if row["problem"] in problems]
         box = supplier_service.pattern(name, True, versions, rows, supplier_service._units(db, t, ids), [], {})
         if box["found"]:
-            return {**box, "supplier": name, "supplier_id": supplier_id}
+            part_versions = [
+                {"id": v["version_id"], "ref": v["version_identifier"], "product": v["product_name"]} for v in versions
+            ]
+            return {**box, "supplier": name, "supplier_id": supplier_id, "part_versions": part_versions}
     return None
+
+
+def _entity_evidence(db: Session, t: str, entity_ids: list[str]) -> dict[str, list[str]]:
+    """``{component or supplier id: [evidence refs]}``: evidence linked to the part or its supplier (H-1's "missing")."""
+    if not entity_ids:
+        return {}
+    rows = db.execute(
+        text(
+            "SELECT l.entity_id, e.business_id FROM evidence_entity_links l JOIN evidence e ON e.tenant_id = l.tenant_id "
+            "AND e.id = l.evidence_id WHERE l.tenant_id = :t AND l.entity_type IN ('Component', 'Supplier') "
+            "AND l.entity_id = ANY(CAST(:ids AS uuid[]))"
+        ),
+        {"t": t, "ids": entity_ids},
+    ).mappings()
+    found: dict[str, list[str]] = defaultdict(list)
+    for r in rows:
+        found[str(r["entity_id"])].append(r["business_id"])
+    return dict(found)
 
 
 def _brief_conclusion(db: Session, case) -> str | None:
@@ -340,6 +361,9 @@ def read(db: Session, case, now: datetime) -> dict:
         "lots": lots,
         "changes": changes,
         "pattern": _pattern(db, t, components, problems, now) if problems else None,
+        "entity_evidence": _entity_evidence(
+            db, t, sorted({*components, *(s["id"] for c in components.values() for s in c["suppliers"])})
+        ),
         "hypotheses": hypotheses,
         "links": _evidence_links(db, case, hypotheses),
         "unknowns": unknowns,
