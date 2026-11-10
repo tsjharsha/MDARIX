@@ -466,6 +466,24 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             ],
             note: "Uploading a complaints file again updates its records and keeps each field's change, shown in that import's data-quality report. An upload that brings a QMS complaint ID entered on a call closes its QMS-complaint task.",
           },
+          {
+            title: "Bring in call logs, export Cases, add files and translations",
+            steps: [
+              "Import data › Cases (call logs) brings in a call centre's or CRM's calls as Cases. The words are masked; contact columns are not read (contacts stay in your source system). Uploading the file again updates each Case by its case ID; old calls come in as backlog, with no check due.",
+              "On Complaints › First contact, Export these cases (CSV) exports the Cases on show, and Export for QMS entry lists the complaints made from Cases that have no QMS ID yet. Contacts are masked; each export is in the audit trail.",
+              "On a Case, Files takes photos and logs (PDF, text, CSV, PNG or JPEG, up to 10 MB). Every file is virus-scanned; a file that fails is not stored.",
+              "When the words may not be English, the Case says so: add What they said later › A translation of their words. The original is kept.",
+            ],
+          },
+          {
+            title: "Get an e-mail when an urgent case arrives",
+            who: "Quality reviewers and regulatory approvers set it.",
+            steps: [
+              "Open Settings › Alerts and files and tick Send an e-mail when an urgent case arrives (off by default).",
+              "The e-mail goes at once to the escalation role and the Triage Leads. It says only that an urgent case arrived and to open MDARIX: no names, product or words.",
+            ],
+            note: "It is sent for an urgent case, a case escalated with a death or serious injury, and a triage reopened on one; one reminder follows when the acknowledgement is overdue. The in-app alert stays either way.",
+          },
         ],
       },
       {
@@ -475,6 +493,30 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         purpose:
           "Most complaints are resolved at service level. You decide how each one is resolved, in a fixed order, and sign once; a complaint that meets an escalation trigger opens an investigation. The disposition never replaces the reportability assessment.",
         tasks: [
+          {
+            title: "Resolve and close a routine complaint: one screen, one signature",
+            who: "Anyone who triages, opens investigations or reviews quality. Administrators never sign.",
+            steps: [
+              "After triage, the complaint's next step reads Resolve and close (open it from the complaint page, or from Complaints › Dispositions). In a free trial, SAMPLE-RT-01 under More cases to try opens it.",
+              "Check what happened, then choose the Problem code (required): your organization's codes, each with its IMDRF term.",
+              "Troubleshooting is filled in from what was tried on the call, and the Correction from what the caller asked for. Type the correction and the Result. A Service ticket is needed only for Part replaced or Setting corrected.",
+              "Choose Why no investigation (ISO 13485:2016 clause 8.2.2). Beside it MDARIX shows the similar complaints in the last 12 months and the escalation triggers it checked; only Other needs your own words.",
+              "Check the Cause and the classification (where it was used, who used it), filled in from the case.",
+              "Record Customer told: how, when and a note or QMS letter ID, or Not possible with the reason. It is written to the communications log; MDARIX sends nothing to the customer.",
+              "Enter Your password and the Authenticator code and choose Resolve and close (Resolve and mark ready to close in your QMS when your QMS owns the complaint).",
+            ],
+            result:
+              "One signature writes two signed records, the disposition and ready to close, both in the event's decision record. When MDARIX owns the complaint it is Closed; otherwise your QMS closes it. Anything still open is listed, and the screen offers Resolve alone.",
+            note: "A trigger met (death, serious injury, a reportable market, a recurrence), a matching open investigation or the reportability watch takes the complaint off this screen to the full decision tree. Escalate instead is always one click away.",
+          },
+          {
+            title: "Reopen a closed complaint",
+            steps: [
+              "Open the complaint: Closed in MDARIX shows with Reopen. Give the reason and choose Reopen.",
+              "A new death or serious injury on a closed complaint reopens it by itself, with its triage on the fast track.",
+            ],
+            note: "The earlier closure stays in the record, superseded; the reopening and its reason are in the audit trail.",
+          },
           {
             title: "Close a routine complaint on the routine path",
             who: "Leader, and anyone who triages trends, opens investigations or reviews quality.",
@@ -741,7 +783,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         title: "Events: owner, stage, closure checklist and the decision record",
         where: "Readiness › Oversight › Ready to close in the QMS? (Checklist)",
         purpose:
-          "Each complaint MDARIX works on is an event with an owner. Its checklist shows what still blocks closure, read from your records. MDARIX never closes the complaint: your QMS does.",
+          "Each complaint MDARIX works on is an event with an owner. Its checklist shows what still blocks closure, read from your records, including that the customer was told. When your QMS owns the complaint, your QMS closes it; when MDARIX owns it, Resolve and close closes it in MDARIX.",
         tasks: [
           {
             title: "Sign ready to close and file the record",

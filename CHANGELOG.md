@@ -89,6 +89,16 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   acknowledgement is overdue. A failed e-mail never cancels the in-app escalation.
 - A translation addendum (Case › Said later › "A translation of their words"): the original words are always kept.
   A Case whose words may not be English says so ("the harm-word check reads English only").
+- Settings › Alerts and files: the urgent e-mail switch and the organization's file storage (a free trial keeps
+  100 MB). The Cases list offers "Export these cases (CSV)" and "Export for QMS entry (CSV)" to people with
+  `data.export`; the Case check drawer has a Files section (list, download, upload; virus-scanned).
+- Getting started › More cases to try lists the routine sample complaint SAMPLE-RT-01, which opens its Resolve and
+  close drawer. The user guide covers Resolve and close, Reopen, the Cases import and export, files on a Case,
+  translations and the urgent e-mail.
+- Trials approved before 0.10.97 (`scripts/refresh_trial_story.py`, `backend/app/trial/sample_0_10_97.py`):
+  SAMPLE-RT-03 gets its reply to the reporter in the communications log (through the distributor, at the
+  disposition's signed time), once, so "The customer was told" is met on day 0. The signed disposition is not
+  edited.
 
 ### Changed (harm words)
 
