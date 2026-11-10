@@ -467,12 +467,19 @@ def _watch_clocks(db, control_db, tenant_id, ids: set[str] | None, now, reminder
         # provisional line that says what to enter, as Home's (oversight/service.py _watch_items).
         market = None if needs else binding.get("market")
         state = rules.state_of(due_at, now, reminder_hours)
+        # Section Q decision 3 (owner, 10 Nov): an Imported backlog complaint's clock is the backlog target, with its
+        # note, never a market window read overdue (reportability/service.py backlog_binding).
+        backlog = bool(binding.get("backlog"))
+        if backlog:
+            needs, market = [], binding.get("market")
         out.setdefault(str(item["id"]), []).append(
             {
-                "key": f"watch:{item['id']}:{'facts' if needs else market}",
+                "key": f"watch:{item['id']}:{'backlog' if backlog else 'facts' if needs else market}",
                 "category": "REPORTING",
                 "category_label": rules.CATEGORIES["REPORTING"],
-                "title": f"Enter {facts.labels(needs)}: needed for the reporting clocks (provisional deadline)"
+                "title": f"{binding['window']} (Imported backlog target)"
+                if backlog
+                else f"Enter {facts.labels(needs)}: needed for the reporting clocks (provisional deadline)"
                 if needs
                 else f"{markets.MARKET_LABELS.get(market, market)}: not assessed yet, provisional deadline",
                 "market": market,
@@ -481,7 +488,9 @@ def _watch_clocks(db, control_db, tenant_id, ids: set[str] | None, now, reminder
                 "state": state,
                 "state_label": rules.STATE_LABELS[state],
                 "hours_left": rules.hours_left(due_at, now),
-                "opens": links.target("Complaints", "Reportability", record=("complaint", item["id"])),
+                "opens": links.target("Complaints", "Imported backlog")
+                if backlog
+                else links.target("Complaints", "Reportability", record=("complaint", item["id"])),
             }
         )
     return out

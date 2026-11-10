@@ -305,3 +305,61 @@ def test_old_flagged_imports_wait_in_the_backlog_and_raise_no_overdue_items(fres
     watched = _ok(user.get("/api/v1/complaints/reportability", params={"show": "all", "page_size": 200}))["items"]
     clocks = [entry["binding"] for entry in watched if (entry.get("complaint_identifier") or "").startswith("OB-")]
     assert clocks and all(clock["window"] == first["note"] and clock["state"] != "OVERDUE" for clock in clocks)
+
+
+def test_old_flagged_imports_with_qms_triage_wait_in_the_backlog_recent_ones_do_not(trial):  # section Q decision 2
+    """Owner, 10 Nov: an old flagged import that came with its QMS triage ("From your QMS: confirm") is Imported
+    backlog work too (flagged first, the note, the backlog target, off To triage, no Oversight or bell item), and its
+    QMS triage is confirmed from the backlog card; a recent one stays on To triage as it was."""
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    old, recent = ((date.today() - timedelta(days=days)).isoformat() for days in (120, 5))
+    header = (
+        "complaint_id,product_id,product_name,description,status,awareness_date,country,death,"
+        "triage_date,triage_severity,triage_owner,immediate_action\n"
+    )
+    _upload(
+        user,
+        header
+        + f"QB-OLD,QB-PUMP,QB Pump,Patient died after the pump stopped,open,{old},US,Y,{old},Minor,Complaint unit,\n"
+        + f"QB-NEW,QB-PUMP,QB Pump,Patient died after the pump stopped,open,{recent},US,Y,{recent},Minor,"
+        + "Complaint unit,\n",
+    )
+    backlog = {item["ref"]: item for item in _ok(user.get(f"{TRIAGE}/backlog", params={"page_size": 100}))["items"]}
+    assert "QB-NEW" not in backlog
+    held = backlog["QB-OLD"]
+    assert held["flags"] and held["qms_to_confirm"] is True
+    assert held["note"] == "Imported: check the reportability decision in your QMS"
+    assert list(backlog).index("QB-OLD") < min(
+        (index for index, item in enumerate(backlog.values()) if not item["flags"]), default=len(backlog)
+    )
+    # Off To triage (in the data, so its form opens), the backlog target as its clock, no market clock, no alert.
+    listed = _triage(user)
+    item = listed["QB-OLD"]
+    assert item["backlog"] is True and item["qms_to_confirm"] is True and item["deadlines"] == []
+    assert item["triage_clock"]["due_at"] == held["due_at"] and not item["acknowledgement"]["required"]
+    oversight = _ok(user.get("/api/v1/oversight", params={"show": "all"}))["items"]
+    assert not [entry for entry in oversight if entry.get("complaint_id") == held["id"]]
+    assert not [entry for entry in _ok(user.get("/api/v1/oversight/alerts"))["items"] if entry.get("ref") == "QB-OLD"]
+    # A recent one is as it was: "From your QMS: confirm" on To triage, not backlog.
+    assert listed["QB-NEW"]["qms_to_confirm"] is True and listed["QB-NEW"]["backlog"] is False
+    # "Confirm QMS triage" from the backlog card: the full form, a person's name on it, then off the backlog.
+    me = _ok(user.get(TRIAGE))["people"][0]["id"]
+    _ok(
+        user.post(
+            f"{TRIAGE}/COMPLAINT/{held['id']}/confirm-qms",
+            json={
+                "severity": "CATASTROPHIC",
+                "event_owner": me,
+                "triage_owner": me,
+                "immediate_action": "Checked against the QMS record.",
+                "public_health_threat": False,
+                "threat_reason": "One device, one patient; no sign of a wider problem.",
+                "awareness_confirmed_at": item["awareness"]["at"],
+                "seen_version": item["record"]["version"],
+            },
+        )
+    )
+    confirmed = _record(tenant_id, "QB-OLD")
+    assert confirmed.completed_at is not None and confirmed.confirmed_by is not None
+    after = _ok(user.get(f"{TRIAGE}/backlog", params={"page_size": 100}))["items"]
+    assert "QB-OLD" not in {entry["ref"] for entry in after}

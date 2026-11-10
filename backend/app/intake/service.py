@@ -576,8 +576,9 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
                 record is None or record.source_system != "QMS"
             ),  # TR-37: a QMS triage accepted at import is not listed
             # OD-12 + 3a (owner, 10 Nov): known of more than backlog_days before the import and never triaged here,
-            # flagged or not, it is Imported backlog work (imported_backlog): its regulatory clock ran in the QMS.
-            "backlog": record is None
+            # flagged or not, it is Imported backlog work (imported_backlog): its regulatory clock ran in the QMS. A QMS
+            # triage still to confirm is no triage here yet (owner, 10 Nov, section Q decision 2).
+            "backlog": (record is None or qms_waiting(record))
             and complaint.ingestion_timestamp is not None
             and complaint.source_system not in ("MDARIX_SAMPLE", "MDARIX_CASE")
             and awareness["at"] < imported_at - timedelta(days=backlog_days),
@@ -645,6 +646,11 @@ BACKLOG_READ = 20_000  # shortcut: one read of this many candidates; page it in 
 BACKLOG_NOTE = "Imported: check the reportability decision in your QMS"
 
 
+def qms_waiting(record: TriageRecord) -> bool:
+    """T-D9: a triage imported from the QMS on a flagged complaint that no person has confirmed or escalated yet."""
+    return record.source_system == "QMS" and record.completed_at is None and record.escalated_at is None
+
+
 def imported_backlog(
     db: Session,
     tenant_id: uuid.UUID,
@@ -658,14 +664,28 @@ def imported_backlog(
     import, open, never triaged and not taken up: their own "Imported backlog" view, due ``backlog_target_days``
     working days after the import. Read by query (flagged first, then oldest first), not from the triage list's newest
     2,000. A flagged one (owner, 10 Nov: OD-12 + 3a) keeps its flag and its fast-track form, with the note to check the
-    reportability decision in the QMS, where its regulatory clock ran; an unflagged one is confirmed in one click."""
+    reportability decision in the QMS, where its regulatory clock ran; an unflagged one is confirmed in one click. A
+    flagged one imported with its QMS triage (T-D9, not yet confirmed) is here too, its "Confirm QMS triage" offered."""
     now = now or now_utc()
     days, target_days = backlog_settings(db, tenant_id)
+    record_of = (
+        TriageRecord.tenant_id == tenant_id,
+        TriageRecord.subject_kind == COMPLAINT,
+        TriageRecord.subject_id == Complaint.id,
+    )
+    waiting = (  # qms_waiting, in SQL
+        TriageRecord.source_system == "QMS",
+        TriageRecord.completed_at.is_(None),
+        TriageRecord.escalated_at.is_(None),
+    )
     taken = (
         exists().where(
-            TriageRecord.tenant_id == tenant_id,
-            TriageRecord.subject_kind == COMPLAINT,
-            TriageRecord.subject_id == Complaint.id,
+            *record_of,
+            or_(
+                TriageRecord.source_system.is_distinct_from("QMS"),
+                TriageRecord.completed_at.isnot(None),
+                TriageRecord.escalated_at.isnot(None),
+            ),
         ),
         exists().where(
             InvestigationComplaint.tenant_id == tenant_id, InvestigationComplaint.complaint_id == Complaint.id
@@ -700,6 +720,7 @@ def imported_backlog(
         Complaint.recorded_timestamp,
         Complaint.ingestion_timestamp,
         Complaint.created_at,
+        exists().where(*record_of, *waiting).label("qms_to_confirm"),
     ).filter(
         Complaint.tenant_id == tenant_id,
         Complaint.source_system.notin_(("MDARIX_SAMPLE", "MDARIX_CASE")),
@@ -737,6 +758,8 @@ def imported_backlog(
                 "overdue": due < now,
                 "flags": flags,
                 "note": BACKLOG_NOTE if flags else None,
+                # Section Q decision 2: a QMS triage to confirm is confirmed from here ("Confirm QMS triage").
+                "qms_to_confirm": row.qms_to_confirm,
             }
         )
     items.sort(key=lambda item: not item["flags"])  # flagged first; stable, so oldest first within each

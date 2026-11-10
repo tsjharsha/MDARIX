@@ -93,7 +93,9 @@ trials' existing Cases; nothing is written until the owner approves the list), t
   organization settings). Read in full, oldest first, however large the import. Old imported complaints **with** a
   harm flag wait there too, listed first with their flags and the note "Imported: check the reportability decision
   in your QMS": the full triage form, the same 10-working-day target, and no regulatory clock shown overdue or
-  alerted (the clock ran in your QMS). Recent imports and Cases logged in MDARIX are unchanged.
+  alerted (the clock ran in your QMS). One that came with its QMS triage ("From your QMS: confirm") waits there too,
+  with "Confirm QMS triage" on its card, and the complaint page shows the note and the backlog target in place of a
+  market clock. Recent imports and Cases logged in MDARIX are unchanged.
 - **Second look: "Closed without a reportability decision?"** A complaint closed in your QMS with a death or a
   serious injury and no signed market conclusion comes to the second look.
 
