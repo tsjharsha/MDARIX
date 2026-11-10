@@ -40,7 +40,15 @@ from sqlalchemy.orm import Session
 
 from backend.app import product_facts
 from backend.app.csv_safe import FORMULA_TRIGGERS
-from backend.app.db.models.foundation import Complaint, LotBatch, ManufacturingSite, Product, ProductVersion
+from backend.app.db.models.foundation import (
+    Complaint,
+    Investigation,
+    InvestigationComplaint,
+    LotBatch,
+    ManufacturingSite,
+    Product,
+    ProductVersion,
+)
 from backend.app.trial import business_imports, insight_questions
 from backend.app.trial.columns import examples as column_examples
 from backend.app.trial.columns import match as columns_match
@@ -1407,6 +1415,7 @@ def _check_references(entity: str, rows, lookup: _Lookup, report: _Report, creat
     new_versions: set[tuple[str, str]] = set()
     new_lots: set[str] = set()
     new_complaints: set[str] = set()
+    moved: dict = {}
     report.new_rows = 0
     held = lookup.complaints(row["complaint_id"] for _, row in rows) if entity == "complaints" else {}
     for line, row in rows:
@@ -1449,6 +1458,7 @@ def _check_references(entity: str, rows, lookup: _Lookup, report: _Report, creat
             elif version is not None and existing.product_version_id not in (None, version.id):
                 report.add(line, "lot_id", f"Lot '{row['lot_id']}' already belongs to another version.")
             continue
+        stored = held.get(row["complaint_id"])
         if row.get("lot_id"):
             lot = lookup.lot(row["lot_id"])
             if lot is None:
@@ -1457,11 +1467,67 @@ def _check_references(entity: str, rows, lookup: _Lookup, report: _Report, creat
                 lot_version = lookup.version_by_id(lot.product_version_id)
                 if lot_version is not None and lot_version.product_id != product.id:
                     report.add(line, "lot_id", f"Lot '{row['lot_id']}' belongs to a different product.")
+                else:
+                    _check_lot_version(line, row, version, lot_version, stored, report)
+        _check_held(line, row, product, version, stored, report, moved)
         if row["complaint_id"] not in held and row["complaint_id"] not in new_complaints:
             new_complaints.add(row["complaint_id"])
             new += 1
             report.new_rows += 1
+    _note_cases(lookup, moved, report)
     return new
+
+
+def _check_lot_version(line, row, version, lot_version, stored, report: _Report) -> None:
+    """PV-1 F4: a complaint's version must be its lot's version when both are known. A blank version cell means the
+    stored version (F5), or the lot's for a new complaint."""
+    own = version.id if version is not None else (stored.product_version_id if stored is not None else None)
+    if lot_version is not None and own is not None and own != lot_version.id:
+        named = repr(row["version"]) if row.get("version") else "the stored version"
+        report.add(
+            line,
+            "version",
+            f"Lot '{row['lot_id']}' is of version '{lot_version.version_identifier}', not {named}: correct one of them.",
+        )
+
+
+def _check_held(line, row, product, version, stored, report: _Report, moved: dict) -> None:
+    """PV-1 F6: a re-upload never moves a complaint to another product; a version change is noted when the complaint
+    is in a case (``moved``: complaint id to its row, for ``_note_cases``)."""
+    if stored is None:
+        return
+    if product is None or stored.product_id != product.id:
+        report.add(
+            line,
+            "product_id",
+            f"Complaint '{row['complaint_id']}' is held for another product; a file cannot move it to "
+            f"'{row['product_id']}'.",
+        )
+    elif version is not None and version.id != stored.product_version_id:
+        moved[stored.id] = (line, row["complaint_id"])
+
+
+def _note_cases(lookup: _Lookup, moved: dict, report: _Report) -> None:
+    """The cases holding a complaint whose version a re-upload changes: a note for each, to check the case's scope."""
+    if not moved:
+        return
+    rows = (
+        lookup.db.query(InvestigationComplaint.complaint_id, Investigation.investigation_identifier)
+        .join(
+            Investigation,
+            (Investigation.tenant_id == InvestigationComplaint.tenant_id)
+            & (Investigation.id == InvestigationComplaint.investigation_id),
+        )
+        .filter(
+            InvestigationComplaint.tenant_id == lookup.tenant_id, InvestigationComplaint.complaint_id.in_(list(moved))
+        )
+        .all()
+    )
+    for complaint_id, case in rows:
+        line, identifier = moved[complaint_id]
+        report.notes.append(
+            f"Line {line}: complaint '{identifier}' changes version while it is in case {case}; check the case's scope."
+        )
 
 
 def _check_complaints_creating(rows, lookup: _Lookup, report: _Report) -> int:
@@ -1473,6 +1539,7 @@ def _check_complaints_creating(rows, lookup: _Lookup, report: _Report) -> int:
     products: set[str] = set()
     versions: set[tuple[str, str]] = set()
     lots: dict[str, str] = {}
+    moved: dict = {}
     held = lookup.complaints(row["complaint_id"] for _, row in rows)
     for line, row in rows:
         product_id = row["product_id"]
@@ -1480,8 +1547,11 @@ def _check_complaints_creating(rows, lookup: _Lookup, report: _Report) -> int:
         if product is None and product_id not in products:
             products.add(product_id)
         version_id = row.get("version")
-        if version_id and (product is None or lookup.version(product, version_id) is None):
+        version = lookup.version(product, version_id) if product is not None and version_id else None
+        if version_id and version is None:
             versions.add((product_id, version_id))
+        stored = held.get(row["complaint_id"])
+        _check_held(line, row, product, version, stored, report, moved)
         lot_id = row.get("lot_id")
         if lot_id:
             lot = lookup.lot(lot_id)
@@ -1493,9 +1563,20 @@ def _check_complaints_creating(rows, lookup: _Lookup, report: _Report) -> int:
                 lot_version = lookup.version_by_id(lot.product_version_id) if lot.product_version_id else None
                 if lot_version is not None and (product is None or lot_version.product_id != product.id):
                     report.add(line, "lot_id", f"Lot '{lot_id}' belongs to a different product.")
+                elif lot_version is not None and version_id and version is None:
+                    # A version the file adds is never the lot's (the lot already has its version).
+                    report.add(
+                        line,
+                        "version",
+                        f"Lot '{lot_id}' is of version '{lot_version.version_identifier}', not '{version_id}': "
+                        "correct one of them.",
+                    )
+                else:
+                    _check_lot_version(line, row, version, lot_version, stored, report)
         if row["complaint_id"] not in held and row["complaint_id"] not in complaints:
             complaints.add(row["complaint_id"])
             new += 1
+    _note_cases(lookup, moved, report)
     report.new_rows = new
     report.creates = {
         key: value
@@ -2143,6 +2224,9 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             # A re-upload sets only what its file holds: a column it leaves out (or a blank status) keeps the stored
             # value, so a file without a status column never reopens a closed complaint (J9).
             values = {name: value for name, value in values.items() if _from_file(name, row)}
+            # PV-1 F5: a blank version cell keeps a stored version; it only fills an unknown one from the lot.
+            if not row.get("version") and complaint.product_version_id is not None:
+                values.pop("product_version_id", None)
         if complaint is None:
             fields = {
                 "id": uuid.uuid4(),
@@ -2180,7 +2264,16 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             if found:  # "updated" counts the rows that changed a field, not every row seen again
                 complaint.updated_at = now
                 updated += 1
-        evidence.append(_complaint_evidence(complaint, row, product, version, lot, source))
+        # PV-1 F5: a version taken from the lot says so in the record.
+        from_lot = (
+            lookup.version_by_id(lot.product_version_id)
+            if version is None
+            and lot is not None
+            and lot.product_version_id is not None
+            and lot.product_version_id == complaint.product_version_id
+            else None
+        )
+        evidence.append(_complaint_evidence(complaint, row, product, version, lot, source, from_lot))
         if row.get("use_environment") or row.get("user_type"):
             proposed[row["complaint_id"]] = (row.get("use_environment"), row.get("user_type"))
     for identifier, names in file_lots.items():
@@ -2522,14 +2615,14 @@ def _complaint_details(row: dict) -> dict:
     return details
 
 
-def _complaint_evidence(complaint: Complaint, row: dict, product, version, lot, source: str):
+def _complaint_evidence(complaint: Complaint, row: dict, product, version, lot, source: str, from_lot=None):
     """What makes the complaint searchable by Ask MDARIX and the investigator (retrieval/record_evidence.py): its
     evidence row, written for the whole file at once by upsert_record_evidences."""
     from retrieval.record_evidence import RecordEvidence, summary
 
     facts = {
         "Product": row["product_id"],
-        "Version": row.get("version"),
+        "Version": row.get("version") or (f"{from_lot.version_identifier} (from the lot)" if from_lot else None),
         "Lot": row.get("lot_id"),
         "Event date": complaint.event_timestamp,
         "Received": complaint.complaint_timestamp,

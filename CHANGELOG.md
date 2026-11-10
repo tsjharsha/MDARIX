@@ -52,6 +52,10 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
   when the scope names exactly one and every included complaint carries it. Otherwise it reads the whole product and
   says "no single known product version", with the scope's versions. The old decision record and the old brief store
   a version by the same rule (the old brief stored none, even for a one-version case).
+- A complaints import refuses a row whose version is not its lot's version ("Lot L is of version Rev A, not 'Rev C'").
+  A blank version cell no longer clears or replaces a stored version; a new complaint's version taken from its lot is
+  shown "(from the lot)" in its searchable record. A re-upload cannot move a held complaint to another product (row
+  error), and a version change of a complaint in a case is noted with the case, to check its scope.
 
 ### Security
 
