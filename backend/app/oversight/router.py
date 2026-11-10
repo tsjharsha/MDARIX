@@ -1030,6 +1030,21 @@ def harm_words(complaint) -> str:
     return "No harm reported"
 
 
+def _resolve_label(db, control_db, tenant_id, complaint: Complaint, found: dict, blocked: list[dict]) -> str | None:
+    """B7: the next step after triage is "Resolve and close" (its Connect wording) when the disposition is next and no
+    escalation trigger is met; with a trigger it stays "Sign the disposition" (the decision tree escalates)."""
+    if not blocked or blocked[0]["code"] != "DECISION" or found["disposition"] is not None:
+        return None
+    if ((blocked[0]["opens"] or {}).get("target") or {}).get("tab") != "Dispositions":
+        return None  # decided in an investigation
+    from backend.app.complaint_disposition import resolve, service as disposition_service
+
+    facts = disposition_service.screen_facts(db, tenant_id, complaint.id, disposition_service.today_utc())
+    if facts is None or facts["triggers"]:
+        return None
+    return resolve.BUTTONS[resolve.mode_of(db, control_db, tenant_id, complaint)]
+
+
 def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict:
     from backend.app.intake import service as intake_service
     from backend.app.reportability import facts, markets
@@ -1040,6 +1055,7 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     row = closure.closure_row(db, tenant_id, complaint.id)
     items = closure.checklist(found)
     blocked = [item for item in items if item["result"] == closure.BLOCKED]
+    next_label = _resolve_label(db, control_db, tenant_id, complaint, found, blocked)
     owner = closure.owner_of(row, found["record"])
     refs = {owner, row.signed_by if row else None, row.filed_by if row else None}
     refs |= {e.signed_by for e in found["first_contact"]} | {d.signed_by for d in found["dispositions"]}
@@ -1111,7 +1127,11 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
             # The nearest dated item, the reportability watch's provisional clock included (0.10.68).
             "nearest_deadline": {key: nearest[key] for key in ("title", "due_at", "opens")} if nearest else None,
             "open_requests": len(found["requests"]),
-            "next_action": {"label": blocked[0]["action"], "detail": blocked[0]["detail"], "opens": blocked[0]["opens"]}
+            "next_action": {
+                "label": next_label or blocked[0]["action"],
+                "detail": blocked[0]["detail"],
+                "opens": blocked[0]["opens"],
+            }
             if blocked and not closure.settled(complaint, items, row)
             else None,
         },
@@ -1127,6 +1147,8 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
             "version": row.version,
             "signed_by": names.get(row.signed_by or "") or "A colleague",
             "signed_at": _iso(row.signed_at),
+            # B7: closed by MDARIX itself (Complete); reopened with a reason.
+            "closed_at": _iso(row.closed_at),
         }
         if row is not None and row.ready_state
         else None,

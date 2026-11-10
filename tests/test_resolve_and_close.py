@@ -295,8 +295,12 @@ def test_rt26_new_harm_on_a_closed_complaint_reopens_it_automatically(trial):
     item = _find(user, f"COMPLAINT:{complaint_id}")
     _ok(user.post(_triage_url(item, "confirm"), json={"seen_version": _seen(item)}))
 
+    # The complaint's next step after triage is the one screen (spec 1.4), and the screen offers the org's codes.
+    event = _ok(user.get(f"/api/v1/oversight/events/{complaint_id}"))
+    assert event["summary"]["next_action"]["label"] == "Resolve and close", event["summary"]["next_action"]
     view = user.get(_url(complaint_id)).json()
     assert view["mode"] == "COMPLETE", view["mode"]
+    assert isinstance(view["problem_codes"], list) and view["closed_at"] is None
     triggers = view["disposition"]["trigger_codes"]
     body = _body(
         view,

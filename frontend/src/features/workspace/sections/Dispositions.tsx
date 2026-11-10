@@ -14,6 +14,8 @@ import { ComplaintNextStep } from "./ComplaintNextStep";
 import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
 import { TrainingPanel } from "./MarketAssessment";
 import { EscalateButton } from "./Triage";
+import { ClassificationField, ResolveClosePanel } from "./ResolveClose";
+import { needsTree, resolvePath, type ResolveScreen } from "../resolveClose";
 import {
   BRANCH_LABELS,
   BRANCH_TONES,
@@ -241,28 +243,46 @@ export function DispositionDrawer({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const screen = useResource<DispositionScreen>(dispositionPath(complaintId));
+  // B7: the Resolve and close screen carries the disposition screen; it opens first on the routine path.
+  const resolve = useResource<ResolveScreen>(resolvePath(complaintId));
+  const [tree, setTree] = useState(false);
+  const data = resolve.data;
+  const screen = data?.disposition;
+  const oneScreen = !!data && !tree && !needsTree(data);
+  const done = () => {
+    resolve.reload();
+    onChanged();
+  };
   return (
     // A drawer opened by its address names its complaint once the screen is read (it said "Complaint").
-    <Drawer title={`${screen.data?.complaint.ref ?? title}: disposition`} onClose={onClose}>
-      {screen.state === "error" && <InlineError text="The disposition could not be read." />}
-      {screen.data && (
-        <DispositionPanel
-          key={`${screen.data.version}-${screen.data.trigger_codes.join()}`}
-          screen={screen.data}
-          onSigned={() => {
-            screen.reload();
-            onChanged();
-          }}
-          onTrained={screen.reload}
+    <Drawer
+      title={`${screen?.complaint.ref ?? title}: ${data && oneScreen ? data.button.toLowerCase() : "disposition"}`}
+      onClose={onClose}
+    >
+      {resolve.state === "error" && <InlineError text="The disposition could not be read." />}
+      {data && oneScreen && (
+        <ResolveClosePanel
+          key={`${data.disposition.version}-${data.closed}`}
+          screen={data}
+          onDone={done}
+          onTree={() => setTree(true)}
+          onTrained={resolve.reload}
         />
       )}
-      {screen.data && (
+      {screen && !oneScreen && (
+        <DispositionPanel
+          key={`${screen.version}-${screen.trigger_codes.join()}`}
+          screen={screen}
+          onSigned={done}
+          onTrained={resolve.reload}
+        />
+      )}
+      {screen && (
         <ComplaintNextStep
           complaintId={complaintId}
           here="Dispositions"
-          pending={!screen.data.current}
-          refreshKey={String(screen.data.current?.version ?? 0)}
+          pending={!screen.current}
+          refreshKey={`${screen.current?.version ?? 0}-${data?.closed}`}
         />
       )}
     </Drawer>
@@ -741,42 +761,6 @@ function QuestionHead({ number, text, state }: { number: number; text: string; s
       <strong>{text}</strong>
       <ToneBadge tone={badge.tone} label={badge.label} />
       <WhyAsked why={DISPOSITION_WHY[number]} />
-    </div>
-  );
-}
-
-function ClassificationField({
-  label,
-  options,
-  value,
-  text,
-  source,
-  onChange,
-}: {
-  label: string;
-  options: Record<string, string>;
-  value: string;
-  text: string;
-  source?: string | null;
-  onChange: (value: string, text: string) => void;
-}) {
-  const shownSource = source && source !== options[value] ? source : null;
-  return (
-    <div className="ca-field">
-      <label>
-        {label}
-        <select value={value} onChange={(event) => onChange(event.target.value, text)}>
-          {Object.entries(options).map(([code, name]) => (
-            <option key={code} value={code}>
-              {name}
-            </option>
-          ))}
-        </select>
-      </label>
-      {shownSource && <span className="uw-cr-meta">Source value: “{shownSource}” (not on the list)</span>}
-      {value === "OTHER" && (
-        <input aria-label={`${label}: other`} value={text} onChange={(event) => onChange(value, event.target.value)} />
-      )}
     </div>
   );
 }

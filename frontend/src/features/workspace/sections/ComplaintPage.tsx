@@ -697,6 +697,8 @@ function NextStepCard({
   onStep: () => void;
 }) {
   const blocked = view.checklist.filter((item) => item.result === "BLOCKED");
+  const { open } = useWorkspace();
+  const closedHere = view.ready?.closed_at;
   return (
     <section className="uw-cp-next" aria-label="Next step">
       <h2>Next step</h2>
@@ -732,6 +734,18 @@ function NextStepCard({
             onClick={onStep}
           >
             {step.label} <ChevronRight size={15} aria-hidden="true" />
+          </button>
+        </>
+      ) : closedHere ? (
+        <>
+          <b>Closed in MDARIX</b>
+          <p className="ac-muted">Resolved and closed {formatDate(closedHere)}. New harm reopens it by itself.</p>
+          <button
+            type="button"
+            className="ac-secondary"
+            onClick={() => open("Complaints", `Dispositions?complaint=${encodeURIComponent(view.event.complaint_id)}`)}
+          >
+            Reopen
           </button>
         </>
       ) : (

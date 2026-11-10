@@ -162,6 +162,25 @@ def similar_count(db: Session, tenant_id, complaint: Complaint, today) -> int:
     )
 
 
+CODES_MAX = 200
+
+
+def known_codes(db: Session, tenant_id, complaint: Complaint) -> tuple[list[str], list[str]]:
+    """The organisation's own problem codes (the picker's choices) and those already recorded on this product: a code
+    not among the latter is a new failure mode (triggers.new_failure_mode), answered on the screen (B7-D4)."""
+    code = func.upper(func.trim(Complaint.problem_code))
+    rows = (
+        db.query(code, Complaint.product_id)
+        .filter(Complaint.tenant_id == tenant_id, Complaint.problem_code.isnot(None), Complaint.id != complaint.id)
+        .distinct()
+        .limit(CODES_MAX * 5)
+        .all()
+    )
+    mine = sorted({value for value, _ in rows if value})[:CODES_MAX]
+    product = sorted({value for value, product_id in rows if value and product_id == complaint.product_id})
+    return mine, product if complaint.product_id is not None else []
+
+
 def offer(db: Session, tenant_id, complaint: Complaint, facts: dict) -> dict:
     """Whether Resolve and close is offered in full (rules.combined_offer): on the routine path, or on the watch with
     every relevant market signed and no trigger (B7-D7); and nothing else open."""
@@ -199,12 +218,14 @@ def resolve_screen(
     mode = mode_of(db, control_db, tenant_id, complaint)
     owner = _owner(db, tenant_id, complaint.id)
     row = closure.closure_row(db, tenant_id, complaint.id)
+    codes, product_codes = known_codes(db, tenant_id, complaint)
     return {
         "disposition": disposition,
         "mode": mode,
         "button": BUTTONS[mode],
         "offer": offer(db, tenant_id, complaint, facts),
         "closed": row is not None and row.closed_at is not None,
+        "closed_at": row.closed_at.isoformat() if row is not None and row.closed_at is not None else None,
         "prefill": {
             "troubleshooting": (case.troubleshooting if case else None) or "",
             "correction_type": rules.default_correction(case.requested if case else None),
@@ -213,6 +234,9 @@ def resolve_screen(
         },
         # Connect: the QMS sends the problem code; once the QMS owns the record it is read only here.
         "problem_code_read_only": complaint.record_owner == "EXTERNAL",
+        "problem_codes": codes,
+        # None: no product, so no code is a new failure mode on it.
+        "product_codes": product_codes if complaint.product_id is not None else None,
         "similar_last_12_months": similar_count(db, tenant_id, complaint, today),
         "owner": {
             "id": owner,

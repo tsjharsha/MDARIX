@@ -224,7 +224,15 @@ export type EventView = {
   state: EventState;
   state_label: string;
   changed_since_signed: boolean;
-  ready: { state: string; reason: string | null; version: number; signed_by: string; signed_at: string | null } | null;
+  ready: {
+    state: string;
+    reason: string | null;
+    version: number;
+    signed_by: string;
+    signed_at: string | null;
+    /** B7: closed in MDARIX (Complete); reopened from the disposition. */
+    closed_at?: string | null;
+  } | null;
   decision_record: {
     entries: RecordEntry[];
     sha256: string;

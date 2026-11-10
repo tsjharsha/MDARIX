@@ -41,6 +41,17 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
 - A new closure check, "The customer was told": a reply in the communications log, a "customer told" entry signed
   with the disposition, or "not possible" with the reason (anonymous, unreachable). The sample's service-level
   complaint records that its customer was told through the distributor.
+- The Resolve and close screen (Complaints › Dispositions, the complaint's drawer): it opens first when no
+  escalation trigger is met and no open investigation matches, pre-filled from the Case (troubleshooting, the
+  correction its request suggests, the service ticket), in the spec's order: what happened, the problem (code from
+  your own codes with its IMDRF term, an optional description masked like the Case words), troubleshooting and
+  resolution, why no investigation (with the similar complaints in 12 months and the triggers checked), cause and
+  classification, customer told, the reportability line, one signature. A code never recorded on the product asks
+  for the known-behaviour reference or "Escalate instead"; "Use the full decision tree" stays one click away. When
+  something else is open it offers "Resolve" only and lists what blocks closing. Flat sections (G-2).
+- The complaint's next step after triage reads "Resolve and close" (Connect: "Resolve and mark ready to close in
+  your QMS") when no trigger is met; with a trigger it stays "Sign the disposition". A complaint closed in MDARIX
+  shows "Closed in MDARIX" with a Reopen button on its page and in its drawer.
 
 ### Changed
 
@@ -50,6 +61,10 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   and "reporter withdrew" is not open on the reportability watch; "Device returned" is recorded; a new failure mode
   may be answered "known behaviour, documented in <reference>" inside the signature (every other trigger still
   escalates).
+- A refused disposition or Resolve and close signature (wrong or missing code) saves nothing but its audit: on the
+  shared trial plane the refusal's commit had saved the problem code chosen on the screen.
+- A complaint MDARIX closed stays on the triage list (done), so a death or serious injury recorded later reopens its
+  triage and the complaint.
 
 ## [0.10.96] - not released yet (ships in the big-bang release)
 
