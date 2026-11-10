@@ -61,3 +61,10 @@ def test_switched_off_the_register_answers_404(viewer, monkeypatch):
     monkeypatch.setenv("MDARIX_RULE_REGISTER", "off")
     assert viewer["client"].get(URL).status_code == 404
     assert viewer["client"].get(f"{URL}/US-floor-1").status_code == 404
+
+
+def test_the_session_says_whether_the_register_shows(viewer, monkeypatch):
+    """Step 10: the session flag the Rules tab and the Rules used panel follow."""
+    assert viewer["client"].get("/api/v1/session/context").json()["rule_register"] is True
+    monkeypatch.setenv("MDARIX_RULE_REGISTER", "off")
+    assert viewer["client"].get("/api/v1/session/context").json()["rule_register"] is False
