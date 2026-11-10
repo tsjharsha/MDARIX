@@ -813,7 +813,10 @@ export function AfterAcceptance({
               }
             }}
           >
-            Create the response obligation
+            {/* A US request is answered by a follow-up, H2 "Response to FDA request" (0.10.96, B3). */}
+            {detail.form.code === "FDA_3500A"
+              ? "Start the follow-up for this request"
+              : "Create the response obligation"}
           </button>
         </details>
       )}

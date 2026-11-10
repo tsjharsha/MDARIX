@@ -605,14 +605,23 @@ def prepare(
 ) -> dict:
     """The file as Send for approval checks it (0.10.96): the blocks FDA requires that are missing or not in its
     format; when none, the file itself and its schema errors (none: FDA's schema takes it). ``previous``: a follow-up's
-    chain values, so its file sends only what changed (``delta``)."""
+    chain values, so its file sends only what changed (``delta``), listed in ``changed`` for the page."""
     cleared: list[str] = []
+    changed: list[str] = []
     if previous is not None:
+        names = fda.labels(sections)
         sections, cleared = delta(sections, previous)
+        changed = [
+            f"{names.get(item['id'], item['id'])}: {item['value']}"
+            for section in sections
+            for item in section["fields"]
+            if item.get("value") and item["id"] not in FOLLOW_UP_SENDS
+        ]
     missing, left = check(sections, parties, kind)
     left = [*left, *cleared]
     xml = None if missing else build(sections, parties, sender=sender, now=now, practice=practice)
-    return {"missing": missing, "left_out": left, "errors": validate(xml) if xml else [], "xml": xml}
+    errors = validate(xml) if xml else []
+    return {"missing": missing, "left_out": left, "errors": errors, "xml": xml, "changed": changed}
 
 
 def plain(xml: bytes):

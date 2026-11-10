@@ -590,7 +590,12 @@ def _emdr_check(sections, context, kind: str = "M-I") -> dict:
     found = emdr.prepare(
         sections or [], context["parties"], kind=kind, sender="-", now=_now(), practice=False, previous=previous
     )
-    return {"missing": found["missing"], "left_out": found["left_out"], "schema_errors": found["errors"]}
+    return {
+        "missing": found["missing"],
+        "left_out": found["left_out"],
+        "schema_errors": found["errors"],
+        "changed": found["changed"],  # a follow-up: what its file sends, new or changed since the last one sent
+    }
 
 
 def _emdr_gate(found: dict) -> None:

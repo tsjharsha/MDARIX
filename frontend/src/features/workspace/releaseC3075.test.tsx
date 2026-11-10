@@ -507,6 +507,127 @@ describe("a report's page: the record page's shape, the status path and the rail
   });
 });
 
+// 0.10.96 (B3, step B3): US follow-ups on the report page: the chain, "Start follow-up #n", and a follow-up's page.
+describe("US follow-ups: the chain, starting one, and what a follow-up sends", () => {
+  const response = (id: string, n: number, state: string, label: string) => ({
+    id,
+    follow_up: n,
+    state,
+    state_label: label,
+    due_on: "2026-12-10",
+    request_text: "The returned device was evaluated.",
+    received_on: "2026-11-10",
+  });
+  const h2 = (value: string | null) => ({
+    code: "H",
+    title: "H. Device manufacturers only",
+    note: null,
+    fields: [field("H2", "H2", "If follow-up, what type?", value ? "ENTERED" : "MUST_HAVE", value)],
+  });
+
+  it("shows the chain in order with each state", () => {
+    resources.data[`${REPORTS}/r1`] = report(5, {
+      state_label: "Accepted",
+      responses: [
+        response("f1", 1, "SUBMITTED_PENDING", "Submitted, acceptance pending"),
+        response("f2", 2, "CANCELLED", "Cancelled before it was sent"),
+      ] as ReportDetail["responses"],
+    });
+    const html = render(<ReportsSection />, api("?report=r1"));
+    const chain = html.slice(html.indexOf('aria-label="Report chain"'));
+    const order = [
+      "Initial report",
+      "Accepted",
+      "Follow-up #1",
+      "acceptance pending",
+      "Follow-up #2",
+      "Cancelled before",
+    ];
+    const at = order.map((text) => chain.indexOf(text));
+    expect(at.every((value) => value >= 0)).toBe(true);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+  });
+
+  it("creates follow-up #n in one click with the received date prefilled and FDA's H2 types", () => {
+    resources.data[`${REPORTS}/r1`] = report(5, {
+      responses: [
+        response("f1", 1, "ACCEPTED", "Accepted"),
+        response("f2", 2, "CANCELLED", "Cancelled before it was sent"),
+      ] as ReportDetail["responses"],
+    });
+    const html = render(<ReportsSection />, api("?report=r1"));
+    // The cancelled one never took a number: the next is #2.
+    expect(html).toContain("<summary>Start follow-up #2</summary>");
+    expect(html).toContain(`value="${new Date().toLocaleDateString("en-CA")}"`);
+    for (const type of ["Correction", "Additional information", "Response to FDA request", "Device evaluation"])
+      expect(html).toContain(type);
+    // One open at a time: an unsent follow-up holds the chain.
+    resources.data[`${REPORTS}/r1`] = report(5, {
+      responses: [
+        response("f1", 1, "ACCEPTED", "Accepted"),
+        response("f3", 2, "DRAFT", "Draft"),
+      ] as ReportDetail["responses"],
+    });
+    const held = render(<ReportsSection />, api("?report=r1"));
+    expect(held).toContain("Follow-up #2 is open");
+    expect(held).not.toContain("Start follow-up");
+    // Not before the initial report is submitted and accepted.
+    resources.data[`${REPORTS}/r1`] = report(3);
+    expect(render(<ReportsSection />, api("?report=r1"))).not.toContain("Report chain");
+  });
+
+  it("shows only what changed on a follow-up, its H2 choices, and cancels it while it is not sent", () => {
+    resources.data[`${REPORTS}/r1`] = report(1, {
+      kind: "RESPONSE",
+      follow_up: 2,
+      parent_id: "r0",
+      request: { text: "The returned device was evaluated.", received_on: "2026-11-10" },
+      sections: [h2("Correction")],
+      emdr: {
+        missing: [],
+        left_out: ["D4 Lot #: cleared here; FDA keeps the earlier value"],
+        changed: ["D1 Brand name: PulseWatch 420"],
+      },
+    });
+    const html = render(<ReportsSection />, api("?report=r1"));
+    expect(html).toContain("Follow-up #2 of its initial report");
+    const head = html.slice(html.indexOf('aria-label="Follow-up #2"'), html.indexOf("Cancel follow-up #2"));
+    expect(head).toContain("The returned device was evaluated.");
+    expect(head).toMatch(/checked="" ?\/?> Correction/);
+    expect(head).not.toMatch(/checked="" ?\/?> Device evaluation/);
+    expect(head).toContain("D1 Brand name: PulseWatch 420");
+    expect(head).toContain("D4 Lot #: cleared here; FDA keeps the earlier value");
+    expect(head).not.toContain("Procode");
+    expect(html).toContain("Cancel follow-up #2");
+    // Sent: no cancel.
+    resources.data[`${REPORTS}/r1`] = report(4, { kind: "RESPONSE", follow_up: 2, sections: [h2("Correction")] });
+    expect(render(<ReportsSection />, api("?report=r1"))).not.toContain("Cancel follow-up");
+  });
+
+  it("offers a follow-up the same three files after approval, named for the follow-up", () => {
+    resources.data[`${REPORTS}/r1`] = report(3, {
+      kind: "RESPONSE",
+      follow_up: 1,
+      sections: [h2("Correction")],
+      emdr: { missing: [], left_out: [], changed: [] },
+    });
+    const html = render(<ReportsSection />, api("?report=r1"));
+    for (const label of ["Download PDF", "Download XML", "Official Form 3500A (PDF)"]) expect(html).toContain(label);
+    expect(html).toContain("No value FDA holds has changed");
+  });
+
+  it("names a follow-up in the list", () => {
+    resources.data[REPORTS] = {
+      items: [listItem("RV-09", ["open"], { kind: "RESPONSE", follow_up: 1 })],
+      forms: [],
+      never_submits: "",
+      starter_mark: "",
+      practice_label: null,
+    };
+    expect(render(<ReportsSection />)).toContain("Form FDA 3500A worksheet (eMDR) · Follow-up #1");
+  });
+});
+
 // 0.10.83 (D2): the tree is answered in place; its screen is tested in releaseD2083.test.tsx.
 describe("Decision trees: a complaint's page opens its tree", () => {
   it("opens from a complaint's page: its decision path per market, and its report", () => {

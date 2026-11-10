@@ -78,6 +78,8 @@ def test_b3_a_follow_up_keeps_the_initial_report_number(trial):
     assert _value(detail, "MFR_REPORT") == _value(rv09, "MFR_REPORT") == _value(detail, "G8")
     assert _value(detail, "G6") == "30-day; Follow-up #1"
     assert _value(detail, "B5") == "Evaluation found the alarm speaker below its specified output."
+    # The page's "what changed since the last report sent": only what the file sends, here the new narrative.
+    assert [line.split(":")[0] for line in detail["emdr"]["changed"]] == ["B5 Describe event or problem"]
     refused = user.put(f"{REPORTS}/{detail['id']}/fields/MFR_REPORT", json={"value": "1234567-2026-00099"})
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "FOLLOWS_INITIAL"
     # The chain on the initial report, and the list's "Follow-up #1".

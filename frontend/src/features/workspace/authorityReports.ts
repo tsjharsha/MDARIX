@@ -56,6 +56,8 @@ export type ReportListItem = {
   stage?: ReportStage | null;
   stage_label?: string;
   mandatory?: Mandatory;
+  /** A US follow-up's number in its chain: "Follow-up #n" (0.10.96, B3). */
+  follow_up?: number | null;
   submitted_at?: string | null;
   /** The Reports tab's list views it belongs to ("open", "my-approval", "submitted-month"). */
   views?: string[];
@@ -252,7 +254,18 @@ export type ReportDetail = {
   submissions: Submission[];
   request: { text: string; received_on: string } | null;
   parent_id: string | null;
-  responses: { id: string; state: ObligationState; state_label: string; due_on: string | null; request_text: string }[];
+  responses: {
+    id: string;
+    state: ObligationState;
+    state_label: string;
+    due_on: string | null;
+    request_text: string;
+    received_on?: string | null;
+    /** A US follow-up's number in its chain (0.10.96, B3). */
+    follow_up?: number | null;
+  }[];
+  /** This report is US follow-up #n of its initial report (0.10.96, B3). */
+  follow_up?: number | null;
   note: string | null;
   follow_up_due_on: string | null;
   starter_mark: string;
@@ -262,7 +275,12 @@ export type ReportDetail = {
   /** Mapped codes are suggestions a person confirms or changes (the new navigation, 0.10.77). */
   codes_confirmed?: boolean;
   /** A US report: what FDA's eMDR file still needs (blocks it), and the approved values it leaves out. */
-  emdr?: { missing: string[]; left_out: string[] } | null;
+  emdr?: {
+    missing: string[];
+    left_out: string[];
+    /** A follow-up: the values its file sends, new or changed since the last report sent (0.10.96, B3). */
+    changed?: string[];
+  } | null;
 };
 
 /** The tab name that opens Reports on one complaint ("Reports?complaint=<id>"), and its reading. */

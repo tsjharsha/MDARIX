@@ -317,6 +317,8 @@ def test_b3_unchanged_values_are_left_out_and_narratives_never_repeat():
     for block in ("D4 model", "D2 procode", "B1", "H1", "H6 clinical"):
         assert ours.xpath(emdr.POINTERS[block]) == [], block  # unchanged: left out
     assert any("FDA keeps the earlier value" in line and "D4_LOT" in line for line in found["left_out"])
+    # The page's "what changed since the last submitted file": only the values the file sends, never the number.
+    assert sorted(found["changed"]) == ["D1: New brand name", "H6_PROBLEM: A0102 Extra (FDA 9999)"]
 
 
 def test_b3_g6_says_follow_up_with_its_number_and_h2_ticks_are_sent_as_fdas_codes():

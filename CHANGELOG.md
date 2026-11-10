@@ -90,6 +90,14 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
   "Cancelled before it was sent", and the chain is free for the next follow-up, which takes its number. An initial
   report (409 `NOT_A_FOLLOW_UP`: it follows its signed conclusion) and a submitted follow-up (409 `ALREADY_SENT`) are
   never cancelled here.
+- The follow-up page (B3, new navigation): a submitted US report shows its chain (Initial report, Follow-up #1, #2
+  ..., each with its state) and "Start follow-up #n" (the day the information arrived, prefilled with today; what is
+  new; FDA's four H2 types; the new B5 narrative). A follow-up's page says what it follows and when the information
+  arrived, ticks its H2 types in place, lists in plain words what changed since the last report sent (the values its
+  file sends, and any value cleared that FDA keeps), offers Cancel while it is not sent, and after approval the same
+  three files, named for the follow-up. The list names each "Follow-up #n". A US request for information is started
+  as "Start the follow-up for this request". The classic panel keeps its downloads (the eMDR XML and the official
+  form) for every US report, follow-ups included.
 
 ## [0.10.95] - not released yet (ships in the big-bang release)
 

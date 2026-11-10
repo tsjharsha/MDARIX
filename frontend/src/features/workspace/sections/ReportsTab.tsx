@@ -39,6 +39,7 @@ import {
 import { ListViewPicker } from "./Views";
 import { STARTER_LABEL } from "../../shared/standards";
 import { ApprovingDoc, ConfirmAllCodes, ThingsToGive, signatureLine } from "./ReportBody";
+import { FollowUps } from "./FollowUps";
 
 /** What MDARIX does with an authority report, said once where it matters (Release C guardrail 3). */
 export const NEVER_SUBMITS =
@@ -185,7 +186,10 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
                   <button type="button" className="ac-link" onClick={() => onOpen(String(row.id))}>
                     <strong>{row.complaint_ref}</strong>
                   </button>
-                  <span className="uw-what-text">{row.form_title}</span>
+                  <span className="uw-what-text">
+                    {row.form_title}
+                    {row.follow_up ? ` · Follow-up #${row.follow_up}` : ""}
+                  </span>
                 </span>
               ),
             },
@@ -302,17 +306,22 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   const resend = detail.state === "CORRECTION_REQUIRED" && detail.stage === "CREATED" && !meterMissing(detail);
   const due = deadlineDue(detail.deadline, detail.state);
   const ref = detail.complaint.ref;
+  // A follow-up's files say which one they are: "...-RV-09-follow-up-2.xml" (0.10.96, B3).
+  const stem = detail.follow_up ? `${ref}-follow-up-${detail.follow_up}` : ref;
   const approved = detail.approved_snapshot;
+  const openReport = (other: string) => open(reportPlace(other).section, reportPlace(other).tab);
   const origin =
     detail.state === "CANCELLED"
       ? `Cancelled: ${detail.cancelled_reason ?? "a later signed conclusion says not reportable"}`
-      : detail.assessment?.conclusion === "REPORTABLE"
-        ? `Created when the ${detail.market_label} conclusion was signed reportable${
-            detail.assessment.report_type_label
-              ? `: ${detail.assessment.report_type_label[0].toLowerCase()}${detail.assessment.report_type_label.slice(1)}`
-              : ""
-          }.`
-        : "Started while the market was still being assessed.";
+      : detail.follow_up
+        ? `Follow-up #${detail.follow_up} of its initial report (21 CFR 803.56).`
+        : detail.assessment?.conclusion === "REPORTABLE"
+          ? `Created when the ${detail.market_label} conclusion was signed reportable${
+              detail.assessment.report_type_label
+                ? `: ${detail.assessment.report_type_label[0].toLowerCase()}${detail.assessment.report_type_label.slice(1)}`
+                : ""
+            }.`
+          : "Started while the market was still being assessed.";
   const fetchFile = async (path: string, name: string, failed: string, query = "") => {
     setPdfError("");
     try {
@@ -324,14 +333,14 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   const pdf = () =>
     fetchFile(
       "worksheet.pdf",
-      `mdarix-${detail.form.code.toLowerCase()}-${ref}.pdf`,
+      `mdarix-${detail.form.code.toLowerCase()}-${stem}.pdf`,
       "The PDF could not be downloaded.",
     );
   // 0.10.96 (A6): FDA's own fillable form, the second US PDF.
   const official = () =>
     fetchFile(
       "worksheet.pdf",
-      `mdarix-fda-3500a-${ref}-official-form.pdf`,
+      `mdarix-fda-3500a-${stem}-official-form.pdf`,
       "The official form could not be downloaded.",
       "&form=official",
     );
@@ -378,7 +387,11 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
             {due && <DeadlineChip item={due} prefix="Due" />}
             {/* The count of what is missing is the "things to give" head while any is (0.10.87). */}
             {meter.share === 100 && <span className="ms-chip">{meter.text} fields</span>}
-            {detail.form.report_kind && <span className="ms-chip">{detail.form.report_kind} report</span>}
+            {detail.follow_up ? (
+              <span className="ms-chip">Follow-up #{detail.follow_up}</span>
+            ) : (
+              detail.form.report_kind && <span className="ms-chip">{detail.form.report_kind} report</span>
+            )}
             {detail.form.starter && <span className="ms-chip is-starter">{STARTER_LABEL}</span>}
             {(detail.state === "CORRECTION_REQUIRED" || detail.state === "CANCELLED") && (
               <StateChip label={detail.state_label} />
@@ -407,6 +420,8 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
         <div className="rp-main">
           {/* 0.10.83 (D2.7): what is missing first, grouped by who knows it; the full report folds away meanwhile. */}
           {/* 0.10.96 (A7): every suggested code confirmed in one click, over the list of what to give. */}
+          {/* 0.10.96 (B3): a submitted US report's chain and "Start follow-up #n"; on a follow-up, what it sends. */}
+          <FollowUps detail={detail} canWrite={write} onChanged={changed} onOpen={openReport} />
           {write && <ConfirmAllCodes detail={detail} onChanged={changed} />}
           {write && <ThingsToGive detail={detail} onChanged={changed} canEdit={write} />}
           {/* 0.10.83 (D2.8): the approver reads what they approve, then approves below it. */}
@@ -446,11 +461,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
               {write && detail.stage === "ACKNOWLEDGED" && detail.state !== "COMPLETE" && (
                 <section className="uw-rec-part" aria-label="After acknowledgement">
                   <h2>After acknowledgement</h2>
-                  <AfterAcceptance
-                    detail={detail}
-                    onChanged={changed}
-                    onOpen={(other) => open(reportPlace(other).section, reportPlace(other).tab)}
-                  />
+                  <AfterAcceptance detail={detail} onChanged={changed} onOpen={openReport} />
                 </section>
               )}
               {detail.sections
@@ -545,7 +556,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                           onClick={() =>
                             void fetchFile(
                               "emdr.xml",
-                              `mdarix-emdr-${ref}.xml`,
+                              `mdarix-emdr-${stem}.xml`,
                               "The eMDR XML could not be downloaded.",
                             )
                           }
