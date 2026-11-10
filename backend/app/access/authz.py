@@ -49,6 +49,33 @@ def platform_account_clause():
     return normalized.in_(sorted(PLATFORM_ROLE_CODES))
 
 
+def staff_accounts(ids) -> dict[str, dict]:
+    """``{str(id): {"name", "email"}}`` for the MDARIX staff accounts among ``ids``.
+
+    Staff accounts live in the platform's organization, which an organization's own (row-level secured) session
+    cannot read; so a support request or an audit event naming a staff member came back without the person. They are
+    read apart in system scope, and only staff accounts are returned: another organization's account never is.
+    """
+    wanted = set()
+    for value in ids:
+        try:
+            wanted.add(value if isinstance(value, uuid.UUID) else uuid.UUID(str(value)))
+        except (TypeError, ValueError):
+            continue
+    if not wanted:
+        return {}
+    from backend.app.db.session import SessionLocal
+
+    with SessionLocal() as lookup:
+        bind_system(lookup, "MDARIX staff accounts named in an organization's own records")
+        rows = (
+            lookup.query(AuthUser.id, AuthUser.display_name, AuthUser.username)
+            .filter(AuthUser.id.in_(wanted), platform_account_clause())
+            .all()
+        )
+    return {str(row.id): {"name": row.display_name or row.username, "email": row.username} for row in rows}
+
+
 def visible_user_filters(viewer: AuthUser) -> list:
     """Filters for AuthUser queries: platform accounts are visible to platform administrators only.
 

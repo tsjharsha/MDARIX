@@ -126,3 +126,45 @@ def test_the_test_alert_script_fails_when_nothing_was_delivered(monkeypatch, cap
     monkeypatch.setattr(alerts, "_post_webhook", lambda *_: (_ for _ in ()).throw(OSError("down")))
     assert _script().main([]) == 1
     assert "Not delivered" in capsys.readouterr().out
+
+
+@pytest.fixture
+def fallback(monkeypatch):
+    """The independent fallback webhook, with a stub transport that records every post by URL."""
+    posted = []
+    monkeypatch.setenv("MDARIX_ALERT_WEBHOOK", "")
+    monkeypatch.setenv("MDARIX_ALERT_FALLBACK_WEBHOOK", "https://fallback.example.test/mdarix")
+    monkeypatch.setattr(alerts, "_post_webhook", lambda url, text, timeout: posted.append((url, text)))
+    return posted
+
+
+def test_when_the_email_alert_fails_the_fallback_webhook_gets_it(fallback, monkeypatch):
+    monkeypatch.setenv("MDARIX_ALERT_EMAIL", "ops@example.test")
+
+    def provider_down(*_args, **_kwargs):
+        raise OSError("email provider unreachable")
+
+    monkeypatch.setattr(emailer, "_send_email", provider_down)
+    outcome = alerts.send_alert("Backup failed", "pg_dump exited 1")
+    assert outcome["email"] != "SENT" and outcome["fallback_webhook"] == "SENT" and alerts.delivered(outcome)
+    assert fallback == [
+        (
+            "https://fallback.example.test/mdarix",
+            "[MDARIX development] Backup failed (the usual alert channel failed)\npg_dump exited 1",
+        )
+    ]
+
+
+def test_the_fallback_webhook_stays_quiet_while_email_works(fallback, mailbox):
+    outcome = alerts.send_alert("Backup failed", "pg_dump exited 1")
+    assert outcome == {"webhook": "NOT_CONFIGURED", "email": "SENT"} and fallback == [] and len(mailbox) == 1
+
+
+def test_without_a_fallback_webhook_nothing_changes(monkeypatch):
+    monkeypatch.setenv("MDARIX_ALERT_WEBHOOK", "")
+    monkeypatch.setenv("MDARIX_ALERT_FALLBACK_WEBHOOK", "")
+    monkeypatch.setenv("MDARIX_ALERT_EMAIL", "ops@example.test")
+    monkeypatch.setattr(emailer, "_send_email", lambda *_a, **_k: "FAILED")
+    monkeypatch.setattr(alerts, "_post_webhook", lambda *_: pytest.fail("no webhook is configured"))
+    outcome = alerts.send_alert("Backup failed", "pg_dump exited 1")
+    assert "fallback_webhook" not in outcome and not alerts.delivered(outcome)

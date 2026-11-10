@@ -5,6 +5,9 @@
 logged at ERROR, so it still reaches the log collector. Alerts never contain customer records: only counts, job names
 and error types.
 
+``MDARIX_ALERT_FALLBACK_WEBHOOK`` (optional) is an independent channel: an alert that no usual channel delivered (the
+email provider down, the main webhook failing) is posted there too. Unset, nothing changes.
+
 A staging or production server with neither destination would alert nobody: ``send_alert`` then logs a clear
 ``NO ALERT DESTINATION CONFIGURED`` error with every alert (``config_check`` refuses to start such a server;
 ``scripts/send_test_alert.py`` proves the configured destinations work before anything goes wrong).
@@ -74,7 +77,20 @@ def send_alert(subject: str, body: str) -> dict:
         except Exception as exc:
             outcome["email"] = "FAILED"
             logger.error("Alert email delivery failed (%s): %s", type(exc).__name__, subject)
-    if outcome["webhook"] != "SENT" and outcome["email"] != "SENT":
+    fallback = os.getenv("MDARIX_ALERT_FALLBACK_WEBHOOK", "").strip()
+    if fallback and not delivered(outcome):
+        # The independent channel (H1): used only when the usual ones failed, e.g. the email provider is down.
+        try:
+            _post_webhook(
+                fallback,
+                f"{title} (the usual alert channel failed)\n{body}",
+                float(os.getenv("MDARIX_ALERT_TIMEOUT_SECONDS", "10")),
+            )
+            outcome["fallback_webhook"] = "SENT"
+        except Exception as exc:
+            outcome["fallback_webhook"] = "FAILED"
+            logger.error("Alert fallback webhook delivery failed (%s): %s", type(exc).__name__, subject)
+    if not delivered(outcome):
         logger.error("ALERT %s: %s", subject, body)
     return outcome
 

@@ -26,7 +26,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.app import support_access as access
-from backend.app.access.authz import _authenticated_user
+from backend.app.access.authz import _authenticated_user, staff_accounts
 from backend.app.db.models.customer_lifecycle import SupportAccessGrant
 from backend.app.db.models.foundation import AuditEvent, AuthUser
 from backend.app.db.session import get_db
@@ -110,7 +110,11 @@ def _people(db: Session, ids) -> dict[str, dict]:
     if not wanted:
         return {}
     rows = db.query(AuthUser).filter(AuthUser.id.in_(wanted)).all()
-    return {str(row.id): {"name": row.display_name or row.username, "email": row.username} for row in rows}
+    # The organization's own people come from its session; MDARIX staff from the platform's organization.
+    return {
+        **staff_accounts(wanted),
+        **{str(row.id): {"name": row.display_name or row.username, "email": row.username} for row in rows},
+    }
 
 
 def _uses(db: Session, tenant_id, grant_ids) -> dict[str, dict]:

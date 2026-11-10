@@ -19,6 +19,7 @@ import hashlib
 import logging
 import os
 import random
+import re
 import time
 from dataclasses import dataclass
 
@@ -79,7 +80,29 @@ LIMITS: dict[str, Limit] = {
     # Evidence searches and Ask questions per person (DEV-11): each runs the local embedding model on the API's CPU,
     # and Ask may call an AI service; the monthly AI allowance (genai/governance.py) still applies on top.
     "search:user": Limit(60, 300),
+    # Heavy work a signed-in person starts (H1), per person and per organization: file uploads and imports, exports
+    # and downloads, connector syncs. Generous for real work (an import is a few calls), tight enough for a loop.
+    "upload:user": Limit(60, 3600),
+    "upload:org": Limit(300, 3600),
+    "export:user": Limit(60, 3600),
+    "export:org": Limit(300, 3600),
+    "sync:user": Limit(20, 3600),
+    "sync:org": Limit(60, 3600),
 }
+
+# Which requests are heavy work (method, path pattern), checked by the API's middleware (backend/app/main.py).
+HEAVY_WORK = (
+    ("upload", {"POST", "PUT"}, re.compile(r"/attachments$|/imports?/(detect|[a-z_-]+(/check)?)$")),
+    ("export", {"GET"}, re.compile(r"(\.csv|\.zip|\.pdf|\.xlsx|/export|/download)$")),
+    ("export", {"POST"}, re.compile(r"/exports$")),
+    ("sync", {"POST"}, re.compile(r"/connectors/[^/]+/execute$")),
+)
+
+
+def heavy_work(method: str, path: str) -> str | None:
+    """ "upload", "export" or "sync" for a request that starts heavy work, else None."""
+    return next((kind for kind, methods, pattern in HEAVY_WORK if method in methods and pattern.search(path)), None)
+
 
 # What a person is told when an invitation limit stops them (the generic sentence fits sign-in, not invitations).
 INVITATION_LIMIT_MESSAGE = (

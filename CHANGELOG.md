@@ -89,6 +89,25 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - A Customer Administrator cannot reactivate an administrator that MDARIX support suspended (the suspension's audit
   record says who made it), by status or by membership; adding a membership is refused for their own account and is
   recorded in the audit trail (`MEMBERSHIP_GRANTED`).
+- Under row-level security an organization could not read the MDARIX staff accounts named in its own records: its
+  support-access requests and their activity showed no person, and its audit history showed a staff action as a bare
+  account id instead of "MDARIX platform administrator". Staff accounts are now read apart in system scope, staff
+  accounts only (another organization's accounts never). Tests run API requests under the runtime role (`SET ROLE`).
+- A test reads the modules that build SQL with table or column names (data-plane lists, analytics, export, purge) and
+  fails when a name could come from anything but a fixed list or the database catalogue, such as a request field.
+- New tests ask, as one organization and under row-level security, for another organization's complaints,
+  investigations, evidence and its download, CAPAs, exports, audit trail and signed decisions, by id, through list
+  filters and through every export: each answer is a refusal or holds none of the other organization's data.
+- New screen tests show that markup typed or imported into a complaint, an imported record or an evidence record's
+  name appears as text on the complaint page, triage, the imported backlog and the case's evidence, never as markup;
+  a test also fails if any screen starts writing raw HTML (the one reviewed, escaped exception is the public
+  questions page's structured data).
+- Uploads and imports, exports and downloads, and connector syncs are rate limited per person and per organization
+  (per hour: 60 and 300 uploads, 60 and 300 exports, 20 and 60 syncs); past a limit the answer is 429 "Too many
+  attempts. Please try again in …" with `Retry-After`.
+- An independent alert channel: when no usual channel delivers an operational alert (for example the email provider
+  is down), it is also posted to `MDARIX_ALERT_FALLBACK_WEBHOOK`. Optional; unset, nothing changes. Operators: add the
+  setting where the alert settings are documented, and prove it with `scripts/send_test_alert.py`.
 
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 
