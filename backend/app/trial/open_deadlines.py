@@ -143,7 +143,14 @@ def _deadline_changes(db: Session, tenant_id, apply: bool, now: datetime) -> lis
                 seen = service.one(db, tenant_id, complaint_id, now)[2]
                 aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
                 clock = markets.market_clock(
-                    market, evaluation["suggested"], evaluation["report_type"], windows, aware, now, seen["org_zone"]
+                    market,
+                    evaluation["suggested"],
+                    evaluation["report_type"],
+                    windows,
+                    aware,
+                    now,
+                    seen["org_zone"],
+                    evaluation["report_type_if_reportable"],
                 )
                 due = date.fromisoformat(clock["due_date"]) if clock else None
                 old = {

@@ -174,6 +174,31 @@ def test_markets_from_countries_and_windows_and_their_clocks():
     assert "Starter, for your consultant to confirm" in india["note"] and india["basis"] == ["IN_MDR"]
 
 
+def test_audit3_a_pending_clock_also_counts_the_report_signing_reportable_would_start():
+    """Code audit 3: with only a 30-day window, a pending US answer whose report would be the 5-work-day one shows the
+    5-work-day date, so signing reportable later is never already overdue; the watch shows the same date."""
+    from types import SimpleNamespace
+
+    from backend.app.reportability import assessments
+
+    fda = watch_rules.clean_window(watch_rules.TEMPLATES[0])
+    aware, today = date(2026, 10, 1), date(2026, 10, 5)
+    old = markets.market_clock(markets.US, markets.PENDING, None, [fda], aware, today)
+    assert old["due_date"] == "2026-10-31"
+    pending = markets.market_clock(markets.US, markets.PENDING, None, [fda], aware, today, None, "US_5_WORK_DAY")
+    signed = markets.market_clock(markets.US, markets.REPORTABLE, "US_5_WORK_DAY", [fda], aware, today)
+    assert pending["due_date"] == signed["due_date"] == "2026-10-08"
+    # The earlier date wins: a 30-day report still pending keeps the 30-day window.
+    assert markets.market_clock(markets.US, markets.PENDING, None, [fda], aware, today, None, "US_30_DAY") == old
+    unknown = answers(**{**US_SERIOUS, "US2C": "UNKNOWN", "US4": "UNKNOWN", "US6": "UNKNOWN"})
+    assert markets.evaluate(markets.US, unknown)["suggested"] == markets.PENDING
+    draft = SimpleNamespace(
+        conclusion=None, answers=unknown, suggested_conclusion=markets.PENDING, report_type=None, version=1
+    )
+    row = assessments.markets_summary({"country": "USA"}, [fda], {markets.US: [draft]}, aware, today)[0]
+    assert row["clock"]["due_date"] == "2026-10-08"
+
+
 def test_classification_codes_list_labels_and_keeps_any_other_source_value_as_unknown():
     assert classification.code_source_value("use_environment", "Intensive care unit") == (
         "INTENSIVE_CARE_UNIT",

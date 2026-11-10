@@ -331,7 +331,14 @@ def save_draft(
     evaluation = markets.evaluate(market, clean["answers"])
     aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
     clock = markets.market_clock(
-        market, evaluation["suggested"], evaluation["report_type"], windows, aware, today, seen.get("org_zone")
+        market,
+        evaluation["suggested"],
+        evaluation["report_type"],
+        windows,
+        aware,
+        today,
+        seen.get("org_zone"),
+        evaluation["report_type_if_reportable"],
     )
     now = datetime.now(timezone.utc)
     action = "COMPLAINT_MARKET_ASSESSMENT_SAVED"

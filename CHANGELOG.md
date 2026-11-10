@@ -88,6 +88,9 @@ trials' existing Cases; nothing is written until the owner approves the list), t
 ### Fixed
 
 - A CSV import stops reading at the row limit, with the same "too many rows" message as a spreadsheet.
+- While a market assessment is still pending, its deadline is the earlier of your organisation's window and the
+  report a "reportable" signature would start (for example the US 5-work-day report), so signing reportable later
+  never lands on a date already past. The assessment, the watch, the report and the alerts show the same date.
 
 ### Security
 
