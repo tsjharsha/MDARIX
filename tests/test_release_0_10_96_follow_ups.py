@@ -146,14 +146,39 @@ def test_b3_re_signing_supersedes_an_approved_follow_up(trial):
     assert after["state"] == "APPROVED"  # rolled back
 
 
-def test_b3_follow_up_numbers_run_1_2_3_without_gaps(trial):
-    rv09 = _rv09(trial)
+def test_b3_an_unsent_follow_up_is_cancelled_with_a_reason_and_frees_the_chain(trial):
+    user, rv09 = trial["user"], _rv09(trial)
+    first = next(row for row in rv09["responses"] if row["follow_up"] == 1)
     second = next(row for row in rv09["responses"] if row["follow_up"] == 2)
-    # An open follow-up that never goes out (cancelled before it was sent) takes no number.
+    assert second["state"] == "APPROVED"  # approved, never sent: it blocks the chain
+    url = f"{REPORTS}/{second['id']}/cancel"
+    short = user.post(url, json={"reason": "No"})
+    assert short.status_code == 422 and short.json()["detail"]["code"] == "REASON_REQUIRED"
+    for other, code in ((rv09["id"], "NOT_A_FOLLOW_UP"), (first["id"], "ALREADY_SENT")):
+        refused = user.post(f"{REPORTS}/{other}/cancel", json={"reason": "Raised in error by the team."})
+        assert refused.status_code == 409 and refused.json()["detail"]["code"] == code, refused.text
+    done = _ok(user.post(url, json={"reason": "Raised in error by the team."}))
+    assert done["state"] == "CANCELLED" and done["state_label"] == "Cancelled before it was sent"
+    assert done["cancelled_reason"] == "Raised in error by the team."
+    assert {row["state"] for row in done["snapshots"]} == {"SUPERSEDED"}  # its approval ends
+    again = _ok(user.get(f"{REPORTS}/{rv09['id']}"))
+    assert again["state"] == "ACCEPTED"  # the initial never changes
+    assert next(row for row in again["responses"] if row["id"] == first["id"])["state"] == "SUBMITTED_PENDING"
     with SessionLocal() as db:
+        from backend.app.db.models.foundation import AuditEvent
+
         bind_tenant(db, trial["tenant_id"])
-        db.get(ReportObligation, uuid.UUID(second["id"])).state = "CANCELLED"
-        db.commit()
+        (event,) = (
+            db.query(AuditEvent)
+            .filter(AuditEvent.entity_id == uuid.UUID(second["id"]), AuditEvent.action == "REPORT_CANCELLED")
+            .all()
+        )
+        assert event.details["reason"] == "Raised in error by the team."
+        assert event.details["state_before"] == "APPROVED"
+
+
+def test_b3_follow_up_numbers_run_1_2_3_without_gaps(trial):
+    # The follow-up cancelled above, before it was sent, takes no number: the next one is #2 again.
     again = _create(trial, h2=["Correction"])
     assert again.status_code == 200, again.text
     assert again.json()["follow_up"] == 2
@@ -162,10 +187,7 @@ def test_b3_follow_up_numbers_run_1_2_3_without_gaps(trial):
     assert third.status_code == 200 and third.json()["follow_up"] == 3
     numbers = [row["follow_up"] for row in _rv09(trial)["responses"]]
     assert numbers == [1, 2, 2, 3]  # the cancelled one reads its would-be number; the sent ones run 1, 2, 3
-    with SessionLocal() as db:
-        bind_tenant(db, trial["tenant_id"])
-        db.get(ReportObligation, uuid.UUID(third.json()["id"])).state = "CANCELLED"  # for the next test
-        db.commit()
+    _ok(trial["user"].post(f"{REPORTS}/{third.json()['id']}/cancel", json={"reason": "Not needed after all."}))
 
 
 def test_b3_an_fda_request_becomes_a_follow_up_ticking_response_to_fda_request(trial):
@@ -198,5 +220,5 @@ def test_b3_a_follow_ups_frozen_file_sends_only_what_changed(trial):
     assert sorted(read["H2"]) == ["C53586", "C53588"]
     assert read["B5"] == ["Evaluation found the alarm speaker below its specified output."]
     assert read["G8"] == [_value(_rv09(trial), "MFR_REPORT")]
-    for block in ("D2 procode", "B1", "H1", "H6 clinical", "G1 email"):
+    for block in ("D2 procode", "B1", "H1", "H6 clinical", "G1 email", "B4"):
         assert block not in read, block  # unchanged since the initial report: FDA keeps it

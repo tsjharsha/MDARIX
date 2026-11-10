@@ -256,6 +256,7 @@ def placements(
             if follow_up:  # G6 "Follow-up #n" (0.10.96, B3 B2): its box and number box
                 put(8, "repFollow", ON)
                 put(8, "repFollowNum", follow_up.group(1))
+                put(1, "dateReport", "N/A")  # FDA's follow-up leaves B4 out (0.10.96)
                 text = text.replace(follow_up.group(0), "")
             found, other = choices(field_id, text)
             for box, _ in found:

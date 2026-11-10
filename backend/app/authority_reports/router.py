@@ -243,6 +243,13 @@ def follow_up_number(chain: list, row) -> int:
     return 1 + sum(item.state in rules.SUBMITTED for item in earlier)
 
 
+def state_label(row) -> str:
+    """A state's label; a follow-up cancelled before it went out says so (it was never "not reportable")."""
+    if row.state == rules.CANCELLED and is_follow_up(row):
+        return "Cancelled before it was sent"
+    return rules.STATE_LABELS[row.state]
+
+
 def _h2(value: str) -> str | None:
     """Why an H2 value is not FDA's follow-up types (None: it is)."""
     from backend.app.authority_reports import fda_3500a
@@ -488,11 +495,11 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
             for route in forms.routes_for(form)
         ],
         "state": obligation.state,
-        "state_label": rules.STATE_LABELS[obligation.state],
+        "state_label": state_label(obligation),
         "next_step": rules.next_step(obligation.state, pending is not None),
         "steps": [{"state": step, "label": rules.STATE_LABELS[step]} for step in rules.STEPS],
         # The status path and the mandatory-fields meter (0.10.75, C3).
-        **rules.stage_view(obligation.state, len(mandatory["missing"]), pending is not None),
+        **rules.stage_view(obligation.state, len(mandatory["missing"]), pending is not None, state_label(obligation)),
         "mandatory": mandatory,
         "approved_snapshot": _snapshot_view(approved, names) if approved else None,
         "preparers": sorted({names.get(ref) or "A colleague" for ref in _preparers(obligation)}),
@@ -543,7 +550,7 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
             {
                 "id": str(row.id),
                 "state": row.state,
-                "state_label": rules.STATE_LABELS[row.state],
+                "state_label": state_label(row),
                 "due_on": _iso(row.due_on),
                 "request_text": row.request_text,
                 "received_on": _iso(row.request_received_on),
@@ -716,7 +723,7 @@ def report_list(
                 "form_title": forms.FORMS[row.form_code].title,
                 "form_version": row.form_version,
                 "state": row.state,
-                "state_label": rules.STATE_LABELS[row.state],
+                "state_label": state_label(row),
                 "next_step": rules.next_step(row.state),
                 **due_fields(due, row.market, org_zone, today, row.due_provisional, row.state in rules.MET, row.state),
                 "assessment": None,
@@ -784,7 +791,7 @@ def _list_paths(db, control_db, ctx, tenant_id, obligations: list[ReportObligati
             else {"total": 0, "filled": 0, "missing": []}
         )
         waiting = pending.get(row.id)
-        path = rules.stage_view(row.state, len(meter["missing"]), waiting is not None)
+        path = rules.stage_view(row.state, len(meter["missing"]), waiting is not None, state_label(row))
         signer = context["current"].signed_by if context is not None and context["current"] else None
         mine = (
             waiting is not None
@@ -1495,7 +1502,8 @@ def request_snapshot(
     if parties is not None:  # the trial sample's own US manufacturer, never stored (0.10.96, A9)
         context["parties"] = parties
     current = _conclusion(context, obligation.market, any_signed=is_follow_up(obligation))
-    context["sent_day"] = _org_day(db, obligation.tenant_id, now).isoformat()  # B4 (0.10.96, Q3)
+    if not is_follow_up(obligation):  # FDA's follow-up leaves B4 out (its "Manufacturer Follow-up" example)
+        context["sent_day"] = _org_day(db, obligation.tenant_id, now).isoformat()  # B4 (0.10.96, Q3)
     names = _names(control_db, obligation.tenant_id, _preparers(obligation))
     frozen_file: dict = {}
     sections = worksheet.frozen(
@@ -2323,6 +2331,49 @@ def start_follow_up(
     )
     db.commit()
     return detail(db, control_db, ctx, child)
+
+
+@router.post("/{obligation_id}/cancel", dependencies=[DECIDERS])
+def cancel_follow_up(
+    obligation_id: uuid.UUID,
+    payload: ReasonRequest,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Cancel a US follow-up that was never sent (0.10.96), with a reason, audited: its approval ends and the chain is
+    free for the next follow-up, which takes its number (numbers count only the follow-ups sent). The initial report
+    (it follows its signed conclusion) and a submitted follow-up are never cancelled here."""
+    obligation = _obligation(db, _tenant(ctx), obligation_id, lock=True)
+    reason = _text(payload.reason)
+    if not reason or len(reason) < rules.REASON_MIN:
+        raise _error(422, "REASON_REQUIRED", f"Say why, in at least {rules.REASON_MIN} characters")
+    if not is_follow_up(obligation):
+        raise _error(409, "NOT_A_FOLLOW_UP", "Only a US follow-up is cancelled here: a report follows its conclusion")
+    if obligation.state not in rules.CANCELLABLE:
+        raise _error(409, "ALREADY_SENT", "This follow-up was submitted (or cancelled): it stays as recorded")
+    pending = []
+    for row in _snapshots(db, obligation):
+        if row.state in ("PENDING", "APPROVED"):
+            if row.state == "PENDING":
+                pending.append(row.id)
+            row.state = "SUPERSEDED"
+    before = obligation.state
+    old = {"state": before, "note": obligation.note}
+    obligation.state, obligation.note, obligation.updated_at = rules.CANCELLED, reason, _now()
+    _audit(
+        db,
+        ctx,
+        "REPORT_CANCELLED",
+        obligation,
+        old,
+        {"state": rules.CANCELLED, "note": reason},
+        reason=reason,
+        state_before=before,
+    )
+    db.commit()
+    end_cancelled_approvals(db, ctx, obligation.tenant_id, pending, "Cancelled: the follow-up was not sent")
+    return detail(db, control_db, ctx, obligation)
 
 
 class InformationRequest(BaseModel):

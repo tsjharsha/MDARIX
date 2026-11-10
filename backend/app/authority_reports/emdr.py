@@ -83,7 +83,8 @@ FOLLOW_UP = re.compile(r"\bfollow-up #?(\d+)\b", re.IGNORECASE)  # G6 on a follo
 # the eSubmitter-layout PDF reads the file back through them, and the tests compare the file with FDA's examples.
 FOLLOW_UP_CODE = "C53579"  # G6 "Follow-up" (FDA's Type_of_Report)
 # What a follow-up always sends, and its narratives, sent only as typed on it (never the initial's text again).
-FOLLOW_UP_SENDS, NARRATIVES = frozenset({"MFR_REPORT", "G8", "G6", "H2", "B4"}), frozenset({"B5", "H11"})
+FOLLOW_UP_SENDS, NARRATIVES = frozenset({"MFR_REPORT", "G8", "G6", "H2"}), frozenset({"B5", "H11"})
+NOT_ON_FOLLOW_UP = frozenset({"B4"})  # FDA's "Manufacturer Follow-up" leaves B4 out: never sent, never "cleared"
 IE = "//message/controlActProcess/subject/investigationEvent"
 DEV = IE + "/pertainsTo/procedureEvent/device/identifiedDevice"
 _PERSON = IE + "/trigger/reaction/subject/investigativeSubject"
@@ -576,21 +577,23 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
 def delta(sections: list[dict], previous: dict[str, str]) -> tuple[list[dict], list[str]]:
     """A follow-up's sections as its file sends them (0.10.96, B3 B2): a value only when it is new or changed against
     the chain's last submitted report (``previous``, its values), a code only when new, the narratives (B5, H11) only
-    as typed on the follow-up, and always its number, G6, H2 and B4. Also what it says of a value cleared here."""
+    as typed on the follow-up, always its number, G6 and H2, and never B4. Also what it says of a value cleared here."""
     names = fda.labels(sections)
     out, left = [], []
     for section in sections:
         fields = []
         for item in section["fields"]:
             key, value = item["id"], str(item.get("value") or "").strip()
-            if key in NARRATIVES:
+            if key in NOT_ON_FOLLOW_UP:
+                value = ""
+            elif key in NARRATIVES:
                 value = value if item.get("status") in ("ENTERED", "CHANGED") else ""
             elif key in REQUIRED_CODES and value:
                 held = {part.strip() for part in previous.get(key, "").split(";")}
                 value = "; ".join(part.strip() for part in value.split(";") if part.strip() not in held)
             elif key not in FOLLOW_UP_SENDS and value == previous.get(key, ""):
                 value = ""
-            if not item.get("value") and previous.get(key) and key not in NARRATIVES:
+            if not item.get("value") and previous.get(key) and key not in NARRATIVES | NOT_ON_FOLLOW_UP:
                 left.append(f"{names.get(key, key)}: cleared here; FDA keeps the earlier value")
             fields.append({**item, "value": value or None})
         out.append({**section, "fields": fields})

@@ -289,8 +289,12 @@ def test_fdas_manufacturer_follow_up_example_is_reproduced_block_by_block():
     ours, theirs = _plain(found["xml"]), _example("Manufacturer Follow-up.xml")
     assert emdr.validate((EXAMPLES / "Manufacturer Follow-up.xml").read_bytes()) == []
     for block, path in POINTERS.items():
-        if block not in ("B4", "version"):  # FDA's example leaves B4 out; MDARIX dates every report it sends
+        if block != "version":
             assert sorted(ours.xpath(path)) == sorted(theirs.xpath(path)), block
+    # B4 is left out, as FDA's example does, though the initial report held it: never listed as "cleared".
+    act = "//message/controlActProcess/effectiveTime/@nullFlavor"
+    assert ours.xpath(act) == theirs.xpath(act) == ["NI"]
+    assert not [line for line in found["left_out"] if "B4" in line]
     number = "//reasonOf/detectedIssueEvent/value[@code='C53579']/../text/text()"
     assert ours.xpath(number) == theirs.xpath(number) == ["1"]
 
@@ -335,5 +339,20 @@ def test_b3_the_official_form_ticks_follow_up_and_h2():
         _sections({"G6": "30-day; Follow-up #2", "H2": "Correction; Device evaluation"}), None
     )
     assert pages[8]["repFollow[0]"] == fda_3500a.ON and pages[8]["repFollowNum[0]"] == "2" and pages[8]["rep30[0]"]
+    assert pages[1]["dateReport[0]"] == "N/A"  # B4 is not applicable to a follow-up
     assert pages[9]["correction[0]"] == fda_3500a.ON and pages[9]["devEval[0]"] == fda_3500a.ON
     assert not left
+
+
+def test_b3_the_esubmitter_pdf_says_b4_is_not_applicable_to_a_follow_up():
+    from backend.app.authority_reports import emdr_pdf
+    from tests.test_fda_3500a_emdr import NOW, TYPICAL, TYPICAL_PARTY
+
+    values = {**TYPICAL, "G6": "30-day; Follow-up #1", "H2": "Correction"}
+    found = emdr.prepare(_follow_up(values), [], kind="M-F", sender="X", now=NOW, practice=False, previous=TYPICAL)
+    lines = [text.strip() for text, _ in emdr_pdf.body(emdr_pdf.read(found["xml"]))]
+    at = lines.index("4. Date of this Report (dd-mmm-yyyy)")
+    assert lines[at + 1] == "Not applicable (follow-up)"
+    initial = emdr.prepare(_sections(TYPICAL), [TYPICAL_PARTY], kind="M-I", sender="X", now=NOW, practice=False)
+    lines = [text.strip() for text, _ in emdr_pdf.body(emdr_pdf.read(initial["xml"]))]
+    assert lines[lines.index("4. Date of this Report (dd-mmm-yyyy)") + 1] == "01-Aug-2023"  # the initial keeps B4

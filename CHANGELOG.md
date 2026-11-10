@@ -82,6 +82,14 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
   new, B5 and H11 only as typed on the follow-up; a value cleared on the follow-up is listed ("FDA keeps the earlier
   value"). FDA's "Manufacturer Follow-up" example is reproduced block by block. The official Form 3500A ticks
   "Follow-up" with its number and the H2 boxes; the eSubmitter-layout PDF shows the follow-up number.
+- A follow-up leaves B4 "Date of this report" out, as FDA's "Manufacturer Follow-up" example does: its file sends
+  B4 as not given (never listed as cleared), its worksheet shows B4 as not used, and both PDFs say not applicable.
+  The initial report keeps B4 = the day it is sent for approval.
+- A follow-up never sent can be cancelled (`POST /authority-reports/{id}/cancel`, a reason of at least 10 characters,
+  audited `REPORT_CANCELLED`): its pending or approved snapshot is superseded and its approval task ends, it reads
+  "Cancelled before it was sent", and the chain is free for the next follow-up, which takes its number. An initial
+  report (409 `NOT_A_FOLLOW_UP`: it follows its signed conclusion) and a submitted follow-up (409 `ALREADY_SENT`) are
+  never cancelled here.
 
 ## [0.10.95] - not released yet (ships in the big-bang release)
 

@@ -103,7 +103,7 @@ def stage(state: str, missing: int, pending: bool) -> str | None:
     return "ACKNOWLEDGED"
 
 
-def stage_view(state: str, missing: int, pending: bool) -> dict:
+def stage_view(state: str, missing: int, pending: bool, label: str | None = None) -> dict:
     """The status path for the screen: each stage done, now or later."""
     now = stage(state, missing, pending)
     codes = [code for code, _ in STAGES]
@@ -111,7 +111,7 @@ def stage_view(state: str, missing: int, pending: bool) -> dict:
     # Acknowledged is the last stage: once there, it is done too.
     return {
         "stage": now,
-        "stage_label": STAGE_LABELS[now] if now and state != CORRECTION else STATE_LABELS[state],
+        "stage_label": STAGE_LABELS[now] if now and state != CORRECTION else label or STATE_LABELS[state],
         "stages": [
             {
                 "code": code,

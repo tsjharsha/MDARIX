@@ -154,7 +154,8 @@ def body(values: dict[str, list[str]]) -> list[tuple[str, str]]:
         "2. Outcomes Attributed to Adverse Event (Check all that apply)", _ticks("B2", values.get("B2", []), many=True)
     )
     item("3. Date of Event (dd-mmm-yyyy)", dated("B3"))
-    item("4. Date of this Report (dd-mmm-yyyy)", dated("B4"))
+    # FDA's follow-up leaves B4 out (0.10.96): not applicable, never a dash that reads as missing.
+    item("4. Date of this Report (dd-mmm-yyyy)", "Not applicable (follow-up)" if one("G6 follow-up #") else dated("B4"))
     item("5. Describe Event or Problem", one("B5") or "-")
     item("6. Relevant Tests/Laboratory Data, Including Dates", one("B6") or "-")
     item(

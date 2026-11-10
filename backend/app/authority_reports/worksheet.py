@@ -843,6 +843,8 @@ def build(
             missing = forms.MUST if item.id in required else forms.missing_class(item, kind)
             if item.id == "H2" and context.get("follow_up"):
                 missing = forms.MUST  # a US follow-up says what type it is (0.10.96, B3 B1; spec 3.3)
+            if item.id == "B4" and context.get("follow_up"):
+                missing = forms.NOT_USED  # FDA's follow-up leaves B4 out (0.10.96)
             annex = item.source[-1] if item.source and item.source.startswith("imdrf_") else None
             found = None
             if item.personal:
