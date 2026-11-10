@@ -490,6 +490,21 @@ def purge_tenant_data(tenant_id: uuid.UUID, payload: PurgeRequest, request: Requ
         )
     actor = db.query(AuthUser).filter(AuthUser.id == platform_admin.id).first()
     if actor is None or not _verify(payload.password, actor.password_hash):
+        status = tenant.status
+        db.rollback()
+        db.add(
+            make_audit_event(
+                tenant_id=tenant_id,
+                actor_ref=str(platform_admin.id),
+                action="TENANT_PURGE_REAUTHENTICATION_FAILED",
+                entity_type="Tenant",
+                entity_id=tenant_id,
+                request=request,
+                reason=payload.reason.strip(),
+                details={"status": status},
+            )
+        )
+        db.commit()
         raise HTTPException(
             403, detail={"code": "INVALID_REAUTHENTICATION", "message": "Your current password is required"}
         )

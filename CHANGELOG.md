@@ -341,6 +341,8 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - A platform administrator's wrong password on a customer's or an organization's status change (suspend, reactivate,
   terminate) is now recorded in the audit trail (`CUSTOMER_LIFECYCLE_REAUTHENTICATION_FAILED`,
   `TENANT_LIFECYCLE_REAUTHENTICATION_FAILED`, with the status asked for); nothing else is saved.
+- A platform administrator's wrong password when deleting an organization's data is now recorded in the audit trail
+  (`TENANT_PURGE_REAUTHENTICATION_FAILED`, with the reason given); nothing is deleted or saved.
 - Signing a decision (`/governance/decisions/{id}/sign`) records `APPROVAL_REQUESTED` only once every check has passed;
   a refused attempt (administrator, plan, approval authority, segregation of duties, password or code) leaves only its
   refusal event in the audit trail.
