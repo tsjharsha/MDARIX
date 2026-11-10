@@ -78,6 +78,22 @@ def test_the_awareness_box_prints_the_local_day_the_deadline_counts_from():  # a
     assert _aware("US", "2026-11-10T12:00:00+00:00", "Asia/Kolkata") == "2026-11-10"
 
 
+def test_the_awareness_box_prints_the_organizations_day_and_the_deadline_keeps_the_market_day():  # owner (a), 10 Nov
+    from datetime import date
+
+    from backend.app.reportability import deadlines
+
+    # 07:00 IST is still the previous evening in New York: an India organization's US form prints its own day ...
+    at = "2026-11-10T01:30:00+00:00"
+    assert _aware("US", at, "Asia/Kolkata") == "2026-11-10"
+    # ... while the FDA deadline still counts from the New York day, as before.
+    moment = datetime.fromisoformat(at)
+    assert deadlines.start_day(moment, "US", "Asia/Kolkata") == date(2026, 11, 9)
+    assert deadlines.count(moment, 30, "CALENDAR", "US", "Asia/Kolkata") == deadlines.count(
+        date(2026, 11, 9), 30, "CALENDAR", "US", "Asia/Kolkata"
+    )
+
+
 def test_each_window_counts_by_the_market_it_covers():  # audit 12
     from backend.app.reportability import deadlines, rules
 

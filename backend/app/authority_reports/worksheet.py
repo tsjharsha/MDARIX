@@ -293,12 +293,13 @@ def _event_type(context):
 
 
 def _aware_day(context):
-    """The local day of awareness the market's deadline counts from (deadlines.start_day; code audit 11), not the
-    UTC day: an awareness at 00:30 IST is that day in India."""
+    """The organization's local day of awareness, as its own records show it (owner decision 10 Nov, after code audit
+    11), not the UTC day: an awareness at 07:00 IST is that day for an organization in India. The deadline still counts
+    from the market clock's day (deadlines.start_day), which can be one day earlier, never later."""
     seen = context["seen"]
     if not seen.get("aware_at"):
         return None
-    day = deadlines.start_day(datetime.fromisoformat(seen["aware_at"]), context.get("market"), seen.get("org_zone"))
+    day = deadlines.start_day(datetime.fromisoformat(seen["aware_at"]), None, seen.get("org_zone"))
     return day.isoformat(), _complaint(context, "Awareness: the earliest awareness, received or recorded date")
 
 

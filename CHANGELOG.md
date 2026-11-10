@@ -23,8 +23,9 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
   and still settle their complaint.
 - FDA Form 3500A box H1 pre-fills "Death" only when the US assessment answers that the device caused or contributed
   to it (question 3), as it already did for "Serious injury".
-- The awareness date on a report form (FDA box G3, and the same box on the EU, UK, India and Canada forms) is the local
-  day the market's deadline counts from, not the UTC day: an awareness at 00:30 IST is that day in India.
+- The awareness date on a report form (FDA box G3, and the same box on the EU, UK, India and Canada forms) is the
+  organization's local day, as its own records show it, not the UTC day: an awareness at 07:00 IST prints that day
+  for an organization in India. The deadline still counts from the market clock's day, which can be one day earlier.
 - A complaint naming several countries counts each reporting window by the rule of the market that window covers, not
   the first country's (an India window on a "United States, India" complaint was one day late).
 - A later import closes only the set-aside rows of the records it wrote (product version, bill-of-materials line,
