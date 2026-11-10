@@ -178,9 +178,18 @@ def test_the_samples_rv07_has_its_eu_mir_and_it_goes_the_whole_way(trial):
             _ok(user.put(f"{REPORTS}/{eu['id']}/fields/{field}", json={"value": choice[0]}))
         else:
             fill(user, REPORTS, eu["id"], [field])  # 0.10.81: a date field takes a date, a code field a code
+    # D7 (B2 run 3): before approval the PDF is a preview marked DRAFT.
+    from io import BytesIO
+
+    from pypdf import PdfReader
+
     pdf = user.get(f"{REPORTS}/{eu['id']}/worksheet.pdf")
-    assert pdf.status_code == 409 and pdf.json()["detail"]["code"] == "APPROVE_FIRST"
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+    assert "DRAFT PREVIEW - NOT APPROVED" in PdfReader(BytesIO(pdf.content)).pages[0].extract_text()
     asked = _ok(user.post(f"{REPORTS}/{eu['id']}/snapshots"))
+    # No XML file before approval (and the eMDR file is a US report's only).
+    xml = user.get(f"{REPORTS}/{eu['id']}/emdr.xml", params={"snapshot": asked["pending_snapshot"]["id"]})
+    assert xml.status_code == 404 and xml.json()["detail"]["code"] == "NOT_A_US_REPORT"
     done = _ok(user.post(f"{REPORTS}/{eu['id']}/snapshots/{asked['pending_snapshot']['id']}/approve",
                          json={"password": PASSWORD}))  # fmt: skip
     assert done["stage"] == "APPROVED"
