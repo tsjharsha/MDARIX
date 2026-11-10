@@ -133,6 +133,8 @@ export type SessionContext = {
   routine_path?: boolean;
   /** B5a (MDARIX_CHALLENGE): the Challenge view and the brief's Challenge and Sources sections. */
   challenge?: boolean;
+  /** B5b (MDARIX_CLOSED_LOOP): Did it work? after a signed decision. */
+  closed_loop?: boolean;
   /** classic or new (tenants.navigation, 0.10.67): the organization's menu (app/linkTable.ts). */
   navigation?: string;
   /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
@@ -393,6 +395,11 @@ export function useRoutinePath(): boolean {
 /** B5a: shown only while the server says it is on (an older server has no challenge API). */
 export function useChallenge(): boolean {
   return useContext(WorkspaceContext)?.session?.challenge === true;
+}
+
+/** B5b: shown only while the server says it is on (an older server has no Did it work? API). */
+export function useClosedLoop(): boolean {
+  return useContext(WorkspaceContext)?.session?.closed_loop === true;
 }
 
 /** B7b: "E-mail to check" shows only while the server has e-mail intake switched on. */

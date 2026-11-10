@@ -26,6 +26,7 @@ import {
 } from "../workspaceContext";
 import { MVP_RECORDS_TABS, recordsAuditView, type MvpRecordsTab } from "../../../app/featureSet";
 import { ReportsPanel } from "../../reports/ReportsPanel";
+import { DidItWorkView } from "./DidItWork";
 import { SignatureVerificationWorkspace } from "../../signature/SignatureVerificationWorkspace";
 import {
   BOARD_SHOWS,
@@ -705,6 +706,13 @@ export function CheckBody({ detail, onChanged }: { detail: CapaDetail; onChanged
         </h3>
         <RecurrenceView recurrence={detail.recurrence} />
       </section>
+      {detail.capa.investigation && (
+        <DidItWorkView
+          investigationId={detail.capa.investigation.id}
+          caseLabel={`Investigation ${detail.capa.investigation.business_id ?? ""}`.trim()}
+          capaRef={detail.capa.capa_identifier || detail.capa.business_id}
+        />
+      )}
       {detail.rounds.length > 0 && (
         <section className="ca-drawer-section">
           <h3>Rounds</h3>

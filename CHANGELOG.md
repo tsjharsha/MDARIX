@@ -57,6 +57,12 @@ not built yet, and the chain is re-ordered at the release join). The API and web
   an impact assessment and its task for the investigation owner, once per decision, trigger and group, audited
   `REOPEN_TRIGGER_FIRED` with the counts and records as at firing. MDARIX never reopens or changes a decision; a
   superseded decision is never read; sample complaints never count on a customer's investigation.
+- Screens (flat): **Did it work?** under the investigation's Decisions & actions (and the classic Decision tab), the
+  same block for one CAPA on Records › Effectiveness checks, and a "Did it work?" link beside each investigation in a
+  Product 360 version's story. Each row shows the server's word, its counts (with the zero upper bound), the
+  denominator or "units unknown for X of Y lots", and opens its complaints; version-unknown and lot-unknown complaints
+  are listed apart; the limits are always one click away; per-lot rows only when the server sends them (a trial).
+  Hidden while the session says `closed_loop` is off.
 
 ## [0.10.97] - not released yet (after the WHIF freeze)
 

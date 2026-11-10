@@ -32,6 +32,7 @@ import { CaseIntelligencePanel } from "./CaseIntelligence";
 import { CaseReviewsPanel } from "./CaseReviews";
 import { CaseDecisionBriefPanel } from "./CaseDecisionBrief";
 import { CaseDecisionPanel } from "./CaseDecision";
+import { DidItWorkView } from "./DidItWork";
 import { CaseIntegrity, CaseTimeline } from "./CaseAudit";
 import { Embedded } from "./common";
 
@@ -292,6 +293,10 @@ export function CaseSections({
                   go("Decisions & actions", "brief");
                 }}
               />
+            </div>
+            {/* B5b: what happened after the signed decision (hidden while the switch is off). */}
+            <div className="uw-case-part" id={partId("did-it-work")}>
+              <DidItWorkView key={`${id}:${briefRound}`} investigationId={id} caseLabel={caseLabel} />
             </div>
             {/* An investigation opened from one complaint ends with that complaint's next step (8.7). */}
             {scope.data?.current?.included_complaints?.length === 1 && (

@@ -4,7 +4,7 @@ import { Empty, Panel } from "../../admin/console/charts";
 import { Tabs, useResource, type Resource } from "../../customer-admin/shared";
 import { DeviceIcon, MonitorBand, StatusPill, deviceKind } from "../../shared/hero/HeroVisuals";
 import { formatDay } from "../../../app/dates";
-import { chooseCase, useWorkspace } from "../workspaceContext";
+import { chooseCase, useClosedLoop, useWorkspace } from "../workspaceContext";
 import { countOf } from "./common";
 import { ChartOrTable } from "./WowCharts";
 import {
@@ -436,6 +436,15 @@ export function VersionStory({
   at: (next: Partial<HubPlace>, how?: "push" | "replace") => void;
 }) {
   const openRecord = useRecordOpener();
+  const { open, work, notify } = useWorkspace();
+  const closedLoop = useClosedLoop();
+  // B5-D11: an investigation's Did it work? (Decisions & actions), one click from the version.
+  const openDidItWork = (row: Row) =>
+    void chooseCase(work, String(row.business_id ?? row.investigation_identifier ?? row.id)).then((found) =>
+      found
+        ? open("Investigations", "Decisions & actions?part=did-it-work")
+        : notify(`${row.investigation_identifier ?? row.business_id} could not be opened right now.`, "critical"),
+    );
   const story = useResource<Row>(
     `/api/v1/products/${encodeURIComponent(productId)}/versions/${encodeURIComponent(String(version.id))}/story`,
   );
@@ -506,6 +515,11 @@ export function VersionStory({
                         <strong>{shown.ref}</strong>
                       )}
                       {shown.text && <small>{shown.text}</small>}
+                      {kind === "investigations" && closedLoop && (
+                        <button type="button" className="ac-link" onClick={() => openDidItWork(row)}>
+                          Did it work?
+                        </button>
+                      )}
                     </li>
                   );
                 })}

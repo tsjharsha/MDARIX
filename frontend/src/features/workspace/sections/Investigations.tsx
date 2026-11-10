@@ -45,6 +45,7 @@ import { CaseIntelligencePanel } from "./CaseIntelligence";
 import { CaseReviewsPanel, ReviewDrawer } from "./CaseReviews";
 import { CaseDecisionBriefPanel } from "./CaseDecisionBrief";
 import { CaseDecisionPanel } from "./CaseDecision";
+import { DidItWorkView } from "./DidItWork";
 import { CaseAiRunCard } from "./CaseAiRun";
 import { ClosureCriteria } from "./AfterDecision";
 import { parseReviewsTab } from "../reviews";
@@ -481,21 +482,29 @@ function ClassicInvestigations({ tab: requested }: { tab?: string }) {
           ))}
         {active === "Decision" &&
           (work.investigationId ? (
-            <CaseDecisionPanel
-              key={work.investigationId}
-              investigationId={work.investigationId}
-              caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
-              initialFollowUp={work.investigationId === reviewCase ? requestedDecision.followUp : null}
-              initialAssessment={work.investigationId === reviewCase ? requestedDecision.assessment : null}
-              onCaseChanged={() => {
-                all.reload();
-                work.refreshInvestigations();
-              }}
-              onReviewBrief={() => {
-                setReviewFocus(true);
-                setActive("Decision Brief");
-              }}
-            />
+            <>
+              <CaseDecisionPanel
+                key={work.investigationId}
+                investigationId={work.investigationId}
+                caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
+                initialFollowUp={work.investigationId === reviewCase ? requestedDecision.followUp : null}
+                initialAssessment={work.investigationId === reviewCase ? requestedDecision.assessment : null}
+                onCaseChanged={() => {
+                  all.reload();
+                  work.refreshInvestigations();
+                }}
+                onReviewBrief={() => {
+                  setReviewFocus(true);
+                  setActive("Decision Brief");
+                }}
+              />
+              {/* B5b: what happened after the signed decision (hidden while the switch is off). */}
+              <DidItWorkView
+                key={`loop-${work.investigationId}`}
+                investigationId={work.investigationId}
+                caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
+              />
+            </>
           ) : (
             <Panel title="No investigation selected">
               <Empty
