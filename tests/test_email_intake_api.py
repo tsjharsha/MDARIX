@@ -145,6 +145,25 @@ def test_em12_not_a_case_on_a_fault_word_needs_a_quality_reviewer(org, monkeypat
     assert done["state"] == "NOT_A_CASE" and done["reason"] == "DUPLICATE"
 
 
+def test_em12_the_reviewer_who_opened_it_does_not_dismiss_it_outside_a_trial(org, monkeypatch):
+    from backend.app.signer_training import router as training
+
+    message_id = _received(org, eml("The pump stopped and gave an error alarm twice."))
+    _ok(org["user"].get(f"{API}/messages"))  # the first to see it is the one who opened it
+    with SessionLocal() as db:
+        bind_system(db, "test:email-intake")
+        assert db.get(InboundMessage, uuid.UUID(message_id)).flags["opened_by"]
+    monkeypatch.setattr(mail_router, "effective_permissions", lambda *args: {"quality.review"})
+    real = training.is_trial
+    monkeypatch.setattr(training, "is_trial", lambda *args: False)
+    refused = org["user"].post(f"{API}/messages/{message_id}/not-a-case", json={"reason": "SPAM"})
+    assert refused.status_code == 403 and refused.json()["detail"]["code"] == "SAME_PERSON"
+    assert "EMAIL_NOT_A_CASE_REFUSED" in _audits(org["tenant_id"], message_id)
+    monkeypatch.setattr(training, "is_trial", real)  # in a trial the one reviewer may decide (spec 4.4 step 6)
+    done = _ok(org["user"].post(f"{API}/messages/{message_id}/not-a-case", json={"reason": "SPAM"}))
+    assert done["state"] == "NOT_A_CASE"
+
+
 def test_em15_the_raw_view_is_need_to_know_and_audited(org, monkeypatch):
     from backend.app.access import permissions
 

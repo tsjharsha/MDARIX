@@ -184,6 +184,12 @@ def list_messages(
         .limit(200)
         .all()
     )
+    # Spec 4.4 step 6: the first person to see a message to check is the one who opened it (no other record exists).
+    unopened = [row for row in rows if row.state == "NEW" and not (row.flags or {}).get("opened_by")]
+    for row in unopened:
+        row.flags = {**(row.flags or {}), "opened_by": str(ctx.user_id), "opened_at": service.now_utc().isoformat()}
+    if unopened:
+        db.commit()
     return {"items": [view(row) for row in rows], "reasons": list(processing.NOT_A_CASE_REASONS)}
 
 
@@ -262,6 +268,19 @@ def not_a_case(
         _audit(db, ctx, "EMAIL_NOT_A_CASE_REFUSED", row, reason=reason)
         db.commit()
         raise _error(403, "QUALITY_REVIEWER_NEEDED", "It has harm or fault words: a quality reviewer decides")
+    from backend.app.signer_training.router import is_trial
+
+    # Outside a trial, the reviewer who opened the message does not also dismiss it (four eyes, like B2's SAME_PERSON).
+    if (
+        (flags.get("harm_words") or flags.get("fault_words"))
+        and flags.get("opened_by") == str(ctx.user_id)
+        and not is_trial(control_db, tenant_id)
+    ):
+        _audit(db, ctx, "EMAIL_NOT_A_CASE_REFUSED", row, reason=reason, why="SAME_PERSON")
+        db.commit()
+        raise _error(
+            403, "SAME_PERSON", "You opened this e-mail first: another quality reviewer decides it is not a case"
+        )
     now = service.now_utc()
     row.state, row.reason, row.decided_by, row.decided_at = "NOT_A_CASE", reason, str(ctx.user_id), now
     row.purge_after, row.version = now + processing.KEEP_NOT_A_CASE, row.version + 1
