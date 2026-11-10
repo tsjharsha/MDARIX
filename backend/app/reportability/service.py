@@ -338,6 +338,7 @@ def watch(
     }
     names = people(control_db, tenant_id, (row.decided_by for row in decisions.values()))
     assessed = assessments.rows_by_complaint(db, tenant_id, ids)
+    backlog = imported_backlog(db, tenant_id, today) if ids else {}
     items = []
     shortest = None
     for complaint, record in candidates:
@@ -363,6 +364,8 @@ def watch(
             if shortest is None:
                 shortest = triage_shortest(db, control_db, tenant_id, today)
             seen["binding"] = shortest_binding(seen["binding"], shortest.get(str(complaint.id)))
+        if str(complaint.id) in backlog:
+            seen["binding"] = backlog_binding(seen["binding"], backlog[str(complaint.id)], today)
         # Settled by an earlier single decision, by its case's completed regulatory review, or by every market's
         # signed conclusion (reportable ones with their filing recorded).
         is_decided = decided is not None or seen["settled_by_case"] or assessments.settled(seen["markets"])
@@ -541,6 +544,33 @@ def triage_shortest(db: Session, control_db, tenant_id: uuid.UUID, now) -> dict[
             if kind == intake.COMPLAINT:
                 found[record_id] = first
     return found
+
+
+def imported_backlog(db: Session, tenant_id: uuid.UUID, now) -> dict[str, dict]:
+    """The Imported backlog's complaints (intake.service.imported_backlog), by id."""
+    from backend.app.intake import service as intake
+
+    found = intake.imported_backlog(db, tenant_id, page_size=intake.BACKLOG_READ, now=now)["items"]
+    return {item["id"]: item for item in found}
+
+
+def backlog_binding(binding: dict | None, held: dict, now) -> dict:
+    """OD-12 + 3a (owner, 10 Nov): an old imported complaint in the Imported backlog: its regulatory clock ran in the
+    customer's QMS, so the clock shown is the backlog target, with the note; never overdue against a market window."""
+    from backend.app.intake.service import BACKLOG_NOTE
+
+    due = datetime.fromisoformat(held["due_at"])
+    return {
+        **(binding or {"days": None, "day_basis": None, "market": None, "triggers": [], "basis": []}),
+        "window": BACKLOG_NOTE,
+        "due_date": due.date().isoformat(),
+        "due_at": held["due_at"],
+        "due_zone": None,
+        "due_label": None,
+        "days_left": (due.date() - deadlines.day_of(now)).days,
+        "state": rules.OVERDUE if held["overdue"] else rules.RUNNING,
+        "backlog": True,
+    }
 
 
 def shortest_binding(binding: dict, triage_first: dict | None) -> dict:
