@@ -39,6 +39,8 @@ export type TenantContext = {
   entitlements?: Array<{ feature_code: string; enabled: boolean; limits?: Record<string, unknown> }>;
   /** full or mvp (backend/app/feature_set.py): under mvp the connections and mapping sections are parked. */
   feature_set?: string;
+  /** B7b: whether this server has e-mail intake switched on (MDARIX_EMAIL_INTAKE). */
+  email_intake?: boolean;
 };
 
 export type ConsoleApi = {

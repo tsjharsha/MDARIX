@@ -5,6 +5,7 @@ import { Table, formatDate, idColumn, listOf, send, useResource } from "../share
 import { LifecycleBadge } from "./Access";
 import { hideUuid } from "../../../app/displayId";
 import { readable } from "../labels";
+import { EmailIntakePanel } from "./EmailIntake";
 
 type DataExport = {
   id: string;
@@ -190,6 +191,7 @@ export function OrganizationSection() {
           ]}
         />
       </Panel>
+      {context?.email_intake && <EmailIntakePanel />}
       <DataExports />
     </>
   );
