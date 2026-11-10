@@ -51,8 +51,9 @@ stays "starter, for your consultant to confirm". On unless `MDARIX_RULE_REGISTER
 - "Rules used" on a market conclusion (the Decision trees answer and the watch's assessment drawer): the floor in force
   at the event, today's floor, and what was decided, kept apart. Both screens are hidden while the register is off.
 - FG-1: an organisation window longer than the law. Saving it gives a warning (the settings return
-  `longer_than_law`), and the watch shows the law's deadline beside that window's clock. Saved windows are never
-  refused or changed. India has no legal period in code (FG-2) and is not compared.
+  `longer_than_law`), and the watch shows the latest date the law allows (the market's longest legal period) beside
+  that window's clock. Saved windows are never refused or changed. India has no legal period in code (FG-2) and is
+  not compared. Off with the register.
 
 ### Fixed
 
