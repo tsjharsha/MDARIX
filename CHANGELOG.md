@@ -90,7 +90,10 @@ trials' existing Cases; nothing is written until the owner approves the list), t
   version stay where they were. The complaint page shows "From your QMS · last synced" with the date of the import.
 - **Imported backlog** (Complaints › More views): imported complaints known of more than 30 days before their import,
   with no harm flag and no triage yet. Routine triage, one click each, due 10 working days after the import (both
-  organization settings). Read in full, oldest first, however large the import.
+  organization settings). Read in full, oldest first, however large the import. Old imported complaints **with** a
+  harm flag wait there too, listed first with their flags and the note "Imported: check the reportability decision
+  in your QMS": the full triage form, the same 10-working-day target, and no regulatory clock shown overdue or
+  alerted (the clock ran in your QMS). Recent imports and Cases logged in MDARIX are unchanged.
 - **Second look: "Closed without a reportability decision?"** A complaint closed in your QMS with a death or a
   serious injury and no signed market conclusion comes to the second look.
 
