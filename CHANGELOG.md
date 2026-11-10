@@ -87,6 +87,14 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   serious injury, and a triage that reopens on one; to the escalation role and the Triage Leads, once per item per
   person. People without an address are recorded in `URGENT_EMAIL_QUEUED`. One reminder when the fast-track
   acknowledgement is overdue. A failed e-mail never cancels the in-app escalation.
+- A translation addendum (Case › Said later › "A translation of their words"): the original words are always kept.
+  A Case whose words may not be English says so ("the harm-word check reads English only").
+
+### Changed (harm words)
+
+- The harm words know more ways to say it ("passed away", "killed", "admitted to hospital", "fracture", "stroke"...)
+  and a plain negation: "not" or "never" directly before harmed, injured, hurt, burned or hospitalised, and "nobody
+  was", "no one was", "without any", "no sign of" before a harm word, no longer flag it. "Not breathing" still does.
 
 ### Changed
 

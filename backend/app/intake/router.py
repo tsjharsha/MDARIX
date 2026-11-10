@@ -363,6 +363,10 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
         "kind": event.kind,
         "kind_label": rules.KIND_LABELS[event.kind],
         "reporter_words": event.reporter_words,
+        # B7 step 12 (IN-15): the words may not be English: the harm words may miss something; add a translation.
+        "language_note": "May not be English: the harm-word check reads English only. Add a translation addendum."
+        if rules.may_not_be_english(event.reporter_words)
+        else None,
         "reporter_type": event.reporter_type,
         "reporter_site": event.reporter_site,
         "country": event.country,
@@ -3224,7 +3228,8 @@ def add_addendum(
     event = _event_or_404(db, tenant_id, event_id, lock=True)
     if event.status == case_rules.VOIDED:
         raise _error(409, "CASE_VOIDED", "This case was withdrawn: entered in error")
-    kind = _choice(payload.kind.upper(), ADDENDUM_KINDS)
+    # EMAIL addenda are made from a message in "E-mail to check" (B7b), never typed here.
+    kind = _choice(payload.kind.upper(), tuple(k for k in ADDENDUM_KINDS if k != "EMAIL"))
     said_by = _choice(payload.said_by_role.upper(), SAID_BY)
     if kind is None or said_by is None:
         raise _error(422, "ADDENDUM_INCOMPLETE", "Choose what kind of addendum it is and who said it")

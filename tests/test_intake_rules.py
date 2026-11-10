@@ -86,9 +86,22 @@ def test_the_triage_flag_is_raised_at_once_by_harm_answers_and_words():
 def test_harm_words_with_abbreviations_and_a_negated_mention():
     assert rules.harm_words("The pt was moved to ICU.") == ["ICU", "pt"]
     assert rules.harm_words("Device returned; no patient injury reported. No harm.") == []
-    # "not" never negates: a conservative reading.
-    assert rules.harm_words("Patient not injured, it seems") == ["injured"]
+    # B7 step 12 (G18): "not" negates a participle directly after it, nothing else ("not breathing" stays harm).
+    assert rules.harm_words("Patient not injured, it seems") == []
+    assert rules.harm_words("The patient was not harmed and nobody was hurt") == []
     assert rules.harm_words("Patient was harmed") == ["harmed"]
+    assert rules.harm_words("Found him not breathing; cardiac arrest") == ["cardiac arrest"]
+    assert rules.harm_words("Not injured but later hospitalized") == ["hospitalized"]
+
+
+def test_harm_word_synonyms_and_the_language_flag():  # B7 step 12 (G18, IN-15)
+    assert rules.harm_words("Her father passed away the next day") == ["passed away"]
+    assert {"fracture", "admitted to hospital"} <= set(rules.harm_words("Admitted to hospital with a fracture"))
+    assert rules.harm_words("Tests ran without any injury reported") == []
+    assert rules.may_not_be_english("Die Pumpe hat beim Patienten einen Alarm ausgelöst und stoppte sofort")
+    assert rules.may_not_be_english("पंप ने अलार्म दिया और रुक गया")
+    assert not rules.may_not_be_english("The pump alarmed and stopped during the infusion")
+    assert not rules.may_not_be_english("Alarm E42")
     # The set-aside rows read the same list.
     assert quarantine_harm({"description": "the patient was taken to hospital"}) == ["hospital"]
 

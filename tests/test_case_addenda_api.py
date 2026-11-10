@@ -288,3 +288,19 @@ def test_a_qms_row_with_the_cases_qms_id_updates_its_complaint_never_a_second(tr
             "Pump stopped mid-dose",
         )
         assert merged.last_synced_at is not None
+
+
+def test_a_translation_is_an_addendum_and_the_original_stays(trial):  # B7 step 12 (IN-15, EM-13)
+    user = trial["user"]
+    event = _ok(
+        user.post(
+            INTAKE,
+            json={"kind": "CONTACT", "reporter_words": "Die Pumpe hat Alarm gegeben und ist dann stehen geblieben"},
+        )
+    )
+    assert _ok(user.get(f"{INTAKE}/{event['id']}"))["language_note"].startswith("May not be English")
+    body = {"kind": "TRANSLATION", "said_by_role": "OUR_STAFF", "text": "The pump alarmed and then stopped."}
+    detail = _ok(user.post(f"{INTAKE}/{event['id']}/addenda", json=body))
+    assert detail["reporter_words"].startswith("Die Pumpe") and "TRANSLATION" in str(detail["addenda"])
+    refused = user.post(f"{INTAKE}/{event['id']}/addenda", json={**body, "kind": "EMAIL"})
+    assert refused.status_code == 422  # e-mail addenda come from "E-mail to check" (B7b) only

@@ -182,6 +182,25 @@ HARM_WORDS = (
     "over infused",
     "wrong dose",
     "shock",
+    # B7 step 12 (G18): the ways people say a death or an injury without the words above.
+    "passed away",
+    "passed on",
+    "fatality",
+    "killed",
+    "life-threatening",
+    "life threatening",
+    "hospitalisation",
+    "hospitalization",
+    "admitted to hospital",
+    "emergency room",
+    "anaphylaxis",
+    "anaphylactic",
+    "stroke",
+    "heart attack",
+    "fracture",
+    "laceration",
+    "amputation",
+    "electrocuted",
 )
 # MDARIX's starter fault words (G32): a "service only" record whose text matches one is always in the QA review.
 FAULT_WORDS = (
@@ -204,7 +223,22 @@ FAULT_WORDS = (
 )
 # A word directly after one of these is negated ("no harm", "no patient injury", "without injury") and does not count.
 # Starter rule: "not" is never a negation here ("not breathing" is harm).
-_NEGATIONS = ("no", "nil", "without", "no patient")
+_NEGATIONS = (
+    "no",
+    "nil",
+    "without",
+    "no patient",
+    "without any",
+    "nobody",
+    "nobody was",
+    "no one",
+    "no one was",
+    "no sign of",
+    "no signs of",
+)
+# B7 step 12 (G18): "not" (or "never") negates only these, directly after it: "the patient was not harmed" is no harm,
+# "not breathing" still is.
+_NOT_NEGATES = frozenset({"harmed", "injured", "hurt", "burned", "burnt", "hospitalised", "hospitalized", "killed"})
 
 
 def clean(value: object, limit: int = TEXT_MAX) -> str:
@@ -221,7 +255,9 @@ def _match(text: str, words) -> list[str]:
         pattern = re.compile(r"(?<![\w&])" + re.escape(target).replace(r"\ ", r"\s+") + r"(?![\w&])")
         for hit in pattern.finditer(plain):
             before = plain[: hit.start()].split()
-            negated = any(before[-len(n.split()) :] == n.split() for n in _NEGATIONS)
+            negated = any(before[-len(n.split()) :] == n.split() for n in _NEGATIONS) or (
+                target in _NOT_NEGATES and before[-1:] in (["not"], ["never"])
+            )
             if not negated:
                 found.append(word)
                 break
@@ -235,6 +271,26 @@ def harm_words(text: object) -> list[str]:
 
 def fault_words(text: object) -> list[str]:
     return _match(str(text or ""), FAULT_WORDS)
+
+
+_ENGLISH = frozenset(
+    "the a an and or of to in on at is was were it he she they we i you my our his her their not no with for from "
+    "this that after before when device pump patient said".split()
+)
+
+
+def may_not_be_english(text: object) -> bool:
+    """B7 step 12 (G18, IN-15): the words may not be English, so the harm words may have missed something: mostly
+    letters outside the Latin alphabet, or six or more words with almost no common English word. Shown, never
+    guessed further; a person adds a translation addendum (the original is always kept)."""
+    value = str(text or "")
+    letters = [char for char in value if char.isalpha()]
+    if not letters:
+        return False
+    if sum(1 for char in letters if ord(char) > 0x24F) / len(letters) > 0.3:
+        return True
+    words = re.findall(r"[a-zA-Z]+", value.lower())
+    return len(words) >= 6 and sum(1 for word in words if word in _ENGLISH) / len(words) < 0.1
 
 
 # --------------------------------------------------------------------------------------------- the first-contact check

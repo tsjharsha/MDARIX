@@ -125,6 +125,9 @@ export type IntakeItem = {
   kind: "CONTACT" | "URGENT" | "SERVICE_RECORD";
   kind_label: string;
   reporter_words: string;
+  /** B7: "May not be English" (the harm-word check reads English only), and an imported old call's note. */
+  language_note?: string | null;
+  backlog_note?: string | null;
   reporter_type: string | null;
   reporter_site: string | null;
   country: string | null;

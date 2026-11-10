@@ -875,6 +875,7 @@ const ADDENDUM_KINDS: readonly [string, string][] = [
   ["TECHNICIAN_FINDING", "A technician's finding"],
   ["CORRECTION_BY_REPORTER", "The reporter corrects a fact"],
   ["WITHDRAWAL", "The reporter withdraws the complaint"],
+  ["TRANSLATION", "A translation of their words (the original is kept)"],
 ];
 const SAID_BY: readonly [string, string][] = [
   ["REPORTER", "The reporter"],
@@ -942,6 +943,8 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
       <section className="ca-drawer-section">
         <h3>What was said</h3>
         <q className="uw-cr-text">{item.reporter_words}</q>
+        {item.language_note && <p className="uw-cr-meta">{item.language_note}</p>}
+        {item.backlog_note && <p className="uw-cr-meta">{item.backlog_note}</p>}
         <p className="uw-cr-meta">
           {[
             item.product_name && item.product_from_lot ? `${item.product_name} (from the lot)` : item.product_name,
