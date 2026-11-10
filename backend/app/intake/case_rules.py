@@ -207,6 +207,7 @@ CHANNELS = {
     "SOCIAL_MEDIA": "Social media",
     "REGULATOR": "Regulator notice",
     "OTHER": "Other",
+    "SERVICE_RECORD_IMPORT": "Imported service record",  # set by the 0.10.93 data script, not offered on the form
 }
 # intake_events.patients (tr19 check patients_known).
 PATIENTS = {"NONE": "None", "ONE": "One", "SEVERAL": "Several", "NOT_KNOWN": "Not known"}

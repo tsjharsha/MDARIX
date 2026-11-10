@@ -276,3 +276,12 @@ def test_the_case_check_offers_six_classifications_each_with_why_it_is_disabled(
     # Unanswered: nothing may be signed.
     assert all(item["disabled_reason"] for item in cr.choices(cr.UNANSWERED))
     assert all(item["disabled_reason"] for item in cr.choices(None))
+
+
+def test_imported_service_record_channel_has_a_label_but_is_not_offered_on_the_form():
+    """Owner Q2 (10 Nov): SERVICE_RECORD_IMPORT reads "Imported service record"; a person never picks it."""
+    from backend.app.intake.router import FORM_CHANNELS
+
+    assert cr.CHANNELS["SERVICE_RECORD_IMPORT"] == "Imported service record"
+    assert "SERVICE_RECORD_IMPORT" not in FORM_CHANNELS
+    assert set(FORM_CHANNELS) == set(cr.CHANNELS) - {"SERVICE_RECORD_IMPORT"}

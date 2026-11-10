@@ -113,7 +113,8 @@ def plan_tenant(db: Session, tenant_id) -> list[str]:
     for event in events:
         ref = event.reference
         if event.channel is None and event.kind in CHANNEL_OF_KIND:
-            lines.append(f"{ref}: channel -> {CHANNEL_OF_KIND[event.kind]} (was kind {event.kind})")
+            channel = CHANNEL_OF_KIND[event.kind]
+            lines.append(f'{ref}: channel -> {channel} ("{case_rules.CHANNELS[channel]}", was kind {event.kind})')
         country = country_change(event.country)
         if country and country[0]:
             lines.append(f"{ref}: country {event.country!r} -> {country[0]}")

@@ -72,6 +72,8 @@ trials' existing Cases; nothing is written until the owner approves the list), t
   investigation record". Old links and bookmarks still open the right tab.
 - **Permissions:** an Investigator no longer classifies first contacts or triages; a Regulatory Reviewer may triage.
 - A service-only Case is closed only with a resolution summary.
+- A service record opened from an imported complaint shows its channel as **Imported service record**; the
+  upgrade script gives the same channel to the service records your trial already has.
 - Screen sentences no longer break in the middle with a long dash.
 - Import: a QMS row carrying an escalated complaint's QMS ID updates that complaint instead of adding a second one.
 - Authority report downloads: before approval, the worksheet PDF or DOCX downloads as a preview marked "DRAFT PREVIEW

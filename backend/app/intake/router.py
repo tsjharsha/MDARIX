@@ -299,7 +299,7 @@ def guide(_ctx: AuthenticatedRequestContext = Depends(get_request_context)):
         "outcomes": [{"code": code, "label": case_rules.OUTCOME_LABELS[code]} for code in case_rules.OUTCOMES],
         "states": [{"code": code, "label": case_rules.STATE_LABELS[code]} for code in case_rules.STATES],
         "issue_categories": [{"code": code, "label": label} for code, label in case_rules.ISSUE_CATEGORIES.items()],
-        "channels": [{"code": code, "label": label} for code, label in case_rules.CHANNELS.items()],
+        "channels": [{"code": code, "label": label} for code, label in FORM_CHANNELS.items()],
         "patients": [{"code": code, "label": label} for code, label in case_rules.PATIENTS.items()],
         "identifiers": {
             "keys": [{"code": key, "label": case_rules.IDENTIFIER_LABELS[key]} for key in case_rules.IDENTIFIERS],
@@ -799,6 +799,10 @@ def intake_detail(
 # --------------------------------------------------------------------------------------------- logging a contact
 
 
+# "Imported service record" is set only by the 0.10.93 data script: a person never picks it (owner Q2, 10 Nov).
+FORM_CHANNELS = {code: label for code, label in case_rules.CHANNELS.items() if code != "SERVICE_RECORD_IMPORT"}
+
+
 def _choice(value: str, allowed, default: str | None = None) -> str | None:
     code = rules.clean(value, 40).upper()
     return code if code in allowed else default
@@ -937,7 +941,7 @@ def log_intake(
         issue_category=case_rules.issue_category(payload.issue_category),
         product_text=product_text,
         lot_text=lot_text,
-        channel=_choice(payload.channel, case_rules.CHANNELS),
+        channel=_choice(payload.channel, FORM_CHANNELS),
         channel_ref=rules.clean(payload.channel_ref, 200) or None,
         patients=_choice(payload.patients, case_rules.PATIENTS),
         harm_text=_masked_text(rules.clean(payload.harm_text))[0] or None,
@@ -1806,6 +1810,7 @@ def check_service_record(
         tenant_id=tenant_id,
         reference=service.make_reference(db, tenant_id, "SERVICE_RECORD"),
         kind="SERVICE_RECORD",
+        channel="SERVICE_RECORD_IMPORT",
         reporter_words=complaint.description,
         reporter_type=complaint.reporter_type,
         country=complaint.country,
