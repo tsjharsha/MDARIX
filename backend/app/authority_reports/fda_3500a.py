@@ -72,6 +72,13 @@ CHOICES: dict[str, dict[str, tuple[str, str]]] = {
         "serious injury": ("eventSInj", "C53569"),
         "malfunction": ("eventMal", "C25745"),
     },
+    # H2, a follow-up's type(s) (0.10.96, B3 group B): FDA's Type_of_Follow-up codes (C53584).
+    "H2": {
+        "correction": ("correction", "C53585"),
+        "additional information": ("addlInfo", "C53586"),
+        "response to fda request": ("reqResp", "C53587"),
+        "device evaluation": ("devEval", "C53588"),
+    },
     "H3": {"yes": ("evalManuY", "true"), "no": ("evalManuN", "false")},
     "H5": {"yes": ("singleUseY2", "true"), "no": ("singleUseN2", "false")},
     "H7": {
@@ -150,7 +157,7 @@ OCCUPATIONS = {
 # The form's character limits (its fields' MaxLen); a longer value is not placed.
 LIMITS = {"D2A": 3, "D2B": 32, "D4_UDI": 1000, "B6": 2000, "B7": 2000, "H11": 450}
 BOX_PAGE = {"A3": 1, "B1": 1, "B2": 1, "D5": 7, "D7A": 7, "D8": 7, "D9": 7, "E2": 7, "E4": 7, "G2": 8, "G6": 8}
-BOX_PAGE |= {key: 9 for key in ("H1", "H3", "H5", "H7", "H8")}
+BOX_PAGE |= {key: 9 for key in ("H1", "H2", "H3", "H5", "H7", "H8")}
 DATES = {"B3", "B4", "D4_EXPIRY", "D6A", "D6B", "G3", "H4"}
 CODES = {"H6_CLINICAL", "H6_IMPACT", "H6_PROBLEM", "H6_COMPONENT", "H6_TYPE", "H6_FINDINGS", "H6_CONCLUSIONS"}
 # The event description: page 1's box, then page 2's continuation (FDA's 10,000 characters).
@@ -245,6 +252,11 @@ def placements(
             if rest:
                 left.append((label, rest, "the rest of the description, beyond the form's 10,000 characters"))
         elif field_id in CHOICES:
+            follow_up = re.search(r"follow-up #?(\d+)", text, re.IGNORECASE) if field_id == "G6" else None
+            if follow_up:  # G6 "Follow-up #n" (0.10.96, B3 B2): its box and number box
+                put(8, "repFollow", ON)
+                put(8, "repFollowNum", follow_up.group(1))
+                text = text.replace(follow_up.group(0), "")
             found, other = choices(field_id, text)
             for box, _ in found:
                 put(BOX_PAGE[field_id], box, ON)

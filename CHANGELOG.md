@@ -69,6 +69,19 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
   `scripts/refresh_trial_story.py` (`backend/app/trial/sample_0_10_96.py`: the approved snapshot frozen again at the
   same moment and the sample approver's record re-recorded on the new fingerprint; left as it was where no file can
   be made). The help says the US files are ready at approval and that MDARIX never submits.
+- US follow-ups (B3 group B, B1): `POST /authority-reports/{id}/follow-ups` on a submitted US initial report makes
+  follow-up #n (what is new, the day it arrived, FDA's H2 types, the new narrative), due 30 calendar days after the
+  information arrived (21 CFR 803.56). It starts from what the initial report holds, carries the initial's number
+  (422 `FOLLOWS_INITIAL` if typed), and G6 reads "30-day; Follow-up #n". One follow-up is open at a time (409
+  `FOLLOW_UP_OPEN`); numbers count only the follow-ups submitted before, so they run 1, 2, 3 without gaps. Send for
+  approval needs an H2 type (422 `H2_REQUIRED`) and a signed conclusion, not necessarily reportable. A US request for
+  information (`POST .../requests`) now creates this follow-up with H2 "Response to FDA request". A conclusion signed
+  again supersedes an approved, unsent follow-up's approval (audit fix 4 for the chain); its own due date stays.
+- The follow-up's eMDR file (B2) is FDA's follow-up shape: G6 "Follow-up" (C53579) with its number, each H2 type as
+  FDA's code (C53584), a value only when new or changed against the chain's last submitted report, codes only when
+  new, B5 and H11 only as typed on the follow-up; a value cleared on the follow-up is listed ("FDA keeps the earlier
+  value"). FDA's "Manufacturer Follow-up" example is reproduced block by block. The official Form 3500A ticks
+  "Follow-up" with its number and the H2 boxes; the eSubmitter-layout PDF shows the follow-up number.
 
 ## [0.10.95] - not released yet (ships in the big-bang release)
 

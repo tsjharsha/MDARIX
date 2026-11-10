@@ -133,8 +133,8 @@ def _settle_open_reports(db: Session, ctx, tenant_id, complaint_id, market: str,
     from backend.app.authority_reports import router as reports
     from backend.app.db.models.authority_reports import ReportObligation
 
-    if signed.conclusion != markets.REPORTABLE:
-        return []
+    from sqlalchemy import or_
+
     ended = []
     for obligation in (
         db.query(ReportObligation)
@@ -142,11 +142,15 @@ def _settle_open_reports(db: Session, ctx, tenant_id, complaint_id, market: str,
             ReportObligation.tenant_id == tenant_id,
             ReportObligation.complaint_id == complaint_id,
             ReportObligation.market == market,
-            ReportObligation.kind == "INITIAL",
+            # The unsubmitted US follow-ups of the chain too, on any signed conclusion (0.10.96, audit fix 4).
+            or_(ReportObligation.kind == "INITIAL", ReportObligation.parent_id.isnot(None)),
         )
         .with_for_update()
     ):
-        ended += reports.follow_signed(db, ctx, obligation, signed, now)
+        if reports.is_follow_up(obligation) or (
+            obligation.kind == "INITIAL" and signed.conclusion == markets.REPORTABLE
+        ):
+            ended += reports.follow_signed(db, ctx, obligation, signed, now)
     return ended
 
 

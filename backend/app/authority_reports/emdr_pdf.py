@@ -30,6 +30,7 @@ EXTRA = {
     "G1 name": _MAKER + "/contactParty[1]/addr/additionalLocator/text()",
     "G4": emdr.DEV + "/identifiedDevice/inventoryItem/manufacturedDeviceModel/asRegulatedProduct/id/@extension",
     "H2": "//message/controlActProcess/reasonOf/detectedIssueEvent/code[@code='C53584']/../value/@code",
+    "G6 follow-up #": "//message/controlActProcess/reasonOf/detectedIssueEvent/value[@code='C53579']/../text/text()",
     # D8 "unknown" goes as FDA's null flavour, not a value.
     "D8 null": emdr.POINTERS["D8"].removesuffix("@value") + "@nullFlavor",
 }
@@ -77,8 +78,7 @@ OPTIONS = {
     ),
     "H8": ("Initial Use of Device", "Reuse", "Unknown"),
 }
-# FDA's own codes outside the form's choices: G6 follow-up, and H2's follow-up types (HL7Medwatch.xlsx, VOCAB).
-FOLLOW_UP_CODE = "C53579"
+# FDA's own codes outside the form's choices: H2's follow-up types (HL7Medwatch.xlsx, VOCAB).
 H2 = (
     ("Correction", "C53585"),
     ("Additional Information", "C53586"),
@@ -215,9 +215,9 @@ def body(values: dict[str, list[str]]) -> list[tuple[str, str]]:
     item("3. Date Received by Manufacturer (dd-mmm-yyyy)", dated("G3"))
     item("4. Premarket Identification PMA/510(k)", one("G4") or "-")
     item("5. If IND/PreANDA, Give Protocol #")
-    # shortcut: the follow-up number (G6 "Follow-up #: n") comes with the follow-up file, B3 group B.
-    follow = "[X]" if FOLLOW_UP_CODE in values.get("G6", []) else "[ ]"
-    item("6. Type of Report", f"{_ticks('G6', values.get('G6', []), many=True)} {follow} Follow-up")
+    number = one("G6 follow-up #")
+    follow = f"[X] Follow-up #: {number}" if number else "[ ] Follow-up"
+    item("6. Type of Report", f"{_ticks('G6', values.get('G6', []), many=True)} {follow}")
     item("7. Adverse Event Term(s)")
     item("8. Manufacturer Report Number", one("G8") or "-")
 

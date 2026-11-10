@@ -194,7 +194,65 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
     context["confirm_codes"] = new_navigation(control_db, obligation.tenant_id)
     # Before approval freezes it, the contact office (G1) is checked as the eMDR file needs it (0.10.92, A5).
     context["check_contact_office"] = obligation.state in rules.EDITABLE
+    if is_follow_up(obligation):
+        parent = db.get(ReportObligation, obligation.parent_id)
+        chain = _follow_ups(db, obligation.tenant_id, parent.id)
+        context["follow_up"] = {
+            "number": follow_up_number(chain, obligation),
+            "report_type": parent.report_type,
+            "previous": _chain_values(db, [parent, *chain], obligation),
+        }
     return context
+
+
+# --------------------------------------------------------------------------------------------- US follow-ups (B3)
+
+
+def is_follow_up(obligation: ReportObligation) -> bool:
+    """A US follow-up (0.10.96, B3 group B): a Form 3500A child of an initial report, in its chain (21 CFR 803.56)."""
+    return obligation.parent_id is not None and obligation.form_code == forms.FDA_3500A.code
+
+
+def _follow_ups(db, tenant_id, parent_id) -> list[ReportObligation]:
+    return (
+        db.query(ReportObligation)
+        .filter(
+            ReportObligation.tenant_id == tenant_id,
+            ReportObligation.parent_id == parent_id,
+            ReportObligation.form_code == forms.FDA_3500A.code,
+        )
+        .order_by(ReportObligation.created_at, ReportObligation.id)
+        .all()
+    )
+
+
+def _chain_values(db, chain: list, obligation) -> dict[str, str]:
+    """What FDA holds for the chain before this follow-up (B2): the values of the last submitted report's approved
+    snapshot (each snapshot keeps every value, so the last is the merged one)."""
+    from backend.app.authority_reports import fda_3500a
+
+    sent = [row for row in chain if row.id != obligation.id and row.state in rules.SUBMITTED]
+    approved = [row for row in _snapshots(db, sent[-1]) if row.state == "APPROVED"] if sent else []
+    return fda_3500a.values((approved[-1].fields or {}).get("sections", [])) if approved else {}
+
+
+def follow_up_number(chain: list, row) -> int:
+    """A follow-up's number: 1 + the follow-ups before it that were submitted. One is open at a time, so the numbers
+    run 1, 2, 3 without gaps; a follow-up cancelled before it was sent never takes one."""
+    earlier = [item for item in chain if (item.created_at, str(item.id)) < (row.created_at, str(row.id))]
+    return 1 + sum(item.state in rules.SUBMITTED for item in earlier)
+
+
+def _h2(value: str) -> str | None:
+    """Why an H2 value is not FDA's follow-up types (None: it is)."""
+    from backend.app.authority_reports import fda_3500a
+
+    found, other = fda_3500a.choices("H2", value)
+    if found and not other:
+        return None
+    return (
+        "Choose FDA's follow-up types: Correction; Additional information; Response to FDA request; Device evaluation"
+    )
 
 
 def _preparers(obligation: ReportObligation, extra: str | None = None) -> set[str]:
@@ -479,6 +537,8 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
             else None
         ),
         "parent_id": str(obligation.parent_id) if obligation.parent_id else None,
+        # A US follow-up's number in its chain (0.10.96, B3): "Follow-up #n".
+        "follow_up": (context.get("follow_up") or {}).get("number"),
         "responses": [
             {
                 "id": str(row.id),
@@ -486,6 +546,10 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
                 "state_label": rules.STATE_LABELS[row.state],
                 "due_on": _iso(row.due_on),
                 "request_text": row.request_text,
+                "received_on": _iso(row.request_received_on),
+                "follow_up": follow_up_number([c for c in children if is_follow_up(c)], row)
+                if is_follow_up(row)
+                else None,
             }
             for row in children
         ],
@@ -515,7 +579,10 @@ def _emdr_kind(obligation: ReportObligation) -> str:
 def _emdr_check(sections, context, kind: str = "M-I") -> dict:
     from backend.app.authority_reports import emdr
 
-    found = emdr.prepare(sections or [], context["parties"], kind=kind, sender="-", now=_now(), practice=False)
+    previous = (context.get("follow_up") or {}).get("previous")
+    found = emdr.prepare(
+        sections or [], context["parties"], kind=kind, sender="-", now=_now(), practice=False, previous=previous
+    )
     return {"missing": found["missing"], "left_out": found["left_out"], "schema_errors": found["errors"]}
 
 
@@ -630,6 +697,10 @@ def report_list(
                 "views": [],
             }
         )
+    chains: dict = {}
+    for row in sorted(obligations, key=lambda item: (item.created_at, str(item.id))):
+        if is_follow_up(row):
+            chains.setdefault(row.parent_id, []).append(row)
     for row in obligations:
         complaint = complaints.get(row.complaint_id)
         if complaint is None:
@@ -640,6 +711,8 @@ def report_list(
                 **base(complaint, row.market),
                 "id": str(row.id),
                 "kind": row.kind,
+                # "Follow-up #n" in the list (0.10.96, B3 B1).
+                "follow_up": follow_up_number(chains[row.parent_id], row) if is_follow_up(row) else None,
                 "form_title": forms.FORMS[row.form_code].title,
                 "form_version": row.form_version,
                 "state": row.state,
@@ -912,6 +985,8 @@ def follow_signed(db, ctx, obligation: ReportObligation, signed, now: datetime) 
         "provisional": obligation.due_provisional,
     }
     after = {"report_type": signed.report_type, "due_on": _iso(signed.due_on), "provisional": False}
+    if is_follow_up(obligation):
+        after = before  # a follow-up keeps its own clock (803.56); only a re-sign supersedes its approval
     if obligation.state in rules.SUBMITTED:
         if (before["report_type"], before["due_on"]) != (after["report_type"], after["due_on"]):
             _audit(
@@ -936,7 +1011,8 @@ def follow_signed(db, ctx, obligation: ReportObligation, signed, now: datetime) 
                 row.state = "SUPERSEDED"
         if obligation.state == rules.APPROVED:
             obligation.state = rules.DRAFT
-    obligation.report_type, obligation.due_on, obligation.due_provisional = signed.report_type, signed.due_on, False
+    if not is_follow_up(obligation):
+        obligation.report_type, obligation.due_on, obligation.due_provisional = signed.report_type, signed.due_on, False
     obligation.updated_at = now
     action = "REPORT_RETYPED_BY_CONCLUSION" if before != after else "REPORT_RESIGNED_BY_CONCLUSION"
     _audit(db, ctx, action, obligation, before, after, version=signed.version, superseded=superseded)
@@ -1053,8 +1129,11 @@ def set_field(
             "PERSONAL_FIELD",
             "Patient and reporter details are entered in the authority's route, never in MDARIX",
         )
-    if field.missing == forms.NOT_USED:
+    follow = is_follow_up(obligation)
+    if field.missing == forms.NOT_USED and not (follow and field_id == "H2"):
         raise _error(422, "FIELD_NOT_USED", "This field is not used in this report")
+    if follow and field_id == "MFR_REPORT":
+        raise _error(422, "FOLLOWS_INITIAL", "A follow-up carries its initial report's number")
     entries = dict(obligation.entries or {})
     before = entries.get(field_id)
     coded = bool(field.source and field.source.startswith("imdrf_"))
@@ -1072,6 +1151,8 @@ def set_field(
     problem = forms.value_problem(field, value)
     if problem:
         raise _error(422, f"NOT_A_{field.kind}", problem)
+    if value and field_id == "H2" and _h2(value):
+        raise _error(422, "NOT_A_CHOICE", _h2(value))
     if value and field.kind == forms.LIST_CODE:
         from backend.app import regulatory_reference as reference
 
@@ -1275,9 +1356,11 @@ def _entry_values(field_id: str, entry: dict | None) -> dict:
     }
 
 
-def _conclusion(context: dict, market: str):
+def _conclusion(context: dict, market: str, any_signed: bool = False):
+    """The market's signed conclusion a snapshot is approved on: reportable, or for a US follow-up any signed one (a
+    follow-up may be sent after a later "not reportable", 0.10.96)."""
     current = context["current"]
-    if current is None or current.conclusion != markets.REPORTABLE:
+    if current is None or (current.conclusion != markets.REPORTABLE and not any_signed):
         raise _error(
             409,
             "CONCLUSION_NOT_SIGNED",
@@ -1301,6 +1384,12 @@ def assign_number(db, control_db, obligation: ReportObligation, actor: str, now:
     from backend.app.authority_reports import emdr
     from backend.app.trial.sample_data import SAMPLE_SOURCE
 
+    if is_follow_up(obligation):  # a follow-up carries its initial report's number, never its own
+        held = (db.get(ReportObligation, obligation.parent_id).entries or {}).get("MFR_REPORT") or {}
+        entries = dict(obligation.entries or {})
+        entries["MFR_REPORT"] = {"value": held.get("value"), "by": actor, "at": _iso(now), "follows_initial": True}
+        obligation.entries = entries
+        return
     db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": f"{NUMBER_LOCK}{obligation.tenant_id}"})
     value = ReportObligation.entries["MFR_REPORT"]["value"].astext
     chain = {obligation.id, obligation.parent_id} - {None}
@@ -1403,9 +1492,9 @@ def request_snapshot(
     from backend.app.human_decision.rules import fingerprint
 
     context = _context(db, control_db, obligation)
-    current = _conclusion(context, obligation.market)
     if parties is not None:  # the trial sample's own US manufacturer, never stored (0.10.96, A9)
         context["parties"] = parties
+    current = _conclusion(context, obligation.market, any_signed=is_follow_up(obligation))
     context["sent_day"] = _org_day(db, obligation.tenant_id, now).isoformat()  # B4 (0.10.96, Q3)
     names = _names(control_db, obligation.tenant_id, _preparers(obligation))
     frozen_file: dict = {}
@@ -1423,11 +1512,14 @@ def request_snapshot(
             sender=_organization_name(control_db, obligation.tenant_id) or "-",
             now=now,
             practice=_trial(control_db, obligation.tenant_id),
+            previous=(context.get("follow_up") or {}).get("previous"),  # a follow-up sends what changed (B2)
         )
         if strict:
             _emdr_gate(found)
         if found["xml"] and not found["errors"]:
             frozen_file = frozen_emdr(found["xml"], context["parties"], sections, found["left_out"])
+    if is_follow_up(obligation):
+        obligation.assessment_id = current.id  # a later re-sign supersedes its approval (audit fix 4, the chain)
     if obligation.kind == "INITIAL":
         obligation.assessment_id, obligation.report_type = current.id, current.report_type
         if obligation.due_provisional:
@@ -1503,6 +1595,10 @@ def ask_for_approval(
             )
     if obligation.form_code == forms.FDA_3500A.code:
         _first_number(obligation)
+    if is_follow_up(obligation) and _h2(((obligation.entries or {}).get("H2") or {}).get("value") or ""):
+        raise _error(
+            422, "H2_REQUIRED", "Tick at least one H2 follow-up type before sending the follow-up for approval"
+        )
     replaced = [row.id for row in _snapshots(db, obligation) if row.state == "PENDING"]
     snapshot = request_snapshot(db, control_db, obligation, str(ctx.user_id), _now(), strict=True)
     _audit(
@@ -2135,6 +2231,100 @@ def complete(
     return detail(db, control_db, ctx, obligation)
 
 
+class FollowUpCreate(BaseModel):
+    received_on: date  # the day the new information arrived (prefilled with today on the page)
+    what_is_new: str = Field(max_length=rules.NOTE_MAX * 2)
+    h2: list[str] = Field(default_factory=list, max_length=4)
+    narrative: str | None = Field(default=None, max_length=worksheet.VALUE_MAX)
+
+
+FOLLOW_UP_OWN = frozenset({"MFR_REPORT", "B4", "B5", "H11", "H2", "G8"})
+
+
+def follow_up_due(received_on: date) -> date:
+    """A US follow-up is due 30 calendar days after the information arrived (21 CFR 803.56)."""
+    return deadlines.count(received_on, 30, "CALENDAR", markets.US, None).day
+
+
+def create_follow_up(db, ctx, initial: ReportObligation, received_on: date, text: str, h2: list[str], narrative, due):
+    """Follow-up #n of a submitted US initial report (0.10.96, B3 B1), with the initial row locked and read fresh
+    (audit fix 6): one open follow-up per chain, FDA's H2 types, and the new narrative (B5) as typed."""
+    if not (initial.kind == "INITIAL" and initial.form_code == forms.FDA_3500A.code):
+        raise _error(409, "NOT_A_US_INITIAL", "A follow-up is made on a US initial report (Form FDA 3500A)")
+    if initial.state not in rules.VALID_SUBMISSION:
+        raise _error(409, "NOT_SUBMITTED", "A follow-up follows the initial report once it is submitted and accepted")
+    chain = _follow_ups(db, initial.tenant_id, initial.id)
+    if any(row.state not in (*rules.SUBMITTED, rules.CANCELLED) for row in chain):
+        raise _error(409, "FOLLOW_UP_OPEN", "Submit the open follow-up first: FDA takes follow-ups in order")
+    ticks = "; ".join(dict.fromkeys(item.strip() for item in h2 if item and item.strip()))
+    if ticks and _h2(ticks):
+        raise _error(422, "NOT_A_CHOICE", _h2(ticks))
+    now, actor = _now(), str(ctx.user_id)
+    number = ((initial.entries or {}).get("MFR_REPORT") or {}).get("value")
+    # The follow-up starts from what the initial report holds (its file sends only what changes, B2); its narrative
+    # (B5, H11) is only what is new, and its number, B4 and H2 are its own.
+    entries = {key: value for key, value in (initial.entries or {}).items() if key not in FOLLOW_UP_OWN}
+    entries["MFR_REPORT"] = {"value": number, "by": actor, "at": _iso(now), "follows_initial": True}
+    if ticks:
+        entries["H2"] = {"value": ticks, "by": actor, "at": _iso(now)}
+    told = _text(narrative, worksheet.VALUE_MAX) if narrative else None
+    if told:
+        entries["B5"] = {"value": told, "by": actor, "at": _iso(now)}
+    child = ReportObligation(
+        id=uuid.uuid4(),
+        tenant_id=initial.tenant_id,
+        complaint_id=initial.complaint_id,
+        market=initial.market,
+        kind="RESPONSE",
+        parent_id=initial.id,
+        assessment_id=initial.assessment_id,
+        form_code=initial.form_code,
+        form_version=initial.form_version,
+        report_type=initial.report_type,
+        due_on=due,
+        due_provisional=False,
+        state=rules.DRAFT,
+        entries=entries,
+        request_text=text,
+        request_received_on=received_on,
+        created_by=actor,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(child)
+    db.flush()
+    _audit(
+        db,
+        ctx,
+        "REPORT_FOLLOW_UP_CREATED",
+        initial,
+        follow_up=str(child.id),
+        number=follow_up_number([*chain, child], child),
+        due_on=_iso(due),
+    )
+    return child
+
+
+@router.post("/{obligation_id}/follow-ups", dependencies=[DECIDERS])
+def start_follow_up(
+    obligation_id: uuid.UUID,
+    payload: FollowUpCreate,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Create follow-up #n of a submitted US report: what is new, the day it arrived, H2 and the new narrative."""
+    initial = _obligation(db, _tenant(ctx), obligation_id, lock=True)
+    text = _text(payload.what_is_new)
+    if not text or len(text) < rules.REASON_MIN:
+        raise _error(422, "REASON_REQUIRED", f"Say what is new, in at least {rules.REASON_MIN} characters")
+    child = create_follow_up(
+        db, ctx, initial, payload.received_on, text, payload.h2, payload.narrative, follow_up_due(payload.received_on)
+    )
+    db.commit()
+    return detail(db, control_db, ctx, child)
+
+
 class InformationRequest(BaseModel):
     request_text: str = Field(max_length=rules.NOTE_MAX * 2)
     received_on: date
@@ -2161,6 +2351,14 @@ def request_for_information(
         raise _error(409, "NO_VALID_SUBMISSION", "A request for information follows a valid (accepted) submission")
     if payload.due_on < payload.received_on:
         raise _error(422, "DUE_BEFORE_REQUEST", "The response cannot be due before the request arrived")
+    if parent.kind == "INITIAL" and parent.form_code == forms.FDA_3500A.code:
+        # A US request for information is answered by a follow-up, H2 "Response to FDA request" (0.10.96, spec 3.3).
+        child = create_follow_up(
+            db, ctx, parent, payload.received_on, text, ["Response to FDA request"], None, payload.due_on
+        )
+        _audit(db, ctx, "REPORT_INFORMATION_REQUESTED", parent, response=str(child.id), due_on=_iso(payload.due_on))
+        db.commit()
+        return detail(db, control_db, ctx, child)
     now = _now()
     child = ReportObligation(
         id=uuid.uuid4(),

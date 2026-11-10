@@ -74,7 +74,13 @@ def test_audit4_re_signing_with_the_same_report_type_supersedes_the_old_conclusi
     monkeypatch.setattr(router, "_snapshots", lambda db, obligation: snapshots)
     monkeypatch.setattr(router, "_audit", lambda db, ctx, action, obligation, *a, **k: audits.append((action, k)))
     obligation = SimpleNamespace(
-        state=rules.APPROVED, report_type="US_30_DAY", due_on=DUE, due_provisional=False, assessment_id=old
+        state=rules.APPROVED,
+        report_type="US_30_DAY",
+        due_on=DUE,
+        due_provisional=False,
+        assessment_id=old,
+        parent_id=None,  # an initial report (0.10.96: a US follow-up keeps its own clock)
+        form_code="FDA_3500A",
     )
     signed = SimpleNamespace(id=new, report_type="US_30_DAY", due_on=DUE, version=2)
     ended = router.follow_signed(None, None, obligation, signed, datetime(2026, 11, 10, tzinfo=timezone.utc))

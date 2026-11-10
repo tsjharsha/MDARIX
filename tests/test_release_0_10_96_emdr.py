@@ -231,3 +231,109 @@ def test_b3_a_draft_pdf_is_marked_draft():
     assert "DRAFT - NOT APPROVED" in draft and "DRAFT PREVIEW - NOT APPROVED" in draft
     approved = text_of(_typical_pdf()[1])
     assert "NOT APPROVED" not in approved and "Approved by Rahul Colleague" in approved
+
+
+# --------------------------------------------------------------------------------------------- B1 (follow-ups)
+
+
+def test_b3_a_follow_up_is_due_30_days_after_the_information_arrived():
+    from datetime import date
+
+    from backend.app.authority_reports.router import follow_up_due
+
+    assert follow_up_due(date(2026, 1, 31)) == date(2026, 3, 2)  # 30 calendar days (21 CFR 803.56)
+    assert follow_up_due(date(2026, 12, 15)) == date(2027, 1, 14)
+
+
+def test_b3_follow_up_numbers_count_only_the_follow_ups_submitted_before():
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+
+    from backend.app.authority_reports.router import follow_up_number
+
+    start = datetime(2026, 11, 1, tzinfo=timezone.utc)
+    chain = [
+        SimpleNamespace(id=str(n), created_at=start + timedelta(days=n), state=state)
+        for n, state in enumerate(("ACCEPTED", "CANCELLED", "SUBMITTED_PENDING", "DRAFT"))
+    ]
+    # Submitted, then cancelled before it was sent (never numbered), then submitted, then the open one: 1, 2, 2, 3.
+    assert [follow_up_number(chain, row) for row in chain] == [1, 2, 2, 3]
+
+
+# --------------------------------------------------------------------------------------------- B2 (follow-up file)
+
+
+def _follow_up(values: dict, typed=("B5", "H11")) -> list[dict]:
+    """A follow-up's sections: the narratives typed on it (ENTERED), the rest from the record."""
+    sections = _sections(values)
+    for item in sections[0]["fields"]:
+        item["status"] = "ENTERED" if item["id"] in typed else "FROM_RECORD"
+    return sections
+
+
+def test_fdas_manufacturer_follow_up_example_is_reproduced_block_by_block():
+    from tests.test_fda_3500a_emdr import EXAMPLES, NOW, POINTERS, TYPICAL, _example, _plain
+
+    held = dict(TYPICAL)  # the initial report as FDA holds it; the follow-up holds the same, plus what is new
+    values = {
+        **held,
+        "B5": "Additional event narrative.",
+        "H11": "Additional follow-up manufacturer narrative.",
+        "G6": "30-day; Follow-up #1",
+        "H2": "Correction; Additional information",
+    }
+    found = emdr.prepare(
+        _follow_up(values), [], kind="M-F", sender="USA Device Manufacturer", now=NOW, practice=False, previous=held
+    )
+    assert found["missing"] == [] and found["errors"] == [], (found["missing"], found["errors"])
+    ours, theirs = _plain(found["xml"]), _example("Manufacturer Follow-up.xml")
+    assert emdr.validate((EXAMPLES / "Manufacturer Follow-up.xml").read_bytes()) == []
+    for block, path in POINTERS.items():
+        if block not in ("B4", "version"):  # FDA's example leaves B4 out; MDARIX dates every report it sends
+            assert sorted(ours.xpath(path)) == sorted(theirs.xpath(path)), block
+    number = "//reasonOf/detectedIssueEvent/value[@code='C53579']/../text/text()"
+    assert ours.xpath(number) == theirs.xpath(number) == ["1"]
+
+
+def test_b3_unchanged_values_are_left_out_and_narratives_never_repeat():
+    from tests.test_fda_3500a_emdr import NOW, TYPICAL, _plain
+
+    held = dict(TYPICAL)
+    values = {**held, "D1": "New brand name", "G6": "30-day; Follow-up #2", "H2": "Correction"}
+    values["H6_PROBLEM"] = held["H6_PROBLEM"] + "; A0102 Extra (FDA 9999)"
+    values["D4_LOT"] = ""  # cleared on the follow-up
+    found = emdr.prepare(
+        _follow_up(values, typed=()), [], kind="M-F", sender="X", now=NOW, practice=False, previous=held
+    )
+    assert found["errors"] == [] and found["missing"] == []
+    ours = _plain(found["xml"])
+    assert ours.xpath(emdr.POINTERS["D1"]) == ["New brand name"]  # changed: sent
+    assert ours.xpath(emdr.POINTERS["H6 problem"]) == ["9999"]  # only the new code
+    assert ours.xpath(emdr.POINTERS["B5"]) == [] and ours.xpath(emdr.POINTERS["H11"]) == []  # never repeated
+    for block in ("D4 model", "D2 procode", "B1", "H1", "H6 clinical"):
+        assert ours.xpath(emdr.POINTERS[block]) == [], block  # unchanged: left out
+    assert any("FDA keeps the earlier value" in line and "D4_LOT" in line for line in found["left_out"])
+
+
+def test_b3_g6_says_follow_up_with_its_number_and_h2_ticks_are_sent_as_fdas_codes():
+    from tests.test_fda_3500a_emdr import NOW, TYPICAL, _plain
+
+    values = {**TYPICAL, "G6": "30-day; Follow-up #3", "H2": "Response to FDA request; Device evaluation"}
+    found = emdr.prepare(_follow_up(values), [], kind="M-F", sender="X", now=NOW, practice=False, previous=TYPICAL)
+    ours = _plain(found["xml"])
+    assert sorted(ours.xpath(emdr.POINTERS["G6"])) == ["C53577", "C53579"]
+    assert ours.xpath("//reasonOf/detectedIssueEvent/value[@code='C53579']/../text/text()") == ["3"]
+    h2 = "//reasonOf/detectedIssueEvent/code[@code='C53584']/../value/@code"
+    assert sorted(ours.xpath(h2)) == ["C53587", "C53588"]
+    assert not [line for line in found["left_out"] if line.startswith("G6")]  # "Follow-up #3" is FDA's choice
+
+
+def test_b3_the_official_form_ticks_follow_up_and_h2():
+    from backend.app.authority_reports import fda_3500a
+
+    pages, left = fda_3500a.placements(
+        _sections({"G6": "30-day; Follow-up #2", "H2": "Correction; Device evaluation"}), None
+    )
+    assert pages[8]["repFollow[0]"] == fda_3500a.ON and pages[8]["repFollowNum[0]"] == "2" and pages[8]["rep30[0]"]
+    assert pages[9]["correction[0]"] == fda_3500a.ON and pages[9]["devEval[0]"] == fda_3500a.ON
+    assert not left

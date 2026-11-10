@@ -81,6 +81,9 @@ KINDS = {"M-I": "m_i", "M-F": "m_f"}  # manufacturer initial, manufacturer follo
 FOLLOW_UP = re.compile(r"\bfollow-up #?(\d+)\b", re.IGNORECASE)  # G6 on a follow-up: "30-day; Follow-up #2"
 # FDA's XPaths (HL7Medwatch.xlsx, 3500A_HL7_Pointers) of the blocks MDARIX carries, namespace left out (``plain``):
 # the eSubmitter-layout PDF reads the file back through them, and the tests compare the file with FDA's examples.
+FOLLOW_UP_CODE = "C53579"  # G6 "Follow-up" (FDA's Type_of_Report)
+# What a follow-up always sends, and its narratives, sent only as typed on it (never the initial's text again).
+FOLLOW_UP_SENDS, NARRATIVES = frozenset({"MFR_REPORT", "G8", "G6", "H2", "B4"}), frozenset({"B5", "H11"})
 IE = "//message/controlActProcess/subject/investigationEvent"
 DEV = IE + "/pertainsTo/procedureEvent/device/identifiedDevice"
 _PERSON = IE + "/trigger/reaction/subject/investigativeSubject"
@@ -251,7 +254,7 @@ def check(sections: list[dict], parties, kind: str = "M-I") -> tuple[list[str], 
         if key in _DATES and fda.day(text) is None:
             left.append(f"{name(key)}: not a date")
         if key in fda.CHOICES and key != "H1":
-            if fda.choices(key, text)[1]:
+            if fda.choices(key, FOLLOW_UP.sub("", text) if key == "G6" else text)[1]:
                 left.append(f"{name(key)}: not one of FDA's choices")
         try:
             text.encode("cp1252")
@@ -354,8 +357,9 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
     _e(act, "effectiveTime", **({"value": reported} if reported else {"nullFlavor": "NI"}))
     event = _e(_e(act, "subject"), "investigationEvent")
     _e(event, "id", assigningAuthorityName="FDA", extension=number, root=FDA_OID)
-    for _, code in pick("B1"):
-        _e(event, "code", code=code, codeSystem=NCI, codeSystemName="Adverse_Event_Or_Product_Problem_Report")
+    for _, code in pick("B1") or [(None, None)]:  # a follow-up that sends no B1: the bare code, as FDA's example
+        attrs = {"code": code} if code else {}
+        _e(event, "code", **attrs, codeSystem=NCI, codeSystemName="Adverse_Event_Or_Product_Problem_Report")
     if vals.get("H11"):
         _e(event, "text", vals["H11"], mediaType="text/plain")
     for tag in ("statusCode", "activityTime", "availabilityTime"):
@@ -363,7 +367,7 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
     _e(_e(event, "authorOrPerformer", typeCode="AUT"), "assignedEntity")
 
     reaction = _e(_e(event, "trigger"), "reaction")
-    _e(reaction, "text", vals["B5"], mediaType="text/plain")
+    _e(reaction, "text", vals.get("B5"), mediaType="text/plain")  # empty on a follow-up with no new narrative
     happened = _day(vals.get("B3"))
     _e(reaction, "effectiveTime", **({"value": happened} if happened else {"nullFlavor": "NI"}))
     subject = _e(_e(reaction, "subject"), "investigativeSubject")
@@ -484,7 +488,8 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
     model = _e(_e(device, "inventoryItem"), "manufacturedDeviceModel")
     if fits("D4_MODEL"):
         _e(model, "id", extension=vals["D4_MODEL"])
-    kind = _e(model, "code", code=vals["D2A"], codeSystemName="Type_of_Device", codeSystem=NCI)
+    procode = {"code": vals["D2A"]} if vals.get("D2A") else {}  # a follow-up sends it only when it changed
+    kind = _e(model, "code", **procode, codeSystemName="Type_of_Device", codeSystem=NCI)
     if fits("D2B"):
         _e(kind, "originalText", vals["D2B"], mediaType="text/plain")
     if fits("D1"):
@@ -547,24 +552,62 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
             _e(_e(_e(procedure, component), item), "effectiveTime", value=when)
     _e(_e(_e(event, "component"), "adverseEventAssessment"), "subject1").append(etree.Element(f"{{{HL7}}}primaryRole"))
 
-    def reason(concept: str, name: str, code: str):
+    def reason(concept: str, name: str, code: str, text: str | None = None):
         issue = _e(_e(act, "reasonOf"), "detectedIssueEvent")
         _e(issue, "code", code=concept, codeSystem=NCI, codeSystemName=name)
+        if text:
+            _e(issue, "text", text, mediaType="text/plain")
         _type(_e(issue, "value", code=code, codeSystem=NCI), "CE")
 
     for _, code in pick("G2"):
         reason("C53566", "Report_Source", code)
-    for _, code in pick("G6"):
+    for _, code in fda.choices("G6", FOLLOW_UP.sub("", vals["G6"]))[0] if "G6" in vals else []:
         reason("C53571", "Type_of_Report", code)
+    follow_up = FOLLOW_UP.search(vals.get("G6", ""))
+    if follow_up:  # G6 "Follow-up" with its number, and H2's types (FDA's "Manufacturer Follow-up" example)
+        reason("C53571", "Type_of_Report", FOLLOW_UP_CODE, follow_up.group(1))
+        for _, code in pick("H2"):
+            reason("C53584", "Type_of_Follow-up", code)
     for _, code in pick("H1"):
         reason("C53570", "Type_of_Reportable_Event", code)
     return etree.tostring(root, xml_declaration=True, encoding="UTF-8", pretty_print=True)
 
 
-def prepare(sections: list[dict], parties, *, kind: str, sender: str, now: datetime, practice: bool) -> dict:
+def delta(sections: list[dict], previous: dict[str, str]) -> tuple[list[dict], list[str]]:
+    """A follow-up's sections as its file sends them (0.10.96, B3 B2): a value only when it is new or changed against
+    the chain's last submitted report (``previous``, its values), a code only when new, the narratives (B5, H11) only
+    as typed on the follow-up, and always its number, G6, H2 and B4. Also what it says of a value cleared here."""
+    names = fda.labels(sections)
+    out, left = [], []
+    for section in sections:
+        fields = []
+        for item in section["fields"]:
+            key, value = item["id"], str(item.get("value") or "").strip()
+            if key in NARRATIVES:
+                value = value if item.get("status") in ("ENTERED", "CHANGED") else ""
+            elif key in REQUIRED_CODES and value:
+                held = {part.strip() for part in previous.get(key, "").split(";")}
+                value = "; ".join(part.strip() for part in value.split(";") if part.strip() not in held)
+            elif key not in FOLLOW_UP_SENDS and value == previous.get(key, ""):
+                value = ""
+            if not item.get("value") and previous.get(key) and key not in NARRATIVES:
+                left.append(f"{names.get(key, key)}: cleared here; FDA keeps the earlier value")
+            fields.append({**item, "value": value or None})
+        out.append({**section, "fields": fields})
+    return out, left
+
+
+def prepare(
+    sections: list[dict], parties, *, kind: str, sender: str, now: datetime, practice: bool, previous=None
+) -> dict:
     """The file as Send for approval checks it (0.10.96): the blocks FDA requires that are missing or not in its
-    format; when none, the file itself and its schema errors (none: FDA's schema takes it)."""
+    format; when none, the file itself and its schema errors (none: FDA's schema takes it). ``previous``: a follow-up's
+    chain values, so its file sends only what changed (``delta``)."""
+    cleared: list[str] = []
+    if previous is not None:
+        sections, cleared = delta(sections, previous)
     missing, left = check(sections, parties, kind)
+    left = [*left, *cleared]
     xml = None if missing else build(sections, parties, sender=sender, now=now, practice=practice)
     return {"missing": missing, "left_out": left, "errors": validate(xml) if xml else [], "xml": xml}
 

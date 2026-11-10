@@ -376,7 +376,9 @@ def test_a_request_for_information_creates_a_separate_response_obligation(trial)
         )
     )
     assert response["kind"] == "RESPONSE" and response["parent_id"] == finished["id"] and response["state"] == "DRAFT"
-    assert _fields(response)["REQUEST"]["value"] == "FDA asks for the device evaluation results."
+    # 0.10.96 (B3): FDA's request is answered by a follow-up on Form 3500A, H2 "Response to FDA request".
+    assert response["follow_up"] == 1 and _fields(response)["H2"]["value"] == "Response to FDA request"
+    assert response["request"]["text"] == "FDA asks for the device evaluation results."
     parent = _ok(user.get(f"{REPORTS}/{finished['id']}"))
     assert parent["state"] == "ACCEPTED" and parent["responses"][0]["id"] == response["id"]
 
