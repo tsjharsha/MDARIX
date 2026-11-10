@@ -25,6 +25,7 @@ import { chanceText, trendCountText, trendResultLabel, type TrendItem } from "..
 import {
   STORY_STEPS,
   casePlace,
+  moreCasePlace,
   openStep,
   shownRun,
   stepBlocker,
@@ -691,7 +692,8 @@ export function MoreCases({ cases, onOpen }: { cases: MoreCase[]; onOpen: (secti
         </strong>
         <p>
           Each opens its own case check: an inquiry, a pending case waiting for the reporter, one to confirm no
-          deficiency, and an urgent case triaged at once.
+          deficiency, and an urgent case triaged at once. The routine complaint opens Resolve and close: one screen, one
+          signature.
         </p>
       </div>
       <div className="uw-story-partner-actions">
@@ -701,7 +703,7 @@ export function MoreCases({ cases, onOpen }: { cases: MoreCase[]; onOpen: (secti
             type="button"
             className="ac-secondary"
             onClick={() => {
-              const place = casePlace(item.id);
+              const place = moreCasePlace(item);
               onOpen(place.section, place.tab);
             }}
           >

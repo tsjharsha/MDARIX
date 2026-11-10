@@ -117,6 +117,9 @@ export type OversightSettings = {
   escalation_role: string;
   escalation_role_label: string;
   updated_at: string | null;
+  /** B7: the opt-in urgent e-mail alert (off by default) and the organization's file storage in MB (B7-D12, D16). */
+  urgent_email?: boolean;
+  attachment_quota_mb?: number;
   roles?: Array<{ code: string; label: string }>;
   weekdays?: string[];
   zones?: string[];

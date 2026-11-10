@@ -121,7 +121,8 @@ def test_the_seed_adds_sample_case_11_unsigned_from_rv11s_own_facts(sample):
     assert [step["label"] for step in run["steps"][:2]] == ["Review the case", "Classify service or complaint"]
     # More cases to try: the other sample calls, with their outcome as the record says (records never renamed).
     more = {item["ref"]: item["label"] for item in story["more_cases"]}
-    assert list(more) == ["SAMPLE-CALL-01", "SAMPLE-CALL-03", "SAMPLE-CALL-04", "SAMPLE-URG-01"]
+    assert list(more) == ["SAMPLE-CALL-01", "SAMPLE-CALL-03", "SAMPLE-CALL-04", "SAMPLE-URG-01", "SAMPLE-RT-01"]
+    assert more["SAMPLE-RT-01"] == "Routine: resolve and close"  # B7a: the routine complaint, one screen
     assert more["SAMPLE-CALL-03"] == "Pending" and more["SAMPLE-CALL-04"] == "Pending: confirm no deficiency"
     assert more["SAMPLE-URG-01"].startswith("Urgent")
     # CASE-11's own triage item raises no alert while it stands apart: RV-11's item already does (day 0 calm).

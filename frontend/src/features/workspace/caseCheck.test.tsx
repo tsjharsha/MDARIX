@@ -237,3 +237,23 @@ describe("the Case check drawer (spec 4.4)", () => {
     );
   });
 });
+
+describe("B7 on the Case check drawer (G18, G19, RT-30)", () => {
+  it("shows the may-not-be-English note and the backlog note under what was said", () => {
+    const html = render(
+      <CheckBody
+        item={item({
+          language_note: "These words may not be English: add a translation; the original is kept.",
+          backlog_note: "Imported as backlog: no check is due.",
+        })}
+        guide={guide}
+        onChanged={vi.fn()}
+      />,
+      ALL,
+    );
+    expect(html).toContain("These words may not be English");
+    expect(html).toContain("Imported as backlog: no check is due.");
+    const plain = render(<CheckBody item={item()} guide={guide} onChanged={vi.fn()} />, ALL);
+    expect(plain).not.toContain("may not be English");
+  });
+});

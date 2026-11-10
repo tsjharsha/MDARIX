@@ -470,7 +470,45 @@ def more_cases(data: Session, tenant_id, sample: dict | None) -> list[dict]:
             else case_rules.OUTCOME_LABELS.get(outcome or "", rules.OUTCOME_LABELS.get(outcome or "", "To check"))
         )
         found.append({"id": str(event.id), "ref": ref, "label": label, "signed": signed is not None})
-    return found
+    routine = _routine_try(data, tenant_id)
+    return found + ([routine] if routine else [])
+
+
+def _routine_try(data: Session, tenant_id) -> dict | None:
+    """B7a: the sample's routine complaint (SAMPLE-RT-01), offered for "Resolve and close" (one screen, one signature);
+    it opens its Dispositions drawer, with its state as the record says."""
+    from backend.app.db.models.complaint_disposition import ComplaintDisposition
+    from backend.app.db.models.oversight import EventClosure
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
+    from backend.app.trial.sample_dispositions import MARKER
+
+    complaint = (
+        data.query(Complaint.id)
+        .filter(
+            Complaint.tenant_id == tenant_id,
+            Complaint.complaint_identifier == MARKER,
+            Complaint.source_system == SAMPLE_SOURCE,
+        )
+        .scalar()
+    )
+    if complaint is None:
+        return None
+    closed = (
+        data.query(EventClosure.closed_at)
+        .filter(EventClosure.tenant_id == tenant_id, EventClosure.complaint_id == complaint)
+        .scalar()
+    )
+    resolved = (
+        data.query(ComplaintDisposition.id)
+        .filter(
+            ComplaintDisposition.tenant_id == tenant_id,
+            ComplaintDisposition.complaint_id == complaint,
+            ComplaintDisposition.signed_at.isnot(None),
+        )
+        .first()
+    )
+    label = "Closed in MDARIX" if closed else "Resolved" if resolved else "Routine: resolve and close"
+    return {"id": str(complaint), "ref": MARKER, "label": label, "signed": bool(closed or resolved), "complaint": True}
 
 
 def progress(data: Session, control_db: Session, ctx, tenant_id, request) -> dict:

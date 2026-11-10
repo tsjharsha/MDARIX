@@ -1,9 +1,17 @@
+import { useState } from "react";
 import { Download } from "lucide-react";
 import { Panel } from "../../admin/console/charts";
-import { Tabs, useResource } from "../../customer-admin/shared";
+import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
 import { NEW_PLACES } from "../../../app/linkTable";
 import { importTemplatesFor, offeredTab } from "../../../app/featureSet";
-import { useCan, useFeatureSet, useReportedTab, useWorkspace, type BusinessPermission } from "../workspaceContext";
+import {
+  useCan,
+  useFeatureSet,
+  useIsTrial,
+  useReportedTab,
+  useWorkspace,
+  type BusinessPermission,
+} from "../workspaceContext";
 import { OVERSIGHT, type OversightSettings } from "../oversight";
 import { COMMUNICATIONS } from "../communications";
 import { ReviewSettingsPanel } from "./Complaints";
@@ -27,6 +35,7 @@ export const SETTING_PERMISSIONS: Record<SettingsTab, readonly BusinessPermissio
   "Working calendar": ["quality.review", "regulatory.approve"],
   "Trend rules": ["signal.triage"],
   "Contact attempts": ["quality.review", "regulatory.approve"],
+  "Alerts and files": ["quality.review", "regulatory.approve"],
   "Import templates": ["records.write"],
   Products: PRODUCT_EDITORS,
 };
@@ -50,6 +59,7 @@ export function SettingsSection({ tab }: { tab?: string }) {
       {active === "Working calendar" && <WorkingCalendar />}
       {active === "Trend rules" && <TrendRules />}
       {active === "Contact attempts" && <ContactAttempts />}
+      {active === "Alerts and files" && <AlertsAndFiles />}
       {active === "Import templates" && <ImportTemplates />}
       {active === "Products" && <ProductSettings />}
     </Tabs>
@@ -107,6 +117,99 @@ function ContactAttempts() {
   ) : (
     <Panel eyebrow="Requests" title="Unanswered attempts before a request moves on" source={list}>
       {null}
+    </Panel>
+  );
+}
+
+/**
+ * Settings › Alerts and files (B7): the opt-in urgent e-mail ("an urgent case arrived, open MDARIX", nothing about the
+ * case) and the organization's file storage for evidence, supplier and Case files. A free trial keeps 100 MB.
+ */
+export function AlertsAndFiles() {
+  const settings = useResource<OversightSettings>(`${OVERSIGHT}/settings`);
+  const quality = useCan("quality.review");
+  const approve = useCan("regulatory.approve");
+  const canSet = quality || approve;
+  const trial = useIsTrial();
+  const [quota, setQuota] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState("");
+  const shown = settings.data;
+  const save = async (body: { urgent_email?: boolean; attachment_quota_mb?: number }, done: string) => {
+    setBusy(true);
+    setError("");
+    setSaved("");
+    try {
+      await send(`${OVERSIGHT}/settings/alerts-and-files`, "PUT", body);
+      setSaved(done);
+      setQuota(null);
+      settings.reload();
+    } catch (reason) {
+      setError(errorText(reason, "The setting was not saved."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const mb = quota ?? shown?.attachment_quota_mb ?? 100;
+  return (
+    <Panel eyebrow="Alerts and files" title="Urgent e-mail and file storage" source={settings}>
+      {shown && (
+        <>
+          <p className="ac-muted">
+            The urgent e-mail says only that an urgent case arrived and to open MDARIX: no names, no product, no words.
+            It goes at once to the people who must act; each delivery is tracked.
+          </p>
+          <label className="ca-check">
+            <input
+              type="checkbox"
+              checked={!!shown.urgent_email}
+              disabled={!canSet || busy}
+              onChange={(event) =>
+                void save(
+                  { urgent_email: event.target.checked },
+                  event.target.checked ? "Urgent e-mail is on." : "Urgent e-mail is off; the in-app alert stays.",
+                )
+              }
+            />{" "}
+            Send an e-mail when an urgent case arrives
+          </label>
+          <div className="ca-form-grid">
+            <label className="ca-field">
+              File storage for this organization (MB)
+              <input
+                type="number"
+                min={1}
+                max={10240}
+                value={mb}
+                disabled={!canSet || busy || trial}
+                onChange={(event) => setQuota(Number(event.target.value))}
+              />
+            </label>
+          </div>
+          <p className="ac-muted">
+            {trial
+              ? "A free trial keeps 100 MB for evidence, supplier and case files."
+              : "Evidence, supplier and case files count together. A new file over the limit is refused; nothing is deleted."}
+          </p>
+          {canSet && !trial && (
+            <button
+              type="button"
+              className="ac-primary"
+              disabled={busy || quota === null || quota < 1 || quota > 10240}
+              onClick={() => void save({ attachment_quota_mb: mb }, `File storage is ${mb} MB.`)}
+            >
+              Save file storage
+            </button>
+          )}
+          {error && (
+            <p className="uw-flag-critical" role="alert">
+              {error}
+            </p>
+          )}
+          {saved && <p role="status">{saved}</p>}
+        </>
+      )}
     </Panel>
   );
 }

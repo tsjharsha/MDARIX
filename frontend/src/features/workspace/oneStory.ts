@@ -56,8 +56,9 @@ export type StoryRun = {
   current: number;
   finished: boolean;
 };
-/** A sample Case offered under "More cases to try" (0.10.93), with its outcome as its record says. */
-export type MoreCase = { id: string; ref: string; label: string; signed: boolean };
+/** A sample Case offered under "More cases to try" (0.10.93), with its outcome as its record says; `complaint` marks
+ * the routine sample complaint (B7a), which opens its Resolve and close drawer. */
+export type MoreCase = { id: string; ref: string; label: string; signed: boolean; complaint?: boolean };
 export type OneStory = { sample: StoryRun | null; yours: StoryRun | null; more_cases?: MoreCase[] };
 
 export const STORY_STEPS = 10;
@@ -104,6 +105,12 @@ export function stepBlocker(run: StoryRun, index: number): string | null {
 
 /** A Case's own check drawer on the Cases view (First contact?check=<id>, the address CasesList opens). */
 export const casePlace = (id: string): Place => ({ section: "Complaints", tab: `First contact?check=${id}` });
+
+/** Where a "More cases to try" item opens: a Case's check, or the routine complaint's Dispositions drawer (B7a). */
+export const moreCasePlace = (item: MoreCase): Place =>
+  item.complaint
+    ? { section: "Complaints", tab: `Dispositions?complaint=${encodeURIComponent(item.id)}` }
+    : casePlace(item.id);
 
 /** The real screen a step opens, with the story's record in place: steps 1 and 2 open the story's Case check. */
 export function stepPlace(run: StoryRun, index: number): Place {
