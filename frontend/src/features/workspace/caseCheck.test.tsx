@@ -160,6 +160,23 @@ describe("the Case check drawer (spec 4.4)", () => {
     expect(html).toMatch(/name="attach" checked=""/);
   });
 
+  it("pre-selects the only match on the case's event day among several (SAMPLE-CASE-11 and RV-11, 0.10.93)", () => {
+    const likely = [
+      { id: "c1", ref: "SAMPLE-RV-11", reasons: ["same product", "same lot"], same_day: true },
+      { id: "c2", ref: "SAMPLE-RT-02", reasons: ["same product", "same lot"], same_day: false },
+    ];
+    const html = render(
+      <CheckBody item={item({ likely_complaints: likely })} guide={guide} onChanged={vi.fn()} />,
+      ALL,
+    );
+    expect(html.match(/name="attach" checked=""/g)).toHaveLength(1);
+    expect(html).toMatch(/name="attach" checked=""\/>Attach this case to SAMPLE-RV-11/);
+    // Two matches on other days: the signer chooses.
+    const none = likely.map((candidate) => ({ ...candidate, same_day: false }));
+    const open = render(<CheckBody item={item({ likely_complaints: none })} guide={guide} onChanged={vi.fn()} />, ALL);
+    expect(open).not.toContain('checked=""/>Attach');
+  });
+
   it("signs any other outcome as 'Sign the case check', without the panel", () => {
     const pending = item({ suggestion: "PENDING", suggestion_label: "Pending", likely_complaints: [] });
     const html = render(<CheckBody item={pending} guide={guide} onChanged={vi.fn()} />, ALL);

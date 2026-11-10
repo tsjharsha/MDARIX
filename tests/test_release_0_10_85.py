@@ -169,14 +169,14 @@ def test_the_story_steps_carry_the_owners_names_and_the_report_path_one_word():
     from backend.app.trial.one_story import STEPS
 
     assert [label for _, label in STEPS] == [
-        "Review the call",
+        "Review the case",
+        "Classify service or complaint",
         "Triage",
         "Assess reportability",
-        "Sign conclusion",
-        "Prepare report",
-        "Complete details",
-        "Approve report",
-        "Record submission",
+        "Sign the conclusion",
+        "Prepare the report",
+        "Complete and approve",
+        "Record the submission",
         "Review records",
         "Explore trends",
     ]

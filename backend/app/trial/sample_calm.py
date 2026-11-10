@@ -27,8 +27,9 @@ from sqlalchemy.orm import Session
 from backend.app.trial.sample_data import FLAGSHIP, SAMPLE_SOURCE
 
 logger = logging.getLogger("mdarix.trial.sample_calm")
-# The story's own triage steps: they stay open.
-STORY_TRIAGE = ("SAMPLE-URG-01", FLAGSHIP)
+# The story's own triage steps: they stay open. SAMPLE-CASE-11 (0.10.93) is the flagship's own call: a finished triage
+# on it would pass to RV-11 when it is attached (T-D8) and tick the story's triage step for the person.
+STORY_TRIAGE = ("SAMPLE-URG-01", FLAGSHIP, "SAMPLE-CASE-11")
 CLOSED_EVENT = "SAMPLE-RV-09"
 TASK_DAYS = 2
 

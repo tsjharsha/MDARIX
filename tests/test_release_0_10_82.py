@@ -57,19 +57,20 @@ def test_the_sample_story_ticks_each_step_from_the_saved_record(trial):
     first = _ok(user.get(STORY))
     sample = first["sample"]
     assert sample["complaint"]["ref"] == "SAMPLE-RV-11" and sample["market"] == "US"
-    # The owner's names (4 Nov 2026).
+    # Part 1's names (0.10.93, B2 spec 4.8).
     assert [step["label"] for step in sample["steps"]] == [
-        "Review the call",
+        "Review the case",
+        "Classify service or complaint",
         "Triage",
         "Assess reportability",
-        "Sign conclusion",
-        "Prepare report",
-        "Complete details",
-        "Approve report",
-        "Record submission",
+        "Sign the conclusion",
+        "Prepare the report",
+        "Complete and approve",
+        "Record the submission",
         "Review records",
         "Explore trends",
     ]
+    assert sample["case"]["ref"] == "SAMPLE-CASE-11"
     # Nothing imported yet: no second run.
     assert (first["yours"], sample["current"], _done(sample)) == (None, 0, [])
     # 0.10.86: Records or Trends opened before their turn is refused and never credited later.
@@ -77,20 +78,27 @@ def test_the_sample_story_ticks_each_step_from_the_saved_record(trial):
         assert _mark(user, "sample", step, 409)["detail"]["code"] == "STEP_NOT_YET"
     after = _ok(user.get(STORY))["sample"]
     assert _done(after) == [] and after["current"] == 0 and not any(step["earlier"] for step in after["steps"])
-    # Step 1 is the person's own mark; step 2 is the triage record.
-    assert _done(_mark(user, "sample", "call")["sample"])[:1] == ["call"]
+    # 0.10.93: steps 1 and 2 read the Case's records; the old "call" mark is refused.
+    assert (
+        user.post(
+            f"{STORY}/marks", json={"run": "sample", "step": "call", "complaint_id": sample["complaint"]["id"]}
+        ).status_code
+        == 422
+    )
+    # The triage record (later work on the complaint) says the case was reviewed and classified (0.10.85's rule).
     complaint = _flagship(user)
     run = _ok(user.get(STORY))["sample"]
-    assert _done(run) == ["call", "triage"] and run["current"] == 2
-    # Steps 3 and 4: signing the US conclusion "reportable" (the report is created with it).
+    assert _done(run) == ["case", "classify", "triage"] and run["current"] == 3
+    # Steps 4 and 5: signing the US conclusion "reportable" (the report is created with it).
     _ok(_sign_us(user, complaint, "REPORTABLE"))
     run = _ok(user.get(STORY))["sample"]
-    assert run["conclusion"] == "REPORTABLE" and run["report_id"] and run["current"] == 4
-    # Step 5 waits for the person to open the report; steps 6 to 8 follow its status path.
+    assert run["conclusion"] == "REPORTABLE" and run["report_id"] and run["current"] == 5
+    # Step 6 waits for the person to open the report; steps 7 and 8 follow its status path.
     run = _mark(user, "sample", "form")["sample"]
-    assert run["current"] == 5
+    assert run["current"] == 6
     (report,) = _reports(user, complaint)
     fill(user, REPORTS, report["id"], _ok(user.get(f"{REPORTS}/{report['id']}"))["mandatory"]["missing"])
+    # Step 7 is "Complete and approve": filled is not enough, the approval ticks it.
     assert _ok(user.get(STORY))["sample"]["current"] == 6
     pending = _ok(user.post(f"{REPORTS}/{report['id']}/snapshots"))["pending_snapshot"]["id"]
     _ok(user.post(f"{REPORTS}/{report['id']}/snapshots/{pending}/approve", json={"password": PASSWORD}))
@@ -130,18 +138,18 @@ def test_your_data_runs_on_the_most_serious_complaint_and_says_what_the_file_did
         # The serious injury outranks the earlier malfunction, though it has no country and no awareness date.
         assert yours["complaint"]["ref"] == "OS-1002" and yours["market"] is None
         assert {need["fact"] for need in yours["needs"]} == {"COUNTRY", "AWARENESS_DATE"}
-        assert yours["current"] == 0 and not yours["finished"]
-        # The sample run is apart: its marks are not this run's.
-        _mark(user, "yours", "call")
+        # No Case behind an imported complaint: steps 1 and 2 are "Classified in your QMS" (0.10.93).
+        assert yours["case"] is None and [step["note"] for step in yours["steps"][:2]] == ["Classified in your QMS"] * 2
+        assert yours["steps"][0]["skipped"] and yours["current"] == 2 and not yours["finished"]
         both = _ok(user.get(STORY))
-        assert _done(both["yours"]) == ["call"] and _done(both["sample"]) == []
+        assert _done(both["yours"]) == [] and _done(both["sample"]) == []
         # A mark names the complaint the screen showed: the sample's complaint is not the run "yours" follows, so
         # nothing lands on it (an import that moved the story while the old screen was open).
         moved = user.post(
             f"{STORY}/marks", json={"run": "yours", "step": "form", "complaint_id": both["sample"]["complaint"]["id"]}
         )
         assert moved.status_code == 409 and moved.json()["detail"]["code"] == "STORY_MOVED"
-        assert _done(_ok(user.get(STORY))["yours"]) == ["call"]
+        assert _done(_ok(user.get(STORY))["yours"]) == []
     finally:
         _purge(tenant_id)
 
@@ -151,12 +159,13 @@ def test_the_story_rules_skip_the_report_steps_after_a_signed_not_reportable_con
 
     from backend.app.trial.one_story import steps_done
 
+    case = {"answered": True, "classification": "BOTH", "escalated": True}
     signed = SimpleNamespace(signed_at=datetime.now(timezone.utc), superseded_by=None, conclusion="NOT_REPORTABLE")
-    done = steps_done({"call": "x", "records": "x"}, True, [signed], None)
-    assert done == [True, True, True, True, "skip", "skip", "skip", "skip", True, False]
+    done = steps_done({"records": "x"}, True, [signed], None, case=case)
+    assert done == [True, True, True, True, True, "skip", "skip", "skip", True, False]
     # A draft only: the tree is answered, nothing is signed, the report steps wait.
     draft = SimpleNamespace(signed_at=None, superseded_by=None, conclusion=None)
-    assert steps_done({}, True, [draft], None)[:5] == [True, True, True, False, False]
+    assert steps_done({}, True, [draft], None, case=case)[:6] == [True, True, True, True, False, False]
 
 
 def test_home_tiles_are_the_counts_of_the_lists_they_open_and_open_complaints_are_most_urgent_first(trial):

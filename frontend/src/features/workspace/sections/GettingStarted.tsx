@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   Signpost,
   Star,
-  PhoneCall,
   ClipboardList,
   Telescope,
   Upload,
@@ -27,7 +26,7 @@ import { EndTrialPanel } from "./EndTrial";
 import { CitedFor } from "./CitedFor";
 import { RemoveSamplePanel, RestartSamplePanel } from "./RemoveSample";
 import { Entrance } from "./Entrance";
-import { OneStory } from "./OneStory";
+import { MoreCasesCard, OneStory } from "./OneStory";
 import { ExploreCards, OTHER_WORKFLOWS, TrialSettings } from "./GettingStartedMore";
 import { TeamPanel } from "./TrialTeam";
 import { BESIDE_YOUR_QMS } from "../../help/besideYourQms";
@@ -321,28 +320,8 @@ export function GettingStartedSection({
             </>
           )}
         </p>
-        {allowed("Complaints") && (
-          <div id="trial-first-contact" className="uw-story-partner uw-anchor">
-            <div>
-              <strong>
-                <PhoneCall size={16} aria-hidden="true" /> Before a complaint: the first call and triage
-              </strong>
-              <p>
-                Log a call from a hospital and see it become a complaint, a service job, both, or pending. Urgent
-                intakes and calls that mention harm go to the triage list at once, with their clocks running from
-                awareness.
-              </p>
-            </div>
-            <div className="uw-story-partner-actions">
-              <button type="button" className="ac-secondary" onClick={() => open("Complaints", "First contact")}>
-                Log a case
-              </button>
-              <button type="button" className="ac-secondary" onClick={() => open("Complaints", "Triage")}>
-                Triage list
-              </button>
-            </div>
-          </div>
-        )}
+        {/* "More cases to try" replaces "Before a complaint" (0.10.93, spec 4.8). */}
+        {allowed("Complaints") && <MoreCasesCard onOpen={(section, tab) => open(section as WorkspaceSection, tab)} />}
         {allowed("Complaints") && (
           <div id="trial-reports" className="uw-story-partner uw-anchor">
             <div>

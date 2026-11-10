@@ -45,7 +45,9 @@ confirmed by the sample author, with the values they were approved with), and 0.
 (backend/app/trial/sample_0_10_79.py: FLOW_ZERO_READING and SPO2_DROPOUT_HARM, which had none), and, in every trial
 with or without its sample, 0.10.81's deadline rules (backend/app/trial/open_deadlines.py: every market's starter
 reporting windows; the open reports and draft assessments whose report type or due date the fixed rules change; the
-signed conclusions they would change, listed for a person to sign again). The sample's dates themselves are brought to today by the
+signed conclusions they would change, listed for a person to sign again), and 0.10.93's SAMPLE-CASE-11 (the call
+behind SAMPLE-RV-11, unsigned, for Getting started Part 1; backend/app/trial/sample_intake.py ``stage_story_case``)
+unless it is there; the old SAMPLE-CALL-01..04 keep their references and are never escalated here. The sample's dates themselves are brought to today by the
 hourly "trial-sample-clock" job (backend/app/trial/sample_clock.py) while nobody has worked on the sample. Each trial
 is committed on its own, with an audit event.
 """
@@ -117,7 +119,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.trial.sample_decision import has_sample_decision, stage_sample_decision
     from backend.app.trial.sample_dispositions import has_routine_examples, seed_routine_examples
     from backend.app.trial.sample_imports import has_sample_import, stage_sample_import
-    from backend.app.trial.sample_intake import has_sample_intake, stage_sample_intake
+    from backend.app.trial.sample_intake import has_sample_intake, has_story_case, stage_sample_intake, stage_story_case
     from backend.app.trial.sample_guides import has_sample_guides, relock_sample_drafts, stage_sample_guides
     from backend.app.trial.sample_oversight import has_sample_oversight, stage_sample_oversight
     from backend.app.trial.sample_lot_impact import has_sample_lot_impact, stage_sample_lot_impact
@@ -186,6 +188,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 is None
             )
             calm_missing = not has_calm_story(session, tenant_id)
+            # 0.10.93: SAMPLE-CASE-11, the call behind the flagship (Getting started Part 1).
+            story_case_missing = not has_story_case(session, tenant_id)
             old_words = reword_sample(session, tenant_id, apply=False)
             # RV-09 signed ready to close over an empty checklist before 0.10.70 (sample_calm.py).
             rv09_unrecorded = not calm_missing and rerecord_rv09(session, tenant_id, apply=False)
@@ -222,6 +226,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 or reports_owed
                 or codes_owed
                 or links_owed
+                or story_case_missing
             ):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
@@ -265,6 +270,11 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                         else []
                     ),
                     *([f"{links_owed} sample IMDRF links (0.10.79)"] if links_owed else []),
+                    *(
+                        ["SAMPLE-CASE-11, the call behind SAMPLE-RV-11, unsigned (0.10.93)"]
+                        if story_case_missing
+                        else []
+                    ),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -297,6 +307,9 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             added["product_facts"] = seed_product_facts(session, tenant_id)
             if flagship_missing and not story_missing:
                 added["flagship"] = seed_flagship(session, tenant_id, now)
+            if story_case_missing:
+                # After the flagship (it copies RV-11's facts), before the calm day 0 (which leaves its triage open).
+                added["story_case"] = stage_story_case(session, tenant_id)
             if calm_missing:
                 # After the flagship and the intake: it finishes the triage the story does not need open.
                 added["calm"] = stage_calm_story(session, tenant_id, now)

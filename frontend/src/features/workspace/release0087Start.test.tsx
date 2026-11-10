@@ -22,14 +22,14 @@ vi.mock("../customer-admin/shared", async (original) => ({
 }));
 
 const LABELS = [
-  "Review the call",
+  "Review the case",
+  "Classify service or complaint",
   "Triage",
   "Assess reportability",
-  "Sign conclusion",
-  "Prepare report",
-  "Complete details",
-  "Approve report",
-  "Record submission",
+  "Sign the conclusion",
+  "Prepare the report",
+  "Complete and approve",
+  "Record the submission",
   "Review records",
   "Explore trends",
 ];
@@ -55,6 +55,8 @@ const runAt = (run: "sample" | "yours", current: number, extra: Partial<StoryRun
   report_id: null,
   report_stage: null,
   needs: [],
+  // 0.10.93: the sample's story Case, whose check steps 1 and 2 open.
+  case: run === "sample" ? { id: "case-11", ref: "SAMPLE-CASE-11", classification: null, state: "OPEN" } : null,
   steps: LABELS.map((label, index) => ({ key: label, label, done: index < current, skipped: false })),
   current,
   finished: current >= 10,
@@ -108,7 +110,7 @@ describe("the walkthrough card renders the progress the server reports", () => {
     const html = render(<StoryView story={{ sample: runAt("sample", 3), yours: null }} />);
     expect(count(html, "<h1")).toBe(1);
     expect(html).toContain("Getting started</h1>");
-    expect(html).toContain("Follow one sample complaint from first call to reporting.");
+    expect(html).toContain("Follow one sample complaint from the first contact to the submission.");
     expect(count(html, practiceLine(true))).toBe(1);
     expect(practiceLine(true)).toBe("Fictional data · Trial outputs are practice records · Human sign-off required");
     expect(html).toContain("Your sample walkthrough</h2>");
@@ -121,19 +123,26 @@ describe("the walkthrough card renders the progress the server reports", () => {
     for (const label of LABELS) expect(html).toContain(`</span>${label}</span>`);
     expect(count(html, 'class="uw-os-s">Completed<')).toBe(3);
     expect(count(html, 'aria-current="step"')).toBe(1);
-    expect(html).toMatch(/aria-current="step" aria-pressed="true"[^>]*>.*Sign conclusion/);
+    expect(html).toMatch(/aria-current="step" aria-pressed="true"[^>]*>.*Assess reportability/);
+    // Part 1's heading, and the parts still to come (spec 4.8).
+    expect(html).toContain("Part 1: from the first contact to the submission</h3>");
+    expect(html).toContain("Coming next: investigation to CAPA · trends to product improvement");
     // The large hero and the miniature browser window are gone.
     expect(html).not.toContain("uw-os-mini");
     expect(html).not.toContain("One complaint, from the first call to the signed report");
   });
 
-  it("shows the step's label, heading, instruction, complaint summary and one main button", () => {
+  it("shows the step's label, heading, its four lines, complaint summary and one main button", () => {
     const html = render(<StoryView story={{ sample: runAt("sample", 0), yours: null }} />);
-    expect(html).toContain("Step 1 · Review the call");
-    expect(html).toContain("Start with the hospital&#x27;s report");
-    expect(html).toContain("Read the event and check the available facts.");
+    expect(html).toContain("Step 1 · Review the case");
+    expect(html).toContain("Start with the hospital&#x27;s call");
+    // Next, Why, Who, Evidence, in that order (spec 4.8).
+    expect(html).toMatch(
+      /<dt>Next<\/dt><dd>Open SAMPLE-CASE-11<\/dd>.*<dt>Why<\/dt>.*<dt>Who<\/dt><dd>Service Desk, Complaint Handler<\/dd>.*<dt>Evidence<\/dt><dd>All nine questions answered and saved on the case check<\/dd>/,
+    );
+    expect(html).toContain("every fact is checked before anyone classifies.");
     expect(count(html, "ac-primary")).toBe(1);
-    expect(html).toContain("Open sample complaint");
+    expect(html).toContain("Open SAMPLE-CASE-11 <svg");
     // The summary is read from the record: its first sentence only, never the whole narrative.
     expect(html).toContain("SAMPLE-RV-11</b>");
     expect(html).toContain("its SpO2 read 4 to 6 points high on two patients.");
@@ -144,7 +153,7 @@ describe("the walkthrough card renders the progress the server reports", () => {
     expect(html).toContain("<dt>Service work</dt><dd>In progress</dd>");
     expect(html).not.toContain("In service");
     // A quiet hint names the step after it.
-    expect(html).toContain("step 2, Triage");
+    expect(html).toContain("step 2, Classify service or complaint");
   });
 
   it("says skipped steps as not needed, and a finished walkthrough as complete", () => {
@@ -183,15 +192,19 @@ describe("picking a step previews it and never completes it", () => {
     vi.stubGlobal("fetch", fetch);
     render(<StoryView story={{ sample: runAt("sample", 1), yours: null }} />);
     expect(fetch).not.toHaveBeenCalled();
-    // The main button of step 1 opens the sample complaint by its reference, in this tenant; its mark is sent once
-    // the complaint page has loaded that complaint (0.10.88).
+    // The main button of step 1 opens SAMPLE-CASE-11's case check on the Cases view (B2-11). Steps 1 and 2 read the
+    // Case's records: no mark is ever sent for them (0.10.93).
     const open = vi.fn();
     const run = runAt("sample", 0);
     await openStep(run, 0, open);
-    expect(open).toHaveBeenCalledWith("Complaint", "Summary?ref=SAMPLE-RV-11");
+    expect(open).toHaveBeenCalledWith("Complaints", "First contact?check=case-11");
+    await openStep(run, 1, open);
+    expect(open).toHaveBeenLastCalledWith("Complaints", "First contact?check=case-11");
+    // Step 3 (triage) opens the complaint itself.
+    await openStep(run, 2, open);
+    expect(open).toHaveBeenLastCalledWith("Complaint", "Summary?ref=SAMPLE-RV-11");
+    await visited({ step: "records", complaintId: run.complaint.id });
     expect(fetch).not.toHaveBeenCalled();
-    await visited({ step: "call", complaintId: run.complaint.id });
-    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -219,10 +232,12 @@ describe("facts the record does not give stay missing", () => {
     );
     expect(html).toContain("Your data walkthrough</h2>");
     expect(html).toContain(">Your data<");
-    expect(html).toContain("Follow your most urgent complaint from first call to reporting.");
+    expect(html).toContain("Follow your most urgent complaint from the first contact to the submission.");
     expect(html).toContain("Trial outputs are practice records · Human sign-off required");
     expect(html).not.toContain("Fictional data");
     expect(html).toContain("Open OS-1002");
+    // No Case behind the imported complaint: it can be checked as a case (spec 4.8).
+    expect(html).toContain(">Check it as a case</button>");
   });
 
   it("summarises in one sentence, and cuts a long one at a word", () => {

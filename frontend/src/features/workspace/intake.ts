@@ -169,7 +169,7 @@ export type IntakeItem = {
   addenda?: Addendum[];
   choices?: Choice[] | null;
   clock?: Deadline | null;
-  likely_complaints?: { id: string; ref: string; reasons: string[] }[];
+  likely_complaints?: { id: string; ref: string; reasons: string[]; same_day?: boolean }[];
   complaint_id?: string | null;
   complaint_ref?: string | null;
   row_version?: number;

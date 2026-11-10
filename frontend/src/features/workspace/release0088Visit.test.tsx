@@ -1,4 +1,5 @@
-// 0.10.88, P0 of the review of 0.10.87: a story step ticked by its visit (the call, the report, Records, Trends)
+// 0.10.88, P0 of the review of 0.10.87: a story step ticked by its visit (the report, Records, Trends; 0.10.93: no
+// longer the call)
 // counts only once its own screen has loaded the story's record; a screen that failed to load ticks nothing.
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
@@ -124,15 +125,8 @@ const report = {
 /** Each destination: the step that opens it, and the screen with its read failed or loaded. */
 const STEPS: Array<{ name: string; index: number; screen: () => string; read: string; data: () => unknown }> = [
   {
-    name: "step 1, the complaint page",
-    index: 0,
-    screen: () => render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />),
-    read: eventPath("SAMPLE-RV-11"),
-    data: rv11,
-  },
-  {
-    name: "step 5, the report page",
-    index: 4,
+    name: "step 6, the report page",
+    index: 5,
     screen: () => render(<ReportPage id="r-rv11" onBack={() => undefined} />),
     read: `${REPORTS}/r-rv11`,
     data: () => report,
@@ -209,19 +203,25 @@ describe.each(STEPS)("$name ticks only once it has loaded", ({ index, screen, re
 describe("a loaded screen of another record ticks nothing", () => {
   it("another complaint, another report, another product", async () => {
     for (const visit of [
-      { step: "call", complaintId: "c-other" },
       { step: "form", reportId: "r-other" },
       { step: "records", complaintId: "c-other" },
       { step: "trends", product: "OTHER-1" },
     ] as Visit[]) {
-      const index = { call: 0, form: 4, records: 8, trends: 9 }[visit.step];
+      const index = { form: 5, records: 8, trends: 9 }[visit.step];
       await openStep(run(index), index, vi.fn());
       await visited(visit);
       // Nor a screen of a different step.
       await visited(
-        visit.step === "call" ? { step: "records", complaintId: "c-rv11" } : { step: "call", complaintId: "c-rv11" },
+        visit.step === "records" ? { step: "form", reportId: "r-rv11" } : { step: "records", complaintId: "c-rv11" },
       );
     }
+    expect(marks()).toEqual([]);
+  });
+
+  it("the complaint page marks nothing: steps 1 and 2 read the case's records (0.10.93)", async () => {
+    await openStep(run(0), 0, vi.fn());
+    resources.data[eventPath("SAMPLE-RV-11")] = rv11();
+    expect(await show(() => render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />))).toEqual([]);
     expect(marks()).toEqual([]);
   });
 

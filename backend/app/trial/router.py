@@ -532,7 +532,8 @@ def one_story(
 
 class OneStoryMark(BaseModel):
     run: str = Field(pattern="^(sample|yours)$")
-    step: str = Field(pattern="^(call|form|records|trends)$")
+    # 0.10.93: steps 1 and 2 read the Case's records; the "call" mark is no longer kept.
+    step: str = Field(pattern="^(form|records|trends)$")
     # The complaint the person's screen showed: the story's complaint can move (a new urgent import), and a mark
     # must never land on a complaint the person did not open.
     complaint_id: uuid.UUID
@@ -545,7 +546,7 @@ def mark_one_story(
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
-    """The person opened a step's screen from the story (the call, the report, Records, Trends): kept on the trial's
+    """The person opened a step's screen from the story (the report, Records, Trends): kept on the trial's
     request under their name, and counted for the whole team. No business record changes."""
     from backend.app.trial import one_story as story
 

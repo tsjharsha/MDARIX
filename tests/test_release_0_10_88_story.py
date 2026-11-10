@@ -10,16 +10,18 @@ def test_an_imported_complaint_not_flagged_for_triage_does_not_hold_the_story_at
     page), so it has no triage form: step 2 waited for a triage record that could never be made, its button opened
     the page already open, and every later step stayed "done earlier", never ticked."""
     signed = SimpleNamespace(signed_at="2026-11-04", superseded_by=None, conclusion="NOT_REPORTABLE")
-    raw = steps_done({"call": "x", "records": "x", "trends": "x"}, False, [signed], None, triage_needed=False)
+    case = {"answered": True, "classification": "COMPLAINT", "escalated": True}
+    raw = steps_done({"records": "x", "trends": "x"}, False, [signed], None, triage_needed=False, case=case)
     ticked, earlier = in_order(raw)
-    assert raw[1] == "skip"
-    assert ticked == [True, "skip", True, True, "skip", "skip", "skip", "skip", True, True]
+    assert raw[2] == "skip"
+    assert ticked == [True, True, "skip", True, True, "skip", "skip", "skip", True, True]
     assert not any(earlier)
 
 
 def test_a_complaint_on_the_triage_list_still_needs_its_triage_record():
-    assert steps_done({"call": "x"}, False, [], None, triage_needed=True)[:2] == [True, False]
-    assert steps_done({"call": "x"}, False, [], None)[:2] == [True, False]
+    case = {"answered": True, "classification": "COMPLAINT", "escalated": True}
+    assert steps_done({}, False, [], None, triage_needed=True, case=case)[:3] == [True, True, False]
+    assert steps_done({}, False, [], None, case=case)[:3] == [True, True, False]
 
 
 # The your-data journey (e2e/your-data-journey.spec.ts) walked two uploads: the first complaint's ten steps done, a
@@ -41,15 +43,18 @@ def test_marks_on_an_earlier_complaint_are_kept_when_the_story_moves_on():
 
     request = SimpleNamespace(profile={})
     now = datetime(2026, 11, 4, tzinfo=timezone.utc)
-    for step in ("call", "form", "records", "trends"):
+    for step in ("form", "records"):
         record_mark(request, "u1", "yours", "A", step, now)
-    record_mark(request, "u1", "yours", "B", "call", now)
-    assert set(team_marks(request, "yours", "A")) == {"call", "form", "records", "trends"}
-    assert set(team_marks(request, "yours", "B")) == {"call"}
+    record_mark(request, "u1", "yours", "B", "form", now)
+    assert set(team_marks(request, "yours", "A")) == {"form", "records"}
+    assert set(team_marks(request, "yours", "B")) == {"form"}
     # Back on A, a mark adds to what A had; B's stay too.
-    record_mark(request, "u1", "yours", "A", "call", now)
-    assert set(team_marks(request, "yours", "A")) == {"call", "form", "records", "trends"}
-    assert set(team_marks(request, "yours", "B")) == {"call"}
+    record_mark(request, "u1", "yours", "A", "trends", now)
+    assert set(team_marks(request, "yours", "A")) == {"form", "records", "trends"}
+    assert set(team_marks(request, "yours", "B")) == {"form"}
+    # 0.10.93: an old "call" mark is kept in the profile but no longer counts (steps 1 and 2 read the Case).
+    record_mark(request, "u1", "yours", "B", "call", now)
+    assert set(team_marks(request, "yours", "B")) == {"form"}
 
 
 def test_the_walkthrough_stays_on_the_complaint_under_way_until_its_last_step():
@@ -61,7 +66,7 @@ def test_the_walkthrough_stays_on_the_complaint_under_way_until_its_last_step():
     now = datetime(2026, 11, 4, tzinfo=timezone.utc)
     first, second = _row("A"), _row("B")
     assert under_way(request, "yours", [first, second]) is None
-    record_mark(request, "u1", "yours", "B", "call", now)
+    record_mark(request, "u1", "yours", "B", "form", now)
     # B's walkthrough is under way: it is followed, whatever the clocks now say.
     assert under_way(request, "yours", [first, second]) is second
     # A more serious complaint still takes over (a death imported meanwhile).

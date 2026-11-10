@@ -42,17 +42,18 @@ def test_the_story_ticks_in_order_and_flags_work_done_out_of_order():
     signed = SimpleNamespace(signed_at=datetime.now(timezone.utc), superseded_by=None, conclusion="REPORTABLE")
     # A signed tree, no triage, no marks: the call was read (later work shows it); triage waits; the tree and the
     # decision are the team's, out of order.
-    raw = steps_done({}, False, [signed], None)
+    case = {"answered": True, "classification": "COMPLAINT", "escalated": True}
+    raw = steps_done({}, False, [signed], None, case=case)
     ticked, earlier = in_order(raw)
-    assert ticked[:4] == [True, False, False, False] and earlier[:4] == [False, False, True, True]
-    assert sum(value is True for value in ticked) == 1
-    # A report past "Created" (fields complete): its form was opened, so Form is ticked with Fill.
-    ticked, earlier = in_order(steps_done({}, True, [signed], "COMPLETE"))
-    assert ticked[:6] == [True] * 6 and not any(earlier)
+    assert ticked[:5] == [True, True, False, False, False] and earlier[:5] == [False, False, False, True, True]
+    assert sum(value is True for value in ticked) == 2
+    # A report past "Created" (fields complete): its form was opened, so Form is ticked; approval waits.
+    ticked, earlier = in_order(steps_done({}, True, [signed], "COMPLETE", case=case))
+    assert ticked[:6] == [True] * 6 and ticked[6] is False and not any(earlier)
     # "Not needed" stays not needed after a gap, and is no tick.
     no = SimpleNamespace(signed_at=datetime.now(timezone.utc), superseded_by=None, conclusion="NOT_REPORTABLE")
-    ticked, earlier = in_order(steps_done({}, False, [no], None))
-    assert ticked[4:8] == ["skip"] * 4 and ticked[1] is False and earlier[2:4] == [True, True]
+    ticked, earlier = in_order(steps_done({}, False, [no], None, case=case))
+    assert ticked[5:8] == ["skip"] * 3 and ticked[2] is False and earlier[3:5] == [True, True]
 
 
 def test_the_story_count_ticks_and_current_step_agree(trial):

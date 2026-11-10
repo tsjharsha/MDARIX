@@ -10,7 +10,7 @@ import uuid
 import pytest
 
 from tests.test_free_trial import _approved_trial_client
-from tests.test_release_c3_0_10_75 import _purge
+from tests.test_release_c3_0_10_75 import _flagship, _purge
 
 pytestmark = pytest.mark.db
 
@@ -129,13 +129,12 @@ def test_the_story_is_the_teams_one_step_for_every_colleague():
             )
         )
         _ok(colleague.post("/api/v1/auth/signin", json={"email": mail, "password": PASSWORD}))
-        complaint_id = _ok(owner.get(STORY))["sample"]["complaint"]["id"]
-        # The colleague opens the call; it counts for the owner too (Trends early is refused since 0.10.86).
-        _ok(colleague.post(f"{STORY}/marks", json={"run": "sample", "step": "call", "complaint_id": complaint_id}))
+        # The colleague triages the flagship; it counts for the owner too (0.10.93: steps 1 and 2 read the records).
+        _flagship(colleague)
         mine, theirs = _ok(owner.get(STORY))["sample"], _ok(colleague.get(STORY))["sample"]
         done = lambda run: [step["key"] for step in run["steps"] if step["done"] or step["earlier"]]  # noqa: E731
-        assert done(mine) == done(theirs) == ["call"]
-        assert mine["current"] == theirs["current"] == 1
+        assert done(mine) == done(theirs) == ["case", "classify", "triage"]
+        assert mine["current"] == theirs["current"] == 3
     finally:
         _purge(tenant_id)
 

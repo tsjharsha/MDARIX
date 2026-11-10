@@ -8,7 +8,6 @@ import {
   GitFork,
   ListChecks,
   Minus,
-  PenLine,
   Phone,
   Send,
   Stethoscope,
@@ -18,13 +17,14 @@ import {
 } from "lucide-react";
 import { MonitorBand, ProgressArc } from "../../shared/hero/HeroVisuals";
 import { BedsideScene, SignedSeal } from "../../shared/hero/HeroArt";
-import { useResource } from "../../customer-admin/shared";
+import { errorText, send, useResource } from "../../customer-admin/shared";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { IMPORTED_SOURCE } from "../complaintList";
 import { TEAM_PATH } from "./TrialTeam";
 import { chanceText, trendCountText, trendResultLabel, type TrendItem } from "../signalAi";
 import {
   STORY_STEPS,
+  casePlace,
   openStep,
   shownRun,
   stepBlocker,
@@ -32,94 +32,131 @@ import {
   stepPlace,
   takeMarkProblem,
   useOneStory,
+  type MoreCase,
   type OneStory as OneStoryData,
   type StoryRun,
 } from "../oneStory";
 
-/** Each step's words: the heading, one short instruction, and its one main button. The record's facts are never
- * written here: the complaint summary below them reads them from the record (owner's specification, 5 Nov 2026). */
-function stepCopy(run: StoryRun, index: number): { h: string; p: string; b: string } {
+/** Each step's words: the heading and its one main button. The record's facts are never written here: the complaint
+ * summary below them reads them from the record (owner's specification, 5 Nov 2026). */
+function stepCopy(run: StoryRun, index: number): { h: string; b: string } {
   const sample = run.run === "sample";
   const ref = run.complaint.ref;
   const market = run.market_label ?? "the market's";
   const copy = [
     sample
-      ? {
-          h: "Start with the hospital's report",
-          p: "Read the event and check the available facts. The awareness time starts every clock.",
-          b: "Open sample complaint",
-        }
+      ? { h: "Start with the hospital's call", b: `Open ${run.case?.ref ?? ref}` }
       : {
           // A reference never breaks at its hyphen (a non-breaking hyphen in the heading).
           h: `Your most urgent complaint: ${ref.replace(/-/g, "‑")}`,
-          p: "MDARIX picked it from your file: the most serious harm, then the shortest clock. Check what the file says and what it lacks.",
-          b: `Open ${ref}`,
+          b: `Open ${run.case?.ref ?? ref}`,
         },
-    {
-      h: "Triage: severity, owner, first action",
-      p: "Confirm the severity, name an owner and the first action. The triage target and the legal clock both run from awareness.",
-      b: "Open the triage",
-    },
-    {
-      h: `Answer the ${market} questions on the tree`,
-      p: "Facts stated in the record arrive as answers to confirm. Judgement questions are never pre-filled: they are yours.",
-      b: "Open the decision tree",
-    },
-    {
-      h: "Reportable or not, and sign it",
-      p: "The outcome says reportable or not, why, and by when. Your own role signs, never the persona you view as.",
-      b: "Go to the outcome and sign",
-    },
-    {
-      h: "The right form for the incident's country",
-      p: "A signed “reportable” conclusion creates the form: FDA 3500A, the EU or MHRA MIR, Canada's problem report or India's MvPI MDAE.",
-      b: "Open the report",
-    },
-    {
-      h: "Fill what is missing",
-      p: "What your records hold arrives filled, each with its source. Each field still empty names its form box and who knows it.",
-      b: "Open the missing fields",
-    },
-    {
-      h: "Approval by a second person",
-      p: "A colleague who may approve gets one task, and nobody approves what they prepared. Working alone in the trial, you approve your own practice report, marked so.",
-      b: "Open the approval",
-    },
-    {
-      h: "The PDF, and your submission recorded",
-      p: "The PDF follows the form's field order. You submit through the authority's own route and record it here. MDARIX never submits.",
-      b: "Open the PDF step",
-    },
-    {
-      h: "The record, ready for an inspector",
-      p: "Records opens on what you just finished: the signed conclusion, the approved report, its PDF and who signed.",
-      b: "Open Records",
-    },
+    { h: "Service, complaint, or both", b: "Sign the case check" },
+    { h: "Triage: severity, owner, first action", b: "Open the triage" },
+    { h: `Answer the ${market} questions on the tree`, b: "Open the decision tree" },
+    { h: "Reportable or not, and sign it", b: "Go to the outcome and sign" },
+    { h: "The right form for the incident's country", b: "Open the report" },
+    { h: "Every field filled, then approved by a second person", b: "Open the missing fields" },
+    { h: "The PDF, and your submission recorded", b: "Open the PDF step" },
+    { h: "The record, ready for an inspector", b: "Open Records" },
     sample
-      ? {
-          h: "Is it happening elsewhere?",
-          p: "Trends compare each product version with its own history, per unit in the field. The sample holds a real rise: OrbitCare 300 Rev B.",
-          b: "Open the OrbitCare 300 trend",
-        }
-      : {
-          h: "Is it happening elsewhere?",
-          p: "Trends compare each product version with its own history, per unit in the field where your file has units. A short history says what it can show now.",
-          b: "Open your product's trend",
-        },
+      ? { h: "Is it happening elsewhere?", b: "Open the OrbitCare 300 trend" }
+      : { h: "Is it happening elsewhere?", b: "Open your product's trend" },
   ][index];
   return copy;
 }
 
+/** Why each step is needed, who takes it and what ticks it (B2 spec 4.8's table), in the walkthrough's order. */
+export const STEP_INFO: ReadonlyArray<{ why: string; who: string; evidence: string }> = [
+  {
+    why: "The reporter's words and the awareness time start everything; every fact is checked before anyone classifies.",
+    who: "Service Desk, Complaint Handler",
+    evidence: "All nine questions answered and saved on the case check",
+  },
+  {
+    why: "An alleged deficiency is a complaint, even when service fixes it; classification is a controlled human decision.",
+    who: "Service Desk, Complaint Handler, Quality Leader",
+    evidence: "A signed case check, and its escalation",
+  },
+  {
+    why: "Every complaint gets a first safety look, an owner and a first action; fast when harm is possible.",
+    who: "Complaint Handler, Quality Leader, Regulatory Leader",
+    evidence: "A complete triage version",
+  },
+  {
+    why: "Each market decides from the facts, with Unknown kept apart from No.",
+    who: "Regulatory Leader",
+    evidence: "An assessment of the incident's market saved",
+  },
+  {
+    why: "Reportable or not, why and by when, signed by your own role.",
+    who: "Regulatory Leader",
+    evidence: "That market's conclusion signed",
+  },
+  {
+    why: "A “reportable” conclusion creates the right form for the incident's country.",
+    who: "Regulatory Leader",
+    evidence: "The report exists and was opened",
+  },
+  {
+    why: "Every mandatory field filled, then a second person approves.",
+    who: "Regulatory Leader, then Decision Maker",
+    evidence: "Report status Approved",
+  },
+  {
+    why: "MDARIX never submits: you record what you sent.",
+    who: "Regulatory Leader",
+    evidence: "Submission recorded",
+  },
+  {
+    why: "The signed record is ready for an inspector.",
+    who: "Quality Leader",
+    evidence: "Records opened after the submission or the “not reportable” conclusion",
+  },
+  {
+    why: "Is it happening elsewhere? Every complaint feeds trends, reportable or not.",
+    who: "Quality Leader",
+    evidence: "Trends opened",
+  },
+];
+
 /** Who takes each step, for a colleague whose role cannot open its screen. */
 const STEP_ROLE: Record<number, string> = {
-  1: "A Complaint Handler or the Quality Leader",
-  2: "A Regulatory Leader",
+  0: "A Service Desk agent or a Complaint Handler",
+  1: "A Service Desk agent, a Complaint Handler or the Quality Leader",
+  2: "A Complaint Handler or the Quality Leader",
   3: "A Regulatory Leader",
   4: "A Regulatory Leader",
   5: "A Regulatory Leader",
-  6: "A Decision Maker",
+  6: "A Regulatory Leader, then a Decision Maker",
   7: "A Regulatory Leader",
 };
+
+/** "Check it as a case" for a complaint classified in your QMS (spec 4.8): opens a Case check linked to it. */
+function CheckAsCase({ run, go }: { run: StoryRun; go: (section: string, tab?: string) => void }) {
+  const [error, setError] = useState("");
+  return (
+    <p className="uw-wt-hint">
+      <button
+        type="button"
+        className="ac-link"
+        onClick={async () => {
+          setError("");
+          try {
+            const event = await send<{ id: string }>(`/api/v1/intake/from-complaint/${run.complaint.id}`, "POST");
+            const place = casePlace(event.id);
+            go(place.section, place.tab);
+          } catch (reason) {
+            setError(errorText(reason, "The case check was not opened"));
+          }
+        }}
+      >
+        Check it as a case
+      </button>
+      {error && <span role="alert"> {error}</span>}
+    </p>
+  );
+}
 
 /** The practice line, said once on the page; "Fictional data" only while the walkthrough is on the sample. */
 export const practiceLine = (sample: boolean) =>
@@ -305,8 +342,8 @@ export function StoryView({
         </h1>
         <p>
           {run && !sample
-            ? "Follow your most urgent complaint from first call to reporting."
-            : "Follow one sample complaint from first call to reporting."}
+            ? "Follow your most urgent complaint from the first contact to the submission."
+            : "Follow one sample complaint from the first contact to the submission."}
         </p>
         {/* Said once, after the read, so it never says "Fictional data" over your own records. */}
         {run && <p className="uw-gs-practice">{practiceLine(sample)}</p>}
@@ -409,12 +446,19 @@ export function StoryView({
     );
   } else {
     const copy = stepCopy(run, selected);
+    const info = STEP_INFO[selected];
     const step = run.steps[selected];
     const blocked = stepBlocker(run, selected);
     // A step whose screen this person's role cannot open says so and who does it: never a dead click (0.10.85).
     const section = stepPlace(run, selected).section;
     const closed = canOpen ? !canOpen(section) : false;
     const then = selected < STORY_STEPS - 1 ? run.steps[selected + 1] : null;
+    const action =
+      blocked && !step.done && !run.report_id && run.needs.length === 0 && run.market
+        ? "Open the decision tree"
+        : blocked && !step.done && (run.needs.length || !run.market)
+          ? `Open ${run.complaint.ref}`
+          : copy.b;
     body = (
       <>
         <div className="uw-os-art">
@@ -440,13 +484,27 @@ export function StoryView({
           </p>
         )}
         <h3 id="uw-os-title">{copy.h}</h3>
-        <p className="uw-wt-lead">{copy.p}</p>
+        {/* Four lines, in this order (spec 4.8): the action, the reason, the role, what ticks it. */}
+        <dl className="uw-os-lines">
+          <div>
+            <dt>Next</dt>
+            <dd>{action}</dd>
+          </div>
+          <div>
+            <dt>Why</dt>
+            <dd>{info.why}</dd>
+          </div>
+          <div>
+            <dt>Who</dt>
+            <dd>{info.who}</dd>
+          </div>
+          <div>
+            <dt>Evidence</dt>
+            <dd>{info.evidence}</dd>
+          </div>
+        </dl>
         {step.skipped ? (
-          <span className="ms-chip uw-os-state">
-            {selected === 1
-              ? "Not needed: not flagged for triage"
-              : "Not needed: the signed conclusion is “not reportable”"}
-          </span>
+          <span className="ms-chip uw-os-state">{step.note ?? "Not needed"}</span>
         ) : step.done ? (
           <span className="ms-chip is-good uw-os-state">
             <Check size={13} aria-hidden="true" /> Done · read from the saved record
@@ -463,6 +521,30 @@ export function StoryView({
           </p>
         )}
         {blocked && !step.done && <p className="uw-os-differ">{blocked}</p>}
+        {/* A pending case keeps step 2 open: who it waits on and by when. */}
+        {!step.done && !step.skipped && step.note && <p className="uw-os-differ">{step.note}</p>}
+        {!run.case && selected <= 1 && <CheckAsCase run={run} go={go} />}
+        {run.branch && run.case && selected >= 1 && selected <= 7 && (
+          <div className="uw-os-differ" role="group" aria-label={run.branch.label}>
+            <p>
+              <b>{run.branch.label}</b> · {run.branch.done ? "Done" : "To do"}
+            </p>
+            <p>{run.branch.why}</p>
+            <p>
+              Who: {run.branch.who} · Evidence: {run.branch.evidence.toLowerCase()}
+            </p>
+            <button
+              type="button"
+              className="ac-link"
+              onClick={() => {
+                const place = casePlace(run.case!.id);
+                go(place.section, place.tab);
+              }}
+            >
+              Open the QA review of {run.case.ref}
+            </button>
+          </div>
+        )}
         <ComplaintSummary run={run} />
         <div className="ca-action-row">
           <button
@@ -472,12 +554,7 @@ export function StoryView({
             aria-describedby={closed ? "uw-os-closed" : undefined}
             onClick={() => void openStep(run, selected, go)}
           >
-            {blocked && !step.done && !run.report_id && run.needs.length === 0 && run.market
-              ? "Open the decision tree"
-              : blocked && !step.done && (run.needs.length || !run.market)
-                ? `Open ${run.complaint.ref}`
-                : copy.b}{" "}
-            <ChevronRight size={15} aria-hidden="true" />
+            {action} <ChevronRight size={15} aria-hidden="true" />
           </button>
         </div>
         {then && (
@@ -497,6 +574,7 @@ export function StoryView({
       <section className="uw-wt" aria-labelledby="uw-wt-title">
         <div className="uw-wt-head">
           <h2 id="uw-wt-title">{sample ? "Your sample walkthrough" : "Your data walkthrough"}</h2>
+          <h3 className="uw-os-part">Part 1: from the first contact to the submission</h3>
           <span className={`ms-chip ${sample ? "is-sample" : "is-yours"}`}>{sample ? "Sample data" : "Your data"}</span>
           <span className="uw-wt-count uw-num">
             {done} of {STORY_STEPS} completed{skipped ? ` · ${skipped} not needed` : ""}
@@ -571,19 +649,22 @@ export function StoryView({
           </ol>
           <div className={`uw-os-main${previewing ? " is-preview" : ""}`}>{body}</div>
         </div>
+        <p className="uw-wt-hint uw-os-coming">Coming next: investigation to CAPA · trends to product improvement</p>
       </section>
+      <MoreCases cases={story?.more_cases ?? []} onOpen={go} />
     </div>
   );
 }
 
-/** Each step's icon, in the walkthrough's order (0.10.90, the hero design). */
+/** Each step's icon, in the walkthrough's order (0.10.90, the hero design); the fork at steps 2 and 5 marks where the
+ * journey branches (spec 4.8). */
 const STEP_ICONS: readonly LucideIcon[] = [
   Phone,
-  Stethoscope,
   GitFork,
-  PenLine,
-  FileText,
+  Stethoscope,
   ListChecks,
+  GitFork,
+  FileText,
   UserCheck,
   Send,
   Archive,
@@ -593,6 +674,49 @@ const STEP_ICONS: readonly LucideIcon[] = [
 function StepIcon({ index, size = 18 }: { index: number; size?: number }) {
   const Icon = STEP_ICONS[index] ?? ListChecks;
   return <Icon size={size} aria-hidden="true" />;
+}
+
+/**
+ * "More cases to try" (0.10.93, spec 4.8; it replaces "Before a complaint"): the sample's other Cases, each opening
+ * its own Case check, with its outcome as the record says. The server lists them (a trial seeded earlier keeps its
+ * SAMPLE-CALL references), so nothing is shown once the sample is removed.
+ */
+export function MoreCases({ cases, onOpen }: { cases: MoreCase[]; onOpen: (section: string, tab?: string) => void }) {
+  if (!cases.length) return null;
+  return (
+    <div id="trial-first-contact" className="uw-story-partner uw-anchor">
+      <div>
+        <strong>
+          <Phone size={16} aria-hidden="true" /> More cases to try
+        </strong>
+        <p>
+          Each opens its own case check: an inquiry, a pending case waiting for the reporter, one to confirm no
+          deficiency, and an urgent case triaged at once.
+        </p>
+      </div>
+      <div className="uw-story-partner-actions">
+        {cases.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            className="ac-secondary"
+            onClick={() => {
+              const place = casePlace(item.id);
+              onOpen(place.section, place.tab);
+            }}
+          >
+            {item.ref} <small className="ac-muted">{item.label}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** "More cases to try" read on its own, for a page that does not show the walkthrough (the classic navigation). */
+export function MoreCasesCard({ onOpen }: { onOpen: (section: string, tab?: string) => void }) {
+  const story = useOneStory();
+  return <MoreCases cases={story.data?.more_cases ?? []} onOpen={onOpen} />;
 }
 
 /**

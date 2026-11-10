@@ -124,7 +124,8 @@ describe("D3.3 the complaint page is a record with a hero", () => {
     resources.data[ONE_STORY_PATH] = { sample: run(0), yours: null };
     const folded = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />);
     expect(folded).toContain("<summary>Triage record: not complete yet</summary>");
-    resources.data[ONE_STORY_PATH] = { sample: run(1), yours: null };
+    // 0.10.93: triage is step 3.
+    resources.data[ONE_STORY_PATH] = { sample: run(2), yours: null };
     expect(render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />)).not.toContain("Triage record: not complete yet");
   });
 });

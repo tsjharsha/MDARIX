@@ -251,6 +251,11 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
 
     found = []
     for item in intake.triage(db, control_db, tenant_id, "open", now)["items"]:
+        # shortcut: the sample's SAMPLE-CASE-11 is SAMPLE-RV-11's own call (Getting started, B2 step 7): while the two
+        # are apart, RV-11's triage item already alerts for the event, so day 0 stays calm; once attached they are one
+        # item and it alerts. Drop this if the sample ever links the two at seeding.
+        if item.get("sample") and item["ref"] == "SAMPLE-CASE-11" and not item.get("linked"):
+            continue
         record = item.get("record") or {}
         owner = record.get("triage_owner") or record.get("event_owner")
         complaint_id = item["id"] if item["kind"] == intake.COMPLAINT else None

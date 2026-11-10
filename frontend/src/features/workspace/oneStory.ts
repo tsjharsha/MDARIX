@@ -6,8 +6,9 @@ import { treePlace } from "./sections/DecisionTrees";
 import { IMPORTED_SOURCE } from "./complaintList";
 
 /**
- * One story, from the first call to the signed report (0.10.82, D1): ten steps on one complaint, the sample's
- * SAMPLE-RV-11 first, then the trial's own most urgent imported complaint. The server reads each tick from the saved
+ * One story, from the first contact to the submission (0.10.82, D1; Part 1 in 0.10.93, B2 spec 4.8): ten steps on one
+ * complaint, the sample's SAMPLE-RV-11 and its call SAMPLE-CASE-11 first, then the trial's own most urgent imported
+ * complaint. The server reads each tick from the saved
  * record (backend/app/trial/one_story.py); each step opens the real screen with the record in place.
  */
 export const ONE_STORY_PATH = "/api/v1/trial/one-story";
@@ -38,16 +39,30 @@ export type StoryRun = {
   report_id: string | null;
   report_stage: string | null;
   needs: StoryNeed[];
-  /** ``earlier`` (0.10.85): done by the team out of order; ticked once the steps before it are done. */
-  steps: Array<{ key: string; label: string; done: boolean; skipped: boolean; earlier?: boolean }>;
+  /** The story's Case (steps 1 and 2 open its Case check); null: classified in your QMS (0.10.93). */
+  case?: { id: string; ref: string; classification: string | null; state: string | null } | null;
+  /** The QA review of a Case signed service only, inquiry or not a complaint (spec 4.8's branch card). */
+  branch?: { key: string; label: string; who: string; evidence: string; why: string; done: boolean } | null;
+  /** ``earlier`` (0.10.85): done by the team out of order; ticked once the steps before it are done. ``note``
+   * (0.10.93): why a step is not needed, or what an open step waits for. */
+  steps: Array<{
+    key: string;
+    label: string;
+    done: boolean;
+    skipped: boolean;
+    earlier?: boolean;
+    note?: string | null;
+  }>;
   current: number;
   finished: boolean;
 };
-export type OneStory = { sample: StoryRun | null; yours: StoryRun | null };
+/** A sample Case offered under "More cases to try" (0.10.93), with its outcome as its record says. */
+export type MoreCase = { id: string; ref: string; label: string; signed: boolean };
+export type OneStory = { sample: StoryRun | null; yours: StoryRun | null; more_cases?: MoreCase[] };
 
 export const STORY_STEPS = 10;
 /** The steps ticked when someone opens the step's screen from the story: it counts for the whole team (0.10.84, M6). */
-const MARKED: Record<number, string> = { 0: "call", 4: "form", 8: "records", 9: "trends" };
+const MARKED: Record<number, string> = { 5: "form", 8: "records", 9: "trends" };
 
 /** The story, read again after every saved change (0.10.84, M1): saving the triage moves the pill and Next step on. */
 export function useOneStory(on = true) {
@@ -78,22 +93,26 @@ type Place = { section: string; tab?: string };
 export function stepBlocker(run: StoryRun, index: number): string | null {
   const country = run.needs.find((need) => need.fact === "COUNTRY");
   const awareness = run.needs.find((need) => need.fact === "AWARENESS_DATE");
-  if (index >= 1 && index <= 3 && awareness)
+  if (index >= 2 && index <= 4 && awareness)
     return `Your file gives no awareness date for ${run.complaint.ref}. The complaint page asks for it: every clock counts from it, and nothing is signed without it.`;
-  if (index >= 2 && index <= 7 && (country || !run.market))
+  if (index >= 3 && index <= 7 && (country || !run.market))
     return `Your file gives no incident country for ${run.complaint.ref}. The complaint page asks for it: it decides which market's tree and form apply.`;
-  if (index >= 4 && index <= 7 && !run.report_id && run.conclusion !== "NOT_REPORTABLE")
-    return "The report is created when you sign a “reportable” conclusion: finish step 4 first.";
+  if (index >= 5 && index <= 7 && !run.report_id && run.conclusion !== "NOT_REPORTABLE")
+    return "The report is created when you sign a “reportable” conclusion: finish step 5 first.";
   return null;
 }
 
-/** The real screen a step opens, with the story's record in place. */
+/** A Case's own check drawer on the Cases view (First contact?check=<id>, the address CasesList opens). */
+export const casePlace = (id: string): Place => ({ section: "Complaints", tab: `First contact?check=${id}` });
+
+/** The real screen a step opens, with the story's record in place: steps 1 and 2 open the story's Case check. */
 export function stepPlace(run: StoryRun, index: number): Place {
   const complaint = recordPlace("complaint", run.complaint.ref, {}, "new") as Place;
   const blocked = stepBlocker(run, index);
-  if (index <= 1) return complaint;
+  if (index <= 1) return run.case ? casePlace(run.case.id) : complaint;
+  if (index === 2) return complaint;
   if (blocked && (run.needs.length || !run.market)) return complaint;
-  if (index <= 3 || (index <= 7 && !run.report_id))
+  if (index <= 4 || (index <= 7 && !run.report_id))
     return run.market ? treePlace(run.market, run.complaint.id) : complaint;
   if (index <= 7) return reportPlace(run.report_id!);
   // Records opens on the record just finished, and Trends on the story's own product: the sample's real rise, or your
@@ -121,16 +140,15 @@ export const takeMarkProblem = () => {
 type PendingVisit = { run: string; step: string; complaintId: string; reportId: string | null; product: string | null };
 let pendingVisit: PendingVisit | null = null;
 
-/** What a destination loaded: the complaint (step 1), the report (step 5), the finished record (step 9) or the trend
- * check of a product (step 10). */
+/** What a destination loaded: the report (step 6), the finished record (step 9) or the trend check of a product
+ * (step 10). */
 export type Visit =
-  | { step: "call"; complaintId: string | undefined }
   | { step: "form"; reportId: string | undefined }
   | { step: "records"; complaintId: string | undefined }
   | { step: "trends"; product: string | undefined };
 
-/** Open a step's screen at once (0.10.85: waiting read as a dead click). A step ticked by the visit itself (the call,
- * the report, Records, Trends) is remembered, and its mark is saved by the screen once it has loaded (``visited``):
+/** Open a step's screen at once (0.10.85: waiting read as a dead click). A step ticked by the visit itself (the
+ * report, Records, Trends) is remembered, and its mark is saved by the screen once it has loaded (``visited``):
  * a screen that failed to load ticks nothing. */
 export async function openStep(
   run: StoryRun,
@@ -140,7 +158,7 @@ export async function openStep(
   const mark = MARKED[index];
   const place = stepPlace(run, index);
   pendingVisit =
-    mark && !(index === 4 && !run.report_id)
+    mark && !(index === 5 && !run.report_id)
       ? {
           run: run.run,
           step: mark,

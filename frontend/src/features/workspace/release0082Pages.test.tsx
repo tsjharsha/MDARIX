@@ -42,7 +42,7 @@ const api = (overrides: Partial<WorkspaceApi> = {}) =>
 const render = (node: ReactNode, value: WorkspaceApi = api()) =>
   renderToStaticMarkup(<WorkspaceContext.Provider value={value}>{node}</WorkspaceContext.Provider>);
 
-const LABELS = ["The call", "Triage", "Tree", "Decide", "Form", "Fill", "Approval", "Submit", "Records", "Trends"];
+const LABELS = ["The case", "Classify", "Triage", "Tree", "Decide", "Form", "Approval", "Submit", "Records", "Trends"];
 const run = (current: number): StoryRun => ({
   run: "sample",
   complaint: {
@@ -67,12 +67,12 @@ const run = (current: number): StoryRun => ({
 describe("every record page: one Next step, which is the story's, and one progress indicator (D1.5)", () => {
   it("on the story's complaint shows a slim pill, the story's step as the rail's one button and one status line", () => {
     resources.data[eventPath("SAMPLE-RV-11")] = rv11();
-    resources.data[ONE_STORY_PATH] = { sample: run(2), yours: null };
+    resources.data[ONE_STORY_PATH] = { sample: run(3), yours: null };
     const html = render(<ComplaintPage tab="Summary?ref=SAMPLE-RV-11" />);
     expect(html).toContain('class="uw-story-pill"');
-    expect(html).toContain("Step 3 of 10");
+    expect(html).toContain("Step 4 of 10");
     const rail = html.slice(html.indexOf('aria-label="Next step"'));
-    expect(rail).toContain("Story step 3: the decision tree");
+    expect(rail).toContain("Story step 4: the decision tree");
     expect(rail).toContain("Open the tree");
     // One main button on the page, and one progress indicator: the status line, no chevron path.
     expect(html.match(/class="ac-primary"/g)).toHaveLength(1);
@@ -103,7 +103,7 @@ describe("Home for every persona (D1.6)", () => {
     for (const persona of ["admin", "regulatory", "handler", "executive"]) {
       const html = home(persona);
       expect(html).toContain('class="uw-card uw-home-banner"');
-      expect(html).toContain("Step 4 of 10: Decide");
+      expect(html).toContain("Step 4 of 10: Tree");
       expect(html).toContain("Continue the story");
       expect(html).not.toContain("Review this sample event");
     }

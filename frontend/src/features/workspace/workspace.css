@@ -8800,3 +8800,36 @@ details.uw-team-change[open] {
 .uw-flip {
   transform: rotate(180deg);
 }
+
+/* Getting started Part 1 (0.10.93, B2 spec 4.8): the step card's four lines, flat (G-2). */
+.uw-os-part {
+  margin: 0;
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-14);
+  font-weight: 600;
+}
+.uw-os-lines {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  font-size: var(--ms-fs-14);
+}
+.uw-os-lines > div {
+  display: grid;
+  grid-template-columns: 7.5em 1fr;
+  gap: 8px;
+}
+.uw-os-lines dt {
+  color: var(--ms-muted);
+  font-weight: 600;
+}
+.uw-os-lines dt::after {
+  content: ":";
+}
+.uw-os-lines dd {
+  margin: 0;
+  color: var(--ms-ink);
+}
+.uw-os-differ > p {
+  margin: 0 0 4px;
+}

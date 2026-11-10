@@ -1001,7 +1001,8 @@ def same_product_complaints(db: Session, tenant_id: uuid.UUID, product_id):
 
 def likely_complaints(db: Session, tenant_id: uuid.UUID, event: IntakeEvent) -> list[dict]:
     """The complaints that may be this Case's event (same product and lot or serial, near dates, same site or
-    country), not yet decided on by a person: each with its reasons."""
+    country), not yet decided on by a person: each with its reasons, those on the Case's own event day first
+    (``same_day``: the strong match the escalation panel pre-selects when it is the only one, spec 3.3 step 2)."""
     if not event.product_id:
         return []
     complaints = same_product_complaints(db, tenant_id, event.product_id).all()
@@ -1023,10 +1024,14 @@ def likely_complaints(db: Session, tenant_id: uuid.UUID, event: IntakeEvent) -> 
         a, b = group.get((INTAKE, event.id)), group.get((COMPLAINT, complaint.id))
         if a is not None and a == b:
             continue
-        reasons = rules.duplicate_reasons(mine, _duplicate_fields(COMPLAINT, complaint, lots))
+        theirs = _duplicate_fields(COMPLAINT, complaint, lots)
+        reasons = rules.duplicate_reasons(mine, theirs)
         if reasons:
-            found.append({"id": str(complaint.id), "ref": complaint_ref(complaint), "reasons": reasons})
-    return found
+            same_day = mine["event_on"] is not None and mine["event_on"] == theirs["event_on"]
+            found.append(
+                {"id": str(complaint.id), "ref": complaint_ref(complaint), "reasons": reasons, "same_day": same_day}
+            )
+    return sorted(found, key=lambda item: not item["same_day"])
 
 
 def _side(kind: str, row, products: dict) -> dict:

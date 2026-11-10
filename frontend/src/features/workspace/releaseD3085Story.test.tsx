@@ -97,12 +97,12 @@ describe("The story always works (owner report on 0.10.84)", () => {
     );
     vi.stubGlobal("fetch", fetch);
     vi.stubGlobal("window", { setTimeout, clearTimeout });
-    const run = runAt("sample", 0);
-    await openStep(run, 0, vi.fn());
-    // 0.10.88: the mark is saved once the complaint page has loaded that complaint.
-    await visited({ step: "call", complaintId: run.complaint.id });
+    const run = runAt("sample", 8);
+    await openStep(run, 8, vi.fn());
+    // 0.10.88: the mark is saved once Records has loaded that complaint's record.
+    await visited({ step: "records", complaintId: run.complaint.id });
     const body = JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body));
-    expect(body).toEqual({ run: "sample", step: "call", complaint_id: run.complaint.id });
+    expect(body).toEqual({ run: "sample", step: "records", complaint_id: run.complaint.id });
     expect(takeMarkProblem()).toContain("The story now follows OS-1002.");
     expect(takeMarkProblem()).toBeNull();
   });
@@ -154,9 +154,11 @@ describe("a triage not needed (0.10.88, DEV-10)", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("says the complaint was not flagged for triage, not that a conclusion was signed", () => {
-    // The card of step 2, as shown when it is selected.
-    const run = { ...runAt("yours", 1), current: 1 };
-    run.steps = run.steps.map((step, index) => (index === 1 ? { ...step, done: false, skipped: true } : step));
+    // The card of step 3 (0.10.93), as shown when it is selected; the server says why it is not needed.
+    const run = { ...runAt("yours", 2), current: 2 };
+    run.steps = run.steps.map((step, index) =>
+      index === 2 ? { ...step, done: false, skipped: true, note: "Not needed: not flagged for triage" } : step,
+    );
     const html = renderToStaticMarkup(
       <WorkspaceContext.Provider value={workspace()}>
         <StoryView story={{ sample: null, yours: run }} />

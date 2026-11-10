@@ -40,7 +40,7 @@ import { ReportingFacts } from "./ReportingFacts";
 import { StoryPill } from "./OneStory";
 import { dueDay } from "./Home";
 import { isLegalDeadline } from "../home";
-import { openStep, runOf, useOneStory, useVisited, type StoryRun } from "../oneStory";
+import { openStep, runOf, useOneStory, type StoryRun } from "../oneStory";
 
 /**
  * The harm in words (0.10.82, D1.7; U-18): "Death", "Serious injury", "No harm reported" or "Not known yet", never
@@ -154,8 +154,6 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
   // Ready to close is shown when it is the next step or signed; before that it is revealed on request (one main button).
   const [readyShown, setReadyShown] = useState(false);
   const links = useImdrfLinks([view?.event.problem_code]);
-  // Story step 1 counts once this complaint has loaded (0.10.88: never on a page that failed to load).
-  useVisited({ step: "call", complaintId: resource.data?.event.complaint_id }, resource.state === "ready");
   const storyShown = story === "short" && view?.event.ref === FLAGSHIP;
   const shortStory = useShortStory(storyShown);
   // A link by the complaint's id (stage 6's Oversight?event=<id>) is rewritten to the reference people read; a former
@@ -432,7 +430,7 @@ export function ComplaintPage({ tab, heading }: { tab?: string; heading?: RefObj
                 {view.case && <CaseCard item={view.case} folded={triageHere} />}
                 {/* Triage is done here when it is the next step (0.10.72, B3), first in Details beside the rail. */}
                 {triageHere &&
-                  (storyRun && !storyRun.finished && storyRun.current !== 1 ? (
+                  (storyRun && !storyRun.finished && storyRun.current !== 2 ? (
                     // The story is on another step: the triage form folds until it is asked for (0.10.85, D3.3).
                     <details className="uw-more uw-cp-fold">
                       <summary>Triage record: not complete yet</summary>
@@ -919,13 +917,13 @@ const onPhone = () =>
 
 /** Each story step on the rail: what it is, one line, and its one button (Getting started's step card's action). */
 const STORY_ACTIONS: Array<[string, string, string]> = [
-  ["read the call", "The reporter's words are on this page; the awareness time starts every clock.", "Read the case"],
+  ["review the case", "The reporter's words and the awareness time start every clock.", "Open the case check"],
+  ["classify service or complaint", "A signed case check; a complaint is escalated.", "Sign the case check"],
   ["triage", "Severity, owner and the first action.", "Open the triage"],
   ["the decision tree", "Facts from the record arrive to confirm; judgement questions are yours.", "Open the tree"],
   ["reportable or not", "Sign the conclusion: your role decides who signs, never the persona.", "Go to the outcome"],
   ["the form", "Created when you signed “reportable”.", "Open the report"],
-  ["fill what is missing", "Each field still empty names its form box.", "Open the missing fields"],
-  ["approval", "A second person approves.", "Open the approval"],
+  ["complete and approve", "Every field filled, then a second person approves.", "Open the missing fields"],
   ["PDF and submission", "MDARIX never submits: you record what you sent.", "Open the PDF step"],
   ["records", "The signed record, ready for an inspector.", "Open Records"],
   ["trends", "Is it happening elsewhere?", "Open Trends"],

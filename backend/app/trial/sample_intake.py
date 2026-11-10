@@ -14,6 +14,12 @@ product, lot 4, the event day and the country, so the duplicate warning shows; l
 awareness and recomputes RT-05's deadlines, with "awareness conflict" on the triage list. The quarantined sample row
 SAMPLE-RJ-02 (sample_imports.py) reaches the triage list by its harm word.
 
+SAMPLE-CASE-11 (0.10.93, B2 spec 4.8) is the hospital's call behind the flagship SAMPLE-RV-11: the same product,
+version, lot, country and event day, received when RV-11's awareness starts. Its check is pre-filled and unsigned
+(question 6 Unknown is the one left for the person; the suggestion is "Complaint and service"): Getting started's
+steps 1 and 2 are done on it. No task is raised for it, so day 0 stays calm. The calls keep their SAMPLE-CALL
+references (spec 9.3's re-seed as SAMPLE-CASE-01..04 was not done: the released tests and the RT-05 example read them).
+
 No complaint, product or lot is added: every count quoted elsewhere stays (the second look, the backlog, the
 reportability watch, the dispositions and the signals read complaints only). Every row is marked ``MDARIX_SAMPLE``
 (the intake events, checks, triage records), so sample removal takes it, with its tasks. Idempotent; flushes but never
@@ -34,6 +40,16 @@ logger = logging.getLogger("mdarix.trial.sample_intake")
 
 MARKER = "SAMPLE-CALL-01"
 RT05_EVENT_DAYS = 33  # sample_dispositions.LATE_EVENT_DAYS["SAMPLE-RT-05"]
+STORY_CASE = "SAMPLE-CASE-11"
+# "More cases to try" on Getting started (spec 4.8), in order; each is shown with its own outcome as the record says.
+MORE_CASES = ("SAMPLE-CALL-01", "SAMPLE-CALL-03", "SAMPLE-CALL-04", "SAMPLE-URG-01")
+STORY_CASE_WORDS = (
+    "Biomedical engineering at a sample hospital called the service desk: they checked a PulseWatch 410 against a "
+    "reference oximeter and its SpO2 read 4 to 6 points high on two patients. No harm was reported. The monitor is "
+    "out of use and they want it serviced."
+)
+# Spec 4.8: Q6 Unknown is the one question left for the person.
+STORY_CASE_ANSWERS = dict(Q1="YES", Q2="YES", Q3="YES", Q4="NO", Q5="NO", Q6="UNKNOWN", Q7="NO", Q8="YES", Q9="NO")
 
 
 def _answers(**given) -> dict:
@@ -315,12 +331,94 @@ def stage_sample_intake(db: Session, tenant_id, now: datetime | None = None) -> 
                 )
                 counts["triage_records"] += 1
         db.flush()
+        counts["story_case"] = stage_story_case(db, tenant_id, author)
         savepoint.commit()
     except Exception:
         savepoint.rollback()
         logger.exception("Trial sample intake could not be staged")
         return {"created": False, "why": "ERROR"}
     return {"created": True, **counts}
+
+
+def has_story_case(db: Session, tenant_id) -> bool:
+    from backend.app.db.models.intake import IntakeEvent
+
+    return (
+        db.query(IntakeEvent.id).filter(IntakeEvent.tenant_id == tenant_id, IntakeEvent.reference == STORY_CASE).first()
+        is not None
+    )
+
+
+def stage_story_case(db: Session, tenant_id, author: str | None = None) -> int:
+    """SAMPLE-CASE-11, unsigned, from the flagship's own facts (once; nothing without the flagship). Flushes; returns
+    1 when added, else 0."""
+    from backend.app.db.models.foundation import Complaint
+    from backend.app.db.models.intake import FirstContactCheck, IntakeEvent
+    from backend.app.intake import case_rules
+    from backend.app.trial.sample_data import FLAGSHIP, FLAGSHIP_SERVICE
+    from backend.app.trial.sample_decision import sample_author
+
+    flagship = (
+        db.query(Complaint)
+        .filter(
+            Complaint.tenant_id == tenant_id,
+            Complaint.source_system == SAMPLE_SOURCE,
+            Complaint.complaint_identifier == FLAGSHIP,
+        )
+        .first()
+    )
+    if flagship is None or has_story_case(db, tenant_id):
+        return 0
+    received = flagship.awareness_timestamp
+    author = author or str(sample_author(db, tenant_id, received).id)
+    event = IntakeEvent(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        reference=STORY_CASE,
+        kind="CONTACT",
+        reporter_words=STORY_CASE_WORDS,
+        reporter_type="Hospital",
+        reporter_site="Sample Lakeside Hospital (Sample)",
+        country=flagship.country,
+        product_id=flagship.product_id,
+        product_version_id=flagship.product_version_id,
+        lot_batch_id=flagship.lot_batch_id,
+        requested="REPAIR",
+        use_environment="HOSPITAL_WARD",
+        user_type="HEALTHCARE_PROFESSIONAL",
+        channel="PHONE",
+        event_at=flagship.event_timestamp,
+        event_zone="UTC",
+        received_at=received,
+        received_zone="UTC",
+        awareness_at=received,
+        awareness_zone="UTC",
+        service_ticket=FLAGSHIP_SERVICE["service_reference"],
+        source_system=SAMPLE_SOURCE,
+        created_by=author,
+        created_at=received,
+        updated_at=received,
+    )
+    db.add(event)
+    db.flush()
+    answers = case_rules.clean_answers({question: {"answer": value} for question, value in STORY_CASE_ANSWERS.items()})
+    db.add(
+        FirstContactCheck(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            intake_event_id=event.id,
+            version=1,
+            guide_version=case_rules.GUIDE_VERSION,
+            answers=answers,
+            suggestion=case_rules.case_outcome(answers, event.requested),
+            source_system=SAMPLE_SOURCE,
+            created_by=author,
+            created_at=received,
+            updated_at=received,
+        )
+    )
+    db.flush()
+    return 1
 
 
 def _queue(db: Session, tenant_id, event, task_type: str) -> None:

@@ -13,7 +13,7 @@ import type { ImportRun } from "./sections/ImportReports";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
 import type { TrendItem } from "./signalAi";
 
-const LABELS = ["The call", "Triage", "Tree", "Decide", "Form", "Fill", "Approval", "Submit", "Records", "Trends"];
+const LABELS = ["The case", "Classify", "Triage", "Tree", "Decide", "Form", "Approval", "Submit", "Records", "Trends"];
 export const runAt = (run: "sample" | "yours", current: number, extra: Partial<StoryRun> = {}): StoryRun => ({
   run,
   complaint: {
@@ -68,14 +68,14 @@ describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
     );
 
   it("has one title, one ten-step list with its Sample data label and one main button", () => {
-    const html = view({ sample: runAt("sample", 2), yours: null });
+    const html = view({ sample: runAt("sample", 3), yours: null });
     expect(html.match(/<h1/g)).toHaveLength(1);
     expect(html).toContain("Getting started</h1>");
     expect(html.match(/class="uw-os-step/g)).toHaveLength(10);
     expect(html).toContain(">Sample data<");
-    expect(html).toContain("2 of 10 completed");
+    expect(html).toContain("3 of 10 completed");
     // The step card is the next step from the saved record, and has exactly one main button.
-    expect(html).toContain("Step 3 · Tree");
+    expect(html).toContain("Step 4 · Tree");
     expect(html.match(/ac-primary/g)).toHaveLength(1);
     expect(html).toContain("Open the decision tree");
     // One-word labels on the rail, so none wraps or is cut.
@@ -93,11 +93,11 @@ describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
   });
 
   it("says which fact the import lacks, and opens the complaint page where it is asked", () => {
-    const run = runAt("yours", 2, {
+    const run = runAt("yours", 3, {
       needs: [{ fact: "COUNTRY", label: "Incident country", message: "", rule: "" }],
     });
-    expect(stepBlocker(run, 2)).toContain("no incident country for OS-1002");
-    expect(stepPlace(run, 2)).toEqual({ section: "Complaint", tab: "Summary?ref=OS-1002" });
+    expect(stepBlocker(run, 3)).toContain("no incident country for OS-1002");
+    expect(stepPlace(run, 3)).toEqual({ section: "Complaint", tab: "Summary?ref=OS-1002" });
     const html = view({ sample: null, yours: run });
     expect(html).toContain("The complaint page asks for it");
     expect(html).toContain("Open OS-1002");
@@ -105,8 +105,14 @@ describe("Getting started: one story of ten steps (D1.1-D1.4)", () => {
 
   it("opens each step's real screen with the record in place", () => {
     const run = runAt("sample", 4, { report_id: "r1" });
+    // No story Case (classified in your QMS): steps 1 and 2 open the complaint itself.
     expect(stepPlace(run, 0).tab).toBe("Summary?ref=SAMPLE-RV-11");
-    expect(stepPlace(run, 2)).toEqual({ section: "Decision trees", tab: "?market=US&complaint=sample-id" });
+    // With the story's Case, steps 1 and 2 open its case check on the Cases view (B2-11); triage opens the complaint.
+    const withCase = { ...run, case: { id: "c11", ref: "SAMPLE-CASE-11", classification: null, state: "OPEN" } };
+    expect(stepPlace(withCase, 0)).toEqual({ section: "Complaints", tab: "First contact?check=c11" });
+    expect(stepPlace(withCase, 1)).toEqual({ section: "Complaints", tab: "First contact?check=c11" });
+    expect(stepPlace(withCase, 2).tab).toBe("Summary?ref=SAMPLE-RV-11");
+    expect(stepPlace(run, 3)).toEqual({ section: "Decision trees", tab: "?market=US&complaint=sample-id" });
     expect(stepPlace(run, 5)).toEqual({ section: "Reports", tab: "?report=r1" });
     expect(stepPlace(run, 8)).toEqual({ section: "Records", tab: "Decision records?complaint=SAMPLE-RV-11" });
     expect(stepPlace(run, 9).tab).toBe("Trend check?product=SAMPLE-ORBIT-300");

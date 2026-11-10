@@ -1,26 +1,34 @@
-"""One story, from the first call to the signed report (release 0.10.82, round D1 of the approved redesign).
+"""One story, from the first contact to the submission (release 0.10.82, round D1; Part 1 in 0.10.93, B2 spec 4.8).
 
-Getting started tells one complaint's story in ten steps, first on the sample (SAMPLE-RV-11), then on the trial's own
-most urgent imported complaint: the most serious harm, then the shortest clock. Each step opens the real screen with
-the record in place, and each tick is read from the saved record, never from the screen on show:
+Getting started tells one complaint's story in ten steps, first on the sample (SAMPLE-RV-11 and its call
+SAMPLE-CASE-11), then on the trial's own most urgent imported complaint: the most serious harm, then the shortest
+clock. Each step opens the real screen with the record in place, and each tick is read from the saved record, never
+from the screen on show (OD-2):
 
-1. the call: the person opened it from the story (their own mark), or its triage is recorded;
-2. triage: the triage record is complete;
-3. the decision tree: an assessment of the complaint's own market is saved (a draft or signed);
-4. reportable or not: that market's conclusion is signed;
-5. the form for the country: the authority report exists and the person opened it (skipped when not reportable);
-6. fill what is missing: every mandatory field is filled (the report's status path is past "Created");
-7. approval: a second person approved it;
-8. PDF and submission: the submission is recorded (MDARIX never submits);
+1. review the case: all nine questions answered and saved on the story's Case check (a person saved them: the
+   sample's pre-filled answers do not count);
+2. classify service or complaint: that Case check signed, and the Case escalated to (or attached to) a complaint;
+3. triage: the triage record is complete;
+4. the decision tree: an assessment of the complaint's own market is saved (a draft or signed);
+5. sign the conclusion: that market's conclusion is signed;
+6. prepare the report: the authority report exists and the person opened it (skipped when not reportable);
+7. complete and approve: the report is approved (every field filled, then a second person);
+8. record the submission: the submission is recorded (MDARIX never submits);
 9. records: the person opened Records once the submission (or the "not reportable" conclusion) is recorded;
 10. trends: the person opened Trends.
 
-The story is the team's, as the record is (0.10.84, M6): every colleague reads the same step. The marks (steps 1, 5, 9
+Later work on the complaint (a triage, an assessment, a report) means steps 1 and 2 were taken, so progress never goes
+backwards on a trial running before 0.10.93. The story's Case: on the sample, the Case that became or joined RV-11, else
+SAMPLE-CASE-11; on your data, the Case linked to the complaint, else steps 1 and 2 are "Classified in your QMS". Branches
+at step 2: a Case signed service only, inquiry or not a complaint skips steps 3 to 8 ("Not needed: not a complaint")
+and adds the QA review; a pending Case keeps step 2 open, waiting for the reporter.
+
+The story is the team's, as the record is (0.10.84, M6): every colleague reads the same step. The marks (steps 6, 9
 and 10) are kept on the trial's request (``profile["one_story"]``, keyed by the person who opened the step and the run,
 tied to the complaint's id so "Restart the sample story" starts them again), and a step any colleague opened counts for
-everyone, from the earliest time it was opened. A step the
-complaint cannot take yet because the import lacks a fact says so (``needs``); the ask itself stays on the step's own
-screen (the complaint page, 0.10.81).
+everyone, from the earliest time it was opened. The mark "call" of earlier releases is ignored (steps 1 and 2 read the
+records). A step the complaint cannot take yet because the import lacks a fact says so (``needs``); the ask itself
+stays on the step's own screen (the complaint page, 0.10.81).
 """
 
 from __future__ import annotations
@@ -34,19 +42,19 @@ from backend.app.db.models.foundation import Complaint
 PROFILE_KEY = "one_story"
 RUNS = ("sample", "yours")
 STEPS = (
-    # The owner's names for the ten steps (4 Nov 2026), shown as a vertical list on Getting started.
-    ("call", "Review the call"),
+    # Part 1's ten steps (B2 spec 4.8), shown as a vertical list on Getting started.
+    ("case", "Review the case"),
+    ("classify", "Classify service or complaint"),
     ("triage", "Triage"),
     ("tree", "Assess reportability"),
-    ("reportable", "Sign conclusion"),
-    ("form", "Prepare report"),
-    ("fill", "Complete details"),
-    ("approval", "Approve report"),
-    ("submit", "Record submission"),
+    ("reportable", "Sign the conclusion"),
+    ("form", "Prepare the report"),
+    ("approval", "Complete and approve"),
+    ("submit", "Record the submission"),
     ("records", "Review records"),
     ("trends", "Explore trends"),
 )
-MARKS = ("call", "form", "records", "trends")
+MARKS = ("form", "records", "trends")
 MARK_STEP = {key: index for index, (key, _) in enumerate(STEPS) if key in MARKS}
 # The report's status path (authority_reports/rules.py STAGES), in order: where steps 6 to 8 are done.
 REPORT_PATH = ("CREATED", "COMPLETE", "APPROVAL", "APPROVED", "SUBMITTED", "ACKNOWLEDGED")
@@ -169,33 +177,96 @@ def record_mark(request, user_id: str, run: str, complaint_id, step: str, now: d
     request.profile = profile
 
 
+NOT_NEEDED = {
+    "case": "Classified in your QMS",
+    "complaint": "Not needed: not a complaint",
+    "triage": "Not needed: not flagged for triage",
+    "reportable": "Not needed: not reportable",
+}
+WAITING = "Waiting for the reporter"
+# The branch card shown when the Case was signed service only, inquiry or not a complaint (spec 4.8).
+QA_REVIEW = {
+    "key": "qa_review",
+    "label": "QA review",
+    "who": "Quality Leader",
+    "evidence": "The signed review",
+    "why": "A service-only case skips reporting. A second person reviews it: hidden complaints are the most cited "
+    "intake failure.",
+}
+
+
+def not_a_complaint(case: dict | None) -> bool:
+    from backend.app.intake import case_rules
+
+    return case is not None and case.get("classification") in case_rules.REVIEWED_OUTCOMES
+
+
 def steps_done(
-    marks: dict, triaged: bool, versions: list, report_stage: str | None, *, triage_needed: bool = True
+    marks: dict,
+    triaged: bool,
+    versions: list,
+    report_stage: str | None,
+    *,
+    triage_needed: bool = True,
+    case: dict | None = None,
 ) -> list:
-    """Per step: True (done), False, or "skip" (not needed: the triage of a complaint not flagged for it, the report's
-    steps after a signed "not reportable" conclusion). Pure, so its rules are tested apart from the records."""
+    """Per step: True (done), False, or "skip" (not needed: steps 1-2 of a complaint with no Case, steps 3-8 of a Case
+    signed not a complaint, the triage of a complaint not flagged for it, the report's steps after a signed "not
+    reportable" conclusion). ``case``: the story's Case, ``{"answered", "classification", "escalated"}`` (None: no
+    Case). Pure, so its rules are tested apart from the records."""
     from backend.app.reportability.markets import NOT_REPORTABLE
 
     signed = next((v for v in reversed(versions) if v.signed_at is not None and v.superseded_by is None), None)
     not_reportable = signed is not None and signed.conclusion == NOT_REPORTABLE
     at = REPORT_PATH.index(report_stage) if report_stage in REPORT_PATH else -1
+    # A step the record shows done says the steps before it were taken (0.10.85): any later work on the complaint means
+    # its case was reviewed and classified; a report past "Created" means its form was opened.
+    later = triaged or bool(versions) or at >= 0
+    if case is None:
+        first = ["skip", "skip"]
+    else:
+        classified = case.get("classification") is not None
+        first = [
+            later or bool(case.get("answered")) or classified,
+            later or (classified and (bool(case.get("escalated")) or not_a_complaint(case))),
+        ]
+    if not_a_complaint(case):
+        return [*first, *["skip"] * 6, bool(marks.get("records")), bool(marks.get("trends"))]
     skip = "skip" if not_reportable else None
     submitted = not_reportable or at >= 4
-    # A step the record shows done says the person's own steps before it were taken (0.10.85): any later work on the
-    # complaint means its call was read; a report past "Created" means its form was opened.
     return [
-        bool(marks.get("call")) or triaged or bool(versions) or at >= 0,
+        *first,
         # A complaint not on the triage list has no triage form (its page reads "Triage: not needed", 0.10.88).
         "skip" if not triaged and not triage_needed else triaged,
         bool(versions),
         signed is not None,
         skip or (at >= 0 and (bool(marks.get("form")) or at >= 1)),
-        skip or at >= 1,
         skip or at >= 3,
         skip or at >= 4,
         bool(marks.get("records")) and submitted,
         bool(marks.get("trends")),
     ]
+
+
+def step_notes(done: list, case: dict | None, waiting: str | None) -> list:
+    """What each step says besides done or not: why it is not needed, or what an open step 2 waits for."""
+    notes = []
+    for index, value in enumerate(done):
+        if value == "skip":
+            notes.append(
+                NOT_NEEDED[
+                    "case"
+                    if index < 2
+                    else "complaint"
+                    if not_a_complaint(case)
+                    else "triage"
+                    if index == 2
+                    else "reportable"
+                ]
+            )
+        else:
+            notes.append(waiting if index == 1 and value is False else None)
+    return notes
 
 
 def in_order(done: list) -> tuple[list, list[bool]]:
@@ -244,8 +315,12 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
     )
     stage = _list_paths(data, control_db, ctx, tenant_id, [report])[report.id]["stage"] if report else None
     marks = team_marks(request, run, complaint.id)
-    done, earlier = in_order(steps_done(marks, triaged, versions, stage, triage_needed=triage_needed))
+    event = story_case(data, tenant_id, complaint, run)
+    case = case_facts(data, control_db, tenant_id, event) if event is not None else None
+    raw = steps_done(marks, triaged, versions, stage, triage_needed=triage_needed, case=case)
+    done, earlier = in_order(raw)
     current = next((index for index, value in enumerate(done) if value is False), len(done))
+    notes = step_notes(raw, case, case.get("waiting") if case else None)
     signed = next((v for v in reversed(versions) if v.signed_at is not None and v.superseded_by is None), None)
     return {
         "run": run,
@@ -268,14 +343,136 @@ def run_progress(data: Session, control_db: Session, ctx, tenant_id, request, ru
         "report_stage": stage,
         # The facts the import did not give; each is asked on the complaint page, where the step needs it.
         "needs": facts.of_complaint(complaint, reporting_service._record(complaint, None, None)),
+        # The story's Case (steps 1 and 2 open its Case check), or None: "Classified in your QMS".
+        "case": {key: case[key] for key in ("id", "ref", "classification", "state")} if case else None,
+        # The QA review of a Case signed service only, inquiry or not a complaint (spec 4.8's branch card).
+        "branch": {**QA_REVIEW, "done": bool(case.get("reviewed"))} if not_a_complaint(case) else None,
         "steps": [
-            {"key": key, "label": label, "done": value is True, "skipped": value == "skip", "earlier": early}
-            for (key, label), value, early in zip(STEPS, done, earlier)
+            {
+                "key": key,
+                "label": label,
+                "done": value is True,
+                "skipped": value == "skip",
+                "earlier": early,
+                "note": note,
+            }
+            for (key, label), value, early, note in zip(STEPS, done, earlier, notes)
         ],
         "current": current,
         "finished": current == len(STEPS),
     }
 
 
+def story_case(data: Session, tenant_id, complaint: Complaint, run: str):
+    """The story's Case: the one that became or joined the complaint, else one a person linked to it; on the sample,
+    else SAMPLE-CASE-11 (not yet attached)."""
+    from backend.app.db.models.intake import IntakeEvent
+    from backend.app.intake import service
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
+    from backend.app.trial.sample_intake import STORY_CASE
+
+    found = (
+        data.query(IntakeEvent)
+        .filter(IntakeEvent.tenant_id == tenant_id, IntakeEvent.complaint_id == complaint.id)
+        .order_by(IntakeEvent.created_at)
+        .first()
+    )
+    if found is not None:
+        return found
+    for link in service.links_of(data, tenant_id):
+        if link.state != "LINKED" or complaint.id not in (link.left_id, link.right_id):
+            continue
+        kind, other = (
+            (link.left_kind, link.left_id) if link.right_id == complaint.id else (link.right_kind, link.right_id)
+        )
+        if kind == service.INTAKE:
+            event = data.get(IntakeEvent, other)
+            if event is not None and event.tenant_id == tenant_id:
+                return event
+    if run != "sample":
+        return None
+    return (
+        data.query(IntakeEvent)
+        .filter(
+            IntakeEvent.tenant_id == tenant_id,
+            IntakeEvent.reference == STORY_CASE,
+            IntakeEvent.source_system == SAMPLE_SOURCE,
+        )
+        .first()
+    )
+
+
+def case_facts(data: Session, control_db: Session, tenant_id, event) -> dict:
+    """What steps 1 and 2 read from the Case: every question answered and saved by a person (the sample's pre-filled
+    answers count only once someone saved them), the signed classification, the escalation, the QA review, and what a
+    pending Case waits for."""
+    from backend.app.intake import case_rules, rules, service
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
+
+    versions = service.checks_of(data, tenant_id, [event.id]).get(event.id, [])
+    latest = versions[-1] if versions else None
+    signed = service.current_signed(versions)
+    answered = (
+        latest is not None
+        and not case_rules.unanswered(latest.answers or {})
+        and (latest.source_system != SAMPLE_SOURCE or bool(latest.history))
+    )
+    waiting = None
+    if signed is not None and signed.classification in rules.PENDING_OUTCOMES:
+        task = service.open_task(service.tasks_of(data, tenant_id, [event.id]).get(event.id, []), service.FOLLOW_UP)
+        owner = task.assigned_user_id if task is not None else None
+        name = service.names_of(control_db, tenant_id, [str(owner)]).get(str(owner)) if owner else None
+        due = rules.utc(task.due_at) if task is not None and task.due_at else None
+        waiting = " · ".join([WAITING, name or "No owner yet", f"due {due.day} {due:%b %Y}" if due else "no due date"])
+    return {
+        "id": str(event.id),
+        "ref": event.reference,
+        "state": event.status,
+        "answered": answered,
+        "classification": signed.classification if signed is not None else None,
+        "escalated": event.complaint_id is not None,
+        "reviewed": signed is not None and signed.review_outcome is not None,
+        "waiting": waiting,
+    }
+
+
+def more_cases(data: Session, tenant_id, sample: dict | None) -> list[dict]:
+    """More cases to try (spec 4.8): the sample's other calls, each with its outcome as its record says; and
+    SAMPLE-CASE-11 too while the sample story is not on it (a trial running before 0.10.93 got past steps 1 and 2)."""
+    from backend.app.db.models.intake import IntakeEvent
+    from backend.app.intake import case_rules, rules, service
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
+    from backend.app.trial.sample_intake import MORE_CASES, STORY_CASE
+
+    refs = list(MORE_CASES)
+    if sample and ((sample.get("case") or {}).get("ref") != STORY_CASE or sample["steps"][1]["done"]):
+        refs.append(STORY_CASE)
+    events = {
+        row.reference: row
+        for row in data.query(IntakeEvent).filter(
+            IntakeEvent.tenant_id == tenant_id,
+            IntakeEvent.source_system == SAMPLE_SOURCE,
+            IntakeEvent.reference.in_(refs),
+        )
+    }
+    checks = service.checks_of(data, tenant_id, [row.id for row in events.values()])
+    found = []
+    for ref in refs:
+        event = events.get(ref)
+        if event is None or (ref == STORY_CASE and event.complaint_id is not None):
+            continue
+        versions = checks.get(event.id, [])
+        signed = service.current_signed(versions)
+        outcome = signed.classification if signed else versions[-1].suggestion if versions else None
+        label = (
+            "Urgent: a complaint by definition"
+            if event.kind == "URGENT"
+            else case_rules.OUTCOME_LABELS.get(outcome or "", rules.OUTCOME_LABELS.get(outcome or "", "To check"))
+        )
+        found.append({"id": str(event.id), "ref": ref, "label": label, "signed": signed is not None})
+    return found
+
+
 def progress(data: Session, control_db: Session, ctx, tenant_id, request) -> dict:
-    return {run: run_progress(data, control_db, ctx, tenant_id, request, run) for run in RUNS}
+    runs = {run: run_progress(data, control_db, ctx, tenant_id, request, run) for run in RUNS}
+    return {**runs, "more_cases": more_cases(data, tenant_id, runs["sample"])}

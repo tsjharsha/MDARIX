@@ -1294,13 +1294,15 @@ function SignForm({
   onSigned: () => void;
 }) {
   const likely = item.likely_complaints ?? [];
+  const sameDay = likely.filter((candidate) => candidate.same_day);
   const [form, setForm] = useState({
     classification: (item.suggestion ?? "") as Outcome | "",
     override: "",
     reason: "",
     ticket: item.service_ticket ?? "",
-    // Spec 3.3 step 2: one strong match is pre-selected "Attach to …"; otherwise the signer chooses.
-    attach: likely.length === 1 ? likely[0].id : "",
+    // Spec 3.3 step 2: one strong match (the only one, or the only one on the case's event day) is pre-selected
+    // "Attach to …"; otherwise the signer chooses.
+    attach: likely.length === 1 ? likely[0].id : sameDay.length === 1 ? sameDay[0].id : "",
     password: "",
     code: "",
   });
