@@ -71,7 +71,7 @@ def body_text(message: EmailMessage) -> str:
         text = part.get_content()
     except (LookupError, ValueError):
         text = (part.get_payload(decode=True) or b"").decode("utf-8", "replace")
-    text = text[:MAX_TEXT_BYTES]
+    text = text[:MAX_TEXT_BYTES].replace("\r\n", "\n")
     if part.get_content_type() == "text/html":
         text = re.sub(r"(?is)<(script|style)\b.*?</\1>", " ", text)
         text = re.sub(r"(?i)<br\s*/?>|</p>|</div>", "\n", text)

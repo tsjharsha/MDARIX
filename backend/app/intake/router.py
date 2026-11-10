@@ -174,6 +174,8 @@ class IntakeIn(BaseModel):
     patients: str = Field(default="", max_length=12)
     harm_text: str = Field(default="", max_length=rules.TEXT_MAX)
     troubleshooting: str = Field(default="", max_length=rules.TEXT_MAX)
+    # B7b "Make it a case": the e-mail it comes from (channel, reference and Received are then the message's own).
+    inbound_message_id: uuid.UUID | None = None
 
 
 class CheckIn(BaseModel):
@@ -915,6 +917,17 @@ def log_intake(
     product_text = None if product is not None else (rules.clean(payload.product_text, 200) or None)
     zone = _zone(payload.received_zone)
     received = _at(payload.received_at, zone) or now
+    message = None
+    if payload.inbound_message_id is not None:
+        from backend.app import mail_in
+        from backend.app.mail_in.router import open_message
+
+        if not mail_in.enabled() or kind != "CONTACT":
+            raise _error(404, "EMAIL_INTAKE_OFF", "E-mail intake is switched off")
+        message = open_message(db, tenant_id, payload.inbound_message_id)
+        # Received is our server's receipt of the e-mail, never the time of the click (spec 4.4 step 6).
+        received = message.received_at
+        payload.channel, payload.channel_ref = "EMAIL", message.message_id[:200]
     if received > now + _SKEW:
         raise _error(422, "TIME_IN_FUTURE", "The contact cannot be received in the future")
     first_at = _at(payload.first_knowledge_at, _zone(payload.first_knowledge_zone, zone))
@@ -996,6 +1009,10 @@ def log_intake(
     )
     db.add(event)
     db.flush()
+    if message is not None:
+        from backend.app.mail_in.router import to_case
+
+        to_case(db, message, event.id, "MADE_CASE", ctx.user_id, now)
     answers = case_rules.clean_answers({key: value.model_dump() for key, value in payload.answers.items()})
     suggestion = case_rules.case_outcome(answers, requested) if kind == "CONTACT" else None
     if kind == "CONTACT":
@@ -1060,6 +1077,7 @@ def log_intake(
                 "awareness_at": service._iso(awareness),
                 "issue_category": event.issue_category,
                 "identifiers": event.identifiers,
+                **({"from_email": str(message.id)} if message is not None else {}),
             },
             created_at=now,
         )

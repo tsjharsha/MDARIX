@@ -13,6 +13,7 @@ import { FIRST_CONTACT_WHY } from "../whyAsked";
 import { Hero, InlineError } from "./boardParts";
 import { EscalateButton } from "./Triage";
 import { CaseHeaderView, CasesList } from "./CasesList";
+import { EmailToCheck, type EmailItem } from "./EmailToCheck";
 import {
   INTAKE,
   REASON_MIN,
@@ -71,6 +72,8 @@ export function FirstContact({
   startLogging?: "CONTACT" | "URGENT" | null;
 }) {
   const [logging, setLogging] = useState<"CONTACT" | "URGENT" | null>(startLogging);
+  // B7b: "Make it a case" opens Log a case pre-filled from the e-mail.
+  const [fromEmail, setFromEmail] = useState<EmailItem | null>(null);
   // The Case whose check is open is part of the address (First contact?check=<id>).
   const [open, setOpen] = useTabParam("check");
   // A save in a drawer reads the list again (the Cases list pages on the server, A5).
@@ -104,6 +107,14 @@ export function FirstContact({
           </div>
         )}
       </Hero>
+      <EmailToCheck
+        reloadKey={reloadKey}
+        onChanged={reload}
+        onMakeCase={(item) => {
+          setFromEmail(item);
+          setLogging("CONTACT");
+        }}
+      />
       <CasesList onOpen={setOpen} reloadKey={reloadKey} />
       {guide.data && (
         <p className="uw-ma-starter" role="note">
@@ -115,9 +126,14 @@ export function FirstContact({
         <LogDrawer
           kind={logging}
           guide={guide.data}
-          onClose={() => setLogging(null)}
+          email={fromEmail}
+          onClose={() => {
+            setLogging(null);
+            setFromEmail(null);
+          }}
           onLogged={(id) => {
             setLogging(null);
+            setFromEmail(null);
             reload();
             setOpen(id);
           }}
@@ -308,11 +324,14 @@ export function ShippedPicker({ site, onPick }: { site: string; onPick: (item: S
 function LogDrawer({
   kind: startKind,
   guide,
+  email = null,
   onClose,
   onLogged,
 }: {
   kind: "CONTACT" | "URGENT";
   guide: Guide;
+  /** B7b: the e-mail this Case is made from: its words, identifiers, channel and receipt time. */
+  email?: EmailItem | null;
   onClose: () => void;
   onLogged: (id: string) => void;
 }) {
@@ -321,15 +340,15 @@ function LogDrawer({
   const [requestKey] = useState(() => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`);
   const [form, setForm] = useState<LogForm>({
     kind: startKind,
-    words: "",
+    words: email?.words ?? "",
     reporterType: "",
     site: "",
     country: "",
     product: "",
     productText: "",
     lot: "",
-    serial: "",
-    udi: "",
+    serial: email?.identifiers.serial?.text ?? "",
+    udi: email?.identifiers.udi?.text ?? "",
     software: "",
     hardware: "",
     firmware: "",
@@ -339,7 +358,7 @@ function LogDrawer({
     ticket: "",
     environment: "UNKNOWN",
     userType: "UNKNOWN",
-    received: zonedInput(new Date(), startingZone(guide, ZONE)),
+    received: zonedInput(email ? new Date(email.received_at) : new Date(), startingZone(guide, ZONE)),
     event: "",
     firstKnowledge: "",
     party: "",
@@ -349,8 +368,8 @@ function LogDrawer({
     receivedTyped: false,
     answers: blankAnswers(guide.questions),
     unknowns: "",
-    channel: "",
-    channelRef: "",
+    channel: email ? "EMAIL" : "",
+    channelRef: email?.message_id ?? "",
     patients: "",
     harmText: "",
     tried: "",
@@ -417,6 +436,8 @@ function LogDrawer({
         harm_text: form.harmText,
         troubleshooting: form.tried,
         request_key: requestKey,
+        // B7b: the server takes channel, reference and Received from the e-mail itself.
+        inbound_message_id: email?.id ?? null,
       });
       onLogged(saved.id);
     } catch (reason) {
@@ -434,6 +455,12 @@ function LogDrawer({
           if (!problem) void submit();
         }}
       >
+        {email && (
+          <p className="uw-ma-starter" role="note">
+            From an e-mail received {formatDate(email.received_at)}: channel E-mail, its Message-ID as the reference,
+            and Received is our server's receipt time. Product, lot, serial and UDI found in it are unconfirmed.
+          </p>
+        )}
         <div className="uw-entry-actions" role="radiogroup" aria-label="Kind of case">
           {(
             [

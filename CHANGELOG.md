@@ -25,6 +25,28 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   addenda accept the kinds `TRANSLATION` and `EMAIL`; a Case import's key is unique per organization. Legacy
   organization databases get the same from `scripts/add_workflow_tables_to_legacy_planes.py` (step `tr25`).
 
+### Added (B7b e-mail intake, switched off by default)
+
+- E-mail intake is OFF unless `MDARIX_EMAIL_INTAKE=on` (operations first opens inbound port 25, adds the MX record for
+  the intake subdomain and a STARTTLS certificate). Off: the receiver does not listen, `/api/v1/email-intake/*`
+  answers 404 and no screen shows. New dependency `aiosmtpd` 1.4.6 (with `atpublic`, `attrs`), pip-audit clean.
+- The `mail-in` receiver (`backend/app/mail_in/receiver.py`; compose service `mail-in` under the `mail-in` profile):
+  known intake addresses only (550 otherwise, no relay, no bounce), 25 MB, opportunistic STARTTLS, 451 over 30
+  messages an hour per sending IP or the organization's daily limit (200), an optional sender-domain allowlist. The
+  raw message is stored encrypted under the organization; the same Message-ID is kept once. It never sends mail.
+- Processing on the outbox (`INBOUND_MAIL_RECEIVED`): auto-replies and bounces to "Not a case"; every attachment
+  through the evidence checks and the virus scan (an infected file is never stored and is stripped from the raw
+  message); replies offered as "Add to <Case>"; the same words within 7 days flagged; the words masked, quotes and
+  signature cut; product, lot, serial and UDI unconfirmed, source E-mail; harm, fault and non-English flags; an
+  earlier forwarded date offered as first knowledge. Death or injury words raise the in-app alert at once and the
+  urgent e-mail when switched on.
+- Cases › First contact shows "E-mail to check" (flat cards): Make it a case (Log a case pre-filled; channel E-mail,
+  the Message-ID as reference, Received = our server's receipt), Add to the Case, Not a case with a reason (on harm
+  or fault words only a quality reviewer), the original message for the contact roles (audited). "Not a case" is
+  purged 30 days after the decision on the 15-minute pass. A free trial gets one SAMPLE e-mail, no real address.
+- Address API for the Customer Admin (`GET`/`PUT /api/v1/email-intake/settings`, `POST .../settings/rotate`: the old
+  address works 30 days). No screen yet.
+
 ### Added
 
 - Resolve and close (`GET`/`POST /api/v1/complaints/{id}/resolve-and-close`): a routine complaint's resolution,

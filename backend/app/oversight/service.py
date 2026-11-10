@@ -477,7 +477,7 @@ def _mail_items(db: Session, tenant_id, calendar: rules.Calendar) -> list[dict]:
                 ("Urgent: an e-mail with death or injury words" if harm else "Check a received e-mail")
                 + ": make it a case, add it to one, or mark it not a case",
                 row.received_at if harm else calendar.working_day_end(row.received_at, 0),
-                ref="E-mail to check",
+                ref="SAMPLE-EMAIL" if row.message_id.startswith("<SAMPLE-") else "E-mail to check",
                 queue="Service Desk",
                 opens=links.target("Complaints", "First contact"),
             )
@@ -793,6 +793,10 @@ def run_for_all_tenants(control_db: Session) -> dict:
                     totals["contacts_erased"] = totals.get("contacts_erased", 0) + intake.erase_expired_contacts(
                         data, tenant_id, now_utc()
                     )
+                    # B7-D11: "Not a case" e-mails are purged 30 days after the decision, on the same pass.
+                    from backend.app.mail_in.router import purge_expired
+
+                    totals["emails_purged"] = totals.get("emails_purged", 0) + purge_expired(data, tenant_id, now_utc())
                     data.commit()
                 except Exception:
                     data.rollback()

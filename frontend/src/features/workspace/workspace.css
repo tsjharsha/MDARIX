@@ -8833,3 +8833,51 @@ details.uw-team-change[open] {
 .uw-os-differ > p {
   margin: 0 0 4px;
 }
+
+/* B7b "E-mail to check": flat cards (G-2), one decision per card. */
+.uw-email-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.uw-email-card {
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  padding: 12px 14px;
+  display: grid;
+  gap: 8px;
+}
+.uw-email-card header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.uw-email-meta,
+.uw-email-refused {
+  color: var(--ms-muted);
+  margin: 0;
+}
+.uw-email-words {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.uw-email-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.uw-email-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.uw-email-close {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}

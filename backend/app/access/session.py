@@ -33,6 +33,7 @@ from backend.app.access.permissions import normalize_role, permissions_for_roles
 from backend.app.cell_link import licence_state
 from backend.app.deployment_role import deployment_role
 from backend.app.feature_set import for_tenant
+from backend.app import mail_in
 from backend.app.role_codes import role_label
 from backend.app.runtime_env import environment
 
@@ -294,6 +295,8 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         # full or mvp (backend/app/feature_set.py): under mvp the interface hides the parked areas; a free trial
         # always shows the MVP.
         "feature_set": for_tenant(db, user.tenant_id),
+        # B7b: "E-mail to check" shows only while e-mail intake is switched on (MDARIX_EMAIL_INTAKE).
+        "email_intake": mail_in.enabled(),
         # classic or new (tenants.navigation, set in Tenant 360): the workspace's navigation; nothing shows it yet.
         "navigation": (tenant.navigation if tenant is not None else None) or "classic",
         # An evaluation on the sample only (tenants.sample_only, 0.10.71): the screens hide every upload and import

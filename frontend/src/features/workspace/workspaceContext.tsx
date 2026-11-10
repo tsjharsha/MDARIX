@@ -127,6 +127,8 @@ export type SessionContext = {
   license?: { state?: string; effective?: boolean };
   /** full or mvp (backend/app/feature_set.py): under mvp the parked tabs and screens are hidden (featureSet.ts). */
   feature_set?: string;
+  /** B7b: whether e-mail intake is switched on (MDARIX_EMAIL_INTAKE); off, "E-mail to check" is not shown. */
+  email_intake?: boolean;
   /** classic or new (tenants.navigation, 0.10.67): the organization's menu (app/linkTable.ts). */
   navigation?: string;
   /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
@@ -377,6 +379,11 @@ export function useIsTrial(): boolean {
 export function useFeatureSet(): FeatureSet {
   const value = useContext(WorkspaceContext);
   return featureSetOf(value?.session?.feature_set);
+}
+
+/** B7b: "E-mail to check" shows only while the server has e-mail intake switched on. */
+export function useEmailIntake(): boolean {
+  return !!useContext(WorkspaceContext)?.session?.email_intake;
 }
 
 export type BusinessPermission =
