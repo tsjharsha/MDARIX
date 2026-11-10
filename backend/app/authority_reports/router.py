@@ -1388,7 +1388,15 @@ def snapshot_material(obligation, complaint: str, conclusion_id, sections: list[
 
 
 def request_snapshot(
-    db, control_db, obligation: ReportObligation, actor: str, now: datetime, source_system=None, *, strict=False
+    db,
+    control_db,
+    obligation: ReportObligation,
+    actor: str,
+    now: datetime,
+    source_system=None,
+    *,
+    strict=False,
+    parties=None,
 ):
     """Freeze the worksheet as the next snapshot, pending approval (shared with the sample). ``strict``: a US report
     whose eMDR file FDA would refuse is refused (Send for approval, 0.10.96)."""
@@ -1396,6 +1404,8 @@ def request_snapshot(
 
     context = _context(db, control_db, obligation)
     current = _conclusion(context, obligation.market)
+    if parties is not None:  # the trial sample's own US manufacturer, never stored (0.10.96, A9)
+        context["parties"] = parties
     context["sent_day"] = _org_day(db, obligation.tenant_id, now).isoformat()  # B4 (0.10.96, Q3)
     names = _names(control_db, obligation.tenant_id, _preparers(obligation))
     frozen_file: dict = {}

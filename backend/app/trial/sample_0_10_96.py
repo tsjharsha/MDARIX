@@ -1,11 +1,11 @@
 """Release 0.10.96's sample correction for trials made before it (scripts/refresh_trial_story.py), idempotent.
 
 SAMPLE-RV-09's US report becomes FDA-valid, as a new trial's is (sample_reports.py): a practice report number, the
-IMDRF codes with their FDA codes, the sample's US manufacturer with its e-mail (there only while the report is frozen),
+IMDRF codes with their FDA codes, the sample's US manufacturer with its e-mail (held in memory, never stored),
 and B4 and G8 as Send for approval fills them. Its approved snapshot is frozen again at the same moment, now with its
 eMDR file (XML, eSubmitter-layout PDF, official form), and the sample approver's record is re-recorded on the new
 fingerprint, as 0.10.72 did for the sample guide. A report that still cannot carry a file (the IMDRF release or FDA's
-mapping not loaded, or the organization's own US party set) is left exactly as it was. The caller commits.
+mapping not loaded) is left exactly as it was. The caller commits.
 """
 
 from __future__ import annotations

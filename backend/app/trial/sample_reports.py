@@ -95,9 +95,9 @@ US_CODES = {
     "H6_FINDINGS": "C1202",
     "H6_CONCLUSIONS": "D0101",
 }
-# The US manufacturer the eMDR file names (G1 contact office, D3), with the e-mail FDA requires. It exists only while
-# the sample's report is frozen (the file and its party parts stay in the approved snapshot), so the organization's own
-# US responsible party, and the trial's "give the contact office's e-mail" step, stay the person's own.
+# The US manufacturer the eMDR file names (G1 contact office, D3), with the e-mail FDA requires. It is never stored:
+# the sample's report is frozen with it (the file and its party parts stay in the approved snapshot), so the
+# organization's own US responsible party, and the trial's "give the contact office's e-mail" step, stay its own.
 US_PARTY = {
     "market": "US",
     "role": "MANUFACTURER",
@@ -365,14 +365,6 @@ def _entries(values: dict, author_id: str, at: datetime) -> dict:
     }
 
 
-# The sample's G1 and D3 as typed before 0.10.96: used when the organization has its own US responsible party, which
-# the sample never reads (its report then keeps no eMDR file; its PDF is the filled official form).
-US_TYPED_PARTY = {
-    "D3": "Orbit Medical Devices (Sample), Springfield, US",
-    "G1": "Orbit Medical Devices (Sample), 1 Sample Way, Springfield, US; vigilance office (sample)",
-}
-
-
 def _coded(db, control_db, obligation, author_id: str, at: datetime) -> dict:
     """The US example's IMDRF codes as the code picker writes them (term and FDA code); none without the release."""
     from fastapi import HTTPException
@@ -395,27 +387,13 @@ def _coded(db, control_db, obligation, author_id: str, at: datetime) -> dict:
 
 
 def _freeze_us(db, control_db, obligation, author_id: str, at: datetime):
-    """Freeze the US example for approval, its eMDR file built from the sample's US manufacturer (``US_PARTY``),
-    which is there only for this; the organization's own party, when it has one, is never read or changed."""
+    """Freeze the US example for approval, its G1, D3 and eMDR file from the sample's US manufacturer (``US_PARTY``),
+    held in memory only: it is never stored, and the organization's own US party is never read or changed."""
     from backend.app.authority_reports import router
     from backend.app.db.models.regulatory_reference import MarketResponsibleParty
 
-    own = (
-        db.query(MarketResponsibleParty.id)
-        .filter(MarketResponsibleParty.tenant_id == obligation.tenant_id, MarketResponsibleParty.market == "US")
-        .first()
-    )
-    if own is not None:
-        obligation.entries = {**(obligation.entries or {}), **_entries(US_TYPED_PARTY, author_id, at)}
-        return router.request_snapshot(db, control_db, obligation, author_id, at, SAMPLE_SOURCE)
-    party = MarketResponsibleParty(tenant_id=obligation.tenant_id, created_at=at, updated_at=at, **US_PARTY)
-    db.add(party)
-    db.flush()
-    try:
-        return router.request_snapshot(db, control_db, obligation, author_id, at, SAMPLE_SOURCE)
-    finally:
-        db.delete(party)
-        db.flush()
+    party = MarketResponsibleParty(id=uuid.uuid4(), tenant_id=obligation.tenant_id, **US_PARTY)
+    return router.request_snapshot(db, control_db, obligation, author_id, at, SAMPLE_SOURCE, parties=[party])
 
 
 def stage_sample_reports(

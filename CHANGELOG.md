@@ -64,7 +64,7 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
 - The trial's finished US example (SAMPLE-RV-09) is FDA-valid (A9), so its PDF, eMDR XML and official form download
   from its approved snapshot: a practice report number (0000000-year-70001), real IMDRF codes with their FDA codes in
   the seven H6 kinds, FDA product code DQA (Oximeter), and G1 and D3 from a sample US manufacturer with an e-mail that
-  exists only while the report is frozen (the organization's own US party is never read or changed). The sample's
+  is held in memory, never stored (the organization's own US party is never read or changed). The sample's
   number is never the organization's first: the person still types their own once. Running trials get it once from
   `scripts/refresh_trial_story.py` (`backend/app/trial/sample_0_10_96.py`: the approved snapshot frozen again at the
   same moment and the sample approver's record re-recorded on the new fingerprint; left as it was where no file can
