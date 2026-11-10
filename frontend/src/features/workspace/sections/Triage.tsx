@@ -461,7 +461,9 @@ function TriageDrawer({
                         ? deadline.basis
                         : deadline.role === "SIGNED"
                           ? `${deadline.basis}, signed`
-                          : `${deadline.tier_label}: ${deadline.basis}`}
+                          : deadline.earliest_note
+                            ? `Earliest possible: ${deadline.earliest_note} (${deadline.basis})`
+                            : `${deadline.tier_label}: ${deadline.basis}`}
                     </td>
                     <td>
                       <span className={`uw-clock tone-${clockTone(deadline.state ?? "")}`}>

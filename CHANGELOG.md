@@ -91,6 +91,10 @@ trials' existing Cases; nothing is written until the owner approves the list), t
 - While a market assessment is still pending, its deadline is the earlier of your organisation's window and the
   report a "reportable" signature would start (for example the US 5-work-day report), so signing reportable later
   never lands on a date already past. The assessment, the watch, the report and the alerts show the same date.
+- Until triage answers the question that decides a shorter report, the Case check's clock, the triage deadlines and
+  their alerts show the earliest possible regulatory date with a plain note: EU/NI and GB "2 days unless a public
+  health threat is ruled out", US "5 work days unless remedial action is ruled out", Canada "10 days unless death or
+  serious deterioration is ruled out". Once triage is completed, the date of its tier applies.
 - When a market conclusion is signed again with the same report type, the report's snapshots waiting for approval or
   approved on the old conclusion are replaced: the old text can no longer be submitted or approved by the new signer,
   and the report goes back to draft for a new snapshot. Recorded in the audit trail.

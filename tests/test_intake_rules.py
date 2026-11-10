@@ -127,7 +127,7 @@ def test_provisional_deadlines_by_tier():
 
 
 # Where the triage tier's date is later than the earliest clock the market rules give a pending assessment (code audit
-# 3: the starter windows and the report an unanswered draft would start). Reported to the owner, 10 Nov; not changed.
+# 3: the starter windows and the report an unanswered draft would start), once triage has answered the question.
 TRIAGE_LATER_THAN_MARKET_RULES = {
     ("US", "FLAGGED"),  # 30 calendar days; an unanswered question 6 keeps the 5-work-day report (803.53)
     ("US", "UNFLAGGED"),
@@ -137,36 +137,63 @@ TRIAGE_LATER_THAN_MARKET_RULES = {
     ("GB", "UNFLAGGED"),
     ("CA", "UNFLAGGED"),  # 30 days; an unanswered question 3 keeps the 10-day report
 }
+LEVELS = ((rules.THREAT, False), (rules.FLAGGED, False), (rules.FLAGGED, True), (rules.UNFLAGGED, False))
 
 
-def test_triage_tier_dates_against_the_earliest_market_clock():
-    """Check 3a (code audit 3 follow-up): for every market and tier, the triage tier's provisional date against the
-    clock a pending market assessment shows with no answer yet (the earlier of the starter windows and the report a
-    signed "reportable" would start). Never later, except the cases listed above."""
+def _pending_clock(market):
     from backend.app.reportability import markets
     from backend.app.reportability import rules as watch_rules
 
     windows = [watch_rules.clean_window(template) for template in watch_rules.TEMPLATES]
-    later, compared = set(), 0
+    if_reportable = markets.evaluate(market, {})["report_type_if_reportable"]
+    return markets.market_clock(market, markets.PENDING, None, windows, NOW, NOW, None, if_reportable)
+
+
+def test_triage_tier_dates_against_the_earliest_market_clock():
+    """Check 3a (owner, 10 Nov 2026: "earliest until answered"): while triage has not answered the question that
+    decides the shorter report, the triage date is never later than the clock a pending market assessment shows with
+    no answer yet, for every market and tier; a date earlier than the tier's carries the plain note."""
+    from backend.app.reportability import markets
+
+    compared = 0
     for market in markets.MARKETS:
-        if_reportable = markets.evaluate(market, {})["report_type_if_reportable"]
-        clock = markets.market_clock(market, markets.PENDING, None, windows, NOW, NOW, None, if_reportable)
-        for level, remedial in (
-            (rules.THREAT, False),
-            (rules.FLAGGED, False),
-            (rules.FLAGGED, True),
-            (rules.UNFLAGGED, False),
-        ):
-            triage = rules.provisional_deadlines(NOW, [market], level, NOW, remedial, own=market)[0]
+        clock = _pending_clock(market)
+        for level, remedial in LEVELS:
+            triage = rules.provisional_deadlines(NOW, [market], level, NOW, remedial, own=market, answered=False)[0]
+            tier = rules.provisional_deadlines(NOW, [market], level, NOW, remedial, own=market)[0]
             compared += 1
-            if triage["due_date"] > clock["due_date"]:
-                # Remedial action shortens only the US date (to the 5-work-day report): never later there.
-                assert not (remedial and market == markets.US), (market, level)
-                later.add((market, level))
+            assert triage["due_date"] <= clock["due_date"], (market, level, remedial)
+            assert (triage["earliest_note"] is not None) == (triage["due_at"] < tier["due_at"]), (market, level)
     assert compared == 4 * len(markets.MARKETS)
-    assert later == TRIAGE_LATER_THAN_MARKET_RULES
-    # The possible-threat tier is never later anywhere.
-    assert not {pair for pair in later if pair[1] == rules.THREAT}
+
+
+EARLIEST = {
+    "US": ("5 work days unless remedial action is ruled out", "2026-11-27"),
+    "EU_NI": ("2 days unless a public health threat is ruled out", "2026-11-22"),
+    "GB": ("2 days unless a public health threat is ruled out", "2026-11-21"),  # the awareness day is day 1 in GB
+    "CA": ("10 days unless death or serious deterioration is ruled out", "2026-11-30"),
+}
+
+
+@pytest.mark.parametrize("market", sorted(EARLIEST))
+def test_unanswered_shows_the_earliest_report_and_answered_the_tier_date(market):
+    """Check 3a, per market: an unflagged item before triage answers shows the earliest possible report with its note;
+    once triage answers it, the tier date applies (later than the market's pending clock, as pinned above)."""
+    note, due = EARLIEST[market]
+    pending = rules.provisional_deadlines(NOW, [market], rules.UNFLAGGED, NOW, own=market, answered=False)[0]
+    assert (pending["earliest_note"], pending["due_date"], pending["tier"]) == (note, due, rules.UNFLAGGED)
+    answered = rules.provisional_deadlines(NOW, [market], rules.UNFLAGGED, NOW, own=market, answered=True)[0]
+    assert answered["earliest_note"] is None and answered["due_date"] > due
+    assert answered["due_date"] > _pending_clock(market)["due_date"]
+    assert (market, rules.UNFLAGGED) in TRIAGE_LATER_THAN_MARKET_RULES
+    # A marked threat (the THREAT tier) is the earliest report already: no note.
+    threat = rules.provisional_deadlines(NOW, [market], rules.THREAT, NOW, own=market, answered=False)[0]
+    assert threat["earliest_note"] is None
+
+
+def test_india_has_no_earlier_report_to_show():
+    pending = rules.provisional_deadlines(NOW, ["IN"], rules.UNFLAGGED, NOW, own="IN", answered=False)[0]
+    assert pending["earliest_note"] is None and pending["days"] == 15
 
 
 def test_both_clocks_and_the_delay():

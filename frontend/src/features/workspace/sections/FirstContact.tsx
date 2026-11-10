@@ -803,9 +803,12 @@ const CORRECTABLE: readonly [string, string][] = [
 ];
 const labelOf = (list: readonly [string, string][], code: string) =>
   list.find(([value]) => value === code)?.[1] ?? code;
-/** The Case check's clock chip (spec 4.4, 5.2): "Provisional: US 30 days, due Mon 7 Dec 2026, 23:59 EST". */
+/** The Case check's clock chip (spec 4.4, 5.2): "Provisional: US 30 days, due Mon 7 Dec 2026, 23:59 EST"; until triage
+ * answers it, the earliest possible report with its note (check 3a). */
 export const clockChip = (clock: NonNullable<IntakeItem["clock"]>) =>
-  `Provisional: ${clock.market} ${clock.days} days${clock.due_label ? `, due ${clock.due_label}` : ""}`;
+  `Provisional: ${clock.market} ${
+    clock.earliest_note ?? `${clock.days} ${clock.day_basis === "WORK" ? "work days" : "days"}`
+  }${clock.due_label ? `, due ${clock.due_label}` : ""}`;
 
 /** The Case check drawer's body (spec 4.4), exported for its test. */
 export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide: Guide; onChanged: () => void }) {

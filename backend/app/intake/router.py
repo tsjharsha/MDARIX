@@ -464,7 +464,9 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
             case_rules.choices(suggestion, no_deficiency_confirmed=_no_deficiency(tasks)) if v2 and latest else None
         )
         open_case = event.status not in (case_rules.ESCALATED, case_rules.VOIDED)
-        found["clock"] = _case_clock(db, tenant_id, event, bool(flags), awareness["at"], now) if open_case else None
+        found["clock"] = (
+            _case_clock(db, tenant_id, event, bool(flags), awareness["at"], now, record) if open_case else None
+        )
         found["likely_complaints"] = (
             service.likely_complaints(db, tenant_id, event)
             if open_case and service.linked_complaint(db, tenant_id, event) is None
@@ -474,18 +476,21 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
     return found
 
 
-def _case_clock(db, tenant_id, event, flagged: bool, aware_at, now) -> dict | None:
+def _case_clock(db, tenant_id, event, flagged: bool, aware_at, now, record=None) -> dict | None:
     """The Case check's clock chip (spec 4.4, 5.2): the provisional clock of the Case's market from its awareness;
-    without a country, the shortest of the enabled markets."""
+    without a country, the shortest of the enabled markets. Until its triage is completed, the market's earliest
+    possible report (check 3a), as the triage list shows it."""
     from backend.app.reportability import deadlines
 
     found = rules.provisional_deadlines(
         aware_at,
         service.enabled_markets(db, tenant_id),
-        rules.tier(flagged, False),
+        rules.tier(flagged, bool(record and record.public_health_threat)),
         now,
+        bool(record and record.remedial_action),
         own=markets.market_of(event.country),
         org_zone=deadlines.org_zone(db, tenant_id),
+        answered=bool(record and record.completed_at),
     )
     # provisional_deadlines sorts the own market first, then the earliest due.
     return found[0] if found else None

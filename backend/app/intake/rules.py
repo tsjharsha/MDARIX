@@ -28,6 +28,7 @@ MDARIX never answers a question, never signs and never submits a report.
 
 from __future__ import annotations
 
+import functools
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -481,6 +482,26 @@ def tier(flagged: bool, threat: bool) -> str:
     return THREAT if threat else FLAGGED if flagged else UNFLAGGED
 
 
+# Check 3a (owner, 10 Nov 2026): until triage answers the question that decides the shorter report, a market's clock
+# is its earliest possible report: the market rules' own result with no answer yet (markets.evaluate), "unless" this.
+RULED_OUT = {
+    markets.US: "remedial action is ruled out",
+    markets.EU_NI: "a public health threat is ruled out",
+    markets.GB: "a public health threat is ruled out",
+    markets.CA: "death or serious deterioration is ruled out",
+}
+
+
+@functools.cache
+def earliest_report(market: str) -> markets.ReportType | None:
+    """The report the market's rules start when no question is answered yet (US 5 work days, EU/NI and GB 2 days,
+    Canada 10 days); None for a market without one (India: the tier date already is its only window)."""
+    if market not in RULED_OUT:
+        return None
+    kind = markets.REPORT_TYPES.get(markets.evaluate(market, {})["report_type_if_reportable"] or "")
+    return kind if kind and kind.days else None
+
+
 OWN, ALSO, SIGNED, NO_COUNTRY, NO_WINDOW = "OWN", "IF_ALSO", "SIGNED", "NO_COUNTRY", "OWN_NO_WINDOW"
 ROLE_LABELS = {
     OWN: "The event's market",
@@ -502,12 +523,15 @@ def provisional_deadlines(
     signed: dict | None = None,
     org_zone: str | None = None,
     ivd: bool = False,
+    answered: bool = True,
 ) -> list[dict]:
     """Each enabled market's deadline for triage (MVP 5.1b; J3), counted by the market's rule (reportability/deadlines.py):
     the event's own market (``own``, from its country) first; the other enabled markets after it, only "if also
     reportable"; a market with a signed conclusion (``signed``: market -> its clock, or None when concluded not
     reportable) shows that conclusion's deadline instead of the provisional one. ``ivd``: an in-vitro diagnostic,
-    whose EU clocks cite the IVDR (starter). ``today``: now (a day in older callers)."""
+    whose EU clocks cite the IVDR (starter). ``today``: now (a day in older callers). ``answered``: triage has
+    answered the threat, remedial and harm questions; until then each market shows its earliest possible report when
+    that is earlier than the tier's date, with ``earliest_note`` (check 3a)."""
     found = []
     signed = signed or {}
     listed = enabled or list(markets.MARKETS)
@@ -553,10 +577,17 @@ def provisional_deadlines(
         days, basis, label = PROVISIONAL[market][level]
         if market == markets.US and remedial and level == FLAGGED:
             days, basis, label = US_REMEDIAL
+        due = deadlines.count(utc(aware), days, basis, market, org_zone)
+        note, kind = None, None if answered else earliest_report(market)
+        if kind is not None:
+            sooner = deadlines.count(utc(aware), kind.days, kind.day_basis, market, org_zone)
+            if sooner.at < due.at:
+                days, basis, label, due = kind.days, kind.day_basis, kind.label, sooner
+                unit = "work days" if basis == reporting.WORK else "days"
+                note = f"{days} {unit} unless {RULED_OUT[market]}"
         if ivd and market == markets.EU_NI:
             label = label.replace("EU MDR Art. 87(4)", IVDR_82).replace("EU MDR Art. 87(5)", IVDR_82)
             label = label.replace("EU MDR Art. 87(3)", IVDR_82)
-        due = deadlines.count(utc(aware), days, basis, market, org_zone)
         found.append(
             {
                 "market": market,
@@ -570,6 +601,7 @@ def provisional_deadlines(
                 "days": days,
                 "day_basis": basis,
                 "basis": label,
+                "earliest_note": note,
                 **deadlines.view(due, today, days),
                 "conservative": True,
             }

@@ -318,7 +318,7 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
                 _item(
                     f"provisional:{item['key']}:{first['market']}",
                     "REPORTING",
-                    f"Provisional {first['label']} deadline for {item['ref']} ({first['basis']})",
+                    f"Provisional {first['label']} deadline for {item['ref']} ({first.get('earliest_note') or first['basis']})",
                     datetime.fromisoformat(first["due_at"]),
                     market=first["market"],
                     **common,

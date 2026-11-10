@@ -221,5 +221,19 @@ describe("the Case check drawer (spec 4.4)", () => {
       /"Inquiry" needs a written reason/,
     );
     expect(clockChip(CLOCK)).toBe("Provisional: US 30 days, due Wed 9 Dec 2026, 23:59 EST");
+    // Check 3a: until triage answers it, the earliest possible report with its plain note.
+    const earliest = {
+      ...CLOCK,
+      market: "EU_NI",
+      days: 2,
+      due_label: "Sun 22 Nov 2026, 23:59 CET",
+      earliest_note: "2 days unless a public health threat is ruled out",
+    } as Deadline;
+    expect(clockChip(earliest)).toBe(
+      "Provisional: EU_NI 2 days unless a public health threat is ruled out, due Sun 22 Nov 2026, 23:59 CET",
+    );
+    expect(clockChip({ ...CLOCK, days: 5, day_basis: "WORK" } as Deadline)).toBe(
+      "Provisional: US 5 work days, due Wed 9 Dec 2026, 23:59 EST",
+    );
   });
 });

@@ -857,6 +857,8 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
         awareness = {**awareness, "source": "LINKED", "linked_ref": found[earliest_source]["ref"]}
     threat = any(row is not None and row.public_health_threat for row in member_records.values())
     remedial = any(row is not None and row.remedial_action for row in member_records.values())
+    # Check 3a: a completed triage has answered the threat, remedial and harm questions (reopening clears it).
+    answered = any(row is not None and row.completed_at is not None for row in member_records.values())
     escalated = [row for row in member_records.values() if row is not None and row.escalated_at is not None]
     flags = list({flag["label"]: flag for key in members for flag in found[key]["flags"]}.values())
     if escalated:
@@ -883,6 +885,7 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
         signed=signed,
         org_zone=context["org_zone"],
         ivd=context["products"].get(primary.get("product_id"), False),
+        answered=answered,
     )
     record = member_records.get(primary_key)
     opened = rules.utc(record.opened_at) if record is not None else primary["available_at"]

@@ -189,6 +189,8 @@ export type Deadline = {
   days: number | null;
   day_basis: "CALENDAR" | "WORK" | null;
   basis: string;
+  /** Check 3a: until triage answers it, the earliest possible report, "2 days unless a public health threat is ruled out". */
+  earliest_note?: string | null;
   due_date: string | null;
   due_at: string | null;
   due_zone: string | null;
