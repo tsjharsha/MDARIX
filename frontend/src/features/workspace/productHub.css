@@ -1,0 +1,274 @@
+/* Product 360 and Supplier 360 (0.10.94, W1). Design rule G-2: the operational parts (cards, tiles, tables, lists)
+   are flat: surface, one line, no gradient, glass or glow. Only the page head is the hero band (MonitorBand). */
+
+.uw-ph-head {
+  margin-bottom: 16px;
+}
+.uw-ph-headgrid {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+.uw-ph-headgrid > .hx-device {
+  flex: none;
+  color: var(--ms-teal-bright);
+}
+.uw-ph-headmain {
+  flex: 1;
+  min-width: 0;
+}
+.uw-ph-headmain h1 {
+  margin: 2px 0 8px;
+}
+.uw-ph-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.uw-ph-versions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-ph-version {
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-surface);
+  color: var(--ms-ink);
+  font: inherit;
+  font-size: var(--ms-fs-12);
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.uw-ph-version[aria-pressed="true"] {
+  border-color: var(--ms-teal-dark);
+  background: var(--ms-teal-dark);
+  color: var(--ms-white);
+}
+.uw-ph-version small {
+  margin-left: 6px;
+  opacity: 0.8;
+}
+.uw-ph-origin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius-pill);
+  background: var(--ms-surface);
+  color: var(--ms-ink-2);
+  font-size: var(--ms-fs-12);
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.uw-ph-note {
+  margin: 8px 0 0;
+  font-size: var(--ms-fs-12);
+}
+
+.uw-ph-cards,
+.uw-ph-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-ph-card,
+.uw-ph-tile {
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+  padding: 16px 18px;
+}
+.uw-ph-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.uw-ph-card-top .hx-device {
+  color: var(--ms-teal-dark);
+  flex: none;
+}
+.uw-ph-card h3,
+.uw-ph-tile h3 {
+  margin: 0;
+  font-size: var(--ms-fs-16);
+}
+.uw-ph-counts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  margin: 12px 0 0;
+}
+.uw-ph-counts button {
+  text-align: left;
+}
+.uw-ph-counts strong {
+  font-size: var(--ms-fs-20);
+  margin-right: 4px;
+}
+.uw-ph-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ms-warn);
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.uw-ph-tile-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.uw-ph-tile-count {
+  font-size: var(--ms-fs-24);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-ph-tile ul {
+  margin: 10px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.uw-ph-tile li {
+  padding: 4px 0;
+  border-top: 1px solid var(--ms-line);
+  font-size: var(--ms-fs-14);
+}
+.uw-ph-tile li small {
+  display: block;
+  color: var(--ms-muted);
+}
+
+.uw-ph-section {
+  margin-top: 18px;
+}
+.uw-ph-section > h2,
+.uw-ph-section > h3 {
+  margin: 0 0 8px;
+  font-size: var(--ms-fs-16);
+}
+.uw-ph-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+}
+.uw-ph-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ms-fs-14);
+}
+.uw-ph-table th,
+.uw-ph-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ms-line);
+  text-align: left;
+  vertical-align: top;
+}
+.uw-ph-table thead th {
+  font-size: var(--ms-fs-12);
+  color: var(--ms-muted);
+  font-weight: var(--ms-fw-semibold);
+}
+.uw-ph-table tr.is-changed td,
+.uw-ph-table tr.is-changed th {
+  background: var(--ms-warn-bg);
+}
+.uw-ph-table td small {
+  display: block;
+  color: var(--ms-muted);
+}
+.uw-ph-state {
+  font-size: var(--ms-fs-12);
+  font-weight: var(--ms-fw-semibold);
+}
+
+.uw-ph-months {
+  display: grid;
+  gap: 8px;
+}
+.uw-ph-month-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: end;
+  gap: 10px;
+}
+.uw-ph-month-bars {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  align-items: end;
+  gap: 3px;
+  height: 56px;
+}
+.uw-ph-month-bars > span {
+  display: block;
+  min-height: 2px;
+  background: var(--ms-teal-dark);
+  border-radius: 2px 2px 0 0;
+}
+.uw-ph-month-bars > span.is-marked {
+  outline: 2px solid var(--ms-warn);
+  outline-offset: 1px;
+}
+.uw-ph-month-axis {
+  display: grid;
+  grid-template-columns: 140px repeat(12, 1fr);
+  gap: 3px;
+  font-size: 11px;
+  color: var(--ms-muted);
+}
+
+.uw-ph-pattern {
+  border: 1px solid var(--ms-line);
+  border-left: 4px solid var(--ms-warn);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+  padding: 14px 18px;
+}
+.uw-ph-pattern.is-quiet {
+  border-left-color: var(--ms-line-strong);
+}
+.uw-ph-pattern h2 {
+  margin: 0 0 6px;
+  font-size: var(--ms-fs-16);
+}
+.uw-ph-pattern p {
+  margin: 0 0 8px;
+}
+.uw-ph-pattern .uw-ph-rule {
+  font-size: var(--ms-fs-12);
+  color: var(--ms-muted);
+}
+.uw-ph-pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.uw-ph-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 640px) {
+  .uw-ph-headgrid > .hx-device {
+    display: none;
+  }
+  .uw-ph-month-row,
+  .uw-ph-month-axis {
+    grid-template-columns: 80px 1fr;
+  }
+  .uw-ph-month-axis > span:not(:first-child) {
+    display: none;
+  }
+}

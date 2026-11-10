@@ -87,7 +87,7 @@ describe("the shell and its tab bar", () => {
     expect(visibleTabs(OPTIONS[0].tabs, ["My Work", "Records"])).toEqual(["home", "records"]);
   });
 
-  it("gives the trial owner the top bar, Viewing as and Admin's eight tabs, with Home first", () => {
+  it("gives the trial owner the top bar, Viewing as and Admin's nine tabs, with Home first", () => {
     const markup = renderToStaticMarkup(<UserWorkspace session={session("admin", false)} initialView="my-work" />);
     expect(tabLabels(markup)).toEqual([
       "Home",
@@ -96,6 +96,7 @@ describe("the shell and its tab bar", () => {
       "Reports",
       "Investigations",
       "Trends",
+      "Products",
       "Records",
       "Team",
     ]);

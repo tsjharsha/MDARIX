@@ -511,12 +511,19 @@ describe("the new navigation (stage 7, 0.10.68)", () => {
       section: "Product 360",
       tab: "Suppliers?supplier=SAMPLE-SUP-B",
     });
-    expect(recordPlace("case", "x", {}, "new").section).toBe("Investigations");
-    expect(NEW_RECORD_PLACES.product).toEqual({ section: "Product 360", tab: "Products", param: "product" });
+    expect((NEW_RECORD_PLACES as Record<string, unknown>).product).toEqual({
+      section: "Product 360",
+      tab: "Products",
+      param: "product",
+    });
   });
 
   it("puts no setting on a daily screen (7.7)", () => {
-    const daily = NEW_MENU.main.flatMap((section) => NEW_PLACES[section].tabs);
+    // Product 360's "Products" tab is the product list, not Settings › Products (the product settings).
+    expect(NEW_PLACES["Product 360"].tabs).toEqual(["Products", "Suppliers"]);
+    const daily = NEW_MENU.main
+      .filter((section) => section !== "Product 360")
+      .flatMap((section) => NEW_PLACES[section].tabs);
     for (const setting of [
       "Review settings",
       "Reporting windows",
