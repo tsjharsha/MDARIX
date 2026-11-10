@@ -86,6 +86,16 @@ def generate_regulatory_draft(
             data_db.query(model.id).filter(model.id == value, model.tenant_id == tenant_id).first() is None
         ):
             raise HTTPException(404, detail={"code": code, "message": "Not found in your organization"})
+    # PV-1 F14: the version must be of the case's product (422), never drafted from a contradictory pair.
+    from backend.app.ask_router import _validate_product_version_scope
+
+    _validate_product_version_scope(
+        data_db,
+        tenant_id=tenant_id,
+        product_version_id=payload.product_version_id,
+        product_id=None,
+        investigation_id=payload.investigation_id,
+    )
     request = payload.model_dump(mode="json")
     draft = RegulatoryDraftService().generate(payload.document_type, request)
     context = grounded_context(

@@ -159,6 +159,16 @@ def _ensure_own_records(db: Session, tenant_id, payload: InteractionRequest) -> 
             db.query(model.id).filter(model.id == value, model.tenant_id == tenant_id).first() is None
         ):
             raise HTTPException(404, detail={"code": code, "message": "Not found in your organization"})
+    # PV-1 F14: and they must agree with each other (the rule Ask applies).
+    from backend.app.ask_router import _validate_product_version_scope
+
+    _validate_product_version_scope(
+        db,
+        tenant_id=tenant_id,
+        product_version_id=payload.product_version_id,
+        product_id=payload.product_id,
+        investigation_id=payload.investigation_id,
+    )
 
 
 def _is_trial(control_db: Session, tenant_id) -> bool:

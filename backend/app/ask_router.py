@@ -119,6 +119,19 @@ def _validate_product_version_scope(
     product_id: UUID | None,
     investigation_id: UUID | None,
 ) -> None:
+    """PV-1 F14: the product, version and case of one request must agree: the version is the product's (or the case's
+    product's when no product is named), and a named product is the case's product (422 otherwise)."""
+    if product_id is not None and investigation_id is not None:
+        case_product = (
+            db.query(Investigation.product_id)
+            .filter(Investigation.tenant_id == tenant_id, Investigation.id == investigation_id)
+            .scalar()
+        )
+        if case_product is not None and case_product != product_id:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "PRODUCT_CASE_MISMATCH", "message": "The product is not the investigation's product"},
+            )
     if product_version_id is None:
         return
     version = (

@@ -232,3 +232,23 @@ def test_a_case_scoped_to_one_version_does_not_cover_another(org):  # F13
         assert triggers.covering_cases(db, org["tenant_id"], product, "E01", uuid.UUID(seed["version_b"])) == []
         assert triggers.covering_cases(db, org["tenant_id"], product, "E01", None) == []
         assert triggers.covering_cases(db, org["tenant_id"], product, "E01")  # any version: as before
+
+
+def test_ai_requests_refuse_a_version_or_case_of_another_product(org):  # F14
+    from tests.test_case_workflow import _code
+
+    investigator, _ = org["investigator"]
+    seed = _seed(org["tenant_id"])
+    case = _open(investigator, seed, seed["complaints"][:2])
+    ask = "/api/v1/stage3/interactions"
+    body = {"prompt": "What changed?", "product_id": seed["product_id"]}
+    refused = investigator.post(ask, json={**body, "product_version_id": seed["other_version"]})
+    assert refused.status_code == 422 and _code(refused) == "PRODUCT_VERSION_SCOPE_MISMATCH", refused.text
+    other_product = _seed(org["tenant_id"])["product_id"]
+    refused = investigator.post(ask, json={**body, "product_id": other_product, "investigation_id": case["id"]})
+    assert refused.status_code == 422 and _code(refused) == "PRODUCT_CASE_MISMATCH", refused.text
+    draft = investigator.post(
+        "/api/v1/regulatory/draft",
+        json={"document_type": "CER", "investigation_id": case["id"], "product_version_id": seed["other_version"]},
+    )
+    assert draft.status_code == 422 and _code(draft) == "PRODUCT_VERSION_SCOPE_MISMATCH", draft.text

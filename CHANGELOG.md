@@ -71,6 +71,9 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - An open case covers a service-level recurrence or a complaint's recurrence trigger only for the versions its scope
   names (or for the whole product when it names none): an open Rev C case no longer hides three Rev D resolutions.
   The known-issue match says "another product version" when the case's scope does not cover the complaint's version.
+- Ask, a stored AI interaction and the regulatory draft refuse a version of another product than the one named (or
+  the case's), and a product other than the case's (422 `PRODUCT_VERSION_SCOPE_MISMATCH`, `PRODUCT_CASE_MISMATCH`),
+  instead of storing or drafting from a contradictory pair.
 
 ### Security
 
