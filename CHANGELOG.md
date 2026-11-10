@@ -10,16 +10,81 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
+
+Development cycle 1, item B2: the Case, the first contact before anyone decides it is a complaint. Migration
+`tr19casesescalation` (expand-only: new columns on the Case, the Case check, triage and alerts; three new tables
+`triage_record_versions`, `case_addenda`, `record_ownership`, each with the tenant isolation policy). The API and web
+images change. Operator steps: run `scripts/cases_0_10_93.py` (it only lists what the upgrade would change in the
+trials' existing Cases; nothing is written until the owner approves the list), then `scripts/refresh_trial_story.py`
+(adds SAMPLE-CASE-11 where the sample exists). A 0.10.92 image runs on the new schema (rollback).
+
 ### Added
 
+- **The Case.** "Log a call" is now **Log a case**: the reporter's words, the channel and its reference, who knew
+  first, the product with its version, lot, serial number, UDI, software, hardware and firmware (each "confirmed" or
+  "unconfirmed" with where it came from; "Not sure" is allowed and never forced), the patients involved, what happened
+  to the patient, what was tried on the call, and a service issue category. A Case has one state at a time (To check,
+  Waiting for the reporter, Waiting for internal team, QA review, Closed, Complaint, Withdrawn), an owner, a next
+  action, a due date and the information still missing.
+- **The Cases list** (Complaints › Cases): pages on the server, views (My Cases, Unassigned, Needs more information,
+  Critical or High, Overdue, Awaiting customer, Awaiting Quality, Service only, Potential complaints), search by
+  reference, product, serial number or customer, and bulk assign. Measured at 5,000 Cases within the one-second budget.
+- **The Case check.** The ten questions keep their numbers; each answer records the question's version. "Unknown",
+  "Not applicable" and "not answered yet" are kept apart, and a changed answer keeps the earlier outcome in the
+  history. Six classifications: Complaint, Complaint and service, Service only, Inquiry, Pending, Not a complaint.
+- **Sign and escalate.** Signing a complaint makes the Case the complaint at once, with its facts and its first
+  awareness carried over (the provisional clock never restarts); or attaches it to a complaint it duplicates. An
+  urgent case ("Urgent: death or serious injury") is a complaint at once. The complaint page shows where it came from
+  and a first card, "The case".
+- **Triage at two speeds.** Fast track when harm is possible, with a named owner who acknowledges it within an hour
+  (unacknowledged: escalated to the next role); routine one-click confirmation otherwise. Every triage change is a
+  new version. A severity floor from the facts, "Not known yet", potential harm, containment, a backup owner, and
+  automatic reopening when new facts arrive. A downgrade of a critical escalation needs a second person (outside the
+  trial) and a refused attempt is recorded.
+- **Alerts record their delivery**: channel, attempts, last attempt and result. A failed delivery never cancels the
+  escalation and shows on screen.
+- **The Service Desk role** ("Service Desk Agent"): logs and checks Cases. Every Case and triage action is checked on
+  the server, and a refused action is recorded in the audit trail.
+- **Customer contact on the Case**: shown only to those who need it, masked in exports by default, never a personal
+  name in a trial, and erased 12 months after the Case closes.
+- **Getting started, Part 1: from the first contact to the submission.** Ten steps on SAMPLE-CASE-11, the hospital's
+  call behind SAMPLE-RV-11: review the case, classify service or complaint, triage, assess reportability, sign the
+  conclusion, prepare the report, complete and approve, record the submission, review records, explore trends. Each
+  step says what to do next, why, who does it and what evidence ticks it, and ticks only from saved records. A
+  service-only, inquiry or "not a complaint" Case skips the reporting steps and goes to the QA review; a pending Case
+  waits for the reporter with an owner and a due date. "More cases to try" lists the other sample Cases.
+
+### Changed
+
+- **"Case" now means only the first contact.** What was called a case is now an **investigation** everywhere in the
+  app, the help and the generated documents: "Investigation evidence", "Investigation timeline", "Download
+  investigation record". Old links and bookmarks still open the right tab.
+- **Permissions:** an Investigator no longer classifies first contacts or triages; a Regulatory Reviewer may triage.
+- A service-only Case is closed only with a resolution summary.
+- Screen sentences no longer break in the middle with a long dash.
+- Import: a QMS row carrying an escalated complaint's QMS ID updates that complaint instead of adding a second one.
+- Authority report downloads: before approval, the worksheet PDF or DOCX downloads as a preview marked "DRAFT PREVIEW
+  - NOT APPROVED"; the record copy and the eMDR XML come only from the approved version.
 - **OmniRoute as an AI provider option** (`MDARIX_GENAI_PROVIDER=omniroute`, an OpenAI-compatible gateway; see
   `docs/runbooks/AI_PROVIDERS.md`). Code only: AI stays off in the trial. Staging and production still need the
   contracted-provider list and a retention clearance before any AI call.
+
+### Fixed
+
+- A CSV import stops reading at the row limit, with the same "too many rows" message as a spreadsheet.
 
 ### Security
 
 - Dependency updates: pypdf 6.21.4, pillow 13.0.0 (with fastembed 0.9.1, which allows it), filelock 4.2.1,
   certifi 2026.10.18; vite 8.3.7, now a development dependency only.
+
+### Known limits
+
+- The sample's earlier calls keep their SAMPLE-CALL references; SAMPLE-CALL-02 (signed before 0.10.93, never linked)
+  is not escalated automatically.
+- The full test suites and the browser journeys run once in the test release before the deploy; the Getting started
+  journeys are rewritten for the new steps then.
 
 ## [0.10.92] - 2026-11-07
 
