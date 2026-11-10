@@ -74,6 +74,9 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - Ask, a stored AI interaction and the regulatory draft refuse a version of another product than the one named (or
   the case's), and a product other than the case's (422 `PRODUCT_VERSION_SCOPE_MISMATCH`, `PRODUCT_CASE_MISMATCH`),
   instead of storing or drafting from a contradictory pair.
+- A version's story (Product 360, "The story of Rev B") lists the product's investigations that record no version, as
+  "applies to the whole product", with their evidence, the same rule as the product's Overview; it no longer shows
+  fewer investigations than the Overview.
 
 ### Security
 

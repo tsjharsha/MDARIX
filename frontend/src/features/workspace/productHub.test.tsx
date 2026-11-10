@@ -282,7 +282,7 @@ describe("one product's page", () => {
       <ProductHubSection />,
       api("Product 360?product=SAMPLE-ORBIT-300&version=Rev+B&view=Version+story"),
     );
-    expect(html).toContain("Investigations with a complaint on Rev B");
+    expect(html).toContain("Investigations on Rev B or the whole product");
     expect(html).toContain("SAMPLE-CMP-1");
     expect(html).toContain("SAMPLE-INV-001");
     expect(html).toContain("None recorded for Rev B");

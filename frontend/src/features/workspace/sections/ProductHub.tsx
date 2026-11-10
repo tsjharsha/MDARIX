@@ -457,7 +457,7 @@ export function VersionStory({
       "complaints",
     ],
     [
-      `Investigations with a complaint on ${name}`,
+      `Investigations on ${name} or the whole product`,
       data.counts?.investigations ?? 0,
       data.investigations ?? [],
       (row) => recordLine("investigations", row),

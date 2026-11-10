@@ -223,13 +223,22 @@ def signal_detail(
 
 
 # Investigations and evidence carry no product version of their own. A version's investigations are those linked
-# (investigation_complaints) to complaints on that version; its evidence is what those investigations hold, directly
-# (evidence.investigation_id) or linked (investigation_evidence), as the case story counts it (_story_counts). Fixed SQL:
-# the tenant and the version are always parameters, and every subquery is scoped to the same tenant.
+# (investigation_complaints) to complaints on that version, and (PV-1, the rule Product 360's Overview applies) the
+# product's investigations with no version recorded at all, which apply to the whole product; its evidence is what those
+# investigations hold, directly (evidence.investigation_id) or linked (investigation_evidence), as the case story counts
+# it (_story_counts). Fixed SQL: the tenant, product and version are always parameters, and every subquery is scoped to
+# the same tenant.
+_ON_VERSION = (
+    "EXISTS (SELECT 1 FROM investigation_complaints ic JOIN complaints c ON c.tenant_id = ic.tenant_id "
+    "AND c.id = ic.complaint_id WHERE ic.tenant_id = :tenant_id AND ic.investigation_id = i.id "
+    "AND c.product_version_id {})"
+)
 _VERSION_INVESTIGATIONS = (
-    "SELECT ic.investigation_id FROM investigation_complaints ic "
-    "JOIN complaints c ON c.tenant_id = ic.tenant_id AND c.id = ic.complaint_id "
-    "WHERE ic.tenant_id = :tenant_id AND c.product_version_id = :version_id"
+    "SELECT i.id FROM investigations i WHERE i.tenant_id = :tenant_id AND i.product_id = :product_id AND ("
+    + _ON_VERSION.format("= :version_id")
+    + " OR NOT "
+    + _ON_VERSION.format("IS NOT NULL")
+    + ")"
 )
 _VERSION_INVESTIGATION_CLAUSE = f"id IN ({_VERSION_INVESTIGATIONS})"
 _VERSION_EVIDENCE_CLAUSE = (
@@ -259,7 +268,7 @@ def product_version_story(
     )
     if not version:
         return {"status": "NOT_FOUND", "product_id": product_id, "version_id": version_id, "tenant_id": ctx.tenant_id}
-    params = {"tenant_id": ctx.tenant_id, "version_id": version_id}
+    params = {"tenant_id": ctx.tenant_id, "version_id": version_id, "product_id": product_id}
     return {
         "status": "READY_FOR_REVIEW",
         "tenant_id": ctx.tenant_id,
@@ -276,8 +285,10 @@ def product_version_story(
         ),
         "investigations": _rows(
             db,
-            "SELECT business_id, investigation_identifier, status, investigation_question FROM investigations "
-            f"WHERE tenant_id=:tenant_id AND {_VERSION_INVESTIGATION_CLAUSE} ORDER BY created_at DESC NULLS LAST LIMIT 50",
+            "SELECT business_id, investigation_identifier, status, investigation_question, "
+            f"CASE WHEN {_ON_VERSION.format('IS NOT NULL')} THEN 'VERSION' ELSE 'PRODUCT' END AS applies_to "
+            f"FROM investigations i WHERE tenant_id=:tenant_id AND {_VERSION_INVESTIGATION_CLAUSE} "
+            "ORDER BY created_at DESC NULLS LAST LIMIT 50",
             params,
         ),
         "evidence": _rows(

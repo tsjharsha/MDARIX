@@ -104,7 +104,12 @@ def test_product_version_story_reaches_cases_and_evidence_through_the_versions_c
     assert set(result["counts"]) == {"complaints", "investigations", "evidence"}
     assert all(params["tenant_id"] == "tenant-a" for _, params in db.statements)
     for table in ("investigations", "evidence"):
-        reads = [sql for sql, _ in db.statements if f"FROM {table} " in sql]
+        # PV-1: the evidence reads name the version's investigations too; each table's own reads are counted.
+        reads = [
+            sql
+            for sql, _ in db.statements
+            if f"FROM {table} " in sql and (table == "evidence") == ("FROM evidence " in sql)
+        ]
         assert len(reads) == 2, table  # the count and the rows
         for sql in reads:
             assert "investigation_complaints ic" in sql and "c.product_version_id = :version_id" in sql

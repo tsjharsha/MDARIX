@@ -252,3 +252,21 @@ def test_ai_requests_refuse_a_version_or_case_of_another_product(org):  # F14
         json={"document_type": "CER", "investigation_id": case["id"], "product_version_id": seed["other_version"]},
     )
     assert draft.status_code == 422 and _code(draft) == "PRODUCT_VERSION_SCOPE_MISMATCH", draft.text
+
+
+def test_the_version_story_lists_whole_product_cases_as_overview_does(org):  # W1 follow-up (report section 5)
+    investigator, _ = org["investigator"]
+    seed = _seed(org["tenant_id"])
+    product_case = _open(investigator, seed, _unknown_version_complaints(org["tenant_id"], seed["product_id"]))
+    rev_a_case = _open(investigator, seed, seed["complaints"][:2])
+    story = investigator.get(f"/api/v1/products/{seed['product_id']}/versions/{seed['version_b']}/story")
+    assert story.status_code == 200, story.text
+    story = story.json()
+    listed = {row["investigation_identifier"]: row["applies_to"] for row in story["investigations"]}
+    assert listed == {product_case["investigation_identifier"]: "PRODUCT"}
+    assert rev_a_case["investigation_identifier"] not in listed and story["counts"]["investigations"] == 1
+    story_a = investigator.get(f"/api/v1/products/{seed['product_id']}/versions/{seed['version_a']}/story").json()
+    assert {row["investigation_identifier"]: row["applies_to"] for row in story_a["investigations"]} == {
+        product_case["investigation_identifier"]: "PRODUCT",
+        rev_a_case["investigation_identifier"]: "VERSION",
+    }
