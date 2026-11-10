@@ -16,6 +16,11 @@ const UNSENT: ObligationState[] = ["DRAFT", "CORRECTION_REQUIRED", "APPROVED"];
 
 const today = () => new Date().toLocaleDateString("en-CA"); // yyyy-mm-dd, the person's own day
 
+/** The chain's open follow-up: the next waits until the last is accepted (or cancelled); an FDA request that arrives
+ * meanwhile is recorded on it (authority_reports/router.py). */
+export const openFollowUp = (detail: ReportDetail) =>
+  detail.responses.find((row) => row.follow_up && !VALID.includes(row.state) && row.state !== "CANCELLED");
+
 /**
  * US follow-ups (0.10.96, B3 step B3, 21 CFR 803.56). On a submitted US initial report: the chain (initial, then
  * follow-up #1, #2 …, each with its state) and "Start follow-up #n". On a follow-up: what it follows, its H2 types,
@@ -78,7 +83,7 @@ function FollowUpChain({
 }) {
   const chain = detail.responses.filter((row) => row.follow_up);
   // The next waits until the last is accepted: one still pending may yet be rejected (authority_reports/router.py).
-  const open = chain.find((row) => !VALID.includes(row.state) && row.state !== "CANCELLED");
+  const open = openFollowUp(detail);
   const next = 1 + chain.filter((row) => SENT.includes(row.state)).length;
   const [form, setForm] = useState({ received: today(), text: "", narrative: "", h2: [] as string[] });
   const [error, setError] = useState("");
@@ -121,7 +126,7 @@ function FollowUpChain({
         (open ? (
           <p className="ac-muted">
             Follow-up #{open.follow_up} is open: the next one starts once FDA accepts it (or it is cancelled). FDA takes
-            follow-ups in order.
+            follow-ups in order. An FDA request that arrives meanwhile is recorded on it.
           </p>
         ) : (
           <details>
@@ -208,6 +213,20 @@ function FollowUpHead({
         {detail.request?.received_on && `, for information received on ${formatDate(detail.request.received_on)}`}.
       </p>
       {detail.request?.text && <p className="ac-muted">What is new: {detail.request.text}</p>}
+      {!!detail.fda_requests?.length && (
+        <>
+          <h3>FDA requests recorded on this follow-up</h3>
+          <ul>
+            {detail.fda_requests.map((row) => (
+              <li key={`${row.received_on}-${row.text}`}>
+                Received {formatDate(row.received_on)}, response due {formatDate(row.due_on)}: {row.text}
+                {!row.h2_ticked &&
+                  ' · H2 "Response to FDA request" is not ticked: this follow-up was approved or sent before the request. Reopen it to tick H2, or answer in the next follow-up.'}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <H2Boxes
         ticked={ticked}
         disabled={!canWrite || !detail.editable || action.busy}

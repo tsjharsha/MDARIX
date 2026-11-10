@@ -75,7 +75,11 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
   (422 `FOLLOWS_INITIAL` if typed), and G6 reads "30-day; Follow-up #n". One follow-up is open at a time (409
   `FOLLOW_UP_OPEN`); numbers count only the follow-ups submitted before, so they run 1, 2, 3 without gaps. Send for
   approval needs an H2 type (422 `H2_REQUIRED`) and a signed conclusion, not necessarily reportable. A US request for
-  information (`POST .../requests`) now creates this follow-up with H2 "Response to FDA request". A conclusion signed
+  information (`POST .../requests`) now creates this follow-up with H2 "Response to FDA request"; one that arrives
+  while a follow-up is open is recorded on that follow-up instead (no 409): the request and its dates are kept and
+  shown, H2 "Response to FDA request" is ticked on a draft, an unsent one is due by the earlier date, and an approved
+  or sent one keeps its file (the page says to reopen it or answer in the next); audited `REPORT_REQUEST_ATTACHED`.
+  A conclusion signed
   again supersedes an approved, unsent follow-up's approval (audit fix 4 for the chain); its own due date stays.
 - The follow-up's eMDR file (B2) is FDA's follow-up shape: G6 "Follow-up" (C53579) with its number, each H2 type as
   FDA's code (C53584), a value only when new or changed against the chain's last submitted report, codes only when
