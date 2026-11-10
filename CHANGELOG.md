@@ -10,6 +10,13 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.99] - not released yet
+
+B4: the rule register. Every rule MDARIX applies, its source, version and dates, in one place; the reportability
+floors of the five markets held as data and read by one small engine; the floor picked by the awareness day. Version 1
+of every rule is today's logic, unchanged (proved case by case against today's code). Every legal citation and law date
+stays "starter, for your consultant to confirm". On unless `MDARIX_RULE_REGISTER=off`.
+
 ## [0.10.98] - not released yet
 
 B5a: the investigation challenge. Migration `tr26challengeloop` (chained from `tr25routinepath`; DB-1 (tr21-tr24) is
