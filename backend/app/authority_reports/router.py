@@ -231,7 +231,8 @@ def _chain_values(db, chain: list, obligation) -> dict[str, str]:
     snapshot (each snapshot keeps every value, so the last is the merged one)."""
     from backend.app.authority_reports import fda_3500a
 
-    sent = [row for row in chain if row.id != obligation.id and row.state in rules.SUBMITTED]
+    mine = (obligation.created_at, str(obligation.id))
+    sent = [row for row in chain if (row.created_at, str(row.id)) < mine and row.state in rules.SUBMITTED]
     approved = [row for row in _snapshots(db, sent[-1]) if row.state == "APPROVED"] if sent else []
     return fda_3500a.values((approved[-1].fields or {}).get("sections", [])) if approved else {}
 
@@ -571,7 +572,10 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         # What the eMDR file still needs, and what it leaves out, read from the approved report (or the draft); on a
         # draft also whether FDA's schema takes the file (0.10.96: Send for approval refuses otherwise).
         "emdr": _emdr_check(
-            (approved.fields or {}).get("sections") if approved else sections, context, _emdr_kind(obligation)
+            (approved.fields or {}).get("sections") if approved else sections,
+            context,
+            _emdr_kind(obligation),
+            frozen=bool(approved and "emdr_xml" in (approved.fields or {})),
         )
         if form.code == forms.FDA_3500A.code
         else None,
@@ -583,7 +587,7 @@ def _emdr_kind(obligation: ReportObligation) -> str:
     return "M-I" if obligation.kind == "INITIAL" else "M-F"
 
 
-def _emdr_check(sections, context, kind: str = "M-I") -> dict:
+def _emdr_check(sections, context, kind: str = "M-I", frozen: bool = False) -> dict:
     from backend.app.authority_reports import emdr
 
     previous = (context.get("follow_up") or {}).get("previous")
@@ -591,9 +595,10 @@ def _emdr_check(sections, context, kind: str = "M-I") -> dict:
         sections or [], context["parties"], kind=kind, sender="-", now=_now(), practice=False, previous=previous
     )
     return {
-        "missing": found["missing"],
+        # An approved file is frozen and signed: today's Settings never block its download (review B3-Z 7).
+        "missing": [] if frozen else found["missing"],
         "left_out": found["left_out"],
-        "schema_errors": found["errors"],
+        "schema_errors": [] if frozen else found["errors"],
         "changed": found["changed"],  # a follow-up: what its file sends, new or changed since the last one sent
     }
 
@@ -1146,6 +1151,8 @@ def set_field(
         raise _error(422, "FIELD_NOT_USED", "This field is not used in this report")
     if follow and field_id == "MFR_REPORT":
         raise _error(422, "FOLLOWS_INITIAL", "A follow-up carries its initial report's number")
+    if follow and field_id == "G6":
+        raise _error(422, "FOLLOWS_CHAIN", "A follow-up's G6 is its clock and its number in the chain")
     entries = dict(obligation.entries or {})
     before = entries.get(field_id)
     coded = bool(field.source and field.source.startswith("imdrf_"))
@@ -1163,6 +1170,11 @@ def set_field(
     problem = forms.value_problem(field, value)
     if problem:
         raise _error(422, f"NOT_A_{field.kind}", problem)
+    if value and field_id == "G6" and obligation.form_code == forms.FDA_3500A.code:
+        from backend.app.authority_reports.emdr import FOLLOW_UP
+
+        if FOLLOW_UP.search(value):  # an initial report is never a follow-up: those are made in the chain
+            raise _error(422, "NOT_A_FOLLOW_UP", "A follow-up is started from the submitted report, not typed in G6")
     if value and field_id == "H2" and _h2(value):
         raise _error(422, "NOT_A_CHOICE", _h2(value))
     if value and field.kind == forms.LIST_CODE:
@@ -2251,7 +2263,7 @@ class FollowUpCreate(BaseModel):
     narrative: str | None = Field(default=None, max_length=worksheet.VALUE_MAX)
 
 
-FOLLOW_UP_OWN = frozenset({"MFR_REPORT", "B4", "B5", "H11", "H2", "G8"})
+FOLLOW_UP_OWN = frozenset({"MFR_REPORT", "B4", "B5", "H11", "H2", "G8", "G6"})
 
 
 def follow_up_due(received_on: date) -> date:
@@ -2267,8 +2279,11 @@ def create_follow_up(db, ctx, initial: ReportObligation, received_on: date, text
     if initial.state not in rules.VALID_SUBMISSION:
         raise _error(409, "NOT_SUBMITTED", "A follow-up follows the initial report once it is submitted and accepted")
     chain = _follow_ups(db, initial.tenant_id, initial.id)
-    if any(row.state not in (*rules.SUBMITTED, rules.CANCELLED) for row in chain):
-        raise _error(409, "FOLLOW_UP_OPEN", "Submit the open follow-up first: FDA takes follow-ups in order")
+    # Accepted (or cancelled) before the next: one still pending may yet be rejected and come back (review B3-Z 1).
+    if any(row.state not in (*rules.VALID_SUBMISSION, rules.CANCELLED) for row in chain):
+        raise _error(
+            409, "FOLLOW_UP_OPEN", "The last follow-up must be accepted (or cancelled) first: FDA takes them in order"
+        )
     ticks = "; ".join(dict.fromkeys(item.strip() for item in h2 if item and item.strip()))
     if ticks and _h2(ticks):
         raise _error(422, "NOT_A_CHOICE", _h2(ticks))
@@ -2575,7 +2590,8 @@ def _file_for_pdf(db, control_db, obligation, frozen, view, organization):
     draft or a pending snapshot whose file does not build, or an older approval whose file cannot be built)."""
     from backend.app.authority_reports import emdr
 
-    parties = _context(db, control_db, obligation)["parties"]
+    context = _context(db, control_db, obligation)
+    parties = context["parties"]
     practice = _trial(control_db, obligation.tenant_id)
     if frozen is None:  # the working draft, as its file builds now (D7: a preview, marked DRAFT)
         found = emdr.prepare(
@@ -2585,6 +2601,7 @@ def _file_for_pdf(db, control_db, obligation, frozen, view, organization):
             sender=organization or "-",
             now=_now(),
             practice=practice,
+            previous=(context.get("follow_up") or {}).get("previous"),  # a follow-up's draft: what it will send
         )
         if not found["xml"] or found["errors"]:
             return None

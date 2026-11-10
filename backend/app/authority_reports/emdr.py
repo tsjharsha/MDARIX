@@ -589,8 +589,13 @@ def delta(sections: list[dict], previous: dict[str, str]) -> tuple[list[dict], l
             elif key in NARRATIVES:
                 value = value if item.get("status") in ("ENTERED", "CHANGED") else ""
             elif key in REQUIRED_CODES and value:
-                held = {part.strip() for part in previous.get(key, "").split(";")}
+                held = {part.strip() for part in previous.get(key, "").split(";") if part.strip()}
+                now = {part.strip() for part in value.split(";") if part.strip()}
                 value = "; ".join(part.strip() for part in value.split(";") if part.strip() not in held)
+                left.extend(
+                    f"{names.get(key, key)}: {code} removed here; FDA keeps the earlier value"
+                    for code in sorted(held - now)
+                )
             elif key not in FOLLOW_UP_SENDS and value == previous.get(key, ""):
                 value = ""
             if not item.get("value") and previous.get(key) and key not in NARRATIVES | NOT_ON_FOLLOW_UP:

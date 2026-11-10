@@ -18,7 +18,7 @@ from backend.app.db.models.market_assessment import ComplaintMarketAssessment
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_tenant
 from tests.test_authority_reports_api import REPORTS, _ok, trial  # noqa: F401 (a fixture)
-from tests.test_release_0_10_96 import _sample_us
+from tests.test_release_0_10_96 import _sample_us, _us_report
 
 pytestmark = pytest.mark.db
 
@@ -37,8 +37,20 @@ def _create(trial, **body):
     return trial["user"].post(f"{REPORTS}/{rv09['id']}/follow-ups", json=payload)
 
 
-def _send_and_submit(trial, report_id: str) -> dict:
-    """Send for approval, a colleague approves, the eMDR submission recorded."""
+def _accept(trial, detail: dict) -> dict:
+    """FDA's Ack3 says accepted."""
+    attempt = detail["submissions"][0]["id"]
+    return _ok(
+        trial["user"].post(
+            f"{REPORTS}/{detail['id']}/submissions/{attempt}/evidence",
+            json={"kind": "ACK3", "outcome": "ACCEPTED", "received_at": datetime.now(timezone.utc).isoformat(),
+                  "note": "Ack3 passed"},
+        )
+    )  # fmt: skip
+
+
+def _send_and_submit(trial, report_id: str, accept: bool = True) -> dict:
+    """Send for approval, a colleague approves, the eMDR submission recorded (and, by default, FDA accepts it)."""
     from tests.test_reporting_capa_api import PASSWORD as COLLEAGUE_PASSWORD
 
     user = trial["user"]
@@ -49,7 +61,7 @@ def _send_and_submit(trial, report_id: str) -> dict:
         )
     )
     assert approved["state"] == "APPROVED", approved["state"]
-    return _ok(
+    submitted = _ok(
         user.post(
             f"{REPORTS}/{report_id}/submissions",
             json={
@@ -61,6 +73,7 @@ def _send_and_submit(trial, report_id: str) -> dict:
             },
         )
     )
+    return _accept(trial, submitted) if accept else submitted
 
 
 def _value(detail: dict, field_id: str):
@@ -82,6 +95,13 @@ def test_b3_a_follow_up_keeps_the_initial_report_number(trial):
     assert [line.split(":")[0] for line in detail["emdr"]["changed"]] == ["B5 Describe event or problem"]
     refused = user.put(f"{REPORTS}/{detail['id']}/fields/MFR_REPORT", json={"value": "1234567-2026-00099"})
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "FOLLOWS_INITIAL"
+    # G6 is the chain's: never typed on a follow-up, and never "Follow-up #n" typed on an initial report.
+    g6 = user.put(f"{REPORTS}/{detail['id']}/fields/G6", json={"value": "30-day; Follow-up #3"})
+    assert g6.status_code == 422 and g6.json()["detail"]["code"] == "FOLLOWS_CHAIN"
+    draft = _us_report(trial["tenant_id"])
+    typed = user.put(f"{REPORTS}/{draft}/fields/G6", json={"value": "30-day; Follow-up #1"})
+    assert typed.status_code == 422 and typed.json()["detail"]["code"] == "NOT_A_FOLLOW_UP", typed.text
+    _ok(user.put(f"{REPORTS}/{draft}/fields/G6", json={"value": "30-day; Initial"}))
     # The chain on the initial report, and the list's "Follow-up #1".
     chain = _ok(user.get(f"{REPORTS}/{rv09['id']}"))["responses"]
     assert [(row["id"], row["follow_up"]) for row in chain] == [(detail["id"], 1)]
@@ -106,8 +126,12 @@ def test_b3_the_next_follow_up_waits_until_the_last_is_submitted(trial):
     (follow,) = _rv09(trial)["responses"]
     refused = _create(trial, h2=["Correction"])
     assert refused.status_code == 409 and refused.json()["detail"]["code"] == "FOLLOW_UP_OPEN"
-    submitted = _send_and_submit(trial, follow["id"])
+    submitted = _send_and_submit(trial, follow["id"], accept=False)
     assert submitted["state"] == "SUBMITTED_PENDING"
+    # Sent but not yet accepted: FDA may still reject it, so the next waits (review B3-Z 1).
+    pending = _create(trial, h2=["Correction"])
+    assert pending.status_code == 409 and pending.json()["detail"]["code"] == "FOLLOW_UP_OPEN"
+    assert _accept(trial, submitted)["state"] == "ACCEPTED"
     second = _create(trial, h2=["Correction"])
     assert second.status_code == 200, second.text
     assert second.json()["follow_up"] == 2 and _value(second.json(), "G6") == "30-day; Follow-up #2"
@@ -165,7 +189,7 @@ def test_b3_an_unsent_follow_up_is_cancelled_with_a_reason_and_frees_the_chain(t
     assert {row["state"] for row in done["snapshots"]} == {"SUPERSEDED"}  # its approval ends
     again = _ok(user.get(f"{REPORTS}/{rv09['id']}"))
     assert again["state"] == "ACCEPTED"  # the initial never changes
-    assert next(row for row in again["responses"] if row["id"] == first["id"])["state"] == "SUBMITTED_PENDING"
+    assert next(row for row in again["responses"] if row["id"] == first["id"])["state"] == "ACCEPTED"
     with SessionLocal() as db:
         from backend.app.db.models.foundation import AuditEvent
 

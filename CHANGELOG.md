@@ -98,6 +98,12 @@ B3: the US eMDR complete for manufacturers (initial report). No migration. The A
   three files, named for the follow-up. The list names each "Follow-up #n". A US request for information is started
   as "Start the follow-up for this request". The classic panel keeps its downloads (the eMDR XML and the official
   form) for every US report, follow-ups included.
+- B3 review fixes: the next follow-up starts only once the last one is accepted (or cancelled), since one still
+  pending may be rejected and come back; G6 on a follow-up is the chain's own (422 `FOLLOWS_CHAIN` if typed, never
+  copied from the initial), and "Follow-up #n" is never typed in an initial report's G6 (422 `NOT_A_FOLLOW_UP`); a
+  code taken off on a follow-up is listed as "removed here; FDA keeps the earlier value"; a follow-up's changes are
+  measured against the reports sent before it, never a later one; its draft PDF lays out the changes-only file it
+  will send; an approved, frozen file's Download XML is never blocked by today's Settings.
 
 ## [0.10.95] - not released yet (ships in the big-bang release)
 

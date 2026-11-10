@@ -77,7 +77,8 @@ function FollowUpChain({
   onOpen: (id: string) => void;
 }) {
   const chain = detail.responses.filter((row) => row.follow_up);
-  const open = chain.find((row) => !SENT.includes(row.state) && row.state !== "CANCELLED");
+  // The next waits until the last is accepted: one still pending may yet be rejected (authority_reports/router.py).
+  const open = chain.find((row) => !VALID.includes(row.state) && row.state !== "CANCELLED");
   const next = 1 + chain.filter((row) => SENT.includes(row.state)).length;
   const [form, setForm] = useState({ received: today(), text: "", narrative: "", h2: [] as string[] });
   const [error, setError] = useState("");
@@ -119,8 +120,8 @@ function FollowUpChain({
       {canWrite &&
         (open ? (
           <p className="ac-muted">
-            Follow-up #{open.follow_up} is open: submit it, or cancel it, before the next one. FDA takes follow-ups in
-            order.
+            Follow-up #{open.follow_up} is open: the next one starts once FDA accepts it (or it is cancelled). FDA takes
+            follow-ups in order.
           </p>
         ) : (
           <details>

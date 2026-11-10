@@ -571,6 +571,11 @@ describe("US follow-ups: the chain, starting one, and what a follow-up sends", (
     const held = render(<ReportsSection />, api("?report=r1"));
     expect(held).toContain("Follow-up #2 is open");
     expect(held).not.toContain("Start follow-up");
+    // Sent but not yet accepted: FDA may still reject it, so the next waits too.
+    resources.data[`${REPORTS}/r1`] = report(5, {
+      responses: [response("f1", 1, "SUBMITTED_PENDING", "Submitted, acceptance pending")] as ReportDetail["responses"],
+    });
+    expect(render(<ReportsSection />, api("?report=r1"))).toContain("Follow-up #1 is open");
     // Not before the initial report is submitted and accepted.
     resources.data[`${REPORTS}/r1`] = report(3);
     expect(render(<ReportsSection />, api("?report=r1"))).not.toContain("Report chain");
