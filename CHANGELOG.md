@@ -35,7 +35,23 @@ not built yet, and the chain is re-ordered at the release join). The API and web
   Audited: `CHALLENGE_VIEWED` (once per scope version), `DRAFT_ADOPTED`, `DRAFT_DISMISSED`, `CHALLENGE_ANSWERED`.
 - The Decision Brief gains a Challenge section and a Sources section (every record cited, with origin, and the rules
   with their versions). Material questions (C-1, C-2, C-3, C-4 above 20%, C-5) block "Submit for review" until
-  answered or marked not applicable. The sample brief carries the sample author's answers.
+  answered or marked not applicable. The sample brief carries the sample author's answers. The case record download
+  (JSON, CSV, PDF) and the investigation report document show the same two sections; older briefs show neither.
+- Screens: Investigations › Intelligence › Challenge (drafts with records for, against and missing, each record a
+  link; Adopt with ticked facts; Dismiss with a reason; Answer or Not applicable; the material questions still
+  blocking "Submit for review" listed first). The Decision Brief shows the Challenge section and Sources collapsed
+  with "N records, M rules". Shown only while the session says `challenge` is on.
+
+### Added (B5b, closed loop; on unless `MDARIX_CLOSED_LOOP=off`)
+
+- `GET /api/v1/investigations/{id}/did-it-work`: after the signed decision, the later complaints (same product,
+  version and problem; "version unknown" listed apart, never in a version), the CAPAs with every effectiveness round,
+  field actions, and for each action date the before/after by version, the lots released before vs after the
+  action, and a new version vs the old ones. Units shipped, else released, else "units unknown" (counts only, never a
+  rate from partial units); an exact conditional test with Benjamini-Hochberg; words "Too early", "Too few to tell",
+  "Fewer", "More", "No change seen", never "effective". Per-lot rows in a free trial only (B5-D9).
+- Completing a follow-up can record the customer's reference; a field action its kind, effective date, lots and
+  versions; a product change its new version (checked against the investigation's product). Off, refused.
 
 ## [0.10.97] - not released yet (after the WHIF freeze)
 

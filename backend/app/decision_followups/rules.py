@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from datetime import datetime, timezone
+import uuid
+from datetime import date, datetime, timezone
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from backend.app.db.models.decision_outcomes import FOLLOW_UP_ACTIONS, IMPACT_CONCLUSIONS
+from backend.app.db.models.decision_outcomes import FIELD_ACTION_KINDS, FOLLOW_UP_ACTIONS, IMPACT_CONCLUSIONS
 from backend.app.role_codes import role_code
 
 INVESTIGATION_WORK = "investigation.work"
@@ -223,6 +225,34 @@ def _text(value: str | None) -> str:
 
 class FollowUpCompletePayload(BaseModel):
     note: str = Field(min_length=NOTE_MIN, max_length=NOTE_MAX)
+    # B5b (tr26), all optional: the customer's reference (field action, CAPA step or change order); for a field action
+    # its kind, effective date and the lots or versions it covers; for a product change the new version.
+    action_reference: str | None = Field(default=None, max_length=120)
+    action_kind: Literal[FIELD_ACTION_KINDS] | None = None  # type: ignore[valid-type]
+    action_effective_on: date | None = None
+    lot_ids: list[uuid.UUID] = Field(default_factory=list, max_length=500)
+    version_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
+    new_version_id: uuid.UUID | None = None
+
+    def action_fields(self) -> dict:
+        """The B5b fields given, as stored (empty when none is)."""
+        found = {}
+        if self.action_reference and self.action_reference.strip():
+            found["action_reference"] = self.action_reference.strip()
+        if self.action_kind:
+            found["action_kind"] = self.action_kind
+        if self.action_effective_on:
+            found["action_effective_on"] = self.action_effective_on
+        scope = {
+            key: [str(item) for item in dict.fromkeys(value)]
+            for key, value in (("lot_ids", self.lot_ids), ("version_ids", self.version_ids))
+            if value
+        }
+        if self.new_version_id:
+            scope["new_version_id"] = str(self.new_version_id)
+        if scope:
+            found["action_scope"] = scope
+        return found
 
     @field_validator("note")
     @classmethod

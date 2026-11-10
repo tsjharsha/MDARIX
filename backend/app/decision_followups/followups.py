@@ -147,6 +147,13 @@ def serialize(db: Session, control_db: Session | None, person: Person, rows: lis
                     else None
                 ),
                 "completion_note": row.completion_note,
+                # B5b: what the follow-up recorded about its field action or product change.
+                "action_record": {
+                    "reference": row.action_reference,
+                    "kind": row.action_kind,
+                    "effective_on": row.action_effective_on.isoformat() if row.action_effective_on else None,
+                    "scope": row.action_scope or {},
+                },
                 "completed_by_name": common.name(people, row.completed_by) if row.completed_by else None,
                 "completed_at": common.iso(row.completed_at),
                 "actions": actions_for(person, row),
@@ -309,6 +316,61 @@ def start_follow_up(
     return _one(db, control_db, person, row)
 
 
+def _action_fields(db: Session, row: DecisionFollowUp, payload: rules.FollowUpCompletePayload) -> dict:
+    """B5b: the follow-up's reference, field-action kind, effective date, lots and versions, or new version, checked
+    against its type and the investigation's product (another product's or organization's records are refused)."""
+    from backend.app import feature_set
+    from backend.app.db.models.foundation import LotBatch, ProductVersion
+
+    found = payload.action_fields()
+    if not found:
+        return {}
+    if not feature_set.closed_loop():
+        raise common.error(409, "CLOSED_LOOP_OFF", "Recording field actions and product changes is switched off")
+    scope = found.get("action_scope") or {}
+    field_only = {"action_kind", "action_effective_on"} & set(found) or scope.get("lot_ids") or scope.get("version_ids")
+    if field_only and row.action_type != "FIELD_ACTION_REVIEW_REQUIRED":
+        raise common.error(
+            422, "NOT_A_FIELD_ACTION", "Kind, effective date, lots and versions belong to a field action"
+        )
+    if scope.get("new_version_id") and row.action_type != "PRODUCT_CHANGE_REQUIRED":
+        raise common.error(422, "NOT_A_PRODUCT_CHANGE", "A new version belongs to a product change")
+    product_id = (
+        db.query(Investigation.product_id)
+        .filter(Investigation.tenant_id == row.tenant_id, Investigation.id == row.investigation_id)
+        .scalar()
+    )
+    versions = {*scope.get("version_ids", []), *([scope["new_version_id"]] if scope.get("new_version_id") else [])}
+    if versions:
+        known = {
+            str(item)
+            for (item,) in db.query(ProductVersion.id).filter(
+                ProductVersion.tenant_id == row.tenant_id,
+                ProductVersion.product_id == product_id,
+                ProductVersion.id.in_([uuid.UUID(item) for item in versions]),
+            )
+        }
+        if versions - known:
+            raise common.error(422, "VERSION_NOT_OF_PRODUCT", "Choose versions of the investigation's product")
+    if scope.get("lot_ids"):
+        known = {
+            str(item)
+            for (item,) in db.query(LotBatch.id)
+            .join(
+                ProductVersion,
+                (ProductVersion.tenant_id == LotBatch.tenant_id) & (ProductVersion.id == LotBatch.product_version_id),
+            )
+            .filter(
+                LotBatch.tenant_id == row.tenant_id,
+                ProductVersion.product_id == product_id,
+                LotBatch.id.in_([uuid.UUID(item) for item in scope["lot_ids"]]),
+            )
+        }
+        if set(scope["lot_ids"]) - known:
+            raise common.error(422, "LOT_NOT_OF_PRODUCT", "Choose lots of the investigation's product")
+    return found
+
+
 def _details(row: DecisionFollowUp, role: str | None, **extra) -> dict:
     return {
         "investigation_id": str(row.investigation_id),
@@ -336,6 +398,9 @@ def complete_follow_up(
     now = rules.now_utc()
     role = person.role_for(INVESTIGATION_WORK)
     before = row.status
+    action = _action_fields(db, row, payload)
+    for key, value in action.items():
+        setattr(row, key, value)
     row.status = "DONE"
     row.completion_note = payload.note
     row.completed_by = person.user_id
@@ -351,7 +416,10 @@ def complete_follow_up(
         correlation_id=ctx.correlation_id,
         reason=payload.note,
         old_values={"status": before},
-        new_values={"status": "DONE"},
+        new_values={
+            "status": "DONE",
+            **{key: str(value) if key == "action_effective_on" else value for key, value in action.items()},
+        },
         details=_details(row, role),
         now=now,
     )
