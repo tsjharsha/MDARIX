@@ -1180,6 +1180,13 @@ def _parse(
     return rows
 
 
+def identity_columns(entity: str) -> list[str]:
+    """The columns naming one record of ``entity``: a duplicate in a file, a set-aside row a later import closes."""
+    spec = TEMPLATES[entity]
+    key = spec["required"][0]
+    return spec.get("identity") or ([key, "version"] if entity == "products" else [key])
+
+
 def _check_values(
     entity: str,
     rows: list[tuple[int, dict]],
@@ -1191,7 +1198,7 @@ def _check_values(
     masked text is what is saved) instead of being refused; what masking does not remove is still refused."""
     spec = TEMPLATES[entity]
     key = spec["required"][0]
-    identity_columns = spec.get("identity")
+    columns = identity_columns(entity)
     seen: dict[tuple, int] = {}
     complaint_lots: dict[str, tuple[int, set]] = {}
     for line, row in rows:
@@ -1293,10 +1300,7 @@ def _check_values(
                 report.add(line, key, f"Duplicate of row {first}.")
             lots.add(lot)
             continue
-        if identity_columns:
-            identity = tuple(row.get(column) for column in identity_columns)
-        else:
-            identity = (row.get(key), row.get("version")) if entity == "products" else (row.get(key),)
+        identity = tuple(row.get(column) for column in columns)
         if identity in seen:
             report.add(line, key, f"Duplicate of row {seen[identity]}.")
         else:
@@ -1861,14 +1865,14 @@ def import_file(
             db, tenant_id, import_ref, entity, TEMPLATES[entity]["required"], rows, version, policy.source
         )
         set_aside = [(line, row, checked.row_problems[line]) for line, row in parsed if line in checked.row_problems]
-        key = TEMPLATES[entity]["required"][0]
+        columns = identity_columns(entity)
         closed = import_quarantine.close_fixed(
             db,
             tenant_id,
             entity,
-            key,
-            written={row.get(key) for _, row in rows},
-            again={row.get(key) for _, row, _ in set_aside},
+            columns,
+            written={import_quarantine.record_identity(row, columns) for _, row in rows},
+            again={import_quarantine.record_identity(row, columns) for _, row, _ in set_aside},
             actor=actor or "system:import",
             source=policy.source,
         )

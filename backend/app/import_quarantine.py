@@ -191,14 +191,19 @@ def dismiss(db: Session, tenant_id, row_id: uuid.UUID, reason: str, actor: str, 
     return _view(item)
 
 
+def record_identity(row: dict | None, columns: list[str]) -> tuple:
+    """The values naming one record (a column the file did not have counts as empty)."""
+    return tuple((row or {}).get(column) or "" for column in columns)
+
+
 def close_fixed(
-    db: Session, tenant_id, entity: str, key: str, written: set, again: set, actor: str, source: str
+    db: Session, tenant_id, entity: str, columns: list[str], written: set, again: set, actor: str, source: str
 ) -> list[str]:
-    """Earlier imports' open set-aside rows of ``entity`` whose record (its ``key`` column) this import wrote close as
-    processed again, so a fixed row does not stay open and on Triage (J11); those whose record this import set aside
-    again are replaced by the newer row; only rows of the same ``source`` (an organization's own imports, never the
-    sample's). Returns the closed rows' ids (for the import's audit record)."""
-    wanted = {value for value in (written | again) if value}
+    """Earlier imports' open set-aside rows of ``entity`` whose record (the values of its identity ``columns``, as a
+    tuple) this import wrote close as processed again, so a fixed row does not stay open and on Triage (J11); those
+    whose record this import set aside again are replaced by the newer row; only rows of the same ``source`` (an
+    organization's own imports, never the sample's). Returns the closed rows' ids (for the import's audit record)."""
+    wanted = {identity for identity in (written | again) if identity[0]}
     if not wanted:
         return []
     now = datetime.now(timezone.utc)
@@ -208,14 +213,16 @@ def close_fixed(
         ImportQuarantineRow.entity == entity,
         ImportQuarantineRow.source == source,
         ImportQuarantineRow.status == OPEN,
-        ImportQuarantineRow.row[key].astext.in_(sorted(wanted)),
+        ImportQuarantineRow.row[columns[0]].astext.in_(sorted({identity[0] for identity in wanted})),
     )
     for item in rows.with_for_update():
-        value = (item.row or {}).get(key)
-        if value in written:
+        identity = record_identity(item.row, columns)
+        if identity in written:
             item.status = REPROCESSED
-        else:
+        elif identity in again:
             item.status, item.resolution_note = DISMISSED, REPLACED_NOTE
+        else:
+            continue  # same first column, another record (another version, component or shipment)
         item.resolved_at, item.resolved_by = now, actor
         closed.append(str(item.id))
     return closed

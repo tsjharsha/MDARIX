@@ -12,7 +12,7 @@ operator knows a release migrates the database.
 
 ## [0.10.95] - not released yet (ships in the big-bang release)
 
-Hardening: code-audit fixes 6-12. No migration. The API image changes.
+Hardening: code-audit fixes 6-20. No migration. The API image changes.
 
 ### Fixed
 
@@ -27,6 +27,8 @@ Hardening: code-audit fixes 6-12. No migration. The API image changes.
   day the market's deadline counts from, not the UTC day: an awareness at 00:30 IST is that day in India.
 - A complaint naming several countries counts each reporting window by the rule of the market that window covers, not
   the first country's (an India window on a "United States, India" complaint was one day late).
+- A later import closes only the set-aside rows of the records it wrote (product version, bill-of-materials line,
+  genealogy link, shipment), no longer every set-aside row that shares the first column.
 
 ### Security
 
