@@ -161,12 +161,27 @@ def reportable(facts: Facts) -> list[dict]:
     return found
 
 
-def covering_cases(db: Session, tenant_id: uuid.UUID, product_id, problem_code: str | None) -> list:
-    """The open cases whose scope holds a complaint with this product and problem code."""
+ANY_VERSION = object()
+
+
+def covers_version(db: Session, case: Investigation, version_id) -> bool:
+    """PV-1 F13: a case covers a version when its current scope names that version, or names no version (the whole
+    product). A complaint of unknown version is covered only by a whole-product scope."""
+    from backend.app.case_workflow import scope
+
+    versions = scope.current_scope(db, case)["product_version_ids"]
+    return not versions or (version_id is not None and str(version_id) in versions)
+
+
+def covering_cases(
+    db: Session, tenant_id: uuid.UUID, product_id, problem_code: str | None, version_id=ANY_VERSION
+) -> list:
+    """The open cases whose scope holds a complaint with this product and problem code; with ``version_id``, only those
+    whose scope covers that version (PV-1 F13)."""
     if product_id is None or not problem_code:
         return []
-    return (
-        db.query(Investigation.id, Investigation.business_id, Investigation.investigation_identifier)
+    cases = (
+        db.query(Investigation)
         .join(
             InvestigationComplaint,
             (InvestigationComplaint.tenant_id == Investigation.tenant_id)
@@ -186,6 +201,9 @@ def covering_cases(db: Session, tenant_id: uuid.UUID, product_id, problem_code: 
         .distinct()
         .all()
     )
+    if version_id is ANY_VERSION:
+        return cases
+    return [case for case in cases if covers_version(db, case, version_id)]
 
 
 def service_level_resolutions(
@@ -217,7 +235,11 @@ def service_level_resolutions(
 def recurrence(db: Session, tenant_id: uuid.UUID, facts: Facts, today: date) -> list[dict]:
     complaint = facts.complaint
     code = (complaint.problem_code or "").strip()
-    if complaint.product_id is None or not code or covering_cases(db, tenant_id, complaint.product_id, code):
+    if (
+        complaint.product_id is None
+        or not code
+        or covering_cases(db, tenant_id, complaint.product_id, code, complaint.product_version_id)
+    ):
         return []
     found = []
     signal = (

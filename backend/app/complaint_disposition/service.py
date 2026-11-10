@@ -220,7 +220,12 @@ def known_issue_cases(db: Session, tenant_id: uuid.UUID, complaint: Complaint) -
     for case, problem_code, lot_id in rows:
         reasons = []
         if code and (problem_code or "").strip().upper() == code:
-            reasons.append("same product and problem code")
+            # PV-1 F13: the reason says whether the case's scope covers this complaint's version.
+            reasons.append(
+                "same product and problem code"
+                if triggers.covers_version(db, case, complaint.product_version_id)
+                else "same product and problem code, another product version"
+            )
         if complaint.lot_batch_id is not None and lot_id == complaint.lot_batch_id:
             reasons.append("same lot")
         if not reasons:
@@ -522,6 +527,7 @@ def recurring(db: Session, tenant_id: uuid.UUID, today: date) -> list[dict]:
             func.upper(Complaint.problem_code),
             Complaint.business_id,
             Complaint.complaint_identifier,
+            Complaint.product_version_id,
         )
         .join(
             ComplaintDisposition,
@@ -541,12 +547,18 @@ def recurring(db: Session, tenant_id: uuid.UUID, today: date) -> list[dict]:
     )
     groups: dict[tuple, list] = defaultdict(list)
     names = {}
-    for product_id, name, code, business_id, identifier in rows:
-        groups[(product_id, code)].append(business_id or identifier)
+    for product_id, name, code, business_id, identifier, version_id in rows:
+        groups[(product_id, code)].append((business_id or identifier, version_id))
         names[product_id] = name
     found = []
-    for (product_id, code), refs in groups.items():
-        if len(refs) >= triggers.RECURRING_COUNT and not triggers.covering_cases(db, tenant_id, product_id, code):
+    for (product_id, code), items in groups.items():
+        # PV-1 F13: a resolution counts unless an open case covers its version (or the whole product).
+        covered = {
+            version_id: bool(triggers.covering_cases(db, tenant_id, product_id, code, version_id))
+            for version_id in {version_id for _, version_id in items}
+        }
+        refs = [ref for ref, version_id in items if not covered[version_id]]
+        if len(refs) >= triggers.RECURRING_COUNT:
             found.append(
                 {
                     "product_id": str(product_id),

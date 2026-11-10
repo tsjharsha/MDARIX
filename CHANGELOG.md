@@ -68,6 +68,9 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - The trend check gives each product's "unknown version" group the age of that product's own first unknown-version
   complaint, not the organization's oldest: a product whose unknown-version complaints are new is SHORT_HISTORY
   instead of a significant rise.
+- An open case covers a service-level recurrence or a complaint's recurrence trigger only for the versions its scope
+  names (or for the whole product when it names none): an open Rev C case no longer hides three Rev D resolutions.
+  The known-issue match says "another product version" when the case's scope does not cover the complaint's version.
 
 ### Security
 

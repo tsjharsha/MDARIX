@@ -210,3 +210,25 @@ def test_the_unknown_version_age_is_per_product(org):  # F12
         )
     assert ages[(None, uuid.UUID(seed["product_id"]))] == 400
     assert ages[(None, uuid.UUID(other["product_id"]))] == 0
+
+
+def test_a_case_scoped_to_one_version_does_not_cover_another(org):  # F13
+    from backend.app.complaint_disposition import triggers
+
+    investigator, _ = org["investigator"]
+    seed = _seed(org["tenant_id"])
+    with SessionLocal() as db:
+        bind_tenant(db, org["tenant_id"])
+        db.query(Complaint).filter(Complaint.id.in_([uuid.UUID(item) for item in seed["complaints"]])).update(
+            {"problem_code": "E01"}, synchronize_session=False
+        )
+        db.commit()
+    case = _open(investigator, seed, seed["complaints"][:2])  # scope: Rev A
+    product = uuid.UUID(seed["product_id"])
+    with SessionLocal() as db:
+        bind_tenant(db, org["tenant_id"])
+        covering = triggers.covering_cases(db, org["tenant_id"], product, "E01", uuid.UUID(seed["version_a"]))
+        assert [str(row.id) for row in covering] == [case["id"]]
+        assert triggers.covering_cases(db, org["tenant_id"], product, "E01", uuid.UUID(seed["version_b"])) == []
+        assert triggers.covering_cases(db, org["tenant_id"], product, "E01", None) == []
+        assert triggers.covering_cases(db, org["tenant_id"], product, "E01")  # any version: as before
