@@ -109,7 +109,10 @@ def _row(db: Session, tenant_id, complaint, market: str, answers: dict, level, t
     aware, _ = service.awareness(complaint)
     state = fields.get("conclusion") or evaluation["suggested"]
     zone = deadlines.org_zone(db, tenant_id)
-    clock = markets.market_clock(market, state, evaluation["report_type"], windows, aware, now, zone)
+    # The rule's own date (code audit 3): a pending draft counts the report a signed "reportable" would start.
+    clock = markets.market_clock(
+        market, state, evaluation["report_type"], windows, aware, now, zone, evaluation["report_type_if_reportable"]
+    )
     row = ComplaintMarketAssessment(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
