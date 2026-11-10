@@ -5,16 +5,18 @@ the person typed into the signing form (0.10.62, J1)."""
 import inspect
 import sys
 import types
+import uuid
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
 
 from backend.app import governance_router
-from backend.app.db.models.foundation import AuthUser
+from backend.app.db.models.foundation import AuditEvent, AuthUser
 from backend.app.db.models.stage2 import LoginThrottle
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system
+from backend.app.enterprise_audit import make_audit_event
 from backend.app.main import app
 from tests.route_inventory import api_routes
 from tests.test_mfa_mvp import PASSWORD, _enroll, _make_user, _next_code, _sign_in
@@ -129,6 +131,46 @@ def test_a_wrong_blank_or_reused_code_is_a_signature_refusal(monkeypatch, signer
     assert _verify(ctx, code=code)[0] == 200
     status, detail, _ = _verify(ctx, code=code)  # each code works once
     assert status == 403 and detail["code"] == "SIGNATURE_CODE_INVALID"
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("password, code", [("not-the-password", None), (PASSWORD, "000000")])
+def test_a_refusal_never_commits_what_the_route_staged(monkeypatch, signer, password, code):
+    """The helper rolls back the caller's session before the refusal audit is committed (hardening 0.10.95)."""
+    monkeypatch.setenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "true")
+    ctx, _ = signer
+    marker = f"staged-{uuid.uuid4().hex[:8]}"
+    with SessionLocal() as db:
+        bind_system(db, "test: staged change")
+        user = db.query(AuthUser).filter(AuthUser.id == uuid.UUID(ctx.user_id)).one()
+        before = user.display_name
+        user.display_name = marker  # what a route changed before it checked the signature
+
+        def refused(action):
+            db.add(
+                make_audit_event(
+                    tenant_id=ctx.tenant_id,
+                    actor_ref=ctx.user_id,
+                    action=action,
+                    entity_type="Test",
+                    details={"m": marker},
+                )
+            )
+
+        with pytest.raises(HTTPException) as caught:
+            governance_router.verify_signing_credentials(
+                db, ctx, password=password, mfa_code=code, record_refusal=refused
+            )
+    assert caught.value.status_code == 403
+    with SessionLocal() as db:
+        bind_system(db, "test: read back")
+        assert db.query(AuthUser).filter(AuthUser.id == uuid.UUID(ctx.user_id)).one().display_name == before
+        audits = (
+            db.query(AuditEvent).filter(AuditEvent.actor_ref == ctx.user_id, AuditEvent.entity_type == "Test").all()
+        )
+        assert [row.details["m"] for row in audits] == [marker]
+        throttle = db.query(LoginThrottle).filter(LoginThrottle.identifier == f"sign:{ctx.user_id}").one()
+        assert throttle.failure_count == 1  # the failed attempt still counts
 
 
 @pytest.mark.db

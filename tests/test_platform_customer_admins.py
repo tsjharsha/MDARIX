@@ -211,6 +211,42 @@ def test_suspending_a_customer_blocks_its_tenants_and_needs_the_password(platfor
     assert reactivated.json()["tenants_affected"][0]["effective_access"] == "ACTIVE"
 
 
+def test_a_wrong_password_on_a_status_change_is_audited_and_changes_nothing(platform, customer):
+    from backend.app.db.models.customer_lifecycle import Customer
+    from backend.app.db.models.foundation import AuditEvent
+    from backend.app.db.tenant_scope import bind_system
+
+    for path, action, entity in (
+        (
+            f"/api/v1/platform-admin/customer-records/{customer['customer_id']}/lifecycle",
+            "CUSTOMER_LIFECYCLE_REAUTHENTICATION_FAILED",
+            customer["customer_id"],
+        ),
+        (
+            f"/api/v1/platform-admin/tenants/{customer['id']}/lifecycle",
+            "TENANT_LIFECYCLE_REAUTHENTICATION_FAILED",
+            customer["id"],
+        ),
+    ):
+        wrong = platform.post(path, json={"status": "SUSPENDED", "reason": "Contract ended", "password": "wrong"})
+        assert wrong.status_code == 403 and wrong.json()["detail"]["code"] == "INVALID_REAUTHENTICATION"
+        db = SessionLocal()
+        try:
+            bind_system(db, "test: read refusal audit")
+            rows = db.query(AuditEvent).filter(AuditEvent.action == action, AuditEvent.entity_id == uuid.UUID(entity))
+            assert [row.details["to"] for row in rows] == ["SUSPENDED"], action
+        finally:
+            db.close()
+    db = SessionLocal()
+    try:
+        bind_system(db, "test: nothing changed")
+        assert db.query(Tenant).filter(Tenant.id == uuid.UUID(customer["id"])).one().status == "ACTIVE"
+        found = db.query(Customer).filter(Customer.id == uuid.UUID(customer["customer_id"])).one()
+        assert found.lifecycle_status == "ACTIVE"
+    finally:
+        db.close()
+
+
 def test_the_customer_page_has_only_working_sections(platform, customer):
     record = platform.get(f"/api/v1/platform-admin/customer-records/{customer['customer_id']}").json()
     assert record["tabs"] == ["Overview", "Administrators", "Subscription", "Usage", "Activity"]
