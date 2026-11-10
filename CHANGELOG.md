@@ -12,7 +12,7 @@ operator knows a release migrates the database.
 
 ## [0.10.95] - not released yet (ships in the big-bang release)
 
-Hardening: code-audit fixes 6-20. No migration. The API image changes.
+Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migration. The API image changes.
 
 ### Fixed
 
@@ -43,6 +43,11 @@ Hardening: code-audit fixes 6-20. No migration. The API image changes.
   back to the file, instead of Python byte text.
 - A CSV import with a stray quote mark is refused with the line it is on ("Line 7: a quote mark ... is not closed"),
   instead of reading the rest of the file as one cell or failing with a server error.
+
+### Fixed: a record's version always belongs to its product (PV-1)
+
+- Log a case refuses a lot of another product than the one chosen (422 `LOT_NOT_FOR_PRODUCT`); a lot given without a
+  product gives the Case the lot's product, shown "(from the lot)". A lot with an unknown version is still taken.
 
 ### Security
 

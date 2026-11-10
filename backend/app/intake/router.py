@@ -49,7 +49,7 @@ from backend.app.complaint_classification import rules as coding
 from backend.app import signing_commit
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.complaint_review import ComplaintSecondLook
-from backend.app.db.models.foundation import Complaint, LotBatch, Product, SignedApprovalRecord
+from backend.app.db.models.foundation import Complaint, LotBatch, Product, ProductVersion, SignedApprovalRecord
 from backend.app.db.models.ingestion import ImportQuarantineRow
 from backend.app.db.models.intake import FirstContactCheck, IntakeEvent, RecordLink, TriageRecord
 from backend.app.db.session import get_db
@@ -361,6 +361,7 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
         "country": event.country,
         "product_id": str(event.product_id) if event.product_id else None,
         "product_name": product.name if product else event.product_text,
+        "product_from_lot": ((event.identifiers or {}).get("product") or {}).get("source") == "LOT",
         "lot": lot.lot_identifier if lot else event.lot_text,
         # Spec 4.2/4.3: typed, not in the organization's products or lots (kept as typed and flagged).
         "not_in_master": [key for key, typed in (("product", event.product_text), ("lot", event.lot_text)) if typed],
@@ -847,11 +848,25 @@ def _at(value: datetime | None, zone: str) -> datetime | None:
 
 
 def _resolve_lot(db, tenant_id, product_id, value: str):
-    """The loaded lot of that number, or None: a lot not in the organization's lots is kept as typed (spec 4.2)."""
+    """The loaded lot of that number and its version's product id, or (None, None): a lot not in the organization's
+    lots is kept as typed (spec 4.2). PV-1 F2: a lot whose version belongs to another product than the chosen one is
+    refused; a lot with an unknown version stays allowed."""
     text = rules.clean(value, 120)
     if not text:
-        return None
-    return db.query(LotBatch).filter(LotBatch.tenant_id == tenant_id, LotBatch.lot_identifier == text).first()
+        return None, None
+    lot = db.query(LotBatch).filter(LotBatch.tenant_id == tenant_id, LotBatch.lot_identifier == text).first()
+    if lot is None or lot.product_version_id is None:
+        return lot, None
+    lot_product = (
+        db.query(ProductVersion.product_id)
+        .filter(ProductVersion.tenant_id == tenant_id, ProductVersion.id == lot.product_version_id)
+        .scalar()
+    )
+    if product_id is not None and lot_product != product_id:
+        raise _error(
+            422, "LOT_NOT_FOR_PRODUCT", f"Lot {text} belongs to another product: choose its product, or check the lot"
+        )
+    return lot, lot_product
 
 
 @router.post("/intake", dependencies=[ANY_ROLE])
@@ -885,7 +900,11 @@ def log_intake(
         product = db.query(Product).filter(Product.tenant_id == tenant_id, Product.id == payload.product_id).first()
         if product is None:
             raise _error(422, "PRODUCT_NOT_FOUND", "No such product in your organization")
-    lot = _resolve_lot(db, tenant_id, payload.product_id, payload.lot)
+    lot, lot_product = _resolve_lot(db, tenant_id, payload.product_id, payload.lot)
+    # PV-1 F2: no product chosen but a known lot: the product is the lot's, shown "from the lot".
+    product_from_lot = product is None and lot_product is not None
+    if product_from_lot:
+        product = db.get(Product, lot_product)
     lot_text = None if lot is not None else (rules.clean(payload.lot, 120) or None)
     product_text = None if product is not None else (rules.clean(payload.product_text, 200) or None)
     zone = _zone(payload.received_zone)
@@ -953,7 +972,12 @@ def log_intake(
         updated_at=now,
         owner_id=str(ctx.user_id),
         request_key=request_key,
-        identifiers=case_rules.clean_identifiers(payload.identifiers, given),
+        identifiers=case_rules.clean_identifiers(payload.identifiers, given)
+        | (
+            {"product": {"not_sure": False, "status": case_rules.UNCONFIRMED, "source": "LOT"}}
+            if product_from_lot
+            else {}
+        ),
         issue_category=case_rules.issue_category(payload.issue_category),
         product_text=product_text,
         lot_text=lot_text,

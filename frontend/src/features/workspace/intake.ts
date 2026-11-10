@@ -129,6 +129,8 @@ export type IntakeItem = {
   reporter_site: string | null;
   country: string | null;
   product_name: string | null;
+  /** PV-1 F2: no product was chosen; it is the lot's product. */
+  product_from_lot?: boolean;
   lot: string | null;
   requested_label: string | null;
   times: Record<string, { at: string | null; zone: string | null }>;

@@ -944,7 +944,7 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
         <q className="uw-cr-text">{item.reporter_words}</q>
         <p className="uw-cr-meta">
           {[
-            item.product_name,
+            item.product_name && item.product_from_lot ? `${item.product_name} (from the lot)` : item.product_name,
             item.lot,
             item.requested_label && `asked for: ${item.requested_label}`,
             item.reporter_type,
