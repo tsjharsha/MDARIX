@@ -14,6 +14,7 @@ from backend.app.db.models.stage2 import LoginThrottle
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system
 from backend.app.main import app
+from tests.conftest import with_signing_plan
 
 PASSWORD = "Mfa-Test-Password-2026!"
 
@@ -186,6 +187,9 @@ def decision():
     with SessionLocal() as db:
         bind_system(db, "test: decision to sign")
         tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first()
+        # The signature gate is reached only by an organization whose plan includes signatures: say so here instead
+        # of relying on an earlier test or seed having given the shared tenant its plan.
+        with_signing_plan(db, tenant)
         investigation = db.query(Investigation).filter(Investigation.tenant_id == tenant.id).first()
         now = datetime.now(timezone.utc)
         row = Decision(
