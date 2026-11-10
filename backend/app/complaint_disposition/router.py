@@ -512,6 +512,9 @@ def sign(
         )
 
     def refused(action: str) -> None:
+        # A refused signature changes nothing but its audit: on the shared trial plane the data session is this one, so
+        # what the request staged (Resolve and close's problem code) would be committed with the audit.
+        control_db.rollback()
         control_db.add(
             make_audit_event(
                 tenant_id=tenant_id,

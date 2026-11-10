@@ -93,6 +93,49 @@ def _closure(tenant_id, complaint_id) -> EventClosure | None:
         return db.query(EventClosure).filter(EventClosure.complaint_id == uuid.UUID(complaint_id)).one_or_none()
 
 
+def test_a_wrong_or_missing_code_is_refused_audited_and_saves_nothing(trial, monkeypatch):
+    """Runs first, on the open sample: refused as the signature's code (never MFA_REQUIRED), each refusal audited, and
+    no disposition, closure, problem code or customer-told entry left behind (test_signing_code_refusals.py)."""
+    from backend.app.db.models.guides_communications import CommunicationEntry
+    from backend.app.db.models.stage2 import LoginThrottle
+    from tests.test_mfa_mvp import _enroll
+
+    user, rt01, tenant_id = trial["user"], trial["rt01"], trial["tenant_id"]
+    _enroll(user)
+    _acknowledge(user)
+    monkeypatch.setenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "true")
+    view = user.get(_url(rt01)).json()
+    seen = [*view["disposition"]["trigger_codes"], "NEW_FAILURE_MODE"]
+    body = _body(view, problem_code="B7_NEW_MODE", seen_triggers=seen, known_behaviour_ref="IFU-PW-12 section 7.3")
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        code_before = db.get(Complaint, uuid.UUID(rt01)).problem_code
+
+    wrong = user.post(_url(rt01), json={**body, "mfa_code": "000000"})
+    assert wrong.status_code == 403 and wrong.json()["detail"]["code"] == "SIGNATURE_CODE_INVALID", wrong.text
+    assert wrong.json()["detail"]["message"].startswith("That code didn't match")
+    missing = user.post(_url(rt01), json=body)
+    assert missing.status_code == 403 and missing.json()["detail"]["code"] == "SIGNATURE_CODE_INVALID"
+
+    refusals = _actions(tenant_id, "SIGNATURE_MFA_FAILED")
+    assert len(refusals) == 2 and {details.get("attempt") for _, details in refusals} == {"COMPLAINT_DISPOSITION_SIGN"}
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        complaint_id = uuid.UUID(rt01)
+        assert db.get(Complaint, complaint_id).problem_code == code_before
+        assert db.get(Complaint, complaint_id).status != "closed"
+        assert db.query(ComplaintDisposition).filter(ComplaintDisposition.complaint_id == complaint_id).count() == 0
+        assert db.query(EventClosure).filter(EventClosure.complaint_id == complaint_id).count() == 0
+        told = db.query(CommunicationEntry).filter(
+            CommunicationEntry.complaint_id == complaint_id, CommunicationEntry.subject.like("Resolution of %")
+        )
+        assert told.count() == 0
+    with SessionLocal() as db:  # wrong codes count on the sign throttle: later tests start afresh
+        bind_system(db, "test: clear the sign throttle")
+        db.query(LoginThrottle).filter(LoginThrottle.identifier.like("sign:%")).delete(synchronize_session=False)
+        db.commit()
+
+
 def test_rt08_one_signature_writes_two_records_and_closes_in_complete(trial):
     user, rt01, tenant_id = trial["user"], trial["rt01"], trial["tenant_id"]
     view = user.get(_url(rt01)).json()

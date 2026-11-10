@@ -26,6 +26,7 @@ SIGNING_ROUTES = {
     ("POST", "/api/v1/capas/{capa_id}/effectiveness/result"),
     ("POST", "/api/v1/complaints/{complaint_id}/disposition/sign"),
     ("POST", "/api/v1/complaints/{complaint_id}/market-assessments/{market}/sign"),
+    ("POST", "/api/v1/complaints/{complaint_id}/resolve-and-close"),
     ("POST", "/api/v1/decision-guides/{market}/versions/{version}/approve"),
     ("POST", "/api/v1/documents/{version_id}/sign"),
     ("POST", "/api/v1/governance/decisions/{decision_id}/sign"),
@@ -46,7 +47,8 @@ SIGNING_ROUTES = {
 
 
 def _reaches(function, target: str, seen: set) -> bool:
-    """Whether a function (or a module-level helper it calls, at any depth) names ``target``."""
+    """Whether a function (or a module-level helper it calls, at any depth, imported from another app module too: B7's
+    resolve-and-close signs through the disposition router's ``sign``) names ``target``."""
     if function in seen or not isinstance(function, types.FunctionType):
         return False
     seen.add(function)
@@ -59,7 +61,7 @@ def _reaches(function, target: str, seen: set) -> bool:
         codes.extend(const for const in code.co_consts if isinstance(const, types.CodeType))
         for name in code.co_names:
             helper = getattr(module, name, None)
-            if isinstance(helper, types.FunctionType) and helper.__module__ == function.__module__:
+            if isinstance(helper, types.FunctionType) and helper.__module__.startswith("backend.app."):
                 if _reaches(helper, target, seen):
                     return True
     return False
