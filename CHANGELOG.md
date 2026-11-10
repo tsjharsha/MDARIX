@@ -54,6 +54,16 @@ trials' existing Cases; nothing is written until the owner approves the list), t
   step says what to do next, why, who does it and what evidence ticks it, and ticks only from saved records. A
   service-only, inquiry or "not a complaint" Case skips the reporting steps and goes to the QA review; a pending Case
   waits for the reporter with an owner and a due date. "More cases to try" lists the other sample Cases.
+- **Your QMS triage on import.** The complaints template takes four optional columns: `triage_date`,
+  `triage_severity`, `triage_owner`, `immediate_action`. A complaint with no harm flag is accepted as triaged in your
+  QMS, with no click; one with a death, an injury, a malfunction or harm words shows "From your QMS: confirm" on the
+  triage list, and a person checks it and presses **Confirm QMS triage** (one at a time). A re-upload never changes a
+  triage a person saved.
+- **Imported backlog** (Complaints › More views): imported complaints known of more than 30 days before their import,
+  with no harm flag and no triage yet. Routine triage, one click each, due 10 working days after the import (both
+  organization settings). Read in full, oldest first, however large the import.
+- **Second look: "Closed without a reportability decision?"** A complaint closed in your QMS with a death or a
+  serious injury and no signed market conclusion comes to the second look.
 
 ### Changed
 

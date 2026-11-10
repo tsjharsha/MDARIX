@@ -20,8 +20,9 @@ from __future__ import annotations
 import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from types import SimpleNamespace
 
-from sqlalchemy import event as sa_event, or_
+from sqlalchemy import event as sa_event, exists, func, or_
 from sqlalchemy.orm import Session
 
 from backend.app.trial.sample_source import is_sample
@@ -42,6 +43,7 @@ FOLLOW_UP, QMS, REVIEW = "FIRST_CONTACT_FOLLOW_UP", "QMS_COMPLAINT", "SERVICE_ON
 TASK_TYPES = (FOLLOW_UP, QMS, REVIEW)
 INTAKE, COMPLAINT, QUARANTINE = "INTAKE", "COMPLAINT", "QUARANTINE"
 READ_LIMIT = 2000
+QMS_IMPORT_ACTOR, QMS_LABEL = "system:qms-import", "Your QMS (imported)"  # trial/imports.py (T-D9)
 AWAITING_IMPORT = "Awaiting import confirmation"
 
 
@@ -554,6 +556,122 @@ def _listed(subject: dict, record: TriageRecord | None) -> bool:
     return bool(subject["flags"]) and not subject.get("taken_up")
 
 
+BACKLOG_READ = 20_000  # shortcut: one read of this many candidates; page it in the database if an import is larger
+
+
+def imported_backlog(
+    db: Session,
+    tenant_id: uuid.UUID,
+    *,
+    page: int = 1,
+    page_size: int = 25,
+    complaint_id: uuid.UUID | None = None,
+    now: datetime | None = None,
+) -> dict:
+    """OD-12 / TR-21 (0.10.93, B2): imported complaints whose awareness was more than ``backlog_days`` before their
+    import, open, with no harm flag, never triaged and not taken up: routine triage in their own "Imported backlog"
+    view, due ``backlog_target_days`` working days after the import. Read by query (every one, oldest first), not from
+    the triage list's newest 2,000. A flagged one is on "To triage" at its own speed: safety never waits."""
+    from backend.app.db.models.oversight import OversightSettings
+
+    now = now or now_utc()
+    settings = (
+        db.query(OversightSettings.backlog_days, OversightSettings.backlog_target_days)
+        .filter(OversightSettings.tenant_id == tenant_id)
+        .first()
+    )
+    days, target_days = (settings.backlog_days, settings.backlog_target_days) if settings else (30, 10)
+    taken = (
+        exists().where(
+            TriageRecord.tenant_id == tenant_id,
+            TriageRecord.subject_kind == COMPLAINT,
+            TriageRecord.subject_id == Complaint.id,
+        ),
+        exists().where(
+            InvestigationComplaint.tenant_id == tenant_id, InvestigationComplaint.complaint_id == Complaint.id
+        ),
+        exists().where(
+            ComplaintDisposition.tenant_id == tenant_id,
+            ComplaintDisposition.complaint_id == Complaint.id,
+            ComplaintDisposition.superseded_by.is_(None),
+        ),
+        exists().where(
+            ComplaintSecondLook.tenant_id == tenant_id,
+            ComplaintSecondLook.complaint_id == Complaint.id,
+            ComplaintSecondLook.decision == "DISMISSED",
+        ),
+    )
+    earliest = func.least(Complaint.awareness_timestamp, Complaint.complaint_timestamp, Complaint.event_timestamp)
+    query = db.query(
+        Complaint.id,
+        Complaint.business_id,
+        Complaint.complaint_identifier,
+        Complaint.product_id,
+        Complaint.status,
+        Complaint.description,
+        Complaint.death,
+        Complaint.serious_injury,
+        Complaint.patient_involved,
+        Complaint.malfunction,
+        Complaint.severity,
+        Complaint.awareness_timestamp,
+        Complaint.complaint_timestamp,
+        Complaint.event_timestamp,
+        Complaint.recorded_timestamp,
+        Complaint.ingestion_timestamp,
+        Complaint.created_at,
+    ).filter(
+        Complaint.tenant_id == tenant_id,
+        Complaint.source_system.notin_(("MDARIX_SAMPLE", "MDARIX_CASE")),
+        Complaint.ingestion_timestamp.isnot(None),
+        # The broad cut; the exact awareness rule (complaint_awareness) is applied below.
+        earliest < Complaint.ingestion_timestamp - func.make_interval(0, 0, 0, days),
+        *(~clause for clause in taken),
+    )
+    if complaint_id is not None:
+        query = query.filter(Complaint.id == complaint_id)
+    rows = query.order_by(earliest.asc(), Complaint.id).limit(BACKLOG_READ + 1).all()
+    calendar_ = calendar(db, tenant_id)
+    products = {row.id: row.name for row in db.query(Product.id, Product.name).filter(Product.tenant_id == tenant_id)}
+    items = []
+    for row in rows[:BACKLOG_READ]:
+        if review_rules.is_closed(row.status) or rules.complaint_flags(_complaint_record(row)):
+            continue
+        aware = complaint_awareness(SimpleNamespace(**row._asdict()))["at"]
+        imported = rules.utc(row.ingestion_timestamp)
+        if aware >= imported - timedelta(days=days):
+            continue
+        due = working_day_end(imported, target_days, calendar_)
+        items.append(
+            {
+                "kind": COMPLAINT,
+                "id": str(row.id),
+                "ref": complaint_ref(row),
+                "identifier": row.complaint_identifier,
+                "product_name": products.get(row.product_id),
+                "words": row.description,
+                "awareness_at": aware.isoformat(),
+                "imported_at": imported.isoformat(),
+                "due_at": due.isoformat(),
+                "overdue": due < now,
+            }
+        )
+    start = (max(page, 1) - 1) * page_size
+    return {
+        "summary": {
+            "total": len(items),
+            "overdue": sum(1 for item in items if item["overdue"]),
+            "backlog_days": days,
+            "target_days": target_days,
+        },
+        "page": max(page, 1),
+        "page_size": page_size,
+        "pages": max(1, -(-len(items) // page_size)),
+        "truncated": len(rows) > BACKLOG_READ,
+        "items": items[start : start + page_size],
+    }
+
+
 def triage_records(db: Session, tenant_id: uuid.UUID) -> dict[tuple, TriageRecord]:
     return {
         (row.subject_kind, row.subject_id): row
@@ -769,6 +887,10 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
     acked = acked if acked is not None and acked >= opened else None
     ack_due = triage_rules.ack_due(opened, target)
     signer = next((found[key].get("signed_by") for key in members if found[key].get("signed_by")), None)
+    # T-D9: a triage imported from the QMS on a flagged record waits for a person ("From your QMS: confirm").
+    qms_to_confirm = any(
+        row is not None and row.source_system == "QMS" and row.completed_at is None for row in member_records.values()
+    )
     return {
         "key": f"{primary['kind']}:{primary['id']}",
         "kind": primary["kind"],
@@ -826,8 +948,9 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
             "acknowledged_by": (names.get(record.acknowledged_by) or "A colleague") if acked else None,
         },
         "routine_prefill": {**triage_rules.ROUTINE_PREFILL, "triage_owner": signer, "event_owner": signer}
-        if pace == triage_rules.ROUTINE
+        if pace == triage_rules.ROUTINE and not qms_to_confirm
         else None,
+        "qms_to_confirm": qms_to_confirm,
         "deadlines": deadlines,
         "own_market": own,
         "earliest_due": deadlines[0]["due_at"] if deadlines else None,
@@ -870,8 +993,14 @@ def record_view(record: TriageRecord, names: dict) -> dict:
         "no_action_reason": record.no_action_reason,
         "awareness_confirmed_at": _iso(record.awareness_confirmed_at),
         "awareness_note": record.awareness_note,
-        "completed_by": name(record.completed_by),
+        "completed_by": QMS_LABEL if record.completed_by == QMS_IMPORT_ACTOR else name(record.completed_by),
         "completed_at": _iso(record.completed_at),
+        # T-D9: the triage done in the QMS, and who confirmed it here.
+        "source_system": record.source_system,
+        "qms_triaged_at": _iso(record.qms_triaged_at),
+        "qms_owner_text": record.qms_owner_text,
+        "confirmed_by": name(record.confirmed_by),
+        "confirmed_at": _iso(record.confirmed_at),
         # B2 (tr19): versions, two speeds, the floor, containment, reopening, the signed threat exclusion.
         "version": record.version,
         "speed": record.speed,

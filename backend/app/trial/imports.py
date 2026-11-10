@@ -120,6 +120,13 @@ COLUMN_HELP: dict[str, dict[str, str]] = {
         "product_name": "The product's name. During a free trial a product, version or lot the complaints name but you "
         "have not loaded is added from this file, under this name.",
         "problem_code": "Your problem code. Signals group by product version and problem code.",
+        "triage_date": "The day your quality system triaged the complaint (YYYY-MM-DD). With the triage columns MDARIX "
+        "keeps your QMS triage: a complaint with no harm flag is accepted as triaged, one with a death, an injury, a "
+        "malfunction or harm words waits for a person to confirm it.",
+        "triage_severity": "The severity your QMS triage gave (Negligible, Minor, Serious, Critical, Catastrophic or "
+        "your own scale's words, mapped like 'severity').",
+        "triage_owner": "Who owns the triage in your QMS: a role or a team (Complaint unit), not a person's name.",
+        "immediate_action": "What was done at once (user told how to stay safe, device taken out of use), or blank.",
         "use_environment": "Where the device was used (hospital ward, intensive care unit, operating theatre, home, "
         "ambulance, clinic): proposed for a person to confirm. Any other value stays Unknown, shown as you gave it.",
         "user_type": "Who used it (healthcare professional, lay user, patient, service engineer): proposed for a person "
@@ -210,6 +217,11 @@ TEMPLATES: dict[str, dict] = {
             "product_name",
             "use_environment",
             "user_type",
+            # T-D9 (0.10.93, B2): the triage done in the QMS (spec 3.4).
+            "triage_date",
+            "triage_severity",
+            "triage_owner",
+            "immediate_action",
         ],
         "example": [
             [
@@ -237,6 +249,10 @@ TEMPLATES: dict[str, dict] = {
                 "AquaFlow 200 Infusion Pump",
                 "Intensive care unit",
                 "Healthcare professional",
+                "2026-08-31",
+                "Minor",
+                "Complaint unit",
+                "Infusion moved to a backup pump; device taken out of use",
             ],
             # The investigations example links both complaints, so the templates load in the order they are offered
             # (FUN-10).
@@ -265,6 +281,10 @@ TEMPLATES: dict[str, dict] = {
                 "AquaFlow 200 Infusion Pump",
                 "Intensive care unit",
                 "Healthcare professional",
+                "",
+                "",
+                "",
+                "",
             ],
         ],
     },
@@ -276,7 +296,7 @@ FLAG_VALUES = {"y": True, "yes": True, "true": True, "1": True, "n": False, "no"
 # What registers write for "not known" in a yes/no column: read as blank (unknown), never as No.
 FLAG_NOT_KNOWN = frozenset({"na", "n/a", "-", "--", "unknown", "not known", "not applicable"})
 FLAG_HINT = "use Y, N, Yes, No, 1 or 0, or leave it blank (or NA) when it is not known."
-LONG_TEXT = {"description": 4000, "text": 4000, "question": 4000, "content": 20000}
+LONG_TEXT = {"description": 4000, "immediate_action": 4000, "text": 4000, "question": 4000, "content": 20000}
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._/#:-]{0,119}$")
 # A version may carry build metadata, as software versions do ("1.4.2+build", J41).
@@ -2160,9 +2180,99 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
         upsert_record_evidences(db, tenant_id, evidence)
         _propose_classifications(db, tenant_id, complaints, proposed, now)
     result = {"entity": entity, "created": created, "updated": updated, "rows": len(rows), "_changes": changes}
+    if entity == "complaints":
+        qms = _qms_triage(db, tenant_id, rows, complaints, now)
+        if qms["accepted"] or qms["to_confirm"]:
+            result["qms_triage"] = qms
     if also_created:
         result["also_created"] = also_created
     return result
+
+
+QMS_TRIAGE_COLUMNS = ("triage_date", "triage_severity", "triage_owner", "immediate_action")
+
+
+def _qms_triage(db: Session, tenant_id, rows, complaints: dict, now: datetime) -> dict:
+    """T-D9 (0.10.93, B2; TR-14, TR-37, TR-38): a complaint row with the QMS triage columns gets a triage record with
+    source QMS. With no flag (no death, injury, harm, malfunction or harm words) it is accepted as triaged, no click
+    needed; with one it waits for a person to confirm it ("From your QMS: confirm", on the triage list because it is
+    flagged). A complaint that already has a triage record keeps it: a file never changes a person's triage."""
+    from backend.app.db.bulk import insert_rows
+    from backend.app.db.models.intake import TriageRecord, TriageRecordVersion
+    from backend.app.intake import rules as intake_rules
+    from backend.app.intake import service as intake_service
+    from backend.app.intake import triage_rules
+    from backend.app.reportability import markets
+
+    wanted: dict[str, dict] = {}
+    for _, row in rows:
+        if row["complaint_id"] not in wanted and any(row.get(column) for column in QMS_TRIAGE_COLUMNS):
+            wanted[row["complaint_id"]] = row
+    found = {"accepted": 0, "to_confirm": 0}
+    if not wanted:
+        return found
+    ids = [complaints[key].id for key in wanted]
+    had: set = set()
+    for start in range(0, len(ids), 5000):
+        had |= {
+            row[0]
+            for row in db.query(TriageRecord.subject_id).filter(
+                TriageRecord.tenant_id == tenant_id,
+                TriageRecord.subject_kind == intake_service.COMPLAINT,
+                TriageRecord.subject_id.in_(ids[start : start + 5000]),
+            )
+        }
+    records, versions = [], []
+    for identifier, row in wanted.items():
+        complaint = complaints[identifier]
+        if complaint.id in had:
+            continue
+        flags = intake_rules.complaint_flags(intake_service._complaint_record(complaint))
+        action = row.get("immediate_action") or None
+        fields = {
+            "id": uuid.uuid4(),
+            "tenant_id": tenant_id,
+            "subject_kind": intake_service.COMPLAINT,
+            "subject_id": complaint.id,
+            "opened_at": now,
+            "source_system": "QMS",
+            "source_identifier": identifier,
+            "qms_triaged_at": _date(row["triage_date"]) if row.get("triage_date") else None,
+            "qms_owner_text": row.get("triage_owner") or None,
+            "severity": markets.level_of_severity(row.get("triage_severity")),
+            "immediate_action": action,
+            "created_by": intake_service.QMS_IMPORT_ACTOR,
+            "created_at": now,
+            "updated_at": now,
+        }
+        if flags:
+            found["to_confirm"] += 1
+        else:
+            # TR-37: accepted as the QMS recorded it, version 1, no person's click.
+            fields.update(
+                speed="ROUTINE",
+                flags_at_completion={"facts": triage_rules.facts([]), "codes": []},
+                containment={"choices": ["OTHER" if action else "NONE_NEEDED"], "text": action or ""},
+                completed_by=intake_service.QMS_IMPORT_ACTOR,
+                completed_at=now,
+            )
+            versions.append(
+                {
+                    "tenant_id": tenant_id,
+                    "triage_record_id": fields["id"],
+                    "version": 1,
+                    "snapshot": intake_service.triage_snapshot(TriageRecord(**fields)),
+                    "changed_fields": {},
+                    "change_reason": "Triaged in your QMS (imported)",
+                    "changed_by": intake_service.QMS_IMPORT_ACTOR,
+                    "changed_at": now,
+                }
+            )
+            found["accepted"] += 1
+        records.append(fields)
+    insert_rows(db, TriageRecord, records)
+    insert_rows(db, TriageRecordVersion, versions)
+    return found
 
 
 # The complaint fields a re-upload sets, and the file columns each comes from (the other fields come from

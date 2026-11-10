@@ -212,6 +212,12 @@ export type TriageRecordView = {
   escalation_reason: string | null;
   completed_by: string | null;
   completed_at: string | null;
+  // 0.10.93 (B2, T-D9): the triage done in the QMS, and who confirmed it here.
+  source_system?: string | null;
+  qms_triaged_at?: string | null;
+  qms_owner_text?: string | null;
+  confirmed_by?: string | null;
+  confirmed_at?: string | null;
   // 0.10.93 (B2): owners by id (the form starts from them), versions, two speeds, containment, the threat exclusion.
   event_owner?: string | null;
   triage_owner?: string | null;
@@ -279,6 +285,8 @@ export type TriageItem = {
     overdue: boolean;
     acknowledged_by: string | null;
   };
+  /** T-D9: a triage imported from the QMS on a flagged record, waiting for a person ("From your QMS: confirm"). */
+  qms_to_confirm?: boolean;
   routine_prefill?: {
     severity: string;
     harm_now_label: string;
@@ -286,6 +294,25 @@ export type TriageItem = {
     no_action_reason: string;
     triage_owner: string | null;
   } | null;
+};
+/** GET /intake/triage/backlog (OD-12, TR-21): the "Imported backlog" view. */
+export type ImportedBacklogList = {
+  summary: { total: number; overdue: number; backlog_days: number; target_days: number };
+  page: number;
+  pages: number;
+  truncated: boolean;
+  items: {
+    kind: "COMPLAINT";
+    id: string;
+    ref: string;
+    identifier: string | null;
+    product_name: string | null;
+    words: string | null;
+    awareness_at: string;
+    imported_at: string;
+    due_at: string;
+    overdue: boolean;
+  }[];
 };
 export type TriageList = {
   items: TriageItem[];

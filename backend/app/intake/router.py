@@ -2062,6 +2062,17 @@ def triage_list(
     return service.triage(db, control_db, _tenant(ctx), show)
 
 
+@router.get("/triage/backlog")
+def imported_backlog(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The "Imported backlog" view (OD-12, TR-21): old imported complaints, routine, with their own target."""
+    return service.imported_backlog(db, _tenant(ctx), page=page, page_size=page_size)
+
+
 def _subject_exists(db, tenant_id, kind: str, record_id: uuid.UUID) -> bool:
     if kind == service.QUARANTINE:
         return (
@@ -2209,12 +2220,17 @@ def _save_triage(db, control_db, ctx, kind, record_id, payload: TriageIn, *, app
     least = item["severity_floor"] if item else None
     record = _record_for(db, tenant_id, kind, record_id, ctx.user_id, now, _opened(item, now))
     saved = bool(record.flags_at_completion)
+    # T-D9: saving the full form on a QMS triage still to confirm is its confirmation (TR-14, TR-38).
+    qms_confirm = record.source_system == "QMS" and record.completed_at is None
+    if qms_confirm:
+        action = "TRIAGE_QMS_CONFIRMED"
     if saved and payload.seen_version != record.version:
         raise _error(409, "TRIAGE_CHANGED", "A colleague changed this triage a moment ago; reload to see it")
     severity = rules.clean(payload.severity, 20).upper()
     potential = rules.clean(payload.potential_severity, 20).upper() or None
     reason = rules.clean(payload.change_reason)
-    problem = triage_rules.severity_problem(severity, least, record.severity if saved else None, reason)
+    # Below the level the QMS gave needs a reason, as lowering a saved one does (spec 3.4, severity rules).
+    problem = triage_rules.severity_problem(severity, least, record.severity if saved or qms_confirm else None, reason)
     if problem:
         raise _error(422, *problem)
     if potential and potential not in triage_rules.SCALE:
@@ -2379,6 +2395,8 @@ def _save_triage(db, control_db, ctx, kind, record_id, payload: TriageIn, *, app
         if row.acknowledged_at is None or rules.utc(row.acknowledged_at) < rules.utc(row.opened_at):
             row.acknowledged_at, row.acknowledged_by = now, str(ctx.user_id)  # saving the triage acknowledges it
         row.completed_by, row.completed_at, row.updated_at = str(ctx.user_id), now, now
+        if row is record and qms_confirm:
+            row.confirmed_by, row.confirmed_at = str(ctx.user_id), now
         db.flush()
         found = service.add_triage_version(db, tenant_id, row, before, ctx.user_id, now, reason or None, signed_id)
         if row is record:
@@ -2479,9 +2497,15 @@ def confirm_routine(
     tenant_id = _tenant(ctx)
     kind = _subject_or_404(db, tenant_id, kind, record_id)
     item = _triage_item(db, control_db, tenant_id, kind, record_id, service.now_utc())
-    if item is None or item["speed"] != triage_rules.ROUTINE:
+    # An imported-backlog complaint (OD-12) is routine but not on the triage list: the same one click, owned by you.
+    backlog = (
+        item is None
+        and kind == service.COMPLAINT
+        and service.imported_backlog(db, tenant_id, complaint_id=record_id)["items"]
+    )
+    if not backlog and (item is None or item["speed"] != triage_rules.ROUTINE or not item["routine_prefill"]):
         raise _error(409, "NOT_ROUTINE", "Only a routine triage is confirmed in one click: use the full form")
-    prefill = item["routine_prefill"]
+    prefill = item["routine_prefill"] if item else {**triage_rules.ROUTINE_PREFILL, "triage_owner": None}
     people = {entry["id"] for entry in service.colleagues(control_db, tenant_id)}
     owner = prefill["triage_owner"] if prefill["triage_owner"] in people else str(ctx.user_id)
     body = TriageIn(
@@ -2494,6 +2518,32 @@ def confirm_routine(
         change_reason="Routine triage confirmed",
     )
     return _save_triage(db, control_db, ctx, kind, record_id, body, action="TRIAGE_ROUTINE_CONFIRMED")
+
+
+@router.post("/triage/{kind}/{record_id}/confirm-qms", dependencies=[TRIAGERS])
+def confirm_qms_triage(
+    kind: str,
+    record_id: uuid.UUID,
+    payload: TriageIn,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Confirm QMS triage (T-D9; TR-14, TR-38): a person checks the triage imported from the QMS on a flagged
+    complaint and saves the full form; the record keeps who confirmed it and when. One record at a time: there is no
+    bulk confirmation."""
+    tenant_id = _tenant(ctx)
+    kind = _subject_or_404(db, tenant_id, kind, record_id)
+    record = (
+        db.query(TriageRecord)
+        .filter(
+            TriageRecord.tenant_id == tenant_id, TriageRecord.subject_kind == kind, TriageRecord.subject_id == record_id
+        )
+        .first()
+    )
+    if record is None or record.source_system != "QMS" or record.completed_at is not None:
+        raise _error(409, "NOT_QMS_TO_CONFIRM", "There is no triage from your QMS waiting for confirmation here")
+    return _save_triage(db, control_db, ctx, kind, record_id, payload)
 
 
 @router.post("/triage/{kind}/{record_id}/acknowledge", dependencies=[TRIAGERS])

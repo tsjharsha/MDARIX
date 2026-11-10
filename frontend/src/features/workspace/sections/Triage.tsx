@@ -29,6 +29,7 @@ import {
   hoursText,
   tierTone,
   type Guide,
+  type ImportedBacklogList,
   type TriageItem,
   type TriageList,
 } from "../intake";
@@ -224,6 +225,7 @@ function TriageCard({
           {item.speed_label && !item.record?.completed_at && (
             <ToneBadge tone={item.speed === "FAST" ? "critical" : "neutral"} label={item.speed_label} />
           )}
+          {item.qms_to_confirm && <ToneBadge tone="warning" label="From your QMS: confirm" />}
           {item.acknowledgement?.overdue && <ToneBadge tone="critical" label="Acknowledgement overdue" />}
           {item.awareness.unresolved && <ToneBadge tone="warning" label="Awareness unresolved" />}
           {item.conflict.length > 0 && <ToneBadge tone="critical" label="Awareness conflict" />}
@@ -366,7 +368,12 @@ function TriageDrawer({
   };
   const awareness = needsAwareness || form.aware !== awareField.initial ? awareField.moment(form.aware) : null;
   const submit = () =>
-    run(`${base}/record`, triageBody(form, record, awareness), "The triage record was not saved", next);
+    run(
+      `${base}/${item.qms_to_confirm ? "confirm-qms" : "record"}`,
+      triageBody(form, record, awareness),
+      "The triage record was not saved",
+      next,
+    );
   const Frame = inline ? InlineFrame : Drawer;
   const ack = item.acknowledgement;
   const label = (code: string | null | undefined) => scale.find((level) => level.code === code)?.label ?? code;
@@ -489,6 +496,9 @@ function TriageDrawer({
               {record.completed_by} · {formatDate(record.completed_at)}
               {record.public_health_threat ? " · possible serious public health threat" : ""}
               {record.threat_excluded_at ? ` · threat excluded ${formatDate(record.threat_excluded_at)}` : ""}
+              {record.source_system === "QMS" && record.confirmed_by
+                ? ` · triaged in your QMS, confirmed by ${record.confirmed_by}`
+                : ""}
             </p>
             <div className="ca-action-row">
               {canWrite && !editing && (
@@ -536,6 +546,21 @@ function TriageDrawer({
             </div>
           </section>
         )}
+        {item.qms_to_confirm && record && (
+          <section className="ca-drawer-section">
+            <h3>Triaged in your QMS</h3>
+            <p>
+              {record.qms_triaged_at ? `On ${formatDate(record.qms_triaged_at)}` : "Date not given"}
+              {record.qms_owner_text ? ` by ${record.qms_owner_text}` : ""} · harm{" "}
+              {record.severity ? label(record.severity) : "not given, or not on your harm scale"}
+              {record.immediate_action ? ` · immediate action: ${record.immediate_action}` : ""}
+            </p>
+            <p className="uw-cr-meta">
+              It suggests harm, so a person checks it here: change what needs changing and confirm. One record at a
+              time.
+            </p>
+          </section>
+        )}
         {canWrite && (editing || item.conflict.length > 0) && (
           <form
             className="ca-drawer-section"
@@ -544,7 +569,13 @@ function TriageDrawer({
               if (!problem) void submit();
             }}
           >
-            <h3>{record?.completed_at ? "Update triage" : "The triage record"}</h3>
+            <h3>
+              {record?.completed_at
+                ? "Update triage"
+                : item.qms_to_confirm
+                  ? "Confirm the QMS triage"
+                  : "The triage record"}
+            </h3>
             <div className="ca-form-grid">
               <label className="ca-field">
                 Harm now
@@ -703,7 +734,7 @@ function TriageDrawer({
             {problem && <p className="uw-hint">{problem}</p>}
             <div className="ca-action-row">
               <button type="submit" className="ac-primary" disabled={busy || !!problem} title={problem || undefined}>
-                {busy ? "Saving…" : "Save the triage"}
+                {busy ? "Saving…" : item.qms_to_confirm ? "Confirm QMS triage" : "Save the triage"}
               </button>
             </div>
           </form>
@@ -913,5 +944,114 @@ export function EscalateButton({
       </button>
       <InlineError text={error} />
     </span>
+  );
+}
+
+/**
+ * "Imported backlog" (OD-12, TR-21): imported complaints known of more than the organization's backlog days before
+ * their import, with no harm flag. Routine triage, one click each, due their own target after the import. A flagged
+ * one is on "To triage" instead.
+ */
+export function ImportedBacklog() {
+  const [page, setPage] = useState(1);
+  const list = useResource<ImportedBacklogList>(`${TRIAGE}/backlog?page=${page}`);
+  const canWrite = useCanTriage();
+  const { open } = useWorkspace();
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const summary = list.data?.summary;
+  const items = list.data?.items ?? [];
+  const confirm = async (id: string) => {
+    setBusy(id);
+    setError("");
+    try {
+      await send(`${TRIAGE}/COMPLAINT/${id}/confirm`, "POST", { seen_version: 0 });
+      list.reload();
+    } catch (reason) {
+      setError(errorText(reason, "The triage was not confirmed"));
+    } finally {
+      setBusy("");
+    }
+  };
+  return (
+    <Panel
+      eyebrow="Imported backlog"
+      title={summary ? `${countOf(summary.total, "complaint")} to triage, routine` : "Imported backlog"}
+      source={list}
+    >
+      {summary && (
+        <p className="uw-cr-meta">
+          Known of more than {summary.backlog_days} days before the import · due {summary.target_days} working days
+          after it{summary.overdue ? ` · ${summary.overdue} past that target` : ""}
+          {list.data?.truncated ? " · the oldest are shown first; more remain" : ""}
+        </p>
+      )}
+      {items.length ? (
+        <ul className="uw-cr-list">
+          {items.map((item) => (
+            <li key={item.id} className="uw-cr-card">
+              <span className={`uw-cr-rail tone-${item.overdue ? "warning" : "neutral"}`} aria-hidden="true" />
+              <div className="uw-cr-body">
+                <div className="uw-cr-head">
+                  <strong className="uw-cr-id">{item.ref}</strong>
+                  <span className="uw-cr-meta">
+                    {item.product_name ?? "Product not given"} · aware {formatDate(item.awareness_at)} · imported{" "}
+                    {formatDate(item.imported_at)}
+                  </span>
+                  <ToneBadge
+                    tone={item.overdue ? "warning" : "neutral"}
+                    label={`${item.overdue ? "Past target since" : "Due"} ${formatDate(item.due_at)}`}
+                  />
+                </div>
+                {item.words && <q className="uw-cr-text uw-cr-clip">{item.words}</q>}
+                <div className="ca-action-row">
+                  {canWrite && (
+                    <button
+                      type="button"
+                      className="ac-primary"
+                      disabled={!!busy}
+                      onClick={() => void confirm(item.id)}
+                    >
+                      {busy === item.id ? "Saving…" : "Confirm triage"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="ac-secondary"
+                    onClick={() => open("Complaint", `Summary?ref=${encodeURIComponent(item.ref)}`)}
+                  >
+                    Open the complaint
+                  </button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <Empty
+          title="No imported backlog"
+          detail="Old complaints you import with no harm flag wait here for a routine triage."
+        />
+      )}
+      {list.data && list.data.pages > 1 && (
+        <div className="ca-action-row">
+          <button type="button" className="ac-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            Previous
+          </button>
+          <span className="uw-cr-meta">
+            Page {page} of {list.data.pages}
+          </span>
+          <button
+            type="button"
+            className="ac-secondary"
+            disabled={page >= list.data.pages}
+            onClick={() => setPage(page + 1)}
+          >
+            Next
+          </button>
+        </div>
+      )}
+      <InlineError text={error} />
+    </Panel>
   );
 }

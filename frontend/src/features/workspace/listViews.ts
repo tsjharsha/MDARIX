@@ -45,6 +45,7 @@ export const QUEUE_VIEWS = [
   "Calls to check",
   "Due soon",
   "Past target",
+  "Imported backlog",
   "Second look",
   "Reporting",
   "Authority reports",

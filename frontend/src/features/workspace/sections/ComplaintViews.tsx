@@ -11,7 +11,7 @@ import { renamed } from "../workspaceContext";
 import { IMPORTED_SOURCE, parseComplaintListTab } from "../complaintList";
 import { inData } from "../home";
 import { listTitle } from "./common";
-import { Triage } from "./Triage";
+import { ImportedBacklog, Triage } from "./Triage";
 import { ReportabilityWatch } from "./ReportabilityWatch";
 import { ReportsSection } from "./ReportsTab";
 import { Communications } from "./Communications";
@@ -99,6 +99,7 @@ export function ComplaintViews({ tab }: { tab?: string }) {
       {view === "Calls to check" && <FirstContact key={logged} part="calls" startLogging={logged ? "CONTACT" : null} />}
       {view === "Due soon" && <Backlog initial="due_soon" fixed />}
       {view === "Past target" && <Backlog initial="past_target" fixed />}
+      {view === "Imported backlog" && <ImportedBacklog />}
       {view === "Second look" && <SecondLook initial="open" fixed />}
       {view === "Dismissed" && <SecondLook initial="dismissed" fixed />}
       {view === "Reporting" && (
@@ -131,6 +132,8 @@ const QUEUE_DETAIL: Record<string, string> = {
   "Calls to check": "Calls logged that may be complaints: the first-contact check.",
   "Due soon": "Open complaints within a week of your target.",
   "Past target": "Open complaints older than your target.",
+  "Imported backlog":
+    "Imported complaints your organization knew of long before the import, with no harm flag: routine triage, with their own target.",
   "Second look": "Records that may be hidden complaints, to confirm or dismiss.",
   Reporting: "Reportability decisions and authority reports.",
   "Authority reports": "Every authority report, with its fields, approval and submission.",
