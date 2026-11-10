@@ -86,3 +86,35 @@ def test_without_a_policy_an_additional_role_changes_nothing(world, monkeypatch)
         assert world["plain"].get(CONTEXT).status_code == 200
     finally:
         _grant(world, world["plain_id"], "APPROVER", "REVOKED")
+
+
+def test_the_welcome_email_at_activation_counts_an_additional_role(world, monkeypatch):
+    """Check 3c: activation (``_redeem`` under the system scope, which survives its commit) reads the additional roles,
+    so an invited Investigator who was also given Leader is told in the welcome e-mail that two-factor sign-in is
+    required; without that role, not."""
+    from fastapi.testclient import TestClient
+
+    from auth.durable import issue_invitation
+    from backend.app import auth_router
+    from backend.app.db.models.foundation import Tenant
+    from backend.app.main import app
+
+    monkeypatch.setenv("MDARIX_REQUIRE_MFA_ROLES", "LEADER,APPROVER")
+    sent: list[tuple] = []
+    monkeypatch.setattr(auth_router, "_send_welcome_quietly", lambda *args: sent.append(args))
+    for label, extra in (("mfa-roles-invited-leader", "LEADER"), ("mfa-roles-invited-plain", None)):
+        with SessionLocal() as db:
+            bind_system(db, "test: invited with an additional role")
+            user = _user(db, db.get(Tenant, world["tenant_id"]), "Investigator", label)
+            user.status, user.email_verified = "INVITED", False
+            db.commit()
+            user_id = user.id
+            token = issue_invitation(db, user_id, world["tenant_id"])
+            db.commit()
+        if extra:
+            _grant(world, user_id, extra)
+        activated = TestClient(app).post(
+            "/api/v1/auth/activate-account", json={"token": token, "password": "A passphrase only I know 2026"}
+        )
+        assert activated.status_code == 200, activated.text
+    assert [args[2] for args in sent] == [True, False]
