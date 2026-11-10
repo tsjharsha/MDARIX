@@ -66,6 +66,52 @@ The remaining cost of the story and of every read that shows a complaint's work 
 items (the reportability watch and the triage list, the latter read twice), computed on each such read however few
 complaints it asks about. It needs a restructure (DEV-12), not a local fix.
 
+## B2 (0.10.93): the Cases list at 5,000 Cases (10 Nov 2026)
+
+A5 and B2-15: `GET /api/v1/intake/cases`, the paged Cases list that replaced the old newest-500 contacts list on the
+screens. Measured on 10 Nov 2026 at about 12:05-12:12 IST on the B2 branch (`feat/b2-cases-0.10.93`, after commit 6b8a0c26),
+same laptop and topology as above, with the W1 build idle. `tests/test_case_load_measure.py` writes 5,000 Cases
+straight into a new trial beside its sample (every live and finished state, a Case check version each, signed where
+the state needs it, owners on half, "Not sure" lots on one in ten), then asks each read 10 times. Budget: p95 under
+1 s a read; approved read target: 500 ms.
+
+| Read (25 a page unless said) | p50 | p95 | Queries | Within 1 s | Within 500 ms |
+|---|---|---|---|---|---|
+| All | 201 ms | 374 ms | 26 | Yes | Yes |
+| To check | 192 ms | 345 ms | 26 | Yes | Yes |
+| Waiting for the reporter | 216 ms | 392 ms | 23 | Yes | Yes |
+| Waiting for internal team | 194 ms | 249 ms | 24 | Yes | Yes |
+| QA review | 220 ms | 496 ms | 23 | Yes | Yes |
+| Became complaints (30 days) | 154 ms | 192 ms | 21 | Yes | Yes |
+| Closed | 168 ms | 258 ms | 24 | Yes | Yes |
+| Withdrawn | 206 ms | 225 ms | 24 | Yes | Yes |
+| My cases | 250 ms | 321 ms | 24 | Yes | Yes |
+| Unassigned | 170 ms | 265 ms | 25 | Yes | Yes |
+| Needs more information | 155 ms | 189 ms | 23 | Yes | Yes |
+| Critical or high | 194 ms | 216 ms | 25 | Yes | Yes |
+| Overdue | 166 ms | 201 ms | 24 | Yes | Yes |
+| Service only | 175 ms | 253 ms | 24 | Yes | Yes |
+| Potential complaints | 224 ms | 553 ms | 25 | Yes | No (p95) |
+| All, 100 a page | 327 ms | 388 ms | 26 | Yes | Yes |
+| All, page 150 | 237 ms | 284 ms | 24 | Yes | Yes |
+| Search by serial (SN-LOAD-04242) | 276 ms | 380 ms | 23 | Yes | Yes |
+| Search by reference (CASE-LOAD-00042) | 214 ms | 273 ms | 23 | Yes | Yes |
+| Search by typed product (LoadPump 3) | 234 ms | 418 ms | 24 | Yes | Yes |
+| To check, search by lot (LOT-LOAD-7) | 162 ms | 218 ms | 21 | Yes | Yes |
+| For comparison: the old contacts list, bounded (GET /intake, 2,000 Cases each read in full; 3 repeats) | 48.8 s | 49.7 s | 14,025 | No | No |
+
+The test passed (1 passed in 4 min 9 s; 5,005 Cases in the trial, the sample's included). The old list is kept only for API clients and older tests (no screen reads it since step 5.3): bounded at 2,000 Cases it still reads each one in full (about seven queries a Case), so it should be retired once its last test callers move, not used for a screen.
+
+Every read is within the 1 s budget; all but one p95 (Potential complaints, 553 ms, a single slow repeat against a
+p50 of 224 ms) are within the 500 ms target. The query count does not grow with the page size (26 at 25 and at 100
+rows): one batched read each for products, lots, complaints, checks, tasks, triage records and people, never one per
+row. No read answered with a server error. Repeat:
+
+```powershell
+$env:POSTGRES_DB = "<a disposable test database>"; $env:MDARIX_TRIAL_LOAD_MEASURE = "1"
+.\.venv\Scripts\python.exe -m pytest tests/test_case_load_measure.py -s
+```
+
 ## Failure drills (local, 4 Nov 2026)
 
 Run with `scripts/journey_api.py`'s e-mail capture so no message left the machine, the real outbox worker loop
