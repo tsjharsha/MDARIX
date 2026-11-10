@@ -1,0 +1,334 @@
+{
+  "code": "US-floor-1",
+  "rule": "US-floor",
+  "version": 1,
+  "kind": "REPORTABILITY_FLOOR",
+  "market": "US",
+  "held_as": "DATA",
+  "title": "US medical device reporting: when a report is owed, which one, and by when",
+  "plain": "Death or serious injury the device caused or contributed to, or a malfunction likely to harm if it recurred: report in 30 days, or 5 work days when remedial action is needed.",
+  "source": [
+    {
+      "catalog": "CFR803_3",
+      "clause": "21 CFR 803.3"
+    },
+    {
+      "catalog": "CFR803_50",
+      "clause": "21 CFR 803.50(a)(1)-(2)"
+    },
+    {
+      "catalog": "CFR803_53",
+      "clause": "21 CFR 803.53"
+    }
+  ],
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": "21 CFR Part 803 as in force at awareness (for your consultant to confirm)",
+  "change": {
+    "kind": "INITIAL",
+    "reason": "Today's logic (0.10.81 onwards, question set US-starter-1), moved to data unchanged."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Owner",
+    "approved_on": "2026-11-11",
+    "built_by": "MDARIX engineering",
+    "release": "0.10.99",
+    "note": "B4 spec approved 11 Nov 2026 (R-D1 to R-D14): version 1 is today's logic, unchanged."
+  },
+  "content": {
+    "question_set": {
+      "version": "US-starter-1",
+      "title": "US medical device reporting (21 CFR Part 803)",
+      "note": "",
+      "basis": [
+        "CFR803_3",
+        "CFR803_50",
+        "CFR803_53"
+      ],
+      "questions": [
+        {
+          "id": "US1",
+          "text": "Did a death occur?",
+          "definition": "A death of a patient, user or other person that the information reasonably suggests.",
+          "clause": "21 CFR 803.50(a)(1)",
+          "basis": [
+            "CFR803_50"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "US2A",
+          "text": "Serious injury, part (a): is the injury or illness life-threatening?",
+          "definition": "Serious injury (21 CFR 803.3(w)) is an injury or illness that is life-threatening, results in permanent impairment of a body function or permanent damage to a body structure, or needs medical or surgical intervention to preclude such permanent impairment or damage. Permanent means irreversible, excluding trivial impairment or damage. Answer each part on its own.",
+          "clause": "21 CFR 803.3(w)(1)",
+          "basis": [
+            "CFR803_3"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "US2B",
+          "text": "Serious injury, part (b): does it result in permanent impairment of a body function or permanent damage to a body structure?",
+          "definition": "Serious injury (21 CFR 803.3(w)) is an injury or illness that is life-threatening, results in permanent impairment of a body function or permanent damage to a body structure, or needs medical or surgical intervention to preclude such permanent impairment or damage. Permanent means irreversible, excluding trivial impairment or damage. Answer each part on its own.",
+          "clause": "21 CFR 803.3(w)(2)",
+          "basis": [
+            "CFR803_3"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "US2C",
+          "text": "Serious injury, part (c): does it need medical or surgical intervention to preclude permanent impairment of a body function or permanent damage to a body structure?",
+          "definition": "Serious injury (21 CFR 803.3(w)) is an injury or illness that is life-threatening, results in permanent impairment of a body function or permanent damage to a body structure, or needs medical or surgical intervention to preclude such permanent impairment or damage. Permanent means irreversible, excluding trivial impairment or damage. Answer each part on its own.",
+          "clause": "21 CFR 803.3(w)(3)",
+          "basis": [
+            "CFR803_3"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "US3",
+          "text": "Did the device cause or contribute to the death or serious injury?",
+          "definition": "Caused or contributed (21 CFR 803.3(c)): the death or serious injury was, or may have been, attributed to the device, including through its failure, malfunction, improper or inadequate design, manufacture or labelling, or user error.",
+          "clause": "21 CFR 803.3(c)",
+          "basis": [
+            "CFR803_3"
+          ],
+          "serious": false,
+          "note": ""
+        },
+        {
+          "id": "US4",
+          "text": "Did the device malfunction?",
+          "definition": "Malfunction (21 CFR 803.3(k)): the device failed to meet its performance specifications or otherwise perform as intended.",
+          "clause": "21 CFR 803.3(k)",
+          "basis": [
+            "CFR803_3"
+          ],
+          "serious": false,
+          "note": ""
+        },
+        {
+          "id": "US5",
+          "text": "Would the malfunction be likely to cause or contribute to a death or serious injury if it were to recur?",
+          "definition": "A malfunction is reportable when the device, or a similar device you market, would be likely to cause or contribute to a death or serious injury if the malfunction were to recur.",
+          "clause": "21 CFR 803.50(a)(2)",
+          "basis": [
+            "CFR803_50"
+          ],
+          "serious": false,
+          "note": "Recurrence is presumed: answer what would follow if it recurred, not whether it will recur. A No needs its reason."
+        },
+        {
+          "id": "US6",
+          "text": "Is remedial action needed to prevent an unreasonable risk of substantial harm to the public health, or has FDA asked in writing for a 5-day report?",
+          "definition": "Remedial action (21 CFR 803.3(v)) is any action other than routine maintenance or servicing of a device where such action is necessary to prevent recurrence of a reportable event. Yes gives the 5-work-day report (803.53); otherwise a reportable event gets the 30-calendar-day report (803.50).",
+          "clause": "21 CFR 803.53(a), (b); 803.3(v)",
+          "basis": [
+            "CFR803_53",
+            "CFR803_3"
+          ],
+          "serious": false,
+          "note": ""
+        }
+      ]
+    },
+    "report_types": {
+      "US_30_DAY": {
+        "label": "30-calendar-day report (21 CFR 803.50)",
+        "days": 30,
+        "basis": "CALENDAR"
+      },
+      "US_5_WORK_DAY": {
+        "label": "5-work-day report (21 CFR 803.53)",
+        "days": 5,
+        "basis": "WORK"
+      }
+    },
+    "defs": {
+      "injury": {
+        "any": [
+          "US2A",
+          "US2B",
+          "US2C"
+        ]
+      }
+    },
+    "rules": [
+      {
+        "id": "F-US-1",
+        "if": {
+          "all": [
+            {
+              "any": [
+                "US1",
+                {
+                  "ref": "injury"
+                }
+              ]
+            },
+            "US3"
+          ]
+        },
+        "cite": "21 CFR 803.50(a)(1)"
+      },
+      {
+        "id": "F-US-2",
+        "if": {
+          "all": [
+            "US4",
+            "US5"
+          ]
+        },
+        "cite": "21 CFR 803.50(a)(2)"
+      }
+    ],
+    "type_rows": [
+      {
+        "id": "T-US-1",
+        "if": {
+          "is_no": "US6"
+        },
+        "type": "US_30_DAY"
+      },
+      {
+        "id": "T-US-2",
+        "type": "US_5_WORK_DAY"
+      }
+    ],
+    "notes": [
+      {
+        "if": {
+          "all": [
+            {
+              "is_yes": {
+                "ref": "reportable"
+              }
+            },
+            {
+              "is_unknown": "US6"
+            }
+          ]
+        },
+        "text": "Question 6 is Unknown: until it is answered, the 5-work-day report (21 CFR 803.53) applies. A No can lengthen it to 30 days (21 CFR 803.50). Starter rule, for your consultant to confirm."
+      },
+      {
+        "if": {
+          "all": [
+            {
+              "is_yes": {
+                "ref": "reportable"
+              }
+            },
+            {
+              "is_no": "US6"
+            }
+          ]
+        },
+        "text": "Question 6 is No, so not the 5-work-day report (803.53)."
+      },
+      {
+        "if": {
+          "is_unknown": {
+            "ref": "reportable"
+          }
+        },
+        "text": "An Unknown answer could make the event reportable: the suggestion stays pending information, and \"not reportable\" cannot be concluded until it is answered."
+      }
+    ],
+    "folding": [
+      {
+        "if": {
+          "all": [
+            {
+              "is_no": "US1"
+            },
+            {
+              "is_no": {
+                "ref": "injury"
+              }
+            }
+          ]
+        },
+        "fold": [
+          "US3"
+        ],
+        "why": "Not asked: no death and no serious injury"
+      },
+      {
+        "if": {
+          "is_no": "US4"
+        },
+        "fold": [
+          "US5"
+        ],
+        "why": "Not asked: no malfunction"
+      },
+      {
+        "if": {
+          "is_no": {
+            "ref": "reportable"
+          }
+        },
+        "fold": [
+          "US6"
+        ],
+        "why": "Not needed: not reportable on the answers above"
+      }
+    ],
+    "precedence": [
+      "US_5_WORK_DAY",
+      "US_30_DAY"
+    ],
+    "prefill": {
+      "death": [
+        "US1"
+      ],
+      "malfunction": [
+        "US4"
+      ],
+      "injury_note": [
+        "US2A",
+        "US2B",
+        "US2C"
+      ]
+    },
+    "counting": {
+      "authority_zone": "America/New_York",
+      "awareness_is_day_one": false,
+      "words": "from the day after awareness; US Eastern time or yours, whichever ends first"
+    },
+    "provisional": {
+      "THREAT": [
+        5,
+        "WORK",
+        "5 work days (21 CFR 803.53)"
+      ],
+      "FLAGGED": [
+        30,
+        "CALENDAR",
+        "30 calendar days (21 CFR 803.50)"
+      ],
+      "UNFLAGGED": [
+        30,
+        "CALENDAR",
+        "30 calendar days (21 CFR 803.50)"
+      ],
+      "remedial": [
+        5,
+        "WORK",
+        "5 work days: remedial action may be needed (21 CFR 803.53)"
+      ],
+      "ruled_out": "remedial action is ruled out"
+    }
+  },
+  "content_hash": "sha256:bbad75809ec95d2fbb39b96fd2589aadf002d6bb44e8bcf2788d87108145b3ac"
+}

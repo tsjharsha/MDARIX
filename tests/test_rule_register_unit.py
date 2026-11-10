@@ -1,0 +1,175 @@
+"""B4 step 1: the rule register's files, their checks and the version in force on a day (spec sections 4 and 5.1),
+without a database. A fixture register in a temporary folder holds a test-only US-floor-2 and a correction."""
+
+from __future__ import annotations
+
+import copy
+import json
+from datetime import date, datetime, timezone
+
+import pytest
+
+from backend.app import standards
+from backend.app.rule_register import register
+
+
+def _write(folder, entries) -> None:
+    for entry in entries:
+        (folder / f"{entry['code']}.json").write_text(json.dumps(entry), encoding="utf-8")
+
+
+def _version(base: dict, version: int, start, end, kind="LAW_CHANGE", corrects=None, **content) -> dict:
+    entry = copy.deepcopy(base)
+    entry.update(code=f"US-floor-{version}", version=version, effective_from=start, effective_to=end)
+    entry["change"] = {"kind": kind, "reason": "test", **({"corrects": corrects} if corrects else {})}
+    entry["content"].update(content)
+    entry["content_hash"] = register.content_hash(entry["content"])
+    return entry
+
+
+@pytest.fixture
+def use(tmp_path, monkeypatch):
+    """Point the register at a fixture folder holding ``entries``; returns the loader's problems text on refusal."""
+
+    def point(entries):
+        folder = tmp_path / f"r{len(list(tmp_path.iterdir()))}"
+        folder.mkdir()
+        _write(folder, entries)
+        monkeypatch.setattr(register, "_DIRECTORY", folder)
+        return folder
+
+    return point
+
+
+@pytest.fixture
+def us1():
+    return copy.deepcopy(register._load(str(register.DATA))["US-floor-1"])
+
+
+def test_the_real_register_loads_and_every_rule_carries_its_source_and_starter_mark():
+    entries = register.load()
+    floors = [entry for entry in entries.values() if entry["kind"] == "REPORTABILITY_FLOOR"]
+    assert sorted(entry["code"] for entry in floors) == [
+        "CA-floor-1",
+        "EU-floor-1",
+        "GB-floor-1",
+        "IN-floor-1",
+        "US-floor-1",
+    ]
+    assert all(entry["review"]["note"] == standards.STARTER_MARK for entry in entries.values())
+    assert all(source["catalog"] in standards.BY_ID for entry in entries.values() for source in entry["source"])
+    # Stored codes are never renamed: the question sets keep theirs inside the floors.
+    assert register.floor("US")["content"]["question_set"]["version"] == "US-starter-1"
+    assert {"routine-basis-1", "disposition-starter-2", "provisional-starter-1", "emdr-rule-book-1"} <= set(entries)
+    # Version 1 is in force from the start and open (R-D7).
+    assert all(entry["effective_from"] is None and entry["effective_to"] is None for entry in entries.values())
+
+
+def test_the_loader_refuses_an_unknown_catalog_id_a_duplicate_and_a_missing_field(use, us1):
+    bad = copy.deepcopy(us1)
+    bad["source"] = [{"catalog": "NOT_A_STANDARD", "clause": "x"}]
+    use([bad])
+    with pytest.raises(register.RegisterError, match=r"US-floor-1.json: unknown catalog id NOT_A_STANDARD"):
+        register.load()
+    twin = copy.deepcopy(us1)
+    twin["rule"] = "other"
+    folder = use([us1])
+    (folder / "twin.json").write_text(json.dumps(twin), encoding="utf-8")
+    with pytest.raises(register.RegisterError, match=r"code US-floor-1 also in twin.json"):
+        register.load()
+    lacking = {key: value for key, value in us1.items() if key != "approval"}
+    use([lacking])
+    with pytest.raises(register.RegisterError, match="missing approval"):
+        register.load()
+
+
+def test_content_changed_without_a_new_version_fails_naming_the_file(use, us1):
+    """DT-33, RR-06: one byte of a floor's content changed, the hash left as it was."""
+    changed = copy.deepcopy(us1)
+    changed["content"]["report_types"]["US_30_DAY"]["days"] = 31
+    use([changed])
+    with pytest.raises(register.RegisterError, match=r"US-floor-1.json: content changed without a new version"):
+        register.load()
+
+
+def test_a_floor_whose_logic_names_an_unknown_question_is_refused(use, us1):
+    broken = _version(us1, 1, None, None, kind="INITIAL", rules=[{"id": "F-US-9", "if": "US99", "cite": "x"}])
+    use([broken])
+    with pytest.raises(register.RegisterError, match="unknown question US99"):
+        register.load()
+
+
+@pytest.mark.parametrize(
+    ("periods", "problem"),
+    [
+        ([(None, "2027-03-01"), ("2027-02-01", None)], "overlaps"),
+        ([(None, "2027-03-01"), ("2027-04-01", None)], "gap from 2027-03-01 to 2027-04-01"),
+        ([(None, "2027-03-01")], "gap after 2027-03-01"),
+        ([("2027-03-01", "2027-02-01"), ("2027-02-01", None)], "is not after effective_from"),
+    ],
+)
+def test_overlaps_gaps_and_an_end_before_a_start_are_refused(use, us1, periods, problem):
+    """ED-12, RR-05."""
+    use([_version(us1, index + 1, start, end) for index, (start, end) in enumerate(periods)])
+    with pytest.raises(register.RegisterError, match=problem):
+        register.load()
+
+
+def test_a_correction_must_keep_the_period_of_the_version_it_corrects(use, us1):
+    v1 = _version(us1, 1, None, "2027-03-01", kind="INITIAL")
+    v2 = _version(us1, 2, "2027-03-01", None)
+    wrong = _version(us1, 3, None, None, kind="CORRECTION", corrects="US-floor-1")
+    use([v1, v2, wrong])
+    with pytest.raises(register.RegisterError, match="US-floor-3.json: a correction has the period of US-floor-1"):
+        register.load()
+
+
+def test_the_version_in_force_on_a_day_law_change_correction_and_scheduled(use, us1):
+    """ED-13, RR-13: the highest version whose period contains the day; a future version is Scheduled."""
+    v1 = _version(us1, 1, None, "2027-03-01", kind="INITIAL")
+    v2 = _version(us1, 2, "2027-03-01", None)
+    use([v1, v2])
+    assert register.pick("US-floor", date(2027, 2, 28))["code"] == "US-floor-1"
+    assert register.pick("US-floor", date(2027, 3, 1))["code"] == "US-floor-2"
+    assert register.state(register.get("US-floor-2"), date(2026, 11, 11)) == "SCHEDULED"
+    assert register.state(register.get("US-floor-1"), date(2027, 3, 2)) == "RETIRED"
+    v3 = _version(us1, 3, None, "2027-03-01", kind="CORRECTION", corrects="US-floor-1")
+    use([v1, v2, v3])
+    assert register.pick("US-floor", date(2027, 2, 28))["code"] == "US-floor-3"
+    assert register.state(register.get("US-floor-1"), date(2027, 2, 1)) == "REPLACED"
+    assert register.pick("US-floor", date(2027, 3, 1))["code"] == "US-floor-2"
+
+
+NY_EST = timezone(__import__("datetime").timedelta(hours=-5))
+
+
+@pytest.mark.parametrize(
+    ("aware", "expected"),
+    [
+        (datetime(2027, 2, 28, 23, 0, tzinfo=NY_EST), "US-floor-1"),  # ED-1
+        (datetime(2027, 3, 1, 0, 0, tzinfo=NY_EST), "US-floor-2"),  # ED-2
+        (datetime(2027, 3, 1, 3, 0, tzinfo=timezone.utc), "US-floor-1"),  # ED-3: 28 Feb in New York
+        (date(2027, 3, 1), "US-floor-2"),  # ED-4: a date-only awareness
+        (datetime(2027, 3, 1, 12, 0, tzinfo=timezone.utc), "US-floor-2"),  # a day-only moment (12:00 UTC) is that day
+    ],
+)
+def test_the_awareness_day_in_the_authoritys_time_zone_picks_the_floor(use, us1, aware, expected):
+    """ED-1..ED-4, RR-07 (R-D3): the authority's day picks the version, whatever the organization's zone."""
+    use([_version(us1, 1, None, "2027-03-01", kind="INITIAL"), _version(us1, 2, "2027-03-01", None)])
+    assert register.floor_at("US", aware, "Asia/Kolkata")["code"] == expected
+
+
+def test_the_eu_floor_is_picked_on_the_brussels_day_across_summer_time(use):
+    """ED-14: awareness 31 Mar 2027 22:30 UTC is 1 Apr 00:30 in Brussels (CEST, from 28 Mar): EU-floor-2 from 1 Apr."""
+    eu1 = copy.deepcopy(register._load(str(register.DATA))["EU-floor-1"])
+
+    def eu(version, start, end, kind):
+        entry = copy.deepcopy(eu1)
+        entry.update(code=f"EU-floor-{version}", version=version, effective_from=start, effective_to=end)
+        entry["change"] = {"kind": kind, "reason": "test"}
+        return entry
+
+    use([eu(1, None, "2027-04-01", "INITIAL"), eu(2, "2027-04-01", None, "LAW_CHANGE")])
+    assert register.floor_at("EU_NI", datetime(2027, 3, 31, 21, 30, tzinfo=timezone.utc))["code"] == "EU-floor-1"
+    assert register.floor_at("EU_NI", datetime(2027, 3, 31, 22, 30, tzinfo=timezone.utc))["code"] == "EU-floor-2"
+    assert register.floor_at("EU_NI", None)["code"] == "EU-floor-1"  # today (before 2027)

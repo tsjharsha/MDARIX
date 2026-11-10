@@ -1,0 +1,282 @@
+{
+  "code": "CA-floor-1",
+  "rule": "CA-floor",
+  "version": 1,
+  "kind": "REPORTABILITY_FLOOR",
+  "market": "CA",
+  "held_as": "DATA",
+  "title": "Canada mandatory problem reporting: when a report is owed, which one, and by when",
+  "plain": "An incident in Canada related to a failure, deterioration or labelling that led, or could lead, to death or serious deterioration: preliminary report in 10 or 30 days; a foreign Class I incident as soon as possible.",
+  "source": [
+    {
+      "catalog": "CA_MDR",
+      "clause": "SOR/98-282 ss. 59-61.1"
+    }
+  ],
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": "SOR/98-282 as current to 19 October 2026 (for your consultant to confirm)",
+  "change": {
+    "kind": "INITIAL",
+    "reason": "Today's logic (0.10.81 onwards, question set CA-starter-1), moved to data unchanged."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Owner",
+    "approved_on": "2026-11-11",
+    "built_by": "MDARIX engineering",
+    "release": "0.10.99",
+    "note": "B4 spec approved 11 Nov 2026 (R-D1 to R-D14): version 1 is today's logic, unchanged."
+  },
+  "content": {
+    "question_set": {
+      "version": "CA-starter-1",
+      "title": "Canada mandatory problem reporting (Medical Devices Regulations s. 59-61.1)",
+      "note": "Calendar days, the awareness day is day zero (Health Canada's guidance). The manufacturer and the importer each report, or the importer reports for both (s. 61.1). A final report follows on the timetable the preliminary report gives (s. 61).",
+      "basis": [
+        "CA_MDR"
+      ],
+      "questions": [
+        {
+          "id": "CA1",
+          "text": "Is the device sold in Canada?",
+          "definition": "The duty to report applies to a device sold in Canada.",
+          "clause": "SOR/98-282 s. 59(1)(a)",
+          "basis": [
+            "CA_MDR"
+          ],
+          "serious": false,
+          "note": ""
+        },
+        {
+          "id": "CA2",
+          "text": "Is the incident related to a failure of the device, a deterioration in its effectiveness, or an inadequacy in its labelling or in its directions for use?",
+          "definition": "An incident is reportable only when it is related to one of these.",
+          "clause": "SOR/98-282 s. 59(1)(b)(i)",
+          "basis": [
+            "CA_MDR"
+          ],
+          "serious": false,
+          "note": ""
+        },
+        {
+          "id": "CA3",
+          "text": "Did it lead to the death or a serious deterioration in the state of health of a patient, user or other person?",
+          "definition": "Serious deterioration in the state of health (SOR/98-282 s. 1, starter paraphrase): a life-threatening disease, disorder or abnormal physical state, the permanent impairment of a body function or permanent damage to a body structure, or a condition that needs an unexpected medical or surgical intervention to prevent them.",
+          "clause": "SOR/98-282 s. 59(1)(b)(ii); s. 60(1)(a)(i) (10 days)",
+          "basis": [
+            "CA_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "CA4",
+          "text": "Could it lead to death or a serious deterioration in the state of health, were it to recur?",
+          "definition": "Serious deterioration in the state of health (SOR/98-282 s. 1, starter paraphrase): a life-threatening disease, disorder or abnormal physical state, the permanent impairment of a body function or permanent damage to a body structure, or a condition that needs an unexpected medical or surgical intervention to prevent them.",
+          "clause": "SOR/98-282 s. 59(1)(b)(ii); s. 60(1)(a)(ii) (30 days)",
+          "basis": [
+            "CA_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "CA5",
+          "text": "Did the incident occur in Canada?",
+          "definition": "An incident in Canada is reported in 10 or 30 days after you become aware of it. An incident outside Canada is reported only as question 6 says.",
+          "clause": "SOR/98-282 s. 59(1) and (1.1)",
+          "basis": [
+            "CA_MDR"
+          ],
+          "serious": false,
+          "note": ""
+        },
+        {
+          "id": "CA6",
+          "text": "For an incident outside Canada: is it a Class I device, and has the manufacturer told the regulator of that country that it intends to take corrective action, or has that regulator required it?",
+          "definition": "A foreign incident is reported for a Class I device, and only once corrective action is intended or required; then as soon as possible (Health Canada's guidance: within 48 hours of the decision). Class II to IV foreign issues come under s. 61.2 (serious risk of injury), not this tree. Answer Not applicable for an incident in Canada.",
+          "clause": "SOR/98-282 s. 59(1.1) and (2); s. 60(1)(b)",
+          "basis": [
+            "CA_MDR"
+          ],
+          "serious": false,
+          "note": ""
+        }
+      ]
+    },
+    "report_types": {
+      "CA_10_DAY": {
+        "label": "Death or serious deterioration: preliminary report in 10 days (SOR/98-282 s. 60(1)(a)(i))",
+        "days": 10,
+        "basis": "CALENDAR"
+      },
+      "CA_30_DAY": {
+        "label": "Could lead to death or serious deterioration if it recurred: preliminary report in 30 days (SOR/98-282 s. 60(1)(a)(ii))",
+        "days": 30,
+        "basis": "CALENDAR"
+      },
+      "CA_FOREIGN": {
+        "label": "Incident outside Canada: preliminary report as soon as possible after the corrective action decision (SOR/98-282 s. 60(1)(b))",
+        "days": null,
+        "basis": "CALENDAR"
+      }
+    },
+    "defs": {},
+    "rules": [
+      {
+        "id": "F-CA-1",
+        "if": {
+          "all": [
+            "CA1",
+            "CA2",
+            {
+              "any": [
+                "CA3",
+                "CA4"
+              ]
+            },
+            {
+              "any": [
+                "CA5",
+                "CA6"
+              ]
+            }
+          ]
+        },
+        "cite": "SOR/98-282 s. 59"
+      }
+    ],
+    "type_rows": [
+      {
+        "id": "T-CA-1",
+        "if": {
+          "is_no": "CA5"
+        },
+        "type": "CA_FOREIGN"
+      },
+      {
+        "id": "T-CA-2",
+        "if": {
+          "is_no": "CA3"
+        },
+        "type": "CA_30_DAY"
+      },
+      {
+        "id": "T-CA-3",
+        "type": "CA_10_DAY"
+      }
+    ],
+    "notes": [
+      {
+        "if": {
+          "all": [
+            {
+              "type": "CA_10_DAY"
+            },
+            {
+              "is_yes": {
+                "ref": "reportable"
+              }
+            },
+            {
+              "is_unknown": "CA3"
+            }
+          ]
+        },
+        "text": "Question 3 is Unknown: until it is answered, the shorter 10-day report applies."
+      },
+      {
+        "if": {
+          "is_unknown": {
+            "ref": "reportable"
+          }
+        },
+        "text": "An Unknown answer could make the event reportable: the suggestion stays pending information, and \"not reportable\" cannot be concluded until it is answered."
+      }
+    ],
+    "folding": [
+      {
+        "if": {
+          "is_no": "CA1"
+        },
+        "fold": [
+          "CA2",
+          "CA3",
+          "CA4",
+          "CA5",
+          "CA6"
+        ],
+        "why": "Not asked: the device is not sold in Canada"
+      },
+      {
+        "if": {
+          "is_no": "CA2"
+        },
+        "fold": [
+          "CA3",
+          "CA4",
+          "CA5",
+          "CA6"
+        ],
+        "why": "Not asked: not related to a failure, a deterioration or the labelling"
+      },
+      {
+        "if": {
+          "is_yes": "CA3"
+        },
+        "fold": [
+          "CA4"
+        ],
+        "why": "Not needed: it already led to death or a serious deterioration"
+      },
+      {
+        "if": {
+          "is_yes": "CA5"
+        },
+        "fold": [
+          "CA6"
+        ],
+        "why": "Not asked: the incident occurred in Canada"
+      }
+    ],
+    "precedence": [
+      "CA_FOREIGN",
+      "CA_10_DAY",
+      "CA_30_DAY"
+    ],
+    "prefill": {
+      "death": [],
+      "malfunction": [],
+      "injury_note": []
+    },
+    "counting": {
+      "authority_zone": null,
+      "awareness_is_day_one": false,
+      "words": "from the day after awareness (awareness is day zero); your time zone"
+    },
+    "provisional": {
+      "THREAT": [
+        10,
+        "CALENDAR",
+        "10 days (SOR/98-282 s. 60(1)(a)(i))"
+      ],
+      "FLAGGED": [
+        10,
+        "CALENDAR",
+        "10 days (SOR/98-282 s. 60(1)(a)(i))"
+      ],
+      "UNFLAGGED": [
+        30,
+        "CALENDAR",
+        "30 days (SOR/98-282 s. 60(1)(a)(ii))"
+      ],
+      "remedial": null,
+      "ruled_out": "death or serious deterioration is ruled out"
+    }
+  },
+  "content_hash": "sha256:26acd97e1b4190dfc764e9a39f2c634499b803386227ec9a30697901341fa8d4"
+}

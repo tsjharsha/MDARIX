@@ -1,0 +1,265 @@
+{
+  "code": "IN-floor-1",
+  "rule": "IN-floor",
+  "version": 1,
+  "kind": "REPORTABILITY_FLOOR",
+  "market": "IN",
+  "held_as": "DATA",
+  "title": "India adverse event reporting: when a serious adverse event report is owed, and by when",
+  "plain": "A serious adverse event suspected to be associated with the device: report within the organization's India window; the awareness day is day 1.",
+  "source": [
+    {
+      "catalog": "IN_MDR",
+      "clause": "India MDR 2017 Rules 3 and 26"
+    }
+  ],
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": "Medical Devices Rules 2017 (in force 1 January 2018) (for your consultant to confirm)",
+  "change": {
+    "kind": "INITIAL",
+    "reason": "Today's logic (0.10.81 onwards, question set IN-starter-1), moved to data unchanged."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Owner",
+    "approved_on": "2026-11-11",
+    "built_by": "MDARIX engineering",
+    "release": "0.10.99",
+    "note": "B4 spec approved 11 Nov 2026 (R-D1 to R-D14): version 1 is today's logic, unchanged."
+  },
+  "content": {
+    "question_set": {
+      "version": "IN-starter-1",
+      "title": "India adverse event reporting (Medical Devices Rules 2017)",
+      "note": "",
+      "basis": [
+        "IN_MDR"
+      ],
+      "questions": [
+        {
+          "id": "IN1",
+          "text": "Is it an adverse event suspected to be associated with the device?",
+          "definition": "An adverse event: an untoward occurrence in a patient, user or other person where the device is suspected to have caused or contributed to it.",
+          "clause": "India MDR 2017 Rules 3 and 26",
+          "basis": [
+            "IN_MDR"
+          ],
+          "serious": false,
+          "note": ""
+        },
+        {
+          "id": "IN2A",
+          "text": "Serious, criterion (a): did it result in death?",
+          "definition": "A serious adverse event (India MDR 2017, starter text: criteria to confirm against the Rules and the MDAE form) results in death, is life-threatening, needs in-patient hospitalisation or prolongs it, results in persistent or significant disability or incapacity, is a congenital anomaly or birth defect, or needs an intervention to prevent permanent impairment or damage. Answer each criterion on its own.",
+          "clause": "India MDR 2017 Rules 3 and 26",
+          "basis": [
+            "IN_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "IN2B",
+          "text": "Serious, criterion (b): is it life-threatening?",
+          "definition": "A serious adverse event (India MDR 2017, starter text: criteria to confirm against the Rules and the MDAE form) results in death, is life-threatening, needs in-patient hospitalisation or prolongs it, results in persistent or significant disability or incapacity, is a congenital anomaly or birth defect, or needs an intervention to prevent permanent impairment or damage. Answer each criterion on its own.",
+          "clause": "India MDR 2017 Rules 3 and 26",
+          "basis": [
+            "IN_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "IN2C",
+          "text": "Serious, criterion (c): did it need in-patient hospitalisation, or prolong it?",
+          "definition": "A serious adverse event (India MDR 2017, starter text: criteria to confirm against the Rules and the MDAE form) results in death, is life-threatening, needs in-patient hospitalisation or prolongs it, results in persistent or significant disability or incapacity, is a congenital anomaly or birth defect, or needs an intervention to prevent permanent impairment or damage. Answer each criterion on its own.",
+          "clause": "India MDR 2017 Rules 3 and 26",
+          "basis": [
+            "IN_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "IN2D",
+          "text": "Serious, criterion (d): did it result in persistent or significant disability or incapacity?",
+          "definition": "A serious adverse event (India MDR 2017, starter text: criteria to confirm against the Rules and the MDAE form) results in death, is life-threatening, needs in-patient hospitalisation or prolongs it, results in persistent or significant disability or incapacity, is a congenital anomaly or birth defect, or needs an intervention to prevent permanent impairment or damage. Answer each criterion on its own.",
+          "clause": "India MDR 2017 Rules 3 and 26",
+          "basis": [
+            "IN_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "IN2E",
+          "text": "Serious, criterion (e): is it a congenital anomaly or birth defect?",
+          "definition": "A serious adverse event (India MDR 2017, starter text: criteria to confirm against the Rules and the MDAE form) results in death, is life-threatening, needs in-patient hospitalisation or prolongs it, results in persistent or significant disability or incapacity, is a congenital anomaly or birth defect, or needs an intervention to prevent permanent impairment or damage. Answer each criterion on its own.",
+          "clause": "India MDR 2017 Rules 3 and 26",
+          "basis": [
+            "IN_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "IN2F",
+          "text": "Serious, criterion (f): did it need an intervention to prevent permanent impairment or damage?",
+          "definition": "A serious adverse event (India MDR 2017, starter text: criteria to confirm against the Rules and the MDAE form) results in death, is life-threatening, needs in-patient hospitalisation or prolongs it, results in persistent or significant disability or incapacity, is a congenital anomaly or birth defect, or needs an intervention to prevent permanent impairment or damage. Answer each criterion on its own.",
+          "clause": "India MDR 2017 Rules 3 and 26",
+          "basis": [
+            "IN_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "IN3",
+          "text": "Is it unexpected?",
+          "definition": "Unexpected: its nature or severity is not consistent with the device's labelling or the risks known for it. A serious and unexpected event is a suspected unexpected serious adverse event.",
+          "clause": "India MDR 2017 Rules 3 and 26",
+          "basis": [
+            "IN_MDR"
+          ],
+          "serious": false,
+          "note": ""
+        }
+      ]
+    },
+    "report_types": {
+      "IN_SERIOUS_ADVERSE_EVENT": {
+        "label": "Serious adverse event (India MDR 2017 Rule 26)",
+        "days": null,
+        "basis": "CALENDAR"
+      }
+    },
+    "defs": {
+      "serious": {
+        "any": [
+          "IN2A",
+          "IN2B",
+          "IN2C",
+          "IN2D",
+          "IN2E",
+          "IN2F"
+        ]
+      }
+    },
+    "rules": [
+      {
+        "id": "F-IN-1",
+        "if": {
+          "all": [
+            "IN1",
+            {
+              "ref": "serious"
+            }
+          ]
+        },
+        "cite": "India MDR 2017 Rule 26"
+      }
+    ],
+    "type_rows": [
+      {
+        "id": "T-IN-1",
+        "type": "IN_SERIOUS_ADVERSE_EVENT"
+      }
+    ],
+    "notes": [
+      {
+        "if": {
+          "all": [
+            {
+              "is_yes": {
+                "ref": "reportable"
+              }
+            },
+            {
+              "is_yes": "IN3"
+            }
+          ]
+        },
+        "text": "Serious and unexpected: a suspected unexpected serious adverse event."
+      },
+      {
+        "if": {
+          "is_unknown": {
+            "ref": "reportable"
+          }
+        },
+        "text": "An Unknown answer could make the event reportable: the suggestion stays pending information, and \"not reportable\" cannot be concluded until it is answered."
+      }
+    ],
+    "folding": [
+      {
+        "if": {
+          "is_no": "IN1"
+        },
+        "fold": [
+          "IN2A",
+          "IN2B",
+          "IN2C",
+          "IN2D",
+          "IN2E",
+          "IN2F",
+          "IN3"
+        ],
+        "why": "Not asked: not an adverse event suspected to be associated with the device"
+      },
+      {
+        "if": {
+          "is_no": {
+            "ref": "serious"
+          }
+        },
+        "fold": [
+          "IN3"
+        ],
+        "why": "Not needed: not serious on the answers above"
+      }
+    ],
+    "precedence": [
+      "IN_SERIOUS_ADVERSE_EVENT"
+    ],
+    "prefill": {
+      "death": [
+        "IN2A"
+      ],
+      "malfunction": [],
+      "injury_note": [
+        "IN2B",
+        "IN2D",
+        "IN2F"
+      ]
+    },
+    "counting": {
+      "authority_zone": "Asia/Kolkata",
+      "awareness_is_day_one": true,
+      "words": "the awareness day is day 1; India time (IST) or yours, whichever ends first"
+    },
+    "provisional": {
+      "THREAT": [
+        15,
+        "CALENDAR",
+        "15 days (India MDR 2017 Rule 26)"
+      ],
+      "FLAGGED": [
+        15,
+        "CALENDAR",
+        "15 days (India MDR 2017 Rule 26)"
+      ],
+      "UNFLAGGED": [
+        15,
+        "CALENDAR",
+        "15 days (India MDR 2017 Rule 26; MvPI default)"
+      ],
+      "remedial": null,
+      "ruled_out": null
+    }
+  },
+  "content_hash": "sha256:f44f766b3bebd0eed385a260cb6ec25e05b2cfea641030b55e2c64bf7d86cd19"
+}

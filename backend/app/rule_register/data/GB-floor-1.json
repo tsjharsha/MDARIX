@@ -1,0 +1,439 @@
+{
+  "code": "GB-floor-1",
+  "rule": "GB-floor",
+  "version": 1,
+  "kind": "REPORTABILITY_FLOOR",
+  "market": "GB",
+  "held_as": "DATA",
+  "title": "Great Britain vigilance: when a serious incident report is owed, which one, and by when",
+  "plain": "A serious incident (death, serious deterioration in health, or a serious public health threat) the device caused or may have caused: report in 2, 10 or 15 days; the awareness day is day 1.",
+  "source": [
+    {
+      "catalog": "UK_MDR",
+      "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368"
+    }
+  ],
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": "UK MDR 2002 Part 4A as amended by SI 2024/1368 (in force 16 June 2025) (for your consultant to confirm)",
+  "change": {
+    "kind": "INITIAL",
+    "reason": "Today's logic (0.10.81 onwards, question set GB-starter-1), moved to data unchanged."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Owner",
+    "approved_on": "2026-11-11",
+    "built_by": "MDARIX engineering",
+    "release": "0.10.99",
+    "note": "B4 spec approved 11 Nov 2026 (R-D1 to R-D14): version 1 is today's logic, unchanged."
+  },
+  "content": {
+    "question_set": {
+      "version": "GB-starter-1",
+      "title": "Great Britain vigilance (UK MDR 2002 as amended by SI 2024/1368)",
+      "note": "Report when unsure: if you cannot tell whether the event is a serious incident, report it within the period (MDCG 2023-3).",
+      "basis": [
+        "UK_MDR"
+      ],
+      "questions": [
+        {
+          "id": "GB1",
+          "text": "Is it an incident?",
+          "definition": "Incident (UK MDR 2002 as amended by SI 2024/1368): any malfunction or deterioration in the characteristics or performance of a device made available on the market, including use error due to ergonomic features, any inadequacy in the information supplied by the manufacturer, and any undesirable side-effect.",
+          "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368 (incident)",
+          "basis": [
+            "UK_MDR"
+          ],
+          "serious": false,
+          "note": ""
+        },
+        {
+          "id": "GB2",
+          "text": "Did it directly or indirectly lead, might it have led, or might it lead to the death of a patient, user or other person?",
+          "definition": "Serious incident (UK MDR 2002 as amended by SI 2024/1368): an incident that directly or indirectly led, might have led or might lead to a death, a temporary or permanent serious deterioration in health, or a serious public health threat.",
+          "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368 (serious incident)",
+          "basis": [
+            "UK_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "GB3A",
+          "text": "Serious deterioration in health, criterion (a): did it lead, might it have led, or might it lead to a life-threatening illness or injury?",
+          "definition": "A serious deterioration in the state of health (UK MDR 2002 as amended by SI 2024/1368; MDCG 2023-3) includes a life-threatening illness or injury, permanent impairment of a body structure or function, hospitalisation or its prolongation, medical or surgical intervention to prevent either, chronic disease, and foetal distress, foetal death or a congenital impairment. Answer each criterion on its own: led to, might have led to, or might lead to.",
+          "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368 (serious incident); MDCG 2023-3",
+          "basis": [
+            "UK_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "GB3B",
+          "text": "Serious deterioration in health, criterion (b): did it lead, might it have led, or might it lead to permanent impairment of a body structure or a body function?",
+          "definition": "A serious deterioration in the state of health (UK MDR 2002 as amended by SI 2024/1368; MDCG 2023-3) includes a life-threatening illness or injury, permanent impairment of a body structure or function, hospitalisation or its prolongation, medical or surgical intervention to prevent either, chronic disease, and foetal distress, foetal death or a congenital impairment. Answer each criterion on its own: led to, might have led to, or might lead to.",
+          "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368 (serious incident); MDCG 2023-3",
+          "basis": [
+            "UK_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "GB3C",
+          "text": "Serious deterioration in health, criterion (c): did it lead, might it have led, or might it lead to hospitalisation, or prolonged hospitalisation, of a patient?",
+          "definition": "A serious deterioration in the state of health (UK MDR 2002 as amended by SI 2024/1368; MDCG 2023-3) includes a life-threatening illness or injury, permanent impairment of a body structure or function, hospitalisation or its prolongation, medical or surgical intervention to prevent either, chronic disease, and foetal distress, foetal death or a congenital impairment. Answer each criterion on its own: led to, might have led to, or might lead to.",
+          "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368 (serious incident); MDCG 2023-3",
+          "basis": [
+            "UK_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "GB3D",
+          "text": "Serious deterioration in health, criterion (d): did it lead, might it have led, or might it lead to medical or surgical intervention to prevent a life-threatening illness or injury, or a permanent impairment?",
+          "definition": "A serious deterioration in the state of health (UK MDR 2002 as amended by SI 2024/1368; MDCG 2023-3) includes a life-threatening illness or injury, permanent impairment of a body structure or function, hospitalisation or its prolongation, medical or surgical intervention to prevent either, chronic disease, and foetal distress, foetal death or a congenital impairment. Answer each criterion on its own: led to, might have led to, or might lead to.",
+          "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368 (serious incident); MDCG 2023-3",
+          "basis": [
+            "UK_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "GB3E",
+          "text": "Serious deterioration in health, criterion (e): did it lead, might it have led, or might it lead to a chronic disease?",
+          "definition": "A serious deterioration in the state of health (UK MDR 2002 as amended by SI 2024/1368; MDCG 2023-3) includes a life-threatening illness or injury, permanent impairment of a body structure or function, hospitalisation or its prolongation, medical or surgical intervention to prevent either, chronic disease, and foetal distress, foetal death or a congenital impairment. Answer each criterion on its own: led to, might have led to, or might lead to.",
+          "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368 (serious incident); MDCG 2023-3",
+          "basis": [
+            "UK_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "GB3F",
+          "text": "Serious deterioration in health, criterion (f): did it lead, might it have led, or might it lead to foetal distress, foetal death, or a congenital physical or mental impairment or birth defect?",
+          "definition": "A serious deterioration in the state of health (UK MDR 2002 as amended by SI 2024/1368; MDCG 2023-3) includes a life-threatening illness or injury, permanent impairment of a body structure or function, hospitalisation or its prolongation, medical or surgical intervention to prevent either, chronic disease, and foetal distress, foetal death or a congenital impairment. Answer each criterion on its own: led to, might have led to, or might lead to.",
+          "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368 (serious incident); MDCG 2023-3",
+          "basis": [
+            "UK_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "GB4",
+          "text": "Did it lead, might it have led, or might it lead to a serious public health threat?",
+          "definition": "Serious public health threat (UK MDR 2002 as amended by SI 2024/1368): an event that could result in imminent risk of death, serious deterioration in health or serious illness, that may require prompt remedial action and may cause significant morbidity or mortality, or that is unusual or unexpected for the place and time.",
+          "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368 (serious public health threat)",
+          "basis": [
+            "UK_MDR"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "GB5",
+          "text": "Is a causal relationship between the device and the event established, or reasonably possible?",
+          "definition": "A causal relationship is established, or cannot be excluded on the information you have. When you cannot tell, it is reasonably possible.",
+          "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368 (reporting)",
+          "basis": [
+            "UK_MDR"
+          ],
+          "serious": false,
+          "note": ""
+        },
+        {
+          "id": "GB6",
+          "text": "Was a serious deterioration in health unanticipated?",
+          "definition": "Asked for the 10-day report: a serious deterioration that was not anticipated (for example not in the risk analysis or the information supplied with the device).",
+          "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368 (reporting)",
+          "basis": [
+            "UK_MDR"
+          ],
+          "serious": false,
+          "note": ""
+        }
+      ]
+    },
+    "report_types": {
+      "GB_2_DAY": {
+        "label": "Serious public health threat: 2 days (UK MDR 2002 as amended)",
+        "days": 2,
+        "basis": "CALENDAR"
+      },
+      "GB_10_DAY": {
+        "label": "Death or unanticipated serious deterioration: 10 days (UK MDR 2002 as amended)",
+        "days": 10,
+        "basis": "CALENDAR"
+      },
+      "GB_15_DAY": {
+        "label": "Serious incident: 15 days (UK MDR 2002 as amended)",
+        "days": 15,
+        "basis": "CALENDAR"
+      }
+    },
+    "defs": {
+      "deterioration": {
+        "any": [
+          "GB3A",
+          "GB3B",
+          "GB3C",
+          "GB3D",
+          "GB3E",
+          "GB3F"
+        ]
+      },
+      "serious": {
+        "any": [
+          "GB2",
+          "GB3A",
+          "GB3B",
+          "GB3C",
+          "GB3D",
+          "GB3E",
+          "GB3F",
+          "GB4"
+        ]
+      }
+    },
+    "rules": [
+      {
+        "id": "F-GB-1",
+        "if": {
+          "all": [
+            "GB1",
+            {
+              "ref": "serious"
+            },
+            "GB5"
+          ]
+        },
+        "cite": "UK MDR 2002 Part 4A"
+      }
+    ],
+    "type_rows": [
+      {
+        "id": "T-GB-1",
+        "if": {
+          "maybe": "GB4"
+        },
+        "type": "GB_2_DAY"
+      },
+      {
+        "id": "T-GB-2",
+        "if": {
+          "any": [
+            {
+              "maybe": "GB2"
+            },
+            {
+              "all": [
+                {
+                  "maybe": {
+                    "ref": "deterioration"
+                  }
+                },
+                {
+                  "maybe": "GB6"
+                }
+              ]
+            }
+          ]
+        },
+        "type": "GB_10_DAY"
+      },
+      {
+        "id": "T-GB-3",
+        "type": "GB_15_DAY"
+      }
+    ],
+    "notes": [
+      {
+        "if": {
+          "all": [
+            {
+              "type": "GB_2_DAY"
+            },
+            {
+              "is_yes": {
+                "ref": "reportable"
+              }
+            },
+            {
+              "is_unknown": "GB4"
+            }
+          ]
+        },
+        "text": "Question 4 (serious public health threat) is Unknown: until it is answered, the 2-day report applies (MDCG 2023-3: report within the period even when uncertain). A No can lengthen it to 10 or 15 days. Starter rule, for your consultant to confirm."
+      },
+      {
+        "if": {
+          "all": [
+            {
+              "type": "GB_10_DAY"
+            },
+            {
+              "is_yes": {
+                "ref": "reportable"
+              }
+            },
+            {
+              "is_unknown": "GB2"
+            }
+          ]
+        },
+        "text": "Question 2 (death) is Unknown: until it is answered, the 10-day report applies (MDCG 2023-3: report within the period even when uncertain). A No can lengthen it to 15 days. Starter rule, for your consultant to confirm."
+      },
+      {
+        "if": {
+          "all": [
+            {
+              "type": "GB_10_DAY"
+            },
+            {
+              "is_yes": {
+                "ref": "reportable"
+              }
+            },
+            {
+              "is_no": "GB2"
+            },
+            {
+              "is_unknown": "GB6"
+            }
+          ]
+        },
+        "text": "Question 6 (unanticipated) is Unknown: until it is answered, the 10-day report applies (MDCG 2023-3: report within the period even when uncertain). A No can lengthen it to 15 days. Starter rule, for your consultant to confirm."
+      },
+      {
+        "if": {
+          "is_unknown": {
+            "ref": "reportable"
+          }
+        },
+        "text": "An Unknown answer could make the event reportable: the suggestion stays pending information, and \"not reportable\" cannot be concluded until it is answered."
+      }
+    ],
+    "folding": [
+      {
+        "if": {
+          "is_no": "GB1"
+        },
+        "fold": [
+          "GB2",
+          "GB3A",
+          "GB3B",
+          "GB3C",
+          "GB3D",
+          "GB3E",
+          "GB3F",
+          "GB4",
+          "GB5",
+          "GB6"
+        ],
+        "why": "Not asked: not an incident"
+      },
+      {
+        "if": {
+          "is_no": {
+            "ref": "serious"
+          }
+        },
+        "fold": [
+          "GB5"
+        ],
+        "why": "Not asked: no death, serious deterioration or public health threat"
+      },
+      {
+        "if": {
+          "any": [
+            {
+              "is_no": "GB5"
+            },
+            {
+              "is_no": {
+                "ref": "serious"
+              }
+            }
+          ]
+        },
+        "fold": [
+          "GB6"
+        ],
+        "why": "Not needed: not reportable on the answers above"
+      },
+      {
+        "if": {
+          "is_yes": "GB4"
+        },
+        "fold": [
+          "GB6"
+        ],
+        "why": "Not needed: a serious public health threat takes the 2-day report"
+      },
+      {
+        "if": {
+          "is_yes": "GB2"
+        },
+        "fold": [
+          "GB6"
+        ],
+        "why": "Not needed: a death takes the 10-day report"
+      },
+      {
+        "if": {
+          "is_no": {
+            "ref": "deterioration"
+          }
+        },
+        "fold": [
+          "GB6"
+        ],
+        "why": "Not needed: no serious deterioration in health"
+      }
+    ],
+    "precedence": [
+      "GB_2_DAY",
+      "GB_10_DAY",
+      "GB_15_DAY"
+    ],
+    "prefill": {
+      "death": [],
+      "malfunction": [],
+      "injury_note": []
+    },
+    "counting": {
+      "authority_zone": "Europe/London",
+      "awareness_is_day_one": true,
+      "words": "the awareness day is day 1; UK time or yours, whichever ends first"
+    },
+    "provisional": {
+      "THREAT": [
+        2,
+        "CALENDAR",
+        "2 days (UK MDR 2002 as amended)"
+      ],
+      "FLAGGED": [
+        10,
+        "CALENDAR",
+        "10 days (UK MDR 2002 as amended)"
+      ],
+      "UNFLAGGED": [
+        15,
+        "CALENDAR",
+        "15 days (UK MDR 2002 as amended)"
+      ],
+      "remedial": null,
+      "ruled_out": "a public health threat is ruled out"
+    }
+  },
+  "content_hash": "sha256:c83169d46d0db0f9fb40dda11c00b404da3153a4bd03356fa160de44de8f0f9e"
+}
