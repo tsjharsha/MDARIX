@@ -147,6 +147,31 @@ def test_the_brief_scope_counts_the_complaints_of_unknown_version(org):  # F10
     assert section["included_count"] == 4 and section["unknown_version_count"] == 2
 
 
+def test_a_composed_brief_lists_the_lots_in_scope(org):  # owner decision 4, 10 Nov 2026
+    from backend.app.db.models.foundation import Investigation
+    from backend.app.decision_brief.compose import compose
+    from tests.test_case_workflow import REASON, _put_scope
+
+    investigator, _ = org["investigator"]
+    seed = _seed(org["tenant_id"])
+    case = _open(investigator, seed, seed["complaints"][:2])
+    saved = _put_scope(
+        investigator,
+        case["id"],
+        lot_ids=[seed["lot_id"]],
+        included_complaint_ids=seed["complaints"][:2],
+        change_reason=REASON,
+    )
+    assert saved.status_code == 200, saved.text
+    with SessionLocal() as db:
+        bind_tenant(db, org["tenant_id"])
+        row = db.get(Investigation, uuid.UUID(case["id"]))
+        content, _ = compose(db, db, row, now=datetime.now(timezone.utc))
+    [lot] = content["scope"]["lots"]
+    assert lot["id"] == seed["lot_id"] and lot["lot_number"].startswith("CW-L-")
+    assert lot["product_version_id"] == seed["version_a"] and lot["version_identifier"] == "Rev A"
+
+
 def test_a_signal_of_one_version_takes_only_that_version(org):  # F11
     from tests.test_case_workflow import _code
 

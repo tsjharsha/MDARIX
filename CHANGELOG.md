@@ -81,6 +81,9 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - A version's story (Product 360, "The story of Rev B") lists the product's investigations that record no version, as
   "applies to the whole product", with their evidence, the same rule as the product's Overview; it no longer shows
   fewer investigations than the Overview.
+- A newly composed decision brief lists the lots in its scope (`scope.lots`: id, lot number, product version), and the
+  brief's Scope section shows a "Lots" line ("PW-2611 (Rev A)", or "version not known"). Briefs composed or signed
+  before stay as they are and show no Lots line.
 
 ### Security
 

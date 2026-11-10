@@ -606,6 +606,17 @@ function ReviewSummary({ title, value }: { title: string; value: unknown }) {
   );
 }
 
+/** "L-1 (Rev A), L-2 (version not known)": the lots a brief's scope stores, each with its product version. */
+function lotsLine(lots: unknown[]): string {
+  if (!lots.length) return "none";
+  return lots
+    .map((item) => {
+      const lot = record(item);
+      return `${safeText(lot.lot_number) ?? "Lot not found"} (${safeText(lot.version_identifier) ?? "version not known"})`;
+    })
+    .join(", ");
+}
+
 /** The sections MDARIX composed from the case's records, each statement with its kind and who made it. */
 function ComposedSections({ version }: { version: BriefVersion }) {
   const content = record(version.content);
@@ -652,6 +663,8 @@ function ComposedSections({ version }: { version: BriefVersion }) {
             {/* The keys the brief's compose stores (decision_brief/compose.py scope_section). */}
             {scope.included_count !== undefined && <li>Complaints in scope: {String(scope.included_count)}</li>}
             {scope.excluded_count !== undefined && <li>Complaints excluded: {String(scope.excluded_count)}</li>}
+            {/* Briefs composed before 0.10.95 store no lots: they show no Lots line. */}
+            {Array.isArray(scope.lots) && <li>Lots: {lotsLine(scope.lots)}</li>}
           </ul>
         ) : (
           <p className="ac-muted">No scope recorded.</p>

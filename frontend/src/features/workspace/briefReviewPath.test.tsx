@@ -148,6 +148,23 @@ describe("the brief's review at the top of the Decision Brief tab", () => {
     expect(html).toContain("Complaints in scope: 3");
     expect(html).toContain("Complaints excluded: 1");
     expect(html).toContain("Complaints with no known version: 1");
+    // A brief composed before 0.10.95 stores no lots and shows no Lots line.
+    expect(html).not.toContain("Lots:");
+  });
+
+  it("shows the lots a new brief's scope stores, each with its product version", () => {
+    const content = {
+      scope: {
+        version: 3,
+        lots: [
+          { id: "l1", lot_number: "PW-2611", product_version_id: "v1", version_identifier: "Rev A" },
+          { id: "l2", lot_number: "PW-2612", product_version_id: null, version_identifier: null },
+        ],
+      },
+    };
+    answers.set(BRIEF, { current: { ...version("APPROVED_FOR_DECISION"), content }, versions: [], actions: {} });
+    const html = render(<CaseDecisionBriefPanel investigationId={CASE} caseLabel="INV000001" />);
+    expect(html).toContain("Lots: PW-2611 (Rev A), PW-2612 (version not known)");
   });
 
   it("leads from the accepted brief to signing the decision", () => {
