@@ -70,6 +70,8 @@ class ToldIn(BaseModel):
 
 class ResolveIn(BaseModel):
     problem_code: str = Field(default="", max_length=120)
+    # Optional, masked like the Case words (spec 1.2 step 2).
+    problem_description: str = Field(default="", max_length=rules.TEXT_MAX * 2)
     service_record: ServiceRecordIn
     attribution: str | None = Field(default=None, max_length=30)
     attribution_reason: str = Field(default="", max_length=rules.TEXT_MAX * 2)
@@ -301,6 +303,9 @@ def resolve_and_close(
     # The triggers are read with the code chosen: a recurrence or a new failure mode it makes refuses the signature.
     complaint.problem_code = code
     db.flush()
+    description = rules.collapse(payload.problem_description)
+    if len(description) > rules.TEXT_MAX:
+        raise _error(422, "TEXT_TOO_LONG", f"Keep the problem description under {rules.TEXT_MAX} characters")
     told = payload.customer_told.model_dump()
     told["how"] = rules.collapse(told["how"]).upper()
     problem = rules.customer_told_problem(told, connect)
@@ -453,7 +458,12 @@ def resolve_and_close(
                 version=version,
             )
 
-    sign(db, control_db, ctx, complaint.id, request, {"customer_told": told_record}, before_sign, before_commit)
+    if description:
+        from backend.app.trial.imports import _mask
+
+        description = _mask(description)
+    extra = {"customer_told": told_record, "problem_description": description or None}
+    sign(db, control_db, ctx, complaint.id, request, extra, before_sign, before_commit)
     return resolve_screen(complaint.id, db, control_db, ctx)
 
 

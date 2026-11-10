@@ -543,8 +543,17 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
         .limit(READ_LIMIT)
         .all()
     )
+    # B7 (RT-26): a complaint MDARIX closed stays on the list (done), so new harm can reopen its triage and it.
+    from backend.app.db.models.oversight import EventClosure
+
+    closed_here = {
+        row.complaint_id
+        for row in db.query(EventClosure.complaint_id).filter(
+            EventClosure.tenant_id == tenant_id, EventClosure.closed_at.isnot(None)
+        )
+    }
     for complaint in complaints:
-        if review_rules.is_closed(complaint.status):
+        if review_rules.is_closed(complaint.status) and complaint.id not in closed_here:
             continue
         record = records.get((COMPLAINT, complaint.id))
         awareness = complaint_awareness(complaint, record)

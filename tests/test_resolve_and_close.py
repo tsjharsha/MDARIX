@@ -182,6 +182,7 @@ def test_rt08_one_signature_writes_two_records_and_closes_in_complete(trial):
             seen_triggers=seen,
             known_behaviour_ref="IFU-PW-12 section 7.3",
             take_over=True,
+            problem_description="Filter alarm; nurse Priya Sharma called from 98450 12345 about it.",
         ),
     )
     assert signed.status_code == 200, signed.text
@@ -199,6 +200,8 @@ def test_rt08_one_signature_writes_two_records_and_closes_in_complete(trial):
         )
         assert disposition.branch == "SERVICE_LEVEL" and disposition.service_record["customer_told"]["how"] == "PHONE"
         assert disposition.answers["TRIGGER"]["known_behaviour"] == "IFU-PW-12 section 7.3"
+        described = disposition.service_record["problem_description"]
+        assert described.startswith("Filter alarm") and "98450" not in described and "Priya" not in described
         row = db.query(EventClosure).filter(EventClosure.complaint_id == complaint.id).one()
         assert row.ready_state == "READY" and row.closed_by == row.signed_by and row.closed_at is not None
         told = next(item for item in row.checklist if item["code"] == "CUSTOMER_TOLD")
@@ -275,3 +278,48 @@ def test_rt27_not_possible_needs_the_reason(trial):
     view = user.get(_url(rt01)).json()
     refused = user.post(_url(rt01), json=_body(view, customer_told={"how": "NOT_POSSIBLE"}))
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "CUSTOMER_TOLD_REQUIRED"
+
+
+def test_rt26_new_harm_on_a_closed_complaint_reopens_it_automatically(trial):
+    """T-D7 hook end to end on a Case-made complaint: logged, signed and escalated, routine triage confirmed, Resolve
+    and close signed (closed in Complete); then the Case check is re-answered with a death. The closed complaint
+    stays on the triage list, so its triage reopens on the fast track and the complaint itself reopens, the closure
+    superseded and audited (COMPLAINT_REOPENED, trigger not MANUAL)."""
+    from tests.test_intake_triage_api import INTAKE, _all_no, _sign
+    from tests.test_triage_two_speeds_api import _find, _log, _ok, _seen
+    from tests.test_triage_two_speeds_api import _url as _triage_url
+
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    case = _ok(_sign(user, _log(user, answers=_all_no(Q2="YES")), "COMPLAINT"))  # routine: no harm
+    complaint_id = case["complaint_id"]
+    item = _find(user, f"COMPLAINT:{complaint_id}")
+    _ok(user.post(_triage_url(item, "confirm"), json={"seen_version": _seen(item)}))
+
+    view = user.get(_url(complaint_id)).json()
+    assert view["mode"] == "COMPLETE", view["mode"]
+    triggers = view["disposition"]["trigger_codes"]
+    body = _body(
+        view,
+        problem_code="B7_NEW_MODE",
+        seen_triggers=[*triggers, "NEW_FAILURE_MODE"] if "NEW_FAILURE_MODE" not in triggers else triggers,
+        known_behaviour_ref="IFU-OC-3 section 4.1",
+        take_over=True,
+    )
+    signed = user.post(_url(complaint_id), json=body)
+    assert signed.status_code == 200 and signed.json()["closed"] is True, signed.text
+    assert _find(user, f"COMPLAINT:{complaint_id}") is not None  # closed, still on the list (done)
+
+    # The reporter calls back: the patient died. The Case check is re-answered (words alone flag "harm not known").
+    seen = _ok(user.get(f"{INTAKE}/{case['id']}"))["version"]
+    death = {"answers": _all_no(Q2="YES", Q4="YES", Q5="YES"), "seen_version": seen}
+    _ok(user.put(f"{INTAKE}/{case['id']}/check", json=death))
+
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        assert db.get(Complaint, uuid.UUID(complaint_id)).status == "open"
+    row = _closure(tenant_id, complaint_id)
+    assert row.closed_at is None and row.reopen_reason.startswith("Triage reopened")
+    reopens = [details for action, details in _actions(tenant_id, "COMPLAINT_REOPENED")]
+    assert reopens[-1]["trigger"] != "MANUAL"
+    item = _find(user, f"COMPLAINT:{complaint_id}")
+    assert item["record"]["completed_at"] is None  # triage open again, on the fast track
