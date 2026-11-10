@@ -27,7 +27,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 
+from backend.app import feature_set
 from backend.app.oversight.rules import zone_info
+from backend.app.rule_register import register
 
 STARTER = "Starter counting rule: conservative until your regulatory consultant confirms it."
 WORK = "WORK"
@@ -83,9 +85,20 @@ def _utc(moment: datetime) -> datetime:
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
-def _zones(market: str | None, org_zone: str | None) -> list[str]:
+def counting(market: str | None, aware=None, org_zone: str | None = None) -> tuple[str | None, bool]:
+    """(the authority's time zone, whether the awareness day is day 1) of the market's floor in force at awareness (B4;
+    today's without one); today's constants when the rule register is off or for a market without a floor."""
+    if market and feature_set.rule_register():
+        floor = register.floor_at(market, aware, org_zone)
+        if floor:
+            found = floor["content"]["counting"]
+            return found["authority_zone"], found["awareness_is_day_one"]
+    return AUTHORITY_ZONES.get(market or ""), market in DAY_ONE_MARKETS
+
+
+def _zones(market: str | None, org_zone: str | None, aware=None) -> list[str]:
     """The time zones a market's deadline is counted in: the authority's first, then the organization's."""
-    found = [zone for zone in (AUTHORITY_ZONES.get(market or ""), org_zone or "UTC") if zone]
+    found = [zone for zone in (counting(market, aware, org_zone)[0], org_zone or "UTC") if zone]
     return list(dict.fromkeys(found))
 
 
@@ -123,12 +136,12 @@ def due_label(at: datetime, market: str | None, org_zone: str | None, legal: boo
     return moment_label(at, org_zone or "UTC")
 
 
-def end_of(day: date, market: str | None, org_zone: str | None) -> Deadline:
+def end_of(day: date, market: str | None, org_zone: str | None, aware=None) -> Deadline:
     """The end of a legal latest day: the earlier of its end in the authority's time zone and in the organization's
-    (a tie keeps the authority's)."""
+    (a tie keeps the authority's). ``aware``: the awareness that picks the market's floor (today's when None)."""
     ends = [
         (datetime.combine(day, END_OF_DAY, tzinfo=zone_info(zone) or timezone.utc).astimezone(timezone.utc), zone)
-        for zone in _zones(market, org_zone)
+        for zone in _zones(market, org_zone, aware)
     ]
     at, zone = min(ends, key=lambda item: item[0])
     return Deadline(day, at, zone, market, org_zone)
@@ -141,7 +154,9 @@ def start_day(aware: datetime | date, market: str | None, org_zone: str | None) 
     if isinstance(aware, datetime) and day_only(aware):
         return _utc(aware).astimezone(timezone.utc).date()
     if isinstance(aware, datetime):
-        return min(_utc(aware).astimezone(zone_info(zone) or timezone.utc).date() for zone in _zones(market, org_zone))
+        return min(
+            _utc(aware).astimezone(zone_info(zone) or timezone.utc).date() for zone in _zones(market, org_zone, aware)
+        )
     return aware
 
 
@@ -152,8 +167,8 @@ def count(aware: datetime | date, days: int, day_basis: str, market: str | None,
     if day_basis == WORK:
         day = add_work_days(start, days)
     else:
-        day = start + timedelta(days=days - 1 if market in DAY_ONE_MARKETS else days)
-    return end_of(day, market, org_zone)
+        day = start + timedelta(days=days - 1 if counting(market, aware, org_zone)[1] else days)
+    return end_of(day, market, org_zone, aware)
 
 
 def days_left(deadline: Deadline, now: datetime | date) -> int:

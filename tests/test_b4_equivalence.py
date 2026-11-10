@@ -11,11 +11,15 @@ from __future__ import annotations
 import itertools
 import json
 import random
+from datetime import date, datetime, timedelta, timezone
+
 
 import pytest
 
 from backend.app.decision_guides import rules as guides
-from backend.app.reportability import legacy_v1, markets
+from backend.app.intake import rules as intake
+from backend.app.oversight.rules import zone_info
+from backend.app.reportability import deadlines, legacy_v1, markets
 from backend.app.rule_register import engine, register
 
 THREE = ("YES", "NO", "UNKNOWN")
@@ -85,3 +89,143 @@ def test_a_quick_sample_of_eu_and_gb_runs_in_every_selection():
         ids = _ids(market)
         for _ in range(5_000):
             _same(market, {question: rng.choice(FIVE) for question in ids})
+
+
+# ------------------------------------------------------------------- step 5: what the rest of the code reads
+
+
+def _switch(monkeypatch, on: bool) -> None:
+    monkeypatch.setenv("MDARIX_RULE_REGISTER", "on" if on else "off")
+
+
+def _both(monkeypatch, run):
+    """``run()`` with the register on and off, as canonical JSON."""
+    found = []
+    for on in (True, False):
+        _switch(monkeypatch, on)
+        found.append(json.dumps(run(), sort_keys=True, default=str))
+    return found
+
+
+@pytest.mark.parametrize("market", markets.MARKETS)
+def test_question_sets_and_report_types_are_identical(market, monkeypatch):
+    """Item 4: the question set (as the screens show it) and the report types of each market."""
+    on, off = _both(monkeypatch, lambda: markets.QUESTION_SETS[market].as_dict())
+    assert on == off
+    assert markets.QUESTION_SETS[market] == markets.V1_QUESTION_SETS[market]
+    on, off = _both(monkeypatch, lambda: {code: vars(kind) for code, kind in markets.REPORT_TYPES.items()})
+    assert on == off and len(json.loads(on)) == 12
+
+
+def test_prefill_and_record_notes_for_every_record_combination(monkeypatch):
+    """Item 5: death, malfunction and serious injury each True, False or None; three severities; every market."""
+    cases = 0
+    for market in markets.MARKETS:
+        question_set = markets.V1_QUESTION_SETS[market]
+        for death, malfunction, injury in itertools.product((True, False, None), repeat=3):
+            for severity in (None, "Serious", "  minor   harm "):
+                record = {"death": death, "malfunction": malfunction, "serious_injury": injury, "severity": severity}
+                on, off = _both(
+                    monkeypatch,
+                    lambda: [markets.suggestions(question_set, record), markets.record_notes(question_set, record)],
+                )
+                assert on == off, (market, record)
+                cases += 1
+    assert cases == 5 * 27 * 3
+
+
+ZONES = ("UTC", "Asia/Kolkata", "America/New_York", "Europe/London", "Australia/Sydney")
+DAYS = (2, 5, 10, 15, 30)
+
+
+def _transitions() -> list[datetime]:
+    """Every daylight-saving change of 2026-2028 in the authority and organization zones (to the hour)."""
+    found = set()
+    for zone in {*ZONES, "Europe/Brussels"}:
+        info = zone_info(zone)
+        moment = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        offset = moment.astimezone(info).utcoffset()
+        while moment.year < 2029:
+            later = moment + timedelta(hours=1)
+            if later.astimezone(info).utcoffset() != offset:
+                found.add(later)
+                offset = later.astimezone(info).utcoffset()
+            moment = later
+    return sorted(found)
+
+
+def _deadline_cases(count: int) -> list[tuple]:
+    rng = random.Random("b4-deadlines")
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    cases = [
+        (
+            start + timedelta(minutes=rng.randrange(3 * 366 * 24 * 60)),
+            rng.choice((*markets.MARKETS, None)),
+            rng.choice(ZONES),
+            rng.choice(DAYS),
+            rng.choice((deadlines.WORK, "CALENDAR")),
+        )
+        for _ in range(count)
+    ]
+    for change in _transitions():
+        for minutes in range(-120, 121, 30):
+            for market in markets.MARKETS:
+                for zone in ZONES:
+                    cases.append((change + timedelta(minutes=minutes), market, zone, 2, "CALENDAR"))
+    # Day-only awareness (12:00 UTC) and a plain day.
+    cases += [
+        (datetime(2027, 3, 1, 12, tzinfo=timezone.utc), m, z, 5, deadlines.WORK) for m in markets.MARKETS for z in ZONES
+    ]
+    cases += [(date(2027, 3, 1), m, z, 10, "CALENDAR") for m in markets.MARKETS for z in ZONES]
+    return cases
+
+
+def _deadline_results(cases) -> list:
+    return [
+        (found.day, found.at, found.zone)
+        for found in (deadlines.count(aware, days, basis, market, zone) for aware, market, zone, days, basis in cases)
+    ]
+
+
+@pytest.mark.slow
+def test_deadlines_one_hundred_thousand_moments_and_every_daylight_saving_change(monkeypatch):
+    """Item 6 (RG-11, RR-14): identical latest day, end and binding zone."""
+    cases = _deadline_cases(100_000)
+    _switch(monkeypatch, True)
+    on = _deadline_results(cases)
+    _switch(monkeypatch, False)
+    assert on == _deadline_results(cases)
+
+
+def test_deadlines_a_quick_sample_and_every_daylight_saving_change(monkeypatch):
+    cases = _deadline_cases(2_000)
+    _switch(monkeypatch, True)
+    on = _deadline_results(cases)
+    _switch(monkeypatch, False)
+    assert on == _deadline_results(cases)
+
+
+def test_triage_provisional_deadlines_every_market_tier_remedial_answered_and_ivd(monkeypatch):
+    """Item 7."""
+    aware = datetime(2026, 11, 6, 22, 30, tzinfo=timezone.utc)
+    cases = 0
+    for level in intake.TIER_LABELS:
+        for remedial, answered, ivd in itertools.product((True, False), repeat=3):
+            for own in (*markets.MARKETS, None):
+                on, off = _both(
+                    monkeypatch,
+                    lambda: intake.provisional_deadlines(
+                        aware,
+                        list(markets.MARKETS),
+                        level,
+                        aware,
+                        remedial,
+                        own=own,
+                        org_zone="Asia/Kolkata",
+                        ivd=ivd,
+                        answered=answered,
+                    ),
+                )
+                assert on == off, (level, remedial, answered, ivd, own)
+                cases += 1
+    assert cases == 3 * 8 * 6

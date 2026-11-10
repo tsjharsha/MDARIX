@@ -33,8 +33,10 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from backend.app.complaint_review.rules import normalize
+from backend.app import feature_set
 from backend.app.reportability import deadlines, markets
 from backend.app.reportability import rules as reporting
+from backend.app.rule_register import register
 
 GUIDE_VERSION = "first-contact-starter-1"
 HARM_WORDS_VERSION = "harm-words-starter-1"
@@ -534,6 +536,18 @@ US_REMEDIAL = (5, reporting.WORK, "5 work days: remedial action may be needed (2
 IVDR_82 = "EU IVDR Art. 82, starter"
 
 
+def _provisional(market: str, level: str, remedial: bool, aware, org_zone: str | None) -> tuple:
+    """A tier's (days, day basis, label, what rules the earliest report out) from the market's floor in force at
+    awareness (B4); today's constants when the rule register is off."""
+    table, remedy, ruled_out = PROVISIONAL[market], US_REMEDIAL if market == markets.US else None, RULED_OUT.get(market)
+    floor = register.floor_at(market, utc(aware), org_zone) if feature_set.rule_register() else None
+    if floor:
+        table = floor["content"]["provisional"]
+        remedy, ruled_out = table["remedial"], table["ruled_out"]
+    days, basis, label = remedy if remedy and remedial and level == FLAGGED else table[level]
+    return days, basis, label, ruled_out
+
+
 def tier(flagged: bool, threat: bool) -> str:
     return THREAT if threat else FLAGGED if flagged else UNFLAGGED
 
@@ -548,12 +562,18 @@ RULED_OUT = {
 }
 
 
-@functools.cache
 def earliest_report(market: str) -> markets.ReportType | None:
     """The report the market's rules start when no question is answered yet (US 5 work days, EU/NI and GB 2 days,
-    Canada 10 days); None for a market without one (India: the tier date already is its only window)."""
+    Canada 10 days); None for a market without one (India: the tier date already is its only window). From the
+    market's floor in force today (B4)."""
     if market not in RULED_OUT:
         return None
+    floor = register.floor(market) if feature_set.rule_register() else None
+    return _earliest(market, floor["code"] if floor else None, str(register._DIRECTORY))
+
+
+@functools.cache
+def _earliest(market: str, floor_code: str | None, directory: str) -> markets.ReportType | None:
     kind = markets.REPORT_TYPES.get(markets.evaluate(market, {})["report_type_if_reportable"] or "")
     return kind if kind and kind.days else None
 
@@ -630,9 +650,7 @@ def provisional_deadlines(
                 }
             )
             continue
-        days, basis, label = PROVISIONAL[market][level]
-        if market == markets.US and remedial and level == FLAGGED:
-            days, basis, label = US_REMEDIAL
+        days, basis, label, ruled_out = _provisional(market, level, remedial, aware, org_zone)
         due = deadlines.count(utc(aware), days, basis, market, org_zone)
         note, kind = None, None if answered else earliest_report(market)
         if kind is not None:
@@ -640,7 +658,7 @@ def provisional_deadlines(
             if sooner.at < due.at:
                 days, basis, label, due = kind.days, kind.day_basis, kind.label, sooner
                 unit = "work days" if basis == reporting.WORK else "days"
-                note = f"{days} {unit} unless {RULED_OUT[market]}"
+                note = f"{days} {unit} unless {ruled_out}"
         if ivd and market == markets.EU_NI:
             label = label.replace("EU MDR Art. 87(4)", IVDR_82).replace("EU MDR Art. 87(5)", IVDR_82)
             label = label.replace("EU MDR Art. 87(3)", IVDR_82)

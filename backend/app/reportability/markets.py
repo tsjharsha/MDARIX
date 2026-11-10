@@ -22,10 +22,13 @@ anything stored.
 from __future__ import annotations
 
 import re
+from collections.abc import MutableMapping
 from dataclasses import dataclass, field
 from functools import lru_cache
 
+from backend.app import feature_set
 from backend.app.reportability import deadlines, rules
+from backend.app.rule_register import engine, register
 from backend.app.standards import STARTER_MARK, version_words
 
 # The label every signed record and document made in a free trial carries (T-B5).
@@ -77,7 +80,8 @@ class ReportType:
     day_basis: str = rules.CALENDAR
 
 
-REPORT_TYPES = {
+# Version 1 (today's constants): the oracle, and the path when the rule register is off (B4).
+V1_REPORT_TYPES = {
     "US_30_DAY": ReportType("30-calendar-day report (21 CFR 803.50)", 30),
     "US_5_WORK_DAY": ReportType("5-work-day report (21 CFR 803.53)", 5, rules.WORK),
     "EU_2_DAY": ReportType("Serious public health threat: 2 days (EU MDR Art. 87(4))", 2),
@@ -482,175 +486,108 @@ CA_SET = QuestionSet(
     "preliminary report gives (s. 61).",
     basis=("CA_MDR",),
 )
-QUESTION_SETS = {question_set.market: question_set for question_set in (US_SET, EU_SET, GB_SET, IN_SET, CA_SET)}
+V1_QUESTION_SETS = {question_set.market: question_set for question_set in (US_SET, EU_SET, GB_SET, IN_SET, CA_SET)}
+
+
+def _register_question_set(entry: dict) -> QuestionSet:
+    found = entry["content"]["question_set"]
+    questions = tuple(
+        Question(q["id"], q["text"], q["definition"], q["clause"], tuple(q["basis"]), q["serious"], q["note"])
+        for q in found["questions"]
+    )
+    return QuestionSet(
+        entry["market"], found["version"], found["title"], questions, found["note"], tuple(found["basis"])
+    )
+
+
+@lru_cache(maxsize=64)
+def _in_force(directory: str, codes: tuple[str, ...]) -> tuple[dict, dict]:
+    """The question sets and report types of these floor versions (cached per register and set of codes)."""
+    entries = [register.get(code) for code in codes]
+    return (
+        {entry["market"]: _register_question_set(entry) for entry in entries},
+        {
+            code: ReportType(kind["label"], kind["days"], kind["basis"])
+            for entry in entries
+            for code, kind in entry["content"]["report_types"].items()
+        },
+    )
+
+
+def floor_question_set(floor: dict) -> QuestionSet:
+    """The question set of one floor version (the one picked by an awareness day)."""
+    return _in_force(str(register._DIRECTORY), (floor["code"],))[0][floor["market"]]
+
+
+class _InForce(MutableMapping):
+    """``QUESTION_SETS`` and ``REPORT_TYPES`` (B4): those of the floors in force today when the rule register is on,
+    version 1's constants when it is off (``MDARIX_RULE_REGISTER=off``), read on every access. An item set on it (a
+    test's newer version) is kept until it is set back."""
+
+    def __init__(self, v1: dict, part: int):
+        self._v1, self._part, self._set = v1, part, {}
+
+    def _now(self) -> dict:
+        if feature_set.rule_register():
+            codes = tuple(found["code"] for market in MARKETS if (found := register.floor(market)))
+            base = _in_force(str(register._DIRECTORY), codes)[self._part]
+        else:
+            base = self._v1
+        return {**base, **self._set} if self._set else base
+
+    def __getitem__(self, key):
+        return self._now()[key]
+
+    def __setitem__(self, key, value) -> None:
+        self._set.pop(key, None)
+        if self._now().get(key) != value:
+            self._set[key] = value
+
+    def __delitem__(self, key) -> None:
+        del self._set[key]
+
+    def __iter__(self):
+        return iter(self._now())
+
+    def __len__(self) -> int:
+        return len(self._now())
+
+
+QUESTION_SETS: MutableMapping = _InForce(V1_QUESTION_SETS, 0)
+REPORT_TYPES: MutableMapping = _InForce(V1_REPORT_TYPES, 1)
 
 
 # --------------------------------------------------------------------------------------------- answers to a result
 
 
-def _value(answers: dict, question_id: str) -> bool | None:
-    """Yes is True; No and Not applicable are False; Unknown, or no answer, is None (never False)."""
-    answer = (answers.get(question_id) or {}).get("answer")
-    if answer == YES:
-        return True
-    if answer in (NO, NOT_APPLICABLE):
-        return False
-    return None
+_value = engine.answer_value
 
 
-def _any(*values: bool | None) -> bool | None:
-    if True in values:
-        return True
-    return None if None in values else False
+def _floor(market: str, floor: dict | None = None) -> dict:
+    """The content of ``floor`` (a register version), else of the market's floor in force today."""
+    found = floor or register.floor(market)
+    if found is None:
+        raise ValueError(f"unknown market {market}")
+    return found["content"]
 
 
-def _all(*values: bool | None) -> bool | None:
-    if False in values:
-        return False
-    return None if None in values else True
-
-
-def _suggestion(reportable: bool | None) -> str:
-    return {True: REPORTABLE, None: PENDING, False: NOT_REPORTABLE}[reportable]
-
-
-MDCG = "MDCG 2023-3"
-
-
-def _shorter(question: str, shorter: str, longer: str, cite: str | None = None) -> str:
-    """The note of an Unknown that keeps the shorter report (0.10.81): which answer would lengthen it."""
-    why = f" ({cite}: report within the period even when uncertain)" if cite else ""
-    return (
-        f"{question} is Unknown: until it is answered, {shorter} applies{why}. A No can lengthen it to {longer}. "
-        "Starter rule, for your consultant to confirm."
-    )
-
-
-def evaluate(market: str, answers: dict) -> dict:
+def evaluate(market: str, answers: dict, floor: dict | None = None) -> dict:
     """The suggested conclusion of a market's answers, the report type, and the notes that explain it.
     ``report_type`` is set when the suggestion is reportable; ``report_type_if_reportable`` is the type a person who
-    concludes reportable against the suggestion gets."""
-    v = lambda question_id: _value(answers, question_id)  # noqa: E731
-    notes: list[str] = []
-    if market == US:
-        injury = _any(v("US2A"), v("US2B"), v("US2C"))
-        harm = _all(_any(v("US1"), injury), v("US3"))
-        malfunction = _all(v("US4"), v("US5"))
-        reportable = _any(harm, malfunction)
-        five_day = v("US6")
-        # Unknown takes the shortest category the facts do not yet exclude (0.10.81, starter).
-        kind = "US_30_DAY" if five_day is False else "US_5_WORK_DAY"
-        if reportable and five_day is None:
-            notes.append(_shorter("Question 6", "the 5-work-day report (21 CFR 803.53)", "30 days (21 CFR 803.50)"))
-        elif reportable and five_day is False:
-            notes.append("Question 6 is No, so not the 5-work-day report (803.53).")
-    elif market in (EU_NI, GB):
-        p = "EU" if market == EU_NI else "GB"
-        limbs = [v(f"{p}3{letter}") for letter in "ABCDEF"]
-        reportable = _all(v(f"{p}1"), _any(v(f"{p}2"), *limbs, v(f"{p}4")), v(f"{p}5"))
-        # Unknown takes the shortest category the facts do not yet exclude (MDCG 2023-3: report within the period
-        # even when uncertain; 0.10.81, starter).
-        threat, death, unanticipated = v(f"{p}4"), v(f"{p}2"), v(f"{p}6")
-        deterioration = _any(*limbs)
-        if threat is not False:
-            kind = f"{p}_2_DAY"
-            if reportable and threat is None:
-                notes.append(
-                    _shorter("Question 4 (serious public health threat)", "the 2-day report", "10 or 15 days", MDCG)
-                )
-        elif death is not False or (deterioration is not False and unanticipated is not False):
-            kind = f"{p}_10_DAY"
-            if reportable and death is None:
-                notes.append(_shorter("Question 2 (death)", "the 10-day report", "15 days", MDCG))
-            elif reportable and not death and unanticipated is None:
-                notes.append(_shorter("Question 6 (unanticipated)", "the 10-day report", "15 days", MDCG))
-        else:
-            kind = f"{p}_15_DAY"
-    elif market == IN:
-        reportable = _all(v("IN1"), _any(*(v(f"IN2{letter}") for letter in "ABCDEF")))
-        kind = "IN_SERIOUS_ADVERSE_EVENT"
-        if reportable and v("IN3"):
-            notes.append("Serious and unexpected: a suspected unexpected serious adverse event.")
-    elif market == CA:
-        reportable = _all(v("CA1"), v("CA2"), _any(v("CA3"), v("CA4")), _any(v("CA5"), v("CA6")))
-        if v("CA5") is False:
-            kind = "CA_FOREIGN"
-        elif v("CA3") is False:
-            kind = "CA_30_DAY"
-        else:
-            # Conservative (starter): while question 3 is Unknown, the shorter 10-day report.
-            kind = "CA_10_DAY"
-            if reportable and v("CA3") is None:
-                notes.append("Question 3 is Unknown: until it is answered, the shorter 10-day report applies.")
-    else:
-        raise ValueError(f"unknown market {market}")
-    suggested = _suggestion(reportable)
-    if suggested == PENDING:
-        notes.append(
-            "An Unknown answer could make the event reportable: the suggestion stays pending information, and "
-            '"not reportable" cannot be concluded until it is answered.'
-        )
-    return {
-        "suggested": suggested,
-        "report_type": kind if reportable else None,
-        "report_type_if_reportable": kind,
-        "notes": notes,
-        "not_asked": not_asked(market, answers),
-    }
+    concludes reportable against the suggestion gets. B4: read from the market's floor in the rule register (``floor``:
+    the version picked by the awareness day; today's when None); today's code (``legacy_v1``) when the register is off."""
+    if not feature_set.rule_register():
+        return legacy_v1.evaluate(market, answers)
+    return engine.evaluate(_floor(market, floor), answers)
 
 
-def not_asked(market: str, answers: dict) -> dict[str, str]:
+def not_asked(market: str, answers: dict, floor: dict | None = None) -> dict[str, str]:
     """The questions earlier answers make unnecessary, each with why (0.10.83, D2): their answer can no longer change
     the conclusion, the report type or the form. Only a Yes, No or Not applicable folds a question away; an Unknown or
     a missing answer never does. A folded question is not required to sign."""
-    v = lambda question_id: _value(answers, question_id)  # noqa: E731
-    found: dict[str, str] = {}
-
-    def fold(ids, why: str) -> None:
-        for question_id in ids:
-            found.setdefault(question_id, why)
-
-    if market == US:
-        if v("US1") is False and _any(v("US2A"), v("US2B"), v("US2C")) is False:
-            fold(["US3"], "Not asked: no death and no serious injury")
-        if v("US4") is False:
-            fold(["US5"], "Not asked: no malfunction")
-        harm = _all(_any(v("US1"), v("US2A"), v("US2B"), v("US2C")), v("US3"))
-        if _any(harm, _all(v("US4"), v("US5"))) is False:
-            fold(["US6"], "Not needed: not reportable on the answers above")
-    elif market in (EU_NI, GB):
-        p = "EU" if market == EU_NI else "GB"
-        limbs = [f"{p}3{letter}" for letter in "ABCDEF"]
-        if v(f"{p}1") is False:
-            fold([f"{p}2", *limbs, f"{p}4", f"{p}5", f"{p}6"], "Not asked: not an incident")
-        serious = _any(v(f"{p}2"), *(v(item) for item in limbs), v(f"{p}4"))
-        if serious is False:
-            fold([f"{p}5"], "Not asked: no death, serious deterioration or public health threat")
-        if v(f"{p}5") is False or serious is False:
-            fold([f"{p}6"], "Not needed: not reportable on the answers above")
-        elif v(f"{p}4") is True:
-            fold([f"{p}6"], "Not needed: a serious public health threat takes the 2-day report")
-        elif v(f"{p}2") is True:
-            fold([f"{p}6"], "Not needed: a death takes the 10-day report")
-        elif _any(*(v(item) for item in limbs)) is False:
-            fold([f"{p}6"], "Not needed: no serious deterioration in health")
-    elif market == IN:
-        criteria = [f"IN2{letter}" for letter in "ABCDEF"]
-        if v("IN1") is False:
-            fold([*criteria, "IN3"], "Not asked: not an adverse event suspected to be associated with the device")
-        elif _any(*(v(item) for item in criteria)) is False:
-            fold(["IN3"], "Not needed: not serious on the answers above")
-    elif market == CA:
-        rest = ["CA2", "CA3", "CA4", "CA5", "CA6"]
-        if v("CA1") is False:
-            fold(rest, "Not asked: the device is not sold in Canada")
-        elif v("CA2") is False:
-            fold(rest[1:], "Not asked: not related to a failure, a deterioration or the labelling")
-        if v("CA3") is True:
-            fold(["CA4"], "Not needed: it already led to death or a serious deterioration")
-        if v("CA5") is True:
-            fold(["CA6"], "Not asked: the incident occurred in Canada")
-    return found
+    if not feature_set.rule_register():
+        return legacy_v1.not_asked(market, answers)
+    return engine.not_asked(_floor(market, floor), answers)
 
 
 def clean_answers(question_set: QuestionSet, raw: dict | None) -> dict:
@@ -672,10 +609,12 @@ def clean_answers(question_set: QuestionSet, raw: dict | None) -> dict:
     return found
 
 
-def answers_problem(question_set: QuestionSet, answers: dict, *, complete: bool) -> str | None:
+def answers_problem(
+    question_set: QuestionSet, answers: dict, *, complete: bool, floor: dict | None = None
+) -> str | None:
     """Why the answers cannot be saved (``complete=False``) or signed (``complete=True``), or None. A question earlier
     answers make unnecessary (``not_asked``) is not required."""
-    folded = not_asked(question_set.market, answers) if complete else {}
+    folded = not_asked(question_set.market, answers, floor) if complete else {}
     for question in question_set.questions:
         item = answers.get(question.id)
         if question.id in folded:
@@ -717,40 +656,34 @@ JUDGEMENT_QUESTIONS = ("US3", "US5", "US6", "IN1", "IN2C", "IN2E", "IN3", *_INJU
 CONFIRMED, CORRECTED, ENTERED = "CONFIRMED", "CORRECTED", "ENTERED"
 
 
-def suggestions(question_set: QuestionSet, record: dict) -> dict[str, dict]:
-    """The factual answers the complaint's record states, each with its source, for the questions of this set."""
-    death, malfunction = record.get("death"), record.get("malfunction")
+def suggestions(question_set: QuestionSet, record: dict, floor: dict | None = None) -> dict[str, dict]:
+    """The factual answers the complaint's record states, each with its source, for the questions of this set (the
+    floor's ``prefill``; ``legacy_v1`` when the register is off)."""
+    if not feature_set.rule_register():
+        return legacy_v1.suggestions(question_set, record)
+    prefill = _floor(question_set.market, floor)["prefill"]
     found: dict[str, dict] = {}
-
-    def suggest(ids, answer, source, evidence):
+    for ids, value, said, evidence in (
+        (prefill["death"], record.get("death"), "death", "Patient outcome fields"),
+        (prefill["malfunction"], record.get("malfunction"), "malfunction", "Malfunction field"),
+    ):
+        if value is None:
+            continue
         for question_id in ids:
             found[question_id] = {
-                "answer": answer,
-                "source": f"From the complaint record: {source}",
+                "answer": YES if value else NO,
+                "source": f"From the complaint record: {'a' if value else 'no'} {said} was reported",
                 "evidence": evidence,
             }
-
-    if death is not None:
-        suggest(
-            _DEATH_QUESTIONS,
-            YES if death else NO,
-            "a death was reported" if death else "no death was reported",
-            "Patient outcome fields",
-        )
-    if malfunction is not None:
-        suggest(
-            _MALFUNCTION_QUESTIONS,
-            YES if malfunction else NO,
-            "a malfunction was reported" if malfunction else "no malfunction was reported",
-            "Malfunction field",
-        )
     asked = {question.id for question in question_set.questions if not question.extra}
     return {key: value for key, value in found.items() if key in asked}
 
 
-def record_notes(question_set: QuestionSet, record: dict) -> dict[str, str]:
+def record_notes(question_set: QuestionSet, record: dict, floor: dict | None = None) -> dict[str, str]:
     """What the record says beside each serious-injury question, never as its answer (0.10.83, D2): the person judges
     it against the regulation's definition."""
+    if not feature_set.rule_register():
+        return legacy_v1.record_notes(question_set, record)
     injury = record.get("serious_injury")
     said = {
         True: "The record says a serious injury was reported",
@@ -760,7 +693,8 @@ def record_notes(question_set: QuestionSet, record: dict) -> dict[str, str]:
     severity = " ".join(str(record.get("severity") or "").split())
     text = f"{said}{f' · severity “{severity}”' if severity else ''}."
     asked = {question.id for question in question_set.questions if not question.extra}
-    return {question_id: text for question_id in _INJURY_QUESTIONS if question_id in asked}
+    ids = _floor(question_set.market, floor)["prefill"]["injury_note"]
+    return {question_id: text for question_id in ids if question_id in asked}
 
 
 def mark_origins(answers: dict, suggested: dict[str, dict], confirmed: set[str]) -> dict:
@@ -1050,3 +984,7 @@ def signature_meaning(ref: str, market: str, version: str, conclusion: str) -> s
         f"I have assessed {ref} for {MARKET_LABELS[market]} with its questions, {version_words(version)}, and the "
         f"harm-severity scale, {version_words(SCALE_VERSION)}, and conclude: {CONCLUSION_LABELS[conclusion].lower()}."
     )
+
+
+# The frozen version 1 is imported last: it reads this module's names.
+from backend.app.reportability import legacy_v1  # noqa: E402
