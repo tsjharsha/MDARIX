@@ -43,6 +43,9 @@ export const WORKSPACE_SECTIONS = [
   "Reports",
   // A trial's own import on the new navigation (0.10.80): its own page, /app/import.
   "Import your data",
+  // Work › Products on the new navigation (0.10.94, W1): Product 360 and Supplier 360, /app/product-360. A new name, so
+  // the classic Products screen and its parking stay as they are.
+  "Product 360",
 ] as const;
 
 /** Sections only the new navigation shows. */
@@ -54,6 +57,7 @@ export const NEW_ONLY_SECTIONS: readonly string[] = [
   "Decision trees",
   "Reports",
   "Import your data",
+  "Product 360",
 ];
 
 /** Sections that exist only in a free-trial workspace. */
@@ -95,6 +99,8 @@ export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   Reports: ["products"],
   // Open to every trial person: the page itself says "not available" to whoever may not import (canImportOwnData).
   "Import your data": [],
+  // Read by every member who reads products and complaints (the server's own check, product360 and supplier routes).
+  "Product 360": ["products"],
 };
 
 export type SessionContext = {
@@ -170,12 +176,18 @@ export type CaseLinkState = { id: string; state: "resolving" | "applied" | "not-
 export type OpenInvestigationRequest = {
   productId: string;
   version: string | null;
-  complaint: {
-    id: string;
-    business_id: string | null;
-    complaint_identifier: string | null;
-    description: string | null;
-  };
+  complaint: RequestedComplaint;
+  /** More complaints of the same product to tick (a Supplier 360 pattern's). */
+  also?: RequestedComplaint[];
+  /** Where it was opened from, kept with the new case ("Opened from Supplier 360: pattern P-1 v1"). */
+  openedFrom?: string;
+};
+
+export type RequestedComplaint = {
+  id: string;
+  business_id: string | null;
+  complaint_identifier: string | null;
+  description: string | null;
 };
 
 export type WorkspaceApi = {

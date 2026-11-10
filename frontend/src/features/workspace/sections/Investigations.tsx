@@ -700,14 +700,15 @@ function OpenInvestigation({
 }) {
   const { work, notify } = useWorkspace();
   const [question, setQuestion] = useState("");
-  const [chosen, setChosen] = useState<string[]>(() => (prefill ? [prefill.complaint.id] : []));
+  const requested = prefill ? [prefill.complaint, ...(prefill.also ?? [])] : [];
+  const [chosen, setChosen] = useState<string[]>(() => requested.map((item) => item.id));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const complaints = withRequestedComplaint(
+  // Only while the context is still on the complaint's product: a case links complaints of its own product only.
+  const complaints = (prefill && prefill.productId === work.productId ? requested : []).reduce(
+    withRequestedComplaint,
     (work.view?.complaints ?? []) as Array<Record<string, string | null>>,
-    // Only while the context is still on the complaint's product: a case links complaints of its own product only.
-    prefill && prefill.productId === work.productId ? prefill.complaint : null,
   );
   const found = matchingComplaints(complaints, search, chosen);
   const product = work.products.find((item) => item.id === work.productId);
@@ -724,6 +725,7 @@ function OpenInvestigation({
           product_id: work.productId,
           investigation_question: question.trim(),
           complaint_ids: chosen,
+          ...(prefill?.openedFrom ? { opened_from: prefill.openedFrom } : {}),
         },
       );
       notify(`Investigation ${displayId(made, "investigation_identifier")} opened and assigned to you.`);

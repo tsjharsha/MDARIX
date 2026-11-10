@@ -73,14 +73,14 @@ WORKSPACE_PERSONAS = (
         "Admin",
         "Trial owner · sees everything",
         "LEADER",
-        ("home", "complaints", "trees", "reports", "investigations", "trends", "records", "team"),
+        ("home", "complaints", "trees", "reports", "investigations", "trends", "products", "records", "team"),
     ),
     WorkspacePersona(
         "quality",
         "Quality Leader",
         "Complaints, investigations, CAPA, trends",
         "LEADER",
-        ("home", "complaints", "reports", "investigations", "trends", "records"),
+        ("home", "complaints", "reports", "investigations", "trends", "products", "records"),
     ),
     WorkspacePersona(
         "regulatory",
@@ -101,14 +101,14 @@ WORKSPACE_PERSONAS = (
         "Investigator",
         "Investigations and the evidence",
         "INVESTIGATOR",
-        ("home", "investigations", "trends"),
+        ("home", "investigations", "trends", "products"),
     ),
     WorkspacePersona(
         "risk",
         "Risk Reviewer",
         "Risk reviews and the risk file",
         "RISK_REVIEWER",
-        ("home", "investigations", "records"),
+        ("home", "investigations", "products", "records"),
     ),
     WorkspacePersona(
         "decision",
@@ -118,7 +118,7 @@ WORKSPACE_PERSONAS = (
         ("home", "complaints", "reports", "records"),
     ),
     WorkspacePersona(
-        "executive", "Executive", "View only: what needs attention", "VIEWER", ("home", "trends", "records")
+        "executive", "Executive", "View only: what needs attention", "VIEWER", ("home", "trends", "products", "records")
     ),
 )
 WORKSPACE_PERSONAS_BY_CODE = {persona.code: persona for persona in WORKSPACE_PERSONAS}

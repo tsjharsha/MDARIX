@@ -1,5 +1,5 @@
 {
-  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. newPlaces, newMenu, newRecords and newHomes (stage 7, 0.10.68): the screens of the new navigation, its menu, where each record opens there, and the new home of every screen and tab above; they apply only to an organization on the new navigation (tenants.navigation = new). classicHomes: where an address of the new navigation opens for an organization on the classic one. 0.10.73 (Release C, C1): the new navigation's tabs (newMenu.main) are Home (My work), Complaints, Decision trees, Reports, Investigations, Trends, Records and Team; each persona shows some of them (access_control/personas.py). 0.10.74 (C2): Complaints' list views (features/workspace/listViews.ts) are its tabs; one complaint's page shows Details (address name Summary), Related and Activity, and opens its former sections' addresses (Evidence: Related; Decisions & actions: Details; History: Activity); Investigations lists every investigation (All investigations). 0.10.80: a trial's own import is its own page on the new navigation, Import your data (/app/import); Getting started › Your data opens it there, and on the classic navigation /app/import opens Getting started › Your data.",
+  "about": "Where every link in MDARIX lands (quality plan stage 6). places: each workspace screen of the MVP feature set (every free trial and pilot), its address and its tabs. records: where each kind of record opens, and the address parameter that names it. viewIds: the stable id under which each screen remembers its lists' column choices (a screen that moves or is renamed keeps its id). oldViews, oldSections and oldTabs: every former address and section name, and the place that holds it now; kept permanently, so e-mails already sent, bookmarks, videos and guides keep working. Read by app/linkTable.ts and, for the server's links, by tests/test_link_targets.py. newPlaces, newMenu, newRecords and newHomes (stage 7, 0.10.68): the screens of the new navigation, its menu, where each record opens there, and the new home of every screen and tab above; they apply only to an organization on the new navigation (tenants.navigation = new). classicHomes: where an address of the new navigation opens for an organization on the classic one. 0.10.73 (Release C, C1): the new navigation's tabs (newMenu.main) are Home (My work), Complaints, Decision trees, Reports, Investigations, Trends, Records and Team; each persona shows some of them (access_control/personas.py). 0.10.74 (C2): Complaints' list views (features/workspace/listViews.ts) are its tabs; one complaint's page shows Details (address name Summary), Related and Activity, and opens its former sections' addresses (Evidence: Related; Decisions & actions: Details; History: Activity); Investigations lists every investigation (All investigations). 0.10.80: a trial's own import is its own page on the new navigation, Import your data (/app/import); Getting started › Your data opens it there, and on the classic navigation /app/import opens Getting started › Your data. 0.10.94 (W1): Work › Products on the new navigation is Product 360 (/app/product-360), with the tabs Product 360 and Supplier 360 (owner, 10 Nov 2026: no clash with Settings › Products); a product opens as Product 360?product=<ref>&version=<ref>, a supplier as Supplier 360?supplier=<ref>; a former Products link opens it there (newHomes, read before the classic parking), and on the classic navigation it opens Readiness, as Products does.",
   "places": {
     "Getting started": {
       "path": "/app/getting-started",
@@ -172,7 +172,8 @@
     "team": ["Team"],
     "decision-trees": ["Decision trees"],
     "reports": ["Reports"],
-    "import": ["Import your data"]
+    "import": ["Import your data"],
+    "product-360": ["Product 360"]
   },
   "oldSections": [
     {
@@ -316,7 +317,8 @@
     "Complaint": "complaint",
     "Decision trees": "decision-trees",
     "Reports": "reports",
-    "Import your data": "import"
+    "Import your data": "import",
+    "Product 360": "product-360"
   },
   "oldTabs": {
     "Signals": {
@@ -458,10 +460,25 @@
     "Import your data": {
       "path": "/app/import",
       "tabs": []
+    },
+    "Product 360": {
+      "path": "/app/product-360",
+      "label": "Products",
+      "tabs": ["Product 360", "Supplier 360"]
     }
   },
   "newMenu": {
-    "main": ["My Work", "Complaints", "Decision trees", "Reports", "Investigations", "Trends", "Records", "Team"],
+    "main": [
+      "My Work",
+      "Complaints",
+      "Decision trees",
+      "Reports",
+      "Investigations",
+      "Trends",
+      "Product 360",
+      "Records",
+      "Team"
+    ],
     "top": ["Settings", "My Account"]
   },
   "newRecords": {
@@ -509,9 +526,26 @@
       "section": "Complaints",
       "tab": "To triage",
       "param": "intake"
+    },
+    "product": {
+      "section": "Product 360",
+      "tab": "Product 360",
+      "param": "product"
+    },
+    "supplier": {
+      "section": "Product 360",
+      "tab": "Supplier 360",
+      "param": "supplier"
     }
   },
   "newHomes": [
+    {
+      "section": "Products",
+      "to": {
+        "section": "Product 360",
+        "tab": "Product 360"
+      }
+    },
     {
       "section": "Getting started",
       "tab": "Your data",
@@ -929,6 +963,12 @@
     }
   ],
   "classicHomes": [
+    {
+      "section": "Product 360",
+      "to": {
+        "section": "Readiness"
+      }
+    },
     {
       "section": "Investigations",
       "tab": "Summary",

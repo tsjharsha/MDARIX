@@ -61,7 +61,9 @@ def test_configuration_components_are_relationship_derived():
 
 def test_change_manufacturing_lot_context():
     view = service.product360(str(primary_product()), version_id="D")
-    assert any(c["change_identifier"] == "CHG-SUP-PROC-001" for c in view.changes)
+    # W1 (OD-11): only the changes recorded as affecting the product or a component of its versions. The golden data
+    # records no AFFECTS link (its graph infers them by name), so none of its organization-wide changes is listed.
+    assert view.changes == []
     assert any(lot["traceability_state"] == "PARTIAL" for lot in view.manufacturing["lots"])
 
 
@@ -155,7 +157,8 @@ def test_historical_rev_c_vs_rev_d():
 def test_timeline_filter_category_and_date_range():
     view = service.product360(str(primary_product()), version_id="D")
     categories = {event.category for event in view.timeline}
-    assert {"DESIGN", "FIELD", "EVIDENCE"}.issubset(categories)
+    # No DESIGN event: no change is recorded against this product (W1, OD-11).
+    assert {"FIELD", "EVIDENCE"}.issubset(categories) and "DESIGN" not in categories
 
 
 def test_vs001_end_to_end_no_root_cause():

@@ -11,4 +11,14 @@ Domain, UI, graph, API, and database contracts are product-centered.
 ## Alternatives Considered
 Complaint-centered architecture was rejected because it narrows lifecycle reasoning.
 ## Status
-PROPOSED
+ACCEPTED (owner, 10 Nov 2026)
+
+## Acceptance gate
+The decision holds only while all of these are true:
+- Every applicable object carries its product, and its product version where a version applies.
+- A version always belongs to its product and to that product's tenant.
+- Filtering by version is correct: with a version chosen, every section shows that version's records, and anything
+  that is genuinely product-level says so in its label.
+- Relationships across versions are explicit (an investigation spanning two versions names both); none is implied.
+- Historical records keep their original version; a later version never rewrites them.
+- An unknown or unverified version is never silently converted to a known one: it is refused or shown as unknown.

@@ -1035,6 +1035,38 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         ],
       },
       {
+        id: "product-360",
+        title: "Product 360 and Supplier 360: everything linked to a product or a supplier",
+        where:
+          "Products on the new navigation, with the tabs Product 360 and Supplier 360 (a product or version link on a complaint, an investigation or a trend check card opens it too)",
+        purpose:
+          "See, for one product version or one supplier, what is recorded against it: complaints, investigations, trends to review, CAPAs, risks, authority reports, parts, lots and changes. Read-only: MDARIX lists what was recorded and why each record is linked; it does not infer a cause.",
+        tasks: [
+          {
+            title: "Read a product version",
+            steps: [
+              "In Products, open the Product 360 tab and choose a product card (its counts are the newest version's; each count opens that list).",
+              "Choose a version at the top. Overview shows six tiles of linked records; See all opens the full list on Records.",
+              "An investigation that records no version is listed under every version and marked applies to the whole product.",
+              "Configuration lists the version's parts and their suppliers; Compare with Rev A puts the earlier version beside it. Lots, Changes and Version story show the rest.",
+            ],
+            result:
+              "A record imported from your own system shows where it came from; correct it there and import it again.",
+          },
+          {
+            title: "Read a supplier and its pattern to review",
+            steps: [
+              "In Products, open the Supplier 360 tab and choose a supplier, or choose a supplier's name on a product's Configuration.",
+              "Read the pattern box first: rule P-1 version 1 (the same problem code with 2 or more complaints on each of 2 or more versions that contain the supplier's parts, in the last 90 days). A pattern to review is never a confirmed signal.",
+              "When an open investigation already holds these complaints, the box offers to open it. Otherwise choose Open an investigation: the form opens with the pattern's complaints of that product ticked; write the question and choose Open investigation.",
+            ],
+            result:
+              "The new investigation keeps where it came from (Opened from Supplier 360: pattern P-1 v1) in its audit trail.",
+            who: "Opening an investigation: anyone who may change records.",
+          },
+        ],
+      },
+      {
         id: "brief",
         title: "The Decision Brief",
         where: "Investigations › Decision Brief",

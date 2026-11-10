@@ -13,14 +13,18 @@ import type { SessionContext } from "./workspaceContext";
 
 // The approved design's PERSONAS (mdarix-hybrid-mockup.html), as the server sends them (access_control/personas.py).
 const OPTIONS = [
-  ["admin", "Admin", ["home", "complaints", "trees", "reports", "investigations", "trends", "records", "team"]],
-  ["quality", "Quality Leader", ["home", "complaints", "reports", "investigations", "trends", "records"]],
+  [
+    "admin",
+    "Admin",
+    ["home", "complaints", "trees", "reports", "investigations", "trends", "products", "records", "team"],
+  ],
+  ["quality", "Quality Leader", ["home", "complaints", "reports", "investigations", "trends", "products", "records"]],
   ["regulatory", "Regulatory Leader", ["home", "complaints", "trees", "reports", "records"]],
   ["handler", "Complaint Handler", ["home", "complaints"]],
-  ["investigator", "Investigator", ["home", "investigations", "trends"]],
-  ["risk", "Risk Reviewer", ["home", "investigations", "records"]],
+  ["investigator", "Investigator", ["home", "investigations", "trends", "products"]],
+  ["risk", "Risk Reviewer", ["home", "investigations", "products", "records"]],
   ["decision", "Decision Maker", ["home", "complaints", "reports", "records"]],
-  ["executive", "Executive", ["home", "trends", "records"]],
+  ["executive", "Executive", ["home", "trends", "products", "records"]],
 ].map(([code, label, tabs]) => ({
   code: code as string,
   label: label as string,
@@ -83,7 +87,7 @@ describe("the shell and its tab bar", () => {
     expect(visibleTabs(OPTIONS[0].tabs, ["My Work", "Records"])).toEqual(["home", "records"]);
   });
 
-  it("gives the trial owner the top bar, Viewing as and Admin's eight tabs, with Home first", () => {
+  it("gives the trial owner the top bar, Viewing as and Admin's nine tabs, with Home first", () => {
     const markup = renderToStaticMarkup(<UserWorkspace session={session("admin", false)} initialView="my-work" />);
     expect(tabLabels(markup)).toEqual([
       "Home",
@@ -92,6 +96,7 @@ describe("the shell and its tab bar", () => {
       "Reports",
       "Investigations",
       "Trends",
+      "Products",
       "Records",
       "Team",
     ]);

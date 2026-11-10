@@ -5,6 +5,7 @@ import { Drawer, errorText, formatDate, send, useResource } from "../../customer
 import { displayId, safeText, sourceId } from "../../../app/displayId";
 import { lotsText } from "../signalAi";
 import { useCan, usePanelState, useWorkspace } from "../workspaceContext";
+import { productTab } from "../productHub";
 import {
   CHECK_RESULT,
   STEP_STATUS,
@@ -367,8 +368,11 @@ function CaseHighlights({
   actions: ReactNode;
   children: ReactNode;
 }) {
-  const { work } = useWorkspace();
+  const { work, open, navigation } = useWorkspace();
   const product = work.products.find((item) => item.id === String(row.product_id ?? work.productId ?? ""));
+  // The investigation's product and version (the one most of its complaints carry), one click from Product 360 on
+  // the new navigation (0.10.94, W1).
+  const productLine = [product?.name, row.version_identifier].filter(Boolean).join(" · ");
   const scope = useResource<{
     current?: { included_complaints?: unknown[]; lots?: Array<{ lot_identifier?: string | null }> } | null;
   }>(row.id ? `/api/v1/investigations/${encodeURIComponent(String(row.id))}/scope` : null);
@@ -388,7 +392,19 @@ function CaseHighlights({
           {/* The question is the investigation's name; its reference is the customer's own (0.10.85, D3.9, D3.12). */}
           <p className="ac-eyebrow">
             Investigation · {sourceId(row, "investigation_identifier") ?? label} ·{" "}
-            {product?.name ?? "product not recorded"}
+            {product && navigation === "new" ? (
+              <button
+                type="button"
+                className="ac-link"
+                onClick={() =>
+                  open("Product 360", productTab(product.product_identifier, row.version_identifier ?? null))
+                }
+              >
+                {productLine}
+              </button>
+            ) : (
+              productLine || "product not recorded"
+            )}
           </p>
           <h2 className="uw-case-question">{safeText(row.investigation_question) ?? "No question recorded."}</h2>
         </div>

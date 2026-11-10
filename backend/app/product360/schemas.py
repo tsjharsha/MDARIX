@@ -12,6 +12,9 @@ class ProductSummary(BaseModel):
     product_family: str | None
     lifecycle_status: str
     available_versions: list[str]
+    # W1: where the product came from (product360/origin.py), and with ``?counts=1`` the newest version's counts.
+    origin: dict[str, Any] | None = None
+    counts: dict[str, Any] | None = None
 
 
 class TimelineEvent(BaseModel):

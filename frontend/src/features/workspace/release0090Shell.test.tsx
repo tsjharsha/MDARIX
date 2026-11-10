@@ -45,6 +45,7 @@ describe("the rail", () => {
       "Reports",
       "Investigations",
       "Trends",
+      "Products",
       "Records",
       "Team",
       "Look ahead",

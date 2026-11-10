@@ -10,6 +10,27 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
+
+Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The API and web images change. Operator step:
+`scripts/refresh_trial_story.py` adds the sample's supply chain where the sample exists.
+
+### Added
+
+- **Product 360** (Work › Products): one page per product with its versions, the product's own changes, six link
+  tiles with a monthly series, and the lists of its complaints and investigations. A chosen version is respected in
+  every section. The product list shows counts.
+- **Supplier 360** (the Suppliers tab): the supplier list, a page per supplier with its complaints, its lots (in a free trial) and the
+  pattern box. From a pattern, "Open an investigation" starts one with all its complaints ticked and keeps where it
+  came from.
+- A trend check card and an investigation open their product version on Product 360.
+- The sample's supply chain (suppliers, parts and their lots), so a new trial shows both pages filled.
+
+### Changed
+
+- Both pages carry the hero design on their headers only; their operational parts are flat. Measured on 5,000
+  complaints, every read stays under the 1 second budget (`docs/runbooks/LOAD_AND_FAILURE_DRILLS.md`).
+
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
 Development cycle 1, item B2: the Case, the first contact before anyone decides it is a complaint. Migration

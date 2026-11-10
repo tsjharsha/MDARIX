@@ -82,4 +82,35 @@ describe("the one case page", () => {
     expect(render("mvp", "Story")).toContain("Investigations in your organization");
     expect(render("full", "Record")).toContain("Investigations in your organization");
   });
+
+  it("opens the form with every complaint of a Supplier 360 pattern ticked (owner, 10 Nov 2026)", () => {
+    const api = workspace("mvp");
+    const complaint = (id: string, ref: string) => ({
+      id,
+      business_id: null,
+      complaint_identifier: ref,
+      description: `${ref} reads high`,
+    });
+    Object.assign(api.work, {
+      products: [{ id: "p1", name: "OrbitCare 300" }],
+      productId: "p1",
+      view: { complaints: [] },
+      openInvestigationRequest: {
+        productId: "p1",
+        version: "Rev B",
+        complaint: complaint("c1", "RV-01"),
+        also: [complaint("c2", "RV-02")],
+        openedFrom: "Opened from Supplier 360: pattern P-1 v1",
+      },
+    });
+    const html = renderToStaticMarkup(
+      <WorkspaceContext.Provider value={api}>
+        <InvestigationsSection />
+      </WorkspaceContext.Provider>,
+    );
+    expect(html).toContain("Open an investigation for OrbitCare 300");
+    expect(html).toContain("2 selected");
+    expect(html.match(/type="checkbox" checked=""/g)?.length).toBe(2);
+    expect(html).toContain("RV-02 reads high");
+  });
 });
