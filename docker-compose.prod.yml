@@ -218,6 +218,36 @@ services:
     depends_on:
       migrate: {condition: service_completed_successfully}
 
+  # B7b e-mail intake (backend/app/mail_in/receiver.py): an SMTP receiver for the intake subdomain, inbound only (it
+  # never sends). OFF until operations has opened inbound port 25, added the MX record and a certificate: it starts
+  # only with "--profile mail-in" and MDARIX_EMAIL_INTAKE=on in .env.production; otherwise it exits without listening.
+  mail-in:
+    <<: *app
+    profiles: [mail-in]
+    command: ["python", "-m", "backend.app.mail_in.receiver"]
+    networks: [internal]
+    ports: ["25:2525"]
+    volumes:
+      - objects:/var/lib/mdarix/objects
+      - *db-ca
+      - ./legal:/var/lib/mdarix/legal:ro
+      - ${MDARIX_MAIL_IN_CERT_DIR:-./certs/mail-in}:/etc/mdarix/mail-in:ro
+    environment:
+      MDARIX_LEGAL_DIR: /var/lib/mdarix/legal
+      MDARIX_OBJECT_STORAGE_ROOT: /var/lib/mdarix/objects
+      MDARIX_MAIL_IN_PORT: "2525"
+      MDARIX_MAIL_IN_CERT: /etc/mdarix/mail-in/cert.pem
+      MDARIX_MAIL_IN_KEY: /etc/mdarix/mail-in/key.pem
+    healthcheck:
+      test: ["CMD", "python", "-c", "import smtplib; s=smtplib.SMTP('127.0.0.1', 2525, timeout=5); s.noop(); s.quit()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    mem_limit: 256m
+    cpus: 0.5
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
   # Virus scanning for every uploaded file (object_storage/service.py, clamd INSTREAM). Signatures refresh daily.
   # Pinned by digest (clamav/clamav:1.4, published for x86-64 only); Dependabot proposes updates. An ARM server uses
   # clamav/clamav-debian instead (docker-compose.staging-oracle.yml).

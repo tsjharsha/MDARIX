@@ -2,6 +2,8 @@
 # from this file (every transitive package pinned, with hashes):
 #   python -m uv pip compile requirements.in --universal --python-version 3.13 --generate-hashes -o requirements.txt
 # Development and test tools are in requirements-dev.txt.
+# The e-mail intake receiver, mail-in (B7b; backend/app/mail_in/receiver.py). Off unless MDARIX_EMAIL_INTAKE=on.
+aiosmtpd==1.4.6
 alembic==1.20.0
 boto3==1.43.108
 cryptography==50.0.2
