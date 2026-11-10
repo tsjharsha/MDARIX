@@ -23,6 +23,9 @@ Hardening: code-audit fixes 6-12. No migration. The API image changes.
 
 - Files attached to an authority submission or its evidence (acknowledgements, receipts) are virus-scanned like every
   other upload; a file the scan refuses is not kept.
+- A platform administrator who adds themselves as Customer Administrator of an organization that already has an active
+  one, or of a free trial, needs the People support access the customer approved; the use or the refusal is in the
+  organization's audit trail.
 
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 

@@ -302,6 +302,7 @@ def add_customer_admin(
         raise HTTPException(
             404, detail={"code": "TENANT_NOT_ACTIVE", "message": "Administrators can be added only to an active tenant"}
         )
+    support_access.require_self_admin_access(db, platform_admin, tenant.id, payload.email, request=request)
     customer = db.query(Customer).filter(Customer.id == tenant.customer_id).first()
     user, token, delivery = create_customer_admin(
         db,
