@@ -1663,7 +1663,8 @@ def escalate_case(
             # unknown; a No rules out both.
             serious_injury=_flag(answers, "Q5"),
             death=False if rules.answer_of(answers, "Q5") == rules.NO else None,
-            malfunction=_flag(answers, "Q6"),
+            # Question 3 asks "did the device malfunction"; question 6 asks whether it could cause serious harm again.
+            malfunction=_flag(answers, "Q3"),
             service_reference=event.service_ticket,
             qms_ref=event.qms_ref,
             record_owner=record_owner,

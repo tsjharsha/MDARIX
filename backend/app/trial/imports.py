@@ -1796,6 +1796,7 @@ def _check_rows(
             if not report.file_problems:
                 kept = [(line, row) for line, row in rows if line not in report.row_problems]
                 if kept:
+                    read_notes = len(report.notes)
                     new_rows = _check_references(entity, kept, _Lookup(db, tenant_id), report, create)
                     if any(line in report.row_problems for line, _ in kept):
                         # A row whose references do not resolve is set aside too; the rest are counted again.
@@ -1806,6 +1807,8 @@ def _check_rows(
                         )
                         report.creates = recount.creates
                         report.new_rows = recount.new_rows
+                        # PV-1 F6: the case notes of the rows still imported, not of the rows now set aside.
+                        report.notes[read_notes:] = recount.notes
         elif not report.error_count:
             new_rows = _check_references(entity, rows, _Lookup(db, tenant_id), report, create)
     # The allowance counts the file's own rows that add a record: one row in the file is one row, whatever products,

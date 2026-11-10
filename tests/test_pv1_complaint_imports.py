@@ -85,3 +85,33 @@ def test_a_reupload_cannot_move_a_complaint_to_another_product(loaded):  # F6
         "product_id",
         f"Complaint 'PV{tag}-1' is held for another product; a file cannot move it to 'PV{tag}-OTHER'.",
     ) in issues
+
+
+def test_the_case_note_stays_when_problem_rows_are_set_aside(loaded):  # F6
+    user, tag = loaded
+    linked = user.post(
+        "/api/v1/trial/imports/investigations",
+        params={"date_column": "none"},
+        content=f"investigation_id,product_id,question,complaint_ids\nI{tag},PV{tag}-PUMP,Why?,PV{tag}-3;PV{tag}-4\n",
+        headers={"Content-Type": "text/csv"},
+    )
+    assert linked.status_code == 200, linked.text
+    # Both complaints are in the case and change version. PV-4's new version is not its lot's, so its row is set aside
+    # and the rest is checked again: PV-3's note stays, PV-4's (a row not imported) goes.
+    csv = (
+        HEAD + f"PV{tag}-3,PV{tag}-PUMP,PV Pump,Rev A,PV{tag}-LN,Screen flicker,2026-10-03\n"
+        f"PV{tag}-4,PV{tag}-PUMP,PV Pump,Rev B,PV{tag}-LA,Screen flicker,2026-10-04\n"
+    )
+    checked = user.post(
+        f"{UPLOAD}/check",
+        params={"date_column": "event_date", "on_problems": "skip"},
+        content=csv,
+        headers={"Content-Type": "text/csv"},
+    )
+    assert checked.status_code == 200, checked.text
+    found = checked.json()
+    assert found["rejected_rows"] == 1 and found["rows_to_import"] == 1
+    notes = [note for note in found["notes"] if "in case" in note]
+    assert notes == [
+        f"Line 2: complaint 'PV{tag}-3' changes version while it is in case I{tag}; check the case's scope."
+    ]

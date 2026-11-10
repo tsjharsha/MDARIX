@@ -140,6 +140,11 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
   instead of reading the rest of the file as one cell or failing with a server error.
 - A Decision Brief's scope section shows how many complaints are in scope and how many are excluded (the
   screen read names the brief does not store, so these lines never appeared). Signed briefs are unchanged.
+- A Case escalated to a complaint takes the complaint's malfunction flag from the Case check's question 3 ("Did the
+  device malfunction or behave abnormally?"), not question 6 (serious harm if it happened again): a Case that says the
+  device malfunctioned gives a complaint flagged malfunction, on the reportability watch, so the routine basis ("no
+  death, serious injury or malfunction recorded") is not offered. Complaints and signed records made before are
+  unchanged.
 
 ### Fixed: a record's version always belongs to its product (PV-1)
 
@@ -153,7 +158,8 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - A complaints import refuses a row whose version is not its lot's version ("Lot L is of version Rev A, not 'Rev C'").
   A blank version cell no longer clears or replaces a stored version; a new complaint's version taken from its lot is
   shown "(from the lot)" in its searchable record. A re-upload cannot move a held complaint to another product (row
-  error), and a version change of a complaint in a case is noted with the case, to check its scope.
+  error), and a version change of a complaint in a case is noted with the case, to check its scope
+  (when problem rows are set aside, only for the rows still imported).
 - An investigations import refuses complaints of another product and a change of a held investigation's product; a
   CAPA naming an investigation must name the investigation's product. A re-upload that changes the product or version
   of a risk, requirement, investigation or CAPA is kept in the history of field changes, like a complaint's.
@@ -175,6 +181,9 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - A version's story (Product 360, "The story of Rev B") lists the product's investigations that record no version, as
   "applies to the whole product", with their evidence, the same rule as the product's Overview; it no longer shows
   fewer investigations than the Overview.
+- A newly composed decision brief lists the lots in its scope (`scope.lots`: id, lot number, product version), and the
+  brief's Scope section shows a "Lots" line ("PW-2611 (Rev A)", or "version not known"). Briefs composed or signed
+  before stay as they are and show no Lots line.
 
 ### Security
 
@@ -196,13 +205,19 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - New tests ask, as one organization and under row-level security, for another organization's complaints,
   investigations, evidence and its download, CAPAs, exports, audit trail and signed decisions, by id, through list
   filters and through every export: each answer is a refusal or holds none of the other organization's data.
+- A case's story (`/api/v1/story/{id}`) and a decision's signature history answer 404 for an unknown or another
+  organization's id, like every other by-id route, instead of an empty answer (200); the story screen shows the
+  "not available" message and clears the previous case's stages.
 - New screen tests show that markup typed or imported into a complaint, an imported record or an evidence record's
   name appears as text on the complaint page, triage, the imported backlog and the case's evidence, never as markup;
   a test also fails if any screen starts writing raw HTML (the one reviewed, escaped exception is the public
-  questions page's structured data).
-- Uploads and imports, exports and downloads, and connector syncs are rate limited per person and per organization
-  (per hour: 60 and 300 uploads, 60 and 300 exports, 20 and 60 syncs); past a limit the answer is 429 "Too many
-  attempts. Please try again in …" with `Retry-After`.
+  questions page's structured data). An API test shows the same markup typed on Log a case or imported into a
+  complaint or an evidence record is stored and returned exactly as typed.
+- New uploads and imports, newly created exports and reports (an export file, a queued report, a CSV, PDF or zip
+  built on request) and connector syncs are rate limited per person and per organization (per hour: 60 and 300
+  uploads, 60 and 300 exports, 20 and 60 syncs); past a limit the answer is 429 "Too many attempts. Please try again
+  in …" with `Retry-After`. Downloading a file that already exists (a finished export or report, evidence, an import
+  template) is never limited.
 - An independent alert channel: when no usual channel delivers an operational alert (for example the email provider
   is down), it is also posted to `MDARIX_ALERT_FALLBACK_WEBHOOK`. Optional; unset, nothing changes. Operators: add the
   setting where the alert settings are documented, and prove it with `scripts/send_test_alert.py`.

@@ -583,22 +583,6 @@ def references(db: Session, tenant_id, data_list: list[dict]) -> dict:
         if complaint_ids
         else {}
     )
-    version_ids = wanted_ids(
-        [
-            *(item for data in data_list for item in data.get("product_version_ids") or ()),
-            *(row.product_version_id for row in complaints.values()),
-        ]
-    )
-    versions = (
-        {
-            str(row.id): row
-            for row in db.query(ProductVersion).filter(
-                ProductVersion.tenant_id == tenant, ProductVersion.id.in_(list(version_ids))
-            )
-        }
-        if version_ids
-        else {}
-    )
     lot_ids = wanted_ids(
         [
             *(item for data in data_list for item in data.get("lot_ids") or ()),
@@ -611,6 +595,23 @@ def references(db: Session, tenant_id, data_list: list[dict]) -> dict:
             for row in db.query(LotBatch).filter(LotBatch.tenant_id == tenant, LotBatch.id.in_(list(lot_ids)))
         }
         if lot_ids
+        else {}
+    )
+    version_ids = wanted_ids(
+        [
+            *(item for data in data_list for item in data.get("product_version_ids") or ()),
+            *(row.product_version_id for row in complaints.values()),
+            *(row.product_version_id for row in lots.values()),
+        ]
+    )
+    versions = (
+        {
+            str(row.id): row
+            for row in db.query(ProductVersion).filter(
+                ProductVersion.tenant_id == tenant, ProductVersion.id.in_(list(version_ids))
+            )
+        }
+        if version_ids
         else {}
     )
     mode_ids = wanted_ids(item for data in data_list for item in data.get("failure_mode_ids") or ())

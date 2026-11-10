@@ -144,6 +144,19 @@ def scope_section(db: Session, case, data: dict) -> dict:
             }
             for item in data.get("product_version_ids") or ()
         ],
+        # The lots in scope (owner decision 4, 10 Nov 2026); briefs composed before have no "lots" key.
+        "lots": [
+            {
+                "id": str(item),
+                "lot_number": lot.lot_identifier if lot is not None else None,
+                "product_version_id": str(lot.product_version_id) if lot and lot.product_version_id else None,
+                "version_identifier": versions[str(lot.product_version_id)].version_identifier
+                if lot is not None and str(lot.product_version_id) in versions
+                else None,
+            }
+            for item in data.get("lot_ids") or ()
+            for lot in [refs["lots"].get(str(item))]
+        ],
         "markets": list(data.get("markets") or ()),
         "date_from": _iso(data.get("date_from")),
         "date_to": _iso(data.get("date_to")),

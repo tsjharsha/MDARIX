@@ -852,10 +852,16 @@ def _case_owner(data, tenant_id, investigation_id) -> str | None:
 def signature_history(
     decision_id: uuid.UUID,
     db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     actor = session_actor(db, ctx)
     t = tenant(db, actor)
+    # Another organization's (or an unknown) decision answers 404, like signature-verification.
+    if not data.query(Decision.id).filter(Decision.id == decision_id, Decision.tenant_id == t.id).first():
+        raise HTTPException(
+            404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}
+        )
     rows = (
         db.query(SignedApprovalRecord)
         .filter_by(tenant_id=t.id, object_type="Decision", object_id=decision_id)

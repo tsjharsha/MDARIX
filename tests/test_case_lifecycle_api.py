@@ -97,6 +97,21 @@ def test_an_escalated_case_is_never_signed_down_and_the_refusal_is_audited(trial
     assert _ok(user.get(f"{INTAKE}/{event['id']}"))["status"] == "ESCALATED"
 
 
+def test_a_case_that_says_the_device_malfunctioned_escalates_to_a_complaint_flagged_malfunction(trial):
+    # Case-check question 3 is "did the device malfunction"; question 6 (serious harm if it recurred) answered No.
+    user = trial["user"]
+    event = _log(user, answers=_all_no(Q3="YES"))
+    signed = _ok(_sign(user, event, "COMPLAINT"))
+    assert signed["escalation"] == "CREATED", signed
+    with SessionLocal() as db:
+        bind_system(db, "test:case-lifecycle")
+        assert db.get(Complaint, uuid.UUID(signed["complaint_id"])).malfunction is True
+    # On the reportability watch, so the routine basis ("no ... malfunction recorded") is never offered to sign.
+    screen = _ok(user.get(f"/api/v1/complaints/{signed['complaint_id']}/disposition"))
+    assert screen["routine"]["offered"] is False
+    assert any(reason.startswith("On the reportability watch") for reason in screen["routine"]["blocked"]), screen
+
+
 def test_a_retried_log_with_the_same_key_creates_one_case(trial):  # A4, B2-01
     user = trial["user"]
     key = f"retry-{uuid.uuid4()}"

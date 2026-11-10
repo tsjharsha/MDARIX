@@ -80,8 +80,9 @@ LIMITS: dict[str, Limit] = {
     # Evidence searches and Ask questions per person (DEV-11): each runs the local embedding model on the API's CPU,
     # and Ask may call an AI service; the monthly AI allowance (genai/governance.py) still applies on top.
     "search:user": Limit(60, 300),
-    # Heavy work a signed-in person starts (H1), per person and per organization: file uploads and imports, exports
-    # and downloads, connector syncs. Generous for real work (an import is a few calls), tight enough for a loop.
+    # Heavy work a signed-in person starts (H1), per person and per organization: new file uploads and imports, newly
+    # created exports and reports, connector syncs. Generous for real work (an import is a few calls), tight enough
+    # for a loop. Downloading a file that already exists (an export, a report, evidence, a template) is not counted.
     "upload:user": Limit(60, 3600),
     "upload:org": Limit(300, 3600),
     "export:user": Limit(60, 3600),
@@ -93,8 +94,9 @@ LIMITS: dict[str, Limit] = {
 # Which requests are heavy work (method, path pattern), checked by the API's middleware (backend/app/main.py).
 HEAVY_WORK = (
     ("upload", {"POST", "PUT"}, re.compile(r"/attachments$|/imports?/(detect|[a-z_-]+(/check)?)$")),
-    ("export", {"GET"}, re.compile(r"(\.csv|\.zip|\.pdf|\.xlsx|/export|/download)$")),
-    ("export", {"POST"}, re.compile(r"/exports$")),
+    # A GET export builds a new file on every call; a stored file's /download and the import templates are not new.
+    ("export", {"GET"}, re.compile(r"^(?!.*/templates/).*(\.csv|\.zip|\.pdf|\.xlsx|/export)$")),
+    ("export", {"POST"}, re.compile(r"/exports$|/reports/[^/]+/jobs$")),
     ("sync", {"POST"}, re.compile(r"/connectors/[^/]+/execute$")),
 )
 
