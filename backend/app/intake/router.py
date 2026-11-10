@@ -776,6 +776,17 @@ def field_changes(
     return {"items": service.changes_of(db, _tenant(ctx), import_ref=import_ref, record_id=record_id)}
 
 
+@router.get("/intake/shipped-to")
+def shipped_to(
+    site: str = Query("", max_length=120),
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """ID-2: the products and lots shipped to the caller's hospital, for Log a case's quick picker. No match is an
+    empty list, never an error: the free picker stays."""
+    return service.shipped_to(db, _tenant(ctx), site)
+
+
 @router.get("/intake/{event_id}")
 def intake_detail(
     event_id: uuid.UUID,

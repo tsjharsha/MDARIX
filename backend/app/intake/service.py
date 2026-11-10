@@ -70,6 +70,62 @@ def _iso(value) -> str | None:
     return value.isoformat() if value is not None else None
 
 
+SHIPPED_LIMIT = 50
+
+
+def shipped_to(db: Session, tenant_id, site: str) -> dict:
+    """ID-2: the products, versions and lots shipped to the caller's hospital (``lot_distributions``), newest shipment
+    first, at most SHIPPED_LIMIT, in one query. A consignee matches on its exact name or its customer reference, both
+    compared trimmed, case- and space-insensitive; never a partial or fuzzy match, so another hospital's devices are
+    never offered. Several sites under that name are listed by name, for the person to choose."""
+    from backend.app.db.models.foundation import ProductVersion
+    from backend.app.db.models.lot_impact import LotDistribution as D
+
+    wanted = " ".join((site or "").split()).lower()
+    if not wanted:
+        return {"sites": [], "items": [], "truncated": False}
+
+    def norm(column):
+        return func.lower(func.regexp_replace(func.btrim(column), r"\s+", " ", "g"))
+
+    # shortcut: the name match scans the tenant's shipments (index starts with tenant_id); add an expression index on
+    # the normalised name if a tenant's distribution grows past ~100k rows.
+    rows = (
+        db.query(D, LotBatch.lot_identifier, ProductVersion.version_identifier, Product.id, Product.name)
+        .join(LotBatch, (LotBatch.tenant_id == D.tenant_id) & (LotBatch.id == D.lot_batch_id))
+        .outerjoin(
+            ProductVersion,
+            (ProductVersion.tenant_id == LotBatch.tenant_id) & (ProductVersion.id == LotBatch.product_version_id),
+        )
+        .outerjoin(Product, (Product.tenant_id == ProductVersion.tenant_id) & (Product.id == ProductVersion.product_id))
+        .filter(D.tenant_id == tenant_id, or_(norm(D.consignee) == wanted, norm(D.consignee_reference) == wanted))
+        .order_by(D.ship_date.desc(), D.consignee, LotBatch.lot_identifier)
+        .limit(SHIPPED_LIMIT + 1)
+        .all()
+    )
+    items = [
+        {
+            "site": f"{row.consignee}|{row.country}",
+            "consignee": row.consignee,
+            "consignee_reference": row.consignee_reference,
+            "country": row.country,
+            "ship_date": row.ship_date.isoformat(),
+            "quantity": row.quantity,
+            "lot": lot,
+            "version": version,
+            "product_id": str(product_id) if product_id else None,
+            "product_name": product_name,
+        }
+        for row, lot, version, product_id, product_name in rows[:SHIPPED_LIMIT]
+    ]
+    # shortcut: the sites are those of the newest SHIPPED_LIMIT shipments; a site shipped to only long ago is left out.
+    sites = {
+        item["site"]: {"site": item["site"], "consignee": item["consignee"], "country": item["country"]}
+        for item in items
+    }
+    return {"sites": list(sites.values()), "items": items, "truncated": len(rows) > SHIPPED_LIMIT}
+
+
 def enabled_markets(db: Session, tenant_id: uuid.UUID) -> list[str]:
     from backend.app.reportability import service as reporting_service
 
