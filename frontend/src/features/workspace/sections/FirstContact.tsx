@@ -1101,15 +1101,25 @@ function QmsForm({ id, onDone }: { id: string; onDone: () => void }) {
 }
 
 function ReviewForm({ item, onDone }: { item: IntakeItem; onDone: () => void }) {
-  const [form, setForm] = useState({ outcome: "AGREED", note: "", password: "", code: "" });
+  const [form, setForm] = useState({
+    outcome: "AGREED",
+    note: "",
+    summary: item.resolution_summary ?? "",
+    password: "",
+    code: "",
+  });
   const [error, setError] = useState("");
   const words = [...(item.fault_words ?? []), ...(item.harm_words ?? [])];
+  // S-2: agreeing closes a service-only Case, which needs what was done for the customer.
+  const closes = form.outcome === "AGREED" && item.signed?.classification === "SERVICE_ONLY";
   const problem =
     form.note.trim().length < REASON_MIN
       ? `Say what you checked (at least ${REASON_MIN} characters)`
-      : !form.password
-        ? "Enter your password to sign"
-        : null;
+      : closes && form.summary.trim().length < REASON_MIN
+        ? `Write the resolution summary (at least ${REASON_MIN} characters) before a service-only case is closed`
+        : !form.password
+          ? "Enter your password to sign"
+          : null;
   return (
     <form
       className="ca-drawer-section"
@@ -1121,6 +1131,7 @@ function ReviewForm({ item, onDone }: { item: IntakeItem; onDone: () => void }) 
           await send(`${INTAKE}/${item.id}/check/review`, "POST", {
             outcome: form.outcome,
             note: form.note,
+            resolution_summary: form.summary,
             password: form.password,
             mfa_code: form.code || null,
           });
@@ -1158,6 +1169,16 @@ function ReviewForm({ item, onDone }: { item: IntakeItem; onDone: () => void }) 
         What you checked
         <input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
       </label>
+      {closes && (
+        <label className="ca-field">
+          Resolution summary: what was done for the customer
+          <textarea
+            rows={2}
+            value={form.summary}
+            onChange={(event) => setForm({ ...form, summary: event.target.value })}
+          />
+        </label>
+      )}
       <div className="ca-form-grid">
         <DecideAndSign />
         <label className="ca-field">

@@ -139,6 +139,7 @@ export type IntakeItem = {
   status_label?: string | null;
   identifiers?: Identifiers;
   issue_category_label?: string | null;
+  resolution_summary?: string | null;
   missing?: { code: string; label: string }[];
   header?: CaseHeader;
   not_in_master?: string[];
