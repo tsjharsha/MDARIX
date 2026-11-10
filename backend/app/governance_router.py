@@ -445,8 +445,10 @@ def verify_signing_credentials(
     regulatory_router.py): the current password, then - when signatures require MFA (``mfa.signatures_require_mfa``)
     - a current authenticator code from an enrolled account. Wrong passwords and wrong codes count together on the
     "sign" throttle (5 lock signing for 15 minutes); sign-in has its own lock, so signing cannot be used to guess
-    passwords around it. Each refusal calls ``record_refusal(action)`` (the caller's audit event), is committed, and
-    raises 403. Returns the signer (None for a legacy in-process session that has no account).
+    passwords around it. Each refusal first rolls back ``db`` (whatever the request staged before the check is never
+    committed with the refusal; the tenant scope is applied again when the next transaction begins), then calls
+    ``record_refusal(action)`` (the caller's audit event), is committed, and raises 403. Returns the signer (None for
+    a legacy in-process session that has no account).
 
     The codes are about this signature only (SIGNATURE_CODE_INVALID, SIGNATURE_MFA_NOT_SET_UP), never MFA_REQUIRED:
     that one means the sign-in still owes its second factor, and the browser leaves the page for it, losing what the
@@ -461,6 +463,7 @@ def verify_signing_credentials(
         signer is not None and bool(signer.password_hash) and bool(password) and _verify(password, signer.password_hash)
     )
     if not password_ok:
+        db.rollback()
         record_refusal("SIGNATURE_REAUTHENTICATION_FAILED")
         if signer is not None:
             mfa.record_failure(db, signer, scope="sign")
@@ -470,6 +473,7 @@ def verify_signing_credentials(
         )
     if mfa.signatures_require_mfa():
         if signer is None or not mfa.is_enrolled(signer):
+            db.rollback()
             record_refusal("MFA_REQUIRED_FOR_SIGNATURE")
             db.commit()
             raise HTTPException(
@@ -480,6 +484,7 @@ def verify_signing_credentials(
                 },
             )
         if not mfa_code or not mfa.check_code(signer, mfa_code, allow_recovery=False):
+            db.rollback()
             record_refusal("SIGNATURE_MFA_FAILED")
             mfa.record_failure(db, signer, scope="sign")
             db.commit()

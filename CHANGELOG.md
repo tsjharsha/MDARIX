@@ -126,6 +126,10 @@ Hardening: code-audit fixes 6-20 and the product-version audit (PV-1). No migrat
 - An independent alert channel: when no usual channel delivers an operational alert (for example the email provider
   is down), it is also posted to `MDARIX_ALERT_FALLBACK_WEBHOOK`. Optional; unset, nothing changes. Operators: add the
   setting where the alert settings are documented, and prove it with `scripts/send_test_alert.py`.
+- A refused signature (wrong password, wrong or missing authenticator code, no authenticator set up) never saves
+  anything the request changed before the check: the shared signing check discards it before the refusal's audit
+  record is saved, for every signing route, present and future. The failed attempt still counts toward the signing
+  lock.
 
 ## [0.10.94] - not released yet (ships with 0.10.93 in the test release, late November)
 
