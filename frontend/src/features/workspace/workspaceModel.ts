@@ -112,7 +112,7 @@ export function workspaceAttention(input: {
       key: "investigations",
       tone: "warning",
       title: `${input.openInvestigations} open ${input.openInvestigations === 1 ? "investigation" : "investigations"}`,
-      detail: "Continue the case work",
+      detail: "Continue the investigation work",
       section: "Investigations",
     });
   if (input.unreliableEvidence)

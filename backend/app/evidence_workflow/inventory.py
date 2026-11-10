@@ -69,7 +69,7 @@ def load_case(db: Session, tenant_id, investigation_id, *, lock: bool = False) -
 
 def refuse_closed(case: Investigation) -> None:
     if case_closed(getattr(case, "workflow_state", None), case.status):
-        raise error(409, "CASE_CLOSED", "The case is closed; its evidence can no longer change")
+        raise error(409, "CASE_CLOSED", "The investigation is closed; its evidence can no longer change")
 
 
 def evidence_view(ev: Evidence) -> dict:
@@ -401,7 +401,7 @@ def review_evidence(
     now = now_utc()
     if link is None:
         if ev.investigation_id != case.id:
-            raise error(404, "EVIDENCE_NOT_IN_CASE", "Link the evidence to the case before reviewing it")
+            raise error(404, "EVIDENCE_NOT_IN_CASE", "Link the evidence to the investigation before reviewing it")
         link = InvestigationEvidence(
             id=uuid.uuid4(),
             tenant_id=tenant_id,

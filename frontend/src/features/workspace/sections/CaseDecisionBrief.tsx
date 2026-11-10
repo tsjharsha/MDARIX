@@ -190,7 +190,7 @@ export function CaseDecisionBriefPanel({
       )}
       {state?.communications && (state.communications.open > 0 || state.communications.unresolved > 0) && (
         <p className={`uw-hint tone-${state.communications.overdue ? "critical" : "warning"}`} role="note">
-          Requests to external contacts on this case's complaints: {state.communications.open} open,{" "}
+          Requests to external contacts on this investigation's complaints: {state.communications.open} open,{" "}
           {state.communications.overdue} overdue, {state.communications.unresolved} unresolved after attempts.{" "}
           {state.communications.items
             .slice(0, 3)
@@ -435,8 +435,8 @@ function NarrativePanel({
           </p>
           {draftOutOfDate(narrative) && (
             <p className="uw-hint">
-              The case&apos;s evidence or scope changed after this draft was made. Run the AI analysis again on the case
-              page, then start a new draft.
+              The investigation&apos;s evidence or scope changed after this draft was made. Run the AI analysis again on
+              the investigation page, then start a new draft.
             </p>
           )}
           {editable && draft && (
@@ -623,7 +623,7 @@ function ComposedSections({ version }: { version: BriefVersion }) {
         Each statement shows its kind (Fact, Source assertion, Derived observation or AI interpretation) and who made
         it.
       </p>
-      <Section title="Case">
+      <Section title="Investigation">
         <p>
           <strong>{safeText(investigation.business_id) ?? "—"}</strong>
           {safeText(product.name) ? ` · ${product.name}` : ""}

@@ -212,7 +212,7 @@ function FactorNote({ view }: { view: LotImpactView }) {
   if (view.source === "saved" && view.saved)
     return (
       <p className="ac-muted">
-        Kept with the case scope{view.saved.scope_version ? ` (version ${view.saved.scope_version})` : ""}
+        Kept with the investigation scope{view.saved.scope_version ? ` (version ${view.saved.scope_version})` : ""}
         {view.saved.saved_by_name ? ` by ${view.saved.saved_by_name}` : ""}
         {view.saved.saved_at ? `, ${formatDate(view.saved.saved_at)}` : ""}.
       </p>

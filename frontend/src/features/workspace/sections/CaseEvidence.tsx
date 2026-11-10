@@ -500,7 +500,7 @@ function LinkDrawer({
       <form className="ca-form ca-drawer-section" onSubmit={submit}>
         <SearchBox value={query} onChange={setQuery} label="Search the evidence library" />
         <p className="ac-note" role="status">
-          {chosen.length} selected · {candidates.length} not yet in this case
+          {chosen.length} selected · {candidates.length} not yet in this investigation
           {candidates.length > 50 ? " (search to narrow the list)" : ""}
         </p>
         {library.state === "loading" && !library.data ? (
@@ -552,7 +552,7 @@ function LinkDrawer({
           </select>
         </label>
         <label className="ca-field">
-          Why they belong to this case (optional)
+          Why they belong to this investigation (optional)
           <textarea
             rows={2}
             maxLength={REVIEW_REASON_MAX}

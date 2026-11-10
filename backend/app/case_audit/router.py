@@ -100,7 +100,7 @@ def case_replay(
             .first()
         )
         if decision is None:
-            raise error(404, "DECISION_NOT_FOUND", "This decision does not belong to this case")
+            raise error(404, "DECISION_NOT_FOUND", "This decision does not belong to this investigation")
     return service.replay(db, control_db, case, as_known_at=as_known_at, decision=decision, now=_now())
 
 

@@ -577,7 +577,7 @@ function DecisionDrawer({
           </h3>
           <p>
             {decision === "CONFIRMED"
-              ? "It now counts on the backlog board until it joins a signal or a case. Your source system is unchanged; record the complaint there as your procedure says."
+              ? "It now counts on the backlog board until it joins a signal or an investigation. Your source system is unchanged; record the complaint there as your procedure says."
               : "It leaves the second look. Your reason is kept in the audit trail."}
           </p>
         </section>
@@ -702,7 +702,7 @@ export function Backlog({ initial = "all", fixed = false }: { initial?: BacklogS
         icon={<Hourglass size={28} />}
         eyebrow={`Backlog · ${target}-day target`}
         title={list.data ? headline.title : "Open complaints against your target"}
-        detail={list.data ? headline.detail : "Open complaints in no signal and no case, against your target."}
+        detail={list.data ? headline.detail : "Open complaints in no signal and no investigation, against your target."}
       />
       <div className="uw-cr-stats">
         <StatTile
@@ -774,7 +774,7 @@ export function Backlog({ initial = "all", fixed = false }: { initial?: BacklogS
             rowKey={(row) => row.id}
             empty={{
               title: show === "all" ? "No open complaint is waiting" : "None here",
-              detail: "Every open complaint is in a signal or a case.",
+              detail: "Every open complaint is in a signal or an investigation.",
             }}
             columns={[
               {
@@ -865,9 +865,9 @@ export function Backlog({ initial = "all", fixed = false }: { initial?: BacklogS
         <Panel eyebrow="Backlog" title="Open complaints by age">
           <BarList items={bandSlices(summary?.bands, target)} />
           <p className="ac-note">
-            Complaints are counted from the day they were received. One that is in no signal and no case has not been
-            looked at as part of a trend, and complaint handling is among the observations FDA cites most often. A
-            cancelled record or an inquiry counts here once your team confirms it on the second look.
+            Complaints are counted from the day they were received. One that is in no signal and no investigation has
+            not been looked at as part of a trend, and complaint handling is among the observations FDA cites most
+            often. A cancelled record or an inquiry counts here once your team confirms it on the second look.
           </p>
         </Panel>
       </div>

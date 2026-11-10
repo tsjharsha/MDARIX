@@ -357,10 +357,10 @@ AUDIT_PREFIXES: tuple[tuple[str, str], ...] = (
     ("AI_", "AI"),
 )
 AUDIT_TITLES: dict[str, str] = {
-    "INVESTIGATION_OPENED": "Case opened",
-    "INVESTIGATION_CREATED": "Case opened",
-    "INVESTIGATION_STATE_CHANGED": "Case state changed",
-    "INVESTIGATION_UPDATED": "Case details updated",
+    "INVESTIGATION_OPENED": "Investigation opened",
+    "INVESTIGATION_CREATED": "Investigation opened",
+    "INVESTIGATION_STATE_CHANGED": "Investigation state changed",
+    "INVESTIGATION_UPDATED": "Investigation details updated",
     "INVESTIGATION_SCOPE_CHANGED": "Scope changed",
     "NEXT_STEP_RECORDED": "Next step recorded",
     "LATE_EVIDENCE_RECEIVED": "Evidence arrived after the decision",
@@ -384,8 +384,8 @@ AUDIT_TITLES: dict[str, str] = {
     "DECISION_ADVISORY_CREATED": "AI decision advisory produced",
     "BRIEF_GENERATED": "AI investigation brief generated",
     "BRIEF_REGENERATED": "AI investigation brief regenerated",
-    "INVESTIGATION_RECORD_EXPORTED": "Case record exported",
-    "CASE_AUDIT_EXPORTED": "Case audit exported",
+    "INVESTIGATION_RECORD_EXPORTED": "Investigation record exported",
+    "CASE_AUDIT_EXPORTED": "Investigation audit exported",
 }
 # Keys of audit details worth showing (everything else stays in the audit trail itself).
 AUDIT_DETAIL_KEYS = (
@@ -431,7 +431,7 @@ def audit_title(action: str | None, extra: Any = None) -> str:
     if code.startswith("TASK_"):
         label = f"Task {readable(code[5:]).lower()}"
     elif code.startswith("INTELLIGENCE_"):
-        label = f"Case intelligence: {readable(code[13:]).lower()}"
+        label = f"Investigation intelligence: {readable(code[13:]).lower()}"
     else:
         label = AUDIT_TITLES.get(code) or readable(code) or "Recorded"
     return title(label, extra)
@@ -506,7 +506,7 @@ def evidence_set_hash(items: Iterable[tuple[Any, Any, Any]]) -> str:
 
 REPLAY_LIMITATIONS = (
     "A record counts as known then when MDARIX had it (ingestion, else recorded, else created time) and it was "
-    "linked to the case by then.",
+    "linked to the investigation by then.",
     "Review statuses and relationships of evidence, and statuses of hypotheses and unknowns, are rebuilt from their "
     "recorded history; a change made before that history was kept is shown as the value recorded later.",
     "Records deleted or purged since are not shown; edits that kept no history (titles, descriptions) are shown as "

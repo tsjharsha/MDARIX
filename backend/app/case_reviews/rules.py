@@ -156,7 +156,7 @@ def review_policy(priority: str | None, complaints: Iterable[Any], signals: Iter
 
     risk: list[str] = []
     if level in ("HIGH", "CRITICAL"):
-        risk.append(f"The case priority is {level.lower()}")
+        risk.append(f"The investigation priority is {level.lower()}")
     if injuries:
         risk.append(_complaints_report(injuries, "a serious injury"))
     if deaths:
@@ -173,7 +173,7 @@ def review_policy(priority: str | None, complaints: Iterable[Any], signals: Iter
 
     regulatory: list[str] = []
     if level == "CRITICAL":
-        regulatory.append("The case priority is critical")
+        regulatory.append("The investigation priority is critical")
     if deaths:
         regulatory.append(_complaints_report(deaths, "a death"))
     if injuries:
@@ -476,7 +476,7 @@ NEXT_STEPS: tuple[tuple[str, str, str], ...] = (
     (
         REQUEST_ADDITIONAL_EVIDENCE,
         "Request additional evidence",
-        "Ask a colleague or a role for evidence the case needs.",
+        "Ask a colleague or a role for evidence the investigation needs.",
     ),
     (
         REQUEST_ADDITIONAL_TESTING,
@@ -486,22 +486,22 @@ NEXT_STEPS: tuple[tuple[str, str, str], ...] = (
     (
         REVIEW_SUPPLIER_CHANGE,
         "Review a supplier change",
-        "Give the case owner (or a colleague or role) a follow-up to review a supplier change.",
+        "Give the investigation owner (or a colleague or role) a follow-up to review a supplier change.",
     ),
     (
         REVIEW_PRODUCT_CHANGE,
         "Review a product change",
-        "Give the case owner (or a colleague or role) a follow-up to review a product change.",
+        "Give the investigation owner (or a colleague or role) a follow-up to review a product change.",
     ),
     (
         REQUEST_RISK_REVIEW,
         "Request a risk review",
-        "Ask the risk reviewers to review the case.",
+        "Ask the risk reviewers to review the investigation.",
     ),
     (
         REQUEST_REGULATORY_REVIEW,
         "Request a regulatory review",
-        "Ask the regulatory reviewers to review the case; reportability is theirs to determine.",
+        "Ask the regulatory reviewers to review the investigation; reportability is theirs to determine.",
     ),
     (
         ESCALATE_FOR_QUALITY_REVIEW,
@@ -645,9 +645,9 @@ def next_step_availability(
     if action == ESCALATE_FOR_QUALITY_REVIEW:
         return False, USE_DECISION_BRIEF
     if not can_work:
-        return False, "Your role does not allow working on cases"
+        return False, "Your role does not allow working on investigations"
     if not case_open:
-        return False, "The case is closed"
+        return False, "The investigation is closed"
     if action in EVIDENCE_ACTIONS and not can_request_evidence:
         return False, "Your role does not allow requesting evidence"
     review_type = REVIEW_ACTIONS.get(action)

@@ -12,7 +12,7 @@ describe("the case Workspace tab in plain words", () => {
     ]);
     expect(notes.map((note) => note.title)).toEqual([
       "MDARIX does not decide the root cause",
-      "No evidence on this case yet",
+      "No evidence on this investigation yet",
       "No matching evidence found yet",
       "The conclusion stays with people",
     ]);

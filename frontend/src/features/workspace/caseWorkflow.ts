@@ -234,7 +234,7 @@ export const CASE_STEPS: ReadonlyArray<{ key: string; label: string; destination
     destination: { section: "Investigations", tab: "Workspace", anchor: "workflow-overview" },
   },
   { key: "scope", label: "Scope", destination: { section: "Investigations", tab: "Scope" } },
-  { key: "evidence", label: "Evidence", destination: { section: "Evidence", tab: "Case evidence" } },
+  { key: "evidence", label: "Evidence", destination: { section: "Evidence", tab: "Investigation evidence" } },
   {
     key: "analysis",
     label: "Analysis",
@@ -419,7 +419,7 @@ export function myCaseTiles(summary: MyCasesSummary | null | undefined): MyCaseT
       key: "unreviewed_evidence",
       label: "Evidence to review",
       value: value("unreviewed_evidence"),
-      target: { section: "Evidence", tab: "Case evidence" },
+      target: { section: "Evidence", tab: "Investigation evidence" },
     },
     { key: "requests_waiting", label: "Requests waiting", value: value("requests_waiting"), target: requests },
     {

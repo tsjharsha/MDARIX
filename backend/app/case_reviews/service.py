@@ -233,7 +233,7 @@ def create_review(
         raise error(
             409,
             "REVIEW_ALREADY_OPEN",
-            f"{rules.TYPE_LABELS[code]} {existing.business_id} is already open on this case",
+            f"{rules.TYPE_LABELS[code]} {existing.business_id} is already open on this investigation",
             review_id=str(existing.id),
         )
     now = now or now_utc()

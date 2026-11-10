@@ -265,7 +265,7 @@ def board(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
         "period": {"from": start.isoformat(), "to": today.isoformat(), "days": period_days},
         "summary": {"products": len(items), **{state.lower(): states.get(state, 0) for state in STATE_ORDER}},
         "note": "Read from your records in MDARIX: complaints, signals, the trend check, your risk register and the "
-        "risk reviews and risk reassessments of your cases. A person decides what the risk file must say.",
+        "risk reviews and risk reassessments of your investigations. A person decides what the risk file must say.",
         "items": items,
     }
 

@@ -88,16 +88,22 @@ describe("addresses", () => {
 
 describe("the Trust & Audit tabs", () => {
   it("opens on the case timeline when a case is chosen and nothing else was asked for", () => {
-    expect(initialTrustTab(null, true)).toBe("Case timeline");
+    expect(initialTrustTab(null, true)).toBe("Investigation timeline");
     expect(initialTrustTab(null, false)).toBe("AI assurance");
     expect(initialTrustTab("Audit trail", true)).toBe("Audit trail");
   });
 
   it("links to a tab for one case and reads the link back", () => {
     const tab = trustTab({ caseId: CASE, caseLabel: "INV000147" });
-    expect(tab).toBe(`Case timeline?case=${CASE}&label=INV000147`);
-    expect(parseTrustTab(tab)).toEqual({ tab: "Case timeline", caseId: CASE, caseLabel: "INV000147" });
-    expect(trustTab()).toBe("Case timeline");
+    expect(tab).toBe(`Investigation timeline?case=${CASE}&label=INV000147`);
+    expect(parseTrustTab(tab)).toEqual({ tab: "Investigation timeline", caseId: CASE, caseLabel: "INV000147" });
+    // A link from before 0.10.93 still opens the timeline, with its case and label.
+    expect(parseTrustTab(`Case timeline?case=${CASE}&label=INV000147`)).toEqual({
+      tab: "Investigation timeline",
+      caseId: CASE,
+      caseLabel: "INV000147",
+    });
+    expect(trustTab()).toBe("Investigation timeline");
     expect(trustTab({ tab: "Replay" })).toBe("Replay");
   });
 
@@ -106,7 +112,7 @@ describe("the Trust & Audit tabs", () => {
     expect(parseTrustTab("Nope")).toEqual({ tab: null, caseId: null, caseLabel: null });
     expect(parseTrustTab(undefined).tab).toBeNull();
     expect(parseTrustTab("Replay?case=<script>&label=INV1")).toEqual({ tab: "Replay", caseId: null, caseLabel: null });
-    expect(trustTab({ caseId: CASE, caseLabel: "Selected investigation" })).toBe(`Case timeline?case=${CASE}`);
+    expect(trustTab({ caseId: CASE, caseLabel: "Selected investigation" })).toBe(`Investigation timeline?case=${CASE}`);
   });
 });
 

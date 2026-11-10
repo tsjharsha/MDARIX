@@ -402,6 +402,6 @@ def changes(signed: dict, current: dict) -> list[str]:
 
 def signature_meaning(case_ref: str, label: str, lots: int) -> str:
     return (
-        f"I confirm this list of {lots} {'lot' if lots == 1 else 'lots'} sharing {label} for case {case_ref}, as "
+        f"I confirm this list of {lots} {'lot' if lots == 1 else 'lots'} sharing {label} for investigation {case_ref}, as "
         "the records show it. MDARIX recommends no field action; any field action is decided in our QMS."
     )

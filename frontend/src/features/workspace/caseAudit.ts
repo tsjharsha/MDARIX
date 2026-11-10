@@ -11,7 +11,7 @@ import { decisionTab } from "./decisionTabs";
 import { intelligenceTab } from "./intelligence";
 import { reviewsTab } from "./reviews";
 import { signalsTab } from "./signals";
-import { recordPlace, type RecordKind } from "../../app/linkTable";
+import { currentTab, recordPlace, type RecordKind } from "../../app/linkTable";
 import { hashState, verificationChecks, type HistoryRow, type VerificationCheck } from "./humanDecision";
 
 const code = (value: unknown) =>
@@ -87,7 +87,7 @@ export function trustExportName(caseLabel: string | null | undefined, format: Ex
 // The tabs of Trust & Audit, and a link to them for one case
 
 export const TRUST_TABS = [
-  "Case timeline",
+  "Investigation timeline",
   "Replay",
   "AI runs",
   "Integrity",
@@ -98,7 +98,7 @@ export const TRUST_TABS = [
 export type TrustTab = (typeof TRUST_TABS)[number];
 
 /** The tabs that belong to one case (they ask for a case when none is chosen). */
-export const CASE_TRUST_TABS: readonly TrustTab[] = ["Case timeline", "Replay", "AI runs", "Integrity"];
+export const CASE_TRUST_TABS: readonly TrustTab[] = ["Investigation timeline", "Replay", "AI runs", "Integrity"];
 
 const isTrustTab = (value: unknown): value is TrustTab =>
   typeof value === "string" && (TRUST_TABS as readonly string[]).includes(value);
@@ -111,11 +111,11 @@ const ref = (value: unknown) => {
 };
 
 /**
- * The tab name `open("Trust & Audit", tab)` takes: "Case timeline", or "Case timeline?case=…&label=INV000147" for a
+ * The tab name `open("Trust & Audit", tab)` takes: "Investigation timeline", or "Investigation timeline?case=…&label=INV000147" for a
  * case the context bar may not hold (opened from a decision). The label is the case's business ID, shown as is.
  */
 export function trustTab(target: { tab?: TrustTab; caseId?: string | null; caseLabel?: string | null } = {}): string {
-  const tab = target.tab ?? "Case timeline";
+  const tab = target.tab ?? "Investigation timeline";
   const params = new URLSearchParams();
   const caseId = ref(target.caseId);
   const label = ref(target.caseLabel);
@@ -125,13 +125,13 @@ export function trustTab(target: { tab?: TrustTab; caseId?: string | null; caseL
   return query ? `${tab}?${query}` : tab;
 }
 
-/** What a tab name passed to Trust & Audit asks for (see trustTab); an unknown name asks for no tab. */
+/** What a tab name passed to Trust & Audit asks for (see trustTab; a former name opens its tab); an unknown name asks for no tab. */
 export function parseTrustTab(value: string | null | undefined): {
   tab: TrustTab | null;
   caseId: string | null;
   caseLabel: string | null;
 } {
-  const text = String(value ?? "");
+  const text = currentTab("Trust & Audit", String(value ?? "")) ?? "";
   const mark = text.indexOf("?");
   const name = mark >= 0 ? text.slice(0, mark) : text;
   const params = new URLSearchParams(mark >= 0 ? text.slice(mark + 1) : "");
@@ -151,7 +151,7 @@ export function initialTrustTab(
   withoutCase: TrustTab = "AI assurance",
 ): TrustTab {
   if (requested) return requested;
-  return hasCase ? "Case timeline" : withoutCase;
+  return hasCase ? "Investigation timeline" : withoutCase;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -178,7 +178,7 @@ export type TimelineCategory = (typeof TIMELINE_CATEGORIES)[number];
 
 export const CATEGORY_LABELS: Record<TimelineCategory, string> = {
   SIGNAL: "Signal",
-  CASE: "Case",
+  CASE: "Investigation",
   SCOPE: "Scope",
   TASK: "Task",
   EVIDENCE: "Evidence",
@@ -316,8 +316,8 @@ const OBJECT_TYPES: Record<string, string> = {
   UNKNOWN: "Unknown",
   SCOPE: "Scope",
   SCOPE_VERSION: "Scope",
-  CASE: "Case",
-  INVESTIGATION: "Case",
+  CASE: "Investigation",
+  INVESTIGATION: "Investigation",
   SIGNATURE: "Signature",
   AI_RUN: "AI run",
   AI_EXECUTION: "AI run",
@@ -378,7 +378,7 @@ export function objectTarget(object: TimelineObject | undefined): ObjectTarget |
     case "EVIDENCE":
     case "EVIDENCE_ITEM":
     case "CASE_EVIDENCE":
-      return { kind: "section", section: "Evidence", tab: "Case evidence" };
+      return { kind: "section", section: "Evidence", tab: "Investigation evidence" };
     case "HYPOTHESIS":
       return { kind: "section", section: "Investigations", tab: intelligenceTab("Hypotheses") };
     case "UNKNOWN":

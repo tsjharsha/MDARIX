@@ -373,7 +373,9 @@ def _check_risks(db: Session, case: Investigation, risk_ids) -> None:
         )
     }
     if len(found) != len(set(risk_ids)):
-        raise service.error(422, "RISK_NOT_FOR_PRODUCT", "Every assessed risk must be a risk of this case's product")
+        raise service.error(
+            422, "RISK_NOT_FOR_PRODUCT", "Every assessed risk must be a risk of this investigation's product"
+        )
 
 
 def _check_owners(control_db: Session, tenant_id, findings: dict) -> None:

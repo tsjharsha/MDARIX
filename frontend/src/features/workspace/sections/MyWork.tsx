@@ -106,7 +106,7 @@ const LIST_EMPTY: Record<TaskView, { title: string; detail: string }> = {
   assigned: { title: "Nothing is assigned to you", detail: "Tasks routed to you appear here." },
   queue: {
     title: "Your role queues are empty",
-    detail: "Work waiting for anyone in your roles (cases without an owner, reviews) appears here.",
+    detail: "Work waiting for anyone in your roles (investigations without an owner, reviews) appears here.",
   },
   waiting: { title: "Nothing to wait for", detail: "Tasks you handed to others and are waiting on appear here." },
   returned: { title: "Nothing was returned to you", detail: "Tasks sent back to you for more work appear here." },
@@ -145,7 +145,10 @@ export function MyWorkSection({ tab }: { tab?: string }) {
       work.setInvestigationId(row.investigationId);
     // A case of another product: its product is looked up (My Work has no context bar to choose it in).
     else if (!(row.caseId && (await chooseCase(work, row.caseId)))) {
-      notify(`${row.caseId ?? "This case"} could not be opened right now. Open it from Investigations.`, "critical");
+      notify(
+        `${row.caseId ?? "This investigation"} could not be opened right now. Open it from Investigations.`,
+        "critical",
+      );
       return;
     }
     open("Investigations", "Decision");
@@ -240,7 +243,10 @@ export function MyWorkMore({ tab }: { tab?: string }) {
     if (!row.investigationId) return;
     if (row.productId) work.setInvestigationId(row.investigationId, row.productId);
     else if (!(row.caseId && (await chooseCase(work, row.caseId)))) {
-      notify(`${row.caseId ?? "This case"} could not be opened right now. Open it from Investigations.`, "critical");
+      notify(
+        `${row.caseId ?? "This investigation"} could not be opened right now. Open it from Investigations.`,
+        "critical",
+      );
       return;
     }
     open("Investigations", "Decision");
@@ -671,7 +677,7 @@ function taskColumns(
         return (
           <span className="ca-person">
             <span>{source}</span>
-            {kase && kase !== source && <small>Case {kase}</small>}
+            {kase && kase !== source && <small>Investigation {kase}</small>}
           </span>
         );
       },
@@ -819,7 +825,7 @@ function TaskDrawer({
         </div>
         {safeText(current.investigation?.business_id) && (
           <div>
-            <dt>Case</dt>
+            <dt>Investigation</dt>
             <dd>{current.investigation?.business_id}</dd>
           </div>
         )}

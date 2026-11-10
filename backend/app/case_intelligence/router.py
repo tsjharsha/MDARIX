@@ -124,7 +124,7 @@ def _is_open(case: Investigation) -> bool:
 
 def _refuse_closed(case: Investigation) -> None:
     if not _is_open(case):
-        raise _error(409, "CASE_CLOSED", "The case is closed; its analysis can no longer change")
+        raise _error(409, "CASE_CLOSED", "The investigation is closed; its analysis can no longer change")
 
 
 def _names(control_db: Session | None, tenant_id, refs) -> dict[str, str]:
@@ -186,7 +186,7 @@ def _case_evidence(db: Session, tenant_id, case: Investigation, evidence_id) -> 
         .first()
     )
     if linked is None:
-        raise _error(404, "EVIDENCE_NOT_IN_CASE", "Link the evidence to the case first")
+        raise _error(404, "EVIDENCE_NOT_IN_CASE", "Link the evidence to the investigation first")
     return ev
 
 
@@ -422,7 +422,7 @@ def _locked_hypothesis(db: Session, tenant_id, case: Investigation, hypothesis_i
         .first()
     )
     if row is None:
-        raise _error(404, "HYPOTHESIS_NOT_FOUND", "Hypothesis is not available in this case")
+        raise _error(404, "HYPOTHESIS_NOT_FOUND", "Hypothesis is not available in this investigation")
     if str(row.status or "").lower() == rules.SUPERSEDED:
         raise _error(409, "HYPOTHESIS_SUPERSEDED", "This hypothesis was replaced by a newer AI run and cannot change")
     return row
@@ -481,7 +481,9 @@ def create_hypothesis(
         .first()
     )
     if duplicate is not None:
-        raise _error(409, "HYPOTHESIS_EXISTS", "The case already has this hypothesis", hypothesis_id=str(duplicate[0]))
+        raise _error(
+            409, "HYPOTHESIS_EXISTS", "The investigation already has this hypothesis", hypothesis_id=str(duplicate[0])
+        )
     now = now_utc()
     row = Hypothesis(
         id=uuid.uuid4(),
@@ -1072,7 +1074,7 @@ def create_unknown(
             .first()
         )
         if hypothesis is None:
-            raise _error(404, "HYPOTHESIS_NOT_FOUND", "Hypothesis is not available in this case")
+            raise _error(404, "HYPOTHESIS_NOT_FOUND", "Hypothesis is not available in this investigation")
     now = now_utc()
     row = Unknown(
         id=uuid.uuid4(),
@@ -1140,7 +1142,7 @@ def set_unknown_status(
         .first()
     )
     if row is None:
-        raise _error(404, "UNKNOWN_NOT_FOUND", "This unknown is not available in this case")
+        raise _error(404, "UNKNOWN_NOT_FOUND", "This unknown is not available in this investigation")
     if rules.unknown_locked(row.status):
         raise _error(409, "UNKNOWN_SUPERSEDED", "This unknown was replaced by a newer AI run and cannot change")
     if str(row.status or "").lower() == payload.status:
@@ -1373,7 +1375,7 @@ def _chain_of_case(db: Session, tenant_id, case: Investigation, chain_id) -> Fai
         .first()
     )
     if chain is None:
-        raise _error(404, "FAILURE_CHAIN_NOT_FOUND", "This failure chain is not available in this case")
+        raise _error(404, "FAILURE_CHAIN_NOT_FOUND", "This failure chain is not available in this investigation")
     return chain
 
 
@@ -1542,7 +1544,7 @@ def _ai_chain_steps(db: Session, tenant_id, ai_chain: dict) -> tuple[list[str], 
             # The AI called it supported but names no evidence of this case: adopted as hypothesized, so an AI claim
             # never enters the case looking established. A person can raise it once they name the evidence.
             state = "HYPOTHESIZED"
-            note += "; adopted as hypothesized because it names no evidence of this case"
+            note += "; adopted as hypothesized because it names no evidence of this investigation"
         links.append(
             {
                 "from_index": start,
@@ -1591,10 +1593,12 @@ def adopt_failure_chain(
         None,
     )
     if ai_chain is None:
-        raise _error(404, "AI_CHAIN_NOT_FOUND", "This AI failure chain is not available in this case")
+        raise _error(404, "AI_CHAIN_NOT_FOUND", "This AI failure chain is not available in this investigation")
     existing = _adopted(db, tenant_id, case.id).get((str(execution.id), payload.ai_chain_id))
     if existing is not None:
-        raise _error(409, "CHAIN_ALREADY_ADOPTED", "This AI failure chain is already in the case", chain_id=existing)
+        raise _error(
+            409, "CHAIN_ALREADY_ADOPTED", "This AI failure chain is already in the investigation", chain_id=existing
+        )
     labels, links = _ai_chain_steps(db, tenant_id, ai_chain)
     if not links:
         raise _error(422, "AI_CHAIN_EMPTY", "This AI failure chain has no links to adopt")

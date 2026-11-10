@@ -95,7 +95,7 @@ TEMPLATES: dict[str, Template] = {
             "capa-log-starter-1",
             ("ISO13485_8_5_2",),
             ORGANIZATION,
-            "Every CAPA imported from your QMS with its QMS ID, the complaints and cases it came from, its status, due "
+            "Every CAPA imported from your QMS with its QMS ID, the complaints and investigations it came from, its status, due "
             "date and effectiveness.",
         ),
         Template(
@@ -104,7 +104,7 @@ TEMPLATES: dict[str, Template] = {
             "investigation-report-starter-1",
             ("ISO13485_8_2_2", "ISO14971_10"),
             CASE,
-            "One case: its scope by version, evidence, hypotheses with their support states, the root cause and its "
+            "One investigation: its scope by version, evidence, hypotheses with their support states, the root cause and its "
             "attribution as recorded in the decision, and the signed decision.",
             (
                 Judgement(
@@ -120,7 +120,7 @@ TEMPLATES: dict[str, Template] = {
             "risk-extract-starter-1",
             ("ISO14971_10",),
             CASE,
-            "One case's risk reviews: the risk-register entries named, each risk-control answer and risk file update, "
+            "One investigation's risk reviews: the risk-register entries named, each risk-control answer and risk file update, "
             "post-market data against the risk file and the impact decisions.",
             (
                 Judgement(

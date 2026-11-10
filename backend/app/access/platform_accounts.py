@@ -197,12 +197,15 @@ PERMISSION_TEXT: dict[str, tuple[str, str]] = {
     "data.export": ("Export data", "Download lists, reports and audit exports."),
     "regulatory.approve": ("Approve regulatory documents", "Approve regulatory drafts and reports."),
     "signal.triage": ("Triage signals", "Start triage, set priority, record a disposition and tune detection rules."),
-    "investigation.create": ("Open investigations", "Open a case, from a signal or on its own."),
-    "investigation.assign": ("Assign investigations", "Give a case or its tasks to a person, or reassign them."),
-    "investigation.work": ("Work on investigations", "Scope, intelligence and the Decision Brief of a case."),
-    "evidence.review": ("Review evidence", "Accept, limit or reject evidence on a case."),
+    "investigation.create": ("Open investigations", "Open an investigation, from a signal or on its own."),
+    "investigation.assign": (
+        "Assign investigations",
+        "Give an investigation or its tasks to a person, or reassign them.",
+    ),
+    "investigation.work": ("Work on investigations", "Scope, intelligence and the Decision Brief of an investigation."),
+    "evidence.review": ("Review evidence", "Accept, limit or reject evidence on an investigation."),
     "evidence.request": ("Request evidence", "Ask colleagues or suppliers for evidence."),
-    "risk.review": ("Record risk reviews", "Assess a case against the risk file and record the outcome."),
+    "risk.review": ("Record risk reviews", "Assess an investigation against the risk file and record the outcome."),
     "regulatory.review": ("Record regulatory reviews", "Assess reportability and record the outcome."),
     "quality.review": ("Review Decision Briefs", "Accept a brief for decision, return it, reject it or escalate."),
     "decision.sign": (
@@ -224,21 +227,27 @@ ROLE_TEXT: dict[str, tuple[str, str]] = {
     ),
     "CUSTOMER_ADMIN": (
         "Customer administration",
-        "Manages their organization's people, roles and settings. Can work on cases with an investigator's rights; "
+        "Manages their organization's people, roles and settings. Can work on investigations with an investigator's rights; "
         "never signs decisions.",
     ),
     "SERVICE_DESK": ("Workspace", "Logs cases, answers and signs the Case check; never triages or reviews."),
-    "TRIAGE_LEAD": ("Workspace", "Triages signals, decides what needs an investigation, and opens and assigns cases."),
+    "TRIAGE_LEAD": (
+        "Workspace",
+        "Triages signals, decides what needs an investigation, and opens and assigns investigations.",
+    ),
     "INVESTIGATOR": (
         "Workspace",
-        "Owns cases: scope, evidence, hypotheses and unknowns, and writes the Decision Brief.",
+        "Owns investigations: scope, evidence, hypotheses and unknowns, and writes the Decision Brief.",
     ),
     "RISK_REVIEWER": (
         "Workspace",
-        "Records the risk review of a case. Reads and asks for evidence; changes no records.",
+        "Records the risk review of an investigation. Reads and asks for evidence; changes no records.",
     ),
-    "REGULATORY_REVIEWER": ("Workspace", "Records the regulatory review of a case and approves regulatory documents."),
-    "REVIEWER": ("Workspace", "Reviews Decision Briefs before a decision, and can assign cases."),
+    "REGULATORY_REVIEWER": (
+        "Workspace",
+        "Records the regulatory review of an investigation and approves regulatory documents.",
+    ),
+    "REVIEWER": ("Workspace", "Reviews Decision Briefs before a decision, and can assign investigations."),
     "APPROVER": ("Workspace", "Makes and signs the human decision on an approved Decision Brief."),
     "LEADER": ("Workspace", "Quality manager: every workspace permission, and receives escalations."),
     "VIEWER": ("Workspace", "Reads everything their organization holds; changes nothing."),

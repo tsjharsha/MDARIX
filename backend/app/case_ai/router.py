@@ -97,7 +97,11 @@ def start_run(
         if payload.trigger == "AUTO":
             return {"started": False, "run": runner.view(current)}
         raise HTTPException(
-            409, detail={"code": "AI_RUN_IN_PROGRESS", "message": "The AI analysis of this case is already running"}
+            409,
+            detail={
+                "code": "AI_RUN_IN_PROGRESS",
+                "message": "The AI analysis of this investigation is already running",
+            },
         )
     if payload.trigger == "AUTO" and (current is not None or _has_analysis(db, tenant_id, investigation_id)):
         # The case's AI work exists already: opening its page never repeats it.

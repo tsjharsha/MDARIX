@@ -292,7 +292,9 @@ def test_the_ai_disclosure():
         {"kind": rules.ai_kind("MDARIX-CONTROLLED-INVESTIGATOR"), "model": "claude-model"},
     ]
     statement = rules.ai_statement(executions)
-    assert statement.startswith("AI assisted: 2 AI runs (Case analysis, Hypotheses) with claude-model in this case")
+    assert statement.startswith(
+        "AI assisted: 2 AI runs (Hypotheses, Investigation analysis) with claude-model in this investigation"
+    )
     assert statement.endswith(rules.AI_JUDGEMENT_SENTENCE)
     assert "AI interpretation" in statement and "people made the judgements" in statement
     drafted = rules.ai_statement([], ai_draft_used=True)

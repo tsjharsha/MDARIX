@@ -224,5 +224,5 @@ def recurring_issues(db: Session, tenant_id: uuid.UUID, product_ids) -> dict:
             item for item in dispositions.recurring(db, tenant_id, today) if item["product_id"] in wanted
         ],
         "rule": f"{triggers.RECURRING_COUNT} or more service-level resolutions on one product and problem code within "
-        f"{triggers.RECURRING_DAYS} days that no open case covers",
+        f"{triggers.RECURRING_DAYS} days that no open investigation covers",
     }

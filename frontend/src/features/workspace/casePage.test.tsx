@@ -76,7 +76,7 @@ describe("the one case page", () => {
   });
 
   it("opens the evidence and record steps, asking for a case when none is chosen", () => {
-    expect(render("mvp", "Evidence")).toContain("Case evidence belongs to one investigation");
+    expect(render("mvp", "Evidence")).toContain("This evidence belongs to one investigation");
     expect(render("mvp", "Record")).toContain("The record belongs to one investigation");
     // A parked or unknown step opens the case list instead.
     expect(render("mvp", "Story")).toContain("Investigations in your organization");

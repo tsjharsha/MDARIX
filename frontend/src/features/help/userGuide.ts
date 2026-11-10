@@ -1239,7 +1239,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           {
             title: "Read an investigation's timeline",
             steps: [
-              "Choose the investigation in the context bar and open Case timeline.",
+              "Choose the investigation in the context bar and open Investigation timeline.",
               "Filter by category, person and dates. Each event says who made it: a person, AI or MDARIX itself.",
               "Choose JSON or CSV under Export to download it.",
             ],

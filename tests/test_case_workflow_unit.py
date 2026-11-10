@@ -44,7 +44,7 @@ def test_the_manual_transition_matrix():
     # The review and decision states are set by their own steps; closing stays with managing the case.
     for target in ("BRIEF_IN_REVIEW", "READY_FOR_DECISION", "DECIDED"):
         assert "not by hand" in states.transition_refusal("IN_PROGRESS", target)
-    assert "Close a case" in states.transition_refusal("IN_PROGRESS", "CLOSED")
+    assert "Close an investigation" in states.transition_refusal("IN_PROGRESS", "CLOSED")
     assert "already on hold" in states.transition_refusal("ON_HOLD", "ON_HOLD")
     assert states.transition_refusal("CLOSED", "IN_PROGRESS")
     assert states.transition_refusal("OPEN", "SOMETHING")
@@ -309,7 +309,7 @@ def _facts(**overrides) -> dict:
         "reviews": {
             "RISK": {
                 "required": True,
-                "reasons": ["The case priority is high"],
+                "reasons": ["The investigation priority is high"],
                 "latest": {"business_id": "REV000001", "status": "COMPLETED", "outcome": "NO_CHANGE_REQUIRED"},
             },
             "REGULATORY": {"required": False, "reasons": [], "latest": None},
@@ -410,7 +410,7 @@ def test_a_new_case_has_its_work_ahead():
     checks = _by_key(result["checks"], "result")
     assert checks["scope_complete"] == "PENDING" and checks["evidence_reviewed"] == "PENDING"
     assert checks["brief_ready"] == "PENDING" and checks["decision"] == "PENDING" and checks["unknowns"] == "PASS"
-    assert _by_key(result["checks"], "rationale")["evidence_reviewed"] == "No evidence on this case yet"
+    assert _by_key(result["checks"], "rationale")["evidence_reviewed"] == "No evidence on this investigation yet"
 
 
 def test_unreviewed_evidence_open_questions_and_urgent_requests():

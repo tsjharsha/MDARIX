@@ -114,8 +114,8 @@ export function EvidenceRequestsPanel({
   return (
     <>
       <Panel
-        eyebrow={investigationId ? "Case evidence" : "My work"}
-        title={investigationId ? `Evidence requests for ${caseLabel ?? "this case"}` : "Evidence requests"}
+        eyebrow={investigationId ? "Investigation evidence" : "My work"}
+        title={investigationId ? `Evidence requests for ${caseLabel ?? "this investigation"}` : "Evidence requests"}
         source={list}
         action={
           canRequest && newFor ? (
@@ -146,7 +146,7 @@ export function EvidenceRequestsPanel({
           <SearchBox value={query} onChange={setQuery} label="Search request ID, title or recipient" />
         </div>
         <p className="ac-note">
-          A response is never evidence by itself: the person who asked reviews it into the case's evidence.
+          A response is never evidence by itself: the person who asked reviews it into the investigation's evidence.
         </p>
         <Table
           caption={box === "sent" ? "Evidence requests sent" : "Evidence requests received"}
@@ -154,7 +154,10 @@ export function EvidenceRequestsPanel({
           rowKey={(row) => String(row.id)}
           empty={
             box === "sent"
-              ? { title: "No requests sent", detail: "Requests for evidence you or this case sent appear here." }
+              ? {
+                  title: "No requests sent",
+                  detail: "Requests for evidence you or this investigation sent appear here.",
+                }
               : {
                   title: "No requests received",
                   detail: "Requests asking you (or your role) for evidence appear here.",
@@ -247,7 +250,7 @@ function requestColumns(
       ? [
           {
             key: "investigation",
-            label: "Case",
+            label: "Investigation",
             fields: ["investigation"],
             sortValue: (row: EvidenceRequest) => safeText(row.investigation?.business_id),
             render: (row: EvidenceRequest) => safeText(row.investigation?.business_id) ?? "—",
@@ -459,7 +462,7 @@ export function NewRequestDrawer({
                 ? "Loading…"
                 : unknownRows.length || extraUnknown
                   ? "Not tied to an unknown"
-                  : "No unknowns recorded for this case"}
+                  : "No unknowns recorded for this investigation"}
             </option>
             {extraUnknown && <option value={extraUnknown.id}>{extraUnknown.label}</option>}
             {unknownRows.map((row) => (
@@ -553,7 +556,7 @@ export function RequestDetailDrawer({
   const openEvidence = () => {
     const kase = request?.investigation;
     if (kase?.id) work.setInvestigationId(String(kase.id), (kase as { product_id?: string | null }).product_id ?? null);
-    open("Evidence", "Case evidence");
+    open("Evidence", "Investigation evidence");
   };
   const items = request?.requested_items ?? [];
   const attachments = listOf(request?.attachments) as NonNullable<EvidenceRequestDetail["attachments"]>;
@@ -594,7 +597,7 @@ export function RequestDetailDrawer({
               </dd>
             </div>
             <div>
-              <dt>Case</dt>
+              <dt>Investigation</dt>
               <dd>{safeText(request.investigation?.business_id) ?? "—"}</dd>
             </div>
             <div>
@@ -656,11 +659,11 @@ export function RequestDetailDrawer({
             <section className="ca-drawer-section">
               <h3>Evidence</h3>
               <p>
-                Reviewed into the case's evidence as{" "}
+                Reviewed into the investigation's evidence as{" "}
                 <strong>{safeText(request.resolved_evidence.business_id) ?? "a new record"}</strong>.
               </p>
               <button type="button" className="ac-secondary" onClick={openEvidence}>
-                Open in Case evidence
+                Open in Investigation evidence
               </button>
             </section>
           )}
@@ -740,7 +743,7 @@ function RespondForm({ requestId, onCancel, onDone }: { requestId: string; onCan
         await requestJson(requestPath(requestId, "attachments"), { method: "POST", body, timeoutMs: 120_000 });
       }
       await send(requestPath(requestId, "respond"), "POST", { note: note.trim() });
-      notify("Response recorded. The person who asked reviews it into the case's evidence.");
+      notify("Response recorded. The person who asked reviews it into the investigation's evidence.");
       onDone();
     } catch (failure) {
       setError(errorText(failure, "The response was not recorded."));
@@ -894,7 +897,7 @@ function ReviewIntoEvidence({
       const evidence = safeText(result?.resolved_evidence?.business_id) ?? safeText(result?.evidence?.business_id);
       notify(
         form.accept
-          ? `Response accepted as evidence${evidence ? ` ${evidence}` : ""}. Find it in Case evidence.`
+          ? `Response accepted as evidence${evidence ? ` ${evidence}` : ""}. Find it in Investigation evidence.`
           : "Response rejected; the reason is recorded.",
       );
       onDone();

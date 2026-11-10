@@ -524,7 +524,7 @@ def recurring_service_level(db: Session, tenant_id: uuid.UUID, today: date) -> d
                 "id": item["product_id"],
                 "ref": f"{item['product_name']}, {item['problem_code'].replace('_', ' ').lower()}",
                 "label": f"{item['count']} service-level resolutions in {RECURRING_DAYS} days ({', '.join(item['complaints'])})"
-                ", no case covers it",
+                ", no investigation covers it",
             }
             for item in found
         ],

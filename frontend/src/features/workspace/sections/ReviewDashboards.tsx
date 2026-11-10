@@ -80,7 +80,7 @@ function ReviewsDashboard() {
             {name} · {reviewTypeLabel(review)}
           </strong>
           <small>
-            {safeText(review.investigation?.business_id) ?? "Case"}
+            {safeText(review.investigation?.business_id) ?? "Investigation"}
             {safeText(review.investigation?.product?.name) ? ` · ${review.investigation?.product?.name}` : ""}
             {safeText(review.investigation?.question) ? ` · ${review.investigation?.question}` : ""}
           </small>
@@ -243,8 +243,8 @@ function QualityReviewDashboard() {
               <Empty title="Nothing awaits review" detail="Briefs submitted for a quality review appear here." />
             )}
           </section>
-          <section aria-label="Blocked cases">
-            <h3>Blocked cases</h3>
+          <section aria-label="Blocked investigations">
+            <h3>Blocked investigations</h3>
             {blocked.length ? (
               <ul className="uw-list">
                 {blocked.map((item) => (
@@ -268,7 +268,10 @@ function QualityReviewDashboard() {
                 ))}
               </ul>
             ) : (
-              <Empty title="No blocked cases" detail="Cases whose brief cannot be submitted yet appear here." />
+              <Empty
+                title="No blocked investigations"
+                detail="Investigations whose brief cannot be submitted yet appear here."
+              />
             )}
           </section>
         </div>

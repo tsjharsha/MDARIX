@@ -192,15 +192,15 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   },
   Investigations: {
     icon: FileSearch,
-    description: "Open and work your cases",
-    guide: "Open a case and work through it step by step, with its evidence and possible explanations.",
+    description: "Open and work your investigations",
+    guide: "Open an investigation and work through it step by step, with its evidence and possible explanations.",
     context: true,
   },
   Evidence: {
     icon: Search,
-    description: "Case evidence and sources",
+    description: "Investigation evidence and sources",
     guide:
-      "The evidence behind each case and where each record came from: supporting, contradicting and missing, side by side.",
+      "The evidence behind each investigation and where each record came from: supporting, contradicting and missing, side by side.",
     context: true,
   },
   Decisions: {

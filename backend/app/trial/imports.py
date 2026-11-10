@@ -126,7 +126,7 @@ COLUMN_HELP: dict[str, dict[str, str]] = {
         "to confirm. Any other value stays Unknown, shown as you gave it.",
     },
     "lot_genealogy": {
-        "component_lot_id": "The component's own lot that went into this lot (a sensor lot, for example). A case's lot "
+        "component_lot_id": "The component's own lot that went into this lot (a sensor lot, for example). An investigation's lot "
         "impact lists every lot built with the same component lot.",
     },
     "distribution": {

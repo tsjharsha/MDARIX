@@ -39,7 +39,7 @@ STEP_LABELS = dict(STEPS)
 # template, not analysis. People still build chains from the evidence on the case.
 PARKED_STEPS = {
     "FAILURE_CHAINS": "Not run in this edition: the automatic chains were a fixed template, not an analysis. Build "
-    "a failure chain from the evidence on the case if the investigation needs one.",
+    "a failure chain from the evidence on the investigation if the investigation needs one.",
 }
 ACTIVE = ("QUEUED", "RUNNING")
 # A run still QUEUED or RUNNING after this long is taken to have stopped (a restarted server); a new one may start.

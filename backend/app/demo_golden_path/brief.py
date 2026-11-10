@@ -19,7 +19,7 @@ BRIEF_V1 = {
         "The new cassette moulding tool is the most likely cause; contain lots from tool T-4 pending confirmation."
     ),
     "recommended_actions": ["Contain cassette lots moulded on tool T-4", "Bench-test more returned cassettes"],
-    "author_notes": "Incoming inspection data of the suspect lots is not yet in the case.",
+    "author_notes": "Incoming inspection data of the suspect lots is not yet in the investigation.",
 }
 BRIEF_V2 = {
     "problem_statement": BRIEF_V1["problem_statement"],

@@ -322,7 +322,7 @@ def lines(data: dict) -> list[tuple[str, str]]:
         body(
             f"Dispositions: {_n(signed['signed'], 'disposition')} signed in the period: "
             f"{branches.get('SERVICE_LEVEL', 0)} resolved at service level ({signed['routine']} on the routine path), "
-            f"{branches.get('KNOWN_ISSUE', 0)} known issues linked to an open case, "
+            f"{branches.get('KNOWN_ISSUE', 0)} known issues linked to an open investigation, "
             f"{branches.get('ESCALATED_BY_TRIGGER', 0)} escalated by a trigger and "
             f"{branches.get('ESCALATED_BY_CHOICE', 0)} by choice."
         )
@@ -685,7 +685,7 @@ def management_review(
             row(
                 f"Service-level trend: {matter['count']} service-level resolutions of "
                 f"{matter['problem_code'].replace('_', ' ').lower()} on {matter['product_name']} within "
-                f"{triggers.RECURRING_DAYS} days; no case covers it.",
+                f"{triggers.RECURRING_DAYS} days; no investigation covers it.",
                 [src("Complaint", ids.get(ref), ref) for ref in matter["complaints"]],
             )
         )

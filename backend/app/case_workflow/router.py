@@ -259,7 +259,7 @@ def transition_investigation(
             raise _error(
                 409,
                 "DECISIONS_AWAITING_REVIEW",
-                "A decision on this case still awaits its human review; finish it before cancelling the case",
+                "A decision on this investigation still awaits its human review; finish it before cancelling the investigation",
             )
     before = {"workflow_state": current, "status": case.status}
     now = states.now_utc()

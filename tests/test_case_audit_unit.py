@@ -108,8 +108,11 @@ def test_titles_are_plain_words():
     assert rules.title("Case opened") == "Case opened"
     assert rules.readable("CASE_REVIEW_COMPLETED") == "Case review completed"
     assert rules.audit_title("TASK_COMPLETED") == "Task completed"
-    assert rules.audit_title("INTELLIGENCE_STATUS_CHANGED") == "Case intelligence: status changed"
-    assert rules.audit_title("INVESTIGATION_STATE_CHANGED", "now in progress") == "Case state changed: now in progress"
+    assert rules.audit_title("INTELLIGENCE_STATUS_CHANGED") == "Investigation intelligence: status changed"
+    assert (
+        rules.audit_title("INVESTIGATION_STATE_CHANGED", "now in progress")
+        == "Investigation state changed: now in progress"
+    )
     assert rules.audit_title("SOMETHING_NEW_HAPPENED") == "Something new happened"
 
 

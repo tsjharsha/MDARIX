@@ -122,7 +122,7 @@ function TemplateBoard({
       <div className="ca-form-grid">
         {scoped ? (
           <label className="ca-field">
-            {template.scope === "CASE" ? "Case" : "Change record"}
+            {template.scope === "CASE" ? "Investigation" : "Change record"}
             <select value={scope} onChange={(event) => setScope(event.target.value)}>
               <option value="">Choose…</option>
               {choices.map((item) => (

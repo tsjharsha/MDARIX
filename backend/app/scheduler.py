@@ -459,7 +459,7 @@ JOBS: tuple[Job, ...] = (
         "late_evidence_sweep",
         timedelta(minutes=60),
         late_evidence_sweep,
-        "Ask for an impact assessment of evidence that reached a decided case",
+        "Ask for an impact assessment of evidence that reached a decided investigation",
         CELL_JOBS,
     ),
     Job(

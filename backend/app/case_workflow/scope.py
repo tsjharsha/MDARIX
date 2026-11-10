@@ -431,7 +431,9 @@ def check_references(db: Session, case, data: dict) -> list[dict]:
         }
         if len(found) != len(versions):
             raise refuse(
-                422, "VERSION_NOT_FOR_PRODUCT", "Every product version must be a version of this case's product"
+                422,
+                "VERSION_NOT_FOR_PRODUCT",
+                "Every product version must be a version of this investigation's product",
             )
     included = id_list(data.get("included_complaint_ids"))
     excluded = [item["complaint_id"] for item in excluded_list(data.get("excluded_complaints"))]
@@ -450,7 +452,7 @@ def check_references(db: Session, case, data: dict) -> list[dict]:
             raise refuse(
                 422,
                 "COMPLAINT_NOT_FOR_PRODUCT",
-                "Every complaint must belong to this case's product in your organization",
+                "Every complaint must belong to this investigation's product in your organization",
             )
     for model, key, code, label in (
         (LotBatch, "lot_ids", "LOT_NOT_FOUND", "lot"),

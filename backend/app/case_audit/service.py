@@ -136,7 +136,7 @@ def read_signals(found: Gathered) -> None:
             category="SIGNAL",
             event="SIGNAL_LINKED_TO_CASE",
             title=rules.title(
-                "Signal linked to the case", display_title(signal.title, signal.origin) if signal else None
+                "Signal linked to the investigation", display_title(signal.title, signal.origin) if signal else None
             ),
             obj=ref,
             origin=rules.origin_of(link.created_by),

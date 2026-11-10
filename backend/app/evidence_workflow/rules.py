@@ -83,7 +83,7 @@ def review_problem(review_status: str, relationship: str, reason: str | None, li
     if review_status not in REVIEWED_STATUSES:
         return f"Choose a review status: {', '.join(REVIEWED_STATUSES)}"
     if relationship not in REVIEWED_RELATIONSHIPS:
-        return f"Choose what the evidence means for the case: {', '.join(REVIEWED_RELATIONSHIPS)}"
+        return f"Choose what the evidence means for the investigation: {', '.join(REVIEWED_RELATIONSHIPS)}"
     if review_status in REASON_REQUIRED_STATUSES and len(reason or "") < REASON_MIN:
         return f"Say in at least {REASON_MIN} characters why the evidence is {review_status.lower()}"
     if review_status in LIMITATION_REQUIRED_STATUSES and not limitation:

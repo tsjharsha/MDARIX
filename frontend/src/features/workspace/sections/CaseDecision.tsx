@@ -838,7 +838,8 @@ function DecisionFormPanel({
         {current && (
           <>
             <p className="ca-note-box">
-              This case already has a signed decision ({safeText(current.business_id) ?? "the current decision"}:{" "}
+              This investigation already has a signed decision (
+              {safeText(current.business_id) ?? "the current decision"}:{" "}
               {outcomeLabel(current.outcome, current.outcome_label)}). Your decision supersedes it. The earlier signed
               record is kept unchanged.
             </p>

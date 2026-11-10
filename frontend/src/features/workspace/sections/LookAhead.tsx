@@ -145,8 +145,8 @@ export function DistributorBody({ data }: { data: DistributorPreview }) {
         </ul>
       )}
       <p className="ac-note">
-        Received: with you, not yet assessed. Under assessment: a disposition, a market assessment or a case holds it.
-        Closed: closed at service level or in your quality system.
+        Received: with you, not yet assessed. Under assessment: a disposition, a market assessment or an investigation
+        holds it. Closed: closed at service level or in your quality system.
       </p>
     </>
   );

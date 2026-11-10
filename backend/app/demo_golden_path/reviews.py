@@ -58,7 +58,7 @@ def complete_case_review(s: Story, spec) -> object:
         review_type=review_type,
         actor_ref=ines.user_id,
         actor_role=requester_role,
-        reason="The case reports repeated interruptions of therapy on a HIGH priority signal.",
+        reason="The investigation reports repeated interruptions of therapy on a HIGH priority signal.",
         due_at=requested + timedelta(days=10),
         now=requested,
     )

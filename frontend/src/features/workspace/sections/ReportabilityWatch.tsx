@@ -299,7 +299,7 @@ export function WatchCard({
         <AlsoKnownAs id={item.business_id} shown={name} />
         {item.case && (
           <p className="uw-cr-meta">
-            In case {item.case.case.business_id ?? "—"}
+            In investigation {item.case.case.business_id ?? "—"}
             {item.case.review
               ? ` · regulatory review ${item.case.review.business_id ?? ""}: ${
                   item.case.review.status === "COMPLETED"
@@ -342,7 +342,7 @@ export function WatchCard({
           </div>
         )}
         {item.settled_by_case && !item.decision && (
-          <p className="uw-cr-meta">Settled by the completed regulatory review of its case.</p>
+          <p className="uw-cr-meta">Settled by the completed regulatory review of its investigation.</p>
         )}
       </div>
       <div className="uw-cr-actions">

@@ -210,7 +210,7 @@ function ClassicInvestigations({ tab: requested }: { tab?: string }) {
     const id = String(row.id);
     if (work.investigations.some((item) => String(item.id) === id)) return openCase(id);
     if (row.business_id && (await chooseCase(work, row.business_id))) setActive("Workspace");
-    else notify(`${row.business_id ?? "This case"} could not be opened right now.`, "critical");
+    else notify(`${row.business_id ?? "This investigation"} could not be opened right now.`, "critical");
   };
   // A step of the case stepper: a tab here, a part of the workspace panel, or another section.
   const goToStep = (destination: StepDestination) => {
@@ -426,7 +426,7 @@ function ClassicInvestigations({ tab: requested }: { tab?: string }) {
                 <LotImpactPanel
                   key={`lot:${work.investigationId}:${lotRound}`}
                   investigationId={work.investigationId}
-                  caseLabel={selected ? displayId(selected, "investigation_identifier") : "this case"}
+                  caseLabel={selected ? displayId(selected, "investigation_identifier") : "this investigation"}
                   focus={lotFocus}
                   onChanged={() => setScopeRound((value) => value + 1)}
                 />
@@ -522,10 +522,10 @@ function ClassicInvestigations({ tab: requested }: { tab?: string }) {
             <CaseEvidencePanel
               key={work.investigationId}
               investigationId={work.investigationId}
-              caseLabel={selected ? displayId(selected, "investigation_identifier") : "this case"}
+              caseLabel={selected ? displayId(selected, "investigation_identifier") : "this investigation"}
             />
           ) : (
-            <NoCase detail="Case evidence belongs to one investigation. Pick one in the context bar above, or open one from the list." />
+            <NoCase detail="This evidence belongs to one investigation. Pick one in the context bar above, or open one from the list." />
           ))}
         {active === "Ask MDARIX" && (
           <Embedded>
@@ -539,9 +539,9 @@ function ClassicInvestigations({ tab: requested }: { tab?: string }) {
           (work.investigationId ? (
             <CaseRecord
               investigationId={work.investigationId}
-              caseLabel={selected ? displayId(selected, "investigation_identifier") : "this case"}
+              caseLabel={selected ? displayId(selected, "investigation_identifier") : "this investigation"}
               onTimeline={(caseId, caseLabel) =>
-                open("Trust & Audit", trustTab({ tab: "Case timeline", caseId, caseLabel }))
+                open("Trust & Audit", trustTab({ tab: "Investigation timeline", caseId, caseLabel }))
               }
             />
           ) : (
@@ -584,17 +584,17 @@ function CaseRecord({
   return (
     <Panel eyebrow="Record" title={`The record of ${caseLabel}`}>
       <p className="ac-muted">
-        Everything this case holds, from its question and evidence to its reviews, decision and audit trail, in one
-        record you can hand an inspector.
+        Everything this investigation holds, from its question and evidence to its reviews, decision and audit trail, in
+        one record you can hand an inspector.
       </p>
       {canExport ? (
         <CaseRecordDownload investigationId={investigationId} label={caseLabel} />
       ) : (
-        <p className="ac-note">Your role cannot download case records. A colleague with export rights can.</p>
+        <p className="ac-note">Your role cannot download investigation records. A colleague with export rights can.</p>
       )}
       <div className="ca-action-row">
         <button type="button" className="ac-secondary" onClick={() => onTimeline(investigationId, caseLabel)}>
-          Open the case timeline
+          Open the investigation timeline
         </button>
       </div>
     </Panel>
@@ -609,7 +609,7 @@ function ReviewOnly({ reviewId }: { reviewId: string }) {
       <Panel title="No investigation selected">
         <Empty
           title="Choose an investigation"
-          detail="Pick the review's case in the context bar above to see all of its reviews."
+          detail="Pick the review's investigation in the context bar above to see all of its reviews."
         />
       </Panel>
       {open && <ReviewDrawer reviewId={reviewId} onClose={() => setOpen(false)} onChanged={() => undefined} />}
@@ -654,7 +654,7 @@ export function Capas() {
           },
           {
             key: "case",
-            label: "From case",
+            label: "From investigation",
             fields: ["investigation_business_id", "source_reference"],
             render: (row) =>
               referenceId(row, "investigation", caseName.get(String(row.investigation_id)), row.source_reference),
@@ -962,7 +962,7 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
             </button>
             {!canClose && <span className="uw-hint">Closing is blocked until the criteria above pass.</span>}
           </div>
-          <p className="ac-muted">A case with a decision still awaiting its human review cannot be closed.</p>
+          <p className="ac-muted">An investigation with a decision still awaiting its human review cannot be closed.</p>
         </>
       )}
       {error && (

@@ -531,7 +531,7 @@ def set_user_roles(
             422,
             detail={
                 "code": ROLE_NOT_ALLOWED[0],
-                "message": "Administrator accounts cannot hold workflow roles; use a separate account for case work",
+                "message": "Administrator accounts cannot hold workflow roles; use a separate account for investigation work",
             },
         )
     wanted: list[str] = []

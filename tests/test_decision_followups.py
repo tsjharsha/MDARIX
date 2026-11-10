@@ -747,7 +747,7 @@ def test_late_evidence_asks_for_one_impact_assessment_and_never_changes_the_deci
     items = listed.json()["items"]
     assert len(items) == 3 and items[0]["evidence"]["id"] == answer
     oldest = items[-1]
-    assert oldest["trigger"] == "EVIDENCE_LINKED" and oldest["trigger_label"] == "Evidence linked to the case"
+    assert oldest["trigger"] == "EVIDENCE_LINKED" and oldest["trigger_label"] == "Evidence linked to the investigation"
     assert oldest["evidence"] == {
         "id": loose,
         "business_id": oldest["evidence"]["business_id"],

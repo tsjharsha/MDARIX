@@ -73,7 +73,7 @@ def _tenant(ctx: AuthenticatedRequestContext) -> uuid.UUID:
 
 def _refuse_closed(case: Investigation) -> None:
     if states.case_state(case) in states.CLOSED_STATES:
-        raise error(409, "CASE_CLOSED", "The case is closed; its brief can no longer change")
+        raise error(409, "CASE_CLOSED", "The investigation is closed; its brief can no longer change")
 
 
 def _versions(db: Session, case: Investigation) -> list[DecisionBriefVersion]:
@@ -113,7 +113,7 @@ def _latest(db: Session, case: Investigation, *, lock: bool = False) -> Decision
 def _draft(db: Session, case: Investigation) -> DecisionBriefVersion:
     row = _latest(db, case, lock=True)
     if row is None:
-        raise error(404, "BRIEF_NOT_FOUND", "This case has no brief yet")
+        raise error(404, "BRIEF_NOT_FOUND", "This investigation has no brief yet")
     if row.status != rules.DRAFT:
         raise error(
             409,
@@ -378,7 +378,9 @@ def _ai_draft(db: Session, case: Investigation) -> tuple[dict, uuid.UUID, list[s
     text = rules.ai_draft_text(brief.content if brief is not None else None)
     if brief is None or not text:
         raise error(
-            409, "AI_DRAFT_NOT_AVAILABLE", "This case has no generated brief to start from; write the narrative"
+            409,
+            "AI_DRAFT_NOT_AVAILABLE",
+            "This investigation has no generated brief to start from; write the narrative",
         )
     return (
         {
@@ -565,7 +567,7 @@ def submit_decision_brief(
         raise error(
             409,
             "CASE_NOT_OPEN_FOR_BRIEF",
-            f"The case is {states.state_label(states.case_state(case)).lower()}; a brief can no longer be submitted",
+            f"The investigation is {states.state_label(states.case_state(case)).lower()}; a brief can no longer be submitted",
         )
     row = _draft(db, case)
     narrative = rules.normalize_narrative(row.narrative)
@@ -841,7 +843,7 @@ def _request_review(
         from backend.app.case_reviews.router import request_review_and_task
     except ImportError:
         logger.warning("Case reviews are not available; no %s review was requested", review_type)
-        return {"review_type": review_type, "requested": False, "reason": "Case reviews are not available"}
+        return {"review_type": review_type, "requested": False, "reason": "Investigation reviews are not available"}
     brief_version_id = row.id
 
     def link_to_brief(review) -> None:

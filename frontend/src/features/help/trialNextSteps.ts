@@ -132,7 +132,7 @@ export const CUSTOMER_ADMINISTRATOR = {
     "Manages the connections to your systems and approves data mapping releases",
     "Sets security settings and exports the audit trail",
   ],
-  note: "The Customer Administrator never signs decisions. If the same person also investigates, they use a second account for case work.",
+  note: "The Customer Administrator never signs decisions. If the same person also investigates, they use a second account for investigation work.",
 } as const;
 
 export const WHAT_WE_NEED = {

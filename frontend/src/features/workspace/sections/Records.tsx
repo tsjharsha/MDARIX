@@ -518,8 +518,8 @@ function EffectivenessBoard({ initialCapa }: { initialCapa: string | null }) {
         <Pager page={page} pages={board.data?.pages ?? 1} onPage={setPage} />
         <p className="ac-note">
           The complaint recurrence before and after the action is counted from your records on the CAPA&apos;s product
-          and its case&apos;s problem codes; it is not a statistical test. The person signing judges against the
-          criteria.
+          and its investigation&apos;s problem codes; it is not a statistical test. The person signing judges against
+          the criteria.
         </p>
         <BasisLine ids={EFFECTIVENESS_BASIS} />
       </Panel>
@@ -540,7 +540,7 @@ export function CapaCard({ item, onOpen }: { item: CapaItem; onOpen: () => void 
           <strong className="uw-cr-id">{ref}</strong>
           <span className="uw-cr-meta">
             {item.capa.product_name ?? "No product"}
-            {item.capa.investigation?.business_id ? ` · case ${item.capa.investigation.business_id}` : ""}
+            {item.capa.investigation?.business_id ? ` · investigation ${item.capa.investigation.business_id}` : ""}
             {capaQmsText(item.capa) ? ` · ${capaQmsText(item.capa)}` : ""}
           </span>
           <ToneBadge tone={state.tone} label={state.label} />
@@ -689,7 +689,7 @@ export function CheckBody({ detail, onChanged }: { detail: CapaDetail; onChanged
         </h3>
         <p className="uw-cr-meta">
           {detail.capa.product_name ?? "No product"}
-          {detail.capa.investigation?.business_id ? ` · case ${detail.capa.investigation.business_id}` : ""}
+          {detail.capa.investigation?.business_id ? ` · investigation ${detail.capa.investigation.business_id}` : ""}
           {detail.capa.due_on ? ` · action due ${formatDay(detail.capa.due_on)}` : ""}
         </p>
         {detail.plan_source === "SOURCE_SYSTEM" && (
@@ -905,7 +905,7 @@ export function CheckBody({ detail, onChanged }: { detail: CapaDetail; onChanged
               open("Investigations", "Workspace");
             }}
           >
-            <FileSearch size={15} aria-hidden="true" /> Go to the case
+            <FileSearch size={15} aria-hidden="true" /> Go to the investigation
           </button>
         </div>
       )}

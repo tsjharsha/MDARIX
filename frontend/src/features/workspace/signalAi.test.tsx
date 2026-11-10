@@ -253,7 +253,7 @@ describe("the case AI run", () => {
       "MIXED",
     );
     expect(runHeadline(null).title).toBe("The AI analysis has not run yet");
-    expect(runHeadline(run({ status: "RUNNING" })).title).toBe("Analysing the case… 2 of 3 steps done");
+    expect(runHeadline(run({ status: "RUNNING" })).title).toBe("Analysing the investigation… 2 of 3 steps done");
     expect(runHeadline(run())).toMatchObject({
       title: "AI analysis ready: judge each explanation below",
       tone: "good",

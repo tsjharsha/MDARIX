@@ -151,7 +151,7 @@ export const structuredOf = (result: unknown): StructuredAnswer | null =>
 export function answerOriginText(answer: StructuredAnswer | null | undefined): string | null {
   if (!answer || answer.aiUsed === null) return null;
   return answer.aiUsed
-    ? "AI interpretation of your records — review before relying on it"
+    ? "AI interpretation of your records: review before relying on it"
     : "Answer built from your records (AI not used)";
 }
 

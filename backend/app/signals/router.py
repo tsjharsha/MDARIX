@@ -829,7 +829,9 @@ def _assignee(control_db: Session, tenant_id, user_id):
     person = find_user(control_db, tenant_id, user_id)
     if person is None or _is_platform_role(person.role) or not _can_work_cases(control_db, person):
         raise _error(
-            422, "ASSIGNEE_NOT_ELIGIBLE", "Assign the case to an active colleague whose role may work on cases"
+            422,
+            "ASSIGNEE_NOT_ELIGIBLE",
+            "Assign the investigation to an active colleague whose role may work on investigations",
         )
     return person
 
@@ -853,7 +855,7 @@ def create_investigation(
     return _open_case_from_signal(signal_id, payload, db, control_db, ctx)
 
 
-ONE_CLICK_REASON = "Investigation required: a case was opened from this signal in one step"
+ONE_CLICK_REASON = "Investigation required: an investigation was opened from this signal in one step"
 
 
 class OpenCaseRequest(BaseModel):

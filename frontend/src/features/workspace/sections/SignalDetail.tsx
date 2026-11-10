@@ -213,7 +213,7 @@ function SignalBody({
       );
       const kase = result?.investigation;
       notify(
-        `${safeText(kase?.business_id) ?? "The case"} was opened for ${name}${result?.triaged ? " and the signal triaged as needing an investigation" : ""}.`,
+        `${safeText(kase?.business_id) ?? "The investigation"} was opened for ${name}${result?.triaged ? " and the signal triaged as needing an investigation" : ""}.`,
       );
       if (kase?.id && casesAllowed) openCase(kase);
       else {
@@ -261,7 +261,7 @@ function SignalBody({
           {safeText(created.business_id) ?? "The investigation"} was opened for {name}.
           {casesAllowed && created.id && (
             <button type="button" className="ac-primary" onClick={() => openCase(created)}>
-              <FileSearch size={16} aria-hidden="true" /> Open the case
+              <FileSearch size={16} aria-hidden="true" /> Open the investigation
             </button>
           )}
         </div>
@@ -411,7 +411,7 @@ function SignalBody({
                   <StatusBadge value={kase.status} />
                   {casesAllowed && (
                     <button type="button" className="ac-link" onClick={() => openCase(kase)}>
-                      Open the case
+                      Open the investigation
                     </button>
                   )}
                 </li>
@@ -1104,7 +1104,7 @@ function InvestigationDrawer({
         </label>
         <fieldset className="ca-fieldset uw-pick-fieldset">
           <legend>
-            Complaints for the case · {form.complaintIds.length} of {complaints.length}
+            Complaints for the investigation · {form.complaintIds.length} of {complaints.length}
           </legend>
           <ul className="uw-pick-list" aria-label="Complaints for the investigation">
             {complaints.map((row) => (
@@ -1171,7 +1171,7 @@ function InvestigationDrawer({
           </fieldset>
         )}
         <label className="ca-field">
-          Your reference for the case (optional)
+          Your reference for the investigation (optional)
           <input
             maxLength={64}
             value={form.identifier}

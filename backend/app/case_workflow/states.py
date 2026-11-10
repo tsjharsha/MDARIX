@@ -109,16 +109,16 @@ def transition_refusal(current: str, to_state: str) -> str | None:
     current = str(current or "").upper()
     target = str(to_state or "").upper()
     if target not in INVESTIGATION_STATES:
-        return "That is not a state a case can be in"
+        return "That is not a state an investigation can be in"
     if target in RESERVED_STATES:
-        return f"A case becomes {STATE_LABELS[target].lower()} through its brief and decision, not by hand"
+        return f"An investigation becomes {STATE_LABELS[target].lower()} through its brief and decision, not by hand"
     if target == "CLOSED":
-        return "Close a case from its management, with a reason"
+        return "Close an investigation from its management, with a reason"
     if target == current:
-        return f"The case is already {STATE_LABELS.get(current, current).lower()}"
+        return f"The investigation is already {STATE_LABELS.get(current, current).lower()}"
     if target not in TRANSITIONS.get(current, ()):
         return (
-            f"A case that is {STATE_LABELS.get(current, current).lower()} cannot be moved to "
+            f"An investigation that is {STATE_LABELS.get(current, current).lower()} cannot be moved to "
             f"{STATE_LABELS[target].lower()}"
         )
     return None

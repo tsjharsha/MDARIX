@@ -296,7 +296,7 @@ CONTENT_CHECK = {
     "key": "content_complete",
     "label": "The brief could be composed",
     "result": "BLOCKED",
-    "rationale": "Some records of the case could not be read; refresh the brief and try again",
+    "rationale": "Some records of the investigation could not be read; refresh the brief and try again",
 }
 
 
@@ -430,7 +430,7 @@ def alternative_hypotheses(hypotheses: Iterable[dict], leading: dict | None) -> 
 # ----------------------------------------------------------------------------------------------- AI disclosure
 
 AI_KIND_LABELS: dict[str, str] = {
-    "mdarix-controlled-investigator": "Case analysis",
+    "mdarix-controlled-investigator": "Investigation analysis",
     "mdarix-controlled-hypothesis-engine": "Hypotheses",
     "mdarix-controlled-ai-challenger": "Challenge of the hypotheses",
     "mdarix-controlled-failure-chain": "Failure chain",
@@ -438,7 +438,7 @@ AI_KIND_LABELS: dict[str, str] = {
     "deterministic-r1": "Rule-based analysis",
 }
 AI_JUDGEMENT_SENTENCE = "Every AI statement is labelled AI interpretation; people made the judgements."
-NO_AI_STATEMENT = "No AI was used in this case. People made the judgements."
+NO_AI_STATEMENT = "No AI was used in this investigation. People made the judgements."
 
 
 def ai_kind(provider: str | None, prompt_template_version: str | None = None) -> str:
@@ -458,7 +458,9 @@ def ai_statement(executions: list[dict], *, ai_draft_used: bool = False) -> str:
         models = sorted({str(item.get("model") or "") for item in executions if item.get("model")})
         run_text = f"{len(executions)} AI run" + ("" if len(executions) == 1 else "s")
         parts.append(
-            f"{run_text} ({', '.join(kinds)})" + (f" with {', '.join(models)}" if models else "") + " in this case"
+            f"{run_text} ({', '.join(kinds)})"
+            + (f" with {', '.join(models)}" if models else "")
+            + " in this investigation"
         )
     if ai_draft_used:
         parts.append("the author started the narrative from an AI draft")

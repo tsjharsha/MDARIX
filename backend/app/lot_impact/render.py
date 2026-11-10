@@ -83,7 +83,7 @@ def header_lines(view: dict, organization: str | None) -> list[str]:
     factor = view["list"]["factor"]
     lines = [
         f"Organization: {organization or '-'}",
-        f"Case: {view['investigation']['business_id'] or view['investigation']['id']}",
+        f"Investigation: {view['investigation']['business_id'] or view['investigation']['id']}",
         f"Suspect factor ({factor['kind_label'].lower()}): {factor['label']}",
         f"List: {view['which_label']}",
     ]

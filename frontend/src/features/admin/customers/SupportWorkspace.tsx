@@ -99,7 +99,7 @@ const COLUMNS: Record<string, Column<Row>[]> = {
     { key: "description", label: "Description", render: (row) => short(row.description) },
   ],
   investigations: [
-    { key: "case", label: "Case", render: recordCell },
+    { key: "case", label: "Investigation", render: recordCell },
     { key: "question", label: "Question", render: (row) => short(row.question, 120) },
     { key: "product", label: "Product", render: (row) => row.product ?? "—" },
     { key: "state", label: "State", render: (row) => titleCase(row.state ?? "—") },
@@ -109,7 +109,7 @@ const COLUMNS: Record<string, Column<Row>[]> = {
   ],
   decisions: [
     { key: "decision", label: "Decision", render: recordCell },
-    { key: "case", label: "Case", render: (row) => row.investigation ?? "—" },
+    { key: "case", label: "Investigation", render: (row) => row.investigation ?? "—" },
     { key: "outcome", label: "Outcome", render: (row) => titleCase(row.outcome ?? "—") },
     { key: "status", label: "Status", render: (row) => titleCase(row.status ?? "—") },
     { key: "by", label: "Decided by", render: (row) => row.decided_by ?? "—" },

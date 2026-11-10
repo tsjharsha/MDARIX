@@ -536,7 +536,7 @@ def story_view(
         "causality_state": "NOT_ESTABLISHED",
         "limitations": [
             "The story view is a traceability view; relationships are not causal conclusions.",
-            "A stage is AVAILABLE when the case has records for it; only a signed decision is COMPLETE.",
+            "A stage is AVAILABLE when the investigation has records for it; only a signed decision is COMPLETE.",
         ],
     }
 

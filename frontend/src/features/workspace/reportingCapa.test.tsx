@@ -247,7 +247,7 @@ describe("CAPA effectiveness", () => {
     expect(markup).toContain("CAPA000012");
     expect(markup).toContain("No check planned");
     expect(markup).toContain("Closed without an effectiveness check");
-    expect(markup).toContain("case INV000147");
+    expect(markup).toContain("investigation INV000147");
   });
 
   it("says when only the date came from the quality system", () => {

@@ -41,10 +41,10 @@ STATUS_LABELS: dict[str, str] = {
 OPEN_FOLLOW_UP_STATUSES = ("OPEN", "IN_PROGRESS")
 
 TRIGGER_LABELS: dict[str, str] = {
-    "EVIDENCE_LINKED": "Evidence linked to the case",
+    "EVIDENCE_LINKED": "Evidence linked to the investigation",
     "EVIDENCE_REVIEWED": "Evidence reviewed",
     "EVIDENCE_REQUEST_ACCEPTED": "Evidence request answer accepted",
-    "EVIDENCE_INGESTED": "Evidence received for the case",
+    "EVIDENCE_INGESTED": "Evidence received for the investigation",
 }
 CONCLUSION_LABELS: dict[str, str] = {
     "NO_IMPACT": "No impact on the decision",
@@ -104,9 +104,9 @@ PASS = "PASS"
 BLOCKED = "BLOCKED"
 NOT_REQUIRED = "NOT_REQUIRED"
 CLOSURE_LABELS: dict[str, str] = {
-    "CASE_OPEN": "The case is open",
+    "CASE_OPEN": "The investigation is open",
     "DECISIONS_REVIEWED": "No decision awaits its human review",
-    "SIGNED_DECISION": "A signed decision that lets the case close",
+    "SIGNED_DECISION": "A signed decision that lets the investigation close",
     "IMPACT_ASSESSMENTS": "Late evidence assessed",
     "CASE_REVIEWS": "Risk and regulatory reviews finished",
     "EVIDENCE_REQUESTS": "No urgent evidence request open",
@@ -328,14 +328,16 @@ def closure_criteria(facts: dict) -> list[dict]:
     of the decision), ``recorded`` (its follow-ups: ``action_type``, ``has_task``) and ``reason`` (the closing
     reason; None when not given yet). A case outside the Decision Brief flow keeps today's two rules."""
     criteria = [
-        _criterion("CASE_OPEN", BLOCKED, "The case is already closed")
+        _criterion("CASE_OPEN", BLOCKED, "The investigation is already closed")
         if facts.get("closed")
-        else _criterion("CASE_OPEN", PASS, "The case is open"),
+        else _criterion("CASE_OPEN", PASS, "The investigation is open"),
         _criterion(
-            "DECISIONS_REVIEWED", BLOCKED, "A decision on this case still awaits its human review; finish it first"
+            "DECISIONS_REVIEWED",
+            BLOCKED,
+            "A decision on this investigation still awaits its human review; finish it first",
         )
         if facts.get("awaiting_review")
-        else _criterion("DECISIONS_REVIEWED", PASS, "No decision on this case awaits its human review"),
+        else _criterion("DECISIONS_REVIEWED", PASS, "No decision on this investigation awaits its human review"),
     ]
     if not facts.get("applies"):
         return criteria
@@ -347,7 +349,7 @@ def closure_criteria(facts: dict) -> list[dict]:
             _criterion(
                 "SIGNED_DECISION",
                 BLOCKED,
-                f"Decision {decision.get('business_id')} rejects the conclusion; the case needs more work and a new "
+                f"Decision {decision.get('business_id')} rejects the conclusion; the investigation needs more work and a new "
                 "decision",
             )
         )
@@ -384,7 +386,9 @@ def closure_criteria(facts: dict) -> list[dict]:
     criteria.append(_follow_up_criterion(decision, list(facts.get("chosen") or ()), list(facts.get("recorded") or ())))
     reason = facts.get("reason")
     if reason is None:
-        criteria.append(_criterion("CLOSURE_REASON", PASS, "Give the reason for closing when you close the case"))
+        criteria.append(
+            _criterion("CLOSURE_REASON", PASS, "Give the reason for closing when you close the investigation")
+        )
     elif len(str(reason).strip()) < REASON_MIN:
         criteria.append(
             _criterion("CLOSURE_REASON", BLOCKED, f"Give a reason for closing of at least {REASON_MIN} characters")

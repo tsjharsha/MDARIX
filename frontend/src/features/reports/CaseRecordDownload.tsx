@@ -29,9 +29,9 @@ export function CaseRecordDownload({ investigationId, label }: { investigationId
       const name = await downloadFile(recordPath(investigationId, format), {
         fallbackName: `${label || "investigation"}-record.${format}`,
       });
-      setResult({ ok: true, text: `Case record downloaded as ${name}.` });
+      setResult({ ok: true, text: `Investigation record downloaded as ${name}.` });
     } catch (reason) {
-      setResult({ ok: false, text: describeError(reason, "The case record could not be downloaded.") });
+      setResult({ ok: false, text: describeError(reason, "The investigation record could not be downloaded.") });
     } finally {
       setBusy(null);
     }
@@ -46,7 +46,7 @@ export function CaseRecordDownload({ investigationId, label }: { investigationId
           className="ac-secondary"
           disabled={busy !== null}
           onClick={() => void download(format)}
-          aria-label={`Download case record as ${name}`}
+          aria-label={`Download investigation record as ${name}`}
         >
           <Download size={14} aria-hidden="true" /> {busy === format ? "Preparing…" : name}
         </button>

@@ -395,9 +395,12 @@ def _case(context):
     if case is None:
         return None
     return (
-        f"Case {case.business_id or case.investigation_identifier}: {case.workflow_state.replace('_', ' ').lower()}",
+        f"Investigation {case.business_id or case.investigation_identifier}: {case.workflow_state.replace('_', ' ').lower()}",
         _source(
-            "Case", case.business_id or case.investigation_identifier, "The case that holds this complaint", case.id
+            "Case",
+            case.business_id or case.investigation_identifier,
+            "The investigation that holds this complaint",
+            case.id,
         ),
     )
 
@@ -412,7 +415,9 @@ def _capas(context):
         for capa in context["capas"]
     )
     case = context["case"]
-    return text, _source("Capa", case.business_id or case.investigation_identifier, "The CAPAs of the case", case.id)
+    return text, _source(
+        "Capa", case.business_id or case.investigation_identifier, "The CAPAs of the investigation", case.id
+    )
 
 
 # A version that reads as a software version number ("2.1", "v1.4.2", "1.4.2+build"); "Rev B" does not.

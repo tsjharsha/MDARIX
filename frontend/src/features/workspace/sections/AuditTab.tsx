@@ -70,7 +70,7 @@ function Signatures({ decisionId }: { decisionId: string }) {
     status === "VALID"
       ? "All signatures valid"
       : status === "INVALID"
-        ? "Invalid — a signature does not match"
+        ? "Invalid: a signature does not match"
         : status === "NOT_SIGNED"
           ? "Not signed"
           : titleCase(status || "Unknown");

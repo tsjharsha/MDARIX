@@ -5,13 +5,14 @@ import { displayId } from "../../../app/displayId";
 import { EvidenceAccessView } from "../../investigator/EvidenceAccessView";
 import { useWorkspace } from "../workspaceContext";
 import { parseRequestTab } from "../evidenceWorkflow";
+import { currentTab } from "../../../app/linkTable";
 import { Embedded, NeedsProduct, ProvenanceTable, RecordTable } from "./common";
 import { Limitations } from "./Products";
 import { CaseEvidencePanel } from "./CaseEvidence";
 import { EvidenceRequestsPanel } from "./EvidenceRequests";
 
 const TABS = [
-  "Case evidence",
+  "Investigation evidence",
   "Requests",
   "Evidence library",
   "Product evidence",
@@ -20,7 +21,7 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number];
 
-/** A tab that needs a selected case says so while none is chosen. */
+/** A tab that needs a selected investigation says so while none is chosen. */
 function NeedsCase({ detail, children }: { detail: string; children: (id: string, label: string) => React.ReactNode }) {
   const { work } = useWorkspace();
   if (!work.investigationId)
@@ -30,20 +31,20 @@ function NeedsCase({ detail, children }: { detail: string; children: (id: string
       </Panel>
     );
   const selected = work.investigations.find((item) => String(item.id) === work.investigationId);
-  return <>{children(work.investigationId, displayId(selected, "investigation_identifier", "this case"))}</>;
+  return <>{children(work.investigationId, displayId(selected, "investigation_identifier", "this investigation"))}</>;
 }
 
 export function EvidenceSection({ tab }: { tab?: string }) {
-  // A tab may name a request to open ("Requests?request=…").
-  const [target] = useState(() => parseRequestTab(tab));
+  // A tab may name a request to open ("Requests?request=…"); a former tab name opens the tab that replaced it.
+  const [target] = useState(() => parseRequestTab(currentTab("Evidence", tab)));
   const [active, setActive] = useState<Tab>(
-    (TABS as readonly string[]).includes(target.tab) ? (target.tab as Tab) : "Case evidence",
+    (TABS as readonly string[]).includes(target.tab) ? (target.tab as Tab) : "Investigation evidence",
   );
   return (
     <>
       <Tabs tabs={TABS} active={active} onChange={setActive} label="Evidence sections">
-        {active === "Case evidence" && (
-          <NeedsCase detail="Case evidence belongs to one investigation. Pick one in the context bar above.">
+        {active === "Investigation evidence" && (
+          <NeedsCase detail="This evidence belongs to one investigation. Pick one in the context bar above.">
             {(id, label) => <CaseEvidencePanel key={id} investigationId={id} caseLabel={label} />}
           </NeedsCase>
         )}

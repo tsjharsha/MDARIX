@@ -81,7 +81,7 @@ SOURCE_LABELS: dict[str, str] = {
     # A version of a case's controlled Decision Brief (Phase 5): its quality review and decision tasks.
     "DecisionBriefVersion": "Decision brief",
     # A risk or regulatory review of a case (Phase 5): its reviewers' queue task and the owner's follow-up.
-    "CaseReview": "Case review",
+    "CaseReview": "Investigation review",
     # Evidence that reached a case after its decision was signed (Phase 6): the owner's impact assessment task.
     "ImpactAssessment": "Impact assessment",
     # A follow-up action chosen while signing a decision (Phase 6): its owner's FOLLOW_UP task.

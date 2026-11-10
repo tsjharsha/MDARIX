@@ -52,8 +52,8 @@ export function TrustSection({ tab }: { tab?: string }) {
         {caseTab && opened && opened.id !== work.investigationId && (
           <p className="ac-note" role="status">
             {mvp
-              ? "Opened from a decision: not the case you have open."
-              : "Opened from a decision. The context bar above still shows another case."}
+              ? "Opened from a decision: not the investigation you have open."
+              : "Opened from a decision. The context bar above still shows another investigation."}
           </p>
         )}
         {caseTab && !caseId && (
@@ -63,8 +63,8 @@ export function TrustSection({ tab }: { tab?: string }) {
               title="Choose an investigation"
               detail={
                 mvp
-                  ? "The case timeline, replay, AI runs and integrity checks belong to an investigation. Open one in Investigations, then its Record step's timeline."
-                  : "The case timeline, replay, AI runs and integrity checks belong to an investigation. Pick one in the context bar above."
+                  ? "The investigation timeline, replay, AI runs and integrity checks belong to an investigation. Open one in Investigations, then its Record step's timeline."
+                  : "The investigation timeline, replay, AI runs and integrity checks belong to an investigation. Pick one in the context bar above."
               }
               action={
                 mvp ? (
@@ -76,7 +76,7 @@ export function TrustSection({ tab }: { tab?: string }) {
             />
           </Panel>
         )}
-        {active === "Case timeline" && caseId && (
+        {active === "Investigation timeline" && caseId && (
           <CaseTimeline key={caseId} investigationId={caseId} caseLabel={caseLabel} onOpenDecision={setRecordId} />
         )}
         {active === "Replay" && caseId && (

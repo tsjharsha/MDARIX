@@ -155,7 +155,7 @@ describe("the investigation stepper", () => {
   it("opens each step where its work is done", () => {
     const at = (key: string) => caseSteps(null).find((step) => step.key === key)?.destination;
     expect(at("scope")).toEqual({ section: "Investigations", tab: "Scope" });
-    expect(at("evidence")).toEqual({ section: "Evidence", tab: "Case evidence" });
+    expect(at("evidence")).toEqual({ section: "Evidence", tab: "Investigation evidence" });
     expect(at("analysis")).toEqual({ section: "Investigations", tab: "Workspace", anchor: "workflow-analysis" });
     expect(at("hypotheses")).toEqual({ section: "Investigations", tab: "Intelligence", view: "Hypotheses" });
     expect(at("gaps")).toEqual({ section: "Investigations", tab: "Intelligence", view: "Unknowns" });
@@ -232,7 +232,7 @@ describe("my investigations", () => {
     expect(tiles.find((tile) => tile.key === "on_hold")?.value).toBeNull();
     expect(tiles.find((tile) => tile.key === "unreviewed_evidence")?.target).toEqual({
       section: "Evidence",
-      tab: "Case evidence",
+      tab: "Investigation evidence",
     });
     expect(tiles.find((tile) => tile.key === "requests_waiting")?.target).toEqual({
       section: "My Work",

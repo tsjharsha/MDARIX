@@ -74,7 +74,7 @@ export function AiOffNote({
 /** What "How MDARIX checks AI output" says while AI cannot run: "AI is off for free trials, so there is no AI output on
  * this case to check." (DEV-010). */
 export const noAiOutputText = (banner: Pick<AiBanner, "shortReason">) =>
-  `${banner.shortReason}, so there is no AI output on this case to check.`;
+  `${banner.shortReason}, so there is no AI output on this investigation to check.`;
 
 export function InvestigationTabSummary({
   activeTab,
@@ -104,7 +104,8 @@ export function InvestigationTabSummary({
   const summaries: Record<string, { title: string; description: string; count: string; state: string }> = {
     overview: {
       title: "Investigation overview",
-      description: "This case's product, evidence and linked records, and what still needs a person's decision.",
+      description:
+        "This investigation's product, evidence and linked records, and what still needs a person's decision.",
       count: `${workspace?.evidence_context.length ?? 0} pieces of evidence`,
       state: workspace ? "Ready" : "Loading…",
     },
@@ -164,7 +165,7 @@ export function InvestigationTabSummary({
     },
     decision: {
       title: "Decision readiness",
-      description: "Prepare the case for an authorized reviewer; MDARIX never makes the regulated decision.",
+      description: "Prepare the investigation for an authorized reviewer; MDARIX never makes the regulated decision.",
       count: "Human authority",
       state: decisionLabel,
     },
@@ -650,7 +651,7 @@ export function InvestigationWorkspacePanel({
       {error && <div className="error inline">{error}</div>}
       {workspace && (
         <div id="workflow-overview" className="workspace-grid">
-          <Panel title="Case at a glance" icon={<ShieldCheck />}>
+          <Panel title="Investigation at a glance" icon={<ShieldCheck />}>
             <div className="context-health">
               <Metric icon={<FileText />} label="Evidence" value={workspace.evidence_context.length} />
               <Metric
@@ -811,7 +812,7 @@ export function InvestigationWorkspacePanel({
                       <p>{chain.chain_statement}</p>
                       {chain.links.map((link) => (
                         <small key={link.link_id}>
-                          {link.from_entity_or_state} — {link.relationship} → {link.to_entity_or_state} [
+                          {link.from_entity_or_state}: {link.relationship} → {link.to_entity_or_state} [
                           {link.epistemic_status}]
                         </small>
                       ))}
@@ -948,8 +949,12 @@ export function InvestigationWorkspacePanel({
             <ShieldCheck size={18} /> How MDARIX checks AI output
           </summary>
           <ul className="guardrail-list">
-            <li>Every statement must point to a record of this case; a statement without a source is flagged.</li>
-            <li>It stays within this case's product, version and point in time, and within your organization.</li>
+            <li>
+              Every statement must point to a record of this investigation; a statement without a source is flagged.
+            </li>
+            <li>
+              It stays within this investigation's product, version and point in time, and within your organization.
+            </li>
             <li>AI never states a root cause or a regulatory conclusion: your team decides, and a person signs.</li>
             <li>No made-up confidence scores; the checks of each AI run are saved with it for the audit trail.</li>
           </ul>
@@ -965,7 +970,7 @@ export function InvestigationWorkspacePanel({
         <h3>Decision readiness</h3>
         <p>
           {trial ? "AI is off in the free trial. " : "AI outputs inform the workflow. "}Authorized humans record
-          decisions {mvp ? "on this case's Decision tab" : "in the Decision Center"}.
+          decisions {mvp ? "on this investigation's Decision tab" : "in the Decision Center"}.
         </p>
         <button className="primary-action" onClick={onOpenDecision}>
           {decisionLabel}

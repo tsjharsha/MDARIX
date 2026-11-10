@@ -61,9 +61,9 @@ function MyInvestigations() {
           ))}
       </div>
       {ready && cases.length > 0 && (
-        <ul className="uw-list uw-my-cases" aria-label="Your cases">
+        <ul className="uw-list uw-my-cases" aria-label="Your investigations">
           {cases.map((row) => {
-            const name = safeText(row.business_id) ?? "Case";
+            const name = safeText(row.business_id) ?? "Investigation";
             const extras = [
               row.unreviewed_evidence
                 ? `${row.unreviewed_evidence} evidence ${row.unreviewed_evidence === 1 ? "item" : "items"} to review`
@@ -103,10 +103,10 @@ function MyInvestigations() {
                     <button
                       type="button"
                       className="ac-link"
-                      aria-label={`Open the case evidence of ${name}`}
-                      onClick={go(row, "Evidence", "Case evidence")}
+                      aria-label={`Open the investigation evidence of ${name}`}
+                      onClick={go(row, "Evidence", "Investigation evidence")}
                     >
-                      Case evidence
+                      Investigation evidence
                     </button>
                   )}
                   {can("Investigations") && (
@@ -126,7 +126,7 @@ function MyInvestigations() {
         </ul>
       )}
       {ready && !cases.length && (
-        <Empty title="No cases assigned to you" detail="Investigations you own or work on appear here." />
+        <Empty title="No investigations assigned to you" detail="Investigations you own or work on appear here." />
       )}
     </Panel>
   );

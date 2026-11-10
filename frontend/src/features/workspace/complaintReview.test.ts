@@ -182,7 +182,9 @@ describe("the backlog board", () => {
     expect(backlogHeadline({ ...base, open_unlinked: 0, past_target: 0, due_soon: 0 }).tone).toBe("good");
     const past = backlogHeadline({ ...base, open_unlinked: 3, past_target: 1, due_soon: 1 });
     expect(past).toMatchObject({ title: "1 complaint past the 30-day target", tone: "critical" });
-    expect(past.detail).toContain("3 open complaints are in no signal and no case; 1 more is due within a week");
+    expect(past.detail).toContain(
+      "3 open complaints are in no signal and no investigation; 1 more is due within a week",
+    );
     expect(backlogHeadline({ ...base, open_unlinked: 2, past_target: 0, due_soon: 2 })).toMatchObject({
       title: "2 complaints due within a week",
       tone: "warning",

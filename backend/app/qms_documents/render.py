@@ -18,7 +18,7 @@ from backend.app.qms_documents.templates import WRITTEN_BY_MANUFACTURER
 REFS_PER_LINE = 12
 SOURCE_LABELS = {
     "Capa": "CAPAs",
-    "Case": "Cases",
+    "Case": "Investigations",
     "CaseReview": "Risk reviews",
     "Change": "Change records",
     "Complaint": "Complaints",

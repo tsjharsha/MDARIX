@@ -832,7 +832,7 @@ export function queueRow(value: DecisionQueueItem | Record<string, unknown> | nu
       safeText(investigation.business_id) ??
       safeText(item.investigation_business_id) ??
       safeText(item.case_business_id) ??
-      "Case",
+      "Investigation",
     question: safeText(investigation.question) ?? safeText(item.question),
     product: safeText(product.name) ?? safeText(product.business_id),
     priority: safeText(investigation.priority) ?? safeText(item.priority),

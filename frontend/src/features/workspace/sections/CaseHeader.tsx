@@ -144,7 +144,7 @@ export function CaseHeader({
           <CaseProgressLine steps={readiness.data ? steps : []} onSection={onSection} />
         </CaseHighlights>
       ) : (
-        <Panel eyebrow="Case" title={label} action={<CaseStateBadge row={current} />}>
+        <Panel eyebrow="Investigation" title={label} action={<CaseStateBadge row={current} />}>
           <p className="uw-case-question">{safeText(current.investigation_question) ?? "No question recorded."}</p>
           <dl className="ca-facts">
             <div>

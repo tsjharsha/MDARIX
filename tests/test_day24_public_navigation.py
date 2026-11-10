@@ -86,7 +86,7 @@ def test_authenticated_home_tells_and_connects_the_workflow_story():
         "/api/v1/analytics/evidence",
     ):
         assert endpoint in WORKSPACE_OVERVIEW
-    for phrase in ("Needs attention", "What to do next", "Open cases", "Latest signals"):
+    for phrase in ("Needs attention", "What to do next", "Open investigations", "Latest signals"):
         assert phrase in WORKSPACE_OVERVIEW
     assert 'open("Investigations")' in WORKSPACE_OVERVIEW
     assert 'open("Evidence")' in WORKSPACE_OVERVIEW

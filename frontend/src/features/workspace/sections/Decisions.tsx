@@ -69,7 +69,7 @@ export function DecisionsSection({ tab }: { tab?: string }) {
             <>
               {opened && opened.id !== work.investigationId && (
                 <p className="ac-note" role="status">
-                  Opened from the approvals queue. The context bar above still shows another case.
+                  Opened from the approvals queue. The context bar above still shows another investigation.
                 </p>
               )}
               <CaseDecisionPanel
@@ -89,7 +89,7 @@ export function DecisionsSection({ tab }: { tab?: string }) {
                 title="Choose an investigation first"
                 detail={
                   canSign
-                    ? "Open a case from Approvals, or pick one in the context bar above."
+                    ? "Open an investigation from Approvals, or pick one in the context bar above."
                     : "Decisions belong to an investigation. Pick one in the context bar above."
                 }
               />

@@ -340,7 +340,7 @@ def sign_lot_impact(
     tenant_id = case.tenant_id
     working = _working(db, tenant_id, scope.current_scope(db, case))
     if working is None:
-        raise _error(409, "NOTHING_TO_SIGN", "Choose the suspect factor and keep it with the case first")
+        raise _error(409, "NOTHING_TO_SIGN", "Choose the suspect factor and keep it with the investigation first")
     if working["fingerprint"] != payload.fingerprint:
         raise _error(409, "LIST_CHANGED", "The list changed a moment ago; read it again before you sign")
 
@@ -465,7 +465,7 @@ def export_lot_impact(
     elif screen["saved"] is not None:
         which, listed, label = "current", screen["list"], "as the records show it now; not signed"
     else:
-        raise _error(404, "NO_LOT_IMPACT_LIST", "Choose the suspect factor and keep it with the case first")
+        raise _error(404, "NO_LOT_IMPACT_LIST", "Choose the suspect factor and keep it with the investigation first")
     listed = {**listed, "factor": {**listed["factor"], "kind_label": service.KIND_LABELS[listed["factor"]["kind"]]}}
     export = {
         "investigation": screen["investigation"],

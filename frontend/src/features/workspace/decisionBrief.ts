@@ -796,7 +796,7 @@ export function summaryCase(row: Record<string, unknown> | null | undefined, ind
       safeText(investigation.business_id) ??
       safeText(item.investigation_business_id) ??
       safeText(item.business_id) ??
-      "Case",
+      "Investigation",
     question: safeText(investigation.question) ?? safeText(item.question),
     briefId: safeText(item.brief_business_id) ?? safeText(brief.business_id),
     version: typeof version === "number" || typeof version === "string" ? String(version) : null,

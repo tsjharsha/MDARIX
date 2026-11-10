@@ -153,7 +153,7 @@ class Decider:
         decided_here = current is not None and row is not None and current.brief_version_id == row.id
         return_refusal = None
         if not self.may_sign_permission:
-            return_refusal = "Your role does not allow deciding on cases"
+            return_refusal = "Your role does not allow deciding on investigations"
         elif self.administrator:
             return_refusal = rules.ADMINISTRATOR_DENIED[1]
         elif row is None or brief is not None:
@@ -652,7 +652,7 @@ def sign_decision(
         return service.record_view(control_db, data, earlier)
     row = service.brief_version(data, case, payload.brief_version_id, lock=True)
     if row is None:
-        refuse(404, "BRIEF_VERSION_NOT_FOUND", "This version of the brief does not belong to this case")
+        refuse(404, "BRIEF_VERSION_NOT_FOUND", "This version of the brief does not belong to this investigation")
     brief_problem = rules.brief_problem(
         status=row.status,
         stored_hash=row.content_hash,
@@ -1037,7 +1037,7 @@ def return_brief(
         raise error(403, *rules.ADMINISTRATOR_DENIED)
     row = service.brief_version(data, case, payload.brief_version_id, lock=True)
     if row is None:
-        raise error(404, "BRIEF_VERSION_NOT_FOUND", "This version of the brief does not belong to this case")
+        raise error(404, "BRIEF_VERSION_NOT_FOUND", "This version of the brief does not belong to this investigation")
     if row.status != brief_rules.APPROVED_FOR_DECISION:
         raise error(409, *rules.STALE_BRIEF)
     current = service.current_decision(data, case, lock=True)

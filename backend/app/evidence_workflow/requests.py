@@ -340,7 +340,7 @@ def resolve_unknown(db: Session, tenant_id, case: Investigation, unknown_id) -> 
     except Exception:
         logger.warning("The unknown set of case %s could not be read", case.id, exc_info=True)
     if item is None:
-        raise error(404, "UNKNOWN_NOT_FOUND", "Choose an unknown of this case")
+        raise error(404, "UNKNOWN_NOT_FOUND", "Choose an unknown of this investigation")
     recorded = (
         db.query(Unknown.id, Unknown.business_id)
         .filter(
@@ -1028,7 +1028,9 @@ def download_evidence_request_attachment(
     if stored is None:
         raise error(404, "ATTACHMENT_NOT_FOUND", "Attachment is not available")
     if not (is_requester(person, row) or is_recipient(person, row) or person.holds(INVESTIGATION_WORK)):
-        raise error(403, "PERMISSION_DENIED", "Only the people on this request or on its case can open its files")
+        raise error(
+            403, "PERMISSION_DENIED", "Only the people on this request or on its investigation can open its files"
+        )
     try:
         content = ObjectStorageService().get(str(tenant_id), stored.object_key)
     except FileNotFoundError as exc:
@@ -1089,7 +1091,9 @@ def review_evidence_request(
     if payload.accept:
         if row.investigation_id is None:
             raise error(
-                409, "REQUEST_WITHOUT_CASE", "This request belongs to no case; its answer cannot become evidence"
+                409,
+                "REQUEST_WITHOUT_CASE",
+                "This request belongs to no investigation; its answer cannot become evidence",
             )
         case = load_case(db, tenant_id, row.investigation_id, lock=True)
         refuse_closed(case)

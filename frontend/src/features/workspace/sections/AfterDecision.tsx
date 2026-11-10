@@ -262,7 +262,7 @@ export function FollowUpDrawer({
           </dd>
         </div>
         <div>
-          <dt>Case</dt>
+          <dt>Investigation</dt>
           <dd>{safeText(followUp.investigation?.business_id) ?? "—"}</dd>
         </div>
         <div>
@@ -798,7 +798,7 @@ function AfterDecisionDashboard() {
                       {name} · {followUpTypeLabel(row)}
                     </strong>
                     <small>
-                      {safeText(row.investigation?.business_id) ?? "Case"}
+                      {safeText(row.investigation?.business_id) ?? "Investigation"}
                       {safeText(row.title) ? ` · ${row.title}` : ""}
                     </small>
                   </span>

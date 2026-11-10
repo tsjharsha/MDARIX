@@ -327,6 +327,12 @@
     },
     "Investigations": {
       "Story": "Workspace"
+    },
+    "Evidence": {
+      "Case evidence": "Investigation evidence"
+    },
+    "Trust & Audit": {
+      "Case timeline": "Investigation timeline"
     }
   },
   "newPlaces": {

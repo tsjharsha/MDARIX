@@ -425,7 +425,9 @@ def sign_disposition(
         attribution_reason = rules.collapse(payload.attribution_reason) or None
         problem = rules.service_record_problem(record) or rules.attribution_problem(attribution, attribution_reason)
     if not problem and branch in rules.ESCALATED and complaint.product_id is None:
-        problem = "This complaint names no product: a case needs one; record the product in your QMS export first"
+        problem = (
+            "This complaint names no product: an investigation needs one; record the product in your QMS export first"
+        )
     classifications = service.classifications_of(db, tenant_id, complaint_id)
     latest = classifications[-1] if classifications else None
     classification_problem, values, changed = _classification_problem(payload.classification, latest, change_reason)

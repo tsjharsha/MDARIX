@@ -159,7 +159,7 @@ def capa_log(db: Session, tenant_id: uuid.UUID, *, control_db=None, today: date,
         }.get(state, label(state))
         came_from = []
         if capa.investigation_id:
-            came_from.append(f"case {case_ref or case_identifier}")
+            came_from.append(f"investigation {case_ref or case_identifier}")
             linked = complaints.get(capa.investigation_id) or []
             if linked:
                 came_from.append(
@@ -280,7 +280,7 @@ def investigation_report(db: Session, tenant_id: uuid.UUID, *, case: Investigati
 
     scope_rows = [
         row(
-            f"Case {ref} on {product.name if product else 'its product'}: {plural(len(linked), 'complaint')} in scope now.",
+            f"Investigation {ref} on {product.name if product else 'its product'}: {plural(len(linked), 'complaint')} in scope now.",
             [src("Case", case.id, ref, case.id), *complaints_of(linked)],
         )
     ]
@@ -378,7 +378,7 @@ def investigation_report(db: Session, tenant_id: uuid.UUID, *, case: Investigati
             .first()
         )
     if decision is None:
-        decision_rows = [row("No decision is signed on this case yet.", [src("Case", case.id, ref, case.id)])]
+        decision_rows = [row("No decision is signed on this investigation yet.", [src("Case", case.id, ref, case.id)])]
         attribution_rows = [row("No root-cause attribution yet: it is recorded with the signed decision.")]
     else:
         decision_ref = decision.business_id or decision.decision_identifier
@@ -419,7 +419,7 @@ def investigation_report(db: Session, tenant_id: uuid.UUID, *, case: Investigati
         "scope": {"case": {"id": str(case.id), "ref": ref, "question": case.investigation_question}},
         "sections": [
             data("SCOPE", "Scope", scope_rows),
-            data("EVIDENCE", "Evidence", evidence_rows or [row("No evidence is linked to the case yet.")]),
+            data("EVIDENCE", "Evidence", evidence_rows or [row("No evidence is linked to the investigation yet.")]),
             data("HYPOTHESES", "Hypotheses and their support states", hypothesis_rows or [row("No hypothesis yet.")]),
             data("ROOT_CAUSE", "Root cause and the signed decision", decision_rows),
             data("ATTRIBUTION", "Root-cause attribution", attribution_rows),
@@ -595,8 +595,8 @@ def risk_review_extract(
         "sections": [
             data(
                 "REVIEWS",
-                f"Risk reviews of case {ref}",
-                review_rows or [row("No risk review on this case yet.", [src("Case", case.id, ref, case.id)])],
+                f"Risk reviews of investigation {ref}",
+                review_rows or [row("No risk review on this investigation yet.", [src("Case", case.id, ref, case.id)])],
             ),
             data("RISKS", "Risk-register entries named", risk_rows or [row("No risk-register entry named yet.")]),
             data(
@@ -606,7 +606,9 @@ def risk_review_extract(
             ),
             data("RISK_FILE_UPDATES", "Risk file updates required", updates or [row("No risk file update required.")]),
             data(
-                "POST_MARKET", "Post-market data against the risk file", post_market or [row("No product on the case.")]
+                "POST_MARKET",
+                "Post-market data against the risk file",
+                post_market or [row("No product on the investigation.")],
             ),
             data("IMPACT_DECISIONS", "Impact decisions", impact_rows or [row("No impact decision recorded yet.")]),
             data("CLOSURE", "Closure", closure or [row("No risk review completed yet.")]),
@@ -731,7 +733,7 @@ def change_impact(db: Session, tenant_id: uuid.UUID, *, change: Change, control_
         *updates,
         *(
             row(
-                f"{item.business_id} on case {case}: {item.title} ({label(item.action_type)}; {label(item.status)}).",
+                f"{item.business_id} on investigation {case}: {item.title} ({label(item.action_type)}; {label(item.status)}).",
                 [src("FollowUp", item.id, item.business_id, item.investigation_id)],
             )
             for item, case in follow_ups

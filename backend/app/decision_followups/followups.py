@@ -682,7 +682,7 @@ def on_case_closed(db: Session, control_db, case, *, actor_user_id, correlation_
                 correlation_id=correlation_id,
                 old_values={"task_id": str(old.id)},
                 new_values={"task_id": str(task.id)},
-                details=_details(row, role, reason="The case was closed; the follow-up stays open"),
+                details=_details(row, role, reason="The investigation was closed; the follow-up stays open"),
             )
             renewed += 1
         return renewed

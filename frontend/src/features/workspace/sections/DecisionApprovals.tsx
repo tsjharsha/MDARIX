@@ -115,7 +115,7 @@ export function ApprovalsPanel({ onOpen }: { onOpen: (row: QueueRow) => void }) 
           columns={[
             {
               key: "caseId",
-              label: "Case",
+              label: "Investigation",
               fields: ["question"],
               render: (row) => (
                 <span className="ca-person">

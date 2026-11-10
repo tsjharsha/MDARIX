@@ -360,7 +360,7 @@ test.describe("free trial journey", () => {
     // (SAMPLE-RT-04, an OrbitCare 300 lot 4 pressure alarm of the sample case).
     const card = (identifier: string) => page.locator("li.uw-cr-card").filter({ hasText: identifier });
     await expect(card("SAMPLE-RT-01")).toContainText("Routine path", { timeout: 20_000 });
-    await expect(card("SAMPLE-RT-04").getByRole("button", { name: "Link to the open case" })).toBeVisible();
+    await expect(card("SAMPLE-RT-04").getByRole("button", { name: "Link to the open investigation" })).toBeVisible();
     await card("SAMPLE-RT-01").getByRole("button", { name: "Close on the routine path" }).click();
     const drawer = page.getByRole("dialog", { name: /: disposition$/ });
     await expect(drawer.getByText("Routine path: one screen, one signature")).toBeVisible({ timeout: 20_000 });

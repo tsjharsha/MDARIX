@@ -281,8 +281,8 @@ function RequestReviewDrawer({
     <Drawer title={`Request a ${label.toLowerCase()}`} onClose={onClose}>
       <form className="ca-form ca-drawer-section" onSubmit={submit}>
         <p className="ac-muted">
-          The review goes to the {type === "RISK" ? "risk" : "regulatory"} reviewers' queue. They see the case's context
-          and record their own outcome.
+          The review goes to the {type === "RISK" ? "risk" : "regulatory"} reviewers' queue. They see the
+          investigation's context and record their own outcome.
         </p>
         <label className="ca-field">
           What should the reviewer look at? (optional)
@@ -380,7 +380,7 @@ export function ReviewDrawer({
                 </dd>
               </div>
               <div>
-                <dt>Case</dt>
+                <dt>Investigation</dt>
                 <dd>
                   {safeText(data.investigation?.business_id) ?? "—"}
                   {safeText(data.investigation?.product?.name) ? ` · ${data.investigation?.product?.name}` : ""}
@@ -856,7 +856,7 @@ function RiskContextView({ context }: { context: unknown }) {
     <section className="ca-drawer-section" aria-label="Risk context">
       <h3>Risk context</h3>
       <p className="ac-muted">
-        Gathered from the product's risk file and this case. It informs your review; it decides nothing.
+        Gathered from the product's risk file and this investigation. It informs your review; it decides nothing.
       </p>
       <ItemList title="Risks" items={risk.risks} empty="No risks recorded for this product." />
       <ItemList title="Hazards" items={risk.hazards} empty="No hazards recorded." />

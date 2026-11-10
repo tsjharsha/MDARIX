@@ -170,7 +170,7 @@ def refuse_unmet_closure(db: Session, case: Investigation, *, reason: str | None
         raise common.error(
             409,
             "CLOSURE_CRITERIA_NOT_MET",
-            "This case cannot be closed yet: " + "; ".join(item["rationale"] for item in blocked),
+            "This investigation cannot be closed yet: " + "; ".join(item["rationale"] for item in blocked),
             criteria=blocked,
         )
 

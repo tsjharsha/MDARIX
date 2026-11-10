@@ -123,7 +123,7 @@ test.describe("demo golden path (read only)", () => {
     const list = "Investigation sections";
 
     const scope = await openTab(page, list, "Scope", /\/api\/v1\/investigations\/[^/]+\/scope(\?|$)/);
-    await expect(scope).toContainText(/What this case covers · version \d+/, { timeout: 20_000 });
+    await expect(scope).toContainText(/What this investigation covers · version \d+/, { timeout: 20_000 });
 
     const intelligence = await openTab(page, list, "Intelligence", /\/api\/v1\/investigations\/[^/]+\/intelligence\//);
     await expect(intelligence).toContainText(/hypothes/i, { timeout: 20_000 });
@@ -144,7 +144,7 @@ test.describe("demo golden path (read only)", () => {
       timeout: 20_000,
     });
     await openSection(page, "Evidence");
-    await openTab(page, "Evidence sections", "Case evidence");
+    await openTab(page, "Evidence sections", "Investigation evidence");
     expect((await inventory).status()).toBe(200);
     await expect(page.locator("main")).toContainText(/EVD\d+/, { timeout: 20_000 });
     await expectNoFailedPanel(page);
@@ -159,16 +159,21 @@ test.describe("demo golden path (read only)", () => {
     await openSection(page, "Trust & Audit");
     const list = "Trust and audit sections";
 
-    const timeline = await openTab(page, list, "Case timeline", /\/api\/v1\/investigations\/[^/]+\/trust\/timeline/);
-    await expect(timeline).toContainText(/Case timeline · \d+/, { timeout: 20_000 });
-    const events = page.getByRole("list", { name: "Case events" });
+    const timeline = await openTab(
+      page,
+      list,
+      "Investigation timeline",
+      /\/api\/v1\/investigations\/[^/]+\/trust\/timeline/,
+    );
+    await expect(timeline).toContainText(/Investigation timeline · \d+/, { timeout: 20_000 });
+    const events = page.getByRole("list", { name: "Investigation events" });
     await expect(events).toBeVisible({ timeout: 20_000 });
     expect(await events.getByRole("listitem").count()).toBeGreaterThan(5);
     await expect(events).toContainText(/SIG\d+|signal/i);
     await page.screenshot({ path: `artifacts/golden-${testInfo.project.name}-timeline.png`, fullPage: true });
 
     const replay = await openTab(page, list, "Replay", /\/api\/v1\/investigations\/[^/]+\/trust\/replay/);
-    await expect(replay).toContainText("Replay the case at a moment", { timeout: 20_000 });
+    await expect(replay).toContainText("Replay the investigation at a moment", { timeout: 20_000 });
     await expect(replay).toContainText("Snapshot taken at signing", { timeout: 20_000 });
     await page.screenshot({ path: `artifacts/golden-${testInfo.project.name}-replay.png`, fullPage: true });
     expect(problems).toEqual([]);

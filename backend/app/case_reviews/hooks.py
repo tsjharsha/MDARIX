@@ -192,7 +192,7 @@ def on_review_completed(
                 "description": (
                     f"{review.business_id} concluded "
                     f'"{outcome}": {service.shorten(review.rationale, 500)} '
-                    f"A new {label.lower()} must be completed before the case is ready for a decision."
+                    f"A new {label.lower()} must be completed before the investigation is ready for a decision."
                 ),
             },
             correlation_id=correlation_id,

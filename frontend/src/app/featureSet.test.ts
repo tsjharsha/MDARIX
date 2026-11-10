@@ -135,10 +135,13 @@ describe("feature set", () => {
     expect(routeFor("Trust & Audit", "Audit trail", "full")).toEqual({ section: "Trust & Audit", tab: "Audit trail" });
   });
 
-  it("carries a case's timeline into Records › Audit trail with its case and label", () => {
-    const routed = routeFor("Trust & Audit", "Case timeline?case=c1&label=INV000001", "mvp");
+  it("carries an investigation's timeline into Records › Audit trail with its case and label", () => {
+    const routed = routeFor("Trust & Audit", "Investigation timeline?case=c1&label=INV000001", "mvp");
     expect(routed.section).toBe("Records");
-    expect(recordsAuditView(routed.tab)).toBe("Case timeline?case=c1&label=INV000001");
+    expect(recordsAuditView(routed.tab)).toBe("Investigation timeline?case=c1&label=INV000001");
+    // A link from before 0.10.93 names the tab "Case timeline": it carries the new name.
+    const old = routeFor("Trust & Audit", "Case timeline?case=c1&label=INV000001", "mvp");
+    expect(recordsAuditView(old.tab)).toBe("Investigation timeline?case=c1&label=INV000001");
     expect(recordsAuditView(routeFor("Trust & Audit", "Integrity", "mvp").tab)).toBe("Integrity");
     expect(recordsAuditView("Audit trail")).toBeNull();
     expect(recordsAuditView("Effectiveness checks?capa=CAPA000001")).toBeNull();
@@ -199,7 +202,7 @@ describe("feature set", () => {
   it("opens Trust & Audit on the audit trail when AI assurance is parked", () => {
     expect(initialTrustTab(null, false)).toBe("AI assurance");
     expect(initialTrustTab(null, false, "Audit trail")).toBe("Audit trail");
-    expect(initialTrustTab(null, true, "Audit trail")).toBe("Case timeline");
+    expect(initialTrustTab(null, true, "Audit trail")).toBe("Investigation timeline");
     expect(initialTrustTab("Integrity", false, "Audit trail")).toBe("Integrity");
   });
 });

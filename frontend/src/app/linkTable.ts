@@ -151,7 +151,8 @@ function classicRoute(section: string, tab: string | undefined): { section: stri
   if (!row) return { section, tab: currentTab(section, tab) };
   const to = row.to;
   if (row.keep === "query") return { section: to.section, tab: query ? `${to.tab}?${query}` : to.tab };
-  if (row.keep === "view") return { section: to.section, tab: `${to.tab}?${new URLSearchParams({ view: tab ?? "" })}` };
+  if (row.keep === "view")
+    return { section: to.section, tab: `${to.tab}?${new URLSearchParams({ view: currentTab(section, tab) ?? "" })}` };
   return { section: to.section, tab: to.tab };
 }
 

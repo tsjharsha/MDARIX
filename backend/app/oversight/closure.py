@@ -770,7 +770,7 @@ def decision_record(control_db: Session, found: dict, row: EventClosure | None, 
                     str(decision.decided_by_user_id or decision.authorized_by_ref),
                     decision.decided_at or decision.decision_timestamp,
                 ),
-                "meaning": "Signed decision on the case",
+                "meaning": "Signed decision on the investigation",
             }
         )
     for snapshot in found["snapshots"]:

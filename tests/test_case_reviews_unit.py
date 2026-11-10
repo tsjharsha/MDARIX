@@ -40,11 +40,11 @@ def test_no_review_is_required_for_a_medium_case_without_harm():
 
 def test_priority_drives_the_risk_review_and_critical_also_the_regulatory_review():
     high = rules.review_policy("HIGH", [], [])
-    assert high["risk"] == {"required": True, "reasons": ["The case priority is high"]}
+    assert high["risk"] == {"required": True, "reasons": ["The investigation priority is high"]}
     assert high["regulatory"] == {"required": False, "reasons": []}
     critical = rules.review_policy("critical", [], [])
-    assert critical["risk"]["reasons"] == ["The case priority is critical"]
-    assert critical["regulatory"] == {"required": True, "reasons": ["The case priority is critical"]}
+    assert critical["risk"]["reasons"] == ["The investigation priority is critical"]
+    assert critical["regulatory"] == {"required": True, "reasons": ["The investigation priority is critical"]}
     assert not rules.review_policy("LOW", [], [])["risk"]["required"]
 
 
@@ -86,13 +86,13 @@ def test_every_rule_that_applies_gives_its_reason():
         [{"business_id": "SIG000001", "serious_harm": True}],
     )
     assert policy["risk"]["reasons"] == [
-        "The case priority is critical",
+        "The investigation priority is critical",
         "1 complaint in scope reports a serious injury",
         "1 complaint in scope reports a death",
         "Signal SIG000001 reports serious harm",
     ]
     assert policy["regulatory"]["reasons"] == [
-        "The case priority is critical",
+        "The investigation priority is critical",
         "1 complaint in scope reports a death",
         "1 complaint in scope reports a serious injury",
         "1 complaint in scope reports a malfunction",
@@ -195,13 +195,15 @@ def _review_result(reviews) -> tuple[dict, dict, dict]:
 def test_a_required_review_nobody_asked_for_blocks_the_case():
     risk, regulatory, step = _review_result(
         {
-            "RISK": _fact(True, ["The case priority is high", "2 complaints in scope report a serious injury"]),
+            "RISK": _fact(
+                True, ["The investigation priority is high", "2 complaints in scope report a serious injury"]
+            ),
             "REGULATORY": _fact(False),
         }
     )
     assert risk["result"] == "BLOCKED"
     assert risk["rationale"] == (
-        "Request a risk review: required because the case priority is high; "
+        "Request a risk review: required because the investigation priority is high; "
         "2 complaints in scope report a serious injury"
     )
     assert regulatory["result"] == "NOT_REQUIRED" and regulatory["rationale"] == "Not required by policy"
@@ -211,7 +213,7 @@ def test_a_required_review_nobody_asked_for_blocks_the_case():
 def test_requested_and_in_progress_reviews_are_pending():
     risk, regulatory, step = _review_result(
         {
-            "RISK": _fact(True, ["The case priority is high"], _latest("REQUESTED")),
+            "RISK": _fact(True, ["The investigation priority is high"], _latest("REQUESTED")),
             "REGULATORY": _fact(False, latest=_latest("IN_PROGRESS", business_id="REV000008")),
         }
     )
@@ -380,7 +382,7 @@ def test_which_next_steps_a_person_may_take():
     assert available("ESCALATE_FOR_QUALITY_REVIEW") == (False, rules.USE_DECISION_BRIEF)
     assert rules.USE_DECISION_BRIEF == "Prepare and submit the Decision Brief for quality review"
     assert available("NO_DECISION_YET", can_work=False)[0] is False
-    assert available("REQUEST_RISK_REVIEW", case_open=False) == (False, "The case is closed")
+    assert available("REQUEST_RISK_REVIEW", case_open=False) == (False, "The investigation is closed")
     assert available("REQUEST_ADDITIONAL_TESTING", can_request_evidence=False)[0] is False
     assert available("REVIEW_PRODUCT_CHANGE", can_request_evidence=False) == (True, None)
     assert available("REQUEST_RISK_REVIEW", open_review_types={"RISK"}) == (False, "A risk review is already open")
@@ -394,7 +396,7 @@ def test_reviews_are_a_task_source_with_their_queues():
     from backend.app.workflow.labels import SOURCE_LABELS, TASK_TYPES
     from backend.app.workflow.router import _source_models
 
-    assert SOURCE_LABELS[rules.SOURCE_TYPE] == "Case review"
+    assert SOURCE_LABELS[rules.SOURCE_TYPE] == "Investigation review"
     assert _source_models()[rules.SOURCE_TYPE].__tablename__ == "case_reviews"
     assert TASK_TYPES[rules.TYPE_TASKS["RISK"]].permission == rules.TYPE_PERMISSIONS["RISK"] == "risk.review"
     assert TASK_TYPES[rules.TYPE_TASKS["REGULATORY"]].queue_role == "REGULATORY_REVIEWER"

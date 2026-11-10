@@ -90,13 +90,13 @@ ROUTINE_BASIS = (
 
 # The written disposition rules a signer acknowledges (starter text, T-B6): shown on the screen behind "show".
 DISPOSITION_RULES = (
-    "Answer in order. An escalation trigger met (safety, injury, a reportable outcome, a recurrence no open case "
-    "covers, a new failure mode) escalates the complaint: a case opens at once and no other branch is allowed.",
-    "A known issue is an open case whose scope holds a complaint with the same product and problem code, or the same "
-    "lot. Link the complaint to it with your reason; no second case is opened.",
+    "Answer in order. An escalation trigger met (safety, injury, a reportable outcome, a recurrence no open investigation "
+    "covers, a new failure mode) escalates the complaint: an investigation opens at once and no other branch is allowed.",
+    "A known issue is an open investigation whose scope holds a complaint with the same product and problem code, or the same "
+    "lot. Link the complaint to it with your reason; no second investigation is opened.",
     "Resolved at service level: record the troubleshooting, the discrete correction, its result, the service ticket and "
     "why no investigation is needed (ISO 13485:2016 clause 8.2.2), and the root-cause attribution.",
-    "Otherwise escalate by choice, with your reason: a case opens.",
+    "Otherwise escalate by choice, with your reason: an investigation opens.",
     "The disposition never replaces the reportability assessment: a complaint on the watch is still assessed for each "
     "market.",
     "A signed disposition is never edited. A change is a new version with its reason; the earlier one stays visible.",

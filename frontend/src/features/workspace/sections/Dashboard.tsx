@@ -543,15 +543,15 @@ export function DashboardSection() {
               title={status === "empty" ? "No records yet" : "You're all caught up"}
               detail={
                 status === "empty"
-                  ? "Import your data or connect your systems; new signals, open cases and evidence gaps will appear here."
-                  : "New signals, open cases and evidence gaps will appear here."
+                  ? "Import your data or connect your systems; new signals, open investigations and evidence gaps will appear here."
+                  : "New signals, open investigations and evidence gaps will appear here."
               }
             />
           )}
         </Panel>
         <Panel
           eyebrow="Investigations"
-          title="Open cases"
+          title="Open investigations"
           source={investigations}
           action={<OpenLink onClick={() => open("Investigations")} />}
         >
@@ -568,7 +568,7 @@ export function DashboardSection() {
               ))}
             </ul>
           ) : (
-            <Empty title="No open investigations" detail="Open cases in your organization appear here." />
+            <Empty title="No open investigations" detail="Open investigations in your organization appear here." />
           )}
         </Panel>
       </div>

@@ -22,19 +22,19 @@ const NOTES: Record<string, WorkspaceNote> = {
   },
   NO_INVESTIGATION_CONCLUSION: {
     title: "The conclusion stays with people",
-    text: "MDARIX organizes the case; a person reviews and signs the decision.",
+    text: "MDARIX organizes the investigation; a person reviews and signs the decision.",
   },
   NO_DIRECT_EVIDENCE: {
-    title: "No evidence on this case yet",
+    title: "No evidence on this investigation yet",
     text: "Add or link evidence on the Evidence tab.",
   },
   NO_RELEVANT_EVIDENCE: {
     title: "No matching evidence found yet",
-    text: "Add or link the evidence that belongs to this case on the Evidence tab.",
+    text: "Add or link the evidence that belongs to this investigation on the Evidence tab.",
   },
   INSUFFICIENT_RELEVANT_EVIDENCE: {
     title: "Only loosely matching evidence",
-    text: "Check the evidence list and link what belongs to this case.",
+    text: "Check the evidence list and link what belongs to this investigation.",
   },
   MISSING_MATERIALIZED_CHUNKS: {
     title: "Some evidence is still being indexed",
@@ -49,7 +49,7 @@ const NOTES: Record<string, WorkspaceNote> = {
 // The search for more evidence found nothing, on a case that already has its own evidence: nothing is missing.
 const NOTHING_MORE: WorkspaceNote = {
   title: "No further matching records",
-  text: "The evidence listed is this case's own; a search of your other records for its question found nothing more.",
+  text: "The evidence listed is this investigation's own; a search of your other records for its question found nothing more.",
 };
 const SEARCH_EMPTY = new Set(["NO_RELEVANT_EVIDENCE", "INSUFFICIENT_RELEVANT_EVIDENCE"]);
 

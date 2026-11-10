@@ -24,32 +24,32 @@ What MDARIX needs from you: a sponsor who owns the pilot's goals, a named Custom
 
 Every person has one account in your organization with one base role. A customer administrator can give a person additional workflow roles on top of it (Users, then the person, then Additional roles, with a reason that is kept in the audit trail), so one person can cover several steps. The server checks the person's roles on every action; the screens only hide what the role cannot do.
 
-The workflow roles, in the order a case meets them:
+The workflow roles, in the order an investigation meets them:
 
-- **PMS / Signal Triage Lead**: triages new signals (complaints and trends), decides what each needs, opens investigations from them and assigns cases.
-- **Quality Investigator**: works the case: scope, evidence, evidence requests, hypotheses and the other intelligence, the risk and regulatory review requests, and writes and submits the Decision Brief.
-- **Risk Reviewer**: carries out the risk reviews of cases that need one. Reads and reviews evidence; does not change case records.
-- **Regulatory Reviewer**: carries out the regulatory reviews of cases that need one, and may approve regulatory documents. Does not change case records.
-- **Quality Reviewer**: reviews each submitted Decision Brief for quality: accepts it for decision, returns it, rejects its conclusion or escalates it. Can also assign cases.
+- **PMS / Signal Triage Lead**: triages new signals (complaints and trends), decides what each needs, opens investigations from them and assigns investigations.
+- **Quality Investigator**: works the investigation: scope, evidence, evidence requests, hypotheses and the other intelligence, the risk and regulatory review requests, and writes and submits the Decision Brief.
+- **Risk Reviewer**: carries out the risk reviews of investigations that need one. Reads and reviews evidence; does not change investigation records.
+- **Regulatory Reviewer**: carries out the regulatory reviews of investigations that need one, and may approve regulatory documents. Does not change investigation records.
+- **Quality Reviewer**: reviews each submitted Decision Brief for quality: accepts it for decision, returns it, rejects its conclusion or escalates it. Can also assign investigations.
 - **Authorized Decision Maker**: signs the decision on a brief that the quality review accepted.
 - **Leader (Quality Manager)**: every right of the roles above, including signing; escalated briefs go to the Leaders.
 
 Two more roles take no step in the workflow:
 
 - **Viewer**: reads everything in the organization and can verify signatures; changes nothing, runs no AI and exports nothing.
-- **Customer Administrator**: runs the organization (users and their roles, integrations, data mapping, security settings, AI processing, audit exports). The same account can open the workspace ("Open workspace" in the console header) to look at cases, open and manage them and use Ask MDARIX, but it holds no workflow role, can never be given one and never signs. A person who administers and also investigates uses a second account for the case work.
+- **Customer Administrator**: runs the organization (users and their roles, integrations, data mapping, security settings, AI processing, audit exports). The same account can open the workspace ("Open workspace" in the console header) to look at investigations, open and manage them and use Ask MDARIX, but it holds no workflow role, can never be given one and never signs. A person who administers and also investigates uses a second account for the investigation work.
 
 ## Who you need: the minimum team
 
-Three rules decide how many people a case needs:
+Three rules decide how many people an investigation needs:
 
 - **Whoever wrote a Decision Brief cannot review or sign it.** The person who created, submitted or edited a brief version cannot carry out its quality review, and cannot sign the decision on it.
 - **Only people with approval authority sign**: Authorized Decision Makers and Leaders. Each signature needs the person's password and the code from their authenticator app.
 - **Administrators never sign**, whatever authority is configured.
 
-So the smallest team that can take a case from signal to a signed decision is **two people, plus an administrator account**:
+So the smallest team that can take an investigation from signal to a signed decision is **two people, plus an administrator account**:
 
-1. **Person A**, Quality Investigator, with Signal Triage Lead as an additional role (and Risk Reviewer and Regulatory Reviewer as additional roles when the case needs those reviews): triages the signal, works the case and writes and submits the brief.
+1. **Person A**, Quality Investigator, with Signal Triage Lead as an additional role (and Risk Reviewer and Regulatory Reviewer as additional roles when the investigation needs those reviews): triages the signal, works the investigation and writes and submits the brief.
 2. **Person B**, Quality Reviewer with Authorized Decision Maker as an additional role (or a Leader): reviews the brief and signs the decision. Person B must not edit the brief, or they become one of its authors.
 3. **The customer administrator** sets the organization up, invites A and B and gives them their roles.
 
@@ -65,25 +65,25 @@ For a pilot that tests how your organization really works, we recommend one pers
 
 ## The investigation workflow
 
-Choose the product, version and case in the context bar at the top of each page; every section below it follows that choice. **My Work** lists what is waiting for you: tasks assigned to you, work your roles can pick up, and evidence requests sent to you.
+Choose the product, version and investigation in the context bar at the top of each page; every section below it follows that choice. **My Work** lists what is waiting for you: tasks assigned to you, work your roles can pick up, and evidence requests sent to you.
 
 ### 1. Triage the signal (Signal Triage Lead)
 
-In **Signals**, new signals come from your complaints and from the trend rule (by default, three related complaints within 30 days). Start triage, set the priority and decide what the signal needs: monitor it, no action, duplicate of another signal (linked, never deleted), investigation required, or escalated (which makes it critical). From a signal that needs an investigation, create the investigation: the case takes the signal's priority, and the signal follows its case until the case closes. A case can also be opened directly in Investigations with "Open an investigation".
+In **Signals**, new signals come from your complaints and from the trend rule (by default, three related complaints within 30 days). Start triage, set the priority and decide what the signal needs: monitor it, no action, duplicate of another signal (linked, never deleted), investigation required, or escalated (which makes it critical). From a signal that needs an investigation, create the investigation: the investigation takes the signal's priority, and the signal follows its investigation until the investigation closes. An investigation can also be opened directly in Investigations with "Open an investigation".
 
 ### 2. Set the scope and gather evidence (Quality Investigator)
 
-Open the case in **Investigations**: every step of a case is a tab of its one page, in the order of the work: Workspace, Evidence, Intelligence, Ask MDARIX, Scope, Reviews, Decision Brief, Decision, Record and CAPAs. Save the **Scope** first (which products, versions, lots and complaints the case covers); saving the first scope starts the case. Each change to the scope is a new version with its reason; earlier versions are kept unchanged.
+Open the investigation in **Investigations**: every step of an investigation is a tab of its one page, in the order of the work: Workspace, Evidence, Intelligence, Ask MDARIX, Scope, Reviews, Decision Brief, Decision, Record and CAPAs. Save the **Scope** first (which products, versions, lots and complaints the investigation covers); saving the first scope starts the investigation. Each change to the scope is a new version with its reason; earlier versions are kept unchanged.
 
-In the case's **Evidence** tab, link the evidence the case needs and review each item: accepted, accepted with a limitation, rejected, quarantined or superseded, and whether it supports, contradicts or only gives context. Some outcomes need a reason. Nothing is ever unlinked. When something is missing, send an evidence request (the case's Evidence tab, or My Work, Evidence requests) to a colleague, to everyone holding a role, or to a supplier; the answer comes back into the case to be reviewed. An open urgent request (high or critical) holds the brief back.
+In the investigation's **Evidence** tab, link the evidence the investigation needs and review each item: accepted, accepted with a limitation, rejected, quarantined or superseded, and whether it supports, contradicts or only gives context. Some outcomes need a reason. Nothing is ever unlinked. When something is missing, send an evidence request (the investigation's Evidence tab, or My Work, Evidence requests) to a colleague, to everyone holding a role, or to a supplier; the answer comes back into the investigation to be reviewed. An open urgent request (high or critical) holds the brief back.
 
 ### 3. Work out what happened (Quality Investigator)
 
-In the case's **Intelligence** tab, record hypotheses, unknowns, the failure chain and observations. When AI processing is on, the AI's analysis, hypotheses and challenges appear beside yours exactly as the AI wrote them, and each statement cites its evidence; your own judgement of each hypothesis (supported, contradicted, retired and so on) is recorded next to it. Nothing is ever marked as confirmed. **Ask MDARIX** (a tab of the case) answers questions from your organization's records and lists the evidence behind each answer.
+In the investigation's **Intelligence** tab, record hypotheses, unknowns, the failure chain and observations. When AI processing is on, the AI's analysis, hypotheses and challenges appear beside yours exactly as the AI wrote them, and each statement cites its evidence; your own judgement of each hypothesis (supported, contradicted, retired and so on) is recorded next to it. Nothing is ever marked as confirmed. **Ask MDARIX** (a tab of the investigation) answers questions from your organization's records and lists the evidence behind each answer.
 
 ### 4. Risk and regulatory reviews (Risk Reviewer, Regulatory Reviewer)
 
-A **risk review** is needed when the case is high or critical priority, or a complaint in its scope reports a serious injury or a death. A **regulatory review** is needed when a complaint in scope reports a death, a serious injury or a malfunction, or the case is critical. The investigator requests them in the case's **Reviews** tab; a Risk or Regulatory Reviewer starts and completes them. An outcome asking for more evidence or escalating a safety or regulatory concern keeps the case waiting until a new review is completed.
+A **risk review** is needed when the investigation is high or critical priority, or a complaint in its scope reports a serious injury or a death. A **regulatory review** is needed when a complaint in scope reports a death, a serious injury or a malfunction, or the investigation is critical. The investigator requests them in the investigation's **Reviews** tab; a Risk or Regulatory Reviewer starts and completes them. An outcome asking for more evidence or escalating a safety or regulatory concern keeps the investigation waiting until a new review is completed.
 
 ### 5. The Decision Brief and its quality review (Quality Investigator, Quality Reviewer)
 
@@ -93,13 +93,13 @@ A **Quality Reviewer** who did not write it then reviews the brief and either ac
 
 ## Decisions and sign-off
 
-1. In **My Work**, **Approvals** lists the accepted briefs waiting for a signature (shown to people who may sign). Each one opens its case on the Decision tab, with the brief.
-2. Acknowledge the unknowns that remain, choose the outcome (accept the conclusion, accept it with conditions, reject the conclusion and send the case back to work, or close with no further action) and write your remarks.
+1. In **My Work**, **Approvals** lists the accepted briefs waiting for a signature (shown to people who may sign). Each one opens its investigation on the Decision tab, with the brief.
+2. Acknowledge the unknowns that remain, choose the outcome (accept the conclusion, accept it with conditions, reject the conclusion and send the investigation back to work, or close with no further action) and write your remarks.
 3. Sign with your password and the code from your authenticator app. MDARIX refuses the signature if you have no approval authority, if you wrote or edited the brief, or if the brief changed after it was accepted. Five wrong codes lock signing for 15 minutes.
 4. The signature records who signed, what it means, when, the brief version and a fingerprint of everything it covered. A signed decision is never edited: a later decision supersedes it.
 5. **Verify a signature** (in Records) shows whether each signature still matches what was signed. Anyone in the organization, Viewers included, can verify.
 
-**After the decision.** Follow-ups the decision calls for (CAPA, product change, field action review, risk reassessment, regulatory action) become tasks for the right role. Evidence that arrives after the decision triggers an impact assessment; a material impact reopens the case. The case closes when its closure checks pass. In **Records**, the Audit trail lists every action, decision and signature, and each case's **Record** tab holds its record, ready to export.
+**After the decision.** Follow-ups the decision calls for (CAPA, product change, field action review, risk reassessment, regulatory action) become tasks for the right role. Evidence that arrives after the decision triggers an impact assessment; a material impact reopens the investigation. The investigation closes when its closure checks pass. In **Records**, the Audit trail lists every action, decision and signature, and each investigation's **Record** tab holds its record, ready to export.
 
 ## Exports
 

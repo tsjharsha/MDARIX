@@ -186,7 +186,7 @@ def generate_document(
     if template.scope == templates.CASE:
         target = content.case_of(db, tenant_id, payload.case_id)
         if target is None:
-            raise _error(422, "CASE_REQUIRED", "Choose the case this document is for")
+            raise _error(422, "CASE_REQUIRED", "Choose the investigation this document is for")
     elif template.scope == templates.CHANGE:
         target = content.change_of(db, tenant_id, payload.change_id)
         if target is None:

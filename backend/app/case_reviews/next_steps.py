@@ -190,12 +190,12 @@ def _follow_up(db: Session, control_db: Session, ctx, person: Person, case: Inve
         user = find_user(control_db, case.tenant_id, details.assignee_user_id)
         if user is None or not may_hold_tasks(control_db, user, definition.permission):
             raise service.error(
-                422, "ASSIGNEE_NOT_ELIGIBLE", "Choose an active colleague whose roles allow working on cases"
+                422, "ASSIGNEE_NOT_ELIGIBLE", "Choose an active colleague whose roles allow working on investigations"
             )
     if details.assigned_role:
         role = role_code(details.assigned_role)
         if not known_role(role) or definition.permission not in (permissions_for_roles([role]) or ()):
-            raise service.error(422, "ROLE_NOT_ELIGIBLE", "That role does not work on cases")
+            raise service.error(422, "ROLE_NOT_ELIGIBLE", "That role does not work on investigations")
     if user is None and role is None and case.owner_ref:
         owner = find_user(control_db, case.tenant_id, case.owner_ref)
         user = owner if owner is not None and may_hold_tasks(control_db, owner, definition.permission) else None

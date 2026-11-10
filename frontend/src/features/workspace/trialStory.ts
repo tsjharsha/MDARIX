@@ -44,7 +44,7 @@ export const CHAPTER_SHORT: Record<string, string> = {
   ROUTINE_COMPLAINTS: "Routine close",
   REPORTING_CLOCKS: "Reporting clocks",
   HIDDEN_COMPLAINTS: "Hidden complaints",
-  TRENDS_TO_CASES: "Trend to case",
+  TRENDS_TO_CASES: "Trend to investigation",
   INVESTIGATE_WITH_AI: "Investigation",
   DECIDE_AND_SIGN: "Signed decision",
   CAPA_EFFECTIVE: "CAPA proven",
@@ -99,7 +99,7 @@ export function loopFromStory(story: TrialStory | null | undefined): LoopStation
 export const STORY_FAILED = {
   title: "Your trial's story could not be loaded",
   detail:
-    "Your records are safe; the connection or the server did not answer in time. Try again, or carry on in Investigations, where the sample case is.",
+    "Your records are safe; the connection or the server did not answer in time. Try again, or carry on in Investigations, where the sample investigation is.",
 };
 
 /** The story as shown while an import's signals are being found and Getting started waits for them before reading it

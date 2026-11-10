@@ -8,6 +8,7 @@ import {
   OLD_VIEWS,
   PLACES,
   RECORD_PLACES,
+  currentTab,
   placeOf,
   placesFor,
   recordPlace,
@@ -31,7 +32,7 @@ import { READINESS_TABS, eventTab } from "../features/workspace/oversight";
 import { LOOK_AHEAD_TABS } from "../features/workspace/partyPreview";
 import { TASK_TABS, OTHER_MY_WORK_TABS, taskDestination } from "../features/workspace/tasks";
 import { TRIAL_TABS } from "../features/workspace/sections/GettingStarted";
-import { objectTarget } from "../features/workspace/caseAudit";
+import { objectTarget, parseTrustTab } from "../features/workspace/caseAudit";
 import { SAMPLE_PAINS } from "../features/workspace/sampleStory";
 import { GUIDE_PARTS } from "../features/help/userGuide";
 import { communicationsTab } from "../features/workspace/communications";
@@ -126,8 +127,27 @@ describe("every old address redirects (6.7)", () => {
     for (const row of table.oldSections) expectLands(row.section, row.tab, `${row.section} › ${row.tab ?? ""}`);
     for (const section of PARKED_SECTIONS) expectLands(section, undefined, section);
     for (const [section, renamed] of Object.entries(table.oldTabs))
-      for (const [old, now] of Object.entries(renamed))
-        expect(routeFor(section, old, "mvp")).toEqual({ section, tab: now });
+      for (const [old, now] of Object.entries(renamed)) {
+        expect(currentTab(section, old)).toBe(now);
+        // A parked section's old tab lands where its new tab does (Evidence, Trust & Audit).
+        expect(routeFor(section, old, "mvp")).toEqual(
+          PARKED_SECTIONS.includes(section) ? routeFor(section, now, "mvp") : { section, tab: now },
+        );
+      }
+  });
+
+  it("opens an old Case evidence or Case timeline link (before 0.10.93) on the renamed tab, with what it carries", () => {
+    expect(currentTab("Evidence", "Case evidence")).toBe("Investigation evidence");
+    expect(currentTab("Evidence", "Case evidence?item=EV000012")).toBe("Investigation evidence?item=EV000012");
+    expect(currentTab("Trust & Audit", "Case timeline?case=c1&label=INV000001")).toBe(
+      "Investigation timeline?case=c1&label=INV000001",
+    );
+    expect(parseTrustTab("Case timeline?case=c1&label=INV000001")).toEqual({
+      tab: "Investigation timeline",
+      caseId: "c1",
+      caseLabel: "INV000001",
+    });
+    expect(currentTab("Evidence", "Requests?request=REQ000001")).toBe("Requests?request=REQ000001");
   });
 
   it("reads every ?section= address (used until 0.10.67) as its screen, and writes the screen's own path", () => {
@@ -250,7 +270,7 @@ describe("every link source resolves to an existing screen (6.10)", () => {
       ["Investigations", decisionTab({ followUp: "FU000001" })],
       ["Investigations", reviewsTab("REV000001")],
       ["Investigations", intelligenceTab("Unknowns")],
-      ["Trust & Audit", trustTab({ tab: "Case timeline", caseId: "c1", caseLabel: "INV000001" })],
+      ["Trust & Audit", trustTab({ tab: "Investigation timeline", caseId: "c1", caseLabel: "INV000001" })],
       ["Readiness", eventTab("c1")],
       ["Decisions", decisionTab({ caseId: "c1" })],
       ["Evidence", "Requests?request=REQ000001"],

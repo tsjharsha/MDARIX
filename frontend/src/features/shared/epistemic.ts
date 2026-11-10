@@ -141,4 +141,4 @@ export function statementBadge(input: {
 }
 
 /** The sentence shown with every block of AI output. */
-export const AI_REVIEW_NOTE = "AI interpretation — review before relying on it.";
+export const AI_REVIEW_NOTE = "AI interpretation: review before relying on it.";

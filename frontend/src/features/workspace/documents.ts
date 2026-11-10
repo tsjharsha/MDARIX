@@ -121,7 +121,7 @@ export function sourceTarget(source: Source): SourceTarget | null {
     CaseReview: "Reviews",
     Decision: "Decision",
     Signature: "Decision",
-    Evidence: "Case evidence",
+    Evidence: "Investigation evidence",
     Hypothesis: "Intelligence",
     FollowUp: "Decision",
   };

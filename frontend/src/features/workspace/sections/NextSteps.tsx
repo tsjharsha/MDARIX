@@ -61,10 +61,10 @@ function NextSteps({ investigationId }: { investigationId: string }) {
     setChosen(step);
   };
   return (
-    <Panel eyebrow="Next steps" title="What happens next with this case" source={options}>
+    <Panel eyebrow="Next steps" title="What happens next with this investigation" source={options}>
       <p className="ac-muted">
-        Choose how the work moves on. A next step records your reason and routes the work. A decision on the case is
-        prepared through the Decision Brief.
+        Choose how the work moves on. A next step records your reason and routes the work. A decision on the
+        investigation is prepared through the Decision Brief.
       </p>
       {steps.length ? (
         <ul className="uw-list" aria-label="Next steps">
@@ -86,7 +86,7 @@ function NextSteps({ investigationId }: { investigationId: string }) {
                   type="button"
                   className="ac-secondary"
                   disabled={!step.available}
-                  title={!step.available ? (step.reason ?? "Not available for this case now") : undefined}
+                  title={!step.available ? (step.reason ?? "Not available for this investigation now") : undefined}
                   onClick={() => choose(step)}
                 >
                   Choose <ArrowRight size={14} aria-hidden="true" />
@@ -98,7 +98,7 @@ function NextSteps({ investigationId }: { investigationId: string }) {
       ) : (
         <Empty
           title="No next steps right now"
-          detail="Nothing is suggested for this case at the moment. Next steps appear here as the case moves on."
+          detail="Nothing is suggested for this investigation at the moment. Next steps appear here as the investigation moves on."
         />
       )}
       {chosen && (
@@ -170,7 +170,7 @@ function NextStepDrawer({
       <form className="ca-form ca-drawer-section" onSubmit={submit}>
         {step.description && <p className="ac-muted">{step.description}</p>}
         <label className="ca-field">
-          Reason (kept in the case's history)
+          Reason (kept in the investigation's history)
           <textarea
             required
             rows={3}
@@ -182,7 +182,7 @@ function NextStepDrawer({
         </label>
         {form === "review" && (
           <p className="ac-muted">
-            The review goes to the reviewers' queue. They see the case's context and record their own outcome.
+            The review goes to the reviewers' queue. They see the investigation's context and record their own outcome.
           </p>
         )}
         {form === "request" && (
@@ -285,7 +285,7 @@ function RequestFields({
               ? "Loading…"
               : unknownRows.length
                 ? "Not tied to an unknown"
-                : "No unknowns recorded for this case"}
+                : "No unknowns recorded for this investigation"}
           </option>
           {unknownRows.map((row) => (
             <option key={row.unknown_id} value={row.unknown_id}>

@@ -257,7 +257,7 @@ export function ReportDrawer({
           )}
           {canWrite && <NextStep detail={detail} onChanged={changed} onOpen={onOpen} />}
         </section>
-        <section className="ca-drawer-section" aria-label="The case behind it">
+        <section className="ca-drawer-section" aria-label="What it was drafted from">
           <h3>Drafted from</h3>
           <p className="uw-cr-meta">
             Complaint {detail.complaint.ref} ({detail.complaint.product_name ?? "no product"}{" "}

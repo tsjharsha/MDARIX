@@ -28,7 +28,7 @@ export function CaseStoryLink({
   const go = () => {
     if (id !== work.investigationId && work.investigations.some((item) => String(item.id) === id))
       work.setInvestigationId(id);
-    open("Trust & Audit", trustTab({ tab: "Case timeline", caseId: id, caseLabel: safeText(caseLabel) }));
+    open("Trust & Audit", trustTab({ tab: "Investigation timeline", caseId: id, caseLabel: safeText(caseLabel) }));
   };
   return (
     <button type="button" className={className} onClick={go}>

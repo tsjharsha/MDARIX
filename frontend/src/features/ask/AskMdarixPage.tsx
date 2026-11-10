@@ -17,7 +17,7 @@ export const EXAMPLE_QUESTIONS = [
   "What changed in the latest version?",
   "Is the rise real, or just more devices in use?",
   "Which complaints report harm or a malfunction?",
-  "What does the evidence on this case show?",
+  "What does the evidence on this investigation show?",
 ];
 
 /** A fixed-rule answer to the counting part of a question (Ask without AI; the same as Getting started's). */
@@ -128,8 +128,11 @@ export function AskMdarixPage({
       <section className="product-header">
         <div>
           <p className="eyebrow">Ask MDARIX</p>
-          <h2>Ask about the active case</h2>
-          <p>Ask about this case in your own words. Answers come from your records and name the records they use.</p>
+          <h2>Ask about the active investigation</h2>
+          <p>
+            Ask about this investigation in your own words. Answers come from your records and name the records they
+            use.
+          </p>
         </div>
         <div className="version-pill">Human review required</div>
       </section>
@@ -170,7 +173,7 @@ export function AskMdarixPage({
         {!investigationId && (
           <p className="ask-hint">
             <Info size={14} aria-hidden="true" /> No investigation is selected, so MDARIX searches all of your records.
-            Choose one in the bar above to focus the answer on that case.
+            Choose one in the bar above to focus the answer on that investigation.
           </p>
         )}
         {error && (

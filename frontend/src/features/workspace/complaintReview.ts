@@ -393,19 +393,19 @@ export function backlogHeadline(summary: BacklogSummary | null | undefined): {
   const soon = summary?.due_soon ?? 0;
   if (!open)
     return {
-      title: "Every open complaint is in a signal or a case",
+      title: "Every open complaint is in a signal or an investigation",
       detail: "Nothing is waiting unseen. New complaints appear here until they join a signal or an investigation.",
       tone: "good",
     };
   if (past)
     return {
       title: `${count(past, "complaint")} past the ${target}-day target`,
-      detail: `${count(open, "open complaint")} ${open === 1 ? "is" : "are"} in no signal and no case${soon ? `; ${count(soon, "more")} ${soon === 1 ? "is" : "are"} due within a week` : ""}. Oldest first below.`,
+      detail: `${count(open, "open complaint")} ${open === 1 ? "is" : "are"} in no signal and no investigation${soon ? `; ${count(soon, "more")} ${soon === 1 ? "is" : "are"} due within a week` : ""}. Oldest first below.`,
       tone: "critical",
     };
   return {
     title: soon ? `${count(soon, "complaint")} due within a week` : "Every open complaint is within its target",
-    detail: `${count(open, "open complaint")} ${open === 1 ? "is" : "are"} in no signal and no case, against a ${target}-day target.`,
+    detail: `${count(open, "open complaint")} ${open === 1 ? "is" : "are"} in no signal and no investigation, against a ${target}-day target.`,
     tone: soon ? "warning" : "good",
   };
 }

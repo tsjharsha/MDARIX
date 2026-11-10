@@ -14,7 +14,7 @@ EXCLUSION_REASON = (
     "outside this investigation."
 )
 SCOPE_CHANGE_REASON = (
-    "Complaints added by the threshold rule since the case was opened; the closed-clamp report is excluded."
+    "Complaints added by the threshold rule since the investigation was opened; the closed-clamp report is excluded."
 )
 SCOPE_OBJECTIVES = (
     "Establish whether cassettes from moulding tool T-4 cause flow interruption on FlowSure 300 Rev 2, and decide "

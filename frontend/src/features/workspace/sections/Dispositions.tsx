@@ -101,7 +101,7 @@ export function Dispositions() {
         <StatTile
           label="Known issues linked"
           value={summary ? summary.by_branch.KNOWN_ISSUE : null}
-          detail="Added to an open case's scope"
+          detail="Added to an open investigation's scope"
           icon={<Link2 size={18} />}
           onOpen={() => choose("signed")}
         />
@@ -707,7 +707,9 @@ export function DispositionPanel({
                 </div>
               </section>
             ) : (
-              <p className="uw-hint">Signing a disposition needs signal triage, case opening or quality review.</p>
+              <p className="uw-hint">
+                Signing a disposition needs signal triage, investigation opening or quality review.
+              </p>
             )}
             <InlineError text={error} />
           </form>
@@ -801,7 +803,7 @@ export function SignedDisposition({ version }: { version: DispositionVersion }) 
         )}
         {version.investigation_ref && (
           <>
-            <dt>Case</dt>
+            <dt>Investigation</dt>
             <dd>{version.investigation_ref}</dd>
           </>
         )}
@@ -903,7 +905,7 @@ export function ResolutionTrend() {
                 (item) => `${item.product_name}, ${item.problem_code.replace(/_/g, " ").toLowerCase()}: ${item.count}`,
               )
               .join("; ")}
-            . The next such complaint is escalated by the recurrence trigger until a case covers it.
+            . The next such complaint is escalated by the recurrence trigger until an investigation covers it.
           </span>
         </div>
       )}

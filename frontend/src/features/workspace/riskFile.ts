@@ -136,7 +136,7 @@ export function riskFileHeadline(board: RiskFileBoard | null | undefined): {
       ]
         .filter(Boolean)
         .join(" · "),
-      detail: "Request a risk review on their cases, and finish the reassessments signed decisions asked for.",
+      detail: "Request a risk review on their investigations, and finish the reassessments signed decisions asked for.",
       tone: "critical",
     };
   if (reassessment_open || no_risk_register)

@@ -206,7 +206,7 @@ export function signProblem(screen: DispositionScreen, form: DispositionForm, tr
   const triggered = screen.trigger_codes.length > 0;
   if (triggered && form.branch !== "ESCALATED_BY_TRIGGER") return "A trigger is met: the complaint is escalated.";
   if (form.branch === "KNOWN_ISSUE" && !screen.candidates.some((item) => item.id === form.caseId))
-    return "Choose the open case this complaint belongs to.";
+    return "Choose the open investigation this complaint belongs to.";
   if (form.branch !== "SERVICE_LEVEL" && short(form.rationale, reasonMin))
     return `Write your reason in at least ${reasonMin} characters.`;
   if (

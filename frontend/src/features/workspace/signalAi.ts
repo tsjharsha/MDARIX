@@ -375,22 +375,22 @@ export function runHeadline(run: CaseAiRun | null | undefined): { title: string;
   if (!run)
     return {
       title: "The AI analysis has not run yet",
-      detail: "It runs by itself the first time the case opens, for someone allowed to run AI.",
+      detail: "It runs by itself the first time the investigation opens, for someone allowed to run AI.",
       tone: "neutral",
     };
   const { done, total } = runProgress(run);
   if (isRunning(run))
     return {
-      title: `Analysing the case… ${done} of ${total} steps done`,
+      title: `Analysing the investigation… ${done} of ${total} steps done`,
       detail: "Evidence, competing explanations, challenges, unknowns, failure chains and the investigation brief.",
       tone: "neutral",
     };
   const author = runAuthor(run);
   const by =
     author === "AI"
-      ? "Written by AI from the case's evidence, every statement cited."
+      ? "Written by AI from the investigation's evidence, every statement cited."
       : author === "RULES"
-        ? "Assembled by the rules from the case's records (AI is off or unavailable)."
+        ? "Assembled by the rules from the investigation's records (AI is off or unavailable)."
         : "Part by AI, part by the rules where AI was unavailable.";
   const trust = runTrust(run);
   const plural = (count: number) => (count === 1 ? "" : "s");
@@ -412,7 +412,7 @@ export function runHeadline(run: CaseAiRun | null | undefined): { title: string;
     return { title: `AI analysis stopped after ${done} of ${total} steps`, detail: run.error ?? by, tone: "warning" };
   return {
     title: "The AI analysis could not run",
-    detail: run.error ?? "Start it again, or work the case without it.",
+    detail: run.error ?? "Start it again, or work the investigation without it.",
     tone: "critical",
   };
 }

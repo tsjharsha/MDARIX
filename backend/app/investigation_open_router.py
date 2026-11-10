@@ -333,7 +333,7 @@ def manage_investigation(
                 422,
                 detail={
                     "code": "ASSIGNEE_NOT_ELIGIBLE",
-                    "message": "Assign the case to an active colleague whose role may work on cases",
+                    "message": "Assign the investigation to an active colleague whose role may work on investigations",
                 },
             )
         case.owner_ref = person.username
@@ -354,7 +354,7 @@ def manage_investigation(
                 409,
                 detail={
                     "code": "DECISIONS_AWAITING_REVIEW",
-                    "message": "A decision on this case still awaits its human review; finish it before closing",
+                    "message": "A decision on this investigation still awaits its human review; finish it before closing",
                 },
             )
         # A case in the Decision Brief flow closes only when its closure criteria are met (409

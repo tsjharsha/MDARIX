@@ -248,7 +248,8 @@ export function DecisionCenterView({
                   <ClipboardList size={18} /> AI advisory (optional)
                 </div>
                 <p className="context-summary" role="note">
-                  An AI advisory is a suggestion to review, never a decision. Use the next steps to move the case on.
+                  An AI advisory is a suggestion to review, never a decision. Use the next steps to move the
+                  investigation on.
                 </p>
                 <div className="toolbar">
                   <button className="primary-action secondary" onClick={runAdvisory}>
@@ -257,7 +258,7 @@ export function DecisionCenterView({
                 </div>
                 {advisory && (
                   <div className="advisory-box">
-                    <strong>AI Advisory — not a human decision</strong>
+                    <strong>AI Advisory (not a human decision)</strong>
                     <p>Recommended action: {advisory.advisory.recommended_action}</p>
                     <p>
                       {advisory.advisory.additional_evidence_needed.join(" ") ||
@@ -321,7 +322,7 @@ export function DecisionCenterView({
               </div>
               {advisory && (
                 <div className="advisory-box">
-                  <strong>AI Advisory — not a human decision</strong>
+                  <strong>AI Advisory (not a human decision)</strong>
                   <p>Recommended action: {advisory.advisory.recommended_action}</p>
                   <p>
                     {advisory.advisory.additional_evidence_needed.join(" ") ||
@@ -386,7 +387,7 @@ export function DecisionCenterView({
         {selected && (
           <div className="human-review-box">
             <strong>
-              Human Review — {displayId(selected, "decision_identifier", "Decision")} · required before finalization
+              Human Review: {displayId(selected, "decision_identifier", "Decision")} · required before finalization
             </strong>
             <p>Decision status: {titleCase(String(selected.decision_status ?? "—"))}</p>
             {selectedActions.reason && (
@@ -428,7 +429,7 @@ export function DecisionCenterView({
                 onSigned={(result) => {
                   setSignedResult({ decisionId: String(selected.id), data: result });
                   setMessage(
-                    `Decision ${displayId(selected, "decision_identifier", "")} ${titleCase(String(result.status ?? ""))} — signed.`,
+                    `Decision ${displayId(selected, "decision_identifier", "")} ${titleCase(String(result.status ?? ""))} and signed.`,
                   );
                   void loadDecisions(String(selected.id));
                 }}
@@ -446,7 +447,7 @@ export function DecisionCenterView({
 function SignedSummary({ signed }: { signed: any }) {
   return (
     <div className="advisory-box">
-      <strong>{signed.status} — SIGNED</strong>
+      <strong>{signed.status} (SIGNED)</strong>
       {safeText(signed.signature_business_id ?? signed.business_id) && (
         <p>Signature ID: {safeText(signed.signature_business_id ?? signed.business_id)}</p>
       )}
@@ -551,7 +552,7 @@ export function ControlledSignature({ decision, onSigned }: { decision: any; onS
   return (
     <div className="human-review-box">
       <button className="primary-action" onClick={begin}>
-        Approve or Reject — Sign
+        Approve or reject, then sign
       </button>
       {message && <p role="alert">{message}</p>}
       {open && (

@@ -141,7 +141,9 @@ def evaluate(facts: dict) -> dict:
         "overview",
         labels["overview"],
         "DONE" if question else "IN_PROGRESS",
-        "The case is open with its question" if question else "Write the question this case must answer",
+        "The investigation is open with its question"
+        if question
+        else "Write the question this investigation must answer",
     )
 
     if scope is None:
@@ -157,7 +159,7 @@ def evaluate(facts: dict) -> dict:
             "DONE" if complete else ("IN_PROGRESS" if scope.get("question") else "NOT_STARTED"),
             (f"Version {version}: " if version else "") + f"{_plural(included, 'complaint')} included"
             if complete
-            else "Add the complaints this case covers",
+            else "Add the complaints this investigation covers",
         )
         checks["scope_complete"] = _check(
             "scope_complete",
@@ -179,14 +181,14 @@ def evaluate(facts: dict) -> dict:
         if blocking:
             status, detail = "BLOCKED", f"Waiting for {_plural(blocking, 'urgent evidence request')}"
         elif total == 0:
-            status, detail = "NOT_STARTED", "No evidence on this case yet"
+            status, detail = "NOT_STARTED", "No evidence on this investigation yet"
         elif unreviewed:
             status, detail = "IN_PROGRESS", f"{unreviewed} of {total} still to review"
         else:
             status, detail = "DONE", f"All {_plural(total, 'piece')} of evidence reviewed"
         steps["evidence"] = _step("evidence", labels["evidence"], status, detail)
         if total == 0:
-            result, rationale = "PENDING", "No evidence on this case yet"
+            result, rationale = "PENDING", "No evidence on this investigation yet"
         elif unreviewed:
             result, rationale = "PENDING", f"{unreviewed} of {total} pieces of evidence are not reviewed yet"
         else:

@@ -1496,7 +1496,10 @@ def test_10_with_ai_switched_off_the_workflow_is_completed_by_hand(org):
     assert no_draft.status_code == 409 and _code(no_draft) == "AI_DRAFT_NOT_AVAILABLE"
     submitted = _submit(org, case_id)
     ai = submitted["content"]["ai_assistance"]
-    assert ai["executions"] == [] and ai["statement"] == "No AI was used in this case. People made the judgements."
+    assert (
+        ai["executions"] == []
+        and ai["statement"] == "No AI was used in this investigation. People made the judgements."
+    )
     brief = _accept(org, case_id)
     signed = _ok(_sign(decider, case_id, brief))
     assert signed["decision"]["ai_execution_refs"] == [] and signed["verification"]["status"] == "VALID"

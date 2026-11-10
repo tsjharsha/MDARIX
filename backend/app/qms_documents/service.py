@@ -224,7 +224,7 @@ def sha256(data: bytes) -> str:
 def _scope_ref(context: dict) -> str | None:
     scope = context.get("scope") or {}
     if scope.get("case"):
-        return f"case {scope['case']['ref']}"
+        return f"investigation {scope['case']['ref']}"
     if scope.get("change"):
         return f"change record {scope['change']['ref']}"
     return None

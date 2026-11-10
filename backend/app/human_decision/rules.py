@@ -32,7 +32,7 @@ CLOSE_NO_FURTHER_ACTION = "CLOSE_NO_FURTHER_ACTION"
 OUTCOMES: dict[str, tuple[str, str]] = {
     ACCEPT_CONCLUSION: (
         "Accept the conclusion",
-        "The proposed conclusion of the brief becomes the conclusion of the case.",
+        "The proposed conclusion of the brief becomes the conclusion of the investigation.",
     ),
     ACCEPT_WITH_CONDITIONS: (
         "Accept with conditions",
@@ -40,11 +40,11 @@ OUTCOMES: dict[str, tuple[str, str]] = {
     ),
     REJECT_CONCLUSION: (
         "Reject the conclusion",
-        "The proposed conclusion is not accepted: the brief goes back to its author and the case back to work.",
+        "The proposed conclusion is not accepted: the brief goes back to its author and the investigation back to work.",
     ),
     CLOSE_NO_FURTHER_ACTION: (
         "Close with no further action",
-        "The case needs no further action and can be closed.",
+        "The investigation needs no further action and can be closed.",
     ),
 }
 
@@ -294,13 +294,13 @@ BRIEF_TAMPERED = (
 )
 SUPERSEDE_REQUIRED = (
     "SUPERSEDE_REQUIRED",
-    "This case already has a signed decision; a new decision must name it as the decision it supersedes",
+    "This investigation already has a signed decision; a new decision must name it as the decision it supersedes",
 )
 SUPERSEDE_MISMATCH = (
     "SUPERSEDE_REQUIRED",
-    "A new decision supersedes only the case's current signed decision; name that decision",
+    "A new decision supersedes only the investigation's current signed decision; name that decision",
 )
-SUPERSEDE_NOT_ALLOWED = ("SUPERSEDE_NOT_ALLOWED", "This case has no signed decision to supersede")
+SUPERSEDE_NOT_ALLOWED = ("SUPERSEDE_NOT_ALLOWED", "This investigation has no signed decision to supersede")
 AUTHOR_DENIED = ("SOD_DENIED", "You wrote or submitted this brief; another authorized person decides on it")
 NOT_ENTITLED = ("DENIED_NOT_ENTITLED", "Your organization's plan does not include controlled signatures")
 ADMINISTRATOR_DENIED = (
@@ -335,7 +335,7 @@ def state_allows(state: str | None, has_current_decision: bool) -> bool:
 def state_refusal(state_label: str | None) -> tuple[str, str]:
     return (
         "CASE_NOT_READY_FOR_DECISION",
-        f"The case is {str(state_label or 'not ready').lower()}; a decision is taken once its brief is approved",
+        f"The investigation is {str(state_label or 'not ready').lower()}; a decision is taken once its brief is approved",
     )
 
 

@@ -536,7 +536,9 @@ def _lots_question(records: _Records) -> dict | None:
     if shared:
         # Lot genealogy (lot_components): the component lots both lots were built with (T-G5).
         facts.append(
-            f"Lots {' and '.join(names)} were both built with " + "; ".join(shared) + " (lot genealogy). A case's Lot "
+            f"Lots {' and '.join(names)} were both built with "
+            + "; ".join(shared)
+            + " (lot genealogy). An investigation's Lot "
             "impact lists every lot built with the same component lot."
         )
     else:
@@ -891,7 +893,9 @@ def _evidence_question(records: _Records) -> dict:
             # MDARIX knows what a case still needs only from what people record on it.
             missing=[]
             if requests or unknowns
-            else ["Evidence a case needs shows here once someone records it as a request or an open question."],
+            else [
+                "Evidence an investigation needs shows here once someone records it as a request or an open question."
+            ],
         ),
     }
 

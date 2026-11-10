@@ -92,7 +92,7 @@ export function verificationSummary(status: unknown): { label: string; tone: "go
     case "VALID":
       return { label: "All signatures valid", tone: "good" };
     case "INVALID":
-      return { label: "Invalid — at least one signature does not match the signed version", tone: "problem" };
+      return { label: "Invalid: at least one signature does not match the signed version", tone: "problem" };
     case "NOT_SIGNED":
     case "":
       return { label: "Not signed", tone: "neutral" };
@@ -162,7 +162,7 @@ export function SignatureVerificationWorkspace() {
         setDecisions(list);
         setDecisionId(list[0]?.id ? String(list[0].id) : "");
       })
-      .catch((error) => setMessage(describeError(error, "The decisions of this case could not be loaded.")));
+      .catch((error) => setMessage(describeError(error, "The decisions of this investigation could not be loaded.")));
   }, [caseId, mvp]);
 
   const verify = async () => {
@@ -193,7 +193,7 @@ export function SignatureVerificationWorkspace() {
           <h1>Signature verification</h1>
           <p>
             Check that every signature on a decision still matches the exact decision version that was signed. Signing
-            itself needs your password and authenticator code, and is done on the case&apos;s decision.
+            itself needs your password and authenticator code, and is done on the investigation&apos;s decision.
           </p>
         </div>
         <span className="platform-admin-badge warning">Human approval only</span>
