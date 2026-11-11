@@ -55,6 +55,16 @@ No migration. Switches: `MDARIX_B6_DEADLINE_LIST` and `MDARIX_B6_LATE_ENTRY` (bo
   `chronyc tracking` (`artifacts/clock-check-<time>.json`) for the release IQ, after a server, network or NTP change
   and in the restore drill (`DEPLOYMENT.md` 2.4, `BACKUP_AND_RESTORE.md` step 5). Records are never re-timed.
 
+### Changed (independent review of Part A)
+- `GET /api/v1/intake/possible-duplicates` needs a workflow role (a Viewer is refused, 403), takes the lot's product
+  when no product is chosen, and compares e-mails to check only while e-mail intake is on.
+- The late-entry reason is masked like the Case's other free text before it is stored and audited.
+- A deadline list with a source that could not be read says "INCOMPLETE" in the CSV and PDF; the daily e-mail is then
+  not queued (the job fails, the scheduler alerts, the next run retries) rather than sent short.
+- The clock check is shown in readiness but leaves the readiness status and the public status page as they were; it
+  measures on its own connection; the SNTP answer must be a synchronized server reply (stratum 1-15); timeout 1 s.
+- The deadline list's due times are in UTC, so the order by text is the order by time.
+
 ## [0.11.02] - not released yet
 
 B9b: other countries, attach-only reports. For a country outside the five built-in markets (US, EU and Northern

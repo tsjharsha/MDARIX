@@ -1318,8 +1318,20 @@ def possible_duplicates(db: Session, tenant_id: uuid.UUID, mine: dict) -> list[d
     pairs with what the form holds: Cases, complaints of the product and e-mails still to check (B7b) that came in
     meanwhile. ``mine``: product_id, lot (text), serial, site, country, event_on. Suggestions only: the person links or
     saves anyway; nothing is merged."""
+    from backend.app import mail_in
+    from backend.app.db.models.foundation import ProductVersion
     from backend.app.db.models.intake import InboundMessage
 
+    if not mine.get("product_id") and mine.get("lot_id"):
+        # No product chosen but a known lot: the lot's product, as Log a case takes it (PV-1 F2).
+        mine = {
+            **mine,
+            "product_id": db.query(ProductVersion.product_id)
+            .join(LotBatch, LotBatch.product_version_id == ProductVersion.id)
+            .filter(LotBatch.tenant_id == tenant_id, LotBatch.lot_identifier == mine["lot_id"])
+            .limit(1)
+            .scalar(),
+        }
     if not mine.get("product_id"):
         return []
     product = mine["product_id"]
@@ -1358,12 +1370,15 @@ def possible_duplicates(db: Session, tenant_id: uuid.UUID, mine: dict) -> list[d
     for complaint in complaints:
         source = "Sample complaint" if is_sample(complaint.source_system) else "Complaint"
         check(COMPLAINT, complaint.id, complaint_ref(complaint), source, _duplicate_fields(COMPLAINT, complaint, lots))
-    for message in (
+    messages = (
         db.query(InboundMessage)
         .filter(InboundMessage.tenant_id == tenant_id, InboundMessage.state == "NEW")
         .order_by(InboundMessage.received_at.desc())
         .limit(BACK_ENTRY_SCAN)
-    ):
+        if mail_in.enabled()
+        else []
+    )
+    for message in messages:
         ids = (message.draft or {}).get("identifiers") or {}
         site = (message.draft or {}).get("site") or {}
         if str((ids.get("product") or {}).get("id") or "") != str(product):

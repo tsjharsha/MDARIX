@@ -115,7 +115,10 @@ def lines(db: Session, control_db: Session | None, tenant_id, now: datetime | No
     now = now or service.now_utc()
     view = service.settings_view(service.settings_row(db, tenant_id))
     calendar = service.calendar_from(view)
-    items = [item for item in service.due_items(db, control_db, tenant_id, now) if item["category"] in CATEGORIES]
+    incomplete: list[str] = []
+    items = [
+        item for item in service.due_items(db, control_db, tenant_id, now, incomplete) if item["category"] in CATEGORIES
+    ]
     obligation_ids = [
         uuid.UUID(item["key"].split(":", 1)[1]) for item in items if item["key"].startswith("obligation:")
     ]
@@ -147,6 +150,7 @@ def lines(db: Session, control_db: Session | None, tenant_id, now: datetime | No
             found += _other_lines(db, tenant_id, now, calendar.zone, {item["key"] for item in items})
     except Exception:
         logger.exception("The other-country deadlines of %s could not be read for the deadline list", tenant_id)
+        incomplete.append("other countries")
     out = []
     for item in found:
         due_at = item["due_at"]
@@ -158,7 +162,8 @@ def lines(db: Session, control_db: Session | None, tenant_id, now: datetime | No
                 "ref": item["ref"] or "",
                 "market": _market_label(item["market"], item["country"]),
                 "owed": item["owed"],
-                "due_at": due_at.isoformat() if due_at else None,
+                # In UTC, so the text sorts as the times do (a task's due time may carry another offset).
+                "due_at": due_at.astimezone(timezone.utc).isoformat() if due_at else None,
                 "due_label": due_label(due_at, item["market"], calendar.zone) if due_at else "Due date not entered",
                 "state": state,
                 "state_label": STATE_LABELS[state],
@@ -169,7 +174,14 @@ def lines(db: Session, control_db: Session | None, tenant_id, now: datetime | No
     out.sort(
         key=lambda line: (line["state"] != rules.OVERDUE, line["due_at"] is None, line["due_at"] or "", line["key"])
     )
-    return {"as_of": now.isoformat(), "zone": calendar.zone, "day": calendar.local_day(now).isoformat(), "lines": out}
+    return {
+        "as_of": now.isoformat(),
+        "zone": calendar.zone,
+        "day": calendar.local_day(now).isoformat(),
+        "lines": out,
+        # A source that could not be read: the list must say it is incomplete, never look complete.
+        "incomplete": incomplete,
+    }
 
 
 def with_owners(control_db: Session | None, tenant_id, found: dict) -> list[dict]:
@@ -189,15 +201,23 @@ def headline(count: int) -> str:
     return f"{count} open reporting deadline{'' if count == 1 else 's'} today"
 
 
+def incomplete_note(incomplete: list[str]) -> str:
+    return (
+        f"INCOMPLETE: {', '.join(incomplete)} could not be read; check MDARIX for the full list." if incomplete else ""
+    )
+
+
 # --------------------------------------------------------------------------------------------- downloads
 
 
-def as_csv(rows: list[dict]) -> bytes:
+def as_csv(rows: list[dict], incomplete: list[str] | None = None) -> bytes:
     from backend.app import csv_safe
 
     stream = io.StringIO()
     writer = csv_safe.writer(stream, fieldnames=list(CSV_FIELDS))
     writer.writeheader()
+    if incomplete:
+        writer.writerow({"ref": "INCOMPLETE", "owed": incomplete_note(incomplete)})
     for line in rows:
         writer.writerow(
             {
@@ -234,6 +254,7 @@ def as_pdf(found: dict, rows: list[dict], organization: str | None) -> bytes:
         [
             f"Organization: {organization or '-'}",
             f"As of {found['as_of'][:16].replace('T', ' ')} UTC; times in {found['zone']}. {headline(len(rows))}.",
+            *([incomplete_note(found["incomplete"])] if found.get("incomplete") else []),
             OUTAGE_NOTE,
         ],
         body,
@@ -274,6 +295,9 @@ def queue_for_tenant(control_db: Session, data_db: Session, tenant_id: uuid.UUID
     if _already_queued(control_db, tenant_id, day):
         return False
     found = lines(data_db, control_db, tenant_id, now)
+    if found["incomplete"]:
+        # Never e-mail a short list that looks complete: the job fails (the scheduler alerts) and retries next run.
+        raise RuntimeError(f"Deadline list incomplete: {', '.join(found['incomplete'])} could not be read")
     keep = ("ref", "market", "owed", "due_at", "due_label", "state", "state_label", "owner_id")
     control_db.add(
         OutboxEvent(

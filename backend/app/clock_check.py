@@ -26,7 +26,7 @@ from sqlalchemy import text
 LIMIT_SECONDS = 1.0
 NTP_ENV = "MDARIX_NTP_SERVER"
 NTP_CACHE_SECONDS = 300
-NTP_TIMEOUT = 2.0
+NTP_TIMEOUT = 1.0
 OK, DEGRADED, UNKNOWN = "ok", "degraded", "unknown"
 _NTP_EPOCH = 2208988800  # seconds from 1900-01-01 (NTP) to 1970-01-01 (Unix)
 _lock = threading.Lock()
@@ -60,7 +60,8 @@ def sntp_offset(server: str, timeout: float = NTP_TIMEOUT, clock=time.time) -> f
             received = clock()
     except (OSError, ValueError):
         return None
-    if len(answer) < 48 or answer[1] == 0:  # stratum 0: a "kiss of death", no time
+    # A server answer (mode 4), synchronized (leap indicator not 3), stratum 1-15 (0 is a "kiss of death").
+    if len(answer) < 48 or answer[0] & 7 != 4 or answer[0] >> 6 == 3 or not 1 <= answer[1] <= 15:
         return None
     server_received, server_sent = _ntp_time(answer[32:40]), _ntp_time(answer[40:48])
     return ((server_received - sent) + (server_sent - received)) / 2
@@ -99,10 +100,17 @@ def assess(database: float | None, ntp: float | None, ntp_server: str | None, li
     }
 
 
-def check(connection) -> dict:
-    """Measure and assess now (``connection``: a SQLAlchemy connection or session)."""
+def check(connection=None) -> dict:
+    """Measure and assess now, on ``connection`` or on a connection of its own (never a caller's session, which a
+    failed query would leave needing a rollback)."""
     try:
-        database = database_offset(connection)
+        if connection is None:
+            from backend.app.db.session import runtime_engine
+
+            with runtime_engine.connect() as own:
+                database = database_offset(own)
+        else:
+            database = database_offset(connection)
     except Exception:
         database = None
     server, ntp = _ntp(time.monotonic())

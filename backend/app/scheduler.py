@@ -222,7 +222,7 @@ def operations_alerts(db: Session, state: dict) -> dict:
     # B6a G19: the clock check (app vs database vs NTP within 1 s), alerted once and once when it clears.
     from backend.app import clock_check
 
-    clock = clock_check.check(db)
+    clock = clock_check.check()
     clock_check.alert(state, clock, send_alert)
     return {
         "dead_letters": dead,

@@ -537,9 +537,12 @@ def _with_complaints(db: Session, tenant_id, items: list[dict]) -> None:
             item["market"] = item["market"] or markets.market_of(row.country)
 
 
-def due_items(db: Session, control_db: Session | None, tenant_id, now: datetime | None = None) -> list[dict]:
+def due_items(
+    db: Session, control_db: Session | None, tenant_id, now: datetime | None = None, failed: list[str] | None = None
+) -> list[dict]:
     """Every dated item of the organization (see the module docstring), soonest first. A source that cannot be read
-    (an older database) is left out and logged; the others still show."""
+    (an older database) is left out and logged, and named in ``failed`` when given (B6a: the deadline list says it is
+    incomplete); the others still show."""
     now = now or now_utc()
     calendar = calendar_of(db, tenant_id)
     sources = (
@@ -558,6 +561,8 @@ def due_items(db: Session, control_db: Session | None, tenant_id, now: datetime 
                 items += read()
         except Exception:
             logger.exception("The %s of %s could not be read for the oversight view", name, tenant_id)
+            if failed is not None:
+                failed.append(name)
     for item in items:
         if item["due_at"].tzinfo is None:
             item["due_at"] = item["due_at"].replace(tzinfo=timezone.utc)

@@ -107,7 +107,8 @@ def _sample_complaint(tenant_id):
         }
 
 
-def test_possible_duplicates_before_saving_a_back_entry(trial):  # B6-09
+def test_possible_duplicates_before_saving_a_back_entry(trial, monkeypatch):  # B6-09
+    monkeypatch.setenv("MDARIX_EMAIL_INTAKE", "on")  # e-mails to check are compared only while intake is on
     user = trial["user"]
     known = _sample_complaint(trial["tenant_id"])
     query = {key: known[key] for key in ("product_id", "lot", "country", "event_on")}
@@ -166,3 +167,21 @@ def test_the_switch_off_on_off(trial, monkeypatch):  # B6-46
         found = user.get(f"{INTAKE}/possible-duplicates", params={"product_id": known["product_id"]})
         assert found.status_code == (200 if on else 404)
         assert user.get("/api/v1/session/context").json()["b6"]["late_entry"] is on
+
+
+def test_possible_duplicates_needs_a_role_and_takes_the_lots_product(trial):  # review findings 1, 7
+    from tests.test_reporting_capa_api import _client
+
+    known = _sample_complaint(trial["tenant_id"])
+    viewer = _client(trial["tenant_id"], "VIEWER")
+    assert viewer.get(f"{INTAKE}/possible-duplicates", params={"product_id": known["product_id"]}).status_code == 403
+    by_lot = trial["user"].get(
+        f"{INTAKE}/possible-duplicates", params={k: known[k] for k in ("lot", "country", "event_on")}
+    )
+    assert by_lot.status_code == 200 and known["id"] in {hit["id"] for hit in by_lot.json()["items"]}
+
+
+def test_the_late_entry_reason_is_masked(trial):  # review finding 2
+    saved = _contact(trial["user"], 30, late_entry_reason="Paper log kept by jane.doe@example.com during the outage")
+    assert saved.status_code == 200, saved.text
+    assert "jane.doe@example.com" not in (saved.json()["late_entry_reason"] or "")

@@ -727,7 +727,7 @@ def deadlines_csv(
     found, rows = _deadlines(db, control_db, ctx, "csv")
     db.commit()
     return Response(
-        content=deadline_list.as_csv(rows),
+        content=deadline_list.as_csv(rows, found["incomplete"]),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": attachment(f"mdarix-deadlines-{found['day']}.csv")},
     )

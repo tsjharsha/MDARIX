@@ -221,3 +221,18 @@ def test_the_switch_off_on_off(trial, monkeypatch):  # B6-46
         assert user.get("/api/v1/session/context").json()["b6"]["deadline_list"] is on
         assert _queue(trial["tenant_id"], later) is on
         later += timedelta(days=1)
+
+
+def test_a_source_that_cannot_be_read_makes_the_list_say_incomplete(trial, monkeypatch):  # review finding 3
+    real = deadline_list.service.due_items
+
+    def failing(db, control_db, tenant_id, now=None, failed=None):
+        found = real(db, control_db, tenant_id, now, failed)
+        failed.append("reports")
+        return found
+
+    monkeypatch.setattr(deadline_list.service, "due_items", failing)
+    body = trial["user"].get(f"{URL}/deadlines.csv").content.decode("utf-8-sig")
+    assert body.splitlines()[1].startswith("INCOMPLETE") and "reports could not be read" in body
+    with pytest.raises(RuntimeError, match="incomplete"):  # never e-mailed as if complete; the job alerts and retries
+        _queue(trial["tenant_id"], _local_noon(trial["tenant_id"], 120))

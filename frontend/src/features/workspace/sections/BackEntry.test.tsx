@@ -25,6 +25,10 @@ describe("back-entry after an outage", () => {
     expect(path).toBe(
       "/api/v1/intake/possible-duplicates?product_id=p-1&lot=L+7&serial=&site=City+Hospital&country=IN&event_on=2026-11-10",
     );
+    // No product chosen: the lot alone, never an empty product id (the server would refuse it).
+    expect(duplicatesPath({ product: "", lot: "L7", serial: "", site: "", country: "", event: "" })).toBe(
+      "/api/v1/intake/possible-duplicates?lot=L7&serial=&site=&country=",
+    );
   });
 
   it("explains that the clock counts from awareness and lists each possible duplicate with its reasons", () => {

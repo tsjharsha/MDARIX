@@ -215,12 +215,10 @@ def _scheduler(job: str = SCHEDULER_WATCH_JOB, max_age: timedelta = SCHEDULER_MA
 def _clock() -> dict:
     """B6a G19: app vs database vs NTP within 1 s (backend/app/clock_check.py); unknown or above the limit is not ok."""
     from backend.app import clock_check
-    from backend.app.db.session import runtime_engine
 
     started = time.perf_counter()
     try:
-        with runtime_engine.connect() as connection:
-            result = clock_check.check(connection)
+        result = clock_check.check()
     except Exception as exc:  # a probe must report, never raise
         logger.warning("Readiness check clock failed: %s", type(exc).__name__)
         result = {"state": clock_check.UNKNOWN, "error": type(exc).__name__}
@@ -243,12 +241,13 @@ def readiness_report() -> dict:
             outbox,
             _check("scheduler", _scheduler),
             _check("email", lambda: _email(outbox.get("email_failing", 0))),
-            _clock(),
         ]
         status = "ready" if database["ok"] else "not_ready"
         if status == "ready" and not all(item["ok"] for item in others):
             status = "degraded"
-        report = {"status": status, "checks": [database, *others]}
+        # B6a G19: reported, and alerted by the operations job, but it leaves the status (and the public status page)
+        # as it was (spec 3.4).
+        report = {"status": status, "checks": [database, *others, _clock()]}
         # Cached from when the report is ready: probes that time out (a database down) take longer than the cache.
         _cached = (time.monotonic(), report)
         return report

@@ -427,7 +427,10 @@ function LogDrawer({
     lateEntry &&
     !email &&
     (lateNeeded || looksLate([form.received, form.firstKnowledge, urgent ? form.awareness : ""]));
-  const duplicateQuery = typeProduct || !form.product ? "" : duplicatesPath(form);
+  const duplicateQuery =
+    (!typeProduct && form.product) || form.lot
+      ? duplicatesPath({ ...form, product: typeProduct ? "" : form.product })
+      : "";
   const submit = async () => {
     setBusy(true);
     setError("");

@@ -74,6 +74,32 @@ def test_sntp_offset_against_a_local_time_server():
         server.close()
 
 
+def test_an_unsynchronized_time_server_is_not_believed(monkeypatch):
+    unsynchronized = bytes([0xDC, 0x02]) + _answer(5.0, 1000.0)[2:]  # leap indicator 3: the server's clock is not set
+
+    class _Socket:
+        def __init__(self, *args):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def settimeout(self, _):
+            pass
+
+        def sendto(self, *args):
+            pass
+
+        def recvfrom(self, _):
+            return unsynchronized, None
+
+    monkeypatch.setattr(clock_check.socket, "socket", _Socket)
+    assert clock_check.sntp_offset("time.example") is None
+
+
 def test_a_time_server_that_does_not_answer_is_unknown():
     silent = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     silent.bind(("127.0.0.1", 0))

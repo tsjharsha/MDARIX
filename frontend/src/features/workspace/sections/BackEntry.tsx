@@ -26,8 +26,15 @@ export function duplicatesPath(form: {
   country: string;
   event: string;
 }): string {
-  const query = new URLSearchParams({ product_id: form.product, lot: form.lot, serial: form.serial, site: form.site });
-  query.set("country", form.country);
+  // No product chosen: the server takes the lot's product (the lot alone is enough to check).
+  const query = new URLSearchParams(form.product ? { product_id: form.product } : {});
+  for (const [key, value] of [
+    ["lot", form.lot],
+    ["serial", form.serial],
+    ["site", form.site],
+    ["country", form.country],
+  ])
+    query.set(key, value);
   if (form.event) query.set("event_on", form.event.slice(0, 10));
   return `${INTAKE}/possible-duplicates?${query}`;
 }

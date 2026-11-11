@@ -805,7 +805,7 @@ def shipped_to(
     return service.shipped_to(db, _tenant(ctx), site)
 
 
-@router.get("/intake/possible-duplicates")
+@router.get("/intake/possible-duplicates", dependencies=[ANY_ROLE])
 def possible_duplicates(
     product_id: uuid.UUID | None = None,
     lot: str = Query("", max_length=120),
@@ -1142,9 +1142,10 @@ def _late_entry_reason(text: str, aware: datetime, now: datetime, from_email: bo
 
     if from_email or not feature_set.switched_on(LATE_ENTRY_SWITCH):
         return None
+    # Masked like the other free text of the Case: the reason is stored and copied into the audit trail.
+    reason = _masked_text(rules.clean(text, rules.TEXT_MAX))[0]
     if now - aware <= timedelta(hours=rules.LATE_ENTRY_HOURS):
-        return rules.clean(text, rules.TEXT_MAX) or None
-    reason = rules.clean(text, rules.TEXT_MAX)
+        return reason or None
     if len(reason) < rules.REASON_MIN:
         raise _error(
             422,
