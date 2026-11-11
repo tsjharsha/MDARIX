@@ -197,6 +197,7 @@ def _mark_concluded(db: Session, tenant_id: uuid.UUID, records: list[dict]) -> N
             ComplaintMarketAssessment.tenant_id == tenant_id,
             ComplaintMarketAssessment.complaint_id.in_(wanted),
             ComplaintMarketAssessment.conclusion.isnot(None),
+            ComplaintMarketAssessment.market != "OTHER",  # B9b: a five-market decision, as before
         )
         .distinct()
     }

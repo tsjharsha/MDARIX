@@ -151,7 +151,8 @@ def decision_trees(
     }
     rows = (
         db.query(ComplaintMarketAssessment)
-        .filter(ComplaintMarketAssessment.tenant_id == tenant_id)
+        # B9b: the five markets' trees; a country outside them is read by reportability/other_countries.
+        .filter(ComplaintMarketAssessment.tenant_id == tenant_id, ComplaintMarketAssessment.market != "OTHER")
         .order_by(ComplaintMarketAssessment.version)
         .all()
     )

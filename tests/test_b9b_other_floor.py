@@ -95,6 +95,7 @@ def test_notes_and_folding():
 
 
 def test_the_switch_off_hides_the_floor_but_a_record_still_reads_it(monkeypatch):
+    monkeypatch.setenv("MDARIX_B9B_OTHER", "on")  # on/off/on whatever the run's environment says
     assert register.floor("OTHER")["code"] == "OTHER-floor-1"
     monkeypatch.setenv("MDARIX_B9B_OTHER", "off")
     assert register.floor("OTHER") is None

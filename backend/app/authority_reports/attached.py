@@ -156,7 +156,8 @@ def follow_conclusion(db, ctx, tenant_id, complaint_id, country: str, signed, no
             _set_entries(existing, due_source=source)
             _audit(db, ctx, "REPORT_DUE_DATE_FROM_WINDOW", existing, old, {"due_on": reports._iso(signed.due_on)})
         return
-    if existing is None or existing.state not in rules.CANCELLABLE:
+    # Only a report never submitted: one rejected by the authority (CORRECTION) was received, so it stays.
+    if existing is None or existing.state != rules.DRAFT:
         return
     reason = (
         f"The {other.name_of(country)} conclusion signed on {now.date().isoformat()} (version {signed.version}) says "
@@ -264,6 +265,8 @@ def detail(db, control_db, ctx, obligation) -> dict:
             "set_due_date": on and source != WINDOW and obligation.state in SUBMITTABLE,
             "follow_up": on and obligation.parent_id is None and obligation.state in CLOSABLE,
             "close": on and obligation.state in CLOSABLE and not open_children,
+            # A follow-up never sent is cancelled with a reason (the shared cancel route).
+            "cancel": on and obligation.parent_id is not None and obligation.state == rules.DRAFT,
         },
     }
 
@@ -286,6 +289,16 @@ class AttachedSubmission(BaseModel):
     note: str = Field(default="", max_length=rules.NOTE_MAX * 2)
     password: str = Field(min_length=1, max_length=128)
     mfa_code: str | None = Field(default=None, max_length=12)
+
+
+def _local_day(db, tenant_id, moment: datetime) -> date:
+    """The day a moment falls on in the organization's time zone (the screen sends UTC: 02:00 IST is the day before)."""
+    from zoneinfo import ZoneInfo
+
+    try:
+        return moment.astimezone(ZoneInfo(deadlines.org_zone(db, tenant_id) or "UTC")).date()
+    except Exception:  # an unknown zone name: the day in UTC
+        return moment.date()
 
 
 def submitted_meaning(country: str, day: date) -> str:
@@ -378,7 +391,7 @@ def attached_submission(
         remarks=f"Report ID: {report_id or NOT_ISSUED}",
         signer_user_id=str(ctx.user_id),
         signer_role=role or "UNKNOWN",
-        signature_meaning=submitted_meaning(obligation.country, payload.submitted_at.date()),
+        signature_meaning=submitted_meaning(obligation.country, _local_day(db, tenant_id, payload.submitted_at)),
         content_fingerprint=content_fingerprint,
         signature_hash=signature_hash(content_fingerprint, str(ctx.user_id), str(attempt)),
         status="SIGNED",

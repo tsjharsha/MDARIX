@@ -155,7 +155,20 @@ def _obligation(db, tenant_id, obligation_id, *, lock: bool = False) -> ReportOb
     found = (query.with_for_update().populate_existing() if lock else query).one_or_none()
     if found is None:
         raise _error(404, "REPORT_NOT_FOUND", "No such report in your organization")
+    if lock and found.form_code == forms.ATTACHED.code:
+        # B9b: every change to an Other Regulatory Report goes through a locked read: switched off, it stays readable
+        # and nothing changes it (the shared evidence, complete and cancel routes included).
+        from backend.app.reportability import other_countries
+
+        if not other_countries.switched_on():
+            raise _error(404, "OTHER_COUNTRIES_OFF", "Other countries are switched off")
     return found
+
+
+def _not_attached(obligation: ReportObligation) -> None:
+    """B9b: a built-in form's step that an Other Regulatory Report does not have (it has its own routes)."""
+    if obligation.form_code == forms.ATTACHED.code:
+        raise _error(409, "ATTACHED_OWN_ROUTES", "An Other Regulatory Report has its own steps on its page")
 
 
 def _form(obligation: ReportObligation) -> forms.Form:
@@ -2599,6 +2612,14 @@ def evidence(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     obligation = _obligation(db, _tenant(ctx), obligation_id, lock=True)
+    if obligation.form_code == forms.ATTACHED.code and obligation.state not in (
+        rules.PENDING,
+        rules.NO_ACK,
+        rules.ACCEPTED,
+        rules.FOLLOW_UP,
+    ):
+        # B9b: the authority's answer comes after "Submitted" and before Close; a closed or cancelled report stays.
+        raise _error(409, "NOT_OPEN_FOR_EVIDENCE", "This report is not waiting for the authority's answer")
     attempt = next((row for row in _submissions(db, obligation) if row.id == submission_id), None)
     if attempt is None:
         raise _error(404, "SUBMISSION_NOT_FOUND", "No such submission of this report")
@@ -2688,6 +2709,7 @@ def follow_up(
 ):
     """A follow-up is due (for example a supplemental report, 21 CFR 803.56): the initial deadline stays met."""
     obligation = _obligation(db, _tenant(ctx), obligation_id, lock=True)
+    _not_attached(obligation)  # B9b: its follow-ups are child reports (attached-follow-ups)
     note = _text(payload.note)
     if not note or len(note) < rules.REASON_MIN:
         raise _error(422, "REASON_REQUIRED", f"Say what is due, in at least {rules.REASON_MIN} characters")
@@ -3392,7 +3414,11 @@ def cancel_follow_up(
     reason = _text(payload.reason)
     if not reason or len(reason) < rules.REASON_MIN:
         raise _error(422, "REASON_REQUIRED", f"Say why, in at least {rules.REASON_MIN} characters")
-    if not keeps_own_clock(obligation):
+    # B9b: an Other Regulatory Report's follow-up (a child report) never sent is cancelled here too.
+    attached_child = obligation.form_code == forms.ATTACHED.code and obligation.parent_id is not None
+    if attached_child and obligation.state != rules.DRAFT:
+        raise _error(409, "ALREADY_SENT", "This follow-up was submitted (or cancelled): it stays as recorded")
+    if not keeps_own_clock(obligation) and not attached_child:
         raise _error(409, "NOT_A_FOLLOW_UP", "Only a follow-up is cancelled here: a report follows its conclusion")
     if is_canada_chain(obligation) and chain_type(obligation) == forms.CA_FINAL:
         # Nothing could make it again (it is made when the Preliminary is submitted): s.61's final report stays owed.
@@ -3420,6 +3446,10 @@ def cancel_follow_up(
     )
     db.commit()
     end_cancelled_approvals(db, ctx, obligation.tenant_id, pending, "Cancelled: the follow-up was not sent")
+    if attached_child:
+        from backend.app.authority_reports import attached
+
+        return attached.detail(db, control_db, ctx, obligation)
     return detail(db, control_db, ctx, obligation)
 
 

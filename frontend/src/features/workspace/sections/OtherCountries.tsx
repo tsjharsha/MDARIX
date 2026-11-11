@@ -230,6 +230,8 @@ export type AttachedDetail = DeadlineFields & {
     set_due_date: boolean;
     follow_up: boolean;
     close: boolean;
+    /** A follow-up never sent: cancelled with a reason. */
+    cancel?: boolean;
   };
 };
 
@@ -364,6 +366,7 @@ export function OtherReportPage({
             <FollowUpsPart detail={detail} canWrite={canWrite} action={action} onOpen={openReport} />
           )}
           {canWrite && detail.can.close && <CloseForm detail={detail} action={action} />}
+          {canWrite && detail.can.cancel && <CloseForm detail={detail} action={action} cancel />}
           {!canWrite && <p className="ac-muted">You can read this report; a Regulatory Leader works on it.</p>}
           <InlineError text={error} />
         </div>
@@ -639,7 +642,9 @@ function Acknowledgement({
   const [receivedAt, setReceivedAt] = useState(nowLocal());
   const [reference, setReference] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [note, setNote] = useState("");
   const [fileError, setFileError] = useState("");
+  const ready = !!kind && (!!file || !!note.trim()) && !action.busy;
   const record = async () => {
     setFileError("");
     let content: FileIn | null = null;
@@ -657,6 +662,7 @@ function Acknowledgement({
         outcome,
         received_at: new Date(receivedAt).toISOString(),
         file: content,
+        note,
         authority_reference: reference,
       },
       "The authority's answer was not recorded.",
@@ -668,7 +674,7 @@ function Acknowledgement({
       aria-label="The authority's answer"
       onSubmit={(event) => {
         event.preventDefault();
-        if (kind && !action.busy) void record();
+        if (ready) void record();
       }}
     >
       <h3>The authority's answer</h3>
@@ -692,11 +698,16 @@ function Acknowledgement({
           <input value={reference} maxLength={240} onChange={(event) => setReference(event.target.value)} />
         </label>
         <label className="ca-field">
-          The file (optional)
+          The file
           <input type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
         </label>
+        <label className="ca-field">
+          Or a note (when there is no file)
+          <input value={note} maxLength={2000} onChange={(event) => setNote(event.target.value)} />
+        </label>
       </div>
-      <button type="submit" className="ac-secondary" disabled={!kind || action.busy}>
+      {/* The server keeps the evidence itself: a file, or a note describing it (EVIDENCE_REQUIRED). */}
+      <button type="submit" className="ac-secondary" disabled={!ready}>
         Record it
       </button>
       <InlineError text={fileError} />
@@ -765,31 +776,39 @@ function FollowUpsPart({
   );
 }
 
-function CloseForm({ detail, action }: { detail: AttachedDetail; action: Action }) {
+/** Close a submitted report with a reason; or (``cancel``) cancel a follow-up that was never sent. */
+function CloseForm({ detail, action, cancel = false }: { detail: AttachedDetail; action: Action; cancel?: boolean }) {
   const [reason, setReason] = useState("");
   const acknowledged = detail.state === "ACCEPTED" || detail.state === "FOLLOW_UP_DUE";
   return (
     <form
       className="uw-card uw-card-pad ca-form"
-      aria-label="Close the report"
+      aria-label={cancel ? "Cancel this follow-up" : "Close the report"}
       onSubmit={(event) => {
         event.preventDefault();
         if (reason.trim().length >= REASON_MIN && !action.busy)
-          void action.run(`${REPORTS}/${detail.id}/complete`, "POST", { reason }, "The report was not closed.");
+          void action.run(
+            `${REPORTS}/${detail.id}/${cancel ? "cancel" : "complete"}`,
+            "POST",
+            { reason },
+            cancel ? "The follow-up was not cancelled." : "The report was not closed.",
+          );
       }}
     >
-      <h2>Close the report</h2>
+      <h2>{cancel ? "Cancel this follow-up" : "Close the report"}</h2>
       <p className="ac-muted">
-        {acknowledged
-          ? "Nothing more is owed? Say why, and close it."
-          : "No acknowledgement recorded: say why nothing more is expected (for example, the authority sends none)."}
+        {cancel
+          ? "Not needed after all? Say why; it is kept as cancelled before it was sent."
+          : acknowledged
+            ? "Nothing more is owed? Say why, and close it."
+            : "No acknowledgement recorded: say why nothing more is expected (for example, the authority sends none)."}
       </p>
       <label className="ca-field">
-        Why it is closed (required)
+        {cancel ? "Why it is cancelled (required)" : "Why it is closed (required)"}
         <input value={reason} maxLength={2000} onChange={(event) => setReason(event.target.value)} />
       </label>
       <button type="submit" className="ac-secondary" disabled={reason.trim().length < REASON_MIN || action.busy}>
-        Close
+        {cancel ? "Cancel the follow-up" : "Close"}
       </button>
     </form>
   );

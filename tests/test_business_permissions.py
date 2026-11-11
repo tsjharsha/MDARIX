@@ -313,6 +313,8 @@ def test_a_viewer_is_refused_on_every_guarded_route(monkeypatch):
     monkeypatch.setenv("MDARIX_FEATURE_SET", "full")
     # B7b: e-mail intake answers 404 while switched off, before the guard runs; switch it on so the guard is reached.
     monkeypatch.setenv("MDARIX_EMAIL_INTAKE", "on")
+    # B9b: the same for other countries (its routes answer 404 while MDARIX_B9B_OTHER is off).
+    monkeypatch.setenv("MDARIX_B9B_OTHER", "on")
     viewer = _client_with_role("Viewer")
     allowed = []
     for method, path, route in _business_actions():

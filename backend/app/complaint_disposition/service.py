@@ -178,7 +178,10 @@ def facts_of(db: Session, tenant_id: uuid.UUID, complaint: Complaint, product_na
     assessments = (
         db.query(ComplaintMarketAssessment)
         .filter(
-            ComplaintMarketAssessment.tenant_id == tenant_id, ComplaintMarketAssessment.complaint_id == complaint.id
+            ComplaintMarketAssessment.tenant_id == tenant_id,
+            ComplaintMarketAssessment.complaint_id == complaint.id,
+            # B9b: the five markets' triggers only; a country outside them is read by reportability/other_countries.
+            ComplaintMarketAssessment.market != "OTHER",
         )
         .order_by(ComplaintMarketAssessment.version)
         .all()

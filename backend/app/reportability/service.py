@@ -388,7 +388,8 @@ def watch(
     backlog = imported_backlog(db, tenant_id, today) if ids else {}
     from backend.app.reportability import other_countries
 
-    others = other_countries.open_lines(db, tenant_id, ids, today) if other_countries.switched_on() else {}
+    # Read with the switch off too: a report still open must not let the complaint read as settled.
+    others = other_countries.open_lines(db, tenant_id, ids, today)
     items = []
     shortest = None
     for complaint, record in candidates:

@@ -389,6 +389,55 @@ def test_the_complaints_decision_record_holds_the_country_and_the_report_with_it
     )
 
 
+def test_review_fixes_the_report_keeps_its_states_and_the_five_markets_their_screens(org, monkeypatch):
+    """Run-2 review: a rejected (received) report is never cancelled by Not reportable; the shared routes neither
+    change a report while the switch is off nor reopen a closed one; a follow-up never sent can be cancelled; the
+    disposition screen of a complaint with a reportable country still reads (five markets untouched)."""
+    from backend.app.complaint_disposition import service as disposition
+    from backend.app.db.tenant_scope import bind_tenant
+
+    complaint, _ = _reportable(org)
+    regulatory, report = org["regulatory"], _report(org["regulatory"], complaint)
+    with SessionLocal() as db:
+        bind_tenant(db, org["tenant_id"])
+        assert (
+            disposition.screen_facts(db, uuid.UUID(str(org["tenant_id"])), uuid.UUID(complaint), date.today())
+            is not None
+        )
+    submission = _submit(regulatory, report["id"]).json()["submissions"][0]["id"]
+    evidence = f"{REPORTS}/{report['id']}/submissions/{submission}/evidence"
+    now = datetime.now(timezone.utc).isoformat()
+    rejected = regulatory.post(
+        evidence, json={"kind": "REJECTION", "outcome": "REJECTED", "received_at": now, "file": _file("no")}
+    )
+    assert rejected.status_code == 200 and rejected.json()["state_label"] == "Rejected by authority", rejected.text
+    resigned = _sign(regulatory, complaint, "AU", _save(regulatory, complaint, "AU", NONE), "NOT_REPORTABLE")
+    assert resigned.status_code == 200 and _report(regulatory, complaint)["state"] == "CORRECTION_REQUIRED"
+    # The generic follow-up route is not this report's.
+    generic = regulatory.post(
+        f"{REPORTS}/{report['id']}/follow-up", json={"due_on": date.today().isoformat(), "note": REASON}
+    )
+    assert generic.json()["detail"]["code"] == "ATTACHED_OWN_ROUTES"
+    # A fresh report: submitted, a follow-up started by mistake and cancelled, then closed; no evidence after Close.
+    complaint, _ = _reportable(org)
+    report = _report(regulatory, complaint)
+    submission = _submit(regulatory, report["id"]).json()["submissions"][0]["id"]
+    child = regulatory.post(f"{REPORTS}/{report['id']}/attached-follow-ups", json={"reason": REASON}).json()
+    assert child["can"]["cancel"] is True
+    cancelled = regulatory.post(f"{REPORTS}/{child['id']}/cancel", json={"reason": REASON})
+    assert cancelled.status_code == 200 and cancelled.json()["state_label"] == "Cancelled before it was sent"
+    monkeypatch.setenv("MDARIX_B9B_OTHER", "off")
+    assert regulatory.post(f"{REPORTS}/{report['id']}/complete", json={"reason": REASON}).status_code == 404
+    monkeypatch.setenv("MDARIX_B9B_OTHER", "on")
+    assert regulatory.post(f"{REPORTS}/{report['id']}/complete", json={"reason": REASON}).status_code == 200
+    late = regulatory.post(
+        f"{REPORTS}/{report['id']}/submissions/{submission}/evidence",
+        json={"kind": "REJECTION", "outcome": "REJECTED", "received_at": now, "file": _file("late")},
+    )
+    assert late.json()["detail"]["code"] == "NOT_OPEN_FOR_EVIDENCE"
+    assert _report(regulatory, complaint)["state"] == "COMPLETE"
+
+
 def test_the_cases_view_of_other_countries_is_listed_and_runs():
     """B9b screens: the Cases list's "Reported in another country" view (a Case whose complaint has such a report)."""
     from datetime import datetime as moment

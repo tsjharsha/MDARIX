@@ -123,7 +123,7 @@ export function otherLineText(line: OtherCountryLine): string {
 }
 
 export type WatchItem = {
-  /** B9b: the open countries outside the five markets (empty when none, or the switch is off). */
+  /** B9b: the open countries outside the five markets (empty when none). */
   other_countries?: OtherCountryLine[];
   id: string;
   business_id: string | null;

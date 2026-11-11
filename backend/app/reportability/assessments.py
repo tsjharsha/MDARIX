@@ -293,6 +293,7 @@ def signed_counts(db: Session, tenant_id: uuid.UUID, begin, end) -> dict:
             ComplaintMarketAssessment.superseded_by.is_(None),
             ComplaintMarketAssessment.signed_at >= begin,
             ComplaintMarketAssessment.signed_at < end,
+            ComplaintMarketAssessment.market != "OTHER",  # B9b: the five markets' counts, as before
         )
         .group_by(ComplaintMarketAssessment.conclusion, filed)
         .all()
