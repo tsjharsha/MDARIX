@@ -276,3 +276,61 @@ def test_a_linked_case_and_a_task_naming_another_complaint_read_the_same_scoped(
         bind_tenant(db, tenant_id)
         work = oversight_router.complaint_work(db, db, tenant_id, [db.get(Complaint, uuid.UUID(ids[1]))])
     assert any("names another" in due["title"] for due in work[ids[1]]["due"])  # listed under the complaint it names
+
+
+def test_a_read_reused_from_a_wider_one_equals_a_fresh_scoped_read(trial, monkeypatch):  # B6a run 3 review 7
+    """A scoped triage read served from the request's whole read (or a wider scoped one) gives the same items, open,
+    done and all, as the same scoped read computed alone."""
+    from backend.app.intake import service as intake
+
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        # The sample's complaints (the 200 imported by an earlier test add time, not cases).
+        mine = (Complaint.tenant_id == trial["tenant_id"], Complaint.source_system == "MDARIX_SAMPLE")
+        ids = [str(row.id) for row in db.query(Complaint.id).filter(*mine)]
+        assert len(ids) >= 5
+        for show in ("open", "done", "all"):
+            for wider in (None, set(ids)):
+                for value in ids:
+                    db.info.pop(intake._MEMO, None)
+                    fresh = intake.triage(db, db, trial["tenant_id"], show, NOW, complaint_ids={value})["items"]
+                    db.info.pop(intake._MEMO, None)
+                    intake.triage(db, db, trial["tenant_id"], "all", NOW, complaint_ids=wider)
+                    reused = intake.triage(
+                        db,
+                        None,
+                        trial["tenant_id"],
+                        show,
+                        NOW,
+                        complaint_ids={value.upper() if wider is None else value},
+                    )
+                    assert reused["items"] == fresh, (show, wider is None, value)
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        None,
+        "",
+        "Closed",
+        " Closed ",
+        "CLOSED_",
+        "closed.",
+        "Closed\u00a0",
+        "ARCH\u0130VED",
+        "Done-",
+        "open",
+        "Re-opened",
+    ],
+)
+def test_the_closed_rule_in_sql_never_skips_what_python_keeps(status):  # B6a run 3 review 5
+    from sqlalchemy import literal, select
+
+    from backend.app.complaint_review import rules as review_rules
+    from backend.app.intake.service import closed_in_sql
+
+    with SessionLocal() as db:
+        skipped = db.execute(select(closed_in_sql(literal(status)))).scalar()
+    assert not skipped or review_rules.is_closed(status), status
+    if status and status.isascii():
+        assert skipped == review_rules.is_closed(status), status

@@ -37,6 +37,7 @@ from backend.app.intake import case_import, case_rules, rules, triage_rules
 from backend.app.reportability import markets
 from backend.app.reportability.deadlines import day_only
 from backend.app.business_ids import complaint_ref
+from backend.app.db.request_memo import any_of
 
 SOURCE_TYPE = "IntakeEvent"
 FOLLOW_UP, QMS, REVIEW = "FIRST_CONTACT_FOLLOW_UP", "QMS_COMPLAINT", "SERVICE_ONLY_REVIEW"
@@ -167,7 +168,7 @@ def later_words(db: Session, tenant_id: uuid.UUID, event_ids) -> dict[uuid.UUID,
         return found
     rows = (
         db.query(CaseAddendum.intake_event_id, CaseAddendum.text)
-        .filter(CaseAddendum.tenant_id == tenant_id, CaseAddendum.intake_event_id.in_(list(event_ids)))
+        .filter(CaseAddendum.tenant_id == tenant_id, any_of(CaseAddendum.intake_event_id, event_ids))
         .order_by(CaseAddendum.created_at)
     )
     for event_id, text in rows:
@@ -182,7 +183,7 @@ def checks_of(db: Session, tenant_id: uuid.UUID, event_ids) -> dict[uuid.UUID, l
         return found
     for row in (
         db.query(FirstContactCheck)
-        .filter(FirstContactCheck.tenant_id == tenant_id, FirstContactCheck.intake_event_id.in_(ids))
+        .filter(FirstContactCheck.tenant_id == tenant_id, any_of(FirstContactCheck.intake_event_id, ids))
         .order_by(FirstContactCheck.version)
     ):
         found.setdefault(row.intake_event_id, []).append(row)
@@ -443,14 +444,14 @@ def _excluded_complaints(db: Session, tenant_id: uuid.UUID, ids: list[uuid.UUID]
     in_case = {
         row[0]
         for row in db.query(InvestigationComplaint.complaint_id).filter(
-            InvestigationComplaint.tenant_id == tenant_id, InvestigationComplaint.complaint_id.in_(ids)
+            InvestigationComplaint.tenant_id == tenant_id, any_of(InvestigationComplaint.complaint_id, ids)
         )
     }
     disposed = {
         row[0]
         for row in db.query(ComplaintDisposition.complaint_id).filter(
             ComplaintDisposition.tenant_id == tenant_id,
-            ComplaintDisposition.complaint_id.in_(ids),
+            any_of(ComplaintDisposition.complaint_id, ids),
             ComplaintDisposition.superseded_by.is_(None),
         )
     }
@@ -458,7 +459,7 @@ def _excluded_complaints(db: Session, tenant_id: uuid.UUID, ids: list[uuid.UUID]
         row[0]
         for row in db.query(ComplaintSecondLook.complaint_id).filter(
             ComplaintSecondLook.tenant_id == tenant_id,
-            ComplaintSecondLook.complaint_id.in_(ids),
+            any_of(ComplaintSecondLook.complaint_id, ids),
             ComplaintSecondLook.decision == "DISMISSED",
         )
     }
@@ -482,6 +483,14 @@ def backlog_settings(db: Session, tenant_id: uuid.UUID) -> tuple[int, int]:
 
     settings = settings_row(db, tenant_id)  # B6a run 3: the settings read once per request
     return (settings.backlog_days, settings.backlog_target_days) if settings else (30, 10)
+
+
+def closed_in_sql(status):
+    """``review_rules.is_closed`` in SQL, for an ASCII status only (B6a run 3): a non-ASCII one is left to Python, whose
+    lower case can differ from the database's, so SQL never skips a complaint Python would keep."""
+    text = func.lower(func.coalesce(status, ""))
+    text = func.btrim(func.regexp_replace(func.regexp_replace(text, r"[_/.:;,-]+", " ", "g"), r"\s+", " ", "g"))
+    return func.coalesce(status, "").op("~")("^[ -~]*$") & text.in_(sorted(review_rules.CLOSED_STATUSES))
 
 
 def subjects(
@@ -547,13 +556,11 @@ def subjects(
     }
     # B6a run 3: every open complaint, no read cut. A complaint closed in the QMS is skipped in SQL (the same rule as
     # review_rules.is_closed, applied again below) so a large closed history costs no Python time.
-    status = func.lower(func.coalesce(Complaint.status, ""))
-    status = func.btrim(func.regexp_replace(func.regexp_replace(status, r"[_/.:;,-]+", " ", "g"), r"\s+", " ", "g"))
     complaints = (
         db.query(Complaint)
         .filter(
             Complaint.tenant_id == tenant_id,
-            or_(status.notin_(sorted(review_rules.CLOSED_STATUSES)), Complaint.id.in_(closed_here)),
+            or_(~closed_in_sql(Complaint.status), any_of(Complaint.id, closed_here)),
             *only(Complaint.id, COMPLAINT),
         )
         .order_by(Complaint.ingestion_timestamp.desc().nullslast(), Complaint.id)
@@ -846,7 +853,7 @@ def triage(
     if kept is None and scope is not None:
         # B6a run 3: a read of more complaints (or of all) in this request serves a read of some of them: their items
         # are the same item by item (tests/test_b6a_scoped_watch.py), so its items for the asked complaints are kept.
-        wanted = {f"{COMPLAINT}:{value}" for value in scope}
+        wanted = {f"{COMPLAINT}:{uuid.UUID(value)}" for value in scope}
         for (tenant, names, moment, wider), entry in memo.items():
             if (
                 (tenant, moment) == (key[0], key[2])
@@ -907,17 +914,15 @@ def _triage(
             for value in (row.event_owner, row.triage_owner, row.backup_owner, row.completed_by, row.escalated_by)
         },
     )
+    # B6a run 3: each group's conflicting links found in one pass (every group scanned every link before).
+    conflicting: dict = {}
+    for link in links:
+        if link.state == "LINKED" and link.conflict and (link.left_kind, link.left_id) in found:
+            conflicting.setdefault(group.get((link.left_kind, link.left_id)), []).append(link)
     items = []
     for group_key, members in by_group.items():
         listed = [key for key in members if _listed(found[key], records.get(key))]
-        conflicts = [
-            link
-            for link in links
-            if link.state == "LINKED"
-            and link.conflict
-            and group.get((link.left_kind, link.left_id)) == group_key
-            and (link.left_kind, link.left_id) in found
-        ]
+        conflicts = conflicting.get(group_key, [])
         member_records = [records[key] for key in members if key in records]
         last_done = max((rules.utc(row.completed_at) for row in member_records if row.completed_at), default=None)
         conflict = [link for link in conflicts if last_done is None or rules.utc(link.decided_at) > last_done]

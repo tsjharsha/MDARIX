@@ -29,3 +29,12 @@ def once(session, key: tuple, read):
     if key not in memo:
         memo[key] = read()
     return memo[key]
+
+
+def any_of(column, values):
+    """``column`` is one of ``values``, sent as ONE array parameter (B6a run 3): an ``IN`` list binds one parameter
+    per value, and the driver allows 65,535, which a full triage read of a large import can pass."""
+    from sqlalchemy import any_, literal
+    from sqlalchemy.dialects.postgresql import ARRAY
+
+    return column == any_(literal(list(values), ARRAY(column.type)))

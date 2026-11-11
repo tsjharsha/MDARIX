@@ -369,9 +369,16 @@ def watch_read(
     from backend.app.reportability import service as reportability
 
     found = reportability.watch(
-        db, control_db, tenant_id, show="open", page_size=10_000, today=now, complaint_ids=complaint_ids
+        db,
+        control_db,
+        tenant_id,
+        show="open",
+        page_size=reportability.READ_LIMIT,
+        today=now,
+        complaint_ids=complaint_ids,
     )
-    if found["truncated"] and incomplete is not None and WATCH_CUT not in incomplete:
+    cut = found["truncated"] or found["total"] > len(found["items"])  # the read cut or the page size: both say so
+    if cut and incomplete is not None and WATCH_CUT not in incomplete:
         incomplete.append(WATCH_CUT)
     return found["items"]
 
@@ -748,7 +755,11 @@ def sweep(db: Session, control_db: Session | None, tenant_id, now: datetime | No
     owner = _trial_owner(control_db, tenant_id)
     away = absences(db, tenant_id, today)
     wanted: dict[tuple, tuple[dict, str]] = {}
-    for item in due_items(db, control_db, tenant_id, now):
+    incomplete: list[str] = []
+    found = due_items(db, control_db, tenant_id, now, incomplete)
+    if incomplete:  # B6a run 3: never silently incomplete; the reminders of what could not be read are not sent
+        logger.error("The reminders of %s are incomplete: %s could not be read", tenant_id, ", ".join(incomplete))
+    for item in found:
         if not item["alerts"]:
             continue
         state = rules.state_of(item["due_at"], now, view["reminder_hours"])

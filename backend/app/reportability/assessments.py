@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.trial.sample_source import is_sample
 from backend.app.db.models.market_assessment import ComplaintMarketAssessment
+from backend.app.db.request_memo import any_of
 from backend.app.reportability import markets
 
 NOT_STARTED, DRAFT = "NOT_STARTED", "DRAFT"
@@ -35,7 +36,7 @@ def rows_by_complaint(
         db.query(ComplaintMarketAssessment)
         .filter(
             ComplaintMarketAssessment.tenant_id == tenant_id,
-            ComplaintMarketAssessment.complaint_id.in_(ids),
+            any_of(ComplaintMarketAssessment.complaint_id, ids),
             ComplaintMarketAssessment.market != "OTHER",
         )
         .order_by(ComplaintMarketAssessment.version)

@@ -90,7 +90,7 @@ export function OversightView({
       {view?.incomplete?.length ? (
         <p className="uw-ov-warning tone-critical" role="alert">
           <AlertTriangle size={15} aria-hidden="true" /> This list is incomplete: {view.incomplete.join(", ")} could not
-          be read. Some deadlines may be missing here; check Reporting.
+          be read. Some deadlines may be missing from this list.
         </p>
       ) : null}
       {part === "all" && view?.staffing && (
