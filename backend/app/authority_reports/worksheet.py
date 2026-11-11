@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from backend.app import product_facts
 from backend.app.authority_reports import forms
-from backend.app.reportability import deadlines, markets
+from backend.app.reportability import deadlines, markets, rules
 
 FROM_RECORD, ENTERED, CONFIRMED, OUTSIDE = "FROM_RECORD", "ENTERED", "CONFIRMED", "OUTSIDE"
 SUGGESTED, CHANGED = "SUGGESTED", "CHANGED"
@@ -163,7 +163,7 @@ def load(db: Session, control_db: Session, tenant_id: uuid.UUID, complaint_id: u
         .filter(
             ProductRegistration.tenant_id == tenant_id,
             ProductRegistration.product_id == product.id,
-            ProductRegistration.market == registry_market,
+            ProductRegistration.market.in_(registry_markets(market, record.get("country"))),
         )
         .all()
         if product
@@ -270,13 +270,36 @@ def contact_office_problem(context, value: str) -> str | None:
     return None
 
 
-def _registration(context, types: tuple[str, ...], column: str, label: str):
-    for item in context["registrations"]:
-        if item.registration_type in types and getattr(item, column):
-            return getattr(item, column), _source(
-                "Registration", f"{item.market} {item.registration_type} {item.registration_number}", label, item.id
-            )
-    return None
+_NORTHERN_IRELAND = ("northern ireland", "ni")  # as markets.MARKET_COUNTRIES names it
+CHOOSE_REGISTRATION = "Two registrations in this market differ: choose"
+
+
+def registry_markets(market: str, country: object) -> tuple[str, ...]:
+    """The registry markets a report reads: the EU/NI form on a Northern Ireland event reads NI's registrations, then
+    the EU's; on any other event the EU's only, never NI's (G7). Every other market its own."""
+    if market != markets.EU_NI:
+        return (market,)
+    first = next(iter(rules.countries(country)), "")
+    return ("NI", "EU") if rules.normalize(first) in _NORTHERN_IRELAND else ("EU",)
+
+
+def _registration(context, types: tuple[str, ...] | None, column: str, label: str):
+    """A value from the product's registrations, chosen the same way every time (G6): NI's before the EU's (only
+    loaded for a Northern Ireland event), then the most recently updated. When registrations in that market give
+    different values, nothing is guessed: ``(None, note)`` leaves the field for a person to choose."""
+    found = [item for item in context["registrations"] if (types is None or item.registration_type in types)]
+    found = [item for item in found if getattr(item, column)]
+    found = [item for item in found if item.market == "NI"] or found
+    if not found:
+        return None
+    found.sort(key=lambda item: (item.updated_at, str(item.id)), reverse=True)
+    if len({getattr(item, column) for item in found}) > 1:
+        named = "; ".join(f"{item.market} {item.registration_type} {item.registration_number}" for item in found)
+        return None, f"{CHOOSE_REGISTRATION} ({named})"
+    item = found[0]
+    return getattr(item, column), _source(
+        "Registration", f"{item.market} {item.registration_type} {item.registration_number}", label, item.id
+    )
 
 
 def _event_type(context):
@@ -562,15 +585,7 @@ def _returned(value: str):
 
 
 def _risk_class(context):
-    for item in context["registrations"]:
-        if item.risk_class:
-            return item.risk_class, _source(
-                "Registration",
-                f"{item.market} {item.registration_type} {item.registration_number}",
-                "The registration's risk class",
-                item.id,
-            )
-    return None
+    return _registration(context, None, "risk_class", "The registration's risk class")
 
 
 def _srn(context):
@@ -704,7 +719,7 @@ SOURCES = {
     "uk_responsible_person": lambda c: _party(
         c, ("UK_RESPONSIBLE_PERSON", "AUTHORISED_REPRESENTATIVE"), "The UK Responsible Person"
     ),
-    "eu_certificate": lambda c: _registration(c, ("CE",), "registration_number", "The EU registration (CE)"),
+    "eu_certificate": lambda c: _registration(c, ("CE", "UKNI"), "registration_number", "The EU registration (CE)"),
     "gb_certificate": lambda c: _registration(c, ("UKCA",), "registration_number", "The GB registration (UKCA)"),
     "ca_licence": lambda c: _registration(c, ("MDL",), "registration_number", "The Health Canada device licence"),
     "gb_nca": lambda c: (
@@ -734,7 +749,9 @@ SOURCES = {
     ),
     "risk_class": _risk_class,
     "manufacturer_srn": _srn,
-    "nb_number": lambda c: _registration(c, ("CE",), "body_number", "The notified body of the EU registration (CE)"),
+    "nb_number": lambda c: _registration(
+        c, ("CE", "UKNI"), "body_number", "The notified body of the EU registration (CE)"
+    ),
     "eu_nomenclature_system": lambda c: _nomenclature(c, 0),
     "eu_nomenclature_code": lambda c: _nomenclature(c, 1),
     "ca_complainant": _user_type(
@@ -891,6 +908,8 @@ def build(
                 problem = contact_office_problem(context, value)
                 # Only the e-mail is missing: it is asked for here, beside the field (PUT .../once contact_email).
                 ask = CONTACT_EMAIL if problem and problem.startswith(EMAIL_NEEDED) else None
+            if value is None and found and isinstance(found[1], str):
+                problem = found[1]  # registrations that differ (G6): a person chooses, nothing is guessed
             if status is None:
                 status = (
                     OUTSIDE
