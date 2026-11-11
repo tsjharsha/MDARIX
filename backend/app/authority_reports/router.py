@@ -206,6 +206,8 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
             context["frozen_recipients"] = frozen
     if is_canada_chain(obligation):
         context["ca_chain"] = _canada_carried(db, obligation)  # A4 and A5's previous date (B9 step 11)
+    if is_mir_chain(obligation):
+        context.update(_mir_carried(db, obligation))  # B8 step 3: values and the NCA's number carried, not copied
     if is_follow_up(obligation):
         parent = db.get(ReportObligation, obligation.parent_id)
         chain = _follow_ups(db, obligation.tenant_id, parent.id)
@@ -298,9 +300,29 @@ def is_canada_chain(obligation: ReportObligation) -> bool:
     return obligation.parent_id is not None and obligation.form_code == forms.HC_MDPR.code
 
 
+# B8: the EU and GB MIR forms and the switch each answers to.
+MIR_FORMS = {forms.EU_MIR.code: "MDARIX_B8_EU_MIR", forms.GB_MIR.code: "MDARIX_B8_GB_MIR"}
+
+
+def mir_on(obligation: ReportObligation) -> bool:
+    """B8: an EU or GB MIR report whose switch is on (its chain, types by position and files)."""
+    switch = MIR_FORMS.get(obligation.form_code)
+    return switch is not None and forms.switched_on(switch)
+
+
+def is_mir_chain(obligation: ReportObligation) -> bool:
+    """An EU or GB MIR follow-up or final (B8 step 3): a MIR child of the chain's first report."""
+    return obligation.parent_id is not None and obligation.form_code in MIR_FORMS
+
+
 def keeps_own_clock(obligation: ReportObligation) -> bool:
     """A chain child keeps its own date: a re-signed conclusion never moves it, only supersedes its approval."""
-    return is_follow_up(obligation) or is_india_chain(obligation) or is_canada_chain(obligation)
+    return (
+        is_follow_up(obligation)
+        or is_india_chain(obligation)
+        or is_canada_chain(obligation)
+        or is_mir_chain(obligation)
+    )
 
 
 def chain_type(obligation: ReportObligation) -> str | None:
@@ -689,6 +711,8 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
             if obligation.form_code == forms.HC_MDPR.code and forms.switched_on("MDARIX_B9_CANADA")
             else None
         ),
+        # B8 step 3: the EU or GB MIR chain (Initial, Follow-ups, a Final), each report its own type.
+        "mir_chain": mir_chain_view(obligation, children, context.get("current")) if mir_on(obligation) else None,
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,
         # A mapped code is a suggestion a person confirms or changes (the new navigation, 0.10.77).
@@ -1314,6 +1338,8 @@ def set_field(
                 "STARTS_THE_CHAIN",
                 "The first report is a Preliminary, or Preliminary & Final: updates and the final follow it",
             )
+    if field_id == forms.EU_MIR.type_field and mir_on(obligation):
+        _mir_type_allowed(obligation, value)
     problem = forms.value_problem(field, value)
     if problem:
         raise _error(422, f"NOT_A_{field.kind}", problem)
@@ -1787,6 +1813,8 @@ def ask_for_approval(
         raise _error(409, "NOT_A_DRAFT", "Only a draft is frozen for approval")
     if obligation.form_code == forms.FDA_3500A.code:
         assign_number(db, control_db, obligation, str(ctx.user_id), _now())
+    if is_mir_chain(obligation) and mir_on(obligation):
+        _mir_previous_accepted(db, obligation)
     if new_navigation(control_db, obligation.tenant_id):
         sections = worksheet.build(
             _form(obligation),
@@ -2256,6 +2284,7 @@ def submission(
         obligation.state = before
     _audit(db, ctx, "REPORT_SUBMISSION_RECORDED", obligation, attempt=row.attempt, route=route, late=row.late)
     canada_final_on_submission(db, ctx, obligation, _now())
+    mir_follow_up_on_submission(db, ctx, obligation)
     db.commit()
     return detail(db, control_db, ctx, obligation)
 
@@ -2645,7 +2674,18 @@ def create_india_report(
 
 
 def _chain_child(
-    db, ctx, initial: ReportObligation, kind: str, text: str, own, *, due_on=None, next_report_on=None, entries=None
+    db,
+    ctx,
+    initial: ReportObligation,
+    kind: str,
+    text: str,
+    own,
+    *,
+    due_on=None,
+    next_report_on=None,
+    entries=None,
+    action="REPORT_CHAIN_CREATED",
+    **audited,
 ) -> ReportObligation:
     """An India or Canada child of ``initial`` (kind RESPONSE, B3's pattern, no migration): it starts from the initial
     report's entries except its own fields (``own``), holds its type in ``CHAIN``, audited ``REPORT_CHAIN_CREATED``."""
@@ -2679,12 +2719,13 @@ def _chain_child(
     _audit(
         db,
         ctx,
-        "REPORT_CHAIN_CREATED",
+        action,
         initial,
         report=str(child.id),
         type=kind,
         due_on=_iso(due_on),
         next_report_on=_iso(next_report_on),
+        **audited,
     )
     return child
 
@@ -2877,6 +2918,185 @@ def create_canada_report(
         next_report_on=payload.next_report_on,
         entries={"A5": {"value": forms.CA_UPDATE, "by": str(ctx.user_id), "at": _iso(_now())}},
     )
+    db.commit()
+    return detail(db, control_db, ctx, child)
+
+
+# ------------------------------------------------------------------------------------------ EU and GB MIR chain (B8)
+# Which types each position takes (the MIR help text; plan 4.1). A child holds only what a person types on it: every
+# other value carries from the reports before it (never copied, so a correction reaches the open draft). A report's
+# own fields never carry: its date (1.2a), its type (1.2e) and its next report date (1.2f).
+MIR_FIRST = (forms.MIR_INITIAL, forms.MIR_COMBINED)
+MIR_LATER = (forms.MIR_FOLLOW_UP, forms.MIR_FINAL, forms.MIR_FINAL_NON)
+MIR_FINALS = (forms.MIR_COMBINED, forms.MIR_FINAL, forms.MIR_FINAL_NON)
+MIR_OWN = frozenset({"1_2A", "1_2E", "1_2F", "CHAIN"})
+MIR_UNKNOWN = "Unknown"  # 1.1c when the authority gave no number (MIR help text)
+MIR_DUE_NOTE = "Your date (1.2f): no fixed legal period"  # MDR Art. 89(5) sets none (starter)
+
+
+class MirChainCreate(BaseModel):
+    type: str
+    what_is_new: str = Field(max_length=rules.NOTE_MAX * 2)
+    updated_final: bool = False  # an "Updated final report" after a Final, on demand only (type Final again)
+
+
+def mir_type(obligation: ReportObligation) -> str:
+    return forms.report_kind(_form(obligation), obligation.entries or {})
+
+
+def _mir_type_allowed(obligation: ReportObligation, value: str | None) -> None:
+    """The first report is an Initial or a Combined initial and final; a later one a Follow up or a Final (422
+    ``NOT_THIS_POSITION``). A later report's type is never cleared: it is its place in the chain."""
+    allowed = MIR_LATER if obligation.parent_id else MIR_FIRST
+    if obligation.parent_id and value is None:
+        raise _error(422, "FOLLOWS_CHAIN", "A follow-up's or final's type is its place in the chain: choose another")
+    if value is not None and value not in allowed:
+        raise _error(422, "NOT_THIS_POSITION", f"This report can be: {'; '.join(allowed)}", choices=list(allowed))
+
+
+def _mir_children(db, tenant_id, parent_id) -> list[ReportObligation]:
+    """The MIR chain after its first report, oldest first, cancelled ones left out."""
+    rows = (
+        db.query(ReportObligation)
+        .filter(ReportObligation.tenant_id == tenant_id, ReportObligation.parent_id == parent_id)
+        .order_by(ReportObligation.created_at, ReportObligation.id)
+        .all()
+    )
+    return [row for row in rows if is_mir_chain(row) and row.state != rules.CANCELLED]
+
+
+def _mir_before(db, obligation: ReportObligation) -> list[ReportObligation]:
+    """The reports of the chain before this child: the first report, then the children created before it."""
+    parent = db.get(ReportObligation, obligation.parent_id)
+    mine = (obligation.created_at, str(obligation.id))
+    later = _mir_children(db, obligation.tenant_id, parent.id)
+    return [parent, *(row for row in later if (row.created_at, str(row.id)) < mine)]
+
+
+def _mir_carried(db, obligation: ReportObligation) -> dict:
+    """What a child reads from the reports before it (``worksheet.build`` puts its own entries on top): their values,
+    later ones first, and 1.1c, the authority's number from the first report's recorded submission ("Unknown" when
+    none was recorded)."""
+    before = _mir_before(db, obligation)
+    carried: dict = {}
+    for row in before:
+        carried.update({key: value for key, value in (row.entries or {}).items() if key not in MIR_OWN})
+    given = [row.authority_reference for row in _submissions(db, before[0]) if row.authority_reference]
+    return {"carried": carried, "nca_reference": given[-1] if given else MIR_UNKNOWN}
+
+
+def _mir_previous_accepted(db, obligation: ReportObligation) -> None:
+    """One open report at a time (B3's order rule): the next is sent for approval only when every report before it is
+    accepted, or recorded with no acknowledgement expected (409 ``PREVIOUS_NOT_ACCEPTED``)."""
+    waiting = [row for row in _mir_before(db, obligation) if row.state not in rules.VALID_SUBMISSION]
+    if waiting:
+        raise _error(
+            409,
+            "PREVIOUS_NOT_ACCEPTED",
+            "The report before this one must be accepted (or recorded with no acknowledgement expected) first",
+        )
+
+
+def mir_chain_view(obligation: ReportObligation, children: list[ReportObligation], current=None) -> dict:
+    """What the MIR report page shows: this report's type and the types its position allows; on the first report the
+    chain in order, whether it ended (a Combined or a Final submitted) and whether a report can be created now. An
+    open later report, after a conclusion signed "not reportable", is offered as a Final (Non-reportable incident) with
+    4.2b from the signed rationale: a person chooses (B8-D5); it is never cancelled."""
+    if obligation.parent_id:
+        offer = None
+        if obligation.state in rules.EDITABLE and current is not None and current.conclusion == markets.NOT_REPORTABLE:
+            offer = {"type": forms.MIR_FINAL_NON, "4_2B": current.override_reason or current.change_reason}
+        return {
+            "type": mir_type(obligation),
+            "types": list(MIR_LATER),
+            "due_on": _iso(obligation.due_on),
+            "due_note": MIR_DUE_NOTE if obligation.due_on else None,
+            "offer_final_non": offer,
+        }
+    chain = [row for row in children if is_mir_chain(row) and row.state != rules.CANCELLED]
+    reports = [obligation, *chain]
+    ended = any(mir_type(row) in MIR_FINALS and row.state in rules.SUBMITTED for row in reports)
+    open_one = any(row.state not in rules.SUBMITTED for row in chain)
+    return {
+        "type": mir_type(obligation),
+        "types": list(MIR_FIRST),
+        "items": [
+            {"id": str(row.id), "type": mir_type(row), "state": row.state, "due_on": _iso(row.due_on)} for row in chain
+        ],
+        "ended": ended,
+        "can_create": obligation.kind == "INITIAL" and obligation.state in rules.SUBMITTED and not open_one,
+    }
+
+
+def create_mir_child(db, ctx, initial: ReportObligation, kind: str, text: str, *, due_on=None, updated_final=False):
+    """The next report of an EU or GB MIR chain (``initial`` locked): a Follow up or a Final, one open at a time;
+    nothing after a Combined or a Final unless an "Updated final report" is asked for (a Final again). It holds only
+    its type; every other value carries (``_mir_carried``)."""
+    if not (initial.kind == "INITIAL" and initial.form_code in MIR_FORMS and mir_on(initial)):
+        raise _error(409, "NOT_A_MIR_INITIAL", "A follow-up or final is made on an EU or GB MIR's first report")
+    if kind not in MIR_LATER:
+        raise _error(422, "NOT_THIS_POSITION", f"A later report is one of: {'; '.join(MIR_LATER)}")
+    if initial.state not in rules.SUBMITTED:
+        raise _error(409, "NOT_SUBMITTED", "A follow-up or final follows the first report once it is submitted")
+    view = mir_chain_view(initial, _mir_children(db, initial.tenant_id, initial.id))
+    if not view["can_create"]:
+        raise _error(409, "CHAIN_OPEN", "Submit (or cancel) the open report first")
+    if view["ended"] and not (updated_final and kind in (forms.MIR_FINAL, forms.MIR_FINAL_NON)):
+        raise _error(409, "CHAIN_ENDED", "A final report ends the chain: ask for an updated final report instead")
+    own = {"1_2E": {"value": kind, "by": str(ctx.user_id), "at": _iso(_now())}}
+    return _chain_child(db, ctx, initial, kind, text, frozenset(initial.entries or {}), due_on=due_on, entries=own)
+
+
+def mir_follow_up_on_submission(db, ctx, obligation: ReportObligation) -> ReportObligation | None:
+    """D14: an EU or GB Initial or Follow-up recorded as submitted creates the next Follow-up draft in the same
+    transaction, due on the date the report itself gave (1.2f), audited ``REPORT_FOLLOW_UP_CREATED`` (automatic).
+    Once only: a second attempt, or a report with a later one already made, creates nothing."""
+    if not mir_on(obligation) or mir_type(obligation) not in (forms.MIR_INITIAL, forms.MIR_FOLLOW_UP):
+        return None
+    initial = db.get(ReportObligation, obligation.parent_id) if obligation.parent_id else obligation
+    mine = (obligation.created_at, str(obligation.id))
+    chain = _mir_children(db, initial.tenant_id, initial.id)
+    if any((row.created_at, str(row.id)) > mine or row.state not in rules.SUBMITTED for row in chain):
+        return None
+    promised = ((obligation.entries or {}).get("1_2F") or {}).get("value") or ""
+    try:
+        due = date.fromisoformat(promised)
+    except ValueError:
+        due = None
+    text = f"The next follow-up, created when the {mir_type(obligation)} was recorded as submitted. " + MIR_DUE_NOTE
+    own = {"1_2E": {"value": forms.MIR_FOLLOW_UP, "by": str(ctx.user_id), "at": _iso(_now())}}
+    return _chain_child(
+        db,
+        ctx,
+        initial,
+        forms.MIR_FOLLOW_UP,
+        text,
+        frozenset(initial.entries or {}),
+        due_on=due,
+        entries=own,
+        action="REPORT_FOLLOW_UP_CREATED",
+        automatic=True,
+        after=str(obligation.id),
+    )
+
+
+@router.post("/{obligation_id}/mir-chain", dependencies=[DECIDERS])
+def create_mir_report(
+    obligation_id: uuid.UUID,
+    payload: MirChainCreate,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Create the next EU or GB MIR report on demand (B8 step 3): a Follow up or a Final, or an "Updated final
+    report". 404 while the report's switch is off."""
+    initial = _obligation(db, _tenant(ctx), obligation_id, lock=True)
+    if initial.form_code in MIR_FORMS and not mir_on(initial):
+        raise _error(404, "NOT_SERVED", "Not available")
+    text = _text(payload.what_is_new)
+    if not text or len(text) < rules.REASON_MIN:
+        raise _error(422, "REASON_REQUIRED", f"Say what is new, in at least {rules.REASON_MIN} characters")
+    child = create_mir_child(db, ctx, initial, payload.type, text, updated_final=payload.updated_final)
     db.commit()
     return detail(db, control_db, ctx, child)
 

@@ -251,6 +251,7 @@ def _empty_context() -> dict:
         "complaint": complaint,
         "record": {"business_id": "C-1", "complaint_identifier": "OWN-1", "version": None},
         "seen": {},
+        "market": None,  # B9's role fields read it (India's R1, Canada's A1)
         "product": None,
         "lot": None,
         "current": None,

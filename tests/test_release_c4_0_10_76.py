@@ -166,10 +166,13 @@ def test_the_samples_rv07_has_its_eu_mir_and_it_goes_the_whole_way(trial):
     # A fixed list takes one of its choices.
     refused = user.put(f"{REPORTS}/{eu['id']}/fields/1_2E", json={"value": "Final"})
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "NOT_A_CHOICE"
-    # The type changes the meter: a final report needs the investigation's fields.
+    # B8 step 3: the first report is an Initial or a Combined initial and final; a Final follows in the chain.
+    refused = user.put(f"{REPORTS}/{eu['id']}/fields/1_2E", json={"value": "Final (Reportable incident)"})
+    assert refused.status_code == 422 and refused.json()["detail"]["code"] == "NOT_THIS_POSITION"
+    # The type changes the meter: a combined (final) report needs the investigation's fields.
     initial = detail["mandatory"]["total"]
-    final = _ok(user.put(f"{REPORTS}/{eu['id']}/fields/1_2E", json={"value": "Final (Reportable incident)"}))
-    assert final["form"]["report_kind"] == "Final (Reportable incident)" and final["mandatory"]["total"] > initial
+    final = _ok(user.put(f"{REPORTS}/{eu['id']}/fields/1_2E", json={"value": "Combined initial and final"}))
+    assert final["form"]["report_kind"] == "Combined initial and final" and final["mandatory"]["total"] > initial
     detail = _ok(user.put(f"{REPORTS}/{eu['id']}/fields/1_2E", json={"clear": True}))
     # Send for approval waits for every mandatory field; then the practice approval, then the PDF.
     blocked = user.post(f"{REPORTS}/{eu['id']}/snapshots")

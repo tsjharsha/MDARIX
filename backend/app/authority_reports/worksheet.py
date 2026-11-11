@@ -673,6 +673,16 @@ def _role_field(context, value, label: str):
 
 SOURCES = {
     "sent_day": _sent_day,
+    # B8 step 3: the same reference on every report of a MIR chain (1.3.1b), and the authority's number (1.1c).
+    "complaint_ref": lambda c: (
+        c["record"]["business_id"] or c["record"]["complaint_identifier"],
+        _complaint(c, "The complaint's ID, the same on every report of the chain"),
+    ),
+    "nca_reference": lambda c: (
+        (c["nca_reference"], _source("Obligation", None, "From the first report's recorded submission"))
+        if c.get("nca_reference")
+        else None
+    ),
     "description": lambda c: (c["complaint"].description, _complaint(c, "The complaint's description, as recorded")),
     "event_date": lambda c: (
         (c["complaint"].event_timestamp.date().isoformat(), _complaint(c, "The complaint's event date"))
@@ -928,6 +938,8 @@ def build(
 ) -> list[dict]:
     """The worksheet's sections, each field with its value, status and source, in the form's order."""
     personal = SAMPLE_PERSONAL.get(context["complaint"].complaint_identifier, {}) if context["sample"] else {}
+    # B8 step 3: a MIR chain's later report reads the reports before it, under what is typed on it.
+    entries = {**context.get("carried", {}), **entries}
     # The report type decides which fields are mandatory (0.10.76: the EU, GB and Canada forms).
     kind = forms.report_kind(form, entries)
     confirm = context.get("confirm_codes", False)

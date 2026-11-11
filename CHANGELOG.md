@@ -27,6 +27,20 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
   4.3.1a (similar incidents by IMDRF codes) is now mandatory in a Combined and a Final (Reportable incident) report, as
   the help text says.
 - Catalog: EU MDR Art. 89 and EU IVDR Art. 84 (the final report), starter, for your consultant to confirm.
+- **The EU and GB report chain**: the first report is an Initial or a Combined initial and final; each later report
+  is a Follow up or a Final (Reportable or Non-reportable incident), its own record linked to the first (422
+  `NOT_THIS_POSITION` for any other type). One open at a time: a later report is sent for approval only once the one
+  before is accepted, or recorded with no acknowledgement expected (409 `PREVIOUS_NOT_ACCEPTED`). Nothing follows a
+  Combined or a Final, except an "Updated final report" on demand (`POST /reports/{id}/mir-chain`). A later report
+  holds only what is typed on it: every other value is read from the reports before it, so a correction reaches the
+  open draft. 1.3.1b is the complaint's ID on every report; 1.1c the authority's number from the first report's
+  recorded submission, else "Unknown". A re-signed conclusion supersedes the approval of an unsent later report but
+  keeps its date; a "not reportable" re-sign never cancels it, and offers it as Final (Non-reportable incident) with
+  4.2b from the signed rationale, for a person to choose.
+- **The next Follow-up, made for you** (D14): recording an Initial or a Follow-up as submitted creates the next
+  Follow-up draft at once, due on the date that report gave in 1.2f ("Your date (1.2f): no fixed legal period"),
+  audited `REPORT_FOLLOW_UP_CREATED` (automatic). A second attempt never makes a second draft. Nothing is made while
+  the market's switch is off.
 
 ## [0.11.00] - not released yet
 

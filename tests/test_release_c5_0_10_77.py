@@ -309,7 +309,8 @@ def test_the_required_codes_per_report_type_hold_approval(trial):
     (eu,) = [item for item in _ok(user.get(REPORTS))["items"] if item["complaint_ref"] == "SAMPLE-RV-07"]
     initial = set(_ok(user.get(f"{REPORTS}/{eu['id']}"))["mandatory"]["missing"])
     assert {"3_3A_E", "3_3A_F"} <= initial and not {"4_2E_B", "4_2E_C", "4_2E_D"} & initial
-    final = _ok(user.put(f"{REPORTS}/{eu['id']}/fields/1_2E", json={"value": "Final (Reportable incident)"}))
+    # B8 step 3: the first report may be a Combined initial and final (a Final follows in the chain).
+    final = _ok(user.put(f"{REPORTS}/{eu['id']}/fields/1_2E", json={"value": "Combined initial and final"}))
     assert {"4_2E_B", "4_2E_C", "4_2E_D"} <= set(final["mandatory"]["missing"])
     _ok(user.put(f"{REPORTS}/{eu['id']}/fields/1_2E", json={"clear": True}))
     blocked = user.post(f"{REPORTS}/{eu['id']}/snapshots")
