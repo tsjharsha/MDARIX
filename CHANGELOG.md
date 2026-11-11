@@ -10,6 +10,13 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.11.01] - not released yet
+
+B8: EU MIR and GB MIR for exporters. MDARIX prepares the files the authorities take (the EU MIR 7.3.1 XML and a PDF
+in MIR order; the GB MIR 7.2.1 XML for upload in MHRA's MORE and a PDF record copy) and keeps the report chain
+(Initial, Follow-ups, Final); the customer submits: MDARIX never submits. Every legal citation is "starter, for your
+consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (on).
+
 ## [0.11.00] - not released yet
 
 B9: markets. India first (MvPI adverse event reports), then Canada (mandatory problem reports), then the US importer
