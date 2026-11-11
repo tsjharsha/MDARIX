@@ -32,7 +32,7 @@ with your consultant". Switch: `MDARIX_B9B_OTHER` (on).
   are notes only. No legal period (your reporting window naming the country, or the date you enter); counted in your
   time zone. Catalog: "IMDRF/GHTF common criteria" (starter). `OTHER` stays out of the five markets' lists, so their
   screens and the B4 equivalence check are unchanged.
-- **Pick a country outside the five markets** (API; the screens follow): `GET /api/v1/other-countries` lists every
+- **Pick a country outside the five markets**: `GET /api/v1/other-countries` lists every
   ISO 3166 country except the EU and EEA, the United Kingdom, the US, Canada and India (each sent to its own tree) and
   the EU outermost regions and Åland ("This may fall under the EU MDR: check with your consultant", B9b-N2).
   `PUT` and `POST .../market-assessments/OTHER-<code>[/sign]` save and sign the country's conclusion with the password
@@ -50,6 +50,20 @@ with your consultant". Switch: `MDARIX_B9B_OTHER` (on).
   report with a reason ("Due date entered by the customer"). Overdue reports are listed as overdue like any other.
 - **Inspection pack**: `11-other-regulatory-reports.csv` lists each report, its submissions, Report IDs and files
   with their SHA-256.
+- **Screens (new navigation, flat):** on Decision trees, "+ Other country" beside the five markets opens the country
+  picker; each assessed country has its own button and tree (the generic starter note, no harm level, no practice
+  training) and, once Reportable, "Open the report". Reports: a Market filter ("Other countries", or one country by
+  name), the report's own status in the list, and the Other Regulatory Report's own page (banner, due date and its
+  source, Record that it was submitted with the password and authenticator code, Report ID later, the authority's
+  answer, follow-ups, Close). Cases: a "Reported in another country" view. With the switch off the countries and
+  reports stay readable and nothing can be changed.
+- **Reportability watch:** an unsigned country, or a Reportable one whose report is not closed, keeps the complaint
+  open, on its own line with its due date ("Due date entered by the customer" where no window names it); it never
+  changes whether the five markets are settled.
+- **The complaint's record:** the event's decision record (and its PDF) lists each country's signed conclusion and
+  each Other Regulatory Report recorded as submitted, with its Report ID, every file's name and SHA-256 and the
+  recorder's signature; the record page names the countries and reports by country.
+- User guide: "Other countries: assess a country outside the five markets" and "the Other Regulatory Report".
 - Decision tables: an "Other countries" section with its own checked table; environment reference:
   `MDARIX_B9B_OTHER`.
 
