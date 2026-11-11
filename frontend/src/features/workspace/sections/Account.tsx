@@ -14,6 +14,7 @@ import {
   useWorkspace,
 } from "../workspaceContext";
 import { AwayPanel } from "./Reminders";
+import { InlineError } from "./boardParts";
 import { hideUuid, safeText } from "../../../app/displayId";
 import { roleLabel, rolesSummary } from "../../../app/roles";
 import { PUBLISHED_CONTACT, useSiteInfo } from "../../../site/legal";
@@ -107,6 +108,41 @@ type EmailPreferences = {
   /** Owner, 11 Nov: in a free trial the list is off until the person tries it. */
   daily_deadlines_trial?: boolean;
 };
+
+/** B6a (owner, 11 Nov): "Try the daily list" beside the deadline downloads in a free trial, as in My Account. */
+export function TryDailyList() {
+  const preferences = useResource<EmailPreferences>("/api/v1/me/email-preferences");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const data = preferences.data;
+  if (!data?.daily_deadlines_eligible || !data.daily_deadlines_trial || data.daily_deadlines) return null;
+  const tryIt = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await send("/api/v1/me/email-preferences", "PUT", { daily_deadlines: true });
+      preferences.reload();
+    } catch (failure) {
+      setError(errorText(failure, "Your email choice was not saved."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button
+        type="button"
+        className="ac-secondary"
+        disabled={busy}
+        title="The open reporting deadlines by e-mail every morning"
+        onClick={() => void tryIt()}
+      >
+        Try the daily list
+      </button>
+      <InlineError text={error} />
+    </>
+  );
+}
 
 /** The weekly readiness email and the daily deadline list, on or off for oneself (GET/PUT
  * /api/v1/me/email-preferences); the last person who receives the daily list cannot switch it off. Exported for its test. */

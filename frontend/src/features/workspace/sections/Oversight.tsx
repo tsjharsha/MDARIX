@@ -30,6 +30,7 @@ import {
   type OversightSettings,
 } from "../oversight";
 import { InlineError, Why } from "./boardParts";
+import { TryDailyList } from "./Account";
 
 const useOpen = useOpenTarget;
 
@@ -299,6 +300,7 @@ export function ExportButton({ filters }: { filters: Filters }) {
           >
             <Download size={15} aria-hidden="true" /> Deadlines CSV
           </button>
+          <TryDailyList />
         </>
       )}
       <InlineError text={error} />

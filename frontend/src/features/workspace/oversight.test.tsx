@@ -347,3 +347,16 @@ describe("the oversight view", () => {
     expect(html).toContain("Decision record (PDF)");
   });
 });
+
+describe("Try the daily list beside the deadline downloads (B6a, owner 11 Nov)", () => {
+  it("is offered in a free trial while the list is off, and gone once it is on", async () => {
+    const { TryDailyList } = await import("./sections/Account");
+    const path = "/api/v1/me/email-preferences";
+    resources.data[path] = { daily_deadlines_eligible: true, daily_deadlines_trial: true, daily_deadlines: false };
+    expect(render(<TryDailyList />)).toContain("Try the daily list");
+    resources.data[path] = { daily_deadlines_eligible: true, daily_deadlines_trial: true, daily_deadlines: true };
+    expect(render(<TryDailyList />)).not.toContain("Try the daily list");
+    resources.data[path] = { daily_deadlines_eligible: true, daily_deadlines_trial: false, daily_deadlines: false };
+    expect(render(<TryDailyList />)).not.toContain("Try the daily list");
+  });
+});

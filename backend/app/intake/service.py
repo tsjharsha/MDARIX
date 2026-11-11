@@ -692,6 +692,8 @@ def imported_backlog(
     reportability decision in the QMS, where its regulatory clock ran; an unflagged one is confirmed in one click. A
     flagged one imported with its QMS triage (T-D9, not yet confirmed) is here too, its "Confirm QMS triage" offered."""
     now = now or now_utc()
+    if not isinstance(now, datetime):  # a day (the readiness checks' watch passes one): read at its noon UTC, as triage
+        now = datetime(now.year, now.month, now.day, 12, tzinfo=timezone.utc)
     days, target_days = backlog_settings(db, tenant_id)
     record_of = (
         TriageRecord.tenant_id == tenant_id,
