@@ -187,10 +187,16 @@ def test_the_routine_complaint_closes_at_service_level_on_one_screen_with_one_si
         ]
         assert {row.signed_record_id for row in markets} == {record.id}
         # B4 (ED-15, RR-16): each market row keeps the floor in force on its awareness day and the routine basis.
-        # Switched off (MDARIX_RULE_REGISTER=off), no floor is recorded.
+        # Switched off (MDARIX_RULE_REGISTER=off), no floor is recorded. B9 steps 19-20: IN-floor-2 and CA-floor-2
+        # correct version 1 from the start, so each is the floor on every awareness day while its switch is on.
         on = feature_set.rule_register()
+        second = {
+            prefix
+            for prefix, switch in (("CA", "MDARIX_B9_CANADA"), ("IN", "MDARIX_B9_INDIA"))
+            if feature_set.switched_on(switch)
+        }
         assert [(row.floor_code, (row.rules_applied or {}).get("rules", [{}])[0].get("id")) for row in markets] == [
-            (f"{prefix}-floor-1", "routine-basis-1") if on else (None, None)
+            (f"{prefix}-floor-{2 if prefix in second else 1}", "routine-basis-1") if on else (None, None)
             for prefix in ("CA", "EU", "GB", "IN", "US")
         ]
         # How the awareness day was found, with no clock ("not reportable").
