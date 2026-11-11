@@ -24,6 +24,11 @@ FORM_FILE = Path(__file__).resolve().parents[3] / "data" / "mvpi_forms" / "MvPI-
 EDITION = "mvpi-mdae-1.2"
 MAP_CHECKED = False  # B9-D17: set True only after a person checks the map against the printed form
 RECORD_TITLE = "MDARIX record - not part of the MvPI form"
+UNFROZEN = (
+    "NOT THE APPROVED FILE. This report was approved before MDARIX froze the official form at approval (0.11.00): this "
+    "form was filled now, from today's blank form and field map. Check it against the approved snapshot before sending."
+)
+UNFROZEN_MARK = "DRAFT - NOT THE APPROVED FILE"
 
 # Text boxes: field id -> (page, field name). R3, A_MANUFACTURER, A_IMPORTER and A_DISTRIBUTOR hold one text each in
 # MDARIX; it goes in the form's Name box (the address box beside it stays for a person, or for later B9 work).
@@ -166,6 +171,19 @@ _SAMPLE = re.compile(r"\s*\(sample\)$", re.I)
 _CLASS = re.compile(r"^(?:class\s+)?([a-d])$", re.I)
 
 
+def field_map() -> dict:
+    """The field map as data: the register's form edition ``mvpi-mdae-1.2`` pins its hash (B9-D16)."""
+    return {
+        "text": TEXT,
+        "others": OTHERS,
+        "choices": CHOICES,
+        "dates": sorted(DATES),
+        "serious_yes": SERIOUS_YES,
+        "serious_reasons": SERIOUS_REASONS,
+        "checked_by_a_person": MAP_CHECKED,
+    }
+
+
 def field_names() -> set[str]:
     """Every field name the map uses (a test checks each one is a real field of the form)."""
     names = {name for _, name in TEXT.values()} | {SERIOUS_YES[1], *SERIOUS_REASONS.values()}
@@ -237,7 +255,9 @@ def placements(sections: list[dict]) -> tuple[dict[int, dict[str, str]], list[tu
     return pages, left
 
 
-def record_page(view: dict, organization: str | None, left: list[tuple[str, str, str]]) -> bytes:
+def record_page(
+    view: dict, organization: str | None, left: list[tuple[str, str, str]], unfrozen: bool = False
+) -> bytes:
     from backend.app.authority_reports.fda_3500a import PRACTICE
     from backend.app.authority_reports.render import LABELS, _sources, manifestation
     from reports import pdf
@@ -258,6 +278,8 @@ def record_page(view: dict, organization: str | None, left: list[tuple[str, str,
         )
     if view.get("practice_label"):
         header.insert(0, PRACTICE)
+    if unfrozen:
+        header.insert(0, UNFROZEN)
     body: list[tuple[str, str]] = [("Prepared by", "heading"), (", ".join(view.get("preparers") or []) or "-", "body")]
     sources = _sources(view)
     if sources:
@@ -270,11 +292,12 @@ def record_page(view: dict, organization: str | None, left: list[tuple[str, str,
     body += [("", "body"), ("Approval", "heading")]
     body += [(line, "body") for line in manifestation(view)]
     watermark = "PRACTICE RECORD - NOT YOUR REGULATORY RECORD" if view.get("practice_label") else "MDARIX RECORD"
+    watermark = UNFROZEN_MARK if unfrozen else watermark
     footer = f"{complaint['ref']} - MvPI MDAE v1.2 - MDARIX's record, not part of the MvPI form"
     return pdf.render(RECORD_TITLE, header, body, watermark=watermark, footer=footer)
 
 
-def render(view: dict, organization: str | None) -> bytes:
+def render(view: dict, organization: str | None, unfrozen: bool = False) -> bytes:
     """MvPI's form filled from the approved snapshot, then MDARIX's record page."""
     from pypdf import PdfReader, PdfWriter
     from pypdf.generic import BooleanObject, NameObject
@@ -288,9 +311,13 @@ def render(view: dict, organization: str | None) -> bytes:
         texts = {name: text for name, text in fields.items() if text != ON}
         writer.update_page_form_field_values(page, {**texts, **on}, auto_regenerate=None)
     writer.add_metadata(
-        {"/Title": f"MvPI MDAE form - {view['complaint']['ref']}", "/Producer": "MDARIX", "/Creator": "MDARIX"}
+        {
+            "/Title": f"{UNFROZEN_MARK + ' - ' if unfrozen else ''}MvPI MDAE form - {view['complaint']['ref']}",
+            "/Producer": "MDARIX",
+            "/Creator": "MDARIX",
+        }
     )
-    writer.append(PdfReader(io.BytesIO(record_page(view, organization, left))))
+    writer.append(PdfReader(io.BytesIO(record_page(view, organization, left, unfrozen))))
     out = io.BytesIO()
     writer.write(out)
     return out.getvalue()

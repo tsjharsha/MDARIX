@@ -317,7 +317,7 @@ def _signed(db, tenant_id, complaint, market, answers, level, term, author_id, s
     return row
 
 
-def _approve(db, obligation, snapshot, approver_id: str, at: datetime) -> None:
+def _approve(db, obligation, snapshot, approver_id: str, at: datetime, control_db=None) -> None:
     from backend.app.authority_reports import router, rules
     from backend.app.db.models.foundation import SignedApprovalRecord
     from backend.app.human_decision.rules import signature_hash
@@ -350,6 +350,8 @@ def _approve(db, obligation, snapshot, approver_id: str, at: datetime) -> None:
         record.id,
     )
     obligation.state = rules.APPROVED
+    db.flush()
+    router.freeze_official_form(db, control_db or db, obligation, snapshot, record)  # B9-D16: as an approval does
     db.flush()
 
 
@@ -509,7 +511,7 @@ def stage_sample_reports(
             snapshot = router.request_snapshot(
                 db, control_db, obligation, author_id, in_submitted - timedelta(hours=2), SAMPLE_SOURCE
             )
-            _approve(db, obligation, snapshot, approver_id, in_submitted - timedelta(hours=1))
+            _approve(db, obligation, snapshot, approver_id, in_submitted - timedelta(hours=1), control_db)
             attempt = router.record_submission(
                 db,
                 obligation,

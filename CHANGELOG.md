@@ -75,6 +75,17 @@ and user facility. MDARIX prepares; the customer submits: MDARIX never submits. 
 - Canada: a corrected Preliminary sent again gives an unsent Final its new promised date (audited
   `REPORT_CHAIN_DUE_CHANGED`); the Final is never cancelled (`FINAL_IS_OWED`), since nothing would make it again.
 - ADRMS sheet: "Patient involved" is Yes only when death or serious injury is recorded, otherwise "enter in ADRMS".
+- **Official forms frozen at approval** (B9-D16, as the eMDR file is): the rule register now holds the form editions
+  `mvpi-mdae-1.2` (blank form and field map, by hash) and `hc-mdpr-2018-04` (form file still awaited), picked by the
+  day the report is sent for approval and recorded in the snapshot (and its fingerprint). At approval the filled MvPI
+  (or, once its file is in place, Health Canada) form is kept in the snapshot with its SHA-256; downloads serve those
+  bytes, whatever later changes the blank form or the map, and refuse a stored file that no longer matches
+  (`409 OFFICIAL_FORM_CHANGED`). A report approved before this change keeps no frozen form: its official form is filled
+  at download and marked "DRAFT - NOT THE APPROVED FILE" on the record page and in the title, never a silent change.
+  The approval's audit event carries the frozen form's SHA-256. A changed blank form or map without a new register
+  version is a pin problem.
+- With `MDARIX_B9_INDIA` or `MDARIX_B9_CANADA` off, a report no longer shows its India or Canada chain, and cancelling a
+  chain child answers 404 (spec 6.4).
 
 ### Not yet built (Part A)
 - The Final in the India sample (SAMPLE-RV-10) after a CAPA: waits for the owner, because the sample keeps RV-10 back

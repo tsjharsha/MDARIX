@@ -559,7 +559,7 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
             ((pending.fields or {}).get("conclusion_signer") if pending else None) or signer,
             trial,
         )
-        if obligation.state in rules.EDITABLE
+        if ctx is not None and obligation.state in rules.EDITABLE  # no ctx: the view frozen at approval (B9-D16)
         else None,
         "submissions": [
             _submission_view(row, evidence.get(row.id, []), names, due, obligation.market, deadline_zone)
@@ -592,11 +592,13 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "note": obligation.note,
         "follow_up_due_on": _iso(obligation.follow_up_due_on),
         # B9 step 14: India's chain (on demand, no legal clock: D15).
-        "india_chain": india_chain_view(obligation, children) if obligation.form_code == forms.MVPI_MDAE.code else None,
+        "india_chain": india_chain_view(obligation, children)
+        if obligation.form_code == forms.MVPI_MDAE.code and _b9_india()
+        else None,
         # B9 step 11: Canada's chain (the Final made when the preliminary is submitted; updates on demand).
         "canada_chain": (
             {**canada_chain_view(obligation, children), "official_form": _hc_form_ready()}
-            if obligation.form_code == forms.HC_MDPR.code
+            if obligation.form_code == forms.HC_MDPR.code and forms.switched_on("MDARIX_B9_CANADA")
             else None
         ),
         "starter_mark": STARTER_MARK,
@@ -1544,7 +1546,7 @@ def snapshot_material(obligation, complaint: str, conclusion_id, sections: list[
         "market": obligation.market,
         "conclusion": str(conclusion_id),
         "sections": sections,
-        **{key: frozen_file[key] for key in ("emdr_sha256", "emdr_parties") if key in frozen_file},
+        **{key: frozen_file[key] for key in ("emdr_sha256", "emdr_parties", "form_edition") if key in frozen_file},
     }
 
 
@@ -1591,6 +1593,12 @@ def request_snapshot(
             _emdr_gate(found)
         if found["xml"] and not found["errors"]:
             frozen_file = frozen_emdr(found["xml"], context["parties"], sections, found["left_out"])
+    if _official_on(obligation):  # B9-D16: the official form's edition, picked by the day sent for approval
+        from backend.app.rule_register import register
+
+        edition = register.pick(OFFICIAL_RULES[obligation.form_code], _org_day(db, obligation.tenant_id, now))
+        if edition is not None:
+            frozen_file = {**frozen_file, "form_edition": edition["code"]}
     if strict and is_canada_final(obligation) and forms.switched_on("MDARIX_B9_CANADA"):
         _canada_final_gate(sections)
     if keeps_own_clock(obligation):
@@ -1877,6 +1885,10 @@ def approve_snapshot(
         created_at=now,
     )
     control_db.add(record)
+    snapshot.state, snapshot.approved_by, snapshot.approved_at = "APPROVED", me, now
+    snapshot.signed_record_id = record.id
+    obligation.state, obligation.updated_at = rules.APPROVED, now
+    official = freeze_official_form(db, control_db, obligation, snapshot, record)
     control_db.add(
         make_audit_event(
             tenant_id=tenant_id,
@@ -1891,13 +1903,11 @@ def approve_snapshot(
                 "signature_id": str(record.id),
                 "fingerprint": snapshot.content_fingerprint,
                 "same_person": same_person,
+                **({"official_form_sha256": official} if official else {}),
             },
             created_at=now,
         )
     )
-    snapshot.state, snapshot.approved_by, snapshot.approved_at = "APPROVED", me, now
-    snapshot.signed_record_id = record.id
-    obligation.state, obligation.updated_at = rules.APPROVED, now
     signing_commit.commit(db, control_db, "report snapshot")
     run_hook(
         db,
@@ -2728,6 +2738,10 @@ def cancel_follow_up(
     audited: its approval ends and the chain is free for the next one (US numbers count only the follow-ups sent). The
     initial report (it follows its signed conclusion) and a submitted follow-up are never cancelled here."""
     obligation = _obligation(db, _tenant(ctx), obligation_id, lock=True)
+    if (is_india_chain(obligation) and not _b9_india()) or (
+        is_canada_chain(obligation) and not forms.switched_on("MDARIX_B9_CANADA")
+    ):  # spec 6.4: off, the chain's routes answer 404
+        raise _error(404, "NOT_FOUND", "Not found")
     reason = _text(payload.reason)
     if not reason or len(reason) < rules.REASON_MIN:
         raise _error(422, "REASON_REQUIRED", f"Say why, in at least {rules.REASON_MIN} characters")
@@ -2922,41 +2936,14 @@ def export(
     elif obligation.state == rules.CANCELLED:
         raise _error(409, "REPORT_CANCELLED", "This report was cancelled: there is no draft to preview")
     if frozen is not None:
-        signature = None
-        if frozen.signed_record_id:
-            record = control_db.get(SignedApprovalRecord, frozen.signed_record_id)
-            if record is not None:
-                signature = {
-                    "signer_name": _names(control_db, tenant_id, [record.signer_user_id]).get(record.signer_user_id)
-                    or "A colleague",
-                    "signer_role": (record.signer_role or "").replace("_", " ").title(),
-                    "signed_at": record.signed_at.isoformat(timespec="seconds") if record.signed_at else None,
-                    "meaning": record.signature_meaning,
-                    "record_business_id": record.business_id,
-                    "record_id": str(record.id),
-                    "content_fingerprint": record.content_fingerprint,
-                }
-        view = {
-            **view,
-            "sections": frozen.fields["sections"],
-            "snapshot": _snapshot_view(frozen, {}),
-            "signature": signature,
-        }
+        record = control_db.get(SignedApprovalRecord, frozen.signed_record_id) if frozen.signed_record_id else None
+        view = _frozen_view(view, frozen, _signature_view(control_db, tenant_id, record) if record else None)
     organization = _organization_name(control_db, tenant_id)
     body = None
-    if india_pdf and form is not None:
+    if (india_pdf or ca_pdf) and form is not None:
         if not view.get("signature"):
             raise _error(409, "APPROVE_FIRST", "The official form is filled once the report is approved")
-        body = INDIA_FILES[form](view, organization)
-    elif ca_pdf and form == "official":
-        from backend.app.authority_reports import hc_mdpr
-
-        if not view.get("signature"):
-            raise _error(409, "APPROVE_FIRST", "The official form is filled once the report is approved")
-        try:
-            body = hc_mdpr.render(view, organization)
-        except hc_mdpr.FormFileNeeded as missing:
-            raise _error(409, "FORM_FILE_NEEDED", f"{missing}: the worksheet PDF is ready meanwhile") from None
+        body = _official_file(frozen, view, organization) if form == "official" else _adrms_sheet(view, organization)
     elif us_pdf and form == "official":
         if not view.get("signature"):
             raise _error(409, "APPROVE_FIRST", "FDA's official form is filled once the report is approved")
@@ -2999,19 +2986,102 @@ def _b9_india() -> bool:
     return feature_set.switched_on("MDARIX_B9_INDIA")
 
 
-def _mvpi_form(view: dict, organization: str | None) -> bytes:
-    from backend.app.authority_reports import mvpi_mdae
-
-    return mvpi_mdae.render(view, organization)
-
-
 def _adrms_sheet(view: dict, organization: str | None) -> bytes:
     from backend.app.authority_reports import mvpi_mdae
 
     return mvpi_mdae.adrms_sheet(view, organization)
 
 
-INDIA_FILES = {"official": _mvpi_form, "adrms": _adrms_sheet}
+INDIA_FILES = ("official", "adrms")
+# B9-D16: the register rule of each official form's edition (picked by the day sent for approval).
+OFFICIAL_RULES = {forms.MVPI_MDAE.code: "mvpi-mdae", forms.HC_MDPR.code: "hc-mdpr"}
+
+
+def _official_on(obligation: ReportObligation) -> bool:
+    switch = {forms.MVPI_MDAE.code: "MDARIX_B9_INDIA", forms.HC_MDPR.code: "MDARIX_B9_CANADA"}.get(obligation.form_code)
+    return switch is not None and forms.switched_on(switch)
+
+
+def _official_module(form_code: str):
+    from backend.app.authority_reports import hc_mdpr, mvpi_mdae
+
+    return mvpi_mdae if form_code == forms.MVPI_MDAE.code else hc_mdpr
+
+
+def _signature_view(control_db, tenant_id, record: SignedApprovalRecord) -> dict:
+    return {
+        "signer_name": _names(control_db, tenant_id, [record.signer_user_id]).get(record.signer_user_id)
+        or "A colleague",
+        "signer_role": (record.signer_role or "").replace("_", " ").title(),
+        "signed_at": record.signed_at.isoformat(timespec="seconds") if record.signed_at else None,
+        "meaning": record.signature_meaning,
+        "record_business_id": record.business_id,
+        "record_id": str(record.id),
+        "content_fingerprint": record.content_fingerprint,
+    }
+
+
+def _frozen_view(view: dict, frozen: ReportSnapshot, signature: dict | None) -> dict:
+    """A report's view as one snapshot froze it (its sections, its version, its approval signature)."""
+    return {
+        **view,
+        "sections": frozen.fields["sections"],
+        "snapshot": _snapshot_view(frozen, {}),
+        "signature": signature,
+    }
+
+
+def freeze_official_form(db, control_db, obligation: ReportObligation, snapshot: ReportSnapshot, record) -> str | None:
+    """At approval (B9-D16, as the eMDR file is frozen): the official India or Canada form, filled from the snapshot
+    with the edition picked when it was sent for approval, kept in the snapshot with its SHA-256; downloads serve these
+    bytes whatever later changes the blank form or the map. Returns the SHA-256, or None when nothing was frozen (no
+    edition recorded at Send, the switch off, the edition's form file or map not as pinned, or no form file yet)."""
+    from backend.app.rule_register import register
+    from backend.app.stage3_workflow_router import _organization_name
+
+    code = (snapshot.fields or {}).get("form_edition")
+    if not code or not _official_on(obligation):
+        return None
+    edition = register.get(code)
+    problems = register.file_problems(edition) if edition else [f"{code}: not in the register"]
+    if problems:  # never a form filled from files the edition does not pin
+        logger.error("Official form of snapshot %s not frozen: %s", snapshot.id, problems)
+        return None
+    module = _official_module(obligation.form_code)
+    view = _frozen_view(
+        detail(db, control_db, None, obligation), snapshot, _signature_view(control_db, obligation.tenant_id, record)
+    )
+    try:
+        body = module.render(view, _organization_name(control_db, obligation.tenant_id))
+    except getattr(module, "FormFileNeeded", ()):  # Canada, until the owner's form file is in place
+        return None
+    found = hashlib.sha256(body).hexdigest()
+    # shortcut: the frozen PDF (about 330 KB as base64) sits in the snapshot's JSONB; move it to object storage if
+    # snapshot reads grow slow.
+    snapshot.fields = {
+        **snapshot.fields,
+        "official_pdf": base64.b64encode(body).decode("ascii"),
+        "official_sha256": found,
+    }
+    return found
+
+
+def _official_file(frozen: ReportSnapshot, view: dict, organization: str | None) -> bytes:
+    """The official form of an approved snapshot: the bytes frozen at approval, checked against their SHA-256 (a
+    mismatch is refused, never re-rendered). A snapshot approved before 0.11.00 (or before the form file was in place)
+    keeps none: it is filled now and marked "DRAFT - NOT THE APPROVED FILE" on its record page, never a silent change."""
+    stored = (frozen.fields or {}).get("official_pdf")
+    if stored is not None:
+        body = base64.b64decode(stored)
+        if hashlib.sha256(body).hexdigest() != frozen.fields.get("official_sha256"):
+            logger.error("Official form of snapshot %s does not match its approval", frozen.id)
+            raise _error(409, "OFFICIAL_FORM_CHANGED", "The stored official form does not match the approved one")
+        return body
+    module = _official_module(view["form"]["code"])
+    try:
+        return module.render(view, organization, unfrozen=True)
+    except getattr(module, "FormFileNeeded", ()) as missing:
+        raise _error(409, "FORM_FILE_NEEDED", f"{missing}: the worksheet PDF is ready meanwhile") from None
 
 
 def snapshot_file(frozen: ReportSnapshot, parties, organization: str | None, practice: bool):

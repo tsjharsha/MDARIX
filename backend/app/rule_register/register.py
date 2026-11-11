@@ -281,8 +281,23 @@ def pin_problems() -> list[str]:
     for entry in load().values():
         if entry.get("pinned") and entry.get("code_hash") != code_hash(entry["implementation"]):
             problems.append(f"{entry['code']}.json: {entry['implementation']} changed without a new version")
-        if entry["held_as"] == DATA_HELD and "file" in entry.get("content", {}):
-            path = Path(__file__).resolve().parents[3] / entry["content"]["file"]
-            if hashlib.sha256(path.read_bytes()).hexdigest() != entry["content"]["sha256"]:
-                problems.append(f"{entry['code']}.json: {entry['content']['file']} changed without a new version")
+        if entry["held_as"] == DATA_HELD:
+            problems += file_problems(entry)
+    return problems
+
+
+def file_problems(entry: dict) -> list[str]:
+    """A data version's file (a rule book, or a form edition's blank form) and a form edition's field map (B9-D16),
+    against the hashes the version pins: a changed file or map is a new version."""
+    import importlib
+
+    content, problems = entry.get("content") or {}, []
+    if content.get("file"):
+        path = Path(__file__).resolve().parents[3] / content["file"]
+        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != content["sha256"]:
+            problems.append(f"{entry['code']}.json: {content['file']} changed without a new version")
+    if content.get("field_map_sha256"):
+        module, _, name = content["field_map"].partition(":")
+        if content_hash(getattr(importlib.import_module(module), name)()) != content["field_map_sha256"]:
+            problems.append(f"{entry['code']}.json: {content['field_map']} changed without a new version")
     return problems

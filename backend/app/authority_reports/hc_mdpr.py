@@ -21,6 +21,8 @@ import json
 from datetime import date
 from pathlib import Path
 
+from backend.app.authority_reports.mvpi_mdae import UNFROZEN, UNFROZEN_MARK
+
 FOLDER = Path(__file__).resolve().parents[3] / "data" / "hc_forms"
 EDITION = "hc-mdpr-2018-04"
 RECORD_TITLE = "MDARIX record - not part of the Health Canada form"
@@ -36,6 +38,7 @@ def manifest() -> dict:
 
 
 def field_map() -> dict:
+    """The field map: the register's form edition ``hc-mdpr-2018-04`` pins its hash (B9-D16)."""
     return json.loads((FOLDER / "field_map.json").read_text(encoding="utf-8"))
 
 
@@ -87,7 +90,9 @@ def placements(sections: list[dict]) -> tuple[dict[str, str], list[tuple[str, st
     return out, left
 
 
-def record_page(view: dict, organization: str | None, left: list[tuple[str, str, str]]) -> bytes:
+def record_page(
+    view: dict, organization: str | None, left: list[tuple[str, str, str]], unfrozen: bool = False
+) -> bytes:
     from backend.app.authority_reports.fda_3500a import PRACTICE
     from backend.app.authority_reports.render import manifestation
     from reports import pdf
@@ -105,6 +110,8 @@ def record_page(view: dict, organization: str | None, left: list[tuple[str, str,
         header.append("The form's field map is still to be checked once by a person. Check every box before sending.")
     if view.get("practice_label"):
         header.insert(0, PRACTICE)
+    if unfrozen:
+        header.insert(0, UNFROZEN)
     body: list[tuple[str, str]] = [("Prepared by", "heading"), (", ".join(view.get("preparers") or []) or "-", "body")]
     if left:
         body += [("", "body"), ("Approved values the form has no place for", "heading")]
@@ -112,11 +119,12 @@ def record_page(view: dict, organization: str | None, left: list[tuple[str, str,
     body += [("", "body"), ("Approval", "heading")]
     body += [(line, "body") for line in manifestation(view)]
     watermark = "PRACTICE RECORD - NOT YOUR REGULATORY RECORD" if view.get("practice_label") else "MDARIX RECORD"
+    watermark = UNFROZEN_MARK if unfrozen else watermark
     footer = f"{complaint['ref']} - HC Pub. 110180 - MDARIX's record, not part of the Health Canada form"
     return pdf.render(RECORD_TITLE, header, body, watermark=watermark, footer=footer)
 
 
-def render(view: dict, organization: str | None) -> bytes:
+def render(view: dict, organization: str | None, unfrozen: bool = False) -> bytes:
     """Health Canada's form filled from the approved snapshot, then MDARIX's record page. ``FormFileNeeded`` until the
     form file and its map are in ``data/hc_forms``."""
     from pypdf import PdfReader, PdfWriter
@@ -138,9 +146,13 @@ def render(view: dict, organization: str | None) -> bytes:
         texts = {name: text for name, text in fields.items() if text != ON}
         writer.update_page_form_field_values(page, {**texts, **on}, auto_regenerate=None)
     writer.add_metadata(
-        {"/Title": f"HC MDPR form - {view['complaint']['ref']}", "/Producer": "MDARIX", "/Creator": "MDARIX"}
+        {
+            "/Title": f"{UNFROZEN_MARK + ' - ' if unfrozen else ''}HC MDPR form - {view['complaint']['ref']}",
+            "/Producer": "MDARIX",
+            "/Creator": "MDARIX",
+        }
     )
-    writer.append(PdfReader(io.BytesIO(record_page(view, organization, left))))
+    writer.append(PdfReader(io.BytesIO(record_page(view, organization, left, unfrozen))))
     out = io.BytesIO()
     writer.write(out)
     return out.getvalue()
