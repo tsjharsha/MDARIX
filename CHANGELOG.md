@@ -17,6 +17,30 @@ and user facility. MDARIX prepares; the customer submits: MDARIX never submits. 
 "starter, for your consultant to confirm". Switches: `MDARIX_B9_INDIA` (on), `MDARIX_B9_CANADA` (on),
 `MDARIX_B9_US_IMPORTER` (on), `MDARIX_B9_US_USER_FACILITY` (off).
 
+### Added (India, Part A)
+- **India's legal period** (rule `IN-floor-2`): a serious adverse event report is due in 15 calendar days (India MDR
+  2017 Rule 26(ii), "within fifteen days"; the awareness day is day 1), starter, for your consultant to confirm. A
+  correction of MDARIX's own rule from the start: a Reportable India conclusion takes your India window only when it
+  is exactly 15 calendar days, otherwise the regulation's 15 days; a pending one takes the earliest. Answers,
+  suggestions, notes and folded questions are unchanged. Conclusions already signed keep their floor and due date; an
+  unsigned India draft is refused at signing (`FLOOR_CHANGED`) until its answers are saved again. A window longer than
+  15 days for India now warns on saving.
+- **MvPI's own form**: an approved India report downloads as the official Medical Device Adverse Event Reporting Form,
+  Version 1.2, filled (`worksheet.pdf?form=official`), with MDARIX's record page. The form's fields have generic names,
+  so they were matched by position: the map is still to be checked once by a person against the printed form, and the
+  record page says so. The blank form is a copy published by nhsrcindia.org (SHA-256 in
+  `data/mvpi_forms/manifest.json`), to be replaced by the ipc.gov.in copy.
+- **ADRMS entry sheet** (`worksheet.pdf?form=adrms`): ADRMS's 16 mandatory fields in its screen order, with the
+  approved snapshot's values, or "enter in ADRMS".
+- **India follow-up and final reports**, on demand only (`POST /api/v1/reports/{id}/india-chain`): one open at a time,
+  a Final ends the chain, an optional next-report date labelled "No legal clock: your date". The report type (P2) now
+  follows the chain and the date of report (P1) is the day the report is sent for approval; neither is typed.
+- Session flags `b9.india`, `b9.canada`, `b9.us_importer`, `b9.us_user_facility`.
+
+### Not yet built (Part A)
+- The screens (role per market, the India chain card, the floor on the conclusion), the Final in the India sample
+  after its CAPA, and the user guide. No database change in Part A.
+
 ## [0.10.99] - not released yet
 
 B4: the rule register. Every rule MDARIX applies, its source, version and dates, in one place; the reportability
