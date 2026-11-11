@@ -36,7 +36,7 @@
   "switch": "MDARIX_B8_GB_MIR",
   "content": {
     "file": "backend/app/authority_reports/rules/gb_mir.csv",
-    "sha256": "101a87122f0b269615e3c1d491c50158a1aa7f58078aa5f0240c72b0e81cbe90"
+    "sha256": "b44b2a02c952f070816ad7cf760ce065b888669d13f0cdc59919d2e205585123"
   },
-  "content_hash": "sha256:fc7302fd7e9f758c15e08d2b11d5d0be40eb43ae9d14a327e16fe3b096f4aca5"
+  "content_hash": "sha256:3d06b63a0d33508888074caba5494dd7f9943db1a7751c18e40bd9d3f001de18"
 }

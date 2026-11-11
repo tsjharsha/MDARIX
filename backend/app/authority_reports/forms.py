@@ -976,7 +976,8 @@ def _mir_incident(market: str) -> tuple[Section, ...]:
                 Field("3_4B", "3.4b", "Name of the healthcare facility where the incident occurred", personal=REPORTER),
                 Field("3_4C", "3.4c", "Healthcare facility report number, if applicable", personal=REPORTER),
                 Field("3_4D", "3.4d-g", "Contact's name, e-mail and phone", personal=REPORTER),
-                *(() if gb else (Field("3_4H", "3.4h", "Country of the initial reporter", "incident_country", MUST),)),
+                # GB too (B8 step 14): MHRA's schema needs the country whenever 3.4a is given.
+                Field("3_4H", "3.4h", "Country of the initial reporter", "incident_country", MUST),
                 Field(
                     "3_4I",
                     "3.4i-n",
@@ -1402,6 +1403,14 @@ EU_MIR = Form(
             note="Starter, for your consultant to confirm: keep what you sent and the authority's reference; for Northern Ireland, MHRA's MORE "
             "portal with the EU form.",
         ),
+        # B8 step 16 (B8-D4): an incident in Northern Ireland goes to MHRA through MORE, with the EU MIR file.
+        Route(
+            "MHRA_MORE_EU",
+            "MHRA MORE (EU form): upload the EU MIR XML in MHRA's MORE portal",
+            {key: value for key, value in _MIR_EVIDENCE.items() if key != "SENT_EMAIL"},
+            note="Northern Ireland: MHRA takes the EU MIR through MORE. Which EU MIR version MORE takes is to confirm "
+            "with MHRA before your first upload (B8-D4). Starter, for your consultant to confirm.",
+        ),
     ),
     ("MDR_87", "IVDR_82", "MDCG_2023_3"),
     report_types=MIR_TYPES,
@@ -1440,7 +1449,14 @@ GB_MIR = Form(
             "1_2",
             "1.2 Date, type and classification of the incident report",
             (
-                Field("1_2A", "1.2", "Date of this report", None, MUST, note="The day you submit."),
+                Field(
+                    "1_2A",
+                    "1.2",
+                    "Date of this report",
+                    "sent_day",
+                    MUST,
+                    note="The day sent for approval (as the EU MIR's 1.2a, B8-D1): record the real day at submission.",
+                ),
                 Field("1_2B", "1.2", "Date of the incident (from … to …)", "event_date", MUST),
                 Field("1_2C", "1.2", "Manufacturer awareness date", "aware_date", MUST),
                 Field("1_2E", "1.2", "Type of report", "report_type", MUST, options=MIR_TYPES),

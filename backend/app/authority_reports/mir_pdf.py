@@ -1,9 +1,9 @@
-"""The EU report as a readable PDF of its MIR file (B8 step 9): sections 1 to 5, each block with the help text's
+"""The EU or GB report as a readable PDF of its MIR file (B8 steps 9 and 15): sections 1 to 5, each block with the help text's
 number and label, in the form's order, the values read back from the XML itself. What the PDF shows is what the file
 says.
 
 The title says who made it (B8-D18): "EU MIR 7.3.1 content, prepared by MDARIX". It never claims the Commission or an
-authority made it. A record page follows: who prepared it, the source records, the approval and the file's SHA-256. A
+authority made it; a GB PDF says it is a record copy, since MHRA takes reports only through MORE. A record page follows: who prepared it, the source records, the approval and the file's SHA-256. A
 report not yet approved is marked DRAFT - NOT APPROVED (D7). No date or time is written into the PDF, so the same
 file renders the same bytes.
 """
@@ -15,9 +15,10 @@ import re
 
 from lxml import etree
 
-from backend.app.authority_reports import emdr_pdf, forms, mir_rules, mir_xml
+from backend.app.authority_reports import emdr_pdf, mir_rules, mir_xml
 
 TITLE = "EU MIR 7.3.1 content, prepared by MDARIX"
+GB_TITLE = "GB MIR 7.2.1 content, prepared by MDARIX. Record copy: MHRA takes reports only through MORE."
 SECTIONS = {
     "1": "1 Administrative information",
     "2": "2 Medical device information",
@@ -44,14 +45,20 @@ def _words(name: str) -> str:
     return words[:1].upper() + words[1:]
 
 
-def _labels() -> dict[str, str]:
-    return {row["block"]: row["label"] for row in mir_rules.rows(forms.EU_MIR.code)}
+def form_of(root) -> str:
+    """EU or GB, read from the file itself: the schema it names."""
+    named = root.get(f"{{{mir_xml.XSI}}}noNamespaceSchemaLocation")
+    return mir_xml.GB if named in mir_xml.GB_FILES.values() else mir_xml.EU
 
 
-def _block(element) -> str | None:
+def _labels(form: str = mir_xml.EU) -> dict[str, str]:
+    return {row["block"]: row["label"] for row in mir_rules.rows(form)}
+
+
+def _block(element, form: str = mir_xml.EU) -> str | None:
     """The rule book's block of an element, or of the nearest parent that has one."""
     while element is not None and element.tag != "incident":
-        found = mir_xml._block(element.tag)
+        found = mir_xml._block(element.tag, form)
         if found != element.tag:
             return found.split(" ", 1)[0]
         element = element.getparent()
@@ -71,11 +78,12 @@ def body(xml: bytes) -> list[tuple[str, str]]:
     """Sections 1 to 5: each block the file holds, with its number and label, and its values. A block with several
     places names each one."""
     root = etree.fromstring(xml)
-    labels = _labels()
+    form = form_of(root)
+    labels = _labels(form)
     blocks: dict[str, list] = {}
     for element in root.iter():
         if len(element) == 0 and element is not root and (element.text or "").strip():
-            blocks.setdefault(_block(element) or "", []).append(element)
+            blocks.setdefault(_block(element, form) or "", []).append(element)
     lines: list[tuple[str, str]] = []
     section = None
     for block, elements in blocks.items():
@@ -97,14 +105,19 @@ def render(xml: bytes, view: dict, organization: str | None, *, note: str = "") 
     from reports import pdf
 
     root = etree.fromstring(xml)
+    gb = form_of(root) == mir_xml.GB
     complaint = view["complaint"]
     header = [
         f"Report type: {root.findtext('admin_info/reportType') or '-'} · Manufacturer's reference: "
         f"{root.findtext('admin_info/mfrRef') or '-'} · Authority: {root.findtext('admin_info/ncaName') or '-'}",
         f"Organization: {organization or '-'} · Complaint {complaint['ref']}: "
         f"{complaint['product_name'] or '-'} {complaint['version'] or ''}".rstrip(),
-        "Prepared by MDARIX from the report's MIR file (XML), in the blocks and order of the MIR form 7.3.1.",
-        "MDARIX never submits: you send the MIR file to the national competent authority. Import the XML into the "
+        "Prepared by MDARIX from the report's MIR file (XML), in the blocks and order of the MIR form "
+        + ("GB 7.2.1." if gb else "7.3.1."),
+        "MDARIX never submits: upload the XML in MHRA's MORE. This PDF is your record copy; MHRA takes reports only "
+        "through MORE."
+        if gb
+        else "MDARIX never submits: you send the MIR file to the national competent authority. Import the XML into the "
         "official MIR PDF if your authority asks for it.",
     ]
     draft = not view.get("signature")
@@ -117,8 +130,9 @@ def render(xml: bytes, view: dict, organization: str | None, *, note: str = "") 
         if draft
         else "PRACTICE RECORD - NOT YOUR REGULATORY RECORD"
         if view.get("practice_label")
-        else "EU MIR CONTENT - PREPARED BY MDARIX"
+        else ("GB MIR RECORD COPY - PREPARED BY MDARIX" if gb else "EU MIR CONTENT - PREPARED BY MDARIX")
     )
     lines = body(xml) + emdr_pdf.record(view, [], hashlib.sha256(xml).hexdigest(), note, name="MIR")
-    footer = f"{complaint['ref']} - EU MIR 7.3.1 content - prepared by MDARIX, which never submits"
-    return pdf.render(TITLE, header, lines, watermark=watermark, footer=footer)
+    edition = "GB MIR 7.2.1 record copy" if gb else "EU MIR 7.3.1 content"
+    footer = f"{complaint['ref']} - {edition} - prepared by MDARIX, which never submits"
+    return pdf.render(GB_TITLE if gb else TITLE, header, lines, watermark=watermark, footer=footer)

@@ -1,5 +1,6 @@
-"""The EU MIR file (B8 step 7): one builder for the five report types of MIR 7.3.1 (schemas SB-11252, vendored in
-``data/mir_forms/eu-7.3.1-SB-11252``). Root ``<incident>``, no namespace; elements in the schema's own order (read
+"""The EU and GB MIR files (B8 steps 7 and 14): one builder for the five report types of the EU MIR 7.3.1 (schemas
+SB-11252, vendored in ``data/mir_forms/eu-7.3.1-SB-11252``) and of MHRA's GB MIR 7.2.1 (``data/mir_forms/gb-7.2.1``),
+picked by the form (``form=``, EU by default). Root ``<incident>``, no namespace; elements in the schema's own order (read
 from the type's XSD, so one table of values serves every type).
 
 The file holds only what the report holds: a blank stays blank, never "Unknown" unless a person (or the help text's
@@ -20,7 +21,8 @@ from lxml import etree
 
 from backend.app.authority_reports import forms, mir_rules, worksheet
 
-FOLDER = Path(__file__).resolve().parents[3] / "data" / "mir_forms" / "eu-7.3.1-SB-11252"
+FORMS_DIR = Path(__file__).resolve().parents[3] / "data" / "mir_forms"
+FOLDER = FORMS_DIR / "eu-7.3.1-SB-11252"
 FILES = {
     forms.MIR_INITIAL: "incident-Initial-v7.3.1.xsd",
     forms.MIR_FOLLOW_UP: "incident-Followup-v7.3.1.xsd",
@@ -28,6 +30,15 @@ FILES = {
     forms.MIR_FINAL: "incident-FinalRep-v7.3.1.xsd",
     forms.MIR_FINAL_NON: "incident-FinalNonRep-v7.3.1.xsd",
 }
+GB_FILES = {
+    forms.MIR_INITIAL: "incident-InitialGB-v7.2.1.xsd",
+    forms.MIR_FOLLOW_UP: "incident-FollowupGB-v7.2.1.xsd",
+    forms.MIR_COMBINED: "incident-InitialFinalGB-v7.2.1.xsd",
+    forms.MIR_FINAL: "incident-FinalRepGB-v7.2.1.xsd",
+    forms.MIR_FINAL_NON: "incident-FinalNonRepGB-v7.2.1.xsd",
+}
+EU, GB = forms.EU_MIR.code, forms.GB_MIR.code
+SCHEMAS = {EU: (FOLDER, FILES), GB: (FORMS_DIR / "gb-7.2.1", GB_FILES)}
 XS = "{http://www.w3.org/2001/XMLSchema}"
 XSI = "http://www.w3.org/2001/XMLSchema-instance"
 LANGUAGE = "en"
@@ -93,6 +104,16 @@ PLAIN = {
     "4_3_3D": "mfr_invest/similarIncidents/howWereDetermined",
     "5": "other_reporting_info/AdditionalComments",
 }
+# The GB form numbers 1.3.1 apart (1.3.1d is the submitter's details, from Settings) and has MHRA's own places: one
+# UDI issuing entity, the UK approved body, no EUDAMED numbers and a PMCF/PMPF ID only (MHRA's GB 7.2.1 schemas).
+GB_PLAIN = {key: path for key, path in PLAIN.items() if key not in ("1_3_1D", "1_3_1E")} | {
+    "1_3_1E": "admin_info/mfrRefFSCA",
+    "1_3_1F": "admin_info/psrId",
+    "1_3_1G": "admin_info/pmcfpmpfId",
+    "2_1E": "device_info/udiIssueEntity",
+    "2_3_UKAB": "device_info/UKABIdNum",
+    "2_3_UKAB_CERT": "device_info/UKABCertNum",
+}
 # IMDRF codes: up to six (eight for Annex B) choices, in the order the report lists them.
 CODES = {
     "3_2A": "incident_info/clinical_event_info/imdrfCodeChoice",
@@ -125,6 +146,10 @@ _MFR = {"Name": "mfrName", "SRN": "mfrSRN", "Street": "mfrOrgStreet", "City": "m
 _MFR |= {"Postcode": "mfrPostcode", "Phone": "mfrPhone", "EmailAddress": "mfrEmailAddress"}
 _MFR |= {"ContactPersonFirstName": "mfrContactPersonFirstName", "ContactPersonSecondName": "mfrContactPersonSecondName"}
 _AR = {key: "AR" + key for key in _PARTY} | {"Postcode": "ARPostCode"}
+# GB: the submitter's own details (reporterDetails, required in every GB submitter block; MHRA's 1.3.1).
+_REPORTER = {key: "reporterOrg" + key for key in _PARTY if key != "SRN"}
+_REPORTER |= {"ContactPersonFirstName": "reporterContactPersonFirstName"}
+_REPORTER |= {"ContactPersonSecondName": "reporterContactPersonSecondName"}
 # The parts a party needs in the file: the schema's required ones for the manufacturer; the same for the authorised
 # representative (the help text's 1.3.3, stricter than the schema's all-optional block, B8-D6).
 NEEDED_PARTS = ("contact_first_name", "contact_last_name", "street", "city", "postcode", "country_code")
@@ -148,12 +173,20 @@ _SUBMITTER = {
     "manufacturer": ("reporterMfr", "Manufacturer"),
     "authorised representative": ("reporterAR", "Authorised representative"),
     "other": ("reporterOther", "Others"),
+    "others": ("reporterOther", "Others"),
+    "united kingdom responsible person": ("reporterUKRP", "United Kingdom Responsible Person"),  # GB only
 }
+# The UK: a manufacturer here needs no UK Responsible Person (starter, for your consultant to confirm).
+INSIDE_UK = frozenset({"GB", "XI", None})
+# Who stands for a manufacturer from elsewhere, per form: the EU authorised representative; in GB the UK Responsible
+# Person (an authorised representative recorded for GB is read as one, as the GB worksheet does).
+REPRESENTATIVES = {EU: ("AUTHORISED_REPRESENTATIVE",), GB: ("UK_RESPONSIBLE_PERSON", "AUTHORISED_REPRESENTATIVE")}
 # shortcut: 1.3.4 (a submitter other than the manufacturer or AR) is one text; the file wants its parts
 # (reporterDetails). The report is still built without them; add a parts form like step 6's when a customer needs it.
 NOT_IN_FILE = frozenset({"1_3_4"})
 # 1.3.2 and 1.3.3: the parties on the worksheet; the file takes their parts (``file_values``).
 PARTY_FIELDS = frozenset({"1_3_2A", "1_3_2B", "1_3_2C", "1_3_3"})
+GB_PARTY_FIELDS = PARTY_FIELDS | {"1_3_1D"}
 _CODE = re.compile(r"[A-G]\d{2,7}")
 _DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 _YES_NO = re.compile(r"^\s*(yes|no)\b[\s,:;.-]*(.*)$", re.IGNORECASE | re.DOTALL)
@@ -168,15 +201,20 @@ class MirRefused(ValueError):
 
 
 # ------------------------------------------------------------------------------------------------- the schema
-@lru_cache(maxsize=len(FILES))
-def _schema(report_type: str) -> etree.XMLSchema:
-    return etree.XMLSchema(etree.parse(str(FOLDER / FILES[report_type])))
+def _path(report_type: str, form: str) -> Path:
+    folder, files = SCHEMAS[form]
+    return folder / files[report_type]
 
 
-@lru_cache(maxsize=len(FILES))
-def _layout(report_type: str) -> tuple:
+@lru_cache(maxsize=2 * len(FILES))
+def _schema(report_type: str, form: str = EU) -> etree.XMLSchema:
+    return etree.XMLSchema(etree.parse(str(_path(report_type, form))))
+
+
+@lru_cache(maxsize=2 * len(FILES))
+def _layout(report_type: str, form: str = EU) -> tuple:
     """The type's elements under <incident>, in order: (name, children or None, enumeration or None, max occurs)."""
-    root = etree.parse(str(FOLDER / FILES[report_type])).getroot()
+    root = etree.parse(str(_path(report_type, form))).getroot()
     types = {node.get("name"): node for node in root if node.get("name") and node.tag != XS + "element"}
 
     def enum(node) -> tuple[str, ...] | None:
@@ -212,12 +250,12 @@ def _fit(value: str, choices: tuple[str, ...] | None) -> str:
     return next((choice for choice in choices if re.sub(r"\s+", "", choice).lower() == key), value)
 
 
-def _write(parent, layout, values: dict, prefix: str, used: set) -> None:
+def _write(parent, layout, values: dict, prefix: str, used: set, form: str = EU) -> None:
     for name, kids, choices, most in layout:
         path = prefix + name
         if kids is not None:
             element = etree.SubElement(parent, name)
-            _write(element, kids, values, path + "/", used)
+            _write(element, kids, values, path + "/", used, form)
             if len(element) == 0:
                 parent.remove(element)
             continue
@@ -228,7 +266,7 @@ def _write(parent, layout, values: dict, prefix: str, used: set) -> None:
         for text in found if isinstance(found, list) else [found]:
             etree.SubElement(parent, name).text = _fit(str(text), choices)
         if isinstance(found, list) and most == "1" and len(found) > 1:
-            raise MirRefused([], [f"{_block(name)}: one value only"])
+            raise MirRefused([], [f"{_block(name, form)}: one value only"])
 
 
 # ------------------------------------------------------------------------------------------------- the values
@@ -266,16 +304,17 @@ def country_code(text: str | None) -> str | None:
     return row["code"] if row else words or None
 
 
-def _risk_class(text: str) -> dict:
+def _risk_class(text: str, form: str = EU) -> dict:
     """2.4: the list entry's elements (``forms.RISK_CLASSES``); a text that is no entry goes in as it is, so the schema
     refuses it, naming 2.4."""
-    return forms.RISK_CLASSES.get(forms.risk_class_choice(text) or "") or {"device_info/deviceClassMDR": text}
+    found = forms.risk_class_choice(text, gb=form == GB)
+    return forms.RISK_CLASSES.get(found or "") or {"device_info/deviceClassMDR": text}
 
 
-def _distribution(text: str) -> dict:
+def _distribution(text: str, form: str = EU) -> dict:
     """2.5: EEA countries (with CH, TR and Northern Ireland) as the schema's codes; "all" as its one choice; anything
     else, as written, in other countries."""
-    eea = dict.fromkeys(next(c for n, _, c, _ in _device_layout() if n == "distributionEEA"))
+    eea = dict.fromkeys(next(c for n, _, c, _ in _device_layout(form) if n == "distributionEEA"))
     codes, other = [], []
     for part in filter(None, (piece.strip() for piece in re.split(r"[;,]", text))):
         if part.lower().startswith("all eea"):
@@ -291,8 +330,8 @@ def _distribution(text: str) -> dict:
     return out
 
 
-def _device_layout():
-    device = next(kids for name, kids, _, _ in _layout(forms.MIR_INITIAL) if name == "device_info")
+def _device_layout(form: str = EU):
+    device = next(kids for name, kids, _, _ in _layout(forms.MIR_INITIAL, form) if name == "device_info")
     return next(kids for name, kids, _, _ in device if name == "distribution")
 
 
@@ -397,10 +436,12 @@ def _party_of(parties, role: str):
     return next((item for item in parties if getattr(item, "role", None) == role), None)
 
 
-def file_values(values: dict, parties, *, udi_entity: str | None = None) -> dict:
-    """Every element's value by its path under <incident>, from the report's values (field id -> text), the EU
+def file_values(values: dict, parties, *, udi_entity: str | None = None, form: str = EU) -> dict:
+    """Every element's value by its path under <incident>, from the report's values (field id -> text), the market's
     responsible parties (with their parts) and the product's UDI issuing entity (B8-D11)."""
-    out: dict = {PLAIN[key]: text for key, text in values.items() if key in PLAIN}
+    gb = form == GB
+    plain = GB_PLAIN if gb else PLAIN
+    out: dict = {plain[key]: text for key, text in values.items() if key in plain}
     for key in ("1_2A", "1_2C", "1_2D", "1_2F", "2_3I", "2_3J"):
         if key in values:
             out[PLAIN[key]] = _day(values[key])
@@ -422,12 +463,12 @@ def file_values(values: dict, parties, *, udi_entity: str | None = None) -> dict
     if "2_3Q" in values:
         out |= _market_date(values["2_3Q"])
     if "2_4" in values:
-        out |= _risk_class(values["2_4"])
+        out |= _risk_class(values["2_4"], form)
     if "2_5" in values:
-        out |= _distribution(values["2_5"])
+        out |= _distribution(values["2_5"], form)
     if "3_4H" in values:
         out["incident_info/initial_reporter_info/healthcareFacilityCountry"] = country_code(values["3_4H"])
-    if "1_3_1F" in values:
+    if "1_3_1F" in values and not gb:  # GB's 1.3.1f is the PSR ID (above); its PMCF/PMPF has only the ID
         answer, detail = _yes_no(values["1_3_1F"])
         out["admin_info/pmcfpmpfQuestion"] = answer
         if detail:
@@ -438,9 +479,11 @@ def file_values(values: dict, parties, *, udi_entity: str | None = None) -> dict
         if detail:
             out["mfr_invest/" + ("rationaleNoReview" if answer == "No" else "riskAssResults")] = detail
     out |= _similar(values)
+    entity = udi_entity or worksheet.udi_issuing_entity(values.get("2_1A"))
+    if gb and "device_info/udiIssueEntity" not in out and entity and values.get("2_1A"):
+        out["device_info/udiIssueEntity"] = entity  # GB: one issuing entity, MHRA's 2.1
     for key, path in (("2_1A", "udiDI_Entity"), ("2_1C", "Basic_Entity"), ("2_1D", "UnitofUse_Entity")):
-        entity = udi_entity or worksheet.udi_issuing_entity(values.get("2_1A"))
-        if key in values and entity:
+        if key in values and entity and not gb:
             out[f"device_info/{path}"] = entity
     submitter = (values.get("1_3_1A") or "").strip()
     holder, status = _SUBMITTER.get(submitter.lower(), (None, None))
@@ -449,61 +492,72 @@ def file_values(values: dict, parties, *, udi_entity: str | None = None) -> dict
     if holder:
         base = f"admin_info/contact_info/{holder}/"
         out[base + "statusReporter"] = status
-        maker, rep = _party_of(parties, "MANUFACTURER"), _party_of(parties, "AUTHORISED_REPRESENTATIVE")
+        maker, rep = _party_of(parties, "MANUFACTURER"), _representative(parties, form)
         for party, block, names in ((maker, "mfrDetails", _MFR), (rep, "arDetails", _AR)):
             if party is not None:
                 for key, attribute in _PARTY.items():
                     text = getattr(party, attribute, None)
                     if text:
                         out[f"{base}{block}/{names[key]}"] = country_code(text) if key == "Country" else text
+        submitting = {"reporterMfr": maker, "reporterAR": rep, "reporterUKRP": rep}.get(holder)
+        if gb and submitting is not None:
+            for key, element in _REPORTER.items():
+                text = getattr(submitting, _PARTY[key], None)
+                if text:
+                    out[f"{base}reporterDetails/{element}"] = country_code(text) if key == "Country" else text
         for key, path in (("1_3_2A", "mfrName"), ("1_3_2B", "mfrSRN")):  # as the report shows them
             if values.get(key):
                 out[f"{base}mfrDetails/{path}"] = values[key]
     return out
 
 
+def _representative(parties, form: str = EU):
+    return next(filter(None, (_party_of(parties, role) for role in REPRESENTATIVES[form])), None)
+
+
 # ------------------------------------------------------------------------------------------------- the file
-def _block(name: str) -> str:
+def _block(name: str, form: str = EU) -> str:
     """The MIR block an element belongs to ("reportNextDate" -> "1.2f Expected date of next report"), from the rule
     book's XML paths; a numbered place (imdrfCodeChoice7) by its first one's block."""
     key = re.sub(r"\d+$", "", name)
-    for row in mir_rules.rows(forms.EU_MIR.code):
+    for row in mir_rules.rows(form):
         for path in row["xpath"].split(";"):
             if key in [re.sub(r"\d+$", "", part) for part in path.strip().split("/")[2:]]:
                 return f"{row['block']} {row['label']}"
     return name
 
 
-def _named(message: str) -> str:
+def _named(message: str, form: str = EU) -> str:
     found = re.search(r"Expected is (?:one of )?\( ([^)]+) \)", message)
     names = [name.strip() for name in found.group(1).split(",")] if found else []
     element = re.match(r"Element '([^']+)'", message)
-    blocks = [_block(name) for name in names] or ([_block(element.group(1))] if element else [])
+    blocks = [_block(name, form) for name in names] or ([_block(element.group(1), form)] if element else [])
     return f"{', '.join(dict.fromkeys(blocks))}: {message}" if blocks else message
 
 
-def validate(xml: bytes, report_type: str) -> list[str]:
+def validate(xml: bytes, report_type: str, form: str = EU) -> list[str]:
     """The schema errors of a file against its type's XSD (none: the Commission's schema takes it), each naming its
     MIR block."""
-    schema = _schema(report_type)
+    schema = _schema(report_type, form)
     if schema.validate(etree.fromstring(xml)):
         return []
-    return [_named(error.message) for error in schema.error_log]
+    return [_named(error.message, form) for error in schema.error_log]
 
 
-def missing(values: dict, parties, report_type: str) -> list[str]:
+def missing(values: dict, parties, report_type: str, form: str = EU) -> list[str]:
     """The blocks the report type needs that hold nothing (the rule book's "M"); the manufacturer (1.3.2), always,
     and an authorised representative (1.3.3) when the manufacturer is outside the EU/EEA, Turkey and Northern Ireland
     (the help text; starter, for your consultant to confirm); and the parts each of them lacks."""
-    needed = mir_rules.mandatory_fields(forms.EU_MIR.code, report_type)
+    needed = mir_rules.mandatory_fields(form, report_type)
     out = [f"{block} ({field})" for field, block in needed.items() if not values.get(field)]
-    maker = _party_of(parties, "MANUFACTURER")
+    maker, rep = _party_of(parties, "MANUFACTURER"), _representative(parties, form)
     if maker is None:
         out.append("1.3.2 the manufacturer (Settings, Products)")
-    elif _party_of(parties, "AUTHORISED_REPRESENTATIVE") is None and getattr(maker, "country_code", None) not in INSIDE:
+    elif rep is None and form == GB and getattr(maker, "country_code", None) not in INSIDE_UK:
+        out.append("1.3.3 the UK Responsible Person: the manufacturer is outside the UK (Settings, Products)")
+    elif rep is None and form == EU and getattr(maker, "country_code", None) not in INSIDE:
         out.append("1.3.3 the authorised representative: the manufacturer is outside the EU (Settings, Products)")
-    for role, block in (("MANUFACTURER", "1.3.2"), ("AUTHORISED_REPRESENTATIVE", "1.3.3")):
-        party = _party_of(parties, role)
+    for party, block in ((maker, "1.3.2"), (rep, "1.3.3")):
         if party is not None:
             lacking = [PART_LABELS[part] for part in NEEDED_PARTS if not getattr(party, part, None)]
             if lacking:
@@ -511,35 +565,41 @@ def missing(values: dict, parties, report_type: str) -> list[str]:
     return out
 
 
-def build(values: dict, parties, *, report_type: str, now: datetime, udi_entity: str | None = None) -> bytes:
+def build(
+    values: dict, parties, *, report_type: str, now: datetime, udi_entity: str | None = None, form: str = EU
+) -> bytes:
     """The MIR XML of a report of this type, valid against its XSD, or ``MirRefused``: never a partial file.
     ``now`` is the moment it is sent for approval (``sCreateTimeStamp``); the same values build the same bytes."""
-    found = file_values(values, parties, udi_entity=udi_entity)
+    found = file_values(values, parties, udi_entity=udi_entity, form=form)
     root = etree.Element("incident", nsmap={"xsi": XSI})
-    root.set(f"{{{XSI}}}noNamespaceSchemaLocation", FILES[report_type])
+    root.set(f"{{{XSI}}}noNamespaceSchemaLocation", SCHEMAS[form][1][report_type])
     root.set("sCreateTimeStamp", now.isoformat(timespec="seconds"))
     root.set("sFormLanguage", LANGUAGE)
     used: set = set()
-    _write(root, _layout(report_type), found, "", used)
+    _write(root, _layout(report_type, form), found, "", used, form)
     stray = sorted(set(found) - used)
-    errors = [f"{_block(path.rsplit('/', 1)[-1])}: not a place in this report type's file ({path})" for path in stray]
+    errors = [
+        f"{_block(path.rsplit('/', 1)[-1], form)}: not a place in this report type's file ({path})" for path in stray
+    ]
     xml = etree.tostring(root, xml_declaration=True, encoding="UTF-8", pretty_print=True)
-    errors += validate(xml, report_type)
+    errors += validate(xml, report_type, form)
     if errors:
         raise MirRefused([], errors)
     return xml
 
 
-def prepare(values: dict, parties, *, report_type: str, now: datetime, udi_entity: str | None = None) -> dict:
+def prepare(
+    values: dict, parties, *, report_type: str, now: datetime, udi_entity: str | None = None, form: str = EU
+) -> dict:
     """The file as Send for approval checks it: the blocks missing; when none, the file or the schema's errors."""
-    lacking = missing(values, parties, report_type)
+    lacking = missing(values, parties, report_type, form)
     if lacking:
         return {"missing": lacking, "errors": [], "xml": None}
     try:
         return {
             "missing": [],
             "errors": [],
-            "xml": build(values, parties, report_type=report_type, now=now, udi_entity=udi_entity),
+            "xml": build(values, parties, report_type=report_type, now=now, udi_entity=udi_entity, form=form),
         }
     except MirRefused as refused:
         return {"missing": refused.missing, "errors": refused.errors, "xml": None}

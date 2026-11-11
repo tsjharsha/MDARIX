@@ -633,6 +633,12 @@ def nca_for(country: str | None) -> dict | None:
     return None if row is None or row["code"] in NCA_ASKED else row
 
 
+def northern_ireland(country: str | None) -> bool:
+    """An incident in Northern Ireland (the Commission's list writes it XI): MHRA takes its EU MIR through MORE."""
+    row = eu_ncas().get(" ".join((country or "").split()).lower())
+    return bool(row and row["code"] == "XI")
+
+
 def _eu_nca(context):
     row = nca_for(context["record"].get("country"))
     if row is None:

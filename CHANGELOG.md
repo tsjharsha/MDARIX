@@ -92,6 +92,20 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
   mandatory in every GB report type, with MHRA's fallback codes when none fits (B8-D3). Where the EU help text would be
   stricter and MHRA lists no difference (SRN, 2.1b-c, 2.3p, 2.4, 3.4h, 4.2i, 4.3.1a, 4.3.3d), the row says "to
   confirm". The GB form's mandatory fields are checked against the rule book.
+- **GB MIR XML** (MHRA's GB 7.2.1 schemas, one per report type): the same builder as the EU file, by form. The UK
+  Responsible Person as submitter (its own details and the manufacturer's), one UDI issuing entity, GMDN, the UK
+  approved body's ID and certificate, MHRA's PMCF/PMPF ID; no EUDAMED number, no 1.2d, no height, no EU-only
+  place (an EU value a GB report cannot hold is refused, naming its block). A manufacturer outside the UK needs a UK
+  Responsible Person (Settings, Products). 3.4h (the initial reporter's country) is now on the GB form too: MHRA's
+  schema needs it with 3.4a. GB 1.2a is the day sent for approval, as the EU's (B8-D1). Frozen at Send for approval
+  and downloaded from the approved snapshot only, as the EU file (`GET /reports/{id}/mir.xml`).
+- **GB PDF record copy** (B8-D18): "GB MIR 7.2.1 content, prepared by MDARIX. Record copy: MHRA takes reports only
+  through MORE.", read back from the GB file; "Upload the XML in MHRA's MORE".
+- **Northern Ireland** (B8-D4): an EU report whose incident is in Northern Ireland offers one route, "MHRA MORE (EU
+  form)", with the EU MIR 7.3.1 file; which EU version MORE takes is to confirm with MHRA before the first upload; 1.1a
+  is asked. An incident elsewhere in the EU never offers MORE. With `MDARIX_B8_EU_MIR` off, today's single route.
+- **Screens**: "Download XML (GB MIR 7.2.1)", the MORE upload note on GB and Northern Ireland reports, and "MHRA's GB
+  schema" in what the file still needs.
 
 ### Database
 - `tr29partyparts` (from `tr28marketroles`, expand-only, no backfill): `market_responsible_parties` gains `street`,
