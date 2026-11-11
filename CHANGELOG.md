@@ -470,6 +470,14 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
 - Both pages carry the hero design on their headers only; their operational parts are flat. Measured on 5,000
   complaints, every read stays under the 1 second budget (`docs/runbooks/LOAD_AND_FAILURE_DRILLS.md`).
 
+### Fixed
+
+- Official forms: a product with two registrations in one market no longer fills a field from whichever comes first.
+  When both give the same value it is used (from the most recently updated registration); when they differ (class or
+  number), the field is left empty for a person, with a note naming both registrations. The EU/NI form on a Northern
+  Ireland event now reads the product's Northern Ireland registrations first (CE or UKNI), then its EU ones; on an EU
+  event it reads EU registrations only. Draft reports only: approved and signed reports keep their frozen content.
+
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
 Development cycle 1, item B2: the Case, the first contact before anyone decides it is a complaint. Migration
