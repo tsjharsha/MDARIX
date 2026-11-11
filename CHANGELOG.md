@@ -10,6 +10,29 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.11.02] - not released yet
+
+B9b: other countries, attach-only reports. For a country outside the five built-in markets (US, EU and Northern
+Ireland, Great Britain, India, Canada) a person picks the country, answers one generic set of starter questions and
+signs the conclusion; when it is Reportable, MDARIX keeps an "Other Regulatory Report": the customer attaches the report
+they made, with its Report ID and status, later the authority's acknowledgement and any follow-ups. There is no form
+and MDARIX never submits. Every question and its logic are "Generic starter questions, not this country's law: confirm
+with your consultant". Switch: `MDARIX_B9B_OTHER` (on).
+
+### Added
+- **Migration `tr31othercountries`** (expand-only, after `tr30personaldata`): `complaint_market_assessments.country`
+  and `report_obligations.country` (ISO 3166 alpha-2, set only when the market is `OTHER`); the assessment market check
+  allows `OTHER`; the assessment version key and the one-initial-report key gain the country, so one complaint can carry
+  Australia and Switzerland side by side. Downgrade refuses while any `OTHER` row exists.
+- **The generic floor `OTHER-floor-1`** in the rule register (switch `MDARIX_B9B_OTHER`): seven questions (death;
+  serious deterioration; could lead to death or serious deterioration were it to happen again; serious public health
+  threat; malfunction or deterioration; use error; marketed in the country). Reportable when death, serious
+  deterioration or a serious public health threat is Yes, or a malfunction could lead to death or serious deterioration
+  were it to happen again (B9b-N1); an Unknown that could make it reportable keeps it pending; use error and "marketed"
+  are notes only. No legal period (your reporting window naming the country, or the date you enter); counted in your
+  time zone. Catalog: "IMDRF/GHTF common criteria" (starter). `OTHER` stays out of the five markets' lists, so their
+  screens and the B4 equivalence check are unchanged.
+
 ## [0.11.01] - not released yet
 
 B8: EU MIR and GB MIR for exporters. MDARIX prepares the files the authorities take (the EU MIR 7.3.1 XML and a PDF

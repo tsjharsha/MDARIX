@@ -53,7 +53,11 @@ __all__ = [
     "SignerTrainingRecord",
 ]
 
-ASSESSMENT_MARKETS = ("US", "EU_NI", "GB", "IN", "CA")
+# B9b (tr31): OTHER is a country outside the five markets, named by ``country`` (ISO 3166 alpha-2).
+ASSESSMENT_MARKETS = ("US", "EU_NI", "GB", "IN", "CA", "OTHER")
+COUNTRY_RULE = (
+    "(market = 'OTHER' AND country IS NOT NULL AND country ~ '^[A-Z]{2}$') OR (market <> 'OTHER' AND country IS NULL)"
+)
 ASSESSMENT_SUGGESTIONS = ("REPORTABLE", "PENDING_INFORMATION", "NOT_REPORTABLE")
 ASSESSMENT_CONCLUSIONS = ("REPORTABLE", "NOT_REPORTABLE")
 USE_ENVIRONMENTS = (
@@ -115,6 +119,7 @@ class ComplaintMarketAssessment(Base):
     # B4 (tr27): the floor in force on the awareness day, the rules that applied, how the due date was counted. Empty
     # on rows signed before the rule register (never backfilled) and while MDARIX_RULE_REGISTER is off.
     floor_code: Mapped[str | None] = mapped_column(String(40))
+    country: Mapped[str | None] = mapped_column(String(2))
     rules_applied = mapped_column(JSONB)
     date_calc = mapped_column(JSONB)
     source_system: Mapped[str | None] = mapped_column(String(40))
@@ -123,9 +128,16 @@ class ComplaintMarketAssessment(Base):
     updated_at = _now()
 
     __table_args__ = (
-        UniqueConstraint(
-            "tenant_id", "complaint_id", "market", "version", name="uq_complaint_market_assessments_version"
+        Index(
+            "uq_complaint_market_assessments_version",
+            "tenant_id",
+            "complaint_id",
+            "market",
+            text("coalesce(country, '')"),
+            "version",
+            unique=True,
         ),
+        CheckConstraint(COUNTRY_RULE, name="country_when_other"),
         ForeignKeyConstraint(
             ["tenant_id", "complaint_id"],
             ["complaints.tenant_id", "complaints.id"],

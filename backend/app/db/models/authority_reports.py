@@ -98,6 +98,7 @@ class ReportObligation(Base):
     tenant_id: Mapped[uuid.UUID] = _tenant()
     complaint_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     market: Mapped[str] = mapped_column(String(10), nullable=False)
+    country: Mapped[str | None] = mapped_column(String(2))  # B9b (tr31): set when market is OTHER
     kind: Mapped[str] = mapped_column(String(20), nullable=False, server_default="INITIAL")
     parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("report_obligations.id"))
     assessment_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -129,12 +130,17 @@ class ReportObligation(Base):
         CheckConstraint(_in("kind", OBLIGATION_KINDS), name="kind_known"),
         CheckConstraint(_in("state", OBLIGATION_STATES), name="state_known"),
         CheckConstraint("kind = 'INITIAL' OR parent_id IS NOT NULL", name="response_has_parent"),
+        CheckConstraint(
+            "(market = 'OTHER' AND country IS NOT NULL AND country ~ '^[A-Z]{2}$') OR (market <> 'OTHER' AND country IS NULL)",
+            name="country_when_other",
+        ),
         Index("ix_report_obligations_tenant_complaint", "tenant_id", "complaint_id"),
         Index(
             "uq_report_obligations_initial",
             "tenant_id",
             "complaint_id",
             "market",
+            text("coalesce(country, '')"),
             unique=True,
             postgresql_where=text("kind = 'INITIAL'"),
         ),
