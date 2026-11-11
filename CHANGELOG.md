@@ -87,6 +87,11 @@ with your consultant". Switch: `MDARIX_B9B_OTHER` (on).
   "submitted on" day is the organization's.
 - The permission sweep tests reach B7b's e-mail intake guards (the intake switch is on for the sweep; the intake
   address settings are reviewed exemptions, Customer Admin only).
+- Tests brought in line with the product (no product change): Readiness "Complaints to recheck" counts the record
+  closed with a serious injury and no signed conclusion (T-D13); the routine close records CA-floor-2 and IN-floor-2
+  while their B9 switches are on (they correct version 1 from the start); the service-level trend test failed only
+  because the routine-close test stopped early. A new test checks the Cases view "Reported in another country"
+  lists a Case whose complaint has an Other Regulatory Report and not one whose complaint has none.
 
 ## [0.11.01] - not released yet
 
