@@ -64,7 +64,7 @@ and user facility. MDARIX prepares; the customer submits: MDARIX never submits. 
 - `MDARIX_B9_CANADA` off: no Final is made, the chain route and the official form answer 404, A4, A5's previous date
   and A6 are typed as before.
 
-### Added (US importer and user facility, Part C: in progress)
+### Added (US importer and user facility, Part C)
 - **Your role in a market** (B9-D8): Manufacturer (the default, nothing changes), Importer (US, India, Canada) or User
   facility (US only, while `MDARIX_B9_US_USER_FACILITY` is on). Set with `PUT /api/v1/complaints/reportability-roles`
   by an approver (regulatory approval permission) with a reason, audited `REPORTING_ROLE_SET` with the old and new
@@ -80,6 +80,33 @@ and user facility. MDARIX prepares; the customer submits: MDARIX never submits. 
   `CFR803_30` and `CFR803_40`.
 - The register: a floor may take its questions from another floor (`questions_from`), and list `recipients` per rule.
   The manufacturer floors are unchanged (B4 equivalence green).
+- **eMDR rule book version 2** (`emdr-rule-book-2`, a correction of version 1 from the start): the importer (I-I, I-F)
+  and user facility (U-I, U-F) rows of the mapping workbook's US sheet, `rules/us_emdr_v2.csv` (LF everywhere). The
+  manufacturer rows are version 1's byte for byte. FDA's lists: importer initial 9 blocks, user facility initial 4,
+  follow-ups F1, F2 and F7.
+- **Section F of Form 3500A** on an importer's or user facility's US report (its role read from the signed report
+  type; Manufacturer while the role's switch is off): F1 the role, F2 the report number (importer: CFN or FEI, year,
+  5 digits; user facility: HCFA number, year, 4 digits; typed once, then numbered, never reused, never with G8), F3
+  to F5 from the role's US party, F6 awareness, F7 Initial or Follow-up #n, F9, F10's four codes, F11 and F13 from
+  the recipients (dated the day sent for approval), F12 FDA's locations, F14 the manufacturer. Sections G and H and
+  the front page's manufacturer number are left out (their fields answer 404; section F answers 404 on a
+  manufacturer's report). The eMDR file places section F as FDA's importer and user facility examples do (rebuilt
+  block by block in the tests); the eSubmitter-layout PDF shows F1 to F14 in FDA's order; the official 09/2025 form
+  ticks F1, F7, F11, F12 and F13 and fills F2 to F6, F9, F10 and F14.
+- **Recipients** (B9-23, B9-24): a new route "Sent to the manufacturer" (`MFR_COPY`, no acknowledgement). The routes
+  offered follow the signed rule's recipients: an importer's malfunction offers no FDA route (422
+  `ROUTE_NOT_A_RECIPIENT`). Each recipient's send is recorded apart, against the approved snapshot (a rejected send
+  no longer counts, so a corrected report is recorded again); the state follows FDA's route and a later
+  manufacturer's copy never moves it; the report page lists each recipient as recorded or to record.
+- **Follow-ups** of an importer's or user facility's report on B3's chain: they share F2, say F7 "Follow-up #n",
+  send F1, F2 and F7, and need no H2. Clock (B9-D12): 30 calendar days from the new information, shown as "Starter,
+  for your consultant to confirm".
+- India's R1 and Canada's A1 come from the organization's role in the market (typed again while the part's switch is
+  off).
+- Screens: "Your role in each market" beside the reporting windows (Settings, regulatory approval with a reason); the
+  report page shows the conclusion's rules (floor) and the US role.
+- FDA's Importer Initial, Importer Follow-up and User Facility Follow-up example files are in the test fixtures for
+  local tests only, until the owner confirms his permission for FDA's public examples covers them.
 
 ### Database
 - `tr28marketroles` (from `tr27ruleregister`), expand-only: `reportability_settings.reporting_roles` (JSONB object,

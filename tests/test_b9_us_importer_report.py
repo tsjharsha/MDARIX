@@ -117,16 +117,19 @@ def test_an_importers_report_has_section_f_its_own_number_and_two_recipients(tri
             },
         )
 
-    copy = _ok(record("MFR_COPY"))
-    assert copy["state"] == "APPROVED"  # FDA's send still to record
-    assert [item["recorded"] for item in copy["recipients"]] == [False, True]
-    assert record("MFR_COPY").json()["detail"]["code"] == "RECIPIENT_RECORDED"
-    done = _ok(record("EMDR"))
-    assert done["state"] == "SUBMITTED_PENDING" and all(item["recorded"] for item in done["recipients"])
-
-    # B9 step 9 (B9-25): FDA accepts; follow-up #1 shares F2, says F7 "Follow-up #1", its clock is a labelled starter,
-    # and its file sends F1, F2 and F7 (no H2 to tick: section H is a manufacturer's).
-    attempt = next(row for row in done["submissions"] if row["route"] == "EMDR")
+    # FDA first (review finding 1): the report is sent and stays sent; the manufacturer's copy is still to record.
+    sent = _ok(record("EMDR"))
+    assert sent["state"] == "SUBMITTED_PENDING"
+    assert [item["recorded"] for item in sent["recipients"]] == [True, False]
+    assert record("EMDR").json()["detail"]["code"] == "RECIPIENT_RECORDED"
+    assert user.post(
+        f"{REPORTS}/{detail['id']}/reopen", json={"reason": "Try to reopen a sent report"}
+    ).status_code in (
+        409,
+        422,
+    )
+    # B9 step 9 (B9-25): FDA accepts; the manufacturer's copy recorded after it keeps the report accepted.
+    attempt = next(row for row in sent["submissions"] if row["route"] == "EMDR")
     now = datetime.now(timezone.utc).isoformat()
     _ok(
         user.post(
@@ -134,6 +137,10 @@ def test_an_importers_report_has_section_f_its_own_number_and_two_recipients(tri
             json={"kind": "ACK3", "outcome": "ACCEPTED", "received_at": now, "note": "Ack3 passed"},
         )
     )
+    done = _ok(record("MFR_COPY"))
+    assert done["state"] == "ACCEPTED" and all(item["recorded"] for item in done["recipients"])
+    # Follow-up #1 shares F2, says F7 "Follow-up #1", its clock is a labelled starter, and its file sends F1, F2 and
+    # F7 (no H2 to tick: section H is a manufacturer's).
     child = _ok(
         user.post(
             f"{REPORTS}/{detail['id']}/follow-ups",

@@ -90,6 +90,9 @@ def test_india_r1_and_canada_a1_read_the_organizations_role_and_are_typed_again_
     from backend.app.authority_reports import forms
 
     for market, form, field in (("IN", forms.MVPI_MDAE, "R1"), ("CA", forms.HC_MDPR, "A1")):
+        monkeypatch.delenv(
+            "MDARIX_B9_INDIA" if market == "IN" else "MDARIX_B9_CANADA", raising=False
+        )  # its default: on
         item = next(entry for entry in form.fields() if entry.id == field)
         context = {"market": market, "seen": {"roles": {market: "IMPORTER"}}}
         assert forms.in_force(form, item).source == "role_reporter"

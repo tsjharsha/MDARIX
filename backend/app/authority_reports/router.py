@@ -237,6 +237,13 @@ def offered_routes(obligation: ReportObligation, context: dict) -> list:
     return [route for route in routes if route.code in wanted]
 
 
+def recorded_routes(snapshots: list, submissions: list) -> set[str]:
+    """The recipients' routes already recorded for the approved snapshot (B9 step 8): a send FDA rejected, or one of
+    an earlier approval, no longer counts, so a corrected report is sent (and recorded) again."""
+    approved = next((row.id for row in reversed(snapshots) if row.state == "APPROVED"), None)
+    return {row.route for row in submissions if row.snapshot_id == approved and row.result != "REJECTED"}
+
+
 def number_key(obligation: ReportObligation) -> str:
     """Where a US report's number is held: F2 for an importer or user facility (B9 step 6), else the front page's."""
     return "F2" if us_role(obligation) else "MFR_REPORT"
@@ -563,7 +570,7 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
                 "recipient": name,
                 "label": RECIPIENT_LABELS[name],
                 "route": RECIPIENT_ROUTES[name],
-                "recorded": any(row.route == RECIPIENT_ROUTES[name] for row in submissions),
+                "recorded": RECIPIENT_ROUTES[name] in recorded_routes(snapshots, submissions),
             }
             for name in worksheet.us_recipients(context)
         ]
@@ -2150,7 +2157,9 @@ def submission(
     """Record what was submitted outside MDARIX, at once: the route, the time and the submitted content, with the
     difference review against the approved snapshot. MDARIX sends nothing."""
     obligation = _obligation(db, _tenant(ctx), obligation_id, lock=True)
-    if obligation.state != rules.APPROVED:
+    role = us_role(obligation)
+    # B9 step 8: a US importer's or user facility's report, once sent to one recipient, still takes the others' sends.
+    if obligation.state != rules.APPROVED and not (role and obligation.state in rules.SUBMITTED):
         raise _error(
             409,
             "SNAPSHOT_NOT_APPROVED",
@@ -2162,9 +2171,10 @@ def submission(
     offered = [item.code for item in offered_routes(obligation, _context(db, control_db, obligation))]
     if route not in offered:  # B9 step 8: e.g. an importer's malfunction report has no FDA route
         raise _error(422, "ROUTE_NOT_A_RECIPIENT", "This report is not sent by that route: " + ", ".join(offered))
-    recorded = {row.route for row in _submissions(db, obligation)}
-    if us_role(obligation) and route in recorded:
+    recorded = recorded_routes(_snapshots(db, obligation), _submissions(db, obligation)) if role else set()
+    if route in recorded:
         raise _error(409, "RECIPIENT_RECORDED", "This recipient's send is already recorded")
+    before = obligation.state
     submitted_at = payload.submitted_at
     if submitted_at.tzinfo is None:
         raise _error(422, "TIME_ZONE_REQUIRED", "Give the submission time with its time zone")
@@ -2193,12 +2203,10 @@ def submission(
         reference=_text(payload.authority_reference, 120),
         now=_now(),
     )
-    if us_role(obligation):  # B9 step 8: submitted once every recipient's send is recorded
-        recorded.add(route)
-        if set(offered) - recorded:
-            obligation.state = rules.APPROVED
-        elif any(forms.route_of(_form(obligation), code).acknowledgement_expected for code in recorded):
-            obligation.state = rules.PENDING
+    # B9 step 8: the state follows FDA's route; a manufacturer's copy recorded after it never moves it (a report
+    # once sent never goes back to Approved: the missing recipients show on the page).
+    if role and before != rules.APPROVED and not forms.route_of(_form(obligation), route).acknowledgement_expected:
+        obligation.state = before
     _audit(db, ctx, "REPORT_SUBMISSION_RECORDED", obligation, attempt=row.attempt, route=route, late=row.late)
     canada_final_on_submission(db, ctx, obligation, _now())
     db.commit()
