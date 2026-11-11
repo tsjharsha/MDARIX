@@ -19,6 +19,7 @@ from pathlib import Path
 
 from lxml import etree
 
+from backend.app import countries
 from backend.app.authority_reports import forms, mir_rules, worksheet
 
 FORMS_DIR = Path(__file__).resolve().parents[3] / "data" / "mir_forms"
@@ -301,7 +302,10 @@ def country_code(text: str | None) -> str | None:
     if re.fullmatch(r"[A-Za-z]{2}", words):
         return words.upper()
     row = worksheet.eu_ncas().get(words.lower())
-    return row["code"] if row else words or None
+    if row:
+        return row["code"]
+    # "Great Britain" is MDARIX's own name for the GB market (reportability/rules.py UK_PARTS), not an ISO name.
+    return "GB" if words.lower() == "great britain" else countries.code_of(words) or words or None
 
 
 def _risk_class(text: str, form: str = EU) -> dict:

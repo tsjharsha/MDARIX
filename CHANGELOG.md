@@ -107,6 +107,11 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
 - **Screens**: "Download XML (GB MIR 7.2.1)", the MORE upload note on GB and Northern Ireland reports, and "MHRA's GB
   schema" in what the file still needs.
 
+### Fixed (GB MIR, found by the GB end-to-end test)
+- A GB incident's country ("Great Britain", "United Kingdom", "England"…) is written in the file as its ISO code
+  (`GB`): before, the name went in as typed and MHRA's schema refused the file at Send for approval.
+- Send for approval's refusal of a GB file names "MHRA's GB schema", not the Commission's.
+
 ### Database
 - `tr29partyparts` (from `tr28marketroles`, expand-only, no backfill): `market_responsible_parties` gains `street`,
   `city`, `postcode`, `country_code` (checked two upper-case letters), `contact_first_name`, `contact_last_name`;

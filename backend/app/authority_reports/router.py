@@ -809,8 +809,10 @@ def _emdr_gate(found: dict) -> None:
         )
 
 
-def _mir_gate(found: dict) -> None:
-    """Send for approval refuses an EU MIR whose file the authority would refuse, naming each block (B8 step 8)."""
+def _mir_gate(found: dict, form: str) -> None:
+    """Send for approval refuses an EU or GB MIR whose file the authority would refuse, naming each block (B8 steps 8
+    and 14)."""
+    schema = "MHRA's GB schema" if form == forms.GB_MIR.code else "the Commission's schema"
     if found["missing"]:
         raise _error(
             422,
@@ -822,7 +824,7 @@ def _mir_gate(found: dict) -> None:
         raise _error(
             422,
             "MIR_INVALID",
-            "The MIR file does not validate against the Commission's schema: " + "; ".join(found["errors"][:3]),
+            f"The MIR file does not validate against {schema}: " + "; ".join(found["errors"][:3]),
             errors=found["errors"][:10],
         )
 
@@ -1882,7 +1884,7 @@ def request_snapshot(
             form=obligation.form_code,
         )
         if strict:
-            _mir_gate(found)
+            _mir_gate(found, obligation.form_code)
         if found["xml"]:
             frozen_file = {**frozen_file, **frozen_mir(found["xml"], context["parties"], report_type)}
     if _official_on(obligation):  # B9-D16: the official form's edition, picked by the day sent for approval
