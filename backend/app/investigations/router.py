@@ -161,13 +161,17 @@ def create_hypotheses(
     investigation_id: uuid.UUID,
     request: HypothesisSetRequest,
     data_db: Session = Depends(get_data_plane_db),
+    control: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> HypothesisSetResponse:
     tenant_id = ctx.tenant_id
     scoped_request = request.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id})
     try:
-        result = hypothesis_service.generate(data_db, scoped_request)
+        # RCA-D13: while AI is off, only a saved analysis named in the request is built on; none is run.
+        result = hypothesis_service.generate(data_db, scoped_request, run_analysis=ai_ready(control, tenant_id))
     except HypothesisEngineError as exc:
+        if exc.code == "AI_OFF":
+            return JSONResponse({"hypothesis_set": None, "persisted": False, "state": "AI_OFF", "message": exc.message})
         raise hypothesis_error(exc) from exc
     return with_hypothesis_business_ids(data_db, tenant_id, result)
 
