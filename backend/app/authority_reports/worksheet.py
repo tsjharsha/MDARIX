@@ -1082,6 +1082,12 @@ def build(
                 problem = forms.value_problem(item, value)
                 if item.source == "front_page" and found and found[0] != value:
                     problem = "Differs from the front page's manufacturer report number: clear it to use that one"
+            if item.id == "2_4" and form.code in MIR_CODES and value:  # 2.4 is a fixed list (B8 run 4)
+                choice = forms.risk_class_choice(value, gb=form.code == "GB_MIR")
+                if choice:
+                    value, problem = choice, None
+                else:
+                    problem = f"Choose again from the list: “{value}” is not a class the authority's file takes"
             ask = None
             if item.source == "us_contact_office" and value and not problem and context.get("check_contact_office"):
                 problem = contact_office_problem(context, value)

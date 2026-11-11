@@ -77,8 +77,13 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
   (Non-reportable incident)" after a "not reportable" re-sign, the 4.3.3c table, what the MIR file still needs before
   Send, and after approval "Download XML (MIR 7.3.1)" beside the PDF.
 - **Sample** (SAMPLE-RV-07): the sample's EU manufacturer and authorised representative, with their parts, are held in
-  memory only for the sample's EU report (never stored; the organization's own EU parties are never read), so the
-  trial user gets the PDF and the MIR XML.
+  memory only for the sample's EU report (never stored; used only until the organization enters its own EU parties,
+  which then win), so the trial user gets the PDF and the MIR XML.
+- **2.4 risk class is a fixed list** (EU and GB MIR): the classes the schemas take (MDR I, IIa, IIb, III and Is, Im, Ir
+  as class I with the schema's sterile, measuring or reusable mark; IVDR A to D; the MDD, AIMDD and IVDD classes;
+  before the directives; EU only: legislation unknown), so no one can type a class the authority's file refuses. A
+  class typed or registered before the list is read as its entry when it clearly is one ("IIb" is MDR class IIb);
+  any other is shown as "Choose again from the list" and counts as missing, never changed silently.
 
 ### Database
 - `tr29partyparts` (from `tr28marketroles`, expand-only, no backfill): `market_responsible_parties` gains `street`,

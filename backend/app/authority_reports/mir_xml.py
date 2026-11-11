@@ -157,7 +157,6 @@ PARTY_FIELDS = frozenset({"1_3_2A", "1_3_2B", "1_3_2C", "1_3_3"})
 _CODE = re.compile(r"[A-G]\d{2,7}")
 _DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 _YES_NO = re.compile(r"^\s*(yes|no)\b[\s,:;.-]*(.*)$", re.IGNORECASE | re.DOTALL)
-_LEGISLATION = re.compile(r"\b(aimdd|mdd|ivdd|ivdr|mdr)\b", re.IGNORECASE)
 
 
 class MirRefused(ValueError):
@@ -268,19 +267,9 @@ def country_code(text: str | None) -> str | None:
 
 
 def _risk_class(text: str) -> dict:
-    """2.4: the legislation and the class. MDARIX's EU registrations hold the MDR (I to III) and IVDR (A to D) classes;
-    a legacy device is written with its directive ("MDD class IIb"). Starter, for your consultant to confirm."""
-    low = text.strip().lower()
-    if "unknown" in low:
-        return {"device_info/AppLegislationUnknown": "Applicable legislation unknown"}
-    if "before" in low:
-        return {"device_info/deviceClass": text.strip()}
-    found = _LEGISLATION.search(low)
-    rest = re.sub(r"^class\s*", "", _LEGISLATION.sub("", low).strip(" :,-"))
-    law = found.group(1) if found else ("ivdr" if re.fullmatch(r"[a-d]", rest) else "mdr")
-    value = f"class {rest}" if re.fullmatch(r"i{1,3}[ab]?|i[sm]{1,2}|[a-d]", rest) else rest  # the schema's case: _fit
-    element = {"mdr": "deviceClassMDR", "ivdr": "deviceClassIVDR", "mdd": "deviceClassMDD", "aimdd": "deviceClassMDD"}
-    return {f"device_info/{element.get(law, 'deviceClassIVDD')}": value}
+    """2.4: the list entry's elements (``forms.RISK_CLASSES``); a text that is no entry goes in as it is, so the schema
+    refuses it, naming 2.4."""
+    return forms.RISK_CLASSES.get(forms.risk_class_choice(text) or "") or {"device_info/deviceClassMDR": text}
 
 
 def _distribution(text: str) -> dict:

@@ -340,7 +340,7 @@ def test_product_identity_is_checked_against_the_lists_and_fills_the_forms(trial
     party = {"market": "EU", "role": "MANUFACTURER", "organisation": "Sample maker", "srn": "xx-mf-000000001"}
     assert _ok(user.put("/api/v1/regulatory-reference/responsible-parties", json=party))["srn"] == "XX-MF-000000001"
     fields = _fields(_ok(user.get(f"{REPORTS}/{eu['id']}")))
-    assert fields["2_4"]["value"] == "IIb" and fields["2_3P_NB"]["value"] == "0123"
+    assert fields["2_4"]["value"] == "MDR class IIb" and fields["2_3P_NB"]["value"] == "0123"
     assert fields["1_3_2B"]["value"] == "XX-MF-000000001" and fields["2_1C"]["value"] == "SAMPLE-BUDI-250"
     assert (fields["2_2A"]["value"], fields["2_2B"]["value"]) == ("EMDN", "Z12")
 

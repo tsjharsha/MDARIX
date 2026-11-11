@@ -265,3 +265,34 @@ def test_b8_every_choice_on_the_worksheet_is_one_the_schema_takes():
             for where, text in path.items():
                 if where in choices:
                     assert mir_xml._fit(text, choices[where]) in choices[where], (field.id, option)
+
+
+def test_b8_every_risk_class_on_the_list_is_one_the_schema_takes():
+    """2.4 is a fixed list (B8 run 4): every entry builds a valid file; GB's list has no "legislation unknown"."""
+    for label in forms.EU_RISK_CLASSES:
+        values = _minimal(forms.MIR_INITIAL) | {"2_4": label}
+        assert (
+            mir_xml.validate(mir_xml.build(values, PARTIES[:1], report_type=forms.MIR_INITIAL, now=NOW), "Initial")
+            == []
+        )
+    assert "Applicable legislation unknown" not in forms.GB_RISK_CLASSES
+    assert next(f for f in forms.GB_MIR.fields() if f.id == "2_4").options == forms.GB_RISK_CLASSES
+
+
+@pytest.mark.parametrize(
+    ("text", "choice"),
+    [
+        ("IIb", "MDR class IIb"),
+        ("class iii", "MDR class III"),
+        ("B", "IVDR class B"),
+        ("MDD class IIb", "MDD class IIb"),
+        ("mdd IIa", "MDD class IIa"),
+        ("Is", "MDR class Is"),
+        ("ivdr class c", "IVDR class C"),
+        ("Class V", None),
+        ("IV", None),
+        ("", None),
+    ],
+)
+def test_b8_a_class_typed_before_the_list_maps_to_it_or_is_chosen_again(text, choice):
+    assert forms.risk_class_choice(text) == choice

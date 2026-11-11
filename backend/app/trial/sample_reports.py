@@ -106,8 +106,8 @@ US_PARTY = {
     "contact_email": "vigilance@orbit-sample.invalid",
 }
 # B8 step 12: the sample's EU manufacturer (outside the EU) and its EU authorised representative, with the parts the
-# MIR file needs, held in memory only (the B3 A9 pattern): never stored; the organization's own EU parties are never
-# read or changed. Fictional values throughout.
+# MIR file needs, held in memory only (the B3 A9 pattern): never stored, used only while the organization has entered no
+# EU party of its own (then theirs are read, never changed). Fictional values throughout.
 EU_PARTIES = (
     {
         "market": "EU",

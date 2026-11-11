@@ -727,6 +727,46 @@ _MIR_DENOMINATOR = (
 )
 
 
+# 2.4: the classes the MIR schemas take (EU 7.3.1 and GB 7.2.1 alike), as a fixed list: label -> the file's elements
+# under device_info. MDR Is/Im/Ir are class I with the schema's own type flag (sterile, measuring, reusable). Starter,
+# for your consultant to confirm.
+_D = "device_info/"
+RISK_CLASSES = {
+    "Applicable legislation unknown": {_D + "AppLegislationUnknown": "Applicable legislation unknown"},  # EU only
+    "Placed on the market before the MDD/AIMDD/IVDD": {
+        _D + "deviceClass": "This device has been placed on the market before the implementation of the MDD/AIMDD/IVDD"
+    },
+    **{f"MDR class {c}": {_D + "deviceClassMDR": f"class {c}"} for c in ("I", "IIa", "IIb", "III")},
+    "MDR class Is": {_D + "deviceClassMDR": "class I", _D + "deviceClassMDRType/sterileconditions": "Yes"},
+    "MDR class Im": {_D + "deviceClassMDR": "class I", _D + "deviceClassMDRType/measuringfunction": "Yes"},
+    "MDR class Ir": {_D + "deviceClassMDR": "class I", _D + "deviceClassMDRType/reusable": "Yes"},
+    **{f"IVDR class {c}": {_D + "deviceClassIVDR": f"class {c}"} for c in "ABCD"},
+    **{f"MDD class {c}": {_D + "deviceClassMDD": f"class {c}"} for c in ("I", "Is", "Im", "Ism", "IIa", "IIb", "III")},
+    "AIMDD active implantable device": {_D + "deviceClassMDD": "active implant"},
+    "MDD custom-made device": {_D + "deviceClassMDD": "custom-made"},
+    "IVDD Annex II List A": {_D + "deviceClassIVDD": "IVD Annex II List A"},
+    "IVDD Annex II List B": {_D + "deviceClassIVDD": "IVD Annex II List B"},
+    "IVDD device for self-testing": {_D + "deviceClassIVDD": "IVD devices for self-testing"},
+    "IVDD general IVD": {_D + "deviceClassIVDD": "IVD general"},
+}
+EU_RISK_CLASSES = tuple(RISK_CLASSES)
+GB_RISK_CLASSES = EU_RISK_CLASSES[1:]  # MHRA's schema has no "legislation unknown"
+
+
+def risk_class_choice(text: str | None, gb: bool = False) -> str | None:
+    """2.4's list entry for a text typed or registered before the list (B8 run 4): the entry itself (case and spaces
+    aside), a class with its law ("MDD IIb"), or a bare class as an EU registration holds it ("IIb" is MDR, "B" is
+    IVDR). Anything else is None: a person chooses again; nothing is changed silently."""
+
+    def key(value: str) -> str:
+        return re.sub(r"\s+|class", "", value.lower())
+
+    options = GB_RISK_CLASSES if gb else EU_RISK_CLASSES
+    found = {key(label): label for label in options}
+    wanted = key(text or "")
+    return (found.get(wanted) or found.get("mdr" + wanted) or found.get("ivdr" + wanted)) if wanted else None
+
+
 def _mir_device(market: str) -> tuple[Field, ...]:
     """Sections 2.3 to 2.6 shared by the EU and GB forms (GB adds its UK approved body fields)."""
     gb = market == "GB"
@@ -808,6 +848,7 @@ def _mir_device(market: str) -> tuple[Field, ...]:
             "risk_class",
             INITIAL if gb else MUST,
             note="GB: optional in MHRA's schema (to confirm)." if gb else "",
+            options=GB_RISK_CLASSES if gb else EU_RISK_CLASSES,
         ),
         *(
             ()

@@ -153,7 +153,16 @@ def test_b8_send_is_refused_while_the_authority_would_refuse_the_file(trial, eu_
     assert refused.json()["detail"]["errors"][0].startswith("2.4a-d ")
     detail = _ok(user.get(f"{REPORTS}/{report}"))
     assert detail["mir"]["snapshot"] is None and detail["mir"]["errors"][0].startswith("2.4a-d ")
-    _fill(trial, report, **{"2_4": "IIb"})
+    # B8 run 4: 2.4 is a fixed list; a class typed before it is shown as "choose again", never changed silently.
+    risk = _fields(detail)["2_4"]
+    assert (
+        risk["value"] == "Class V" and risk["problem"].startswith("Choose again") and "MDR class IIb" in risk["options"]
+    )
+    assert (
+        user.put(f"{REPORTS}/{report}/fields/2_4", json={"value": "Class V"}).json()["detail"]["code"] == "NOT_A_CHOICE"
+    )
+    _fill(trial, report, **{"2_4": "IIb"})  # typed before the list: read as the MDR class
+    assert _fields(_ok(user.get(f"{REPORTS}/{report}")))["2_4"]["value"] == "MDR class IIb"
     _ok(_send(trial, report))
     frozen = _pending(trial, report)
     assert frozen.fields["mir_type"] == forms.MIR_INITIAL
