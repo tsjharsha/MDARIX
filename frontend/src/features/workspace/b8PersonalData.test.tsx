@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
-import type { ReportDetail } from "./authorityReports";
+import { isSimilarTable, type ReportDetail } from "./authorityReports";
 import type { ReportabilitySettings } from "./reportability";
 import { PersonalAtSend, personalBody } from "./sections/PersonalAtSend";
 import { PersonalDataBody } from "./sections/ReportingWindows";
@@ -98,5 +98,13 @@ describe("B8: GB rows to confirm with your consultant", () => {
     const html = render(<FieldRow detail={report(false)} item={item} onChanged={() => {}} canEdit />);
     expect(html).toContain("To confirm with your consultant.");
     expect(html).toContain('role="note"');
+  });
+});
+
+describe("B8 review: the approval page's 4.3.3c", () => {
+  it("draws the grid only for the table, never for text typed before it", () => {
+    expect(isSimilarTable(JSON.stringify([{}, {}, {}, {}]))).toBe(true);
+    expect(isSimilarTable("Three similar incidents in 2025")).toBe(false);
+    expect(isSimilarTable(null)).toBe(false);
   });
 });

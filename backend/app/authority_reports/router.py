@@ -32,6 +32,7 @@ from backend.app import links
 import base64
 import binascii
 import hashlib
+import re
 import logging
 import uuid
 from datetime import date, datetime, timezone
@@ -1945,6 +1946,10 @@ def request_snapshot(
     return snapshot
 
 
+MIR_NUMBERS = ("3_3B", "3_3D", "3_3E")
+_DIGIT = re.compile(r"\d")
+
+
 class SendRequest(BaseModel):
     # tr30: patient and reporter details typed at the report step (field id -> text), kept only in the snapshot.
     personal: dict[str, str] = Field(default_factory=dict, max_length=40)
@@ -1975,6 +1980,8 @@ def _personal(db, obligation: ReportObligation, typed: dict[str, str]) -> dict[s
         if field.options and choice is None:
             problem = "Choose one of: " + ", ".join(field.options)
         typed[key] = choice or value
+        if not problem and obligation.form_code in MIR_FORMS and key in MIR_NUMBERS and not _DIGIT.search(value):
+            problem = "Enter a number"  # the MIR file takes a number here (age, weight, height)
         if problem:
             raise _error(422, "PERSONAL_VALUE_INVALID", f"{field.number} {field.label}: {problem}")
     return typed
@@ -2036,7 +2043,13 @@ def ask_for_approval(
         obligation,
         version=snapshot.version,
         fingerprint=snapshot.content_fingerprint,
-        personal_fields=sorted(personal),  # which boxes were typed, never their values (tr30)
+        # Which boxes were typed into the snapshot, never their values (tr30).
+        personal_fields=sorted(
+            item["id"]
+            for section in (snapshot.fields or {}).get("sections") or []
+            for item in section["fields"]
+            if (item.get("source") or {}).get("label") == worksheet.TYPED_AT_SEND
+        ),
         # The US report number, and whether MDARIX assigned it at this send (0.10.96, D5).
         **(
             {key: (obligation.entries.get(number_key(obligation)) or {}).get(name) for key, name in NUMBER_AUDIT}
@@ -3175,7 +3188,11 @@ def _mir_approved_values(db, obligation: ReportObligation) -> dict:
         item["id"]: {"value": item["value"], "at": item.get("at"), "code_state": item["status"]}
         for section in (approved.fields or {}).get("sections") or []
         for item in section["fields"]
-        if item.get("status") in MIR_TYPED and item.get("value") is not None and item["id"] not in MIR_OWN
+        if item.get("status") in MIR_TYPED
+        and item.get("value") is not None
+        and item["id"] not in MIR_OWN
+        # tr30: patient and reporter details stay in their own report's snapshot; each report types them again.
+        and not item.get("personal")
     }
 
 

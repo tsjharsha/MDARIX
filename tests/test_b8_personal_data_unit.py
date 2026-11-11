@@ -162,3 +162,46 @@ def test_b8_a_stored_4_3_3c_table_prints_as_plain_lines_never_json():
     printed = [line for line, _ in render.lines(view)]
     table = [line for line in printed if "incident(s)" in line]
     assert len(table) == 4 and not any("{" in line or '"start"' in line for line in printed)
+
+
+def test_b8_review_masked_export_also_hides_the_frozen_official_form():
+    fields = {
+        "sections": [{"fields": [{"id": "C1", "personal": "PATIENT", "value": "HOSP-Planted"}]}],
+        "official_pdf": "JVBERi0xLjQgUGxhbnRlZA==",
+    }
+    masked = tenant_export.masked_row("report_snapshots", {"fields": fields})["fields"]
+    assert masked["official_pdf"] == tenant_export.PERSONAL_HELD and "Planted" not in str(masked)
+
+
+def test_b8_review_an_eu_weight_with_decimals_is_rounded_for_the_whole_number_schema():
+    values = FULL | TYPED | {"3_3D": "71.5 kg", "3_3E": "170.4 cm", "1_2E": forms.MIR_FINAL}
+    root = etree.fromstring(mir_xml.build(values, PARTIES, report_type=forms.MIR_FINAL, now=NOW, personal=True))
+    assert _text(root, "massKG") == "72" and _text(root, "heightCM") == "170"
+    gb = GB_FULL | TYPED | {"3_3D": "71.5 kg", "1_2E": forms.MIR_INITIAL}
+    gb_root = etree.fromstring(
+        mir_xml.build(gb, GB_PARTIES, report_type=forms.MIR_INITIAL, now=NOW, form=GB, personal=True)
+    )
+    assert _text(gb_root, "massKG") == "71.5"  # MHRA's schema takes a decimal
+
+
+def test_b8_review_a_later_mir_report_never_carries_personal_values(monkeypatch):
+    from types import SimpleNamespace
+
+    from backend.app.authority_reports import router, worksheet
+
+    approved = SimpleNamespace(
+        approved_at="2026-11-11",
+        fields={
+            "sections": [
+                {
+                    "fields": [
+                        {"id": "3_4B", "personal": "REPORTER", "value": "Ward Planted", "status": worksheet.ENTERED},
+                        {"id": "4_1A", "personal": None, "value": "Analysis", "status": worksheet.ENTERED},
+                    ]
+                }
+            ]
+        },
+    )
+    monkeypatch.setattr(router, "_snapshots", lambda db, obligation: [approved])
+    carried = router._mir_approved_values(None, SimpleNamespace())
+    assert "4_1A" in carried and "3_4B" not in carried

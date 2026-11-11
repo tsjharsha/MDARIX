@@ -350,6 +350,16 @@ export const SIMILAR_COUNTS = [
 export type SimilarRow = { start: string; end: string } & Partial<Record<(typeof SIMILAR_COUNTS)[number][0], number>>;
 
 /** The stored table (a JSON list of four periods), or four empty periods. */
+/** Whether a stored 4.3.3c value is the table (four periods); text typed before the table is shown as text. */
+export function isSimilarTable(value: string | null | undefined): boolean {
+  try {
+    const rows = JSON.parse(value ?? "");
+    return Array.isArray(rows) && rows.length === SIMILAR_PERIODS.length;
+  } catch {
+    return false;
+  }
+}
+
 export function similarRows(value: string | null | undefined): SimilarRow[] {
   try {
     const rows = JSON.parse(value ?? "");

@@ -23,7 +23,8 @@ export function PersonalAtSend({
       <summary>Patient and reporter details (optional)</summary>
       <p className="ac-muted">
         Typed here, they go into this report only: its approved version and the authority&apos;s file. They are never
-        kept on the draft, used by AI, analytics or search, or written to an export.
+        kept on the draft, used by AI, analytics or search, or written to an export. A follow-up or final report does
+        not carry them: type them again there if the authority needs them.
       </p>
       {fields.map((field) => (
         <label className="ca-field" key={field.id}>

@@ -142,7 +142,7 @@ def lines(view: dict) -> list[tuple[str, str]]:
         for item in section["fields"]:
             first, *more = _value(item).split("\n")
             out.append((first, "body"))
-            out += [(f"    {line}", "body") for line in more]  # 4.3.3c's periods, one per line
+            out += [(f"  {line}", "body") for line in more]  # 4.3.3c's periods, one per line (body, not a note)
             out.append((f"    {_status(item)}", "muted"))
     out += [("", "body"), ("Source records", "heading")]
     for kind, refs in _sources(view).items():

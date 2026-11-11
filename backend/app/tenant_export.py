@@ -71,7 +71,8 @@ MASKED, UNMASKED = "MASKED", "UNMASKED"
 # tr30 (B9-D9 / B8-D9): patient and reporter details typed at Send for approval live only in that report's snapshot;
 # a masked export writes "Personal data held: yes" in their place, and in place of the frozen files that carry them.
 PERSONAL_HELD = "Personal data held: yes"
-PERSONAL_FILES = ("mir_xml", "emdr_xml", "emdr_left_out")
+# The official India/Canada form frozen at approval (base64 PDF) prints them too (B8 run 6 review).
+PERSONAL_FILES = ("mir_xml", "emdr_xml", "emdr_left_out", "official_pdf")
 
 
 def _held(item: dict) -> bool:

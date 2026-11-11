@@ -522,7 +522,11 @@ def file_values(
         out["incident_info/patient_info/Gender"] = values["3_3C"]
     for key, element in (("3_3D", "massKG"), ("3_3E", "heightCM")):
         if key in values:
-            out[f"incident_info/patient_info/{element}"] = _number(values[key])
+            number = _number(values[key])
+            # The Commission's schema takes whole kg and cm (MHRA's a decimal weight): round, never refuse 71.5.
+            if not gb and re.fullmatch(r"\d+\.\d+", number):
+                number = str(int(float(number) + 0.5))  # half up
+            out[f"incident_info/patient_info/{element}"] = number
     if "3_4D" in values:
         out |= _contact(values["3_4D"])
     if "1_3_1F" in values and not gb:  # GB's 1.3.1f is the PSR ID (above); its PMCF/PMPF has only the ID

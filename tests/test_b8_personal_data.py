@@ -68,6 +68,8 @@ def test_b8_personal_data_off_on_off_keeps_values_only_in_the_frozen_snapshot(tr
     assert detail["personal_data"] is True and _rows(detail)["3_3B"]["status"] == "AT_SEND"
     wrong = user.post(f"{REPORTS}/{report}/snapshots", json={"personal": {"3_3C": "F"}})
     assert wrong.json()["detail"]["code"] == "PERSONAL_VALUE_INVALID"
+    words = user.post(f"{REPORTS}/{report}/snapshots", json={"personal": {"3_3B": "about sixty"}})
+    assert words.json()["detail"]["code"] == "PERSONAL_VALUE_INVALID" and "sixty" not in words.text
     stranger = user.post(f"{REPORTS}/{report}/snapshots", json={"personal": {"3_1A": "x"}})
     assert stranger.json()["detail"]["code"] == "PERSONAL_FIELD_UNKNOWN"
 
