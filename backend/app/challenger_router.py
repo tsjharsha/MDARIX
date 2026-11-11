@@ -1,10 +1,13 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from backend.app.ai_settings import ai_ready
 from backend.app.db.models.foundation import Investigation
 from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.fault_injection import dependency_failure_simulated
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -46,6 +49,7 @@ def create_challenges(
     request: Request,
     data: ChallengeRequest,
     db: Session = Depends(get_data_plane_db),
+    control: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     context = {"tenant_id": ctx.tenant_id, "user_id": ctx.user_id}
@@ -55,8 +59,11 @@ def create_challenges(
         _authorize_investigation(db, tenant_id, investigation_id)
         if dependency_failure_simulated():
             raise RuntimeError("simulated analysis dependency failure")
+        # RCA-D13: while AI is off, only a saved hypothesis set named in the request is challenged; none is generated.
         result = service.generate(
-            db, data.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id})
+            db,
+            data.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id}),
+            run_analysis=ai_ready(control, tenant_id),
         )
         db.add(
             make_audit_event(
@@ -70,6 +77,8 @@ def create_challenges(
         )
         db.commit()
     except ChallengerError as e:
+        if e.code == "AI_OFF":
+            return JSONResponse({"challenge_set": None, "persisted": False, "state": "AI_OFF", "message": e.message})
         raise err(e) from e
     except HTTPException:
         raise
