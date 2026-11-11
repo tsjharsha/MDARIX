@@ -361,7 +361,9 @@ def test_supplier_evidence_requests_carry_their_supplier_and_case_ids(seed):
     assert reply.status_code == 200 and reply.json()["business_id"] == made.json()["business_id"]
 
 
-def test_ai_results_carry_record_and_evidence_ids(seed):
+def test_ai_results_carry_record_and_evidence_ids(seed, monkeypatch):
+    # AI answering for the organization (RCA-D13: with AI off the analysis routes answer an off state).
+    monkeypatch.setattr("backend.app.investigations.router.ai_ready", lambda control, tenant_id: True)
     client = role_client("INVESTIGATOR")[0]
     case = seed["investigation_id"]
     made = client.post(f"/api/v1/investigations/{case}/hypotheses", json={"investigation_id": case})

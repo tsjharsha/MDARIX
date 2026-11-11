@@ -150,7 +150,6 @@ def test_the_daily_retention_run_deletes_them_and_says_how_many():
 # ------------------------------------------------------------------- UX-15: nothing saved yet answers 200 on request
 
 LATEST = {
-    "analysis/latest": ("analysis", "ANALYSIS_NOT_FOUND"),
     "hypotheses": ("hypothesis_set", "HYPOTHESIS_SET_NOT_FOUND"),
     "challenges": ("challenge_set", "CHALLENGE_SET_NOT_FOUND"),
     "unknowns": ("unknown_set", "UNKNOWN_SET_NOT_FOUND"),
@@ -181,6 +180,10 @@ def test_a_new_case_reads_nothing_saved_as_200_when_asked_and_404_otherwise():
         empty = owner.get(f"{base}/{path}", params={"missing": "empty"})
         assert empty.status_code == 200, (path, empty.text)
         assert empty.json() == {field: None, "persisted": False}, path
+    # The analysis read answers AI's off state in a trial, saved or not (RCA-D13: tests/test_r1_analysis_off.py).
+    for params in ({}, {"missing": "empty"}):
+        off = owner.get(f"{base}/analysis/latest", params=params)
+        assert off.status_code == 200 and off.json()["state"] == "AI_OFF" and off.json()["analysis"] is None
     # A case of another organization stays out of reach: its brief read is still 404 with the parameter.
     other = owner.get(f"/api/v1/investigations/{uuid.uuid4()}/briefs/latest", params={"missing": "empty"})
     assert other.status_code == 404
