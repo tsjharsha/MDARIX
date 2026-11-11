@@ -612,8 +612,61 @@ def _carried(context, key: str, label: str):
 
 def derived_only(source: str | None) -> bool:
     """A source a typed value never overrides: B4/P1 (the day sent for approval) and, while MDARIX_B9_INDIA is on,
-    India's P2 (the chain, B9). Off, P2 is typed over "Initial" as before B9."""
-    return source == "sent_day" or (source == "in_report_type" and forms.india_derived())
+    India's P2 (the chain, B9). Off, P2 is typed over "Initial" as before B9. B9 steps 7-8: F1 (the role), F7 (the
+    chain) and F11/F13 (who must receive the report)."""
+    return source in _DERIVED or (source == "in_report_type" and forms.india_derived())
+
+
+_DERIVED = {"sent_day", "us_role_name", "us_role_report_type", "us_sent_fda", "us_sent_manufacturer"}
+_ROLE_WORDS = {"IMPORTER": "Importer", "USER_FACILITY": "User facility"}
+# An importer's initial report needs a code of each of F10's four kinds (FDA's list, rule book v2); a user facility's
+# codes are optional.
+F10_CODES = ("F10_CLINICAL", "F10_IMPACT", "F10_PROBLEM", "F10_COMPONENT")
+
+
+def us_recipients(context) -> list[str]:
+    """Who must receive a US importer's or user facility's report (B9 step 8, us-recipients-1 in the role floors): the
+    recipients of every rule of the signed conclusion that applies or could apply (Unknown is never No), FDA when the
+    rule says so for an unknown manufacturer and none is set. Nothing named (a conclusion signed before B9): both."""
+    row = context.get("current")
+    rules = ((row.rules_applied or {}).get("rules") or []) if row is not None else []
+    named = {name for rule in rules for name in rule.get("recipients") or []}
+    out = []
+    if "FDA" in named or ("FDA_IF_MANUFACTURER_UNKNOWN" in named and SOURCES["us_manufacturer"](context) is None):
+        out.append("FDA")
+    if "MANUFACTURER" in named:
+        out.append("MANUFACTURER")
+    return out or ["FDA", "MANUFACTURER"]
+
+
+def _role_party(context):
+    role = context.get("us_role")
+    return next((item for item in context["parties"] if item.role == role), None) if role else None
+
+
+def _sent_to(recipient: str):
+    def read(context):
+        if not context.get("us_role"):
+            return None
+        sent = recipient in us_recipients(context)
+        day = context.get("sent_day")
+        text = ("Yes, " + day if day else "Yes") if sent else "No"
+        return text, _source("Obligation", None, "Who must receive the report, from the signed conclusion's rule")
+
+    return read
+
+
+def _role_reporter(context):
+    """India's R1 and Canada's A1 (B9 step 11): the organization's role in the market."""
+    role = (context["seen"].get("roles") or {}).get(context["market"])
+    return ("Importer" if role == "IMPORTER" else "Manufacturer"), _source(
+        "Settings", None, "Your organization's role in this market (Settings, reporting windows)"
+    )
+
+
+def _role_field(context, value, label: str):
+    party = _role_party(context)
+    return (value(party), _source("ResponsibleParty", f"US {party.role.lower()}", label, party.id)) if party else None
 
 
 SOURCES = {
@@ -629,6 +682,30 @@ SOURCES = {
     "us_outcome": _us_outcome,
     "us_event_type": _us_event_type,
     "us_report_type": _us_report_type,
+    # B9 steps 7-8: section F of an importer's or user facility's US report.
+    "us_role_name": lambda c: (
+        (_ROLE_WORDS[c["us_role"]], _source("Settings", None, "Your organization's role in the US"))
+        if c.get("us_role")
+        else None
+    ),
+    "us_role_address": lambda c: _role_field(
+        c, lambda p: ", ".join(part for part in (p.organisation, p.address) if part), "The US responsible party"
+    ),
+    "us_role_contact": lambda c: (
+        _party(c, (c["us_role"],), "The US responsible party (importer or user facility)") if c.get("us_role") else None
+    ),
+    "us_role_phone": lambda c: _role_field(c, lambda p: p.contact_phone, "The US responsible party's phone"),
+    "us_role_report_type": lambda c: (
+        (
+            f"Follow-up #{c['follow_up']['number']}" if c.get("follow_up") else "Initial",
+            _source("Obligation", None, "The report's place in its chain"),
+        )
+        if c.get("us_role")
+        else None
+    ),
+    "us_sent_fda": _sent_to("FDA"),
+    "us_sent_manufacturer": _sent_to("MANUFACTURER"),
+    "role_reporter": _role_reporter,
     # B9 step 14: Initial, Follow up or Final, from the report's place in its chain (never typed).
     "in_report_type": lambda c: (
         c.get("chain_type") or "Initial",
@@ -852,11 +929,20 @@ def build(
     # The report type decides which fields are mandatory (0.10.76: the EU, GB and Canada forms).
     kind = forms.report_kind(form, entries)
     confirm = context.get("confirm_codes", False)
-    required = forms.CODES_REQUIRED.get(form.code, ()) if confirm else ()
+    # B9 step 7: a US importer's or user facility's report has section F and no G, H or front-page manufacturer
+    # number; a manufacturer's keeps section F empty, as before.
+    role = context.get("us_role") if form.code == forms.FDA_3500A.code else None
+    required = forms.CODES_REQUIRED.get(form.code, ()) if confirm and not role else ()
+    if role == "IMPORTER" and not context.get("follow_up"):
+        required = F10_CODES
+    us = form.code == forms.FDA_3500A.code
     out = []
     for section in form.sections:
         rows = []
+        dropped = us and ((role and section.code in ("G", "H")) or (not role and section.code == "F"))
         for item in section.fields:
+            if dropped or (role and item.id == "MFR_REPORT"):
+                continue
             item = forms.in_force(form, item)
             entry = entries.get(item.id) or {}
             missing = forms.MUST if item.id in required else forms.missing_class(item, kind)
@@ -947,7 +1033,12 @@ def build(
                     "once_key": "US_REGISTRATION" if item.source in ("us_product_code", "us_clearance") else item.id,
                 }
             )
-        out.append({"code": section.code, "title": section.title, "note": section.note or None, "fields": rows})
+        note = section.note or None
+        if dropped and role:
+            note = "Left out: an importer's or user facility's report has no section G or H (manufacturers only)."
+        elif role and section.code == "FRONT":
+            note = "An importer's or user facility's report number is F2, in section F."
+        out.append({"code": section.code, "title": section.title, "note": note, "fields": rows})
     return out
 
 

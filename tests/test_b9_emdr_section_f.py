@@ -5,6 +5,8 @@ block by block from their data. No database."""
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from backend.app.authority_reports import emdr
@@ -152,3 +154,26 @@ def test_report_numbers_per_role_never_reused_practice_from_7():
     assert emdr.next_number(["1234567890-2026-0002"], 2026, False, "I") is None  # an HCFA number is not an F2 of I
     assert emdr.role_kind("IMPORTER", False) == "I-I" and emdr.role_kind(None, True) == "M-F"
     assert emdr.role_kind("USER_FACILITY", True) == "U-F"
+
+
+def test_the_esubmitter_pdf_and_the_official_form_carry_section_f():
+    from backend.app.authority_reports import emdr_pdf, fda_3500a
+
+    values = _initial(IMPORTER, "1234567-2026-00001", "I")
+    xml = emdr.build(_sections(values), [IMPORTER, MAKER], sender="Importer", now=NOW, practice=False, kind="I-I")
+    lines = [text for text, _ in emdr_pdf.body(emdr_pdf.read(xml))]
+    start = lines.index("F. FOR USE BY USER FACILITY/IMPORTER (Devices Only)")
+    numbered = [found.group(1) for text in lines[start:] if (found := re.match(r"(\d+)\. ", text))]
+    assert numbered == [str(n) for n in range(1, 15)]  # FDA's F1 to F14, in order
+    assert "    ( ) User Facility (X) Importer" in lines
+    assert "    1234567-2026-00001" in lines and "Not used in an importer's or user facility's report." in lines
+    assert not any(text.startswith("8. Manufacturer Report Number") for text in lines)
+    assert not any("FDA generated" in text or "prepared by FDA" in text for text in lines)
+    pages, _ = fda_3500a.placements(_sections(values))
+    page8 = pages[8]
+    on = fda_3500a.ON
+    assert page8["userImport[0]"] == on and page8["reptInitial[0]"] == on and page8["reportNum[0]"] == values["F2"]
+    assert page8["reptFDAY[0]"] == on and page8["reportSentDate[0]"] == "01-Aug-2023" and page8["locOther[0]"] == on
+    assert page8["locOtherSpec[0]"] == "Other location description" and page8["devProbCode[0]"] == "2896, 1384"
+    follow_up, _ = fda_3500a.placements(_sections({"F1": "User facility", "F7": "Follow-up #2"}))
+    assert follow_up[8] == {"userFac[0]": on, "reptFollowUp[0]": on, "followUpNum[0]": "2"}

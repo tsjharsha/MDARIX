@@ -196,6 +196,7 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
     # Before approval freezes it, the contact office (G1) is checked as the eMDR file needs it (0.10.92, A5).
     context["check_contact_office"] = obligation.state in rules.EDITABLE
     context["chain_type"] = chain_type(obligation)  # India's P2 (B9 step 14); None: an initial report
+    context["us_role"] = us_role(obligation)  # B9 step 7: an importer's or user facility's US report (section F)
     if is_canada_chain(obligation):
         context["ca_chain"] = _canada_carried(db, obligation)  # A4 and A5's previous date (B9 step 11)
     if is_follow_up(obligation):
@@ -207,6 +208,38 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
             "previous": _chain_values(db, [parent, *chain], obligation),
         }
     return context
+
+
+def us_role(obligation: ReportObligation) -> str | None:
+    """B9: a US report's role (IMPORTER, USER_FACILITY), read from the report type it was signed under; None for a
+    manufacturer's report, and while the role's switch is off (a role behind an off switch reads as Manufacturer)."""
+    from backend.app.authority_reports import emdr
+    from backend.app.reportability import service
+
+    role = emdr.ROLE_OF_TYPE.get(obligation.report_type or "") if obligation.form_code == forms.FDA_3500A.code else None
+    return role if role and forms.switched_on(service.ROLES["US", role]) else None
+
+
+RECIPIENT_ROUTES = {"FDA": "EMDR", "MANUFACTURER": "MFR_COPY"}  # B9 step 8: who receives a US report, by route
+RECIPIENT_LABELS = {"FDA": "Sent to FDA", "MANUFACTURER": "Sent to the manufacturer"}
+
+
+def offered_routes(obligation: ReportObligation, context: dict) -> list:
+    """The routes a report's submission may be recorded by (B9 step 8): a US importer's or user facility's report
+    offers one per recipient its signed rule names (an importer's malfunction: the manufacturer only, no FDA route); a
+    manufacturer's US report never offers the manufacturer's copy; every other form its own routes."""
+    routes = list(forms.routes_for(_form(obligation)))
+    if obligation.form_code != forms.FDA_3500A.code:
+        return routes
+    if not us_role(obligation):
+        return [route for route in routes if route.code != "MFR_COPY"]
+    wanted = {RECIPIENT_ROUTES[name] for name in worksheet.us_recipients(context)}
+    return [route for route in routes if route.code in wanted]
+
+
+def number_key(obligation: ReportObligation) -> str:
+    """Where a US report's number is held: F2 for an importer or user facility (B9 step 6), else the front page's."""
+    return "F2" if us_role(obligation) else "MFR_REPORT"
 
 
 # --------------------------------------------------------------------------------------------- US follow-ups (B3)
@@ -519,8 +552,20 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
                     for kind, outcomes in route.evidence.items()
                 ],
             }
-            for route in forms.routes_for(form)
+            for route in offered_routes(obligation, context)
         ],
+        # B9 step 8: each recipient of a US importer's or user facility's report, and whether its send is recorded.
+        "recipients": [
+            {
+                "recipient": name,
+                "label": RECIPIENT_LABELS[name],
+                "route": RECIPIENT_ROUTES[name],
+                "recorded": any(row.route == RECIPIENT_ROUTES[name] for row in submissions),
+            }
+            for name in worksheet.us_recipients(context)
+        ]
+        if us_role(obligation)
+        else None,
         "state": obligation.state,
         "state_label": state_label(obligation),
         "next_step": rules.next_step(obligation.state, pending is not None),
@@ -621,8 +666,11 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
 
 
 def _emdr_kind(obligation: ReportObligation) -> str:
-    """The eMDR report type: a manufacturer's initial report, or a follow-up in its chain."""
-    return "M-I" if obligation.kind == "INITIAL" else "M-F"
+    """The eMDR report type: a manufacturer's (B9: an importer's, a user facility's) initial report, or a follow-up
+    in its chain."""
+    from backend.app.authority_reports import emdr
+
+    return emdr.role_kind(us_role(obligation), obligation.kind != "INITIAL")
 
 
 def _emdr_check(sections, context, kind: str = "M-I", frozen: bool = False) -> dict:
@@ -1176,6 +1224,12 @@ def set_field(
     if obligation.state not in rules.EDITABLE:
         raise _error(409, "NOT_A_DRAFT", "Only a draft is changed: reopen it first")
     field = next((item for item in _form(obligation).fields() if item.id == field_id), None)
+    # B9 step 7: section F is an importer's or user facility's report only; G, H and the front page's number a
+    # manufacturer's only (404 as for any field the report does not show, switches off included).
+    if field is not None and obligation.form_code == forms.FDA_3500A.code:
+        section = next(part.code for part in forms.FDA_3500A.sections if field in part.fields)
+        if section in (("G", "H", "FRONT") if us_role(obligation) else ("F",)):
+            field = None
     if field is None:
         raise _error(404, "FIELD_UNKNOWN", "No such field on this form")
     field = forms.in_force(_form(obligation), field)  # B9 off: India's P1 is typed again
@@ -1188,7 +1242,7 @@ def set_field(
     follow = is_follow_up(obligation)
     if field.missing == forms.NOT_USED and not (follow and field_id == "H2"):
         raise _error(422, "FIELD_NOT_USED", "This field is not used in this report")
-    if follow and field_id == "MFR_REPORT":
+    if follow and field_id == number_key(obligation):
         raise _error(422, "FOLLOWS_INITIAL", "A follow-up carries its initial report's number")
     if follow and field_id == "G6":
         raise _error(422, "FOLLOWS_CHAIN", "A follow-up's G6 is its clock and its number in the chain")
@@ -1458,14 +1512,16 @@ def assign_number(db, control_db, obligation: ReportObligation, actor: str, now:
     from backend.app.authority_reports import emdr
     from backend.app.trial.sample_data import SAMPLE_SOURCE
 
+    key = number_key(obligation)  # B9 step 6: an importer's or user facility's number is F2
+    letter = emdr.role_kind(us_role(obligation), False)[0]
     if is_follow_up(obligation):  # a follow-up carries its initial report's number, never its own
-        held = (db.get(ReportObligation, obligation.parent_id).entries or {}).get("MFR_REPORT") or {}
+        held = (db.get(ReportObligation, obligation.parent_id).entries or {}).get(key) or {}
         entries = dict(obligation.entries or {})
-        entries["MFR_REPORT"] = {"value": held.get("value"), "by": actor, "at": _iso(now), "follows_initial": True}
+        entries[key] = {"value": held.get("value"), "by": actor, "at": _iso(now), "follows_initial": True}
         obligation.entries = entries
         return
     db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": f"{NUMBER_LOCK}{obligation.tenant_id}"})
-    value = ReportObligation.entries["MFR_REPORT"]["value"].astext
+    value = ReportObligation.entries[key]["value"].astext
     chain = {obligation.id, obligation.parent_id} - {None}
     rows = [
         (number, source == SAMPLE_SOURCE)
@@ -1484,7 +1540,7 @@ def assign_number(db, control_db, obligation: ReportObligation, actor: str, now:
     # first number either, so the person still types their own once. Sample numbers go first: the CFN is the last own.
     used = [number for number, sample in sorted(rows, key=lambda row: not row[1])]
     entries = dict(obligation.entries or {})
-    typed = (entries.get("MFR_REPORT") or {}).get("value")
+    typed = (entries.get(key) or {}).get("value")
     if typed:
         if typed in used:
             raise _error(
@@ -1492,15 +1548,25 @@ def assign_number(db, control_db, obligation: ReportObligation, actor: str, now:
             )
         return
     year = _org_day(db, obligation.tenant_id, now).year
-    own = any(not sample and emdr.REPORT_NUMBER.match(number) for number, sample in rows)
-    number = emdr.next_number(used, year, _trial(control_db, obligation.tenant_id)) if own else None
+    pattern = emdr.ROLE_NUMBER.get(letter, emdr.REPORT_NUMBER)
+    own = any(not sample and pattern.match(number) for number, sample in rows)
+    number = emdr.next_number(used, year, _trial(control_db, obligation.tenant_id), letter) if own else None
     if number is None:
         return  # the organization's first number: a person types it once (FIRST_NUMBER, after the mandatory fields)
-    entries["MFR_REPORT"] = {"value": number, "by": actor, "at": _iso(now), "assigned": True}
+    entries[key] = {"value": number, "by": actor, "at": _iso(now), "assigned": True}
     obligation.entries = entries
 
 
 def _first_number(obligation: ReportObligation) -> None:
+    if us_role(obligation):  # B9 step 6: F2, typed once in the format the eMDR check names
+        if not ((obligation.entries or {}).get("F2") or {}).get("value"):
+            raise _error(
+                422,
+                "REPORT_NUMBER_FIRST",
+                "Type your first importer or user facility report number (F2) once: MDARIX numbers every later "
+                "report from it",
+            )
+        return
     if not ((obligation.entries or {}).get("MFR_REPORT") or {}).get("value"):
         raise _error(
             422,
@@ -1517,19 +1583,24 @@ def _org_day(db, tenant_id, now: datetime) -> date:
     return now.astimezone(zone_info(deadlines.org_zone(db, tenant_id)) or timezone.utc).date()
 
 
-def frozen_emdr(xml: bytes, parties, sections: list[dict], left: list[str] = ()) -> dict:
+def frozen_emdr(xml: bytes, parties, sections: list[dict], left: list[str] = (), kind: str = "M-I") -> dict:
     """What a US snapshot keeps of its eMDR file (0.10.96, D6): the file's text, its SHA-256, and the G1 contact
     office and D3 manufacturer it was built from, in parts (the official form reads them, never Settings later); and,
     for the PDF's record page, the approved values the file leaves out as they read at Send."""
     from backend.app.authority_reports import emdr, fda_3500a
 
     values = fda_3500a.values(sections)
+    # B9 step 7: an importer's or user facility's report also keeps F4's reporter and F14's manufacturer.
+    role = {"F4": emdr.office(parties, emdr.REPORTER_ROLE[kind[0]], values.get("F4"))} if kind[0] != "M" else {}
+    if role:
+        role["F14"] = emdr.office(parties, emdr.MAKER_ROLES, values.get("F14"))
     return {
         "emdr_xml": xml.decode("utf-8"),
         "emdr_sha256": hashlib.sha256(xml).hexdigest(),
         "emdr_parties": {
             "G1": emdr.office(parties, emdr.OFFICE_ROLES, values.get("G1")),
             "D3": emdr.office(parties, emdr.MAKER_ROLES, values.get("D3")),
+            **role,
         },
         "emdr_left_out": list(left),
     }
@@ -1592,7 +1663,9 @@ def request_snapshot(
         if strict:
             _emdr_gate(found)
         if found["xml"] and not found["errors"]:
-            frozen_file = frozen_emdr(found["xml"], context["parties"], sections, found["left_out"])
+            frozen_file = frozen_emdr(
+                found["xml"], context["parties"], sections, found["left_out"], _emdr_kind(obligation)
+            )
     if _official_on(obligation):  # B9-D16: the official form's edition, picked by the day sent for approval
         from backend.app.rule_register import register
 
@@ -1693,7 +1766,7 @@ def ask_for_approval(
         fingerprint=snapshot.content_fingerprint,
         # The US report number, and whether MDARIX assigned it at this send (0.10.96, D5).
         **(
-            {key: (obligation.entries.get("MFR_REPORT") or {}).get(name) for key, name in NUMBER_AUDIT}
+            {key: (obligation.entries.get(number_key(obligation)) or {}).get(name) for key, name in NUMBER_AUDIT}
             if obligation.form_code == forms.FDA_3500A.code
             else {}
         ),
@@ -2079,6 +2152,12 @@ def submission(
     route = str(payload.route or "").strip().upper()
     if forms.route_of(_form(obligation), route) is None:
         raise _error(422, "ROUTE_UNKNOWN", "Choose the route you submitted through")
+    offered = [item.code for item in offered_routes(obligation, _context(db, control_db, obligation))]
+    if route not in offered:  # B9 step 8: e.g. an importer's malfunction report has no FDA route
+        raise _error(422, "ROUTE_NOT_A_RECIPIENT", "This report is not sent by that route: " + ", ".join(offered))
+    recorded = {row.route for row in _submissions(db, obligation)}
+    if us_role(obligation) and route in recorded:
+        raise _error(409, "RECIPIENT_RECORDED", "This recipient's send is already recorded")
     submitted_at = payload.submitted_at
     if submitted_at.tzinfo is None:
         raise _error(422, "TIME_ZONE_REQUIRED", "Give the submission time with its time zone")
@@ -2107,6 +2186,12 @@ def submission(
         reference=_text(payload.authority_reference, 120),
         now=_now(),
     )
+    if us_role(obligation):  # B9 step 8: submitted once every recipient's send is recorded
+        recorded.add(route)
+        if set(offered) - recorded:
+            obligation.state = rules.APPROVED
+        elif any(forms.route_of(_form(obligation), code).acknowledgement_expected for code in recorded):
+            obligation.state = rules.PENDING
     _audit(db, ctx, "REPORT_SUBMISSION_RECORDED", obligation, attempt=row.attempt, route=route, late=row.late)
     canada_final_on_submission(db, ctx, obligation, _now())
     db.commit()
@@ -2324,7 +2409,7 @@ class FollowUpCreate(BaseModel):
     narrative: str | None = Field(default=None, max_length=worksheet.VALUE_MAX)
 
 
-FOLLOW_UP_OWN = frozenset({"MFR_REPORT", "B4", "B5", "H11", "H2", "G8", "G6"})
+FOLLOW_UP_OWN = frozenset({"MFR_REPORT", "B4", "B5", "H11", "H2", "G8", "G6", "F2", "F8"})
 
 
 def follow_up_due(received_on: date) -> date:
@@ -2349,11 +2434,12 @@ def create_follow_up(db, ctx, initial: ReportObligation, received_on: date, text
     if ticks and _h2(ticks):
         raise _error(422, "NOT_A_CHOICE", _h2(ticks))
     now, actor = _now(), str(ctx.user_id)
-    number = ((initial.entries or {}).get("MFR_REPORT") or {}).get("value")
+    key = number_key(initial)  # B9 step 9: an importer's or user facility's chain shares its F2
+    number = ((initial.entries or {}).get(key) or {}).get("value")
     # The follow-up starts from what the initial report holds (its file sends only what changes, B2); its narrative
     # (B5, H11) is only what is new, and its number, B4 and H2 are its own.
-    entries = {key: value for key, value in (initial.entries or {}).items() if key not in FOLLOW_UP_OWN}
-    entries["MFR_REPORT"] = {"value": number, "by": actor, "at": _iso(now), "follows_initial": True}
+    entries = {name: value for name, value in (initial.entries or {}).items() if name not in FOLLOW_UP_OWN}
+    entries[key] = {"value": number, "by": actor, "at": _iso(now), "follows_initial": True}
     if ticks:
         entries["H2"] = {"value": ticks, "by": actor, "at": _iso(now)}
     told = _text(narrative, worksheet.VALUE_MAX) if narrative else None

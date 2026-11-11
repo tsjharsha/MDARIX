@@ -45,7 +45,8 @@ def test_every_member_reads_every_rule_with_its_source_and_starter_mark(viewer):
     assert [item["code"] for item in floors] == ["CA-floor-1", "EU-floor-1", "GB-floor-1", *india, *roles, "US-floor-1"]
     assert all(item["starter_mark"] == body["summary"]["starter_mark"] for item in body["items"])
     # B9: IN-floor-2 corrects IN-floor-1 from the start, so version 1 reads Replaced while India's switch is on.
-    replaced = {"IN-floor-1"} if len(india) == 2 else set()
+    # B9 step 5: emdr-rule-book-2 corrects version 1 (adds the importer and user facility rows), from the start.
+    replaced = ({"IN-floor-1"} if len(india) == 2 else set()) | {"emdr-rule-book-1"}
     assert all(item["state"] == ("REPLACED" if item["code"] in replaced else "IN_FORCE") for item in body["items"])
     assert all(item["source"] is not None for item in body["items"])
     # No organization's data, and no implementation detail for customers.

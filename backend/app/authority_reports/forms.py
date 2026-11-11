@@ -261,7 +261,59 @@ FDA_3500A = Form(
         Section(
             "F",
             "F. For use by user facility/importer (devices only)",
-            (),
+            # B9 step 7: an importer's or user facility's report only (its role in the US); a manufacturer's report
+            # shows the section empty, as before.
+            (
+                Field("F1", "F1", "Check one: user facility or importer", "us_role_name", MUST),
+                Field(
+                    "F2",
+                    "F2",
+                    "UF/importer report number",
+                    None,
+                    MUST,
+                    note="Importer: your CFN or FEI, the year and a 5-digit number. User facility: your 10-digit HCFA "
+                    "number, the year and a 4-digit number. Typed once; MDARIX numbers every later report from it.",
+                ),
+                Field("F3", "F3", "User facility or importer name/address", "us_role_address", INITIAL),
+                Field("F4", "F4", "Contact person (with e-mail)", "us_role_contact", MUST),
+                Field("F5", "F5", "Contact person's phone number", "us_role_phone", INITIAL),
+                Field("F6", "F6", "Date user facility or importer became aware of event", "aware_date", INITIAL),
+                Field("F7", "F7", "Type of report", "us_role_report_type", MUST),
+                Field("F8", "F8", "Date of this report", "sent_day", INITIAL),
+                Field("F9", "F9", "Approximate age of device", None, INITIAL, note="For example: 2 years, 8 months."),
+                Field("F10_CLINICAL", "F10", "Health effect - clinical code", "imdrf_E", INITIAL),
+                Field("F10_IMPACT", "F10", "Health effect - impact code", "imdrf_F", INITIAL),
+                Field("F10_PROBLEM", "F10", "Medical device problem code", "imdrf_A", INITIAL),
+                Field("F10_COMPONENT", "F10", "Component code", "imdrf_G", INITIAL),
+                Field(
+                    "F11",
+                    "F11",
+                    "Report sent to FDA?",
+                    "us_sent_fda",
+                    INITIAL,
+                    note="From who must receive the report (the signed conclusion's rule), dated the day you send it "
+                    "for approval. Record each recipient's send separately.",
+                ),
+                Field(
+                    "F12",
+                    "F12",
+                    "Location where event occurred",
+                    None,
+                    INITIAL,
+                    options=(
+                        "Hospital",
+                        "Home",
+                        "Nursing home",
+                        "Outpatient treatment facility",
+                        "Outpatient diagnostic facility",
+                        "Ambulatory surgical facility",
+                        "Other",
+                    ),
+                    note='For "Other", type "Other: " and the place (up to 40 characters).',
+                ),
+                Field("F13", "F13", "Report sent to manufacturer?", "us_sent_manufacturer", INITIAL),
+                Field("F14", "F14", "Manufacturer name/address", "us_manufacturer", INITIAL),
+            ),
             "Filled by a user facility or an importer, not by the manufacturer.",
         ),
         Section(
@@ -334,6 +386,15 @@ FDA_3500A = Form(
             note="Ack1: received by FDA's gateway; Ack2: sent on to CDRH; Ack3 and Ack4 carry the load result. A "
             "receipt is not acceptance: Ack3's pass or fail decides it.",
         ),
+        # B9 step 8: an importer's or user facility's copy to the manufacturer (21 CFR 803.30, 803.40), recorded
+        # apart from the FDA submission; how it reaches the manufacturer is the customer's procedure.
+        Route(
+            "MFR_COPY",
+            "Sent to the manufacturer (importer or user facility report)",
+            {"SUBMITTED_CONTENT": (_CONTENT,), "OTHER": (_RECEIPT,)},
+            acknowledgement_expected=False,
+            note="Offered only on an importer's or user facility's report that the manufacturer must receive.",
+        ),
     ),
     ("CFR803_50", "CFR803_53", "CFR803_3"),
 )
@@ -375,7 +436,8 @@ MVPI_MDAE = Form(
             "REPORTER",
             "Reporter details",
             (
-                Field("R1", "1", "Type of reporter", None, MUST),
+                # B9 step 11: from the organization's role in India (Manufacturer or Importer); typed over if needed.
+                Field("R1", "1", "Type of reporter", "role_reporter", MUST),
                 Field("R2A", "2 a)", "Has the reporter informed the incident to the manufacturer?"),
                 Field("R2B", "2 b)", "Is the reporter also submitting the report on behalf of the manufacturer?"),
                 Field(
@@ -1429,7 +1491,8 @@ HC_MDPR = Form(
             "A",
             "A. Reporter information",
             (
-                _ca("A1", "A1 i", "Reporter type", options=("Manufacturer", "Importer")),
+                # B9 step 11: from the organization's role in Canada (Manufacturer or Importer).
+                _ca("A1", "A1 i", "Reporter type", "role_reporter", options=("Manufacturer", "Importer")),
                 Field(
                     "A1_II",
                     "A1 ii",
@@ -1692,6 +1755,11 @@ _BEFORE_B9 = {
     ("HC_MDPR", "A6"): (
         "MDARIX_B9_CANADA",
         Field("A6", "A6", "Date submitted", None, MUST, note="The day you submit."),
+    ),
+    ("MVPI_MDAE", "R1"): ("MDARIX_B9_INDIA", Field("R1", "1", "Type of reporter", None, MUST)),
+    ("HC_MDPR", "A1"): (
+        "MDARIX_B9_CANADA",
+        Field("A1", "A1 i", "Reporter type", None, INITIAL, must_in=_CA_PRELIM, options=("Manufacturer", "Importer")),
     ),
 }
 

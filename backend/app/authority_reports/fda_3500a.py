@@ -146,6 +146,24 @@ TEXT = {
     "H9": (9, "rep21USC"),
     "H10": (9, "relRepNum"),
     "H11": (9, "addNarr"),
+    # Section F (B9 step 7): an importer's or user facility's report.
+    "F2": (8, "reportNum"),
+    "F3": (8, "facilityNAddr"),
+    "F4": (8, "facPOC"),
+    "F5": (8, "facPhone"),
+    "F6": (8, "userAwareDate"),
+    "F14": (8, "manuNameAddr2"),
+}
+# F10's code boxes (page 8), and F11/F13's yes, no and date boxes.
+F10_BOXES = {
+    "F10_CLINICAL": "healthClinCode",
+    "F10_IMPACT": "healthImpCode",
+    "F10_PROBLEM": "devProbCode",
+    "F10_COMPONENT": "compCode",
+}
+SENT_BOXES = {
+    "F11": ("reptFDAY", "reptFDAN", "reportSentDate"),
+    "F13": ("reptManuY", "reptManuN", "reportManuSentDate"),
 }
 # E3: the form's occupation list (its export value) and FDA's code for each.
 OCCUPATIONS = {
@@ -168,8 +186,9 @@ OCCUPATIONS = {
 # The form's character limits (its fields' MaxLen); a longer value is not placed.
 LIMITS = {"D2A": 3, "D2B": 32, "D4_UDI": 1000, "B6": 2000, "B7": 2000, "H11": 450}
 BOX_PAGE = {"A3": 1, "B1": 1, "B2": 1, "D5": 7, "D7A": 7, "D8": 7, "D9": 7, "E2": 7, "E4": 7, "G2": 8, "G6": 8}
+BOX_PAGE |= {"F1": 8, "F12": 8}
 BOX_PAGE |= {key: 9 for key in ("H1", "H2", "H3", "H5", "H7", "H8")}
-DATES = {"B3", "B4", "D4_EXPIRY", "D6A", "D6B", "G3", "H4"}
+DATES = {"B3", "B4", "D4_EXPIRY", "D6A", "D6B", "G3", "H4", "F6"}
 CODES = {"H6_CLINICAL", "H6_IMPACT", "H6_PROBLEM", "H6_COMPONENT", "H6_TYPE", "H6_FINDINGS", "H6_CONCLUSIONS"}
 # The event description: page 1's box, then page 2's continuation (FDA's 10,000 characters).
 DESCRIPTION = ((1, "advEvDesc", 2500), (2, "advEvDescribe", 7500))
@@ -262,6 +281,8 @@ def placements(
                     rest = rest[cut:]
             if rest:
                 left.append((label, rest, "the rest of the description, beyond the form's 10,000 characters"))
+        elif field_id in ("F7", "F9", "F11", "F12", "F13") or field_id in F10_BOXES:
+            _section_f(field_id, text, put, left, label)
         elif field_id in CHOICES:
             follow_up = re.search(r"follow-up #?(\d+)", text, re.IGNORECASE) if field_id == "G6" else None
             if follow_up:  # G6 "Follow-up #n" (0.10.96, B3 B2): its box and number box
@@ -321,6 +342,47 @@ def placements(
         else:
             left.append((label, text, "the form has no box for it"))
     return pages, left
+
+
+def _section_f(field_id: str, text: str, put, left: list, label: str) -> None:
+    """Section F's boxes that are not plain text (B9 step 7): F7's type and follow-up number, F9's age, F10's codes,
+    F11/F13 sent (yes or no, with the day) and F12's location ("Other: ..." with its words)."""
+    if field_id in F10_BOXES:
+        codes, other = fda_codes(text)
+        if codes:
+            put(8, F10_BOXES[field_id], ", ".join(codes))
+        if other:
+            left.append((label, "; ".join(other), "no FDA code is mapped to it"))
+    elif field_id == "F7":
+        follow_up = re.search(r"follow-up #?(\d+)", text, re.IGNORECASE)
+        put(8, "reptFollowUp" if follow_up else "reptInitial", ON)
+        if follow_up:
+            put(8, "followUpNum", follow_up.group(1))
+    elif field_id == "F9":
+        age = _AGE.match(text)
+        if age and age.group(2).lower() in ("year", "month"):
+            unit = age.group(2).lower() == "year"
+            put(8, "deviceAgeYears" if unit else "deviceAgeMonth", ON)
+            put(8, "ageYears" if unit else "ageMonths", age.group(1))
+        else:
+            left.append((label, text, "the form takes the age in years or months"))
+    elif field_id in SENT_BOXES:
+        yes, no, when = SENT_BOXES[field_id]
+        words = text.strip().lower()
+        if words.startswith(("yes", "no")):
+            put(8, yes if words.startswith("yes") else no, ON)
+            found = re.search(r"\d{4}-\d{2}-\d{2}", words)
+            if found and words.startswith("yes"):
+                put(8, when, _form_day(found.group(0)))
+    else:  # F12
+        place, _, words = text.partition(":")
+        hit = CHOICES["F12"].get(place.strip().lower())
+        if hit:
+            put(8, hit[0], ON)
+            if words.strip():
+                put(8, "locOtherSpec", words.strip())
+        else:
+            left.append((label, text, "not one of the form's locations"))
 
 
 def record_lines(view: dict, organization: str | None, left: list[tuple[str, str, str]]) -> tuple[list, list]:

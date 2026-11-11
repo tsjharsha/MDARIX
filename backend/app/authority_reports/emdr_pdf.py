@@ -21,6 +21,7 @@ RECORD_TITLE = "MDARIX record - not part of the eMDR file"
 # manufacturer (D3), the contact office's name (G1), the PMA/510(k) (G4) and the follow-up type (H2).
 _UNIT = emdr.IE + "/trigger/reaction/subject/investigativeSubject/subjectOf/observation/code[@code='{}']/../value/@unit"
 _MAKER = emdr.DEV + "/identifiedDevice/asManufacturedProduct/manufacturerOrReprocessor[code/@code='C53616']"
+_F = emdr.IE + "/pertinentInformation1[sequenceNumber]/secondaryCaseNotification"
 EXTRA = {
     "A2 unit": _UNIT.format("C25150"),
     "A2 born": emdr.IE + "/trigger/reaction/subject/investigativeSubject/subjectAffectedPerson/birthTime/@value",
@@ -33,6 +34,16 @@ EXTRA = {
     "G6 follow-up #": "//message/controlActProcess/reasonOf/detectedIssueEvent/value[@code='C53579']/../text/text()",
     # D8 "unknown" goes as FDA's null flavour, not a value.
     "D8 null": emdr.POINTERS["D8"].removesuffix("@value") + "@nullFlavor",
+    # Section F (B9 step 7): an importer's or user facility's report.
+    "F3": _F + "/author/assignedEntity/assignedOrganization/addr/additionalLocator/text()",
+    "F5": _F + "/author/assignedEntity/assignedOrganization/contactParty/contactPerson/telecom"
+    "[starts-with(@value, 'tel:')]/@value",
+    "F9 unit": emdr.POINTERS["F9"].removesuffix("@value") + "@unit",
+    "F11 sent": _F + "/receiver/@negationInd",
+    "F12 other": emdr.POINTERS["F12"].removesuffix("@code") + "originalText/text()",
+    "F13 sent": emdr.IE + "/pertinentInformation1/secondaryCaseNotification/receiver[time/low]/@negationInd",
+    "F14 email": emdr.IE + "/pertinentInformation1/secondaryCaseNotification/receiver/assignedEntity"
+    "/assignedOrganization/telecom[starts-with(@value, 'mailto:')]/@value",
 }
 UNITS = {"YR": "Year(s)", "MO": "Month(s)", "WK": "Week(s)", "DA": "Day(s)", "KG": "Kilogram(s)", "LBS": "Pound(s)"}
 # FDA's choices in its order and words; their codes are fda_3500a.CHOICES' (one table for the form, file and PDF).
@@ -155,7 +166,8 @@ def body(values: dict[str, list[str]]) -> list[tuple[str, str]]:
     )
     item("3. Date of Event (dd-mmm-yyyy)", dated("B3"))
     # FDA's follow-up leaves B4 out (0.10.96): not applicable, never a dash that reads as missing.
-    item("4. Date of this Report (dd-mmm-yyyy)", "Not applicable (follow-up)" if one("G6 follow-up #") else dated("B4"))
+    follow_up = one("G6 follow-up #") or one("F7 number")
+    item("4. Date of this Report (dd-mmm-yyyy)", "Not applicable (follow-up)" if follow_up else dated("B4"))
     item("5. Describe Event or Problem", one("B5") or "-")
     item("6. Relevant Tests/Laboratory Data, Including Dates", one("B6") or "-")
     item(
@@ -205,7 +217,16 @@ def body(values: dict[str, list[str]]) -> list[tuple[str, str]]:
     item("4. Initial Reporter Also Sent Report to FDA?", _flag("E4", values.get("E4", [])))
 
     section("F. FOR USE BY USER FACILITY/IMPORTER (Devices Only)")
-    lines.append(("Not used in a manufacturer's report.", "muted"))
+    role = one("F1")
+    if not role:
+        lines.append(("Not used in a manufacturer's report.", "muted"))
+    else:
+        _section_f(values, one, item, dated)
+        for title in ("G. ALL MANUFACTURERS", "H. DEVICE MANUFACTURERS ONLY"):
+            section(title)
+            lines.append(("Not used in an importer's or user facility's report.", "muted"))
+        lines.extend((("", "body"), ("File Attachments: none", "body")))
+        return lines
 
     section("G. ALL MANUFACTURERS")
     contact = [one("G1 name") or "-"]
@@ -253,6 +274,51 @@ def body(values: dict[str, list[str]]) -> list[tuple[str, str]]:
     item("11. Additional Manufacturer Narrative", one("H11") or "-")
     lines.extend((("", "body"), ("File Attachments: none", "body")))
     return lines
+
+
+def _section_f(values: dict[str, list[str]], one, item, dated) -> None:
+    """Section F's blocks in FDA's order (B9 step 7), read back from the file."""
+    reporter = {"C53617": "Importer", "C53567": "User Facility"}.get(one("F1"), "-")
+    item(
+        "1. Check One",
+        " ".join(f"{'(X)' if label == reporter else '( )'} {label}" for label in ("User Facility", "Importer")),
+    )
+    item("2. UF/Importer Report Number", one("F2") or "-")
+    item("3. User Facility or Importer Name/Address", one("F3") or "-")
+    item("4. Contact Person", one("F4 email").removeprefix("mailto:") or "-")
+    item("5. Phone Number", one("F5").removeprefix("tel:") or "-")
+    item("6. Date User Facility or Importer Became Aware of Event (dd-mmm-yyyy)", dated("F6"))
+    number = one("F7 number")
+    item(
+        "7. Type of Report",
+        f"[{' ' if number else 'X'}] Initial [{'X' if number else ' '}] Follow-up #: {number or '-'}",
+    )
+    item("8. Date of This Report (dd-mmm-yyyy)", "-")
+    age = f"{one('F9')} {UNITS.get(one('F9 unit'), one('F9 unit'))}" if one("F9") else "-"
+    item("9. Approximate Age of Device", age)
+    item(
+        "10. Event Problem Codes (Refer to coding manual)",
+        *(
+            f"{label}: {' - '.join(values.get(block, [])) or '-'}"
+            for label, block in (
+                ("Health Effect - Clinical Code", "H6 clinical"),
+                ("Health Effect - Impact Code", "H6 impact"),
+                ("Medical Device Problem Code", "H6 problem"),
+                ("Component Code", "H6 component"),
+            )
+        ),
+    )
+    sent = {"false": "Yes", "true": "No"}
+    fda_sent = sent.get(one("F11 sent"), "-")
+    item("11. Report Sent to FDA?", f"{fda_sent}" + (f", {dated('F11')}" if one("F11") else ""))
+    place = {code: label for label, (_, code) in fda.CHOICES["F12"].items()}.get(one("F12"), "-")
+    item(
+        "12. Location Where Event Occurred", place.capitalize() + (f": {one('F12 other')}" if one("F12 other") else "")
+    )
+    maker_sent = sent.get(one("F13 sent"), "-")
+    item("13. Report Sent to Manufacturer?", f"{maker_sent}" + (f", {dated('F13')}" if one("F13") else ""))
+    email = one("F14 email").removeprefix("mailto:")
+    item("14. Manufacturer Name/Address", one("F14") or "-", email and f"Email: {email}" or None)
 
 
 def record(view: dict, left: list[str], sha256: str, note: str) -> list[tuple[str, str]]:
