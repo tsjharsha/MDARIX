@@ -50,11 +50,15 @@ class CompetingHypothesisService:
         self.validator = validator or HypothesisValidator()
         self.model_engine = model_engine or ModelHypothesisEngine()
 
-    def generate(self, db: Session, request: HypothesisSetRequest) -> HypothesisSetResponse:
+    def generate(self, db: Session, request: HypothesisSetRequest, run_analysis: bool = True) -> HypothesisSetResponse:
+        """``run_analysis=False``: build only on the saved analysis named in the request, never run a new one (RCA-D13:
+        while AI is off the analysis would be keyword rules); without a usable saved analysis, ``AI_OFF`` is raised."""
         if request.tenant_id is None:
             raise HypothesisEngineError("TENANT_REQUIRED", "tenant_id is required")
         start = time.time()
         analysis_response = self._shown_analysis(db, request)
+        if analysis_response is None and not run_analysis:
+            raise HypothesisEngineError("AI_OFF", "AI analysis is off for this organization.")
         try:
             analysis_response = analysis_response or self.investigator_service.analyze(
                 db,
