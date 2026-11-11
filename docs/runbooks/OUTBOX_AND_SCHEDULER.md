@@ -142,6 +142,7 @@ briefly unavailable) is logged and tried again on the next one.
 | `due-alerts` | 15 min | Raise reminders for items due soon and escalations for overdue ones (owner, backup, the escalation role), and resolve those whose item is done; in-app only, nothing is e-mailed (`DUE_ITEM_ESCALATED` in the audit trail) |
 | `signature-settlement` | 10 min | Settle every signature a dedicated plane's signing left PENDING for over 2 minutes (a restart, a lost connection between its two commits): SIGNED with its audit events when the record it signs was saved, otherwise removed with `SIGNATURE_ABANDONED` (nothing was signed). The state machine is documented in `backend/app/signing_commit.py`; a PENDING signature is never shown as valid |
 | `readiness-digest` | 6 h | Once per ISO week (from Monday 06:00 UTC): queue each organization's weekly readiness email (`READINESS_DIGEST`) to its quality leads |
+| `deadline-list` | 15 min | Once per organization and local day, from 06:00 in its time zone (weekends too): queue its open reporting deadlines (`DEADLINE_LIST`) to its regulatory approvers, Leaders and customer administrators; sent also when empty, so a missing e-mail means a problem (B6a G18a, switch `MDARIX_B6_DEADLINE_LIST`) |
 
 Every run is recorded in `scheduler_runs` (status, result, error type, consecutive failures). Jobs run in system
 scope and write their own audit events.

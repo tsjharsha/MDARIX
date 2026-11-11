@@ -885,6 +885,18 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             ],
           },
           {
+            title: "Keep a copy of your deadlines for an outage",
+            who: "Anyone who may export data; the daily e-mail goes to regulatory approvers, Leaders and customer administrators.",
+            steps: [
+              "Every day from 06:00 your time, MDARIX e-mails the open reporting deadlines: overdue first, then soonest, with the complaint reference, market, what is owed, the due time and the owner. It comes also when nothing is due, so a missing e-mail means something is wrong.",
+              "Choose Deadlines PDF for a printed copy (one page per 40 lines) or Deadlines CSV. Keep the latest copy where your team can reach it without MDARIX.",
+              "To stop the daily e-mail, switch it off under My Account; the last person who receives it cannot.",
+              "If MDARIX is unavailable, follow your own procedure; Help › If MDARIX is unavailable: SOP template is a starter to adapt, to confirm with your consultant.",
+            ],
+            result:
+              "When MDARIX is back, log what arrived with Log a case. When you learned of it more than 24 hours ago, MDARIX asks why it is entered late and shows records that may be the same event before you save. The clock counts from when you became aware, so a back-entered case can be overdue at once.",
+          },
+          {
             title: "Set the working calendar",
             who: "Quality reviewers and regulatory approvers.",
             steps: [

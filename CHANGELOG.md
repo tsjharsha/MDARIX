@@ -10,6 +10,51 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.11.03] - not released yet
+
+B6a: deadline protection, speed, reviews and trace. Part A (deadline protection, G18 and G19): legal reporting clocks
+keep running when MDARIX is down, so every organization gets an offline copy of its open reporting deadlines (a daily
+e-mail and a download), back-entry after an outage asks a late-entry reason and shows possible duplicates before saving,
+a starter SOP for the manual workaround is in Help, and a clock check proves the times on audit entries and signatures.
+No migration. Switches: `MDARIX_B6_DEADLINE_LIST` and `MDARIX_B6_LATE_ENTRY` (both on).
+
+### Added
+- **Daily deadline list (G18a).** The scheduler job `deadline-list` (every 15 min) queues one outbox event
+  `DEADLINE_LIST` per organization and local day, from 06:00 in the organization's time zone (the oversight calendar),
+  weekends included. It lists every open reporting item from Oversight's own reads (market clocks being assessed,
+  reports owed, the watch's provisional clocks) and a country outside the five markets (B9b) whose conclusion is not
+  signed yet or whose report has no date: overdue first, then soonest, each with its complaint reference, market, what
+  is owed, due time with its zone, state and owner. An empty list is still sent ("0 open reporting deadlines today"),
+  so a missing e-mail means a problem. The queue holds references, dates and owner ids only; names and addresses are
+  resolved when it is sent; no description, patient or reporter text anywhere. It goes to the regulatory approvers,
+  Leaders and customer administrators; each may switch it off under My Account (new key `daily_deadlines` in
+  `auth_users.email_preferences`, no migration), except the last one left on (409 `LAST_DEADLINE_RECIPIENT`); should
+  none be left on, every eligible person gets it.
+- **Deadline downloads (G18a).** `GET /api/v1/oversight/deadlines.csv` and `.pdf` (`data.export`, audited
+  `DEADLINE_LIST_DOWNLOADED`): the same list; the PDF is dated, one page per 40 lines, "Printed copy for an outage:
+  check MDARIX when it is back". Oversight shows "Deadlines PDF" and "Deadlines CSV" beside its CSV.
+- **Late-entry reason (G18b).** `POST /api/v1/intake` takes `late_entry_reason`; when awareness (else Received) is more
+  than 24 hours before the entry, it is required, at least 10 characters (422 `LATE_ENTRY_REASON_NEEDED`). Stored in the
+  existing `intake_events.late_entry_reason`, audited on `INTAKE_LOGGED`, shown on the Case as "Entered late: ...". The
+  clock still counts from awareness, so a back-entered Case can be overdue at once. A Case made from an e-mail is not a
+  back-entry (Received is the server's own receipt) and is not asked.
+- **Duplicate check before saving a back-entry (G18c).** `GET /api/v1/intake/possible-duplicates` runs today's duplicate
+  rule (same product, same lot or serial, events within 2 days, same site or country) against the organization's Cases,
+  the product's complaints and the e-mails still to check. Log a case asks it before "Save" on a back-entry and shows
+  the matches; the person adds the call to that record or saves anyway. Nothing is linked or merged automatically.
+- **Manual-workaround SOP template (G18d)** in Help ("If MDARIX is unavailable: SOP template"): when to switch to manual
+  mode, using the daily list or its printout, a log whose columns match Log a case, who decides reportability
+  meanwhile, back-entry with the reason, the completeness check after recovery. Marked "Starter template: adapt it to
+  your own procedures. To confirm with your consultant." It never says how to report to an authority: it points to the
+  customer's own SOP.
+- **Clock check (G19).** Readiness gains a `clock` check: the application's clock against the database's
+  `clock_timestamp()` (corrected for the round trip) and, when `MDARIX_NTP_SERVER` is set, a standard-library SNTP
+  query (cached 5 minutes; no new dependency). Above 1 s, or a source that cannot be measured ("unknown", never ok),
+  the check is not ok and the operations alert fires once, naming the last good check ("check the audit entries and
+  signatures made since ..."), and once when it clears. `scripts/clock_check.py` prints and saves the figures and
+  `chronyc tracking` (`artifacts/clock-check-<time>.json`) for the release IQ, after a server, network or NTP change
+  and in the restore drill (`DEPLOYMENT.md` 2.4, `BACKUP_AND_RESTORE.md` step 5). Records are never re-timed.
+
 ## [0.11.02] - not released yet
 
 B9b: other countries, attach-only reports. For a country outside the five built-in markets (US, EU and Northern

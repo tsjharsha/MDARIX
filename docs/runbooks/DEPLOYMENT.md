@@ -121,7 +121,17 @@ curl -fsS https://<your domain>/health/status          # {"status":"ok"} ("degra
 docker compose -f docker-compose.prod.yml --env-file .env.production exec api python -c \
   "from backend.app.readiness import readiness_report as r; import json; print(json.dumps(r(), indent=1))"
 docker compose -f docker-compose.prod.yml --env-file .env.production exec api python scripts/send_test_alert.py
+chronyc tracking                                      # on the host: "Leap status: Normal", small "System time"
+docker compose -f docker-compose.prod.yml --env-file .env.production exec api python scripts/clock_check.py
 ```
+
+**Clock check (B6a G19, every release's IQ and after any server, network or NTP change).** `scripts/clock_check.py`
+prints the application's time, the database clock's offset and the time server's offset (`MDARIX_NTP_SERVER`, or
+`--ntp <server>`; the trusted source is the host's chrony against the hosting provider's time service) and saves them
+as `artifacts/clock-check-<time>.json`; exit 1 above **1 s** or when a source cannot be measured. Keep the JSON with
+the release's IQ record. Readiness carries the same `clock` check and the operations alert fires once when it goes out
+of step (naming the last good check: the audit entries and signatures since then are the ones to look at) and once
+when it is back; records are never re-timed.
 
 `migrate` runs on every `up`: it applies new migrations, gives the runtime role its login, grants the application
 privileges, stores the system-scope token and migrates any dedicated customer databases. The API and the

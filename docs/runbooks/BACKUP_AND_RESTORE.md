@@ -109,7 +109,8 @@ files are stored locally, and `MANIFEST.sha256`. Database connections use the ap
    re-applications (it should list erasures made after the backup's timestamp).
 5. Checks: `alembic current` shows the release's head; row counts of `tenants`, `auth_users`, `audit_events`,
    `investigations`, `evidence` match the source at backup time; `SELECT count(*) FROM pg_policies` matches; a
-   restored files archive extracts (`age -d -i key objects.tar.age | tar -t | head`).
+   restored files archive extracts (`age -d -i key objects.tar.age | tar -t | head`); the clock check
+   (`python scripts/clock_check.py` with `POSTGRES_DB=mdarix_restore_drill`, B6a G19) is ok within 1 s.
 6. Record the date, backup timestamp, duration and results in the operations log; drop the drill database.
 
 CI runs the same drill on every change (`prod-stack` job): a backup with the BYPASSRLS login and one through the
