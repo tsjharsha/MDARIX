@@ -13,6 +13,7 @@ import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
 import { CodePicker } from "./CodePicker";
 import { FollowUps, openFollowUp } from "./FollowUps";
+import { SimilarTableRow } from "./SimilarTable";
 import { ROLE_LABELS } from "../reportability";
 import {
   OUTCOME_LABELS,
@@ -22,6 +23,7 @@ import {
   RESULT_LABELS,
   deadlineDue,
   deadlineText,
+  fieldOptions,
   fieldTone,
   fileIn,
   nowLocal,
@@ -1119,6 +1121,10 @@ export function FieldRow({
   const editable = canEdit && item.editable !== false;
   // A code field takes only codes from the picker, on either navigation (0.10.81, F6).
   if (item.code_annex) return <CodeFieldRow detail={detail} item={item} onChanged={onChanged} canEdit={editable} />;
+  // B8 step 10: the MIR's 4.3.3c similar incidents, a table of periods and regions.
+  if (item.kind === "TABLE")
+    return <SimilarTableRow detail={detail} item={item} onChanged={onChanged} canEdit={editable} />;
+  const options = fieldOptions(detail, item); // a MIR type: only the types its place in the chain allows
   return (
     <li className="uw-rp-field">
       <div className="uw-rp-field-head">
@@ -1172,14 +1178,14 @@ export function FieldRow({
             if (await action.run(path, "PUT", { value })) setEditing(false);
           }}
         >
-          {item.options?.length ? (
+          {options.length ? (
             <select
               aria-label={`${item.number} ${item.label}`.trim()}
               value={value}
               onChange={(event) => setValue(event.target.value)}
             >
               <option value="">Choose…</option>
-              {item.options.map((choice) => (
+              {options.map((choice) => (
                 <option key={choice} value={choice}>
                   {choice}
                 </option>

@@ -288,6 +288,23 @@ export type ReportDetail = {
   } | null;
   /** B9 step 11: a Canada report's chain (the Final made when the preliminary is submitted; updates on demand).
    * ``official_form``: Health Canada's form file is in place (until then only the worksheet PDF). */
+  /** B8 step 3: an EU MIR's chain. On the first report: its later reports (``items``); on a later one: its type,
+   * due date, the types its position allows and, after a "not reportable" re-sign, the Final it is offered as. */
+  mir_chain?: {
+    type: string;
+    types: string[];
+    items?: { id: string; type: string; state: ObligationState; due_on?: string | null }[];
+    ended?: boolean;
+    can_create?: boolean;
+    due_on?: string | null;
+    due_note?: string | null;
+    offer_final_non?: { type: string; "4_2B": string | null } | null;
+    note?: string;
+    next_report_on?: string | null;
+  } | null;
+  /** B8 step 8: an EU report's MIR file. Approved: the frozen file's snapshot and SHA-256; a draft: what Send for
+   * approval would refuse (blocks missing, the schema's errors). */
+  mir?: { snapshot: string | null; sha256: string | null; missing: string[]; errors: string[] } | null;
   canada_chain?: {
     type: string;
     due_on?: string | null;
@@ -316,6 +333,35 @@ export type ReportDetail = {
 };
 
 /** The tab name that opens Reports on one complaint ("Reports?complaint=<id>"), and its reading. */
+/** B8 step 10: the MIR's 4.3.3c table, as the server checks it (forms.table_problem). */
+export const SIMILAR_PERIODS = ["N", "N-1", "N-2", "N-3"] as const;
+export const SIMILAR_COUNTS = [
+  ["country_incidents", "Similar incidents: the incident's country"],
+  ["country_devices", "Devices on the market: the incident's country"],
+  ["eea_incidents", "Similar incidents: EEA + CH + TR"],
+  ["eea_devices", "Devices on the market: EEA + CH + TR"],
+  ["world_incidents", "Similar incidents: worldwide"],
+  ["world_devices", "Devices on the market: worldwide"],
+] as const;
+export type SimilarRow = { start: string; end: string } & Partial<Record<(typeof SIMILAR_COUNTS)[number][0], number>>;
+
+/** The stored table (a JSON list of four periods), or four empty periods. */
+export function similarRows(value: string | null | undefined): SimilarRow[] {
+  try {
+    const rows = JSON.parse(value ?? "");
+    if (Array.isArray(rows) && rows.length === SIMILAR_PERIODS.length) return rows as SimilarRow[];
+  } catch {
+    // not the table yet: start empty
+  }
+  return SIMILAR_PERIODS.map(() => ({ start: "", end: "" }));
+}
+
+/** A MIR type field's choices: only the types the report's place in its chain allows (B8 step 3). */
+export function fieldOptions(detail: Pick<ReportDetail, "mir_chain">, item: { id: string; options?: string[] | null }) {
+  const allowed = item.id === "1_2E" ? detail.mir_chain?.types : null;
+  return allowed ? (item.options ?? []).filter((choice) => allowed.includes(choice)) : (item.options ?? []);
+}
+
 export function reportsTab(complaintId?: string): string {
   return complaintId ? `${REPORTS_TAB}?complaint=${encodeURIComponent(complaintId)}` : REPORTS_TAB;
 }

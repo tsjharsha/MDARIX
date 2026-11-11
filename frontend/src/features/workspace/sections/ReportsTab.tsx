@@ -40,6 +40,7 @@ import { ListViewPicker } from "./Views";
 import { STARTER_LABEL } from "../../shared/standards";
 import { ApprovingDoc, ConfirmAllCodes, ThingsToGive, signatureLine } from "./ReportBody";
 import { FollowUps } from "./FollowUps";
+import { MirFiles, MirNeeds } from "./MirFiles";
 
 /** What MDARIX does with an authority report, said once where it matters (Release C guardrail 3). */
 export const NEVER_SUBMITS =
@@ -504,6 +505,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                 The eMDR XML also needs: {emdrNeeds.join("; ")}.
               </p>
             )}
+            <MirNeeds detail={detail} />
             {write && detail.stage === "CREATED" && !resend && (
               <>
                 <button type="button" className="ac-secondary" disabled aria-describedby="rp-why-send">
@@ -574,6 +576,12 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                         </p>
                       </>
                     )}
+                    <MirFiles
+                      detail={detail}
+                      onXml={() =>
+                        void fetchFile("mir.xml", `mdarix-mir-${stem}.xml`, "The MIR XML could not be downloaded.")
+                      }
+                    />
                     {/* B9 step 10: Health Canada's own form, once its form file is in place (needed from the owner). */}
                     {canada && detail.canada_chain?.official_form && (
                       <button

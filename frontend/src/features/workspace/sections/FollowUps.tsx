@@ -40,10 +40,11 @@ export function FollowUps({
 }) {
   const india = useB9India();
   const canada = useB9Canada();
-  // B9: an India or Canada report's chain, shown while its switch is on.
-  const market = detail.india_chain ? "india" : detail.canada_chain ? "canada" : null;
+  // B9: an India or Canada report's chain, shown while its switch is on; B8: an EU MIR's (the server sends it only
+  // while MDARIX_B8_EU_MIR is on).
+  const market = detail.india_chain ? "india" : detail.canada_chain ? "canada" : detail.mir_chain ? "mir" : null;
   if (market)
-    return (market === "india" ? india : canada) ? (
+    return (market === "india" ? india : market === "canada" ? canada : true) ? (
       <MarketChain market={market} detail={detail} canWrite={canWrite} onChanged={onChanged} onOpen={onOpen} />
     ) : null;
   if (detail.follow_up)
@@ -311,6 +312,20 @@ const CHAINS = {
     // The Final waits for its date: only an unsent update holds the chain.
     isOpen: (row: ChainItem) => row.type === "Update" && !SENT.includes(row.state),
   },
+  mir: {
+    path: "mir-chain",
+    label: "EU MIR",
+    types: ["Follow up", "Final (Reportable incident)", "Final (Non-reportable incident)"],
+    box: "1.2e",
+    sentDay: "1.2a",
+    create: "Create a follow-up or final report",
+    intro:
+      "A follow-up is made for you each time a report is recorded as submitted, due on the date it gave in 1.2f. Create a Final when the investigation is done.",
+    ended:
+      "A Final (or a Combined initial and final) report ends the chain. If you must correct it, ask for an updated final report.",
+    // One open at a time: the next waits until the last is accepted (or recorded with no acknowledgement expected).
+    isOpen: (row: ChainItem) => !VALID.includes(row.state),
+  },
 } as const;
 type ChainItem = { id: string; type: string; state: ObligationState; due_on?: string | null };
 
@@ -334,7 +349,10 @@ function MarketChain({
   onOpen: (id: string) => void;
 }) {
   const spec = CHAINS[market];
-  const chain = (market === "india" ? detail.india_chain : detail.canada_chain)!;
+  const chain = (
+    market === "india" ? detail.india_chain : market === "canada" ? detail.canada_chain : detail.mir_chain
+  )!;
+  const offer = market === "mir" ? detail.mir_chain?.offer_final_non : null;
   const action = useAction(onChanged, "That step was not recorded.");
   const [form, setForm] = useState({ type: spec.types[0] as string, text: "", next: "", reason: "" });
   const [error, setError] = useState("");
@@ -357,11 +375,33 @@ function MarketChain({
         </p>
         {detail.request?.text && <p className="ac-muted">What is new: {detail.request.text}</p>}
         <p className="ac-muted">
-          {chain.due_on ? `Due ${formatDate(chain.due_on)}: the date the preliminary report promised (A5). ` : ""}
+          {chain.due_on
+            ? `Due ${formatDate(chain.due_on)}: ${market === "mir" ? (detail.mir_chain?.due_note ?? "your date (1.2f)") : "the date the preliminary report promised (A5)"}. `
+            : ""}
           {chain.next_report_on ? `Next report planned for ${formatDate(chain.next_report_on)}. ` : ""}
           {chain.note}
-          {chain.type === "Final" ? " A Final report ends the chain." : ""}
+          {chain.type.startsWith("Final") ? " A Final report ends the chain." : ""}
         </p>
+        {offer && canWrite && UNSENT.includes(detail.state) && (
+          <div className="ac-note">
+            <p>
+              The conclusion was signed again: not reportable. This report is not cancelled. You may send it as a{" "}
+              {offer.type}, with 4.2b taken from the signed rationale; you decide.
+            </p>
+            <button
+              type="button"
+              className="ac-secondary"
+              disabled={action.busy}
+              onClick={async () => {
+                const path = `${REPORTS}/${detail.id}/fields`;
+                if ((await action.run(`${path}/1_2E`, "PUT", { value: offer.type })) && offer["4_2B"])
+                  await action.run(`${path}/4_2B`, "PUT", { value: offer["4_2B"] });
+              }}
+            >
+              Start the {offer.type}
+            </button>
+          </div>
+        )}
         {/* Canada's Final is owed (s.61): it is corrected, never cancelled (FINAL_IS_OWED). */}
         {canWrite && UNSENT.includes(detail.state) && !(market === "canada" && chain.type === "Final") && (
           <details>
@@ -452,14 +492,16 @@ function MarketChain({
                   ))}
                 </fieldset>
               )}
-              <label className="ca-field">
-                Next report on (optional, your date)
-                <input
-                  type="date"
-                  value={form.next}
-                  onChange={(event) => setForm({ ...form, next: event.target.value })}
-                />
-              </label>
+              {market !== "mir" && (
+                <label className="ca-field">
+                  Next report on (optional, your date)
+                  <input
+                    type="date"
+                    value={form.next}
+                    onChange={(event) => setForm({ ...form, next: event.target.value })}
+                  />
+                </label>
+              )}
               <label className="ca-field ca-wide">
                 What is new
                 <textarea
