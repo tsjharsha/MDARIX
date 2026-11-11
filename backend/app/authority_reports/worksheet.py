@@ -628,6 +628,8 @@ def us_recipients(context) -> list[str]:
     """Who must receive a US importer's or user facility's report (B9 step 8, us-recipients-1 in the role floors): the
     recipients of every rule of the signed conclusion that applies or could apply (Unknown is never No), FDA when the
     rule says so for an unknown manufacturer and none is set. Nothing named (a conclusion signed before B9): both."""
+    if context.get("frozen_recipients") is not None:  # approved: the list frozen at Send for approval (B9-D8)
+        return list(context["frozen_recipients"])
     row = context.get("current")
     rules = ((row.rules_applied or {}).get("rules") or []) if row is not None else []
     named = {name for rule in rules for name in rule.get("recipients") or []}

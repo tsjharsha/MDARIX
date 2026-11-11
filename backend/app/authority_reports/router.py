@@ -40,6 +40,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session
 
 from backend.app.access.permissions import DATA_EXPORT, REGULATORY_APPROVE, REGULATORY_REVIEW, require_permission
@@ -197,6 +198,12 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
     context["check_contact_office"] = obligation.state in rules.EDITABLE
     context["chain_type"] = chain_type(obligation)  # India's P2 (B9 step 14); None: an initial report
     context["us_role"] = us_role(obligation)  # B9 step 7: an importer's or user facility's US report (section F)
+    if context["us_role"] and obligation.state not in rules.EDITABLE:
+        # B9 step 8: past approval, the recipients are the list frozen at Send for approval, never the live conclusion
+        approved = next((row for row in reversed(_snapshots(db, obligation)) if row.state == "APPROVED"), None)
+        frozen = (approved.fields or {}).get("us_recipients") if approved is not None else None
+        if frozen is not None:
+            context["frozen_recipients"] = frozen
     if is_canada_chain(obligation):
         context["ca_chain"] = _canada_carried(db, obligation)  # A4 and A5's previous date (B9 step 11)
     if is_follow_up(obligation):
@@ -212,12 +219,36 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
 
 def us_role(obligation: ReportObligation) -> str | None:
     """B9: a US report's role (IMPORTER, USER_FACILITY), read from the report type it was signed under; None for a
-    manufacturer's report, and while the role's switch is off (a role behind an off switch reads as Manufacturer)."""
+    manufacturer's report, and for a draft initial report while the role's switch is off (a role behind an off switch
+    reads as Manufacturer). An approved or sent report, and a follow-up in its chain, keep their signed role (B9-D8):
+    switching the role off never turns an importer's malfunction report into a manufacturer's one."""
     from backend.app.authority_reports import emdr
     from backend.app.reportability import service
 
     role = emdr.ROLE_OF_TYPE.get(obligation.report_type or "") if obligation.form_code == forms.FDA_3500A.code else None
-    return role if role and forms.switched_on(service.ROLES["US", role]) else None
+    if not role:
+        return None
+    found = sa_inspect(obligation, raiseerr=False)  # None: a plain stand-in (unit tests)
+    session = found.session if found is not None else None
+    if session is not None and obligation.state not in rules.EDITABLE:  # B9-D8: the role frozen at approval
+        approved = (
+            session.query(ReportSnapshot.fields)
+            .filter(
+                ReportSnapshot.tenant_id == obligation.tenant_id,
+                ReportSnapshot.obligation_id == obligation.id,
+                ReportSnapshot.state == "APPROVED",
+            )
+            .order_by(ReportSnapshot.version.desc())
+            .first()
+        )
+        if approved is not None and "us_role" in (approved.fields or {}):
+            return approved.fields["us_role"]
+        return role
+    if session is not None and obligation.parent_id is not None:  # a follow-up: its sent chain's role
+        parent = session.get(ReportObligation, obligation.parent_id)
+        if parent is not None:
+            return us_role(parent)
+    return role if forms.switched_on(service.ROLES["US", role]) else None
 
 
 RECIPIENT_ROUTES = {"FDA": "EMDR", "MANUFACTURER": "MFR_COPY"}  # B9 step 8: who receives a US report, by route
@@ -1629,7 +1660,11 @@ def snapshot_material(obligation, complaint: str, conclusion_id, sections: list[
         "market": obligation.market,
         "conclusion": str(conclusion_id),
         "sections": sections,
-        **{key: frozen_file[key] for key in ("emdr_sha256", "emdr_parties", "form_edition") if key in frozen_file},
+        **{
+            key: frozen_file[key]
+            for key in ("emdr_sha256", "emdr_parties", "form_edition", "us_role", "us_recipients")
+            if key in frozen_file
+        },
     }
 
 
@@ -1678,6 +1713,10 @@ def request_snapshot(
             frozen_file = frozen_emdr(
                 found["xml"], context["parties"], sections, found["left_out"], _emdr_kind(obligation)
             )
+        if emdr.ROLE_OF_TYPE.get(obligation.report_type or ""):  # B9-D8: the role and recipients, frozen with it
+            frozen_file = {**frozen_file, "us_role": context["us_role"]}
+            if context["us_role"]:
+                frozen_file["us_recipients"] = worksheet.us_recipients(context)
     if _official_on(obligation):  # B9-D16: the official form's edition, picked by the day sent for approval
         from backend.app.rule_register import register
 
