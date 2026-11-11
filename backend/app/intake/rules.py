@@ -249,14 +249,24 @@ def clean(value: object, limit: int = TEXT_MAX) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
 
 
-def _match(text: str, words) -> list[str]:
-    plain = normalize(text)
+@functools.cache
+def _patterns(words: tuple) -> list[tuple]:
+    """Each word's normalised form and whole-word pattern, built once per word list (B6a run 4: they were built for
+    every text, a third of the triage list's time at 5,000 complaints)."""
     found = []
     for word in words:
         target = normalize(word)
-        if not target:
-            continue
-        pattern = re.compile(r"(?<![\w&])" + re.escape(target).replace(r"\ ", r"\s+") + r"(?![\w&])")
+        if target:
+            found.append(
+                (word, target, re.compile(r"(?<![\w&])" + re.escape(target).replace(r"\ ", r"\s+") + r"(?![\w&])"))
+            )
+    return found
+
+
+def _match(text: str, words) -> list[str]:
+    plain = normalize(text)
+    found = []
+    for word, target, pattern in _patterns(tuple(words)):
         for hit in pattern.finditer(plain):
             before = plain[: hit.start()].split()
             negated = any(before[-len(n.split()) :] == n.split() for n in _NEGATIONS) or (

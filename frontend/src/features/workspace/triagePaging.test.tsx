@@ -5,7 +5,8 @@ import { TRIAGE_PAGE, Triage } from "./sections/Triage";
 import type { TriageItem, TriageList } from "./intake";
 
 // B6a run 3: no deadline is hidden by a read cap. Every open item is counted; one page shows TRIAGE_PAGE of them and
-// says how many more there are; an item past the first page still opens by its address.
+// says how many more there are; an item past the first page still opens by its address. B6a run 4: the server sends
+// the page and the counts (``limit``), and the item past the page by its address (``want``).
 
 const item = (index: number) =>
   ({
@@ -29,19 +30,26 @@ const item = (index: number) =>
   }) as unknown as TriageItem;
 
 const LIST = {
-  items: Array.from({ length: TRIAGE_PAGE + 50 }, (_, index) => item(index)),
+  items: Array.from({ length: TRIAGE_PAGE }, (_, index) => item(index)),
+  total: TRIAGE_PAGE + 50,
+  overdue: 3,
   summary: { open: TRIAGE_PAGE + 50, done: 0, conflicts: 0 },
   people: [],
   enabled_markets: [],
 } as unknown as TriageList;
+const asked: string[] = [];
 
 vi.mock("../customer-admin/shared", async (original) => ({
   ...(await original<typeof import("../customer-admin/shared")>()),
-  useResource: (path: string | null) => ({
-    state: "ready",
-    data: path?.startsWith("/api/v1/triage?") ? LIST : null,
-    reload: () => undefined,
-  }),
+  useResource: (path: string | null) => {
+    if (path) asked.push(path);
+    const away = path?.includes("&want=COMPLAINT%3Ac140");
+    return {
+      state: "ready",
+      data: away ? { ...LIST, items: [], wanted: item(140) } : path?.startsWith("/api/v1/triage?") ? LIST : null,
+      reload: () => undefined,
+    };
+  },
   Drawer: () => <div data-drawer="open" />,
 }));
 
@@ -73,6 +81,8 @@ describe("the triage list pages, never hides", () => {
     expect(html).toContain("50 more events on this list.");
     expect(html).toContain("Show the next 50");
     expect(html).toContain("150 events to triage");
+    expect(html).toMatch(/ac-stat-value">3</); // past the triage target, counted by the server over every item
+    expect(asked).toContain("/api/v1/triage?show=open&limit=100");
   });
 
   it("opens an item past the first page by its address", () => {

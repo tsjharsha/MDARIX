@@ -2203,11 +2203,18 @@ def undo_link(
 @router.get("/triage")
 def triage_list(
     show: str = Query("open", pattern="^(open|done|all)$"),
+    limit: int | None = Query(None, ge=0, le=100_000),
+    offset: int = Query(0, ge=0),
+    want: str | None = Query(None, max_length=200),
+    complaint: uuid.UUID | None = Query(None),
     db: Session = Depends(get_data_plane_db),
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    return service.triage(db, control_db, _tenant(ctx), show)
+    """The triage list (whole without ``limit``). B6a run 4: ``limit`` and ``offset`` page it, with its counts over
+    every item and ``want`` (a key or reference) found wherever it is; ``complaint``: only that complaint's event."""
+    found = service.triage(db, control_db, _tenant(ctx), show, complaint_ids=[complaint] if complaint else None)
+    return found if limit is None else service.triage_page(found, limit, offset, want)
 
 
 @router.get("/triage/backlog")

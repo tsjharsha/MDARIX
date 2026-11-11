@@ -879,6 +879,22 @@ def triage(
     return {**found, "items": [item for item, closed in zip(found["items"], done) if closed == (show == "done")]}
 
 
+def triage_page(found: dict, limit: int, offset: int = 0, want: str | None = None) -> dict:
+    """B6a run 4: a page of the triage list as the screen shows it (Imported backlog items apart, OD-12), with what the
+    whole list counts (every item, those past their triage target) and the asked item (``want``: its key, reference or
+    identifier) wherever it is, backlog included. Pages in order equal the whole list (tests/test_b6a_scoped_watch.py).
+    """
+    listed = [item for item in found["items"] if not item["backlog"]]
+    matches = (item for item in found["items"] if want in (item["key"], item["ref"], item["identifier"]))
+    return {
+        **found,
+        "items": listed[offset : offset + limit],
+        "total": len(listed),
+        "overdue": sum(item["triage_clock"]["state"] == "OVERDUE" for item in listed),
+        "wanted": next(matches, None) if want else None,
+    }
+
+
 def _triage(
     db: Session,
     control_db: Session | None,
@@ -997,6 +1013,7 @@ def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datet
         "fast_hours": fast_hours(db, tenant_id),
         "calendar": calendar(db, tenant_id),
         "backlog_target_days": backlog_settings(db, tenant_id)[1],
+        "deadline_memo": {},
     }
 
 
@@ -1054,19 +1071,28 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
     signed: dict = {}
     for key in members:
         signed = {**context["signed"].get(key, {}), **signed}
-    deadlines = rules.provisional_deadlines(
-        awareness["at"],
-        enabled,
-        level,
-        now,
-        remedial,
-        own=own,
-        signed=signed,
-        org_zone=context["org_zone"],
-        ivd=context["products"].get(primary.get("product_id"), False),
-        answered=answered,
-        roles=context.get("roles"),
-    )
+    ivd = context["products"].get(primary.get("product_id"), False)
+    # B6a run 4: the deadlines are a pure function of these (the rest is fixed for the request): items with the same
+    # awareness and facts, as an import's day-only dates give, are counted once. Copies, so no item shares a dict.
+    memo_key = None if signed else (awareness["at"], level, remedial, own, ivd, answered)
+    deadlines = context["deadline_memo"].get(memo_key) if memo_key else None
+    if deadlines is None:
+        deadlines = rules.provisional_deadlines(
+            awareness["at"],
+            enabled,
+            level,
+            now,
+            remedial,
+            own=own,
+            signed=signed,
+            org_zone=context["org_zone"],
+            ivd=ivd,
+            answered=answered,
+            roles=context.get("roles"),
+        )
+        if memo_key:
+            context["deadline_memo"][memo_key] = deadlines
+    deadlines = [dict(line) for line in deadlines]
     record = member_records.get(primary_key)
     opened = rules.utc(record.opened_at) if record is not None else primary["available_at"]
     # A link that brought an earlier awareness reopens triage: its target counts from the link (G19's reopening).

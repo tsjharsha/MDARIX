@@ -272,10 +272,14 @@ describe("the oversight view", () => {
   it("says plainly when a source reached its read cut (B6a run 3: never silently incomplete)", () => {
     resources.data["/api/v1/oversight"] = {
       ...oversight,
-      incomplete: ["the reportability watch beyond its first 20,000 complaints"],
+      incomplete: [
+        "the reportability watch past 20,000 complaints (it keeps those without a decision or a signed conclusion, earliest awareness first; decided ones and the latest awareness are left out)",
+      ],
     };
     const html = render(<OversightView />, ["data.export"]);
-    expect(html).toContain("This list is incomplete: the reportability watch beyond its first 20,000 complaints");
+    expect(html).toContain(
+      "This list is incomplete: the reportability watch past 20,000 complaints (it keeps those without a decision or a signed conclusion, earliest awareness first; decided ones and the latest awareness are left out)",
+    );
     resources.data["/api/v1/oversight"] = oversight;
   });
 

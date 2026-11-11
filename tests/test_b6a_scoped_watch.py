@@ -84,6 +84,71 @@ def _assert_scoped_equals_whole(tenant_id, monkeypatch, ids: list[str] | None = 
         return dated
 
 
+class _NoMemo(dict):
+    """A deadline memo that keeps nothing: every item's deadlines are counted afresh, as before B6a run 4."""
+
+    def __setitem__(self, key, value):
+        pass
+
+
+def _assert_pages_equal_whole(tenant_id, monkeypatch) -> int:
+    """B6a run 4: the triage list read page by page (each page its own request, ``limit`` 100) equals the whole list
+    in order, with the same counts (items, past the triage target, summary); an item on any page, or in the Imported
+    backlog, is found by its key and its reference; the deadline memo changes no item. Returns the open items."""
+    from backend.app.intake import service as intake
+
+    real = intake._deadline_context
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        db.info.pop(intake._MEMO, None)
+        whole = intake.triage(db, db, tenant_id, "all", NOW)
+        monkeypatch.setattr(intake, "_deadline_context", lambda *args: {**real(*args), "deadline_memo": _NoMemo()})
+        db.info.pop(intake._MEMO, None)
+        assert intake.triage(db, db, tenant_id, "all", NOW) == whole  # the memo changes nothing
+        monkeypatch.setattr(intake, "_deadline_context", real)
+        counted = 0
+        for show in ("open", "done"):
+            db.info.pop(intake._MEMO, None)
+            full = intake.triage(db, db, tenant_id, show, NOW)
+            listed = [item for item in full["items"] if not item["backlog"]]
+            paged, offset = [], 0
+            while True:
+                db.info.pop(intake._MEMO, None)  # each page is its own request
+                page = intake.triage_page(intake.triage(db, db, tenant_id, show, NOW), 100, offset)
+                assert page["total"] == len(listed) and page["summary"] == full["summary"], show
+                assert page["overdue"] == sum(item["triage_clock"]["state"] == "OVERDUE" for item in listed)
+                if not page["items"]:
+                    break
+                paged += page["items"]
+                offset += 100
+            assert paged == listed, show
+            for item in full["items"][:: max(1, len(full["items"]) // 25)]:  # every 25th: backlog ones too
+                found = intake.triage_page(full, 0, 0, item["key"])
+                assert found["wanted"] == item and not found["items"]
+                by_ref = intake.triage_page(full, 0, 0, item["ref"])["wanted"]
+                assert item["ref"] in (by_ref["ref"], by_ref["identifier"])
+            counted += len(listed) if show == "open" else 0
+        return counted
+
+
+def test_the_triage_list_pages_equal_the_whole_list(trial, monkeypatch):  # B6a run 4
+    assert _assert_pages_equal_whole(trial["tenant_id"], monkeypatch) >= 3
+    user = trial["user"]
+    whole = user.get("/api/v1/triage?show=all").json()
+    keys = [item["key"] for item in whole["items"] if not item["backlog"]]
+    page = user.get("/api/v1/triage?show=all&limit=2&offset=1").json()
+    assert [item["key"] for item in page["items"]] == keys[1:3] and page["total"] == len(keys)
+    assert user.get(f"/api/v1/triage?show=all&limit=0&want={keys[-1]}").json()["wanted"]["key"] == keys[-1]
+    assert "total" not in whole  # no limit: the whole list, as before
+    # A complaint's own triage panel reads only its event (the scoped read), the same item as the whole list's.
+    item = next(item for item in whole["items"] if item["kind"] == "COMPLAINT")
+    mine = user.get(f"/api/v1/triage?show=all&complaint={item['id']}").json()["items"]
+    assert item["key"] in [row["key"] for row in mine] and all(
+        f"COMPLAINT:{item['id']}" in row["members"] for row in mine
+    )
+    assert user.get("/api/v1/triage?limit=-1").status_code == 422
+
+
 def test_every_sample_complaint_reads_the_same_scoped_as_organization_wide(trial, monkeypatch):  # B6-14
     dated = _assert_scoped_equals_whole(trial["tenant_id"], monkeypatch)
     assert dated >= 5  # the sample's story complaints carry clocks, deadlines and targets
@@ -174,6 +239,7 @@ def test_the_story_chooses_the_same_imported_complaint_as_before(trial, monkeypa
 def test_the_load_set_reads_the_same_scoped_as_organization_wide(trial, monkeypatch):  # B6-14, load set
     _import(trial["user"], 5000)
     _assert_story_chooses_as_before(trial["tenant_id"], monkeypatch)
+    assert _assert_pages_equal_whole(trial["tenant_id"], monkeypatch) >= 1000  # B6a run 4: more than ten pages
     assert _assert_scoped_equals_whole(trial["tenant_id"], monkeypatch) >= 100
 
 
@@ -230,6 +296,49 @@ def test_the_watch_read_cut_is_said_plainly_and_never_hides_a_complaint_page_clo
             )
     shown = trial["user"].get("/api/v1/oversight").json()
     assert shown["incomplete"] == [oversight.WATCH_CUT]
+    # B6a run 4 (review #4 rest): the complaint list views and the Oversight CSV say so too.
+    listed = trial["user"].get("/api/v1/complaints", params={"view": "open", "work": 1}).json()
+    assert listed["incomplete"] == [oversight.WATCH_CUT]
+    assert trial["user"].get("/api/v1/complaints").json()["incomplete"] == []  # no view: no dated read, nothing cut
+    exported = trial["user"].get("/api/v1/oversight/export.csv")
+    assert exported.status_code == 200 and "INCOMPLETE," in exported.text and "past 20,000" in exported.text
+
+
+def test_the_watch_read_cut_keeps_undecided_complaints_earliest_awareness_first(trial, monkeypatch):  # review #4
+    """B6a run 4: the watch's cut drops complaints with a person's decision before any without one, and among those
+    the latest awareness first (it dropped the newest first, decided or not)."""
+    from datetime import date
+
+    from backend.app.db.models.market_assessment import ComplaintMarketAssessment
+    from backend.app.db.models.reportability import ComplaintReportability
+    from backend.app.reportability import service as reportability
+
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        everyone = reportability._rows(db, trial["tenant_id"], date(2000, 1, 1), None)
+        decided = {
+            row[0]
+            for row in db.query(ComplaintReportability.complaint_id).filter(
+                ComplaintReportability.tenant_id == trial["tenant_id"]
+            )
+        } | {
+            row[0]
+            for row in db.query(ComplaintMarketAssessment.complaint_id).filter(
+                ComplaintMarketAssessment.tenant_id == trial["tenant_id"],
+                ComplaintMarketAssessment.conclusion.isnot(None),
+            )
+        }
+        undecided = [row[0] for row in everyone if row[0].id not in decided]
+        assert decided and len(undecided) > 2  # the sample has both, so the order is tested on real rows
+        flags = [row[0].id in decided for row in everyone]
+        assert flags == sorted(flags)  # every undecided complaint before every decided one
+        moments = [row.awareness_timestamp or row.complaint_timestamp or row.recorded_timestamp for row in undecided]
+        known = [moment for moment in moments if moment is not None]
+        assert moments[: len(moments) - len(known)] == [None] * (len(moments) - len(known))
+        assert known == sorted(known)
+        monkeypatch.setattr(reportability, "READ_LIMIT", 2)
+        kept = reportability._rows(db, trial["tenant_id"], date(2000, 1, 1), None)
+        assert [row[0].id for row in kept] == [row.id for row in undecided[:3]]  # the cut + 1 that tells it was cut
 
 
 def test_a_linked_case_and_a_task_naming_another_complaint_read_the_same_scoped(trial, monkeypatch):  # B6-14

@@ -71,19 +71,22 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   // A call's next action on Home opens its own card (Triage?intake=<id>, 0.10.82, navigation M5).
   const [intake] = useTabParam("intake");
   const { reportTab, shownTab } = useWorkspace();
-  const list = useResource<TriageList>(`${TRIAGE}?show=${show}`);
-  // B6a run 3: every open item is read and counted; one page shows TRIAGE_PAGE of them, "Show more" the next.
+  // B6a run 4: every open item is counted on the server; it sends the first shownCount of them (TRIAGE_PAGE more on
+  // "Show the next"), Imported backlog items apart (OD-12 + 3a: their form opens from the backlog, by address).
   const [shownCount, setShownCount] = useState(TRIAGE_PAGE);
+  const list = useResource<TriageList>(`${TRIAGE}?show=${show}&limit=${shownCount}`);
   const summary = list.data?.summary;
-  // An old flagged import is Imported backlog work (OD-12 + 3a): not listed here, but its form opens from the backlog.
-  const every = list.data?.items ?? [];
-  const items = every.filter((item) => !item.backlog);
+  const items = list.data?.items ?? [];
   const wanted =
-    openKey ??
-    (complaint ? `COMPLAINT:${complaint}` : null) ??
-    (intake ? `INTAKE:${intake}` : null) ??
-    (ref ? (every.find((item) => item.ref === ref || item.identifier === ref)?.key ?? null) : null);
-  const open = wanted ? (every.find((item) => item.key === wanted) ?? null) : null;
+    openKey ?? (complaint ? `COMPLAINT:${complaint}` : null) ?? (intake ? `INTAKE:${intake}` : null) ?? ref ?? null;
+  const onPage = wanted
+    ? items.find((item) => item.key === wanted || item.ref === wanted || item.identifier === wanted)
+    : undefined;
+  // An item not on the page shown (further down, or Imported backlog) is asked for by its address alone.
+  const away = useResource<TriageList>(
+    wanted && list.data && !onPage ? `${TRIAGE}?show=${show}&limit=0&want=${encodeURIComponent(wanted)}` : null,
+  );
+  const open = onPage ?? away.data?.wanted ?? null;
   const setOpen = (item: TriageItem | null) => {
     if (item || !reportTab || !shownTab) return setOpenKey(item ? item.key : null);
     // Closing clears every parameter that opens the panel, in one address change: complaint= or ref= left behind
@@ -93,7 +96,8 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
       "push",
     );
   };
-  const overdue = items.filter((item) => item.triage_clock.state === "OVERDUE").length;
+  const overdue = list.data?.overdue ?? 0;
+  const more = (list.data?.total ?? 0) - items.length;
   return (
     <div className="ac-overview">
       <Hero
@@ -166,15 +170,19 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
         {items.length ? (
           <>
             <ul className="uw-cr-list">
-              {items.slice(0, shownCount).map((item) => (
+              {items.map((item) => (
                 <TriageCard key={item.key} item={item} onOpen={() => setOpen(item)} onOpenTab={onOpenTab} />
               ))}
             </ul>
-            {items.length > shownCount && (
+            {more > 0 && (
               <p className="uw-hint">
-                {countOf(items.length - shownCount, "more event")} on this list.{" "}
-                <button type="button" className="ac-secondary" onClick={() => setShownCount(shownCount + TRIAGE_PAGE)}>
-                  Show the next {Math.min(TRIAGE_PAGE, items.length - shownCount)}
+                {countOf(more, "more event")} on this list.{" "}
+                <button
+                  type="button"
+                  className="ac-secondary"
+                  onClick={() => setShownCount(items.length + TRIAGE_PAGE)}
+                >
+                  Show the next {Math.min(TRIAGE_PAGE, more)}
                 </button>
               </p>
             )}
@@ -883,7 +891,8 @@ function InlineFrame({ title, children }: { title: string; onClose: () => void; 
 
 /** The triage record on the complaint's own page (0.10.72, B3): its triage panel, saved there. */
 export function InlineTriage({ complaintId, onDone }: { complaintId: string; onDone: () => void }) {
-  const list = useResource<TriageList>(TRIAGE);
+  // B6a run 4: only this complaint's event is read (the scoped read), not the whole list.
+  const list = useResource<TriageList>(`${TRIAGE}?complaint=${complaintId}`);
   const item = list.data?.items.find((row) => row.kind === "COMPLAINT" && row.id === complaintId);
   if (!list.data || !item) return null;
   return <TriageDrawer item={item} people={list.data.people} onClose={() => undefined} onDone={onDone} inline />;

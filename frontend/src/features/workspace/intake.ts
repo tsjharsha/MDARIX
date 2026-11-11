@@ -334,6 +334,10 @@ export type ImportedBacklogList = {
 export type TriageList = {
   items: TriageItem[];
   summary: { open: number; done: number; conflicts: number };
+  /** B6a run 4, a paged read (``limit``): the list's items (backlog apart), those past the triage target, the asked one. */
+  total?: number;
+  overdue?: number;
+  wanted?: TriageItem | null;
   people: { id: string; name: string }[];
   enabled_markets: string[];
   starter_mark: string;

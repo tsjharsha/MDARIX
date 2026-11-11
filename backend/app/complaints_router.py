@@ -250,6 +250,8 @@ def list_complaints(
         "page_size": page_size,
         "pages": max(1, -(-total // page_size)),
         "statuses": statuses,
+        # B6a run 4: a list view whose dated reads were cut or failed says so, as Oversight does (never silently).
+        "incomplete": reads[1]["incomplete"] if reads else [],
         **_facets(db, tenant_id),
         "items": [
             {

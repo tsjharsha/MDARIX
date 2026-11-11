@@ -38,6 +38,7 @@ pytestmark = pytest.mark.skipif(
 
 # The approved targets (owner, 3 Nov 2026).
 READ_MS, WRITE_MS, IMPORT_S = 500, 1000, 60
+TRIAGE_SCREEN = "/api/v1/triage?show=open&limit=100"  # B6a run 4: the triage screen's own read (a page of 100)
 
 # The app runs on TestClient's own thread, so the count is process-wide; the measured calls run one at a time.
 _counter = {"on": False, "queries": 0}
@@ -75,7 +76,7 @@ def _series(client: TestClient, method: str, path: str, times: int = 0, body=Non
         queries.append(count)
     p95 = _pct(took, 0.95)
     return {
-        "path": path.split("?")[0],
+        "path": path,
         "p50_ms": _pct(took, 0.5),
         "p95_ms": p95,
         "queries": int(statistics.median(queries)),
@@ -164,7 +165,8 @@ def test_measure_a_trial_against_the_targets(monkeypatch):
 
         # B6a B1: the complaint page and the story on the sample alone, before any import.
         pages = ["/api/v1/oversight/events/SAMPLE-RV-11", "/api/v1/trial/one-story"]
-        report["reads_sample"] = [_series(user, "GET", path) for path in pages]
+        # B6a run 4: and the triage list, whole and as the screen asks for it (its first 100, counted over all).
+        report["reads_sample"] = [_series(user, "GET", path) for path in [*pages, "/api/v1/triage", TRIAGE_SCREEN]]
         _save(report)
         _profile(user, pages[0], "complaint-page-sample")
 
@@ -231,12 +233,12 @@ def test_measure_a_trial_against_the_targets(monkeypatch):
         # B6a: MDARIX_TRIAL_LOAD_PAGES=1 measures only the complaint page, the story and the triage list, then stops.
         pages_only = bool(os.getenv("MDARIX_TRIAL_LOAD_PAGES"))
         report["reads_5000"] = []
-        for path in [*pages, "/api/v1/triage"] if pages_only else reads:
+        for path in [*pages, "/api/v1/triage", TRIAGE_SCREEN] if pages_only else [*reads, TRIAGE_SCREEN]:
             report["reads_5000"].append(_series(user, "GET", path))
             _save(report)
         _profile(user, pages[0], "complaint-page-5000")
         _profile(user, pages[1], "story-5000")
-        _profile(user, "/api/v1/triage", "triage-5000")
+        _profile(user, TRIAGE_SCREEN, "triage-5000")
         if pages_only:
             return
 

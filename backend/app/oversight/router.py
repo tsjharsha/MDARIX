@@ -690,8 +690,10 @@ def export(
     """The oversight list as CSV: IDs, owners, dates and states only (no patient or reporter data)."""
     from backend.app import csv_safe
 
+    from backend.app.oversight.deadline_list import incomplete_note
+
     tenant_id = _tenant(ctx)
-    items, _ = _item_views(db, control_db, tenant_id, service.now_utc())
+    items, context = _item_views(db, control_db, tenant_id, service.now_utc())
     stream = io.StringIO()
     writer = csv_safe.writer(stream, fieldnames=list(CSV_FIELDS))
     writer.writeheader()
@@ -712,6 +714,8 @@ def export(
                 "escalated_to": "; ".join(item["escalated_to"]),
             }
         )
+    if context["incomplete"]:  # B6a run 4: as the deadline list's CSV, a last line says the list is incomplete
+        writer.writerow({"category": "INCOMPLETE", "title": incomplete_note(context["incomplete"])})
     _audit(db, ctx, "OVERSIGHT_EXPORTED", "OversightView", None, product=product, market=market, category=category)
     db.commit()
     return Response(

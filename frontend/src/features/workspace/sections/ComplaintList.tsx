@@ -123,6 +123,13 @@ export function ComplaintList({
           sourceChosen={!!dataSource}
         />
       )}
+      {list.data?.incomplete?.length ? (
+        // B6a run 4: as on Oversight, a list view whose dated reads were cut or failed says so.
+        <p className="uw-ov-warning tone-critical" role="alert">
+          <AlertCircle size={15} aria-hidden="true" /> This list is incomplete: {list.data.incomplete.join(", ")} could
+          not be read. Some complaints with deadlines may be missing from this view.
+        </p>
+      ) : null}
       {(sixColumns || view) && list.data && pages === 1 && listOf(list.data.items).length > 0 && (
         <ListGlance rows={listOf(list.data.items)} />
       )}

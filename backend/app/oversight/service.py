@@ -352,7 +352,10 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime, ids: set[st
 
 
 # B6a run 3: named in a list's "incomplete" when the watch reached its read cut (never silently incomplete).
-WATCH_CUT = "the reportability watch beyond its first 20,000 complaints"
+WATCH_CUT = (
+    "the reportability watch past 20,000 complaints (it keeps those without a decision or a signed conclusion, "
+    "earliest awareness first; decided ones and the latest awareness are left out)"
+)
 
 
 def watch_read(

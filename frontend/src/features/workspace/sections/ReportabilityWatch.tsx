@@ -185,7 +185,10 @@ export function ReportabilityWatch({ onOpenTab }: { onOpenTab: (tab: string) => 
           />
         </div>
         {list.data?.truncated && (
-          <p className="uw-hint">Only the first 20,000 complaints were read. Choose a product to see all of its own.</p>
+          <p className="uw-hint">
+            Only 20,000 complaints were read: those without a decision first, the earliest awareness first. Choose a
+            product to see all of its own.
+          </p>
         )}
         {items.length ? (
           <ul className="uw-cr-list">

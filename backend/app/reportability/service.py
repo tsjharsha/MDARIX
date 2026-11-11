@@ -10,7 +10,7 @@ import uuid
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import func, or_
+from sqlalchemy import exists, func, or_
 from sqlalchemy.orm import Session
 
 from backend.app.complaint_review import rules as review_rules
@@ -324,7 +324,22 @@ def _rows(db: Session, tenant_id: uuid.UUID, since: date, product_id: uuid.UUID 
         # B6a: the asked complaints. B6a run 3: no read cut here, so a complaint page always has its own clock; past
         # the whole read's cut the whole read says it is incomplete (truncated) instead.
         query = query.filter(Complaint.id.in_([uuid.UUID(str(value)) for value in complaint_ids]))
-    return query.order_by(AWARE_AT.asc(), Complaint.id).limit(READ_LIMIT + 1).all()
+    # B6a run 4: past the read cut the latest awareness was dropped first, decided or not. Complaints with no decision
+    # and no signed market conclusion now come first, the earliest awareness (the earliest clock; none known first)
+    # first: a cut drops decided ones before any undecided one (oversight.service.WATCH_CUT says so).
+    from backend.app.db.models.market_assessment import ComplaintMarketAssessment as Assessed
+
+    decided = or_(
+        exists().where(
+            ComplaintReportability.tenant_id == Complaint.tenant_id, ComplaintReportability.complaint_id == Complaint.id
+        ),
+        exists().where(
+            Assessed.tenant_id == Complaint.tenant_id,
+            Assessed.complaint_id == Complaint.id,
+            Assessed.conclusion.isnot(None),
+        ),
+    )
+    return query.order_by(decided, AWARE_AT.asc().nullsfirst(), Complaint.id).limit(READ_LIMIT + 1).all()
 
 
 def _linked(db: Session, tenant_id: uuid.UUID, complaint_ids) -> dict:
