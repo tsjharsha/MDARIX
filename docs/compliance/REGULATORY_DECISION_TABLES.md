@@ -123,7 +123,11 @@ days of the regulation; a pending one takes the earliest of the windows and the 
 Reportable when the device is sold in Canada (CA1), the incident relates to a failure, a deterioration or the
 labelling (CA2), it led to (CA3) or could lead to, if it recurred (CA4), a death or serious deterioration, and it
 occurred in Canada (CA5) or, abroad, is a Class I device with corrective action intended or required (CA6). In Canada:
-10 days when it led to it, 30 days when it could if it recurred; abroad: as soon as possible.
+10 days when it led to it, 30 days when it could if it recurred; abroad: as soon as possible. Since B9 (rule
+`CA-floor-2`, a correction of `CA-floor-1` from the start, owner decision B9-D6, starter) "as soon as possible" is the
+end of the day after the corrective-action decision day, counted from awareness until that day is known (provisional:
+awareness is day 0, so the end of the next day); while "in Canada" is Unknown and CA6 is Yes that foreign clock applies
+(CA-11). Signed conclusions keep `CA-floor-1` and their due date; drafts are saved again.
 
 <!-- table: evaluate -->
 | ID | Market | Yes | Unknown | Not applicable | Not answered | Suggested | Type if reportable | Rule |
@@ -138,6 +142,7 @@ occurred in Canada (CA5) or, abroad, is a Class I device with corrective action 
 | CA-8 | CA | CA1 CA2 CA5 | CA3 | CA6 | | PENDING | CA_10_DAY | Whether health deteriorated is Unknown |
 | CA-9 | CA | CA1 CA2 CA5 | | CA6 | | NOT_REPORTABLE | CA_30_DAY | No serious deterioration possible |
 | CA-10 | CA | CA1 CA2 CA3 | CA5 | CA6 | | PENDING | CA_10_DAY | Whether it occurred in Canada is Unknown (see owner decision OD-3) |
+| CA-11 | CA | CA1 CA2 CA3 CA6 | CA5 | | | REPORTABLE | CA_FOREIGN | CA-floor-2 (B9-D6): "in Canada" Unknown and CA6 Yes: the foreign clock, the shortest not ruled out (CA_10_DAY while `MDARIX_B9_CANADA` is off) |
 
 ### US importer and user facility (B9, rules `US-IMP-floor-1` and `US-UF-floor-1`)
 
@@ -385,7 +390,7 @@ signed before keep the version they were signed with.
 | VR-15 | EU and Northern Ireland reportability floor (rule register) | EU-floor-1 |
 | VR-16 | Great Britain reportability floor (rule register) | GB-floor-1 |
 | VR-17 | India reportability floor (rule register; B9 correction of IN-floor-1) | IN-floor-2 |
-| VR-18 | Canada reportability floor (rule register) | CA-floor-1 |
+| VR-18 | Canada reportability floor (rule register; B9 correction of CA-floor-1) | CA-floor-2 |
 | VR-19 | US importer reportability floor (rule register, B9) | US-IMP-floor-1 |
 | VR-20 | US user facility reportability floor (rule register, B9) | US-UF-floor-1 |
 
@@ -409,6 +414,7 @@ same logic held in code (`reportability/legacy_v1.py`).
 - **OD-2** Decided 5 Nov 2026 (0.10.88): "United Kingdom" or "UK" as the incident country is asked, Great Britain or
   Northern Ireland (MK-5); Northern Ireland follows the EU MDR (EU_NI).
 - **OD-3** Canada: while "did it occur in Canada" is Unknown, the 10-day type applies (CA-10), though an incident abroad
-  is "as soon as possible" (Health Canada's guidance: 48 hours). Unchanged until decided.
+  is "as soon as possible" (Health Canada's guidance: 48 hours). Decided 11 Nov 2026 (B9-D6, rule `CA-floor-2`): when
+  CA6 is Yes the foreign clock applies (CA-11); with CA6 No or Unknown the 10-day type still applies (CA-10).
 - **OD-4** Decided 5 Nov 2026 (0.10.88): re-signing a market conclusion (a new version superseding a signed one)
   needs a change reason, kept with the new version, as re-signing a disposition does.

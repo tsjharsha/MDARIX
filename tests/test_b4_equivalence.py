@@ -29,14 +29,18 @@ FIVE = ("YES", "NO", "UNKNOWN", "NOT_APPLICABLE", None)
 
 def _same(market: str, given: dict) -> None:
     answers = {key: {"answer": value} for key, value in given.items() if value is not None}
-    content = register.floor(market)["content"]
+    content = _first(market)["content"]  # the oracle is valid for version 1 only (B4); B9 corrects IN and CA
     old = json.dumps(legacy_v1.evaluate(market, answers), sort_keys=True)
     new = json.dumps(engine.evaluate(content, answers), sort_keys=True)
     assert new == old, f"{market} {given}"
 
 
 def _ids(market: str) -> list[str]:
-    return [question["id"] for question in register.floor(market)["content"]["question_set"]["questions"]]
+    return [question["id"] for question in _first(market)["content"]["question_set"]["questions"]]
+
+
+def _first(market: str) -> dict:
+    return register.get(f"{register.FLOOR_RULES[market]}-1")
 
 
 def _every(market: str, values) -> int:
@@ -118,9 +122,11 @@ def test_question_sets_and_report_types_are_identical(market, monkeypatch):
     on, off = json.loads(on), json.loads(off)
     if feature_set.switched_on("MDARIX_B9_INDIA"):  # B9: IN-floor-2 gives India's report its 15 days, nothing else
         assert on.pop("IN_SERIOUS_ADVERSE_EVENT")["days"] == 15 and off.pop("IN_SERIOUS_ADVERSE_EVENT")["days"] is None
+    if feature_set.switched_on("MDARIX_B9_CANADA"):  # B9: CA-floor-2 gives the foreign report its day, nothing else
+        assert on.pop("CA_FOREIGN")["days"] == 1 and off.pop("CA_FOREIGN")["days"] is None
     for role_type in ("US_IMP_30_DAY", "US_UF_10_WORK_DAY"):  # B9: the role floors' own types, on only
         on.pop(role_type, None)
-    assert on == off and len(on) in (11, 12)
+    assert on == off and len(on) in (10, 11, 12)  # less the types B9 corrects (India, Canada) while on
     # Version 1 of every floor, India included, explicitly (the oracle is valid for version 1 only).
     first = tuple(f"{rule}-1" for rule in register.FLOOR_RULES.values())
     v1 = {code: vars(kind) for code, kind in markets._in_force(str(register._DIRECTORY), first)[1].items()}

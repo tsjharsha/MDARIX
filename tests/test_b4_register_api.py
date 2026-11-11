@@ -33,6 +33,7 @@ def test_every_member_reads_every_rule_with_its_source_and_starter_mark(viewer):
     assert body["summary"]["markets"] == 5 and body["summary"]["rules"] == len({item["rule"] for item in body["items"]})
     floors = [item for item in body["items"] if item["kind"] == "REPORTABILITY_FLOOR"]
     india = ["IN-floor-1", "IN-floor-2"] if feature_set.switched_on("MDARIX_B9_INDIA") else ["IN-floor-1"]
+    canada = ["CA-floor-1", "CA-floor-2"] if feature_set.switched_on("MDARIX_B9_CANADA") else ["CA-floor-1"]
     # B9 Part C: the US role floors, each while its switch is on (user facility: off by default).
     roles = [
         code
@@ -42,11 +43,12 @@ def test_every_member_reads_every_rule_with_its_source_and_starter_mark(viewer):
         )
         if feature_set.switched_on(switch)
     ]
-    assert [item["code"] for item in floors] == ["CA-floor-1", "EU-floor-1", "GB-floor-1", *india, *roles, "US-floor-1"]
+    assert [item["code"] for item in floors] == [*canada, "EU-floor-1", "GB-floor-1", *india, *roles, "US-floor-1"]
     assert all(item["starter_mark"] == body["summary"]["starter_mark"] for item in body["items"])
     # B9: IN-floor-2 corrects IN-floor-1 from the start, so version 1 reads Replaced while India's switch is on.
     # B9 step 5: emdr-rule-book-2 corrects version 1 (adds the importer and user facility rows), from the start.
     replaced = ({"IN-floor-1"} if len(india) == 2 else set()) | {"emdr-rule-book-1"}
+    replaced |= {"CA-floor-1"} if len(canada) == 2 else set()  # B9 step 20: CA-floor-2 corrects it from the start
     assert all(item["state"] == ("REPLACED" if item["code"] in replaced else "IN_FORCE") for item in body["items"])
     assert all(item["source"] is not None for item in body["items"])
     # No organization's data, and no implementation detail for customers.

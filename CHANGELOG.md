@@ -136,6 +136,27 @@ and user facility. MDARIX prepares; the customer submits: MDARIX never submits. 
   version is a pin problem.
 - With `MDARIX_B9_INDIA` or `MDARIX_B9_CANADA` off, a report no longer shows its India or Canada chain, and cancelling a
   chain child answers 404 (spec 6.4).
+- **Signed US reports keep their role and recipients** (B9-D8): Send for approval freezes the role and who must
+  receive the report in the snapshot (and its fingerprint); past approval the routes read them. Switching the importer
+  or user facility role off never turns an approved report into a manufacturer's one (an importer's malfunction is
+  never offered to FDA), and a later conclusion never changes the recipients. A follow-up reads its chain's role.
+- A typed importer or user facility number (F2) equal to an earlier manufacturer number, or the reverse, is refused
+  (`REPORT_NUMBER_IN_USE`); a generated number skips the other role's numbers.
+- A manufacturer's US decision guide no longer offers the importer's or user facility's report types.
+- The signed conclusion card names its rules (floor) and the role it was decided in.
+- Register pins hold on Linux: the register's data, rule books and form-edition JSON files are `eol=lf`
+  (`.gitattributes`), and a pinned text file is hashed with LF endings. `emdr-rule-book-1` re-pinned once (same file;
+  B4 not released): SHA-256 `a3208bb0…66c6`, content hash `sha256:3c76b467…`.
+- Sample clock (found by the story test at 04:00-05:00 UTC, also on B4): it moved sample times by 24-hour days, so after
+  a summer-time change an end-of-day deadline sat an hour early and a due-soon triage step read overdue for an hour a
+  day. It now moves whole days on the organization's calendar's wall clock.
+
+### Added (Canada, step 20)
+- **`CA-floor-2`** (B9-D6, a correction of `CA-floor-1` from the start, behind `MDARIX_B9_CANADA`, starter): a foreign
+  incident's preliminary report is due by the end of the day after the corrective-action decision day, counted from
+  awareness until that day is known (provisional, noted on the conclusion); while "in Canada" is Unknown and CA6 is Yes
+  the foreign clock applies (decision table CA-11; OD-3 otherwise unchanged). Signed conclusions keep version 1.
+  **Not built:** entering the corrective-action decision day (the clock stays provisional from awareness).
 
 ### Not yet built (Part A)
 - The Final in the India sample (SAMPLE-RV-10) after a CAPA: waits for the owner, because the sample keeps RV-10 back

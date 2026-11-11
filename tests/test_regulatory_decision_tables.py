@@ -90,6 +90,8 @@ def test_every_row_id_is_unique_and_every_question_named_exists():
 @pytest.mark.parametrize("row", _cases("evaluate"))
 def test_evaluate(row):
     market = row["Market"]
+    if row["ID"] == "CA-11" and not feature_set.switched_on("MDARIX_B9_CANADA"):  # off: CA-floor-1, OD-3's 10 days
+        row = {**row, "Type if reportable": "CA_10_DAY"}
     found = markets.evaluate(market, _answered(market, row))
     expected = SUGGESTED[row["Suggested"]]
     assert found["suggested"] == expected
@@ -220,6 +222,8 @@ def test_version(row):
     # Market order: VR-1 US, VR-2 EU/NI, VR-3 GB, VR-4 India, VR-5 Canada (markets.MARKETS).
     if row["ID"] == "VR-17" and not feature_set.switched_on("MDARIX_B9_INDIA"):  # B9 off: India is back on version 1
         row = {**row, "Version": "IN-floor-1"}
+    if row["ID"] == "VR-18" and not feature_set.switched_on("MDARIX_B9_CANADA"):  # off: Canada back on version 1
+        row = {**row, "Version": "CA-floor-1"}
     assert VERSIONS[row["ID"]] == row["Version"]
 
 

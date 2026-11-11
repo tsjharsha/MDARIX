@@ -51,6 +51,7 @@ def test_the_real_register_loads_and_every_rule_carries_its_source_and_starter_m
     floors = [entry for entry in entries.values() if entry["kind"] == "REPORTABILITY_FLOOR"]
     assert sorted(entry["code"] for entry in floors) == [
         "CA-floor-1",
+        "CA-floor-2",
         "EU-floor-1",
         "GB-floor-1",
         "IN-floor-1",
