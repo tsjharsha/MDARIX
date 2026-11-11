@@ -298,7 +298,8 @@ def registry_markets(market: str, country: object) -> tuple[str, ...]:
     if market != markets.EU_NI:
         return (market,)
     first = next(iter(rules.countries(country)), "")
-    return ("NI", "EU") if rules.normalize(first) in _NORTHERN_IRELAND else ("EU",)
+    # The same Northern Ireland as the MORE route (northern_ireland), and the market list's own "NI".
+    return ("NI", "EU") if northern_ireland(first) or rules.normalize(first) in _NORTHERN_IRELAND else ("EU",)
 
 
 def _registration(context, types: tuple[str, ...] | None, column: str, label: str):
