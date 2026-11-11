@@ -65,3 +65,23 @@ def test_a_conclusion_signed_under_version_one_never_changes(org, india, monkeyp
     assert [getattr(after, name) for name in fields] == [getattr(before, name) for name in fields]
     current = _market(india.get(f"/api/v1/complaints/{complaint}/market-assessments").json(), "IN")["current"]
     assert current["report_type_label"] == "Serious adverse event (India MDR 2017 Rule 26)"  # its own floor's words
+
+
+def test_a_conclusion_signed_before_the_register_keeps_version_one(org, india, monkeypatch):  # noqa: F811
+    """A row signed before B4 names no floor: it counts and reads by version 1, never by IN-floor-2's 15 days."""
+    from backend.app.db.models.market_assessment import ComplaintMarketAssessment
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.reportability import assessments
+
+    complaint, item = _saved(org, india)
+    assert _sign(india, complaint, "IN", item, "REPORTABLE").status_code == 200
+    with SessionLocal() as db:
+        bind_tenant(db, org["tenant_id"])
+        row = db.query(ComplaintMarketAssessment).filter_by(complaint_id=complaint, market="IN").one()
+        row.floor_code = None  # as every conclusion signed before B4
+        db.commit()
+        monkeypatch.setenv("MDARIX_B9_INDIA", "on")
+        assert assessments.signed_floor("IN", row, {"code": "IN-floor-2"})["code"] == "IN-floor-1"
+    current = _market(india.get(f"/api/v1/complaints/{complaint}/market-assessments").json(), "IN")["current"]
+    assert current["report_type_label"] == "Serious adverse event (India MDR 2017 Rule 26)"

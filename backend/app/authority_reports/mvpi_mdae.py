@@ -340,8 +340,8 @@ def adrms_rows(sections: list[dict]) -> list[tuple[str, str]]:
     rows = []
     for name, ids in ADRMS_FIELDS:
         parts = [f"{names[i]}: {vals[i]}" if len(ids) > 1 else vals[i] for i in ids if vals.get(i)]
-        if name == "Patient involved" and "adverse event" in vals.get("B2", "").lower():
-            parts = ["Yes (an adverse event is recorded)"]
+        if name == "Patient involved":  # spec 2.3: Yes only when death or serious injury is recorded, else asked
+            parts = ["Yes (death or serious injury recorded)"] if vals.get("B8", "").lower().startswith("yes") else []
         if name == "Serious case, with its reasons" and not parts and vals.get("B9", "").lower() == "yes":
             parts = ["No (non-serious event)"]
         rows.append((name, "; ".join(parts) or ENTER))

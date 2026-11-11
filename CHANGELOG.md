@@ -70,6 +70,12 @@ and user facility. MDARIX prepares; the customer submits: MDARIX never submits. 
 - A re-signed conclusion now also supersedes the approval of an unsent India or Canada follow-up, update or final
   (audit fix 4 for every chain), never moving its date.
 
+- An India conclusion signed before the rule register (no rule recorded on it) keeps version 1's clock and words: the
+  15-day correction never moves an older signature (watch, intake clocks, labels).
+- Canada: a corrected Preliminary sent again gives an unsent Final its new promised date (audited
+  `REPORT_CHAIN_DUE_CHANGED`); the Final is never cancelled (`FINAL_IS_OWED`), since nothing would make it again.
+- ADRMS sheet: "Patient involved" is Yes only when death or serious injury is recorded, otherwise "enter in ADRMS".
+
 ### Not yet built (Part A)
 - The Final in the India sample (SAMPLE-RV-10) after a CAPA: waits for the owner, because the sample keeps RV-10 back
   for the trial user's correction. No database change in Part A.

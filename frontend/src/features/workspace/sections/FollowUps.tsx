@@ -362,7 +362,8 @@ function MarketChain({
           {chain.note}
           {chain.type === "Final" ? " A Final report ends the chain." : ""}
         </p>
-        {canWrite && UNSENT.includes(detail.state) && (
+        {/* Canada's Final is owed (s.61): it is corrected, never cancelled (FINAL_IS_OWED). */}
+        {canWrite && UNSENT.includes(detail.state) && !(market === "canada" && chain.type === "Final") && (
           <details>
             <summary>Cancel this {name}</summary>
             <label className="ca-field ca-wide">

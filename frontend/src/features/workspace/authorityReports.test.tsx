@@ -455,7 +455,7 @@ describe("B9 step 11: Canada's chain card follows the Canada switch", () => {
       b9: { canada: true },
     });
     expect(html).toContain("the date the preliminary report promised (A5)");
-    expect(html).toContain("Cancel this final report");
+    expect(html).not.toContain("Cancel this final report"); // owed: corrected, never cancelled
     const ended = canada("ACCEPTED", {
       type: "Preliminary",
       items: [{ id: "f1", type: "Final", state: "ACCEPTED", due_on: "2027-02-01" }],

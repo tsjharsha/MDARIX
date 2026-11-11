@@ -155,7 +155,15 @@ def test_the_final_follows_the_preliminary_and_the_chain_carries_its_numbers(tri
         bind_tenant(db, tenant_id)
         ctx = SimpleNamespace(user_id=uuid.uuid4(), correlation_id=None)
         initial = db.get(ReportObligation, uuid.UUID(report))
+        # Sent again after a correction that promises a new date: no second Final; the unsent one takes the new date.
+        initial.entries = {**initial.entries, "A5_FINAL_DATE": {"value": "2027-04-01"}}
         assert router.canada_final_on_submission(db, ctx, initial, datetime.now(timezone.utc)) is None
+        db.commit()
+    (final,) = [row for row in _children(tenant_id, report) if row.entries["A5"]["value"] == "Final"]
+    assert str(final.due_on) == "2027-04-01"
+    # The Final is owed (s.61): never cancelled, since nothing would make it again.
+    owed = user.post(f"{REPORTS}/{final.id}/cancel", json={"reason": "Started by mistake, not needed."})
+    assert owed.status_code == 409 and owed.json()["detail"]["code"] == "FINAL_IS_OWED"
     monkeypatch.setenv("MDARIX_B9_CANADA", "off")
     assert (
         user.post(f"{REPORTS}/{report}/canada-chain", json={"type": "Update", "what_is_new": WHAT}).status_code == 404

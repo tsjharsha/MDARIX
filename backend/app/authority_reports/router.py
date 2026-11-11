@@ -2637,13 +2637,30 @@ def canada_final_on_submission(db, ctx, obligation: ReportObligation, now: datet
         and forms.switched_on("MDARIX_B9_CANADA")
     ):
         return None
-    if any(chain_type(row) == forms.CA_FINAL for row in _canada_children(db, obligation.tenant_id, obligation.id)):
-        return None
     promised = ((obligation.entries or {}).get("A5_FINAL_DATE") or {}).get("value") or ""
     try:
         due = date.fromisoformat(promised.strip()[:10])
     except ValueError:
         due = None  # no date promised: the Final waits without a due date
+    final = next(
+        (row for row in _canada_children(db, obligation.tenant_id, obligation.id) if chain_type(row) == forms.CA_FINAL),
+        None,
+    )
+    if final is not None:
+        # A corrected Preliminary sent again: an unsent Final takes the date it now promises (audited).
+        if final.state not in rules.SUBMITTED and final.due_on != due:
+            before = {"due_on": _iso(final.due_on)}
+            final.due_on, final.updated_at = due, now
+            _audit(
+                db,
+                ctx,
+                "REPORT_CHAIN_DUE_CHANGED",
+                final,
+                before,
+                {"due_on": _iso(due)},
+                preliminary=str(obligation.id),
+            )
+        return None
     return _chain_child(
         db,
         ctx,
@@ -2716,6 +2733,9 @@ def cancel_follow_up(
         raise _error(422, "REASON_REQUIRED", f"Say why, in at least {rules.REASON_MIN} characters")
     if not keeps_own_clock(obligation):
         raise _error(409, "NOT_A_FOLLOW_UP", "Only a follow-up is cancelled here: a report follows its conclusion")
+    if is_canada_chain(obligation) and chain_type(obligation) == forms.CA_FINAL:
+        # Nothing could make it again (it is made when the Preliminary is submitted): s.61's final report stays owed.
+        raise _error(409, "FINAL_IS_OWED", "Canada's final report is owed: correct it instead of cancelling it")
     if obligation.state not in rules.CANCELLABLE:
         raise _error(409, "ALREADY_SENT", "This follow-up was submitted (or cancelled): it stays as recorded")
     pending = []

@@ -49,12 +49,25 @@ def _iso(value) -> str | None:
     return value.isoformat() if value is not None else None
 
 
+def signed_floor(market: str, row, in_force: dict) -> dict:
+    """The floor a signed conclusion counts by: the one it names; one signed before the register names none and
+    counts by version 1 (B9: a later correction such as IN-floor-2 never moves an older signature's clock)."""
+    from backend.app.rule_register import register
+
+    code = row.floor_code or f"{register.FLOOR_RULES.get(market, '')}-1"
+    return register.get(code) or in_force
+
+
 def type_label(row: ComplaintMarketAssessment, kind) -> str | None:
     """The report type's words, as the floor the row was saved or signed under has them (B9: a conclusion signed under
     IN-floor-1 keeps its words; one under IN-floor-2 reads "Serious adverse event: 15 days (India MDR 2017 Rule 26,
     starter)"); the floor in force for a row saved before the register."""
-    if kind is None or not row.floor_code:
-        return kind.label if kind else None
+    if kind is None:
+        return None
+    if not row.floor_code:
+        # Signed before the register: version 1's words (B9: IN-floor-2's 15 days never reach an older signature).
+        old = markets.V1_REPORT_TYPES.get(row.report_type or "") if row.conclusion is not None else None
+        return (old or kind).label
     from backend.app.rule_register import register
 
     held = (((register.get(row.floor_code) or {}).get("content") or {}).get("report_types") or {}).get(row.report_type)
@@ -154,10 +167,8 @@ def markets_summary(
         signed, draft = current_and_draft(versions_by_market.get(market, []))
         # B4: the floor at awareness; a signed conclusion's clock counts by the floor it was signed under.
         floor = floor_at(market, aware, org_zone)
-        if floor is not None and signed is not None and signed.floor_code and seen["state"] in markets.CONCLUSIONS:
-            from backend.app.rule_register import register
-
-            floor = register.get(signed.floor_code) or floor
+        if floor is not None and signed is not None and seen["state"] in markets.CONCLUSIONS:
+            floor = signed_floor(market, signed, floor)
         # A draft's pending clock also counts the report a signed "reportable" would start (code audit 3).
         if_reportable = (
             markets.evaluate(market, draft.answers or {}, floor)["report_type_if_reportable"]
@@ -186,7 +197,10 @@ def markets_summary(
                 "preselected": market in pre,
                 "enabled": market in enabled,
                 **seen,
-                "report_type_label": kind.label if kind else None,
+                "report_type_label": (
+                    type_label(signed, kind) if signed is not None and seen["state"] in markets.CONCLUSIONS else None
+                )
+                or (kind.label if kind else None),
                 "clock": clock,
             }
         )
