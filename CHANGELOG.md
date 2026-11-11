@@ -226,6 +226,9 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
 - From the independent review: a masked export also replaces the frozen India/Canada official form; a later MIR chain
   report never carries the previous report's patient and reporter values (typed again per report); age, weight and
   height must hold a number, and the EU file rounds weight and height to whole kg and cm.
+- Merged from 0.10.94 (Fixed): the registration rule (two registrations in one market, Northern Ireland
+  registrations). On the MIR, a Northern Ireland event is recognised by the same names as the MORE route (XI,
+  "United Kingdom - Northern Ireland") and by "NI"; 2.4, 2.3p and the MvPI and Canada risk class all use the rule.
 
 ### Documentation (B8)
 - Step-by-step user guide, Reports: the EU MIR file, the MIR chain (follow-up and final reports), Great Britain's GB
