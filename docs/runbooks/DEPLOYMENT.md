@@ -155,6 +155,12 @@ evaluation gate > Run workflow** with the contracted provider. It needs the `MDA
 secret and fails unless every golden scenario passes with model-written analyses
 (`scripts/run_real_evaluation.py --gate --require-model`). Do not promote a release whose gate failed.
 
+Before each release, compare the authorities' pages with the pinned report-form files (B8-D8): the Commission's PMSV
+reporting forms page (EU MIR XSDs and form), MHRA's GB MIR page (GB XSDs, help text, schema guide) and the
+Commission's vigilance contact points page (`rules/eu_nca.csv`). The pages and SHA-256 of every pin are in
+`data/mir_forms/manifest.json` and `data/mir_forms/eu-nca-2026-09/source.json`. A newer build is a new folder and a
+new rule-register version, never an edit of a pinned file; until it is added, MDARIX keeps building the pinned edition.
+
 A release is a git tag `vX.Y.Z` (matching `VERSION`). `.github/workflows/release.yml` builds the api, web and backup
 images, scans them and attaches each image's SBOM to the GitHub release. It pushes and signs them in
 `ghcr.io/<owner>/<repo>/{api,web,backup}:<tag>` only when the repository variable `MDARIX_PUBLISH_IMAGES` is `true`

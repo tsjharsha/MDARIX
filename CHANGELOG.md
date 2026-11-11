@@ -112,6 +112,13 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
   (`GB`): before, the name went in as typed and MHRA's schema refused the file at Send for approval.
 - Send for approval's refusal of a GB file names "MHRA's GB schema", not the Commission's.
 
+### Documentation (B8)
+- Step-by-step user guide, Reports: the EU MIR file, the MIR chain (follow-up and final reports), Great Britain's GB
+  MIR file for MORE and Northern Ireland's EU file in MORE. "What MDARIX covers" no longer says EU, NI and GB reports
+  have no worksheet.
+- Environment reference: `MDARIX_B8_EU_MIR` and `MDARIX_B8_GB_MIR`. Deployment runbook, Upgrading: before each
+  release, compare the Commission's and MHRA's pages with the pinned MIR files (`data/mir_forms/manifest.json`).
+
 ### Database
 - `tr29partyparts` (from `tr28marketroles`, expand-only, no backfill): `market_responsible_parties` gains `street`,
   `city`, `postcode`, `country_code` (checked two upper-case letters), `contact_first_name`, `contact_last_name`;

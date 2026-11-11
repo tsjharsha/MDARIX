@@ -104,7 +104,7 @@ export const COVERAGE: readonly CoverageRow[] = [
     worksheets: "US 3500A and India MDAE; India's IVD category field is not used yet.",
     checks: "Trend by calendar day, as a consumable, unless the product is marked not single-use.",
     notYet:
-      "The EU questions quote the MDR's definitions, not the IVDR's; IVDR trend reporting and performance follow-up; an EU worksheet.",
+      "The EU questions quote the MDR's definitions, not the IVDR's; IVDR trend reporting and performance follow-up.",
   },
   {
     category: "Kit",
@@ -118,7 +118,7 @@ export const COVERAGE: readonly CoverageRow[] = [
 
 /** Said once under the table: what no category has yet. */
 export const COVERAGE_NOTE =
-  "No category has an EU, NI or GB report worksheet yet: prepare those reports in the authority's own form. MDARIX never submits a report, and a person decides and signs every conclusion.";
+  "Every category's EU, NI and GB reports get the MIR file the authority takes (EU MIR 7.3.1; GB MIR 7.2.1 for MHRA's MORE), with the device's details as for any device. MDARIX never submits a report, and a person decides and signs every conclusion.";
 
 export const GUIDE_PARTS: readonly GuidePart[] = [
   {
@@ -654,9 +654,9 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         id: "reports",
         title: "Reports: from a conclusion to a report ready to file",
         where:
-          "Complaints › Reports; a signed US or India conclusion's Open the report worksheet; Getting started, After a conclusion",
+          "Complaints › Reports; a signed conclusion's Open the report worksheet; Getting started, After a conclusion",
         purpose:
-          "A market assessed reportable, or pending information, owes a report with its deadline. MDARIX drafts the US Form FDA 3500A (09/2025) or the India MvPI MDAE form (Version 1.2) worksheet in the authority's field order, each field with its source and status. A second person approves the snapshot; you enter it in the authority's route and record the submission and the receipt. MDARIX never submits.",
+          "A market assessed reportable, or pending information, owes a report with its deadline. MDARIX drafts the authority's worksheet in its field order (the US Form FDA 3500A (09/2025), the India MvPI MDAE form (Version 1.2), Health Canada's form, the EU MIR 7.3.1 and MHRA's GB MIR 7.2.1), each field with its source and status; for the EU and GB it also makes the MIR XML file. A second person approves the snapshot; you enter it in the authority's route and record the submission and the receipt. MDARIX never submits.",
         tasks: [
           {
             title: "Prepare the worksheet and have it approved",
@@ -708,6 +708,54 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             ],
             result: "The preliminary report lists its updates and final, with their states and the Final's due date.",
             note: "Health Canada's own form (HC Pub. 110180) is filled once MDARIX holds the official form file; until then send the approved worksheet PDF's values on the form yourself. Periods, the e-mail address and the form's reading are starter text for your regulatory consultant to confirm.",
+          },
+          {
+            title: "EU: the MIR file (MIR 7.3.1) for EUDAMED or the national competent authority",
+            who: "Anyone with regulatory review or approval rights; the parties need the right to change records; downloads need export rights.",
+            steps: [
+              "Once, in Settings › Products › Responsible parties and SRN, set the EU manufacturer and, for a manufacturer outside the EU, the authorised representative, with the address and contact in parts (Street and number, Postcode, City, Country as a two-letter code, the contact's first and last name). The file reads them from there on every report.",
+              "A signed EU conclusion (Reportable or Pending information) makes the report. 1.1a, the authority, comes from the incident country (the Commission's list of vigilance contact points); a country the list does not name is asked. 1.2a, the date of the report, is the day you send it for approval: never typed. 1.2d is asked; the day the conclusion was signed is shown beside it as a hint only.",
+              "Choose the report type (1.2e): the first report is an Initial, or a Combined initial and final only when the investigation is already complete. Give the next report's date (1.2f) on an Initial or a Follow up. Choose the risk class (2.4) from the list the schema takes.",
+              "For 4.3.3c (similar incidents) choose Enter the table: one row per period and region, with the incidents and the devices on the market. Every number is yours: MDARIX holds no distribution data. Enter 0 where you found none.",
+              "Patient and reporter details are not in the file: MDARIX never stores them. Add them in the authority's route.",
+              "Send it for approval. MDARIX builds the XML for the report type and checks it against the Commission's schema for that type; while the authority would refuse it, the report lists what the file still needs, block by block, and is not sent.",
+              "A colleague approves it. Then choose Download XML (MIR 7.3.1) and Download PDF (EU MIR 7.3.1 content, prepared by MDARIX, with a record page and the file's SHA-256). Both were made at approval and the approval covers the XML; before approval no XML is given. A report approved before the MIR file keeps its PDF only.",
+              "Send the XML through EUDAMED or the authority's own channel (import it into the official MIR PDF if your authority asks for it), then Record the submission. MDARIX never submits.",
+            ],
+            result: "The approved report holds the MIR file, its SHA-256 and the parties it was built from.",
+            note: "The mandatory set per report type is the stricter of the Commission's help text and schema, for your regulatory consultant to confirm. Before each release the pinned schema files are compared with the Commission's page.",
+          },
+          {
+            title: "EU and GB: follow-up and final reports (the MIR chain)",
+            who: "Anyone with regulatory review or approval rights.",
+            steps: [
+              "When you record an Initial or a Follow up as submitted, MDARIX creates the next Follow up draft at once, due on the date that report gave in 1.2f: your date, with no fixed legal period.",
+              "One report is open at a time: the next one can be sent for approval only when the last one is accepted, or recorded with no acknowledgement expected.",
+              "Under Report chain, choose Create a follow-up or final report, or change an open Follow up's type to Final (Reportable incident) or Final (Non-reportable incident) when the investigation is done. The fields it must hold change with the type at once.",
+              "A later report holds only what you type on it; everything else comes from the records or from the chain's last approved report, so a correction is never left behind in an old copy. 1.3.1b is the complaint's ID on every report; 1.1c is the authority's reference from the initial report's recorded submission, else Unknown.",
+              "A Final or a Combined initial and final ends the chain. If you must correct a sent Final, ask for an updated final report: it is again a Final, made only on request.",
+              "If the conclusion is signed again as not reportable, an open report is never cancelled: it offers Start the Final (Non-reportable incident), with 4.2b from the signed rationale. You decide. Reports already sent never change.",
+            ],
+            result: "The first report lists every later report with its type and state, and which one is open.",
+          },
+          {
+            title: "Great Britain: the GB MIR file (GB MIR 7.2.1) for MHRA's MORE",
+            who: "Anyone with regulatory review or approval rights; downloads need export rights.",
+            steps: [
+              "Once, in Settings › Products › Responsible parties and SRN, set the GB manufacturer and, for a manufacturer outside the UK, the UK Responsible Person, with the address and contact in parts. The UK Responsible Person is the submitter in the file.",
+              "Enter the incident country as Great Britain (England, Scotland or Wales). United Kingdom alone is asked again before signing: Great Britain follows UK MDR 2002, Northern Ireland the EU MDR.",
+              "A signed GB conclusion makes the GB report, with the same report types, chain and approval as the EU report. The GB file has no EUDAMED number and no 1.2d; it takes the UK approved body, MHRA's PMCF/PMPF ID and one UDI issuing entity; Annex B, C, D and G codes are needed in every GB report type.",
+              "After approval choose Download XML (GB MIR 7.2.1). Upload it in MHRA's MORE, the only route MHRA takes, then Record the submission with the MORE route. The PDF is your record copy. MDARIX never submits.",
+            ],
+            note: "The GB rules are read from MHRA's own files first. Where only the EU help text is stricter, the field is optional on a GB report and marked to confirm, for your regulatory consultant.",
+          },
+          {
+            title: "Northern Ireland: the EU MIR file in MORE",
+            steps: [
+              "An incident in Northern Ireland is assessed in the EU market (EU MDR) and gets the EU report and the EU MIR 7.3.1 file.",
+              "Its only route is MHRA MORE (EU form): upload the EU MIR XML in MHRA's MORE. 1.1a is asked. An incident anywhere else in the EU never offers MORE.",
+            ],
+            note: "Which EU MIR version MORE takes is to confirm with MHRA before your first upload.",
           },
         ],
       },
