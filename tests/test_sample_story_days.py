@@ -61,11 +61,18 @@ def fresh():
 
 
 def _age(tenant_id, days: int) -> None:
-    """``days`` pass: every stored time and date of the trial moves back (its request's sample anchor too)."""
+    """``days`` pass: every stored time and date of the trial moves back (its request's sample anchor too), by whole
+    days on the organization's calendar, as the sample clock counts them: across a summer-time change, ``days`` times
+    24 hours is a day fewer on that calendar for one hour of the day."""
     from backend.app.db.models.stage2 import OnboardingRequest
+    from backend.app.oversight.service import calendar_of
     from backend.app.trial.sample_clock import ANCHOR
 
+    with SessionLocal() as data:
+        bind_tenant(data, tenant_id)
+        zone = calendar_of(data, tenant_id).zone
     with SessionLocal() as db:
+        db.execute(text("SELECT set_config('TimeZone', :zone, true)"), {"zone": zone})  # interval days: wall clock
         columns = db.execute(
             text(
                 "SELECT c.table_name, c.column_name, c.data_type FROM information_schema.columns c "
@@ -84,7 +91,10 @@ def _age(tenant_id, days: int) -> None:
             )
         request = db.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).one()
         anchor = datetime.fromisoformat(request.profile[ANCHOR])
-        request.profile = {**request.profile, ANCHOR: (anchor - timedelta(days=days)).isoformat()}
+        request.profile = {
+            **request.profile,
+            ANCHOR: (anchor.astimezone(zone_info(zone)) - timedelta(days=days)).isoformat(),
+        }
         db.commit()
 
 
@@ -260,8 +270,11 @@ def test_day_0_is_calm_and_the_same_story_is_told_on_day_7_15_and_29(fresh):
         "SAMPLE-URG-01|TRIAGE|DUE_SOON|REMINDER|NO_OWNER",
     ], day0["bell"]
     assert day0["bell_unread"] == 3
-    # Every story deadline is ahead of the reader except RV-09's, the finished late example.
-    assert [row for row in day0["watch"] if "|OVERDUE|" in row] == ["SAMPLE-RV-09|OVERDUE|-10"]
+    # Every story deadline is ahead of the reader except RV-09's, the finished late example. Its days are counted in
+    # New York (the US deadline's zone): before 05:00 UTC New York is still on the day before, one day fewer behind.
+    behind = datetime.now(zone_info("America/New_York")).date() < datetime.now(zone_info("UTC")).date()
+    late = -9 if behind else -10
+    assert [row for row in day0["watch"] if "|OVERDUE|" in row] == [f"SAMPLE-RV-09|OVERDUE|{late}"]
     # The OrbitCare rise is significant; RV-09 (signed ready to close before it was closed) is "Closed" (J30).
     assert any("SIGNIFICANT" in row for row in day0["trends"])
     assert day0["events"]["CLOSED"] == 1
