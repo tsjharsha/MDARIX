@@ -32,6 +32,30 @@ with your consultant". Switch: `MDARIX_B9B_OTHER` (on).
   are notes only. No legal period (your reporting window naming the country, or the date you enter); counted in your
   time zone. Catalog: "IMDRF/GHTF common criteria" (starter). `OTHER` stays out of the five markets' lists, so their
   screens and the B4 equivalence check are unchanged.
+- **Pick a country outside the five markets** (API; the screens follow): `GET /api/v1/other-countries` lists every
+  ISO 3166 country except the EU and EEA, the United Kingdom, the US, Canada and India (each sent to its own tree) and
+  the EU outermost regions and Åland ("This may fall under the EU MDR: check with your consultant", B9b-N2).
+  `PUT` and `POST .../market-assessments/OTHER-<code>[/sign]` save and sign the country's conclusion with the password
+  and MFA, as the five markets'; the signed material holds `OTHER-floor-1`, its content hash and the generic-starter
+  note. One complaint can carry several countries.
+- **The Other Regulatory Report** (form `ATTACHED`, "The authority's own route"): created by a signed Reportable
+  conclusion, cancelled by a later Not reportable before it is submitted. "Submitted" needs the report file (scanned,
+  at most 2 MB, B9b-N3) and the date, the Report ID or "Not issued yet" (entered later, audited), and the recorder's
+  e-signature with the file's SHA-256 (B9b-N4: "I recorded that this report was submitted to the authority of
+  <country> on <date>, as attached"); no second person (OC-D3). Acknowledgement or rejection through the evidence
+  route; follow-ups are child reports, several allowed, each with its own file, Report ID and status; Close needs a
+  reason and is refused while a follow-up is open. Every file is kept: a new one never overwrites an earlier one.
+  States read "To be submitted", "Submitted", "Acknowledged", "Rejected by authority", "Follow-up required", "Closed".
+- **Due date**: a reporting window naming the country (name or ISO code) gives it; else the person enters it on the
+  report with a reason ("Due date entered by the customer"). Overdue reports are listed as overdue like any other.
+- **Inspection pack**: `11-other-regulatory-reports.csv` lists each report, its submissions, Report IDs and files
+  with their SHA-256.
+- Decision tables: an "Other countries" section with its own checked table; environment reference:
+  `MDARIX_B9B_OTHER`.
+
+### Fixed
+- The permission sweep tests reach B7b's e-mail intake guards (the intake switch is on for the sweep; the intake
+  address settings are reviewed exemptions, Customer Admin only).
 
 ## [0.11.01] - not released yet
 

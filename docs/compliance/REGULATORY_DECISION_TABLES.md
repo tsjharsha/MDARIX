@@ -168,6 +168,32 @@ manufacturer (FDA when the manufacturer is unknown). Starter, for your consultan
 | UF-4 | US | USER_FACILITY | US1 | | | | NOT_REPORTABLE | US_UF_10_WORK_DAY | | The device did not cause or contribute |
 | UF-5 | US | USER_FACILITY | | | | | NOT_REPORTABLE | US_UF_10_WORK_DAY | | No death or serious injury (no malfunction reports) |
 
+### Other countries (B9b, rule `OTHER-floor-1`, generic starter)
+
+For a country outside the five markets the person picks the country (ISO 3166; the EU and EEA, the United Kingdom,
+the US, Canada and India go to their own trees; the EU outermost regions and Åland are not offered: "This may fall
+under the EU MDR: check with your consultant"). One generic set of questions: death (OT1), serious deterioration
+(OT2), could lead to death or serious deterioration were it to happen again (OT3), serious public health threat
+(OT4), malfunction or deterioration (OT5), use error (OT6), marketed in the country (OT7). Reportable when OT1, OT2 or
+OT4 is Yes, or OT5 and OT3 are both Yes (owner decision B9b-N1); an Unknown that could make it reportable keeps it
+pending; OT6 and OT7 are notes only and never change the outcome. No legal period: a reporting window naming the
+country gives the due date, else the customer enters it ("Due date entered by the customer"). Generic starter
+questions, not this country's law: confirm with your consultant. The report is an "Other Regulatory Report": the
+customer attaches the report they made; MDARIX never submits.
+
+<!-- table: other -->
+| ID | Yes | Unknown | Suggested | Rule |
+|---|---|---|---|---|
+| OT-1 | OT1 OT7 | | REPORTABLE | Death |
+| OT-2 | OT2 | | REPORTABLE | Serious deterioration |
+| OT-3 | OT4 | | REPORTABLE | Serious public health threat |
+| OT-4 | OT5 OT3 | | REPORTABLE | A malfunction that could lead to death or serious deterioration were it to recur |
+| OT-5 | OT5 | | NOT_REPORTABLE | A malfunction that could not |
+| OT-6 | OT3 OT6 | | NOT_REPORTABLE | No malfunction: use error is a note only |
+| OT-7 | OT5 | OT3 | PENDING | Whether it could recur seriously is Unknown |
+| OT-8 | | OT1 | PENDING | Whether there was a death is Unknown |
+| OT-9 | | OT6 OT7 | NOT_REPORTABLE | Use error and "marketed" never change the outcome |
+
 ### Questions folded away
 
 A question earlier answers make unnecessary is shown as "not asked" and is not required to sign. Only Yes, No or Not

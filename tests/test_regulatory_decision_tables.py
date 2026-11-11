@@ -78,7 +78,7 @@ def _answered(market: str, row: dict, ids=None) -> dict:
 
 def test_every_row_id_is_unique_and_every_question_named_exists():
     seen: list[str] = []
-    for kind in "evaluate role fold market facts conclusion answers deadline routine linked version".split():
+    for kind in "evaluate role other fold market facts conclusion answers deadline routine linked version".split():
         seen += [row["ID"] for row in _tables(kind)]
     assert len(seen) == len(set(seen)), sorted(item for item in seen if seen.count(item) > 1)
     for row in _tables("evaluate"):
@@ -99,6 +99,18 @@ def test_evaluate(row):
     assert found["report_type"] == (row["Type if reportable"] if expected == markets.REPORTABLE else None)
     if expected == markets.PENDING:
         assert any("Unknown" in note for note in found["notes"])
+
+
+@pytest.mark.parametrize("row", _cases("other"))
+def test_other_country(row):
+    """B9b: the generic floor of a country outside the five markets (OTHER-floor-1), every other question No."""
+    from backend.app.rule_register import engine, register
+
+    content = register.get("OTHER-floor-1")["content"]
+    answers = {f"OT{number}": {"answer": markets.NO} for number in range(1, 8)}
+    answers.update({question_id: {"answer": markets.YES} for question_id in _ids(row["Yes"])})
+    answers.update({question_id: {"answer": markets.UNKNOWN} for question_id in _ids(row["Unknown"])})
+    assert engine.evaluate(content, answers)["suggested"] == SUGGESTED[row["Suggested"]]
 
 
 @pytest.mark.parametrize("row", _cases("role"))
