@@ -65,6 +65,36 @@ No migration. Switches: `MDARIX_B6_DEADLINE_LIST` and `MDARIX_B6_LATE_ENTRY` (bo
   measures on its own connection; the SNTP answer must be a synchronized server reply (stratum 1-15); timeout 1 s.
 - The deadline list's due times are in UTC, so the order by text is the order by time.
 
+### Changed (owner decisions, 11 Nov)
+- **Late entry counts from Received.** A Case entered more than 24 hours after the organization received it needs the
+  late-entry reason; a call logged as it arrives, about something a distributor knew days earlier, is not asked. The
+  reporting clock still counts from awareness. A Case made from an e-mail is still never asked. The form asks early
+  only from the Received time.
+- **The daily list is off by default in a free trial.** In a free-trial organization nobody receives it until they
+  choose "Try the daily list" under My Account (it then goes to that person; they may switch it off again: the
+  last-recipient rule applies only where the list is on by default). With nobody on, no list is queued. The CSV and
+  PDF downloads are always there. Pilots and paying organizations are unchanged (on by default, last recipient kept).
+  `GET /api/v1/me/email-preferences` gains `daily_deadlines_trial`.
+
+### Speed and release checks (Part B)
+- **One complaint's page reads only that complaint.** `GET /api/v1/oversight/events/{ref}` and the story's complaint
+  choice read only the asked complaints' dated items, triage events, reportability watch and Imported backlog entries
+  (`complaint_ids` on `reportability.watch`, `oversight.due_items`, `intake.triage`, `closure.open_on_triage`,
+  `intake.imported_backlog`), and the watch once per page instead of twice; the lists read the watch once too. Each
+  scoped read is proven equal to the whole organization's read filtered to that complaint, complaint by complaint
+  (`tests/test_b6a_scoped_watch.py`; on the 5,000-row load set with `MDARIX_TRIAL_LOAD_MEASURE=1`).
+- **The story picks its complaint in the database.** Getting started's "your data" run finds the imported complaints
+  of the most serious harm with one SQL query (it loaded every imported complaint twice) and computes clocks only for
+  them; the same complaint is chosen as before (tested).
+- **Release checks.** `scripts/release_checks.ps1` runs the targeted tests, ruff, vitest, `tsc`, the production build,
+  the chromium journeys on the production bundle, the k6 smoke (now also the complaint page and the story at
+  p95 <= 500 ms when given a test session) and the load measures, locally, and writes
+  `artifacts/release-checks-<version>.json` with versions, timings and pass/fail. No CI minutes.
+- **Boundary tests.** `tests/test_b6a_boundaries.py`: both sides of every security limit (sign-in lockout 4/5, lock
+  length, MFA failures 4/5, signature re-authentication 4/5, idle 29/31 min, session 11:59/12:01, every rate limit
+  at its limit and one over with `Retry-After`, request sizes at the limit and one byte over, row limits, password 12/11),
+  each tagged with its scenario (`requirement` marker).
+
 ## [0.11.02] - not released yet
 
 B9b: other countries, attach-only reports. For a country outside the five built-in markets (US, EU and Northern

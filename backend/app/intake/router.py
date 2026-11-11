@@ -975,7 +975,7 @@ def log_intake(
         if kind == "CONTACT"
         else _at(payload.awareness_at, _zone(payload.awareness_zone, zone))
     )
-    late_reason = _late_entry_reason(payload.late_entry_reason, awareness or received, now, message is not None)
+    late_reason = _late_entry_reason(payload.late_entry_reason, received, now, message is not None)
     requested = _choice(payload.requested, rules.REQUESTS, "NONE")
     serial = rules.clean(payload.serial_number, 120) or None
     values = {
@@ -1134,9 +1134,10 @@ def log_intake(
     return intake_detail(event.id, db, control_db, ctx)
 
 
-def _late_entry_reason(text: str, aware: datetime, now: datetime, from_email: bool) -> str | None:
-    """B6a G18b: a Case entered more than LATE_ENTRY_HOURS after awareness (else Received) is a back-entry and needs
-    a reason (422 LATE_ENTRY_REASON_NEEDED); its clock still counts from awareness. A Case made from an e-mail is not
+def _late_entry_reason(text: str, received: datetime, now: datetime, from_email: bool) -> str | None:
+    """B6a G18b: a Case entered more than LATE_ENTRY_HOURS after the organization Received it is a back-entry and
+    needs a reason (422 LATE_ENTRY_REASON_NEEDED); its clock still counts from awareness (owner, 11 Nov: a call
+    logged as it arrives about something a distributor knew earlier is not late). A Case made from an e-mail is not
     back-entered: Received is the server's own receipt of it. Off (MDARIX_B6_LATE_ENTRY), today's behaviour."""
     from backend.app import feature_set
 
@@ -1144,15 +1145,15 @@ def _late_entry_reason(text: str, aware: datetime, now: datetime, from_email: bo
         return None
     # Masked like the other free text of the Case: the reason is stored and copied into the audit trail.
     reason = _masked_text(rules.clean(text, rules.TEXT_MAX))[0]
-    if now - aware <= timedelta(hours=rules.LATE_ENTRY_HOURS):
+    if now - received <= timedelta(hours=rules.LATE_ENTRY_HOURS):
         return reason or None
     if len(reason) < rules.REASON_MIN:
         raise _error(
             422,
             "LATE_ENTRY_REASON_NEEDED",
-            f"Awareness is more than {rules.LATE_ENTRY_HOURS} hours ago: say in at least {rules.REASON_MIN} characters "
-            "why the Case is entered late (for example, MDARIX was unavailable)",
-            hours=round((now - aware).total_seconds() / 3600, 1),
+            f"It was received more than {rules.LATE_ENTRY_HOURS} hours ago: say in at least {rules.REASON_MIN} "
+            "characters why the Case is entered late (for example, MDARIX was unavailable)",
+            hours=round((now - received).total_seconds() / 3600, 1),
         )
     return reason
 

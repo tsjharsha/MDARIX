@@ -35,7 +35,8 @@ def _view(db: Session, user) -> dict:
 
     lead = any(role_code(role) in QUALITY_LEAD_ROLES for role in roles_of_user(db, user))
     daily = deadline_list.switched_on() and deadline_list.eligible(db, user)
-    on = deadline_list.wants_list(user)
+    trial = deadline_list.in_trial(db, user.tenant_id)
+    on = deadline_list.wants_list(user, trial)
     last = daily and on and deadline_list.last_recipient(db, user)
     return {
         PREFERENCE: wants_digest(user),
@@ -48,9 +49,12 @@ def _view(db: Session, user) -> dict:
         deadline_list.PREFERENCE: on,
         "daily_deadlines_eligible": daily,
         "daily_deadlines_locked": last,
+        # Owner, 11 Nov: off by default in a free trial; the screen offers "Try the daily list".
+        "daily_deadlines_trial": trial,
         "daily_deadlines_about": (
             "Every day from 06:00 your organization's time: the open reporting deadlines, your copy if MDARIX is "
             "unavailable. Sent also when nothing is due."
+            + (" In a free trial it is off until you try it; the downloads are always there." if trial else "")
             + (" You are the last person who receives it, so it stays on." if last else "")
             if daily
             else "Sent to regulatory approvers, Leaders and customer administrators; your role does not receive it."
@@ -94,7 +98,7 @@ def update_email_preferences(payload: EmailPreferences, request: Request, db: Se
     if payload.weekly_readiness is not None and wants_digest(user) != payload.weekly_readiness:
         _changed(db, request, user, PREFERENCE, wants_digest(user), payload.weekly_readiness, now)
         changed = True
-    before = deadline_list.wants_list(user)
+    before = deadline_list.wants_list(user, deadline_list.in_trial(db, user.tenant_id))
     if payload.daily_deadlines is not None and before != payload.daily_deadlines:
         if not payload.daily_deadlines and deadline_list.eligible(db, user) and deadline_list.last_recipient(db, user):
             db.rollback()

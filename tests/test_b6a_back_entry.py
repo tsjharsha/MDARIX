@@ -1,5 +1,5 @@
-"""B6a Part A, G18b/c (B6-07..B6-09): back-entry after an outage. More than 24 h after awareness needs a late-entry
-reason (23 h needs none); the reason is stored, audited and shown; the clock counts from awareness, so a back-entered
+"""B6a Part A, G18b/c (B6-07..B6-09): back-entry after an outage. Entered more than 24 h after Received needs a
+late-entry reason (just under 24 h needs none; owner, 11 Nov: Received, not awareness); the reason is stored, audited and shown; the clock counts from awareness, so a back-entered
 Case can be overdue at once; possible duplicates (a complaint, an e-mail to check) are found before saving; another
 organization's records are never offered; switched off, today's behaviour."""
 
@@ -41,14 +41,35 @@ def _contact(user, hours_ago: float, **extra):
     return user.post(INTAKE, json={**body, **extra})
 
 
-def test_more_than_24_hours_after_awareness_needs_a_reason(trial):  # B6-07
+def test_more_than_24_hours_after_received_needs_a_reason(trial):  # B6-07 (owner, 11 Nov: from Received)
     user = trial["user"]
-    within = _contact(user, 23)
+    within = _contact(user, 23.9)
     assert within.status_code == 200, within.text
     assert within.json()["late_entry_reason"] is None
-    refused = _contact(user, 25)
+    refused = _contact(user, 24.1)
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "LATE_ENTRY_REASON_NEEDED"
     assert _contact(user, 25, late_entry_reason="outage").status_code == 422  # under 10 characters
+
+
+def test_a_call_logged_as_it_arrives_is_not_late_though_a_distributor_knew_days_before(trial):  # B6-07, B6-08
+    knew = (datetime.now(timezone.utc) - timedelta(days=3)).replace(tzinfo=None, microsecond=0)
+    saved = _contact(
+        trial["user"],
+        0.1,
+        first_knowledge_at=knew.isoformat(),
+        first_knowledge_zone="UTC",
+        first_knowledge_basis="ACTS_FOR_MANUFACTURER",
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["late_entry_reason"] is None
+    # The clock still counts from awareness: the distributor's knowledge three days ago.
+    from backend.app.db.models.intake import IntakeEvent
+    from backend.app.intake.service import event_awareness
+
+    with open_tenant_data_session(trial["tenant_id"]) as data:
+        event = data.get(IntakeEvent, uuid.UUID(saved.json()["id"]))
+        aware = event_awareness(event, None)["at"]
+    assert abs(aware - knew.replace(tzinfo=timezone.utc)) < timedelta(seconds=1)
 
 
 def test_the_reason_is_stored_audited_and_shown(trial):  # B6-07

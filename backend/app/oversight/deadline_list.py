@@ -294,6 +294,8 @@ def queue_for_tenant(control_db: Session, data_db: Session, tenant_id: uuid.UUID
     day = calendar.local_day(now).isoformat()
     if _already_queued(control_db, tenant_id, day):
         return False
+    if in_trial(control_db, tenant_id) and not recipients(control_db, tenant_id):
+        return False  # a free trial where nobody turned the list on (owner, 11 Nov)
     found = lines(data_db, control_db, tenant_id, now)
     if found["incomplete"]:
         # Never e-mail a short list that looks complete: the job fails (the scheduler alerts) and retries next run.
@@ -349,9 +351,17 @@ def run_for_all_tenants(control_db: Session, now: datetime | None = None) -> dic
 # --------------------------------------------------------------------------------------------- recipients
 
 
-def wants_list(user) -> bool:
+def in_trial(control_db: Session, tenant_id) -> bool:
+    from backend.app.trial.service import trial_subscription
+
+    return trial_subscription(control_db, tenant_id) is not None
+
+
+def wants_list(user, trial: bool = False) -> bool:
+    """On unless switched off; in a free trial off unless the person turned it on ("Try the daily list"; owner,
+    11 Nov: a trial's sample deadlines are not mailed every day unasked)."""
     preferences = user.email_preferences if isinstance(getattr(user, "email_preferences", None), dict) else {}
-    return preferences.get(PREFERENCE) is not False
+    return preferences.get(PREFERENCE) is True if trial else preferences.get(PREFERENCE) is not False
 
 
 def eligible(control_db: Session, user) -> bool:
@@ -381,14 +391,19 @@ def eligible_users(control_db: Session, tenant_id) -> list:
 
 def recipients(control_db: Session, tenant_id) -> list[str]:
     """The eligible people who have it on. Should none be left on (the last one lost the role meanwhile), every
-    eligible person gets it: the list is never sent to nobody."""
+    eligible person gets it: the list is never sent to nobody. A free trial's list goes only to those who turned it
+    on (none: no list)."""
+    trial = in_trial(control_db, tenant_id)
     everyone = eligible_users(control_db, tenant_id)
-    wanted = [user.username for user in everyone if wants_list(user)]
-    return sorted(set(wanted or [user.username for user in everyone]))
+    wanted = [user.username for user in everyone if wants_list(user, trial)]
+    return sorted(set(wanted or ([] if trial else [user.username for user in everyone])))
 
 
 def last_recipient(control_db: Session, user) -> bool:
-    """Whether ``user`` is the only eligible person of their organization who still has the list on."""
+    """Whether ``user`` is the only eligible person of their organization who still has the list on (never in a free
+    trial, where the list is off by default: the rule applies only where it is on)."""
+    if in_trial(control_db, user.tenant_id):
+        return False
     others = [
         other for other in eligible_users(control_db, user.tenant_id) if other.id != user.id and wants_list(other)
     ]

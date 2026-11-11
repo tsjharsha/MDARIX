@@ -24,6 +24,14 @@ from tests.test_reporting_capa_api import _client
 pytestmark = pytest.mark.db
 
 URL = "/api/v1/oversight"
+REAL_IN_TRIAL = deadline_list.in_trial
+
+
+@pytest.fixture(autouse=True)
+def as_pilot(monkeypatch):
+    """The tests are about the list where it is on by default (a pilot or a paying organization), run on a trial's
+    sample data; the free-trial default (off until tried; owner, 11 Nov) is tested on its own below."""
+    monkeypatch.setattr(deadline_list, "in_trial", lambda *_args: False)
 
 
 @pytest.fixture(scope="module")
@@ -209,6 +217,46 @@ def test_opt_out_except_the_last_recipient(trial):  # B6-05
     # A Viewer does not receive it.
     viewer = _client(trial["tenant_id"], "VIEWER").get("/api/v1/me/email-preferences").json()
     assert viewer["daily_deadlines_eligible"] is False
+
+
+def test_a_free_trial_is_told_apart_from_a_customer_organization(trial):  # owner, 11 Nov
+    from tests.test_auth_hardening import _tenant
+
+    with SessionLocal() as db:
+        bind_system(db, "test: trial or not")
+        assert REAL_IN_TRIAL(db, trial["tenant_id"]) is True
+        assert REAL_IN_TRIAL(db, _tenant(db).id) is False  # the synthetic customer organization, no trial plan
+
+
+def test_in_a_free_trial_the_list_is_off_until_the_person_tries_it(monkeypatch):  # owner, 11 Nov
+    from backend.app.trial.retention import purge_trial
+
+    monkeypatch.setattr(deadline_list, "in_trial", REAL_IN_TRIAL)
+    user, approval, email = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    try:
+        shown = user.get("/api/v1/me/email-preferences").json()
+        assert shown["daily_deadlines"] is False and shown["daily_deadlines_trial"] is True
+        assert shown["daily_deadlines_locked"] is False and shown["daily_deadlines_eligible"] is True
+        with SessionLocal() as db:
+            bind_system(db, "test: deadline recipients")
+            assert deadline_list.recipients(db, tenant_id) == []
+        assert _queue(tenant_id, _local_noon(tenant_id, 1)) is False and not _queued(tenant_id)
+        # The downloads are always there.
+        assert user.get(f"{URL}/deadlines.csv").status_code == 200
+        # "Try the daily list": on for this person, who then gets it, and may switch it off again (no last-recipient
+        # lock where the list is off by default).
+        tried = user.put("/api/v1/me/email-preferences", json={"daily_deadlines": True})
+        assert tried.status_code == 200 and tried.json()["daily_deadlines"] is True
+        with SessionLocal() as db:
+            bind_system(db, "test: deadline recipients")
+            assert deadline_list.recipients(db, tenant_id) == [email]
+        assert _queue(tenant_id, _local_noon(tenant_id, 1)) is True
+        off = user.put("/api/v1/me/email-preferences", json={"daily_deadlines": False})
+        assert off.status_code == 200 and off.json()["daily_deadlines"] is False
+    finally:
+        with SessionLocal() as db:
+            purge_trial(db, tenant_id, "test:b6a-deadline-list-trial-default")
 
 
 def test_the_switch_off_on_off(trial, monkeypatch):  # B6-46

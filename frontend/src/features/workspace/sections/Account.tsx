@@ -104,6 +104,8 @@ type EmailPreferences = {
   daily_deadlines_eligible?: boolean;
   daily_deadlines_locked?: boolean;
   daily_deadlines_about?: string;
+  /** Owner, 11 Nov: in a free trial the list is off until the person tries it. */
+  daily_deadlines_trial?: boolean;
 };
 
 /** The weekly readiness email and the daily deadline list, on or off for oneself (GET/PUT
@@ -142,6 +144,16 @@ export function EmailChoices() {
             </label>
           )}
           {data.daily_deadlines_about && <p>{data.daily_deadlines_about}</p>}
+          {data.daily_deadlines_eligible && data.daily_deadlines_trial && !data.daily_deadlines && (
+            <button
+              type="button"
+              className="ac-primary"
+              disabled={busy}
+              onClick={() => void change({ daily_deadlines: true })}
+            >
+              Try the daily list
+            </button>
+          )}
           {data.daily_deadlines_eligible && (
             <label className="ca-check">
               <input

@@ -1,7 +1,7 @@
 import { INTAKE } from "../intake";
 
-/** B6a G18b/c: entering a Case after an outage (a back-entry). The server decides (more than 24 h after awareness needs
- * a reason, 422 LATE_ENTRY_REASON_NEEDED); the form asks early when a time it holds is that old. */
+/** B6a G18b/c: entering a Case after an outage (a back-entry). The server decides (entered more than 24 h after it was
+ * received needs a reason, 422 LATE_ENTRY_REASON_NEEDED; owner, 11 Nov); the form asks early when Received is that old. */
 
 /** Asked a little before the server's 24 h, since the form's times are wall-clock times in the Case's zone. */
 const ASK_AFTER_HOURS = 12;
@@ -42,7 +42,7 @@ export function duplicatesPath(form: {
 export function LateEntryField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
     <label className="ca-field ca-wide">
-      Why is this Case entered late? (needed when you learned of it more than 24 hours ago)
+      Why is this Case entered late? (needed when it was received more than 24 hours ago)
       <textarea
         rows={2}
         value={value}

@@ -426,7 +426,7 @@ function LogDrawer({
   const backEntry =
     lateEntry &&
     !email &&
-    (lateNeeded || looksLate([form.received, form.firstKnowledge, urgent ? form.awareness : ""]));
+    (lateNeeded || looksLate([form.received]));
   const duplicateQuery =
     (!typeProduct && form.product) || form.lot
       ? duplicatesPath({ ...form, product: typeProduct ? "" : form.product })
