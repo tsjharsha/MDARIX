@@ -39,6 +39,8 @@ VIEWS = {
     "overdue": "Overdue",
     "service_only": "Service only",
     "potential_complaints": "Potential complaints",
+    # B9b: Cases whose complaint has an Other Regulatory Report (a country outside the five markets).
+    "other_countries": "Reported in another country",
 }
 LIVE = (C.OPEN, C.PENDING, C.WAITING_INTERNAL, C.IN_REVIEW)
 _HIGH = (triage_rules.NOT_KNOWN, "SERIOUS", "CRITICAL", "CATASTROPHIC")
@@ -124,6 +126,14 @@ def _condition(view: str, user_id: str, now: datetime, backlog_days: int = 30):
                 FirstContactCheck.suggestion.in_((rules.COMPLAINT, rules.BOTH)),
             )
             return and_(E.status.in_((C.OPEN, C.PENDING, C.WAITING_INTERNAL)), or_(suggested, triage))
+        case "other_countries":
+            from backend.app.db.models.authority_reports import ReportObligation
+
+            return exists().where(
+                ReportObligation.tenant_id == E.tenant_id,
+                ReportObligation.complaint_id == E.complaint_id,
+                ReportObligation.market == "OTHER",
+            )
     return None
 
 

@@ -10,6 +10,8 @@ import {
   ASSESSMENT_LIMITS,
   CONCLUSION_LABELS,
   assessmentPath,
+  isOtherKey,
+  marketIn,
   trainingMissing,
   type AssessmentDetail,
   type Conclusion,
@@ -62,7 +64,8 @@ export function signItems({
   changeReason?: string;
 }): CheckItem[] {
   const items = signChecklist(groups, item, form, folded);
-  if (!harm.level) items.push({ ok: false, text: "The harm level" });
+  // B9b: a country outside the five markets has no harm scale: its generic questions ask the seriousness.
+  if (!harm.level && !isOtherKey(item.market)) items.push({ ok: false, text: "The harm level" });
   if (item.disagreement && collapsed(harm.disagreement).length < ASSESSMENT_LIMITS.reasonMin)
     items.push({ ok: false, text: "Why the answers differ from the harm level" });
   if (choice === "override" && collapsed(overrideReason).length < ASSESSMENT_LIMITS.reasonMin)
@@ -148,6 +151,7 @@ export function SignCard({
   const ready = !!outcome && !!conclusion && items.every((entry) => entry.ok) && !!password && !busy;
   const levels = detail.scale.levels;
   const fromMapping = detail.severity_level;
+  const other = isOtherKey(item.market);
   const sign = async () => {
     setBusy(true);
     setError("");
@@ -169,7 +173,7 @@ export function SignCard({
         password,
         mfa_code: code || null,
       });
-      const next = out.markets.find((entry) => entry.market === item.market);
+      const next = marketIn(out, item.market);
       setPassword("");
       setCode("");
       if (next) onSigned(next);
@@ -290,21 +294,23 @@ export function SignCard({
               </li>
             ))}
           </ul>
-          <label className="dt-harm">
-            <span>Harm level</span>
-            <select value={harm.level} onChange={(event) => onHarm({ ...harm, level: event.target.value })}>
-              <option value="">Choose</option>
-              {levels.map((level) => (
-                <option key={level.code} value={level.code}>
-                  {level.label}
-                </option>
-              ))}
-            </select>
-            {fromMapping && harm.level === fromMapping && detail.severity_source && (
-              <small>{`From ${detail.severity_source.replace(/^The /, "the ").replace(/^Your /, "your ")}`}</small>
-            )}
-          </label>
-          {fromMapping && harm.level && harm.level !== fromMapping && (
+          {!other && (
+            <label className="dt-harm">
+              <span>Harm level</span>
+              <select value={harm.level} onChange={(event) => onHarm({ ...harm, level: event.target.value })}>
+                <option value="">Choose</option>
+                {levels.map((level) => (
+                  <option key={level.code} value={level.code}>
+                    {level.label}
+                  </option>
+                ))}
+              </select>
+              {fromMapping && harm.level === fromMapping && detail.severity_source && (
+                <small>{`From ${detail.severity_source.replace(/^The /, "the ").replace(/^Your /, "your ")}`}</small>
+              )}
+            </label>
+          )}
+          {!other && fromMapping && harm.level && harm.level !== fromMapping && (
             <input
               className="dt-input"
               aria-label="Why this harm level"
@@ -356,9 +362,11 @@ export function SignCard({
             {busy ? "Signing…" : `Sign as ${session?.display_name ?? "yourself"}`}
           </button>
           {/* The tree's head names its version already (0.10.84: fewer words beside Sign). */}
-          <p className="dt-hint">
-            {tree?.tests.passed ?? 0} of {tree?.tests.total ?? 0} worked complaints pass
-          </p>
+          {tree && (
+            <p className="dt-hint">
+              {tree.tests.passed} of {tree.tests.total} worked complaints pass
+            </p>
+          )}
           <InlineError text={error} />
         </form>
       )}

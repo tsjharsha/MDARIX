@@ -1027,7 +1027,12 @@ def _list_paths(db, control_db, ctx, tenant_id, obligations: list[ReportObligati
             else {"total": 0, "filled": 0, "missing": []}
         )
         waiting = pending.get(row.id)
-        path = rules.stage_view(row.state, len(meter["missing"]), waiting is not None, state_label(row))
+        path = (
+            # B9b: an Other Regulatory Report has no worksheet and no approval stage: its own status words.
+            {"stage": None, "stage_label": state_label(row)}
+            if row.form_code == forms.ATTACHED.code
+            else rules.stage_view(row.state, len(meter["missing"]), waiting is not None, state_label(row))
+        )
         signer = context["current"].signed_by if context is not None and context["current"] else None
         mine = (
             waiting is not None

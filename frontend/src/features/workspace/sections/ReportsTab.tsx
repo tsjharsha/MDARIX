@@ -11,7 +11,9 @@ import {
   REPORT_VIEWS,
   REPORT_VIEW_NAMES,
   askNote,
+  byCountry,
   deadlineDue,
+  otherCountryOptions,
   deadlineText,
   reportPlace,
   reportsInView,
@@ -42,6 +44,7 @@ import { ApprovingDoc, ConfirmAllCodes, ThingsToGive, signatureLine } from "./Re
 import { FollowUps } from "./FollowUps";
 import { MirFiles, MirNeeds } from "./MirFiles";
 import { PersonalAtSend, personalBody } from "./PersonalAtSend";
+import { OtherReportPage, type AttachedDetail } from "./OtherCountries";
 
 /** What MDARIX does with an authority report, said once where it matters (Release C guardrail 3). */
 export const NEVER_SUBMITS =
@@ -141,7 +144,11 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
   const view = REPORT_VIEW_NAMES.find((name) => REPORT_VIEWS[name].code === code) ?? "Open reports";
   const list = useResource<ReportList>(REPORTS);
   // One complaint's reports when the list is opened from it (Complaints › Reporting, Authority reports).
-  const items = (list.data?.items ?? []).filter((row) => !complaintId || row.complaint_id === complaintId);
+  const all = (list.data?.items ?? []).filter((row) => !complaintId || row.complaint_id === complaintId);
+  // B9b: "Other countries" and each country by name, once the list holds an Other Regulatory Report.
+  const [country, setCountry] = useTabParam("country", "replace");
+  const countries = otherCountryOptions(all);
+  const items = byCountry(all, country ?? "");
   const rows = list.data ? reportsInView(items, view) : [];
   const name = (row: ReportListItem) => `${row.form_title ?? "Report"} for ${row.complaint_ref}`;
   return (
@@ -153,6 +160,20 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
           onChange={(next) => setCode(REPORT_VIEWS[next as ReportView].code)}
           detail={REPORT_VIEWS[view].detail}
         />
+        {countries.length > 0 && (
+          <label className="ca-field">
+            Market
+            <select value={country ?? ""} onChange={(event) => setCountry(event.target.value || null)}>
+              <option value="">Every market</option>
+              <option value="OTHER">Other countries</option>
+              {countries.map((item) => (
+                <option key={item.code} value={item.code}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
       <Panel title={listTitle(view, list.data ? rows.length : undefined)} source={list}>
         <Table
@@ -205,6 +226,8 @@ function ReportListView({ onOpen, complaintId }: { onOpen: (id: string) => void;
               key: "mandatory",
               label: "Mandatory fields",
               render: (row) => {
+                // B9b: no form, so no fields to count: the report is attached.
+                if (row.market === "OTHER") return <span className="ac-muted">Attached report, no form</span>;
                 const meter = meterText(row.mandatory);
                 return (
                   <span className="uw-meter-cell">
@@ -302,6 +325,15 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
       </Panel>
     );
   const changed = (next: ReportDetail) => setShown(next);
+  // B9b: an Other Regulatory Report has no form: its own page (attach, Report ID, status, follow-ups).
+  if ((detail as unknown as Partial<AttachedDetail>).attached)
+    return (
+      <OtherReportPage
+        detail={detail as unknown as AttachedDetail}
+        onBack={onBack}
+        onChanged={(next) => setShown(next as unknown as ReportDetail)}
+      />
+    );
   const mandatory = detail.mandatory ?? { total: 0, filled: 0, missing: [] };
   const meter = meterText(mandatory);
   const missing = mandatory.total - mandatory.filled;

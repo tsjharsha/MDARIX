@@ -6,7 +6,10 @@ import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import {
   ANSWER_LABELS,
   CONCLUSION_LABELS,
+  allMarkets,
   assessmentPath,
+  isOtherKey,
+  marketIn,
   type Answer,
   type AssessmentDetail,
   type MarketItem,
@@ -32,6 +35,7 @@ import { InlineError } from "./boardParts";
 import { TREE_NAMES, type TreeMarket, type TreePath, type Trees } from "../decisionTrees";
 import { inData } from "../home";
 import { FormCard, SignCard } from "./TreeSign";
+import { OtherCountryPicker, OtherReportCard } from "./OtherCountries";
 import { RulesUsedPanel } from "./RuleRegister";
 import { STARTER_LABEL, isStarterVersion } from "../../shared/standards";
 import "./decide.css";
@@ -66,9 +70,12 @@ export function TreeAnswer({ trees: all, modes = null }: { trees: Trees; modes?:
     complaintId ? `/api/v1/decision-trees?complaint_id=${encodeURIComponent(complaintId)}` : null,
   );
   const data = detail.data?.complaint.id === complaintId ? detail.data : null;
-  const shown = data?.markets ?? [];
-  const item =
-    shown.find((entry) => entry.market === marketParam) ?? shown.find((entry) => entry.preselected) ?? shown[0];
+  // B9b: the countries outside the five markets ("OTHER-AU") follow the five; "OTHER" opens the country picker.
+  const shown = data ? allMarkets(data) : [];
+  const picking = marketParam === "OTHER" && !!data?.other_countries_on;
+  const item = picking
+    ? undefined
+    : (shown.find((entry) => entry.market === marketParam) ?? shown.find((entry) => entry.preselected) ?? shown[0]);
   const listed = trees.complaints.find((entry) => entry.id === complaintId);
   const ref = data ? (data.complaint.complaint_identifier ?? data.complaint.business_id) : (listed?.ref ?? null);
   const reload = () => {
@@ -137,11 +144,42 @@ export function TreeAnswer({ trees: all, modes = null }: { trees: Trees; modes?:
               </button>
             );
           })}
+          {(data.other_countries ?? []).map((other) => (
+            <button
+              key={other.key}
+              type="button"
+              className={other.key === item?.market ? "dt-mkt is-on" : "dt-mkt"}
+              aria-pressed={other.key === item?.market}
+              onClick={() => setMarket(other.key)}
+            >
+              {other.country_name}
+              <small> · other country</small>
+            </button>
+          ))}
+          {data.other_countries_on && (
+            <button
+              type="button"
+              className={picking ? "dt-mkt is-on" : "dt-mkt"}
+              aria-pressed={picking}
+              onClick={() => setMarket("OTHER")}
+            >
+              + Other country
+            </button>
+          )}
           {modes}
         </div>
       )}
       {!data && modes}
-      {data && !shown.length && (
+      {data && picking && (
+        <OtherCountryPicker
+          detail={data}
+          onStarted={(key) => {
+            reload();
+            setMarket(key);
+          }}
+        />
+      )}
+      {data && !shown.length && !picking && (
         <p className="ac-muted">
           No market is enabled yet: enter your reporting windows (Settings › Reporting windows) for the markets you
           report to.
@@ -181,7 +219,11 @@ export function MarketTree({
   path: TreePath | null;
   onSigned: () => void;
 }) {
-  const canDecide = useCanDecide();
+  const other = isOtherKey(item.market)
+    ? (detail.other_countries ?? []).find((entry) => entry.key === item.market)
+    : undefined;
+  // B9b: with the switch off a country's assessment stays readable, never changed (its routes answer 404).
+  const canDecide = useCanDecide() && (!other || !!detail.other_countries_on);
   const groups = groupQuestions(item.question_set.questions);
   const [form, setForm] = useState<TreeForm>(() => treeFormOf(item, groups));
   const [latest, setLatest] = useState<MarketItem>(item);
@@ -225,7 +267,7 @@ export function MarketTree({
           harm_level_reason: now.harm.reason,
           scale_disagreement_reason: now.harm.disagreement,
         });
-        const next = out.markets.find((entry) => entry.market === item.market) ?? null;
+        const next = marketIn(out, item.market) ?? null;
         if (next) setLatest(next);
         setError("");
         return next;
@@ -282,6 +324,11 @@ export function MarketTree({
             )}
             {item.question_set_current === false ? " · started on an earlier version: it keeps that one" : ""}
           </span>
+          {other && (
+            <p className="dt-hint" role="note">
+              {other.label}: {other.generic_note}
+            </p>
+          )}
         </div>
         <ol className="dt-qs" id="dt-questions" tabIndex={-1}>
           {groups.map((group, index) => {
@@ -363,15 +410,19 @@ export function MarketTree({
           }}
           flat={flat}
         />
-        <FormCard
-          item={latest}
-          tree={tree}
-          trees={trees}
-          outcome={outcome}
-          signed={signed}
-          path={path}
-          enabled={detail.enabled_markets}
-        />
+        {other ? (
+          <OtherReportCard country={other} outcome={outcome} signed={signed} />
+        ) : (
+          <FormCard
+            item={latest}
+            tree={tree}
+            trees={trees}
+            outcome={outcome}
+            signed={signed}
+            path={path}
+            enabled={detail.enabled_markets}
+          />
+        )}
         <RulesUsedPanel used={latest.rules_used} />
       </aside>
     </div>

@@ -31,6 +31,7 @@ import {
   WATCH_SHOWS,
   clockText,
   legalOf,
+  otherLineText,
   timelinessOf,
   watchHeadline,
   watchPath,
@@ -328,6 +329,18 @@ export function WatchCard({
                 </li>
               );
             })}
+          </ul>
+        )}
+        {(item.other_countries ?? []).length > 0 && (
+          <ul className="uw-cr-chips" aria-label="Other countries">
+            {(item.other_countries ?? []).map((line) => (
+              <li
+                key={line.country}
+                className={`uw-cr-chip tone-${line.clock_state === "OVERDUE" ? "critical" : line.clock_state === "DUE_SOON" ? "warning" : "neutral"}`}
+              >
+                {otherLineText(line)}
+              </li>
+            ))}
           </ul>
         )}
         {item.decision && (

@@ -169,6 +169,82 @@ def clock(windows: list[dict], country: str, state: str | None, aware, now, org_
     return min(found, key=lambda item: item["due_at"]) if found else None
 
 
+def market_label(row) -> str:
+    """A report's or an assessment's market in words: a country outside the five by its name."""
+    return label(row.country) if row.market == OTHER else markets.MARKET_LABELS.get(row.market, row.market)
+
+
+_URGENCY = {rules.OVERDUE: 0, rules.DUE_SOON: 1, rules.RUNNING: 2}
+
+
+def most_urgent(state: str | None, lines: list[dict]) -> str | None:
+    """The watch's clock state with the countries' open lines counted: the most urgent of them."""
+    found = [item for item in [state, *(line["clock_state"] for line in lines)] if item in _URGENCY]
+    return min(found, key=_URGENCY.get) if found else state
+
+
+def open_lines(db: Session, tenant_id, complaint_ids: list, today) -> dict:
+    """Run-2 decision Q4: the countries outside the five markets that keep a complaint open on the reportability watch,
+    by complaint: an unsigned assessment, or a Reportable one whose report is not closed yet; each its own line with its
+    due date (a window's, or "Due date entered by the customer"). The five markets' "settled" is unchanged."""
+    from backend.app.authority_reports import attached
+    from backend.app.authority_reports import rules as report_rules
+    from backend.app.db.models.authority_reports import ReportObligation
+
+    if not complaint_ids:
+        return {}
+    rows: dict = {}
+    for row in (
+        db.query(ComplaintMarketAssessment)
+        .filter(
+            ComplaintMarketAssessment.tenant_id == tenant_id,
+            ComplaintMarketAssessment.complaint_id.in_(complaint_ids),
+            ComplaintMarketAssessment.market == OTHER,
+        )
+        .order_by(ComplaintMarketAssessment.version)
+    ):
+        rows.setdefault((row.complaint_id, row.country), []).append(row)
+    reports = {
+        (row.complaint_id, row.country): row
+        for row in db.query(ReportObligation).filter(
+            ReportObligation.tenant_id == tenant_id,
+            ReportObligation.complaint_id.in_(complaint_ids),
+            ReportObligation.market == OTHER,
+            ReportObligation.kind == "INITIAL",
+        )
+    }
+    found: dict = {}
+    for (complaint_id, country), versions in sorted(rows.items(), key=lambda item: name_of(item[0][1])):
+        current, draft = assessments.current_and_draft(versions)
+        report = reports.get((complaint_id, country))
+        if draft is not None:
+            words, due, due_label = "Not signed yet", draft.due_on, draft.window_name
+        elif (
+            current is not None
+            and current.conclusion == markets.REPORTABLE
+            and (report is None or report.state not in report_rules.CLOSED)
+        ):
+            manual = report is not None and (report.entries or {}).get("due_source") == attached.CUSTOMER
+            words = attached.state_label(report) if report is not None else "Reportable"
+            due = report.due_on if report is not None else current.due_on
+            due_label = MANUAL_DUE if manual else current.window_name
+        else:
+            continue
+        found.setdefault(complaint_id, []).append(
+            {
+                "country": country,
+                "label": label(country),
+                "state_label": words,
+                "due_on": due.isoformat() if due else None,
+                "due_label": due_label if due else None,
+                # shortcut: "due soon" counted as for a 30-day window; use the window's own days if a customer asks.
+                "clock_state": rules.clock_state(due, today, 30) if due else None,
+                "report_id": str(report.id) if report is not None else None,
+            }
+        )
+    return found
+
+
 # ---------------------------------------------------------------------------------------------------------- routes
 
 
@@ -191,9 +267,22 @@ def items(db: Session, control_db: Session, ctx, complaint_id, record: dict, see
         return []
     refs = {ref for rows in by_country.values() for row in rows for ref in (row.signed_by, row.created_by) if ref}
     names = people(control_db, tenant_id, list(refs))
+    from backend.app.authority_reports import attached
+    from backend.app.db.models.authority_reports import ReportObligation
+
+    reports = {
+        row.country: row
+        for row in db.query(ReportObligation).filter(
+            ReportObligation.tenant_id == tenant_id,
+            ReportObligation.complaint_id == complaint_id,
+            ReportObligation.market == OTHER,
+            ReportObligation.kind == "INITIAL",
+        )
+    }
     found = []
     windows = service.settings_of(db, tenant_id)["windows"]
     for country, versions in sorted(by_country.items(), key=lambda item: name_of(item[0])):
+        report = reports.get(country)
         current, draft = assessments.current_and_draft(versions)
         floor = _floor(aware, seen, draft if draft is not None else current) or register.get("OTHER-floor-1")
         question_set = markets.floor_question_set(floor)
@@ -221,6 +310,8 @@ def items(db: Session, control_db: Session, ctx, complaint_id, record: dict, see
                 "history": [_view(row, names, floor) for row in reversed(versions) if row not in (current, draft)],
                 "clock": clock(windows, country, state, aware, today, seen.get("org_zone")),
                 "floor": {"code": floor["code"], "title": floor["title"]},
+                # The country's Other Regulatory Report, once a Reportable conclusion created it.
+                "report": {"id": str(report.id), "state_label": attached.state_label(report)} if report else None,
             }
         )
     return found

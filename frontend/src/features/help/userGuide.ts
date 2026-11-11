@@ -710,6 +710,32 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             note: "Health Canada's own form (HC Pub. 110180) is filled once MDARIX holds the official form file; until then send the approved worksheet PDF's values on the form yourself. Periods, the e-mail address and the form's reading are starter text for your regulatory consultant to confirm.",
           },
           {
+            title: "Other countries: assess a country outside the five markets",
+            who: "Anyone with regulatory review or approval rights; administrators cannot sign.",
+            steps: [
+              "On the Decision trees page, choose the complaint, then + Other country beside the five markets. Pick the country (for example Australia, Switzerland or Japan) and choose Assess this country. EU and EEA countries, Great Britain, Northern Ireland, the US, Canada and India are not in the list: they have their own trees. Places such as Réunion or Åland are not offered either: they may fall under the EU MDR, so check with your consultant.",
+              "Answer the generic questions: death, serious deterioration in health, could it lead to death or serious deterioration if it happened again, a serious public health threat, a malfunction, a use error, and whether the device is marketed there. An Unknown on any of the first four keeps the outcome Pending information: Unknown is never No.",
+              "Sign the conclusion with your password and authenticator code. The signed record names the rules (OTHER-floor-1) and says: generic starter questions, not this country's law: confirm with your consultant.",
+            ],
+            result:
+              "The country shows beside the five markets on the complaint. An unsigned country, or a reportable one whose report is still open, keeps the complaint open on the reportability watch, on its own line with its due date.",
+            note: "The generic questions are MDARIX starter text, not any country's law. A reporting window that names the country (by name or two-letter code) gives the due date; otherwise you enter it on the report.",
+          },
+          {
+            title: "Other countries: the Other Regulatory Report (attach the report you made)",
+            who: "Anyone with regulatory review or approval rights. The person who records the submission signs it; no second person approves it.",
+            steps: [
+              "A Reportable conclusion for the country creates its Other Regulatory Report. Open it from the conclusion (Open the report), or in the Reports list choose Market: Other countries, or the country by name; the Cases list's More views has Reported in another country. A later Not reportable cancels a report not yet submitted.",
+              "If no reporting window names the country, enter the due date and where it comes from. It shows as Due date entered by the customer and counts in Overdue and Due this week.",
+              "Make the report in the authority's own format and route. MDARIX has no form for it and never submits.",
+              "Choose Record that it was submitted: attach the report you sent (scanned, at most 2 MB), give the date, and the Report ID or tick Not issued yet. Sign with your password and authenticator code: the file's SHA-256 is part of what you sign.",
+              "When the authority gives the Report ID later, enter it under the submission. When its answer arrives, record it (acknowledgement, reference or rejection) with its file. A new file never replaces an earlier one.",
+              "If the authority asks for more, choose Start a follow-up report: each follow-up has its own file, Report ID and status. Close the report with a reason once nothing more is owed; it cannot close while a follow-up is open.",
+            ],
+            result:
+              "The report, its files with their SHA-256, the Report IDs and the signatures are in the complaint's decision record and in the inspection pack (file 11).",
+          },
+          {
             title: "EU: the MIR file (MIR 7.3.1) for EUDAMED or the national competent authority",
             who: "Anyone with regulatory review or approval rights; the parties need the right to change records; downloads need export rights.",
             steps: [

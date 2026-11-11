@@ -4,7 +4,7 @@
 // a person decides; MDARIX never submits a report.
 import type { Tone } from "../admin/console/dashboardModel";
 import { collapsed } from "./complaintReview";
-import { timeLeft, type DueLike } from "../../app/dates";
+import { formatDay, timeLeft, type DueLike } from "../../app/dates";
 import type { MarketSummary } from "./marketAssessment";
 
 export const REPORT_LIMITS = {
@@ -103,7 +103,28 @@ export type ReportabilityDecision = {
   decided_at: string | null;
 };
 
+/** B9b (run-2 decision Q4): a country outside the five markets that keeps the complaint open, on its own line. */
+export type OtherCountryLine = {
+  country: string;
+  label: string;
+  state_label: string;
+  due_on: string | null;
+  due_label: string | null;
+  clock_state: "OVERDUE" | "DUE_SOON" | "RUNNING" | null;
+  report_id: string | null;
+};
+
+/** "Japan (other country): to be submitted · due 20 Nov 2026 (due date entered by the customer)". */
+export function otherLineText(line: OtherCountryLine): string {
+  const due = line.due_on
+    ? ` · due ${formatDay(line.due_on)}${line.due_label ? ` (${line.due_label.charAt(0).toLowerCase()}${line.due_label.slice(1)})` : ""}`
+    : " · no due date yet";
+  return `${line.label}: ${line.state_label.toLowerCase()}${due}`;
+}
+
 export type WatchItem = {
+  /** B9b: the open countries outside the five markets (empty when none, or the switch is off). */
+  other_countries?: OtherCountryLine[];
   id: string;
   business_id: string | null;
   complaint_identifier: string | null;

@@ -227,7 +227,58 @@ export type AssessmentDetail = {
   /** The practice-training rule binds free-trial organizations only (owner decision 6, 31 Oct 2026). */
   training_required: boolean;
   legacy_decision: LegacyDecision | null;
+  /** B9b: the countries outside the five markets assessed on this complaint (readable while the switch is off). */
+  other_countries?: OtherCountryItem[];
+  /** B9b: the "Other country" picker is offered (MDARIX_B9B_OTHER on). */
+  other_countries_on?: boolean;
 };
+
+/** B9b: a country outside the five markets on the complaint (reportability/other_countries.py ``items``). */
+export type OtherCountryItem = Pick<
+  MarketItem,
+  "question_set" | "suggestions" | "record_notes" | "current" | "draft" | "evaluation" | "history" | "clock"
+> & {
+  market: "OTHER";
+  /** "OTHER-AU": the country's address in the assessment routes. */
+  key: string;
+  country: string;
+  country_name: string;
+  label: string;
+  generic_note: string;
+  floor: { code: string; title: string };
+  /** The country's Other Regulatory Report, once a Reportable conclusion created it. */
+  report?: { id: string; state_label: string } | null;
+};
+
+/** A country outside the five markets is addressed "OTHER-<ISO code>" (B9b). */
+export const isOtherKey = (market: string) => market.startsWith("OTHER-");
+
+/** A country as the tree screens read a market: no harm scale, no practice training, never the event's preselected
+ * market; its key ("OTHER-AU") stands where a market code stands, so the same save and sign paths take it. */
+export function otherAsMarket(item: OtherCountryItem): MarketItem {
+  return {
+    ...item,
+    market: item.key as Market,
+    enabled: true,
+    preselected: false,
+    required: false,
+    threshold: { level: "", label: "" },
+    disagreement: null,
+    training: [],
+    trained_colleagues: [],
+    rules_used: null,
+  };
+}
+
+/** Every market and country of an assessment, as the tree screens read them. */
+export const allMarkets = (detail: AssessmentDetail): MarketItem[] => [
+  ...detail.markets,
+  ...(detail.other_countries ?? []).map(otherAsMarket),
+];
+
+/** One market or country ("OTHER-AU") of an assessment, after a save or a signature. */
+export const marketIn = (detail: AssessmentDetail, market: string): MarketItem | undefined =>
+  allMarkets(detail).find((entry) => entry.market === market);
 
 /** A market as the watch lists it on a complaint. */
 export type MarketSummary = {

@@ -61,7 +61,23 @@ export type ReportListItem = {
   submitted_at?: string | null;
   /** The Reports tab's list views it belongs to ("open", "my-approval", "submitted-month"). */
   views?: string[];
+  /** B9b: a country outside the five markets (market "OTHER"), its ISO code; null for the five markets. */
+  country?: string | null;
 };
+
+/** B9b: the Reports list's country filter: every report (""), every country outside the five ("OTHER"), or one
+ * country by its ISO code. */
+export function byCountry<T extends Pick<ReportListItem, "market" | "country">>(items: readonly T[], filter: string) {
+  if (!filter) return [...items];
+  return items.filter((row) => row.market === "OTHER" && (filter === "OTHER" || row.country === filter));
+}
+
+/** The countries outside the five markets the list holds, by name, for the filter ("Australia (other country)"). */
+export function otherCountryOptions(items: readonly Pick<ReportListItem, "market" | "country" | "market_label">[]) {
+  const found = new Map<string, string>();
+  for (const row of items) if (row.market === "OTHER" && row.country) found.set(row.country, row.market_label);
+  return [...found].map(([code, label]) => ({ code, label })).sort((a, b) => a.label.localeCompare(b.label));
+}
 
 export type ReportList = {
   items: ReportListItem[];

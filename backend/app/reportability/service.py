@@ -386,6 +386,9 @@ def watch(
     assessed = assessments.rows_by_complaint(db, tenant_id, ids)
     roles = reporting_roles(db, tenant_id)
     backlog = imported_backlog(db, tenant_id, today) if ids else {}
+    from backend.app.reportability import other_countries
+
+    others = other_countries.open_lines(db, tenant_id, ids, today) if other_countries.switched_on() else {}
     items = []
     shortest = None
     for complaint, record in candidates:
@@ -415,14 +418,27 @@ def watch(
             seen["binding"] = backlog_binding(seen["binding"], backlog[str(complaint.id)], today)
         # Settled by an earlier single decision, by its case's completed regulatory review, or by every market's
         # signed conclusion (reportable ones with their filing recorded).
-        is_decided = decided is not None or seen["settled_by_case"] or assessments.settled(seen["markets"])
+        # B9b (run-2 decision Q4): a country outside the five markets, unsigned or with its report still open, keeps
+        # the complaint open on its own line; it never changes the five markets' "settled".
+        lines = others.get(complaint.id, [])
+        is_decided = (
+            decided is not None or seen["settled_by_case"] or assessments.settled(seen["markets"])
+        ) and not lines
         state = rules.watch_state(
-            seen["binding"]["state"] if seen["binding"] else None,
+            other_countries.most_urgent(seen["binding"]["state"] if seen["binding"] else None, lines),
             is_decided,
             seen["in_review"],
             bool(seen["triggers"]),
         )
-        items.append({**record, **seen, "state": state, "decision": decision_view(decided, names)})
+        items.append(
+            {
+                **record,
+                **seen,
+                "state": state,
+                "decision": decision_view(decided, names),
+                "other_countries": lines,
+            }
+        )
 
     def urgency(item: dict):
         binding = item["binding"]

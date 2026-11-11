@@ -334,6 +334,75 @@ def test_the_switch_off_hides_the_picker_and_routes_and_keeps_records_readable(o
     assert org["regulatory"].get("/api/v1/other-countries").status_code == 200
 
 
+def test_an_open_country_keeps_the_complaint_open_on_the_watch_on_its_own_line(org):
+    """Run-2 decision Q4: unsigned, or Reportable with its report not closed, is open, with its due date."""
+    regulatory = org["regulatory"]
+    complaint = _complaint(org["tenant_id"], org["product"], country="Japan", malfunction=True)
+
+    def watched() -> dict:
+        found = regulatory.get("/api/v1/complaints/reportability", params={"show": "all", "page_size": 200})
+        assert found.status_code == 200, found.text
+        return next(row for row in found.json()["items"] if row["id"] == complaint)
+
+    item = _save(regulatory, complaint, "JP", REPORTABLE)
+    line = watched()
+    assert line["state"] != "DECIDED" and line["other_countries"][0]["state_label"] == "Not signed yet"
+    assert _sign(regulatory, complaint, "JP", item, "REPORTABLE").status_code == 200
+    report = _report(regulatory, complaint, "JP")
+    # The list says the report's own status, never a worksheet's "ready for approval" (OC-D3).
+    assert report["stage"] is None and report["stage_label"] == "To be submitted"
+    late = (date.today() - timedelta(days=1)).isoformat()
+    regulatory.put(f"{REPORTS}/{report['id']}/attached-due-date", json={"due_on": late, "reason": REASON})
+    line = watched()
+    assert line["state"] == "OVERDUE"
+    assert line["other_countries"] == [
+        {
+            "country": "JP",
+            "label": "Japan (other country)",
+            "state_label": "To be submitted",
+            "due_on": late,
+            "due_label": "Due date entered by the customer",
+            "clock_state": "OVERDUE",
+            "report_id": report["id"],
+        }
+    ]
+    assert _submit(regulatory, report["id"], report_id="PMDA-1").status_code == 200
+    assert watched()["other_countries"][0]["state_label"] == "Submitted"
+    assert regulatory.post(f"{REPORTS}/{report['id']}/complete", json={"reason": REASON}).status_code == 200
+    assert watched()["other_countries"] == []
+
+
+def test_the_complaints_decision_record_holds_the_country_and_the_report_with_its_files(org):
+    """OC-15, per complaint: the event's decision record lists the signed conclusion and the submission's files."""
+    complaint, _ = _reportable(org)
+    report = _report(org["regulatory"], complaint)
+    assert _submit(org["regulatory"], report["id"], report_id="TGA-REC-1").status_code == 200
+    event = org["regulatory"].get(f"/api/v1/oversight/events/{complaint}")
+    assert event.status_code == 200, event.text
+    entries = event.json()["decision_record"]["entries"]
+    assert any(entry["kind"] == "Market conclusion, Australia (other country)" for entry in entries)
+    entry = next(entry for entry in entries if entry["kind"] == "Other Regulatory Report, Australia (other country)")
+    assert "TGA-REC-1" in entry["summary"] and "report.pdf" in entry["summary"]
+    assert hashlib.sha256(b"%PDF-1.4 our report to the TGA").hexdigest() in entry["summary"]
+    assert entry["meaning"].startswith("I recorded that this report was submitted") and entry["signer"] == (
+        "Rita Regulatory"
+    )
+
+
+def test_the_cases_view_of_other_countries_is_listed_and_runs():
+    """B9b screens: the Cases list's "Reported in another country" view (a Case whose complaint has such a report)."""
+    from datetime import datetime as moment
+
+    from backend.app.db.models.intake import IntakeEvent
+    from backend.app.intake import cases_list
+
+    assert cases_list.VIEWS["other_countries"] == "Reported in another country"
+    with SessionLocal() as db:
+        bind_system(db, "test: the cases view")
+        condition = cases_list._condition("other_countries", "nobody", moment.now(timezone.utc))
+        assert db.query(IntakeEvent.id).filter(condition).limit(1).all() is not None
+
+
 def test_the_inspection_pack_lists_the_reports_and_their_files(org):
     """OC-15."""
     from backend.app.db.tenant_scope import bind_tenant
