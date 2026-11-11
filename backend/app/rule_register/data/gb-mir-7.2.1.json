@@ -6,7 +6,7 @@
   "market": "GB",
   "held_as": "DATA",
   "title": "GB MIR 7.2.1 (MHRA, changelog 04/06/2025)",
-  "plain": "MHRA's GB MIR 7.2.1 schemas (one per report type) MDARIX builds and checks the GB MIR XML against, with MHRA's GB help text, the changelog and the GB MIR and FSCA schema implementation guide, each pinned by SHA-256 in the manifest. Picked by the day the report is sent for approval; the XML is frozen at approval. MHRA takes reports only through MORE.",
+  "plain": "MHRA's GB MIR 7.2.1 schemas (one per report type) MDARIX builds and checks the GB MIR XML against, with MHRA's GB help text, the changelog and MHRA's GB MIR and FSCA schema guide, each pinned by SHA-256 in the manifest. Picked by the day the report is sent for approval; the XML is frozen at approval. MHRA takes reports only through MORE.",
   "source": [
     {
       "catalog": "UK_MDR",
