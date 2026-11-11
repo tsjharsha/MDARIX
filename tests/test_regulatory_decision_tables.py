@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from backend.app import feature_set
 from backend.app.authority_reports import forms
 from backend.app.complaint_classification.rules import CODING_CRITERIA_VERSION
 from backend.app.complaint_disposition import rules as disposition
@@ -196,6 +197,8 @@ VERSIONS = {
 @pytest.mark.parametrize("row", _cases("version"))
 def test_version(row):
     # Market order: VR-1 US, VR-2 EU/NI, VR-3 GB, VR-4 India, VR-5 Canada (markets.MARKETS).
+    if row["ID"] == "VR-17" and not feature_set.switched_on("MDARIX_B9_INDIA"):  # B9 off: India is back on version 1
+        row = {**row, "Version": "IN-floor-1"}
     assert VERSIONS[row["ID"]] == row["Version"]
 
 

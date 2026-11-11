@@ -360,7 +360,7 @@ signed before keep the version they were signed with.
 | VR-14 | US reportability floor (rule register) | US-floor-1 |
 | VR-15 | EU and Northern Ireland reportability floor (rule register) | EU-floor-1 |
 | VR-16 | Great Britain reportability floor (rule register) | GB-floor-1 |
-| VR-17 | India reportability floor (rule register) | IN-floor-1 |
+| VR-17 | India reportability floor (rule register; B9 correction of IN-floor-1) | IN-floor-2 |
 | VR-18 | Canada reportability floor (rule register) | CA-floor-1 |
 
 Assumptions the deadlines rest on, starter text: the authority time zones (US America/New_York, EU and NI
