@@ -219,8 +219,13 @@ def test_every_check_reads_the_records_behind_it(org, seeded):
         "TRENDS_WITHOUT_ACTION",
     ]
     checks = {check["code"]: check for check in body["checks"]}
-    assert (checks["COMPLAINTS_TO_RECHECK"]["value"], checks["COMPLAINTS_TO_RECHECK"]["state"]) == (1, "CRITICAL")
-    assert checks["COMPLAINTS_TO_RECHECK"]["items"][0]["id"] == seeded["hidden"]
+    # The cancelled record with a death, and (T-D13, TR-23) the record closed with a serious injury and no signed
+    # market conclusion: the second look asks whether anyone decided its reportability.
+    assert (checks["COMPLAINTS_TO_RECHECK"]["value"], checks["COMPLAINTS_TO_RECHECK"]["state"]) == (2, "CRITICAL")
+    assert {item["id"] for item in checks["COMPLAINTS_TO_RECHECK"]["items"]} == {
+        seeded["hidden"],
+        seeded["harm_closed"],
+    }
     assert checks["COMPLAINTS_TO_RECHECK"]["opens"].items() >= {"section": "Complaints", "tab": "Second look"}.items()
     assert (checks["COMPLAINTS_PAST_TARGET"]["value"], checks["COMPLAINTS_PAST_TARGET"]["state"]) == (1, "CRITICAL")
     assert checks["COMPLAINTS_PAST_TARGET"]["items"][0]["id"] == seeded["past_target"]
