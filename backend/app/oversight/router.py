@@ -1118,6 +1118,9 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     refs.add(complaint.service_owner)
     refs |= {v.created_by for versions in found["assessments"].values() for v in versions}
     refs |= {s.requested_by for s in found["snapshots"]}
+    # B9b: the countries' signers and the people who recorded an Other Regulatory Report as submitted.
+    refs |= {v.signed_by for versions in found["other_assessments"].values() for v in versions}
+    refs |= {submission.recorded_by for _, submission, _ in found["attached"]}
     names = _names(control_db, tenant_id, refs)
     record = closure.decision_record(control_db, found, row, names)
     signed_print = row.content_fingerprint if row is not None else None

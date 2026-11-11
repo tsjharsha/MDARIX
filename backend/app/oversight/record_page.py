@@ -102,12 +102,22 @@ def related(db, found: dict, complaint, names: dict[str, str], service: dict | N
         else:
             assessments.append(f"{label.get(market, market)}: not assessed yet")
     from backend.app.authority_reports import forms as report_forms
-    from backend.app.authority_reports import rules as report_rules
+    from backend.app.authority_reports.router import state_label
+    from backend.app.reportability import other_countries
 
+    # B9b: each country outside the five markets assessed on the complaint, by name.
+    for country, versions in found.get("other_assessments", {}).items():
+        current, draft = current_and_draft(versions)
+        name = other_countries.label(country)
+        if current is not None:
+            who = names.get(current.signed_by or "") or "a colleague"
+            text = market_rules.CONCLUSION_LABELS.get(current.conclusion, current.conclusion)
+            assessments.append(f"{name}: {text}, signed {current.signed_at.date().isoformat()} by {who}")
+        elif draft is not None:
+            assessments.append(f"{name}: started, not signed")
     # The form's name and the report's state in words, not their codes (0.10.75: it read "FDA_3500A · draft").
     reports = [
-        f"{label.get(row.market, row.market)} · {report_forms.FORMS[row.form_code].title} · "
-        + report_rules.STATE_LABELS.get(row.state, row.state).lower()
+        f"{other_countries.market_label(row)} · {report_forms.FORMS[row.form_code].title} · " + state_label(row).lower()
         for row in found["obligations"]
     ]
     decisions = [
@@ -163,7 +173,11 @@ def related(db, found: dict, complaint, names: dict[str, str], service: dict | N
             "label": "Authority reports",
             "count": len(reports),
             "lines": reports or ["None started"],
-            "items": [{"id": str(row.id), "ref": row.market} for row in found["obligations"] if row.kind == "INITIAL"],
+            "items": [
+                {"id": str(row.id), "ref": other_countries.market_label(row) if row.country else row.market}
+                for row in found["obligations"]
+                if row.kind == "INITIAL"
+            ],
         },
         {
             "key": "decisions",

@@ -195,6 +195,7 @@ def facts(
     from backend.app.db.models.intake import FirstContactCheck
     from backend.app.intake.service import enabled_markets
     from backend.app.reportability.assessments import rows_by_complaint
+    from backend.app.reportability.other_countries import rows_by_country
 
     dispositions = (
         db.query(ComplaintDisposition)
@@ -255,7 +256,36 @@ def facts(
         "tasks": tasks,
         "capas": capas,
         "responses": responses(db, tenant_id, [complaint.id]).get(complaint.id, 0),
+        # B9b (OC-15): the countries outside the five markets, and each Other Regulatory Report's submissions with
+        # their files, for the record page and the event's decision record.
+        "other_assessments": rows_by_country(db, tenant_id, complaint.id),
+        "attached": _attached_submissions(db, tenant_id, obligations),
     }
+
+
+def _attached_submissions(db: Session, tenant_id, obligations: list) -> list[tuple]:
+    """``(report, submission, files)`` of every Other Regulatory Report of the complaint, oldest first."""
+    from backend.app.db.models.authority_reports import ReportEvidence, ReportSubmission
+
+    reports = {row.id: row for row in obligations if row.market == "OTHER"}
+    if not reports:
+        return []
+    submissions = (
+        db.query(ReportSubmission)
+        .filter(ReportSubmission.tenant_id == tenant_id, ReportSubmission.obligation_id.in_(list(reports)))
+        .order_by(ReportSubmission.recorded_at, ReportSubmission.attempt)
+        .all()
+    )
+    files: dict = {}
+    for item in (
+        db.query(ReportEvidence)
+        .filter(ReportEvidence.tenant_id == tenant_id, ReportEvidence.submission_id.in_([s.id for s in submissions]))
+        .order_by(ReportEvidence.recorded_at)
+        if submissions
+        else []
+    ):
+        files.setdefault(item.submission_id, []).append(item)
+    return [(reports[row.obligation_id], row, files.get(row.id, [])) for row in submissions]
 
 
 def facts_many(
@@ -413,8 +443,9 @@ def _signed_decision(row) -> bool:
 def checklist(found: dict) -> list[dict]:
     """The closure-readiness checklist (see the module docstring), each item with where it is resolved."""
     from backend.app.authority_reports import rules as report_rules
+    from backend.app.authority_reports.router import state_label as report_state_label
     from backend.app.communications.service import TASK_TYPE as REPLY_TASK
-    from backend.app.reportability import markets
+    from backend.app.reportability import markets, other_countries
     from backend.app.reportability import facts
     from backend.app.reportability import rules as reporting_rules
     from backend.app.reportability.assessments import current_and_draft, required_markets
@@ -501,7 +532,8 @@ def checklist(found: dict) -> list[dict]:
     for row in found["obligations"]:
         if row.state in report_rules.CLOSED:
             continue
-        label, state = markets.MARKET_LABELS.get(row.market, row.market), report_rules.STATE_LABELS[row.state].lower()
+        # B9b: an Other Regulatory Report by its country's name and its own status words.
+        label, state = other_countries.market_label(row), report_state_label(row).lower()
         unmet.append(f"{label}: {state}")
         actions.setdefault("OBLIGATIONS", f"Complete the {label} report ({state})")
         if len(unmet) == 1:
@@ -758,7 +790,7 @@ def _manifest(record, names: dict, by: str | None, at) -> dict:
 def decision_record(control_db: Session, found: dict, row: EventClosure | None, names: dict) -> dict:
     """Every signed decision on the event, oldest first, with a SHA-256 checksum of the whole."""
     from backend.app.db.models.foundation import SignedApprovalRecord
-    from backend.app.reportability import markets
+    from backend.app.reportability import markets, other_countries
 
     def record(record_id):
         if not record_id or control_db is None:
@@ -836,6 +868,47 @@ def decision_record(control_db: Session, found: dict, row: EventClosure | None, 
                     decision.decided_at or decision.decision_timestamp,
                 ),
                 "meaning": "Signed decision on the investigation",
+            }
+        )
+    # B9b (OC-15): each country's signed conclusion, and each Other Regulatory Report recorded as submitted with its
+    # Report ID and every file's name and SHA-256 (the recorder's own signature, OC-D3).
+    for country, versions in found.get("other_assessments", {}).items():
+        for version in versions:
+            if version.conclusion is None:
+                continue
+            entries.append(
+                {
+                    "kind": f"Market conclusion, {other_countries.label(country)}",
+                    "summary": f"Version {version.version}: "
+                    f"{markets.CONCLUSION_LABELS.get(version.conclusion, version.conclusion)}"
+                    + (", superseded" if version.superseded_by else ""),
+                    "reason": version.override_reason,
+                    **_manifest(record(version.signed_record_id), names, version.signed_by, version.signed_at),
+                }
+            )
+    for report, submission, files in found.get("attached", []):
+        signed = next(
+            (
+                item
+                for item in (report.entries or {}).get("signatures") or []
+                if item.get("attempt") == submission.attempt
+            ),
+            {},
+        )
+        shown = "; ".join(f"{item.file_name} (SHA-256 {item.sha256})" for item in files if item.file_name)
+        entries.append(
+            {
+                "kind": f"Other Regulatory Report, {other_countries.label(report.country)}",
+                "summary": f"{'Follow-up' if report.parent_id else 'Report'} recorded as submitted "
+                f"{submission.submitted_at.date().isoformat()}; Report ID {submission.authority_reference or 'not issued yet'}"
+                + (f"; files: {shown}" if shown else ""),
+                "reason": None,
+                **_manifest(
+                    record(uuid.UUID(signed["signature_id"]) if signed.get("signature_id") else None),
+                    names,
+                    submission.recorded_by,
+                    submission.recorded_at,
+                ),
             }
         )
     for snapshot in found["snapshots"]:
