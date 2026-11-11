@@ -32,8 +32,8 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
   `NOT_THIS_POSITION` for any other type). One open at a time: a later report is sent for approval only once the one
   before is accepted, or recorded with no acknowledgement expected (409 `PREVIOUS_NOT_ACCEPTED`). Nothing follows a
   Combined or a Final, except an "Updated final report" on demand (`POST /reports/{id}/mir-chain`). A later report
-  holds only what is typed on it: every other value is read from the reports before it, so a correction reaches the
-  open draft. 1.3.1b is the complaint's ID on every report; 1.1c the authority's number from the first report's
+  holds only what is typed on it: every other value is read from the approved snapshots of the reports before it, so
+  an approved correction reaches the open draft and a reopened report's unapproved draft never does. 1.3.1b is the complaint's ID on every report; 1.1c the authority's number from the first report's
   recorded submission, else "Unknown". A re-signed conclusion supersedes the approval of an unsent later report but
   keeps its date; a "not reportable" re-sign never cancels it, and offers it as Final (Non-reportable incident) with
   4.2b from the signed rationale, for a person to choose.

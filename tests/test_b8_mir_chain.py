@@ -33,8 +33,8 @@ def _initial(trial) -> str:  # noqa: F811
         children = db.query(ReportObligation).filter_by(parent_id=row.id).all()
         for item in (row, *children):
             db.query(ReportSubmission).filter_by(obligation_id=item.id).delete()
-        for item in children:
             db.query(ReportSnapshot).filter_by(obligation_id=item.id).delete()
+        for item in children:
             db.delete(item)
         row.state = "DRAFT"
         row.entries = {key: value for key, value in (row.entries or {}).items() if key not in ("1_2E", "4_2H")}
@@ -135,18 +135,68 @@ def test_b8_the_reference_and_ncas_number_carry_to_every_report(trial):  # noqa:
     assert _fields(_ok(user.get(f"{REPORTS}/{child['id']}")))["1_1C"]["value"] == "ANSM-2026-0042"
 
 
+def _approve(trial, report_id: str, state: str) -> None:  # noqa: F811
+    """The report's worksheet as an approved snapshot (the approval flow has its own tests), then ``state``."""
+    sections = _ok(trial["user"].get(f"{REPORTS}/{report_id}"))["sections"]
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        row = db.get(ReportObligation, uuid.UUID(report_id))
+        versions = [item.version for item in db.query(ReportSnapshot).filter_by(obligation_id=row.id)]
+        db.add(
+            ReportSnapshot(
+                tenant_id=row.tenant_id,
+                obligation_id=row.id,
+                version=max(versions, default=0) + 1,
+                form_version=row.form_version,
+                fields={"sections": sections},
+                content_fingerprint="0" * 64,
+                state="APPROVED",
+                requested_by="test",
+                requested_at=now,
+                approved_by="test-approver",
+                approved_at=now,
+                signed_record_id=uuid.uuid4(),
+            )
+        )
+        row.state = state
+        db.commit()
+
+
+def _reopen(trial, report_id: str) -> None:  # noqa: F811
+    """As a reopen or a re-sign does: the approved snapshot is superseded, the report a draft again."""
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        for item in db.query(ReportSnapshot).filter_by(obligation_id=uuid.UUID(report_id), state="APPROVED"):
+            item.state = "SUPERSEDED"
+        db.get(ReportObligation, uuid.UUID(report_id)).state = "DRAFT"
+        db.commit()
+
+
 def test_b8_a_correction_to_an_earlier_report_reaches_the_open_draft(trial):  # noqa: F811
+    """Values carry from the earlier report's approved snapshot: a reopened report's draft never reaches the open
+    child; once the correction is approved, it does."""
     user, initial = trial["user"], _initial(trial)
     _ok(user.put(f"{REPORTS}/{initial}/fields/4_2H", json={"value": "Sensor recall planned (sample)."}))
-    _state(trial, initial, "ACCEPTED")
+    _approve(trial, initial, "ACCEPTED")
     child = _ok(_create(user, initial, FU))
     assert _fields(child)["4_2H"]["value"] == "Sensor recall planned (sample)."
     with SessionLocal() as db:  # nothing was copied onto the child
         bind_tenant(db, trial["tenant_id"])
         assert set(db.get(ReportObligation, uuid.UUID(child["id"])).entries) == {"1_2E", "CHAIN"}
-    _state(trial, initial, "DRAFT")
+    _reopen(trial, initial)
     _ok(user.put(f"{REPORTS}/{initial}/fields/4_2H", json={"value": "Sensor recall done (sample)."}))
+    assert _fields(_ok(user.get(f"{REPORTS}/{child['id']}")))["4_2H"]["value"] == "Sensor recall planned (sample)."
+    _approve(trial, initial, "ACCEPTED")
     assert _fields(_ok(user.get(f"{REPORTS}/{child['id']}")))["4_2H"]["value"] == "Sensor recall done (sample)."
+
+
+def test_b8_a_draft_value_never_carried_before_approval(trial):  # noqa: F811
+    user, initial = trial["user"], _initial(trial)
+    _ok(user.put(f"{REPORTS}/{initial}/fields/4_2H", json={"value": "Typed, never approved (sample)."}))
+    _state(trial, initial, "ACCEPTED")  # no approved snapshot: nothing to carry
+    child = _ok(_create(user, initial, FU))
+    assert _fields(child)["4_2H"]["value"] is None
 
 
 def test_b8_re_signing_supersedes_an_approved_unsent_follow_up(trial):  # noqa: F811

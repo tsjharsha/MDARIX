@@ -2973,14 +2973,31 @@ def _mir_before(db, obligation: ReportObligation) -> list[ReportObligation]:
     return [parent, *(row for row in later if (row.created_at, str(row.id)) < mine)]
 
 
+MIR_TYPED = (worksheet.ENTERED, worksheet.CONFIRMED, worksheet.CHANGED)  # a person's value, not the records'
+
+
+def _mir_approved_values(db, obligation: ReportObligation) -> dict:
+    """A report's typed values as its last approved snapshot froze them (what was signed), as entries. A report
+    reopened since keeps its approved values here: its draft never reaches a later report (B8 run 2)."""
+    approved = next((row for row in reversed(_snapshots(db, obligation)) if row.approved_at is not None), None)
+    if approved is None:
+        return {}
+    return {
+        item["id"]: {"value": item["value"], "at": item.get("at"), "code_state": item["status"]}
+        for section in (approved.fields or {}).get("sections") or []
+        for item in section["fields"]
+        if item.get("status") in MIR_TYPED and item.get("value") is not None and item["id"] not in MIR_OWN
+    }
+
+
 def _mir_carried(db, obligation: ReportObligation) -> dict:
-    """What a child reads from the reports before it (``worksheet.build`` puts its own entries on top): their values,
-    later ones first, and 1.1c, the authority's number from the first report's recorded submission ("Unknown" when
-    none was recorded)."""
+    """What a child reads from the reports before it (``worksheet.build`` puts its own entries on top): their approved
+    values, later ones first, and 1.1c, the authority's number from the first report's recorded submission ("Unknown"
+    when none was recorded)."""
     before = _mir_before(db, obligation)
     carried: dict = {}
     for row in before:
-        carried.update({key: value for key, value in (row.entries or {}).items() if key not in MIR_OWN})
+        carried.update(_mir_approved_values(db, row))
     given = [row.authority_reference for row in _submissions(db, before[0]) if row.authority_reference]
     return {"carried": carried, "nca_reference": given[-1] if given else MIR_UNKNOWN}
 
