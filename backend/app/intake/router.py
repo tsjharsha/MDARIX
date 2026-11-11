@@ -15,6 +15,8 @@
 - ``GET /api/v1/intake/duplicates``, ``POST /api/v1/intake/links``, ``POST /api/v1/intake/links/{id}/undo``: possible
   duplicates; link or dismiss with a reason; undo a link with a reason;
 - ``GET /api/v1/intake/changes``: the field changes a re-upload made;
+- ``GET /api/v1/intake/possible-duplicates``: B6a, what may be the same event before a back-entered Case is saved;
+  ``POST /api/v1/intake`` asks a late-entry reason when awareness is more than 24 h before the entry;
 - ``GET /api/v1/triage``, ``POST /api/v1/triage/escalate``, ``POST /api/v1/triage/{kind}/{id}/record``: the triage
   list before every queue; a manual escalation from any queue; the triage record.
 
@@ -28,7 +30,7 @@ from __future__ import annotations
 import logging
 import uuid
 from types import SimpleNamespace
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -118,6 +120,7 @@ TRIAGERS = require_any_permission_audited(COMPLAINT_TRIAGE)
 LINKERS = require_any_permission_audited(CASE_LOG, COMPLAINT_TRIAGE)
 # Clock skew allowed for a time entered as "now".
 _SKEW = timedelta(minutes=5)
+LATE_ENTRY_SWITCH = "MDARIX_B6_LATE_ENTRY"
 
 
 def _error(status: int, code: str, message: str, **extra) -> HTTPException:
@@ -176,6 +179,8 @@ class IntakeIn(BaseModel):
     troubleshooting: str = Field(default="", max_length=rules.TEXT_MAX)
     # B7b "Make it a case": the e-mail it comes from (channel, reference and Received are then the message's own).
     inbound_message_id: uuid.UUID | None = None
+    # B6a G18b: required when awareness (else Received) is more than 24 h before the entry (a back-entry).
+    late_entry_reason: str = Field(default="", max_length=rules.TEXT_MAX)
 
 
 class CheckIn(BaseModel):
@@ -406,6 +411,8 @@ def _event_view(db, control_db, tenant_id, event: IntakeEvent, versions, tasks, 
         "flagged": bool(flags),
         "qms_ref": event.qms_ref,
         "service_ticket": event.service_ticket,
+        # B6a G18b: why a Case was entered more than 24 h after awareness (shown "Entered late: <reason>").
+        "late_entry_reason": event.late_entry_reason,
         "channel": event.channel,
         "channel_label": case_rules.CHANNELS.get(event.channel or ""),
         "channel_ref": event.channel_ref,
@@ -798,6 +805,34 @@ def shipped_to(
     return service.shipped_to(db, _tenant(ctx), site)
 
 
+@router.get("/intake/possible-duplicates")
+def possible_duplicates(
+    product_id: uuid.UUID | None = None,
+    lot: str = Query("", max_length=120),
+    serial: str = Query("", max_length=120),
+    site: str = Query("", max_length=120),
+    country: str = Query("", max_length=80),
+    event_on: date | None = None,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """B6a G18c: before a back-entered Case is saved, what may be the same event (today's duplicate rule) among the
+    Cases, complaints and e-mails to check. Suggestions only; nothing is linked or merged here."""
+    from backend.app import feature_set
+
+    if not feature_set.switched_on(LATE_ENTRY_SWITCH):
+        raise _error(404, "LATE_ENTRY_OFF", "The back-entry checks are switched off")
+    mine = {
+        "product_id": product_id,
+        "lot_id": rules.clean(lot, 120) or None,
+        "serial": rules.clean(serial, 120) or None,
+        "site": rules.clean(site, 120) or None,
+        "country": rules.clean(country, 80) or None,
+        "event_on": event_on,
+    }
+    return {"items": service.possible_duplicates(db, _tenant(ctx), mine), "window_days": rules.DUPLICATE_DAYS}
+
+
 @router.get("/intake/{event_id}")
 def intake_detail(
     event_id: uuid.UUID,
@@ -940,6 +975,7 @@ def log_intake(
         if kind == "CONTACT"
         else _at(payload.awareness_at, _zone(payload.awareness_zone, zone))
     )
+    late_reason = _late_entry_reason(payload.late_entry_reason, awareness or received, now, message is not None)
     requested = _choice(payload.requested, rules.REQUESTS, "NONE")
     serial = rules.clean(payload.serial_number, 120) or None
     values = {
@@ -1007,6 +1043,7 @@ def log_intake(
         patients=_choice(payload.patients, case_rules.PATIENTS),
         harm_text=_masked_text(rules.clean(payload.harm_text))[0] or None,
         troubleshooting=_masked_text(rules.clean(payload.troubleshooting))[0] or None,
+        late_entry_reason=late_reason,
         **values,
     )
     db.add(event)
@@ -1080,6 +1117,7 @@ def log_intake(
                 "issue_category": event.issue_category,
                 "identifiers": event.identifiers,
                 **({"from_email": str(message.id)} if message is not None else {}),
+                **({"late_entry_reason": late_reason} if late_reason else {}),
             },
             created_at=now,
         )
@@ -1094,6 +1132,28 @@ def log_intake(
             raise
         return intake_detail(known, db, control_db, ctx)
     return intake_detail(event.id, db, control_db, ctx)
+
+
+def _late_entry_reason(text: str, aware: datetime, now: datetime, from_email: bool) -> str | None:
+    """B6a G18b: a Case entered more than LATE_ENTRY_HOURS after awareness (else Received) is a back-entry and needs
+    a reason (422 LATE_ENTRY_REASON_NEEDED); its clock still counts from awareness. A Case made from an e-mail is not
+    back-entered: Received is the server's own receipt of it. Off (MDARIX_B6_LATE_ENTRY), today's behaviour."""
+    from backend.app import feature_set
+
+    if from_email or not feature_set.switched_on(LATE_ENTRY_SWITCH):
+        return None
+    if now - aware <= timedelta(hours=rules.LATE_ENTRY_HOURS):
+        return rules.clean(text, rules.TEXT_MAX) or None
+    reason = rules.clean(text, rules.TEXT_MAX)
+    if len(reason) < rules.REASON_MIN:
+        raise _error(
+            422,
+            "LATE_ENTRY_REASON_NEEDED",
+            f"Awareness is more than {rules.LATE_ENTRY_HOURS} hours ago: say in at least {rules.REASON_MIN} characters "
+            "why the Case is entered late (for example, MDARIX was unavailable)",
+            hours=round((now - aware).total_seconds() / 3600, 1),
+        )
+    return reason
 
 
 def _by_request_key(db, tenant_id, request_key: str):

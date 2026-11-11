@@ -47,6 +47,8 @@ TEXT_MAX = 2000
 WORDS_MAX = 4000
 TRIAGE_TARGET_HOURS = 24
 DUPLICATE_DAYS = 2
+# B6a-D2 (owner, 11 Nov): a Case entered more than this many hours after awareness needs a late-entry reason.
+LATE_ENTRY_HOURS = 24
 
 KINDS = ("CONTACT", "URGENT", "SERVICE_RECORD")
 KIND_LABELS = {"CONTACT": "Logged contact", "URGENT": "Urgent intake", "SERVICE_RECORD": "Imported service record"}

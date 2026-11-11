@@ -6,7 +6,9 @@ import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { requestJson } from "../../../app/apiClient";
 import { downloadFile } from "../../reports/download";
-import { useCan, useRoutinePath, useTabParam, useWorkspace } from "../workspaceContext";
+import { useCan, useLateEntry, useRoutinePath, useTabParam, useWorkspace } from "../workspaceContext";
+import { ApiError } from "../../../app/apiClient";
+import { DuplicateHits, LateEntryField, duplicatesPath, looksLate, type DuplicateHit } from "./BackEntry";
 import { DecideAndSign } from "./common";
 import { WhyAsked } from "../../shared/Basis";
 import { FIRST_CONTACT_WHY } from "../whyAsked";
@@ -403,6 +405,12 @@ function LogDrawer({
   const [earlier, setEarlier] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // B6a G18b/c: a back-entry gives its late-entry reason and sees possible duplicates before it is saved.
+  const lateEntry = useLateEntry();
+  const [lateReason, setLateReason] = useState("");
+  const [lateNeeded, setLateNeeded] = useState(false);
+  const [hits, setHits] = useState<DuplicateHit[]>([]);
+  const [checkedFor, setCheckedFor] = useState("");
   const set = (patch: Partial<LogForm>) => setForm((current) => ({ ...current, ...patch }));
   const entry = (code: string) => form.ids[code] ?? NEW_IDENTIFIER;
   const setEntry = (code: string) => (value: IdentifierEntry) => set({ ids: { ...form.ids, [code]: value } });
@@ -415,10 +423,22 @@ function LogDrawer({
     onEntry: setEntry(code),
     guide,
   });
+  const backEntry =
+    lateEntry &&
+    !email &&
+    (lateNeeded || looksLate([form.received, form.firstKnowledge, urgent ? form.awareness : ""]));
+  const duplicateQuery = typeProduct || !form.product ? "" : duplicatesPath(form);
   const submit = async () => {
     setBusy(true);
     setError("");
     try {
+      // Checked once for the values on the form: shown before Save; saving again with them saves anyway.
+      if (backEntry && duplicateQuery && checkedFor !== duplicateQuery) {
+        setCheckedFor(duplicateQuery);
+        const found = await requestJson<{ items: DuplicateHit[] }>(duplicateQuery);
+        setHits(found.items);
+        if (found.items.length) return;
+      }
       const saved = await send<IntakeItem>(INTAKE, "POST", {
         kind: form.kind,
         reporter_words: form.words,
@@ -460,9 +480,11 @@ function LogDrawer({
         request_key: requestKey,
         // B7b: the server takes channel, reference and Received from the e-mail itself.
         inbound_message_id: email?.id ?? null,
+        late_entry_reason: lateReason,
       });
       onLogged(saved.id);
     } catch (reason) {
+      if (reason instanceof ApiError && reason.code === "LATE_ENTRY_REASON_NEEDED") setLateNeeded(true);
       setError(errorText(reason, "Not saved"));
     } finally {
       setBusy(false);
@@ -822,10 +844,18 @@ function LogDrawer({
             </label>
           </details>
         )}
+        {backEntry && <LateEntryField value={lateReason} onChange={setLateReason} />}
+        {hits.length > 0 && checkedFor === duplicateQuery && <DuplicateHits hits={hits} />}
         {problem && <p className="uw-hint">{problem}</p>}
         <div className="ca-action-row">
           <button type="submit" className="ac-primary" disabled={busy || !!problem}>
-            {busy ? "Saving…" : urgent ? "Send to triage now" : "Save the case"}
+            {busy
+              ? "Saving…"
+              : hits.length > 0 && checkedFor === duplicateQuery
+                ? "Save anyway"
+                : urgent
+                  ? "Send to triage now"
+                  : "Save the case"}
           </button>
         </div>
         <InlineError text={error} />
@@ -1142,6 +1172,7 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
           Clocks count from {formatDate(item.awareness.at)}: {item.awareness.source_label}.
           {item.awareness.label ? ` ${item.awareness.label}.` : ""}
         </p>
+        {item.late_entry_reason && <p className="uw-hint">Entered late: {item.late_entry_reason}</p>}
         {item.clock && (
           <p>
             <ToneBadge tone={clockTone(item.clock.state ?? "RUNNING")} label={clockChip(item.clock)} />{" "}

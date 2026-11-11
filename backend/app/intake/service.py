@@ -1310,6 +1310,78 @@ def likely_complaints(db: Session, tenant_id: uuid.UUID, event: IntakeEvent) -> 
     return sorted(found, key=lambda item: not item["same_day"])
 
 
+BACK_ENTRY_SCAN = 500  # the newest Cases and e-mails a back-entry is compared with
+
+
+def possible_duplicates(db: Session, tenant_id: uuid.UUID, mine: dict) -> list[dict]:
+    """B6a G18c: before a back-entered Case is saved, the records today's duplicate rule (``rules.duplicate_reasons``)
+    pairs with what the form holds: Cases, complaints of the product and e-mails still to check (B7b) that came in
+    meanwhile. ``mine``: product_id, lot (text), serial, site, country, event_on. Suggestions only: the person links or
+    saves anyway; nothing is merged."""
+    from backend.app.db.models.intake import InboundMessage
+
+    if not mine.get("product_id"):
+        return []
+    product = mine["product_id"]
+    events = (
+        db.query(IntakeEvent)
+        .filter(
+            IntakeEvent.tenant_id == tenant_id, IntakeEvent.product_id == product, IntakeEvent.kind != "SERVICE_RECORD"
+        )
+        .order_by(IntakeEvent.created_at.desc())
+        .limit(BACK_ENTRY_SCAN)
+        .all()
+    )
+    complaints = same_product_complaints(db, tenant_id, product).all()
+    lot_ids = {row.lot_batch_id for row in [*events, *complaints] if row.lot_batch_id}
+    lots = (
+        {
+            row.id: row.lot_identifier
+            for row in db.query(LotBatch.id, LotBatch.lot_identifier).filter(
+                LotBatch.tenant_id == tenant_id, LotBatch.id.in_(lot_ids)
+            )
+        }
+        if lot_ids
+        else {}
+    )
+    found = []
+
+    def check(kind: str, row_id, ref: str, source: str, theirs: dict) -> None:
+        reasons = rules.duplicate_reasons(mine, theirs)
+        if reasons:
+            found.append({"kind": kind, "id": str(row_id), "ref": ref, "source": source, "reasons": reasons})
+
+    for event in events:
+        fields = _duplicate_fields(INTAKE, event, lots)
+        fields["lot_id"] = fields["lot_id"] or event.lot_text
+        check(INTAKE, event.id, event.reference, rules.KIND_LABELS[event.kind], fields)
+    for complaint in complaints:
+        source = "Sample complaint" if is_sample(complaint.source_system) else "Complaint"
+        check(COMPLAINT, complaint.id, complaint_ref(complaint), source, _duplicate_fields(COMPLAINT, complaint, lots))
+    for message in (
+        db.query(InboundMessage)
+        .filter(InboundMessage.tenant_id == tenant_id, InboundMessage.state == "NEW")
+        .order_by(InboundMessage.received_at.desc())
+        .limit(BACK_ENTRY_SCAN)
+    ):
+        ids = (message.draft or {}).get("identifiers") or {}
+        site = (message.draft or {}).get("site") or {}
+        if str((ids.get("product") or {}).get("id") or "") != str(product):
+            continue
+        theirs = {
+            "product_id": product,
+            "lot_id": (ids.get("lot") or {}).get("text"),
+            "serial": (ids.get("serial") or {}).get("text"),
+            "site": site.get("text") if isinstance(site, dict) else None,
+            "country": None,
+            "event_on": None,  # an e-mail has no event date: "no event date on one of them"
+        }
+        check(
+            "EMAIL", message.id, "E-mail to check", f"E-mail received {message.received_at:%d %b %Y %H:%M} UTC", theirs
+        )
+    return found[:50]
+
+
 def _side(kind: str, row, products: dict) -> dict:
     if kind == INTAKE:
         aware = event_awareness(row)

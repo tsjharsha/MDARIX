@@ -62,6 +62,8 @@ def test_a_case_signed_complaint_becomes_the_complaint_at_once_with_its_awarenes
         first_knowledge_at=knew.isoformat(),
         first_knowledge_party="DISTRIBUTOR",
         first_knowledge_basis="ACTS_FOR_MANUFACTURER",
+        # B6a G18b: awareness (the distributor's knowledge) is more than 24 h before the entry: a back-entry.
+        late_entry_reason="The distributor told us a day before the call came in.",
     )
     assert event["status"] == "OPEN" and event["suggestion"] == "COMPLAINT"
     assert datetime.fromisoformat(event["times"]["awareness"]["at"]) == knew

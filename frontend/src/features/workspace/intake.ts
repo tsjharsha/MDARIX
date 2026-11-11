@@ -142,6 +142,8 @@ export type IntakeItem = {
   flagged: boolean;
   qms_ref: string | null;
   service_ticket: string | null;
+  /** B6a G18b: why the Case was entered more than 24 h after awareness. */
+  late_entry_reason?: string | null;
   sample: boolean;
   created_by: string | null;
   created_at: string;

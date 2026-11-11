@@ -170,6 +170,8 @@ def test_a_calls_time_is_converted_in_the_time_zone_chosen_for_it(trial):
         "reporter_words": "Caller in Chicago reports the pump alarmed at the start of the morning shift.",
         "received_at": f"{day.isoformat()}T09:00",
         "received_zone": "America/Chicago",
+        # B6a G18b: a call two days ago is a back-entry.
+        "late_entry_reason": "Entered from the paper log after the outage.",
     }
     logged = _ok(user.post("/api/v1/intake", json=body))
     received = datetime.fromisoformat(logged["times"]["received"]["at"])
