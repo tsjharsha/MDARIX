@@ -452,6 +452,41 @@ def test_the_cases_view_of_other_countries_is_listed_and_runs():
         assert db.query(IntakeEvent.id).filter(condition).limit(1).all() is not None
 
 
+def test_the_cases_view_lists_a_case_whose_complaint_has_an_other_country_report_and_no_other(org):
+    """Follow-up (11 Nov): a Case escalated to a complaint with an Other Regulatory Report is in "Reported in another
+    country"; a Case escalated to a complaint with none is not."""
+    from backend.app.db.models.intake import IntakeEvent
+
+    reported, _ = _reportable(org)
+    assert _report(org["regulatory"], reported)["market"] == "OTHER"
+    plain = _complaint(org["tenant_id"], org["product"], country="Australia", malfunction=True)
+    now, cases = datetime.now(timezone.utc), {}
+    with SessionLocal() as db:
+        bind_system(db, "test: the cases view")
+        for name, complaint in (("reported", reported), ("plain", plain)):
+            case = IntakeEvent(
+                id=uuid.uuid4(),
+                tenant_id=org["tenant_id"],
+                reference=f"OC-{uuid.uuid4().hex[:10].upper()}",
+                kind="CONTACT",
+                reporter_words="The monitor stopped reading during use (synthetic).",
+                complaint_id=uuid.UUID(complaint),
+                status="ESCALATED",
+                created_by="test",
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(case)
+            cases[name] = str(case.id)
+        db.commit()
+    listed = org["regulatory"].get("/api/v1/intake/cases", params={"view": "other_countries", "size": 100})
+    assert listed.status_code == 200, listed.text
+    ids = {item["id"] for item in listed.json()["items"]}
+    assert cases["reported"] in ids and cases["plain"] not in ids
+    everything = org["regulatory"].get("/api/v1/intake/cases", params={"view": "all", "size": 100}).json()
+    assert {cases["reported"], cases["plain"]} <= {item["id"] for item in everything["items"]}
+
+
 def test_the_inspection_pack_lists_the_reports_and_their_files(org):
     """OC-15."""
     from backend.app.db.tenant_scope import bind_tenant
