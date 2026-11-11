@@ -117,8 +117,13 @@ def applied(content: dict, answers: dict) -> dict:
     conclusion (``rules_applied``) so an auditor sees which rules decided it."""
     context = _Context(content, answers)
     states = {True: "APPLIES", None: "COULD_APPLY"}
+    recipients = content.get("recipients") or {}  # B9: who must receive the report, per rule (US role floors)
     rules = [
-        {"id": rule["id"], "state": states[found]}
+        {
+            "id": rule["id"],
+            "state": states[found],
+            **({"recipients": recipients[rule["id"]]} if rule["id"] in recipients else {}),
+        }
         for rule in content["rules"]
         if (found := context.value(rule["if"])) is not False
     ]
@@ -167,6 +172,10 @@ def check(content: dict) -> list[str]:
         problems.append("type_rows: the last row has no condition (the default)")
     for row in content["folding"]:
         problems += [f"folding: unknown question {q}" for q in row["fold"] if q not in questions]
+    rule_ids = {rule["id"] for rule in content["rules"]}
+    problems += [
+        f"recipients: unknown rule {rule_id}" for rule_id in content.get("recipients", {}) if rule_id not in rule_ids
+    ]
     if set(content["precedence"]) != set(content["report_types"]):
         problems.append("precedence: lists every report type once")
     return problems

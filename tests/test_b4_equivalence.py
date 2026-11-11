@@ -118,6 +118,8 @@ def test_question_sets_and_report_types_are_identical(market, monkeypatch):
     on, off = json.loads(on), json.loads(off)
     if feature_set.switched_on("MDARIX_B9_INDIA"):  # B9: IN-floor-2 gives India's report its 15 days, nothing else
         assert on.pop("IN_SERIOUS_ADVERSE_EVENT")["days"] == 15 and off.pop("IN_SERIOUS_ADVERSE_EVENT")["days"] is None
+    for role_type in ("US_IMP_30_DAY", "US_UF_10_WORK_DAY"):  # B9: the role floors' own types, on only
+        on.pop(role_type, None)
     assert on == off and len(on) in (11, 12)
     # Version 1 of every floor, India included, explicitly (the oracle is valid for version 1 only).
     first = tuple(f"{rule}-1" for rule in register.FLOOR_RULES.values())

@@ -126,8 +126,12 @@ def check_party(payload: dict) -> dict:
     market, role = str(payload.get("market", "")).upper(), str(payload.get("role", "")).upper()
     if market not in MARKETS:
         raise _bad("MARKET_UNKNOWN", f"Market must be one of {', '.join(MARKETS)}")
-    if role not in PARTY_ROLES:
-        raise _bad("ROLE_UNKNOWN", f"Role must be one of {', '.join(PARTY_ROLES)}")
+    from backend.app import feature_set
+
+    # B9: a user facility's profile is a US one, offered only while MDARIX_B9_US_USER_FACILITY is on.
+    offered = [r for r in PARTY_ROLES if r != "USER_FACILITY" or feature_set.switched_on("MDARIX_B9_US_USER_FACILITY")]
+    if role not in offered or (role == "USER_FACILITY" and market != "US"):
+        raise _bad("ROLE_UNKNOWN", f"Role must be one of {', '.join(offered)}")
     organisation = _text(payload.get("organisation"), 200)
     if not organisation:
         raise _bad("ORGANISATION_REQUIRED", "Name the responsible organization")

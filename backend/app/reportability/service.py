@@ -56,7 +56,41 @@ def settings_of(db: Session, tenant_id: uuid.UUID, control_db: Session | None = 
         "updated_by": editor,
         "updated_by_name": (names.get(editor) or "A colleague") if editor else None,
         "updated_at": row.updated_at.isoformat() if row and row.updated_at else None,
+        # B9: the organization's role per market (absent: Manufacturer) and the roles it may choose.
+        "reporting_roles": effective_roles(row.reporting_roles if row else None),
+        "roles_offered": roles_offered(),
     }
+
+
+# B9 (B9-D8): the roles an organization may hold per market besides Manufacturer, each behind its part's switch.
+ROLES = {
+    ("US", "IMPORTER"): "MDARIX_B9_US_IMPORTER",
+    ("US", "USER_FACILITY"): "MDARIX_B9_US_USER_FACILITY",
+    ("IN", "IMPORTER"): "MDARIX_B9_INDIA",
+    ("CA", "IMPORTER"): "MDARIX_B9_CANADA",
+}
+
+
+def roles_offered() -> dict[str, list[str]]:
+    """Market -> the roles offered now (Manufacturer always first)."""
+    from backend.app import feature_set
+
+    found: dict[str, list[str]] = {}
+    for (market, role), switch in ROLES.items():
+        if feature_set.switched_on(switch):
+            found.setdefault(market, ["MANUFACTURER"]).append(role)
+    return found
+
+
+def effective_roles(stored: dict | None) -> dict[str, str]:
+    """The stored roles that are offered now: a role whose switch is off reads as Manufacturer (spec 6.4)."""
+    offered = roles_offered()
+    return {market: role for market, role in (stored or {}).items() if role in offered.get(market, ())}
+
+
+def reporting_roles(db: Session, tenant_id: uuid.UUID) -> dict[str, str]:
+    row = db.query(ReportabilitySettings.reporting_roles).filter(ReportabilitySettings.tenant_id == tenant_id).first()
+    return effective_roles(row[0] if row else None)
 
 
 def _moment(value) -> datetime | None:
@@ -465,6 +499,7 @@ def one(db: Session, tenant_id: uuid.UUID, complaint_id: uuid.UUID, today: datet
         ivd=markets.product_is_ivd(product),
     )
     seen["org_zone"] = org_zone
+    seen["roles"] = reporting_roles(db, tenant_id)
     return complaint, record, seen, second_look
 
 

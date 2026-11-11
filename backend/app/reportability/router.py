@@ -184,3 +184,65 @@ def update_reportability_settings(
         db.rollback()
         raise _error(409, "CHANGED_MEANWHILE", "The settings were changed a moment ago; reload and try again") from exc
     return _with_warnings(service.settings_of(db, tenant_id, control_db))
+
+
+class RoleRequest(BaseModel):
+    market: str = Field(max_length=10)
+    role: str = Field(max_length=20)
+    reason: str = Field(max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def _why(cls, value: str) -> str:
+        return _text(value, rules.REASON_MIN, "why")
+
+
+@router.put("/reportability-roles", dependencies=[Depends(require_permission(REGULATORY_APPROVE))])
+def set_reporting_role(
+    payload: RoleRequest,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """B9 (B9-D8): the organization's role in one market (Manufacturer, Importer, or User facility in the US), set by an
+    approver with a reason, audited ``REPORTING_ROLE_SET``. It picks the market's floor: a draft re-picks at its next
+    save (signing a draft saved under another floor answers 409 FLOOR_CHANGED); signed conclusions keep theirs."""
+    tenant_id = uuid.UUID(ctx.tenant_id)
+    market, role = payload.market.strip().upper(), payload.role.strip().upper()
+    if role not in service.roles_offered().get(market, ["MANUFACTURER"]):
+        raise _error(422, "ROLE_NOT_OFFERED", "This role is not offered for this market")
+    row = db.query(ReportabilitySettings).filter(ReportabilitySettings.tenant_id == tenant_id).with_for_update().first()
+    now = datetime.now(timezone.utc)
+    if row is None:
+        row = ReportabilitySettings(tenant_id=tenant_id, version=0, windows=[], reporting_roles={})
+        db.add(row)
+    before = dict(row.reporting_roles or {})
+    after = {key: value for key, value in before.items() if key != market}
+    if role != "MANUFACTURER":
+        after[market] = role
+    if after == before:
+        raise _error(422, "NOTHING_TO_CHANGE", "This is already the role")
+    row.reporting_roles, row.version = after, int(row.version or 0) + 1
+    row.updated_by, row.updated_at = ctx.user_id, now
+    db.flush()
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=ctx.user_id,
+            action="REPORTING_ROLE_SET",
+            entity_type="ReportabilitySettings",
+            entity_id=row.id,
+            correlation_id=ctx.correlation_id,
+            reason=payload.reason,
+            details={"market": market, "role": role, "version": row.version},
+            old_values={"role": before.get(market, "MANUFACTURER")},
+            new_values={"role": role},
+            created_at=now,
+        )
+    )
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise _error(409, "CHANGED_MEANWHILE", "The settings were changed a moment ago; reload and try again") from exc
+    return _with_warnings(service.settings_of(db, tenant_id, control_db))

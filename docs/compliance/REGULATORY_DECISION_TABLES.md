@@ -139,6 +139,30 @@ occurred in Canada (CA5) or, abroad, is a Class I device with corrective action 
 | CA-9 | CA | CA1 CA2 CA5 | | CA6 | | NOT_REPORTABLE | CA_30_DAY | No serious deterioration possible |
 | CA-10 | CA | CA1 CA2 CA3 | CA5 | CA6 | | PENDING | CA_10_DAY | Whether it occurred in Canada is Unknown (see owner decision OD-3) |
 
+### US importer and user facility (B9, rules `US-IMP-floor-1` and `US-UF-floor-1`)
+
+An organization that sets its US role to Importer (21 CFR 803.40) or User facility (803.30) reads its own floor;
+a tenant that never sets a role keeps `US-floor-1`. The questions are the manufacturer's, word for word. Importer:
+questions 1 to 5, 30 calendar days, no 5-work-day report (803.53 applies to manufacturers); a death or serious
+injury goes to FDA and the manufacturer, a malfunction to the manufacturer only. User facility: questions 1 to 3,
+10 work days, no malfunction reports; a death goes to FDA and the manufacturer, a serious injury to the
+manufacturer (FDA when the manufacturer is unknown). Starter, for your consultant to confirm (B9-D10, D11).
+
+<!-- table: role -->
+| ID | Market | Role | Yes | Unknown | Not applicable | Not answered | Suggested | Type if reportable | Recipients | Rule |
+|---|---|---|---|---|---|---|---|---|---|---|
+| IMP-1 | US | IMPORTER | US1 US3 | | | | REPORTABLE | US_IMP_30_DAY | FDA MANUFACTURER | 803.40(a): death caused or contributed |
+| IMP-2 | US | IMPORTER | US2A US3 | | | | REPORTABLE | US_IMP_30_DAY | FDA MANUFACTURER | 803.40(a): serious injury |
+| IMP-3 | US | IMPORTER | US4 US5 | | | | REPORTABLE | US_IMP_30_DAY | MANUFACTURER | 803.40(b): malfunction, to the manufacturer only |
+| IMP-4 | US | IMPORTER | US1 | US3 | | | PENDING | US_IMP_30_DAY | | Whether the device caused it is Unknown |
+| IMP-5 | US | IMPORTER | US4 | US5 | | | PENDING | US_IMP_30_DAY | | Whether a recurrence would harm is Unknown |
+| IMP-6 | US | IMPORTER | | | | | NOT_REPORTABLE | US_IMP_30_DAY | | No death, injury or malfunction |
+| UF-1 | US | USER_FACILITY | US1 US3 | | | | REPORTABLE | US_UF_10_WORK_DAY | FDA MANUFACTURER | 803.30(a)(1): death |
+| UF-2 | US | USER_FACILITY | US2B US3 | | | | REPORTABLE | US_UF_10_WORK_DAY | MANUFACTURER FDA_IF_MANUFACTURER_UNKNOWN | 803.30(a)(2): serious injury |
+| UF-3 | US | USER_FACILITY | US2A | US3 | | | PENDING | US_UF_10_WORK_DAY | | Whether the device caused it is Unknown |
+| UF-4 | US | USER_FACILITY | US1 | | | | NOT_REPORTABLE | US_UF_10_WORK_DAY | | The device did not cause or contribute |
+| UF-5 | US | USER_FACILITY | | | | | NOT_REPORTABLE | US_UF_10_WORK_DAY | | No death or serious injury (no malfunction reports) |
+
 ### Questions folded away
 
 A question earlier answers make unnecessary is shown as "not asked" and is not required to sign. Only Yes, No or Not
@@ -362,6 +386,8 @@ signed before keep the version they were signed with.
 | VR-16 | Great Britain reportability floor (rule register) | GB-floor-1 |
 | VR-17 | India reportability floor (rule register; B9 correction of IN-floor-1) | IN-floor-2 |
 | VR-18 | Canada reportability floor (rule register) | CA-floor-1 |
+| VR-19 | US importer reportability floor (rule register, B9) | US-IMP-floor-1 |
+| VR-20 | US user facility reportability floor (rule register, B9) | US-UF-floor-1 |
 
 Assumptions the deadlines rest on, starter text: the authority time zones (US America/New_York, EU and NI
 Europe/Brussels, GB Europe/London, India Asia/Kolkata); day 1 on the awareness day for GB and India; no weekend or

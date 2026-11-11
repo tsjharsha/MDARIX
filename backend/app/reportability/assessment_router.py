@@ -171,7 +171,8 @@ def _versions(db: Session, tenant_id, complaint_id, market: str, lock: bool = Fa
 
 def _floor_at(market: str, aware, seen: dict) -> dict | None:
     """The market's floor in force on the awareness day (B4, R-D3); None while the rule register is off."""
-    return register.floor_at(market, aware, seen.get("org_zone")) if feature_set.rule_register() else None
+    role = (seen.get("roles") or {}).get(market)  # B9: the organization's role in the market picks its floor
+    return register.floor_at(market, aware, seen.get("org_zone"), role) if feature_set.rule_register() else None
 
 
 def _date_calc(market: str, floor: dict, clock: dict | None, aware, seen: dict) -> dict:
@@ -201,7 +202,7 @@ def _rules_used(market: str, at_event: dict | None, aware, seen: dict, draft, cu
     rule register" for a row without a floor). None while the register is off."""
     if at_event is None:
         return None
-    today = register.floor(market)
+    today = register.floor(market, role=(seen.get("roles") or {}).get(market))
     picked = register.floor_day(market, aware, seen.get("org_zone"))
     return {
         "at_event": {

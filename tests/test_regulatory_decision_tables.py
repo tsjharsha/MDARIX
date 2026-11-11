@@ -62,9 +62,9 @@ def _pairs(cell: str) -> dict[str, str]:
     return dict(item.split("=", 1) for item in cell.split() if "=" in item)
 
 
-def _answered(market: str, row: dict) -> dict:
+def _answered(market: str, row: dict, ids=None) -> dict:
     """The answers of an evaluate row: every core question No, except those the row lists."""
-    found = {question_id: markets.NO for question_id in markets.QUESTION_SETS[market].ids()}
+    found = {question_id: markets.NO for question_id in ids or markets.QUESTION_SETS[market].ids()}
     for column, answer in (
         ("Yes", markets.YES),
         ("Unknown", markets.UNKNOWN),
@@ -78,7 +78,7 @@ def _answered(market: str, row: dict) -> dict:
 
 def test_every_row_id_is_unique_and_every_question_named_exists():
     seen: list[str] = []
-    for kind in "evaluate fold market facts conclusion answers deadline routine linked version".split():
+    for kind in "evaluate role fold market facts conclusion answers deadline routine linked version".split():
         seen += [row["ID"] for row in _tables(kind)]
     assert len(seen) == len(set(seen)), sorted(item for item in seen if seen.count(item) > 1)
     for row in _tables("evaluate"):
@@ -97,6 +97,24 @@ def test_evaluate(row):
     assert found["report_type"] == (row["Type if reportable"] if expected == markets.REPORTABLE else None)
     if expected == markets.PENDING:
         assert any("Unknown" in note for note in found["notes"])
+
+
+@pytest.mark.parametrize("row", _cases("role"))
+def test_role_floor(row, monkeypatch):
+    """B9 step 4: the US importer and user facility floors, with who must receive each report."""
+    from backend.app.rule_register import engine
+
+    monkeypatch.setenv("MDARIX_B9_US_IMPORTER", "on")
+    monkeypatch.setenv("MDARIX_B9_US_USER_FACILITY", "on")
+    floor = register.floor(row["Market"], role=row["Role"])
+    answers = _answered(row["Market"], row, markets.floor_question_set(floor).ids())
+    found = markets.evaluate(row["Market"], answers, floor)
+    expected = SUGGESTED[row["Suggested"]]
+    assert found["suggested"] == expected
+    assert found["report_type_if_reportable"] == row["Type if reportable"]
+    rules = engine.applied(floor["content"], answers)["rules"]
+    sent = [who for rule in rules if rule["state"] == "APPLIES" for who in rule.get("recipients", [])]
+    assert sent == _ids(row["Recipients"])
 
 
 @pytest.mark.parametrize("row", _cases("fold"))
@@ -191,6 +209,9 @@ VERSIONS = {
     },
     # B4: each market's floor in the rule register (market order, as VR-1 to VR-5).
     **{f"VR-{index}": register.floor(market)["code"] for index, market in enumerate(markets.MARKETS, 14)},
+    # B9: the US role floors, whatever their switches (a signed record names its version).
+    "VR-19": max(code for code in register.load() if code.startswith("US-IMP-floor-")),
+    "VR-20": max(code for code in register.load() if code.startswith("US-UF-floor-")),
 }
 
 
@@ -288,7 +309,9 @@ def test_folded_questions_never_change_the_outcome(market):
 
 @pytest.mark.parametrize("market", markets.MARKETS)
 def test_every_starter_report_type_is_reached_by_a_table_row(market):
-    reached = {row["Type if reportable"] for row in _tables("evaluate") if row["Market"] == market}
+    reached = {
+        row["Type if reportable"] for kind in ("evaluate", "role") for row in _tables(kind) if row["Market"] == market
+    }
     own = {code for code in markets.REPORT_TYPES if code.startswith(disposition_prefix(market))}
     assert own <= reached, own - reached
 

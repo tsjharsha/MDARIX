@@ -8,7 +8,8 @@ a complaint's linked service work) tr13 (each person's workspace persona), tr14 
 registration's risk class, a responsible party's SRN), tr18 (a re-signed market conclusion's change reason) and
 tr19 (Cases, escalation to a Complaint, triage at two speeds) and tr25 (the routine path, Case attachments,
 e-mail intake) and tr26 (a hypothesis's drafting rule, a follow-up's field action or product change) and tr27 (the
-reportability floor a market conclusion used).
+reportability floor a market conclusion used) and tr28 (reporting roles per market, the user facility
+profile).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -352,6 +353,17 @@ STEPS = (
         done_sql=(
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
             "AND table_name = 'complaint_market_assessments' AND column_name = 'date_calc')"
+        ),
+    ),
+    Step(
+        "tr28",
+        "tr28_trial_market_roles.py",
+        "add_market_roles",
+        (),
+        ("reportability_settings", "market_responsible_parties"),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'reportability_settings' AND column_name = 'reporting_roles')"
         ),
     ),
 )

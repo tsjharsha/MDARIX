@@ -531,6 +531,9 @@ class _InForce(MutableMapping):
     def _now(self) -> dict:
         if feature_set.rule_register():
             codes = tuple(found["code"] for market in MARKETS if (found := register.floor(market)))
+            if self._part == 1:  # B9: the report types of the role floors in force too (their questions stay apart)
+                roles = (register.floor(market, role=role)["code"] for market, role in register.ROLE_RULES)
+                codes += tuple(code for code in roles if code not in codes)
             base = _in_force(str(register._DIRECTORY), codes)[self._part]
         else:
             base = self._v1

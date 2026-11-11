@@ -28,6 +28,7 @@ PARTY_ROLES = (
     "UK_RESPONSIBLE_PERSON",
     "SPONSOR",
     "LICENCE_HOLDER",
+    "USER_FACILITY",  # tr28 (B9): a US user facility's profile (name, address, contact, HCFA number)
 )
 ANNEXES = ("A", "B", "C", "D", "E", "F", "G")
 MAPPING_STATES = ("PROPOSED", "APPROVED", "REJECTED")

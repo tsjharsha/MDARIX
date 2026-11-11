@@ -64,6 +64,29 @@ and user facility. MDARIX prepares; the customer submits: MDARIX never submits. 
 - `MDARIX_B9_CANADA` off: no Final is made, the chain route and the official form answer 404, A4, A5's previous date
   and A6 are typed as before.
 
+### Added (US importer and user facility, Part C: in progress)
+- **Your role in a market** (B9-D8): Manufacturer (the default, nothing changes), Importer (US, India, Canada) or User
+  facility (US only, while `MDARIX_B9_US_USER_FACILITY` is on). Set with `PUT /api/v1/complaints/reportability-roles`
+  by an approver (regulatory approval permission) with a reason, audited `REPORTING_ROLE_SET` with the old and new
+  role; a customer administrator alone is refused. The role picks the market's floor: a draft re-picks it at its next
+  save (signing a draft saved under another floor answers 409 `FLOOR_CHANGED`); signed conclusions keep theirs. A role
+  whose switch is off reads as Manufacturer. Settings show `reporting_roles` and `roles_offered`.
+- **US role floors** in the rule register, starter, from the start: `US-IMP-floor-1` (21 CFR 803.40: questions 1 to 5
+  of the US set by reference, word for word; 30 calendar days; no 5-work-day report) and `US-UF-floor-1` (803.30:
+  questions 1 to 3; 10 work days; no malfunction reports). Each rule names who must receive the report (death or
+  serious injury: FDA and the manufacturer; an importer's malfunction: the manufacturer only; a user facility's
+  serious injury: the manufacturer, FDA when the manufacturer is unknown), kept in the conclusion's rules applied.
+  Triage tiers follow the role's single period. Decision tables IMP-1..6, UF-1..5, VR-19, VR-20. Catalog ids
+  `CFR803_30` and `CFR803_40`.
+- The register: a floor may take its questions from another floor (`questions_from`), and list `recipients` per rule.
+  The manufacturer floors are unchanged (B4 equivalence green).
+
+### Database
+- `tr28marketroles` (from `tr27ruleregister`), expand-only: `reportability_settings.reporting_roles` (JSONB object,
+  default `{}`); the responsible-party role check gains `USER_FACILITY` (offered only for the US, while its switch is
+  on). Downgrade refuses while a user facility profile exists. Legacy organization databases: step `tr28` in
+  `scripts/add_workflow_tables_to_legacy_planes.py`.
+
 ### Fixed
 - India's P1 (date of report) and Canada's A6 no longer count as missing on the mandatory meter: they are filled at
   Send for approval, as FDA's B4 is (P1 had blocked Send for approval on the new navigation since step 14).

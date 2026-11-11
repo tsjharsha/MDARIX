@@ -1,0 +1,195 @@
+{
+  "code": "US-UF-floor-1",
+  "rule": "US-UF-floor",
+  "version": 1,
+  "kind": "REPORTABILITY_FLOOR",
+  "market": "US",
+  "held_as": "DATA",
+  "title": "US user facility reporting: when a report is owed, to whom, and by when",
+  "plain": "A death or serious injury the device caused or contributed to: a user facility reports in 10 work days. No malfunction reports.",
+  "source": [
+    {
+      "catalog": "CFR803_3",
+      "clause": "21 CFR 803.3"
+    },
+    {
+      "catalog": "CFR803_30",
+      "clause": "21 CFR 803.30"
+    }
+  ],
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": "21 CFR Part 803 as in force at awareness (for your consultant to confirm)",
+  "change": {
+    "kind": "INITIAL",
+    "reason": "B9 Part C (B9-D11): the user facility's floor, questions 1 to 3 reused from US-floor-1, 10 work days, no malfunction."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Owner",
+    "approved_on": "2026-11-11",
+    "built_by": "MDARIX engineering",
+    "release": "0.11.00",
+    "note": "B9 spec approved 11 Nov 2026 (B9-D8, D10, D11, D12): role floors, starter, from the start."
+  },
+  "switch": "MDARIX_B9_US_USER_FACILITY",
+  "content": {
+    "question_set": {
+      "version": "US-UF-starter-1",
+      "title": "US user facility reporting (21 CFR 803.30)",
+      "note": "Questions 1 to 3 of the manufacturer's set, word for word. Questions 4 to 6 are not asked: user facilities do not report malfunctions. Whether question 3's wording matches 803.30's test is to confirm with your consultant.",
+      "basis": [
+        "CFR803_3",
+        "CFR803_30"
+      ],
+      "questions_from": "US-floor-1",
+      "questions": [
+        "US1",
+        "US2A",
+        "US2B",
+        "US2C",
+        "US3"
+      ]
+    },
+    "report_types": {
+      "US_UF_10_WORK_DAY": {
+        "label": "10-work-day user facility report (21 CFR 803.30)",
+        "days": 10,
+        "basis": "WORK"
+      }
+    },
+    "precedence": [
+      "US_UF_10_WORK_DAY"
+    ],
+    "defs": {
+      "injury": {
+        "any": [
+          "US2A",
+          "US2B",
+          "US2C"
+        ]
+      }
+    },
+    "rules": [
+      {
+        "id": "F-UF-1",
+        "if": {
+          "all": [
+            "US1",
+            "US3"
+          ]
+        },
+        "cite": "21 CFR 803.30(a)(1)"
+      },
+      {
+        "id": "F-UF-2",
+        "if": {
+          "all": [
+            {
+              "ref": "injury"
+            },
+            "US3"
+          ]
+        },
+        "cite": "21 CFR 803.30(a)(2)"
+      }
+    ],
+    "recipients": {
+      "F-UF-1": [
+        "FDA",
+        "MANUFACTURER"
+      ],
+      "F-UF-2": [
+        "MANUFACTURER",
+        "FDA_IF_MANUFACTURER_UNKNOWN"
+      ]
+    },
+    "type_rows": [
+      {
+        "id": "T-UF-1",
+        "type": "US_UF_10_WORK_DAY"
+      }
+    ],
+    "notes": [
+      {
+        "if": {
+          "is_yes": {
+            "ref": "reportable"
+          }
+        },
+        "text": "User facility report: 10 work days (21 CFR 803.30). A death goes to FDA and the manufacturer; a serious injury to the manufacturer, or to FDA when the manufacturer is unknown. User facilities do not report malfunctions. Starter rule, for your consultant to confirm."
+      },
+      {
+        "if": {
+          "is_unknown": {
+            "ref": "reportable"
+          }
+        },
+        "text": "An Unknown answer could make the event reportable: the suggestion stays pending information, and \"not reportable\" cannot be concluded until it is answered."
+      }
+    ],
+    "folding": [
+      {
+        "if": {
+          "all": [
+            {
+              "is_no": "US1"
+            },
+            {
+              "is_no": {
+                "ref": "injury"
+              }
+            }
+          ]
+        },
+        "fold": [
+          "US3"
+        ],
+        "why": "Not asked: no death and no serious injury"
+      }
+    ],
+    "prefill": {
+      "death": [
+        "US1"
+      ],
+      "malfunction": [],
+      "injury_note": [
+        "US2A",
+        "US2B",
+        "US2C"
+      ]
+    },
+    "counting": {
+      "authority_zone": "America/New_York",
+      "awareness_is_day_one": false,
+      "words": "from the day after awareness; US Eastern time or yours, whichever ends first"
+    },
+    "provisional": {
+      "THREAT": [
+        10,
+        "WORK",
+        "10 work days (21 CFR 803.30)"
+      ],
+      "FLAGGED": [
+        10,
+        "WORK",
+        "10 work days (21 CFR 803.30)"
+      ],
+      "UNFLAGGED": [
+        10,
+        "WORK",
+        "10 work days (21 CFR 803.30)"
+      ],
+      "remedial": [
+        10,
+        "WORK",
+        "10 work days (21 CFR 803.30)"
+      ],
+      "ruled_out": "the role has one report period"
+    }
+  },
+  "content_hash": "sha256:95967bbb0a0ebc8a429aa0247d7c5eb438493dfad0f8d41097e8296452d5a698"
+}

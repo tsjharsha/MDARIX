@@ -114,7 +114,7 @@ def rules(
         if (market is None or entry["market"] == market) and (kind is None or entry["kind"] == kind)
     ]
     found.sort(key=lambda item: (list(register.KINDS).index(item["kind"]), item["market"] or "", item["code"]))
-    every = register.load().values()
+    every = [entry for entry in register.load().values() if register.offered(entry)]  # an off switch's rule hides
     return {
         "summary": {
             "rules": len({entry["rule"] for entry in every}),

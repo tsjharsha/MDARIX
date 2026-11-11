@@ -55,6 +55,9 @@ FLOOR_PARTS = (
     "counting", "provisional",
 )  # fmt: skip
 FLOOR_RULES = {"US": "US-floor", "EU_NI": "EU-floor", "GB": "GB-floor", "IN": "IN-floor", "CA": "CA-floor"}
+# B9 Part C: a tenant's role in a market other than Manufacturer reads its own floor, where one exists (only the US
+# law differs by role in the planning files). A role floor behind an off switch is never picked: Manufacturer's applies.
+ROLE_RULES = {("US", "IMPORTER"): "US-IMP-floor", ("US", "USER_FACILITY"): "US-UF-floor"}
 
 
 class RegisterError(ValueError):
@@ -80,6 +83,7 @@ def _problems(entries: list[tuple[str, dict]]) -> list[str]:
     problems: list[str] = []
     codes: dict[str, str] = {}
     versions: dict[tuple, str] = {}
+    by_code = {entry.get("code"): entry for _, entry in entries if isinstance(entry, dict)}
     for name, entry in entries:
         missing = [key for key in REQUIRED if key not in entry]
         if missing:
@@ -112,7 +116,13 @@ def _problems(entries: list[tuple[str, dict]]) -> list[str]:
             if entry.get("content_hash") != content_hash(entry.get("content")):
                 problems.append(f"{name}: content changed without a new version (content_hash does not match)")
             if entry["kind"] == "REPORTABILITY_FLOOR":
-                content = entry["content"]
+                content = _resolved(entry, by_code)["content"]
+                unworded = [q["id"] for q in content["question_set"]["questions"] if "text" not in q]
+                if unworded:  # a referenced question the named floor does not hold
+                    problems.append(
+                        f"{name}: questions not in {content['question_set'].get('questions_from')}: {unworded}"
+                    )
+                    continue
                 lacking = [part for part in FLOOR_PARTS if part not in content]
                 if lacking:
                     problems.append(f"{name}: floor lacks {', '.join(lacking)}")
@@ -174,7 +184,21 @@ def _load(directory: str) -> dict[str, dict]:
     problems = _problems(entries)
     if problems:
         raise RegisterError("; ".join(problems))
-    return {entry["code"]: entry for _, entry in entries}
+    by_code = {entry["code"]: entry for _, entry in entries}
+    return {code: _resolved(entry, by_code) for code, entry in by_code.items()}
+
+
+def _resolved(entry: dict, by_code: dict) -> dict:
+    """A floor whose question set names another floor's questions (``questions_from``, B9: no copies to drift) with
+    those questions in place, word for word; any other entry as it is. The content hash is the file's own."""
+    found = (entry.get("content") or {}).get("question_set") or {}
+    source = by_code.get(found.get("questions_from"))
+    if source is None or not isinstance(found.get("questions"), list):
+        return entry
+    wording = {question["id"]: question for question in source["content"]["question_set"]["questions"]}
+    questions = [wording.get(question_id, {"id": question_id}) for question_id in found["questions"]]
+    content = {**entry["content"], "question_set": {**found, "questions": questions}}
+    return {**entry, "content": content}
 
 
 def load() -> dict[str, dict]:
@@ -221,10 +245,12 @@ def state(entry: dict, day: date | None = None) -> str:
     return "IN_FORCE" if pick(entry["rule"], day)["code"] == entry["code"] else "REPLACED"
 
 
-def floor(market: str, day: date | None = None) -> dict | None:
-    """The market's reportability floor in force on ``day`` (today when None); None for a market without one."""
+def floor(market: str, day: date | None = None, role: str | None = None) -> dict | None:
+    """The market's reportability floor in force on ``day`` (today when None); None for a market without one. ``role``
+    (B9: IMPORTER, USER_FACILITY; None is Manufacturer) picks the role's own floor when one is in force."""
+    found = pick(ROLE_RULES[(market, role)], day) if (market, role) in ROLE_RULES else None
     rule = FLOOR_RULES.get(market or "")
-    return pick(rule, day) if rule else None
+    return found or (pick(rule, day) if rule else None)
 
 
 def floor_day(market: str, aware, org_zone: str | None = None) -> date | None:
@@ -245,9 +271,9 @@ def floor_day(market: str, aware, org_zone: str | None = None) -> date | None:
     return deadlines._utc(aware).astimezone(zone_info(zone) or timezone.utc).date()
 
 
-def floor_at(market: str, aware, org_zone: str | None = None) -> dict | None:
+def floor_at(market: str, aware, org_zone: str | None = None, role: str | None = None) -> dict | None:
     """The market's floor in force at an awareness moment (a datetime or a day); today's floor without awareness."""
-    return floor(market, floor_day(market, aware, org_zone))
+    return floor(market, floor_day(market, aware, org_zone), role)
 
 
 def code_hash(
