@@ -13,7 +13,7 @@ import { WorkspaceContext, useCan, useWorkspace } from "../workspaceContext";
 import { reportsTab, worksheetMarkets } from "../authorityReports";
 import { communicationsTab } from "../communications";
 import { recordName } from "../complaintReview";
-import { clockText } from "../reportability";
+import { ROLE_LABELS, clockText } from "../reportability";
 import {
   ANSWERS,
   ANSWER_LABELS,
@@ -857,6 +857,12 @@ export function SignedVersion({
         />
         {version.report_type_label && <span className="uw-cr-meta">{version.report_type_label}</span>}
         {version.due_on && <span className="uw-cr-meta">Due {formatDay(version.due_on)}</span>}
+        {(version.floor_code || version.role) && (
+          <span className="uw-cr-meta">
+            {version.floor_code ? `Rules ${version.floor_code}` : "Signed before the rule register"}
+            {version.role ? ` · your role: ${ROLE_LABELS[version.role] ?? version.role}` : ""}
+          </span>
+        )}
         <span className="uw-cr-meta">
           Signed by {version.signed_by} · {formatDate(version.signed_at)} · guide {versionWords(version.question_set)} ·
           scale {versionWords(version.scale_version)}

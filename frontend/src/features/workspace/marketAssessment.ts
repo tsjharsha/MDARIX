@@ -106,6 +106,10 @@ export type Version = {
   signed_by: string | null;
   signed_at: string | null;
   superseded: boolean;
+  /** B4/B9: the rules (floor) the version was decided under; null before the rule register. */
+  floor_code?: string | null;
+  /** B9: the organization's role the signed conclusion was decided in (MANUFACTURER, IMPORTER, USER_FACILITY). */
+  role?: string;
   sample: boolean;
   created_by: string;
   saved_at: string | null;

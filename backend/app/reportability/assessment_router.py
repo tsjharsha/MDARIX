@@ -196,6 +196,20 @@ def _date_calc(market: str, floor: dict, clock: dict | None, aware, seen: dict) 
     }
 
 
+def _with_role(view: dict | None, market: str, row, seen: dict) -> dict | None:
+    """B9 review 5: the role a signed conclusion was decided in, for its card beside the floor. Where the role has its
+    own floor (the US), the floor it was signed under says it; elsewhere (India, Canada: one floor for every role) it
+    is the organization's role in the market, as the report reads it."""
+    if view is None:
+        return None
+    if any(item == market for item, _ in register.ROLE_RULES):
+        rule = (register.get(row.floor_code) or {}).get("rule") if row.floor_code else None
+        role = next((role for (item, role), name in register.ROLE_RULES.items() if name == rule), "MANUFACTURER")
+    else:
+        role = (seen.get("roles") or {}).get(market) or "MANUFACTURER"
+    return {**view, "role": role}
+
+
 def _rules_used(market: str, at_event: dict | None, aware, seen: dict, draft, current) -> dict | None:
     """The "Rules used" panel (B4, C4), three lines kept apart: the floor in force on the awareness day and the rules
     that applied; the floor in force today, same or not; and what the signed conclusion recorded ("Signed before the
@@ -309,7 +323,7 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
                 "question_set_current": question_set.version == codes[market],
                 "rules_used": _rules_used(market, at_event, aware, seen, draft, current),
                 "threshold": {"level": markets.THRESHOLDS[market], "label": markets.THRESHOLD_LABELS[market]},
-                "current": assessments.row_view(current, names, codes[market]),
+                "current": _with_role(assessments.row_view(current, names, codes[market]), market, current, seen),
                 "draft": assessments.row_view(draft, names, codes[market]),
                 "evaluation": evaluation,
                 "disagreement": markets.disagreement(market, draft.answers or {}, draft.harm_level) if draft else None,

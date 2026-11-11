@@ -388,6 +388,24 @@ describe("the assessment screen", () => {
     expect(html).toContain("Reportable · version 1");
     expect(html).toContain("30-calendar-day report (21 CFR 803.50)");
     expect(html).toContain("Overrides the suggestion (pending information): Report when unsure, QP-08");
+    // B9 review 5: the floor and the role the conclusion was decided under, on its card.
+    expect(html).not.toContain("your role");
+    const importer = render(
+      <SignedVersion
+        version={{ ...signed, floor_code: "US-IMP-floor-1", role: "IMPORTER" }}
+        complaintId="c1"
+        onSaved={vi.fn()}
+      />,
+    );
+    expect(importer).toContain("Rules US-IMP-floor-1 · your role: Importer");
+    const before = render(
+      <SignedVersion
+        version={{ ...signed, floor_code: null, role: "MANUFACTURER" }}
+        complaintId="c1"
+        onSaved={vi.fn()}
+      />,
+    );
+    expect(before).toContain("Signed before the rule register · your role: Manufacturer");
     // A US conclusion opens its report worksheet (0.10.58); EU/NI and GB keep the filing reference and date.
     expect(html).toContain("Open the report worksheet");
     expect(html).not.toContain("Record the filing");

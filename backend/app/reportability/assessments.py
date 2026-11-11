@@ -108,6 +108,7 @@ def row_view(
         "signed_by": (names.get(row.signed_by) or "A colleague") if row.signed_by else None,
         "signed_at": _iso(row.signed_at),
         "superseded": row.superseded_by is not None,
+        "floor_code": row.floor_code,  # B4/B9: the rules the version was decided under (None: before the register)
         "sample": is_sample(row.source_system),
         "created_by": names.get(row.created_by) or "A colleague",
         "saved_at": _iso(row.updated_at),

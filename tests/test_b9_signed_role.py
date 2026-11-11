@@ -12,7 +12,7 @@ import pytest
 from backend.app.db.models.authority_reports import ReportSnapshot
 from backend.app.db.session import SessionLocal
 from tests.report_fill import fill
-from tests.test_authority_reports_api import REPORTS, _ok, _start_rv06
+from tests.test_authority_reports_api import REPORTS, _ok, _sign_rv06, _start_rv06
 from tests.test_b9_us_importer_report import IMPORTER, MAKER, PARTIES, trial  # noqa: F401 (fixture)
 from tests.test_reporting_capa_api import PASSWORD as COLLEAGUE_PASSWORD
 
@@ -28,7 +28,12 @@ def test_an_approved_importers_report_keeps_its_signed_role_and_frozen_recipient
             json={"market": "US", "role": "IMPORTER", "reason": "We import this device into the US from its maker."},
         )
     )
+    complaint = _sign_rv06(trial)
     detail = _start_rv06(trial)
+    # Review 5: the conclusion card names the floor and the role it was decided under.
+    card = _ok(user.get(f"/api/v1/complaints/{complaint}/market-assessments"))
+    us = next(item for item in card["markets"] if item["market"] == "US")["current"]
+    assert us["floor_code"] == "US-IMP-floor-1" and us["role"] == "IMPORTER", us
     _ok(user.put(PARTIES, json=IMPORTER))
     _ok(user.put(PARTIES, json=MAKER))
     _ok(user.put(f"{REPORTS}/{detail['id']}/fields/F2", json={"value": f"1234567-{date.today().year}-00002"}))
