@@ -42,6 +42,10 @@ SIGNING_ROUTES = {
     ("POST", "/api/v1/regulatory/documents/{document_id}/status"),
     ("POST", "/api/v1/reports/{obligation_id}/attached-submission"),  # B9b: the recorder signs (B9b-N4)
     ("POST", "/api/v1/reports/{obligation_id}/snapshots/{snapshot_id}/approve"),
+    ("POST", "/api/v1/reviews/access/sign"),  # B6a Part C: the signed reviews
+    ("POST", "/api/v1/reviews/audit-trail/sign"),
+    ("POST", "/api/v1/reviews/audit-trail/{review_id}/confirm"),
+    ("POST", "/api/v1/reviews/configuration/sign"),
     ("POST", "/api/v1/triage/downgrades/{task_id}"),
     ("POST", "/api/v1/triage/{kind}/{record_id}/confirm"),
     ("POST", "/api/v1/triage/{kind}/{record_id}/confirm-qms"),

@@ -127,7 +127,13 @@ B8_SWITCHES = {"MDARIX_B8_EU_MIR": True, "MDARIX_B8_GB_MIR": True}
 B9B_SWITCHES = {"MDARIX_B9B_OTHER": True}
 # B6a switches and their defaults (B6a-D13, all on): the daily deadline list and its downloads; the late-entry reason
 # and the duplicate check before saving a back-entered Case.
-B6_SWITCHES = {"MDARIX_B6_DEADLINE_LIST": True, "MDARIX_B6_LATE_ENTRY": True}
+# Part C: the signed reviews (G1, G14, G21) and the reason for change on reporting facts and the calendar (G10).
+B6_SWITCHES = {
+    "MDARIX_B6_DEADLINE_LIST": True,
+    "MDARIX_B6_LATE_ENTRY": True,
+    "MDARIX_B6_REVIEWS": True,
+    "MDARIX_B6_CHANGE_REASON": True,
+}
 SWITCHES = {**B9_SWITCHES, **B8_SWITCHES, **B9B_SWITCHES, **B6_SWITCHES}
 
 

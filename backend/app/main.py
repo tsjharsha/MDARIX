@@ -79,6 +79,7 @@ from backend.app.decision_guides.router import router as decision_guides_router
 from backend.app.decision_guides.trees import router as decision_trees_router
 from backend.app.rule_register.router import router as rule_register_router
 from backend.app.oversight.router import router as oversight_router
+from backend.app.signed_reviews.router import router as signed_reviews_router
 from backend.app.lot_impact.router import router as lot_impact_router
 from backend.app.qms_documents.router import router as qms_documents_router
 from backend.app.party_views.router import router as party_views_router
@@ -509,6 +510,7 @@ app.include_router(
 )  # The Decision trees tab: one tree per market, each complaint's path (0.10.75)
 app.include_router(communications_router)  # The external communications log (tr06)
 app.include_router(oversight_router)  # Reminders and escalation, the oversight view, the event closure (tr07)
+app.include_router(signed_reviews_router)  # B6a Part C: audit trail, access and configuration reviews, signed
 app.include_router(qms_documents_router)  # Ready-to-use documents, signed PDF and DOCX (T-G35)
 app.include_router(party_views_router)  # Distributor and authorised-representative preview, trial only (T-G37P)
 app.include_router(lot_impact_router)  # Lot impact on a case, trial only (T-G5, tr08)
