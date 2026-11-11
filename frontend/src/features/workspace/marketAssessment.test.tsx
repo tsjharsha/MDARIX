@@ -18,6 +18,7 @@ import {
   type Version,
 } from "./marketAssessment";
 import marketAssessmentSource from "./sections/MarketAssessment.tsx?raw";
+import { formatDay } from "../../app/dates";
 
 function workspace(permissions: string[]): WorkspaceApi {
   return {
@@ -373,6 +374,50 @@ describe("the assessment screen", () => {
     const html = render(<MarketPanel detail={detail(item())} item={item()} onSaved={vi.fn()} />, []);
     expect(html).not.toContain("Save and sign");
     expect(html).not.toContain("Before you sign");
+  });
+
+  it("shows a Canada foreign report's corrective-action decision day: provisional until entered, then dated", () => {
+    const foreign = version({
+      market: "CA",
+      conclusion: "REPORTABLE",
+      report_type: "CA_FOREIGN",
+      due_on: "2027-01-05",
+      due_now: "2027-01-05",
+      due_provisional: true,
+      decision_day: null,
+    });
+    const pending = render(<SignedVersion version={foreign} complaintId="c1" onSaved={vi.fn()} />);
+    expect(pending).toContain("(provisional)");
+    expect(pending).toContain("counted from awareness until the corrective-action decision day is entered");
+    expect(pending).toContain("Record the decision day");
+    const entered = render(
+      <SignedVersion
+        version={{
+          ...foreign,
+          due_now: "2027-01-09",
+          due_provisional: false,
+          decision_day: {
+            day: "2027-01-08",
+            by: "Rita Regulatory",
+            at: "2027-01-08T10:00:00+00:00",
+            reason: "Recall decided",
+          },
+        }}
+        complaintId="c1"
+        onSaved={vi.fn()}
+      />,
+    );
+    expect(entered).not.toContain("(provisional)");
+    expect(entered).toContain(`Due ${formatDay("2027-01-09")}`);
+    expect(entered).toContain("Entered by Rita Regulatory");
+    expect(entered).toContain("Correct the decision day");
+    expect(render(<SignedVersion version={foreign} complaintId="c1" onSaved={vi.fn()} />, [])).not.toContain(
+      "Record the decision day",
+    );
+    // Any other market or report type shows no decision day.
+    expect(
+      render(<SignedVersion version={{ ...foreign, report_type: "CA_10_DAY" }} complaintId="c1" onSaved={vi.fn()} />),
+    ).not.toContain("decision day");
   });
 
   it("shows a signed conclusion with its override, its scale reason and the filing to record", () => {

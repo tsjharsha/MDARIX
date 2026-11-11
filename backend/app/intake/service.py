@@ -915,7 +915,14 @@ def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datet
             if floor is not None:
                 floor = assessments.signed_floor(market, current, floor)
             clock = markets.market_clock(
-                market, current.conclusion, current.report_type, windows, aware, now, zone, floor=floor
+                market,
+                current.conclusion,
+                current.report_type,
+                windows,
+                assessments.clock_from(current, aware),
+                now,
+                zone,
+                floor=floor,
             )
             signed.setdefault(key, {})[market] = clock
     products = {

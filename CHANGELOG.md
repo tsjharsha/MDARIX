@@ -156,7 +156,19 @@ and user facility. MDARIX prepares; the customer submits: MDARIX never submits. 
   incident's preliminary report is due by the end of the day after the corrective-action decision day, counted from
   awareness until that day is known (provisional, noted on the conclusion); while "in Canada" is Unknown and CA6 is Yes
   the foreign clock applies (decision table CA-11; OD-3 otherwise unchanged). Signed conclusions keep version 1.
-  **Not built:** entering the corrective-action decision day (the clock stays provisional from awareness).
+- **The corrective-action decision day** (B9-D6): one date with a reason on a signed reportable Canada foreign
+  conclusion's card (`POST /api/v1/complaints/{id}/market-assessments/CA/corrective-action-day`, regulatory review or
+  approve). Each entry is its own audit event `CA_CORRECTIVE_ACTION_DAY_SET` on the complaint (who, when, reason, the
+  conclusion it was entered on); it is never written onto the signed conclusion, a correction is a new entry and the
+  latest counts. Once entered the foreign clock (watch, triage, card) is due by the end of the day after it and is no
+  longer provisional; an unsent Canada report takes that date. 404 while `MDARIX_B9_CANADA` is off. No migration.
+- `CA-floor-2`'s foreign report label is shorter (it did not fit the 160-character window name, so saving a foreign
+  incident's assessment failed); the provisional words stay in its notes. Content hash renewed (not released).
+
+### Fixed (review 6)
+- Triage's provisional clocks and the watch's pending clocks count by the organization's role floor: a user facility's
+  10 work days (803.30), not the manufacturer's 30 days; an importer never shows a 5-work-day clock. Manufacturers and
+  switched-off roles are unchanged.
 
 ### Not yet built (Part A)
 - The Final in the India sample (SAMPLE-RV-10) after a CAPA: waits for the owner, because the sample keeps RV-10 back

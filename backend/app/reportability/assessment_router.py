@@ -294,6 +294,9 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
     )
     if legacy is not None:
         refs.add(legacy.decided_by)
+    refs |= {
+        row.decision_day["by"] for rows in by_market.values() for row in rows if getattr(row, "decision_day", None)
+    }
     wanted_holders: dict[str, list[str]] = {}
     codes = guides.current_codes(db, tenant_id)
     for market in shown:
@@ -325,7 +328,12 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
                 "question_set_current": question_set.version == codes[market],
                 "rules_used": _rules_used(market, at_event, aware, seen, draft, current),
                 "threshold": {"level": markets.THRESHOLDS[market], "label": markets.THRESHOLD_LABELS[market]},
-                "current": _with_role(assessments.row_view(current, names, codes[market]), market, current, seen),
+                "current": _foreign(
+                    _with_role(assessments.row_view(current, names, codes[market]), market, current, seen),
+                    current,
+                    summary.get(market),
+                    names,
+                ),
                 "draft": assessments.row_view(draft, names, codes[market]),
                 "evaluation": evaluation,
                 "disagreement": markets.disagreement(market, draft.answers or {}, draft.harm_level) if draft else None,
@@ -926,3 +934,116 @@ def record_filing(
     )
     db.commit()
     return detail(db, control_db, ctx, complaint_id, today)
+
+
+class DecisionDayRequest(BaseModel):
+    decision_day: date
+    reason: str = Field(max_length=2000)
+
+
+@router.post("/{complaint_id}/market-assessments/CA/corrective-action-day", dependencies=[DECIDERS])
+def record_decision_day(
+    complaint_id: uuid.UUID,
+    payload: DecisionDayRequest,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """B9 step 20: enter, or correct, the corrective-action decision day of a signed Canada foreign report. Its own
+    audited entry (who, when, reason), never written onto the signed conclusion; the foreign clock is then due by the
+    end of the day after it and no longer provisional, and an unsent report takes that date."""
+    from backend.app.authority_reports import rules as report_rules
+    from backend.app.db.models.authority_reports import ReportObligation
+
+    if not feature_set.switched_on("MDARIX_B9_CANADA"):
+        raise _error(404, "NOT_FOUND", "Not found")
+    tenant_id = uuid.UUID(ctx.tenant_id)
+    today = service.today_utc()
+    _, record, seen, _ = _found(db, tenant_id, complaint_id, today)
+    reason = " ".join(payload.reason.split())
+    if len(reason) < rules.REASON_MIN:
+        raise _error(422, "REASON_REQUIRED", f"Say in at least {rules.REASON_MIN} characters why this day")
+    if payload.decision_day > today:
+        raise _error(422, "DAY_IN_FUTURE", "The corrective-action decision day cannot be in the future")
+    current, _ = assessments.current_and_draft(_versions(db, tenant_id, complaint_id, markets.CA, lock=True))
+    if current is None or current.conclusion != markets.REPORTABLE or current.report_type != assessments.CA_FOREIGN:
+        raise _error(409, "NOT_FOREIGN_REPORT", "Enter the decision day on a signed reportable Canada foreign incident")
+    before = assessments.decision_days(db, tenant_id, [complaint_id]).get(complaint_id)
+    day = payload.decision_day.isoformat()
+    if before and before["day"] == day:
+        raise _error(422, "NOTHING_TO_CHANGE", "This decision day is already recorded")
+    floor = (
+        assessments.signed_floor(markets.CA, current, register.floor(markets.CA))
+        if feature_set.rule_register()
+        else None
+    )
+    windows = service.settings_of(db, tenant_id)["windows"]
+    clock = markets.market_clock(
+        markets.CA,
+        markets.REPORTABLE,
+        current.report_type,
+        windows,
+        payload.decision_day,
+        today,
+        seen.get("org_zone"),
+        floor=floor,
+    )
+    report = (
+        db.query(ReportObligation)
+        .filter(
+            ReportObligation.tenant_id == tenant_id,
+            ReportObligation.complaint_id == complaint_id,
+            ReportObligation.market == markets.CA,
+            ReportObligation.kind == "INITIAL",
+        )
+        .with_for_update()
+        .first()
+    )
+    now = datetime.now(timezone.utc)
+    moved = None
+    if clock and report is not None and report.state not in report_rules.SUBMITTED:
+        moved = {"report_due_on": _iso_day(report.due_on), "to": clock["due_date"]}
+        report.due_on, report.due_provisional, report.updated_at = date.fromisoformat(clock["due_date"]), False, now
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=ctx.user_id,
+            action=assessments.DECISION_DAY_SET,
+            entity_type="Complaint",
+            entity_id=complaint_id,
+            correlation_id=ctx.correlation_id,
+            reason=reason,
+            details={
+                "complaint": complaint_ref(record),
+                "market": markets.CA,
+                "assessment_id": str(current.id),
+                "version": current.version,
+                "due_date": clock["due_date"] if clock else None,
+                **({"report": moved} if moved else {}),
+            },
+            old_values={"decision_day": before["day"]} if before else None,
+            new_values={"decision_day": day},
+            created_at=now,
+        )
+    )
+    db.commit()
+    return detail(db, control_db, ctx, complaint_id, today)
+
+
+def _iso_day(value) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+def _foreign(view: dict | None, row, item: dict | None, names: dict) -> dict | None:
+    """B9 step 20: a signed Canada foreign report's latest corrective-action decision day and the due date it gives;
+    provisional (counted from awareness) until the day is entered."""
+    if view is None or row.report_type != assessments.CA_FOREIGN:
+        return view
+    entry = getattr(row, "decision_day", None)
+    clock = (item or {}).get("clock")
+    return {
+        **view,
+        "decision_day": {**entry, "by": names.get(entry["by"]) or "A colleague"} if entry else None,
+        "due_provisional": entry is None,
+        "due_now": clock["due_date"] if clock else view["due_on"],
+    }

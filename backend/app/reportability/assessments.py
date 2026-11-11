@@ -10,6 +10,7 @@ recorded. Earlier single decisions (complaint_reportability) stay as they are an
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -35,7 +36,56 @@ def rows_by_complaint(
         .order_by(ComplaintMarketAssessment.version)
     ):
         found.setdefault(row.complaint_id, {}).setdefault(row.market, []).append(row)
+    foreign = [key for key, by in found.items() if any(row.report_type == CA_FOREIGN for row in by.get("CA", ()))]
+    for complaint_id, entry in decision_days(db, tenant_id, foreign).items():
+        for row in found[complaint_id]["CA"]:
+            row.decision_day = entry  # read only: an attribute outside the mapped (signed) columns
     return found
+
+
+# B9 step 20: the corrective-action decision day of a Canada foreign incident. It is usually known after the conclusion
+# is signed, so it is never written onto the signed row: each entry is its own audit event (who, when, reason) on the
+# complaint, naming the conclusion it was entered on; a correction is a new entry, the latest counts.
+CA_FOREIGN = "CA_FOREIGN"
+DECISION_DAY_SET = "CA_CORRECTIVE_ACTION_DAY_SET"
+
+
+def decision_days(db: Session, tenant_id: uuid.UUID, complaint_ids) -> dict[uuid.UUID, dict]:
+    """``{complaint id: the latest corrective-action decision day entry}`` (day, by, at, reason, version)."""
+    from backend.app.db.models.foundation import AuditEvent
+
+    ids = list(complaint_ids)
+    if not ids:
+        return {}
+    # shortcut: audit_events has no entity index (tenant + created only); fine while few Canada foreign reports exist,
+    # add an (tenant_id, entity_id) index if the watch slows.
+    events = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.tenant_id == tenant_id,
+            AuditEvent.action == DECISION_DAY_SET,
+            AuditEvent.entity_type == "Complaint",
+            AuditEvent.entity_id.in_(ids),
+        )
+        .order_by(AuditEvent.created_at, AuditEvent.chain_seq)
+    )
+    return {
+        event.entity_id: {
+            "day": event.new_values["decision_day"],
+            "by": event.actor_ref,
+            "at": event.created_at.isoformat(),
+            "reason": event.reason,
+            "version": (event.details or {}).get("version"),
+        }
+        for event in events
+    }
+
+
+def clock_from(row, aware):
+    """What a signed conclusion's clock counts from: a Canada foreign report from its corrective-action decision day
+    once entered (day 0; due by the end of the next day), from awareness until then (provisional)."""
+    entry = getattr(row, "decision_day", None) if row is not None and row.report_type == CA_FOREIGN else None
+    return date.fromisoformat(entry["day"]) if entry else aware
 
 
 def current_and_draft(versions: list[ComplaintMarketAssessment]):
@@ -192,7 +242,7 @@ def markets_summary(
                 clock_state,
                 report_type,
                 windows,
-                aware,
+                clock_from(signed if seen["state"] in markets.CONCLUSIONS else None, aware),
                 today,
                 org_zone,
                 if_reportable,

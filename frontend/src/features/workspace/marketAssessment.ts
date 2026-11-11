@@ -110,6 +110,11 @@ export type Version = {
   floor_code?: string | null;
   /** B9: the organization's role the signed conclusion was decided in (MANUFACTURER, IMPORTER, USER_FACILITY). */
   role?: string;
+  /** B9 step 20: a signed Canada foreign report's latest corrective-action decision day (its own audited entry). */
+  decision_day?: { day: string; by: string; at: string; reason: string | null } | null;
+  /** B9 step 20: the due date counted from awareness until that day is entered (provisional), then from that day. */
+  due_provisional?: boolean;
+  due_now?: string | null;
   sample: boolean;
   created_by: string;
   saved_at: string | null;

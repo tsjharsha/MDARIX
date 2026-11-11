@@ -121,7 +121,7 @@
         "basis": "CALENDAR"
       },
       "CA_FOREIGN": {
-        "label": "Incident outside Canada: preliminary report by the end of the day after the corrective-action decision (SOR/98-282 s. 60(1)(b), starter); counted from awareness until that day is known",
+        "label": "Incident outside Canada: preliminary report by the end of the day after the corrective-action decision (SOR/98-282 s. 60(1)(b), starter)",
         "days": 1,
         "basis": "CALENDAR"
       }
@@ -300,5 +300,5 @@
     }
   },
   "switch": "MDARIX_B9_CANADA",
-  "content_hash": "sha256:16a1548af0d1964b5c5e1f2bb39e3b2209206867af05ab1ba3aca14d65d43473"
+  "content_hash": "sha256:375ae51b892e6a64fa331c27bb5d9bb3afa9320b29265e763c2cdbae0b5efb3a"
 }

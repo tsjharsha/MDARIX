@@ -856,7 +856,12 @@ export function SignedVersion({
           label={`${CONCLUSION_LABELS[conclusion]} · version ${version.version}`}
         />
         {version.report_type_label && <span className="uw-cr-meta">{version.report_type_label}</span>}
-        {version.due_on && <span className="uw-cr-meta">Due {formatDay(version.due_on)}</span>}
+        {version.due_on && (
+          <span className="uw-cr-meta">
+            Due {formatDay(version.due_now ?? version.due_on)}
+            {version.due_provisional ? " (provisional)" : ""}
+          </span>
+        )}
         {(version.floor_code || version.role) && (
           <span className="uw-cr-meta">
             {version.floor_code ? `Rules ${version.floor_code}` : "Signed before the rule register"}
@@ -928,8 +933,76 @@ export function SignedVersion({
             </p>
           </form>
         )}
+      {conclusion === "REPORTABLE" && version.market === "CA" && version.report_type === "CA_FOREIGN" && (
+        <DecisionDay version={version} complaintId={complaintId} canDecide={canDecide} onSaved={onSaved} />
+      )}
       <InlineError text={error} />
     </section>
+  );
+}
+
+/** B9 step 20: a Canada foreign report's corrective-action decision day, entered after signing as its own audited entry
+ * (never on the signed conclusion); a correction is a new entry. Exported for tests. */
+export function DecisionDay({
+  version,
+  complaintId,
+  canDecide,
+  onSaved,
+}: {
+  version: Version;
+  complaintId: string;
+  canDecide: boolean;
+  onSaved: () => void;
+}) {
+  const entry = version.decision_day;
+  const [day, setDay] = useState("");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    try {
+      await send(assessmentPath(complaintId, "CA", "/corrective-action-day"), "POST", { decision_day: day, reason });
+      setDay("");
+      setReason("");
+      onSaved();
+    } catch (failure) {
+      setError(errorText(failure, "The decision day was not recorded."));
+    }
+  };
+  return (
+    <div>
+      <p className="uw-cr-meta">
+        {entry
+          ? `Corrective-action decision day ${formatDay(entry.day)}: the foreign report is due by the end of the next day. Entered by ${entry.by} · ${formatDate(entry.at)}${entry.reason ? ` · ${entry.reason}` : ""}`
+          : "Provisional: counted from awareness until the corrective-action decision day is entered (due by the end of the day after it)."}
+      </p>
+      {canDecide && (
+        <form className="ca-form-grid" onSubmit={save} aria-label="Corrective-action decision day">
+          <label className="ca-field">
+            Corrective-action decision day
+            <input type="date" value={day} onChange={(event) => setDay(event.target.value)} />
+          </label>
+          <label className="ca-field">
+            Why this day
+            <input
+              value={reason}
+              maxLength={ASSESSMENT_LIMITS.rationaleMax}
+              placeholder="e.g. the recall decision recorded in the CAPA"
+              onChange={(event) => setReason(event.target.value)}
+            />
+          </label>
+          <button
+            type="submit"
+            className="ac-secondary"
+            disabled={!day || reason.trim().length < ASSESSMENT_LIMITS.reasonMin}
+          >
+            {entry ? "Correct the decision day" : "Record the decision day"}
+          </button>
+        </form>
+      )}
+      <InlineError text={error} />
+    </div>
   );
 }
 

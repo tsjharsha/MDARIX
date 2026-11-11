@@ -80,3 +80,12 @@ def test_a_conclusion_signed_under_version_one_keeps_it():
     assert assessments.signed_floor("CA", signed, two)["code"] == "CA-floor-1"
     before = SimpleNamespace(floor_code=None)  # signed before the register: version 1
     assert assessments.signed_floor("CA", before, two)["code"] == "CA-floor-1"
+
+
+def test_every_floors_report_type_label_fits_the_window_name_column():
+    """A pending or signed clock stores the label as the window's name (complaint_market_assessments.window_name, 160):
+    the first CA-floor-2 label did not fit, and saving a foreign incident failed."""
+    for path in sorted(register._DIRECTORY.glob("*floor-*.json")):
+        content = json.loads(path.read_text(encoding="utf-8")).get("content") or {}
+        for code, kind in (content.get("report_types") or {}).items():
+            assert len(kind["label"]) <= 160, (path.name, code)
