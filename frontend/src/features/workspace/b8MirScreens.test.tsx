@@ -146,6 +146,27 @@ describe("B8: the EU MIR screens", () => {
     expect(render(<MirNeeds detail={approved as unknown as ReportDetail} />)).toBe("");
   });
 
+  it("GB report shows MORE as its only route", () => {
+    const mir = { snapshot: "s1", sha256: "ab".repeat(32), missing: [], errors: [] };
+    const more = [{ code: "MHRA_MORE", label: "MHRA's MORE portal" }];
+    const gb = { stage: "APPROVED", form: { code: "GB_MIR" }, routes: more, mir };
+    const html = render(<MirFiles detail={gb as unknown as ReportDetail} onXml={vi.fn()} />);
+    expect(html).toContain("Download XML (GB MIR 7.2.1)");
+    expect(html).toContain("upload the XML in MHRA&#x27;s MORE, the only route MHRA takes");
+    expect(html).toContain("The PDF is your record copy");
+    expect(html).not.toContain("national competent authority");
+    const draft = { ...gb, stage: "CREATED", mir: { ...mir, snapshot: null, missing: ["4.2f (4_2F)"] } };
+    expect(render(<MirNeeds detail={draft as unknown as ReportDetail} />)).toContain("MHRA&#x27;s GB schema");
+  });
+
+  it("a Northern Ireland incident uploads the EU file in MORE, version to confirm", () => {
+    const mir = { snapshot: "s1", sha256: "ab".repeat(32), missing: [], errors: [] };
+    const ni = { stage: "APPROVED", form: { code: "EU_MIR" }, routes: [{ code: "MHRA_MORE_EU" }], mir };
+    const html = render(<MirFiles detail={ni as unknown as ReportDetail} onXml={vi.fn()} />);
+    expect(html).toContain("Download XML (MIR 7.3.1)");
+    expect(html).toContain("to confirm with MHRA before your first upload");
+  });
+
   it("enters 4.3.3c as a table of periods and regions, every number a person's", () => {
     const item = {
       id: "4_3_3C",
