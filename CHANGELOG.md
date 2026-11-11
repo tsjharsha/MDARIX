@@ -34,12 +34,19 @@ and user facility. MDARIX prepares; the customer submits: MDARIX never submits. 
   approved snapshot's values, or "enter in ADRMS".
 - **India follow-up and final reports**, on demand only (`POST /api/v1/reports/{id}/india-chain`): one open at a time,
   a Final ends the chain, an optional next-report date labelled "No legal clock: your date". The report type (P2) now
-  follows the chain and the date of report (P1) is the day the report is sent for approval; neither is typed.
+  follows the chain and the date of report (P1) is the day the report is sent for approval; neither is typed. While
+  `MDARIX_B9_INDIA` is off, both are typed as before.
+- **India screens**: the report page (and the classic drawer) shows India's report chain with "Create a follow-up or
+  final report", and an unsent follow-up or final can be cancelled with a reason; an approved India report offers
+  "Official MvPI form v1.2 (PDF)" and "ADRMS entry sheet (PDF)". Hidden while `b9.india` is off.
+- A market conclusion's report type reads as the rule it was signed under: India under `IN-floor-2` reads "Serious
+  adverse event: 15 days (India MDR 2017 Rule 26, starter)"; one signed earlier keeps its own words.
+- User guide, Reports: "India: the official MvPI form, the ADRMS sheet, follow-up and final reports".
 - Session flags `b9.india`, `b9.canada`, `b9.us_importer`, `b9.us_user_facility`.
 
 ### Not yet built (Part A)
-- The screens (role per market, the India chain card, the floor on the conclusion), the Final in the India sample
-  after its CAPA, and the user guide. No database change in Part A.
+- The Final in the India sample (SAMPLE-RV-10) after a CAPA: waits for the owner, because the sample keeps RV-10 back
+  for the trial user's correction. No database change in Part A.
 
 ## [0.10.99] - not released yet
 

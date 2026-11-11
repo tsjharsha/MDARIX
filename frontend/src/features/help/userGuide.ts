@@ -681,6 +681,21 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             ],
             note: "In a free trial every snapshot and submission is a practice record. The worksheets' field order and mappings are starter text until the regulatory consultant confirms them.",
           },
+          {
+            title: "India: the official MvPI form, the ADRMS sheet, follow-up and final reports",
+            who: "Anyone with regulatory review or approval rights; downloads need export rights.",
+            steps: [
+              "A Reportable India conclusion is due 15 calendar days after awareness, the awareness day being day 1 (India MDR 2017 Rule 26, starter). An India window of exactly 15 calendar days is used as it is; a longer one no longer gives a later date. A conclusion signed before this rule keeps its own date.",
+              "Box P1 (date of report) is filled in with the day the report is sent for approval; box P2 (type of report) follows the chain: Initial, Follow up or Final. Neither is typed.",
+              "Once the report is approved, choose Official MvPI form v1.2 (PDF): MvPI's own form, filled from the approved snapshot, with a record page. Choose ADRMS entry sheet (PDF) to copy the values into ADRMS: its 16 mandatory fields in ADRMS's screen order, each value or Enter in ADRMS.",
+              "E-mail the official form to MvPI, or enter the sheet's values in ADRMS, then record the submission. MDARIX never submits.",
+              "After the initial report is accepted, under Report chain choose Create a follow-up or final report when the investigation has news: pick Follow up or Final, say what is new and, if you wish, a next-report date. No legal clock was found for these reports: the date is yours. MDARIX never creates one by itself.",
+              "Enter the root cause (box F3) on a follow-up or final. One follow-up is open at a time: submit it or cancel it (with a reason) before the next. A Final report ends the chain.",
+            ],
+            result:
+              "The initial report lists its follow-ups and final with their states; each child names the report it follows.",
+            note: "Where each value sits on MvPI's form (the field map) awaits one person's check against the printed form; until then compare the filled form with your copy before sending. The 15-day period, the recipients and the ADRMS order are starter text for your regulatory consultant to confirm.",
+          },
         ],
       },
       {
