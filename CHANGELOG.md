@@ -53,6 +53,12 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
   country (two-letter code; XI for Northern Ireland) and contact's first and last name, as the MIR files need them, and
   names the parts still to enter. "Enter once" on a report saves them on the party (and the product's UDI issuing
   entity), never over a value already held. A Settings save that does not send the parts keeps them.
+- **The EU MIR file** (`mir_xml.py`): one builder for the five report types, its elements in the order of each type's
+  own schema (SB-11252), checked against that schema before it is returned. A file the schema would refuse is never
+  made: each error names its MIR block ("1.2f Expected date of next report: ..."), and a value that does not fit its
+  place is never dropped to make the file pass. Blanks stay blank ("Unknown" only where the report says so, as 1.1c);
+  patient and reporter boxes are never written. The manufacturer and authorised representative go in from their
+  parts; a party missing a part is named with the parts to enter. The same report builds the same bytes.
 
 ### Database
 - `tr29partyparts` (from `tr28marketroles`, expand-only, no backfill): `market_responsible_parties` gains `street`,
