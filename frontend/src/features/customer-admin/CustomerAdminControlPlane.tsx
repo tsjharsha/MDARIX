@@ -7,6 +7,7 @@ import {
   Building2,
   Database,
   FileClock,
+  FileSignature,
   KeyRound,
   LayoutDashboard,
   LogOut,
@@ -37,6 +38,7 @@ import { SubscriptionSection } from "./sections/Subscription";
 import { SecuritySection } from "./sections/Security";
 import { NotificationsSection } from "./sections/Notifications";
 import { AuditSection } from "./sections/Audit";
+import { ReviewsSection } from "./sections/Reviews";
 import { OrganizationSection } from "./sections/Organization";
 
 // `description` is the short line in the side navigation; `purpose` is the one-line explanation under the page heading.
@@ -85,6 +87,11 @@ const NAV: Record<Section, { icon: typeof Users; description: string; purpose: s
     icon: FileClock,
     description: "Audit trail and exports",
     purpose: "A permanent record of every administrative change, which you can search and download.",
+  },
+  Reviews: {
+    icon: FileSignature,
+    description: "Signed reviews",
+    purpose: "The audit trail review, the access review and the configuration snapshot your organization signs.",
   },
   Organization: {
     icon: Building2,
@@ -256,6 +263,7 @@ export function CustomerAdminControlPlane({
                   {section === "Security" && <SecuritySection tab={tab} />}
                   {section === "Notifications" && <NotificationsSection />}
                   {section === "Audit" && <AuditSection />}
+                  {section === "Reviews" && <ReviewsSection />}
                   {section === "Organization" && <OrganizationSection />}
                 </div>
               </SectionErrorBoundary>

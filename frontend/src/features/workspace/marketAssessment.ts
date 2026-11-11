@@ -115,6 +115,9 @@ export type Version = {
   /** B9 step 20: the due date counted from awareness until that day is entered (provisional), then from that day. */
   due_provisional?: boolean;
   due_now?: string | null;
+  /** B6a G10: the facts it was counted from that differ now ("awareness", "country"); computed, never rewritten. */
+  facts_changed?: string[];
+  facts_changed_label?: string | null;
   sample: boolean;
   created_by: string;
   saved_at: string | null;

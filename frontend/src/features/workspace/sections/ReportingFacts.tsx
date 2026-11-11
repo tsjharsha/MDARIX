@@ -39,7 +39,8 @@ export function ReportingFacts({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   if (!needs?.length) return null;
-  const ready = needs.some((need) => values[need.fact]?.trim());
+  // B6a G10: every change of the country or the awareness date says why (kept in the audit trail).
+  const ready = needs.some((need) => values[need.fact]?.trim()) && Boolean(values.REASON?.trim());
   const save = async () => {
     setBusy(true);
     setError("");
@@ -47,6 +48,7 @@ export function ReportingFacts({
       await send(`/api/v1/complaints/${complaintId}/reporting-facts`, "PUT", {
         country: values.COUNTRY?.trim() || null,
         awareness_date: values.AWARENESS_DATE || null,
+        reason: values.REASON?.trim() || null,
       });
       setValues({});
       onSaved();
@@ -95,6 +97,17 @@ export function ReportingFacts({
           )}
         </div>
       ))}
+      {canEnter && (
+        <label className="uw-fact">
+          Why it changes{" "}
+          <input
+            maxLength={2000}
+            placeholder="For example: the reporter's e-mail of 3 November"
+            value={values.REASON ?? ""}
+            onChange={(event) => setValues({ ...values, REASON: event.target.value })}
+          />
+        </label>
+      )}
       {canEnter ? (
         <button
           type="button"

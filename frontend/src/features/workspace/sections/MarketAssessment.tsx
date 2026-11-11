@@ -855,6 +855,12 @@ export function SignedVersion({
           tone={conclusion === "REPORTABLE" ? "warning" : "good"}
           label={`${CONCLUSION_LABELS[conclusion]} · version ${version.version}`}
         />
+        {version.facts_changed_label && (
+          <ToneBadge
+            tone="warning"
+            label={`${version.facts_changed_label} (${(version.facts_changed ?? []).join(", ")})`}
+          />
+        )}
         {version.report_type_label && <span className="uw-cr-meta">{version.report_type_label}</span>}
         {version.due_on && (
           <span className="uw-cr-meta">

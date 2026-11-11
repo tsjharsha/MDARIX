@@ -12,6 +12,7 @@ export const SECTIONS = [
   "Security",
   "Notifications",
   "Audit",
+  "Reviews",
   "Organization",
 ] as const;
 

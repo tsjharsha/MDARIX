@@ -55,7 +55,12 @@ def test_once_the_country_is_known_the_header_clock_is_that_markets_deadline(fic
     entered as the United States, the header names the US clock, the deadline its triage table gives the US, and Home
     says the same: one calculation."""
     user, complaint_id = fic["user"], fic["complaint_id"]
-    _ok(user.put(f"/api/v1/complaints/{complaint_id}/reporting-facts", json={"country": "United States"}))
+    _ok(
+        user.put(
+            f"/api/v1/complaints/{complaint_id}/reporting-facts",
+            json={"country": "United States", "reason": "Reporter confirmed"},
+        )
+    )
     event = _ok(user.get("/api/v1/oversight/events/FIC-2001"))
     (header,) = [item for item in event["work"]["due"] if item["key"].endswith(":facts")]
     (us,) = [deadline for deadline in _triage_row(user, complaint_id)["deadlines"] if deadline["own"]]

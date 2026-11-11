@@ -159,6 +159,9 @@ def test_the_working_calendar_is_set_by_quality_and_used_by_the_communications_l
     )
     wrong = user.put(f"{VIEW}/settings", json={**_settings(), "time_zone": "Mars/Olympus"})
     assert wrong.status_code == 422 and wrong.json()["detail"]["code"] == "SETTINGS_INVALID"
+    # B6a G10: the calendar changes only with a reason (it changes reminders, not legal clocks).
+    no_reason = user.put(f"{VIEW}/settings", json={**_settings(), "reason": "  "})
+    assert no_reason.status_code == 422 and no_reason.json()["detail"]["code"] == "CHANGE_REASON_REQUIRED"
     # A browser's old name is stored under the current one.
     saved = _ok(user.put(f"{VIEW}/settings", json={**_settings(), "time_zone": "Asia/Calcutta"}))
     assert saved["time_zone"] == "Asia/Kolkata" and saved["holidays"][0] == {"date": "2026-11-09", "name": "Diwali"}
@@ -180,6 +183,7 @@ def _settings() -> dict:
         "holidays": [{"date": "2026-11-09", "name": "Diwali"}],
         "reminder_hours": 48,
         "escalation_role": "LEADER",
+        "reason": "Calendar of the India site",
     }
 
 

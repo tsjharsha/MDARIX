@@ -790,6 +790,8 @@ class SettingsIn(BaseModel):
     holidays: list[HolidayIn] = Field(default_factory=list, max_length=rules.HOLIDAYS_MAX * 2)
     reminder_hours: int = Field(ge=rules.HOURS_MIN, le=rules.HOURS_MAX)
     escalation_role: str = Field(max_length=60)
+    # B6a G10: why the calendar changes (reminders, not legal clocks); required while MDARIX_B6_CHANGE_REASON is on.
+    reason: str | None = Field(default=None, max_length=2000)
 
 
 def _settings_body(db, tenant_id) -> dict:
@@ -826,6 +828,11 @@ def save_settings(
         problem = "Choose the escalation role from the list"
     if problem:
         raise _error(422, "SETTINGS_INVALID", problem)
+    from backend.app import feature_set
+
+    reason = " ".join((payload.reason or "").split()) or None
+    if reason is None and feature_set.switched_on("MDARIX_B6_CHANGE_REASON"):
+        raise _error(422, "CHANGE_REASON_REQUIRED", "Say why the calendar or escalation changes")
     now = service.now_utc()
     row = service.settings_row(db, tenant_id)
     old = service.settings_view(row)
@@ -847,6 +854,7 @@ def save_settings(
             entity_type="OversightSettings",
             entity_id=row.id,
             correlation_id=ctx.correlation_id,
+            reason=reason,
             old_values={
                 key: old[key] for key in ("time_zone", "work_days", "holidays", "reminder_hours", "escalation_role")
             },

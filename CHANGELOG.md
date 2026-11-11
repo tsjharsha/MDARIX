@@ -123,6 +123,33 @@ No migration. Switches: `MDARIX_B6_DEADLINE_LIST` and `MDARIX_B6_LATE_ENTRY` (bo
   the complaints without a recorded reportability decision, earliest awareness first (it dropped the latest
   awareness first, decided or not), and says what it left out.
 
+### Reviews the customer signs (Part C, G1, G14, G21, G10)
+No migration. Switches `MDARIX_B6_REVIEWS` and `MDARIX_B6_CHANGE_REASON` (both on).
+- **One way to sign a review.** A review's content is kept as JSON in one audit event and signed as a
+  `SignedApprovalRecord` whose fingerprint is the SHA-256 of that content, after the current password (and the
+  authenticator code when signatures need MFA; refusals audited and counted on the signing lock). Nothing is edited
+  after signing; a correction is a new review naming the earlier one. Each signed review downloads as PDF (rendered
+  from the stored content) or JSON, audited (`/api/v1/reviews/signed/{id}`, `/download?format=pdf|json`).
+- **Audit trail review (G1).** Customer administration > Reviews, and Oversight for a Leader or Quality Reviewer:
+  the flags first (edits without a reason, edits after a signature, changes by administrator or MDARIX staff accounts,
+  more than 50 changes by one person in 10 minutes, changes outside the working calendar, 10 or more failed sign-ins
+  for one account in a day, the audit-chain check), then every event of the period with before and after. Reads the
+  control database and, on a dedicated plane, the plane's own database. Signed by a Leader or Quality Reviewer only
+  (never a customer administrator alone); a signer whose own actions are flagged needs a second reviewer's
+  confirmation. Monthly by default (shown as "next review due").
+- **Access review (G14).** One row per active user (roles, MFA, last active, invited, role and status changes since
+  the last review); each row marked Keep, Change or Remove (audited); the customer administrator's own row is marked
+  by another administrator, or by a Leader when there is one administrator; signed by the customer administrator once
+  every row is marked. Every 90 days.
+- **Configuration report (G21).** A snapshot of the configuration in force (reporting windows and look-back, role per
+  market, personal-data setting, rule-register floors in force, switches, calendar and escalation, complaint review,
+  communication, e-mail intake, AI, signal rule, connectors and mappings without keys or secret references, users and
+  roles), signed, downloadable, and compared with now or another snapshot: each changed item with who, when and why.
+- **Reason for change (G10).** Editing a complaint's country or awareness date, and the working calendar, now needs a
+  reason (kept in the audit trail). A signed market conclusion whose awareness or country differs now shows "Facts
+  changed after signing: re-check"; nothing signed is rewritten (re-check is the existing re-sign with a reason).
+  New conclusions keep the country in their date calculation.
+
 ## [0.11.02] - not released yet
 
 B9b: other countries, attach-only reports. For a country outside the five built-in markets (US, EU and Northern

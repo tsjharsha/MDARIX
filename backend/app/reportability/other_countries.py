@@ -304,7 +304,7 @@ def items(db: Session, control_db: Session, ctx, complaint_id, record: dict, see
                 "question_set": question_set.as_dict(),
                 "suggestions": markets.suggestions(question_set, record, floor),
                 "record_notes": markets.record_notes(question_set, record, floor),
-                "current": _view(current, names, floor),
+                "current": base._with_facts(_view(current, names, floor), current, seen),
                 "draft": _view(draft, names, floor),
                 "evaluation": engine.evaluate(floor["content"], draft.answers or {}) if draft is not None else None,
                 "history": [_view(row, names, floor) for row in reversed(versions) if row not in (current, draft)],

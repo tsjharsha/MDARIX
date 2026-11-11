@@ -94,6 +94,8 @@ class SignRequest(BaseModel):
 class FactsRequest(BaseModel):
     country: str | None = Field(default=None, max_length=rules.MARKET_MAX_LENGTH)
     awareness_date: date | None = None
+    # B6a G10 (D3): why the fact changes; required on every edit while MDARIX_B6_CHANGE_REASON is on.
+    reason: str | None = Field(default=None, max_length=2000)
 
 
 class FilingRequest(BaseModel):
@@ -187,6 +189,7 @@ def _date_calc(market: str, floor: dict, clock: dict | None, aware, seen: dict) 
         "authority_zone": counting["authority_zone"],
         "awareness_is_day_one": counting["awareness_is_day_one"],
         "org_zone": seen.get("org_zone"),
+        "country": seen.get("country"),  # B6a G10: the country the clock was counted for
         "counting_rule": "counting-starter-1",
         **(
             {key: clock.get(key) for key in ("source", "window", "days", "day_basis", "due_date", "due_zone")}
@@ -194,6 +197,29 @@ def _date_calc(market: str, floor: dict, clock: dict | None, aware, seen: dict) 
             else {"source": None}
         ),
     }
+
+
+def facts_changed(row, seen: dict) -> list[str]:
+    """B6a G10 (D3): the facts a signed conclusion was counted from that differ now: "awareness" (its date
+    calculation's awareness moment) and "country" (kept in the calculation from B6a on). Computed on read; nothing
+    signed is rewritten. Re-checking is the existing re-sign with a change reason."""
+    calc = (row.date_calc or {}) if row is not None and row.signed_at is not None else {}
+    changed = []
+    if calc.get("aware_at") and calc["aware_at"] != seen.get("aware_at"):
+        changed.append("awareness")
+    if "country" in calc and calc["country"] != seen.get("country"):
+        changed.append("country")
+    return changed
+
+
+def _with_facts(view: dict | None, row, seen: dict) -> dict | None:
+    if view is None:
+        return None
+    changed = facts_changed(row, seen)
+    return {**view, "facts_changed": changed, "facts_changed_label": FACTS_CHANGED_LABEL if changed else None}
+
+
+FACTS_CHANGED_LABEL = "Facts changed after signing: re-check"
 
 
 def _with_role(view: dict | None, market: str, row, seen: dict) -> dict | None:
@@ -330,11 +356,15 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
                 "question_set_current": question_set.version == codes[market],
                 "rules_used": _rules_used(market, at_event, aware, seen, draft, current),
                 "threshold": {"level": markets.THRESHOLDS[market], "label": markets.THRESHOLD_LABELS[market]},
-                "current": _foreign(
-                    _with_role(assessments.row_view(current, names, codes[market]), market, current, seen),
+                "current": _with_facts(
+                    _foreign(
+                        _with_role(assessments.row_view(current, names, codes[market]), market, current, seen),
+                        current,
+                        summary.get(market),
+                        names,
+                    ),
                     current,
-                    summary.get(market),
-                    names,
+                    seen,
                 ),
                 "draft": assessments.row_view(draft, names, codes[market]),
                 "evaluation": evaluation,
@@ -846,6 +876,9 @@ def set_reporting_facts(
             complaint.awareness_timestamp = moment
     if not new:
         raise _error(422, "NOTHING_TO_CHANGE", "Enter the country or the awareness date")
+    reason = " ".join((payload.reason or "").split()) or None
+    if reason is None and feature_set.switched_on("MDARIX_B6_CHANGE_REASON"):
+        raise _error(422, "CHANGE_REASON_REQUIRED", "Say why the country or awareness date changes")
     now = datetime.now(timezone.utc)
     complaint.updated_at = now
     db.add(
@@ -856,6 +889,7 @@ def set_reporting_facts(
             entity_type="Complaint",
             entity_id=complaint_id,
             correlation_id=ctx.correlation_id,
+            reason=reason,
             details={"complaint": complaint_ref(complaint), "fields": sorted(new)},
             old_values=old,
             new_values=new,

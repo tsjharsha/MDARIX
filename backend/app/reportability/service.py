@@ -280,6 +280,8 @@ def assess(
         "aware_at": aware.isoformat() if aware else None,
         "aware_source": source,
         "days_since_aware": (deadlines.day_of(today) - aware.date()).days if aware else None,
+        # B6a G10: kept with a conclusion's date calculation, to tell when the country changed after signing.
+        "country": record.get("country"),
         "triggers": rules.triggers_of(record),
         "clocks": [clock.as_dict() for clock in clock_list],
         "binding": clock_list[0].as_dict() if clock_list else None,

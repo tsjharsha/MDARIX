@@ -31,6 +31,7 @@ import {
 } from "../oversight";
 import { InlineError, Why } from "./boardParts";
 import { TryDailyList } from "./Account";
+import { AuditTrailReview } from "../../customer-admin/sections/Reviews";
 
 const useOpen = useOpenTarget;
 
@@ -54,6 +55,8 @@ export function OversightView({
   // The event whose checklist is open is part of the address (Oversight?event=<complaint id>).
   const [event, setEvent] = useTabParam("event", "push", initialEvent);
   const view = data.data;
+  // B6a G1: the audit trail review is signed by a Leader or Quality Reviewer (the server decides; this only shows it).
+  const reviews = useCan("quality.review");
   const go = useOpen();
   const { open } = useWorkspace();
   if (part === "events")
@@ -131,6 +134,7 @@ export function OversightView({
       </Panel>
       {part === "all" && view && <EventsPanel events={view.events} onOpen={setEvent} />}
       {part === "all" && view && <CalendarPanel settings={view.settings} onSaved={data.reload} />}
+      {part === "all" && reviews && <AuditTrailReview />}
       {event && <EventDrawer complaintId={event} onClose={() => setEvent(null)} onChanged={data.reload} />}
     </div>
   );
@@ -742,6 +746,7 @@ export function CalendarPanel({ settings, onSaved }: { settings: OversightSettin
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
+  const [why, setWhy] = useState("");
   const shown = draft ?? full.data ?? settings;
   const edit = (next: Partial<OversightSettings>) => setDraft({ ...shown, ...next });
   const save = async () => {
@@ -755,8 +760,10 @@ export function CalendarPanel({ settings, onSaved }: { settings: OversightSettin
         holidays: shown.holidays,
         reminder_hours: shown.reminder_hours,
         escalation_role: shown.escalation_role,
+        reason: why.trim(),
       });
       setDraft(body);
+      setWhy("");
       setSaved("Saved. Due times from now on count on this calendar.");
       onSaved();
     } catch (reason) {
@@ -889,17 +896,24 @@ export function CalendarPanel({ settings, onSaved }: { settings: OversightSettin
               />
             </div>
           </fieldset>
+          <label className="ca-field">
+            Why it changes (kept in the audit trail)
+            <input value={why} maxLength={2000} onChange={(e) => setWhy(e.target.value)} />
+          </label>
           <div className="ca-action-row">
             <button
               type="button"
               className="ac-primary"
-              disabled={busy || !draft}
+              disabled={busy || !draft || !why.trim()}
               aria-describedby="calendar-why"
               onClick={() => void save()}
             >
               {busy ? "Saving…" : "Save the calendar"}
             </button>
-            <Why id="calendar-why" text={!draft && "Change something first."} />
+            <Why
+              id="calendar-why"
+              text={(!draft && "Change something first.") || (!why.trim() && "Say why it changes first.")}
+            />
             {saved && <small className="ac-muted">{saved}</small>}
           </div>
           <InlineError text={error} />

@@ -184,7 +184,8 @@ FACTS_CSV = (
 
 
 def _facts(user, complaint_id: str, **body):
-    return user.put(f"/api/v1/complaints/{complaint_id}/reporting-facts", json=body)
+    # B6a G10: every edit of a reporting fact carries a reason (the reason rule itself: test_b6a_change_reason.py).
+    return user.put(f"/api/v1/complaints/{complaint_id}/reporting-facts", json={"reason": "Reporter confirmed", **body})
 
 
 def test_f3_f4_f9_a_missing_country_or_awareness_date_is_asked_for_and_blocks_signing(trial):

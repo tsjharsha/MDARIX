@@ -193,7 +193,11 @@ def test_a_follow_up_request_is_due_on_the_day_its_task_is_due_on_the_organizati
     user = trial["user"]
     settings = _ok(user.get("/api/v1/oversight/settings"))
     keep = {key: settings[key] for key in ("work_days", "holidays", "reminder_hours", "escalation_role")}
-    _ok(user.put("/api/v1/oversight/settings", json={**keep, "time_zone": "America/New_York"}))
+    _ok(
+        user.put(
+            "/api/v1/oversight/settings", json={**keep, "time_zone": "America/New_York", "reason": "Back to New York"}
+        )
+    )
     unknown = {f"Q{n}": {"answer": "NO"} for n in range(1, 10)} | {"Q4": {"answer": "UNKNOWN"}}
     logged = _ok(
         user.post(
