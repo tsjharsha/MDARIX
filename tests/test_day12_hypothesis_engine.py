@@ -153,7 +153,9 @@ def test_hypothesis_provenance_persisted():
         db.close()
 
 
-def test_hypothesis_api_create_list_and_get():
+def test_hypothesis_api_create_list_and_get(monkeypatch):
+    # AI answering for the organization (RCA-D13: with AI off the route runs no analysis and answers an off state).
+    monkeypatch.setattr("backend.app.investigations.router.ai_ready", lambda control, tenant_id: True)
     _, investigation_id = context()
     response = client.post(
         f"/api/v1/investigations/{investigation_id}/hypotheses",

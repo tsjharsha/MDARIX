@@ -2,7 +2,9 @@ from backend.app.main import app
 from tests.conftest import authenticated_client, golden_investigation_id
 
 
-def test_assurance_persists_profile_and_checks():
+def test_assurance_persists_profile_and_checks(monkeypatch):
+    # AI answering for the organization (RCA-D13: with AI off the analysis routes answer an off state).
+    monkeypatch.setattr("backend.app.investigations.router.ai_ready", lambda control, tenant_id: True)
     client = authenticated_client(app)
     # Create a real investigator execution in the golden tenant instead of
     # relying on an execution id that only existed in one local database.

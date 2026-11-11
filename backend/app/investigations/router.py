@@ -2,9 +2,13 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from backend.app.ai_settings import ai_ready
+
 from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from hypothesis_engine.schemas import HypothesisSetRequest, HypothesisSetResponse
 from hypothesis_engine.service import CompetingHypothesisService, HypothesisEngineError
@@ -41,6 +45,21 @@ def workspace_error(exc: InvestigationWorkspaceError) -> HTTPException:
 def investigator_error(exc: InvestigatorError) -> HTTPException:
     status = 404 if exc.code in {"INVESTIGATION_NOT_FOUND", "ANALYSIS_NOT_FOUND"} else 400
     return HTTPException(status_code=status, detail={"code": exc.code, "message": exc.message})
+
+
+# RCA-D13: while no model answers for the organization, the analysis would be keyword rules written for the sample
+# data, run on the organization's records. The analysis routes answer with this state instead and run nothing; analyses
+# stored earlier stay stored (ai_executions) and come back when AI answers again.
+AI_ANALYSIS_OFF = {
+    "analysis": None,
+    "persisted": False,
+    "state": "AI_OFF",
+    "message": "AI analysis is off for this organization.",
+}
+
+
+def analysis_off(control: Session, tenant_id) -> JSONResponse | None:
+    return None if ai_ready(control, tenant_id) else JSONResponse(dict(AI_ANALYSIS_OFF))
 
 
 def hypothesis_error(exc: HypothesisEngineError) -> HTTPException:
@@ -83,9 +102,12 @@ def create_investigation_analysis(
     investigation_id: uuid.UUID,
     request: InvestigationAnalysisRequest,
     data_db: Session = Depends(get_data_plane_db),
+    control: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> InvestigationAnalysisResponse:
     tenant_id = ctx.tenant_id
+    if off := analysis_off(control, tenant_id):
+        return off
     scoped_request = request.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id})
     try:
         result = investigator_service.analyze(data_db, scoped_request)
@@ -99,9 +121,12 @@ def get_latest_investigation_analysis(
     investigation_id: uuid.UUID,
     request: Request,
     data_db: Session = Depends(get_data_plane_db),
+    control: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> InvestigationAnalysisResponse:
     tenant_id = ctx.tenant_id
+    if off := analysis_off(control, tenant_id):
+        return off
     result = investigator_service.latest(data_db, tenant_id, investigation_id)
     if result is None:
         # 404, or 200 with nothing saved for the case workspace (?missing=empty; backend/app/saved_results.py, UX-15).
@@ -114,9 +139,12 @@ def get_investigation_analysis(
     investigation_id: uuid.UUID,
     analysis_id: uuid.UUID,
     data_db: Session = Depends(get_data_plane_db),
+    control: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> InvestigationAnalysisResponse:
     tenant_id = ctx.tenant_id
+    if off := analysis_off(control, tenant_id):
+        return off
     try:
         result = investigator_service.get(data_db, tenant_id, investigation_id, analysis_id)
     except InvestigatorError as exc:
@@ -133,13 +161,17 @@ def create_hypotheses(
     investigation_id: uuid.UUID,
     request: HypothesisSetRequest,
     data_db: Session = Depends(get_data_plane_db),
+    control: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> HypothesisSetResponse:
     tenant_id = ctx.tenant_id
     scoped_request = request.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id})
     try:
-        result = hypothesis_service.generate(data_db, scoped_request)
+        # RCA-D13: while AI is off, only a saved analysis named in the request is built on; none is run.
+        result = hypothesis_service.generate(data_db, scoped_request, run_analysis=ai_ready(control, tenant_id))
     except HypothesisEngineError as exc:
+        if exc.code == "AI_OFF":
+            return JSONResponse({"hypothesis_set": None, "persisted": False, "state": "AI_OFF", "message": exc.message})
         raise hypothesis_error(exc) from exc
     return with_hypothesis_business_ids(data_db, tenant_id, result)
 
