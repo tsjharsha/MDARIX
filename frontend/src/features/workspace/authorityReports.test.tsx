@@ -470,3 +470,31 @@ describe("B9 step 11: Canada's chain card follows the Canada switch", () => {
     expect(html).not.toContain("Create an update");
   });
 });
+
+describe("B9 step 15: a US importer's report", () => {
+  it("shows its rules, its role, each recipient and the starter follow-up clock", () => {
+    resources.data["/api/v1/reports/r1"] = detail("APPROVED", {
+      assessment: {
+        conclusion: "REPORTABLE",
+        report_type_label: "30-calendar-day importer report (21 CFR 803.40)",
+        floor_code: "US-IMP-floor-1",
+        role: "IMPORTER",
+        signed_by: "Asha Rao",
+        signed_at: "2026-11-04T09:00:00Z",
+        version: 1,
+      },
+      recipients: [
+        { recipient: "FDA", label: "Sent to FDA", route: "EMDR", recorded: false },
+        { recipient: "MANUFACTURER", label: "Sent to the manufacturer", route: "MFR_COPY", recorded: true },
+      ],
+      follow_up_clock:
+        "Due 30 calendar days after the new information arrived. Starter, for your consultant to confirm.",
+    });
+    const html = render(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />);
+    expect(html).toContain("rules US-IMP-floor-1");
+    expect(html).toContain("(your role: Importer)");
+    expect(html).toContain("Sent to FDA: to record");
+    expect(html).toContain("Sent to the manufacturer: recorded");
+    expect(html).toContain("Starter, for your consultant to confirm.");
+  });
+});

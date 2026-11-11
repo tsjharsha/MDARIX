@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { WORKSPACE_SECTIONS, WorkspaceContext, sectionAllowed, type WorkspaceApi } from "./workspaceContext";
 import { WatchCard } from "./sections/ReportabilityWatch";
-import { WindowsBody } from "./sections/ReportingWindows";
+import { RolesBody, WindowsBody } from "./sections/ReportingWindows";
 import { CapaCard, CheckBody, RecordsSection, RecurrenceView } from "./sections/Records";
 import { addressFor, locationFromAddress } from "./workspaceAddress";
 import { VIEW_TO_SECTION } from "./UserWorkspace";
@@ -392,5 +392,35 @@ describe("the Records section", () => {
     });
     expect(sectionAllowed("Records", ["home"])).toBe(true);
     expect(render(<RecordsSection />)).toContain("Effectiveness checks");
+  });
+});
+
+describe("B9 step 15: the organization's role in each market", () => {
+  const settings = {
+    windows: [],
+    lookback_days: 30,
+    configured: true,
+    templates: [],
+    version: 1,
+    updated_by_name: null,
+    updated_at: null,
+    reporting_roles: { US: "IMPORTER" },
+    roles_offered: { US: ["MANUFACTURER", "IMPORTER"], IN: ["MANUFACTURER", "IMPORTER"] },
+  } as ReportabilitySettings;
+
+  it("shows each market's role and lets a person with regulatory approval change it with a reason", () => {
+    const markup = render(<RolesBody settings={settings} onSaved={vi.fn()} />, ["regulatory.approve"]);
+    expect(markup).toContain("Your role in each market");
+    expect(markup).toContain("<dt>United States</dt><dd>Importer</dd>");
+    expect(markup).toContain("<dt>India</dt><dd>Manufacturer</dd>");
+    expect(markup).toContain("Save role");
+    expect(markup).toContain("Reason (at least 10 characters");
+  });
+
+  it("is read-only to everyone else and hidden when no role is offered", () => {
+    expect(render(<RolesBody settings={settings} onSaved={vi.fn()} />, ["regulatory.review"])).not.toContain(
+      "Save role",
+    );
+    expect(render(<RolesBody settings={{ ...settings, roles_offered: {} }} onSaved={vi.fn()} />)).toBe("");
   });
 });

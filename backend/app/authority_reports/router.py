@@ -402,6 +402,9 @@ def _assessment_view(context: dict, names: dict) -> dict | None:
         "conclusion": row.conclusion,
         "suggested": row.suggested_conclusion,
         "report_type_label": assessments.type_label(row, kind),  # the words of the floor it was signed under (B9)
+        # B9 step 15: the rules (floor) it was decided under and, on a US report, the organization's role.
+        "floor_code": row.floor_code,
+        "role": context.get("us_role"),
         "signed_by": names.get(row.signed_by) if row.signed_by else None,
         "signed_by_id": row.signed_by,
         "signed_at": _iso(row.signed_at),

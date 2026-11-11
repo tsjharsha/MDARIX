@@ -13,6 +13,8 @@ import {
   windowsBody,
   windowsChanged,
   windowsProblem,
+  ROLE_LABELS,
+  ROLE_MARKETS,
   type ReportabilitySettings,
   type WindowForm,
 } from "../reportability";
@@ -30,7 +32,104 @@ export function ReportingWindows() {
   return (
     <Panel eyebrow="Complaints" title="Reporting windows" source={settings}>
       {settings.data && <WindowsBody key={settings.data.version} settings={settings.data} onSaved={settings.reload} />}
+      {settings.data && <RolesBody settings={settings.data} onSaved={settings.reload} />}
     </Panel>
+  );
+}
+
+/**
+ * B9 (B9-D8): the organization's role in each market (Manufacturer unless set). It picks the rules MDARIX applies to
+ * that market's assessments: an importer or user facility in the US has its own rules and section F of Form 3500A.
+ * Changed only by a person with regulatory approval, with a reason (audited); signed conclusions keep their rules.
+ */
+export function RolesBody({ settings, onSaved }: { settings: ReportabilitySettings; onSaved: () => void }) {
+  const { notify } = useWorkspace();
+  const canEdit = useCan("regulatory.approve");
+  const offered = settings.roles_offered ?? {};
+  const current = settings.reporting_roles ?? {};
+  const [market, setMarket] = useState(Object.keys(offered)[0] ?? "");
+  const [role, setRole] = useState(current[market] ?? "MANUFACTURER");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  if (!Object.keys(offered).length) return null;
+  const changed = (current[market] ?? "MANUFACTURER") !== role;
+  const short = reason.trim().length < 10;
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!changed || short) return;
+    setBusy(true);
+    setError("");
+    try {
+      await send("/api/v1/complaints/reportability-roles", "PUT", { market, role, reason: reason.trim() });
+      notify(`Your role in ${ROLE_MARKETS[market] ?? market} is now ${ROLE_LABELS[role] ?? role}.`);
+      setReason("");
+      onSaved();
+    } catch (failure) {
+      setError(errorText(failure, "The role was not saved."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="ca-drawer-section">
+      <h3>Your role in each market</h3>
+      <p className="ac-muted">
+        Manufacturer unless you set it. An importer or a US user facility reports under its own rules (for the US: 21
+        CFR 803.40 and 803.30, starter, for your consultant to confirm). A change applies to drafts at their next save;
+        signed conclusions keep the rules they were signed under.
+      </p>
+      <dl className="ca-facts">
+        {Object.keys(offered).map((code) => (
+          <div key={code}>
+            <dt>{ROLE_MARKETS[code] ?? code}</dt>
+            <dd>{ROLE_LABELS[current[code] ?? "MANUFACTURER"]}</dd>
+          </div>
+        ))}
+      </dl>
+      {canEdit && (
+        <form className="ca-form" onSubmit={submit}>
+          <div className="ca-form-grid">
+            <label className="ca-field">
+              <span>Market</span>
+              <select
+                value={market}
+                onChange={(event) => {
+                  setMarket(event.target.value);
+                  setRole(current[event.target.value] ?? "MANUFACTURER");
+                }}
+              >
+                {Object.keys(offered).map((code) => (
+                  <option key={code} value={code}>
+                    {ROLE_MARKETS[code] ?? code}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ca-field">
+              <span>Role</span>
+              <select value={role} onChange={(event) => setRole(event.target.value)}>
+                {(offered[market] ?? []).map((code) => (
+                  <option key={code} value={code}>
+                    {ROLE_LABELS[code] ?? code}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="ca-field">
+            <span>Reason (at least 10 characters, kept in the audit trail)</span>
+            <input value={reason} maxLength={500} onChange={(event) => setReason(event.target.value)} />
+          </label>
+          {error && <InlineError text={error} />}
+          <div className="ca-action-row">
+            <button type="submit" className="ac-primary" disabled={busy || !changed || short}>
+              Save role
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
   );
 }
 

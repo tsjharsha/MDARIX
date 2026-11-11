@@ -51,7 +51,18 @@ export type ReportabilitySettings = {
   updated_at: string | null;
   /** B4 FG-1: windows that can end after the law's longest period for a market they cover (a warning, never refused). */
   longer_than_law?: Array<{ window: string; market: string; market_label: string; legal: string; message: string }>;
+  /** B9: the organization's role per market (absent: Manufacturer) and the roles offered now, per market. */
+  reporting_roles?: Record<string, string>;
+  roles_offered?: Record<string, string[]>;
 };
+
+/** B9: a reporting role's words. */
+export const ROLE_LABELS: Record<string, string> = {
+  MANUFACTURER: "Manufacturer",
+  IMPORTER: "Importer",
+  USER_FACILITY: "User facility",
+};
+export const ROLE_MARKETS: Record<string, string> = { US: "United States", IN: "India", CA: "Canada" };
 
 export type Clock = {
   window: string;

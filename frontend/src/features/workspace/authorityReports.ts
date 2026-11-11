@@ -219,6 +219,10 @@ export type ReportDetail = {
     report_kind?: string | null;
   };
   routes: Route[];
+  /** B9 step 8: a US importer's or user facility's recipients, each recorded apart ("Sent to FDA", "... manufacturer"). */
+  recipients?: { recipient: string; label: string; route: string; recorded: boolean }[] | null;
+  /** B9 step 9: an importer's or user facility's follow-up clock, a labelled starter. */
+  follow_up_clock?: string | null;
   state: ObligationState;
   state_label: string;
   next_step: string;
@@ -236,6 +240,9 @@ export type ReportDetail = {
   assessment: {
     conclusion: string | null;
     report_type_label: string | null;
+    /** B9: the rules (floor) the conclusion was decided under, and a US report's role (IMPORTER, USER_FACILITY). */
+    floor_code?: string | null;
+    role?: string | null;
     signed_by: string | null;
     signed_at: string | null;
     version: number;

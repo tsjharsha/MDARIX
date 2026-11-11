@@ -13,6 +13,7 @@ import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
 import { CodePicker } from "./CodePicker";
 import { FollowUps, openFollowUp } from "./FollowUps";
+import { ROLE_LABELS } from "../reportability";
 import {
   OUTCOME_LABELS,
   REASON_MIN,
@@ -267,8 +268,22 @@ export function ReportDrawer({
               ? ` · ${detail.market} conclusion: ${detail.assessment.conclusion ? `${detail.assessment.conclusion.toLowerCase().replace("_", " ")}, signed by ${detail.assessment.signed_by} ${formatDate(detail.assessment.signed_at)}` : "not signed yet (pending)"}`
               : ""}
             {detail.assessment?.report_type_label ? ` · ${detail.assessment.report_type_label}` : ""}
+            {detail.assessment?.floor_code ? ` · rules ${detail.assessment.floor_code}` : ""}
+            {detail.assessment?.role
+              ? ` (your role: ${ROLE_LABELS[detail.assessment.role] ?? detail.assessment.role})`
+              : ""}
             {detail.case ? ` · ${detail.case}` : ""}
           </p>
+          {detail.follow_up_clock && <p className="ac-muted">{detail.follow_up_clock}</p>}
+          {detail.recipients && (
+            <ul className="uw-cr-meta" aria-label="Who must receive this report">
+              {detail.recipients.map((item) => (
+                <li key={item.recipient}>
+                  {item.label}: {item.recorded ? "recorded" : "to record"} (record each send by its route)
+                </li>
+              ))}
+            </ul>
+          )}
           <CommunicationsLink complaintId={detail.complaint.id} />
         </section>
         {/* B9: India's chain (follow-up and final on demand) on the classic navigation too. */}
