@@ -125,3 +125,31 @@ def test_a_value_that_is_none_of_the_forms_choices_ticks_nothing():
 def test_the_same_snapshot_gives_the_same_values():
     first = _fields(mvpi_mdae.render(_view(REPORT), "Org"))
     assert first == _fields(mvpi_mdae.render(_view(REPORT), "Org"))
+
+
+# ------------------------------------------------------------------------------------- step 13: the ADRMS entry sheet
+
+
+def test_the_adrms_sheet_lists_all_16_mandatory_fields_in_screen_order_with_the_forms_values():
+    """B9-06: each field has the snapshot's value or "enter in ADRMS"; the values are the form's."""
+    rows = mvpi_mdae.adrms_rows(_sections(REPORT))
+    assert len(rows) == 16 and [name for name, _ in rows] == [name for name, _ in mvpi_mdae.ADRMS_FIELDS]
+    found = dict(rows)
+    assert found["Report type"] == "Initial" and found["Date of report"] == REPORT["P1"]
+    assert found["Serious case, with its reasons"] == REPORT["B8"] and found["Description"] == REPORT["B12"]
+    assert found["Patient involved"].startswith("Yes") and found["Reported by"] == "Manufacturer"
+    assert "Device risk classification" in found["Device information"] and "PW-410" in found["Device information"]
+    assert [name for name, value in rows if value == mvpi_mdae.ENTER] == [
+        "Reporter department",
+        "Reporter country",
+        "Reporter mobile",
+        "Patient outcome",
+    ]
+    text = PdfReader(io.BytesIO(mvpi_mdae.adrms_sheet(_view(REPORT), "Org"))).pages[0].extract_text()
+    assert "16. Patient outcome *: enter in ADRMS" in text.replace("\n", " ") and "MDARIX never submits" in text
+
+
+def test_a_non_serious_event_reads_no_and_nothing_held_reads_enter_in_adrms():
+    found = dict(mvpi_mdae.adrms_rows(_sections({"B9": "Yes"})))
+    assert found["Serious case, with its reasons"] == "No (non-serious event)"
+    assert found["Patient involved"] == found["Report type"] == mvpi_mdae.ENTER

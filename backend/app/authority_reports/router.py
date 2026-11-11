@@ -2610,7 +2610,7 @@ def export(
     db.commit()
     stem = f"mdarix-{obligation.form_code.lower().replace('_', '-')}-{view['complaint']['ref']}"
     stem += f"-snapshot-{frozen.version}" if frozen else "-draft"
-    stem += "-official-form" if form else ""
+    stem += {"official": "-official-form", "adrms": "-adrms-entry-sheet"}.get(form or "", "")
     return Response(
         content=body,
         media_type=MEDIA[kind],
@@ -2630,7 +2630,13 @@ def _mvpi_form(view: dict, organization: str | None) -> bytes:
     return mvpi_mdae.render(view, organization)
 
 
-INDIA_FILES = {"official": _mvpi_form}
+def _adrms_sheet(view: dict, organization: str | None) -> bytes:
+    from backend.app.authority_reports import mvpi_mdae
+
+    return mvpi_mdae.adrms_sheet(view, organization)
+
+
+INDIA_FILES = {"official": _mvpi_form, "adrms": _adrms_sheet}
 
 
 def snapshot_file(frozen: ReportSnapshot, parties, organization: str | None, practice: bool):

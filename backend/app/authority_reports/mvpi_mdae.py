@@ -303,3 +303,70 @@ def _on_state(page, name: str) -> str:
         if name in (widget.get("/T"), parent and parent.get_object().get("/T")):
             return next(key for key in widget["/AP"]["/N"] if key != "/Off")
     raise KeyError(name)
+
+
+# ------------------------------------------------------------------------------------- the ADRMS entry sheet (step 13)
+ENTER = "enter in ADRMS"
+SHEET_TITLE = "ADRMS entry sheet - MDARIX's aid, not an MvPI form"
+# ADRMS's 16 mandatory fields (marked * on its screens), in its screen order, each with the form fields it reads
+# (ADRMS User Manual for Stakeholders, 18 Aug 2025, and the MDAE capture SOP of 3 Feb 2026: starter, for your
+# consultant to confirm against the portal).
+ADRMS_FIELDS = (
+    ("Patient involved", ()),
+    ("Report type", ("P2",)),
+    ("Date of report", ("P1",)),
+    ("Serious case, with its reasons", ("B8",)),
+    ("Reporter department", ()),
+    ("Reporter country", ()),
+    ("Reporter mobile", ()),
+    ("Reported by", ("R1",)),
+    ("Primary reporter", ("R1", "R3")),
+    ("Device category", ("CAT1", "CAT2", "CAT3", "CAT4", "CAT5", "CAT6")),
+    ("Device name", ("A_COMMON", "A_BRAND")),
+    ("Device information", ("A1", "A3", "A4", "A6", "A7", "A10", "A11")),
+    ("Event date", ("B1",)),
+    ("Adverse event category", ("B2",)),
+    ("Description", ("B12",)),
+    ("Patient outcome", ("C7",)),
+)
+
+
+def adrms_rows(sections: list[dict]) -> list[tuple[str, str]]:
+    """(ADRMS field, value): each value from the same approved snapshot as the form, or "enter in ADRMS"."""
+    from backend.app.authority_reports.fda_3500a import labels, values
+
+    vals, names = values(sections), labels(sections)
+    rows = []
+    for name, ids in ADRMS_FIELDS:
+        parts = [f"{names[i]}: {vals[i]}" if len(ids) > 1 else vals[i] for i in ids if vals.get(i)]
+        if name == "Patient involved" and "adverse event" in vals.get("B2", "").lower():
+            parts = ["Yes (an adverse event is recorded)"]
+        if name == "Serious case, with its reasons" and not parts and vals.get("B9", "").lower() == "yes":
+            parts = ["No (non-serious event)"]
+        rows.append((name, "; ".join(parts) or ENTER))
+    return rows
+
+
+def adrms_sheet(view: dict, organization: str | None) -> bytes:
+    """The values in ADRMS screen order, for fast copying (ADRMS has no import), then the approval."""
+    from backend.app.authority_reports.fda_3500a import PRACTICE
+    from backend.app.authority_reports.render import manifestation
+    from reports import pdf
+
+    snapshot = view.get("snapshot") or {}
+    header = [
+        "MDARIX's aid for entering the approved report in ADRMS. It is not an MvPI form and is not sent to MvPI.",
+        f"Organization: {organization or '-'}",
+        f"From approved snapshot {snapshot.get('version')}: the same values as the filled MvPI form v1.2",
+        "* = mandatory in ADRMS (starter, for your consultant to confirm against the portal).",
+        "MDARIX never submits. You enter the report in ADRMS yourself.",
+    ]
+    if view.get("practice_label"):
+        header.insert(0, PRACTICE)
+    body: list[tuple[str, str]] = [("ADRMS fields, in screen order", "heading")]
+    body += [(f"{n}. {name} *: {value}", "body") for n, (name, value) in enumerate(adrms_rows(view["sections"]), 1)]
+    body += [("", "body"), ("Approval", "heading")]
+    body += [(line, "body") for line in manifestation(view)]
+    watermark = "PRACTICE RECORD - NOT YOUR REGULATORY RECORD" if view.get("practice_label") else "MDARIX RECORD"
+    footer = f"{view['complaint']['ref']} - ADRMS entry sheet - MDARIX's aid, not an MvPI form"
+    return pdf.render(SHEET_TITLE, header, body, watermark=watermark, footer=footer)
