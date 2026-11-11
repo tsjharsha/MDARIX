@@ -139,6 +139,39 @@ Every read is under the 1 s budget, so the fallback index migration (OD-7, `tr20
 miss 500 ms at p95 only, their p50 being under 200 ms (a slower single read among ten). Query counts include the
 request's own session and access statements, not only the reads of the spec's tables.
 
+## B6a (0.11.03): the complaint page and the story at 5,000 complaints, 11 Nov 2026
+
+`MDARIX_TRIAL_LOAD_MEASURE=1 MDARIX_TRIAL_LOAD_PAGES=1 [MDARIX_TRIAL_LOAD_PROFILE=<folder>] pytest
+tests/test_trial_load_measure.py -s`: a new trial, its sample, the same synthetic 5,000-row export imported, then ten
+calls each of the complaint page (`GET /oversight/events/SAMPLE-RV-11`), the story (`GET /trial/one-story`) and the
+triage list (`GET /triage`), in-process, on the B6a branch, no other test suite running. With a profile folder it also
+writes each page's profile and its SQL statements grouped by text (`queries-<page>.txt`). Local, in-process, not
+production.
+
+| Read, 5,000 imported complaints | Before B6a (73a668bd) | B6a run 2 (d6536102) | B6a run 3 | Target p95 | Met |
+|---|---|---|---|---|---|
+| Complaint page | p50 13.3 s, p95 15.1 s, 218 queries | 550 / 659 ms, 140 | **351 / 411 ms, 106** | 500 ms | Yes |
+| Story | 45.1 s / 48.2 s, 232 queries | 1,033 / 1,109 ms, 208 | **587 / 634 ms, 129** | 500 ms | No |
+| Triage list | - | - | 4.6 s / 4.9 s, 34 | 500 ms | No (reads all 5,000 now) |
+| Complaint page, sample only | 790 / 990 ms, 189 | 603 / 842 ms, 148 | 383 / 809 ms, 106 | 500 ms | No (p95; one slow call of ten) |
+
+What changed in run 3: the settings, open tasks and record links are read once per request
+(`backend/app/db/request_memo.py`, dropped at the session's next flush, commit or rollback); one triage read serves the
+open, done and whole lists and every narrower read of the same request; the complaint page reads its facts once. The
+query count is flat with the organization's size: `tests/test_b6a_query_budget.py` (100 and 1,000 complaints: the same
+count; budget 115 for the complaint page and 140 for the story).
+
+Read cuts (owner decision, 11 Nov: no deadline may be hidden by a read cut): the triage list and the dated tasks now
+read every open item. That makes the whole triage list slower at 5,000 imported complaints (it read only the newest
+2,000 before, so the older ones were on no list); one page shows 100 events with "N more". The reportability watch
+keeps its 20,000 cut; a complaint's own page reads its own clock without it, and Oversight and the deadline list say
+"incomplete" when it is reached.
+
+Open: the story (p95 634 ms) and the triage list (4.9 s) are above 500 ms. The story's remaining time is the clocks of
+the 52 imported complaints with a serious injury (triage, watch and due items for them); the triage list's is the
+provisional deadlines of every flagged imported complaint. Both are B9 work (spec 4.2: a precomputed watch needs an
+owner decision). LCP on the production bundle (B4) is not measured yet (Playwright not run in this build).
+
 ## Failure drills (local, 4 Nov 2026)
 
 Run with `scripts/journey_api.py`'s e-mail capture so no message left the machine, the real outbox worker loop

@@ -94,6 +94,20 @@ No migration. Switches: `MDARIX_B6_DEADLINE_LIST` and `MDARIX_B6_LATE_ENTRY` (bo
   length, MFA failures 4/5, signature re-authentication 4/5, idle 29/31 min, session 11:59/12:01, every rate limit
   at its limit and one over with `Retry-After`, request sizes at the limit and one byte over, row limits, password 12/11),
   each tagged with its scenario (`requirement` marker).
+- **No deadline is hidden by a read cut.** The triage list and the dated tasks read every open item (they read only
+  the newest 2,000 records, so at 5,000 imported complaints older ones were on no triage list); complaints closed in
+  the QMS are skipped in the database. The triage list shows 100 events at a time with "N more events" and "Show the
+  next 100"; an event past the first page still opens by its address. A complaint's own page always reads its own
+  reportability clock; when the organization-wide watch reaches its 20,000-complaint read cut, Oversight and the
+  deadline list (download and e-mail) say plainly that they are incomplete.
+- **One read per request.** The settings, open tasks and record links a page asks for many times are read once per
+  request and read again after any write in it (`backend/app/db/request_memo.py`); one triage read serves the open,
+  done and whole lists and the narrower reads of the same request; the complaint page no longer reads its facts twice.
+  At 5,000 imported complaints (local, in-process): complaint page p95 411 ms, 106 queries (was 659 ms, 140); story
+  p95 634 ms, 129 queries (was 1,109 ms, 208). The story is still above the 500 ms target. The triage list now reads
+  all 5,000 (p95 4.9 s; it read 2,000 before).
+- **Query budget.** `tests/test_b6a_query_budget.py` fails when the complaint page or the story reads more than its
+  budget, or reads more at 1,000 complaints than at 100.
 
 ## [0.11.02] - not released yet
 
