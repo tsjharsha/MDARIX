@@ -149,6 +149,14 @@ No migration. Switches `MDARIX_B6_REVIEWS` and `MDARIX_B6_CHANGE_REASON` (both o
   reason (kept in the audit trail). A signed market conclusion whose awareness or country differs now shows "Facts
   changed after signing: re-check"; nothing signed is rewritten (re-check is the existing re-sign with a reason).
   New conclusions keep the country in their date calculation.
+- **Independent review of Part C (10 findings, 9 fixed).** A signed audit trail review keeps a dedicated plane's
+  events as a reference and a hash, never their values (they stay in the plane); the chain check runs from the event
+  before the period, not from the first event ever; the events page caps its offset; a period that leaves days
+  unreviewed since the last signed review says so in the review; the snapshot keeps the intake address as a hint and
+  connector endpoints without user, password or query; a correction must name an earlier audit trail review of the
+  organization; a review whose content no longer matches cannot be confirmed, and a double signature answers 409;
+  MDARIX staff accounts never read the reviews; the comparison says "incomplete" past 5,000 change events. Not
+  changed: "data changed by administrators" uses each person's role today (a known limit).
 
 ## [0.11.02] - not released yet
 

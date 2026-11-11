@@ -27,7 +27,7 @@ from backend.app.db.session import get_db
 from backend.app.downloads import attachment
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from backend.app.role_codes import is_administrator_role, is_customer_admin_role, role_code
+from backend.app.role_codes import is_administrator_role, is_customer_admin_role, is_platform_admin_role, role_code
 from backend.app.signed_reviews import access_review, audit_review, configuration, signing
 from backend.app.signed_reviews.signing import error, sign
 
@@ -60,6 +60,8 @@ def _reviewer(control_db: Session, ctx) -> bool:
 
 
 def _can_read(kind: str, control_db: Session, ctx, me: AuthUser) -> bool:
+    if is_platform_admin_role(me.role):
+        return False  # MDARIX staff never read an organization's signed reviews (review finding 9)
     if kind.startswith("audit-trail"):
         return _reviewer(control_db, ctx) or is_customer_admin_role(me.role)
     return is_customer_admin_role(me.role) or access_review.is_leader(control_db, me)
@@ -181,7 +183,7 @@ def _awaiting(control_db: Session, tenant_id) -> list[dict]:
 def audit_trail_events(
     period_from: date | None = Query(default=None, alias="from"),
     period_to: date | None = Query(default=None, alias="to"),
-    offset: int = Query(default=0, ge=0),
+    offset: int = Query(default=0, ge=0, le=audit_review.READ_CAP),
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_data_plane_db),
     control_db: Session = Depends(get_db),
@@ -205,11 +207,22 @@ def sign_audit_trail(
     are among the flags, the review records that a second reviewer must confirm them (D4)."""
     me = _require_read("audit-trail", control_db, ctx)
     role = _audit_signer_role(control_db, ctx)
+    if payload.corrects is not None:
+        earlier = signing.read(control_db, me.tenant_id, payload.corrects)  # 404 for another organization's
+        if earlier["kind"] != "audit-trail":
+            raise error(422, "CORRECTS_INVALID", "A correction names an earlier audit trail review")
     start, end = _period(control_db, me.tenant_id, payload.period_from, payload.period_to)
-    content = audit_review.build(control_db, db, me.tenant_id, start, end)
+    content = audit_review.for_signing(audit_review.build(control_db, db, me.tenant_id, start, end))
     own = audit_review.own_flags(content, me.id)
     content["own_flags"] = own
     content["needs_second_reviewer"] = bool(own)
+    # A period that does not start where the last signed review ended leaves days unreviewed: said in the review.
+    last_to = ((_last(control_db, me.tenant_id, "audit-trail") or {}).get("content") or {}).get("period", {}).get("to")
+    if last_to and start > date.fromisoformat(last_to) + timedelta(days=1):
+        content["unreviewed_gap"] = {
+            "from": (date.fromisoformat(last_to) + timedelta(days=1)).isoformat(),
+            "to": (start - timedelta(days=1)).isoformat(),
+        }
     if db is not control_db:
         db.rollback()  # nothing is written on the plane; end its read transaction
     return sign(
@@ -242,6 +255,8 @@ def confirm_audit_trail(
         raise error(404, "REVIEW_NOT_FOUND", "No such audit trail review in your organization")
     if not (review["content"] or {}).get("needs_second_reviewer"):
         raise error(409, "NO_CONFIRMATION_NEEDED", "This review needs no second reviewer")
+    if not review["intact"]:
+        raise error(409, "REVIEW_NOT_INTACT", "This review's stored content no longer matches its signature")
     if len(review["signatures"]) > 1:
         raise error(409, "ALREADY_CONFIRMED", "A second reviewer has already confirmed this review")
     if review["signatures"][0]["signed_by"] == str(me.id):
@@ -391,8 +406,9 @@ def compare_configuration(
     end = datetime.fromisoformat(second["content"]["taken_at"])
     if end < start:
         first, second, start, end = second, first, end, start
-    events = configuration.events_between(control_db, db, me.tenant_id, start, end)
+    events, incomplete = configuration.events_between(control_db, db, me.tenant_id, start, end)
     return {
+        "incomplete": incomplete,
         "before": {"review_id": first["review_id"], "taken_at": first["content"]["taken_at"]},
         "after": {"review_id": second["review_id"], "taken_at": second["content"]["taken_at"]},
         **configuration.compare(first["content"], second["content"], events),

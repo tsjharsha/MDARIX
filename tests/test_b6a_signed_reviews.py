@@ -200,7 +200,11 @@ def test_a_broken_chain_is_shown(org, trail):
     with SessionLocal() as db:
         bind_tenant(db, org["tenant_id"])
         try:
-            event = db.query(AuditEvent).filter(AuditEvent.tenant_id == org["tenant_id"]).first()
+            event = (
+                db.query(AuditEvent)
+                .filter(AuditEvent.tenant_id == org["tenant_id"], AuditEvent.action == "SIGN_IN_FAILED")
+                .first()
+            )
             db.execute(text("ALTER TABLE audit_events DISABLE TRIGGER audit_events_immutable"))
             db.execute(text("UPDATE audit_events SET reason = 'edited later' WHERE id = :id"), {"id": event.id})
             content = audit_review.build(db, db, org["tenant_id"], date(2026, 10, 5), date(2026, 10, 11))
@@ -218,6 +222,16 @@ def test_a_dedicated_plane_is_read_beside_the_control_database(org, trail):
         two = audit_review.build(control, plane, org["tenant_id"], date(2026, 10, 5), date(2026, 10, 11))
     assert [read["plane"] for read in one["planes"]] == ["control"]
     assert [read["plane"] for read in two["planes"]] == ["control", "data"] and two["events"] == 2 * one["events"]
+    # What is signed keeps a plane's events as a reference and a hash, never their values (review finding 1).
+    kept = audit_review.for_signing(two)
+    lines = [line for flag in kept["flags"] for line in flag["events"]]
+    data = [line for line in lines if line["plane"] == "data"]
+    assert data and all("old_values" not in line and len(line["values_sha256"]) == 64 for line in data)
+    assert all(
+        line["old_values"] is not None
+        for line in lines
+        if line["plane"] == "control" and line["action"] != "SIGN_IN_FAILED"
+    )
 
 
 def _sign(client, path: str, **extra):
@@ -276,6 +290,26 @@ def test_who_signs_the_audit_trail_review_and_what_is_kept(org, trail):  # B6-30
     assert again["content"] == read["content"] and again["intact"] is True
     for method in ("put", "patch", "delete"):
         assert getattr(leader, method)(f"{URL}/signed/{review_id}").status_code == 405
+    # A changed signature is caught (review finding 6), then put back.
+    with SessionLocal() as db:
+        bind_system(db, "test: tamper with the signature")
+        db.execute(
+            text("UPDATE signed_approval_records SET content_fingerprint = :bad WHERE object_id = :id"),
+            {"bad": "0" * 64, "id": uuid.UUID(review_id)},
+        )
+        db.commit()
+        try:
+            assert leader.get(f"{URL}/signed/{review_id}").json()["intact"] is False
+        finally:
+            db.execute(
+                text("UPDATE signed_approval_records SET content_fingerprint = :good WHERE object_id = :id"),
+                {"good": record.content_fingerprint, "id": uuid.UUID(review_id)},
+            )
+            db.commit()
+    # A correction names an earlier review of this organization; MDARIX staff never read the reviews.
+    unknown = _sign(leader, "audit-trail/sign", corrects=str(uuid.uuid4()), **_period(WEEK))
+    assert unknown.status_code == 404
+    assert _person(org["tenant_id"], "PLATFORM_ADMIN")[0].get(f"{URL}/audit-trail").status_code == 403
     # Downloads: a PDF from the stored content and the JSON; both audited.
     pdf = leader.get(f"{URL}/signed/{review_id}/download", params={"format": "pdf"})
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
@@ -376,7 +410,7 @@ def test_the_configuration_snapshot_and_comparison(org):  # B6-34, B6-35
                 code="QMS-SNAPSHOT",
                 connector_type="REST",
                 configuration={
-                    "endpoint": "https://qms.example.invalid",
+                    "endpoint": "https://user:SNAPSHOT_URL_PASSWORD@qms.example.invalid/api?key=SNAPSHOT_URL_KEY",
                     "credential_ref": "SNAPSHOT_SECRET_REF",
                     "tenant_key": "SNAPSHOT_TENANT_KEY",
                     "api_key": "SNAPSHOT_RAW_KEY",
@@ -394,10 +428,18 @@ def test_the_configuration_snapshot_and_comparison(org):  # B6-34, B6-35
     snapshot = admin.get(f"{URL}/configuration")
     assert snapshot.status_code == 200, snapshot.text
     body = json.dumps(snapshot.json())
-    for secret in ("SNAPSHOT_SECRET_REF", "SNAPSHOT_TENANT_KEY", "SNAPSHOT_RAW_KEY", "SNAPSHOT_ENCRYPTED_KEY", "KEY9"):
+    for secret in (
+        "SNAPSHOT_SECRET_REF",
+        "SNAPSHOT_TENANT_KEY",
+        "SNAPSHOT_RAW_KEY",
+        "SNAPSHOT_ENCRYPTED_KEY",
+        "KEY9",
+        "SNAPSHOT_URL_PASSWORD",
+        "SNAPSHOT_URL_KEY",
+    ):
         assert secret not in body
     connector = next(item for item in snapshot.json()["connectors"] if item["code"] == "QMS-SNAPSHOT")
-    assert connector["endpoint"] == "https://qms.example.invalid" and connector["key_set"] is True
+    assert connector["endpoint"] == "https://qms.example.invalid/api" and connector["key_set"] is True
     assert "MDARIX_B6_REVIEWS" in snapshot.json()["switches"] and snapshot.json()["users"]
     assert org["regulatory"][0].get(f"{URL}/configuration").status_code == 403
     signed = _sign(admin, "configuration/sign")

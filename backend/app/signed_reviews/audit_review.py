@@ -16,6 +16,7 @@ Flags (each with a count and the events):
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
@@ -186,7 +187,21 @@ def build(control_db: Session, data_db: Session, tenant_id, start: date, end: da
             rows = rows[:READ_CAP]
             incomplete.append(plane)
         lines.extend(_line(plane, row) for row in rows)
-        chain = verify_tenant_chain(session, tenant_id)
+        # The chain from the event before the period (its stored hash as the anchor) to the newest event: the period
+        # and everything after it, without re-hashing years of history on every read (review finding 2).
+        anchor = (
+            session.query(AuditEvent.chain_seq, AuditEvent.event_hash)
+            .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.chain_seq < rows[0].chain_seq)
+            .order_by(AuditEvent.chain_seq.desc())
+            .first()
+            if rows
+            else None
+        )
+        chain = (
+            verify_tenant_chain(session, tenant_id, anchor.chain_seq, anchor.event_hash)
+            if anchor
+            else verify_tenant_chain(session, tenant_id)
+        )
         reads.append(
             {
                 "plane": plane,
@@ -245,6 +260,26 @@ def build(control_db: Session, data_db: Session, tenant_id, start: date, end: da
         "edits": len(edits),
         "incomplete": incomplete,
         "flags": flags,
+    }
+
+
+def for_signing(content: dict) -> dict:
+    """What a signed review keeps: events read from a dedicated plane keep a reference and a hash of their values,
+    never the values (the review is stored in the control database; the plane's data stays in the plane)."""
+    from backend.app.human_decision.rules import fingerprint
+
+    def kept(line: dict) -> dict:
+        if line["plane"] != "data":
+            return line
+        values = {key: line[key] for key in ("reason", "old_values", "new_values")}
+        return {
+            **{key: value for key, value in line.items() if key not in values},
+            "values_sha256": fingerprint(json.loads(json.dumps(values, default=str))),
+        }
+
+    return {
+        **content,
+        "flags": [{**flag, "events": [kept(line) for line in flag["events"]]} for flag in content["flags"]],
     }
 
 

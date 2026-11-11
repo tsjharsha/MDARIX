@@ -18,6 +18,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import AuditEvent, SignedApprovalRecord
@@ -148,7 +149,11 @@ def sign(
             request=request,
         )
     )
-    control_db.commit()
+    try:
+        control_db.commit()
+    except IntegrityError as exc:  # the same review signed a moment ago (uq_signed_approval_version)
+        control_db.rollback()
+        raise error(409, "SIGNED_MEANWHILE", "This review was signed a moment ago; reload to see it") from exc
     return {"review_id": str(review_id), "signature_id": str(record.id), "fingerprint": content_fingerprint}
 
 

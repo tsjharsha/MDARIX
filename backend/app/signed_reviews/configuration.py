@@ -42,6 +42,23 @@ CHANGE_ACTIONS = (
 )
 
 
+def _hint(address: str | None) -> str | None:
+    return f"...{address.split('@', 1)[0][-4:]}@{address.split('@', 1)[-1]}" if address and "@" in address else None
+
+
+def _bare_url(url: str | None) -> str | None:
+    """An endpoint without user, password, query or fragment (a key written into a URL never reaches a snapshot)."""
+    from urllib.parse import urlsplit, urlunsplit
+
+    if not url:
+        return url
+    parts = urlsplit(str(url))
+    host = parts.hostname or ""
+    if parts.port is not None:
+        host = f"{host}:{parts.port}"
+    return urlunsplit((parts.scheme, host, parts.path, "", ""))
+
+
 def _rule_entry(entry: dict | None) -> dict | None:
     if entry is None:
         return None
@@ -86,6 +103,7 @@ def snapshot(control_db: Session, data_db: Session, viewer, now: datetime) -> di
             "version": row.version,
             "key_set": bool(row.credential_set_at),
             **{field: (row.configuration or {}).get(field) for field in CONNECTOR_FIELDS},
+            "endpoint": _bare_url((row.configuration or {}).get("endpoint")),
         }
         for row in control_db.query(ConnectorConfiguration)
         .filter(ConnectorConfiguration.tenant_id == tenant_id)
@@ -132,8 +150,11 @@ def snapshot(control_db: Session, data_db: Session, viewer, now: datetime) -> di
             key: review.get(key) for key in ("backlog_target_days", "second_look_words", "custom_words", "version")
         },
         "communication": {"attempts_before_escalation": attempts_limit(data_db, tenant_id)},
+        # The intake address is a bearer address: a snapshot keeps its last characters only (review finding 5).
         "email_intake": {
-            key: mail.get(key) for key in ("address", "on", "old_addresses", "allowed_domains", "daily_limit")
+            "address": _hint(mail.get("address")),
+            "old_addresses": [_hint(item.get("address")) for item in mail.get("old_addresses") or []],
+            **{key: mail.get(key) for key in ("on", "allowed_domains", "daily_limit")},
         },
         "ai": {
             "processing_allowed": bool(tenant.ai_processing_allowed),
@@ -210,12 +231,15 @@ def _concerns(item: str, event: dict) -> bool:
     return event["action"] in SECTIONS.get(item.split(".", 1)[0], ())
 
 
-def events_between(control_db: Session, data_db: Session, tenant_id, start: datetime, end: datetime) -> list:
+def events_between(
+    control_db: Session, data_db: Session, tenant_id, start: datetime, end: datetime
+) -> tuple[list, bool]:
+    """The change events between two moments, from every database, and whether a cap cut them (said, never silent)."""
     from backend.app.signed_reviews.audit_review import sessions
 
-    found = []
+    found, incomplete = [], False
     for _plane, session in sessions(control_db, data_db):
-        found.extend(
+        rows = (
             session.query(AuditEvent)
             .filter(
                 AuditEvent.tenant_id == tenant_id,
@@ -224,7 +248,12 @@ def events_between(control_db: Session, data_db: Session, tenant_id, start: date
                 AuditEvent.created_at <= end,
             )
             .order_by(AuditEvent.created_at.asc())
-            .limit(5000)
+            .limit(EVENTS_CAP + 1)
             .all()
         )
-    return sorted(found, key=lambda row: row.created_at)
+        incomplete = incomplete or len(rows) > EVENTS_CAP
+        found.extend(rows[:EVENTS_CAP])
+    return sorted(found, key=lambda row: row.created_at), incomplete
+
+
+EVENTS_CAP = 5000  # per database; above it the comparison says "incomplete"
