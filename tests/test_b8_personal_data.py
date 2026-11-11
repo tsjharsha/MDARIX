@@ -12,7 +12,7 @@ import uuid
 import pytest
 
 from backend.app import tenant_export
-from backend.app.authority_reports import mir_xml
+from backend.app.authority_reports import forms, mir_xml
 from backend.app.db.models.authority_reports import ReportObligation
 from backend.app.db.models.foundation import AuditEvent
 from backend.app.db.session import SessionLocal
@@ -79,7 +79,8 @@ def test_b8_personal_data_off_on_off_keeps_values_only_in_the_frozen_snapshot(tr
     held = _rows({"sections": frozen["sections"]})
     assert held["3_4B"]["value"] == TYPED["3_4B"] and held["3_4B"]["status"] == "ENTERED"
     assert held["3_3C"]["value"] == "Female"
-    assert (
+    gb_file = forms.switched_on("MDARIX_B8_GB_MIR")  # off: no GB MIR file, the snapshot alone holds them
+    assert not gb_file or (
         PLANTED in frozen["mir_xml"]
         and mir_xml.validate(frozen["mir_xml"].encode(), frozen["mir_type"], "GB_MIR") == []
     )
@@ -102,8 +103,9 @@ def test_b8_personal_data_off_on_off_keeps_values_only_in_the_frozen_snapshot(tr
     assert _ok(user.put(SETTING, json={"on": False, "reason": WHY}))["report_personal_data"] is False
     assert _frozen(tenant_id, snapshot) == frozen
     _ok(user.post(f"{REPORTS}/{report}/snapshots/{snapshot}/approve", json={"password": PASSWORD}))
-    served = user.get(f"{REPORTS}/{report}/mir.xml", params={"snapshot": snapshot})
-    assert served.status_code == 200 and served.content == frozen["mir_xml"].encode("utf-8")
+    if gb_file:
+        served = user.get(f"{REPORTS}/{report}/mir.xml", params={"snapshot": snapshot})
+        assert served.status_code == 200 and served.content == frozen["mir_xml"].encode("utf-8")
     assert user.put(SETTING, json={"on": False, "reason": WHY}).json()["detail"]["code"] == "NOTHING_TO_CHANGE"
 
 

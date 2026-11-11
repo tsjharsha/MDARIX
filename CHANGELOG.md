@@ -139,7 +139,10 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
 
 ### Fixed (B8 run 6)
 - 4.3.3c (similar incidents) prints as plain lines, one per period, in the worksheet PDF and Word file, and as a table
-  on the approval page, whatever the B8 switches: never its stored JSON text.
+  on the approval page, whatever the B8 switches: never its stored JSON text (text typed before the table stays text).
+- From the independent review: a masked export also replaces the frozen India/Canada official form; a later MIR chain
+  report never carries the previous report's patient and reporter values (typed again per report); age, weight and
+  height must hold a number, and the EU file rounds weight and height to whole kg and cm.
 
 ### Documentation (B8)
 - Step-by-step user guide, Reports: the EU MIR file, the MIR chain (follow-up and final reports), Great Britain's GB
