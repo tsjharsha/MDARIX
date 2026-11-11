@@ -416,6 +416,11 @@ export function useB9India(): boolean {
   return useContext(WorkspaceContext)?.session?.b9?.india === true;
 }
 
+/** B9: Canada's chain and official form show only while the server has MDARIX_B9_CANADA on. */
+export function useB9Canada(): boolean {
+  return useContext(WorkspaceContext)?.session?.b9?.canada === true;
+}
+
 /** B7b: "E-mail to check" shows only while the server has e-mail intake switched on. */
 export function useEmailIntake(): boolean {
   return !!useContext(WorkspaceContext)?.session?.email_intake;

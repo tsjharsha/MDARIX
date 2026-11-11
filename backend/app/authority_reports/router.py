@@ -594,7 +594,11 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         # B9 step 14: India's chain (on demand, no legal clock: D15).
         "india_chain": india_chain_view(obligation, children) if obligation.form_code == forms.MVPI_MDAE.code else None,
         # B9 step 11: Canada's chain (the Final made when the preliminary is submitted; updates on demand).
-        "canada_chain": canada_chain_view(obligation, children) if obligation.form_code == forms.HC_MDPR.code else None,
+        "canada_chain": (
+            {**canada_chain_view(obligation, children), "official_form": _hc_form_ready()}
+            if obligation.form_code == forms.HC_MDPR.code
+            else None
+        ),
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,
         # A mapped code is a suggestion a person confirms or changes (the new navigation, 0.10.77).
@@ -2594,6 +2598,17 @@ def _canada_carried(db, obligation: ReportObligation) -> dict:
     file_no = next((row.authority_reference for row in reversed(sent) if row.authority_reference), None)
     previous = _org_day(db, obligation.tenant_id, sent[-1].submitted_at).isoformat() if sent else None
     return {"hc_file": file_no, "previous": previous}
+
+
+def _hc_form_ready() -> bool:
+    """Health Canada's form file and its field map are in ``data/hc_forms`` (step 10: needed from the owner)."""
+    from backend.app.authority_reports import hc_mdpr
+
+    try:
+        hc_mdpr.form_file()
+    except hc_mdpr.FormFileNeeded:
+        return False
+    return True
 
 
 def _canada_final_gate(sections: list[dict]) -> None:

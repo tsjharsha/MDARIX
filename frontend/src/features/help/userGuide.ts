@@ -696,6 +696,19 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "The initial report lists its follow-ups and final with their states; each child names the report it follows.",
             note: "Where each value sits on MvPI's form (the field map) awaits one person's check against the printed form; until then compare the filled form with your copy before sending. The 15-day period, the recipients and the ADRMS order are starter text for your regulatory consultant to confirm.",
           },
+          {
+            title: "Canada: preliminary, update and final reports",
+            who: "Anyone with regulatory review or approval rights.",
+            steps: [
+              "The first report is a Preliminary, or a Preliminary & Final when the investigation is already complete (box A5). On a Preliminary, give the anticipated date of the final report.",
+              "Box A6 (date submitted) is filled in with the day the report is sent for approval.",
+              "When you record the Preliminary as submitted, MDARIX creates its Final report at once, due on the date the Preliminary promised. Record Health Canada's file number from its acknowledgement as the authority reference: it is carried into box A4 of every later report, with your file number (A3) and the previous report's date.",
+              "Under Report chain choose Create an update when the investigation has news before the final report. One update is open at a time; the next-report date is optional and yours.",
+              "A Final (or Preliminary & Final) goes for approval only with the root cause (E2) and the corrective actions (E3). Nothing follows a submitted Final.",
+            ],
+            result: "The preliminary report lists its updates and final, with their states and the Final's due date.",
+            note: "Health Canada's own form (HC Pub. 110180) is filled once MDARIX holds the official form file; until then send the approved worksheet PDF's values on the form yourself. Periods, the e-mail address and the form's reading are starter text for your regulatory consultant to confirm.",
+          },
         ],
       },
       {

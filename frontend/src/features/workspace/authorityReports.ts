@@ -272,10 +272,23 @@ export type ReportDetail = {
    * initial report: its follow-ups and final, and whether one can be created now. */
   india_chain?: {
     type: "Initial" | "Follow up" | "Final";
+    due_on?: null;
     next_report_on?: string | null;
-    items?: { id: string; type: "Follow up" | "Final"; state: ObligationState }[];
+    items?: { id: string; type: "Follow up" | "Final"; state: ObligationState; due_on?: null }[];
     ended?: boolean;
     can_create?: boolean;
+    note: string;
+  } | null;
+  /** B9 step 11: a Canada report's chain (the Final made when the preliminary is submitted; updates on demand).
+   * ``official_form``: Health Canada's form file is in place (until then only the worksheet PDF). */
+  canada_chain?: {
+    type: string;
+    due_on?: string | null;
+    next_report_on?: string | null;
+    items?: { id: string; type: string; state: ObligationState; due_on?: string | null }[];
+    ended?: boolean;
+    can_create?: boolean;
+    official_form?: boolean;
     note: string;
   } | null;
   note: string | null;

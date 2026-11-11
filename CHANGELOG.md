@@ -58,6 +58,9 @@ and user facility. MDARIX prepares; the customer submits: MDARIX never submits. 
   HC Pub. 110180 is needed from the owner** (the canada.ca download failed; no other site's copy is used). Until it
   is in `data/hc_forms` with its SHA-256 and field map, the route answers `409 FORM_FILE_NEEDED` and the read-back
   tests are skipped.
+- **Canada screens**: the report page shows the chain (the Final with its due date, "Create an update", Cancel on an
+  unsent update or final); "Official form HC Pub. 110180 (PDF)" appears once the form file is in place. User guide,
+  Reports: "Canada: preliminary, update and final reports". Hidden while `b9.canada` is off.
 - `MDARIX_B9_CANADA` off: no Final is made, the chain route and the official form answer 404, A4, A5's previous date
   and A6 are typed as before.
 

@@ -5,7 +5,7 @@ import { Table, errorText, notFound, useResource } from "../../customer-admin/sh
 import { downloadFile } from "../../reports/download";
 import { marketLabel, versionWords } from "../../../app/labels";
 import { DeadlineChip, SampleDates, StateChip } from "../../../app/chips";
-import { useB9India, useCan, useTabParam, useWorkspace } from "../workspaceContext";
+import { useB9Canada, useB9India, useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import {
   REPORTS,
   REPORT_VIEWS,
@@ -278,6 +278,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   const canWrite = useCanReport();
   const canExport = useCan("data.export");
   const india = useB9India();
+  const canada = useB9Canada();
   const detail = shown?.id === id ? shown : resource.data;
   const action = useAction((next) => setShown(next), "That step was not recorded.");
   const [pdfError, setPdfError] = useState("");
@@ -572,6 +573,23 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                           through your own ESG account or eSubmitter and record the submission here.
                         </p>
                       </>
+                    )}
+                    {/* B9 step 10: Health Canada's own form, once its form file is in place (needed from the owner). */}
+                    {canada && detail.canada_chain?.official_form && (
+                      <button
+                        type="button"
+                        className="ac-secondary"
+                        onClick={() =>
+                          void fetchFile(
+                            "worksheet.pdf",
+                            `mdarix-hc-mdpr-${stem}-official-form.pdf`,
+                            "The official form could not be downloaded.",
+                            "&form=official",
+                          )
+                        }
+                      >
+                        <FileText size={15} aria-hidden="true" /> Official form HC Pub. 110180 (PDF)
+                      </button>
                     )}
                     {/* B9 steps 12-13: India's official MvPI form and the ADRMS entry sheet, from the same snapshot. */}
                     {india && detail.form.code === "MVPI_MDAE" && (

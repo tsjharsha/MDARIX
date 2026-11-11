@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
+import { formatDate } from "../customer-admin/shared";
 import {
   askNote,
   deadlineText,
@@ -402,5 +403,70 @@ describe("B9 step 15: India's chain card and files follow the India switch", () 
       note: "No legal clock: your date",
     });
     expect(renderAs(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />, INDIA)).not.toContain("Report chain");
+  });
+});
+
+describe("B9 step 11: Canada's chain card follows the Canada switch", () => {
+  const renderAs = (node: ReactNode, session: Record<string, unknown>) =>
+    renderToStaticMarkup(
+      <WorkspaceContext.Provider value={workspace(["regulatory.review", "data.export"], session)}>
+        {node}
+      </WorkspaceContext.Provider>,
+    );
+  const canada = (
+    state: ReportDetail["state"],
+    chain: ReportDetail["canada_chain"],
+    extra: Partial<ReportDetail> = {},
+  ) =>
+    detail(state, {
+      market: "CA",
+      form: { ...detail("DRAFT").form, code: "HC_MDPR", title: "Health Canada mandatory problem report worksheet" },
+      canada_chain: chain,
+      ...extra,
+    });
+
+  it("lists the Final made at submission with its due date and offers an update", async () => {
+    const { FollowUps } = await import("./sections/FollowUps");
+    const report = canada("SUBMITTED_PENDING", {
+      type: "Preliminary",
+      items: [{ id: "f1", type: "Final", state: "DRAFT", due_on: "2027-02-01" }],
+      ended: false,
+      can_create: true,
+      note: "Health Canada's file number (A4) and your file number (A3) carry to every later report.",
+    });
+    const card = <FollowUps detail={report} canWrite onChanged={vi.fn()} onOpen={vi.fn()} />;
+    const html = renderAs(card, { b9: { canada: true } });
+    expect(html).toContain("Preliminary report");
+    expect(html).toContain("Final report");
+    expect(html).toContain(`due ${formatDate("2027-02-01")}`);
+    expect(html).toContain("Create an update");
+    expect(html).not.toContain("Type (box A5)"); // one type only: no choice to make
+    expect(renderAs(card, { b9: { canada: false } })).toBe("");
+  });
+
+  it("shows a Final's promised date and, after it, that the chain has ended", async () => {
+    const { FollowUps } = await import("./sections/FollowUps");
+    const final = canada(
+      "DRAFT",
+      { type: "Final", due_on: "2027-02-01", note: "A4 and A3 carry." },
+      { kind: "RESPONSE", parent_id: "r0" },
+    );
+    let html = renderAs(<FollowUps detail={final} canWrite onChanged={vi.fn()} onOpen={vi.fn()} />, {
+      b9: { canada: true },
+    });
+    expect(html).toContain("the date the preliminary report promised (A5)");
+    expect(html).toContain("Cancel this final report");
+    const ended = canada("ACCEPTED", {
+      type: "Preliminary",
+      items: [{ id: "f1", type: "Final", state: "ACCEPTED", due_on: "2027-02-01" }],
+      ended: true,
+      can_create: false,
+      note: "x",
+    });
+    html = renderAs(<FollowUps detail={ended} canWrite onChanged={vi.fn()} onOpen={vi.fn()} />, {
+      b9: { canada: true },
+    });
+    expect(html).toContain("The final report is submitted");
+    expect(html).not.toContain("Create an update");
   });
 });
