@@ -1,0 +1,42 @@
+{
+  "code": "gb-mir-rule-book-1",
+  "rule": "gb-mir-rule-book",
+  "version": 1,
+  "kind": "REPORT_FORM",
+  "market": "GB",
+  "held_as": "DATA",
+  "title": "GB MIR 7.2.1 rule book (84 blocks, five report types)",
+  "plain": "The blocks the GB MIR requires in each report type, as a CSV rule book from MHRA's GB 7.2.1 files: the GB schemas' own minOccurs and MHRA's GB help text (a list of differences from the EU form), with the MDARIX GB form where it is stricter (B8-D6). Annex B, C, D and G codes are mandatory in every report type, with MHRA's fallback codes when none fits (B8-D3). Where the EU help text would be stricter and MHRA lists no difference, the row says so: to confirm.",
+  "source": [
+    {
+      "catalog": "UK_MDR",
+      "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368"
+    }
+  ],
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": null,
+  "change": {
+    "kind": "INITIAL",
+    "reason": "B8 step 13: the GB MIR rules held as data from the start; the GB form's own must_in (forms.py) is checked against it."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Owner",
+    "approved_on": "2026-11-11",
+    "built_by": "MDARIX engineering",
+    "release": "0.11.01",
+    "note": "B8 plan approved 11 Nov 2026 (B8-D3: Annex B-G on every GB type; B8-D6: the stricter of the XSD and the help text)."
+  },
+  "implementation": "backend.app.authority_reports.rules.gb_mir.csv",
+  "pinned": false,
+  "switch": "MDARIX_B8_GB_MIR",
+  "content": {
+    "file": "backend/app/authority_reports/rules/gb_mir.csv",
+    "sha256": "101a87122f0b269615e3c1d491c50158a1aa7f58078aa5f0240c72b0e81cbe90"
+  },
+  "content_hash": "sha256:fc7302fd7e9f758c15e08d2b11d5d0be40eb43ae9d14a327e16fe3b096f4aca5"
+}

@@ -1,0 +1,44 @@
+{
+  "code": "gb-mir-7.2.1",
+  "rule": "gb-mir-form",
+  "version": 1,
+  "kind": "REPORT_FORM",
+  "market": "GB",
+  "held_as": "DATA",
+  "title": "GB MIR 7.2.1 (MHRA, changelog 04/06/2025)",
+  "plain": "MHRA's GB MIR 7.2.1 schemas (one per report type) MDARIX builds and checks the GB MIR XML against, with MHRA's GB help text, the changelog and the GB MIR and FSCA schema implementation guide, each pinned by SHA-256 in the manifest. Picked by the day the report is sent for approval; the XML is frozen at approval. MHRA takes reports only through MORE.",
+  "source": [
+    {
+      "catalog": "UK_MDR",
+      "clause": "UK MDR 2002 Part 4A, as amended by SI 2024/1368"
+    }
+  ],
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": null,
+  "change": {
+    "kind": "INITIAL",
+    "reason": "The edition MDARIX holds, from the start (B8-D8). A newer file set on MHRA's page is a new version."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Owner",
+    "approved_on": "2026-11-11",
+    "built_by": "MDARIX engineering",
+    "release": "0.11.01",
+    "note": "B8 plan approved 11 Nov 2026 (B8-D8, D16): form editions pinned from the start; files downloaded from MHRA's gov.uk pages with the owner's OK (11 Nov 2026)."
+  },
+  "implementation": "backend.app.authority_reports.mir_rules",
+  "pinned": false,
+  "switch": "MDARIX_B8_GB_MIR",
+  "content": {
+    "edition": "GB MIR 7.2.1 (MHRA, changelog 04/06/2025)",
+    "folder": "data/mir_forms/gb-7.2.1",
+    "file": "data/mir_forms/manifest.json",
+    "sha256": "41f132041e760fc87e67eaec6aa43ae52d94473a09d22e41a51955fa648cc1e4"
+  },
+  "content_hash": "sha256:5f0d7c21498aaea04a4c32e536f7c3722039167c417c8312ef0dd1c1978eae2a"
+}

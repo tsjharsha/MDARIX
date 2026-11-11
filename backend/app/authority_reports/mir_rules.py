@@ -2,7 +2,7 @@
 that hold it, its XML path and whether it is mandatory (M), conditional (C) or optional (O) in each report type.
 
 Where the help text and the XSD disagree, the stricter of the two is kept (B8-D6). The rule book is register data
-(``eu-mir-rule-book-1``, pinned by SHA-256); ``forms.py``'s ``must_in`` must agree with it (tested). Starter, for your
+(``eu-mir-rule-book-1``, ``gb-mir-rule-book-1``, pinned by SHA-256); ``forms.py``'s ``must_in`` must agree with it (tested). Starter, for your
 consultant to confirm.
 """
 
@@ -15,7 +15,7 @@ from pathlib import Path
 from backend.app.authority_reports import forms
 
 RULES = Path(__file__).with_name("rules")
-BOOKS = {forms.EU_MIR.code: RULES / "eu_mir.csv"}
+BOOKS = {forms.EU_MIR.code: RULES / "eu_mir.csv", forms.GB_MIR.code: RULES / "gb_mir.csv"}
 # The rule book's columns per report type, in the form's order of types.
 TYPE_COLUMNS = {
     forms.MIR_INITIAL: "i",

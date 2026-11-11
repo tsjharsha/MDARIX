@@ -85,6 +85,14 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
   class typed or registered before the list is read as its entry when it clearly is one ("IIb" is MDR class IIb);
   any other is shown as "Choose again from the list" and counts as missing, never changed silently.
 
+### Added (GB MIR and Northern Ireland, Part B)
+- **GB MIR rule book** (`gb-mir-rule-book-1`, `rules/gb_mir.csv`; edition `gb-mir-7.2.1`, switch `MDARIX_B8_GB_MIR`):
+  what each GB report type must hold, from MHRA's own files: the GB schemas' minOccurs and MHRA's GB help text (its
+  list of differences from the EU form), with the GB form where it is stricter (B8-D6). Annex B, C, D and G codes stay
+  mandatory in every GB report type, with MHRA's fallback codes when none fits (B8-D3). Where the EU help text would be
+  stricter and MHRA lists no difference (SRN, 2.1b-c, 2.3p, 2.4, 3.4h, 4.2i, 4.3.1a, 4.3.3d), the row says "to
+  confirm". The GB form's mandatory fields are checked against the rule book.
+
 ### Database
 - `tr29partyparts` (from `tr28marketroles`, expand-only, no backfill): `market_responsible_parties` gains `street`,
   `city`, `postcode`, `country_code` (checked two upper-case letters), `contact_first_name`, `contact_last_name`;
