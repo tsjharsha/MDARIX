@@ -1,0 +1,570 @@
+# Manufacturer Incident Report (MIR) - Changelog
+################################################################################################### 
+## Version: 7.3.1 (SB-11252) (10/06/2026)
+## Changes in PDF
+##---------------
+None
+
+## Changes within XSD files
+##-------------------------
+## (SB-11252)
+## incident-InitialFinal-v7.3.1.xsd AND incident-FinalRep-v7.3.1.xsd
+-- (4.3.3.d : 'Comments on how similar serious incidents and associated number of devices on the market were determined')
+key howWereDetermined	fix minOccurs="1" (previously was minOccurs="0")
+## ALL XSD files
+-- Tag <xsd:documentation> 
+Replace comment 'version 7.3.1 of 06.05.2026 - SB-11154' with 'version 7.3.1 of 10.06.2026 - SB-11252'
+
+################################################################################################### 
+## Version: 7.3.1 (SB-11154) (06/05/2026)
+## Changes in PDF
+##---------------
+## (SB-11154)
+Field 4.2.i 'Final comments from the manufacturer on cause investigation and conclusion'
+	- Fixes bug: missing red border while importing XML with report type "Combined" or "Final Rep"
+
+## Changes within XSD files
+##-------------------------
+## ALL XSD files
+-- Tag <xsd:documentation> 
+Replace comment 'version 7.3.1 of 15.10.2025 - SB-10781' with 'version 7.3.1 of 06.05.2026 - SB-11154'
+
+################################################################################################### 
+## Version: 7.3.1 (SB-11154) (22/04/2026)
+## Changes in PDF
+##---------------
+None
+
+## Changes within XSD files
+##-------------------------
+## (SB-11154)
+## incident-InitialFinal-v7.3.1.xsd AND incident-FinalRep-v7.3.1.xsd
+-- (4.3.1.a : 'Identification of similar serious incidents using IMDRF Adverse Event Reporting terms and codes')
+key similarIncImdrfCodesAnnexA	fix minOccurs="0"
+
+################################################################################################### 
+## Version: 7.3.1 (SB-11010) (20/03/2026) 
+## Changes in PDF
+##---------------
+## (SB-11099)
+Field 1.2.e		:
+	- Fixed a bug that triggered an error, related to field 2.4, in some specific cases when changing the document type.
+
+## (SB-11100)
+General		:
+	- Entirely removed the "Align form after import" button to avoid visual glitch (button appearing then disappearing) when JavaScript is disabled.
+	
+## (SB-11011)
+Field 4.3.1.a	:
+	- Fixed a bug where the form check was incorrectly reporting a missing information ("Annex A") when "Other" was selected.
+
+## Changes within XSD files
+##-------------------------
+None.
+
+################################################################################################### 
+## Version: 7.3.1 (SB-10781) (15/12/2025) 
+## Changes in PDF
+##---------------
+## (SB-10874 / SB-10877)
+Field 1.3.2g Country	:
+	- Fixed a bug that allowed to fill-in a text different from the countries listed.
+	- If the reporter is set to "Authorised representative" and field 1.3.2.g is set to EU, EEA, Turkey or Northern Ireland, a pop-up appears
+	  to notify the user that an authorised representative is not required in such cases (the user has the choice to keep or discard his choice).
+
+## (SB-10875)
+Field 2.3.b Nomenclature text	: Behaviour updated to always have this field visible instead of hiding it when optional.
+
+## (SB-10876)
+Signature and locking	:
+	- Make totally independent the signature process and the submission of the PDF or XML by email. It is now possible to submit by email without signing first.
+	- Ensure that the PDF / XML is also locked when the MIR is submitted even if it has not been signed.
+	
+## (SB-10878)
+Field 4.2.a 	: Label set to "For Final (Serious incident): Description of the manufacturer’s evaluation concerning possible root causes /causative factors and conclusion".
+Field 4.2.b 	: Label set to "For Final (non-reportable): Fill out rationale for why this is considered not reportable".
+
+## (SB-10886)
+Field 4.2.i 	: Field behaviour adapted to match field 4.2.g behaviour (following the helptext update).
+
+## (SB-10916)
+Fields 4.3.2 (whole section)	: Since this section was only valid until June 2025, it has been marked as read-only.
+
+General:
+	- Disabled the "Align form after import" button since it's not required anymore in v7.3.1.
+
+## Changes within XSD files
+##-------------------------
+## incident-InitialFinal-v7.3.1.xsd AND incident-FinalRep-v7.3.1.xsd
+-- (4.3.1.a : 'Identification of similar serious incidents using IMDRF Adverse Event Reporting terms and codes')
+key similarIncImdrfCodesAnnexC	fix minOccurs="0" (following the helptext update).
+
+## incident-InitialFinal-v7.3.1.xsd AND incident-FinalRep-v7.3.1.xsd
+-- (4.2.i : 'Final comments from the manufacturer on cause investigation and conclusion')
+key manufacturersFinalComments	fix minOccurs="1" (following the helptext update).
+
+################################################################################################### 
+## Version: 7.3.1 (SB-10625) (15/09/2025) 
+## Changes in PDF
+##---------------
+## Change after mail from Oracle (SB10677)
+Field 1.3.2g Country	: replace label 'XI - United Kingdom (Northern Ireland only)' to 'XI - Northern Ireland'
+
+## Change after mail from DE, Oracle(SB-10658)
+Field 2.5 	: fix spelling mistake (missing 'r' in 'Northern') in "All EEA, Turkey and Northern Ireland" value
+XSD files updated accordingly
+
+## Changes after mail from  SWISSMEDIC (SB10573), DE (SB10622), Sonova (SB10671), Compliance Quest (SB10702) 
+Label rename 'Before signing and submitting' with 'Before submitting' and remove buttons 'Save as XML' and 'Save as PDF' 
+
+Label rename 'After signing and to submit' with 'Export and / or submission' 
+	and rename button 'Save XML to submit' with 'Save XML' and rename button 'Save PDF to submit' with 'Save PDF' 
+Signature		: set as not mandatory
+Date			: automatic update when clicking button
+
+## Changes after mail from Compliance Quest (SB10635)
+Mandatory fields not displayed as required (missing red border) 
+-- in report type : Initial,Follow up 
+1.1.a Name of receiving national competent authority (NCA) → ncaName
+1.2.f In case of initial and follow-up reports, please indicate the expected date of next report → reportNextDate
+
+-- in report type : Combined initial and final, Final (Reportable incident)
+1.1.a Name of receiving national competent authority (NCA) → ncaName
+4.2.a For Final (Reportable incident)- Description of the manufacturer's evaluation concerning possible root causes/causative factors and conclusion → rootCauses
+4.2.e IMDRF 'Cause Investigation' terms and codes (Annex B, C, D) → imdrfTypeInvestigationCodeChoice1-8, imdrfInvestigationFindingsCodeChoice1-6, imdrfInvestigationConclusionCodeChoice1-6, imdrfMissingCodeCauseInvestigation
+4.2.f IMDRF Component codes (Annex G) → imdrfComponentCodeChoice1-6, imdrfMissingComponentCodes
+4.2.g Description of remedial action/corrective action/preventive action/Field Safety Corrective Action → correctiveAction
+4.3.3.c Start Date, End Date → startDateN - startDateN-3, endDateN - endDateN-3
+
+-- in report type : Final (Non-reportable incident)
+1.1.a Name of receiving national competent authority (NCA) → ncaName
+
+## Fix export issue (SB-10605 / SB-10622 / SB-10662 / SB-10669)
+Updated PDF security settings to resolve issue with XML export
+
+## Changes within XSD files
+##-------------------------
+## Change within ALL XSD files after mail from Oracle (SB10658), Abbott (SB10671)
+Replace <xsd:enumeration value="All EEA, Turkey and Nothern Ireland"/> with <xsd:enumeration value="All EEA, Turkey and Northern Ireland"/>
+concerns Field 2.5 Market distribution of device (region/country)
+
+## Changes within XSD files after mail from MHRA  (SB10663); Oracle (SB10677) 
+## -- (2.3p Notified body (NB) ID number(s) (if applicable) Notified body (NB) certificate number(s) of device (if applicable)
+## incident-Initial-v7.3.1.xsd, incident-Followup-v7.3.1.xsd 
+Remove lines 
+<xsd:element name="nbCertNumLI"          type="string50T"           minOccurs="0" maxOccurs="unbounded"/>
+<xsd:element name="nbCertNum2LI"         type="string50T"           minOccurs="0" maxOccurs="unbounded"/>
+
+## incident-InitialFinal-v7.3.1.xsd, incident-FinalRep-v7.3.1.xsd, incident-FinalNonRep-v7.3.1.xsd 
+Remove comment lines
+<!-- <xsd:element name="nbCertNumLI"          type="string50T"           minOccurs="0" maxOccurs="unbounded"/> -->
+<!-- <xsd:element name="nbCertNum2LI"         type="string50T"           minOccurs="0" maxOccurs="unbounded"/> -->
+
+## incident_in_7.3.1.xsl
+Remove lines
+<xsl:template match="incident/device_info/nbCertNumLI"/>
+<xsl:template match="incident/device_info/nbCertNum2LI"/>
+
+## incident_out_7.3.1.xsl
+Remove lines 330 to 360 management of multiple items in the field nbCertNum with creation of new element nbCertNumLI
+Remove lines 362 to 392 management of multiple items in the field nbCertNum2 with creation of new element nbCertNum2LI
+
+## Changes within XSD files, after mail from Compliance Quest (SB10635)
+4.2d 'Has the risk assessment been reviewed?' business rules implementation
+
+################################################################################################### 
+## Version: 7.3.1 (SB-10603) (31/07/2025)
+## No change in PDF form
+##
+## Changes within XSD files, after mail from Honeywell 
+## incident-Initial-v7.3.1.xsd, incident-InitialFinal-v7.3.1.xsd, incident-FinalRep-v7.3.1.xsd, incident-FinalNonRep-v7.3.1.xsd, incident-Followup-v7.3.1.xsd 
+## -- (1.3.3 Authorised representative information) l
+key ARName    					fix minOccurs="0"
+key ARContactPersonFirstName 			fix minOccurs="0"
+key ARContactPersonSecondName			fix minOccurs="0"
+key ARStreet					fix minOccurs="0"
+key ARCity					fix minOccurs="0"
+key ARCountry 					fix minOccurs="0"
+key ARPostCode					fix minOccurs="0"
+key ARPhone					fix minOccurs="0"
+key AREmailAddress				fix minOccurs="0"
+
+## incident-InitialFinal-v7.3.1.xsd, incident-FinalRep-v7.3.1.xsd 
+## -- (4.2.d Has the risk assessment been reviewed ?) 
+key rationaleNoReview				fix minOccurs="0"
+key riskAssAdequate" 				fix minOccurs="0"
+key riskAssResults"                             fix minOccurs="0"
+
+###################################################################################################
+## Version: 7.3.1 (SB-10573) (18/07/2025)
+## Update in changelog, after mail fom MHRA, to add missing changes
+-- in ## Version 7.3.1 SB-10407 (30/04/2025) - ## Changes within XSD files
+	 -- add type to key udiPI
+	 -- add key names : patientRemedialAction, massKG, reporterOtherText
+
+## Change in PDF form
+Remove link between ticket-ID and key formVersion
+Field 3.3d Body weight (kg)	: align max value to 255 with Type Integer  
+Field 3.3e Height (cm) 		: align max value to 255 with Type Integer
+
+## Change within all XSD files 
+Remove key formVersion
+
+## Changes within XSD files
+## incident-Initial-v7.3.1.xsd, incident-InitialFinal-v7.3.1.xsd, incident-FinalRep-v7.3.1.xsd, incident-Followup-v7.3.1.xsd 
+## -- (1.3.2 Details of the Manufacturer)
+key mfrOrgStreet				fix minOccurs="1"
+## -- (1.3.3 Authorised representative information)
+key ARName    					fix minOccurs="1"
+key ARContactPersonFirstName 			fix minOccurs="1"
+key ARContactPersonSecondName			fix minOccurs="1"
+key ARStreet					fix minOccurs="1"
+key ARCity					fix minOccurs="1"
+key ARCountry 					fix minOccurs="1"
+key ARPostCode					fix minOccurs="1"
+key ARPhone					fix minOccurs="1"
+key AREmailAddress				fix minOccurs="1"
+
+###################################################################################################
+## Version: 7.3.1 (SB-10553) (11/07/2025)
+## Change in PDF form
+Field 3.3c : Replace label 'Unknown' with 'Other' and label 'Not applicable' with 'Not specified'
+
+## Change within XSD files (all)
+## - (3.3.c : Gender') 
+Type name 'GenderT' 		Remove value 'Unknown' and replace value 'Not applicable' with 'Not specified'
+
+## - (3.4.h : 'Country') 
+Type name 'isoCountryT'         Add value "00" into the value list to display 'Other' within dropdown list when 'if other, please specify' is checked
+
+####################################################################################################
+## Update in changelog after MDCG PMSV meeting 2 July 2025
+- in ## Version 7.3.1 SB-10434 (21/05/2025)
+	-- add comment about ticket-ID 
+
+####################################################################################################
+## Update in changelog with feedback from MedTech
+- in ## Version 7.3.1 SB-10407 (30/04/2025) - ## Changes within PDF form 
+	-- change reindexation letters in line 'Reindexation of each sub sections (c-->e, d-->f, e-->g) within section 1.2: "Date, type, and classification of incident report" 
+	-- add section numbers updated from Version 7.2.1
+	-- replace line 4.2.d: "Has the risk assessment been reviewed ?": with 4.2.c: "Suspicion or confirmation of..."
+        -- replace 4.3.3.a: with 4.3.2.a:
+
+####################################################################################################
+## SB-10545 (30/06/2025)
+## No change in PDF form
+##
+## Changes within XSD files
+## incident-InitialFinal-v7.3.1.xsd AND incident-FinalRep-v7.3.1.xsd
+-- (4.2.d : 'Has the risk assessment been reviewed ?')
+key rationaleNoReview		fix minOccurs="1"
+key riskAssAdequate		fix minOccurs="1"
+key riskAssResults		fix minOccurs="1"
+
+## incident-InitialFinal-v7.3.1.xsd AND incident-FinalRep-v7.3.1.xsd
+-- (4.3.1.a : 'Identification of similar serious incidents using IMDRF Adverse Event Reporting terms and codes')
+key similarIncImdrfCodesAnnexA	fix minOccurs="1"
+key similarIncImdrfCodesAnnexC	fix minOccurs="1"
+
+####################################################################################################
+## SB-10517 (24/06/2025)
+## No change in PDF form
+##
+## Changes within XSD files
+## incident-FinalRep-v7.3.1.xsd and incident-Followup-v7.3.1.xsd 
+-- (2.3.b : 'Nomenclature text')
+key deviceNomenclature  	fix minOccurs="0"
+
+####################################################################################################
+## Version: 7.3.1 (SB-10449) (23/05/2025)
+## Change in PDF form 
+Field 4.2d Results of the assessment:,Replace Field format 'Rich text' with 'Plain Text Only'
+
+####################################################################################################
+## Version 7.3.1 (SB-10434) (21/05/2025)
+Field 2.5a Country, Fix order list of country codes among PDF, XSL, XSD
+display ticket-ID (SB-xxxxx) to better identify version in use. This numbering provides direct access to the technical details of our actions.   
+align all XSL and XSD filenames (xx7.3) to release name 7.3.1
+
+####################################################################################################
+## Version 7.3.1 SB-10407 (30/04/2025)
+
+## New fields in XSD files
+1.2.c: "Manufacturer awareness date of the incident" : (KeyName = mfrAwarenessDate)
+1.2.d: "Manufacturer awareness date of reportability" : (KeyName =  mfrAwarenessReportDate)
+1.3.1.f: "The incident occurred within a PMCF/PMPF investigation" : (KeyName = pmcfpmpfQuestion)
+2.1.a: "Issuing entity" : (KeyName =  udiDI_Entity)
+2.1.c: "Issuing entity" : (KeyName =  Basic_Entity)
+2.1.d: "Issuing entity" : (KeyName =  UnitofUse_Entity)
+2.3.b: "Nomenclature text" : (KeyName = deviceNomenclature)
+2.4.a: "Applicable legislation unknown" : (KeyName = AppLegislationUnknown)
+2.4.b: (ex-a) "This device has been placed on the market before the implementation of the MDD/AIMDD/IVDD" : (KeyName = deviceClass)
+2.4.e: "Did this device continue to be placed on the EU market after MDR / IVDR date of application?" : (KeyName = DevicePlacedMarket)
+2.4.f: "Does the device fulfil any of the following cases:
+- “for this device a scientific opinion has been asked in accordance with Article 52(9) MDR or Article 52(10) MDR”,
+- “for companion diagnostic a competent authority or European Medicines Agency (EMA) was consulted in
+accordance with section 5.2 of Annex IX IVDR or section 3.k of Annex X IVDR." (KeyName = DeviceFulfill)
+2.4.f: "Competent authority name or European Medicines Agency which delivered the scientific opinion or was consulted
+by the notified body" (KeyName = CompetentAuthName)
+2.4.f: "Name(s) of the medicinal substance(s) / product(s), tissue(s), cell(s) of human origin or their derivative(s)
+associated with the device" (KeyName =  RelevantName)
+3.3.e: "Height (cm)" : (KeyName = heightCM)
+3.4.h: "if other, please specify" : (KeyName = healthcareFacilityCountryOther)
+4.1.b: "Suspicion of a relationship between the incident and the medicinal substance(s) / product(s), tissue(s), cell(s) of human origin or their derivative(s) associated with the device?" : (KeyName = suspicionRelationShip)
+4.2.c: "Suspicion or confirmation of a relationship between the serious incident and the medicinal substance(s) /
+product(s), tissue (s), cell(s) of human origin or their derivative(s) associated with the device?" : (KeyName = relationShipIncidentSubstance)
+                                                                
+New key <xsd:enumeration value="XI"/> (2.5.a: All countries check boxes)
+
+## Changes within Javascript
+Align with Helptext : section 4.3.1.a and 4.3.2.a resolving checking issue on 'Investigation findings' (Annex C)
+Align with Helptext : section 4.3.1.a and 4.3.2.a resolving the mandatory issue following the report type
+Align with Helptext : section 1.3: "Submitter information"
+Align with helptext : 2.3b 'Nomenclature text' ((When the selection of 'medical device nomenclature' is not empty) the field is mandatory
+Align with helptext : 2.3b resolving the mandatory issue following the report type
+Align with Helptext : 4.3.1.a: Adjust the 3 checkboxes ('Medical device problem', 'Investigation findings' and 'Other') + the text field ('Other') to be mandatory or not. 
+Helptext of "27-03-2025" filename '20250327_MIR 7.3.1 Helptext_final.docx'
+
+## Changes within XSD files
+key statusReporter (1.3.1.a : 'Manufacturer', 'Authorised representative', 'Other, please specify' ) fix minOccurs="0"
+key reporterDetails 	fix minOccurs="0"
+key mfrDetails 		fix minOccurs="0"
+key arDetails 		fix minOccurs="0"
+key mfrSRN, (1.3.2.b : "Single registration number")	fix minOccurs="0"
+key udiDI   (2.1.a : "(Master) UDI-DI/Eudamed ID") 	fix minOccurs="0" 
+key udiPI   (2.1.b : "UDI production identifier") 	type="string80T" from 19/04/2023
+key patientRemedialAction type="string2000T"
+key massKG		type="xsd:integer"
+key reporterOtherText 	fix minOccurs="0"
+
+key deviceNomenclature (2.3.b. "Nomenclature text") fix type=string300T 
+key otherCountries (2.5.a: "Others") fix type=string4000T
+key eventDescription (3.1.a: "Provide a comprehensive description of the incident, including (1) what went wrong with the device (if applicable)and (2) a description of the health effects (if applicable), i.e. clinical signs, symptoms, conditions as well as the overall health impact (i.e. Death; life-threatening; hospitalization – initial or prolonged; required intervention to prevent permanent damage; disability or permanent damage; congenital anomaly/Birth defects; indirect harm; no serious outcome)") fix type=string4000T
+
+key patientPriorMedication (3.3.f: "List any of the patient's prior health condition or medication that may be relevant to this incident") fix type=string4000T
+
+key manufacturersPrelimAnalysis (4.1.a)	fix type=string4000T
+key manufacturersInitialCorrecAction (4.1.c)  	fix type=string4000T
+key furtherInvestigations (4.1.d)  		fix type=string4000T
+key rootCauses (4.2.a.) 			fix type=string4000T
+key manufacturersWhyNotReportable (4.2.b.)	fix type=string4000T
+key rationaleNoReview (4.2.d.) 		fix type=string4000T
+key riskAssResults (4.2.d.) 			fix type=string4000T
+key imdrfMissingCodeCauseInvestigation (4.2.e.) fix type=string4000T
+key imdrfMissingComponentCodes (4.2.f.)   	fix type=string4000T
+key correctiveAction (4.2.g)			fix type=string4000T
+key correctiveActionSchedule (4.2.h.) 		fix type=string4000T
+key manufacturersFinalComments (4.2.i.) 	fix type=string4000T
+key AdditionalComments (5.)			fix type=string4000T
+
+## Changes within PDF form
+Title updated : 1.1: "Responsible competent authority in which country the incident occurred"
+New 
+Reindexation of each sub sections (d-->e, e-->f, f-->g) within section 1.2: "Date, type, and classification of incident report" 
+
+1.2.a: "Date of report submission": Labelling updated
+1.2.a to d: Update of the layout of the 3 sections to add the new item 1.2.d
+1.2.a to d, 1.2 f: Update labels about date format
+1.2.d Manufacturer awareness date of reportability
+1.2.e was 1.2.d in MIR 7.2.1
+1.2.f was 1.2.e in MIR 7.2.1
+1.2.g was 1.2.f in MIR 7.2.1
+Title updated : 1.2.f: "In case of initial and follow-up reports, please indicate the expected date of the next report" 
+Title updated : 1.2.g: "Classification of serious incident"
+
+Removing Big Red rectangle in fields 1.3.2.h,i,j & k: 
+Removing Big Red rectangle in fields section 1.3.3.h,i,j & k
+Removing Big Red rectangle in fields section 1.3.4.g,h,i & j
+
+Label updated (add 'Master') 2.1.a: "(Master) UDI-DI/Eudamed ID"
+Removing the redbox on the field "Issuing entity"
+
+Remove the redbox on the field 2.1.c: "Issuing entity"  
+
+2.2.a: - Change the radio buttons by a drop down list
+       - Apply a business rule: when the selection is not empty, the 2 fields ('Nomenclature code' and 'Nomenclature text') become mandatory 
+
+2.3.b: "Nomenclature text": Rework the layout of the 2.3.b section in order to add this new field
+2.3.i  to l: date fields: label displaying the formating of the date are updated
+2.3.q : "Please indicate the date of one of the following:" : Rework the layout to move the 2 fields (year and month)
+
+Page 5: Review layout of sections 2.4, 2.5 and 2.6 to increase space for 2.4e  (Javascript updated (due to the restructuration of the page)) 
+
+2.4.c: "MDD/AIMDD": Moving and restucturing the labels for reducing the used space
+2.4.c: "IVDD" : Moving and restucturing the labels for reducing the used space
+2.4.d: "MDR" : align Javascript code to Helptext
+2.4.d: "Type (Multiple choice)":  - Moving and restucturing the labels and graphics for reducing the used space and align Javascript code to Helptext
+2.4.d: "IVDR": align Javascript code to Helptext
+2.4.d: "Type (Multiple choice)":  - Moving and restucturing the labels and graphics for reducing the used space and align Javascript code to Helptext
+
+2.5: "Market distribution of device (region/country)": Title of the section modified
+2.5.a: All countries check boxes: - Rework the section (alignment, add the "XI" country) 
+
+3: "Section 3: Incident information derived from initial reporter": Title of the section modified
+3.1.a: "Provide a comprehensive description of the incident, ..." : Adjust the length of the field to 4000 characters
+3.2.a: "If exceptionally no relevant IMDRF code is available or specific enough, then provide additional information below": Labelling updated
+3.2.a: Force the field to mandatory (Choice 1)
+
+3.3: "Clinical information": Title of the section modified
+3.3.a: "If exceptionally no relevant IMDRF code is available or specific enough, then provide additional information below": Labelling updated
+3.3.e: Rework the layout of the section 3.3.d in order to add the new section 3.3.e and reindexation of section 3.3.e to 3.3.f
+
+3.4: "Initial reporter": Title of the section modified
+
+Page 8: Review layout of sections 4.1 and 4.2.a, b, c and d to increase space for 4.1b and 4.2c (second question)(Javascript updated (due to the restructuration of the page)) 
+
+4.1.c to d: reindexation of section due to the new section 4.1.b and updating the JavaScript
+
+4.2.c: Add "Suspicion or confirmation of a relationship between the serious incident and the medicinal substance(s) / product(s), tissue (s), cell(s) of human origin or their derivative(s) associated with the device?" 
+4.2.e: Add hyperlinks to the different annexes (A-> G)
+       Force every cell of choice 1 of each line to be mandatory
+
+4.2.e: "If exceptionally no relevant IMDRF code is available or specific enough, then provide additional information below": Labelling updated
+4.2.f: "If exceptionally no relevant IMDRF code is available or specific enough, then provide additional information below": Labelling updated
+4.2.g: "(FSCA have to be reported separately)": Labelling updated
+
+4.3: "Similar serious incidents (for Final serious incidents)": Title of the section modified
+4.3.1: "Use of IMDRF terms and codes for identifying similar incidents": Title of the section modified
+4.3.1.a: "Identification of similar serious incidents...":
+         - Labelling updated - Add all links to the different annex A & C - The Label of the checkboxes is modified 
+4.3.2: "Use of in-house terms/codes for identifying.....": Title of the section modified 
+4.3.2.a: "If similar serious incident were not identified by IMDRF codes...": 
+         - Labelling updated - Change the accessing of the 4 text fields -  Apply new business rule - The Label of the checkboxes is modified 
+         - Unlock the 4 text fields
+4.3.3: "Number of similar serious incidents....": Title of the section modified 
+4.3.2.a: "If similar serious incident were not identified by IMDRF codes but by in-house codes, please provide the codes and terms below.":  - Labelling updated
+4.3.3.b: "Indicate on which criteria the number of devices on the market...":  - Labelling updated
+4.3.3.c: "Enter the number of similar serious incidents (SI) and devices on the market for the indicated time periods": 
+         - Labelling updated - Labelling of date format is updated ('in format YYYY-MM-DD')
+         - Header of the column is updated  - Label of the row "EEA + TR XI" updated 
+         - Create a function to check values between rows (Country of serious incident, EEA + TR + XI, World)
+4.3.3.d: "Comments on how similar (serious) incidents and associated number of devices on the market were determined":  - Labelling updated
+
+Page 12: align boxes
+Page 12: Add button "Save as XML"  above the sign part
+Page 12: Add buttons ("Save XML to Submit" and "Save ¨PDF to Submit") and related Javascript codebelow the sign part
+
+ 
+## Changed
+Main title modified
+Add JIRA ticket number
+Version of the document upgraded
+
+About XSL files
+---------------
+Rename the 2 XSL files
+incident_in_7.0.xsl   ->	incident_in_7.3.xsl
+incident_out_7.0.xsl  ->	incident_out_7.3.xsl
+
+File incident_in_7.3.xsl: add "XI" country in the list
+File incident_out_7.3.xsl: - update the name of XSD file to used following the report type
+                           - add the generic XSL filename (incident_PDFgeneric-v7.3.xsd) in the default case
+
+About XSD files
+---------------
+New XSD file : incident_PDFgeneric-v7.3.xsd
+
+Within all XSD files : new text for <xsd:documentation>
+- incident_PDFgeneric-v7.3.xsd
+  "Schema for GENERICS reports about Incidents for EU vigilance exchange. version 7.3.1 of 03.2024"
+- incident-Initial-v7.3.xsd
+  "Schema for INITIAL reports about Incidents for EU vigilance exchange. version 7.3.1 of 03.2024"
+- incident-Followup-v7.3.xsd
+  "Schema for FOLLOW-UP reports about Incidents for EU vigilance exchange. version 7.3.1 of 03.2024"
+- incident-InitialFinal-v7.3.xsd
+  "Schema for COMBINED INITIAL AND FINAL reports about Incidents for EU vigilance exchange. version 7.3.1 of 03.2024"
+- incident-FinalRep-v7.3.xsd
+  "Schema for FINAL REPORTABLE reports about Incidents for EU vigilance exchange. version 7.3.1 of 03.2024"
+-incident-FinalNonRep-v7.3.xsd
+  "Schema for FINAL NOT REPORTABLE reports about Incidents for EU vigilance exchange. version 7.3.1 of 03.2024"
+
+Use new XSD filenames for version : 7.3.1
+incident-Initial-v7.2.1.xsd 	     ->	incident-Initial-v7.3.xsd
+incident-Followup-v7.2.1.xsd	     ->	incident-Followup-v7.3.xsd
+incident-InitialFinal-v7.2.1.xsd     ->	incident-InitialFinal-v7.3.xsd
+incident-FinalRep-v7.2.1.xsd	     ->	incident-FinalRep-v7.3.xsd
+incident-FinalNonRep-v7.2.1.xsd  ->	incident-FinalNonRep-v7.3.xsd
+
+
+
+## Version 7.2.1 (XX/05/2019)
+
+### Fixed
+1.2 b: Date of incident mandatory in the XSD files. In the PDF it was already implemented.
+2.4 a: The string "OR MDR/IVDR" is removed from deviceClassT element in the XSD files. In the PDF it was already correct.
+3.2 a: Choice 1 mandatory in the XSD files. In the PDF it was already implemented.
+
+The form was not blocked when sent via email. Fixed.
+
+### Changed
+4.2 f: IMDRF Component codes (Annex G) accepts 8 characters codes according to the format published in April 2020
+4.4.3 c: Limitation to 1,000,000 for Number of devices on market has been removed
+
+The following fields has been made auto-expandable:
+2.6 a - Relevant accessories used with the device being reported on
+2.6 b - Relevant associated devices used with the device being reported on
+3.1 a - Provide a comprehensive description of the incident
+3.2 f - Remedial actions taken by healthcare facility, patient or user subsequent to the incident
+3.3 a - If you think the incident is unique and a suitable IMDRF term is missing, briefly explain
+3.2 a - If you think the incident is unique and a suitable IMDRF term is missing, briefly explain
+3.3 e - List any of the patient's prior health condition or medication that may be relevant to this incident
+4.1 a - For initial and follow-up reports: preliminary results and conclusions of manufacturer’s investigation
+4.1 b - Initial actions (corrective and/or preventive) implemented by the manufacturer
+4.1 c - What further investigations do you intend in view of reaching final conclusions?
+4.2 a - Description of the manufacturer’s evaluation concerning possible root causes/causative factors and conclusion
+4.2 b - Fill out rationale for why this is considered not reportable
+4.2 d - Rationale for no review
+4.2 d - Results of the assessment:
+4.2 e - If you think the incident is unique and a suitable IMDRF term is missing, briefly explain
+4.2 f - If you think the incident is unique and a suitable IMDRF term is missing, briefly explain:
+4.2 g - Description of remedial action/corrective action/preventive action/field safety corrective action (FSCA)
+4.2 h - Time schedule for the implementation of the identified actions
+4.2 i - Final comments from the manufacturer on cause investigation and conclusion
+4.3.1 - Other
+4.3.2 - Other
+4.3.3 a - Details of the selection made above
+4.3.3 b - Other describe
+4.3.3 d - Comments on how similar incidents and associated number of devices on the market were determined
+5 - General comments
+
+
+
+## Version 7.2 (02/09/2019)
+
+### Added
+2.2 a: Radio button for EMDN. This change will require also a little modification of the XML. The XSDs files have been modified accordingly: a new enumeration element with value "EMDN" has been added to the simpleType "nomenclatureSystemT".
+
+### Changed
+1.1 c: mandatory for Follow up, Final Reportable and Final Non reportable. Both the PDF from and the XSDs have been modified.
+2.1 a: label changed from "UDI device identifier" to "UDI device identifier/Eudamed ID". The HelpText has been modified accordingly.
+2.1 c: label changed from "Basic UDI-DI" to "Basic UDI-DI/Eudamed-DI". The HelpText has been modified accordingly.
+4.3.3 c: XSDs files have been modified (complex type numSimilarIncidentsDevicesT) in order to be compatible with stylesheet-based mapping techniques (e.g. Lotus Note)
+
+### Fixed
+3.3 b: The code that validates the content of years, months and days has been modified in order to be aligned with the Helptext.
+
+Mismatch between mandatory rule and filed data type (i.e. nonEmptyString50T, nonEmptyString200T) for the following fields:
+1.3.1 a: reporterOtherText
+1.3.1 b: mfrRef 
+1.3.4 g: reporterOrgStreet
+1.3.4 h: reporterOrgStreetNum
+1.3.4 i: reporterOrgAddress
+1.3.2 b: mfrSRN
+1.3.2 h: mfrOrgStreet
+1.3.2 i: mfrOrgStreetNum
+1.3.2 j: mfrAddress
+1.3.3 b: ARSRN
+1.3.3 c: ARContactPersonFirstName
+1.3.3 d: ARContactPersonSecondName
+1.3.3 h: ARStreet
+1.3.3 i: ARStreetNum
+1.3.3 j: ARAddress
+1.3.3 l: ARCity
+1.3.3 m: ARPostCode
+1.3.3 f: ARPhone
+4.2 i: manufacturersFinalComments
+
+## Version 7.1 (09/01/2019)
+
+### Fixed 
+The title of the form has been modified from "Manufacturer Incident Report (MIR) for Serious Incidents (MDR/IVDR) and Incidents (MDD/IMDD/IVDD)" to "Manufacturer Incident Report (MIR) for Serious Incidents (MDR/IVDR) and Incidents (MDD/AIMDD/IVDD)"

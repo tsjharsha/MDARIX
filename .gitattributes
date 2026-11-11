@@ -35,6 +35,9 @@ data/code_lists/manifest.json text eol=lf
 # FDA's fillable 3500A and eMDR schemas stay byte-identical to FDA's files (their SHA-256 is in the manifest).
 data/fda_forms/** -text
 data/fda_forms/manifest.json text eol=lf
+# The Commission's and MHRA's MIR files (B8) stay byte-identical (their SHA-256 is in the manifest).
+data/mir_forms/** -text
+data/mir_forms/manifest.json text eol=lf
 # FDA's example eMDR files stay byte-identical (their SHA-256 is in the fixtures' manifest).
 tests/fixtures/emdr_examples/*.xml -text
 

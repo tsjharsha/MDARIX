@@ -1,0 +1,1213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xdb="http://xmlns.oracle.com/xdb" xdb:storeVarrayAsTable="true" xdb:schemaURL="incident-FinalRepGB-v7.2.1.xsd" xdb:numProps="287" xdb:flags="2105633" xdb:schemaOwner="HALO">
+  <xsd:annotation>
+    <xsd:documentation>
+			Schema for FINAL REPORTABLE reports about Incidents for GB vigilance exchange.
+			version 7.2.1 of 05.2020
+		</xsd:documentation>
+  </xsd:annotation>
+  <xsd:element name="incident" xdb:propNumber="7376" xdb:global="true" xdb:SQLType="CLOB" xdb:SQLName="incident" xdb:memType="258">
+    <xsd:complexType>
+      <xsd:sequence>
+        <!-- Section 1: Administrative information -->
+        <xsd:element name="admin_info" type="admin_infoT" minOccurs="1" maxOccurs="1" xdb:propNumber="7371" xdb:global="false" xdb:SQLName="admin_info" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+        <!-- Section 2: Medical device information -->
+        <xsd:element name="device_info" type="device_infoT" minOccurs="1" maxOccurs="1" xdb:propNumber="7372" xdb:global="false" xdb:SQLName="device_info" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+        <!-- Section 3: Incident information derived from healthcare professional and/or lay user -->
+        <xsd:element name="incident_info" type="incident_infoT" minOccurs="1" maxOccurs="1" xdb:propNumber="7373" xdb:global="false" xdb:SQLName="incident_info" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+        <!-- Section 4: Manufacturer analysis -->
+        <xsd:element name="mfr_invest" type="mfrInvestigationT" minOccurs="1" maxOccurs="1" xdb:propNumber="7374" xdb:global="false" xdb:SQLName="mfr_invest" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+        <!-- Section 5: General comments -->
+        <xsd:element name="other_reporting_info" type="other_reporting_infoT" minOccurs="0" maxOccurs="1" xdb:propNumber="7375" xdb:global="false" xdb:SQLName="other_reporting_info" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      </xsd:sequence>
+      <xsd:attribute name="version" type="string50T" xdb:propNumber="7368" xdb:global="false" xdb:memType="1"/>
+      <xsd:attribute name="sCreateTimeStamp" type="xsd:dateTime" xdb:SQLType="TIMESTAMP WITH TIME ZONE" use="required" xdb:propNumber="7369" xdb:global="false" xdb:memType="181"/>
+      <xsd:attribute name="sFormLanguage" type="isoLanguageT" use="required" xdb:propNumber="7370" xdb:global="false" xdb:memType="259"/>
+    </xsd:complexType>
+  </xsd:element>
+  <!-- SECTION 1: Administrative information -->
+  <xsd:complexType name="admin_infoT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <!-- 1.1 Corresponding competent authority -->
+      <xsd:element name="ncaName" type="nonEmptyString200T" minOccurs="1" maxOccurs="1" xdb:propNumber="7377" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ncaReportNo" type="nonEmptyString50T" minOccurs="1" maxOccurs="1" xdb:propNumber="7379" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <!-- 1.2 Date, type, and classification of incident report -->
+      <xsd:element name="reportDate" type="xsd:date" minOccurs="1" xdb:propNumber="7381" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="adverseEventDateFrom" type="xsd:date" minOccurs="1" maxOccurs="1" xdb:propNumber="7382" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="adverseEventDateTo" type="xsd:date" minOccurs="1" maxOccurs="1" xdb:propNumber="7383" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrAwarenessDate" type="xsd:date" minOccurs="1" maxOccurs="1" xdb:propNumber="7384" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reportType" type="reportTypeT" minOccurs="1" maxOccurs="1" xdb:propNumber="7385" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reportNextDate" type="xsd:date" minOccurs="0" maxOccurs="1" xdb:propNumber="7386" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="eventClassification" type="eventClassificationT" minOccurs="1" maxOccurs="1" xdb:propNumber="7387" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <!-- 1.3 Submitter information -->
+      <!-- 1.3.1 Submitter of the report -->
+      <xsd:element name="contact_info" type="contact_infoT" minOccurs="1" maxOccurs="1" xdb:propNumber="7388" xdb:global="false" xdb:SQLName="contact_info" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="mfrRef" type="nonEmptyString50T" minOccurs="1" xdb:propNumber="7389" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ncaRefMultiDev" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7390" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ncaRefMultiDevLI" type="string50T" minOccurs="0" maxOccurs="unbounded" xdb:propNumber="7391" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="eudamedRefMultiDev" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7392" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="eudamedRefMultiDevLI" type="string50T" minOccurs="0" maxOccurs="unbounded" xdb:propNumber="7393" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrRefMultiDev" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7394" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrRefMultiDevLI" type="string50T" minOccurs="0" maxOccurs="unbounded" xdb:propNumber="7395" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ncaRefFSCA" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7396" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ncaRefFSCALI" type="string50T" minOccurs="0" maxOccurs="unbounded" xdb:propNumber="7397" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="eudamedRefFSCA" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7398" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrRefFSCA" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7400" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrRefFSCALI" type="string50T" minOccurs="0" maxOccurs="unbounded" xdb:propNumber="7401" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="psrId" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7402" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="psrIdLI" type="string50T" minOccurs="0" maxOccurs="unbounded" xdb:propNumber="7403" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="pmcfpmpfId" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7404" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="pmcfpmpfIdLI" type="string50T" minOccurs="0" maxOccurs="unbounded" xdb:propNumber="7405" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <!-- 1.3.2	Manufacturer information -->
+  <xsd:complexType name="contact_infoT" xdb:SQLType="CLOB">
+    <xsd:choice>
+      <xsd:element name="reporterMfr" type="reporterMfrT" minOccurs="1" maxOccurs="1" xdb:propNumber="7406" xdb:global="false" xdb:SQLName="reporterMfr" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="reporterAR" type="reporterART" minOccurs="0" maxOccurs="1" xdb:propNumber="7407" xdb:global="false" xdb:SQLName="reporterAR" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="reporterUKRP" type="reporterUKRPT" maxOccurs="1" xdb:propNumber="6778" xdb:global="false" xdb:SQLName="reporterUKRP" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="reporterOther" type="reporterOtherT" minOccurs="0" maxOccurs="1" xdb:propNumber="7408" xdb:global="false" xdb:SQLName="reporterOther" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+    </xsd:choice>
+  </xsd:complexType>
+  <xsd:complexType name="reporterMfrT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="statusReporter" type="statusReporterMfrT" minOccurs="1" maxOccurs="1" xdb:propNumber="7409" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterDetails" type="reporterDetailsT" minOccurs="1" maxOccurs="1" xdb:propNumber="7410" xdb:global="false" xdb:SQLName="reporterDetails" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="mfrDetails" type="mfrDetailsT" minOccurs="1" maxOccurs="1" xdb:propNumber="7411" xdb:global="false" xdb:SQLName="mfrDetails" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="arDetails" type="authRepDetailsT" minOccurs="0" maxOccurs="1" xdb:propNumber="7412" xdb:global="false" xdb:SQLName="arDetails" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="reporterOtherText" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7413" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="reporterART" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="statusReporter" type="statusReporterAuthRepT" minOccurs="1" maxOccurs="1" xdb:propNumber="7414" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterDetails" type="reporterDetailsT" minOccurs="1" maxOccurs="1" xdb:propNumber="7415" xdb:global="false" xdb:SQLName="reporterDetails" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="mfrDetails" type="mfrDetailsT" minOccurs="1" maxOccurs="1" xdb:propNumber="7416" xdb:global="false" xdb:SQLName="mfrDetails" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="arDetails" type="authRepDetailsT" minOccurs="1" maxOccurs="1" xdb:propNumber="7417" xdb:global="false" xdb:SQLName="arDetails" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="reporterUKRPT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="statusReporter" type="statusReporterUKRPT" minOccurs="1" maxOccurs="1" xdb:propNumber="6779" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterDetails" type="reporterDetailsT" minOccurs="1" maxOccurs="1" xdb:propNumber="6780" xdb:global="false" xdb:SQLName="reporterDetails" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="mfrDetails" type="mfrDetailsT" minOccurs="1" maxOccurs="1" xdb:propNumber="6781" xdb:global="false" xdb:SQLName="mfrDetails" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="arDetails" type="authRepDetailsT" minOccurs="1" maxOccurs="1" xdb:propNumber="6782" xdb:global="false" xdb:SQLName="arDetails" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="reporterOtherT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="statusReporter" type="statusReporterOtherT" minOccurs="1" maxOccurs="1" xdb:propNumber="7418" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterDetails" type="reporterDetailsT" minOccurs="1" maxOccurs="1" xdb:propNumber="7419" xdb:global="false" xdb:SQLName="reporterDetails" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="mfrDetails" type="mfrDetailsT" minOccurs="1" maxOccurs="1" xdb:propNumber="7420" xdb:global="false" xdb:SQLName="mfrDetails" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="arDetails" type="authRepDetailsT" minOccurs="0" maxOccurs="1" xdb:propNumber="7421" xdb:global="false" xdb:SQLName="arDetails" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="reporterOtherText" type="nonEmptyString50T" minOccurs="1" maxOccurs="1" xdb:propNumber="7422" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:simpleType name="statusReporterMfrT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Manufacturer"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="statusReporterAuthRepT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Authorised representative"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="statusReporterUKRPT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="United Kingdom Responsible Person"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="statusReporterOtherT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Others"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:complexType name="reporterDetailsT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="reporterOrgName" type="nonEmptyString200T" minOccurs="1" maxOccurs="1" xdb:propNumber="7423" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterContactPersonFirstName" type="nonEmptyString50T" minOccurs="1" maxOccurs="1" xdb:propNumber="7424" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterContactPersonSecondName" type="nonEmptyString50T" minOccurs="1" maxOccurs="1" xdb:propNumber="7425" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterOrgAddress" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7426" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterOrgStreet" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7427" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterOrgStreetNum" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7428" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterOrgCity" type="nonEmptyString50T" minOccurs="1" maxOccurs="1" xdb:propNumber="7429" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterOrgCountry" type="isoCountryT" minOccurs="1" maxOccurs="1" xdb:propNumber="7430" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterOrgPOBox" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7431" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterOrgPostcode" type="nonEmptyString50T" minOccurs="1" maxOccurs="1" xdb:propNumber="7432" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterOrgPhone" type="nonEmptyString50T" minOccurs="1" maxOccurs="1" xdb:propNumber="7433" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reporterOrgEmailAddress" type="string255T" minOccurs="1" maxOccurs="1" xdb:propNumber="7434" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="mfrDetailsT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="mfrName" type="nonEmptyString200T" minOccurs="1" xdb:propNumber="7435" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrSRN" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7436" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrContactPersonFirstName" type="nonEmptyString50T" minOccurs="1" maxOccurs="1" xdb:propNumber="7437" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrContactPersonSecondName" type="nonEmptyString50T" minOccurs="1" maxOccurs="1" xdb:propNumber="7438" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrAddress" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7439" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrOrgStreet" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7440" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrOrgStreetNum" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7441" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrCity" type="nonEmptyString50T" minOccurs="1" maxOccurs="1" xdb:propNumber="7442" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrCountry" type="isoCountryT" minOccurs="1" maxOccurs="1" xdb:propNumber="7443" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrOrgPOBox" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7444" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrPostcode" type="nonEmptyString50T" minOccurs="1" maxOccurs="1" xdb:propNumber="7445" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrPhone" type="nonEmptyString50T" minOccurs="1" maxOccurs="1" xdb:propNumber="7446" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="mfrEmailAddress" type="string255T" minOccurs="1" maxOccurs="1" xdb:propNumber="7447" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="authRepDetailsT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="ARName" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7448" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ARSRN" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7449" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ARContactPersonFirstName" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7450" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ARContactPersonSecondName" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7451" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ARAddress" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7452" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ARStreet" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7453" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ARStreetNum" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7454" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ARCity" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7455" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ARCountry" type="isoCountryT" minOccurs="0" maxOccurs="1" xdb:propNumber="7456" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ARPOBox" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7457" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ARPostCode" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7458" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ARPhone" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7459" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="AREmailAddress" type="string255T" minOccurs="0" maxOccurs="1" xdb:propNumber="7460" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <!-- Section 2: Medical device information -->
+  <xsd:complexType name="device_infoT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <!-- 2.1 Unique Device Identification (UDI) -->
+      <xsd:element name="udiDI" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7461" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="udiPI" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7462" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="udiDIBasic" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7463" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="udiDIUnitUse" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7464" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="udiIssueEntity" type="udiT" minOccurs="0" maxOccurs="1" xdb:propNumber="7081" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <!-- 2.2 Categorisation of device -->
+      <xsd:element name="nomenclatureSystem" type="nomenclatureSystemT" minOccurs="0" maxOccurs="1" xdb:propNumber="7465" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="nomenclatureSystemOther" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7466" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="nomenclatureCode" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7467" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <!-- 2.3 Description of device and commercial information -->
+      <xsd:element name="brandName" type="string300T" minOccurs="1" maxOccurs="1" xdb:propNumber="7468" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceDescription" type="string4000T" minOccurs="1" maxOccurs="1" xdb:propNumber="7469" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="modelNum" type="string300T" minOccurs="0" maxOccurs="1" xdb:propNumber="7470" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="catalogNum" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7471" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="serialNum" type="string1000T" minOccurs="0" maxOccurs="1" xdb:propNumber="7472" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="batchNum" type="string1000T" minOccurs="0" maxOccurs="1" xdb:propNumber="7473" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceSoftwareVer" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7474" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceFirmwareVer" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7475" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceMfrDate" type="xsd:date" minOccurs="0" maxOccurs="1" xdb:propNumber="7476" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceExpiryDate" type="xsd:date" minOccurs="0" maxOccurs="1" xdb:propNumber="7477" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ImplantedDateFrom" type="xsd:date" minOccurs="0" maxOccurs="1" xdb:propNumber="7478" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ImplantedDateTo" type="xsd:date" minOccurs="0" maxOccurs="1" xdb:propNumber="7479" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ExplantedDateFrom" type="xsd:date" minOccurs="0" maxOccurs="1" xdb:propNumber="7480" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="ExplantedDateTo" type="xsd:date" minOccurs="0" maxOccurs="1" xdb:propNumber="7481" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="implantDuration" type="optDurationT" minOccurs="0" maxOccurs="1" xdb:propNumber="7482" xdb:global="false" xdb:SQLName="implantDuration" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="implantFacilityName" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7483" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="explantFacilityName" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7484" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="nbIdNum" type="nbIdNumT" minOccurs="0" maxOccurs="1" xdb:propNumber="7485" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="UKABIdNum" type="UKABIdNumT" minOccurs="0" maxOccurs="1" xdb:propNumber="7674" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="nbCertNum" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7486" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="nbCertNumLI" type="string50T" minOccurs="0" maxOccurs="unbounded" xdb:propNumber="7487" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="nbIdNum2" type="nbIdNumT" minOccurs="0" maxOccurs="1" xdb:propNumber="7488" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="nbCertNum2" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7489" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="nbCertNum2LI" type="string50T" minOccurs="0" maxOccurs="unbounded" xdb:propNumber="7490" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="UKABCertNum" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7675" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="UKABCertNumLI" type="string50T" minOccurs="0" maxOccurs="unbounded" xdb:propNumber="8537" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>      
+	  <xsd:element name="deviceMarketDateType" type="marketDateTypeT" minOccurs="0" maxOccurs="1" xdb:propNumber="7491" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceMarketDate" type="optShortStructDateT" minOccurs="0" maxOccurs="1" xdb:propNumber="7492" xdb:global="false" xdb:SQLName="deviceMarketDate" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <!-- 2.4 Risk class of device when placed on market -->
+      <xsd:element name="deviceClass" type="deviceClassT" minOccurs="0" maxOccurs="1" xdb:propNumber="7493" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceClassMDD" type="deviceClassMDDT" minOccurs="0" maxOccurs="1" xdb:propNumber="7494" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceClassIVDD" type="deviceClassIVDDT" minOccurs="0" maxOccurs="1" xdb:propNumber="7495" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceClassMDR" type="deviceClassMDRT" minOccurs="0" maxOccurs="1" xdb:propNumber="7496" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceClassMDRType" type="deviceClassMDRTypeT" minOccurs="0" maxOccurs="1" xdb:propNumber="7497" xdb:global="false" xdb:SQLName="deviceClassMDRType" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="deviceClassIVDR" type="deviceClassIVDRT" minOccurs="0" maxOccurs="1" xdb:propNumber="7498" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceClassIVDRType" type="deviceClassIVDRTypeT" minOccurs="0" maxOccurs="1" xdb:propNumber="7499" xdb:global="false" xdb:SQLName="deviceClassIVDRType" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <!-- 2.5 Market distribution of device (region / country) -->
+      <xsd:element name="distribution" type="distributionT" minOccurs="1" maxOccurs="1" xdb:propNumber="7500" xdb:global="false" xdb:SQLName="distribution" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <!-- 2.6 Use of accessories, associated devices or other devices -->
+      <xsd:element name="deviceAccessories" type="string2000T" minOccurs="0" maxOccurs="1" xdb:propNumber="7501" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceAssociated" type="string2000T" minOccurs="0" maxOccurs="1" xdb:propNumber="7502" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:simpleType name="nbIdNumT">
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="[0-9]+"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="UKABIdNumT">
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="[0-9]+"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <!-- Section 3: Incident information derived from healthcare professional and/or lay user -->
+  <xsd:complexType name="incident_infoT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="clinical_event_info" type="clinical_event_infoT" minOccurs="1" maxOccurs="1" xdb:propNumber="7503" xdb:global="false" xdb:SQLName="clinical_event_info" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="patient_info" type="patient_infoT" minOccurs="0" maxOccurs="1" xdb:propNumber="7504" xdb:global="false" xdb:SQLName="patient_info" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="initial_reporter_info" type="healthcare_facility_infoT" minOccurs="0" maxOccurs="1" xdb:propNumber="7505" xdb:global="false" xdb:SQLName="initial_reporter_info" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="clinical_event_infoT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <!-- 3.1 Nature of incident -->
+      <xsd:element name="eventDescription" type="stringT" minOccurs="1" maxOccurs="1" xdb:propNumber="7506" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <!-- 3.2 Medical device problem information -->
+      <xsd:element name="imdrfCodeChoice1" type="codeStringT" minOccurs="1" maxOccurs="1" xdb:propNumber="7507" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfCodeChoice2" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7508" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfCodeChoice3" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7509" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfCodeChoice4" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7510" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfCodeChoice5" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7511" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfCodeChoice6" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7512" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfCodeMissing" type="string300T" minOccurs="0" maxOccurs="1" xdb:propNumber="7513" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="numPatientsInvolved" type="xsd:integer" minOccurs="0" maxOccurs="1" xdb:propNumber="7514" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="currentDeviceLocation" type="currentDeviceLocationT" minOccurs="1" maxOccurs="1" xdb:propNumber="7515" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="currentDeviceLocationOtherText" type="string300T" minOccurs="0" maxOccurs="1" xdb:propNumber="7516" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceOperatorAtEvent" type="deviceOperatorAtEventT" minOccurs="0" maxOccurs="1" xdb:propNumber="7517" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceOperatorAtEventOther" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7518" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceUsage" type="deviceUsageT" minOccurs="0" maxOccurs="1" xdb:propNumber="7519" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="deviceUsageOther" type="string50T" minOccurs="0" xdb:propNumber="7520" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="patientRemedialAction" type="stringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7521" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <!-- 3.3 Patient information -->
+  <xsd:complexType name="patient_infoT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="imdrfClinicalCodeChoice1" type="codeStringT" minOccurs="1" maxOccurs="1" xdb:propNumber="7522" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfClinicalCodeChoice2" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7523" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfClinicalCodeChoice3" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7524" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfClinicalCodeChoice4" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7525" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfClinicalCodeChoice5" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7526" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfClinicalCodeChoice6" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7527" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfHealthCodeChoice1" type="codeStringT" minOccurs="1" maxOccurs="1" xdb:propNumber="7528" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfHealthCodeChoice2" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7529" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfHealthCodeChoice3" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7530" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfHealthCodeChoice4" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7531" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfHealthCodeChoice5" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7532" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfHealthCodeChoice6" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7533" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfMissingCodeHealthEffect" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7534" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="patientAgeAtEvent" type="optDurationT" minOccurs="0" maxOccurs="1" xdb:propNumber="7535" xdb:global="false" xdb:SQLName="patientAgeAtEvent" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="Gender" type="GenderT" minOccurs="0" maxOccurs="1" xdb:propNumber="7536" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="massKG" type="xsd:decimal" minOccurs="0" maxOccurs="1" xdb:propNumber="7537" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="patientPriorMedication" type="stringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7538" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <!-- 3.4 Initial reporter (can be healthcare professional of facility, patient, lay user) -->
+  <xsd:complexType name="healthcare_facility_infoT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="initialReporterRole" type="initialReporterRoleT" minOccurs="1" maxOccurs="1" xdb:propNumber="7539" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="initialReporterRoleOther" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7540" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityName" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7541" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityRepNum" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7542" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityContactPersonFirstName" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7543" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityContactPersonSecondName" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7544" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityAddress" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7545" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityPhone" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7546" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityEmail" type="string255T" minOccurs="0" maxOccurs="1" xdb:propNumber="7547" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityCountry" type="isoCountryT" minOccurs="1" maxOccurs="1" xdb:propNumber="7548" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityStreet" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7549" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityStreetNum" type="string200T" minOccurs="0" maxOccurs="1" xdb:propNumber="7550" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityCity" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7551" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityPOBox" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7552" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="healthcareFacilityPostcode" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7553" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <!-- Section 4: Manufacturer analysis -->
+  <xsd:complexType name="mfrInvestigationT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <!-- 4.1 Manufacturer’s preliminary comments -->
+      <xsd:element name="manufacturersPrelimAnalysis" type="stringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7554" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="manufacturersInitialCorrecAction" type="stringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7555" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="furtherInvestigations" type="stringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7556" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <!-- 4.2 Cause investigation and conclusion -->
+      <xsd:element name="rootCauses" type="stringT" minOccurs="1" maxOccurs="1" xdb:propNumber="7557" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="manufacturersWhyNotReportable" type="stringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7558" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="rootCauseConfirmed" type="yesNoT" minOccurs="1" maxOccurs="1" xdb:propNumber="7559" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="riskAssReviewed" type="yesNoT" minOccurs="1" maxOccurs="1" xdb:propNumber="7560" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="rationaleNoReview" type="string4000T" minOccurs="0" maxOccurs="1" xdb:propNumber="7561" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="riskAssAdequate" type="yesNoT" minOccurs="0" maxOccurs="1" xdb:propNumber="7562" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="riskAssResults" type="string4000T" minOccurs="0" maxOccurs="1" xdb:propNumber="7563" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfTypeInvestigationCodeChoice1" type="codeStringT" minOccurs="1" maxOccurs="1" xdb:propNumber="7564" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfTypeInvestigationCodeChoice2" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7565" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfTypeInvestigationCodeChoice3" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7566" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfTypeInvestigationCodeChoice4" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7567" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfTypeInvestigationCodeChoice5" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7568" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfTypeInvestigationCodeChoice6" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7569" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfTypeInvestigationCodeChoice7" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7570" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfTypeInvestigationCodeChoice8" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7571" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfInvestigationFindingsCodeChoice1" type="codeStringT" minOccurs="1" maxOccurs="1" xdb:propNumber="7572" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfInvestigationFindingsCodeChoice2" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7573" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfInvestigationFindingsCodeChoice3" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7574" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfInvestigationFindingsCodeChoice4" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7575" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfInvestigationFindingsCodeChoice5" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7576" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfInvestigationFindingsCodeChoice6" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7577" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfInvestigationConclusionCodeChoice1" type="codeStringT" minOccurs="1" maxOccurs="1" xdb:propNumber="7578" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfInvestigationConclusionCodeChoice2" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7579" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfInvestigationConclusionCodeChoice3" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7580" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfInvestigationConclusionCodeChoice4" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7581" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfInvestigationConclusionCodeChoice5" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7582" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfInvestigationConclusionCodeChoice6" type="codeStringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7583" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfMissingCodeCauseInvestigation" type="stringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7584" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfComponentCodeChoice1" type="codeString8charT" minOccurs="1" maxOccurs="1" xdb:propNumber="7585" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfComponentCodeChoice2" type="codeString8charT" minOccurs="0" maxOccurs="1" xdb:propNumber="7586" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfComponentCodeChoice3" type="codeString8charT" minOccurs="0" maxOccurs="1" xdb:propNumber="7587" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfComponentCodeChoice4" type="codeString8charT" minOccurs="0" maxOccurs="1" xdb:propNumber="7588" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfComponentCodeChoice5" type="codeString8charT" minOccurs="0" maxOccurs="1" xdb:propNumber="7589" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfComponentCodeChoice6" type="codeString8charT" minOccurs="0" maxOccurs="1" xdb:propNumber="7590" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="imdrfMissingComponentCodes" type="stringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7591" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="correctiveAction" type="stringT" minOccurs="1" maxOccurs="1" xdb:propNumber="7592" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="correctiveActionSchedule" type="stringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7593" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="manufacturersFinalComments" type="stringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7594" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <!-- 4.3 Similar incidents (for Final (Reportable incident)) -->
+      <xsd:element name="similarIncidents" type="similarIncidentsT" minOccurs="0" maxOccurs="1" xdb:propNumber="7595" xdb:global="false" xdb:SQLName="similarIncidents" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <!-- 4.3 Similar incidents (for Final (Reportable incident)) -->
+  <xsd:complexType name="similarIncidentsT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <!-- 4.3.1 Use of IMDRF terms and codes for identifying similar incidents -->
+      <xsd:element name="similarIncImdrfCodesAnnexA" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7596" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="similarIncImdrfCodesAnnexC" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7597" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="similarIncOtherReportingCodes" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7598" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="similarIncOtherReportingCodesText" type="string2000T" minOccurs="0" maxOccurs="1" xdb:propNumber="7599" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <!-- 4.3.2 Use of in-house terms/codes for identifying similar incidents (only for transition period) -->
+      <xsd:element name="similarIncMdCodesChoice1Code" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7600" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="similarIncMdCodesChoice1Term" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7601" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="similarIncRootCouseCodesChoice1Code" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7602" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="similarIncRootCouseCodesChoice1Term" type="string50T" minOccurs="0" maxOccurs="1" xdb:propNumber="7603" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="similarIncOtherInHouseCodes" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7604" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="similarIncOtherInHouseCodesText" type="string2000T" minOccurs="0" maxOccurs="1" xdb:propNumber="7605" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <!-- 4.3.3 Number of similar incidents and devices on the market -->
+      <xsd:element name="similarVariant" type="similarVariantT" minOccurs="1" maxOccurs="1" xdb:propNumber="7606" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="similarVariantDetails" type="string4000T" minOccurs="0" maxOccurs="1" xdb:propNumber="7607" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="numberBasedOn" type="numberBasedOnT" minOccurs="1" maxOccurs="1" xdb:propNumber="7608" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="numberBasedOnOther" type="string300T" minOccurs="0" maxOccurs="1" xdb:propNumber="7609" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="timePeriodN" type="numSimilarIncidentsDevicesT" minOccurs="1" maxOccurs="1" xdb:propNumber="7610" xdb:global="false" xdb:SQLName="timePeriodN" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="timePeriodN-1" type="numSimilarIncidentsDevicesT" minOccurs="0" maxOccurs="1" xdb:propNumber="7611" xdb:global="false" xdb:SQLName="timePeriodN-1" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="timePeriodN-2" type="numSimilarIncidentsDevicesT" minOccurs="0" maxOccurs="1" xdb:propNumber="7612" xdb:global="false" xdb:SQLName="timePeriodN-2" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="timePeriodN-3" type="numSimilarIncidentsDevicesT" minOccurs="0" maxOccurs="1" xdb:propNumber="7613" xdb:global="false" xdb:SQLName="timePeriodN-3" xdb:memType="258" xdb:MemInline="false" xdb:SQLInline="true" xdb:JavaInline="false"/>
+      <xsd:element name="howWereDetermined" type="string2000T" minOccurs="0" maxOccurs="1" xdb:propNumber="7614" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <!-- Section 5: General comments -->
+  <xsd:complexType name="other_reporting_infoT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="AdditionalComments" type="stringT" minOccurs="0" maxOccurs="1" xdb:propNumber="7615" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:simpleType name="reportTypeT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Initial"/>
+      <xsd:enumeration value="Follow up"/>
+      <xsd:enumeration value="Combined initial and final"/>
+      <xsd:enumeration value="Final (Reportable incident)"/>
+      <xsd:enumeration value="Final (Non-reportable incident)"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="eventClassificationT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Serious public health threat"/>
+      <xsd:enumeration value="Death"/>
+      <xsd:enumeration value="Unanticipated serious deterioration in state of health"/>
+      <xsd:enumeration value="All other reportable incidents"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="marketDateTypeT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="First declaration of conformity"/>
+      <xsd:enumeration value="The device first CE marked"/>
+      <xsd:enumeration value="First placed on the market"/>
+      <xsd:enumeration value="First put into service"/>
+      <xsd:enumeration value="If software, date first made available"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="nomenclatureSystemT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="GMDN"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="deviceClassT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="This device has been placed on the market before the implementation of the MDD/AIMDD/IVDD"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="deviceClassMDDT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="active implant"/>
+      <xsd:enumeration value="class III"/>
+      <xsd:enumeration value="class IIb"/>
+      <xsd:enumeration value="class IIa"/>
+      <xsd:enumeration value="class I"/>
+      <xsd:enumeration value="class Is"/>
+      <xsd:enumeration value="class Im"/>
+      <xsd:enumeration value="class Ism"/>
+      <xsd:enumeration value="custom-made"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="deviceClassIVDDT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="IVD Annex II List A"/>
+      <xsd:enumeration value="IVD Annex II List B"/>
+      <xsd:enumeration value="IVD devices for self-testing"/>
+      <xsd:enumeration value="IVD general"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="deviceClassMDRT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="class III"/>
+      <xsd:enumeration value="class IIb"/>
+      <xsd:enumeration value="class IIa"/>
+      <xsd:enumeration value="class I"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="deviceClassIVDRT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="class D"/>
+      <xsd:enumeration value="class C"/>
+      <xsd:enumeration value="class B"/>
+      <xsd:enumeration value="class A"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:complexType name="deviceClassMDRTypeT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="implantable" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7616" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="activedevice" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7617" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="intendedtoadminister" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7618" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="sterileconditions" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7619" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="measuringfunction" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7620" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reusable" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7621" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="software" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7622" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="systems" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7623" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="procedurepacks" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7624" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="custommade" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7625" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="non-medical" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7626" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="deviceClassIVDRTypeT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="selftesting" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7627" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="nearpatienttesting" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7628" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="professionaltesting" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7629" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="companiondiagnostics" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7630" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="reagent" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7631" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="software" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7632" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="instrument" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7633" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="sterileconditions" type="yesNoT" default="No" minOccurs="0" maxOccurs="1" xdb:propNumber="7634" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:simpleType name="currentDeviceLocationT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Healthcare facility/carer"/>
+      <xsd:enumeration value="Patient/user"/>
+      <xsd:enumeration value="In transit to manufacturer"/>
+      <xsd:enumeration value="Manufacturer"/>
+      <xsd:enumeration value="Distributor"/>
+      <xsd:enumeration value="Discarded"/>
+      <xsd:enumeration value="Remains implanted"/>
+      <xsd:enumeration value="Unknown"/>
+      <xsd:enumeration value="Other"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="deviceOperatorAtEventT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Healthcare professional"/>
+      <xsd:enumeration value="Patient/lay user"/>
+      <xsd:enumeration value="Other"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="deviceUsageT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Initial use"/>
+      <xsd:enumeration value="Reuse of a reusable medical device"/>
+      <xsd:enumeration value="Reuse of a single use medical device"/>
+      <xsd:enumeration value="Re-serviced/refurbished/fully refurbished"/>
+      <xsd:enumeration value="Problem noted prior use"/>
+      <xsd:enumeration value="Other"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="GenderT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Male"/>
+      <xsd:enumeration value="Female"/>
+      <xsd:enumeration value="Other"/>
+      <xsd:enumeration value="Unknown"/>
+      <xsd:enumeration value="Not applicable"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="udiT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="GS1"/>
+      <xsd:enumeration value="HIBCC"/>
+      <xsd:enumeration value="ICCBBA"/>
+      <xsd:enumeration value="IFA"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="initialReporterRoleT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Healthcare professional"/>
+      <xsd:enumeration value="Patient"/>
+      <xsd:enumeration value="Lay user"/>
+      <xsd:enumeration value="Other"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="similarVariantT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Model"/>
+      <xsd:enumeration value="Software"/>
+      <xsd:enumeration value="Lot/Batch"/>
+      <xsd:enumeration value="Product platform"/>
+      <xsd:enumeration value="Other"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="numberBasedOnT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Devices placed on the market or put into service"/>
+      <xsd:enumeration value="Units distributed within each time period"/>
+      <xsd:enumeration value="Number of tests performed"/>
+      <xsd:enumeration value="Number of episodes of use (for reusable devices)"/>
+      <xsd:enumeration value="Active installed base"/>
+      <xsd:enumeration value="Units distributed from the date of declaration of Conformity/CE mark approval to the end date of each time period"/>
+      <xsd:enumeration value="Number of devices implanted"/>
+      <xsd:enumeration value="Other"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:complexType name="numSimilarIncidentsDevicesT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="startDate" type="xsd:date" minOccurs="0" xdb:propNumber="7635" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="endDate" type="xsd:date" minOccurs="0" xdb:propNumber="7636" xdb:global="false" xdb:memType="12" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="countrySimInc" type="xsd:integer" minOccurs="0" xdb:propNumber="7637" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="eeaChTrSimInc" type="xsd:integer" minOccurs="0" xdb:propNumber="7638" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="worldSimInc" type="xsd:integer" minOccurs="0" xdb:propNumber="7639" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="countrySimDev" type="xsd:integer" minOccurs="0" xdb:propNumber="7640" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="eeaChTrSimDev" type="xsd:integer" minOccurs="0" xdb:propNumber="7641" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="worldSimDev" type="xsd:integer" minOccurs="0" xdb:propNumber="7642" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="numberIncidentsDevicesT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="countryIncident" type="xsd:integer" minOccurs="0" xdb:propNumber="7643" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="eeaChTr" type="xsd:integer" minOccurs="0" xdb:propNumber="7644" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="world" type="xsd:integer" minOccurs="0" xdb:propNumber="7645" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="optDurationT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="numYears" type="xsd:integer" minOccurs="0" xdb:propNumber="7646" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="numMonths" type="xsd:integer" minOccurs="0" xdb:propNumber="7647" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="numDays" type="xsd:integer" minOccurs="0" xdb:propNumber="7648" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="optShortStructDateT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="year" type="validYearsT" minOccurs="0" xdb:propNumber="7649" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="month" type="validMonthsT" minOccurs="0" xdb:propNumber="7650" xdb:global="false" xdb:memType="2" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:simpleType name="codeStringT">
+    <xsd:restriction base="xsd:string">
+      <xsd:minLength value="3"/>
+      <xsd:maxLength value="7"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="codeString8charT">
+    <xsd:restriction base="xsd:string">
+      <xsd:minLength value="3"/>
+      <xsd:maxLength value="8"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="nonEmptyString50T">
+    <xsd:restriction base="xsd:string">
+      <xsd:minLength value="1"/>
+      <xsd:maxLength value="50"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="nonEmptyString200T">
+    <xsd:restriction base="xsd:string">
+      <xsd:minLength value="1"/>
+      <xsd:maxLength value="200"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="string255T">
+    <xsd:restriction base="xsd:string">
+      <xsd:maxLength value="255"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="nonEmptyString300T">
+    <xsd:restriction base="xsd:string">
+      <xsd:minLength value="1"/>
+      <xsd:maxLength value="300"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="nonEmptyString1000T">
+    <xsd:restriction base="xsd:string">
+      <xsd:minLength value="1"/>
+      <xsd:maxLength value="1000"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="nonEmptyString2000T">
+    <xsd:restriction base="xsd:string">
+      <xsd:minLength value="1"/>
+      <xsd:maxLength value="2000"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="string4000T">
+    <xsd:restriction base="xsd:string">
+      <xsd:maxLength value="4000"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="nonEmptyStringT">
+    <xsd:restriction base="xsd:string">
+      <xsd:minLength value="1"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="string50T">
+    <xsd:restriction base="xsd:string">
+      <xsd:maxLength value="50"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="string200T">
+    <xsd:restriction base="xsd:string">
+      <xsd:maxLength value="200"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="string300T">
+    <xsd:restriction base="xsd:string">
+      <xsd:maxLength value="300"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="string1000T">
+    <xsd:restriction base="xsd:string">
+      <xsd:maxLength value="1000"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="string2000T">
+    <xsd:restriction base="xsd:string">
+      <xsd:maxLength value="2000"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="stringT">
+    <xsd:restriction base="xsd:string"/>
+  </xsd:simpleType>
+  <xsd:simpleType name="yesNoT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Yes"/>
+      <xsd:enumeration value="No"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="yesNoEmptyT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="Yes"/>
+      <xsd:enumeration value="No"/>
+      <xsd:enumeration value=""/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:complexType name="distributionT" xdb:SQLType="CLOB">
+    <xsd:sequence>
+      <xsd:element name="distributionEEA" type="distributionEEAT" minOccurs="0" maxOccurs="unbounded" xdb:propNumber="7651" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="distribution_all" type="distribution_allT" minOccurs="0" maxOccurs="1" xdb:propNumber="7652" xdb:global="false" xdb:memType="259" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="otherCountries" type="string4000T" minOccurs="0" maxOccurs="1" xdb:propNumber="7653" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+      <xsd:element name="otherCountriesLI" type="string50T" minOccurs="0" maxOccurs="unbounded" xdb:propNumber="7654" xdb:global="false" xdb:memType="1" xdb:MemInline="true" xdb:SQLInline="true" xdb:JavaInline="true"/>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:simpleType name="distributionEEAT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="AT"/>
+      <xsd:enumeration value="BE"/>
+      <xsd:enumeration value="BG"/>
+      <xsd:enumeration value="CH"/>
+      <xsd:enumeration value="CY"/>
+      <xsd:enumeration value="CZ"/>
+      <xsd:enumeration value="DE"/>
+      <xsd:enumeration value="DK"/>
+      <xsd:enumeration value="EE"/>
+      <xsd:enumeration value="ES"/>
+      <xsd:enumeration value="FI"/>
+      <xsd:enumeration value="FR"/>
+      <xsd:enumeration value="GB"/>
+      <xsd:enumeration value="GR"/>
+      <xsd:enumeration value="HR"/>
+      <xsd:enumeration value="HU"/>
+      <xsd:enumeration value="IE"/>
+      <xsd:enumeration value="IS"/>
+      <xsd:enumeration value="IT"/>
+      <xsd:enumeration value="LI"/>
+      <xsd:enumeration value="LT"/>
+      <xsd:enumeration value="LU"/>
+      <xsd:enumeration value="LV"/>
+      <xsd:enumeration value="MT"/>
+      <xsd:enumeration value="NL"/>
+      <xsd:enumeration value="NO"/>
+      <xsd:enumeration value="PL"/>
+      <xsd:enumeration value="PT"/>
+      <xsd:enumeration value="RO"/>
+      <xsd:enumeration value="SE"/>
+      <xsd:enumeration value="SI"/>
+      <xsd:enumeration value="SK"/>
+      <xsd:enumeration value="TR"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="distribution_allT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="All EEA, Switzerland and Turkey"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="validYearsT">
+    <xsd:restriction base="xsd:integer">
+      <xsd:minInclusive value="1900"/>
+      <xsd:maxInclusive value="2050"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="validMonthsT">
+    <xsd:restriction base="xsd:integer">
+      <xsd:minInclusive value="1"/>
+      <xsd:maxInclusive value="12"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <!-- ISO 639-1 2-character language codes, always lower case, !!! incomplete -->
+  <xsd:simpleType name="isoLanguageT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="ab"/>
+      <xsd:enumeration value="aa"/>
+      <xsd:enumeration value="af"/>
+      <xsd:enumeration value="ak"/>
+      <xsd:enumeration value="sq"/>
+      <xsd:enumeration value="am"/>
+      <xsd:enumeration value="ar"/>
+      <xsd:enumeration value="an"/>
+      <xsd:enumeration value="hy"/>
+      <xsd:enumeration value="as"/>
+      <xsd:enumeration value="av"/>
+      <xsd:enumeration value="ae"/>
+      <xsd:enumeration value="ay"/>
+      <xsd:enumeration value="az"/>
+      <xsd:enumeration value="bm"/>
+      <xsd:enumeration value="ba"/>
+      <xsd:enumeration value="eu"/>
+      <xsd:enumeration value="be"/>
+      <xsd:enumeration value="bn"/>
+      <xsd:enumeration value="bh"/>
+      <xsd:enumeration value="bi"/>
+      <xsd:enumeration value="bs"/>
+      <xsd:enumeration value="br"/>
+      <xsd:enumeration value="bg"/>
+      <xsd:enumeration value="my"/>
+      <xsd:enumeration value="ca"/>
+      <xsd:enumeration value="ch"/>
+      <xsd:enumeration value="ce"/>
+      <xsd:enumeration value="ny"/>
+      <xsd:enumeration value="zh"/>
+      <xsd:enumeration value="cv"/>
+      <xsd:enumeration value="kw"/>
+      <xsd:enumeration value="co"/>
+      <xsd:enumeration value="cr"/>
+      <xsd:enumeration value="hr"/>
+      <xsd:enumeration value="cs"/>
+      <xsd:enumeration value="da"/>
+      <xsd:enumeration value="dv"/>
+      <xsd:enumeration value="nl"/>
+      <xsd:enumeration value="dz"/>
+      <xsd:enumeration value="en"/>
+      <xsd:enumeration value="eo"/>
+      <xsd:enumeration value="et"/>
+      <xsd:enumeration value="ee"/>
+      <xsd:enumeration value="fo"/>
+      <xsd:enumeration value="fj"/>
+      <xsd:enumeration value="fi"/>
+      <xsd:enumeration value="fr"/>
+      <xsd:enumeration value="ff"/>
+      <xsd:enumeration value="gl"/>
+      <xsd:enumeration value="gd"/>
+      <xsd:enumeration value="gv"/>
+      <xsd:enumeration value="ka"/>
+      <xsd:enumeration value="de"/>
+      <xsd:enumeration value="el"/>
+      <xsd:enumeration value="kl"/>
+      <xsd:enumeration value="gn"/>
+      <xsd:enumeration value="gu"/>
+      <xsd:enumeration value="ht"/>
+      <xsd:enumeration value="ha"/>
+      <xsd:enumeration value="he"/>
+      <xsd:enumeration value="hz"/>
+      <xsd:enumeration value="hi"/>
+      <xsd:enumeration value="ho"/>
+      <xsd:enumeration value="hu"/>
+      <xsd:enumeration value="is"/>
+      <xsd:enumeration value="io"/>
+      <xsd:enumeration value="ig"/>
+      <xsd:enumeration value="ia"/>
+      <xsd:enumeration value="ie"/>
+      <xsd:enumeration value="iu"/>
+      <xsd:enumeration value="ik"/>
+      <xsd:enumeration value="ga"/>
+      <xsd:enumeration value="it"/>
+      <xsd:enumeration value="ja"/>
+      <xsd:enumeration value="jv"/>
+      <xsd:enumeration value="kl"/>
+      <xsd:enumeration value="kn"/>
+      <xsd:enumeration value="kr"/>
+      <xsd:enumeration value="ks"/>
+      <xsd:enumeration value="kk"/>
+      <xsd:enumeration value="km"/>
+      <xsd:enumeration value="ki"/>
+      <xsd:enumeration value="rw"/>
+      <xsd:enumeration value="rn"/>
+      <xsd:enumeration value="ky"/>
+      <xsd:enumeration value="kv"/>
+      <xsd:enumeration value="kg"/>
+      <xsd:enumeration value="ko"/>
+      <xsd:enumeration value="ku"/>
+      <xsd:enumeration value="kj"/>
+      <xsd:enumeration value="lo"/>
+      <xsd:enumeration value="la"/>
+      <xsd:enumeration value="lv"/>
+      <xsd:enumeration value="li"/>
+      <xsd:enumeration value="ln"/>
+      <xsd:enumeration value="lt"/>
+      <xsd:enumeration value="lu"/>
+      <xsd:enumeration value="lg"/>
+      <xsd:enumeration value="lb"/>
+      <xsd:enumeration value="gv"/>
+      <xsd:enumeration value="mk"/>
+      <xsd:enumeration value="mg"/>
+      <xsd:enumeration value="ms"/>
+      <xsd:enumeration value="ml"/>
+      <xsd:enumeration value="mt"/>
+      <xsd:enumeration value="mi"/>
+      <xsd:enumeration value="mr"/>
+      <xsd:enumeration value="mh"/>
+      <xsd:enumeration value="mo"/>
+      <xsd:enumeration value="mn"/>
+      <xsd:enumeration value="na"/>
+      <xsd:enumeration value="nv"/>
+      <xsd:enumeration value="ng"/>
+      <xsd:enumeration value="nd"/>
+      <xsd:enumeration value="ne"/>
+      <xsd:enumeration value="no"/>
+      <xsd:enumeration value="nb"/>
+      <xsd:enumeration value="nn"/>
+      <xsd:enumeration value="ii"/>
+      <xsd:enumeration value="oc"/>
+      <xsd:enumeration value="oj"/>
+      <xsd:enumeration value="cu"/>
+      <xsd:enumeration value="or"/>
+      <xsd:enumeration value="om"/>
+      <xsd:enumeration value="os"/>
+      <xsd:enumeration value="pi"/>
+      <xsd:enumeration value="ps"/>
+      <xsd:enumeration value="fa"/>
+      <xsd:enumeration value="pl"/>
+      <xsd:enumeration value="pt"/>
+      <xsd:enumeration value="pa"/>
+      <xsd:enumeration value="qu"/>
+      <xsd:enumeration value="rm"/>
+      <xsd:enumeration value="ro"/>
+      <xsd:enumeration value="ru"/>
+      <xsd:enumeration value="se"/>
+      <xsd:enumeration value="sm"/>
+      <xsd:enumeration value="sg"/>
+      <xsd:enumeration value="sa"/>
+      <xsd:enumeration value="sr"/>
+      <xsd:enumeration value="sh"/>
+      <xsd:enumeration value="st"/>
+      <xsd:enumeration value="tn"/>
+      <xsd:enumeration value="sn"/>
+      <xsd:enumeration value="ii"/>
+      <xsd:enumeration value="sd"/>
+      <xsd:enumeration value="si"/>
+      <xsd:enumeration value="ss"/>
+      <xsd:enumeration value="sk"/>
+      <xsd:enumeration value="sl"/>
+      <xsd:enumeration value="so"/>
+      <xsd:enumeration value="nr"/>
+      <xsd:enumeration value="es"/>
+      <xsd:enumeration value="su"/>
+      <xsd:enumeration value="sw"/>
+      <xsd:enumeration value="ss"/>
+      <xsd:enumeration value="sv"/>
+      <xsd:enumeration value="tl"/>
+      <xsd:enumeration value="ty"/>
+      <xsd:enumeration value="tg"/>
+      <xsd:enumeration value="ta"/>
+      <xsd:enumeration value="tt"/>
+      <xsd:enumeration value="te"/>
+      <xsd:enumeration value="th"/>
+      <xsd:enumeration value="bo"/>
+      <xsd:enumeration value="ti"/>
+      <xsd:enumeration value="to"/>
+      <xsd:enumeration value="ts"/>
+      <xsd:enumeration value="tr"/>
+      <xsd:enumeration value="tk"/>
+      <xsd:enumeration value="tw"/>
+      <xsd:enumeration value="ug"/>
+      <xsd:enumeration value="uk"/>
+      <xsd:enumeration value="ur"/>
+      <xsd:enumeration value="uz"/>
+      <xsd:enumeration value="ve"/>
+      <xsd:enumeration value="vi"/>
+      <xsd:enumeration value="vo"/>
+      <xsd:enumeration value="wa"/>
+      <xsd:enumeration value="cy"/>
+      <xsd:enumeration value="wo"/>
+      <xsd:enumeration value="fy"/>
+      <xsd:enumeration value="xh"/>
+      <xsd:enumeration value="yi"/>
+      <xsd:enumeration value="yo"/>
+      <xsd:enumeration value="za"/>
+      <xsd:enumeration value="zu"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <!-- ISO 3166-1 2-character country codes, always upper case, complete -->
+  <xsd:simpleType name="isoCountryT">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="AF"/>
+      <xsd:enumeration value="AX"/>
+      <xsd:enumeration value="AL"/>
+      <xsd:enumeration value="DZ"/>
+      <xsd:enumeration value="AS"/>
+      <xsd:enumeration value="AD"/>
+      <xsd:enumeration value="AO"/>
+      <xsd:enumeration value="AI"/>
+      <xsd:enumeration value="AQ"/>
+      <xsd:enumeration value="AG"/>
+      <xsd:enumeration value="AR"/>
+      <xsd:enumeration value="AM"/>
+      <xsd:enumeration value="AW"/>
+      <xsd:enumeration value="AU"/>
+      <xsd:enumeration value="AT"/>
+      <xsd:enumeration value="AZ"/>
+      <xsd:enumeration value="BS"/>
+      <xsd:enumeration value="BH"/>
+      <xsd:enumeration value="BD"/>
+      <xsd:enumeration value="BB"/>
+      <xsd:enumeration value="BY"/>
+      <xsd:enumeration value="BE"/>
+      <xsd:enumeration value="BZ"/>
+      <xsd:enumeration value="BJ"/>
+      <xsd:enumeration value="BM"/>
+      <xsd:enumeration value="BT"/>
+      <xsd:enumeration value="BO"/>
+      <xsd:enumeration value="BQ"/>
+      <xsd:enumeration value="BA"/>
+      <xsd:enumeration value="BW"/>
+      <xsd:enumeration value="BV"/>
+      <xsd:enumeration value="BR"/>
+      <xsd:enumeration value="IO"/>
+      <xsd:enumeration value="BN"/>
+      <xsd:enumeration value="BG"/>
+      <xsd:enumeration value="BF"/>
+      <xsd:enumeration value="BI"/>
+      <xsd:enumeration value="KH"/>
+      <xsd:enumeration value="CM"/>
+      <xsd:enumeration value="CA"/>
+      <xsd:enumeration value="CV"/>
+      <xsd:enumeration value="KY"/>
+      <xsd:enumeration value="CF"/>
+      <xsd:enumeration value="TD"/>
+      <xsd:enumeration value="CL"/>
+      <xsd:enumeration value="CN"/>
+      <xsd:enumeration value="CX"/>
+      <xsd:enumeration value="CC"/>
+      <xsd:enumeration value="CO"/>
+      <xsd:enumeration value="KM"/>
+      <xsd:enumeration value="CG"/>
+      <xsd:enumeration value="CD"/>
+      <xsd:enumeration value="CK"/>
+      <xsd:enumeration value="CR"/>
+      <xsd:enumeration value="CI"/>
+      <xsd:enumeration value="HR"/>
+      <xsd:enumeration value="CU"/>
+      <xsd:enumeration value="CW"/>
+      <xsd:enumeration value="CY"/>
+      <xsd:enumeration value="CZ"/>
+      <xsd:enumeration value="DK"/>
+      <xsd:enumeration value="DJ"/>
+      <xsd:enumeration value="DM"/>
+      <xsd:enumeration value="DO"/>
+      <xsd:enumeration value="EC"/>
+      <xsd:enumeration value="EG"/>
+      <xsd:enumeration value="SV"/>
+      <xsd:enumeration value="GQ"/>
+      <xsd:enumeration value="ER"/>
+      <xsd:enumeration value="EE"/>
+      <xsd:enumeration value="ET"/>
+      <xsd:enumeration value="FK"/>
+      <xsd:enumeration value="FO"/>
+      <xsd:enumeration value="FJ"/>
+      <xsd:enumeration value="FI"/>
+      <xsd:enumeration value="FR"/>
+      <xsd:enumeration value="GF"/>
+      <xsd:enumeration value="PF"/>
+      <xsd:enumeration value="TF"/>
+      <xsd:enumeration value="GA"/>
+      <xsd:enumeration value="GM"/>
+      <xsd:enumeration value="GE"/>
+      <xsd:enumeration value="DE"/>
+      <xsd:enumeration value="GH"/>
+      <xsd:enumeration value="GI"/>
+      <xsd:enumeration value="GR"/>
+      <xsd:enumeration value="GL"/>
+      <xsd:enumeration value="GD"/>
+      <xsd:enumeration value="GP"/>
+      <xsd:enumeration value="GU"/>
+      <xsd:enumeration value="GT"/>
+      <xsd:enumeration value="GG"/>
+      <xsd:enumeration value="GN"/>
+      <xsd:enumeration value="GW"/>
+      <xsd:enumeration value="GY"/>
+      <xsd:enumeration value="HT"/>
+      <xsd:enumeration value="HM"/>
+      <xsd:enumeration value="VA"/>
+      <xsd:enumeration value="HN"/>
+      <xsd:enumeration value="HK"/>
+      <xsd:enumeration value="HU"/>
+      <xsd:enumeration value="IS"/>
+      <xsd:enumeration value="IN"/>
+      <xsd:enumeration value="ID"/>
+      <xsd:enumeration value="IR"/>
+      <xsd:enumeration value="IQ"/>
+      <xsd:enumeration value="IE"/>
+      <xsd:enumeration value="IM"/>
+      <xsd:enumeration value="IL"/>
+      <xsd:enumeration value="IT"/>
+      <xsd:enumeration value="JM"/>
+      <xsd:enumeration value="JP"/>
+      <xsd:enumeration value="JE"/>
+      <xsd:enumeration value="JO"/>
+      <xsd:enumeration value="KZ"/>
+      <xsd:enumeration value="KE"/>
+      <xsd:enumeration value="KI"/>
+      <xsd:enumeration value="KP"/>
+      <xsd:enumeration value="KR"/>
+      <xsd:enumeration value="KW"/>
+      <xsd:enumeration value="KG"/>
+      <xsd:enumeration value="LA"/>
+      <xsd:enumeration value="LV"/>
+      <xsd:enumeration value="LB"/>
+      <xsd:enumeration value="LS"/>
+      <xsd:enumeration value="LR"/>
+      <xsd:enumeration value="LY"/>
+      <xsd:enumeration value="LI"/>
+      <xsd:enumeration value="LT"/>
+      <xsd:enumeration value="LU"/>
+      <xsd:enumeration value="MO"/>
+      <xsd:enumeration value="MK"/>
+      <xsd:enumeration value="MG"/>
+      <xsd:enumeration value="MW"/>
+      <xsd:enumeration value="MY"/>
+      <xsd:enumeration value="MV"/>
+      <xsd:enumeration value="ML"/>
+      <xsd:enumeration value="MT"/>
+      <xsd:enumeration value="MH"/>
+      <xsd:enumeration value="MQ"/>
+      <xsd:enumeration value="MR"/>
+      <xsd:enumeration value="MU"/>
+      <xsd:enumeration value="YT"/>
+      <xsd:enumeration value="MX"/>
+      <xsd:enumeration value="FM"/>
+      <xsd:enumeration value="MD"/>
+      <xsd:enumeration value="MC"/>
+      <xsd:enumeration value="MN"/>
+      <xsd:enumeration value="ME"/>
+      <xsd:enumeration value="MS"/>
+      <xsd:enumeration value="MA"/>
+      <xsd:enumeration value="MZ"/>
+      <xsd:enumeration value="MM"/>
+      <xsd:enumeration value="NA"/>
+      <xsd:enumeration value="NR"/>
+      <xsd:enumeration value="NP"/>
+      <xsd:enumeration value="NL"/>
+      <xsd:enumeration value="NC"/>
+      <xsd:enumeration value="NZ"/>
+      <xsd:enumeration value="NI"/>
+      <xsd:enumeration value="NE"/>
+      <xsd:enumeration value="NG"/>
+      <xsd:enumeration value="NU"/>
+      <xsd:enumeration value="NF"/>
+      <xsd:enumeration value="MP"/>
+      <xsd:enumeration value="NO"/>
+      <xsd:enumeration value="OM"/>
+      <xsd:enumeration value="PK"/>
+      <xsd:enumeration value="PW"/>
+      <xsd:enumeration value="PS"/>
+      <xsd:enumeration value="PA"/>
+      <xsd:enumeration value="PG"/>
+      <xsd:enumeration value="PY"/>
+      <xsd:enumeration value="PE"/>
+      <xsd:enumeration value="PH"/>
+      <xsd:enumeration value="PN"/>
+      <xsd:enumeration value="PL"/>
+      <xsd:enumeration value="PT"/>
+      <xsd:enumeration value="PR"/>
+      <xsd:enumeration value="QA"/>
+      <xsd:enumeration value="RE"/>
+      <xsd:enumeration value="RO"/>
+      <xsd:enumeration value="RU"/>
+      <xsd:enumeration value="RW"/>
+      <xsd:enumeration value="BL"/>
+      <xsd:enumeration value="SH"/>
+      <xsd:enumeration value="KN"/>
+      <xsd:enumeration value="LC"/>
+      <xsd:enumeration value="MF"/>
+      <xsd:enumeration value="PM"/>
+      <xsd:enumeration value="VC"/>
+      <xsd:enumeration value="WS"/>
+      <xsd:enumeration value="SM"/>
+      <xsd:enumeration value="ST"/>
+      <xsd:enumeration value="SA"/>
+      <xsd:enumeration value="SN"/>
+      <xsd:enumeration value="RS"/>
+      <xsd:enumeration value="SC"/>
+      <xsd:enumeration value="SL"/>
+      <xsd:enumeration value="SG"/>
+      <xsd:enumeration value="SX"/>
+      <xsd:enumeration value="SK"/>
+      <xsd:enumeration value="SI"/>
+      <xsd:enumeration value="SB"/>
+      <xsd:enumeration value="SO"/>
+      <xsd:enumeration value="ZA"/>
+      <xsd:enumeration value="GS"/>
+      <xsd:enumeration value="ES"/>
+      <xsd:enumeration value="LK"/>
+      <xsd:enumeration value="SD"/>
+      <xsd:enumeration value="SR"/>
+      <xsd:enumeration value="SJ"/>
+      <xsd:enumeration value="SZ"/>
+      <xsd:enumeration value="SE"/>
+      <xsd:enumeration value="CH"/>
+      <xsd:enumeration value="SY"/>
+      <xsd:enumeration value="TW"/>
+      <xsd:enumeration value="TJ"/>
+      <xsd:enumeration value="TZ"/>
+      <xsd:enumeration value="TH"/>
+      <xsd:enumeration value="TL"/>
+      <xsd:enumeration value="TG"/>
+      <xsd:enumeration value="TK"/>
+      <xsd:enumeration value="TO"/>
+      <xsd:enumeration value="TT"/>
+      <xsd:enumeration value="TN"/>
+      <xsd:enumeration value="TR"/>
+      <xsd:enumeration value="TM"/>
+      <xsd:enumeration value="TC"/>
+      <xsd:enumeration value="TV"/>
+      <xsd:enumeration value="UG"/>
+      <xsd:enumeration value="UA"/>
+      <xsd:enumeration value="AE"/>
+      <xsd:enumeration value="GB"/>
+      <xsd:enumeration value="US"/>
+      <xsd:enumeration value="UM"/>
+      <xsd:enumeration value="UY"/>
+      <xsd:enumeration value="UZ"/>
+      <xsd:enumeration value="VU"/>
+      <xsd:enumeration value="VE"/>
+      <xsd:enumeration value="VN"/>
+      <xsd:enumeration value="VG"/>
+      <xsd:enumeration value="VI"/>
+      <xsd:enumeration value="WF"/>
+      <xsd:enumeration value="EH"/>
+      <xsd:enumeration value="YE"/>
+      <xsd:enumeration value="ZM"/>
+      <xsd:enumeration value="ZW"/>
+      <xsd:enumeration value="SS"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+</xsd:schema>

@@ -1,0 +1,128 @@
+{
+  "note": "The official Manufacturer Incident Report (MIR) files MDARIX builds and checks EU and GB MIR XML against (B8), each byte-identical to the publisher's copy downloaded on 11 Nov 2026 from the publisher's own page (owner's OK, 11 Nov 2026). XSDs and XSLs are the members of the published zip, unchanged; the zip's own SHA-256 is kept too. Before each release, compare the publishers' pages with these pins (B8-D8). A newer build is a new folder and a new register version, never an edit here.",
+  "editions": [
+    {
+      "folder": "eu-7.3.1-SB-11252",
+      "edition": "EU MIR 7.3.1, XSD/XSL build SB-11252 (10 Jun 2026); PDF form build SB-11154 (6 May 2026, page: 'update 7 May 2026')",
+      "publisher": "European Commission (DG SANTE), PMSV reporting forms",
+      "page": "https://health.ec.europa.eu/medical-devices-sector/new-regulations/guidance-mdcg-endorsed-documents-and-other-guidance/pmsv-reporting-forms_en",
+      "page_date": "2026-06-11 (the page's dateModified; read 11 Nov 2026: SB-11154 PDF and SB-11252 XSD/XSL listed, no newer build)",
+      "zip": {
+        "source_url": "https://health.ec.europa.eu/document/download/12d3a3db-b089-482d-b0d1-44e7cd2324da_en?filename=md_new-reg_mir-xsd-xsl-v7.3.1_en.zip",
+        "sha256": "7f230641de8df5dae7af64dcd780e081ee7ccfe86a37a11cbcf59dacdc80c839"
+      },
+      "files": [
+        {
+          "file": "incident-FinalNonRep-v7.3.1.xsd",
+          "sha256": "de74292cb397b5f40295a000c48bdabc786e9e8a24de5819105d0d7816f62b75",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "incident-FinalRep-v7.3.1.xsd",
+          "sha256": "b2394adf8cfe67cde2e5ee3c8c828c88f7c877cefecc13f51dc2d20ed4a7e158",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "incident-Followup-v7.3.1.xsd",
+          "sha256": "9a1f67504dce36c16930df6d72932c7799de6410c38c480184acdaedfed05dc4",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "incident-Initial-v7.3.1.xsd",
+          "sha256": "9eb0dc128520f7000fb5f61eeb41b88fed8631b531ffdf3db4c9d05ab30a24a9",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "incident-InitialFinal-v7.3.1.xsd",
+          "sha256": "4006937ef791c3a0ff4dacb2c27eb8b9265171b7958389a1198a9ed2d5e8d55c",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "incident-PDFgeneric-v7.3.1.xsd",
+          "sha256": "9c67d848f7d6ea71821d985e07bcd3e6b881215231625fd11682385a73325c29",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "incident_in_7.3.1.xsl",
+          "sha256": "f9614d964554cb50ba94fcf8b92d2ae83273e659b40726a5342fe06c3c531ffc",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "incident_out_7.3.1.xsl",
+          "sha256": "377a4653f7bcce620911fed510479b1585f44084f2406316344015e1624db2f5",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "md_new-reg_mir-changelog-v7.3.1_en.txt",
+          "sha256": "74c0792db3daf3b18ac6a4bd88c9eea23224531abafd63c36565222917e9f9be",
+          "source_url": "https://health.ec.europa.eu/document/download/6d4a14de-c05f-4d50-975f-f20dfa0fa1c2_en?filename=md_new-reg_mir-changelog-v7.3.1_en.txt"
+        },
+        {
+          "file": "md_new-reg_mir-form-v7.3.1_en.pdf",
+          "sha256": "fbf4c86a11b7845233b0fec117719c1958485ef6fd1f91fa32d8cc677a8a397b",
+          "source_url": "https://health.ec.europa.eu/document/download/e8ce9f53-82cb-44c8-a06e-91ad71c16b01_en?filename=md_new-reg_mir-form-v7.3.1_en.pdf",
+          "use": "reference only (password-protected XFA form; MDARIX never fills it)"
+        },
+        {
+          "file": "md_new-reg_mir-help-v7.3.1_en.pdf",
+          "sha256": "c36818ecf060f5b03939efe4180f028dc03979d28cdb794c33f932de86200525",
+          "source_url": "https://health.ec.europa.eu/document/download/dc6acc1b-f1ae-4512-b838-2fae869124c3_en?filename=md_new-reg_mir-help-v7.3.1_en.pdf"
+        }
+      ]
+    },
+    {
+      "folder": "gb-7.2.1",
+      "edition": "GB MIR 7.2.1 (version 04/06/2025, the changelog's own date; the changelog PDF was attached to the page later). FSCA GB 2.8 files are not vendored (out of B8's scope)",
+      "publisher": "Medicines and Healthcare products Regulatory Agency (MHRA), gov.uk",
+      "page": "https://www.gov.uk/government/publications/documentation-for-implementation-of-data-requirements-under-the-new-post-marketing-surveillance-regulations",
+      "page_date": "2025-06-09 (published; the page's metadata reads updated 2026-10-19; read 11 Nov 2026)",
+      "zip": {
+        "source_url": "https://assets.publishing.service.gov.uk/media/684187dad5f6bf75703e8786/GB_XSD_Files.zip",
+        "sha256": "7b4a019f0bc2e44f91e3873ba3a3306704be705b804ab909d4212326a81f2cbe",
+        "members": "MIR GB 7.2.1/*.xsd"
+      },
+      "files": [
+        {
+          "file": "GB_schema_implementation_guide.pdf",
+          "sha256": "583ea73f694c015d4fd4be2a682dbf5b76ff1c424dfec7ae80494e87b70297bb",
+          "source_url": "https://assets.publishing.service.gov.uk/media/6825a453ffcd6ecfbf1ab8e6/GB_schema_implementation_guide.pdf"
+        },
+        {
+          "file": "Helptext_for_MIR_GB_7.2.1.xlsx",
+          "sha256": "f7f0bceb1d33583817396aac4d004627a64eb6ea55cf5e8ee43e4f1ac8a32247",
+          "source_url": "https://assets.publishing.service.gov.uk/media/684187bd578282a4b102c081/Helptext_for_MIR_GB_7.2.1.xlsx"
+        },
+        {
+          "file": "incident-FinalNonRepGB-v7.2.1.xsd",
+          "sha256": "a3e6b0558e6fbe91102363bfc3bd85e38ed266882bb6646ca1c3241195763fec",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "incident-FinalRepGB-v7.2.1.xsd",
+          "sha256": "5903256e7836c17c93103ea917504837880c0ed85072910a7c5aa042505585fc",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "incident-FollowupGB-v7.2.1.xsd",
+          "sha256": "a84b1a63ef1d8a6db571c35725002c53fde0eb73ef0da3ad40ad1edadd52e986",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "incident-InitialFinalGB-v7.2.1.xsd",
+          "sha256": "9edf460f14c2f8ed772d8c32ab579523b36316ece365b12e48e4eef333482172",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "incident-InitialGB-v7.2.1.xsd",
+          "sha256": "29b512b8e334488c847f38b9b6ac6f85637e5c484783b3d09e6bfcab117f6651",
+          "source_url": "member of the zip"
+        },
+        {
+          "file": "Manufacturer_Incident_Report__MIR__7.2.1_changelog.pdf",
+          "sha256": "65947bd72c9745ffd8a8472f87ba6bd071eea37c5fbdcb47c6140f896374c2a2",
+          "source_url": "https://assets.publishing.service.gov.uk/media/69047907e2ebc0fb39a52058/Manufacturer_Incident_Report__MIR__7.2.1_changelog.pdf"
+        }
+      ]
+    }
+  ]
+}
