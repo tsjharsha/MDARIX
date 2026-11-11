@@ -171,7 +171,9 @@ def test_ai_execution_provenance_persisted_without_hidden_chain_of_thought():
         db.close()
 
 
-def test_investigator_api_create_latest_and_get():
+def test_investigator_api_create_latest_and_get(monkeypatch):
+    # AI answering for the organization (RCA-D13: with AI off the analysis routes answer an off state).
+    monkeypatch.setattr("backend.app.investigations.router.ai_ready", lambda control, tenant_id: True)
     _, investigation_id = context()
     response = client.post(
         f"/api/v1/investigations/{investigation_id}/analysis",
