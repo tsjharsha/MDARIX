@@ -186,9 +186,18 @@ def get(code: str) -> dict | None:
     return load().get(code)
 
 
+def offered(entry: dict) -> bool:
+    """Whether a version's switch is on (B9): a version behind an off switch is never picked, but ``get`` still reads
+    it for a record that names it."""
+    from backend.app import feature_set
+
+    return feature_set.switched_on(entry.get("switch"))
+
+
 def versions(rule: str) -> list[dict]:
-    """A rule's versions, lowest first."""
-    return sorted((entry for entry in load().values() if entry["rule"] == rule), key=lambda entry: entry["version"])
+    """A rule's versions, lowest first (those whose switch is on)."""
+    found = (entry for entry in load().values() if entry["rule"] == rule and offered(entry))
+    return sorted(found, key=lambda entry: entry["version"])
 
 
 def today() -> date:

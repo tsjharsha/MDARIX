@@ -16,6 +16,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+from backend.app import feature_set
 from backend.app.decision_guides import rules as guides
 from backend.app.intake import rules as intake
 from backend.app.oversight.rules import zone_info
@@ -114,7 +115,14 @@ def test_question_sets_and_report_types_are_identical(market, monkeypatch):
     assert on == off
     assert markets.QUESTION_SETS[market] == markets.V1_QUESTION_SETS[market]
     on, off = _both(monkeypatch, lambda: {code: vars(kind) for code, kind in markets.REPORT_TYPES.items()})
-    assert on == off and len(json.loads(on)) == 12
+    on, off = json.loads(on), json.loads(off)
+    if feature_set.switched_on("MDARIX_B9_INDIA"):  # B9: IN-floor-2 gives India's report its 15 days, nothing else
+        assert on.pop("IN_SERIOUS_ADVERSE_EVENT")["days"] == 15 and off.pop("IN_SERIOUS_ADVERSE_EVENT")["days"] is None
+    assert on == off and len(on) in (11, 12)
+    # Version 1 of every floor, India included, explicitly (the oracle is valid for version 1 only).
+    first = tuple(f"{rule}-1" for rule in register.FLOOR_RULES.values())
+    v1 = {code: vars(kind) for code, kind in markets._in_force(str(register._DIRECTORY), first)[1].items()}
+    assert v1 == {code: vars(kind) for code, kind in markets.V1_REPORT_TYPES.items()} and len(v1) == 12
 
 
 def test_prefill_and_record_notes_for_every_record_combination(monkeypatch):

@@ -31,6 +31,12 @@ no longer block submitting a brief. Briefs already signed keep their sections.
 
 ``MDARIX_CLOSED_LOOP`` (B5b): on unless ``off``. Off, "Did it work?" answers 404 and the session's ``closed_loop`` is
 false so its tab hides; the follow-up fields and the reopen triggers are kept as recorded but not offered or checked.
+
+B9 (markets), one switch per part (``switched_on``): ``MDARIX_B9_INDIA``, ``MDARIX_B9_CANADA`` and
+``MDARIX_B9_US_IMPORTER`` are on unless ``off``; ``MDARIX_B9_US_USER_FACILITY`` is off unless ``on`` (B9-D18). A register
+version that names a switch (``"switch"`` in its file) is in force only while the switch is on: off, the market is back
+on the version before it, drafts re-save, and signed records keep the version they name. Off, the part's routes answer
+404 and the session hides its screens.
 """
 
 from __future__ import annotations
@@ -101,6 +107,25 @@ def rule_register() -> bool:
     """B4 is on unless ``MDARIX_RULE_REGISTER=off`` (read on every call): the floors are read from the rule register;
     off, every rule function takes today's code (``reportability/legacy_v1.py``)."""
     return os.getenv("MDARIX_RULE_REGISTER", "").strip().lower() not in ("off", "0", "false", "no")
+
+
+# B9 switches and their defaults (B9-D18): user facility is off until a user facility customer asks (D4).
+B9_SWITCHES = {
+    "MDARIX_B9_INDIA": True,
+    "MDARIX_B9_CANADA": True,
+    "MDARIX_B9_US_IMPORTER": True,
+    "MDARIX_B9_US_USER_FACILITY": False,
+}
+
+
+def switched_on(name: str | None) -> bool:
+    """A B9 switch (read on every call); None (no switch) is always on."""
+    if name is None:
+        return True
+    value = os.getenv(name, "").strip().lower()
+    if B9_SWITCHES[name]:
+        return value not in ("off", "0", "false", "no")
+    return value in ("on", "1", "true", "yes")
 
 
 def routine_path() -> bool:

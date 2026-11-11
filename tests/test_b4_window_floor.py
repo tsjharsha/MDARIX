@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from backend.app import feature_set
 from backend.app.reportability import markets, rules
 
 pytestmark = pytest.mark.unit
@@ -24,8 +25,16 @@ def _window(name: str, days: int, basis: str = rules.CALENDAR, markets_: list[st
         (_window("US 30 days", 30, markets_=["US"]), []),
         (_window("US 20 work days", 20, rules.WORK, ["US"]), []),  # 28 calendar days at most
         (_window("US 23 work days", 23, rules.WORK, ["US"]), ["US"]),  # 31 or more calendar days
-        (_window("India 60 days", 60, markets_=["India"]), []),  # no legal period in code (FG-2)
-        (_window("Everywhere 20 days", 20), ["EU_NI", "GB"]),  # longer than 15 days; US and Canada allow 30
+        # B9 IN-floor-2: 15 days (FG-2 closed); switched off, India has no legal period in code again.
+        (
+            _window("India 60 days", 60, markets_=["India"]),
+            ["IN"] if feature_set.switched_on("MDARIX_B9_INDIA") else [],
+        ),
+        # Longer than 15 days; US and Canada allow 30 (and India 15 with B9's IN-floor-2).
+        (
+            _window("Everywhere 20 days", 20),
+            ["EU_NI", "GB", *(["IN"] if feature_set.switched_on("MDARIX_B9_INDIA") else [])],
+        ),
     ],
 )
 def test_a_window_longer_than_the_law_is_named_with_the_legal_period(window, warned):

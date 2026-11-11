@@ -95,7 +95,13 @@ possible (5). The type: a public health threat 2 days (Art. 87(4)); a death, or 
 
 Reportable when it is an adverse event suspected to be associated with the device (IN1) and serious by any criterion
 (IN2A-IN2F). Unexpected (IN3) adds a note (a suspected unexpected serious adverse event); it does not change the
-conclusion. The period is the organization's window for India (starter: 15 days).
+conclusion. The period (B9, rule `IN-floor-2`, a correction of `IN-floor-1` from the start) is 15 calendar days, India MDR
+2017 Rule 26(ii) "within fifteen days", the awareness day being day 1 (starter, for your consultant to confirm). A
+Reportable conclusion takes the organization's India window only when it is exactly 15 calendar days, otherwise the 15
+days of the regulation; a pending one takes the earliest of the windows and the 15 days. Conclusions signed under
+`IN-floor-1` keep their due date; a draft saved under it is refused at signing until saved again. With
+`MDARIX_B9_INDIA=off` India is back on `IN-floor-1` (the organization's window, any length). Linked tests:
+`tests/test_b9_india_period.py`, `tests/test_b9_india_period_db.py`.
 
 <!-- table: evaluate -->
 | ID | Market | Yes | Unknown | Not applicable | Not answered | Suggested | Type if reportable | Rule |

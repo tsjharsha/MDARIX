@@ -105,7 +105,7 @@ def rules(
 ):
     """Every rule. ``as_at``: only the version of each rule in force on that day (for auditors); otherwise every version
     with its state today."""
-    entries = list(register.load().values())
+    entries = [entry for entry in register.load().values() if register.offered(entry)]
     if as_at is not None:
         entries = [entry for entry in entries if register.pick(entry["rule"], as_at) is entry]
     found = [

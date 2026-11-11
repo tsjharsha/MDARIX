@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from backend.app import feature_set
 from tests.test_reporting_capa_api import _client, _organization
 
 pytestmark = pytest.mark.db
@@ -31,9 +32,13 @@ def test_every_member_reads_every_rule_with_its_source_and_starter_mark(viewer):
     body = found.json()
     assert body["summary"]["markets"] == 5 and body["summary"]["rules"] == len({item["rule"] for item in body["items"]})
     floors = [item for item in body["items"] if item["kind"] == "REPORTABILITY_FLOOR"]
-    assert [item["code"] for item in floors] == ["CA-floor-1", "EU-floor-1", "GB-floor-1", "IN-floor-1", "US-floor-1"]
+    india = ["IN-floor-1", "IN-floor-2"] if feature_set.switched_on("MDARIX_B9_INDIA") else ["IN-floor-1"]
+    assert [item["code"] for item in floors] == ["CA-floor-1", "EU-floor-1", "GB-floor-1", *india, "US-floor-1"]
     assert all(item["starter_mark"] == body["summary"]["starter_mark"] for item in body["items"])
-    assert all(item["state"] == "IN_FORCE" and item["source"] is not None for item in body["items"])
+    # B9: IN-floor-2 corrects IN-floor-1 from the start, so version 1 reads Replaced while India's switch is on.
+    replaced = {"IN-floor-1"} if len(india) == 2 else set()
+    assert all(item["state"] == ("REPLACED" if item["code"] in replaced else "IN_FORCE") for item in body["items"])
+    assert all(item["source"] is not None for item in body["items"])
     # No organization's data, and no implementation detail for customers.
     assert str(viewer["tenant_id"]) not in found.text and "implementation" not in found.text
     us = viewer["client"].get(f"{URL}?market=US&kind=REPORTABILITY_FLOOR").json()["items"]

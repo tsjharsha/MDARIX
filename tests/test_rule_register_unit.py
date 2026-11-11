@@ -54,6 +54,7 @@ def test_the_real_register_loads_and_every_rule_carries_its_source_and_starter_m
         "EU-floor-1",
         "GB-floor-1",
         "IN-floor-1",
+        "IN-floor-2",
         "US-floor-1",
     ]
     assert all(entry["review"]["note"] == standards.STARTER_MARK for entry in entries.values())
