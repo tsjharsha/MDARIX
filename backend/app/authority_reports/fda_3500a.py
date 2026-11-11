@@ -79,6 +79,17 @@ CHOICES: dict[str, dict[str, tuple[str, str]]] = {
         "response to fda request": ("reqResp", "C53587"),
         "device evaluation": ("devEval", "C53588"),
     },
+    # Section F (B9 steps 6-7): an importer's or user facility's report. F12: FDA's Location_Where_Event_Occurred.
+    "F1": {"importer": ("userImport", "C53617"), "user facility": ("userFac", "C53567")},
+    "F12": {
+        "hospital": ("locHosp", "C16696"),
+        "home": ("locHome", "C18002"),
+        "nursing home": ("locNurs", "C53533"),
+        "outpatient treatment facility": ("locTreat", "C53549"),
+        "outpatient diagnostic facility": ("locDiag", "C53548"),
+        "ambulatory surgical facility": ("locAmb", "C51945"),
+        "other": ("locOther", "C17649"),
+    },
     "H3": {"yes": ("evalManuY", "true"), "no": ("evalManuN", "false")},
     "H5": {"yes": ("singleUseY2", "true"), "no": ("singleUseN2", "false")},
     "H7": {

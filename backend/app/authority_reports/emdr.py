@@ -58,10 +58,11 @@ LENGTHS = {
 }
 _REQUIRED_TEXT = {"B5", "D2A"}  # and G8, which follows the front page's number
 _DATES = {"B3", "B4", "D4_EXPIRY", "D6A", "D6B", "G3", "H4"}
-# The rule book (decision D17): the manufacturer rows of the mapping workbook's US sheet, exported by
-# scripts/export_us_emdr_rules.py. Its block numbers are FDA's package's (D2B is the procode); the report's fields
+# The rule book (decision D17): the mapping workbook's US sheet, exported by scripts/export_us_emdr_rules.py. Version 2
+# (register emdr-rule-book-2, B9 step 5) adds the importer and user facility rows; its manufacturer rows are version
+# 1's (us_emdr.csv) byte for byte. Its block numbers are FDA's package's (D2B is the procode); the report's fields
 # follow the 09/2025 form (D2A is the procode). A required row with no field here fails at the first check.
-RULES = Path(__file__).with_name("rules") / "us_emdr.csv"
+RULES = Path(__file__).with_name("rules") / "us_emdr_v2.csv"
 RULE_FIELDS = {
     ("B5", "Describe event or problem"): "B5",
     ("D2B", "Procode"): "D2A",
@@ -76,9 +77,39 @@ RULE_FIELDS = {
     ("H6", "Type of Investigation"): "H6_TYPE",
     ("H6", "Investigation Findings"): "H6_FINDINGS",
     ("H6", "Investigation Conclusions"): "H6_CONCLUSIONS",
+    # Section F (B9 step 5): an importer's or a user facility's own blocks.
+    ("F1", "Check one: User Facility, Importer"): "F1",
+    ("F2", "UF/Distributor (Importer) Report Number"): "F2",
+    ("F4", "User Facility or Distributor (Importer) Contact Email"): "F4",
+    ("F7", "Type of report"): "F7",
+    ("F10", "Health Effect - Clinical Code"): "F10_CLINICAL",
+    ("F10", "Health Effect - Impact Code"): "F10_IMPACT",
+    ("F10", "Medical Device Problem Code"): "F10_PROBLEM",
+    ("F10", "Component Code"): "F10_COMPONENT",
 }
-KINDS = {"M-I": "m_i", "M-F": "m_f"}  # manufacturer initial, manufacturer follow-up
-FOLLOW_UP = re.compile(r"\bfollow-up #?(\d+)\b", re.IGNORECASE)  # G6 on a follow-up: "30-day; Follow-up #2"
+# Report types: manufacturer, importer and user facility (B9), each initial (-I) or follow-up (-F).
+KINDS = {"M-I": "m_i", "M-F": "m_f", "I-I": "i_i", "I-F": "i_f", "U-I": "u_i", "U-F": "u_f"}
+# B9: the reporting role behind a US report type (21 CFR 803.40 importer, 803.30 user facility); absent: manufacturer.
+ROLE_OF_TYPE = {"US_IMP_30_DAY": "IMPORTER", "US_UF_10_WORK_DAY": "USER_FACILITY"}
+_LETTER = {"IMPORTER": "I", "USER_FACILITY": "U"}
+# F2 (B9 step 6, never with G8): an importer's CFN or FEI, the year and 5 digits; a user facility's 10-digit HCFA
+# number, the year and 4 digits.
+ROLE_NUMBER = {"I": re.compile(r"^(\d{7}|\d{10})-\d{4}-\d{5}$"), "U": re.compile(r"^\d{10}-\d{4}-\d{4}$")}
+ROLE_FORMAT = {
+    "I": "your 7-digit CFN or 10-digit FEI, the year and a 5-digit number (1234567-2026-00001)",
+    "U": "your 10-digit HCFA number, the year and a 4-digit number (1234567890-2026-0001)",
+}
+# F10's four codes sit at the XPaths of H6's patient and device codes (FDA's importer and user facility examples).
+F10 = {
+    "F10_CLINICAL": "H6_CLINICAL",
+    "F10_IMPACT": "H6_IMPACT",
+    "F10_PROBLEM": "H6_PROBLEM",
+    "F10_COMPONENT": "H6_COMPONENT",
+}
+REPORTER = {"I": "C53617", "U": "C53567"}  # F1: FDA's Type_of_Reporter (importer, user facility)
+REPORTER_ROLE = {"I": ("IMPORTER",), "U": ("USER_FACILITY",)}  # whose party F3 to F5 read
+INITIAL_CODE = "C53620"  # F7 "Initial" (FDA's Type_of_Report)
+FOLLOW_UP = re.compile(r"\bfollow-up #?(\d+)\b", re.IGNORECASE)  # G6 or F7 on a follow-up: "30-day; Follow-up #2"
 # FDA's XPaths (HL7Medwatch.xlsx, 3500A_HL7_Pointers) of the blocks MDARIX carries, namespace left out (``plain``):
 # the eSubmitter-layout PDF reads the file back through them, and the tests compare the file with FDA's examples.
 FOLLOW_UP_CODE = "C53579"  # G6 "Follow-up" (FDA's Type_of_Report)
@@ -146,7 +177,46 @@ POINTERS = {
     "H9": DEV + "/subjectOf/deviceObservation/code[@code='C53619']/../value/text()",
     "H10": DEV + "/subjectOf/deviceObservation/code[@code='C103162']/../value/text()",
     "H11": IE + "/text/text()",
+    # Section F (B9 step 6): the first notification is the importer's or user facility's own, the second the
+    # manufacturer it was sent to (FDA's importer and user facility examples).
+    "F1": IE + "/pertinentInformation1/secondaryCaseNotification/author/assignedEntity/code/@code",
+    "F2": IE + "/pertinentInformation1/secondaryCaseNotification/id/@extension",
+    "F4 email": IE + "/pertinentInformation1/secondaryCaseNotification/author/assignedEntity/assignedOrganization"
+    "/contactParty/contactPerson/telecom[starts-with(@value, 'mailto:')]/@value",
+    "F6": IE + "/pertinentInformation1/secondaryCaseNotification/effectiveTime/@value",
+    "F7": IE + "/pertinentInformation1/secondaryCaseNotification/code/@code",
+    "F7 number": IE + "/pertinentInformation1/sequenceNumber/@value",
+    "F9": DEV + "/subjectOf/deviceObservation/code[@code='C53451']/../value/@value",
+    "F11": IE + "/pertinentInformation1/secondaryCaseNotification/receiver/time/@value",
+    "F12": IE + "/trigger/reaction/location/locatedEntity/location/code/@code",
+    "F13": IE + "/pertinentInformation1/secondaryCaseNotification/receiver/time/low/@value",
+    "F14": IE + "/pertinentInformation1/secondaryCaseNotification/receiver/assignedEntity/assignedOrganization"
+    "/name/text()",
 }
+
+
+def role_kind(role: str | None, follow_up: bool) -> str:
+    """The eMDR report type of a role (None: manufacturer) and place in its chain: M-I, M-F, I-I, I-F, U-I or U-F."""
+    return f"{_LETTER.get(role or '', 'M')}-{'F' if follow_up else 'I'}"
+
+
+def report_values(sections: list[dict], kind: str = "M-I") -> dict[str, str]:
+    """The report's values as the file reads them: on an importer's or user facility's report, F10's codes in H6's
+    places (the same XPaths) and nothing of sections G and H (manufacturers only)."""
+    vals = fda.values(sections)
+    if kind[0] == "M":
+        return vals
+    out = {key: text for key, text in vals.items() if key[0] not in "GH" and key != "MFR_REPORT"}
+    return out | {F10[key]: text for key, text in vals.items() if key in F10}
+
+
+def _sent(text: str | None) -> tuple[str | None, str | None]:
+    """F11 or F13 ("Yes, 2026-11-04" / "No"): FDA's negation ("false": it was sent) and the day, or (None, None)."""
+    words = (text or "").strip().lower()
+    if words.startswith("yes"):
+        found = re.search(r"\d{4}-\d{2}-\d{2}", words)
+        return "false", _day(found.group(0)) if found else None
+    return ("true", None) if words.startswith("no") else (None, None)
 
 
 @lru_cache(maxsize=len(KINDS))
@@ -157,12 +227,13 @@ def required(kind: str = "M-I") -> frozenset[str]:
     return frozenset(RULE_FIELDS[row["block"], row["label"]] for row in rows)
 
 
-def next_number(numbers: list[str], year: int, practice: bool) -> str | None:
+def next_number(numbers: list[str], year: int, practice: bool, letter: str = "M") -> str | None:
     """The next manufacturer report number (G8; decision D5, owner Q2 and Q5): the CFN or FEI of the organization's
     last number, the year, and the last sequence of that year plus one (5 digits, from 00001 each year). A practice
     report's sequence starts with 7, as FDA's test reports do (70001). None before the organization's first number,
-    which a person types once. ``numbers``: every number the organization has used, oldest first."""
-    found = [number.split("-") for number in numbers if REPORT_NUMBER.match(number)]
+    which a person types once. ``numbers``: every number the organization has used, oldest first. ``letter`` I or U
+    (B9 step 6): an importer's F2 (5 digits) or a user facility's (HCFA number, 4 digits, practice from 7001)."""
+    found = [number.split("-") for number in numbers if ROLE_NUMBER.get(letter, REPORT_NUMBER).match(number)]
     if not found:
         return None
     prefix = found[-1][0]
@@ -170,6 +241,8 @@ def next_number(numbers: list[str], year: int, practice: bool) -> str | None:
         int(seq) for cfn, yyyy, seq in found if cfn == prefix and yyyy == str(year) and seq.startswith("7") == practice
     ]
     # shortcut: no guard past 69999 (a real organization's) or 79999 (practice) a year; add one if anyone nears it.
+    if letter == "U":
+        return f"{prefix}-{year}-{(max(used) + 1 if used else 7001 if practice else 1):04d}"
     return f"{prefix}-{year}-{(max(used) + 1 if used else 70001 if practice else 1):05d}"
 
 
@@ -194,17 +267,40 @@ def office(parties, roles: tuple[str, ...], text: str | None) -> dict | None:
 def check(sections: list[dict], parties, kind: str = "M-I") -> tuple[list[str], list[str]]:
     """What stops the eMDR file (missing or not in FDA's format), and the approved values it leaves out.
 
-    ``kind`` is the report type (M-I manufacturer initial, M-F manufacturer follow-up): the blocks FDA requires on it
-    come from the rule book (``required``); the format of any value given is checked on both."""
-    vals, names = fda.values(sections), fda.labels(sections)
+    ``kind`` is the report type (M-I manufacturer initial, M-F manufacturer follow-up; B9: I-I, I-F importer, U-I,
+    U-F user facility): the blocks FDA requires on it come from the rule book (``required``); the format of any value
+    given is checked on each."""
+    vals, names = report_values(sections, kind), fda.labels(sections)
+    role = kind[0] if kind[0] != "M" else None
     name = lambda key: names.get(key, key)  # noqa: E731
-    need = required(kind)
+    need = required(kind) | {F10[key] for key in required(kind) if key in F10}
     missing: list[str] = []
     left: list[str] = []
     for key in sorted(_REQUIRED_TEXT & need - set(vals)):
         missing.append(f"{name(key)}: missing")
     number = vals.get("G8") or vals.get("MFR_REPORT")
-    if not number:
+    if role:  # F2, never together with G8 (B9 step 6)
+        if {"G8", "MFR_REPORT"} & {key for key, text in fda.values(sections).items() if text}:
+            missing.append(f"{name('G8')}: an importer's or user facility's report has no manufacturer report number")
+        if not vals.get("F2"):
+            missing.append(f"{name('F2')}: missing")
+        elif not ROLE_NUMBER[role].match(vals["F2"]):
+            missing.append(f"{name('F2')}: FDA's format is {ROLE_FORMAT[role]}")
+        if "F7" in need and not FOLLOW_UP.search(vals.get("F7", "")):
+            missing.append(f"{name('F7')}: Follow-up with its number (Follow-up #1)")
+        reporter = office(parties, REPORTER_ROLE[role], vals.get("F4"))
+        if "F4" in need and not (reporter and reporter["email"] and len(reporter["email"]) <= 50):
+            missing.append(
+                f"{name('F4')}: set your organization's US {'importer' if role == 'I' else 'user facility'} in "
+                "Settings, with an e-mail of up to 50 characters, and approve the report again so it reads the same"
+            )
+        if vals.get("F14") and office(parties, MAKER_ROLES, vals["F14"]) is None:
+            left.append(f"{name('F14')}: not your organization's US manufacturer as set in Settings")
+        if reporter and (reporter["address"] or reporter["person"]):
+            left.append(f"{name('F3')} address and contact person: FDA wants them in parts; give them in eSubmitter")
+        if vals.get("F12") and not fda.choices("F12", vals["F12"].partition(":")[0])[0]:
+            left.append(f"{name('F12')}: not one of FDA's locations")
+    elif not number:
         if "G8" in need:
             missing.append(f"{name('G8')}: missing")
     elif not REPORT_NUMBER.match(number):
@@ -234,19 +330,21 @@ def check(sections: list[dict], parties, kind: str = "M-I") -> tuple[list[str], 
     if vals.get("D3") and office(parties, MAKER_ROLES, vals["D3"]) is None:
         left.append(f"{name('D3')}: not your organization's US manufacturer as set in Settings")
     # FDA's schema needs an initial report's type (B1); a follow-up sends only what is new.
-    if kind == "M-I" and not fda.choices("B1", vals.get("B1", ""))[0]:
+    if kind.endswith("-I") and not fda.choices("B1", vals.get("B1", ""))[0]:
         missing.append(f"{name('B1')}: adverse event, product problem or both")
     found, other = fda.choices("H1", vals.get("H1", ""))
     if not found and "H1" in need:
         missing.append(f"{name('H1')}: death, serious injury or malfunction")
+    shown = {held: own for own, held in F10.items()} if role else {}  # F10's own names on a role's report
     for key in REQUIRED_CODES:
         codes, uncoded = fda.fda_codes(vals.get(key, ""))
         if not codes and key in need:
             missing.append(
-                f"{name(key)}: at least one code with its FDA code" + (" (none of these has one)" * bool(uncoded))
+                f"{name(shown.get(key, key))}: at least one code with its FDA code"
+                + (" (none of these has one)" * bool(uncoded))
             )
         elif uncoded:
-            left.append(f"{name(key)}: {'; '.join(uncoded)} (no FDA code)")
+            left.append(f"{name(shown.get(key, key))}: {'; '.join(uncoded)} (no FDA code)")
     for key, text in vals.items():
         if key in LENGTHS and len(text) > LENGTHS[key]:
             (missing if key in _REQUIRED_TEXT & need else left).append(
@@ -254,7 +352,7 @@ def check(sections: list[dict], parties, kind: str = "M-I") -> tuple[list[str], 
             )
         if key in _DATES and fda.day(text) is None:
             left.append(f"{name(key)}: not a date")
-        if key in fda.CHOICES and key != "H1":
+        if key in fda.CHOICES and key not in ("H1", "F12"):
             if fda.choices(key, FOLLOW_UP.sub("", text) if key == "G6" else text)[1]:
                 left.append(f"{name(key)}: not one of FDA's choices")
         try:
@@ -306,11 +404,13 @@ def _coded(parent, wrapper: str, item: str, concept: str, name: str, value_code:
     return holder
 
 
-def build(sections: list[dict], parties, *, sender: str, now: datetime, practice: bool) -> bytes:
-    """The eMDR XML of an approved report (``check`` first: this writes only what it finds)."""
-    vals = fda.values(sections)
+def build(sections: list[dict], parties, *, sender: str, now: datetime, practice: bool, kind: str = "M-I") -> bytes:
+    """The eMDR XML of an approved report (``check`` first: this writes only what it finds). ``kind`` I-x or U-x (B9
+    step 6): an importer's or user facility's report, its number F2 and section F filled, sections G and H left out."""
+    vals = report_values(sections, kind)
+    role = kind[0] if kind[0] != "M" else None
     pick = lambda key: fda.choices(key, vals[key])[0] if key in vals else []  # noqa: E731
-    number = vals.get("G8") or vals["MFR_REPORT"]
+    number = vals["F2"] if role else vals.get("G8") or vals["MFR_REPORT"]
     contact = office(parties, OFFICE_ROLES, vals.get("G1")) or {}
     maker = office(parties, MAKER_ROLES, vals.get("D3")) or {}
 
@@ -332,12 +432,12 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
     _e(root, "versionCode", code="V3NORMED_2016")
     _e(root, "interactionId")
     _e(root, "batchTotalNumber", value="1")
-    for role, name in (("receiver", "CDRH"), ("sender", sender)):
-        party = _e(root, role)
+    for side, name in (("receiver", "CDRH"), ("sender", sender)):
+        party = _e(root, side)
         _e(party, "telecom")
         device = _e(party, "device")
         _e(device, "id", nullFlavor="NA")
-        if role == "sender":
+        if side == "sender":
             _e(device, "softwareName", "MDARIX")
         organization = _e(_e(device, "asAgent"), "representedOrganization")
         _e(organization, "id", nullFlavor="NA")
@@ -348,8 +448,8 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
     _e(message, "interactionId", root="2.16.840.1.113883.1.6", extension="PORR_IN04001", assigningAuthorityName="HL7")
     for tag in ("processingCode", "processingModeCode", "acceptAckCode"):
         _e(message, tag, nullFlavor="NA")
-    for role in ("receiver", "sender"):
-        party = _e(message, role)
+    for side in ("receiver", "sender"):
+        party = _e(message, side)
         _e(party, "telecom")
         _e(_e(party, "device"), "id", nullFlavor="NA")
     act = _e(message, "controlActProcess", moodCode="EVN")
@@ -357,7 +457,8 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
     reported = _day(vals.get("B4"))
     _e(act, "effectiveTime", **({"value": reported} if reported else {"nullFlavor": "NI"}))
     event = _e(_e(act, "subject"), "investigationEvent")
-    _e(event, "id", assigningAuthorityName="FDA", extension=number, root=FDA_OID)
+    # An importer's or user facility's number is F2, in section F; the event's own id is then "NI" (FDA's examples).
+    _e(event, "id", assigningAuthorityName="FDA", extension="NI" if role else number, root=FDA_OID)
     for _, code in pick("B1") or [(None, None)]:  # a follow-up that sends no B1: the bare code, as FDA's example
         attrs = {"code": code} if code else {}
         _e(event, "code", **attrs, codeSystem=NCI, codeSystemName="Adverse_Event_Or_Product_Problem_Report")
@@ -400,6 +501,14 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
     ):
         for code in fda.fda_codes(vals.get(key, ""))[0]:
             _coded(subject, "subjectOf", "observation", concept, name, code)
+    for _, code in fda.choices("F12", vals.get("F12", "").partition(":")[0])[0][
+        :1
+    ]:  # F12, where it happened (FDA's codes); "Other: ..." sends its words
+        located = _e(_e(_e(_e(reaction, "location"), "locatedEntity"), "location"), "code", code=code, codeSystem=NCI)
+        located.set("codeSystemName", "Location")
+        words = vals["F12"].partition(":")[2].strip()
+        if code == "C17649" and 0 < len(words) <= 40:
+            _e(located, "originalText", words)
     source = _e(_e(reaction, "pertinentInformation"), "primarySourceReport")
     _e(source, "id", nullFlavor="ASKU")
     _e(source, "code", nullFlavor="ASKU")
@@ -411,6 +520,86 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
     if occupation:
         _e(author, "code", code=occupation[1], codeSystem=NCI, codeSystemName="Occupation")
 
+    if role:
+        _section_f(event, vals, parties, role, number)
+    else:
+        _empty_section_f(event, vals)
+    for _, code in pick("B2"):
+        seriousness = _e(_e(event, "pertinentInformation2"), "caseSeriousness")
+        _e(seriousness, "code", code="C49489", codeSystem=NCI, codeSystemName="Adverse_Event_Outcome")
+        _type(_e(seriousness, "value", code=code, codeSystem=NCI), "CE")
+    _device(event, vals, pick, maker, contact, role)
+
+    def reason(concept: str, name: str, code: str, text: str | None = None):
+        issue = _e(_e(act, "reasonOf"), "detectedIssueEvent")
+        _e(issue, "code", code=concept, codeSystem=NCI, codeSystemName=name)
+        if text:
+            _e(issue, "text", text, mediaType="text/plain")
+        _type(_e(issue, "value", code=code, codeSystem=NCI), "CE")
+
+    for _, code in pick("G2"):
+        reason("C53566", "Report_Source", code)
+    for _, code in fda.choices("G6", FOLLOW_UP.sub("", vals["G6"]))[0] if "G6" in vals else []:
+        reason("C53571", "Type_of_Report", code)
+    follow_up = FOLLOW_UP.search(vals.get("G6", ""))
+    if follow_up:  # G6 "Follow-up" with its number, and H2's types (FDA's "Manufacturer Follow-up" example)
+        reason("C53571", "Type_of_Report", FOLLOW_UP_CODE, follow_up.group(1))
+        for _, code in pick("H2"):
+            reason("C53584", "Type_of_Follow-up", code)
+    for _, code in pick("H1"):
+        reason("C53570", "Type_of_Reportable_Event", code)
+    return etree.tostring(root, xml_declaration=True, encoding="UTF-8", pretty_print=True)
+
+
+def _section_f(event, vals: dict, parties, role: str, number: str) -> None:
+    """Section F of an importer's or user facility's report (B9 step 6), placed as FDA's examples place it: the
+    reporter's notification (F1, F2, F3 to F5, F6, F7 with its number, F11 sent to FDA), then the manufacturer's
+    (F13 sent to the manufacturer, F14 the manufacturer)."""
+    follow_up = FOLLOW_UP.search(vals.get("F7", ""))
+    first = _e(event, "pertinentInformation1")
+    _e(first, "sequenceNumber", **({"value": follow_up.group(1)} if follow_up else {"nullFlavor": "NI"}))
+    note = _e(first, "secondaryCaseNotification")
+    _e(note, "id", assigningAuthorityName="FDA", extension=number, root=FDA_OID)
+    code = FOLLOW_UP_CODE if follow_up else INITIAL_CODE
+    _e(note, "code", code=code, codeSystem=NCI, codeSystemName="Type_of_Report")
+    aware = _day(vals.get("F6"))
+    _e(note, "effectiveTime", **({"value": aware} if aware else {"nullFlavor": "NI"}))
+    negation, sent = _sent(vals.get("F11"))
+    to = _e(note, "receiver", **({"negationInd": negation} if negation else {}))
+    _e(to, "time", **({"value": sent} if sent else {"nullFlavor": "NI"}))
+    receiver = _e(_e(to, "assignedEntity"), "assignedOrganization")
+    _e(receiver, "code", code="C17237", codeSystem=NCI, codeSystemName="Report_Receiver")
+    author = _e(_e(note, "author"), "assignedEntity")
+    _e(author, "code", code=REPORTER[role], codeSystem=NCI, codeSystemName="Type_of_Reporter")
+    reporter = office(parties, REPORTER_ROLE[role], vals.get("F4"))
+    if reporter:  # F3 to F5: the name (in FDA's place for it), the phone in FDA's format and the e-mail
+        organization = _e(author, "assignedOrganization")
+        _e(organization, "name", nullFlavor="NA")
+        _e(_e(organization, "addr"), "additionalLocator", (reporter["name"] or "")[:60])
+        person = _e(_e(organization, "contactParty"), "contactPerson")
+        if reporter["phone"] and PHONE.match(reporter["phone"]):
+            _e(person, "telecom", value=f"tel:{reporter['phone']}")
+        if 0 < len(reporter["email"] or "") <= 50:
+            _e(person, "telecom", value=f"mailto:{reporter['email']}")
+    negation, sent = _sent(vals.get("F13"))
+    second = _e(_e(event, "pertinentInformation1"), "secondaryCaseNotification")
+    _e(second, "id", nullFlavor="NA")
+    _e(second, "code", nullFlavor="NI")
+    to = _e(second, "receiver", **({"negationInd": negation} if negation else {}))
+    when = _e(to, "time")
+    _e(when, "low", **({"value": sent} if sent else {"nullFlavor": "NI"}))
+    _e(when, "high", nullFlavor="NI")
+    entity = _e(to, "assignedEntity")
+    maker = office(parties, MAKER_ROLES, vals.get("F14"))
+    if maker:  # F14: the manufacturer the report went to
+        organization = _e(entity, "assignedOrganization")
+        _e(organization, "code", code="C53616", codeSystem=NCI, codeSystemName="Report_Receiver")
+        _e(organization, "name", (maker["name"] or "")[:50])
+        if 0 < len(maker["email"] or "") <= 50:
+            _e(organization, "telecom", value=f"mailto:{maker['email']}")
+
+
+def _empty_section_f(event, vals: dict) -> None:
     # Section F's notification, empty in a manufacturer's report: as every manufacturer example of FDA's has it.
     first = _e(event, "pertinentInformation1")
     _e(first, "sequenceNumber", nullFlavor="NI")
@@ -438,11 +627,10 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
     _e(when, "low", nullFlavor="NI")
     _e(when, "high", **({"value": received} if received else {"nullFlavor": "NI"}))
     _e(receiver, "assignedEntity")
-    for _, code in pick("B2"):
-        seriousness = _e(_e(event, "pertinentInformation2"), "caseSeriousness")
-        _e(seriousness, "code", code="C49489", codeSystem=NCI, codeSystemName="Adverse_Event_Outcome")
-        _type(_e(seriousness, "value", code=code, codeSystem=NCI), "CE")
 
+
+def _device(event, vals: dict, pick, maker: dict, contact: dict, role: str | None) -> None:
+    """Section D's device and procedure, F9, and H's evaluation (a manufacturer's only: none on a role's report)."""
     procedure = _e(_e(event, "pertainsTo"), "procedureEvent")
     _e(procedure, "code", nullFlavor="ASKU")
     outer = _e(_e(procedure, "device"), "identifiedDevice")
@@ -479,13 +667,14 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
     ):
         for code in fda.fda_codes(vals.get(key, ""))[0]:
             _coded(investigation, component, item, concept, name, code)
-    office_element = _e(maker_element, "contactParty")
-    _e(_e(office_element, "addr"), "additionalLocator", contact.get("name", "")[:60])
-    if contact.get("email"):
-        _e(office_element, "telecom", value=f"mailto:{contact['email']}")
-    if contact.get("phone") and PHONE.match(contact["phone"]):
-        _e(office_element, "telecom", value=f"tel:{contact['phone']}")
-    _e(office_element, "contactManufacturerContact")
+    if not role:  # G1, the manufacturer's contact office: never on an importer's or user facility's report
+        office_element = _e(maker_element, "contactParty")
+        _e(_e(office_element, "addr"), "additionalLocator", contact.get("name", "")[:60])
+        if contact.get("email"):
+            _e(office_element, "telecom", value=f"mailto:{contact['email']}")
+        if contact.get("phone") and PHONE.match(contact["phone"]):
+            _e(office_element, "telecom", value=f"tel:{contact['phone']}")
+        _e(office_element, "contactManufacturerContact")
     model = _e(_e(device, "inventoryItem"), "manufacturedDeviceModel")
     if fits("D4_MODEL"):
         _e(model, "id", extension=vals["D4_MODEL"])
@@ -507,6 +696,10 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
         observation = observe("C53449", "Device_available_for_evaluation")
         _e(observation, "effectiveTime", nullFlavor="NI")
         _type(_e(observation, "value", value=flag), "BL")
+    age = fda._AGE.match(vals.get("F9", ""))
+    if age:  # F9, the device's approximate age
+        unit = {"year": "YR", "month": "MO", "week": "WK", "day": "DA"}[age.group(2).lower()]
+        _type(_e(observe("C53451", "Approximate_Age_of_Device"), "value", value=age.group(1), unit=unit), "PQ")
     for key, concept, name in (
         ("H6_PROBLEM", "C53982", "Device_Problem_Code"),
         ("H6_COMPONENT", "C54577", "Component_Code"),
@@ -552,26 +745,6 @@ def build(sections: list[dict], parties, *, sender: str, now: datetime, practice
         if when:
             _e(_e(_e(procedure, component), item), "effectiveTime", value=when)
     _e(_e(_e(event, "component"), "adverseEventAssessment"), "subject1").append(etree.Element(f"{{{HL7}}}primaryRole"))
-
-    def reason(concept: str, name: str, code: str, text: str | None = None):
-        issue = _e(_e(act, "reasonOf"), "detectedIssueEvent")
-        _e(issue, "code", code=concept, codeSystem=NCI, codeSystemName=name)
-        if text:
-            _e(issue, "text", text, mediaType="text/plain")
-        _type(_e(issue, "value", code=code, codeSystem=NCI), "CE")
-
-    for _, code in pick("G2"):
-        reason("C53566", "Report_Source", code)
-    for _, code in fda.choices("G6", FOLLOW_UP.sub("", vals["G6"]))[0] if "G6" in vals else []:
-        reason("C53571", "Type_of_Report", code)
-    follow_up = FOLLOW_UP.search(vals.get("G6", ""))
-    if follow_up:  # G6 "Follow-up" with its number, and H2's types (FDA's "Manufacturer Follow-up" example)
-        reason("C53571", "Type_of_Report", FOLLOW_UP_CODE, follow_up.group(1))
-        for _, code in pick("H2"):
-            reason("C53584", "Type_of_Follow-up", code)
-    for _, code in pick("H1"):
-        reason("C53570", "Type_of_Reportable_Event", code)
-    return etree.tostring(root, xml_declaration=True, encoding="UTF-8", pretty_print=True)
 
 
 def delta(sections: list[dict], previous: dict[str, str]) -> tuple[list[dict], list[str]]:
@@ -624,7 +797,7 @@ def prepare(
         ]
     missing, left = check(sections, parties, kind)
     left = [*left, *cleared]
-    xml = None if missing else build(sections, parties, sender=sender, now=now, practice=practice)
+    xml = None if missing else build(sections, parties, sender=sender, now=now, practice=practice, kind=kind)
     errors = validate(xml) if xml else []
     return {"missing": missing, "left_out": left, "errors": errors, "xml": xml, "changed": changed}
 

@@ -27,8 +27,9 @@ def _rule_rows() -> list[dict]:
 
 
 def test_b3_every_mandatory_us_row_is_enforced():
-    rows = _rule_rows()
-    assert len(rows) == 161 and all(row["m_i"] or row["m_f"] for row in rows)  # the sheet's manufacturer rows
+    # The sheet's manufacturer rows (B9 step 5: version 2 adds the importer and user facility rows beside them).
+    rows = [row for row in _rule_rows() if row["m_i"] or row["m_f"]]
+    assert len(rows) == 161
     mandatory = [row for row in rows if row["m_i"] == "required"]
     # The rule book agrees with FDA's own list: 12 blocks on an initial report, 2 on a follow-up.
     assert len(mandatory) == 12 and emdr.required("M-I") == FDA_REQUIRED["M-I"]

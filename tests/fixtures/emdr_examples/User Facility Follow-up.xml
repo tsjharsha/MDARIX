@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PORR_IN040001UV01 ITSVersion="XML_1.0" xsi:schemaLocation="urn:hl7-org:v3 ../../../../eMDRHL7/Impl_Files/Con170227.xsd" xmlns="urn:hl7-org:v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+   <id assigningAuthorityName="MessageSender" extension="-20230824141144" root="1.1"/>
+   <!--Created element Id with attributes root , assigningAuthName and extension-->
+   <creationTime value="20230824"/>
+   <!--Created element creationTime-->
+   <responseModeCode/>
+   <!--Created element responseModeCode-->
+   <versionCode code="V3NORMED_2016"/>
+   <!--Created element versionCode-->
+   <interactionId/>
+   <!--Created element interactionId-->
+   <batchTotalNumber value="1"/>
+   <!--Created element batchTotalNumber-->
+   <receiver>
+      <telecom/>
+      <device>
+         <id nullFlavor="NA"/>
+         <asAgent>
+            <representedOrganization>
+               <id nullFlavor="NA"/>
+               <name>CDRH</name>
+            </representedOrganization>
+         </asAgent>
+      </device>
+   </receiver>
+   <!--Created receiver: Message Receiver Identifier-->
+   <sender>
+      <telecom/>
+      <device>
+         <id nullFlavor="NA"/>
+         <softwareName>emdr_esub</softwareName>
+         <asAgent>
+            <representedOrganization>
+               <id nullFlavor="NA"/>
+               <name>USA Device Manufacturer</name>
+            </representedOrganization>
+         </asAgent>
+      </device>
+   </sender>
+   <!--Created sender: Message Sender Identifier-->
+   <message>
+      <id extension="1"/>
+      <!--adding id under message tag: Message Identifier-->
+      <creationTime nullFlavor="NA"/>
+      <!--N.2.r.4: Date of Message Creation-->
+      <interactionId root="2.16.840.1.113883.1.6" extension="PORR_IN04001" assigningAuthorityName="HL7"/>
+      <!--Created element interactionId-->
+      <processingCode nullFlavor="NA"/>
+      <processingModeCode nullFlavor="NA"/>
+      <acceptAckCode nullFlavor="NA"/>
+      <receiver>
+         <telecom/>
+         <device>
+            <id nullFlavor="NA"/>
+         </device>
+      </receiver>
+      <!--N.2.r.3: Message Receiver Identifier-->
+      <sender>
+         <telecom/>
+         <device>
+            <id nullFlavor="NA"/>
+         </device>
+      </sender>
+      <!--N.2.r.2: Message Sender Identifier-->
+      <controlActProcess moodCode="EVN">
+         <code code="PORR_TE040001UV01" codeSystem="HL7" codeSystemName="HL7 Trigger Event Id"/>
+         <!--HL7 Trigger Event ID-->
+         <effectiveTime nullFlavor="NI"/>
+         <!--Report Creation date: Date of Creation-->
+         <subject>
+            <investigationEvent>
+               <id assigningAuthorityName="FDA" extension="NI" root="2.16.840.1.113883.3.24"/>
+               <!--C.1.1: Sender's Safety Report Unique Identifier-->
+               <code codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Adverse_Event_Or_Product_Problem_Report"/>
+               <!--Created  text node for H10: Created  text node for H10-->
+               <statusCode/>
+               <activityTime/>
+               <availabilityTime/>
+               <authorOrPerformer typeCode="AUT">
+                  <assignedEntity/>
+               </authorOrPerformer>
+               <trigger>
+                  <reaction>
+                     <text mediaType="text/plain">Additional event narrative.</text>
+                     <!--Created  text node for B5: Created  text node for B5-->
+                     <term mediaType="text/plain"/>
+                     <!--Created  text node for B5: Created  text node for B5-->
+                     <effectiveTime nullFlavor="NI"/>
+                     <!--Effective time under trigger: Effective time under trigger-->
+                     <subject>
+                        <investigativeSubject>
+                           <subjectAffectedPerson>
+                              <birthTime nullFlavor="NI"/>
+                              <!--Birth Time: Date of Birth-->
+                              <deceasedTime nullFlavor="NI"/>
+                              <!--Deceased Time: Date of Death-->
+                           </subjectAffectedPerson>
+                           <subjectOf>
+                              <observation moodCode="EVN">
+                                 <code code="C25150" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Age"/>
+                                 <value xsi:type="PQ" unit=""/>
+                              </observation>
+                           </subjectOf>
+                           <!--Age: Patient Age-->
+                           <subjectOf>
+                              <observation moodCode="EVN">
+                                 <code code="C25208" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Weight"/>
+                                 <value xsi:type="PQ" unit=""/>
+                              </observation>
+                           </subjectOf>
+                           <!--Weight: Patient Weight-->
+                           <!--H6: Health Effect - Clinical Code-->
+                           <!--H6: Health Effect - Impact Code-->
+                           <!--F10: Health Effect Impact Code-->
+                        </investigativeSubject>
+                     </subject>
+                     <pertinentInformation>
+                        <primarySourceReport>
+                           <id nullFlavor="ASKU"/>
+                           <code nullFlavor="ASKU"/>
+                           <receiver>
+                              <assignedEntity>
+                                 <assignedOrganization>
+                                    <name>FDA</name>
+                                 </assignedOrganization>
+                              </assignedEntity>
+                           </receiver>
+                           <author>
+                              <assignedEntity/>
+                           </author>
+                        </primarySourceReport>
+                     </pertinentInformation>
+                  </reaction>
+               </trigger>
+               <pertinentInformation1>
+                  <sequenceNumber value="1"/>
+                  <secondaryCaseNotification>
+                     <id assigningAuthorityName="FDA" extension="1234567890-2023-0001" root="2.16.840.1.113883.3.24"/>
+                     <code code="C53579" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Type_of_Report"/>
+                     <effectiveTime nullFlavor="NI"/>
+                     <receiver>
+                        <time nullFlavor="NI"/>
+                        <assignedEntity>
+                           <assignedOrganization>
+                              <code code="C17237" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Report_Receiver"/>
+                           </assignedOrganization>
+                        </assignedEntity>
+                     </receiver>
+                     <!--F3-5: Contact Person-->
+                     <author>
+                        <assignedEntity>
+                           <code code="C53567" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Type_of_Reporter"/>
+                        </assignedEntity>
+                     </author>
+                  </secondaryCaseNotification>
+               </pertinentInformation1>
+               <pertinentInformation1>
+                  <secondaryCaseNotification>
+                     <id nullFlavor="NA"/>
+                     <code nullFlavor="NI"/>
+                     <receiver>
+                        <time>
+                           <low nullFlavor="NI"/>
+                           <high nullFlavor="NI"/>
+                        </time>
+                        <assignedEntity>
+                           <!--F14: Manufacturer Name/Address-->
+                        </assignedEntity>
+                     </receiver>
+                  </secondaryCaseNotification>
+               </pertinentInformation1>
+               <pertainsTo>
+                  <procedureEvent>
+                     <code nullFlavor="ASKU"/>
+                     <device>
+                        <identifiedDevice>
+                           <id nullFlavor="NI"/>
+                           <identifiedDevice>
+                              <id nullFlavor="NI"/>
+                              <existenceTime nullFlavor="NI"/>
+                              <lotNumberText mediaType="text/plain"/>
+                              <expirationTime nullFlavor="NI"/>
+                              <asManufacturedProduct>
+                                 <id nullFlavor="NI"/>
+                                 <code nullFlavor="NI"/>
+                                 <manufacturerOrReprocessor>
+                                    <code code="C53616" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Type_of_Manufacturer"/>
+                                    <name/>
+                                    <telecom value=""/>
+                                    <telecom value=""/>
+                                    <addr>
+                                       <streetAddressLine/>
+                                       <streetAddressLine/>
+                                       <city/>
+                                       <state/>
+                                       <postalCode/>
+                                       <country/>
+                                    </addr>
+                                    <asRole>
+                                       <performance>
+                                          <investigationEvent/>
+                                       </performance>
+                                    </asRole>
+                                 </manufacturerOrReprocessor>
+                              </asManufacturedProduct>
+                              <inventoryItem>
+                                 <manufacturedDeviceModel>
+                                    <id nullFlavor="NI"/>
+                                    <code codeSystemName="Type_of_Device" codeSystem="2.16.840.1.113883.3.26.1.1">
+                                       <originalText mediaType="text/plain"/>
+                                    </code>
+                                    <manufacturerModelName mediaType="text/plain"/>
+                                    <!--G4: PMA/510k number-->
+                                    <asRegulatedProduct>
+                                       <id nullFlavor="NI"/>
+                                    </asRegulatedProduct>
+                                    <!--G4: BLA Number-->
+                                    <asRegulatedProduct>
+                                       <id nullFlavor="NI"/>
+                                    </asRegulatedProduct>
+                                 </manufacturedDeviceModel>
+                              </inventoryItem>
+                           </identifiedDevice>
+                           <!--D9: Device available for evaluation-->
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53449" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Device_available_for_evaluation"/>
+                                 <effectiveTime nullFlavor="NI"/>
+                                 <value nullFlavor="NI" xsi:type="BL"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53451" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Approximate_Age_of_Device"/>
+                                 <value nullFlavor="NI" xsi:type="PQ"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <!--H6: Device Problem Code-->
+                           <!--H6: Component Code-->
+                           <!--Start: F10 Component Code-->
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53629" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Device_Evaluated_By_Manufacturer"/>
+                                 <value nullFlavor="NI" xsi:type="BL"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53602" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Device_Labeled_for_single_use"/>
+                                 <value nullFlavor="NI" xsi:type="BL"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <!--H8: Usage of Device-->
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53645" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Usage_of_Device"/>
+                                 <value nullFlavor="NI" xsi:type="CE" codeSystem="2.16.840.1.113883.3.26.1.1"/>
+                              </deviceObservation>
+                           </subjectOf>
+                           <subjectOf>
+                              <deviceObservation>
+                                 <code code="C53619" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Corrective_Action_Number"/>
+                                 <value xsi:type="ED" mediaType="text/plain"/>
+                              </deviceObservation>
+                           </subjectOf>
+                        </identifiedDevice>
+                     </device>
+                     <authorOrPerformer typeCode="AUT">
+                        <assignedEntity>
+                           <code codeSystemName="Operator_of_Medical_Device" codeSystem="2.16.840.1.113883.3.26.1.1">
+                              <originalText mediaType="text/plain"/>
+                           </code>
+                        </assignedEntity>
+                     </authorOrPerformer>
+                     <pertinentInformation1>
+                        <observation moodCode="EVN">
+                           <code code="C53563" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Single-Use_Device_Reprocessed_and_Reused_on_Patient"/>
+                           <value nullFlavor="NI" xsi:type="BL"/>
+                        </observation>
+                     </pertinentInformation1>
+                     <!--D8: Serviced by Third Party-->
+                     <pertinentInformation1>
+                        <observation moodCode="EVN">
+                           <code code="C85488" codeSystem="2.16.840.1.113883.3.26.1.1" codeSystemName="Device_Serviced_By_Third_Party"/>
+                           <value nullFlavor="NI" xsi:type="BL"/>
+                        </observation>
+                     </pertinentInformation1>
+                     <!--D10: Concomitant medical products-->
+                     <component1>
+                        <implantation>
+                           <effectiveTime nullFlavor="NI"/>
+                        </implantation>
+                     </component1>
+                     <component2>
+                        <explantation>
+                           <effectiveTime nullFlavor="NI"/>
+                        </explantation>
+                     </component2>
+                  </procedureEvent>
+               </pertainsTo>
+               <component>
+                  <adverseEventAssessment>
+                     <subject1>
+                        <primaryRole/>
+                     </subject1>
+                  </adverseEventAssessment>
+               </component>
+            </investigationEvent>
+         </subject>
+         <!--end of item subject content: end of item subject content-->
+         <!--H1: Type of Reportable Event (Death, Malfunction, etc)-->
+      </controlActProcess>
+   </message>
+</PORR_IN040001UV01>

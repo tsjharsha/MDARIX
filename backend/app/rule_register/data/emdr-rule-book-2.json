@@ -1,0 +1,50 @@
+{
+  "code": "emdr-rule-book-2",
+  "rule": "emdr-rule-book",
+  "version": 2,
+  "kind": "REPORT_FORM",
+  "market": "US",
+  "held_as": "DATA",
+  "title": "US eMDR rule book (201 rows: manufacturer, importer, user facility)",
+  "plain": "The blocks FDA requires per report type, as a CSV rule book: manufacturer (M-I, M-F), importer (I-I, I-F) and user facility (U-I, U-F) reports. The manufacturer rows are version 1's, unchanged.",
+  "source": [
+    {
+      "catalog": "CFR803_50",
+      "clause": "21 CFR 803.50"
+    },
+    {
+      "catalog": "CFR803_40",
+      "clause": "21 CFR 803.40, 803.42"
+    },
+    {
+      "catalog": "CFR803_30",
+      "clause": "21 CFR 803.30, 803.32"
+    }
+  ],
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": null,
+  "change": {
+    "kind": "CORRECTION",
+    "corrects": "emdr-rule-book-1",
+    "reason": "B9 step 5: version 1 held the manufacturer rows only. Version 2 adds the importer and user facility rows of the mapping workbook's US sheet (section F, and the shared blocks' I-I, I-F, U-I, U-F needs: FDA's lists, importer 9 blocks, user facility 4, follow-ups F1, F2, F7). The manufacturer rows are byte for byte version 1's. A correction from the start: no report changes."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Owner",
+    "approved_on": "2026-11-11",
+    "built_by": "MDARIX engineering",
+    "release": "0.11.00",
+    "note": "B9 spec approved 11 Nov 2026 (B9-D10, D11): eMDR rule book version 2 with the importer and user facility rows."
+  },
+  "implementation": "backend.app.authority_reports.rules.us_emdr_v2.csv",
+  "pinned": false,
+  "content": {
+    "file": "backend/app/authority_reports/rules/us_emdr_v2.csv",
+    "sha256": "caba680906d762565d6ef372165798a852c1e9d1bb689f1b7d811c5084a96ac5"
+  },
+  "content_hash": "sha256:7e967d7565db02d7b5642c882068f0357e9314f78367559545f39c006e8546c1"
+}
