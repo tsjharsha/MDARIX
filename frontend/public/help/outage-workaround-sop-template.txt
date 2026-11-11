@@ -1,0 +1,73 @@
+MANUAL WORKAROUND WHEN MDARIX IS UNAVAILABLE - STARTER SOP TEMPLATE
+
+Starter template: adapt it to your own procedures. To confirm with your consultant.
+It does not tell you how or when to report to an authority: your own reporting SOP does.
+
+Document number: ____________   Version: ____   Effective date: ____________
+Owner (role): ______________________   Approved by (role): ______________________
+
+1. PURPOSE
+   Legal reporting clocks keep running when MDARIX is unavailable. This procedure keeps complaint intake,
+   reportability decisions and report deadlines under control during an outage, and brings the records back into
+   MDARIX completely afterwards.
+
+2. SCOPE
+   Complaints, calls, e-mails and other reports of a possible adverse event or malfunction received while MDARIX
+   cannot be used (planned maintenance, an outage, a network failure at our site).
+
+3. WHEN TO SWITCH TO MANUAL MODE
+   3.1 MDARIX cannot be reached, or cannot save, for more than ____ minutes (we suggest 30), or the MDARIX team
+       announces an outage.
+   3.2 The person who notices tells: ______________________ (role), who declares manual mode and records the time.
+   3.3 Check MDARIX's status page: ______________________ (address from your MDARIX contract or the support team).
+
+4. DEADLINES DURING THE OUTAGE
+   4.1 Use the latest daily deadline e-mail from MDARIX ("Open reporting deadlines"), or the latest printed copy
+       (Oversight > Deadlines PDF). Keep the printed copy at: ______________________.
+   4.2 The person responsible for each deadline is the owner shown on the list; if absent: ______________________.
+   4.3 A report due during the outage is prepared and submitted under your own reporting SOP
+       (document number: ____________), outside MDARIX.
+
+5. PAPER OR SPREADSHEET LOG (one row per contact; the columns match MDARIX's "Log a case")
+   - Log row number
+   - Received: date, time and time zone
+   - When we became aware (first knowledge): date, time, time zone, who knew (us, a distributor, ...)
+   - Channel (phone, e-mail, visit, ...) and its reference
+   - Reporter's site and country
+   - Product, lot, serial number, UDI (as stated)
+   - Event date and time
+   - The reporter's own words (verbatim)
+   - Patient involved? What happened to them?
+   - What was asked for (replacement, investigation, ...)
+   - Urgent (death, serious injury, public health threat)? yes / no
+   - Entered by (name, signature) and when
+   - Back-entered in MDARIX as (Case reference) - filled in after recovery
+   Keep personal data of patients and reporters to what your procedures allow.
+
+6. WHO DECIDES REPORTABILITY MEANWHILE
+   6.1 Urgent contacts go at once to: ______________________ (role), by phone: ______________________.
+   6.2 Reportability decisions made during the outage are recorded on paper with the decider's name, date and
+       reasoning, under your own procedure, and entered in MDARIX after recovery.
+
+7. AFTER RECOVERY: BACK-ENTRY
+   7.1 Enter every log row in MDARIX with "Log a case". Use the real times from the log: MDARIX counts every clock
+       from when you became aware, never from the time of entry, so a back-entered Case may already be due or
+       overdue.
+   7.2 When you became aware more than 24 hours before the entry, MDARIX asks for a late-entry reason. Write, for
+       example: "MDARIX unavailable <date> <from>-<to>; entered from manual log row <n>".
+   7.3 Before saving, MDARIX shows records that may be the same event (Cases, complaints, e-mails received
+       meanwhile). If it is the same event, add the contact to that record; do not create a second one.
+   7.4 Record decisions taken on paper (section 6) on the Case or complaint, with the original date in the reason.
+   7.5 Write the MDARIX Case reference on each log row.
+
+8. COMPLETENESS CHECK AFTER RECOVERY
+   8.1 ______________________ (role, not the person who entered the rows) checks that every log row has an MDARIX
+       reference, and that every deadline of the outage period was met or its delay is documented.
+   8.2 Sign and date the log; file it with: ______________________.
+   8.3 A missed or late deadline is handled under your deviation / CAPA procedure (document number: ____________).
+
+9. RECORDS
+   Manual log (signed), printed deadline list used, completeness check, any deviation raised.
+
+10. REFERENCES (fill in)
+   Complaint handling SOP: ____________   Vigilance / reporting SOP: ____________   Deviation / CAPA SOP: ____________

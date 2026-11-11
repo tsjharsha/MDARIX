@@ -3,6 +3,7 @@ import {
   BookOpen,
   Bug,
   CircleHelp,
+  FileDown,
   Info,
   LifeBuoy,
   ListChecks,
@@ -27,6 +28,9 @@ export const releaseLine = (version: string) => (version ? `MDARIX release v${ve
 
 /** The website's video series (frontend/src/site/videos.tsx), opened beside the product. */
 export const VIDEOS_PATH = "/videos";
+
+/** B6a G18d: the manual-workaround SOP starter template for an outage (frontend/public/help/). */
+export const OUTAGE_SOP_PATH = "/help/outage-workaround-sop-template.txt";
 
 /**
  * Help in every signed-in screen: getting started (during a trial), the step-by-step user guide (every screen), the
@@ -189,6 +193,15 @@ export function HelpMenu({
           <li>
             <a href="/help/pilot-guide" target="_blank" rel="noopener">
               <NotebookText size={15} aria-hidden="true" /> Pilot guide
+            </a>
+          </li>
+          <li>
+            <a href={OUTAGE_SOP_PATH} download>
+              <FileDown size={15} aria-hidden="true" />
+              <span className="help-menu-item">
+                If MDARIX is unavailable: SOP template
+                <small>Starter, adapt to your procedures; to confirm with your consultant</small>
+              </span>
             </a>
           </li>
           <li>
