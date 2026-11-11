@@ -47,6 +47,10 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   asks for (`POST .../ai-run`, MANUAL) starts nothing and answers "AI analysis is off for this organization", like the
   automatic one; `POST .../hypotheses` builds only on a saved analysis named in the request and otherwise answers the
   same off state without running an analysis. A person's own hypotheses (Intelligence tab) are unchanged (RCA-D13).
+- And for the last two R1 routes: `POST .../challenges` challenges only a saved set of competing explanations named in
+  the request, and `POST .../unknowns` and `POST .../failure-chains` build only on the saved explanations and challenges
+  for the same point in time; while AI does not answer, neither generates new ones (so no analysis runs) and both answer
+  "AI analysis is off for this organization" without writing anything. The Intelligence tab is unchanged (RCA-D13).
 
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 

@@ -7,7 +7,7 @@ set for the investigation, and persist their results as AI executions.
 import time
 from ai.execution import record_ai_execution
 from backend.app.db.models.foundation import AIExecution
-from hypothesis_engine.service import CompetingHypothesisService
+from hypothesis_engine.service import CompetingHypothesisService, HypothesisEngineError
 from hypothesis_engine.schemas import HypothesisSetRequest
 from challenger.service import ChallengerService
 from challenger.schemas import ChallengeRequest
@@ -55,24 +55,32 @@ class UnknownsFailureChainService:
             return None
         return hs, latest_challenges.challenge_set
 
-    def _inputs(self, db, request):
+    def _inputs(self, db, request, run_analysis=True):
+        """``run_analysis=False`` (RCA-D13, AI off): only the saved hypotheses and challenges for this view are used;
+        none is generated (that would run the keyword analysis), so ``AI_OFF`` is raised and nothing is written."""
         reused = self._current_inputs(db, request)
         if reused is not None:
             return reused
-        hs = (
-            CompetingHypothesisService()
-            .generate(
-                db,
-                HypothesisSetRequest(
-                    tenant_id=request.tenant_id,
-                    investigation_id=request.investigation_id,
-                    temporal_mode=request.temporal_mode,
-                    as_of=request.as_of,
-                    persist=True,
-                ),
+        try:
+            hs = (
+                CompetingHypothesisService()
+                .generate(
+                    db,
+                    HypothesisSetRequest(
+                        tenant_id=request.tenant_id,
+                        investigation_id=request.investigation_id,
+                        temporal_mode=request.temporal_mode,
+                        as_of=request.as_of,
+                        persist=True,
+                    ),
+                    run_analysis=run_analysis,
+                )
+                .hypothesis_set
             )
-            .hypothesis_set
-        )
+        except HypothesisEngineError as e:
+            if e.code == "AI_OFF":
+                raise UnknownsFailureChainError(e.code, e.message) from e
+            raise
         cs = (
             ChallengerService()
             .generate(
@@ -90,10 +98,10 @@ class UnknownsFailureChainService:
         )
         return hs, cs
 
-    def unknowns(self, db, request: UnknownRequest):
+    def unknowns(self, db, request: UnknownRequest, run_analysis: bool = True):
         if request.tenant_id is None:
             raise UnknownsFailureChainError("TENANT_REQUIRED", "tenant_id is required")
-        hs, cs = self._inputs(db, request)
+        hs, cs = self._inputs(db, request, run_analysis)
         started = time.time()
         result = ControlledUnknownsRadar().generate(hs, cs)
         execution = None
@@ -124,10 +132,10 @@ class UnknownsFailureChainService:
             execution = row.id
         return UnknownResponse(unknown_set=result, persisted=request.persist, ai_execution_id=execution)
 
-    def chains(self, db, request: FailureChainRequest):
+    def chains(self, db, request: FailureChainRequest, run_analysis: bool = True):
         if request.tenant_id is None:
             raise UnknownsFailureChainError("TENANT_REQUIRED", "tenant_id is required")
-        hs, cs = self._inputs(db, request)
+        hs, cs = self._inputs(db, request, run_analysis)
         us = ControlledUnknownsRadar().generate(hs, cs)
         started = time.time()
         result = ControlledFailureChain().generate(hs, us)
