@@ -1,0 +1,18 @@
+{
+  "note": "The Commission's list of medical devices vigilance contact points, byte-identical to the publisher's copy downloaded on 11 Nov 2026 from the publisher's own page (owner's OK for the Commission's files, 11 Nov 2026). backend/app/authority_reports/rules/eu_nca.csv holds, per country, the authority's name and its vigilance e-mail as written in this PDF (EU MIR 1.1a, B8 step 5). Before each release, compare the page with this pin; a newer list is a new folder.",
+  "edition": "Medical devices - Vigilance contact points, September 2026 (the PDF's own date; created 21 Sep 2026)",
+  "publisher": "European Commission (DG SANTE), medical devices sector contacts",
+  "page": "https://health.ec.europa.eu/medical-devices-sector/contacts_en",
+  "page_date": "2026-07-22 (the page's dateModified; read 11 Nov 2026: 'Vigilance contact points' listed)",
+  "files": [
+    {
+      "file": "md_vigilance_contact_points.pdf",
+      "sha256": "b05e5995ce71f238764501f2445c0ac41c3d96dc87c42c62ad2245a702d76a62",
+      "source_url": "https://health.ec.europa.eu/document/download/900ad9e7-fc79-4617-93be-f6712a3e3306_en?filename=md_vigilance_contact_points.pdf"
+    }
+  ],
+  "derived": {
+    "file": "backend/app/authority_reports/rules/eu_nca.csv",
+    "sha256": "bc0f04d01c7fa3a3d503f15254f47d167f09526d4a68f1932b8a16e1ef533b28"
+  }
+}

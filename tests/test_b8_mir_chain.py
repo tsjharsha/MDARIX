@@ -351,3 +351,25 @@ def test_b8_switching_the_draft_to_a_final_changes_what_is_mandatory(trial):  # 
     final = _ok(user.put(f"{REPORTS}/{child['id']}/fields/1_2E", json={"value": FR}))
     assert {"4_2A", "4_3_3A"} <= set(final["mandatory"]["missing"]) and "4_1C" not in final["mandatory"]["missing"]
     assert "4_1C" in _ok(user.put(f"{REPORTS}/{child['id']}/fields/1_2E", json={"value": FU}))["mandatory"]["missing"]
+
+
+# ------------------------------------------------------------------------------------------------- B8 step 5
+
+
+def test_b8_personal_fields_stay_blank_while_the_setting_is_off(trial):  # noqa: F811
+    """B8-D9 (as B9-D9): no setting turns report-step personal data on yet, so patient and reporter boxes are refused
+    and never stored."""
+    user, initial = trial["user"], _initial(trial)
+    for field in ("3_3B", "3_4B"):
+        refused = user.put(f"{REPORTS}/{initial}/fields/{field}", json={"value": "Someone (sample)"})
+        assert refused.status_code == 422 and _code(refused) == "PERSONAL_FIELD"
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        assert not {"3_3B", "3_4B"} & set(db.get(ReportObligation, uuid.UUID(initial)).entries or {})
+
+
+def test_b8_the_sample_eu_report_names_ansm_and_leaves_1_2d_to_a_person(trial):  # noqa: F811
+    values = _fields(_ok(trial["user"].get(f"{REPORTS}/{_initial(trial)}")))
+    assert values["1_1A"]["value"].endswith("(ANSM)")  # the incident in France
+    assert values["1_2D"]["value"] is None and "a hint only" in (values["1_2D"]["hint"] or "")
+    assert values["1_2A"]["value"] is None and values["1_2A"]["editable"] is False

@@ -1116,7 +1116,15 @@ EU_MIR = Form(
             "1_1",
             "1.1 Responsible competent authority in the country where the incident occurred",
             (
-                Field("1_1A", "1.1a", "Name of the receiving national competent authority (NCA)", None, MUST),
+                Field(
+                    "1_1A",
+                    "1.1a",
+                    "Name of the receiving national competent authority (NCA)",
+                    "eu_nca",
+                    MUST,
+                    note="From the incident country (the Commission's vigilance contact points); Northern Ireland: ask "
+                    "MHRA.",
+                ),
                 Field("1_1B", "1.1b", "EUDAMED number of the NCA", note="Mandatory once available in EUDAMED."),
                 Field(
                     "1_1C",
@@ -1134,7 +1142,14 @@ EU_MIR = Form(
             "1_2",
             "1.2 Date, type and classification of the incident report",
             (
-                Field("1_2A", "1.2a", "Date of report submission", None, MUST, note="The day you submit."),
+                Field(
+                    "1_2A",
+                    "1.2a",
+                    "Date of report submission",
+                    "sent_day",
+                    MUST,
+                    note="The day sent for approval (B8-D1): record the real day at submission.",
+                ),
                 Field("1_2B", "1.2b", "Date of the incident (from … to …)", "event_date", MUST),
                 Field("1_2C", "1.2c", "Manufacturer awareness date of the incident", "aware_date", MUST),
                 Field(

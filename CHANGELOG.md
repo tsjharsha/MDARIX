@@ -41,6 +41,14 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
   Follow-up draft at once, due on the date that report gave in 1.2f ("Your date (1.2f): no fixed legal period"),
   audited `REPORT_FOLLOW_UP_CREATED` (automatic). A second attempt never makes a second draft. Nothing is made while
   the market's switch is off.
+- **Values MDARIX fills, and the ones only you give** (EU MIR): 1.1a names the authority of the incident's country,
+  from the Commission's vigilance contact points (September 2026, pinned by SHA-256 in
+  `data/mir_forms/eu-nca-2026-09`); a country the list does not name, and Northern Ireland, is asked (B8-D4). 1.2a is
+  the organisation's day the report is sent for approval (B8-D1); it is never typed and never counts as missing.
+  1.2d is asked: the day the conclusion was signed Reportable is shown beside it as a hint only (B8-D2). 2.5 shows the
+  product's registered markets as a hint only. The UDI issuing entity is read only from an unambiguous format (GS1 with
+  a valid check digit, HIBCC "+", ICCBBA "="), never IFA (B8-D11). Patient and reporter boxes stay refused and blank
+  (B8-D9: no setting turns them on yet).
 
 ## [0.11.00] - not released yet
 

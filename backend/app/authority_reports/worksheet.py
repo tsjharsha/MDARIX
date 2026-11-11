@@ -17,9 +17,12 @@ FDA-IMDRF mapping): one choice fills both.
 
 from __future__ import annotations
 
+import csv
 import re
 import uuid
 from datetime import datetime
+from functools import lru_cache
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -193,6 +196,17 @@ def load(db: Session, control_db: Session, tenant_id: uuid.UUID, complaint_id: u
         "capas": capas,
         "triage": triage,
         "registrations": registrations,
+        # B8 step 5 (2.5): every market the product is registered in, a hint for the market distribution only.
+        "registered_markets": sorted(
+            {
+                row.market
+                for row in db.query(ProductRegistration.market).filter(
+                    ProductRegistration.tenant_id == tenant_id, ProductRegistration.product_id == product.id
+                )
+            }
+        )
+        if product
+        else [],
         "parties": parties,
         "imdrf": codes,
         # FDA's code for each IMDRF code, on the FDA's form (0.10.77): one choice fills both.
@@ -598,6 +612,68 @@ def _immediate_action(context):
     return (text, _source("Triage", _ref(context), "The triage record's immediate action", triage.id)) if text else None
 
 
+NCA_LIST = Path(__file__).with_name("rules") / "eu_nca.csv"
+# B8-D4: Northern Ireland's 1.1a is asked until MHRA confirms what goes in it (the list names MHRA for it).
+NCA_ASKED = frozenset({"XI"})
+
+
+@lru_cache
+def eu_ncas() -> dict[str, dict]:
+    """The Commission's vigilance contact points (``data/mir_forms/eu-nca-2026-09``, pinned by SHA-256), by every name
+    and code a country is written with, lower case."""
+    with NCA_LIST.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    return {key.lower(): row for row in rows for key in (row["code"], *row["names"].split("|"))}
+
+
+def nca_for(country: str | None) -> dict | None:
+    """The national competent authority of the incident's country (1.1a), or None when the list does not name the
+    country (a person enters it) or it is Northern Ireland (B8-D4)."""
+    row = eu_ncas().get(" ".join((country or "").split()).lower())
+    return None if row is None or row["code"] in NCA_ASKED else row
+
+
+def _eu_nca(context):
+    row = nca_for(context["record"].get("country"))
+    if row is None:
+        return None
+    return row["authority"], _source(
+        "Form", None, "The incident country's authority, from the Commission's vigilance contact points (Sep 2026)"
+    )
+
+
+def udi_issuing_entity(udi: str | None) -> str | None:
+    """B8-D11: the UDI issuing entity, only from an unambiguous format. GS1: 14 digits with a valid check digit;
+    HIBCC: starts with "+"; ICCBBA: starts with "=". IFA is never derived. Anything else: None (asked once per
+    product)."""
+    text = (udi or "").strip()
+    if re.fullmatch(r"\d{14}", text):
+        digits = [int(char) for char in text]
+        total = sum(digit * (3 if index % 2 == 0 else 1) for index, digit in enumerate(digits[:13]))
+        return "GS1" if (10 - total % 10) % 10 == digits[13] else None
+    return {"+": "HIBCC", "=": "ICCBBA"}.get(text[:1])
+
+
+def _reportable_hint(context) -> str | None:
+    """1.2d (B8-D2): the day the EU conclusion was signed Reportable, a hint only; a person enters the date."""
+    current = context.get("current")
+    if current is None or current.conclusion != "REPORTABLE" or current.signed_at is None:
+        return None
+    day = deadlines.start_day(current.signed_at, None, context["seen"].get("org_zone"))
+    return f"Your conclusion was signed Reportable on {day.isoformat()}: a hint only. Enter the day you knew."
+
+
+def _market_hint(context) -> str | None:
+    """2.5: the markets the product is registered in, a hint only; a person writes the distribution."""
+    found = context.get("registered_markets")
+    return f"Registered in: {', '.join(found)} (Settings, Products). A hint only." if found else None
+
+
+# B8 step 5: a value MDARIX may only point to, never fill (shown beside the field, never frozen).
+HINTS = {"1_2D": _reportable_hint, "2_5": _market_hint}
+MIR_CODES = ("EU_MIR", "GB_MIR")
+
+
 def _sent_day(context):
     """FDA's B4, "date of this report": the organization's day the report is sent for approval (0.10.96, owner Q3), so
     the approver signs the exact file; sending again refreshes it. Blank on a draft."""
@@ -821,6 +897,7 @@ SOURCES = {
     "gmdn_system": lambda c: _product(
         c, "GMDN" if c["product"] and c["product"].gmdn_code else None, "The product's GMDN code"
     ),
+    "eu_nca": lambda c: _eu_nca(c),
     "incident_country": lambda c: (
         (c["record"]["country"], _complaint(c, "The complaint's event country")) if c["record"].get("country") else None
     ),
@@ -1033,6 +1110,9 @@ def build(
                     "kind": item.kind,
                     "problem": problem,
                     "ask": ask,
+                    "hint": HINTS[item.id](context)
+                    if form.code in MIR_CODES and item.id in HINTS and not value
+                    else None,
                     "by": names.get(entry.get("by")) if entry else None,
                     "at": entry.get("at") if entry else None,
                     # Codes (0.10.77): the annex the field codes, the suggestion waiting, what was suggested before a
@@ -1075,7 +1155,7 @@ def frozen(sections: list[dict]) -> list[dict]:
                 {
                     key: value
                     for key, value in item.items()
-                    if key not in ("editable", "suggestion", "scope", "once", "once_key", "ask")
+                    if key not in ("editable", "suggestion", "scope", "once", "once_key", "ask", "hint")
                 }
                 for item in section["fields"]
             ],
@@ -1091,7 +1171,8 @@ def mandatory(sections: list[dict]) -> dict:
         item
         for section in sections
         for item in section["fields"]
-        if item["missing_class"] == forms.MUST and not item.get("personal")
+        # A field nobody can type (1.2a, the day sent for approval) is filled at Send for approval, never missing.
+        if item["missing_class"] == forms.MUST and not item.get("personal") and item.get("editable", True)
     ]
     missing = [item["id"] for item in fields if item["status"] in (forms.MUST, SUGGESTED) or item.get("problem")]
     return {"total": len(fields), "filled": len(fields) - len(missing), "missing": missing}
