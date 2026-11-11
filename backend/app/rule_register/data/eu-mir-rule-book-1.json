@@ -1,0 +1,54 @@
+{
+  "code": "eu-mir-rule-book-1",
+  "rule": "eu-mir-rule-book",
+  "version": 1,
+  "kind": "REPORT_FORM",
+  "market": "EU_NI",
+  "held_as": "DATA",
+  "title": "EU MIR 7.3.1 rule book (88 blocks, five report types)",
+  "plain": "The blocks the EU MIR requires in each report type (Initial, Follow up, Combined initial and final, Final (Reportable incident), Final (Non-reportable incident)), as a CSV rule book from the mapping workbook's EU sheet: mandatory, conditional or optional, with the XML path and the MDARIX fields that hold each block. Where the help text and the XSD disagree, the stricter of the two (B8-D6).",
+  "source": [
+    {
+      "catalog": "MDR_87",
+      "clause": "EU MDR Art. 87"
+    },
+    {
+      "catalog": "MDR_89",
+      "clause": "EU MDR Art. 89(5) (final report)"
+    },
+    {
+      "catalog": "IVDR_82",
+      "clause": "EU IVDR Art. 82"
+    },
+    {
+      "catalog": "IVDR_84",
+      "clause": "EU IVDR Art. 84"
+    }
+  ],
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": null,
+  "change": {
+    "kind": "INITIAL",
+    "reason": "B8 step 2: the EU MIR rules held as data from the start; the form's own must_in (forms.py) is checked against it."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Owner",
+    "approved_on": "2026-11-11",
+    "built_by": "MDARIX engineering",
+    "release": "0.11.01",
+    "note": "B8 plan approved 11 Nov 2026 (B8-D6: the stricter of the XSD and the help text)."
+  },
+  "implementation": "backend.app.authority_reports.rules.eu_mir.csv",
+  "pinned": false,
+  "switch": "MDARIX_B8_EU_MIR",
+  "content": {
+    "file": "backend/app/authority_reports/rules/eu_mir.csv",
+    "sha256": "dcc084ecc4ec2b69afdc2290259d24c95b482d387ccd3758bb051f5d34f115a9"
+  },
+  "content_hash": "sha256:d0fc97c54c03da9be6e208b07873950a4cbb6fadfd982ad4dfb2e90d0bbffe0c"
+}

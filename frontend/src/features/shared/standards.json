@@ -172,9 +172,23 @@
       "jurisdiction": "European Union"
     },
     {
+      "id": "MDR_89",
+      "short": "EU MDR Art. 89",
+      "title": "Analysis of serious incidents and field safety corrective actions (final report)",
+      "jurisdiction": "European Union",
+      "starter": true
+    },
+    {
       "id": "IVDR_82",
       "short": "EU IVDR Art. 82",
       "title": "Reporting of serious incidents and field safety corrective actions (in-vitro diagnostics)",
+      "jurisdiction": "European Union",
+      "starter": true
+    },
+    {
+      "id": "IVDR_84",
+      "short": "EU IVDR Art. 84",
+      "title": "Analysis of serious incidents and field safety corrective actions (in-vitro diagnostics, final report)",
       "jurisdiction": "European Union",
       "starter": true
     },

@@ -1047,7 +1047,10 @@ def _mir_analysis(market: str) -> tuple[Section, ...]:
                     "4.3.1a",
                     "Similar serious incidents identified by IMDRF codes (Annex A, Annex C, or other, with the "
                     "rationale)",
-                    note="Conditional since 22 Apr 2026 (to confirm)." if not gb else "",
+                    None,
+                    INITIAL if gb else LATER,
+                    # B8-D6: the help text's "mandatory in final reports" is stricter than the XSD's optional.
+                    must_in=() if gb else _FINAL_SI,
                 ),
                 Field(
                     "4_3_3A",

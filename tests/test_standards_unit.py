@@ -75,9 +75,21 @@ EXPECTED = [
     ),
     ("MDR_88", "EU MDR Art. 88", "Trend reporting", "European Union"),
     (
+        "MDR_89",
+        "EU MDR Art. 89",
+        "Analysis of serious incidents and field safety corrective actions (final report)",
+        "European Union",
+    ),
+    (
         "IVDR_82",
         "EU IVDR Art. 82",
         "Reporting of serious incidents and field safety corrective actions (in-vitro diagnostics)",
+        "European Union",
+    ),
+    (
+        "IVDR_84",
+        "EU IVDR Art. 84",
+        "Analysis of serious incidents and field safety corrective actions (in-vitro diagnostics, final report)",
         "European Union",
     ),
     ("MDCG_2023_3", "MDCG 2023-3", "Questions and answers on vigilance terms and concepts (EU MDR)", "European Union"),
@@ -104,6 +116,8 @@ STARTER = {
     "MDCG_2023_3",
     "IN_MDR",
     "IVDR_82",
+    "MDR_89",
+    "IVDR_84",
     "CFR803_30",
     "CFR803_40",
 }

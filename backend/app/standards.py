@@ -115,12 +115,27 @@ CATALOG: tuple[Standard, ...] = (
         EUROPEAN_UNION,
     ),
     Standard("MDR_88", "EU MDR Art. 88", "Trend reporting", EUROPEAN_UNION),
+    # B8: the manufacturer's final report after its investigation (Art. 89(5)); starter until the consultant confirms.
+    Standard(
+        "MDR_89",
+        "EU MDR Art. 89",
+        "Analysis of serious incidents and field safety corrective actions (final report)",
+        EUROPEAN_UNION,
+        True,
+    ),
     # The IVDR's counterpart of MDR Art. 87 for in-vitro diagnostics (Regulation (EU) 2017/746); starter until the
     # consultant confirms it (0.10.63).
     Standard(
         "IVDR_82",
         "EU IVDR Art. 82",
         "Reporting of serious incidents and field safety corrective actions (in-vitro diagnostics)",
+        EUROPEAN_UNION,
+        True,
+    ),
+    Standard(
+        "IVDR_84",
+        "EU IVDR Art. 84",
+        "Analysis of serious incidents and field safety corrective actions (in-vitro diagnostics, final report)",
         EUROPEAN_UNION,
         True,
     ),

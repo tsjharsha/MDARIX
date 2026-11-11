@@ -17,6 +17,17 @@ in MIR order; the GB MIR 7.2.1 XML for upload in MHRA's MORE and a PDF record co
 (Initial, Follow-ups, Final); the customer submits: MDARIX never submits. Every legal citation is "starter, for your
 consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (on).
 
+### Added (EU MIR, Part A)
+- **The authorities' own files, pinned**: the Commission's MIR 7.3.1 schemas (XSD/XSL build SB-11252, 10 Jun 2026),
+  help text, changelog and PDF form (reference only), and MHRA's GB MIR 7.2.1 schemas, help text, changelog and schema
+  implementation guide, each byte-identical to the publisher's copy (downloaded 11 Nov 2026) with its SHA-256 in
+  `data/mir_forms/manifest.json`. A newer build is a new register version (`eu-mir-7.3.1-SB-11252`).
+- **EU MIR rule book** (`eu-mir-rule-book-1`, `rules/eu_mir.csv`): what each of the five report types must hold, block
+  by block, the stricter of the help text and the schema (B8-D6). The form's mandatory fields are checked against it.
+  4.3.1a (similar incidents by IMDRF codes) is now mandatory in a Combined and a Final (Reportable incident) report, as
+  the help text says.
+- Catalog: EU MDR Art. 89 and EU IVDR Art. 84 (the final report), starter, for your consultant to confirm.
+
 ## [0.11.00] - not released yet
 
 B9: markets. India first (MvPI adverse event reports), then Canada (mandatory problem reports), then the US importer
