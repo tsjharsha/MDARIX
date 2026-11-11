@@ -620,6 +620,8 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "parent_id": str(obligation.parent_id) if obligation.parent_id else None,
         # A US follow-up's number in its chain (0.10.96, B3): "Follow-up #n".
         "follow_up": (context.get("follow_up") or {}).get("number"),
+        # B9 step 9 (B9-D12): the follow-up clock of an importer's or user facility's chain is a starter.
+        "follow_up_clock": ROLE_FOLLOW_UP_CLOCK if is_follow_up(obligation) and us_role(obligation) else None,
         "responses": [
             {
                 "id": str(row.id),
@@ -1751,7 +1753,9 @@ def ask_for_approval(
             )
     if obligation.form_code == forms.FDA_3500A.code:
         _first_number(obligation)
-    if is_follow_up(obligation) and _h2(((obligation.entries or {}).get("H2") or {}).get("value") or ""):
+    # H2 is a manufacturer's (section H): an importer's or user facility's follow-up has no H2 to tick (B9 step 9).
+    h2 = ((obligation.entries or {}).get("H2") or {}).get("value") or ""
+    if is_follow_up(obligation) and not us_role(obligation) and _h2(h2):
         raise _error(
             422, "H2_REQUIRED", "Tick at least one H2 follow-up type before sending the follow-up for approval"
         )
@@ -2410,6 +2414,13 @@ class FollowUpCreate(BaseModel):
 
 
 FOLLOW_UP_OWN = frozenset({"MFR_REPORT", "B4", "B5", "H11", "H2", "G8", "G6", "F2", "F8"})
+
+
+# B9-D12: an importer's or user facility's follow-up takes the manufacturer's 30 days (803.56), until confirmed.
+ROLE_FOLLOW_UP_CLOCK = (
+    "Due 30 calendar days after the new information arrived: the manufacturer's clock (21 CFR 803.56) applied to "
+    "importers and user facilities. Starter, for your consultant to confirm."
+)
 
 
 def follow_up_due(received_on: date) -> date:

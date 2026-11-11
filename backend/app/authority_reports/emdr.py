@@ -114,7 +114,9 @@ FOLLOW_UP = re.compile(r"\bfollow-up #?(\d+)\b", re.IGNORECASE)  # G6 or F7 on a
 # the eSubmitter-layout PDF reads the file back through them, and the tests compare the file with FDA's examples.
 FOLLOW_UP_CODE = "C53579"  # G6 "Follow-up" (FDA's Type_of_Report)
 # What a follow-up always sends, and its narratives, sent only as typed on it (never the initial's text again).
-FOLLOW_UP_SENDS, NARRATIVES = frozenset({"MFR_REPORT", "G8", "G6", "H2"}), frozenset({"B5", "H11"})
+# B9 step 9: an importer's or user facility's follow-up always sends F1, F2 and F7 (FDA's I-F and U-F lists).
+FOLLOW_UP_SENDS = frozenset({"MFR_REPORT", "G8", "G6", "H2", "F1", "F2", "F7"})
+NARRATIVES = frozenset({"B5", "H11"})
 NOT_ON_FOLLOW_UP = frozenset({"B4"})  # FDA's "Manufacturer Follow-up" leaves B4 out: never sent, never "cleared"
 IE = "//message/controlActProcess/subject/investigationEvent"
 DEV = IE + "/pertainsTo/procedureEvent/device/identifiedDevice"

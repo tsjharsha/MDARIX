@@ -123,3 +123,25 @@ def test_an_importers_report_has_section_f_its_own_number_and_two_recipients(tri
     assert record("MFR_COPY").json()["detail"]["code"] == "RECIPIENT_RECORDED"
     done = _ok(record("EMDR"))
     assert done["state"] == "SUBMITTED_PENDING" and all(item["recorded"] for item in done["recipients"])
+
+    # B9 step 9 (B9-25): FDA accepts; follow-up #1 shares F2, says F7 "Follow-up #1", its clock is a labelled starter,
+    # and its file sends F1, F2 and F7 (no H2 to tick: section H is a manufacturer's).
+    attempt = next(row for row in done["submissions"] if row["route"] == "EMDR")
+    now = datetime.now(timezone.utc).isoformat()
+    _ok(
+        user.post(
+            f"{REPORTS}/{detail['id']}/submissions/{attempt['id']}/evidence",
+            json={"kind": "ACK3", "outcome": "ACCEPTED", "received_at": now, "note": "Ack3 passed"},
+        )
+    )
+    child = _ok(
+        user.post(
+            f"{REPORTS}/{detail['id']}/follow-ups",
+            json={"received_on": date.today().isoformat(), "what_is_new": "The device was returned and examined."},
+        )
+    )
+    fields = _fields(child)
+    assert fields["F2"]["value"] == number and fields["F7"]["value"] == "Follow-up #1"
+    assert "Starter" in child["follow_up_clock"] and child["emdr"]["missing"] == [], child["emdr"]
+    sent = _ok(user.post(f"{REPORTS}/{child['id']}/snapshots"))
+    assert sent["pending_snapshot"], sent["state"]
