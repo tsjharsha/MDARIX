@@ -77,6 +77,8 @@ def _context(category=None, version="Rev B", lot=None, other_lots=None) -> dict:
 
 
 def _values(form, context) -> dict:
+    # The worksheet's own context always names the form's market (worksheet.py); B9's role fields read it.
+    context = {"market": form.market, **context}
     return {
         item["id"]: item["value"] for section in worksheet.build(form, context, {}, {}) for item in section["fields"]
     }
