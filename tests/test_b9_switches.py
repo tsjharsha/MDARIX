@@ -27,6 +27,8 @@ def test_defaults_india_canada_importer_on_user_facility_off(monkeypatch):
 
 @pytest.mark.unit
 def test_the_india_routes_are_served_only_while_india_is_on(monkeypatch):
+    # Switch-aware (review 8): passes whatever the run's environment sets, by setting India itself.
+    monkeypatch.setenv("MDARIX_B9_INDIA", "on")
     assert feature_set.serves_path(CHAIN, "POST")
     monkeypatch.setenv("MDARIX_B9_INDIA", "off")
     assert not feature_set.serves_path(CHAIN, "POST")
@@ -40,6 +42,15 @@ def test_the_session_names_each_switch_off_on_off(viewer, monkeypatch):  # noqa:
     monkeypatch.setenv("MDARIX_B9_INDIA", "off")
     assert flags()["india"] is False
     monkeypatch.setenv("MDARIX_B9_INDIA", "on")
-    assert flags() == {"india": True, "canada": True, "us_importer": True, "us_user_facility": False}
+    # The other three follow the run's environment (all on, all off or the defaults): each as switched_on reads it.
+    others = {
+        name.removeprefix("MDARIX_B9_").lower(): feature_set.switched_on(name)
+        for name in feature_set.B9_SWITCHES
+        if name != "MDARIX_B9_INDIA"
+    }
+    assert flags() == {"india": True, **others}
+    for name in feature_set.B9_SWITCHES:
+        monkeypatch.delenv(name, raising=False)
+    assert flags() == {"india": True, "canada": True, "us_importer": True, "us_user_facility": False}  # defaults
     monkeypatch.setenv("MDARIX_B9_INDIA", "off")
     assert flags()["india"] is False
