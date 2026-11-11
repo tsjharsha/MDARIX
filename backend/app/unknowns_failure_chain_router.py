@@ -1,10 +1,13 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from backend.app.ai_settings import ai_ready
 from backend.app.db.models.foundation import Investigation
 from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.saved_results import nothing_saved
@@ -31,6 +34,11 @@ def err(e):
     return HTTPException(status_code=400, detail={"code": e.code, "message": e.message})
 
 
+def ai_off(key: str, e: UnknownsFailureChainError) -> JSONResponse:
+    """RCA-D13: AI is off and no saved hypotheses and challenges exist for this view; nothing ran, nothing written."""
+    return JSONResponse({key: None, "persisted": False, "state": "AI_OFF", "message": e.message})
+
+
 def _authorize_investigation(db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID) -> None:
     if (
         db.query(Investigation.id)
@@ -51,6 +59,7 @@ def create_unknowns(
     request: Request,
     data: UnknownRequest,
     db: Session = Depends(get_data_plane_db),
+    control: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     # Same tenant check as failure chains: another tenant's investigation is simply not found.
@@ -58,9 +67,13 @@ def create_unknowns(
     _authorize_investigation(db, tenant_id, investigation_id)
     try:
         result = service.unknowns(
-            db, data.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id})
+            db,
+            data.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id}),
+            run_analysis=ai_ready(control, tenant_id),
         )
     except UnknownsFailureChainError as e:
+        if e.code == "AI_OFF":
+            return ai_off("unknown_set", e)
         raise err(e) from e
     return with_unknown_business_ids(db, tenant_id, result)
 
@@ -92,6 +105,7 @@ def create_chains(
     request: Request,
     data: FailureChainRequest,
     db: Session = Depends(get_data_plane_db),
+    control: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     context = {"tenant_id": ctx.tenant_id, "user_id": ctx.user_id}
@@ -102,7 +116,9 @@ def create_chains(
         if dependency_failure_simulated():
             raise RuntimeError("simulated analysis dependency failure")
         result = service.chains(
-            db, data.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id})
+            db,
+            data.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id}),
+            run_analysis=ai_ready(control, tenant_id),
         )
         db.add(
             make_audit_event(
@@ -116,6 +132,8 @@ def create_chains(
         )
         db.commit()
     except UnknownsFailureChainError as e:
+        if e.code == "AI_OFF":
+            return ai_off("failure_chain_set", e)
         raise err(e) from e
     except HTTPException:
         raise
