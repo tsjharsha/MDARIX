@@ -1,0 +1,13 @@
+{
+  "note": "The blank form MDARIX fills for an India report (backend/app/authority_reports/mvpi_mdae.py), byte-identical to the copy downloaded on 11 Nov 2026. It is a copy published by nhsrcindia.org: replace it with the copy from ipc.gov.in when the owner obtains it (B9 spec section 8), and check the field map once by a person against the printed form (B9-D17). Until then the map is NOT checked.",
+  "files": [
+    {
+      "file": "MvPI-MDAE-Reporting-Form-v1.2.pdf",
+      "sha256": "eaf7d7c8ae30cd8b88fdb6e5a6704dbc30b10e9af5706f0395d1a2eeeb24cb14",
+      "edition": "Medical Device Adverse Event Reporting Form, Materiovigilance Program of India (MvPI), Version 1.2; 4 pages, 172 fillable fields with generic names; created 12 Aug 2024, modified 16 Aug 2024 (the file's own dates); release date to confirm",
+      "publisher": "Indian Pharmacopoeia Commission (Materiovigilance Programme of India)",
+      "source_url": "https://nhsrcindia.org/sites/default/files/Medical-Devices-Adverse-Event-Reporting-Form-(Version-1.2).pdf",
+      "field_map_checked_by_a_person": false
+    }
+  ]
+}

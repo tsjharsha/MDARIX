@@ -2537,8 +2537,14 @@ def export(
     tenant_id = _tenant(ctx)
     obligation = _obligation(db, tenant_id, obligation_id)
     us_pdf = kind == "pdf" and obligation.form_code == forms.FDA_3500A.code
-    if form is not None and (form != "official" or not us_pdf):
-        raise _error(404, "FORMAT_NOT_SUPPORTED", "The official form is a US report's PDF (Form FDA 3500A)")
+    # B9: an India report's official MvPI form (form=official) and ADRMS entry sheet (form=adrms).
+    india_pdf = kind == "pdf" and obligation.form_code == forms.MVPI_MDAE.code and _b9_india()
+    if (
+        form is not None
+        and not (form == "official" and (us_pdf or india_pdf))
+        and not (form in INDIA_FILES and india_pdf)
+    ):
+        raise _error(404, "FORMAT_NOT_SUPPORTED", "The official form is a US or India report's PDF")
     view = detail(db, control_db, ctx, obligation)
     frozen = None
     if snapshot is not None:
@@ -2572,7 +2578,11 @@ def export(
         }
     organization = _organization_name(control_db, tenant_id)
     body = None
-    if us_pdf and form == "official":
+    if india_pdf and form is not None:
+        if not view.get("signature"):
+            raise _error(409, "APPROVE_FIRST", "The official form is filled once the report is approved")
+        body = INDIA_FILES[form](view, organization)
+    elif us_pdf and form == "official":
         if not view.get("signature"):
             raise _error(409, "APPROVE_FIRST", "FDA's official form is filled once the report is approved")
         body = _official_form(db, control_db, obligation, frozen, view, organization)
@@ -2606,6 +2616,21 @@ def export(
         media_type=MEDIA[kind],
         headers={"Content-Disposition": attachment(f"{stem}.{kind}")},
     )
+
+
+def _b9_india() -> bool:
+    from backend.app import feature_set
+
+    return feature_set.switched_on("MDARIX_B9_INDIA")
+
+
+def _mvpi_form(view: dict, organization: str | None) -> bytes:
+    from backend.app.authority_reports import mvpi_mdae
+
+    return mvpi_mdae.render(view, organization)
+
+
+INDIA_FILES = {"official": _mvpi_form}
 
 
 def snapshot_file(frozen: ReportSnapshot, parties, organization: str | None, practice: bool):
