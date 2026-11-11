@@ -123,11 +123,13 @@ B9_SWITCHES = {
 }
 # B8 switches and their defaults (B8-D14): the EU and GB MIR files and report chains.
 B8_SWITCHES = {"MDARIX_B8_EU_MIR": True, "MDARIX_B8_GB_MIR": True}
-SWITCHES = {**B9_SWITCHES, **B8_SWITCHES}
+# B9b switch and its default: a country outside the five markets (the picker, its routes, OTHER-floor-1).
+B9B_SWITCHES = {"MDARIX_B9B_OTHER": True}
+SWITCHES = {**B9_SWITCHES, **B8_SWITCHES, **B9B_SWITCHES}
 
 
 def switched_on(name: str | None) -> bool:
-    """A B9 or B8 switch (read on every call); None (no switch) is always on."""
+    """A B9, B8 or B9b switch (read on every call); None (no switch) is always on."""
     if name is None:
         return True
     value = os.getenv(name, "").strip().lower()

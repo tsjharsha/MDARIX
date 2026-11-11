@@ -163,6 +163,14 @@ CATALOG: tuple[Standard, ...] = (
         INDIA,
         True,
     ),
+    # B9b: the generic starter questions for a country outside the five markets (OTHER-floor-1); not any country's law.
+    Standard(
+        "IMDRF_GHTF_COMMON",
+        "IMDRF/GHTF common criteria",
+        "Adverse event reporting criteria common to most regulators (generic starter, not a country's law)",
+        INTERNATIONAL,
+        True,
+    ),
 )
 
 BY_ID: dict[str, Standard] = {standard.id: standard for standard in CATALOG}

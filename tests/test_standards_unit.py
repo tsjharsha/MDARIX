@@ -104,6 +104,12 @@ EXPECTED = [
         "Medical Devices Rules 2017: definitions and post-market reporting of adverse events",
         "India",
     ),
+    (
+        "IMDRF_GHTF_COMMON",
+        "IMDRF/GHTF common criteria",
+        "Adverse event reporting criteria common to most regulators (generic starter, not a country's law)",
+        "International",
+    ),
 ]
 # Entries whose wording awaits the regulatory consultant (T-B6): marked starter text on screen and in exports.
 STARTER = {
@@ -115,6 +121,7 @@ STARTER = {
     "MDR_2",
     "MDCG_2023_3",
     "IN_MDR",
+    "IMDRF_GHTF_COMMON",
     "IVDR_82",
     "MDR_89",
     "IVDR_84",

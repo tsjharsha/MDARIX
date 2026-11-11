@@ -235,6 +235,13 @@
       "title": "Medical Devices Rules 2017: definitions and post-market reporting of adverse events",
       "jurisdiction": "India",
       "starter": true
+    },
+    {
+      "id": "IMDRF_GHTF_COMMON",
+      "short": "IMDRF/GHTF common criteria",
+      "title": "Adverse event reporting criteria common to most regulators (generic starter, not a country's law)",
+      "jurisdiction": "International",
+      "starter": true
     }
   ]
 }

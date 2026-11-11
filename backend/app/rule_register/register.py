@@ -55,6 +55,9 @@ FLOOR_PARTS = (
     "counting", "provisional",
 )  # fmt: skip
 FLOOR_RULES = {"US": "US-floor", "EU_NI": "EU-floor", "GB": "GB-floor", "IN": "IN-floor", "CA": "CA-floor"}
+# B9b: OTHER (a country outside the five markets) reads one generic floor, kept apart from the five markets'
+# (markets.MARKETS, the B4 equivalence oracle) so none of their loops sees it.
+GENERIC_RULES = {"OTHER": "OTHER-floor"}
 # B9 Part C: a tenant's role in a market other than Manufacturer reads its own floor, where one exists (only the US
 # law differs by role in the planning files). A role floor behind an off switch is never picked: Manufacturer's applies.
 ROLE_RULES = {("US", "IMPORTER"): "US-IMP-floor", ("US", "USER_FACILITY"): "US-UF-floor"}
@@ -249,7 +252,7 @@ def floor(market: str, day: date | None = None, role: str | None = None) -> dict
     """The market's reportability floor in force on ``day`` (today when None); None for a market without one. ``role``
     (B9: IMPORTER, USER_FACILITY; None is Manufacturer) picks the role's own floor when one is in force."""
     found = pick(ROLE_RULES[(market, role)], day) if (market, role) in ROLE_RULES else None
-    rule = FLOOR_RULES.get(market or "")
+    rule = FLOOR_RULES.get(market or "") or GENERIC_RULES.get(market or "")
     return found or (pick(rule, day) if rule else None)
 
 

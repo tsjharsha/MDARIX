@@ -1,0 +1,243 @@
+{
+  "code": "OTHER-floor-1",
+  "rule": "OTHER-floor",
+  "version": 1,
+  "kind": "REPORTABILITY_FLOOR",
+  "market": "OTHER",
+  "held_as": "DATA",
+  "title": "Other country (outside the five markets): generic reportability questions, starter",
+  "plain": "For a country outside the five built-in markets: Reportable when the event led to a death, a serious deterioration in health or a serious public health threat, or a malfunction could lead to death or serious deterioration were it to happen again. Generic starter questions, not this country's law: confirm with your consultant.",
+  "source": [
+    {
+      "catalog": "IMDRF_GHTF_COMMON",
+      "clause": "IMDRF/GHTF common criteria (generic starter)"
+    }
+  ],
+  "switch": "MDARIX_B9B_OTHER",
+  "effective_from": null,
+  "effective_to": null,
+  "law_in_force_from": "No country's law: generic starter (for your consultant to confirm)",
+  "change": {
+    "kind": "INITIAL",
+    "reason": "B9b (OC spec approved 9 Nov 2026; plan decision B9b-N1 approved 11 Nov 2026)."
+  },
+  "review": {
+    "status": "STARTER",
+    "note": "Starter, for your consultant to confirm."
+  },
+  "approval": {
+    "approved_by": "Owner",
+    "approved_on": "2026-11-11",
+    "built_by": "MDARIX engineering",
+    "release": "0.11.02",
+    "note": "B9b plan approved 11 Nov 2026 (N1: the generic Reportable rule, labelled a generic starter)."
+  },
+  "content": {
+    "question_set": {
+      "version": "OTHER-starter-1",
+      "title": "Other country: generic reportability questions (IMDRF/GHTF common criteria, starter)",
+      "note": "One generic set for every country outside the five built-in markets. Generic starter questions, not this country's law: confirm with your consultant. The period comes from your reporting window naming the country, or the due date you enter on the report.",
+      "basis": [
+        "IMDRF_GHTF_COMMON"
+      ],
+      "questions": [
+        {
+          "id": "OT1",
+          "text": "Did the event lead to the death of a patient, user or other person?",
+          "definition": "A death the device caused or contributed to, or may have.",
+          "clause": "IMDRF/GHTF common criteria (generic starter)",
+          "basis": [
+            "IMDRF_GHTF_COMMON"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "OT2",
+          "text": "Did it lead to a serious deterioration in the state of health of a patient, user or other person?",
+          "definition": "Serious deterioration in the state of health (generic starter wording): a life-threatening illness or injury, the permanent impairment of a body function or permanent damage to a body structure, or a condition that needs medical or surgical intervention to prevent them.",
+          "clause": "IMDRF/GHTF common criteria (generic starter)",
+          "basis": [
+            "IMDRF_GHTF_COMMON"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "OT3",
+          "text": "Could it lead to death or a serious deterioration in the state of health, were it to happen again?",
+          "definition": "Serious deterioration in the state of health (generic starter wording): a life-threatening illness or injury, the permanent impairment of a body function or permanent damage to a body structure, or a condition that needs medical or surgical intervention to prevent them.",
+          "clause": "IMDRF/GHTF common criteria (generic starter)",
+          "basis": [
+            "IMDRF_GHTF_COMMON"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "OT4",
+          "text": "Is it a serious public health threat?",
+          "definition": "An event that may lead to imminent risk of death, serious deterioration in health or serious illness for many people, and that may need prompt remedial action (generic starter wording).",
+          "clause": "IMDRF/GHTF common criteria (generic starter)",
+          "basis": [
+            "IMDRF_GHTF_COMMON"
+          ],
+          "serious": true,
+          "note": ""
+        },
+        {
+          "id": "OT5",
+          "text": "Was there a malfunction or deterioration in the characteristics or performance of the device (including its labelling or instructions for use)?",
+          "definition": "Any failure of the device to perform as intended, including an inadequacy in its labelling or instructions for use.",
+          "clause": "IMDRF/GHTF common criteria (generic starter)",
+          "basis": [
+            "IMDRF_GHTF_COMMON"
+          ],
+          "serious": false,
+          "note": ""
+        },
+        {
+          "id": "OT6",
+          "text": "Was a use error involved?",
+          "definition": "An act, or omission of an act, by the user that led to a different result than the manufacturer intended or the user expected. A note only: it never lowers the outcome.",
+          "clause": "IMDRF/GHTF common criteria (generic starter)",
+          "basis": [
+            "IMDRF_GHTF_COMMON"
+          ],
+          "serious": false,
+          "note": ""
+        },
+        {
+          "id": "OT7",
+          "text": "Is the device marketed (made available) in this country?",
+          "definition": "A note only: some authorities want a report even for a device not marketed there (for example in a clinical study). It never lowers the outcome.",
+          "clause": "IMDRF/GHTF common criteria (generic starter)",
+          "basis": [
+            "IMDRF_GHTF_COMMON"
+          ],
+          "serious": false,
+          "note": ""
+        }
+      ]
+    },
+    "report_types": {
+      "OTHER_REPORT": {
+        "label": "Report to this country's authority (period: your reporting window naming the country, or the due date you enter)",
+        "days": null,
+        "basis": "CALENDAR"
+      }
+    },
+    "defs": {},
+    "rules": [
+      {
+        "id": "F-OT-1",
+        "if": {
+          "any": [
+            "OT1",
+            "OT2",
+            "OT4"
+          ]
+        },
+        "cite": "IMDRF/GHTF common criteria (generic starter)"
+      },
+      {
+        "id": "F-OT-2",
+        "if": {
+          "all": [
+            "OT5",
+            "OT3"
+          ]
+        },
+        "cite": "IMDRF/GHTF common criteria (generic starter)"
+      }
+    ],
+    "type_rows": [
+      {
+        "id": "T-OT-1",
+        "type": "OTHER_REPORT"
+      }
+    ],
+    "notes": [
+      {
+        "text": "Generic starter questions, not this country's law: confirm with your consultant."
+      },
+      {
+        "if": {
+          "is_yes": "OT6"
+        },
+        "text": "A use error was involved: some authorities ask for use-error reports too. Check with your consultant."
+      },
+      {
+        "if": {
+          "is_no": "OT7"
+        },
+        "text": "The device is not marketed in this country: some authorities still want a report. Check with your consultant."
+      },
+      {
+        "if": {
+          "is_unknown": {
+            "ref": "reportable"
+          }
+        },
+        "text": "An Unknown answer could make the event reportable: the suggestion stays pending information, and \"not reportable\" cannot be concluded until it is answered."
+      }
+    ],
+    "folding": [
+      {
+        "if": {
+          "is_yes": "OT1"
+        },
+        "fold": [
+          "OT2"
+        ],
+        "why": "Not needed: it led to a death"
+      },
+      {
+        "if": {
+          "is_no": "OT5"
+        },
+        "fold": [
+          "OT3"
+        ],
+        "why": "Not needed: no malfunction or deterioration of the device"
+      }
+    ],
+    "precedence": [
+      "OTHER_REPORT"
+    ],
+    "prefill": {
+      "death": [
+        "OT1"
+      ],
+      "malfunction": [
+        "OT5"
+      ],
+      "injury_note": []
+    },
+    "counting": {
+      "authority_zone": null,
+      "awareness_is_day_one": false,
+      "words": "from the day after awareness (awareness is day zero); your time zone"
+    },
+    "provisional": {
+      "THREAT": [
+        null,
+        "CALENDAR",
+        "No period in MDARIX: your reporting window naming the country, or the due date you enter"
+      ],
+      "FLAGGED": [
+        null,
+        "CALENDAR",
+        "No period in MDARIX: your reporting window naming the country, or the due date you enter"
+      ],
+      "UNFLAGGED": [
+        null,
+        "CALENDAR",
+        "No period in MDARIX: your reporting window naming the country, or the due date you enter"
+      ],
+      "remedial": null,
+      "ruled_out": null
+    }
+  },
+  "content_hash": "sha256:44cb0ac3755aa92b32a6f8ba2af83ef83862773f3f54e5afe5478c02e4b40b6c"
+}
