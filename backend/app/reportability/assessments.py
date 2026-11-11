@@ -25,14 +25,19 @@ NOT_STARTED, DRAFT = "NOT_STARTED", "DRAFT"
 def rows_by_complaint(
     db: Session, tenant_id: uuid.UUID, complaint_ids
 ) -> dict[uuid.UUID, dict[str, list[ComplaintMarketAssessment]]]:
-    """``{complaint id: {market: versions, oldest first}}``."""
+    """``{complaint id: {market: versions, oldest first}}``, for the five markets (B9b: a country outside them,
+    market OTHER, is read by ``other_countries`` only, so no five-market loop ever meets it)."""
     found: dict[uuid.UUID, dict[str, list[ComplaintMarketAssessment]]] = {}
     ids = list(complaint_ids)
     if not ids:
         return found
     for row in (
         db.query(ComplaintMarketAssessment)
-        .filter(ComplaintMarketAssessment.tenant_id == tenant_id, ComplaintMarketAssessment.complaint_id.in_(ids))
+        .filter(
+            ComplaintMarketAssessment.tenant_id == tenant_id,
+            ComplaintMarketAssessment.complaint_id.in_(ids),
+            ComplaintMarketAssessment.market != "OTHER",
+        )
         .order_by(ComplaintMarketAssessment.version)
     ):
         found.setdefault(row.complaint_id, {}).setdefault(row.market, []).append(row)

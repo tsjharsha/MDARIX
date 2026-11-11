@@ -83,6 +83,8 @@ from backend.app.lot_impact.router import router as lot_impact_router
 from backend.app.qms_documents.router import router as qms_documents_router
 from backend.app.party_views.router import router as party_views_router
 from backend.app.reportability.assessment_router import router as market_assessment_router
+from backend.app.reportability.other_countries import router as other_countries_router
+from backend.app.authority_reports.attached import router as attached_reports_router
 from backend.app.reportability.router import router as reportability_router
 from backend.app.signer_training.router import router as signer_training_router
 from backend.app.capa_effectiveness.router import router as capa_effectiveness_router
@@ -498,6 +500,7 @@ app.include_router(case_export_router)  # B7: Cases export and export for QMS en
 app.include_router(case_attachments_router)  # B7: files on a Case
 app.include_router(email_intake_router)  # B7b: E-mail to check and the intake address (404 while switched off)
 app.include_router(intake_router)  # First contact, urgent intake and triage, duplicates (tr04)
+app.include_router(attached_reports_router)  # B9b: the Other Regulatory Report (attach-only)
 app.include_router(authority_reports_router)  # Report worksheets, obligations and the submission record (tr05)
 app.include_router(decision_guides_router)  # The customer's own decision guide versions (tr06)
 app.include_router(rule_register_router)  # B4: the rule register, read-only
@@ -510,6 +513,8 @@ app.include_router(qms_documents_router)  # Ready-to-use documents, signed PDF a
 app.include_router(party_views_router)  # Distributor and authorised-representative preview, trial only (T-G37P)
 app.include_router(lot_impact_router)  # Lot impact on a case, trial only (T-G5, tr08)
 app.include_router(reportability_router)  # Reportability watch and reporting windows (md41)
+# B9b: before the five markets' routes, so OTHER-<code> reaches its own (the generic {market} would 404 it).
+app.include_router(other_countries_router)
 app.include_router(market_assessment_router)  # Seriousness and causation per market, signed conclusions (tr01)
 app.include_router(signer_training_router)  # Training on the current version of what a signature relies on (tr01)
 app.include_router(capa_effectiveness_router)  # CAPA effectiveness checks (md41)

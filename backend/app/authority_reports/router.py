@@ -380,6 +380,10 @@ def state_label(row) -> str:
     """A state's label; a follow-up cancelled before it went out says so (it was never "not reportable")."""
     if row.state == rules.CANCELLED and is_follow_up(row):
         return "Cancelled before it was sent"
+    if row.form_code == forms.ATTACHED.code:  # B9b: "To be submitted", "Acknowledged", "Rejected by authority"...
+        from backend.app.authority_reports import attached
+
+        return attached.state_label(row)
     return rules.STATE_LABELS[row.state]
 
 
@@ -840,7 +844,10 @@ def _mir_gate(found: dict, form: str) -> None:
 def _candidates(db, tenant_id, complaint_id=None) -> list[ComplaintMarketAssessment]:
     """Each complaint and market whose assessment says reportable (signed, current) or pending (a draft): the market
     obligations G2b tracks."""
-    query = db.query(ComplaintMarketAssessment).filter(ComplaintMarketAssessment.tenant_id == tenant_id)
+    # B9b: a country outside the five markets gets its report when its conclusion is signed, never a candidate row.
+    query = db.query(ComplaintMarketAssessment).filter(
+        ComplaintMarketAssessment.tenant_id == tenant_id, ComplaintMarketAssessment.market != "OTHER"
+    )
     if complaint_id:
         query = query.filter(ComplaintMarketAssessment.complaint_id == complaint_id)
     rows = query.order_by(ComplaintMarketAssessment.version).all()
@@ -891,14 +898,18 @@ def report_list(
     # The EU, GB and Canada worksheets are the new navigation's (0.10.76); the classic one keeps the US and India.
     fresh = new_navigation(control_db, tenant_id)
 
-    def base(complaint, market):
+    def base(complaint, market, country=None):
+        from backend.app.reportability import other_countries
+
         return {
             "complaint_id": str(complaint.id),
             "complaint_ref": complaint_ref(complaint),
             "complaint_identifier": complaint.complaint_identifier,
             "description": complaint.description,
             "market": market,
-            "market_label": markets.MARKET_LABELS.get(market, market),
+            # B9b: a country outside the five markets, by name ("Australia (other country)").
+            "country": country,
+            "market_label": other_countries.label(country) if country else markets.MARKET_LABELS.get(market, market),
             "sample": is_sample(complaint.source_system),
         }
 
@@ -936,9 +947,11 @@ def report_list(
         if complaint is None:
             continue
         due = row.due_on
+        # B9b: an Other Regulatory Report meets its date when submitted (no acceptance step of MDARIX's own).
+        met = row.state in (rules.SUBMITTED if row.form_code == forms.ATTACHED.code else rules.MET)
         items.append(
             {
-                **base(complaint, row.market),
+                **base(complaint, row.market, row.country),
                 "id": str(row.id),
                 "kind": row.kind,
                 # "Follow-up #n" in the list (0.10.96, B3 B1).
@@ -948,7 +961,7 @@ def report_list(
                 "state": row.state,
                 "state_label": state_label(row),
                 "next_step": rules.next_step(row.state),
-                **due_fields(due, row.market, org_zone, today, row.due_provisional, row.state in rules.MET, row.state),
+                **due_fields(due, row.market, org_zone, today, row.due_provisional, met, row.state),
                 "assessment": None,
                 "can_start": False,
                 **paths[row.id],
@@ -1005,7 +1018,7 @@ def _list_paths(db, control_db, ctx, tenant_id, obligations: list[ReportObligati
     out = {}
     for row in obligations:
         try:
-            context = _context(db, control_db, row)
+            context = None if row.form_code == forms.ATTACHED.code else _context(db, control_db, row)
         except HTTPException:
             context = None
         meter = (
@@ -1292,7 +1305,12 @@ def report_detail(
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    return detail(db, control_db, ctx, _obligation(db, _tenant(ctx), obligation_id))
+    obligation = _obligation(db, _tenant(ctx), obligation_id)
+    if obligation.form_code == forms.ATTACHED.code:  # B9b: an Other Regulatory Report has no worksheet
+        from backend.app.authority_reports import attached
+
+        return attached.detail(db, control_db, ctx, obligation)
+    return detail(db, control_db, ctx, obligation)
 
 
 # --------------------------------------------------------------------------------------------- the worksheet
@@ -1996,6 +2014,8 @@ def ask_for_approval(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     obligation = _obligation(db, _tenant(ctx), obligation_id, lock=True)
+    if obligation.form_code == forms.ATTACHED.code:  # B9b (OC-D3): recorded with the recorder's own signature
+        raise _error(409, "ATTACHED_NO_APPROVAL", "An Other Regulatory Report is recorded as submitted, not approved")
     if obligation.state not in rules.EDITABLE:
         raise _error(409, "NOT_A_DRAFT", "Only a draft is frozen for approval")
     personal = _personal(db, obligation, payload.personal if payload else {})
@@ -2506,6 +2526,7 @@ def _filed(db, obligation: ReportObligation, submission_row: ReportSubmission) -
             ComplaintMarketAssessment.tenant_id == obligation.tenant_id,
             ComplaintMarketAssessment.complaint_id == obligation.complaint_id,
             ComplaintMarketAssessment.market == obligation.market,
+            ComplaintMarketAssessment.country == obligation.country,  # B9b: None (IS NULL) for the five markets
         )
         .order_by(ComplaintMarketAssessment.version)
         .all()
@@ -2607,6 +2628,10 @@ def evidence(
     )
     _audit(db, ctx, "REPORT_EVIDENCE_RECORDED", obligation, attempt=attempt.attempt, kind=kind, outcome=outcome)
     db.commit()
+    if obligation.form_code == forms.ATTACHED.code:  # B9b: the acknowledgement of an Other Regulatory Report (OC-06)
+        from backend.app.authority_reports import attached
+
+        return attached.detail(db, control_db, ctx, obligation)
     return detail(db, control_db, ctx, obligation)
 
 
@@ -2682,6 +2707,18 @@ def complete(
     note = _text(payload.reason)
     if not note or len(note) < rules.REASON_MIN:
         raise _error(422, "REASON_REQUIRED", f"Say why it is complete, in at least {rules.REASON_MIN} characters")
+    if obligation.form_code == forms.ATTACHED.code:
+        # B9b: an Other Regulatory Report closes once submitted, with a reason (needed above, so also when no
+        # acknowledgement came), and never while a follow-up is open (OC-09).
+        from backend.app.authority_reports import attached
+
+        problem = attached.close_problem(db, obligation)
+        if problem:
+            raise _error(*problem)
+        obligation.state, obligation.note, obligation.updated_at = rules.COMPLETE, note, _now()
+        _audit(db, ctx, "REPORT_COMPLETED", obligation, country=obligation.country)
+        db.commit()
+        return attached.detail(db, control_db, ctx, obligation)
     if obligation.state not in (rules.ACCEPTED, rules.NO_ACK, rules.FOLLOW_UP):
         raise _error(409, "NOT_ACCEPTED", "An obligation is completed after its report is accepted")
     obligation.state, obligation.note, obligation.updated_at = rules.COMPLETE, note, _now()

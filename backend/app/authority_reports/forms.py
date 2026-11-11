@@ -1851,7 +1851,35 @@ RESPONSE = Form(
     (),
 )
 
-FORMS = {form.code: form for form in (FDA_3500A, MVPI_MDAE, EU_MIR, GB_MIR, HC_MDPR, RESPONSE)}
+# B9b: a country outside the five markets has no form in MDARIX. The customer attaches the report they made, with its
+# Report ID and status; MDARIX keeps the copy, the dates and the audit trail (authority_reports/attached.py).
+ATTACHED = Form(
+    "ATTACHED",
+    "OTHER",
+    "Other Regulatory Report",
+    "attached-1",
+    "The country's authority",
+    "",
+    (),
+    (
+        Route(
+            "AUTHORITY_ROUTE",
+            "The authority's own route",
+            {
+                "SUBMITTED_CONTENT": (_CONTENT,),
+                "REFERENCE": (_RECEIPT,),
+                "ACCEPTANCE": (_ACCEPTED,),
+                "REJECTION": (_REJECTED,),
+                "OTHER": (_RECEIPT,),
+            },
+            note="Report prepared outside MDARIX; MDARIX holds the copy as attached.",
+        ),
+    ),
+    ("IMDRF_GHTF_COMMON",),
+    starter=True,
+)
+
+FORMS = {form.code: form for form in (FDA_3500A, MVPI_MDAE, EU_MIR, GB_MIR, HC_MDPR, RESPONSE, ATTACHED)}
 # The worksheet each market has (0.10.76: EU / NI, Great Britain and Canada join, on the new navigation only).
 BY_MARKET = {"US": FDA_3500A, "IN": MVPI_MDAE, "EU_NI": EU_MIR, "GB": GB_MIR, "CA": HC_MDPR}
 # The markets whose worksheet the classic navigation (and every pilot on it) keeps: its 0.10.58 rules.

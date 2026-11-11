@@ -28,6 +28,7 @@ SIGNING_ROUTES = {
     ("POST", "/api/v1/capas/{capa_id}/effectiveness/result"),
     ("POST", "/api/v1/complaints/{complaint_id}/disposition/sign"),
     ("POST", "/api/v1/complaints/{complaint_id}/market-assessments/{market}/sign"),
+    ("POST", "/api/v1/complaints/{complaint_id}/market-assessments/OTHER-{country}/sign"),  # B9b
     ("POST", "/api/v1/complaints/{complaint_id}/resolve-and-close"),
     ("POST", "/api/v1/decision-guides/{market}/versions/{version}/approve"),
     ("POST", "/api/v1/documents/{version_id}/sign"),
@@ -39,6 +40,7 @@ SIGNING_ROUTES = {
     ("POST", "/api/v1/investigations/{investigation_id}/lot-impact/sign"),
     ("POST", "/api/v1/oversight/events/{complaint_id}/ready"),
     ("POST", "/api/v1/regulatory/documents/{document_id}/status"),
+    ("POST", "/api/v1/reports/{obligation_id}/attached-submission"),  # B9b: the recorder signs (B9b-N4)
     ("POST", "/api/v1/reports/{obligation_id}/snapshots/{snapshot_id}/approve"),
     ("POST", "/api/v1/triage/downgrades/{task_id}"),
     ("POST", "/api/v1/triage/{kind}/{record_id}/confirm"),

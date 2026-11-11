@@ -160,7 +160,7 @@ class QuestionSet:
     def as_dict(self) -> dict:
         return {
             "market": self.market,
-            "market_label": MARKET_LABELS[self.market],
+            "market_label": MARKET_LABELS.get(self.market, "Other country"),  # B9b: OTHER is no market of its own
             "version": self.version,
             "title": self.title,
             "note": self.note or None,

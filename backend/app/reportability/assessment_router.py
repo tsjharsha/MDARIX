@@ -272,6 +272,8 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
     single decision."""
     tenant_id = uuid.UUID(ctx.tenant_id)
     today = deadlines.as_moment(today)
+    from backend.app.reportability import other_countries
+
     complaint, record, seen, second_look = _found(db, tenant_id, complaint_id, today)
     windows = service.settings_of(db, tenant_id)["windows"]
     by_market = assessments.rows_by_complaint(db, tenant_id, [complaint_id]).get(complaint_id, {})
@@ -353,6 +355,10 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
         "enabled_markets": enabled,
         "preselected": markets.market_of(record.get("country")),
         "markets": items,
+        # B9b: the countries outside the five markets assessed on this complaint, and whether the picker is offered
+        # (records already made stay readable while it is off).
+        "other_countries": other_countries.items(db, control_db, ctx, complaint_id, record, seen, aware, today),
+        "other_countries_on": other_countries.switched_on(),
         "scale": markets.scale(),
         "severity": record.get("severity"),
         **_severity_level(db, tenant_id, complaint_id, record.get("severity")),
