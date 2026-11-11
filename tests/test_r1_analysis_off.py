@@ -86,3 +86,71 @@ def test_the_gate_is_the_organizations_ai_status(monkeypatch, models, switched_o
     usage = {"ai_processing_allowed": switched_on, "monthly_token_budget": 1000, "tokens_used": 0}
     monkeypatch.setattr(ai_settings.governance, "usage", lambda db, tenant_id: usage)
     assert ai_settings.ai_ready(None, CTX.tenant_id) is ready
+
+
+# ------------------------------------------------------------------- the case AI run and the hypotheses (follow-up)
+
+
+@pytest.mark.parametrize("trigger", ["AUTO", "MANUAL"])
+def test_the_case_ai_run_starts_nothing_while_ai_is_off_whoever_asks(monkeypatch, trigger):
+    from backend.app.case_ai import router as case_ai_router
+
+    monkeypatch.setattr(ai_settings, "ai_ready", lambda control, tenant_id: False)
+    monkeypatch.setattr(case_ai_router.runner, "latest", lambda db, tenant_id, case_id: None)
+    monkeypatch.setattr(case_ai_router, "_has_analysis", lambda db, tenant_id, case_id: False)
+    db, background = MagicMock(), MagicMock()
+    ctx = SimpleNamespace(tenant_id=str(CTX.tenant_id), user_id="person", correlation_id="c")
+
+    answer = case_ai_router.start_run(
+        CASE, case_ai_router.RunRequest(trigger=trigger), background, db=db, control=None, ctx=ctx
+    )
+
+    assert answer == {
+        "started": False,
+        "run": None,
+        "reason": "AI_NOT_READY",
+        "state": "AI_OFF",
+        "message": "AI analysis is off for this organization.",
+    }
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+    background.add_task.assert_not_called()
+
+
+@pytest.mark.parametrize("source", [None, uuid.uuid4()])
+def test_hypotheses_run_no_analysis_while_ai_is_off(monkeypatch, rules, source):
+    """Without a saved analysis to build on (none named, or the one named cannot be read), nothing runs."""
+    from investigator.service import InvestigatorError
+
+    provider, _ = rules
+    analysis = MagicMock()
+    analysis.analyze.side_effect = AssertionError("keyword analysis ran")
+    analysis.get.side_effect = InvestigatorError("ANALYSIS_NOT_FOUND", "not found")
+    monkeypatch.setattr(router.hypothesis_service, "investigator_service", analysis)
+    monkeypatch.setattr(router, "ai_ready", lambda control, tenant_id: False)
+    request = router.HypothesisSetRequest(investigation_id=CASE, source_analysis_id=source)
+
+    response = router.create_hypotheses(CASE, request, data_db=None, control=None, ctx=CTX)
+
+    assert response.status_code == 200
+    assert json.loads(response.body) == {
+        "hypothesis_set": None,
+        "persisted": False,
+        "state": "AI_OFF",
+        "message": "AI analysis is off for this organization.",
+    }
+    analysis.analyze.assert_not_called()
+    provider.assert_not_called()
+
+
+def test_with_ai_answering_the_hypotheses_may_run_the_analysis(monkeypatch):
+    service = MagicMock()
+    monkeypatch.setattr(router, "hypothesis_service", service)
+    monkeypatch.setattr(router, "ai_ready", lambda control, tenant_id: True)
+    monkeypatch.setattr(router, "with_hypothesis_business_ids", lambda db, tenant_id, result: result)
+    request = router.HypothesisSetRequest(investigation_id=CASE)
+
+    result = router.create_hypotheses(CASE, request, data_db="data", control="control", ctx=CTX)
+
+    assert result is service.generate.return_value
+    assert service.generate.call_args.kwargs == {"run_analysis": True}
