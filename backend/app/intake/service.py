@@ -23,7 +23,7 @@ from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from sqlalchemy import event as sa_event, exists, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from backend.app.trial.sample_source import is_sample
 from backend.app.complaint_review import rules as review_rules
@@ -493,6 +493,30 @@ def closed_in_sql(status):
     return func.coalesce(status, "").op("~")("^[ -~]*$") & text.in_(sorted(review_rules.CLOSED_STATUSES))
 
 
+_TRIAGE_COLUMNS = (
+    "status",
+    "ingestion_timestamp",
+    "created_at",
+    "business_id",
+    "complaint_identifier",
+    "country",
+    "product_id",
+    "lot_batch_id",
+    "description",
+    "death",
+    "serious_injury",
+    "patient_involved",
+    "malfunction",
+    "severity",
+    "source_system",
+    "last_synced_at",
+    "awareness_timestamp",
+    "complaint_timestamp",
+    "event_timestamp",
+    "recorded_timestamp",
+)
+
+
 def subjects(
     db: Session, tenant_id: uuid.UUID, records: dict, now: datetime, keys: set[tuple] | None = None
 ) -> dict[tuple, dict]:
@@ -558,6 +582,8 @@ def subjects(
     # review_rules.is_closed, applied again below) so a large closed history costs no Python time.
     complaints = (
         db.query(Complaint)
+        # B6a run 4: only the columns read here (a whole row each made most of the list's time at 5,000 complaints).
+        .options(load_only(*(getattr(Complaint, name) for name in _TRIAGE_COLUMNS)))
         .filter(
             Complaint.tenant_id == tenant_id,
             or_(~closed_in_sql(Complaint.status), any_of(Complaint.id, closed_here)),
