@@ -99,3 +99,39 @@ def test_another_organization_never_sees_the_role(org):
     assert _set(org["approver"], "IN", "IMPORTER").status_code == 200
     assert org["other"].get(SETTINGS).json()["reporting_roles"] == {}
     assert _set(org["approver"], "IN", "MANUFACTURER").status_code == 200
+
+
+def test_a_user_facility_sees_its_10_work_day_clock_in_triage_and_on_the_watch(org, monkeypatch):
+    """Review 6: triage's provisional clock and the watch's pending clock count by the role floor (803.30), not the
+    manufacturer's 30 days or 5 work days; back to Manufacturer, today's clocks."""
+    approver, regulatory = org["approver"], org["regulatory"]
+    monkeypatch.setenv("MDARIX_B9_US_USER_FACILITY", "on")
+    _acknowledge(regulatory)
+    complaint = _complaint(org["tenant_id"], org["product"], country="US", malfunction=True, aware_days_ago=1)
+    pending = dict(US1="NO", US2A="UNKNOWN", US2B="UNKNOWN", US2C="UNKNOWN", US3="YES")
+
+    def clocks() -> tuple[dict, dict]:
+        ref = next(item for item in _watch(regulatory) if item["id"] == complaint)
+        triage = {item["ref"]: item for item in regulatory.get(TRIAGE, params={"show": "all"}).json()["items"]}
+        us = next(d for d in triage[ref["complaint_identifier"]]["deadlines"] if d["market"] == "US")
+        return us, next(m for m in ref["markets"] if m["market"] == "US")["clock"]
+
+    maker_triage, _ = clocks()
+    assert (maker_triage["days"], maker_triage["day_basis"]) == (5, "WORK")  # the earliest until triage answers
+    assert _set(approver, "US", "USER_FACILITY").status_code == 200
+    _save(regulatory, complaint, "US", _answers(**pending), harm_level="SERIOUS")
+    triage, watch = clocks()
+    assert (triage["days"], triage["day_basis"]) == (10, "WORK") and "803.30" in triage["basis"]
+    assert watch["days"] == 10 and watch["day_basis"] == "WORK"
+    assert _set(approver, "US", "MANUFACTURER").status_code == 200
+    again, _ = clocks()
+    assert again == maker_triage
+
+
+TRIAGE = "/api/v1/triage"
+
+
+def _watch(client) -> list[dict]:
+    response = client.get("/api/v1/complaints/reportability", params={"show": "all", "page_size": 100})
+    assert response.status_code == 200, response.text
+    return response.json()["items"]

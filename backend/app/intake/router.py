@@ -490,6 +490,7 @@ def _case_clock(db, tenant_id, event, flagged: bool, aware_at, now, record=None)
     without a country, the shortest of the enabled markets. Until its triage is completed, the market's earliest
     possible report (check 3a), as the triage list shows it."""
     from backend.app.reportability import deadlines
+    from backend.app.reportability.service import reporting_roles
 
     found = rules.provisional_deadlines(
         aware_at,
@@ -500,6 +501,7 @@ def _case_clock(db, tenant_id, event, flagged: bool, aware_at, now, record=None)
         own=markets.market_of(event.country),
         org_zone=deadlines.org_zone(db, tenant_id),
         answered=bool(record and record.completed_at),
+        roles=reporting_roles(db, tenant_id),
     )
     # provisional_deadlines sorts the own market first, then the earliest due.
     return found[0] if found else None

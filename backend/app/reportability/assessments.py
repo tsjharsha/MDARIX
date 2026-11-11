@@ -143,18 +143,28 @@ def required_markets(country: object, enabled: list[str], assessed) -> list[str]
     return [market for market in markets.MARKETS if market in wanted]
 
 
-def floor_at(market: str, aware, org_zone: str | None) -> dict | None:
-    """The market's floor in force at awareness (B4; None while the register is off or without awareness)."""
+def floor_at(market: str, aware, org_zone: str | None, role: str | None = None) -> dict | None:
+    """The market's floor in force at awareness (B4; None while the register is off or without awareness); ``role``:
+    the organization's role in the market picks its own floor (B9)."""
     from backend.app import feature_set
     from backend.app.rule_register import register
 
-    return register.floor_at(market, aware, org_zone) if aware is not None and feature_set.rule_register() else None
+    if aware is None or not feature_set.rule_register():
+        return None
+    return register.floor_at(market, aware, org_zone, role)
 
 
 def markets_summary(
-    record: dict, windows: list[dict], versions_by_market: dict, aware, today, org_zone: str | None = None
+    record: dict,
+    windows: list[dict],
+    versions_by_market: dict,
+    aware,
+    today,
+    org_zone: str | None = None,
+    roles: dict | None = None,
 ) -> list[dict]:
-    """Each market the complaint must be assessed for, with its state and its clock (for the watch)."""
+    """Each market the complaint must be assessed for, with its state and its clock (for the watch). ``roles``: market
+    -> the organization's role there (B9, ``service.reporting_roles``): a draft's pending clock counts by its floor."""
     enabled = markets.enabled_markets(windows)
     pre = markets.markets_of(record.get("country"))
     found = []
@@ -167,7 +177,7 @@ def markets_summary(
         started = seen["state"] != NOT_STARTED and not seen["filed"]
         signed, draft = current_and_draft(versions_by_market.get(market, []))
         # B4: the floor at awareness; a signed conclusion's clock counts by the floor it was signed under.
-        floor = floor_at(market, aware, org_zone)
+        floor = floor_at(market, aware, org_zone, (roles or {}).get(market))
         if floor is not None and signed is not None and seen["state"] in markets.CONCLUSIONS:
             floor = signed_floor(market, signed, floor)
         # A draft's pending clock also counts the report a signed "reportable" would start (code audit 3).

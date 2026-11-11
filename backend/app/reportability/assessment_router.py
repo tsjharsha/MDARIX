@@ -279,7 +279,9 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
     aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
     summary = {
         item["market"]: item
-        for item in assessments.markets_summary(record, windows, by_market, aware, today, seen.get("org_zone"))
+        for item in assessments.markets_summary(
+            record, windows, by_market, aware, today, seen.get("org_zone"), seen.get("roles")
+        )
     }
     shown = [market for market in markets.MARKETS if market in enabled or market in by_market]
     refs = {row.signed_by for rows in by_market.values() for row in rows} | {
@@ -759,6 +761,7 @@ def sign_conclusion(
             aware,
             today,
             seen.get("org_zone"),
+            seen.get("roles"),
         )
     ):
         from backend.app.reportability.router import _finish_reminders

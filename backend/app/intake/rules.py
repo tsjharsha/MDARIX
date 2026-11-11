@@ -536,11 +536,14 @@ US_REMEDIAL = (5, reporting.WORK, "5 work days: remedial action may be needed (2
 IVDR_82 = "EU IVDR Art. 82, starter"
 
 
-def _provisional(market: str, level: str, remedial: bool, aware, org_zone: str | None) -> tuple:
+def _provisional(
+    market: str, level: str, remedial: bool, aware, org_zone: str | None, role: str | None = None
+) -> tuple:
     """A tier's (days, day basis, label, what rules the earliest report out) from the market's floor in force at
-    awareness (B4); today's constants when the rule register is off."""
+    awareness (B4); today's constants when the rule register is off. ``role``: the organization's role in the market
+    (B9: a user facility's 10 work days, an importer's 30 days; None is Manufacturer)."""
     table, remedy, ruled_out = PROVISIONAL[market], US_REMEDIAL if market == markets.US else None, RULED_OUT.get(market)
-    floor = register.floor_at(market, utc(aware), org_zone) if feature_set.rule_register() else None
+    floor = register.floor_at(market, utc(aware), org_zone, role) if feature_set.rule_register() else None
     if floor:
         table = floor["content"]["provisional"]
         remedy, ruled_out = table["remedial"], table["ruled_out"]
@@ -562,13 +565,15 @@ RULED_OUT = {
 }
 
 
-def earliest_report(market: str, aware=None, org_zone: str | None = None) -> markets.ReportType | None:
+def earliest_report(
+    market: str, aware=None, org_zone: str | None = None, role: str | None = None
+) -> markets.ReportType | None:
     """The report the market's rules start when no question is answered yet (US 5 work days, EU/NI and GB 2 days,
     Canada 10 days); None for a market without one (India: the tier date already is its only window). From the
-    market's floor in force at awareness (B4; today's without one)."""
+    market's floor in force at awareness (B4; today's without one), the role's own floor for ``role`` (B9)."""
     if market not in RULED_OUT:
         return None
-    floor = register.floor_at(market, utc(aware), org_zone) if feature_set.rule_register() else None
+    floor = register.floor_at(market, utc(aware), org_zone, role) if feature_set.rule_register() else None
     return _earliest(market, floor["code"] if floor else None, str(register._DIRECTORY))
 
 
@@ -602,6 +607,7 @@ def provisional_deadlines(
     org_zone: str | None = None,
     ivd: bool = False,
     answered: bool = True,
+    roles: dict | None = None,
 ) -> list[dict]:
     """Each enabled market's deadline for triage (MVP 5.1b; J3), counted by the market's rule (reportability/deadlines.py):
     the event's own market (``own``, from its country) first; the other enabled markets after it, only "if also
@@ -609,7 +615,8 @@ def provisional_deadlines(
     reportable) shows that conclusion's deadline instead of the provisional one. ``ivd``: an in-vitro diagnostic,
     whose EU clocks cite the IVDR (starter). ``today``: now (a day in older callers). ``answered``: triage has
     answered the threat, remedial and harm questions; until then each market shows its earliest possible report when
-    that is earlier than the tier's date, with ``earliest_note`` (check 3a)."""
+    that is earlier than the tier's date, with ``earliest_note`` (check 3a). ``roles``: market -> the organization's
+    role there (B9, ``reportability.service.reporting_roles``): a role's own floor counts its clocks."""
     found = []
     signed = signed or {}
     listed = enabled or list(markets.MARKETS)
@@ -652,9 +659,10 @@ def provisional_deadlines(
                 }
             )
             continue
-        days, basis, label, ruled_out = _provisional(market, level, remedial, aware, org_zone)
+        held = (roles or {}).get(market)  # "role" above is the market's place in the list
+        days, basis, label, ruled_out = _provisional(market, level, remedial, aware, org_zone, held)
         due = deadlines.count(utc(aware), days, basis, market, org_zone)
-        note, kind = None, None if answered else earliest_report(market, aware, org_zone)
+        note, kind = None, None if answered else earliest_report(market, aware, org_zone, held)
         if kind is not None:
             sooner = deadlines.count(utc(aware), kind.days, kind.day_basis, market, org_zone)
             if sooner.at < due.at:

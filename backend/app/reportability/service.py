@@ -372,6 +372,7 @@ def watch(
     }
     names = people(control_db, tenant_id, (row.decided_by for row in decisions.values()))
     assessed = assessments.rows_by_complaint(db, tenant_id, ids)
+    roles = reporting_roles(db, tenant_id)
     backlog = imported_backlog(db, tenant_id, today) if ids else {}
     items = []
     shortest = None
@@ -389,7 +390,7 @@ def watch(
         decided = decisions.get(complaint.id)
         aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
         seen["markets"] = assessments.markets_summary(
-            record, windows, assessed.get(complaint.id, {}), aware, today, org_zone
+            record, windows, assessed.get(complaint.id, {}), aware, today, org_zone, roles
         )
         seen["binding"] = binding_of(seen["binding"], seen["markets"])
         if seen["needs"] and seen["binding"]:
@@ -511,6 +512,7 @@ def clocks_for(
     today = deadlines.as_moment(today)
     org_zone = deadlines.org_zone(db, tenant_id)
     windows = settings_of(db, tenant_id)["windows"]
+    roles = reporting_roles(db, tenant_id)
     ids = [row.id for row in complaints]
     decisions = {
         row.complaint_id: row
@@ -539,7 +541,7 @@ def clocks_for(
         aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
         assessed = assessments.rows_by_complaint(db, tenant_id, [complaint.id]).get(complaint.id, {})
         binding = binding_of(
-            seen["binding"], assessments.markets_summary(record, windows, assessed, aware, today, org_zone)
+            seen["binding"], assessments.markets_summary(record, windows, assessed, aware, today, org_zone, roles)
         )
         decided = decisions.get(complaint.id)
         found.append(

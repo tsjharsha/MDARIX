@@ -148,7 +148,9 @@ def _reportability(db: Session, tenant_id: uuid.UUID, complaint_id, today: date)
     aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
     by_market = assessments.rows_by_complaint(db, tenant_id, [complaint_id]).get(complaint_id, {})
     summary = (
-        assessments.markets_summary(record, windows, by_market, aware, today, seen.get("org_zone")) if on_watch else []
+        assessments.markets_summary(record, windows, by_market, aware, today, seen.get("org_zone"), seen.get("roles"))
+        if on_watch
+        else []
     )
     settled = (not on_watch) or assessments.settled(summary) or bool(seen.get("decided"))
     return {

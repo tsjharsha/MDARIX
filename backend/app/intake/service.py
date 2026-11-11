@@ -899,6 +899,7 @@ def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datet
 
     zone = zone_of(db, tenant_id)
     windows = reporting_service.settings_of(db, tenant_id)["windows"]
+    roles = reporting_service.reporting_roles(db, tenant_id)
     complaint_ids = [key[1] for key in found if key[0] == COMPLAINT]
     rows = assessments.rows_by_complaint(db, tenant_id, complaint_ids) if complaint_ids else {}
     signed: dict = {}
@@ -910,7 +911,7 @@ def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datet
                 continue
             aware = found[key]["awareness"]["at"]
             # B4: the floor the conclusion was signed under, else the one in force at awareness (never today's).
-            floor = assessments.floor_at(market, aware, zone)
+            floor = assessments.floor_at(market, aware, zone, roles.get(market))
             if floor is not None:
                 floor = assessments.signed_floor(market, current, floor)
             clock = markets.market_clock(
@@ -923,6 +924,7 @@ def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datet
     }
     return {
         "org_zone": zone,
+        "roles": roles,
         "signed": signed,
         "products": products,
         "fast_hours": fast_hours(db, tenant_id),
@@ -996,6 +998,7 @@ def _item(found, members, listed, records, conflict, enabled, names, now, today,
         org_zone=context["org_zone"],
         ivd=context["products"].get(primary.get("product_id"), False),
         answered=answered,
+        roles=context.get("roles"),
     )
     record = member_records.get(primary_key)
     opened = rules.utc(record.opened_at) if record is not None else primary["available_at"]

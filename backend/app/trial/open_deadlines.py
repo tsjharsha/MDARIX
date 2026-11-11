@@ -141,7 +141,7 @@ def _deadline_changes(db: Session, tenant_id, apply: bool, now: datetime) -> lis
             if draft is not None and draft.answers:
                 seen = service.one(db, tenant_id, complaint_id, now)[2]
                 aware = datetime.fromisoformat(seen["aware_at"]) if seen["aware_at"] else None
-                floor = assessments.floor_at(market, aware, seen["org_zone"])
+                floor = assessments.floor_at(market, aware, seen["org_zone"], seen["roles"].get(market))
                 evaluation = markets.evaluate(market, draft.answers, floor)
                 clock = markets.market_clock(
                     market,
