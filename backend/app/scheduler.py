@@ -219,10 +219,16 @@ def operations_alerts(db: Session, state: dict) -> dict:
             else "The e-mails waiting to be retried have gone out.",
         )
     state["lagging"], state["email_failing"] = lagging, failing
+    # B6a G19: the clock check (app vs database vs NTP within 1 s), alerted once and once when it clears.
+    from backend.app import clock_check
+
+    clock = clock_check.check(db)
+    clock_check.alert(state, clock, send_alert)
     return {
         "dead_letters": dead,
         "worker": worker,
         "outbox": backlog,
+        "clock": clock["state"],
         "heartbeat_url": ping_heartbeat_url(),
     }
 
@@ -368,6 +374,14 @@ def readiness_digest(db: Session, _state: dict) -> dict:
     return run_for_all_tenants(db)
 
 
+def deadline_list(db: Session, _state: dict) -> dict:
+    """B6a G18a: each organization's open reporting deadlines, queued once a day from 06:00 organization time
+    (backend/app/oversight/deadline_list.py); the outbox worker sends it."""
+    from backend.app.oversight.deadline_list import run_for_all_tenants
+
+    return run_for_all_tenants(db)
+
+
 def platform_sync(db: Session, _state: dict) -> dict:
     """A cell reports to the platform and fetches its licence and packages (backend/app/cell_link.py)."""
     from backend.app import cell_link
@@ -488,6 +502,13 @@ JOBS: tuple[Job, ...] = (
         timedelta(hours=6),
         readiness_digest,
         "Email each organization's quality leads their quality loop once a week",
+        CELL_JOBS,
+    ),
+    Job(
+        "deadline-list",
+        timedelta(minutes=15),
+        deadline_list,
+        "Email each organization its open reporting deadlines once a day from 06:00 its time",
         CELL_JOBS,
     ),
     Job(

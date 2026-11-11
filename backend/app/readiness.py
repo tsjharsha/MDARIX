@@ -2,7 +2,7 @@
 
 The API is *ready* when its database answers as the role it runs as and the schema is at the migration this code
 was built for (a deploy that skipped its migration job is taken out of rotation instead of failing at random).
-Data planes, object storage, the background worker, the scheduler and email are checked too; when one fails the
+Data planes, object storage, the background worker, the scheduler, email and the clock (B6a G19) are checked too; when one fails the
 report says ``degraded`` but the API stays in rotation, since most screens still work. Results are cached for a few
 seconds so frequent probes do not load the databases. ``public_status`` reduces the report to one word for
 ``/health/status``.
@@ -212,6 +212,22 @@ def _scheduler(job: str = SCHEDULER_WATCH_JOB, max_age: timedelta = SCHEDULER_MA
     return {"seconds_since": int(age)}
 
 
+def _clock() -> dict:
+    """B6a G19: app vs database vs NTP within 1 s (backend/app/clock_check.py); unknown or above the limit is not ok."""
+    from backend.app import clock_check
+    from backend.app.db.session import runtime_engine
+
+    started = time.perf_counter()
+    try:
+        with runtime_engine.connect() as connection:
+            result = clock_check.check(connection)
+    except Exception as exc:  # a probe must report, never raise
+        logger.warning("Readiness check clock failed: %s", type(exc).__name__)
+        result = {"state": clock_check.UNKNOWN, "error": type(exc).__name__}
+    ok = result["state"] == clock_check.OK
+    return {"name": "clock", "ok": ok, **result, "ms": round((time.perf_counter() - started) * 1000, 1)}
+
+
 def readiness_report() -> dict:
     global _cached
     with _lock:
@@ -227,6 +243,7 @@ def readiness_report() -> dict:
             outbox,
             _check("scheduler", _scheduler),
             _check("email", lambda: _email(outbox.get("email_failing", 0))),
+            _clock(),
         ]
         status = "ready" if database["ok"] else "not_ready"
         if status == "ready" and not all(item["ok"] for item in others):
