@@ -137,6 +137,8 @@ export type SessionContext = {
   closed_loop?: boolean;
   /** B4 (MDARIX_RULE_REGISTER): Decision trees â€º Rules and the "Rules used" panel. */
   rule_register?: boolean;
+  /** B9 (MDARIX_B9_*, feature_set.B9_SWITCHES): each market part's screens show only while its switch is on. */
+  b9?: { india?: boolean; canada?: boolean; us_importer?: boolean; us_user_facility?: boolean };
   /** classic or new (tenants.navigation, 0.10.67): the organization's menu (app/linkTable.ts). */
   navigation?: string;
   /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
@@ -407,6 +409,11 @@ export function useClosedLoop(): boolean {
 /** B4: shown only while the server says it is on (an older server has no rule register API). */
 export function useRuleRegister(): boolean {
   return useContext(WorkspaceContext)?.session?.rule_register === true;
+}
+
+/** B9: India's official form, ADRMS sheet and chain show only while the server has MDARIX_B9_INDIA on. */
+export function useB9India(): boolean {
+  return useContext(WorkspaceContext)?.session?.b9?.india === true;
 }
 
 /** B7b: "E-mail to check" shows only while the server has e-mail intake switched on. */

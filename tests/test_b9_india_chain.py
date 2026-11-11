@@ -61,6 +61,11 @@ def test_follow_up_and_final_on_demand_one_open_at_a_time_and_a_final_ends_the_c
     typed = user.put(f"{REPORTS}/{follow['id']}/fields/P2", json={"value": "Final"})
     assert typed.status_code == 422 and typed.json()["detail"]["code"] == "FOLLOWS_CHAIN"
     assert _create(user, initial, "Final").json()["detail"]["code"] == "CHAIN_OPEN"
+    # An unsent one is cancelled with a reason (step 15's card): the chain is free again.
+    spare = user.post(f"{REPORTS}/{follow['id']}/cancel", json={"reason": "Started by mistake, not needed."})
+    assert spare.status_code == 200 and spare.json()["state"] == "CANCELLED", spare.text
+    assert _ok(user.get(f"{REPORTS}/{initial}"))["india_chain"]["can_create"] is True
+    follow = _ok(_create(user, initial, "Follow up"))
 
     _state(tenant_id, follow["id"], "ACCEPTED")
     final = _ok(_create(user, initial, "Final"))

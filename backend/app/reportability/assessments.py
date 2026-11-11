@@ -49,6 +49,18 @@ def _iso(value) -> str | None:
     return value.isoformat() if value is not None else None
 
 
+def type_label(row: ComplaintMarketAssessment, kind) -> str | None:
+    """The report type's words, as the floor the row was saved or signed under has them (B9: a conclusion signed under
+    IN-floor-1 keeps its words; one under IN-floor-2 reads "Serious adverse event: 15 days (India MDR 2017 Rule 26,
+    starter)"); the floor in force for a row saved before the register."""
+    if kind is None or not row.floor_code:
+        return kind.label if kind else None
+    from backend.app.rule_register import register
+
+    held = (((register.get(row.floor_code) or {}).get("content") or {}).get("report_types") or {}).get(row.report_type)
+    return (held or {}).get("label") or kind.label
+
+
 def row_view(
     row: ComplaintMarketAssessment | None, names: dict[str, str], current_code: str | None = None
 ) -> dict | None:
@@ -73,7 +85,7 @@ def row_view(
         "override_reason": row.override_reason,
         "change_reason": row.change_reason,
         "report_type": row.report_type,
-        "report_type_label": kind.label if kind else None,
+        "report_type_label": type_label(row, kind),
         "window_name": row.window_name,
         "due_on": _iso(row.due_on),
         "filing_reference": row.filing_reference,

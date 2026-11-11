@@ -5,7 +5,7 @@ import { Table, errorText, notFound, useResource } from "../../customer-admin/sh
 import { downloadFile } from "../../reports/download";
 import { marketLabel, versionWords } from "../../../app/labels";
 import { DeadlineChip, SampleDates, StateChip } from "../../../app/chips";
-import { useCan, useTabParam, useWorkspace } from "../workspaceContext";
+import { useB9India, useCan, useTabParam, useWorkspace } from "../workspaceContext";
 import {
   REPORTS,
   REPORT_VIEWS,
@@ -277,6 +277,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   const [shown, setShown] = useState<ReportDetail | null>(null);
   const canWrite = useCanReport();
   const canExport = useCan("data.export");
+  const india = useB9India();
   const detail = shown?.id === id ? shown : resource.data;
   const action = useAction((next) => setShown(next), "That step was not recorded.");
   const [pdfError, setPdfError] = useState("");
@@ -569,6 +570,43 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                         <p className="ac-note">
                           The files were made when the report was approved. MDARIX never submits: you send the XML
                           through your own ESG account or eSubmitter and record the submission here.
+                        </p>
+                      </>
+                    )}
+                    {/* B9 steps 12-13: India's official MvPI form and the ADRMS entry sheet, from the same snapshot. */}
+                    {india && detail.form.code === "MVPI_MDAE" && (
+                      <>
+                        <button
+                          type="button"
+                          className="ac-secondary"
+                          onClick={() =>
+                            void fetchFile(
+                              "worksheet.pdf",
+                              `mdarix-mvpi-mdae-${stem}-official-form.pdf`,
+                              "The official form could not be downloaded.",
+                              "&form=official",
+                            )
+                          }
+                        >
+                          <FileText size={15} aria-hidden="true" /> Official MvPI form v1.2 (PDF)
+                        </button>
+                        <button
+                          type="button"
+                          className="ac-secondary"
+                          onClick={() =>
+                            void fetchFile(
+                              "worksheet.pdf",
+                              `mdarix-mvpi-mdae-${stem}-adrms-entry-sheet.pdf`,
+                              "The ADRMS entry sheet could not be downloaded.",
+                              "&form=adrms",
+                            )
+                          }
+                        >
+                          <FileText size={15} aria-hidden="true" /> ADRMS entry sheet (PDF)
+                        </button>
+                        <p className="ac-note">
+                          MDARIX never submits: e-mail the official form to MvPI, or type the sheet's values into ADRMS
+                          in its screen order, then record the submission here.
                         </p>
                       </>
                     )}

@@ -359,7 +359,7 @@ def _assessment_view(context: dict, names: dict) -> dict | None:
         "state": row.conclusion or "DRAFT",
         "conclusion": row.conclusion,
         "suggested": row.suggested_conclusion,
-        "report_type_label": kind.label if kind else None,
+        "report_type_label": assessments.type_label(row, kind),  # the words of the floor it was signed under (B9)
         "signed_by": names.get(row.signed_by) if row.signed_by else None,
         "signed_by_id": row.signed_by,
         "signed_at": _iso(row.signed_at),
@@ -2495,15 +2495,15 @@ def cancel_follow_up(
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """Cancel a US follow-up that was never sent (0.10.96), with a reason, audited: its approval ends and the chain is
-    free for the next follow-up, which takes its number (numbers count only the follow-ups sent). The initial report
-    (it follows its signed conclusion) and a submitted follow-up are never cancelled here."""
+    """Cancel a US follow-up, or an India follow-up or final (B9), that was never sent (0.10.96), with a reason,
+    audited: its approval ends and the chain is free for the next one (US numbers count only the follow-ups sent). The
+    initial report (it follows its signed conclusion) and a submitted follow-up are never cancelled here."""
     obligation = _obligation(db, _tenant(ctx), obligation_id, lock=True)
     reason = _text(payload.reason)
     if not reason or len(reason) < rules.REASON_MIN:
         raise _error(422, "REASON_REQUIRED", f"Say why, in at least {rules.REASON_MIN} characters")
-    if not is_follow_up(obligation):
-        raise _error(409, "NOT_A_FOLLOW_UP", "Only a US follow-up is cancelled here: a report follows its conclusion")
+    if not keeps_own_clock(obligation):
+        raise _error(409, "NOT_A_FOLLOW_UP", "Only a follow-up is cancelled here: a report follows its conclusion")
     if obligation.state not in rules.CANCELLABLE:
         raise _error(409, "ALREADY_SENT", "This follow-up was submitted (or cancelled): it stays as recorded")
     pending = []

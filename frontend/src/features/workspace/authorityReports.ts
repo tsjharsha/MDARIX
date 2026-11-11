@@ -268,6 +268,16 @@ export type ReportDetail = {
   }[];
   /** This report is US follow-up #n of its initial report (0.10.96, B3). */
   follow_up?: number | null;
+  /** B9 step 14: an India report's place in its chain (on demand, no legal clock: D15); null for other markets. On the
+   * initial report: its follow-ups and final, and whether one can be created now. */
+  india_chain?: {
+    type: "Initial" | "Follow up" | "Final";
+    next_report_on?: string | null;
+    items?: { id: string; type: "Follow up" | "Final"; state: ObligationState }[];
+    ended?: boolean;
+    can_create?: boolean;
+    note: string;
+  } | null;
   note: string | null;
   follow_up_due_on: string | null;
   starter_mark: string;

@@ -36,9 +36,9 @@ vi.mock("../customer-admin/shared", async (importOriginal) => {
 
 const { Reports, ReportDrawer } = await import("./sections/Reports");
 
-function workspace(permissions: string[]): WorkspaceApi {
+function workspace(permissions: string[], extra: Record<string, unknown> = {}): WorkspaceApi {
   return {
-    session: { allowed_menu: ["products", "investigations"], business_permissions: permissions },
+    session: { allowed_menu: ["products", "investigations"], business_permissions: permissions, ...extra },
     open: vi.fn(),
     notify: vi.fn(),
     work: { products: [], requestOpenInvestigation: vi.fn() },
@@ -328,5 +328,79 @@ describe("the reports screens", () => {
     const html = render(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />);
     expect(html).toContain("Mark as submitted");
     expect(html).toContain("Reopen the draft");
+  });
+});
+
+describe("B9 step 15: India's chain card and files follow the India switch", () => {
+  const INDIA = { b9: { india: true } };
+  const renderAs = (node: ReactNode, session: Record<string, unknown>) =>
+    renderToStaticMarkup(
+      <WorkspaceContext.Provider value={workspace(["regulatory.review", "data.export"], session)}>
+        {node}
+      </WorkspaceContext.Provider>,
+    );
+  const india = (state: ReportDetail["state"], chain: ReportDetail["india_chain"], extra: Partial<ReportDetail> = {}) =>
+    detail(state, {
+      market: "IN",
+      form: { ...detail("DRAFT").form, code: "MVPI_MDAE", title: "MvPI adverse event report worksheet" },
+      snapshots: [{ id: "s1", version: 1, state: "APPROVED" } as ReportDetail["snapshots"][number]],
+      india_chain: chain,
+      ...extra,
+    });
+
+  it("offers a follow-up or final on a submitted initial report, and the official form and ADRMS sheet", () => {
+    resources.data["/api/v1/reports/r1"] = india("ACCEPTED", {
+      type: "Initial",
+      items: [],
+      ended: false,
+      can_create: true,
+      note: "No legal clock: your date",
+    });
+    const html = renderAs(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />, INDIA);
+    expect(html).toContain("Create a follow-up or final report");
+    expect(html).toContain("No legal clock: your date");
+    expect(html).toContain("Official MvPI form v1.2 (PDF)");
+    expect(html).toContain("ADRMS entry sheet (PDF)");
+    // Off: today's worksheet only.
+    const off = renderAs(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />, { b9: { india: false } });
+    expect(off).not.toContain("Create a follow-up or final report");
+    expect(off).not.toContain("Official MvPI form");
+    expect(off).not.toContain("ADRMS entry sheet");
+  });
+
+  it("says a Final ends the chain and shows a child's own date as the user's", () => {
+    resources.data["/api/v1/reports/r1"] = india("ACCEPTED", {
+      type: "Initial",
+      items: [
+        { id: "f1", type: "Follow up", state: "ACCEPTED" },
+        { id: "f2", type: "Final", state: "ACCEPTED" },
+      ],
+      ended: true,
+      can_create: false,
+      note: "No legal clock: your date",
+    });
+    let html = renderAs(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />, INDIA);
+    expect(html).toContain("A Final report ends the chain: nothing follows it.");
+    expect(html).not.toContain("Create a follow-up or final report");
+    resources.data["/api/v1/reports/r1"] = india(
+      "DRAFT",
+      { type: "Follow up", next_report_on: "2027-01-15", note: "No legal clock: your date" },
+      { kind: "RESPONSE", parent_id: "r0" },
+    );
+    html = renderAs(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />, INDIA);
+    expect(html).toContain("Follow up report");
+    expect(html).toContain("No legal clock: your date");
+    expect(html).toContain("Cancel this follow up report");
+  });
+
+  it("shows no chain on an India initial report that is not submitted yet", () => {
+    resources.data["/api/v1/reports/r1"] = india("DRAFT", {
+      type: "Initial",
+      items: [],
+      ended: false,
+      can_create: false,
+      note: "No legal clock: your date",
+    });
+    expect(renderAs(<ReportDrawer id="r1" onOpen={vi.fn()} onClose={vi.fn()} />, INDIA)).not.toContain("Report chain");
   });
 });

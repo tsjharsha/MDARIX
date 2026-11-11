@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { REASON_MIN, REPORTS, type ObligationState, type ReportDetail } from "../authorityReports";
 import { errorText, formatDate, send } from "../../customer-admin/shared";
+import { useB9India } from "../workspaceContext";
 import { InlineError } from "./boardParts";
 import { useAction } from "./Reports";
 
@@ -37,6 +38,10 @@ export function FollowUps({
   onChanged: (detail: ReportDetail) => void;
   onOpen: (id: string) => void;
 }) {
+  const india = useB9India();
+  // B9 step 14: an India report's chain (follow-up and final on demand), shown while MDARIX_B9_INDIA is on.
+  if (detail.india_chain)
+    return india ? <IndiaChain detail={detail} canWrite={canWrite} onChanged={onChanged} onOpen={onOpen} /> : null;
   if (detail.follow_up)
     return <FollowUpHead detail={detail} canWrite={canWrite} onChanged={onChanged} onOpen={onOpen} />;
   if (detail.kind !== "INITIAL" || detail.form.code !== "FDA_3500A" || !VALID.includes(detail.state)) return null;
@@ -270,6 +275,166 @@ function FollowUpHead({
         </details>
       )}
       <InlineError text={action.error} />
+    </section>
+  );
+}
+
+/**
+ * India's report chain (B9 step 14, MvPI): on a submitted initial report, its follow-ups and final, and "Create a
+ * follow-up or final" (never automatic: D15; one open at a time; a Final ends the chain). On a follow-up or final: what
+ * it follows, what is new, the user's own next-report date ("No legal clock: your date"), and Cancel while unsent.
+ */
+function IndiaChain({
+  detail,
+  canWrite,
+  onChanged,
+  onOpen,
+}: {
+  detail: ReportDetail;
+  canWrite: boolean;
+  onChanged: (detail: ReportDetail) => void;
+  onOpen: (id: string) => void;
+}) {
+  const chain = detail.india_chain!;
+  const action = useAction(onChanged, "That step was not recorded.");
+  const [form, setForm] = useState({ type: "Follow up", text: "", next: "", reason: "" });
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (chain.type !== "Initial") {
+    return (
+      <section className="uw-card uw-card-pad" aria-label={`India ${chain.type.toLowerCase()} report`}>
+        <h2>{chain.type} report</h2>
+        <p>
+          Of the{" "}
+          {detail.parent_id ? (
+            <button type="button" className="ac-link" onClick={() => onOpen(detail.parent_id!)}>
+              initial report
+            </button>
+          ) : (
+            "initial report"
+          )}
+          . Box P2 says "{chain.type}"; P1 is filled in with the day it is sent for approval.
+        </p>
+        {detail.request?.text && <p className="ac-muted">What is new: {detail.request.text}</p>}
+        <p className="ac-muted">
+          {chain.next_report_on ? `Next report planned for ${formatDate(chain.next_report_on)}. ` : ""}
+          {chain.note}.{chain.type === "Final" ? " A Final report ends the chain." : ""}
+        </p>
+        {canWrite && UNSENT.includes(detail.state) && (
+          <details>
+            <summary>Cancel this {chain.type.toLowerCase()} report</summary>
+            <label className="ca-field ca-wide">
+              Why it is cancelled
+              <input value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
+            </label>
+            <button
+              type="button"
+              className="ac-secondary"
+              disabled={action.busy || form.reason.trim().length < REASON_MIN}
+              onClick={() => void action.run(`${REPORTS}/${detail.id}/cancel`, "POST", { reason: form.reason })}
+            >
+              Cancel the {chain.type.toLowerCase()} report
+            </button>
+          </details>
+        )}
+        <InlineError text={action.error} />
+      </section>
+    );
+  }
+  const items = chain.items ?? [];
+  if (!items.length && !chain.can_create) return null; // not submitted yet: nothing follows it
+  const open = items.find((row) => !VALID.includes(row.state));
+  const create = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const made = await send<ReportDetail>(`${REPORTS}/${detail.id}/india-chain`, "POST", {
+        type: form.type,
+        what_is_new: form.text,
+        next_report_on: form.next || null,
+      });
+      onOpen(made.id);
+    } catch (reason) {
+      setError(errorText(reason, "The report was not created."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="uw-card uw-card-pad" aria-label="India report chain">
+      <h2>Report chain</h2>
+      <ol>
+        <li>
+          <b>Initial report</b> · {detail.state_label}
+        </li>
+        {items.map((row) => (
+          <li key={row.id}>
+            <button type="button" className="ac-link" onClick={() => onOpen(row.id)}>
+              <b>{row.type} report</b>
+            </button>{" "}
+            · {row.state.toLowerCase().replace(/_/g, " ")}
+          </li>
+        ))}
+      </ol>
+      {chain.ended ? (
+        <p className="ac-muted">A Final report ends the chain: nothing follows it.</p>
+      ) : open ? (
+        <p className="ac-muted">
+          The {open.type.toLowerCase()} report is open: submit or cancel it before the next one.
+        </p>
+      ) : (
+        canWrite &&
+        chain.can_create && (
+          <details>
+            <summary>Create a follow-up or final report</summary>
+            <p className="ac-muted">
+              MvPI asks for follow-up and final reports as the investigation goes on. MDARIX creates one only when you
+              ask. {chain.note}: the next-report date is optional.
+            </p>
+            <div className="ca-form-grid">
+              <fieldset className="ca-field">
+                <legend>Type (box P2)</legend>
+                {["Follow up", "Final"].map((type) => (
+                  <label key={type} className="ca-check">
+                    <input
+                      type="radio"
+                      name="india-chain-type"
+                      checked={form.type === type}
+                      onChange={() => setForm({ ...form, type })}
+                    />{" "}
+                    {type}
+                  </label>
+                ))}
+              </fieldset>
+              <label className="ca-field">
+                Next report on (optional, your date)
+                <input
+                  type="date"
+                  value={form.next}
+                  onChange={(event) => setForm({ ...form, next: event.target.value })}
+                />
+              </label>
+              <label className="ca-field ca-wide">
+                What is new
+                <textarea
+                  rows={2}
+                  value={form.text}
+                  onChange={(event) => setForm({ ...form, text: event.target.value })}
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className="ac-primary"
+              disabled={busy || form.text.trim().length < REASON_MIN}
+              onClick={() => void create()}
+            >
+              Create the {form.type.toLowerCase()} report
+            </button>
+          </details>
+        )
+      )}
+      <InlineError text={error} />
     </section>
   );
 }

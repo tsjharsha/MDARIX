@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from tests.test_b4_effective_dating import _row
-from tests.test_market_assessment_api import _acknowledge, _answers, _save, _sign, org  # noqa: F401
+from tests.test_market_assessment_api import _acknowledge, _answers, _market, _save, _sign, org  # noqa: F401
 from tests.test_reporting_capa_api import REASON, SETTINGS, _complaint
 
 pytestmark = pytest.mark.db
@@ -48,6 +48,9 @@ def test_a_draft_saved_under_version_one_is_refused_then_saved_again_under_versi
     assert row.floor_code == "IN-floor-2"
     # 15 days from the regulation, not the 30-day window (B9-01 on the API).
     assert (row.date_calc["source"], row.date_calc["days"]) == ("REGULATION", 15)
+    # Step 15: the conclusion names the floor's period (B9-01 on screen).
+    label = _market(signed.json(), "IN")["current"]["report_type_label"]
+    assert label == "Serious adverse event: 15 days (India MDR 2017 Rule 26, starter)"
 
 
 def test_a_conclusion_signed_under_version_one_never_changes(org, india, monkeypatch):  # noqa: F811
@@ -60,3 +63,5 @@ def test_a_conclusion_signed_under_version_one_never_changes(org, india, monkeyp
     after = _row(org["tenant_id"], complaint, "IN")
     fields = ("floor_code", "due_on", "content_fingerprint", "rules_applied", "date_calc", "answers")
     assert [getattr(after, name) for name in fields] == [getattr(before, name) for name in fields]
+    current = _market(india.get(f"/api/v1/complaints/{complaint}/market-assessments").json(), "IN")["current"]
+    assert current["report_type_label"] == "Serious adverse event (India MDR 2017 Rule 26)"  # its own floor's words

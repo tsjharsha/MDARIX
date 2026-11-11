@@ -5,14 +5,14 @@ import { CheckCircle2, ClipboardList, Download, FileText, Send, ShieldCheck, Und
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
-import { WorkspaceContext, useCan, useNavigation, useTabParam } from "../workspaceContext";
+import { WorkspaceContext, useB9India, useCan, useNavigation, useTabParam } from "../workspaceContext";
 import { communicationsTab } from "../communications";
 import { AlsoKnownAs, countOf, DecideAndSign } from "./common";
 import { ComplaintNextStep } from "./ComplaintNextStep";
 import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
 import { CodePicker } from "./CodePicker";
-import { openFollowUp } from "./FollowUps";
+import { FollowUps, openFollowUp } from "./FollowUps";
 import {
   OUTCOME_LABELS,
   REASON_MIN,
@@ -271,6 +271,8 @@ export function ReportDrawer({
           </p>
           <CommunicationsLink complaintId={detail.complaint.id} />
         </section>
+        {/* B9: India's chain (follow-up and final on demand) on the classic navigation too. */}
+        {detail.india_chain && <FollowUps detail={detail} canWrite={canWrite} onChanged={changed} onOpen={onOpen} />}
         <Downloads detail={detail} />
         <Worksheet detail={detail} onChanged={changed} canWrite={canWrite} />
         <SubmissionRecord detail={detail} />
@@ -831,6 +833,7 @@ export function AfterAcceptance({
 
 function Downloads({ detail }: { detail: ReportDetail }) {
   const canExport = useCan("data.export");
+  const india = useB9India();
   // D7: before approval the working draft downloads as a preview marked DRAFT - NOT APPROVED; the approved snapshot
   // is the record copy. A cancelled report has no draft to preview.
   const preview = detail.state !== "CANCELLED";
@@ -883,6 +886,29 @@ function Downloads({ detail }: { detail: ReportDetail }) {
             }
           >
             <FileText size={15} aria-hidden="true" /> Official Form 3500A (PDF)
+          </button>
+        </>
+      )}
+      {/* B9 steps 12-13: India's official MvPI form and the ADRMS entry sheet, from the approved snapshot. */}
+      {approved && india && detail.form.code === "MVPI_MDAE" && (
+        <>
+          <button
+            type="button"
+            className="ac-secondary"
+            onClick={() =>
+              void get("pdf", `${approved.id}&form=official`, "worksheet.pdf", `${stem}-official-form.pdf`)
+            }
+          >
+            <FileText size={15} aria-hidden="true" /> Official MvPI form v1.2 (PDF)
+          </button>
+          <button
+            type="button"
+            className="ac-secondary"
+            onClick={() =>
+              void get("pdf", `${approved.id}&form=adrms`, "worksheet.pdf", `${stem}-adrms-entry-sheet.pdf`)
+            }
+          >
+            <FileText size={15} aria-hidden="true" /> ADRMS entry sheet (PDF)
           </button>
         </>
       )}
