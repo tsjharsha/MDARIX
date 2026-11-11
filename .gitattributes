@@ -38,5 +38,10 @@ data/fda_forms/manifest.json text eol=lf
 # FDA's example eMDR files stay byte-identical (their SHA-256 is in the fixtures' manifest).
 tests/fixtures/emdr_examples/*.xml -text
 
-# The eMDR rule book version 2 is pinned by its SHA-256 (rule register emdr-rule-book-2): the same bytes everywhere.
-backend/app/authority_reports/rules/us_emdr_v2.csv text eol=lf
+# The rule register's data and the files it pins by SHA-256 (rule books, form editions' manifests and field maps):
+# LF on every platform, so a pin taken on Windows holds on a Linux checkout (the register also hashes text files with
+# LF endings). Blank forms are PDFs, kept byte-identical by the binary rule above.
+backend/app/rule_register/data/** text eol=lf
+backend/app/authority_reports/rules/** text eol=lf
+data/mvpi_forms/*.json text eol=lf
+data/hc_forms/*.json text eol=lf

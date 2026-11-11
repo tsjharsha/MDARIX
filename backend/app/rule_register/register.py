@@ -312,6 +312,16 @@ def pin_problems() -> list[str]:
     return problems
 
 
+TEXT_FILES = (".csv", ".json")
+
+
+def file_sha256(path: Path) -> str:
+    """A pinned file's SHA-256. A text file (a rule book) is hashed with LF line endings whatever the checkout wrote,
+    so a pin holds on Windows (CRLF) and Linux (LF) alike; a binary file (a blank form) as its bytes."""
+    data = path.read_bytes()
+    return hashlib.sha256(data.replace(b"\r\n", b"\n") if path.suffix in TEXT_FILES else data).hexdigest()
+
+
 def file_problems(entry: dict) -> list[str]:
     """A data version's file (a rule book, or a form edition's blank form) and a form edition's field map (B9-D16),
     against the hashes the version pins: a changed file or map is a new version."""
@@ -320,7 +330,7 @@ def file_problems(entry: dict) -> list[str]:
     content, problems = entry.get("content") or {}, []
     if content.get("file"):
         path = Path(__file__).resolve().parents[3] / content["file"]
-        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != content["sha256"]:
+        if not path.is_file() or file_sha256(path) != content["sha256"]:
             problems.append(f"{entry['code']}.json: {content['file']} changed without a new version")
     if content.get("field_map_sha256"):
         module, _, name = content["field_map"].partition(":")

@@ -25,6 +25,20 @@ def test_every_pin_holds():
     assert register.pin_problems() == []
 
 
+def test_a_file_pin_is_the_same_on_a_crlf_and_an_lf_checkout(tmp_path):
+    # B9 review 7: emdr-rule-book-1 was pinned on a CRLF (Windows) checkout and failed on Linux (LF).
+    for code in ("emdr-rule-book-1", "emdr-rule-book-2"):
+        content = register.get(code)["content"]
+        lf = (register.DATA.parents[2].parent / content["file"]).read_bytes().replace(b"\r\n", b"\n")
+        for name, data in (("lf.csv", lf), ("crlf.csv", lf.replace(b"\n", b"\r\n"))):
+            (tmp_path / name).write_bytes(data)
+            assert register.file_sha256(tmp_path / name) == content["sha256"], (code, name)
+    # A binary file (a blank form) is hashed as its bytes.
+    (tmp_path / "form.pdf").write_bytes(b"%PDF-1\r\n")
+    (tmp_path / "other.pdf").write_bytes(b"%PDF-1\n")
+    assert register.file_sha256(tmp_path / "form.pdf") != register.file_sha256(tmp_path / "other.pdf")
+
+
 def test_a_comment_or_docstring_does_not_move_a_pin_but_code_does(tmp_path, monkeypatch):
     module = tmp_path / "pinned_example.py"
     monkeypatch.syspath_prepend(str(tmp_path))
