@@ -11,7 +11,6 @@ returned (``build`` raises ``MirRefused``).
 
 from __future__ import annotations
 
-import json
 import re
 from datetime import datetime
 from functools import lru_cache
@@ -140,6 +139,11 @@ PART_LABELS = {
     "contact_phone": "phone",
     "contact_email": "e-mail",
 }
+# A manufacturer here needs no authorised representative: the EU/EEA, Turkey and Northern Ireland (2.5's list without
+# Switzerland). A manufacturer with no country yet is named by its missing parts first.
+INSIDE = frozenset(
+    "AT BE BG CY CZ DE DK EE ES FI FR XI GR HR HU IE IS IT LI LT LU LV MT NL NO PL PT RO SE SI SK TR".split()
+) | {None}
 _SUBMITTER = {
     "manufacturer": ("reporterMfr", "Manufacturer"),
     "authorised representative": ("reporterAR", "Authorised representative"),
@@ -386,14 +390,11 @@ PERIOD_KEYS = {
 
 
 def _periods(text: str) -> dict:
-    """4.3.3c, stored as one structured entry (step 10): a JSON list of up to four periods, N first, each with the
+    """4.3.3c, one structured entry (step 10, ``forms.similar_table``): periods N to N-3 in order, each with the
     keys of ``PERIOD_KEYS``. Text that is not the table goes in N's first count, so the schema refuses it."""
     base = "mfr_invest/similarIncidents/"
-    try:
-        rows = json.loads(text)
-    except ValueError:
-        rows = None
-    if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows) or len(rows) > len(PERIODS):
+    rows = forms.similar_table(text)
+    if rows is None:
         return {base + "timePeriodN/countrySimInc": text}
     out = {}
     for name, row in zip(PERIODS, rows):
@@ -502,10 +503,16 @@ def validate(xml: bytes, report_type: str) -> list[str]:
 
 
 def missing(values: dict, parties, report_type: str) -> list[str]:
-    """The blocks the report type needs that hold nothing (the rule book's "M"), and the parts a party in the file
-    lacks (1.3.2, 1.3.3)."""
+    """The blocks the report type needs that hold nothing (the rule book's "M"); the manufacturer (1.3.2), always,
+    and an authorised representative (1.3.3) when the manufacturer is outside the EU/EEA, Turkey and Northern Ireland
+    (the help text; starter, for your consultant to confirm); and the parts each of them lacks."""
     needed = mir_rules.mandatory_fields(forms.EU_MIR.code, report_type)
     out = [f"{block} ({field})" for field, block in needed.items() if not values.get(field)]
+    maker = _party_of(parties, "MANUFACTURER")
+    if maker is None:
+        out.append("1.3.2 the manufacturer (Settings, Products)")
+    elif _party_of(parties, "AUTHORISED_REPRESENTATIVE") is None and getattr(maker, "country_code", None) not in INSIDE:
+        out.append("1.3.3 the authorised representative: the manufacturer is outside the EU (Settings, Products)")
     for role, block in (("MANUFACTURER", "1.3.2"), ("AUTHORISED_REPRESENTATIVE", "1.3.3")):
         party = _party_of(parties, role)
         if party is not None:

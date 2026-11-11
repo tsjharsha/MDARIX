@@ -229,6 +229,9 @@ def test_b8_a_file_the_schema_refuses_is_never_built():
 def test_b8_send_checks_name_the_missing_blocks_and_parts():
     found = mir_xml.prepare({"1_2E": forms.MIR_INITIAL}, [], report_type=forms.MIR_INITIAL, now=NOW)
     assert found["xml"] is None and any(item.startswith("1.2f ") for item in found["missing"])
+    assert "1.3.2 the manufacturer (Settings, Products)" in found["missing"]
+    found = mir_xml.prepare(_minimal(forms.MIR_INITIAL), PARTIES[:1], report_type=forms.MIR_INITIAL, now=NOW)
+    assert [item[:6] for item in found["missing"]] == ["1.3.3 "]  # a US manufacturer needs an EU representative
     bare = SimpleNamespace(role="MANUFACTURER", organisation="Orbit", srn=None, contact_phone="1", contact_email=None)
     found = mir_xml.prepare(_minimal(forms.MIR_INITIAL), [bare], report_type=forms.MIR_INITIAL, now=NOW)
     assert found["missing"] == [

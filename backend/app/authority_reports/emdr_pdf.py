@@ -321,14 +321,15 @@ def _section_f(values: dict[str, list[str]], one, item, dated) -> None:
     item("14. Manufacturer Name/Address", one("F14") or "-", email and f"Email: {email}" or None)
 
 
-def record(view: dict, left: list[str], sha256: str, note: str) -> list[tuple[str, str]]:
-    """MDARIX's record page: who prepared it, the source records, what the file leaves out, the approval, the hash."""
+def record(view: dict, left: list[str], sha256: str, note: str, *, name: str = "eMDR") -> list[tuple[str, str]]:
+    """MDARIX's record page: who prepared it, the source records, what the file leaves out, the approval, the hash.
+    ``name``: the file's name (eMDR; MIR for an EU report, B8 step 9)."""
     from backend.app.authority_reports.render import LABELS, _sources, manifestation
     from reports.pdf import PAGE_BREAK
 
-    out: list[tuple[str, str]] = [("", PAGE_BREAK), (RECORD_TITLE, "heading")]
+    out: list[tuple[str, str]] = [("", PAGE_BREAK), (RECORD_TITLE.replace("eMDR", name), "heading")]
     out.append(
-        ("This page is MDARIX's record of the report. It is not part of the eMDR file and is not sent.", "muted")
+        (f"This page is MDARIX's record of the report. It is not part of the {name} file and is not sent.", "muted")
     )
     out += [("", "body"), ("Prepared by", "heading"), (", ".join(view.get("preparers") or []) or "-", "body")]
     sources = _sources(view)
@@ -340,7 +341,7 @@ def record(view: dict, left: list[str], sha256: str, note: str) -> list[tuple[st
         out.append(("Give these in eSubmitter, or attach them, as you decide.", "muted"))
         out += [(line, "body") for line in left]
     out += [("", "body"), ("Approval", "heading"), *((line, "body") for line in manifestation(view))]
-    out += [("", "body"), ("The eMDR file", "heading"), (f"SHA-256 of the eMDR file: {sha256}", "body")]
+    out += [("", "body"), (f"The {name} file", "heading"), (f"SHA-256 of the {name} file: {sha256}", "body")]
     out.append((note, "muted"))
     return out
 

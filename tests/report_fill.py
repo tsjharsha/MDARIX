@@ -20,6 +20,8 @@ US_PARTY = {
 LIST_VALUES = {"D2A": "FRN"}  # an FDA product code (infusion pump); GMDN and EMDN fields: their patterns
 # A 3500A choice block takes one of FDA's choices, so the eMDR file can be made (0.10.96).
 US_CHOICES = {"B1": "Product problem", "H1": "Malfunction"}
+# An EU MIR's 2.4 takes a class its schema has, so the MIR file can be made (B8 step 8).
+US_CHOICES["2_4"] = "IIb"
 
 
 def _code(annex: str) -> str:

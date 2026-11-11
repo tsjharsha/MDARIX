@@ -59,6 +59,26 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
   place is never dropped to make the file pass. Blanks stay blank ("Unknown" only where the report says so, as 1.1c);
   patient and reporter boxes are never written. The manufacturer and authorised representative go in from their
   parts; a party missing a part is named with the parts to enter. The same report builds the same bytes.
+- **Files frozen at Send for approval** (EU MIR): Send builds the MIR file and refuses it while the authority would:
+  422 `MIR_MISSING` (the blocks, the manufacturer, an authorised representative for a manufacturer outside the EU, or a
+  party's missing parts) or 422 `MIR_INVALID` (the schema's errors, by block). The XML, its SHA-256, its type and the
+  parties' parts are kept in the snapshot and covered by its fingerprint, so the approver signs exactly the file that
+  is downloaded. `GET /reports/{id}/mir.xml?snapshot=` serves those bytes from the approved snapshot only (409
+  `APPROVE_FIRST`, `SNAPSHOT_NOT_APPROVED`); a later Settings change never reaches it. A report approved before this
+  release keeps its PDF and has no XML (404 `NO_MIR_FILE`, B8-D10). Audited `REPORT_MIR_DOWNLOADED`.
+- **The EU MIR PDF**: "EU MIR 7.3.1 content, prepared by MDARIX" (B8-D18), read back from the XML: sections 1 to 5,
+  each block with its number and label, then MDARIX's record page with the file's SHA-256. A draft is marked DRAFT;
+  the same file gives the same bytes. A report approved before this release keeps its worksheet PDF.
+- **4.3 similar incidents as a table** (4.3.3c): periods N to N-3, each with its dates and, for the incident's country,
+  EEA + CH + TR and the world, the similar incidents and the devices on the market. Every number is entered by a person
+  (B8-D7); a Final needs every period and region; the table goes into the XML in the schema's order.
+- **Screens** (new navigation): the EU report chain card (each report with its state; "Create a follow-up or final
+  report", later types only), the type field offering only the types the report's place allows, "Start the Final
+  (Non-reportable incident)" after a "not reportable" re-sign, the 4.3.3c table, what the MIR file still needs before
+  Send, and after approval "Download XML (MIR 7.3.1)" beside the PDF.
+- **Sample** (SAMPLE-RV-07): the sample's EU manufacturer and authorised representative, with their parts, are held in
+  memory only for the sample's EU report (never stored; the organization's own EU parties are never read), so the
+  trial user gets the PDF and the MIR XML.
 
 ### Database
 - `tr29partyparts` (from `tr28marketroles`, expand-only, no backfill): `market_responsible_parties` gains `street`,

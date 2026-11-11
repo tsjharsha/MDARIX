@@ -25,6 +25,7 @@ starter mapping, marked starter text until the regulatory consultant reviews it 
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -38,6 +39,17 @@ MISSING_LABELS = {
 }
 PATIENT, REPORTER = "PATIENT", "REPORTER"
 TEXT, DATE, DATE_RANGE, IMDRF_CODE, LIST_CODE = "TEXT", "DATE", "DATE_RANGE", "IMDRF_CODE", "LIST_CODE"
+TABLE = "TABLE"  # B8 step 10: the MIR's 4.3.3c table of similar incidents, one structured entry
+SIMILAR_PERIODS = ("N", "N-1", "N-2", "N-3")
+# Per period: similar incidents and devices on the market in the incident's country, EEA + CH + TR, and the world.
+SIMILAR_COUNTS = (
+    "country_incidents",
+    "country_devices",
+    "eea_incidents",
+    "eea_devices",
+    "world_incidents",
+    "world_devices",
+)
 _DATE_WORD = re.compile(r"\bdate\b", re.I)
 _NOT_A_DATE = re.compile(r"^(age|duration)\b", re.I)
 # The fields whose value is a code of a published list, with the list it is checked against when loaded
@@ -61,6 +73,33 @@ def _day(text: str) -> date | None:
         return None
 
 
+def similar_table(text: str | None) -> list[dict] | None:
+    """4.3.3c as entered (a JSON list): four periods, N first, each a dict; None when it is not that shape."""
+    try:
+        rows = json.loads(text or "")
+    except ValueError:
+        return None
+    ok = isinstance(rows, list) and len(rows) == len(SIMILAR_PERIODS) and all(isinstance(row, dict) for row in rows)
+    return rows if ok else None
+
+
+def table_problem(text: str) -> str | None:
+    """Why a 4.3.3c table is not complete (B8-D7: every number is a person's): each period N to N-3 needs its start
+    and end dates and, for the country, EEA + CH + TR and the world, the similar incidents and devices on the market."""
+    rows = similar_table(text)
+    if rows is None:
+        return "Enter the table: four periods, N to N-3"
+    for name, row in zip(SIMILAR_PERIODS, rows):
+        start, end = _day(str(row.get("start") or "")), _day(str(row.get("end") or ""))
+        if start is None or end is None or end < start:
+            return f"Period {name}: a start and an end date (YYYY-MM-DD), the end not before the start"
+        for key in SIMILAR_COUNTS:
+            count = row.get(key)
+            if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+                return f"Period {name}: every count is a whole number, 0 or more ({key.replace('_', ' ')})"
+    return None
+
+
 def value_problem(field: "Field", value: str | None) -> str | None:
     """Why a typed value does not fit its field (0.10.81, F6), or None: a date field takes a date (YYYY-MM-DD), a range
     field a date or "YYYY-MM-DD to YYYY-MM-DD", a list code its list's pattern, and an IMDRF code field only the code
@@ -69,6 +108,8 @@ def value_problem(field: "Field", value: str | None) -> str | None:
     if not text:
         return None
     kind = field.kind
+    if kind == TABLE:
+        return table_problem(text)
     if kind == IMDRF_CODE:
         return "Choose the code in the code picker: typed text is not a code"
     if kind == DATE and _day(text) is None:
@@ -121,6 +162,8 @@ class Field:
         """What the field takes (0.10.81, F6), read from its source and label: an IMDRF code (picked, never typed), a
         published list's code (an FDA product code, an EMDN or GMDN code), a date, a date or a range of dates
         ("from ... to ..."), or text."""
+        if self.id == "4_3_3C":
+            return TABLE
         if self.source and self.source.startswith("imdrf_"):
             return IMDRF_CODE
         if self.source in LIST_CODES:

@@ -105,6 +105,52 @@ US_PARTY = {
     "address": "1 Sample Way, Springfield, US",
     "contact_email": "vigilance@orbit-sample.invalid",
 }
+# B8 step 12: the sample's EU manufacturer (outside the EU) and its EU authorised representative, with the parts the
+# MIR file needs, held in memory only (the B3 A9 pattern): never stored; the organization's own EU parties are never
+# read or changed. Fictional values throughout.
+EU_PARTIES = (
+    {
+        "market": "EU",
+        "role": "MANUFACTURER",
+        "organisation": "Orbit Medical Devices (Sample)",
+        "address": "1 Sample Way, Springfield, US",
+        "srn": "US-MF-000000000",
+        "street": "1 Sample Way",
+        "city": "Springfield",
+        "postcode": "00000",
+        "country_code": "US",
+        "contact_name": "Sam Sample",
+        "contact_first_name": "Sam",
+        "contact_last_name": "Sample",
+        "contact_phone": "+1 555 0100",
+        "contact_email": "vigilance@orbit-sample.invalid",
+    },
+    {
+        "market": "EU",
+        "role": "AUTHORISED_REPRESENTATIVE",
+        "organisation": "Sample EU Authorised Representative (Sample)",
+        "address": "1 Rue de l'Exemple, 75001 Paris, FR",
+        "srn": "FR-AR-000000000",
+        "street": "1 Rue de l'Exemple",
+        "city": "Paris",
+        "postcode": "75001",
+        "country_code": "FR",
+        "contact_name": "Alex Exemple",
+        "contact_first_name": "Alex",
+        "contact_last_name": "Exemple",
+        "contact_phone": "+33 1 00 00 00 00",
+        "contact_email": "vigilance@eu-rep-sample.invalid",
+    },
+)
+
+
+def sample_eu_parties(tenant_id) -> list:
+    """The sample's EU parties as unsaved rows (``EU_PARTIES``), for the sample's EU report only."""
+    from backend.app.db.models.regulatory_reference import MarketResponsibleParty
+
+    return [MarketResponsibleParty(id=uuid.uuid4(), tenant_id=tenant_id, **party) for party in EU_PARTIES]
+
+
 IN_ENTRIES = {
     "P1": "{submitted}",
     "P4": "SAMPLE-MAH-2026-001 (sample)",

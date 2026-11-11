@@ -208,6 +208,11 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
         context["ca_chain"] = _canada_carried(db, obligation)  # A4 and A5's previous date (B9 step 11)
     if is_mir_chain(obligation):
         context.update(_mir_carried(db, obligation))  # B8 step 3: values and the NCA's number carried, not copied
+    if obligation.form_code == forms.EU_MIR.code and is_sample(obligation.source_system):
+        from backend.app.trial.sample_reports import sample_eu_parties
+
+        # B8 step 12: the sample's EU report reads the sample's EU parties, held in memory only (B3 A9).
+        context["parties"] = sample_eu_parties(obligation.tenant_id)
     if is_follow_up(obligation):
         parent = db.get(ReportObligation, obligation.parent_id)
         chain = _follow_ups(db, obligation.tenant_id, parent.id)
@@ -729,7 +734,32 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         )
         if form.code == forms.FDA_3500A.code
         else None,
+        # B8 step 8: the EU MIR file. Approved: the frozen file to download; a draft: what Send for approval refuses.
+        "mir": _mir_check(obligation, sections, context, approved, today) if form.code == forms.EU_MIR.code else None,
     }
+
+
+def _mir_check(obligation: ReportObligation, sections, context, approved, today) -> dict | None:
+    from backend.app.authority_reports import fda_3500a, mir_xml
+
+    if not mir_on(obligation):
+        return None
+    fields = (approved.fields or {}) if approved else {}
+    if "mir_xml" in fields:
+        return {"snapshot": str(approved.id), "sha256": fields["mir_sha256"], "missing": [], "errors": []}
+    if obligation.state not in rules.EDITABLE:
+        return {"snapshot": None, "sha256": None, "missing": [], "errors": []}  # approved before B8 (B8-D10)
+    values = fda_3500a.values(sections) | {
+        "1_2A": deadlines.day_of(today).isoformat()
+    }  # 1.2a is filled at Send for approval
+    found = mir_xml.prepare(
+        values,
+        context["parties"],
+        report_type=mir_type(obligation),
+        now=_now(),
+        udi_entity=getattr(context["product"], "udi_issuing_entity", None),
+    )
+    return {"snapshot": None, "sha256": None, "missing": found["missing"], "errors": found["errors"]}
 
 
 def _emdr_kind(obligation: ReportObligation) -> str:
@@ -770,6 +800,24 @@ def _emdr_gate(found: dict) -> None:
             422,
             "EMDR_INVALID",
             "The eMDR file does not validate against FDA's schema: " + "; ".join(found["errors"][:3]),
+            errors=found["errors"][:10],
+        )
+
+
+def _mir_gate(found: dict) -> None:
+    """Send for approval refuses an EU MIR whose file the authority would refuse, naming each block (B8 step 8)."""
+    if found["missing"]:
+        raise _error(
+            422,
+            "MIR_MISSING",
+            "Before sending for approval, the MIR file needs: " + "; ".join(found["missing"]),
+            missing=found["missing"],
+        )
+    if found["errors"]:
+        raise _error(
+            422,
+            "MIR_INVALID",
+            "The MIR file does not validate against the Commission's schema: " + "; ".join(found["errors"][:3]),
             errors=found["errors"][:10],
         )
 
@@ -1723,6 +1771,24 @@ def frozen_emdr(xml: bytes, parties, sections: list[dict], left: list[str] = (),
     }
 
 
+def frozen_mir(xml: bytes, parties, report_type: str) -> dict:
+    """What an EU MIR snapshot keeps of its file (B8 step 8): the XML, its SHA-256, its report type and the parties'
+    parts it was built from (a later Settings change never reaches an approved report)."""
+    from backend.app.authority_reports import mir_xml
+
+    keep = ("organisation", "srn", *mir_xml.NEEDED_PARTS)
+    return {
+        "mir_xml": xml.decode("utf-8"),
+        "mir_sha256": hashlib.sha256(xml).hexdigest(),
+        "mir_type": report_type,
+        "mir_parties": {
+            party.role: {key: getattr(party, key, None) for key in keep}
+            for party in parties
+            if party.role in ("MANUFACTURER", "AUTHORISED_REPRESENTATIVE")
+        },
+    }
+
+
 def snapshot_material(obligation, complaint: str, conclusion_id, sections: list[dict], frozen_file: dict) -> dict:
     """What a snapshot's fingerprint (and so its approval signature) covers: the report, its form, the conclusion,
     the sections and, for a US report, the eMDR file's SHA-256 and the parties it was built from (0.10.96, D6)."""
@@ -1736,7 +1802,15 @@ def snapshot_material(obligation, complaint: str, conclusion_id, sections: list[
         "sections": sections,
         **{
             key: frozen_file[key]
-            for key in ("emdr_sha256", "emdr_parties", "form_edition", "us_role", "us_recipients")
+            for key in (
+                "emdr_sha256",
+                "emdr_parties",
+                "form_edition",
+                "us_role",
+                "us_recipients",
+                "mir_sha256",
+                "mir_parties",
+            )
             if key in frozen_file
         },
     }
@@ -1791,6 +1865,21 @@ def request_snapshot(
             frozen_file = {**frozen_file, "us_role": context["us_role"]}
             if context["us_role"]:
                 frozen_file["us_recipients"] = worksheet.us_recipients(context)
+    if obligation.form_code == forms.EU_MIR.code and mir_on(obligation):  # B8 step 8: the MIR file, frozen
+        from backend.app.authority_reports import fda_3500a, mir_xml
+
+        report_type = mir_type(obligation)
+        found = mir_xml.prepare(
+            fda_3500a.values(sections),
+            context["parties"],
+            report_type=report_type,
+            now=now,
+            udi_entity=getattr(context["product"], "udi_issuing_entity", None),
+        )
+        if strict:
+            _mir_gate(found)
+        if found["xml"]:
+            frozen_file = {**frozen_file, **frozen_mir(found["xml"], context["parties"], report_type)}
     if _official_on(obligation):  # B9-D16: the official form's edition, picked by the day sent for approval
         from backend.app.rule_register import register
 
@@ -3351,6 +3440,8 @@ def export(
     india_pdf = kind == "pdf" and obligation.form_code == forms.MVPI_MDAE.code and _b9_india()
     # B9 step 10: a Canada report's official HC Pub. 110180 (form=official).
     ca_pdf = kind == "pdf" and obligation.form_code == forms.HC_MDPR.code and forms.switched_on("MDARIX_B9_CANADA")
+    # B8 step 9: an EU report's PDF is its MIR file in the MIR form's blocks and order.
+    eu_pdf = kind == "pdf" and obligation.form_code == forms.EU_MIR.code and mir_on(obligation)
     if (
         form is not None
         and not (form == "official" and (us_pdf or india_pdf or ca_pdf))
@@ -3388,6 +3479,12 @@ def export(
             body = emdr_pdf.render(found[0], view, organization, found[1], note=found[2])
         elif view.get("signature"):  # approved before 0.10.96, and no file builds from it: today's form, as before
             body = _official_form(db, control_db, obligation, frozen, view, organization)
+    elif eu_pdf:
+        from backend.app.authority_reports import mir_pdf
+
+        found = _mir_for_pdf(db, control_db, obligation, frozen, view)
+        if found:  # else approved before B8 (B8-D10), or a draft that builds no file yet: the worksheet, as before
+            body = mir_pdf.render(found[0], view, organization, note=found[1])
     if body is None:
         body = render.render(view, kind, organization=organization)
     db.add(
@@ -3410,6 +3507,32 @@ def export(
         media_type=MEDIA[kind],
         headers={"Content-Disposition": attachment(f"{stem}.{kind}")},
     )
+
+
+def _mir_for_pdf(db, control_db, obligation: ReportObligation, frozen, view: dict) -> tuple[bytes, str] | None:
+    """The MIR file a PDF shows: the one frozen with the snapshot (and signed with it); for the draft, the file as it
+    builds now; None when there is none."""
+    from backend.app.authority_reports import fda_3500a, mir_xml
+
+    if frozen is not None:
+        stored = (frozen.fields or {}).get("mir_xml")
+        if stored is None:
+            return None
+        body = stored.encode("utf-8")
+        if hashlib.sha256(body).hexdigest() != frozen.fields.get("mir_sha256"):
+            logger.error("MIR file of snapshot %s does not match its approval", frozen.id)
+            raise _error(409, "MIR_CHANGED", "The stored MIR file does not match the approved one")
+        return body, "The file frozen at Send for approval: the approval signature covers it."
+    context = _context(db, control_db, obligation)
+    day = _org_day(db, obligation.tenant_id, _now()).isoformat()
+    found = mir_xml.prepare(
+        fda_3500a.values(view["sections"]) | {"1_2A": day},
+        context["parties"],
+        report_type=mir_type(obligation),
+        now=_now().replace(microsecond=0),
+        udi_entity=getattr(context["product"], "udi_issuing_entity", None),
+    )
+    return (found["xml"], "A draft: the file as it builds now, not approved.") if found["xml"] else None
 
 
 def _b9_india() -> bool:
@@ -3585,6 +3708,54 @@ def _official_form(db, control_db, obligation, frozen, view, organization) -> by
         g1 = fda_3500a.values(view["sections"]).get("G1")
         contact = emdr.office(_context(db, control_db, obligation)["parties"], emdr.OFFICE_ROLES, g1)
     return fda_3500a.render(view, organization, contact)
+
+
+@router.get("/{obligation_id}/mir.xml", dependencies=[Depends(require_permission(DATA_EXPORT))])
+def mir_file(
+    obligation_id: uuid.UUID,
+    snapshot: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """An approved EU report's MIR 7.3.1 XML (B8 step 8): the bytes frozen at Send for approval and covered by the
+    approval, only from the approved snapshot. A report approved before B8 keeps its PDF and has no XML (B8-D10).
+    MDARIX never submits: the customer sends the file to the authority and records the submission here."""
+    tenant_id = _tenant(ctx)
+    obligation = _obligation(db, tenant_id, obligation_id)
+    if obligation.form_code != forms.EU_MIR.code or not mir_on(obligation):
+        raise _error(404, "NOT_AN_EU_MIR", "The MIR file is for an EU report (EU MIR)")
+    frozen = next((row for row in _snapshots(db, obligation) if row.id == snapshot), None)
+    if frozen is None:
+        raise _error(404, "SNAPSHOT_NOT_FOUND", "No such snapshot of this report")
+    if not frozen.signed_record_id:
+        raise _error(409, "APPROVE_FIRST", "The MIR file is made once the report is approved")
+    _approved_only(frozen)
+    stored = (frozen.fields or {}).get("mir_xml")
+    if stored is None:
+        raise _error(404, "NO_MIR_FILE", "This report was approved before MDARIX made MIR files: its PDF is the record")
+    body = stored.encode("utf-8")
+    if hashlib.sha256(body).hexdigest() != frozen.fields.get("mir_sha256"):
+        logger.error("MIR file of snapshot %s does not match its approval", frozen.id)
+        raise _error(409, "MIR_CHANGED", "The stored MIR file does not match the approved one")
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=ctx.user_id,
+            action="REPORT_MIR_DOWNLOADED",
+            entity_type="ReportObligation",
+            entity_id=obligation.id,
+            correlation_id=ctx.correlation_id,
+            details={"snapshot": frozen.version, "sha256": frozen.fields["mir_sha256"]},
+        )
+    )
+    db.commit()
+    ref = complaint_ref(_context(db, control_db, obligation)["record"])
+    return Response(
+        content=body,
+        media_type="application/xml",
+        headers={"Content-Disposition": attachment(f"mdarix-mir-{ref}-snapshot-{frozen.version}.xml")},
+    )
 
 
 @router.get("/{obligation_id}/emdr.xml", dependencies=[Depends(require_permission(DATA_EXPORT))])
