@@ -61,11 +61,22 @@ REPORT_PATH = ("CREATED", "COMPLETE", "APPROVAL", "APPROVED", "SUBMITTED", "ACKN
 
 
 def _imported(data: Session, tenant_id) -> list[Complaint]:
+    """The imported complaints of the most serious harm any of them reports (B6a B3: picked in the database, not by
+    loading every imported complaint; ``harm_rank`` in SQL). The story only ever follows one of these: ``under_way``
+    drops a kept complaint less serious than the most serious one, and ``most_urgent`` chooses among them."""
+    from sqlalchemy import case, func, or_
+
     from backend.app.trial.imports import UPLOAD_SOURCE
 
-    return (
-        data.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.source_system == UPLOAD_SOURCE).all()
+    rank = case(
+        (Complaint.death.is_(True), 3),
+        (Complaint.serious_injury.is_(True), 2),
+        (or_(Complaint.malfunction.is_(True), Complaint.patient_involved.is_(True)), 1),
+        else_=0,
     )
+    mine = (Complaint.tenant_id == tenant_id, Complaint.source_system == UPLOAD_SOURCE)
+    top = data.query(func.max(rank)).filter(*mine).scalar()
+    return [] if top is None else data.query(Complaint).filter(*mine, rank == top).all()
 
 
 def harm_rank(complaint) -> int:
@@ -87,12 +98,12 @@ def reported_harm(complaint) -> str | None:
     return "NONE" if complaint.death is False and complaint.serious_injury is False else None
 
 
-def most_urgent(data: Session, control_db: Session, tenant_id) -> Complaint | None:
+def most_urgent(data: Session, control_db: Session, tenant_id, rows: list | None = None) -> Complaint | None:
     """The trial's own most urgent imported complaint: the most serious harm, then the shortest clock, then the
-    reference (so the choice holds while nothing changes)."""
+    reference (so the choice holds while nothing changes). ``rows``: ``_imported`` already read."""
     from backend.app.oversight.router import complaint_work
 
-    rows = _imported(data, tenant_id)
+    rows = _imported(data, tenant_id) if rows is None else rows
     if not rows:
         return None
     top = max(harm_rank(row) for row in rows)
@@ -129,8 +140,9 @@ def subject(data: Session, control_db: Session, tenant_id, run: str, request=Non
 
     if run == "sample":
         return flagship(data, tenant_id)
-    kept = under_way(request, run, _imported(data, tenant_id)) if request is not None else None
-    return kept or most_urgent(data, control_db, tenant_id)
+    rows = _imported(data, tenant_id)
+    kept = under_way(request, run, rows) if request is not None else None
+    return kept or most_urgent(data, control_db, tenant_id, rows)
 
 
 def _slot(person: dict, run: str, complaint_id) -> dict:

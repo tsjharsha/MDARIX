@@ -85,6 +85,20 @@ def _series(client: TestClient, method: str, path: str, times: int = 0, body=Non
     }
 
 
+def _profile(client: TestClient, path: str, name: str) -> None:
+    """B6a B1: one call profiled, MDARIX's own 45 slowest functions by cumulative time written next to the report."""
+    import cProfile
+    import pstats
+
+    folder = os.getenv("MDARIX_TRIAL_LOAD_PROFILE")
+    if not folder:
+        return
+    profiler = cProfile.Profile()
+    profiler.runcall(client.get, path)
+    with open(os.path.join(folder, f"profile-{name}.txt"), "w", encoding="utf-8") as handle:
+        pstats.Stats(profiler, stream=handle).sort_stats("cumulative").print_stats(r"backend[\\/]app", 45)
+
+
 def _save(report: dict) -> None:
     """Write the report so far (a long run keeps what it measured if it is stopped)."""
     if os.getenv("MDARIX_TRIAL_LOAD_REPORT"):
@@ -133,6 +147,11 @@ def test_measure_a_trial_against_the_targets(monkeypatch):
         user, approval, _ = _approved_trial_client()
         tenant_id = uuid.UUID(approval["tenant_id"])
         trials.append(tenant_id)
+
+        # B6a B1: the complaint page and the story on the sample alone, before any import.
+        pages = ["/api/v1/oversight/events/SAMPLE-RV-11", "/api/v1/trial/one-story"]
+        report["reads_sample"] = [_series(user, "GET", path) for path in pages]
+        _save(report)
 
         # 1. A 5,000-row import, as one file: check, then import. TestClient would run the work the server does after
         # the answer (finding signals, queueing embeddings) before returning: it is held and timed on its own.
@@ -194,10 +213,16 @@ def test_measure_a_trial_against_the_targets(monkeypatch):
             "/api/v1/intake/duplicates",
             "/api/v1/oversight/events/SAMPLE-RV-11",
         ]
+        # B6a: MDARIX_TRIAL_LOAD_PAGES=1 measures only the complaint page and the story, then stops.
+        pages_only = bool(os.getenv("MDARIX_TRIAL_LOAD_PAGES"))
         report["reads_5000"] = []
-        for path in reads:
+        for path in pages if pages_only else reads:
             report["reads_5000"].append(_series(user, "GET", path))
             _save(report)
+        _profile(user, pages[0], "complaint-page-5000")
+        _profile(user, pages[1], "story-5000")
+        if pages_only:
+            return
 
         _save(report)
         # 3. A communications log of more than 500 entries.

@@ -22,7 +22,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from sqlalchemy import event as sa_event, exists, func, or_
+from sqlalchemy import event as sa_event, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.trial.sample_source import is_sample
@@ -487,10 +487,22 @@ def backlog_settings(db: Session, tenant_id: uuid.UUID) -> tuple[int, int]:
     return (settings.backlog_days, settings.backlog_target_days) if settings else (30, 10)
 
 
-def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) -> dict[tuple, dict]:
+def subjects(
+    db: Session, tenant_id: uuid.UUID, records: dict, now: datetime, keys: set[tuple] | None = None
+) -> dict[tuple, dict]:
     """Every record the triage list may show, by ``(kind, id)``: intake events, open imported complaints and open
-    set-aside rows, each with its flags, availability and awareness."""
+    set-aside rows, each with its flags, availability and awareness (``keys``: only these records, B6a)."""
+
+    def only(column, kind, mine: tuple, order: tuple) -> list:
+        """The asked records of ``kind``, within the same READ_LIMIT cut the whole read makes (so both agree)."""
+        if keys is None:
+            return []
+        cut = select(column).where(*mine).order_by(*order).limit(READ_LIMIT)
+        return [column.in_([key[1] for key in keys if key[0] == kind]), column.in_(cut)]
+
     found: dict[tuple, dict] = {}
+    event_rows = (IntakeEvent.tenant_id == tenant_id,)
+    event_order = (IntakeEvent.created_at.desc(), IntakeEvent.id)
     backlog_days = backlog_settings(db, tenant_id)[0]
     products = {
         row.id: row.name
@@ -502,8 +514,8 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
     }
     events = (
         db.query(IntakeEvent)
-        .filter(IntakeEvent.tenant_id == tenant_id)
-        .order_by(IntakeEvent.created_at.desc())
+        .filter(*event_rows, *only(IntakeEvent.id, INTAKE, event_rows, event_order))
+        .order_by(*event_order)
         .limit(READ_LIMIT)
         .all()
     )
@@ -539,10 +551,12 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
             # imported backlog work: no alert, on the Cases list with its note.
             "backlog": record is None and case_import.is_backlog(event, backlog_days),
         }
+    complaint_rows = (Complaint.tenant_id == tenant_id,)
+    complaint_order = (Complaint.ingestion_timestamp.desc().nullslast(), Complaint.id)
     complaints = (
         db.query(Complaint)
-        .filter(Complaint.tenant_id == tenant_id)
-        .order_by(Complaint.ingestion_timestamp.desc().nullslast())
+        .filter(*complaint_rows, *only(Complaint.id, COMPLAINT, complaint_rows, complaint_order))
+        .order_by(*complaint_order)
         .limit(READ_LIMIT)
         .all()
     )
@@ -598,13 +612,15 @@ def subjects(db: Session, tenant_id: uuid.UUID, records: dict, now: datetime) ->
     excluded = _excluded_complaints(db, tenant_id, [key[1] for key in found if key[0] == COMPLAINT])
     for complaint_id in excluded:
         found[(COMPLAINT, complaint_id)]["taken_up"] = True
+    open_rows = (
+        ImportQuarantineRow.tenant_id == tenant_id,
+        ImportQuarantineRow.entity == "complaints",
+        ImportQuarantineRow.status == "OPEN",
+    )
     rows = (
         db.query(ImportQuarantineRow)
-        .filter(
-            ImportQuarantineRow.tenant_id == tenant_id,
-            ImportQuarantineRow.entity == "complaints",
-            ImportQuarantineRow.status == "OPEN",
-        )
+        .filter(*open_rows, *only(ImportQuarantineRow.id, QUARANTINE, open_rows, (ImportQuarantineRow.id,)))
+        .order_by(ImportQuarantineRow.id)
         .limit(READ_LIMIT)
         .all()
     )
@@ -671,6 +687,7 @@ def imported_backlog(
     page_size: int = 25,
     complaint_id: uuid.UUID | None = None,
     now: datetime | None = None,
+    complaint_ids=None,
 ) -> dict:
     """OD-12 / TR-21 (0.10.93, B2): imported complaints whose awareness was more than ``backlog_days`` before their
     import, open, never triaged and not taken up: their own "Imported backlog" view, due ``backlog_target_days``
@@ -743,6 +760,8 @@ def imported_backlog(
     )
     if complaint_id is not None:
         query = query.filter(Complaint.id == complaint_id)
+    if complaint_ids is not None:  # B6a: a page's own complaints (each row is judged alone, so the items are the same)
+        query = query.filter(Complaint.id.in_([uuid.UUID(str(value)) for value in complaint_ids]))
     rows = query.order_by(earliest.asc(), Complaint.id).limit(BACKLOG_READ + 1).all()
     calendar_ = calendar(db, tenant_id)
     products = {row.id: row.name for row in db.query(Product.id, Product.name).filter(Product.tenant_id == tenant_id)}
@@ -812,23 +831,37 @@ def _forget_triage(session, *_) -> None:
 
 
 def triage(
-    db: Session, control_db: Session | None, tenant_id: uuid.UUID, show: str = "open", now: datetime | None = None
+    db: Session,
+    control_db: Session | None,
+    tenant_id: uuid.UUID,
+    show: str = "open",
+    now: datetime | None = None,
+    complaint_ids=None,
 ) -> dict:
-    """The triage list: one item per event (linked records together), the open ones most urgent first."""
+    """The triage list: one item per event (linked records together), the open ones most urgent first.
+    ``complaint_ids`` (B6a): only the events these complaints belong to, each item exactly as the whole list gives it
+    (tests/test_b6a_scoped_watch.py); the summary then counts only them."""
     # A moment given is kept to the minute: the watch passes its own "now", microseconds apart within one request.
     minute = now.replace(second=0, microsecond=0) if isinstance(now, datetime) else now
-    key = (str(tenant_id), show, control_db is not None, minute)
+    scope = None if complaint_ids is None else frozenset(str(value) for value in complaint_ids)
+    key = (str(tenant_id), show, control_db is not None, minute, scope)
     memo = db.info.setdefault(_MEMO, {})
-    kept = memo.get(key)
+    # A read with the people's names also serves one that needs none (B6a: a page read the list twice for that).
+    kept = memo.get(key) or (memo.get((*key[:2], True, *key[3:])) if control_db is None else None)
     if kept and time.monotonic() - kept[0] < _MEMO_SECONDS:
         return kept[1]
-    found = _triage(db, control_db, tenant_id, show, now)
+    found = _triage(db, control_db, tenant_id, show, now, scope)
     memo[key] = (time.monotonic(), found)
     return found
 
 
 def _triage(
-    db: Session, control_db: Session | None, tenant_id: uuid.UUID, show: str, now: datetime | date | None
+    db: Session,
+    control_db: Session | None,
+    tenant_id: uuid.UUID,
+    show: str,
+    now: datetime | date | None,
+    scope: frozenset[str] | None = None,
 ) -> dict:
     now = now or now_utc()
     if not isinstance(now, datetime):
@@ -837,9 +870,14 @@ def _triage(
         now = datetime(now.year, now.month, now.day, 12, tzinfo=timezone.utc)
     today = now.date()
     records = triage_records(db, tenant_id)
-    found = subjects(db, tenant_id, records, now)
     links = links_of(db, tenant_id)
     group = groups(links)
+    keys = None
+    if scope is not None:
+        # The asked complaints and every record linked with them: their events' members, as the whole list has them.
+        wanted = {group.get((COMPLAINT, uuid.UUID(value)), (COMPLAINT, uuid.UUID(value))) for value in scope}
+        keys = {(COMPLAINT, uuid.UUID(value)) for value in scope} | {k for k, g in group.items() if g in wanted}
+    found = subjects(db, tenant_id, records, now, keys)
     enabled = enabled_markets(db, tenant_id)
     context = _deadline_context(db, tenant_id, found, now)
     by_group: dict = {}

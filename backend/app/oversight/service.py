@@ -205,22 +205,33 @@ def _legal_end(day: date, market: str | None, zone: str) -> datetime:
     return end_of(day, market, zone).at
 
 
-def _task_items(db: Session, tenant_id) -> list[dict]:
+def _task_items(db: Session, tenant_id, complaint_ids: set[str] | None = None) -> list[dict]:
+    from sqlalchemy import or_, select
+
     from backend.app.communications.service import TASK_TYPE as REPLY_TASK
     from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
     from backend.app.workflow.labels import role_label
 
-    found = []
-    for task in (
-        db.query(WorkflowTask)
-        .filter(
-            WorkflowTask.tenant_id == tenant_id,
-            WorkflowTask.status.in_(list(OPEN_TASK_STATUSES)),
-            WorkflowTask.due_at.isnot(None),
+    dated = (
+        WorkflowTask.tenant_id == tenant_id,
+        WorkflowTask.status.in_(list(OPEN_TASK_STATUSES)),
+        WorkflowTask.due_at.isnot(None),
+    )
+    order = (WorkflowTask.due_at, WorkflowTask.id)
+    query = db.query(WorkflowTask).filter(*dated)
+    if complaint_ids is not None:
+        # The two ways a task names its complaint (below), within the same READ_LIMIT cut as the whole read (so both
+        # agree); due_items keeps only the asked complaints' items after.
+        query = query.filter(
+            or_(
+                WorkflowTask.details["complaint_id"].astext.in_(list(complaint_ids)),
+                (WorkflowTask.source_entity_type == "Complaint")
+                & WorkflowTask.source_entity_id.in_([uuid.UUID(value) for value in complaint_ids]),
+            ),
+            WorkflowTask.id.in_(select(WorkflowTask.id).where(*dated).order_by(*order).limit(READ_LIMIT)),
         )
-        .order_by(WorkflowTask.due_at)
-        .limit(READ_LIMIT)
-    ):
+    found = []
+    for task in query.order_by(*order).limit(READ_LIMIT):
         details = task.details or {}
         complaint_id = details.get("complaint_id") or (
             task.source_entity_id if task.source_entity_type == "Complaint" else None
@@ -251,11 +262,11 @@ def _task_items(db: Session, tenant_id) -> list[dict]:
     return found
 
 
-def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dict]:
+def _triage_items(db: Session, control_db, tenant_id, now: datetime, ids: set[str] | None = None) -> list[dict]:
     from backend.app.intake import service as intake
 
     found = []
-    for item in intake.triage(db, control_db, tenant_id, "open", now)["items"]:
+    for item in intake.triage(db, control_db, tenant_id, "open", now, complaint_ids=ids)["items"]:
         # shortcut: the sample's SAMPLE-CASE-11 is SAMPLE-RV-11's own call (Getting started, B2 step 7): while the two
         # are apart, RV-11's triage item already alerts for the event, so day 0 stays calm; once attached they are one
         # item and it alerts. Drop this if the sample ever links the two at seeding.
@@ -334,17 +345,28 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime) -> list[dic
     return found
 
 
-def _watch_items(db: Session, control_db, tenant_id, now: datetime) -> list[dict]:
+def watch_read(db: Session, control_db, tenant_id, now: datetime, complaint_ids: set[str] | None = None) -> list[dict]:
+    """The reportability watch's open items (``complaint_ids``: these complaints only), read once per page and shared
+    by its due items and its clocks (B6a: a complaint page read the whole organization's watch twice)."""
+    from backend.app.reportability import service as reportability
+
+    return reportability.watch(
+        db, control_db, tenant_id, show="open", page_size=10_000, today=now, complaint_ids=complaint_ids
+    )["items"]
+
+
+def _watch_items(
+    db: Session, control_db, tenant_id, now: datetime, watched: list[dict] | None = None, ids: set[str] | None = None
+) -> list[dict]:
     """The reportability watch's provisional clock of a market not assessed yet (SAMPLE-RV-06: FDA), so Oversight
     says what Reporting and the complaint page say (stage 8; it listed a market's clock only once its assessment was
     started)."""
     from backend.app.reportability import markets
-    from backend.app.reportability import service as reportability
 
     from backend.app.reportability import facts
 
     found = []
-    for item in reportability.watch(db, control_db, tenant_id, show="open", page_size=10_000, today=now)["items"]:
+    for item in watched if watched is not None else watch_read(db, control_db, tenant_id, now, ids):
         binding = item.get("binding")
         needs = item.get("needs") or []
         if not binding or not binding.get("due_at"):
@@ -370,7 +392,7 @@ def _watch_items(db: Session, control_db, tenant_id, now: datetime) -> list[dict
     return found
 
 
-def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
+def _report_items(db: Session, tenant_id, zone: str, complaint_ids: set[str] | None = None) -> list[dict]:
     from backend.app.authority_reports import forms
     from backend.app.authority_reports import rules as report_rules
     from backend.app.authority_reports.router import _candidates
@@ -380,15 +402,14 @@ def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
     found = []
     # Not capped (0.10.86): an unordered cap could drop an overdue report, or an initial report that was started (its
     # assessment then read "the report is not started"). Only the open ones and the initial reports are read.
-    obligations = (
-        db.query(ReportObligation)
-        .filter(
-            ReportObligation.tenant_id == tenant_id,
-            (ReportObligation.kind == "INITIAL")
-            | (ReportObligation.due_on.isnot(None) & ReportObligation.state.notin_(list(report_rules.CLOSED))),
-        )
-        .all()
+    query = db.query(ReportObligation).filter(
+        ReportObligation.tenant_id == tenant_id,
+        (ReportObligation.kind == "INITIAL")
+        | (ReportObligation.due_on.isnot(None) & ReportObligation.state.notin_(list(report_rules.CLOSED))),
     )
+    if complaint_ids is not None:
+        query = query.filter(ReportObligation.complaint_id.in_([uuid.UUID(value) for value in complaint_ids]))
+    obligations = query.all()
     started = {(row.complaint_id, row.market) for row in obligations if row.kind == "INITIAL"}
     for row in obligations:
         if row.due_on is None or row.state in report_rules.CLOSED:
@@ -409,6 +430,8 @@ def _report_items(db: Session, tenant_id, zone: str) -> list[dict]:
         )
     for row in _candidates(db, tenant_id):
         if row.due_on is None or row.filed_on or (row.complaint_id, row.market) in started:
+            continue
+        if complaint_ids is not None and str(row.complaint_id) not in complaint_ids:
             continue
         label = markets.MARKET_LABELS.get(row.market, row.market)
         pending = row.conclusion is None
@@ -538,22 +561,37 @@ def _with_complaints(db: Session, tenant_id, items: list[dict]) -> None:
 
 
 def due_items(
-    db: Session, control_db: Session | None, tenant_id, now: datetime | None = None, failed: list[str] | None = None
+    db: Session,
+    control_db: Session | None,
+    tenant_id,
+    now: datetime | None = None,
+    failed: list[str] | None = None,
+    *,
+    complaint_ids: set[str] | None = None,
+    watched: list[dict] | None = None,
 ) -> list[dict]:
     """Every dated item of the organization (see the module docstring), soonest first. A source that cannot be read
     (an older database) is left out and logged, and named in ``failed`` when given (B6a: the deadline list says it is
-    incomplete); the others still show."""
+    incomplete); the others still show.
+
+    B6a: ``complaint_ids`` gives only these complaints' items, the same items in the same order as the whole
+    organization's list filtered to them (tests/test_b6a_scoped_watch.py): each source reads only them, and the
+    sources that never name a complaint (guides, CAPAs, e-mails) are not read. ``watched``: the watch already read
+    for the same complaints (watch_read), so a page reads it once."""
     now = now or now_utc()
     calendar = calendar_of(db, tenant_id)
+    ids = None if complaint_ids is None else {str(value) for value in complaint_ids}
     sources = (
-        ("tasks", lambda: _task_items(db, tenant_id)),
-        ("triage", lambda: _triage_items(db, control_db, tenant_id, now)),
-        ("reports", lambda: _report_items(db, tenant_id, calendar.zone)),
-        ("watch", lambda: _watch_items(db, control_db, tenant_id, now)),
+        ("tasks", lambda: _task_items(db, tenant_id, ids)),
+        ("triage", lambda: _triage_items(db, control_db, tenant_id, now, ids)),
+        ("reports", lambda: _report_items(db, tenant_id, calendar.zone, ids)),
+        ("watch", lambda: _watch_items(db, control_db, tenant_id, now, watched, ids)),
         ("guides", lambda: _guide_items(db, tenant_id, calendar)),
         ("capas", lambda: _capa_items(db, tenant_id)),
         ("e-mails", lambda: _mail_items(db, tenant_id, calendar)),
     )
+    if ids is not None:
+        sources = tuple(source for source in sources if source[0] not in ("guides", "capas", "e-mails"))
     items: list[dict] = []
     for name, read in sources:
         try:
@@ -587,6 +625,8 @@ def due_items(
         for item in items
         if not (item["key"].startswith("watch:") and (item["complaint_id"], item["market"]) in dated)
     ]
+    if ids is not None:
+        items = [item for item in items if item["complaint_id"] in ids]
     _with_complaints(db, tenant_id, items)
     items.sort(key=lambda item: (item["due_at"], item["key"]))
     return items

@@ -48,6 +48,8 @@ artifacts/data-plane-backups/
 artifacts/automated-release-gate.md
 # Local demo recordings and their injected recorder helpers are generated evidence, not application source.
 artifacts/demo/
+# B6a G7: each release check's full output (the summary artifacts/release-checks-<version>.json stays tracked).
+artifacts/release-checks/
 
 # Keys, certificates, database dumps and encrypted backups never belong in the repository; the filled production
 # settings (.env.production, .env.migrate) are covered by .env.* above.

@@ -168,12 +168,13 @@ def open_tasks_by_complaint(db: Session, tenant_id) -> dict[str, list]:
     return found
 
 
-def open_on_triage(db: Session, tenant_id) -> set[str]:
-    """The complaints open on the triage list (flagged or escalated, triage not complete), read once for a list."""
+def open_on_triage(db: Session, tenant_id, complaint_ids=None) -> set[str]:
+    """The complaints open on the triage list (flagged or escalated, triage not complete), read once for a list
+    (``complaint_ids``: of these complaints' events only, B6a)."""
     from backend.app.intake import service as intake
 
     found: set[str] = set()
-    for item in intake.triage(db, None, tenant_id, "open")["items"]:
+    for item in intake.triage(db, None, tenant_id, "open", complaint_ids=complaint_ids)["items"]:
         found |= {member.split(":", 1)[1] for member in item["members"] if member.startswith(f"{intake.COMPLAINT}:")}
     return found
 
@@ -241,7 +242,8 @@ def facts(
     return {
         "complaint": complaint,
         "record": triage_record(db, tenant_id, complaint.id),
-        "on_triage": str(complaint.id) in (triage if triage is not None else open_on_triage(db, tenant_id)),
+        "on_triage": str(complaint.id)
+        in (triage if triage is not None else open_on_triage(db, tenant_id, {str(complaint.id)})),
         "intakes": intakes,
         "first_contact": checks,
         "assessments": rows_by_complaint(db, tenant_id, [complaint.id]).get(complaint.id, {}),
@@ -310,7 +312,7 @@ def facts_many(
     if not ids:
         return {}
     tasks = tasks if tasks is not None else open_tasks_by_complaint(db, tenant_id)
-    triage = triage if triage is not None else open_on_triage(db, tenant_id)
+    triage = triage if triage is not None else open_on_triage(db, tenant_id, {str(value) for value in ids})
     enabled = enabled if enabled is not None else enabled_markets(db, tenant_id)
 
     def grouped(rows, key) -> dict:

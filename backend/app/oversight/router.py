@@ -157,12 +157,14 @@ def _escalations(db, tenant_id) -> dict[str, list[str]]:
     return found
 
 
-def _item_views(db, control_db, tenant_id, now: datetime) -> tuple[list[dict], dict]:
+def _item_views(
+    db, control_db, tenant_id, now: datetime, complaint_ids: set[str] | None = None, watched: list[dict] | None = None
+) -> tuple[list[dict], dict]:
     view = service.settings_view(service.settings_row(db, tenant_id))
     calendar = service.calendar_from(view)
     today = calendar.local_day(now)
     away = service.absences(db, tenant_id, today)
-    items = service.due_items(db, control_db, tenant_id, now)
+    items = service.due_items(db, control_db, tenant_id, now, complaint_ids=complaint_ids, watched=watched)
     escalated = _escalations(db, tenant_id)
     refs = {ref for item in items for ref in (item["owner_id"], item["backup_id"])}
     refs |= {ref for found in escalated.values() for ref in found} | {a["backup_id"] for a in away}
@@ -349,8 +351,9 @@ def _signers(control_db, tenant_id, me: str, has_case: bool) -> dict[str, dict]:
 def dated_reads(db, control_db, tenant_id, now) -> tuple[list[dict], dict, dict[str, list[dict]]]:
     """The dated items, their context and the watch's clocks that the list's views, its order and its work columns all
     read: read once per request (0.10.85, D3.13; each read the whole watch again)."""
-    views, context = _item_views(db, control_db, tenant_id, now)
-    clocks = _watch_clocks(db, control_db, tenant_id, None, now, context["settings"]["reminder_hours"])
+    watched = service.watch_read(db, control_db, tenant_id, now)  # B6a: the watch read once, not twice
+    views, context = _item_views(db, control_db, tenant_id, now, watched=watched)
+    clocks = _watch_clocks(db, control_db, tenant_id, None, now, context["settings"]["reminder_hours"], watched)
     return views, context, clocks
 
 
@@ -392,13 +395,16 @@ def complaint_work(db, control_db, tenant_id, complaints: list, reads=None) -> d
     ids = {str(complaint.id) for complaint in complaints}
     now = service.now_utc()
     if reads is None:
-        views, context = _item_views(db, control_db, tenant_id, now)
-        clocks = _watch_clocks(db, control_db, tenant_id, ids, now, context["settings"]["reminder_hours"])
+        # B6a: only these complaints' items and watch, the watch read once (equal to the whole organization's read
+        # filtered to them: tests/test_b6a_scoped_watch.py).
+        watched = service.watch_read(db, control_db, tenant_id, now, ids)
+        views, context = _item_views(db, control_db, tenant_id, now, complaint_ids=ids, watched=watched)
+        clocks = _watch_clocks(db, control_db, tenant_id, ids, now, context["settings"]["reminder_hours"], watched)
     else:
         views, context, clocks = reads
     due = [view for view in views if view["complaint_id"] in ids]
     tasks = closure.open_tasks_by_complaint(db, tenant_id)
-    triage = closure.open_on_triage(db, tenant_id)
+    triage = closure.open_on_triage(db, tenant_id, ids)
     rows = {
         row.complaint_id: row
         for row in db.query(EventClosure).filter(
@@ -454,14 +460,15 @@ def complaint_work(db, control_db, tenant_id, complaints: list, reads=None) -> d
     return out
 
 
-def _watch_clocks(db, control_db, tenant_id, ids: set[str] | None, now, reminder_hours: int) -> dict[str, list[dict]]:
+def _watch_clocks(
+    db, control_db, tenant_id, ids: set[str] | None, now, reminder_hours: int, watched: list[dict] | None = None
+) -> dict[str, list[dict]]:
     """The reportability watch's running clock of each complaint (its binding deadline), as a dated item (``ids``:
-    these complaints only; None: every one)."""
+    these complaints only; None: every one; ``watched``: the watch already read for them)."""
     from backend.app.reportability import facts, markets
-    from backend.app.reportability import service as reportability
 
     out: dict[str, list[dict]] = {}
-    for item in reportability.watch(db, control_db, tenant_id, show="open", page_size=10_000, today=now)["items"]:
+    for item in watched if watched is not None else service.watch_read(db, control_db, tenant_id, now, ids):
         binding = item.get("binding")
         if (ids is not None and str(item["id"]) not in ids) or not binding or not binding.get("due_at"):
             continue

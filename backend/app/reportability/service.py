@@ -10,7 +10,7 @@ import uuid
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.complaint_review import rules as review_rules
@@ -288,7 +288,7 @@ def assess(
     }
 
 
-def _rows(db: Session, tenant_id: uuid.UUID, since: date, product_id: uuid.UUID | None):
+def _rows(db: Session, tenant_id: uuid.UUID, since: date, product_id: uuid.UUID | None, complaint_ids=None):
     query = (
         db.query(Complaint, Product, ProductVersion.version_identifier, ComplaintSecondLook.decision)
         .outerjoin(Product, (Product.tenant_id == Complaint.tenant_id) & (Product.id == Complaint.product_id))
@@ -300,19 +300,26 @@ def _rows(db: Session, tenant_id: uuid.UUID, since: date, product_id: uuid.UUID 
             ComplaintSecondLook,
             (ComplaintSecondLook.tenant_id == Complaint.tenant_id) & (ComplaintSecondLook.complaint_id == Complaint.id),
         )
-        .filter(
-            Complaint.tenant_id == tenant_id,
-            or_(
-                Complaint.death.is_(True),
-                Complaint.serious_injury.is_(True),
-                Complaint.malfunction.is_(True),
-                Complaint.patient_involved.is_(True),
-            ),
-            or_(AWARE_AT.is_(None), AWARE_AT >= datetime.combine(since, datetime.min.time(), tzinfo=timezone.utc)),
-        )
     )
+    followed = [
+        Complaint.tenant_id == tenant_id,
+        or_(
+            Complaint.death.is_(True),
+            Complaint.serious_injury.is_(True),
+            Complaint.malfunction.is_(True),
+            Complaint.patient_involved.is_(True),
+        ),
+        or_(AWARE_AT.is_(None), AWARE_AT >= datetime.combine(since, datetime.min.time(), tzinfo=timezone.utc)),
+    ]
     if product_id:
-        query = query.filter(Complaint.product_id == product_id)
+        followed.append(Complaint.product_id == product_id)
+    query = query.filter(*followed)
+    if complaint_ids is not None:
+        # B6a: the asked complaints, within the same READ_LIMIT cut the whole read makes, so both always agree.
+        cut = select(Complaint.id).where(*followed).order_by(AWARE_AT.asc(), Complaint.id).limit(READ_LIMIT)
+        query = query.filter(
+            Complaint.id.in_([uuid.UUID(str(value)) for value in complaint_ids]), Complaint.id.in_(cut)
+        )
     return query.order_by(AWARE_AT.asc(), Complaint.id).limit(READ_LIMIT + 1).all()
 
 
@@ -343,15 +350,17 @@ def watch(
     page: int = 1,
     page_size: int = 25,
     today: datetime | date | None = None,
+    complaint_ids=None,
 ) -> dict:
     """The complaints whose reportability needs a person's decision, most urgent first, with a summary. ``today``:
-    now (a day in older callers)."""
+    now (a day in older callers). ``complaint_ids`` (B6a): these complaints only, each item exactly as the whole
+    organization's read gives it (tests/test_b6a_scoped_watch.py); the summary then counts only them."""
     today = deadlines.as_moment(today)
     org_zone = deadlines.org_zone(db, tenant_id)
     settings = settings_of(db, tenant_id)
     windows = settings["windows"]
     since = deadlines.day_of(today) - timedelta(days=settings["lookback_days"])
-    rows = _rows(db, tenant_id, since, product_id)
+    rows = _rows(db, tenant_id, since, product_id, complaint_ids)
     truncated = len(rows) > READ_LIMIT
     candidates = []
     held_on_second_look = 0
@@ -385,7 +394,7 @@ def watch(
     names = people(control_db, tenant_id, (row.decided_by for row in decisions.values()))
     assessed = assessments.rows_by_complaint(db, tenant_id, ids)
     roles = reporting_roles(db, tenant_id)
-    backlog = imported_backlog(db, tenant_id, today) if ids else {}
+    backlog = imported_backlog(db, tenant_id, today, ids if complaint_ids is not None else None) if ids else {}
     from backend.app.reportability import other_countries
 
     # Read with the switch off too: a report still open must not let the complaint read as settled.
@@ -413,7 +422,7 @@ def watch(
             # Waiting for its country or awareness date, the clock is the shortest possible: the earliest of the
             # per-market deadlines the triage table shows, one calculation for every screen (0.10.82).
             if shortest is None:
-                shortest = triage_shortest(db, control_db, tenant_id, today)
+                shortest = triage_shortest(db, control_db, tenant_id, today, complaint_ids)
             seen["binding"] = shortest_binding(seen["binding"], shortest.get(str(complaint.id)))
         if str(complaint.id) in backlog:
             seen["binding"] = backlog_binding(seen["binding"], backlog[str(complaint.id)], today)
@@ -589,15 +598,15 @@ def clocks_for(
     return sorted(found, key=lambda item: (order.get(item["state"], 9), (item["binding"] or {}).get("due_at") or ""))
 
 
-def triage_shortest(db: Session, control_db, tenant_id: uuid.UUID, now) -> dict[str, dict]:
+def triage_shortest(db: Session, control_db, tenant_id: uuid.UUID, now, complaint_ids=None) -> dict[str, dict]:
     """Each complaint's earliest per-market deadline as triage counts it (intake/rules.py provisional_deadlines, each
-    market's conservative category), by the complaint's id: what "shortest possible" means on every screen.
-    shortcut: reads the whole triage list once per watch read; fine for a trial's or pilot's hundreds of open events,
-    read only the complaints asked for if a watch ever holds thousands."""
+    market's conservative category), by the complaint's id: what "shortest possible" means on every screen
+    (``complaint_ids``: only these complaints' events, B6a; the whole list otherwise)."""
     from backend.app.intake import service as intake
 
     found: dict[str, dict] = {}
-    for item in intake.triage(db, control_db, tenant_id, "all", deadlines.as_moment(now))["items"]:
+    moment = deadlines.as_moment(now)
+    for item in intake.triage(db, control_db, tenant_id, "all", moment, complaint_ids=complaint_ids)["items"]:
         dated = [deadline for deadline in item["deadlines"] if deadline.get("due_at")]
         if not dated:
             continue
@@ -612,11 +621,13 @@ def triage_shortest(db: Session, control_db, tenant_id: uuid.UUID, now) -> dict[
     return found
 
 
-def imported_backlog(db: Session, tenant_id: uuid.UUID, now) -> dict[str, dict]:
-    """The Imported backlog's complaints (intake.service.imported_backlog), by id."""
+def imported_backlog(db: Session, tenant_id: uuid.UUID, now, complaint_ids=None) -> dict[str, dict]:
+    """The Imported backlog's complaints (intake.service.imported_backlog), by id (``complaint_ids``: these only)."""
     from backend.app.intake import service as intake
 
-    found = intake.imported_backlog(db, tenant_id, page_size=intake.BACKLOG_READ, now=now)["items"]
+    found = intake.imported_backlog(db, tenant_id, page_size=intake.BACKLOG_READ, now=now, complaint_ids=complaint_ids)[
+        "items"
+    ]
     return {item["id"]: item for item in found}
 
 
