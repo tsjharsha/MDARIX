@@ -1565,27 +1565,32 @@ def assign_number(db, control_db, obligation: ReportObligation, actor: str, now:
         return
     db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": f"{NUMBER_LOCK}{obligation.tenant_id}"})
     value = ReportObligation.entries[key]["value"].astext
+    other = ReportObligation.entries["MFR_REPORT" if key == "F2" else "F2"]["value"].astext
     chain = {obligation.id, obligation.parent_id} - {None}
-    rows = [
-        (number, source == SAMPLE_SOURCE)
-        for row_id, parent_id, number, source in db.query(
-            ReportObligation.id, ReportObligation.parent_id, value, ReportObligation.source_system
+    found = [
+        (number, other_number, source == SAMPLE_SOURCE)
+        for row_id, parent_id, number, other_number, source in db.query(
+            ReportObligation.id, ReportObligation.parent_id, value, other, ReportObligation.source_system
         )
         .filter(
             ReportObligation.tenant_id == obligation.tenant_id,
             ReportObligation.form_code == forms.FDA_3500A.code,
-            value.isnot(None),
+            (value.isnot(None)) | (other.isnot(None)),
         )
         .order_by(ReportObligation.created_at, ReportObligation.id)
         if row_id not in chain and parent_id not in chain
     ]
+    rows = [(number, sample) for number, _, sample in found if number]
+    # Review item 3: the other role's numbers (a manufacturer's front-page number, an importer's or user facility's
+    # F2) are never reused either: an FEI-based F2 has the manufacturer number's very format.
+    others = {number for _, number, _ in found if number}
     # A trial's sample report holds a practice number (0.10.96, A9): it is never reused, but never the organization's
     # first number either, so the person still types their own once. Sample numbers go first: the CFN is the last own.
     used = [number for number, sample in sorted(rows, key=lambda row: not row[1])]
     entries = dict(obligation.entries or {})
     typed = (entries.get(key) or {}).get("value")
     if typed:
-        if typed in used:
+        if typed in used or typed in others:
             raise _error(
                 409, "REPORT_NUMBER_IN_USE", f"Report number {typed} is already used by another US report: clear it"
             )
@@ -1594,6 +1599,9 @@ def assign_number(db, control_db, obligation: ReportObligation, actor: str, now:
     pattern = emdr.ROLE_NUMBER.get(letter, emdr.REPORT_NUMBER)
     own = any(not sample and pattern.match(number) for number, sample in rows)
     number = emdr.next_number(used, year, _trial(control_db, obligation.tenant_id), letter) if own else None
+    while number is not None and number in others:  # the same CFN or FEI as the other role's: the next free one
+        used.append(number)
+        number = emdr.next_number(used, year, _trial(control_db, obligation.tenant_id), letter)
     if number is None:
         return  # the organization's first number: a person types it once (FIRST_NUMBER, after the mandatory fields)
     entries[key] = {"value": number, "by": actor, "at": _iso(now), "assigned": True}
