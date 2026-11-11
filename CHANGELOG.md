@@ -68,6 +68,11 @@ with your consultant". Switch: `MDARIX_B9B_OTHER` (on).
   `MDARIX_B9B_OTHER`.
 
 ### Fixed
+- Other countries never reach a five-market screen or count (the disposition triggers, the decision trees' list,
+  the management review's signed counts, the second look). A report the authority received is never cancelled by a
+  later Not reportable; with the switch off no shared route changes an Other Regulatory Report; the authority's
+  answer is recorded only between Submitted and Close; a follow-up never sent can be cancelled; the signed
+  "submitted on" day is the organization's.
 - The permission sweep tests reach B7b's e-mail intake guards (the intake switch is on for the sweep; the intake
   address settings are reviewed exemptions, Customer Admin only).
 
