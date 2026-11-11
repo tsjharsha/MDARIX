@@ -1652,6 +1652,25 @@ EVIDENCE_LABELS = {
 }
 
 
+# India's P1 before B9 (typed, "the day you submit"): in force again while MDARIX_B9_INDIA is off (spec 6.4).
+_INDIA_BEFORE_B9 = {"P1": Field("P1", "1", "Date of report", None, MUST, note="The day you submit.")}
+
+
+def india_derived() -> bool:
+    """B9 step 14 is in force: India's P1 is the day sent for approval and P2 follows the chain. Off, both are typed
+    as before B9 (today's worksheet stays)."""
+    from backend.app.feature_set import switched_on
+
+    return switched_on("MDARIX_B9_INDIA")
+
+
+def in_force(form: Form, field: Field) -> Field:
+    """The field as the switches have it now: India's P1 is typed again while MDARIX_B9_INDIA is off."""
+    if form.code == MVPI_MDAE.code and field.id in _INDIA_BEFORE_B9 and not india_derived():
+        return _INDIA_BEFORE_B9[field.id]
+    return field
+
+
 def form_for(market: str, new_navigation: bool) -> Form | None:
     """The market's worksheet, or None: the classic navigation keeps the US and India ones only."""
     return BY_MARKET.get(market) if new_navigation or market in CLASSIC_MARKETS else None

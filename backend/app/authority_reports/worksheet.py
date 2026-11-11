@@ -605,8 +605,11 @@ def _sent_day(context):
     return (day, _source("Worksheet", None, "The day the report was sent for approval")) if day else None
 
 
-# Sources a typed value never overrides: B4/P1 (the day sent for approval) and India's P2 (the chain, B9).
-DERIVED_ONLY = frozenset({"sent_day", "in_report_type"})
+def derived_only(source: str | None) -> bool:
+    """A source a typed value never overrides: B4/P1 (the day sent for approval) and, while MDARIX_B9_INDIA is on,
+    India's P2 (the chain, B9). Off, P2 is typed over "Initial" as before B9."""
+    return source == "sent_day" or (source == "in_report_type" and forms.india_derived())
+
 
 SOURCES = {
     "sent_day": _sent_day,
@@ -846,6 +849,7 @@ def build(
     for section in form.sections:
         rows = []
         for item in section.fields:
+            item = forms.in_force(form, item)
             entry = entries.get(item.id) or {}
             missing = forms.MUST if item.id in required else forms.missing_class(item, kind)
             if item.id == "H2" and context.get("follow_up"):
@@ -878,7 +882,7 @@ def build(
             if annex and confirm and value and not entry.get("value") and not entry.get("confirmed"):
                 # A code the mapping supplies waits for a person (0.10.77): never filed unconfirmed.
                 suggestion, value, status = value, None, SUGGESTED
-            if not item.personal and entry.get("value") and item.source not in DERIVED_ONLY:  # B4 typed before 0.10.96
+            if not item.personal and entry.get("value") and not derived_only(item.source):  # B4 typed before 0.10.96
                 value, status = (
                     entry["value"],
                     {CONFIRMED: CONFIRMED, CHANGED: CHANGED}.get(entry.get("code_state"), ENTERED),
@@ -915,7 +919,7 @@ def build(
                     "source": source,
                     "personal": item.personal,
                     "missing_class": missing,
-                    "editable": not item.personal and missing != forms.NOT_USED and item.source not in DERIVED_ONLY,
+                    "editable": not item.personal and missing != forms.NOT_USED and not derived_only(item.source),
                     "options": list(item.options) or None,
                     "note": item.note or None,
                     "kind": item.kind,

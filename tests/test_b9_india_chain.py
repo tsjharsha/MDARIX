@@ -107,3 +107,31 @@ def test_b9_india_sample_gives_form_and_sheet(trial):  # noqa: F811
     assert "ADRMS fields, in screen order" in PdfReader(io.BytesIO(sheet.content)).pages[0].extract_text()
     refused = user.get(url, params={"form": "official"})  # the working draft: not approved
     assert refused.status_code == 409 and refused.json()["detail"]["code"] == "APPROVE_FIRST"
+
+
+def test_p1_and_p2_follow_the_india_switch_off_on_off(trial, monkeypatch):  # noqa: F811
+    """Spec 6.4: off, today's worksheet stays (P1 and P2 typed); on, P1 is the day sent and P2 follows the chain."""
+    user, tenant_id = trial["user"], trial["tenant_id"]
+    initial = _items(user)[("SAMPLE-RV-10", "IN", "INITIAL")]["id"]
+    _state(tenant_id, initial, "DRAFT")
+
+    def put(field: str, value: str):
+        return user.put(f"{REPORTS}/{initial}/fields/{field}", json={"value": value})
+
+    monkeypatch.setenv("MDARIX_B9_INDIA", "off")
+    assert put("P1", "2026-11-02").status_code == 200
+    assert put("P2", "Follow up").status_code == 200
+    fields = _fields(_ok(user.get(f"{REPORTS}/{initial}")))
+    assert fields["P1"]["editable"] and fields["P1"]["value"] == "2026-11-02"
+    assert fields["P2"]["editable"] and fields["P2"]["value"] == "Follow up"
+
+    monkeypatch.setenv("MDARIX_B9_INDIA", "on")
+    fields = _fields(_ok(user.get(f"{REPORTS}/{initial}")))
+    assert not fields["P1"]["editable"] and fields["P1"]["value"] != "2026-11-02"
+    assert not fields["P2"]["editable"] and fields["P2"]["value"] == "Initial"
+    assert put("P2", "Final").json()["detail"]["code"] == "FOLLOWS_CHAIN"
+    assert put("P1", "2026-11-03").json()["detail"]["code"] == "FILLED_AT_SEND"
+
+    monkeypatch.setenv("MDARIX_B9_INDIA", "off")
+    fields = _fields(_ok(user.get(f"{REPORTS}/{initial}")))
+    assert fields["P1"]["value"] == "2026-11-02" and fields["P2"]["value"] == "Follow up"

@@ -1161,6 +1161,7 @@ def set_field(
     field = next((item for item in _form(obligation).fields() if item.id == field_id), None)
     if field is None:
         raise _error(404, "FIELD_UNKNOWN", "No such field on this form")
+    field = forms.in_force(_form(obligation), field)  # B9 off: India's P1 is typed again
     if field.personal:
         raise _error(
             422,
@@ -1188,7 +1189,7 @@ def set_field(
         )
     if value and field.source == "sent_day":
         raise _error(422, "FILLED_AT_SEND", "This date is filled in with the day the report is sent for approval")
-    if value and field.source == "in_report_type":
+    if value and field.source == "in_report_type" and forms.india_derived():  # off: typed over "Initial", as before
         raise _error(422, "FOLLOWS_CHAIN", "The report type follows the chain: create a follow-up or final instead")
     problem = forms.value_problem(field, value)
     if problem:
