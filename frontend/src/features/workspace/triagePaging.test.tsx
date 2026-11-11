@@ -43,7 +43,8 @@ vi.mock("../customer-admin/shared", async (original) => ({
   ...(await original<typeof import("../customer-admin/shared")>()),
   useResource: (path: string | null) => {
     if (path) asked.push(path);
-    const away = path?.includes("&want=COMPLAINT%3Ac140");
+    // Any address read answers item 140, as a read kept from an earlier address would.
+    const away = path?.includes("&want=");
     return {
       state: "ready",
       data: away ? { ...LIST, items: [], wanted: item(140) } : path?.startsWith("/api/v1/triage?") ? LIST : null,
@@ -87,5 +88,10 @@ describe("the triage list pages, never hides", () => {
 
   it("opens an item past the first page by its address", () => {
     expect(render("To triage?item=COMPLAINT%3Ac140")).toContain('data-drawer="open"');
+  });
+
+  it("never opens an item read for another address (a closed or changed address)", () => {
+    expect(render("To triage?item=COMPLAINT%3Ac141")).not.toContain('data-drawer="open"');
+    expect(render("To triage")).not.toContain('data-drawer="open"');
   });
 });

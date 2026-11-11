@@ -91,6 +91,17 @@ class _NoMemo(dict):
         pass
 
 
+class _Counted(dict):
+    """The deadline memo, counting the items it served (so the proof cannot pass without the memo being used)."""
+
+    hits = 0
+
+    def get(self, key, default=None):
+        found = super().get(key, default)
+        _Counted.hits += found is not None
+        return found
+
+
 def _assert_pages_equal_whole(tenant_id, monkeypatch) -> int:
     """B6a run 4: the triage list read page by page (each page its own request, ``limit`` 100) equals the whole list
     in order, with the same counts (items, past the triage target, summary); an item on any page, or in the Imported
@@ -98,9 +109,11 @@ def _assert_pages_equal_whole(tenant_id, monkeypatch) -> int:
     from backend.app.intake import service as intake
 
     real = intake._deadline_context
+    _Counted.hits = 0
     with SessionLocal() as db:
         bind_tenant(db, tenant_id)
         db.info.pop(intake._MEMO, None)
+        monkeypatch.setattr(intake, "_deadline_context", lambda *args: {**real(*args), "deadline_memo": _Counted()})
         whole = intake.triage(db, db, tenant_id, "all", NOW)
         monkeypatch.setattr(intake, "_deadline_context", lambda *args: {**real(*args), "deadline_memo": _NoMemo()})
         db.info.pop(intake._MEMO, None)
@@ -239,7 +252,8 @@ def test_the_story_chooses_the_same_imported_complaint_as_before(trial, monkeypa
 def test_the_load_set_reads_the_same_scoped_as_organization_wide(trial, monkeypatch):  # B6-14, load set
     _import(trial["user"], 5000)
     _assert_story_chooses_as_before(trial["tenant_id"], monkeypatch)
-    assert _assert_pages_equal_whole(trial["tenant_id"], monkeypatch) >= 1000  # B6a run 4: more than ten pages
+    # B6a run 4: more than four pages (most of the load set is Imported backlog, found by address), the memo used.
+    assert _assert_pages_equal_whole(trial["tenant_id"], monkeypatch) >= 400 and _Counted.hits >= 1000
     assert _assert_scoped_equals_whole(trial["tenant_id"], monkeypatch) >= 100
 
 
@@ -309,23 +323,29 @@ def test_the_watch_read_cut_keeps_undecided_complaints_earliest_awareness_first(
     the latest awareness first (it dropped the newest first, decided or not)."""
     from datetime import date
 
-    from backend.app.db.models.market_assessment import ComplaintMarketAssessment
     from backend.app.db.models.reportability import ComplaintReportability
     from backend.app.reportability import service as reportability
 
     with SessionLocal() as db:
         bind_tenant(db, trial["tenant_id"])
+        first = reportability._rows(db, trial["tenant_id"], date(2000, 1, 1), None)[0][0]
+        if not db.query(ComplaintReportability).filter(ComplaintReportability.tenant_id == trial["tenant_id"]).count():
+            # A recorded decision on the complaint read first so far: the order must now move it last.
+            db.add(
+                ComplaintReportability(
+                    tenant_id=trial["tenant_id"],
+                    complaint_id=first.id,
+                    decision="NOT_REPORTABLE",
+                    rationale="Test: decided, so the read cut leaves it out first.",
+                    decided_by="test",
+                )
+            )
+            db.commit()
         everyone = reportability._rows(db, trial["tenant_id"], date(2000, 1, 1), None)
         decided = {
             row[0]
             for row in db.query(ComplaintReportability.complaint_id).filter(
                 ComplaintReportability.tenant_id == trial["tenant_id"]
-            )
-        } | {
-            row[0]
-            for row in db.query(ComplaintMarketAssessment.complaint_id).filter(
-                ComplaintMarketAssessment.tenant_id == trial["tenant_id"],
-                ComplaintMarketAssessment.conclusion.isnot(None),
             )
         }
         undecided = [row[0] for row in everyone if row[0].id not in decided]

@@ -86,7 +86,9 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const away = useResource<TriageList>(
     wanted && list.data && !onPage ? `${TRIAGE}?show=${show}&limit=0&want=${encodeURIComponent(wanted)}` : null,
   );
-  const open = onPage ?? away.data?.wanted ?? null;
+  // The last answer stays after the address changes or closes: use it only when it is the item asked for now.
+  const far = away.data?.wanted;
+  const open = onPage ?? (wanted && far && [far.key, far.ref, far.identifier].includes(wanted) ? far : null);
   const setOpen = (item: TriageItem | null) => {
     if (item || !reportTab || !shownTab) return setOpenKey(item ? item.key : null);
     // Closing clears every parameter that opens the panel, in one address change: complaint= or ref= left behind

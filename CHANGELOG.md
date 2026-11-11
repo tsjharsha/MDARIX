@@ -111,6 +111,17 @@ No migration. Switches: `MDARIX_B6_DEADLINE_LIST` and `MDARIX_B6_LATE_ENTRY` (bo
 - **"Try the daily list" beside the deadline downloads** (free trials, owner 11 Nov), not only in My Account.
 - **Fixed:** the Imported backlog read with a day (the readiness checks' reporting clocks) raised an error when an
   organization had backlog complaints; it reads the day at its noon UTC, as triage does.
+- **The triage list is paged on the server.** The Triage screen asks for 100 events at a time and gets the whole
+  list's counts with them (events to triage, past the triage target, "N more"); an event further down, or in the
+  Imported backlog, is asked for by its address alone. A complaint's own triage panel reads only that complaint's
+  event. Every open item is still counted: no deadline is hidden. The harm words are matched with patterns built
+  once, items with the same awareness and facts share one deadline count, and only the complaint columns the list
+  uses are read. At 5,000 imported complaints (local, in-process, on a laptop short of memory) the screen's read is
+  p50 1.6 s / p95 2.0 s (it was 4.6 / 4.9 s): still above the 500 ms target.
+- **"Incomplete" everywhere a dated read can be cut.** The complaint list views and the Oversight CSV now say so too
+  (Oversight and the deadline list already did). Past its 20,000-complaint read cut the reportability watch keeps
+  the complaints without a recorded reportability decision, earliest awareness first (it dropped the latest
+  awareness first, decided or not), and says what it left out.
 
 ## [0.11.02] - not released yet
 
