@@ -266,6 +266,11 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   number), the field is left empty for a person, with a note naming both registrations. The EU/NI form on a Northern
   Ireland event now reads the product's Northern Ireland registrations first (CE or UKNI), then its EU ones; on an EU
   event it reads EU registrations only. Draft reports only: approved and signed reports keep their frozen content.
+- The investigation's analysis workspace no longer shows the rule-based "Analysis" (observations, contradictions,
+  possible explanations) while AI does not answer for the organization (no model on the server, AI switched off, or a
+  free trial): its rules matched words written for the sample data. The tab, the section and the Run Analysis button
+  are hidden, and the analysis routes answer "AI analysis is off for this organization" without running anything.
+  Analyses saved earlier are kept (`ai_executions`) and show again once AI answers (RCA-D13).
 
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
