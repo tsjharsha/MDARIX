@@ -20,7 +20,7 @@ import { CaseRecordDownload } from "../reports/CaseRecordDownload";
 import { displayId } from "../../app/displayId";
 import { hasSavedResults, loadSavedResults } from "./savedResults";
 import { AiInterpretationNote } from "../shared/StatementKind";
-import { useAiBanner } from "../workspace/useAiStatus";
+import { useAiBanner, useAiReady } from "../workspace/useAiStatus";
 import { aiNoticeOf, epistemicOf, type AiBanner, type IntelligenceView } from "../workspace/intelligence";
 import { pointInTimeText, searchStatusText, stateText, workspaceNotes } from "./workspaceLabels";
 
@@ -249,6 +249,9 @@ export function InvestigationWorkspacePanel({
   // When AI is off, unavailable or over its allowance, say so and offer the manual way; otherwise nothing changes.
   const aiBanner = useAiBanner();
   const aiBlocked = Boolean(aiBanner);
+  // RCA-D13: without a model the analysis is keyword rules written for the sample data, so it is shown (and run)
+  // only once AI is known to answer for the organization; the server answers "AI analysis is off" otherwise.
+  const analysisShown = useAiReady() === true;
   const runTitle = aiBanner ? aiBanner.disabledReason : undefined;
   const runDescribedBy = aiBanner ? "ai-status-banner" : undefined;
   // What each AI response says it is (an AI interpretation) and, when rules wrote it, why.
@@ -522,16 +525,18 @@ export function InvestigationWorkspacePanel({
             </span>
           ) : canRun ? (
             <>
-              <button
-                className="primary-action"
-                onClick={runAnalysis}
-                disabled={Boolean(pendingAction) || aiBlocked}
-                title={runTitle}
-                aria-describedby={runDescribedBy}
-              >
-                {" "}
-                {pendingAction === "Run Analysis" ? "Running Analysis…" : "Run Analysis"}
-              </button>
+              {analysisShown && (
+                <button
+                  className="primary-action"
+                  onClick={runAnalysis}
+                  disabled={Boolean(pendingAction) || aiBlocked}
+                  title={runTitle}
+                  aria-describedby={runDescribedBy}
+                >
+                  {" "}
+                  {pendingAction === "Run Analysis" ? "Running Analysis…" : "Run Analysis"}
+                </button>
+              )}
               <button
                 className="primary-action secondary"
                 onClick={runHypotheses}
@@ -616,6 +621,7 @@ export function InvestigationWorkspacePanel({
           ] as const
         )
           .filter((tab) => !(mvp && (tab === "counterfactual" || tab === "failure-chain")))
+          .filter((tab) => tab !== "analysis" || analysisShown)
           .map((tab) => (
             <button
               key={tab}
@@ -712,26 +718,29 @@ export function InvestigationWorkspacePanel({
           </Panel>
         </div>
       )}
-      <section id="workflow-analysis" className="workflow-action">
-        <h3>Analysis</h3>
-        <p>Grounded observations and possible explanations for the selected context.</p>
-        {canRun && aiBanner && <AiOffNote banner={aiBanner} manual={byHand("Observations")} />}
-        {canRun && !aiBanner && (
-          <button
-            className="primary-action"
-            onClick={runAnalysis}
-            disabled={Boolean(pendingAction) || aiBlocked}
-            title={runTitle}
-            aria-describedby={runDescribedBy}
-          >
-            {pendingAction === "Run Analysis" ? "Running Analysis…" : "Run Analysis"}
-          </button>
-        )}
-      </section>
-      {analysis && (
+      {analysisShown && (
         <>
-          <AiBlockNote label={labels.analysis} onJudge={judge("Observations")} />
-          <AnalysisVisual analysis={analysis} />
+          <section id="workflow-analysis" className="workflow-action">
+            <h3>Analysis</h3>
+            <p>Grounded observations and possible explanations for the selected context.</p>
+            {canRun && !aiBanner && (
+              <button
+                className="primary-action"
+                onClick={runAnalysis}
+                disabled={Boolean(pendingAction) || aiBlocked}
+                title={runTitle}
+                aria-describedby={runDescribedBy}
+              >
+                {pendingAction === "Run Analysis" ? "Running Analysis…" : "Run Analysis"}
+              </button>
+            )}
+          </section>
+          {analysis && (
+            <>
+              <AiBlockNote label={labels.analysis} onJudge={judge("Observations")} />
+              <AnalysisVisual analysis={analysis} />
+            </>
+          )}
         </>
       )}
       <section id="workflow-hypotheses" className="workflow-action">
