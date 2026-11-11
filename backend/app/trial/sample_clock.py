@@ -219,10 +219,15 @@ def keep_current(control: Session, data: Session, tenant_id, now: datetime | Non
         return {"moved": False, "why": "NO_SAMPLE"}
     if worked_on(data, tenant_id):
         return {"moved": False, "why": "WORKED_ON"}
+    # Whole days on that calendar's clock (wall time), so a summer-time change never shifts a sample time by an hour.
+    data.execute(text("SELECT set_config('TimeZone', :zone, true)"), {"zone": calendar.zone})
     moved = move(data, tenant_id, timedelta(days=days), days)
     data.commit()
     # The anchor moves by the same days, so its time of day, and every sample time's, stays as seeded.
-    request.profile = {**(request.profile or {}), ANCHOR: (since + timedelta(days=days)).isoformat()}
+    request.profile = {
+        **(request.profile or {}),
+        ANCHOR: (since.astimezone(calendar.tz) + timedelta(days=days)).isoformat(),
+    }
     control.commit()
     return {"moved": True, "by_days": days, "rows": sum(moved.values())}
 
