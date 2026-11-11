@@ -1,7 +1,15 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../../app/apiClient";
-import { HowItWasRead, alsoCreatesText, checkFailureText, importedText, readyText } from "./sections/ImportData";
+import {
+  HowItWasRead,
+  SignedChanges,
+  alsoCreatesText,
+  checkFailureText,
+  importUrl,
+  importedText,
+  readyText,
+} from "./sections/ImportData";
 
 describe("uploading a quality system's export as it comes", () => {
   it("says what a complaints file adds besides its complaints", () => {
@@ -90,5 +98,36 @@ describe("uploading a quality system's export as it comes", () => {
     expect(html).toContain("Not used (not stored):</b> Patient Name");
     expect(html).toContain("Excel workbook");
     expect(renderToStaticMarkup(<HowItWasRead report={{}} />)).toBe("");
+  });
+});
+
+describe("B6a G10: a re-upload behind a signed conclusion (B6-38)", () => {
+  const changed = [{ complaint_id: "QMS-7", fields: ["awareness date", "country"] }];
+
+  it("lists the complaints and asks one reason for the run", () => {
+    const html = renderToStaticMarkup(
+      <SignedChanges
+        report={{ signed_decisions_changed: changed, change_reason_required: true }}
+        reason=""
+        onReason={() => {}}
+      />,
+    );
+    expect(html).toContain("1 complaint with a signed conclusion");
+    expect(html).toContain("QMS-7: awareness date, country");
+    expect(html).toContain("one reason for the whole import");
+    // Switched off: listed, no reason asked; nothing changed: nothing shown.
+    const off = renderToStaticMarkup(
+      <SignedChanges report={{ signed_decisions_changed: changed }} reason="" onReason={() => {}} />,
+    );
+    expect(off).not.toContain("textarea");
+    expect(renderToStaticMarkup(<SignedChanges report={{}} reason="" onReason={() => {}} />)).toBe("");
+  });
+
+  it("sends the reason with the import only", () => {
+    const choices = { changeReason: "  Corrected awareness  " };
+    expect(importUrl("/i", "complaints", "import", "ISO", undefined, undefined, choices)).toBe(
+      "/i/complaints?change_reason=Corrected+awareness",
+    );
+    expect(importUrl("/i", "complaints", "check", "ISO", undefined, undefined, choices)).toBe("/i/complaints/check");
   });
 });

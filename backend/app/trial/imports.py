@@ -1905,6 +1905,11 @@ def _check_rows(
         # Accepted complaint rows that contradict themselves or lack a fact a reporting step needs (0.10.81).
         "row_flags": complaint_flags(kept, report) if entity == "complaints" else [],
     }
+    if entity == "complaints":
+        # B6a G10 (B6-38): the complaints whose signed conclusion used a fact this file changes.
+        signed = signed_fact_changes(db, tenant_id, kept) if ready else []
+        result["signed_decisions_changed"] = signed
+        result["change_reason_required"] = reason_required(signed, policy)
     if skip_problem_rows and rejected and not report.file_problems:
         result["rejects_csv"] = _rejects_csv(rows, report)
     return result, (kept if ready else [])
@@ -1972,11 +1977,12 @@ def import_file(
     mask_personal_data: bool = False,
     reading: FileReading | None = None,
     actor: str | None = None,
+    change_reason: str | None = None,
 ) -> dict:
     """Check the file and write it (all or nothing, unless problem rows are set aside). A governed import keeps each
     row's lineage and stores the rows set aside; a set-aside row of an earlier import closes once its record comes in
     with this one (J11), and is replaced when this one sets the same record aside again. ``actor`` is recorded on the
-    rows it closes."""
+    rows it closes. ``change_reason`` is the run's one reason when it changes facts behind a signed decision."""
     hold_allowance(db, tenant_id, policy)
     checked = _Report()
     parsed = _parse(entity, raw, checked, policy, date_format, reading)
@@ -1988,8 +1994,11 @@ def import_file(
         raise HTTPException(
             422, detail={"code": "IMPORT_CHECK_FAILED", "message": "Fix the listed problems first", "report": report}
         )
+    change_reason = _signed_reason(report, change_reason, policy)
     # The checked rows themselves: masked where asked, without the rows set aside.
     result = _write_rows(db, tenant_id, entity, rows, policy, actor)
+    if report.get("signed_decisions_changed"):
+        result.update(signed_decisions_changed=report["signed_decisions_changed"], change_reason=change_reason)
     import_ref = uuid.uuid4()
     _after_complaints(db, tenant_id, entity, rows, result, import_ref if policy.quarantine else None, policy.source)
     if policy.quarantine:
@@ -2107,9 +2116,13 @@ def import_records(db: Session, tenant_id, entity: str, records: list[dict], pol
         raise HTTPException(
             422, detail={"code": "IMPORT_CHECK_FAILED", "message": "Fix the listed problems first", "report": report}
         )
+    _signed_reason(report, None, policy)
     rows = rows_from_records(entity, records, _Report())
     result = _write_rows(db, tenant_id, entity, rows, policy)
     _after_complaints(db, tenant_id, entity, rows, result, None, policy.source)
+    if report.get("signed_decisions_changed"):
+        # A QMS sync: its reason, "QMS sync <run>", is recorded with the run (access/connector_sync.py).
+        result["signed_decisions_changed"] = report["signed_decisions_changed"]
     return result
 
 
@@ -2488,6 +2501,124 @@ def _field_changes(complaint: Complaint, values: dict, identifier: str) -> list[
                 }
             )
     return found
+
+
+# B6a G10 (B6-38): the complaint facts a signed market conclusion is counted from, as the check names them.
+SIGNED_FACTS = {
+    "country": "country",
+    "awareness_timestamp": "awareness date",
+    "event_timestamp": "event date",
+    "death": "death",
+    "serious_injury": "serious injury",
+    "product_id": "product",
+    "lot_batch_id": "lot",
+}
+SIGNED_FACTS_REIMPORTED = "COMPLAINT_FACTS_REIMPORTED"
+
+
+def signed_fact_changes(db: Session, tenant_id, rows) -> list[dict]:
+    """B6a G10 (B6-38): the complaints already here with a signed market conclusion whose facts (SIGNED_FACTS) these
+    rows change, each with the facts' values before and after, read the way _write_rows sets them (a column the file
+    leaves out keeps its value; a complaint's first row counts). Nothing signed is rewritten: the conclusion then
+    reads "Facts changed after signing: re-check" (reportability/assessment_router.facts_changed)."""
+    from backend.app.db.models.market_assessment import ComplaintMarketAssessment as Conclusion
+
+    lookup = _Lookup(db, tenant_id)
+    ids = [row["complaint_id"] for _, row in rows]
+    stored = lookup.complaints(ids)
+    stored.update(
+        _qms_matches(db, tenant_id, stored, ids, {row["complaint_id"]: row.get("mdarix_ref") for _, row in rows})
+    )
+    keys = [complaint.id for complaint in stored.values()]
+    signed: set = set()
+    for start in range(0, len(keys), 1000):
+        signed |= {
+            row[0]
+            for row in db.query(Conclusion.complaint_id)
+            .filter(
+                Conclusion.tenant_id == tenant_id,
+                Conclusion.complaint_id.in_(keys[start : start + 1000]),
+                Conclusion.signed_at.isnot(None),
+            )
+            .distinct()
+        }
+    found: list[dict] = []
+    seen: set = set()
+    for _, row in rows:
+        complaint = stored.get(row["complaint_id"])
+        if complaint is None or complaint.id not in signed or row["complaint_id"] in seen:
+            continue
+        seen.add(row["complaint_id"])
+        values = {name: value for name, value in _complaint_details(row).items() if name in SIGNED_FACTS}
+        product = lookup.product(row["product_id"])
+        values["product_id"] = product.id if product else None
+        if "event_date" in row:
+            values["event_timestamp"] = _date(row["event_date"]) if row["event_date"] else None
+        if "lot_id" in row:
+            lot = lookup.lot(row["lot_id"]) if row["lot_id"] else None
+            values["lot_batch_id"] = lot.id if lot else None
+        changes = _field_changes(complaint, values, row["complaint_id"])
+        if changes:
+            found.append(
+                {
+                    "complaint_id": row["complaint_id"],
+                    "record_id": str(complaint.id),
+                    "fields": [SIGNED_FACTS[change["field"]] for change in changes],
+                    "before": {SIGNED_FACTS[change["field"]]: change["before"] for change in changes},
+                    "after": {SIGNED_FACTS[change["field"]]: change["after"] for change in changes},
+                }
+            )
+    return found
+
+
+def _automatic_reason(policy: ImportPolicy) -> bool:
+    """A QMS sync records its own reason, "QMS sync <run>" (access/connector_sync.py)."""
+    return policy.source.startswith("CONNECTOR:")
+
+
+def reason_required(signed: list[dict], policy: ImportPolicy) -> bool:
+    from backend.app import feature_set
+
+    return bool(signed) and not _automatic_reason(policy) and feature_set.switched_on("MDARIX_B6_CHANGE_REASON")
+
+
+def _signed_reason(report: dict, change_reason: str | None, policy: ImportPolicy) -> str | None:
+    """The run's one reason, whitespace collapsed; refused (422 CHANGE_REASON_REQUIRED) when the file changes facts
+    behind a signed decision and no reason is given (B6a G10, D3)."""
+    reason = " ".join((change_reason or "").split())[:2000] or None
+    signed = report.get("signed_decisions_changed") or []
+    if reason is None and reason_required(signed, policy):
+        raise HTTPException(
+            422,
+            detail={
+                "code": "CHANGE_REASON_REQUIRED",
+                "message": f"This file changes facts behind the signed conclusion of {len(signed):,} "
+                f"{'complaint' if len(signed) == 1 else 'complaints'}: say why, once for the whole import.",
+                "signed_decisions_changed": signed,
+            },
+        )
+    return reason
+
+
+def signed_change_events(tenant_id, actor_ref, signed: list[dict], reason: str | None) -> list:
+    """One audit event per complaint whose signed facts a run changed, with the run's reason and the values before
+    and after: an edit on a signed record, so the audit trail review lists it under "edits after a signature"."""
+    from backend.app.enterprise_audit import make_audit_event
+
+    return [
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=actor_ref,
+            action=SIGNED_FACTS_REIMPORTED,
+            entity_type="Complaint",
+            entity_id=uuid.UUID(item["record_id"]),
+            reason=reason,
+            details={"complaint": item["complaint_id"], "fields": item["fields"]},
+            old_values=item["before"],
+            new_values=item["after"],
+        )
+        for item in signed
+    ]
 
 
 def _after_complaints(db: Session, tenant_id, entity: str, rows, result: dict, import_ref, source: str) -> None:

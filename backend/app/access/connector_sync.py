@@ -218,6 +218,15 @@ def sync_connector(
             details={"version": row.version, "run_type": run_type, "records_read": len(result)},
         )
     )
+    if canonical_import and canonical_import.get("status") == "IMPORTED":
+        from backend.app.trial import imports
+
+        # B6a G10: a sync that changes facts behind a signed decision records its reason by itself.
+        db.add_all(
+            imports.signed_change_events(
+                tenant_id, actor_ref, canonical_import.get("signed_decisions_changed") or [], f"QMS sync {run.id}"
+            )
+        )
     db.commit()
     return {"run": run, "records_read": len(result), "canonical_import": canonical_import}
 

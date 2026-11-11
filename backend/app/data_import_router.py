@@ -166,6 +166,7 @@ def _import_and_audit(
     options: tuple[bool, bool] = (False, False),
     file_name: str | None = None,
     reading: imports.FileReading | None = None,
+    change_reason: str | None = None,
 ) -> dict:
     """The import (all or nothing, unless the uploader chose to set problem rows aside), then its audit record (runs
     in the thread pool). ``options`` is (skip_problem_rows, mask_personal_data); ``file_name`` is the uploaded file's
@@ -176,7 +177,16 @@ def _import_and_audit(
     failure = ("TRIAL_IMPORT_FAILED" if trial else "IMPORT_FAILED", "The import failed; nothing was saved")
     try:
         result = imports.import_file(
-            data, tenant_id, entity, raw, policy, date_format, *options, reading=reading, actor=str(ctx.user_id)
+            data,
+            tenant_id,
+            entity,
+            raw,
+            policy,
+            date_format,
+            *options,
+            reading=reading,
+            actor=str(ctx.user_id),
+            change_reason=change_reason,
         )
         # Counts only: the rejects file holds the uploader's own rows, personal data included.
         details = {k: v for k, v in result.items() if k != "rejects_csv"}
@@ -189,11 +199,16 @@ def _import_and_audit(
             details={**details, "file_name": imports.file_label(file_name)}
             if trial
             else {**details, "source": policy.source, "file_name": imports.file_label(file_name)},
+            reason=result.get("change_reason"),
             created_at=datetime.now(timezone.utc),
         )
         cases = _cases_audit(tenant_id, ctx, result) if entity == "cases" else None
+        # B6a G10 (B6-38): one event per complaint whose signed facts the run changed, with the run's reason.
+        signed = imports.signed_change_events(
+            tenant_id, str(ctx.user_id), result.get("signed_decisions_changed") or [], result.get("change_reason")
+        )
         if trial:
-            db.add_all([event, cases] if cases else [event])
+            db.add_all([event, *signed, cases] if cases else [event, *signed])
         data.commit()
         if trial and db is not data:
             db.commit()
@@ -204,7 +219,7 @@ def _import_and_audit(
         data.rollback()
         raise HTTPException(500, detail={"code": failure[0], "message": failure[1]}) from exc
     if not trial:
-        db.add_all([event, cases] if cases else [event])
+        db.add_all([event, *signed, cases] if cases else [event, *signed])
         db.commit()
     return result
 
@@ -261,6 +276,7 @@ async def run_import(
     sheet: str | None = Query(default=None, max_length=64),
     number_format: str = Query(default="GROUP", max_length=16),
     date_column: str | None = Query(default=None, max_length=255),
+    change_reason: str | None = Query(default=None, max_length=2000),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
@@ -273,7 +289,19 @@ async def run_import(
     reading = await run_in_threadpool(_reading, data, tenant_id, sheet, number_format, date_column)
     raw = await _body(request, policy)
     result = await run_in_threadpool(
-        _import_and_audit, db, data, ctx, tenant_id, entity, raw, policy, order, options, file_name, reading
+        _import_and_audit,
+        db,
+        data,
+        ctx,
+        tenant_id,
+        entity,
+        raw,
+        policy,
+        order,
+        options,
+        file_name,
+        reading,
+        change_reason,
     )
     source = "trial import" if policy.source == imports.UPLOAD_SOURCE else "CSV import"
     return imports.after_import(background, tenant_id, result, source=source)

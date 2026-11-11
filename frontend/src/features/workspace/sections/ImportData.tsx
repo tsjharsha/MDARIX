@@ -93,7 +93,11 @@ type CheckReport = {
   date_column_choices?: string[];
   /** 0.10.81: accepted complaint rows that contradict themselves or lack a fact a reporting step needs. */
   row_flags?: RowFlag[];
+  /** B6a G10: complaints whose signed conclusion used a fact this file changes; one reason covers the import. */
+  signed_decisions_changed?: SignedChange[];
+  change_reason_required?: boolean;
 };
+export type SignedChange = { complaint_id: string; fields: string[] };
 export type RowFlag = { row: number; complaint_id: string | null; message: string };
 
 /** Rows that import but are flagged: what MDARIX will ask for, or what to check. */
@@ -113,6 +117,42 @@ export function RowFlags({ flags }: { flags: RowFlag[] | undefined }) {
           </li>
         ))}
       </ul>
+    </>
+  );
+}
+
+/** B6a G10: the complaints whose signed conclusion used a fact this file changes, and the one reason for the run.
+ * The signed conclusions are not changed: each then reads "Facts changed after signing: re-check". */
+export function SignedChanges({
+  report,
+  reason,
+  onReason,
+}: {
+  report: Pick<CheckReport, "signed_decisions_changed" | "change_reason_required">;
+  reason: string;
+  onReason: (value: string) => void;
+}) {
+  const changed = report.signed_decisions_changed ?? [];
+  if (!changed.length) return null;
+  return (
+    <>
+      <p className="uw-trial-message is-bad">
+        {countOf(changed.length, "complaint")} with a signed conclusion: this file changes facts the conclusion used.
+        The signed conclusions stay as they are and will read "Facts changed after signing: re-check".
+      </p>
+      <ul className="uw-trial-issues">
+        {changed.map((item) => (
+          <li key={item.complaint_id}>
+            {item.complaint_id}: {item.fields.join(", ")}
+          </li>
+        ))}
+      </ul>
+      {report.change_reason_required && (
+        <label className="ca-field ca-wide">
+          Why do these facts change? (one reason for the whole import)
+          <textarea value={reason} maxLength={2000} rows={2} onChange={(event) => onReason(event.target.value)} />
+        </label>
+      )}
     </>
   );
 }
@@ -216,7 +256,13 @@ export const NUMBER_FORMATS: [NumberFormat, string][] = [
   ["DECIMAL_COMMA", "1.250,00"],
 ];
 /** The choices about the file itself: the workbook sheet, the number format, the column that holds the date. */
-export type FileChoices = { sheet?: string | null; numberFormat?: NumberFormat; dateColumn?: string | null };
+export type FileChoices = {
+  sheet?: string | null;
+  numberFormat?: NumberFormat;
+  dateColumn?: string | null;
+  /** B6a G10: the run's one reason, sent with the import only. */
+  changeReason?: string;
+};
 /** The date column choice for a complaints file that has none: each complaint is dated the import day. */
 export const NO_DATE_COLUMN = "none";
 
@@ -240,6 +286,7 @@ export function importUrl(
   if (choices.dateColumn) query.set("date_column", choices.dateColumn);
   // The file's name, for the import's data-quality report (only with the import itself).
   if (mode === "import" && fileName) query.set("file_name", fileName.slice(0, 255));
+  if (mode === "import" && choices.changeReason?.trim()) query.set("change_reason", choices.changeReason.trim());
   const search = query.toString();
   return search ? `${path}?${search}` : path;
 }
@@ -490,7 +537,8 @@ function ImportForm({
       .catch((error) => setDetected({ entity: null, message: checkFailureText(error) }));
   };
   const limit = setup.file_limit_bytes;
-  const choices: FileChoices = { sheet, numberFormat, dateColumn };
+  const [changeReason, setChangeReason] = useState("");
+  const choices: FileChoices = { sheet, numberFormat, dateColumn, changeReason };
 
   const send = async (mode: "check" | "import") => {
     if (!file || !template) return null;
@@ -823,6 +871,7 @@ function ImportForm({
                 <CheckCircle2 size={16} aria-hidden="true" /> {readyText(report)}
               </p>
               <RowFlags flags={report.row_flags} />
+              <SignedChanges report={report} reason={changeReason} onReason={setChangeReason} />
               {!!report.rejected_rows && (
                 <>
                   <p className="uw-trial-message is-bad">
@@ -862,7 +911,12 @@ function ImportForm({
           )}
           {report.preview.length > 0 && <FilePreviewTable rows={report.preview} />}
           {report.ready && canImport && (
-            <button type="button" className="ac-primary" disabled={busy} onClick={runImport}>
+            <button
+              type="button"
+              className="ac-primary"
+              disabled={busy || (!!report.change_reason_required && !changeReason.trim())}
+              onClick={runImport}
+            >
               <Upload size={15} aria-hidden="true" />{" "}
               {busy ? "Importing…" : `Import ${countOf(report.rows_to_import ?? report.rows, "row")}`}
             </button>
