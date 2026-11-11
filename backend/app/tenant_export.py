@@ -73,10 +73,41 @@ MASKED, UNMASKED = "MASKED", "UNMASKED"
 PERSONAL_HELD = "Personal data held: yes"
 # The official India/Canada form frozen at approval (base64 PDF) prints them too (B8 run 6 review).
 PERSONAL_FILES = ("mir_xml", "emdr_xml", "emdr_left_out", "official_pdf")
+# Owner, 11 Nov ("tick-box"): an unmasked export leaves them out too unless "Include patient and reporter details from
+# submitted reports" is ticked (data.export, the export's reason, audited EXPORT_PERSONAL_DATA_INCLUDED). The hand-back
+# made while the organization is suspended or terminated (account closing) always holds everything.
+INCLUDED, LEFT_OUT = "INCLUDED", "LEFT_OUT"
+EXIT_STATUSES = ("SUSPENDED", "TERMINATED")
+PERSONAL_EVENT = "EXPORT_PERSONAL_DATA_INCLUDED"
 
 
 def _held(item: dict) -> bool:
     return bool(item.get("personal") and item.get("value"))
+
+
+def personal_held(fields) -> tuple[list[str], list[str]]:
+    """The patient and reporter boxes a snapshot holds values in, and its frozen files that carry them: ids only."""
+    if not isinstance(fields, dict):
+        return [], []
+    ids = sorted(
+        {
+            str(item.get("id"))
+            for section in fields.get("sections") or []
+            for item in section.get("fields") or []
+            if _held(item)
+        }
+    )
+    return ids, [key for key in PERSONAL_FILES if ids and fields.get(key)]
+
+
+def _tally(tally: dict, fields) -> None:
+    ids, files = personal_held(fields)
+    if not ids:
+        return
+    tally["snapshots"] += 1
+    for group, keys in (("fields", ids), ("files", files)):
+        for key in keys:
+            tally[group][key] = tally[group].get(key, 0) + 1
 
 
 def masked_snapshot(fields):
@@ -211,10 +242,17 @@ class ExportTooLarge(RuntimeError):
 
 
 def request_export(
-    db: Session, tenant_id, requested_by: str, reason: str, unmask_contacts: bool = False
+    db: Session,
+    tenant_id,
+    requested_by: str,
+    reason: str,
+    unmask_contacts: bool = False,
+    include_personal: bool = False,
 ) -> TenantExport:
     """Queue a full export (one at a time per organization). Does not commit. Contacts are masked unless the caller
-    (who checked data.export) asks to unmask them; a trial's export stays masked whatever is asked (OD-1)."""
+    (who checked data.export) asks to unmask them; a trial's export stays masked whatever is asked (OD-1). Patient and
+    reporter details from submitted reports are left out unless an unmasked export asks for them (``include_personal``).
+    The hand-back of a suspended or terminated organization (not a trial) holds everything."""
     tenant_id = uuid.UUID(str(tenant_id))
     busy = (
         db.query(TenantExport)
@@ -229,7 +267,12 @@ def request_export(
     if files > MAX_EXPORT_BYTES:
         raise ExportTooLarge(str(files))
     now = datetime.now(timezone.utc)
-    contacts = UNMASKED if unmask_contacts and not _trial(db, tenant_id) else MASKED
+    trial = _trial(db, tenant_id)
+    tenant = db.get(Tenant, tenant_id)
+    leaving = not trial and tenant is not None and tenant.status in EXIT_STATUSES
+    contacts = UNMASKED if leaving or (unmask_contacts and not trial) else MASKED
+    personal = INCLUDED if leaving or (contacts == UNMASKED and include_personal) else LEFT_OUT
+    summary = {"contacts": contacts, "personal": personal, "exit": leaving}
     row = TenantExport(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
@@ -237,7 +280,7 @@ def request_export(
         reason=reason,
         status="QUEUED",
         created_at=now,
-        summary={"contacts": contacts},
+        summary=summary,
     )
     db.add(row)
     db.flush()
@@ -260,7 +303,7 @@ def request_export(
             entity_type="TenantExport",
             entity_id=row.id,
             reason=reason,
-            details={"contacts": contacts},
+            details=summary,
             created_at=now,
         )
     )
@@ -329,7 +372,13 @@ def _json_default(value):
 
 
 def _write_tables(
-    db: Session, archive: zipfile.ZipFile, tenant_id, prefix: str, manifest: dict, unmask: bool = False
+    db: Session,
+    archive: zipfile.ZipFile,
+    tenant_id,
+    prefix: str,
+    manifest: dict,
+    unmask: bool = False,
+    personal: bool = False,
 ) -> None:
     for schema, table in _tables(db):
         result = db.execute(
@@ -343,6 +392,10 @@ def _write_tables(
             while rows := result.fetchmany(FETCH_ROWS):
                 for row in rows:
                     values = {key: row._mapping[key] for key in columns}
+                    if table == "report_snapshots" and "fields" in values:
+                        _tally(manifest["personal_data"], values["fields"])
+                        if not personal:
+                            values["fields"] = masked_snapshot(values["fields"])
                     values = values if unmask else masked_row(table, values)
                     writer.write(json.dumps(values, default=_json_default) + "\n")
                     count += 1
@@ -398,7 +451,9 @@ def _cell(value):
     return value
 
 
-def _build_archive(db: Session, tenant_id, tenant: Tenant | None, storage, path: Path, unmask: bool = False) -> dict:
+def _build_archive(
+    db: Session, tenant_id, tenant: Tenant | None, storage, path: Path, unmask: bool = False, personal: bool = False
+) -> dict:
     """Write the export zip to ``path`` and return its manifest."""
     from backend.app.audit_chain import verify_tenant_chain
     from backend.app.db.data_plane import open_tenant_data_session
@@ -418,14 +473,27 @@ def _build_archive(db: Session, tenant_id, tenant: Tenant | None, storage, path:
         "tables": {},
         "readable": {},
         "files": {},
+        # Box ids and counts only, never values.
+        "personal_data": {
+            "included": personal,
+            "note": (
+                "Patient and reporter details typed into submitted reports are included"
+                if personal
+                else f"Patient and reporter details typed into submitted reports are left out: each value, and each "
+                f"frozen official file (PDF, XML) that carries them, reads '{PERSONAL_HELD}'"
+            ),
+            "snapshots": 0,
+            "fields": {},
+            "files": {},
+        },
     }
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        _write_tables(db, archive, tenant_id, "data/", manifest, unmask)
+        _write_tables(db, archive, tenant_id, "data/", manifest, unmask, personal)
         # A dedicated data plane holds the business records in its own database; the shared plane is the control
         # database. The readable bundle always comes from wherever the business records live.
         with open_tenant_data_session(tenant_id) as data:
             if str(data.get_bind().url) != str(db.get_bind().url):
-                _write_tables(data, archive, tenant_id, "data/plane/", manifest, unmask)
+                _write_tables(data, archive, tenant_id, "data/plane/", manifest, unmask, personal)
             _write_readable(data, archive, tenant_id, manifest)
         for key in storage.list_tenant_objects(str(tenant_id)):
             relative = key.split("/", 1)[1]
@@ -464,15 +532,19 @@ def run_export(export_id) -> dict:
             return {"status": row.status if row else "MISSING"}
         tenant_id = row.tenant_id
         tenant = db.get(Tenant, tenant_id)
-        contacts = (row.summary or {}).get("contacts", MASKED)
-        unmask = contacts == UNMASKED and not _trial(db, tenant_id)  # a trial is masked even if it became one later
+        asked = row.summary or {}
+        unmask = asked.get("contacts") == UNMASKED and not _trial(
+            db, tenant_id
+        )  # a trial is masked even if it became one later
+        personal = unmask and asked.get("personal") == INCLUDED
+        leaving = bool(asked.get("exit"))
         row.status, row.error = "RUNNING", None
         db.commit()
         storage = ObjectStorageService()
         bind_system(db, f"tenant export {export_id}")
         with tempfile.NamedTemporaryFile(prefix="mdarix-export-", suffix=".zip", delete=False) as handle:
             temp = Path(handle.name)
-        manifest = _build_archive(db, tenant_id, tenant, storage, temp, unmask)
+        manifest = _build_archive(db, tenant_id, tenant, storage, temp, unmask, personal)
         if temp.stat().st_size > MAX_EXPORT_BYTES:
             # Not retried: the same records give the same size.
             bind_system(db, f"tenant export {export_id}: too large")
@@ -493,9 +565,26 @@ def run_export(export_id) -> dict:
             "files": len(manifest["files"]),
             "readable": {table: item["rows"] for table, item in manifest["readable"].items()},
             "contacts": UNMASKED if unmask else MASKED,
+            "personal": INCLUDED if personal else LEFT_OUT,
+            "exit": leaving,
         }
         row.completed_at = datetime.now(timezone.utc)
         row.expires_at = row.completed_at + timedelta(days=EXPORT_DAYS)
+        if personal:
+            tally = manifest["personal_data"]
+            db.add(
+                AuditEvent(
+                    id=uuid.uuid4(),
+                    tenant_id=tenant_id,
+                    actor_ref=row.requested_by,
+                    action=PERSONAL_EVENT,
+                    entity_type="TenantExport",
+                    entity_id=row.id,
+                    reason=row.reason,
+                    details={"exit": leaving, **{key: tally[key] for key in ("snapshots", "fields", "files")}},
+                    created_at=row.completed_at,
+                )
+            )
         db.add(
             AuditEvent(
                 id=uuid.uuid4(),

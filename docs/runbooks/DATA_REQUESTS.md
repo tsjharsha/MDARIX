@@ -21,6 +21,12 @@ controller and handles the request directly.
   every stored file, and `manifest.json` with row counts, a SHA-256 per entry and the audit trail's verified head.
   Passwords, secrets, tokens and encrypted keys are never included. Download it within 7 days (the scheduler then
   deletes it); every download is audited. Send it by a secure channel, never by email attachment.
+  Customer contacts are masked, and patient and reporter details typed into submitted reports (with the frozen
+  official PDF/XML files that carry them) read "Personal data held: yes", unless the customer administrator ticks
+  "Include patient and reporter details from submitted reports" (needs `data.export`; the export's reason covers it;
+  audited `EXPORT_PERSONAL_DATA_INCLUDED` with box ids and counts, never values). A trial's export is always masked.
+  An export prepared while the organization is suspended or terminated is the hand-back (section 3) and always holds
+  everything.
 * **One person**: the customer administrator downloads `GET /api/v1/admin/people/{id}/export` (signed in as the
   organization's administrator; a button in Users is not built yet). The JSON document holds the account record, memberships, a summary of
   sessions, the last 500 sign-in events, the audit events the person caused (up to 10,000; `audit_events_truncated`

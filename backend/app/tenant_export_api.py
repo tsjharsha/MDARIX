@@ -54,6 +54,9 @@ class ExportRequest(BaseModel):
     mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
     # OD-1: contacts are masked unless asked; the reason above is the reason for unmasking, audited with the export.
     unmask_contacts: bool = False
+    # Owner 11 Nov ("tick-box"): patient and reporter details from submitted reports, only in an unmasked export;
+    # the same reason covers it, and the worker audits EXPORT_PERSONAL_DATA_INCLUDED.
+    include_personal: bool = False
 
 
 def confirm_with_authenticator(
@@ -104,9 +107,11 @@ def confirm_with_authenticator(
     mfa.record_success(db, user)
 
 
-def _queue(db: Session, tenant_id, actor_ref: str, reason: str, unmask_contacts: bool = False) -> dict:
+def _queue(
+    db: Session, tenant_id, actor_ref: str, reason: str, unmask_contacts: bool = False, include_personal: bool = False
+) -> dict:
     try:
-        row = request_export(db, tenant_id, actor_ref, reason.strip(), unmask_contacts)
+        row = request_export(db, tenant_id, actor_ref, reason.strip(), unmask_contacts, include_personal)
     except ExportInProgress:
         raise HTTPException(
             409, detail={"code": "EXPORT_IN_PROGRESS", "message": "An export is already being prepared"}
@@ -176,6 +181,14 @@ def _download(db: Session, tenant_id, export_id: uuid.UUID, actor_ref: str) -> S
 @router.post("/admin/exports", status_code=202)
 def request_own_export(payload: ExportRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
+    if payload.include_personal and not payload.unmask_contacts:
+        raise HTTPException(
+            422,
+            detail={
+                "code": "PERSONAL_DATA_NEEDS_UNMASKED",
+                "message": "Patient and reporter details are included only in an export with contacts unmasked",
+            },
+        )
     confirm_with_authenticator(
         db, admin, payload.mfa_code, tenant_id=admin.tenant_id, action="TENANT_EXPORT", request=request
     )
@@ -184,9 +197,13 @@ def request_own_export(payload: ExportRequest, request: Request, db: Session = D
 
         if DATA_EXPORT not in permissions_for_roles(roles_of_user(db, admin)):
             raise HTTPException(
-                403, detail={"code": "PERMISSION_DENIED", "message": "Unmasking contacts needs data.export"}
+                403,
+                detail={
+                    "code": "PERMISSION_DENIED",
+                    "message": "Unmasking contacts or including patient and reporter details needs data.export",
+                },
             )
-    return _queue(db, admin.tenant_id, str(admin.id), payload.reason, payload.unmask_contacts)
+    return _queue(db, admin.tenant_id, str(admin.id), payload.reason, payload.unmask_contacts, payload.include_personal)
 
 
 @router.get("/admin/exports")
@@ -358,6 +375,7 @@ def request_tenant_export(
     confirm_with_authenticator(
         db, platform_admin, payload.mfa_code, tenant_id=tenant_id, action="TENANT_EXPORT", request=request
     )
+    # Masked, unless the organization is suspended or terminated: then it is the hand-back and holds everything.
     return _queue(db, tenant_id, str(platform_admin.id), payload.reason)
 
 

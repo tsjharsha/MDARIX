@@ -232,10 +232,14 @@ def test_exempt_routes_that_need_a_session_require_one():
         assert anonymous.status_code == 401, f"{key} answered {anonymous.status_code} without a session"
 
 
-def _client_with_role(role: str) -> TestClient:
+def _client_with_role(role: str, tenant_id=None) -> TestClient:
     db = SessionLocal()
     try:
-        tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
+        tenant = (
+            db.get(Tenant, tenant_id)
+            if tenant_id
+            else db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
+        )
         now = datetime.now(timezone.utc)
         user = AuthUser(
             id=uuid.uuid4(),

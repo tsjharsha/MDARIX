@@ -655,7 +655,9 @@ export type Confirmation = {
   acknowledge?: string;
   /** Ask for the current code from the administrator's authenticator app (the server decides whether it is needed). */
   mfaCode?: boolean;
-  run: (reason: string, password: string, acknowledged: boolean, mfaCode: string) => Promise<unknown>;
+  /** An optional choice, off by default, shown with a plain warning (passed to run as `option`). */
+  option?: { label: string; warning: string };
+  run: (reason: string, password: string, acknowledged: boolean, mfaCode: string, option?: boolean) => Promise<unknown>;
   done: string;
 };
 
@@ -675,6 +677,7 @@ export function ConfirmDialog({
   const [password, setPassword] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
   const [code, setCode] = useState("");
+  const [option, setOption] = useState(false);
   useEffect(() => {
     setBusy(false);
     setError("");
@@ -682,13 +685,14 @@ export function ConfirmDialog({
     setPassword("");
     setAcknowledged(false);
     setCode("");
+    setOption(false);
   }, [request]);
   if (!request) return null;
   const confirm = async () => {
     setBusy(true);
     setError("");
     try {
-      await request.run(reason.trim(), password, acknowledged, code.trim());
+      await request.run(reason.trim(), password, acknowledged, code.trim(), option);
       onDone(request.done);
     } catch (reason) {
       setError(errorText(reason, "The change was not applied."));
@@ -738,6 +742,17 @@ export function ConfirmDialog({
               placeholder="6 digits"
             />
           </label>
+        )}
+        {request.option && (
+          <>
+            <label className="ca-check">
+              <input type="checkbox" checked={option} onChange={(event) => setOption(event.target.checked)} />
+              {request.option.label}
+            </label>
+            <p className="ca-note-box" role="note">
+              {request.option.warning}
+            </p>
+          </>
         )}
         {request.acknowledge && (
           <label className="ca-check ca-acknowledge">

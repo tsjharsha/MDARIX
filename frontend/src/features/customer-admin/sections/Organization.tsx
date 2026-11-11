@@ -12,10 +12,26 @@ type DataExport = {
   status: string;
   reason: string;
   size_bytes: number | null;
-  summary: { tables: number; rows: number; files: number } | null;
+  summary: { tables: number; rows: number; files: number; personal?: string } | null;
   created_at: string;
   expires_at: string | null;
 };
+
+export const PERSONAL_OPTION = {
+  label: "Include patient and reporter details from submitted reports",
+  warning:
+    "Off by default. If ticked, the zip file also holds the patient and reporter details typed into submitted reports and their official files (PDF and XML), and your customers' contact details in full. Keep it only where your procedure allows personal data. Your reason is recorded in the audit trail.",
+};
+
+/** The export request: patient and reporter details only when ticked, and then in an export with contacts unmasked
+ * (the server refuses them in a masked one and checks data.export). */
+export function exportRequest(reason: string, mfaCode: string, personal = false) {
+  return {
+    reason,
+    ...(mfaCode ? { mfa_code: mfaCode } : {}),
+    ...(personal ? { unmask_contacts: true, include_personal: true } : {}),
+  };
+}
 
 /** A complete copy of everything the organization stored, prepared in the background, downloadable for 7 days. */
 function DataExports() {
@@ -40,13 +56,14 @@ function DataExports() {
             onClick={() =>
               confirm({
                 title: "Prepare a full export?",
-                body: "Every record, the audit trail and every file your organization stored are collected into one zip file. Passwords and secrets are never included. It is ready in a few minutes and can be downloaded for 7 days.",
+                body: "Every record, the audit trail and every file your organization stored are collected into one zip file. Passwords and secrets are never included. Patient and reporter details from submitted reports are left out unless you tick the option below. It is ready in a few minutes and can be downloaded for 7 days.",
                 confirmLabel: "Prepare export",
                 reason: { label: "Why is the export needed?", min: 10 },
                 mfaCode: true,
+                option: PERSONAL_OPTION,
                 done: "The export is being prepared. Refresh in a few minutes.",
-                run: async (reason, _password, _acknowledged, mfaCode) => {
-                  await send("/api/v1/admin/exports", "POST", { reason, ...(mfaCode ? { mfa_code: mfaCode } : {}) });
+                run: async (reason, _password, _acknowledged, mfaCode, personal) => {
+                  await send("/api/v1/admin/exports", "POST", exportRequest(reason, mfaCode, personal));
                   exports.reload();
                 },
               })
@@ -78,7 +95,9 @@ function DataExports() {
             label: "Contents",
             render: (row) =>
               row.summary
-                ? `${row.summary.rows.toLocaleString()} records · ${row.summary.files.toLocaleString()} files`
+                ? `${row.summary.rows.toLocaleString()} records · ${row.summary.files.toLocaleString()} files${
+                    row.summary.personal === "INCLUDED" ? " · with patient and reporter details" : ""
+                  }`
                 : "—",
           },
           {

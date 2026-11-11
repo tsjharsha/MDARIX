@@ -258,7 +258,7 @@ def test_a_closed_service_cases_contact_is_erased_twelve_months_later(trial):  #
         assert service.erase_expired_contacts(db, tenant_id, now) == 0
         # A trial's export stays masked even when unmasking is asked.
         export = request_export(db, tenant_id, "test", "Test: OD-1 trial export", unmask_contacts=True)
-        assert export.summary == {"contacts": MASKED}
+        assert export.summary == {"contacts": MASKED, "personal": "LEFT_OUT", "exit": False}
         db.rollback()
 
 

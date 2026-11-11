@@ -67,6 +67,18 @@ with your consultant". Switch: `MDARIX_B9B_OTHER` (on).
 - Decision tables: an "Other countries" section with its own checked table; environment reference:
   `MDARIX_B9B_OTHER`.
 
+### Changed
+- **Full export: patient and reporter details stay out unless ticked** (B8 follow-up, owner 11 Nov). An unmasked
+  export no longer carries the patient and reporter details typed into submitted reports: in each frozen report
+  snapshot the values, and the frozen official files that carry them (India/Canada PDF, EU/GB MIR XML, eMDR), read
+  "Personal data held: yes"; `manifest.json` says so and counts the boxes. The export screen's new option "Include
+  patient and reporter details from submitted reports" (off by default, with a plain warning) includes them: it needs
+  `data.export`, uses the export's reason (at least 10 characters), asks for an unmasked export
+  (`PERSONAL_DATA_NEEDS_UNMASKED` otherwise) and is audited `EXPORT_PERSONAL_DATA_INCLUDED` with box ids and counts,
+  never values. An export prepared while the organization is suspended or terminated (the hand-back at account
+  closing) always holds everything, contacts included. Masked and trial exports never hold them (unchanged). The
+  export's summary and its audit events name `personal` (`INCLUDED`/`LEFT_OUT`) and `exit`. No migration.
+
 ### Fixed
 - Other countries never reach a five-market screen or count (the disposition triggers, the decision trees' list,
   the management review's signed counts, the second look). A report the authority received is never cancelled by a
