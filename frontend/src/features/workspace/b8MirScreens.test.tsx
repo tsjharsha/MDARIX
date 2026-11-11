@@ -4,7 +4,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceContext, type WorkspaceApi } from "./workspaceContext";
-import { fieldOptions, similarRows, type ReportDetail, type WorksheetField } from "./authorityReports";
+import {
+  fieldOptions,
+  similarRows,
+  type ObligationState,
+  type ReportDetail,
+  type WorksheetField,
+} from "./authorityReports";
 import { FollowUps } from "./sections/FollowUps";
 import { MirFiles, MirNeeds } from "./sections/MirFiles";
 import { SimilarTableRow } from "./sections/SimilarTable";
@@ -76,6 +82,28 @@ describe("B8: the EU MIR screens", () => {
     expect(html).toContain("accepted");
     expect(html).toContain("draft");
     expect(html).toContain("The final (reportable incident) report is open");
+  });
+
+  it("after a sent Final, offers an updated final report (a Final only); a sent report awaiting receipt is not open", () => {
+    const chain = (items: { id: string; type: string; state: ObligationState }[], ended: boolean) =>
+      render(
+        <FollowUps
+          detail={eu({ mir_chain: { type: "Initial", types: ["Initial"], items, ended, can_create: true } })}
+          canWrite
+          onChanged={vi.fn()}
+          onOpen={vi.fn()}
+        />,
+      );
+    const ended = chain([{ id: "f1", type: "Final (Reportable incident)", state: "ACCEPTED" }], true);
+    expect(ended).toContain("ends the chain");
+    expect(ended).toContain("Ask for an updated final report");
+    expect(ended).toContain("Final (Non-reportable incident)");
+    expect(ended.split('type="radio"').length - 1).toBe(2); // the two Finals, never a Follow up
+    expect(ended).toContain("Create the final (reportable incident) report");
+    // A follow-up recorded as submitted, its receipt awaited: the next report may be made (sent only after acceptance).
+    const pending = chain([{ id: "f1", type: "Follow up", state: "SUBMITTED_PENDING" }], false);
+    expect(pending).not.toContain("is open");
+    expect(pending).toContain("Create a follow-up or final report");
   });
 
   it("offers only the types this position allows", () => {

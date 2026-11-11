@@ -323,8 +323,9 @@ const CHAINS = {
       "A follow-up is made for you each time a report is recorded as submitted, due on the date it gave in 1.2f. Create a Final when the investigation is done.",
     ended:
       "A Final (or a Combined initial and final) report ends the chain. If you must correct it, ask for an updated final report.",
-    // One open at a time: the next waits until the last is accepted (or recorded with no acknowledgement expected).
-    isOpen: (row: ChainItem) => !VALID.includes(row.state),
+    // Open until recorded as submitted, as the server counts it; sending the next for approval waits until the last
+    // is accepted (or recorded with no acknowledgement expected).
+    isOpen: (row: ChainItem) => !SENT.includes(row.state),
   },
 } as const;
 type ChainItem = { id: string; type: string; state: ObligationState; due_on?: string | null };
@@ -427,14 +428,19 @@ function MarketChain({
   const items: ChainItem[] = chain.items;
   if (!items.length && !chain.can_create && !chain.ended) return null; // not submitted yet: nothing follows it
   const open = items.find(spec.isOpen);
+  // B8: after a sent Final, an "Updated final report" on request only, a Final again.
+  const updated = market === "mir" && chain.ended;
+  const types: readonly string[] = updated ? spec.types.filter((type) => type.startsWith("Final")) : spec.types;
+  const kind = types.includes(form.type) ? form.type : types[0];
   const create = async () => {
     setBusy(true);
     setError("");
     try {
       const made = await send<ReportDetail>(`${REPORTS}/${detail.id}/${spec.path}`, "POST", {
-        type: form.type,
+        type: kind,
         what_is_new: form.text,
         next_report_on: form.next || null,
+        ...(updated ? { updated_final: true } : {}),
       });
       onOpen(made.id);
     } catch (reason) {
@@ -460,31 +466,33 @@ function MarketChain({
           </li>
         ))}
       </ol>
-      {chain.ended ? (
-        <p className="ac-muted">{spec.ended}</p>
-      ) : open ? (
+      {chain.ended && <p className="ac-muted">{spec.ended}</p>}
+      {open ? (
         <p className="ac-muted">
           The {open.type.toLowerCase()} report is open: submit or cancel it before the next one.
         </p>
       ) : (
         canWrite &&
-        chain.can_create && (
+        chain.can_create &&
+        (!chain.ended || updated) && (
           <details>
-            <summary>{spec.create}</summary>
+            <summary>{updated ? "Ask for an updated final report" : spec.create}</summary>
             <p className="ac-muted">
-              {spec.intro} No legal clock was found for it: the next-report date is optional and yours.
+              {updated
+                ? "An updated final report corrects the sent Final: it is a Final again."
+                : `${spec.intro} No legal clock was found for it: the next-report date is optional and yours.`}
             </p>
             <p className="ac-muted">{chain.note}</p>
             <div className="ca-form-grid">
-              {spec.types.length > 1 && (
+              {types.length > 1 && (
                 <fieldset className="ca-field">
                   <legend>Type (box {spec.box})</legend>
-                  {spec.types.map((type) => (
+                  {types.map((type) => (
                     <label key={type} className="ca-check">
                       <input
                         type="radio"
                         name={`${spec.path}-type`}
-                        checked={form.type === type}
+                        checked={kind === type}
                         onChange={() => setForm({ ...form, type })}
                       />{" "}
                       {type}
@@ -517,7 +525,7 @@ function MarketChain({
               disabled={busy || form.text.trim().length < REASON_MIN}
               onClick={() => void create()}
             >
-              Create the {form.type.toLowerCase()} report
+              Create the {kind.toLowerCase()} report
             </button>
           </details>
         )

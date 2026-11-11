@@ -733,7 +733,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "One report is open at a time: the next one can be sent for approval only when the last one is accepted, or recorded with no acknowledgement expected.",
               "Under Report chain, choose Create a follow-up or final report, or change an open Follow up's type to Final (Reportable incident) or Final (Non-reportable incident) when the investigation is done. The fields it must hold change with the type at once.",
               "A later report holds only what you type on it; everything else comes from the records or from the chain's last approved report, so a correction is never left behind in an old copy. 1.3.1b is the complaint's ID on every report; 1.1c is the authority's reference from the initial report's recorded submission, else Unknown.",
-              "A Final or a Combined initial and final ends the chain. If you must correct a sent Final, ask for an updated final report: it is again a Final, made only on request.",
+              "A Final or a Combined initial and final ends the chain. If you must correct a sent Final, choose Ask for an updated final report: it is again a Final, made only on request.",
               "If the conclusion is signed again as not reportable, an open report is never cancelled: it offers Start the Final (Non-reportable incident), with 4.2b from the signed rationale. You decide. Reports already sent never change.",
             ],
             result: "The first report lists every later report with its type and state, and which one is open.",

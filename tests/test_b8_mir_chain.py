@@ -37,7 +37,7 @@ def _initial(trial) -> str:  # noqa: F811
         for item in children:
             db.delete(item)
         row.state = "DRAFT"
-        row.entries = {key: value for key, value in (row.entries or {}).items() if key not in ("1_2E", "4_2H")}
+        row.entries = {key: value for key, value in (row.entries or {}).items() if key not in ("1_2E", "4_2H", "1_1C")}
         db.commit()
     return initial
 
@@ -299,6 +299,46 @@ def test_b8_a_second_attempt_creates_no_second_draft(trial):  # noqa: F811
     _state(trial, initial, "APPROVED")  # a second attempt (e.g. after a rejected send)
     _ok(_record(user, initial))
     assert len(_ok(user.get(f"{REPORTS}/{initial}"))["mir_chain"]["items"]) == 1
+
+
+def test_b8_a_cancelled_automatic_follow_up_is_never_made_again(trial):  # noqa: F811
+    user, initial = trial["user"], _initial(trial)
+    _state(trial, initial, "APPROVED")
+    (item,) = _ok(_record(user, initial))["mir_chain"]["items"]
+    _ok(user.post(f"{REPORTS}/{item['id']}/cancel", json={"reason": "Made by mistake, test (sample)."}))
+    _state(trial, initial, "APPROVED")  # a second attempt
+    _ok(_record(user, initial))
+    assert _ok(user.get(f"{REPORTS}/{initial}"))["mir_chain"]["items"] == []
+
+
+def test_b8_typed_unknown_never_hides_the_recorded_reference(trial):  # noqa: F811
+    """Review run 5: 1.1c typed "Unknown" on the first report (its field note says so) is not carried over the
+    authority's number recorded with its submission."""
+    user, initial = trial["user"], _initial(trial)
+    _ok(user.put(f"{REPORTS}/{initial}/fields/1_1C", json={"value": "Unknown"}))
+    _approve(trial, initial, "APPROVED")
+    (item,) = _ok(_record(user, initial, "ANSM-2026-0042"))["mir_chain"]["items"]
+    assert _fields(_ok(user.get(f"{REPORTS}/{item['id']}")))["1_1C"]["value"] == "ANSM-2026-0042"
+
+
+def test_b8_the_position_rule_holds_at_send_and_after_a_final(trial):  # noqa: F811
+    """Review run 5: a first report holding a later type (typed before B8, or with the switch off) is refused at Send
+    for approval; an updated final report stays a Final."""
+    user, initial = trial["user"], _initial(trial)
+    with SessionLocal() as db:
+        bind_tenant(db, trial["tenant_id"])
+        row = db.get(ReportObligation, uuid.UUID(initial))
+        row.entries = {**(row.entries or {}), "1_2E": {"value": FU}}
+        db.commit()
+    refused = user.post(f"{REPORTS}/{initial}/snapshots")
+    assert refused.status_code == 422 and _code(refused) == "NOT_THIS_POSITION"
+    _initial(trial)
+    _ok(user.put(f"{REPORTS}/{initial}/fields/1_2E", json={"value": "Combined initial and final"}))
+    _state(trial, initial, "ACCEPTED")
+    updated = _ok(_create(user, initial, FR, updated_final=True))
+    refused = user.put(f"{REPORTS}/{updated['id']}/fields/1_2E", json={"value": FU})
+    assert refused.status_code == 422 and _code(refused) == "NOT_THIS_POSITION"
+    assert _ok(user.put(f"{REPORTS}/{updated['id']}/fields/1_2E", json={"value": FNR}))["mir_chain"]["type"] == FNR
 
 
 def test_b8_nothing_is_created_after_a_combined_report_or_with_the_switch_off(trial, monkeypatch):  # noqa: F811

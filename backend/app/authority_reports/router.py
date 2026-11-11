@@ -1394,7 +1394,7 @@ def set_field(
                 "The first report is a Preliminary, or Preliminary & Final: updates and the final follow it",
             )
     if field_id == forms.EU_MIR.type_field and mir_on(obligation):
-        _mir_type_allowed(obligation, value)
+        _mir_type_allowed(db, obligation, value)
     problem = forms.value_problem(field, value)
     if problem:
         raise _error(422, f"NOT_A_{field.kind}", problem)
@@ -1949,6 +1949,8 @@ def ask_for_approval(
         raise _error(409, "NOT_A_DRAFT", "Only a draft is frozen for approval")
     if obligation.form_code == forms.FDA_3500A.code:
         assign_number(db, control_db, obligation, str(ctx.user_id), _now())
+    if obligation.form_code in MIR_FORMS and mir_on(obligation):  # a type typed before B8 or while it was off
+        _mir_type_allowed(db, obligation, ((obligation.entries or {}).get(forms.EU_MIR.type_field) or {}).get("value"))
     if is_mir_chain(obligation) and mir_on(obligation):
         _mir_previous_accepted(db, obligation)
     if new_navigation(control_db, obligation.tenant_id):
@@ -3080,10 +3082,15 @@ def mir_type(obligation: ReportObligation) -> str:
     return forms.report_kind(_form(obligation), obligation.entries or {})
 
 
-def _mir_type_allowed(obligation: ReportObligation, value: str | None) -> None:
-    """The first report is an Initial or a Combined initial and final; a later one a Follow up or a Final (422
-    ``NOT_THIS_POSITION``). A later report's type is never cleared: it is its place in the chain."""
+def _mir_type_allowed(db, obligation: ReportObligation, value: str | None) -> None:
+    """The first report is an Initial or a Combined initial and final; a later one a Follow up or a Final, and only a
+    Final after a sent Final or Combined (an updated final report) (422 ``NOT_THIS_POSITION``). A later report's type
+    is never cleared: it is its place in the chain. Checked when typed and again at Send for approval."""
     allowed = MIR_LATER if obligation.parent_id else MIR_FIRST
+    if obligation.parent_id and any(
+        mir_type(row) in MIR_FINALS and row.state in rules.SUBMITTED for row in _mir_before(db, obligation)
+    ):
+        allowed = (forms.MIR_FINAL, forms.MIR_FINAL_NON)
     if obligation.parent_id and value is None:
         raise _error(422, "FOLLOWS_CHAIN", "A follow-up's or final's type is its place in the chain: choose another")
     if value is not None and value not in allowed:
@@ -3134,6 +3141,8 @@ def _mir_carried(db, obligation: ReportObligation) -> dict:
     carried: dict = {}
     for row in before:
         carried.update(_mir_approved_values(db, row))
+    if str((carried.get("1_1C") or {}).get("value", "")).strip().lower() == MIR_UNKNOWN.lower():
+        del carried["1_1C"]  # "Unknown", typed before the authority gave a number, never hides the recorded one
     given = [row.authority_reference for row in _submissions(db, before[0]) if row.authority_reference]
     return {"carried": carried, "nca_reference": given[-1] if given else MIR_UNKNOWN}
 
@@ -3209,7 +3218,12 @@ def mir_follow_up_on_submission(db, ctx, obligation: ReportObligation) -> Report
     initial = db.get(ReportObligation, obligation.parent_id) if obligation.parent_id else obligation
     mine = (obligation.created_at, str(obligation.id))
     chain = _mir_children(db, initial.tenant_id, initial.id)
-    if any((row.created_at, str(row.id)) > mine or row.state not in rules.SUBMITTED for row in chain):
+    if any(row.state not in rules.SUBMITTED for row in chain):
+        return None
+    made = db.query(ReportObligation).filter(  # cancelled ones count: a cancelled follow-up is never made again
+        ReportObligation.tenant_id == initial.tenant_id, ReportObligation.parent_id == initial.id
+    )
+    if any((row.created_at, str(row.id)) > mine for row in made if is_mir_chain(row)):
         return None
     promised = ((obligation.entries or {}).get("1_2F") or {}).get("value") or ""
     try:

@@ -112,6 +112,16 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
   (`GB`): before, the name went in as typed and MHRA's schema refused the file at Send for approval.
 - Send for approval's refusal of a GB file names "MHRA's GB schema", not the Commission's.
 
+### Fixed (MIR chain, from the independent review)
+- 1.1c typed "Unknown" on an earlier report (as its field note says) no longer hides the authority's number recorded
+  with the first report's submission on later reports.
+- The position rule is checked again at Send for approval (a first report holding a later type, typed before B8 or
+  with the switch off, is refused `NOT_THIS_POSITION`), and an updated final report can only be a Final.
+- A cancelled automatic follow-up is never made again when a second submission attempt is recorded.
+- GB 1.1c (MHRA's reference) and 1.3.1b (the complaint's ID) carry along the chain as the EU's do.
+- Report chain: "Ask for an updated final report" after a sent Final (before, the API only); a report recorded as
+  submitted and awaiting its receipt no longer counts as open on the screen (as on the server).
+
 ### Documentation (B8)
 - Step-by-step user guide, Reports: the EU MIR file, the MIR chain (follow-up and final reports), Great Britain's GB
   MIR file for MORE and Northern Ireland's EU file in MORE. "What MDARIX covers" no longer says EU, NI and GB reports

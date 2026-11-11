@@ -79,6 +79,7 @@ describe("step-by-step user guide", () => {
       ["Record the submission", "../workspace/sections/ReportsTab.tsx"],
       ["Report chain", "../workspace/sections/FollowUps.tsx"],
       ["Create a follow-up or final report", "../workspace/sections/FollowUps.tsx"],
+      ["Ask for an updated final report", "../workspace/sections/FollowUps.tsx"],
       ["Create trend", "../workspace/sections/SignalInbox.tsx"],
       ["Open an investigation", "../workspace/sections/SignalDetail.tsx"],
       ["Raise a trend", "../workspace/sections/TrendCheck.tsx"],

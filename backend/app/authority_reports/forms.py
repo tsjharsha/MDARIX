@@ -1437,7 +1437,7 @@ GB_MIR = Form(
                     "1_1C",
                     "1.1",
                     "Reference number assigned by the MHRA for this incident",
-                    None,
+                    "nca_reference",  # carried from the first report's recorded submission, as the EU's
                     INITIAL,
                     must_in=_AFTER_INITIAL,
                     note="MORE generates it for a web-form initial or combined report; keep the same number on every "
@@ -1515,7 +1515,7 @@ GB_MIR = Form(
                     MUST,
                     note="For a manufacturer outside the UK (to confirm for your organization).",
                 ),
-                Field("1_3_1B", "1.3", "Manufacturer's reference number for this incident", None, MUST),
+                Field("1_3_1B", "1.3", "Manufacturer's reference number for this incident", "complaint_ref", MUST),
                 Field(
                     "1_3_1C",
                     "1.3",
