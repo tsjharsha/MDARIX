@@ -108,6 +108,9 @@ No migration. Switches: `MDARIX_B6_DEADLINE_LIST` and `MDARIX_B6_LATE_ENTRY` (bo
   all 5,000 (p95 4.9 s; it read 2,000 before).
 - **Query budget.** `tests/test_b6a_query_budget.py` fails when the complaint page or the story reads more than its
   budget, or reads more at 1,000 complaints than at 100.
+- **"Try the daily list" beside the deadline downloads** (free trials, owner 11 Nov), not only in My Account.
+- **Fixed:** the Imported backlog read with a day (the readiness checks' reporting clocks) raised an error when an
+  organization had backlog complaints; it reads the day at its noon UTC, as triage does.
 
 ## [0.11.02] - not released yet
 
