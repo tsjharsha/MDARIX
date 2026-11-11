@@ -320,9 +320,7 @@ def detail(db, control_db, ctx, market: str, version: int) -> dict:
         "answer_labels": markets.ANSWER_LABELS,
         "expected_labels": {code: markets.CONCLUSION_LABELS[code] for code in rules.EXPECTED},
         "report_types": [
-            {"code": code, "label": kind.label}
-            for code, kind in markets.REPORT_TYPES.items()
-            if code.startswith(rules.PREFIX[market] + "_")
+            {"code": code, "label": markets.REPORT_TYPES[code].label} for code in rules.guide_types(market)
         ],
         "core_rule": CORE_RULE,
         "matrix_rule": MATRIX_RULE,

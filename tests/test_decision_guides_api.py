@@ -99,6 +99,17 @@ def test_a_test_that_expects_no_from_an_unknown_fails():
     assert problem and "drives the conclusion" in problem
 
 
+def test_a_manufacturers_guide_never_lists_an_importers_or_user_facilitys_report_type(monkeypatch):
+    # B9 review 4: the guide is built on the manufacturer's questions; the role floors' types are not its outcomes.
+    monkeypatch.setenv("MDARIX_B9_US_USER_FACILITY", "on")
+    kinds = rules.guide_types(markets.US)
+    assert kinds == ["US_30_DAY", "US_5_WORK_DAY"], kinds
+    assert "US_IMP_30_DAY" not in kinds and "US_UF_10_WORK_DAY" not in kinds
+    row = {"name": "Importer", "answers": {"US1": "YES", "US3": "YES"}, "expected": "REPORTABLE"}
+    _, problem = rules.clean_tests(markets.US, [{**row, "expected_report_type": "US_IMP_30_DAY"}])
+    assert problem and "report type" in problem
+
+
 # --------------------------------------------------------------------------------------------- through the API
 
 

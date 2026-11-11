@@ -239,10 +239,24 @@ def changed_rows(market: str, tests: list[dict]) -> list[dict]:
     return [row for row in run(market, tests) if not row["passed"]]
 
 
+def guide_types(market: str) -> list[str]:
+    """A guide's report types: the market's manufacturer types. A guide is built on the manufacturer's questions, so a
+    role floor's types (a US importer's or user facility's, B9) are never one of its outcomes (B9 review 4)."""
+    from backend.app.rule_register import register
+
+    roles = {
+        code
+        for entry in register.load().values()
+        if entry["rule"] in register.ROLE_RULES.values()
+        for code in (entry.get("content") or {}).get("report_types") or {}
+    }
+    return [kind for kind in markets.REPORT_TYPES if kind.startswith(PREFIX[market] + "_") and kind not in roles]
+
+
 def _clean_rows(market: str, raw: list[dict]) -> tuple[list[dict] | None, str | None]:
     """Answers name core questions only: extra questions never drive a conclusion."""
     core_ids = starter(market).ids()
-    kinds = [kind for kind in markets.REPORT_TYPES if kind.startswith(PREFIX[market] + "_")]
+    kinds = guide_types(market)
     found: list[dict] = []
     if len(raw or []) > TESTS_MAX:
         return None, f"Keep the test matrix to {TESTS_MAX} worked complaints"
