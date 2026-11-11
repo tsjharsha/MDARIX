@@ -10,6 +10,13 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.11.00] - not released yet
+
+B9: markets. India first (MvPI adverse event reports), then Canada (mandatory problem reports), then the US importer
+and user facility. MDARIX prepares; the customer submits: MDARIX never submits. Every legal citation and period is
+"starter, for your consultant to confirm". Switches: `MDARIX_B9_INDIA` (on), `MDARIX_B9_CANADA` (on),
+`MDARIX_B9_US_IMPORTER` (on), `MDARIX_B9_US_USER_FACILITY` (off).
+
 ## [0.10.99] - not released yet
 
 B4: the rule register. Every rule MDARIX applies, its source, version and dates, in one place; the reportability
