@@ -166,6 +166,9 @@ EXEMPT = {
         "POST",
         "/api/v1/investigations/{investigation_id}/decision/sign",
     ): "approval authority + segregation of duties + re-authentication",
+    # B7b: the intake address is set by the Customer Admin only (backend/app/mail_in/router.py `_customer_admin`).
+    ("PUT", "/api/v1/email-intake/settings"): "checked in the route: Customer Admin only",
+    ("POST", "/api/v1/email-intake/settings/rotate"): "checked in the route: Customer Admin only",
 }
 # Exempt routes that must still refuse anyone without a session: the exemption is from the business permission,
 # never from authentication.
@@ -304,6 +307,8 @@ def test_a_viewer_is_refused_on_every_guarded_route(monkeypatch):
     # Under MDARIX_FEATURE_SET=mvp the feature-set gate answers 404 for parked routes before their guard runs (its own
     # tests: test_feature_set.py). This test checks the guards themselves, so it serves every route.
     monkeypatch.setenv("MDARIX_FEATURE_SET", "full")
+    # B7b: e-mail intake answers 404 while switched off, before the guard runs; switch it on so the guard is reached.
+    monkeypatch.setenv("MDARIX_EMAIL_INTAKE", "on")
     viewer = _client_with_role("Viewer")
     allowed = []
     for method, path, route in _business_actions():
