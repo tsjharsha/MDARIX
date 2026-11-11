@@ -663,7 +663,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             who: "Anyone with regulatory review or approval rights. The approver is never the preparer, never the signer of the market conclusion and never an administrator.",
             steps: [
               "Open Complaints › Reports and choose Start the worksheet on the complaint and market (or Open the report worksheet on the signed conclusion).",
-              "Read each section in the form's order. Each field shows From record (with its record), Entered by a person, Confirmed, or what is missing: must have before submission, may be unknown in an initial report, or follow up later. Patient and reporter details say Enter in the authority's route: MDARIX never stores them (the sample shows fictional ones).",
+              "Read each section in the form's order. Each field shows From record (with its record), Entered by a person, Confirmed, or what is missing: must have before submission, may be unknown in an initial report, or follow up later. Patient and reporter details say Enter in the authority's route (the sample shows fictional ones), unless your Customer Admin has allowed them at the report step: then they say Optional: type it at Send for approval.",
               "Choose Enter a value for what the records do not hold, or Confirm against the source. Missing fields never block a timely initial report.",
               "Choose Ask for approval: the worksheet is frozen as a snapshot. A colleague opens it, enters their password and authenticator code and chooses Approve the snapshot.",
               "Download the PDF or DOCX: a working draft, or the approved snapshot exactly as frozen.",
@@ -717,7 +717,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "A signed EU conclusion (Reportable or Pending information) makes the report. 1.1a, the authority, comes from the incident country (the Commission's list of vigilance contact points); a country the list does not name is asked. 1.2a, the date of the report, is the day you send it for approval: never typed. 1.2d is asked; the day the conclusion was signed is shown beside it as a hint only.",
               "Choose the report type (1.2e): the first report is an Initial, or a Combined initial and final only when the investigation is already complete. Give the next report's date (1.2f) on an Initial or a Follow up. Choose the risk class (2.4) from the list the schema takes.",
               "For 4.3.3c (similar incidents) choose Enter the table: one row per period and region, with the incidents and the devices on the market. Every number is yours: MDARIX holds no distribution data. Enter 0 where you found none.",
-              "Patient and reporter details are not in the file: MDARIX never stores them. Add them in the authority's route.",
+              "Patient and reporter details: by default they are not in the file; add them in the authority's route. If your Customer Admin has switched on Patient and reporter details in reports (Complaints › Reporting windows, with a reason), open Patient and reporter details (optional) beside Send for approval and type them there: they go only into this report's approved version and its file, never on the draft, into AI, analytics, search or an export.",
               "Send it for approval. MDARIX builds the XML for the report type and checks it against the Commission's schema for that type; while the authority would refuse it, the report lists what the file still needs, block by block, and is not sent.",
               "A colleague approves it. Then choose Download XML (MIR 7.3.1) and Download PDF (EU MIR 7.3.1 content, prepared by MDARIX, with a record page and the file's SHA-256). Both were made at approval and the approval covers the XML; before approval no XML is given. A report approved before the MIR file keeps its PDF only.",
               "Send the XML through EUDAMED or the authority's own channel (import it into the official MIR PDF if your authority asks for it), then Record the submission. MDARIX never submits.",
@@ -747,7 +747,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "A signed GB conclusion makes the GB report, with the same report types, chain and approval as the EU report. The GB file has no EUDAMED number and no 1.2d; it takes the UK approved body, MHRA's PMCF/PMPF ID and one UDI issuing entity; Annex B, C, D and G codes are needed in every GB report type.",
               "After approval choose Download XML (GB MIR 7.2.1). Upload it in MHRA's MORE, the only route MHRA takes, then Record the submission with the MORE route. The PDF is your record copy. MDARIX never submits.",
             ],
-            note: "The GB rules are read from MHRA's own files first. Where only the EU help text is stricter, the field is optional on a GB report and marked to confirm, for your regulatory consultant.",
+            note: "The GB rules are read from MHRA's own files first. Where only the EU help text is stricter (SRN, 2.1b-c, 2.3p, 2.4, 4.2i, 4.3.1a, 4.3.3d), the field is optional on a GB report and, while empty, shows a warning to confirm with your consultant; it never stops Send for approval. 3.4h, the reporter's country, is always needed.",
           },
           {
             title: "Northern Ireland: the EU MIR file in MORE",

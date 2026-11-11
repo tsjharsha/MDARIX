@@ -101,6 +101,8 @@ export type WorksheetField = {
   problem?: string | null;
   /** 0.10.92 (A5): what is asked for beside the field (CONTACT_EMAIL: the eMDR's contact office e-mail). */
   ask?: "CONTACT_EMAIL" | null;
+  /** B8 run 6 (GB, follow MHRA): optional on MHRA's form, mandatory in the EU help text: a non-blocking warning. */
+  warning?: string | null;
   /** 0.10.83 (D2.7): who knows it (the product, the organization, or this event), and whether it is entered once
    * for every report (``once_key`` groups fields entered together). */
   scope?: "PRODUCT" | "ORGANIZATION" | "EVENT";
@@ -251,6 +253,8 @@ export type ReportDetail = {
   sections: WorksheetSection[];
   counts: Record<string, number>;
   status_labels: Record<string, string>;
+  /** tr30 (B9-D9 / B8-D9): patient and reporter details may be typed at Send for approval (organization setting). */
+  personal_data?: boolean;
   editable: boolean;
   snapshots: Snapshot[];
   pending_snapshot: (Snapshot & { sections?: WorksheetSection[] | null }) | null;

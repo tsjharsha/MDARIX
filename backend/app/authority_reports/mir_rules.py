@@ -9,6 +9,7 @@ consultant to confirm.
 from __future__ import annotations
 
 import csv
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -35,6 +36,29 @@ def rows(form_code: str) -> tuple[dict, ...]:
 def need(row: dict, report_type: str) -> str:
     """M, C or O: what the rule book says of ``row`` in ``report_type``."""
     return row[TYPE_COLUMNS[report_type]]
+
+
+# GB rows MHRA's own files leave optional where only the EU help text is stricter (owner, 11 Nov: follow MHRA).
+_TO_CONFIRM = re.compile(r"mandatory in ([A-Z, ]+?) and MHRA's GB help text lists no difference: to confirm")
+CONFIRM_WARNING = (
+    "Optional on MHRA's GB form; the EU help text asks for it in this report type. To confirm with your consultant."
+)
+
+
+def to_confirm(form_code: str, report_type: str | None) -> dict[str, str]:
+    """The fields of a non-blocking "to confirm" warning when empty (GB only): optional on MHRA's files, mandatory in
+    the EU help text for this report type (any type when none is chosen), each with its block."""
+    found: dict[str, str] = {}
+    if form_code != forms.GB_MIR.code:
+        return found
+    column = TYPE_COLUMNS.get(report_type or "")
+    for row in rows(form_code):
+        match = _TO_CONFIRM.search(row["help_text"])
+        types = {part.strip().lower() for part in match.group(1).split(",")} if match else set()
+        if types and (column is None or column in types):
+            for field in filter(None, row["fields"].split(";")):
+                found.setdefault(field, row["block"])
+    return found
 
 
 def mandatory_fields(form_code: str, report_type: str) -> dict[str, str]:

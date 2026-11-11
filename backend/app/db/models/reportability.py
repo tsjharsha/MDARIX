@@ -15,6 +15,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -50,6 +51,9 @@ class ReportabilitySettings(Base):
     lookback_days: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("365"))
     # tr28 (B9): market -> IMPORTER or USER_FACILITY; absent is Manufacturer. Set only by an approver, audited.
     reporting_roles = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    # tr30 (B9-D9 / B8-D9): patient and reporter details may be typed at Send for approval, kept only in that report's
+    # frozen snapshot. Default off. Set only by a Customer Admin with a reason, audited.
+    report_personal_data: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     updated_by: Mapped[str | None] = mapped_column(String(255))
     updated_at = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("now()"))

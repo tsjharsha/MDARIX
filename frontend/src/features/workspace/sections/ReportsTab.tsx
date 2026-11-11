@@ -41,6 +41,7 @@ import { STARTER_LABEL } from "../../shared/standards";
 import { ApprovingDoc, ConfirmAllCodes, ThingsToGive, signatureLine } from "./ReportBody";
 import { FollowUps } from "./FollowUps";
 import { MirFiles, MirNeeds } from "./MirFiles";
+import { PersonalAtSend, personalBody } from "./PersonalAtSend";
 
 /** What MDARIX does with an authority report, said once where it matters (Release C guardrail 3). */
 export const NEVER_SUBMITS =
@@ -283,6 +284,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
   const detail = shown?.id === id ? shown : resource.data;
   const action = useAction((next) => setShown(next), "That step was not recorded.");
   const [pdfError, setPdfError] = useState("");
+  const [personal, setPersonal] = useState<Record<string, string>>({});
   if (!detail)
     return (
       <Panel eyebrow="Report" title="Authority report" source={notFound(resource) ? undefined : resource}>
@@ -519,11 +521,16 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
             {write && (detail.stage === "COMPLETE" || resend) && (
               <>
                 <p className="ac-muted">{askNote(detail.approval)}</p>
+                <PersonalAtSend detail={detail} values={personal} onChange={setPersonal} />
                 <button
                   type="button"
                   className="ac-primary"
                   disabled={action.busy}
-                  onClick={() => void action.run(`${REPORTS}/${detail.id}/snapshots`, "POST")}
+                  onClick={() =>
+                    void action
+                      .run(`${REPORTS}/${detail.id}/snapshots`, "POST", personalBody(personal))
+                      .then((ok) => ok && setPersonal({}))
+                  }
                 >
                   <Send size={15} aria-hidden="true" /> Send for approval
                 </button>

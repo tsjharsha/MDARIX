@@ -377,6 +377,17 @@ STEPS = (
             "AND table_name = 'products' AND column_name = 'udi_issuing_entity')"
         ),
     ),
+    Step(
+        "tr30",
+        "tr30_trial_personal_data.py",
+        "add_personal_data",
+        (),
+        ("reportability_settings",),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'reportability_settings' AND column_name = 'report_personal_data')"
+        ),
+    ),
 )
 
 

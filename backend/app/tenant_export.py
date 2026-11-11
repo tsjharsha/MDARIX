@@ -68,10 +68,46 @@ CONTACT_HELD = "Contact held: yes"
 MASKED, UNMASKED = "MASKED", "UNMASKED"
 
 
+# tr30 (B9-D9 / B8-D9): patient and reporter details typed at Send for approval live only in that report's snapshot;
+# a masked export writes "Personal data held: yes" in their place, and in place of the frozen files that carry them.
+PERSONAL_HELD = "Personal data held: yes"
+PERSONAL_FILES = ("mir_xml", "emdr_xml", "emdr_left_out")
+
+
+def _held(item: dict) -> bool:
+    return bool(item.get("personal") and item.get("value"))
+
+
+def masked_snapshot(fields):
+    """A report snapshot's frozen content without its patient and reporter values (unchanged when it holds none)."""
+    if not isinstance(fields, dict):
+        return fields
+    sections = fields.get("sections") or []
+    if not any(_held(item) for section in sections for item in section.get("fields") or []):
+        return fields
+    return {
+        **fields,
+        "sections": [
+            {
+                **section,
+                "fields": [
+                    {**item, "value": PERSONAL_HELD} if _held(item) else item for item in section.get("fields") or []
+                ],
+            }
+            for section in sections
+        ],
+        **{key: PERSONAL_HELD for key in PERSONAL_FILES if fields.get(key)},
+    }
+
+
 def masked_row(table: str, row: dict) -> dict:
-    """The row as a masked export writes it: each contact value held is replaced by "Contact held: yes"."""
+    """The row as a masked export writes it: each contact value held is replaced by "Contact held: yes"; a report
+    snapshot's patient and reporter values by "Personal data held: yes"."""
     columns = CONTACT_COLUMNS.get(table, ())
-    return {key: (CONTACT_HELD if key in columns and value else value) for key, value in row.items()}
+    out = {key: (CONTACT_HELD if key in columns and value else value) for key, value in row.items()}
+    if table == "report_snapshots" and "fields" in out:
+        out["fields"] = masked_snapshot(out["fields"])
+    return out
 
 
 FETCH_ROWS = 1000

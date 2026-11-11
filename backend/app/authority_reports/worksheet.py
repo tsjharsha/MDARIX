@@ -27,12 +27,15 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from backend.app import product_facts
-from backend.app.authority_reports import forms
+from backend.app.authority_reports import forms, mir_rules
 from backend.app.reportability import deadlines, markets
 
 FROM_RECORD, ENTERED, CONFIRMED, OUTSIDE = "FROM_RECORD", "ENTERED", "CONFIRMED", "OUTSIDE"
 SUGGESTED, CHANGED = "SUGGESTED", "CHANGED"
 FICTIONAL_STATUS = "FICTIONAL"
+# tr30 (B9-D9 / B8-D9): the organization lets patient and reporter details be typed at Send for approval.
+AT_SEND = "AT_SEND"
+TYPED_AT_SEND = "Typed at Send for approval, kept only in this report"
 STATUS_LABELS = {
     FROM_RECORD: "From record",
     ENTERED: "Entered by a person",
@@ -40,6 +43,7 @@ STATUS_LABELS = {
     SUGGESTED: "Suggested from your approved mapping",
     CHANGED: "Changed from the suggestion",
     OUTSIDE: "Enter in the authority's route",
+    AT_SEND: "Optional: type it at Send for approval",
     FICTIONAL_STATUS: "Fictional (sample only)",
     **forms.MISSING_LABELS,
 }
@@ -1021,6 +1025,8 @@ def build(
 ) -> list[dict]:
     """The worksheet's sections, each field with its value, status and source, in the form's order."""
     personal = SAMPLE_PERSONAL.get(context["complaint"].complaint_identifier, {}) if context["sample"] else {}
+    # tr30: patient and reporter details typed at Send for approval (request_snapshot only; never stored elsewhere).
+    typed = context.get("personal_typed") or {}
     # B8 step 3: a MIR chain's later report reads the reports before it, under what is typed on it.
     entries = {**context.get("carried", {}), **entries}
     # The report type decides which fields are mandatory (0.10.76: the EU, GB and Canada forms).
@@ -1033,6 +1039,8 @@ def build(
     if role == "IMPORTER" and not context.get("follow_up"):
         required = F10_CODES
     us = form.code == forms.FDA_3500A.code
+    # GB (owner 11 Nov, follow MHRA): optional rows the EU help text alone makes mandatory warn when empty.
+    to_confirm = mir_rules.to_confirm(form.code, kind)
     out = []
     for section in form.sections:
         rows = []
@@ -1052,6 +1060,8 @@ def build(
             if item.personal:
                 value = personal.get(item.id)
                 found = (value, _source("Sample", None, FICTIONAL)) if value else None
+                if not value and typed.get(item.id):
+                    found = (typed[item.id], _source("Report step", None, TYPED_AT_SEND))
             elif item.source == "front_page":
                 # The front page's number, entered once (stage 8: nothing typed twice).
                 front = (entries.get("MFR_REPORT") or {}).get("value")
@@ -1068,7 +1078,9 @@ def build(
             elif item.source:
                 found = SOURCES[item.source](context)
             value, source = found if found and found[0] else (None, None)
-            status = (FICTIONAL_STATUS if item.personal else FROM_RECORD) if value else None
+            status = None
+            if value:
+                status = FROM_RECORD if not item.personal else FICTIONAL_STATUS if personal.get(item.id) else ENTERED
             suggestion = None
             if annex and confirm and value and not entry.get("value") and not entry.get("confirmed"):
                 # A code the mapping supplies waits for a person (0.10.77): never filed unconfirmed.
@@ -1100,11 +1112,12 @@ def build(
                 # Only the e-mail is missing: it is asked for here, beside the field (PUT .../once contact_email).
                 ask = CONTACT_EMAIL if problem and problem.startswith(EMAIL_NEEDED) else None
             if status is None:
-                status = (
-                    OUTSIDE
-                    if item.personal and not context["sample"]
-                    else (forms.NOT_USED if missing == forms.NOT_USED else missing)
-                )
+                if item.personal and context.get("personal_data"):
+                    status = AT_SEND
+                elif item.personal and not context["sample"]:
+                    status = OUTSIDE
+                else:
+                    status = forms.NOT_USED if missing == forms.NOT_USED else missing
             rows.append(
                 {
                     "id": item.id,
@@ -1125,6 +1138,7 @@ def build(
                     "hint": HINTS[item.id](context)
                     if form.code in MIR_CODES and item.id in HINTS and not value
                     else None,
+                    "warning": mir_rules.CONFIRM_WARNING if item.id in to_confirm and not value else None,
                     "by": names.get(entry.get("by")) if entry else None,
                     "at": entry.get("at") if entry else None,
                     # Codes (0.10.77): the annex the field codes, the suggestion waiting, what was suggested before a
@@ -1167,7 +1181,7 @@ def frozen(sections: list[dict]) -> list[dict]:
                 {
                     key: value
                     for key, value in item.items()
-                    if key not in ("editable", "suggestion", "scope", "once", "once_key", "ask", "hint")
+                    if key not in ("editable", "suggestion", "scope", "once", "once_key", "ask", "hint", "warning")
                 }
                 for item in section["fields"]
             ],

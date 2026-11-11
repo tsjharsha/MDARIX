@@ -33,6 +33,7 @@ export function ReportingWindows() {
     <Panel eyebrow="Complaints" title="Reporting windows" source={settings}>
       {settings.data && <WindowsBody key={settings.data.version} settings={settings.data} onSaved={settings.reload} />}
       {settings.data && <RolesBody settings={settings.data} onSaved={settings.reload} />}
+      {settings.data && <PersonalDataBody settings={settings.data} onSaved={settings.reload} />}
     </Panel>
   );
 }
@@ -125,6 +126,64 @@ export function RolesBody({ settings, onSaved }: { settings: ReportabilitySettin
           <div className="ca-action-row">
             <button type="submit" className="ac-primary" disabled={busy || !changed || short}>
               Save role
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
+  );
+}
+
+/**
+ * tr30 (B9-D9 / B8-D9): whether patient and reporter details may be typed at Send for approval. Default off. Changed
+ * only by the Customer Admin (a trial's owner in their place), with a reason, audited; approved reports keep theirs.
+ */
+export function PersonalDataBody({ settings, onSaved }: { settings: ReportabilitySettings; onSaved: () => void }) {
+  const { notify } = useWorkspace();
+  const on = !!settings.report_personal_data;
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const short = reason.trim().length < 10;
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (short) return;
+    setBusy(true);
+    setError("");
+    try {
+      await send("/api/v1/complaints/reportability-personal-data", "PUT", { on: !on, reason: reason.trim() });
+      notify(
+        on
+          ? "Patient and reporter details are now entered in the authority's route."
+          : "Patient and reporter details can now be typed at Send for approval.",
+      );
+      setReason("");
+      onSaved();
+    } catch (failure) {
+      setError(errorText(failure, "The setting was not saved."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="ca-drawer-section" id="rw-personal">
+      <h3>Patient and reporter details in reports</h3>
+      <p className="ac-muted">
+        {on
+          ? "On: a preparer may type them at Send for approval. They are kept only in that report's approved version and the authority's file; never on the draft, in AI, analytics, search or an export."
+          : "Off: the patient and reporter boxes stay blank and are entered in the authority's own route."}{" "}
+        Approved reports never change when this changes.
+      </p>
+      {settings.can_set_personal_data && (
+        <form className="ca-form" onSubmit={submit}>
+          <label className="ca-field">
+            <span>Reason (at least 10 characters, kept in the audit trail)</span>
+            <input value={reason} maxLength={500} onChange={(event) => setReason(event.target.value)} />
+          </label>
+          {error && <InlineError text={error} />}
+          <div className="ca-action-row">
+            <button type="submit" className="ac-primary" disabled={busy || short}>
+              {on ? "Switch off" : "Switch on"}
             </button>
           </div>
         </form>

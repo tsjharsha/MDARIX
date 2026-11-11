@@ -122,6 +122,25 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
 - Report chain: "Ask for an updated final report" after a sent Final (before, the API only); a report recorded as
   submitted and awaiting its receipt no longer counts as open on the screen (as on the server).
 
+### Added (B8 run 6, owner's answers of 11 Nov)
+- **Patient and reporter details at the report step** (B9-D9 / B8-D9), one organization setting, default off. The
+  Customer Admin (a trial's owner in their place) switches it in Complaints › Reporting windows with a reason of at
+  least 10 characters, audited `REPORT_PERSONAL_DATA_SET` (`PUT /api/v1/complaints/reportability-personal-data`).
+  On: the patient and reporter boxes say "Optional: type it at Send for approval"; the values travel only in the Send
+  for approval request (`POST /reports/{id}/snapshots {personal: {field: value}}`) and are written only into that
+  report's frozen snapshot and its files (EU and GB MIR XML: 3.3b age, 3.3c gender from each schema's own list, 3.3d
+  weight, 3.3e height, 3.3f, 3.4b-g, 3.4i-n; India and Canada forms read them from the snapshot). Never on the draft,
+  in the audit trail (only which boxes were typed), AI context, search or a masked export ("Personal data held: yes").
+  Off: today's behaviour, and Send refuses typed details (422 `PERSONAL_DATA_OFF`). Switching off never changes a
+  frozen snapshot.
+- **GB rows to confirm** (owner: follow MHRA): SRN, 2.1b-c, 2.3p, 2.4, 4.2i, 4.3.1a and 4.3.3d stay optional on a GB
+  report and, while empty, show a non-blocking warning "To confirm with your consultant" in the report types the EU
+  help text names; 3.4h stays mandatory.
+
+### Fixed (B8 run 6)
+- 4.3.3c (similar incidents) prints as plain lines, one per period, in the worksheet PDF and Word file, and as a table
+  on the approval page, whatever the B8 switches: never its stored JSON text.
+
 ### Documentation (B8)
 - Step-by-step user guide, Reports: the EU MIR file, the MIR chain (follow-up and final reports), Great Britain's GB
   MIR file for MORE and Northern Ireland's EU file in MORE. "What MDARIX covers" no longer says EU, NI and GB reports
@@ -134,6 +153,9 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
   `city`, `postcode`, `country_code` (checked two upper-case letters), `contact_first_name`, `contact_last_name`;
   `products` gains `udi_issuing_entity` (GS1, HIBCC, ICCBBA or IFA). Downgrade refuses while any holds a value.
   Legacy organization databases: `scripts/add_workflow_tables_to_legacy_planes.py` step tr29.
+- `tr30personaldata` (from `tr29partyparts`, expand-only, no backfill): `reportability_settings.report_personal_data`,
+  boolean, default false (tenant-isolated table, row-level security unchanged). Downgrade refuses while any
+  organization has it on. Legacy organization databases: step tr30.
 
 ## [0.11.00] - not released yet
 

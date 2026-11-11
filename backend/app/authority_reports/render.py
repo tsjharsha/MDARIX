@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import io
 
+from backend.app.authority_reports import forms
+
 from backend.app.qms_documents.render import SOURCE_LABELS
 from reports.pdf import PAGE_BREAK
 
@@ -57,6 +59,8 @@ def header_lines(view: dict, organization: str | None) -> list[str]:
 
 def _value(item: dict) -> str:
     value = item["value"] if item["value"] else "-"
+    if item["value"] and (item.get("kind") == forms.TABLE or item.get("id") == "4_3_3C"):
+        value = "\n" + forms.table_text(item["value"])  # 4.3.3c in plain lines, never its stored JSON (B8 run 6)
     return f"{item['number'] + ' ' if item['number'] else ''}{item['label']}: {value}"
 
 
@@ -136,7 +140,9 @@ def lines(view: dict) -> list[tuple[str, str]]:
         if not section["fields"]:
             continue
         for item in section["fields"]:
-            out.append((_value(item), "body"))
+            first, *more = _value(item).split("\n")
+            out.append((first, "body"))
+            out += [(f"    {line}", "body") for line in more]  # 4.3.3c's periods, one per line
             out.append((f"    {_status(item)}", "muted"))
     out += [("", "body"), ("Source records", "heading")]
     for kind, refs in _sources(view).items():

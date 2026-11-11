@@ -54,6 +54,9 @@ export type ReportabilitySettings = {
   /** B9: the organization's role per market (absent: Manufacturer) and the roles offered now, per market. */
   reporting_roles?: Record<string, string>;
   roles_offered?: Record<string, string[]>;
+  /** tr30: patient and reporter details at Send for approval (default off), and whether this person may change it. */
+  report_personal_data?: boolean;
+  can_set_personal_data?: boolean;
 };
 
 /** B9: a reporting role's words. */

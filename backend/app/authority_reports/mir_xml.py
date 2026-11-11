@@ -4,8 +4,8 @@ picked by the form (``form=``, EU by default). Root ``<incident>``, no namespace
 from the type's XSD, so one table of values serves every type).
 
 The file holds only what the report holds: a blank stays blank, never "Unknown" unless a person (or the help text's
-rule, as 1.1c's) put it there. Personal fields (3.3b-f, 3.4b-g, 3.4i-n) are never written while no tenant setting
-allows them (B8-D9, today's "off"). A value that does not fit its element is written as it is, so the schema refuses
+rule, as 1.1c's) put it there. Personal fields (3.3b-f, 3.4b-g, 3.4i-n) are written only when the report's snapshot
+holds them: typed at Send for approval while the organization's setting allows it (tr30, B8-D9). A value that does not fit its element is written as it is, so the schema refuses
 it and names the block: the builder never drops a value to make a file pass. A file that fails its XSD is never
 returned (``build`` raises ``MirRefused``).
 """
@@ -91,7 +91,13 @@ PLAIN = {
     "3_2D": "incident_info/clinical_event_info/deviceOperatorAtEvent",
     "3_2E": "incident_info/clinical_event_info/deviceUsage",
     "3_2F": "incident_info/clinical_event_info/patientRemedialAction",
+    "3_3F": "incident_info/patient_info/patientPriorMedication",
     "3_4A": "incident_info/initial_reporter_info/initialReporterRole",
+    # tr30: the reporter's details as typed at Send for approval. shortcut: 3.4i-n is one text, written as the
+    # facility's address; split it into street, number, city, PO box and postcode when a customer asks.
+    "3_4B": "incident_info/initial_reporter_info/healthcareFacilityName",
+    "3_4C": "incident_info/initial_reporter_info/healthcareFacilityRepNum",
+    "3_4I": "incident_info/initial_reporter_info/healthcareFacilityAddress",
     "4_1A": "mfr_invest/manufacturersPrelimAnalysis",
     "4_1B": "mfr_invest/suspicionRelationShip",
     "4_1C": "mfr_invest/manufacturersInitialCorrecAction",
@@ -185,6 +191,8 @@ REPRESENTATIVES = {EU: ("AUTHORISED_REPRESENTATIVE",), GB: ("UK_RESPONSIBLE_PERS
 # shortcut: 1.3.4 (a submitter other than the manufacturer or AR) is one text; the file wants its parts
 # (reporterDetails). The report is still built without them; add a parts form like step 6's when a customer needs it.
 NOT_IN_FILE = frozenset({"1_3_4"})
+# The patient and reporter fields (3.3b-f, 3.4b-g, 3.4i-n), EU and GB alike.
+PERSONAL = frozenset(item.id for form in (forms.EU_MIR, forms.GB_MIR) for item in form.fields() if item.personal)
 # 1.3.2 and 1.3.3: the parties on the worksheet; the file takes their parts (``file_values``).
 PARTY_FIELDS = frozenset({"1_3_2A", "1_3_2B", "1_3_2C", "1_3_3"})
 GB_PARTY_FIELDS = PARTY_FIELDS | {"1_3_1D"}
@@ -339,13 +347,43 @@ def _device_layout(form: str = EU):
     return next(kids for name, kids, _, _ in device if name == "distribution")
 
 
-def _duration(text: str) -> dict:
+def _duration(text: str, base: str = "device_info/implantDuration") -> dict:
     parts = {
         unit: re.search(rf"(\d+)\s*{word}", text, re.IGNORECASE)
         for unit, word in (("numYears", "y"), ("numMonths", "mo"), ("numDays", "d"))
     }
-    found = {f"device_info/implantDuration/{unit}": hit.group(1) for unit, hit in parts.items() if hit}
-    return found or {"device_info/implantDuration/numYears": text}
+    found = {f"{base}/{unit}": hit.group(1) for unit, hit in parts.items() if hit}
+    return found or {f"{base}/numYears": text}
+
+
+def _number(text: str) -> str:
+    """ "71 kg" -> "71"; text without a number stays as it is (the schema refuses it, naming the block)."""
+    found = re.search(r"\d+(?:[.,]\d+)?", text)
+    return found.group(0).replace(",", ".") if found else text
+
+
+_EMAIL = re.compile(r"[^\s,;<>()]+@[^\s,;<>()]+")
+_PHONE = re.compile(r"\+?\d[\d\s().-]{5,}\d")
+
+
+def _contact(text: str) -> dict:
+    """3.4d-g, one text ("Name Surname, e-mail, phone"), in the file's parts: the e-mail and phone found by their
+    shape, the rest the name (first word the first name). shortcut: one text, not four boxes; split the boxes when a
+    customer asks."""
+    base = "incident_info/initial_reporter_info/healthcareFacility"
+    out: dict = {}
+    email, phone = _EMAIL.search(text), _PHONE.search(text)
+    rest = text
+    for found, element in ((email, "Email"), (phone, "Phone")):
+        if found:
+            out[base + element] = found.group(0).strip()
+            rest = rest.replace(found.group(0), " ")
+    words = " ".join(re.sub(r"[,;]", " ", rest).split()).split(" ", 1)
+    if words[0]:
+        out[base + "ContactPersonFirstName"] = words[0]
+        if len(words) > 1:
+            out[base + "ContactPersonSecondName"] = words[1]
+    return out
 
 
 def _market_date(text: str) -> dict:
@@ -440,10 +478,15 @@ def _party_of(parties, role: str):
     return next((item for item in parties if getattr(item, "role", None) == role), None)
 
 
-def file_values(values: dict, parties, *, udi_entity: str | None = None, form: str = EU) -> dict:
+def file_values(
+    values: dict, parties, *, udi_entity: str | None = None, form: str = EU, personal: bool = False
+) -> dict:
     """Every element's value by its path under <incident>, from the report's values (field id -> text), the market's
-    responsible parties (with their parts) and the product's UDI issuing entity (B8-D11)."""
+    responsible parties (with their parts) and the product's UDI issuing entity (B8-D11). ``personal``: the patient
+    and reporter fields are written only for a snapshot sent while the organization allows them (tr30)."""
     gb = form == GB
+    if not personal:
+        values = {key: text for key, text in values.items() if key not in PERSONAL}
     plain = GB_PLAIN if gb else PLAIN
     out: dict = {plain[key]: text for key, text in values.items() if key in plain}
     for key in ("1_2A", "1_2C", "1_2D", "1_2F", "2_3I", "2_3J"):
@@ -472,6 +515,16 @@ def file_values(values: dict, parties, *, udi_entity: str | None = None, form: s
         out |= _distribution(values["2_5"], form)
     if "3_4H" in values:
         out["incident_info/initial_reporter_info/healthcareFacilityCountry"] = country_code(values["3_4H"])
+    # tr30: the patient's details, only when typed at Send for approval (the snapshot holds them).
+    if "3_3B" in values:
+        out |= _duration(values["3_3B"], "incident_info/patient_info/patientAgeAtEvent")
+    if "3_3C" in values:
+        out["incident_info/patient_info/Gender"] = values["3_3C"]
+    for key, element in (("3_3D", "massKG"), ("3_3E", "heightCM")):
+        if key in values:
+            out[f"incident_info/patient_info/{element}"] = _number(values[key])
+    if "3_4D" in values:
+        out |= _contact(values["3_4D"])
     if "1_3_1F" in values and not gb:  # GB's 1.3.1f is the PSR ID (above); its PMCF/PMPF has only the ID
         answer, detail = _yes_no(values["1_3_1F"])
         out["admin_info/pmcfpmpfQuestion"] = answer
@@ -570,11 +623,18 @@ def missing(values: dict, parties, report_type: str, form: str = EU) -> list[str
 
 
 def build(
-    values: dict, parties, *, report_type: str, now: datetime, udi_entity: str | None = None, form: str = EU
+    values: dict,
+    parties,
+    *,
+    report_type: str,
+    now: datetime,
+    udi_entity: str | None = None,
+    form: str = EU,
+    personal: bool = False,
 ) -> bytes:
     """The MIR XML of a report of this type, valid against its XSD, or ``MirRefused``: never a partial file.
     ``now`` is the moment it is sent for approval (``sCreateTimeStamp``); the same values build the same bytes."""
-    found = file_values(values, parties, udi_entity=udi_entity, form=form)
+    found = file_values(values, parties, udi_entity=udi_entity, form=form, personal=personal)
     root = etree.Element("incident", nsmap={"xsi": XSI})
     root.set(f"{{{XSI}}}noNamespaceSchemaLocation", SCHEMAS[form][1][report_type])
     root.set("sCreateTimeStamp", now.isoformat(timespec="seconds"))
@@ -593,7 +653,14 @@ def build(
 
 
 def prepare(
-    values: dict, parties, *, report_type: str, now: datetime, udi_entity: str | None = None, form: str = EU
+    values: dict,
+    parties,
+    *,
+    report_type: str,
+    now: datetime,
+    udi_entity: str | None = None,
+    form: str = EU,
+    personal: bool = False,
 ) -> dict:
     """The file as Send for approval checks it: the blocks missing; when none, the file or the schema's errors."""
     lacking = missing(values, parties, report_type, form)
@@ -603,7 +670,9 @@ def prepare(
         return {
             "missing": [],
             "errors": [],
-            "xml": build(values, parties, report_type=report_type, now=now, udi_entity=udi_entity, form=form),
+            "xml": build(
+                values, parties, report_type=report_type, now=now, udi_entity=udi_entity, form=form, personal=personal
+            ),
         }
     except MirRefused as refused:
         return {"missing": refused.missing, "errors": refused.errors, "xml": None}

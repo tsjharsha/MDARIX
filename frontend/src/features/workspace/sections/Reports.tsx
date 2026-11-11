@@ -13,6 +13,7 @@ import { DeadlineChip, StateChip } from "../../../app/chips";
 import { Hero, InlineError } from "./boardParts";
 import { CodePicker } from "./CodePicker";
 import { FollowUps, openFollowUp } from "./FollowUps";
+import { PersonalAtSend, personalBody } from "./PersonalAtSend";
 import { SimilarTableRow } from "./SimilarTable";
 import { ROLE_LABELS } from "../reportability";
 import {
@@ -351,6 +352,7 @@ function NextStep({
   onOpen: (id: string) => void;
 }) {
   const action = useAction(onChanged, "That step was not recorded.");
+  const [personal, setPersonal] = useState<Record<string, string>>({});
   const base = `${REPORTS}/${detail.id}`;
   if (detail.editable) {
     return (
@@ -362,12 +364,15 @@ function NextStep({
             Check each field. Missing fields never block a timely initial report. {askNote(detail.approval)}
           </p>
         )}
+        <PersonalAtSend detail={detail} values={personal} onChange={setPersonal} />
         <div className="ca-action-row">
           <button
             type="button"
             className="ac-primary"
             disabled={action.busy}
-            onClick={() => void action.run(`${base}/snapshots`, "POST")}
+            onClick={() =>
+              void action.run(`${base}/snapshots`, "POST", personalBody(personal)).then((ok) => ok && setPersonal({}))
+            }
           >
             <ShieldCheck size={15} aria-hidden="true" />{" "}
             {detail.pending_snapshot ? "Freeze the worksheet again" : "Ask for approval"}
@@ -1093,6 +1098,11 @@ function CodeFieldRow({
           }}
         />
       )}
+      {item.warning && (
+        <p className="uw-hint" role="note">
+          {item.warning}
+        </p>
+      )}
       <InlineError text={action.error} />
     </li>
   );
@@ -1143,6 +1153,11 @@ export function FieldRow({
         {item.note ? ` ${item.note}` : ""}
       </p>
       {item.problem && <InlineError text={`${item.problem}: it counts as missing until it is corrected.`} />}
+      {item.warning && (
+        <p className="uw-hint" role="note">
+          {item.warning}
+        </p>
+      )}
       {editable && !editing && (
         <div className="ca-action-row">
           <button type="button" className="ac-link" onClick={() => setEditing(true)}>

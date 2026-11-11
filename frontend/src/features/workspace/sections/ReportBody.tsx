@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { REPORTS, type ReportDetail, type WorksheetField } from "../authorityReports";
+import { REPORTS, similarRows, type ReportDetail, type WorksheetField } from "../authorityReports";
+import { SimilarGrid } from "./SimilarTable";
 import { formatDateTime } from "../../../app/dates";
 import { formName } from "./TreeSign";
 import { FieldRow, useAction } from "./Reports";
@@ -253,7 +254,12 @@ export function ApprovingDoc({ detail }: { detail: ReportDetail }) {
                       {item.number ? <b>{item.number}</b> : null} {item.label}
                     </dt>
                     <dd>
-                      {item.value ?? "—"}
+                      {/* 4.3.3c as its table, never its stored text (B8 run 6, whatever the switch). */}
+                      {item.value && (item.kind === "TABLE" || item.id === "4_3_3C") ? (
+                        <SimilarGrid rows={similarRows(item.value)} edit={null} />
+                      ) : (
+                        (item.value ?? "—")
+                      )}
                       {item.source ? (
                         <small>
                           {item.source.label}

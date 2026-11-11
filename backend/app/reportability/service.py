@@ -59,6 +59,8 @@ def settings_of(db: Session, tenant_id: uuid.UUID, control_db: Session | None = 
         # B9: the organization's role per market (absent: Manufacturer) and the roles it may choose.
         "reporting_roles": effective_roles(row.reporting_roles if row else None),
         "roles_offered": roles_offered(),
+        # tr30 (B9-D9 / B8-D9): patient and reporter details at Send for approval; off unless a Customer Admin set it.
+        "report_personal_data": bool(row.report_personal_data) if row else False,
     }
 
 
@@ -86,6 +88,16 @@ def effective_roles(stored: dict | None) -> dict[str, str]:
     """The stored roles that are offered now: a role whose switch is off reads as Manufacturer (spec 6.4)."""
     offered = roles_offered()
     return {market: role for market, role in (stored or {}).items() if role in offered.get(market, ())}
+
+
+def personal_data_on(db: Session, tenant_id: uuid.UUID) -> bool:
+    """Whether the organization lets patient and reporter details be typed at Send for approval (default off)."""
+    row = (
+        db.query(ReportabilitySettings.report_personal_data)
+        .filter(ReportabilitySettings.tenant_id == tenant_id)
+        .first()
+    )
+    return bool(row and row[0])
 
 
 def reporting_roles(db: Session, tenant_id: uuid.UUID) -> dict[str, str]:

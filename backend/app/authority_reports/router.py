@@ -55,6 +55,7 @@ from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.evidence_workflow.people import current_person, require_any_permission
 from backend.app.reportability import assessments, deadlines, markets
+from backend.app.reportability.service import personal_data_on
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.standards import STARTER_MARK, chips
 from backend.app.workflow import approvals
@@ -198,6 +199,8 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
     context["check_contact_office"] = obligation.state in rules.EDITABLE
     context["chain_type"] = chain_type(obligation)  # India's P2 (B9 step 14); None: an initial report
     context["us_role"] = us_role(obligation)  # B9 step 7: an importer's or user facility's US report (section F)
+    # tr30 (B9-D9 / B8-D9): patient and reporter details may be typed at Send for approval (organization setting).
+    context["personal_data"] = personal_data_on(db, obligation.tenant_id)
     if context["us_role"] and obligation.state not in rules.EDITABLE:
         # B9 step 8: past approval, the recipients are the list frozen at Send for approval, never the live conclusion
         approved = next((row for row in reversed(_snapshots(db, obligation)) if row.state == "APPROVED"), None)
@@ -656,6 +659,7 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "sections": sections,
         "counts": worksheet.counts(sections),
         "status_labels": worksheet.STATUS_LABELS,
+        "personal_data": context["personal_data"],
         "editable": obligation.state in rules.EDITABLE,
         "snapshots": [_snapshot_view(row, names) for row in reversed(snapshots)],
         # The approver reads the values as frozen, in the form's order, with each value's source (0.10.83, D2.8).
@@ -1832,12 +1836,15 @@ def request_snapshot(
     *,
     strict=False,
     parties=None,
+    personal=None,
 ):
     """Freeze the worksheet as the next snapshot, pending approval (shared with the sample). ``strict``: a US report
-    whose eMDR file FDA would refuse is refused (Send for approval, 0.10.96)."""
+    whose eMDR file FDA would refuse is refused (Send for approval, 0.10.96). ``personal``: patient and reporter details
+    typed at Send for approval (tr30), written only into this snapshot's sections and files."""
     from backend.app.human_decision.rules import fingerprint
 
     context = _context(db, control_db, obligation)
+    context["personal_typed"] = personal or {}
     if parties is not None:  # the trial sample's own US manufacturer, never stored (0.10.96, A9)
         context["parties"] = parties
     current = _conclusion(context, obligation.market, any_signed=keeps_own_clock(obligation))
@@ -1882,6 +1889,7 @@ def request_snapshot(
             now=now,
             udi_entity=getattr(context["product"], "udi_issuing_entity", None),
             form=obligation.form_code,
+            personal=bool(context["personal_typed"]),  # tr30: typed at Send for approval, setting on
         )
         if strict:
             _mir_gate(found, obligation.form_code)
@@ -1937,9 +1945,45 @@ def request_snapshot(
     return snapshot
 
 
+class SendRequest(BaseModel):
+    # tr30: patient and reporter details typed at the report step (field id -> text), kept only in the snapshot.
+    personal: dict[str, str] = Field(default_factory=dict, max_length=40)
+
+
+def _personal(db, obligation: ReportObligation, typed: dict[str, str]) -> dict[str, str]:
+    """The patient and reporter details typed at Send for approval, checked: only when the organization allows them
+    (tr30), only the form's own patient and reporter fields, each fitting its field. The values are never echoed in
+    an error, an audit event or a log."""
+    typed = {key: " ".join(str(value).split()) for key, value in typed.items() if str(value).strip()}
+    if not typed:
+        return {}
+    if not personal_data_on(db, obligation.tenant_id):
+        raise _error(
+            422,
+            "PERSONAL_DATA_OFF",
+            "Patient and reporter details are entered in the authority's route: your Customer Admin has not allowed "
+            "them at the report step (Settings, Reporting windows)",
+        )
+    form = _form(obligation)
+    fields = {item.id: forms.in_force(form, item) for item in form.fields() if item.personal}
+    for key, value in typed.items():
+        field = fields.get(key)
+        if field is None:
+            raise _error(422, "PERSONAL_FIELD_UNKNOWN", f"{key[:20]} is not a patient or reporter field of this form")
+        problem = forms.value_problem(field, value) if len(value) <= worksheet.VALUE_MAX else "Too long"
+        choice = next((option for option in field.options if option.lower() == value.lower()), None)
+        if field.options and choice is None:
+            problem = "Choose one of: " + ", ".join(field.options)
+        typed[key] = choice or value
+        if problem:
+            raise _error(422, "PERSONAL_VALUE_INVALID", f"{field.number} {field.label}: {problem}")
+    return typed
+
+
 @router.post("/{obligation_id}/snapshots", dependencies=[DECIDERS])
 def ask_for_approval(
     obligation_id: uuid.UUID,
+    payload: SendRequest | None = None,
     db: Session = Depends(get_data_plane_db),
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
@@ -1947,6 +1991,7 @@ def ask_for_approval(
     obligation = _obligation(db, _tenant(ctx), obligation_id, lock=True)
     if obligation.state not in rules.EDITABLE:
         raise _error(409, "NOT_A_DRAFT", "Only a draft is frozen for approval")
+    personal = _personal(db, obligation, payload.personal if payload else {})
     if obligation.form_code == forms.FDA_3500A.code:
         assign_number(db, control_db, obligation, str(ctx.user_id), _now())
     if obligation.form_code in MIR_FORMS and mir_on(obligation):  # a type typed before B8 or while it was off
@@ -1983,7 +2028,7 @@ def ask_for_approval(
             422, "H2_REQUIRED", "Tick at least one H2 follow-up type before sending the follow-up for approval"
         )
     replaced = [row.id for row in _snapshots(db, obligation) if row.state == "PENDING"]
-    snapshot = request_snapshot(db, control_db, obligation, str(ctx.user_id), _now(), strict=True)
+    snapshot = request_snapshot(db, control_db, obligation, str(ctx.user_id), _now(), strict=True, personal=personal)
     _audit(
         db,
         ctx,
@@ -1991,6 +2036,7 @@ def ask_for_approval(
         obligation,
         version=snapshot.version,
         fingerprint=snapshot.content_fingerprint,
+        personal_fields=sorted(personal),  # which boxes were typed, never their values (tr30)
         # The US report number, and whether MDARIX assigned it at this send (0.10.96, D5).
         **(
             {key: (obligation.entries.get(number_key(obligation)) or {}).get(name) for key, name in NUMBER_AUDIT}

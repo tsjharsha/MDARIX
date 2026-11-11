@@ -56,6 +56,10 @@ EXEMPT = {
         "/api/v1/trial/support-access/{grant_id}/approve",
     ): "trial owner only (in place of a Customer Administrator) with an authenticator code, checked in the route",
     ("POST", "/api/v1/trial/support-access/{grant_id}/deny"): "trial owner only, checked in the route",
+    (
+        "PUT",
+        "/api/v1/complaints/reportability-personal-data",
+    ): "the Customer Administrator only (a trial's owner in their place), with a reason, audited; checked in the route",
     ("POST", "/api/v1/trial/support-access/{grant_id}/revoke"): "trial owner only, checked in the route",
     ("GET", "/api/v1/stage3/compliance-report"): "administrators only, checked in the route",
     ("GET", "/api/v1/reports/catalog"): "read-only list of report types",

@@ -83,6 +83,29 @@ def similar_table(text: str | None) -> list[dict] | None:
     return rows if ok else None
 
 
+def table_text(text: str | None) -> str | None:
+    """4.3.3c in plain lines for the worksheet PDF and Word file, whatever the switch (B8 run 6): one line per period,
+    "N 2026-01-01 to 2026-12-31: country 1 incident(s), 400 device(s); EEA + CH + TR ...; world ...". Text that is not
+    the table's shape is returned as it is."""
+    rows = similar_table(text)
+    if rows is None:
+        return text
+    regions = (("country", "the incident's country"), ("eea", "EEA + CH + TR"), ("world", "worldwide"))
+
+    def count(row: dict, key: str) -> str:
+        value = row.get(key)
+        return "-" if value is None or value == "" else str(value)
+
+    return "\n".join(
+        f"{name} {row.get('start') or '-'} to {row.get('end') or '-'}: "
+        + "; ".join(
+            f"{label} {count(row, f'{key}_incidents')} incident(s), {count(row, f'{key}_devices')} device(s) on the market"
+            for key, label in regions
+        )
+        for name, row in zip(SIMILAR_PERIODS, rows)
+    )
+
+
 def table_problem(text: str) -> str | None:
     """Why a 4.3.3c table is not complete (B8-D7: every number is a person's): each period N to N-3 needs its start
     and end dates and, for the country, EEA + CH + TR and the world, the similar incidents and devices on the market."""
@@ -950,7 +973,16 @@ def _mir_incident(market: str) -> tuple[Section, ...]:
                 ),
                 Field("3_3A_F", "3.3a", "IMDRF health impact codes (Annex F): choice 1", "imdrf_F", MUST),
                 Field("3_3B", "3.3b", "Age of the patient at the time of the incident", personal=PATIENT),
-                Field("3_3C", "3.3c", "Gender", personal=PATIENT),
+                Field(
+                    "3_3C",
+                    "3.3c",
+                    "Gender",
+                    personal=PATIENT,
+                    # The schemas' own lists (tr30): MHRA's GB list differs from the Commission's.
+                    options=("Male", "Female", "Other", "Unknown", "Not applicable")
+                    if gb
+                    else ("Female", "Male", "Other", "Not specified"),
+                ),
                 Field("3_3D", "3.3d", "Body weight (kg)", personal=PATIENT),
                 *(() if gb else (Field("3_3E", "3.3e", "Height (cm)", personal=PATIENT),)),
                 Field(

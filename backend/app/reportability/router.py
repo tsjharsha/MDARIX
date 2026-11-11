@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -120,11 +120,17 @@ def _finish_reminders(db: Session, tenant_id: uuid.UUID, complaint_id: uuid.UUID
 
 @router.get("/reportability-settings")
 def reportability_settings(
+    request: Request,
     db: Session = Depends(get_data_plane_db),
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    return _with_warnings(service.settings_of(db, uuid.UUID(ctx.tenant_id), control_db))
+    found = _with_warnings(service.settings_of(db, uuid.UUID(ctx.tenant_id), control_db))
+    try:
+        admin = _is_customer_admin(request, control_db)  # tr30: shows the form; the PUT checks again
+    except HTTPException:
+        admin = False  # a reader without a person's account (a service) never sets it
+    return {**found, "can_set_personal_data": admin}
 
 
 def _with_warnings(settings: dict) -> dict:
@@ -237,6 +243,80 @@ def set_reporting_role(
             details={"market": market, "role": role, "version": row.version},
             old_values={"role": before.get(market, "MANUFACTURER")},
             new_values={"role": role},
+            created_at=now,
+        )
+    )
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise _error(409, "CHANGED_MEANWHILE", "The settings were changed a moment ago; reload and try again") from exc
+    return _with_warnings(service.settings_of(db, tenant_id, control_db))
+
+
+class PersonalDataRequest(BaseModel):
+    on: bool
+    reason: str = Field(max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def _why(cls, value: str) -> str:
+        return _text(value, rules.REASON_MIN, "why")
+
+
+def _is_customer_admin(request: Request, control_db: Session) -> bool:
+    """The Customer Admin; in a trial, which has none, the trial owner in their place (as support access)."""
+    from backend.app.access.authz import _authenticated_user
+    from backend.app.role_codes import is_customer_admin_role
+    from backend.app.signer_training.router import is_trial
+    from backend.app.trial.team import is_trial_owner
+
+    user = _authenticated_user(request, control_db)
+    if is_customer_admin_role(user.role):
+        return True
+    return is_trial(control_db, user.tenant_id) and is_trial_owner(control_db, user.tenant_id, user)
+
+
+def _customer_admin(request: Request, control_db: Session = Depends(get_db)) -> None:
+    if not _is_customer_admin(request, control_db):
+        raise _error(403, "CUSTOMER_ADMIN_REQUIRED", "Only the Customer Admin changes this setting")
+
+
+@router.put("/reportability-personal-data")
+def set_report_personal_data(
+    payload: PersonalDataRequest,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    _admin=Depends(_customer_admin),
+):
+    """B9-D9 / B8-D9 (tr30): whether patient and reporter details may be typed at Send for approval, kept only in that
+    report's frozen snapshot. A Customer Admin with a reason, audited ``REPORT_PERSONAL_DATA_SET``. Switching it off
+    later never changes a frozen snapshot."""
+    tenant_id = uuid.UUID(ctx.tenant_id)
+    row = db.query(ReportabilitySettings).filter(ReportabilitySettings.tenant_id == tenant_id).with_for_update().first()
+    now = datetime.now(timezone.utc)
+    if row is None:
+        row = ReportabilitySettings(tenant_id=tenant_id, version=0, windows=[], reporting_roles={})
+        db.add(row)
+    before = bool(row.report_personal_data)
+    if before == payload.on:
+        raise _error(422, "NOTHING_TO_CHANGE", "This is already the setting")
+    row.report_personal_data, row.version = payload.on, int(row.version or 0) + 1
+    row.updated_by, row.updated_at = ctx.user_id, now
+    db.flush()
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=ctx.user_id,
+            action="REPORT_PERSONAL_DATA_SET",
+            entity_type="ReportabilitySettings",
+            entity_id=row.id,
+            correlation_id=ctx.correlation_id,
+            reason=payload.reason,
+            details={"on": payload.on, "version": row.version},
+            old_values={"report_personal_data": before},
+            new_values={"report_personal_data": payload.on},
             created_at=now,
         )
     )
