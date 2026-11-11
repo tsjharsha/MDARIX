@@ -167,8 +167,12 @@ def test_the_samples_rv07_has_its_eu_mir_and_it_goes_the_whole_way(trial):
     refused = user.put(f"{REPORTS}/{eu['id']}/fields/1_2E", json={"value": "Final"})
     assert refused.status_code == 422 and refused.json()["detail"]["code"] == "NOT_A_CHOICE"
     # B8 step 3: the first report is an Initial or a Combined initial and final; a Final follows in the chain.
-    refused = user.put(f"{REPORTS}/{eu['id']}/fields/1_2E", json={"value": "Final (Reportable incident)"})
-    assert refused.status_code == 422 and refused.json()["detail"]["code"] == "NOT_THIS_POSITION"
+    # (With MDARIX_B8_EU_MIR off, the type is chosen by hand as before B8.)
+    typed = user.put(f"{REPORTS}/{eu['id']}/fields/1_2E", json={"value": "Final (Reportable incident)"})
+    if forms.switched_on("MDARIX_B8_EU_MIR"):
+        assert typed.status_code == 422 and typed.json()["detail"]["code"] == "NOT_THIS_POSITION"
+    else:
+        assert typed.status_code == 200, typed.text
     # The type changes the meter: a combined (final) report needs the investigation's fields.
     initial = detail["mandatory"]["total"]
     final = _ok(user.put(f"{REPORTS}/{eu['id']}/fields/1_2E", json={"value": "Combined initial and final"}))
