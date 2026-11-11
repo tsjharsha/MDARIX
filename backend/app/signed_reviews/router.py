@@ -153,16 +153,59 @@ def audit_trail(
     start, end = _period(control_db, me.tenant_id, period_from, period_to)
     content = audit_review.build(control_db, db, me.tenant_id, start, end)
     last = signing.signed_events(control_db, me.tenant_id, "audit-trail", limit=1)
+    months = audit_review.frequency(control_db, me.tenant_id)
     return {
         **content,
         "own_flags": audit_review.own_flags(content, me.id),
         "may_sign": _reviewer(control_db, ctx) and not is_administrator_role(me.role),
         "last_signed": signing.summary(last[0]) if last else None,
-        "next_due": (
-            (last[0].created_at + timedelta(days=audit_review.DUE_DAYS)).date() if last else _now().date()
+        "next_due": audit_review.next_due(
+            last[0].created_at if last else audit_review.started(control_db, me.tenant_id), months, _now().date()
         ).isoformat(),
+        "frequency_months": months,
+        "may_set_frequency": access_review.is_leader(control_db, me),
         "awaiting_confirmation": _awaiting(control_db, me.tenant_id),
     }
+
+
+class FrequencyIn(BaseModel):
+    months: int = Field(ge=audit_review.MONTHS_MIN, le=audit_review.MONTHS_MAX)
+    reason: str = Field(default="", max_length=2000)
+
+
+@router.put("/audit-trail/frequency")
+def set_audit_trail_frequency(
+    payload: FrequencyIn,
+    request: Request,
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """How often the audit trail review falls due (1-12 months, monthly by default): a Leader sets it with a reason;
+    the change is an audit event with the months before and after (the setting is the latest such event)."""
+    me = _require_read("audit-trail", control_db, ctx)
+    if not access_review.is_leader(control_db, me):
+        raise error(403, "LEADER_REQUIRED", "A Leader sets how often the audit trail review falls due")
+    reason = " ".join(payload.reason.split())
+    if not reason:
+        raise error(422, "CHANGE_REASON_REQUIRED", "Say why the review frequency changes")
+    before = audit_review.frequency(control_db, me.tenant_id)
+    if payload.months == before:
+        raise error(422, "NOTHING_TO_CHANGE", f"The review already falls due every {before} month(s)")
+    control_db.add(
+        make_audit_event(
+            tenant_id=me.tenant_id,
+            actor_ref=str(me.id),
+            action=audit_review.FREQUENCY_SET,
+            entity_type="AuditTrailReview",
+            correlation_id=ctx.correlation_id,
+            request=request,
+            reason=reason,
+            old_values={"months": before},
+            new_values={"months": payload.months},
+        )
+    )
+    control_db.commit()
+    return {"frequency_months": payload.months}
 
 
 def _awaiting(control_db: Session, tenant_id) -> list[dict]:

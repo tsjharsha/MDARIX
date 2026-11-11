@@ -27,7 +27,7 @@ from backend.app.trial.sample_source import is_sample
 from backend.app import links
 import logging
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -571,6 +571,47 @@ def _capa_items(db: Session, tenant_id) -> list[dict]:
     ]
 
 
+def _review_items(control_db: Session | None, tenant_id, now: datetime) -> list[dict]:
+    """B6a G1, G14: "Audit trail review due" (every 1-12 months after the last signed one, as a Leader set it; monthly
+    by default) and "Access review due" (90 days after the last signed one); counted from the organization's start
+    when none was ever signed. Read from the control database; none while the reviews are switched off."""
+    from backend.app import feature_set
+    from backend.app.signed_reviews import access_review, audit_review, signing
+
+    if control_db is None or not feature_set.switched_on("MDARIX_B6_REVIEWS"):
+        return []
+    today, started = now.date(), audit_review.started(control_db, tenant_id)
+    audit = signing.signed_events(control_db, tenant_id, "audit-trail", limit=1)
+    access = signing.signed_events(control_db, tenant_id, "access", limit=1)
+    audit_due = audit_review.next_due(
+        audit[0].created_at if audit else started, audit_review.frequency(control_db, tenant_id), today
+    )
+    access_due = access_review.next_due(control_db, tenant_id, access[0].created_at if access else None, now)
+    # shortcut: no reminder e-mails for review items (alerts=False); add them if the owner wants reviews escalated.
+    return [
+        _item(
+            "review:audit-trail",
+            "REVIEW",
+            "Audit trail review due: a Leader or Quality Reviewer reviews the flags and signs",
+            datetime.combine(audit_due, time(23, 59), timezone.utc),
+            ref="Audit trail review",
+            queue="Leaders and Quality Reviewers",
+            opens=links.target("Readiness", "Oversight"),
+            alerts=False,
+        ),
+        _item(
+            "review:access",
+            "REVIEW",
+            "Access review due: a customer administrator marks every user and signs (Customer administration > Reviews)",
+            datetime.combine(access_due, time(23, 59), timezone.utc),
+            ref="Access review",
+            queue="Customer administrators",
+            opens=links.target("Readiness", "Oversight"),
+            alerts=False,
+        ),
+    ]
+
+
 def _with_complaints(db: Session, tenant_id, items: list[dict]) -> None:
     """Each item about a complaint gets its reference, product and (where it has none) its market."""
     from backend.app.db.models.foundation import Complaint, Product
@@ -626,9 +667,10 @@ def due_items(
         ("guides", lambda: _guide_items(db, tenant_id, calendar)),
         ("capas", lambda: _capa_items(db, tenant_id)),
         ("e-mails", lambda: _mail_items(db, tenant_id, calendar)),
+        ("reviews", lambda: _review_items(control_db, tenant_id, now)),
     )
     if ids is not None:
-        sources = tuple(source for source in sources if source[0] not in ("guides", "capas", "e-mails"))
+        sources = tuple(source for source in sources if source[0] not in ("guides", "capas", "e-mails", "reviews"))
     items: list[dict] = []
     for name, read in sources:
         try:

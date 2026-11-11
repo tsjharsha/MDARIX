@@ -51,6 +51,7 @@ CATEGORIES = {
     "GUIDE": "Guide approvals",
     "CAPA": "CAPA",
     "TASK": "Other tasks",
+    "REVIEW": "Signed reviews",
 }
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 DEFAULT_ZONE, DEFAULT_DAYS, DEFAULT_HOURS, DEFAULT_ROLE = "UTC", (0, 1, 2, 3, 4), 24, "LEADER"

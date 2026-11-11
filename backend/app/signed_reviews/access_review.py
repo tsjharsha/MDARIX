@@ -12,7 +12,7 @@ administrator signs. Due every 90 days.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -149,11 +149,19 @@ def rows(control_db: Session, viewer: AuthUser, now: datetime) -> dict:
         )
     return {
         "since": since.isoformat() if since else None,
-        "next_due": ((since + timedelta(days=DUE_DAYS)).date().isoformat() if since else now.date().isoformat()),
+        "next_due": next_due(control_db, tenant_id, since, now).isoformat(),
         "administrators": len(administrators(users)),
         "rows": listed,
         "unmarked": sum(1 for row in listed if not row["mark"]),
     }
+
+
+def next_due(control_db: Session, tenant_id, since: datetime | None, now: datetime) -> date:
+    """90 days after the last signed access review, else after the organization's start (Oversight shows the same)."""
+    from backend.app.signed_reviews.audit_review import started
+
+    base = since or started(control_db, tenant_id)
+    return (base + timedelta(days=DUE_DAYS)).date() if base else now.date()
 
 
 def check_marker(control_db: Session, marker: AuthUser, target: AuthUser, users: list[AuthUser]) -> str:

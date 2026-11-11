@@ -500,3 +500,52 @@ def test_the_switch_off_on_off(org, monkeypatch):  # B6-46
     assert leader.get(f"{URL}/signed/{signed[0]['review_id']}").json()["intact"] is True
     monkeypatch.setenv("MDARIX_B6_REVIEWS", "off")
     assert leader.get(f"{URL}/access").status_code == 404
+
+
+def test_review_due_dates_and_the_audit_trail_review_frequency(org, monkeypatch):  # B6a G1, G14 due items
+    assert audit_review.add_months(date(2026, 1, 31), 1) == date(2026, 2, 28)
+    assert audit_review.add_months(date(2026, 11, 15), 2) == date(2027, 1, 15)
+    assert audit_review.add_months(date(2026, 3, 10), 12) == date(2027, 3, 10)
+    leader, reviewer, admin, other = (org[key][0] for key in ("leader", "reviewer", "admin", "other"))
+    body = leader.get(f"{URL}/audit-trail").json()
+    assert body["frequency_months"] == 1 and body["may_set_frequency"] is True
+    assert reviewer.get(f"{URL}/audit-trail").json()["may_set_frequency"] is False
+    # Only a Leader changes it, with a reason, within 1-12 months.
+    path = f"{URL}/audit-trail/frequency"
+    for client in (reviewer, admin):
+        refused = client.put(path, json={"months": 3, "reason": "Quarterly is enough"})
+        assert refused.status_code == 403 and refused.json()["detail"]["code"] == "LEADER_REQUIRED"
+    assert leader.put(path, json={"months": 3, "reason": "  "}).json()["detail"]["code"] == "CHANGE_REASON_REQUIRED"
+    for months in (0, 13):
+        assert leader.put(path, json={"months": months, "reason": "Out of range"}).status_code == 422
+    saved = leader.put(path, json={"months": 3, "reason": "Quarterly after two clean reviews"})
+    assert saved.status_code == 200, saved.text
+    with SessionLocal() as db:
+        bind_system(db, "test: frequency audited")
+        event = (
+            db.query(AuditEvent)
+            .filter(AuditEvent.tenant_id == org["tenant_id"], AuditEvent.action == audit_review.FREQUENCY_SET)
+            .one()
+        )
+    assert (event.old_values, event.new_values, event.reason) == (
+        {"months": 1},
+        {"months": 3},
+        "Quarterly after two clean reviews",
+    )
+    body = leader.get(f"{URL}/audit-trail").json()
+    signed_at = datetime.fromisoformat(body["last_signed"]["signed_at"])
+    assert body["frequency_months"] == 3
+    assert body["next_due"] == audit_review.add_months(signed_at.date(), 3).isoformat()
+    # Another organization keeps its own (monthly).
+    assert other.get(f"{URL}/audit-trail").json()["frequency_months"] == 1
+
+    # Oversight lists both reviews as due items, with the same dates as the review screens.
+    def due(client) -> dict[str, str]:
+        items = client.get("/api/v1/oversight", params={"show": "all", "category": "REVIEW"}).json()["items"]
+        return {item["key"]: item["due_at"][:10] for item in items}
+
+    access_due = admin.get(f"{URL}/access").json()["next_due"]
+    assert due(leader) == {"review:audit-trail": body["next_due"], "review:access": access_due}
+    monkeypatch.setenv("MDARIX_B6_REVIEWS", "off")
+    assert due(leader) == {}
+    assert leader.put(path, json={"months": 2, "reason": "Off"}).status_code == 404

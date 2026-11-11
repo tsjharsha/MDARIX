@@ -74,6 +74,16 @@ describe("Signed reviews", () => {
     expect(html).toContain("a second reviewer confirms them");
   });
 
+  it("shows the review frequency setting to a Leader only (1-12 months, a reason)", () => {
+    resources.data["/api/v1/reviews/audit-trail"] = audit({ frequency_months: 3, may_set_frequency: true });
+    const html = render(<AuditTrailReview />);
+    expect(html).toContain("Review every");
+    expect(html).toContain("12 months");
+    expect(html).toContain("Why does it change?");
+    resources.data["/api/v1/reviews/audit-trail"] = audit({ frequency_months: 1, may_set_frequency: false });
+    expect(render(<AuditTrailReview />)).not.toContain("Review every");
+  });
+
   it("asks for every access row to be marked before signing", () => {
     resources.data["/api/v1/reviews/access"] = {
       rows: [

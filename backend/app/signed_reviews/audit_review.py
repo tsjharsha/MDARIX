@@ -28,6 +28,45 @@ from backend.app.db.models.foundation import AuditEvent, AuthUser
 
 BULK_COUNT, BULK_MINUTES, FAILED_SIGN_INS = 50, 10, 10
 DUE_DAYS = 30  # monthly by default (D4)
+# How often the review falls due: 1-12 months (monthly by default), set by a Leader with a reason. Kept as the latest
+# audit event of this action (no migration): the setting and its history are the audit trail itself.
+FREQUENCY_SET = "AUDIT_TRAIL_REVIEW_FREQUENCY_SET"
+MONTHS_MIN, MONTHS_MAX, MONTHS_DEFAULT = 1, 12, 1
+
+
+def frequency(control_db: Session, tenant_id) -> int:
+    row = (
+        control_db.query(AuditEvent.new_values)
+        .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.action == FREQUENCY_SET)
+        .order_by(AuditEvent.created_at.desc(), AuditEvent.chain_seq.desc())
+        .first()
+    )
+    months = ((row[0] if row else None) or {}).get("months")
+    return months if isinstance(months, int) and MONTHS_MIN <= months <= MONTHS_MAX else MONTHS_DEFAULT
+
+
+def add_months(day: date, months: int) -> date:
+    """The same day ``months`` later, or that month's last day (31 Jan + 1 month = 28 or 29 Feb)."""
+    import calendar
+
+    index = day.month - 1 + months
+    year, month = day.year + index // 12, index % 12 + 1
+    return date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
+
+
+def started(control_db: Session, tenant_id) -> datetime | None:
+    """When the organization started (activated, else created): a review never signed falls due from here."""
+    from backend.app.db.models.foundation import Tenant
+
+    row = control_db.query(Tenant.activated_at, Tenant.created_at).filter(Tenant.id == tenant_id).first()
+    return (row[0] or row[1]) if row else None
+
+
+def next_due(since: datetime | None, months: int, today: date) -> date:
+    """Due ``months`` after ``since`` (the last signed review, else the organization's start); today without either."""
+    return add_months(since.date(), months) if since else today
+
+
 READ_CAP = 20_000  # per database and period; above it the review says "incomplete" (never a silent cut)
 LISTED_PER_FLAG = 500
 FLAG_LABELS = {

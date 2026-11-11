@@ -38,6 +38,8 @@ type AuditReview = {
   may_sign: boolean;
   last_signed: Signed | null;
   next_due: string;
+  frequency_months: number;
+  may_set_frequency: boolean;
   awaiting_confirmation: Signed[];
 };
 
@@ -238,9 +240,49 @@ export function AuditTrailReview() {
             <p className="ac-muted">A Leader or Quality Reviewer signs this review.</p>
           )}
           {data.last_signed && <Downloads reviewId={data.last_signed.review_id} />}
+          {data.may_set_frequency && <FrequencyForm months={data.frequency_months} onSaved={review.reload} />}
         </>
       )}
     </Panel>
+  );
+}
+
+/** How often the audit trail review falls due (1-12 months): a Leader changes it with a reason (audited). */
+export function FrequencyForm({ months, onSaved }: { months: number; onSaved: () => void }) {
+  const [value, setValue] = useState(months);
+  const [reason, setReason] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const save = async () => {
+    setProblem(null);
+    try {
+      await send(`${REVIEWS}/audit-trail/frequency`, "PUT", { months: value, reason });
+      setReason("");
+      onSaved();
+    } catch (error) {
+      setProblem(errorText(error, "The frequency was not changed."));
+    }
+  };
+  return (
+    <div className="ca-form">
+      <label className="ca-field">
+        Review every
+        <select value={value} onChange={(event) => setValue(Number(event.target.value))}>
+          {Array.from({ length: 12 }, (_, index) => index + 1).map((count) => (
+            <option key={count} value={count}>
+              {plural(count, "month")}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="ca-field ca-wide">
+        Why does it change?
+        <textarea rows={2} value={reason} maxLength={2000} onChange={(event) => setReason(event.target.value)} />
+      </label>
+      {problem && <p className="ca-inline-error">{problem}</p>}
+      <button type="button" className="ac-secondary" disabled={value === months || !reason.trim()} onClick={save}>
+        Change the frequency
+      </button>
+    </div>
   );
 }
 
