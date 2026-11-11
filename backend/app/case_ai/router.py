@@ -4,7 +4,8 @@
   ``trigger=AUTO`` (the case page, the first time it opens) starts one only when the case has neither a run nor a
   saved analysis, and only when AI really answers for the organization (a provider configured and allowed, AI switched
   on, allowance left); otherwise it answers with what exists (200), so opening a case page never repeats the AI's work
-  and never writes rule results in the AI's name when AI is off.
+  and never writes rule results in the AI's name when AI is off. ``trigger=MANUAL`` (a person) starts nothing either
+  while AI does not answer: 200 with ``state: AI_OFF`` (RCA-D13).
   A run already queued or running is answered as it is (409 for a person's MANUAL request).
 - ``GET /api/v1/investigations/{id}/ai-run``: the latest run with each step's outcome (``run`` is null without one).
 
@@ -106,9 +107,16 @@ def start_run(
     if payload.trigger == "AUTO" and (current is not None or _has_analysis(db, tenant_id, investigation_id)):
         # The case's AI work exists already: opening its page never repeats it.
         return {"started": False, "run": runner.view(current)}
-    if payload.trigger == "AUTO" and not ai_ready(control, tenant_id):
-        # AI is off, not available or used up: opening the case page starts nothing (the steps work by hand).
-        return {"started": False, "run": runner.view(current), "reason": "AI_NOT_READY"}
+    if not ai_ready(control, tenant_id):
+        # AI is off, not available or used up: nothing starts, AUTO or MANUAL (RCA-D13: the steps would be keyword
+        # rules written for the sample data); every step still works by hand.
+        return {
+            "started": False,
+            "run": runner.view(current),
+            "reason": "AI_NOT_READY",
+            "state": "AI_OFF",
+            "message": "AI analysis is off for this organization.",
+        }
     if current is not None and runner.is_stale(current):
         current.status, current.error = "FAILED", "The run stopped before it finished"
         current.finished_at = runner.now_utc()

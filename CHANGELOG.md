@@ -172,6 +172,10 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   free trial): its rules matched words written for the sample data. The tab, the section and the Run Analysis button
   are hidden, and the analysis routes answer "AI analysis is off for this organization" without running anything.
   Analyses saved earlier are kept (`ai_executions`) and show again once AI answers (RCA-D13).
+- The same holds for the case's one-pass AI run and for generated hypotheses: while AI does not answer, a run a person
+  asks for (`POST .../ai-run`, MANUAL) starts nothing and answers "AI analysis is off for this organization", like the
+  automatic one; `POST .../hypotheses` builds only on a saved analysis named in the request and otherwise answers the
+  same off state without running an analysis. A person's own hypotheses (Intelligence tab) are unchanged (RCA-D13).
 
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 
