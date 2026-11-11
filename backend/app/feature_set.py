@@ -91,6 +91,8 @@ _CHALLENGE_API = (re.compile(r"^/api/v1/investigations/[^/]+/challenge(/|$)"),)
 _CLOSED_LOOP_API = (re.compile(r"^/api/v1/investigations/[^/]+/did-it-work(/|$)"),)
 # B4 routes refused while MDARIX_RULE_REGISTER is off.
 _RULE_REGISTER_API = (re.compile(r"^/api/v1/rule-register(/|$)"),)
+# B9 routes refused while their switch is off (the official India form and ADRMS sheet are refused in the route).
+_B9_API = {"MDARIX_B9_INDIA": (re.compile(r"^/api/v1/reports/[^/]+/india-chain/?$"),)}
 
 
 def challenge() -> bool:
@@ -169,6 +171,8 @@ def serves_path(path: str, method: str = "GET") -> bool:
     if not closed_loop() and any(pattern.match(path) for pattern in _CLOSED_LOOP_API):
         return False
     if not rule_register() and any(pattern.match(path) for pattern in _RULE_REGISTER_API):
+        return False
+    if any(not switched_on(name) and any(p.match(path) for p in patterns) for name, patterns in _B9_API.items()):
         return False
     if not is_mvp():
         return True

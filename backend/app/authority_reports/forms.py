@@ -351,7 +351,14 @@ MVPI_MDAE = Form(
             "PRIMARY",
             "Primary information",
             (
-                Field("P1", "1", "Date of report", None, MUST, note="The day you submit."),
+                Field(
+                    "P1",
+                    "1",
+                    "Date of report",
+                    "sent_day",
+                    MUST,
+                    note="Filled in with the day you send the report for approval.",
+                ),
                 Field("P2", "2", "Type of report (initial, follow up, final, trend)", "in_report_type", MUST),
                 Field("P3", "3", "Report reference no. for MDMC only", missing=NOT_USED),
                 Field(
@@ -511,7 +518,12 @@ MVPI_MDAE = Form(
             (
                 Field("F1", "1", "Investigation needed?", "investigation_needed", INITIAL),
                 Field("F2", "2", "Investigation action taken with timeline", "case", LATER),
-                Field("F3", "3", "Root cause of problem (applicable for follow up / final reports)", missing=NOT_USED),
+                Field(
+                    "F3",
+                    "3",
+                    "Root cause of problem (applicable for follow up / final reports)",
+                    note="Expected on a follow-up or final report (B9).",
+                ),
                 Field("F4", "4", "Corrective and preventive action (CAPA) taken", "capas", LATER),
             ),
         ),

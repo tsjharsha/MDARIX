@@ -35,6 +35,7 @@ import hashlib
 import logging
 import uuid
 from datetime import date, datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
@@ -194,6 +195,7 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
     context["confirm_codes"] = new_navigation(control_db, obligation.tenant_id)
     # Before approval freezes it, the contact office (G1) is checked as the eMDR file needs it (0.10.92, A5).
     context["check_contact_office"] = obligation.state in rules.EDITABLE
+    context["chain_type"] = chain_type(obligation)  # India's P2 (B9 step 14); None: an initial report
     if is_follow_up(obligation):
         parent = db.get(ReportObligation, obligation.parent_id)
         chain = _follow_ups(db, obligation.tenant_id, parent.id)
@@ -211,6 +213,21 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
 def is_follow_up(obligation: ReportObligation) -> bool:
     """A US follow-up (0.10.96, B3 group B): a Form 3500A child of an initial report, in its chain (21 CFR 803.56)."""
     return obligation.parent_id is not None and obligation.form_code == forms.FDA_3500A.code
+
+
+def is_india_chain(obligation: ReportObligation) -> bool:
+    """An India follow-up or final (B9 step 14): an MvPI child of an initial report, created on demand only (D15)."""
+    return obligation.parent_id is not None and obligation.form_code == forms.MVPI_MDAE.code
+
+
+def keeps_own_clock(obligation: ReportObligation) -> bool:
+    """A chain child keeps its own date: a re-signed conclusion never moves it."""
+    return is_follow_up(obligation) or is_india_chain(obligation)
+
+
+def chain_type(obligation: ReportObligation) -> str | None:
+    """An India child's type in its chain (P2): "Follow up" or "Final"."""
+    return ((obligation.entries or {}).get("CHAIN") or {}).get("type") if is_india_chain(obligation) else None
 
 
 def _follow_ups(db, tenant_id, parent_id) -> list[ReportObligation]:
@@ -565,6 +582,8 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         ],
         "note": obligation.note,
         "follow_up_due_on": _iso(obligation.follow_up_due_on),
+        # B9 step 14: India's chain (on demand, no legal clock: D15).
+        "india_chain": india_chain_view(obligation, children) if obligation.form_code == forms.MVPI_MDAE.code else None,
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,
         # A mapped code is a suggestion a person confirms or changes (the new navigation, 0.10.77).
@@ -1004,7 +1023,7 @@ def follow_signed(db, ctx, obligation: ReportObligation, signed, now: datetime) 
         "provisional": obligation.due_provisional,
     }
     after = {"report_type": signed.report_type, "due_on": _iso(signed.due_on), "provisional": False}
-    if is_follow_up(obligation):
+    if keeps_own_clock(obligation):
         after = before  # a follow-up keeps its own clock (803.56); only a re-sign supersedes its approval
     if obligation.state in rules.SUBMITTED:
         if (before["report_type"], before["due_on"]) != (after["report_type"], after["due_on"]):
@@ -1030,7 +1049,7 @@ def follow_signed(db, ctx, obligation: ReportObligation, signed, now: datetime) 
                 row.state = "SUPERSEDED"
         if obligation.state == rules.APPROVED:
             obligation.state = rules.DRAFT
-    if not is_follow_up(obligation):
+    if not keeps_own_clock(obligation):
         obligation.report_type, obligation.due_on, obligation.due_provisional = signed.report_type, signed.due_on, False
     obligation.updated_at = now
     action = "REPORT_RETYPED_BY_CONCLUSION" if before != after else "REPORT_RESIGNED_BY_CONCLUSION"
@@ -1169,6 +1188,8 @@ def set_field(
         )
     if value and field.source == "sent_day":
         raise _error(422, "FILLED_AT_SEND", "This date is filled in with the day the report is sent for approval")
+    if value and field.source == "in_report_type":
+        raise _error(422, "FOLLOWS_CHAIN", "The report type follows the chain: create a follow-up or final instead")
     problem = forms.value_problem(field, value)
     if problem:
         raise _error(422, f"NOT_A_{field.kind}", problem)
@@ -2350,6 +2371,116 @@ def start_follow_up(
         raise _error(422, "REASON_REQUIRED", f"Say what is new, in at least {rules.REASON_MIN} characters")
     child = create_follow_up(
         db, ctx, initial, payload.received_on, text, payload.h2, payload.narrative, follow_up_due(payload.received_on)
+    )
+    db.commit()
+    return detail(db, control_db, ctx, child)
+
+
+# --------------------------------------------------------------------------------------------- India chain (B9 step 14)
+IN_FOLLOW_UP, IN_FINAL = "Follow up", "Final"
+NO_LEGAL_CLOCK = "No legal clock: your date"
+IN_CHAIN_OWN = frozenset({"P1", "P2", "CHAIN"})
+
+
+class IndiaChainCreate(BaseModel):
+    type: Literal["Follow up", "Final"]
+    what_is_new: str = Field(max_length=rules.NOTE_MAX * 2)
+    next_report_on: date | None = None  # optional, the user's own date: no legal clock was found (D15)
+
+
+def _india_children(db, tenant_id, parent_id) -> list[ReportObligation]:
+    rows = (
+        db.query(ReportObligation)
+        .filter(ReportObligation.tenant_id == tenant_id, ReportObligation.parent_id == parent_id)
+        .order_by(ReportObligation.created_at, ReportObligation.id)
+        .all()
+    )
+    return [row for row in rows if is_india_chain(row)]
+
+
+def india_chain_view(obligation: ReportObligation, children: list[ReportObligation]) -> dict:
+    """What the India report page shows: its type, and on the initial report whether a follow-up or final can be
+    created (never automatically: D15)."""
+    if is_india_chain(obligation):
+        return {
+            "type": chain_type(obligation),
+            "next_report_on": _iso(obligation.follow_up_due_on),
+            "note": NO_LEGAL_CLOCK,
+        }
+    chain = [row for row in children if is_india_chain(row) and row.state != rules.CANCELLED]
+    ended = any(chain_type(row) == IN_FINAL for row in chain)
+    open_one = any(row.state not in rules.VALID_SUBMISSION for row in chain)
+    return {
+        "type": "Initial",
+        "items": [{"id": str(row.id), "type": chain_type(row), "state": row.state} for row in chain],
+        "ended": ended,
+        "can_create": obligation.kind == "INITIAL"
+        and obligation.state in rules.VALID_SUBMISSION
+        and not ended
+        and not open_one,
+        "note": NO_LEGAL_CLOCK,
+    }
+
+
+@router.post("/{obligation_id}/india-chain", dependencies=[DECIDERS])
+def create_india_report(
+    obligation_id: uuid.UUID,
+    payload: IndiaChainCreate,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Create an India follow-up or final report of a submitted initial report, on demand (B9-D5, D15): one open at a
+    time; a Final ends the chain. It starts from the initial report's entries; P1 and P2 are its own. No legal clock:
+    ``next_report_on`` is the user's own date. 404 while MDARIX_B9_INDIA is off (feature_set.serves_path)."""
+    initial = _obligation(db, _tenant(ctx), obligation_id, lock=True)
+    text = _text(payload.what_is_new)
+    if not text or len(text) < rules.REASON_MIN:
+        raise _error(422, "REASON_REQUIRED", f"Say what is new, in at least {rules.REASON_MIN} characters")
+    if not (initial.kind == "INITIAL" and initial.form_code == forms.MVPI_MDAE.code):
+        raise _error(409, "NOT_AN_INDIA_INITIAL", "A follow-up or final is made on an India initial report")
+    if initial.state not in rules.VALID_SUBMISSION:
+        raise _error(409, "NOT_SUBMITTED", "A follow-up or final follows the initial report once it is submitted")
+    chain = [row for row in _india_children(db, initial.tenant_id, initial.id) if row.state != rules.CANCELLED]
+    if any(chain_type(row) == IN_FINAL for row in chain):
+        raise _error(409, "CHAIN_ENDED", "A Final report ends the chain: nothing follows it")
+    if any(row.state not in rules.VALID_SUBMISSION for row in chain):
+        raise _error(409, "CHAIN_OPEN", "Submit (or cancel) the open follow-up first")
+    now, actor = _now(), str(ctx.user_id)
+    entries = {key: value for key, value in (initial.entries or {}).items() if key not in IN_CHAIN_OWN}
+    entries["CHAIN"] = {"type": payload.type, "by": actor, "at": _iso(now)}
+    child = ReportObligation(
+        id=uuid.uuid4(),
+        tenant_id=initial.tenant_id,
+        complaint_id=initial.complaint_id,
+        market=initial.market,
+        kind="RESPONSE",
+        parent_id=initial.id,
+        assessment_id=initial.assessment_id,
+        form_code=initial.form_code,
+        form_version=initial.form_version,
+        report_type=initial.report_type,
+        due_on=None,
+        due_provisional=False,
+        follow_up_due_on=payload.next_report_on,
+        state=rules.DRAFT,
+        entries=entries,
+        request_text=text,
+        request_received_on=_org_day(db, initial.tenant_id, now),
+        created_by=actor,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(child)
+    db.flush()
+    _audit(
+        db,
+        ctx,
+        "REPORT_CHAIN_CREATED",
+        initial,
+        report=str(child.id),
+        type=payload.type,
+        next_report_on=_iso(payload.next_report_on),
     )
     db.commit()
     return detail(db, control_db, ctx, child)

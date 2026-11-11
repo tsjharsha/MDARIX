@@ -605,6 +605,9 @@ def _sent_day(context):
     return (day, _source("Worksheet", None, "The day the report was sent for approval")) if day else None
 
 
+# Sources a typed value never overrides: B4/P1 (the day sent for approval) and India's P2 (the chain, B9).
+DERIVED_ONLY = frozenset({"sent_day", "in_report_type"})
+
 SOURCES = {
     "sent_day": _sent_day,
     "description": lambda c: (c["complaint"].description, _complaint(c, "The complaint's description, as recorded")),
@@ -618,7 +621,11 @@ SOURCES = {
     "us_outcome": _us_outcome,
     "us_event_type": _us_event_type,
     "us_report_type": _us_report_type,
-    "in_report_type": lambda c: ("Initial", _source("Obligation", None, "An initial report")),
+    # B9 step 14: Initial, Follow up or Final, from the report's place in its chain (never typed).
+    "in_report_type": lambda c: (
+        c.get("chain_type") or "Initial",
+        _source("Obligation", None, "The report's place in its chain (Initial, Follow up, Final)"),
+    ),
     "in_serious": _in_serious,
     "in_non_serious": _in_non_serious,
     "follow_up_type": lambda c: None,
@@ -871,7 +878,7 @@ def build(
             if annex and confirm and value and not entry.get("value") and not entry.get("confirmed"):
                 # A code the mapping supplies waits for a person (0.10.77): never filed unconfirmed.
                 suggestion, value, status = value, None, SUGGESTED
-            if not item.personal and entry.get("value") and item.source != "sent_day":  # B4 typed before 0.10.96
+            if not item.personal and entry.get("value") and item.source not in DERIVED_ONLY:  # B4 typed before 0.10.96
                 value, status = (
                     entry["value"],
                     {CONFIRMED: CONFIRMED, CHANGED: CHANGED}.get(entry.get("code_state"), ENTERED),
@@ -908,7 +915,7 @@ def build(
                     "source": source,
                     "personal": item.personal,
                     "missing_class": missing,
-                    "editable": not item.personal and missing != forms.NOT_USED and item.source != "sent_day",
+                    "editable": not item.personal and missing != forms.NOT_USED and item.source not in DERIVED_ONLY,
                     "options": list(item.options) or None,
                     "note": item.note or None,
                     "kind": item.kind,
