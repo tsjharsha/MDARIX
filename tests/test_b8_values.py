@@ -95,3 +95,25 @@ def test_b8_an_ambiguous_udi_never_gets_an_issuing_entity():
     assert worksheet.udi_issuing_entity("=/A9999XYZ") == "ICCBBA"
     assert worksheet.udi_issuing_entity("PZN-12345678") is None  # IFA is never derived
     assert worksheet.udi_issuing_entity("") is None and worksheet.udi_issuing_entity(None) is None
+
+
+@pytest.mark.parametrize("form", list(forms.FORMS.values()), ids=lambda form: form.code)
+def test_b8_only_derived_fields_never_count_as_missing(form):
+    """1.2a's rule (the meter skips a mandatory field nobody can type) touches only fields MDARIX fills itself: in
+    every form and report type, a skipped field is derived, and a value typed into it is never used."""
+    seen = set()
+    for kind in form.report_types or (None,):
+        context = {**_empty_context(), "market": form.market}
+        typed = {item.id: {"value": "typed"} for item in form.fields()}
+        if kind:
+            typed[form.type_field] = {"value": kind}
+        sections = worksheet.build(form, context, typed, {})
+        meter = worksheet.mandatory(sections)
+        for item in (item for section in sections for item in section["fields"]):
+            skipped = item["missing_class"] == forms.MUST and not item["personal"] and not item["editable"]
+            if skipped:
+                field = next(each for each in form.fields() if each.id == item["id"])
+                assert worksheet.derived_only(field.source) and field.source in worksheet.SOURCES, (kind, item["id"])
+                assert item["value"] != "typed" and item["id"] not in meter["missing"], (kind, item["id"])
+                seen.add(item["id"])
+    assert form is not forms.EU_MIR or "1_2A" in seen  # the rule is in force where it was made for
