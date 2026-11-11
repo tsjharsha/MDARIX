@@ -124,7 +124,8 @@ def test_the_decision_day_is_its_own_audited_entry_and_moves_the_foreign_clock(o
     assert _enter(regulatory, complaint, today - timedelta(days=2)).status_code == 404
 
 
-def test_a_us_conclusion_takes_no_decision_day(org):
+def test_a_us_conclusion_takes_no_decision_day(org, monkeypatch):
+    monkeypatch.delenv("MDARIX_B9_CANADA", raising=False)  # on: off, the route is 404 (above)
     regulatory = org["regulatory"]
     complaint = _complaint(org["tenant_id"], org["product"], country="US", aware_days_ago=1)
     refused = _enter(regulatory, complaint, datetime.now(timezone.utc).date())
