@@ -165,7 +165,13 @@ class Product(TenantOwned, Base):
     # tr09: a single-use product, and the days a unit stays in use after its lot's release (signals/trend_rules.py).
     single_use: Mapped[bool | None] = mapped_column(Boolean)
     use_period_days: Mapped[int | None] = mapped_column(Integer)
+    # tr29 (B8-D11): who issued the UDI (GS1, HIBCC, ICCBBA or IFA); derived only from an unambiguous format.
+    udi_issuing_entity: Mapped[str | None] = mapped_column(String(10))
     __table_args__ = (
+        CheckConstraint(
+            "udi_issuing_entity IS NULL OR udi_issuing_entity IN ('GS1', 'HIBCC', 'ICCBBA', 'IFA')",
+            name="udi_issuing_entity_known",
+        ),
         UniqueConstraint("tenant_id", "product_identifier", name="uq_products_tenant_product_identifier"),
         UniqueConstraint("tenant_id", "id", name="uq_products_tenant_id_id"),
     )

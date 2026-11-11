@@ -49,6 +49,16 @@ consultant to confirm". Switches: `MDARIX_B8_EU_MIR` (on), `MDARIX_B8_GB_MIR` (o
   product's registered markets as a hint only. The UDI issuing entity is read only from an unambiguous format (GS1 with
   a valid check digit, HIBCC "+", ICCBBA "="), never IFA (B8-D11). Patient and reporter boxes stay refused and blank
   (B8-D9: no setting turns them on yet).
+- **Addresses in parts** (EU and GB MIR): Settings › Products takes each responsible party's street, postcode, city,
+  country (two-letter code; XI for Northern Ireland) and contact's first and last name, as the MIR files need them, and
+  names the parts still to enter. "Enter once" on a report saves them on the party (and the product's UDI issuing
+  entity), never over a value already held. A Settings save that does not send the parts keeps them.
+
+### Database
+- `tr29partyparts` (from `tr28marketroles`, expand-only, no backfill): `market_responsible_parties` gains `street`,
+  `city`, `postcode`, `country_code` (checked two upper-case letters), `contact_first_name`, `contact_last_name`;
+  `products` gains `udi_issuing_entity` (GS1, HIBCC, ICCBBA or IFA). Downgrade refuses while any holds a value.
+  Legacy organization databases: `scripts/add_workflow_tables_to_legacy_planes.py` step tr29.
 
 ## [0.11.00] - not released yet
 

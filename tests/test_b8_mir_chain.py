@@ -373,3 +373,36 @@ def test_b8_the_sample_eu_report_names_ansm_and_leaves_1_2d_to_a_person(trial): 
     assert values["1_1A"]["value"].endswith("(ANSM)")  # the incident in France
     assert values["1_2D"]["value"] is None and "a hint only" in (values["1_2D"]["hint"] or "")
     assert values["1_2A"]["value"] is None and values["1_2A"]["editable"] is False
+
+
+# ------------------------------------------------------------------------------------------------- B8 step 6
+
+PARTIES = "/api/v1/regulatory-reference/responsible-parties"
+PARTS = {
+    "street": "1 Rue Exemple",
+    "city": "Paris",
+    "postcode": "75001",
+    "country_code": "FR",
+    "contact_first_name": "Ana",
+    "contact_last_name": "Sample",
+}
+
+
+def test_b8_parts_entered_once_reach_every_report(trial):  # noqa: F811
+    user, initial = trial["user"], _initial(trial)
+    role = "AUTHORISED_REPRESENTATIVE"  # the sample's own parties are held in memory only: one is set here
+    party = _ok(user.put(PARTIES, json={"market": "EU", "role": role, "organisation": "EU Rep (sample)"}))
+    try:
+        _ok(user.put(f"{REPORTS}/{initial}/once", json={"party_parts": {role: PARTS}}))
+        saved = next(item for item in _ok(user.get(PARTIES))["parties"] if item["id"] == party["id"])
+        assert {key: saved[key] for key in PARTS} == PARTS  # on the party: every EU report reads it from there
+        assert saved["organisation"] == "EU Rep (sample)"  # nothing else changed
+        again = user.put(f"{REPORTS}/{initial}/once", json={"party_parts": {role: {**PARTS, "city": "Lyon"}}})
+        assert again.status_code == 409 and _code(again) == "PARTY_EXISTS"  # never overwritten
+        missing = user.put(f"{REPORTS}/{initial}/once", json={"party_parts": {"SPONSOR": PARTS}})
+        assert missing.status_code == 409 and _code(missing) == "NO_PARTY"
+        assert user.put(f"{REPORTS}/{initial}/once", json={"udi_issuing_entity": "ACME"}).status_code == 422
+        resent = _ok(user.put(PARTIES, json={"market": "EU", "role": role, "organisation": "EU Rep (sample)"}))
+        assert resent["city"] == "Paris"  # a Settings save that does not send the parts keeps them
+    finally:
+        assert user.delete(f"{PARTIES}/{party['id']}").status_code == 204

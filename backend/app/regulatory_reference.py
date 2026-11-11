@@ -119,7 +119,18 @@ def check_identity(payload: dict) -> dict:
         "gmdn_code": gmdn_code,
         "gmdn_term": _text(payload.get("gmdn_term"), 300),
         "emdn_code": emdn_code,
+        "udi_issuing_entity": _issuer(payload.get("udi_issuing_entity")),
     }
+
+
+UDI_ISSUERS = ("GS1", "HIBCC", "ICCBBA", "IFA")
+
+
+def _issuer(value) -> str | None:
+    issuer = (_text(value, 10) or "").upper() or None
+    if issuer and issuer not in UDI_ISSUERS:
+        raise _bad("ISSUER_UNKNOWN", f"The UDI issuing entity is one of {', '.join(UDI_ISSUERS)}")
+    return issuer
 
 
 def check_party(payload: dict) -> dict:
@@ -147,7 +158,23 @@ def check_party(payload: dict) -> dict:
         "contact_email": email,
         "contact_phone": _text(payload.get("contact_phone"), 40),
         "srn": (_text(payload.get("srn"), 40) or "").upper() or None,
+        # tr29 (B8): the parts the MIR XML needs.
+        "street": _text(payload.get("street"), 500),
+        "city": _text(payload.get("city"), 120),
+        "postcode": _text(payload.get("postcode"), 20),
+        "country_code": _country(payload.get("country_code")),
+        "contact_first_name": _text(payload.get("contact_first_name"), 100),
+        "contact_last_name": _text(payload.get("contact_last_name"), 100),
     }
+
+
+def _country(value) -> str | None:
+    code = (_text(value, 2) or "").upper() or None
+    if code and not re.fullmatch(r"[A-Z]{2}", code):
+        raise _bad(
+            "COUNTRY_INVALID", "Give the country as its two-letter ISO code, for example FR (XI: Northern Ireland)"
+        )
+    return code
 
 
 def _insert(db: Session, item, code: str, message: str) -> None:
@@ -169,7 +196,7 @@ def _product(db: Session, tenant_id, product_id: uuid.UUID) -> Product:
 
 
 # The product identity columns set_identity changes (check_identity's keys), audited before and after (0.10.81).
-IDENTITY_COLUMNS = ("udi_di", "basic_udi_di", "gmdn_code", "gmdn_term", "emdn_code")
+IDENTITY_COLUMNS = ("udi_di", "basic_udi_di", "gmdn_code", "gmdn_term", "emdn_code", "udi_issuing_entity")
 
 
 def registration_view(db: Session, tenant_id, product_id: uuid.UUID, registration_id: uuid.UUID) -> dict | None:
@@ -210,7 +237,11 @@ def _party_view(item: MarketResponsibleParty) -> dict:
         "contact_email": item.contact_email,
         "contact_phone": item.contact_phone,
         "srn": item.srn,
+        **{name: getattr(item, name) for name in PARTY_PARTS},
     }
+
+
+PARTY_PARTS = ("street", "city", "postcode", "country_code", "contact_first_name", "contact_last_name")
 
 
 def product_profile(db: Session, tenant_id, product_id: uuid.UUID, control: Session | None = None) -> dict:
@@ -241,6 +272,7 @@ def product_profile(db: Session, tenant_id, product_id: uuid.UUID, control: Sess
         "gmdn_code": product.gmdn_code,
         "gmdn_term": product.gmdn_term,
         "emdn_code": product.emdn_code,
+        "udi_issuing_entity": product.udi_issuing_entity,
         # The EMDN term and FDA device names from the loaded lists (0.10.77); None when not loaded or not found.
         "emdn_term": reference_term(control, "EMDN", product.emdn_code) if control else None,
         "registrations": [
@@ -260,6 +292,8 @@ def product_profile(db: Session, tenant_id, product_id: uuid.UUID, control: Sess
 def set_identity(db: Session, tenant_id, product_id: uuid.UUID, payload: dict, control: Session | None = None) -> dict:
     product = _product(db, tenant_id, product_id)
     values = check_identity(payload)
+    if "udi_issuing_entity" not in payload:  # a screen that does not show it never clears it (tr29)
+        values.pop("udi_issuing_entity")
     if control is not None:
         _known(control, "EMDN", values["emdn_code"], "EMDN_CODE_UNKNOWN", "is not in the loaded EMDN")
     for column, value in values.items():
@@ -338,7 +372,8 @@ def set_party(db: Session, tenant_id, payload: dict) -> dict:
         _insert(db, item, "PARTY_EXISTS", "A responsible party for this market and role was just set; reload")
     else:
         for column, value in values.items():
-            setattr(item, column, value)
+            if column not in PARTY_PARTS or column in payload:  # parts not sent are kept (tr29)
+                setattr(item, column, value)
         item.updated_at = now
     db.flush()
     return _party_view(item)

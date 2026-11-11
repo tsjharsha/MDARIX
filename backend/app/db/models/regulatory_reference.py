@@ -81,12 +81,20 @@ class MarketResponsibleParty(Base):
     contact_phone: Mapped[str | None] = mapped_column(String(40))
     # tr16: the EUDAMED single registration number (manufacturer, authorised representative, importer).
     srn: Mapped[str | None] = mapped_column(String(40))
+    # tr29 (B8): the address and contact in the parts the MIR XML needs; address and contact_name stay.
+    street: Mapped[str | None] = mapped_column(String(500))
+    city: Mapped[str | None] = mapped_column(String(120))
+    postcode: Mapped[str | None] = mapped_column(String(20))
+    country_code: Mapped[str | None] = mapped_column(String(2))
+    contact_first_name: Mapped[str | None] = mapped_column(String(100))
+    contact_last_name: Mapped[str | None] = mapped_column(String(100))
     created_at = tz(False)
     updated_at = tz(False)
     __table_args__ = (
         UniqueConstraint("tenant_id", "market", "role", name="uq_market_responsible_party"),
         CheckConstraint(_in("market", MARKETS), name="responsible_party_market_known"),
         CheckConstraint(_in("role", PARTY_ROLES), name="responsible_party_role_known"),
+        CheckConstraint("country_code IS NULL OR country_code ~ '^[A-Z]{2}$'", name="country_code_alpha2"),
     )
 
 

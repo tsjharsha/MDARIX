@@ -366,6 +366,17 @@ STEPS = (
             "AND table_name = 'reportability_settings' AND column_name = 'reporting_roles')"
         ),
     ),
+    Step(
+        "tr29",
+        "tr29_trial_party_parts.py",
+        "add_party_parts",
+        (),
+        ("market_responsible_parties", "products"),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'products' AND column_name = 'udi_issuing_entity')"
+        ),
+    ),
 )
 
 

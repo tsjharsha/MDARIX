@@ -1438,6 +1438,9 @@ class OnceRequest(BaseModel):
     values: dict[str, str] = Field(default_factory=dict, max_length=10)
     # The US contact office's e-mail (G1), added to the responsible party the eMDR file reads it from (0.10.92, A5).
     contact_email: str = Field(default="", max_length=254)
+    # B8 step 6 (tr29): a responsible party's address and contact parts, by role, and the product's UDI issuing entity.
+    party_parts: dict[str, dict[str, str]] = Field(default_factory=dict, max_length=4)
+    udi_issuing_entity: str = Field(default="", max_length=10)
 
 
 _PARTY_MARKET = {"US": "US", "EU_NI": "EU", "GB": "GB", "IN": "IN", "CA": "CA"}
@@ -1464,7 +1467,7 @@ def enter_once(
     fields = {item.id: item for item in _form(obligation).fields()}
     values = {key: _text(value, 200) for key, value in payload.values.items() if _text(value, 200)}
     email = _text(payload.contact_email, 254)
-    if not values and not email:
+    if not values and not email and not payload.party_parts and not payload.udi_issuing_entity:
         raise _error(422, "NOTHING_TO_SAVE", "Enter the value")
     if email and len(email) > 50:
         raise _error(422, "EMAIL_TOO_LONG", "FDA's eMDR takes a contact e-mail of up to 50 characters")
@@ -1540,9 +1543,46 @@ def enter_once(
             raise _error(409, "PARTY_EXISTS", "The contact office has an e-mail: change it in Settings › Products")
         reference.set_party(db, tenant_id, {**held, "contact_email": email})
         done.append({"market": market, "role": held["role"], "contact_email": email})
+    done += _enter_parts_once(db, tenant_id, market, product, payload)
     _audit(db, ctx, "REPORT_FACT_ENTERED_ONCE", obligation, None, {"saved": done}, fields=sorted(values))
     db.commit()
     return detail(db, control_db, ctx, obligation)
+
+
+def _enter_parts_once(db, tenant_id, market: str, product, payload: OnceRequest) -> list[dict]:
+    """B8 step 6: the MIR's party parts and the UDI issuing entity, entered once on the report and saved on the
+    market's responsible party or the product, for every report. A part already held is never overwritten (409)."""
+    from backend.app import regulatory_reference as reference
+
+    done: list[dict] = []
+    for role, given in payload.party_parts.items():
+        parts = {key: _text(value, 500) for key, value in given.items() if key in reference.PARTY_PARTS}
+        parts = {key: value for key, value in parts.items() if value}
+        held = next(
+            (
+                item
+                for item in reference.responsible_parties(db, tenant_id)
+                if (item["market"], item["role"]) == (market, role)
+            ),
+            None,
+        )
+        if held is None:
+            raise _error(409, "NO_PARTY", "Set this responsible party first, in Settings › Products")
+        if any(held[key] and held[key] != value for key, value in parts.items()):
+            raise _error(409, "PARTY_EXISTS", "These details are set: change them in Settings › Products")
+        if parts:
+            reference.set_party(db, tenant_id, {**held, **parts})
+            done.append({"market": market, "role": role, **parts})
+    issuer = _text(payload.udi_issuing_entity, 10)
+    if issuer:
+        if product is None:
+            raise _error(409, "NO_PRODUCT", "This complaint names no product: enter the value on this report")
+        if product.udi_issuing_entity and product.udi_issuing_entity != issuer.upper():
+            raise _error(409, "PRODUCT_HOLDS_A_VALUE", "The product already holds this value: change it in Products")
+        held = {column: getattr(product, column) for column in reference.IDENTITY_COLUMNS}
+        reference.set_identity(db, tenant_id, product.id, {**held, "udi_issuing_entity": issuer})
+        done.append({"product": product.product_identifier, "udi_issuing_entity": issuer.upper()})
+    return done
 
 
 def _entry_values(field_id: str, entry: dict | None) -> dict:

@@ -1061,7 +1061,23 @@ type Party = {
   contact_email: string | null;
   contact_phone: string | null;
   srn: string | null;
+  // B8 (tr29): the parts the EU and GB MIR XML needs.
+  street?: string | null;
+  city?: string | null;
+  postcode?: string | null;
+  country_code?: string | null;
+  contact_first_name?: string | null;
+  contact_last_name?: string | null;
 };
+const PARTS = ["street", "city", "postcode", "country_code", "contact_first_name", "contact_last_name"] as const;
+
+/** What the MIR XML reads for a party, or the parts still to enter (B8 step 6). */
+export function partsLine(item: Party): string {
+  const missing = PARTS.filter((key) => !item[key]);
+  return missing.length
+    ? `MIR address and contact parts to enter (${missing.length} of ${PARTS.length})`
+    : `${item.street}, ${item.postcode} ${item.city}, ${item.country_code} · ${item.contact_first_name} ${item.contact_last_name}`;
+}
 const ROLE_LABELS: Record<string, string> = {
   MANUFACTURER: "Manufacturer",
   IMPORTER: "Importer",
@@ -1086,6 +1102,12 @@ export function ResponsibleParties() {
     contact_name: "",
     contact_email: "",
     contact_phone: "",
+    street: "",
+    city: "",
+    postcode: "",
+    country_code: "",
+    contact_first_name: "",
+    contact_last_name: "",
   });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1120,6 +1142,8 @@ export function ResponsibleParties() {
               </strong>{" "}
               {item.organisation}
               {item.srn ? ` · SRN ${item.srn}` : ""}
+              <br />
+              <span className="ac-muted">{partsLine(item)}</span>
             </li>
           ))}
         </ul>
@@ -1163,6 +1187,13 @@ export function ResponsibleParties() {
           {field("contact_name", "Contact", 200)}
           {field("contact_email", "Contact e-mail", 254)}
           {field("contact_phone", "Contact phone", 40)}
+          <p className="ac-muted">The EU and GB MIR files take the address and contact in parts:</p>
+          {field("street", "Street and number", 500)}
+          {field("postcode", "Postcode", 20)}
+          {field("city", "City", 120)}
+          {field("country_code", "Country (two-letter code, e.g. FR; XI for Northern Ireland)", 2)}
+          {field("contact_first_name", "Contact's first name", 100)}
+          {field("contact_last_name", "Contact's last name", 100)}
           <p className="ac-muted">Setting a market and role again replaces it.</p>
           <div className="ca-action-row">
             <button type="submit" className="ac-primary" disabled={busy || !form.organisation.trim()}>
