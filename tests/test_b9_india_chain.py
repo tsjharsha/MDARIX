@@ -82,3 +82,28 @@ def test_only_an_india_initial_report_takes_a_chain(trial):  # noqa: F811
     assert refused.status_code == 409, refused.text
     assert refused.json()["detail"]["code"] == "NOT_AN_INDIA_INITIAL"
     assert _create(user, us, "Trend").status_code == 422  # only Follow up and Final are made here
+
+
+def test_b9_india_sample_gives_form_and_sheet(trial):  # noqa: F811
+    """Step 16 (B9-05, B9-06 on the sample): SAMPLE-RV-10's approved snapshot downloads as MvPI's own form v1.2 and as
+    the ADRMS entry sheet; neither before approval."""
+    import io
+
+    from pypdf import PdfReader
+
+    user = trial["user"]
+    initial = _items(user)[("SAMPLE-RV-10", "IN", "INITIAL")]["id"]
+    detail = _ok(user.get(f"{REPORTS}/{initial}"))
+    snapshot = next(row for row in detail["snapshots"] if row["state"] == "APPROVED")["id"]
+    url = f"{REPORTS}/{initial}/worksheet.pdf"
+    official = user.get(url, params={"snapshot": snapshot, "form": "official"})
+    assert official.status_code == 200, official.text
+    assert "official-form" in official.headers["content-disposition"]
+    fields = PdfReader(io.BytesIO(official.content)).get_fields()
+    assert fields["text_110wxft"].get("/V") and fields["checkbox_9kjrf"].get("/V") not in (None, "/Off")  # R1
+    assert fields["checkbox_37bwpo"].get("/V") not in (None, "/Off")  # A1 "Class B (sample)": class B
+    sheet = user.get(url, params={"snapshot": snapshot, "form": "adrms"})
+    assert sheet.status_code == 200 and "adrms-entry-sheet" in sheet.headers["content-disposition"]
+    assert "ADRMS fields, in screen order" in PdfReader(io.BytesIO(sheet.content)).pages[0].extract_text()
+    refused = user.get(url, params={"form": "official"})  # the working draft: not approved
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "APPROVE_FIRST"

@@ -162,6 +162,7 @@ SERIOUS_REASONS = {
 OTHERS = {"B4": (3, "checkbox_54fbdm", "text_136cxwr"), "B5": (3, "checkbox_59xrd", "text_171htgq")}
 ON = "\x00on"
 _REASON = re.compile(r"^([a-g])\)")
+_SAMPLE = re.compile(r"\s*\(sample\)$", re.I)
 _CLASS = re.compile(r"^(?:class\s+)?([a-d])$", re.I)
 
 
@@ -213,7 +214,7 @@ def placements(sections: list[dict]) -> tuple[dict[int, dict[str, str]], list[tu
             put(page, specify, text.partition(":")[2].strip() or text)
         elif field_id in CHOICES:
             page, table = CHOICES[field_id]
-            words = text.strip()
+            words = _SAMPLE.sub("", text.strip())  # the sample's "(sample)" mark is not part of the choice
             if field_id == "A1":
                 found = _CLASS.match(words)
                 words = found.group(1) if found else words
