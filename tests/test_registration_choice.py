@@ -66,7 +66,7 @@ def test_two_registrations_same_market_different_class_are_left_for_a_person():
     # A person's own choice clears the note.
     entered = worksheet.build(forms.EU_MIR, context, {_risk_field_id(): {"value": "III", "by": "x"}}, {})
     chosen = next(item for section in entered for item in section["fields"] if item["id"] == _risk_field_id())
-    assert chosen["value"] == "III" and chosen["problem"] is None
+    assert chosen["value"].endswith("III") and chosen["problem"] is None  # B8 writes the MIR's own "MDR class III"
 
 
 def test_two_registrations_with_different_numbers_are_left_for_a_person():
@@ -80,6 +80,7 @@ def test_two_registrations_with_different_numbers_are_left_for_a_person():
 def test_ni_only_registration_is_used_on_a_northern_ireland_report():
     assert worksheet.registry_markets(markets.EU_NI, "Northern Ireland") == ("NI", "EU")
     assert worksheet.registry_markets(markets.EU_NI, "NI") == ("NI", "EU")
+    assert worksheet.registry_markets(markets.EU_NI, "United Kingdom - Northern Ireland") == ("NI", "EU")
     ni = _reg(market="NI", number="UKNI-9", kind="UKNI", risk_class="IIb", body="0086")
     context = _context(ni)
     assert worksheet.SOURCES["risk_class"](context)[0] == "IIb"
