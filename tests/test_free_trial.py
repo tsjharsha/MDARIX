@@ -1085,7 +1085,8 @@ def test_the_inspection_pack_holds_every_record_behind_every_check():
     archive = zipfile.ZipFile(io.BytesIO(response.content))
     names = archive.namelist()
     assert names[:3] == ["00-README.txt", "01-readiness-summary.pdf", "02-inspection-checks.csv"]
-    assert names[-1] == "manifest.json" and len(names) == 12
+    # B9b (OC-15): 11-other-regulatory-reports.csv joins the check files.
+    assert names[-1] == "manifest.json" and len(names) == 13 and "11-other-regulatory-reports.csv" in names
     manifest = json.loads(archive.read("manifest.json"))
     assert manifest["unreadable"] == [] and manifest["checks"]["checks"] == 11
     for entry in manifest["files"]:

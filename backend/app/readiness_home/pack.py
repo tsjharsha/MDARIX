@@ -288,11 +288,86 @@ CHECK_FILES = (
 )
 
 
+def other_regulatory_reports(db: Session, tenant_id, today) -> bytes:
+    """B9b (OC-15): every Other Regulatory Report (a country outside the five markets) with its state, due date, each
+    submission's Report ID and every attached file with its SHA-256. MDARIX holds the copies; it never submitted them."""
+    from backend.app.authority_reports import attached
+    from backend.app.db.models.authority_reports import ReportEvidence, ReportObligation, ReportSubmission
+    from backend.app.db.models.foundation import Complaint
+    from backend.app.reportability import other_countries
+
+    reports = (
+        db.query(ReportObligation, Complaint)
+        .join(
+            Complaint,
+            (Complaint.tenant_id == ReportObligation.tenant_id) & (Complaint.id == ReportObligation.complaint_id),
+        )
+        .filter(ReportObligation.tenant_id == tenant_id, ReportObligation.form_code == attached.FORM)
+        .order_by(ReportObligation.created_at, ReportObligation.id)
+        .all()
+    )
+    rows = []
+    for report, complaint in reports:
+        submissions = (
+            db.query(ReportSubmission)
+            .filter(ReportSubmission.tenant_id == tenant_id, ReportSubmission.obligation_id == report.id)
+            .order_by(ReportSubmission.attempt)
+            .all()
+        )
+        base = [
+            complaint.business_id or complaint.complaint_identifier,
+            other_countries.name_of(report.country),
+            "Follow-up" if report.parent_id else "First report",
+            attached.state_label(report),
+            report.due_on.isoformat() if report.due_on else None,
+        ]
+        if not submissions:
+            rows.append([*base, None, None, None, None, None, None])
+        for submission in submissions:
+            files = (
+                db.query(ReportEvidence)
+                .filter(ReportEvidence.tenant_id == tenant_id, ReportEvidence.submission_id == submission.id)
+                .order_by(ReportEvidence.recorded_at)
+                .all()
+            )
+            for item in files or [None]:
+                rows.append(
+                    [
+                        *base,
+                        submission.submitted_at.isoformat(),
+                        submission.authority_reference or attached.NOT_ISSUED,
+                        item.kind if item else None,
+                        item.outcome if item else None,
+                        item.file_name if item else None,
+                        item.sha256 if item else None,
+                    ]
+                )
+    return _csv(
+        [
+            "Complaint",
+            "Country",
+            "Report",
+            "Status",
+            "Due",
+            "Submitted",
+            "Report ID",
+            "Evidence",
+            "Outcome",
+            "File",
+            "SHA-256",
+        ],
+        rows,
+    )
+
+
+OTHER_REPORTS_FILE = "11-other-regulatory-reports.csv"
+
 # The basis of the files that are not one check's records, as catalog ids: the summary is organized by the
 # management review inputs; the manifest keeps any change to a file identifiable, as the control of records asks.
 FILE_BASIS = {
     "01-readiness-summary.pdf": ("ISO13485_5_6_2",),
     "manifest.json": ("ISO13485_4_2_5",),
+    OTHER_REPORTS_FILE: ("ISO13485_4_2_5", "IMDRF_GHTF_COMMON"),
 }
 
 
@@ -397,6 +472,12 @@ def build_pack(
             unreadable.append(code)
             content = _csv(["Note"], [[f"The records behind {code} could not be read when this pack was made."]])
         files.append((name, content))
+    try:
+        files.append((OTHER_REPORTS_FILE, other_regulatory_reports(db, tenant_id, today)))
+    except Exception:  # as a check's list: the pack is still made, the file says so
+        db.rollback()
+        unreadable.append("OTHER_REGULATORY_REPORTS")
+        files.append((OTHER_REPORTS_FILE, _csv(["Note"], [["The Other Regulatory Reports could not be read."]])))
     names = [name for name, _ in files]
     readme = _readme(organization, generated_at, data["period"], data["readiness"], names)
     files.insert(0, ("00-README.txt", readme))

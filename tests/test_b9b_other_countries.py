@@ -332,3 +332,20 @@ def test_the_switch_off_hides_the_picker_and_routes_and_keeps_records_readable(o
     assert shown["state_label"] == "To be submitted" and shown["can"]["submit"] is False
     monkeypatch.setenv("MDARIX_B9B_OTHER", "on")
     assert org["regulatory"].get("/api/v1/other-countries").status_code == 200
+
+
+def test_the_inspection_pack_lists_the_reports_and_their_files(org):
+    """OC-15."""
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.readiness_home import pack
+
+    complaint, _ = _reportable(org)
+    report = _report(org["regulatory"], complaint)
+    assert _submit(org["regulatory"], report["id"], report_id="TGA-PACK-1").status_code == 200
+    with SessionLocal() as db:
+        bind_tenant(db, org["tenant_id"])
+        text = pack.other_regulatory_reports(db, org["tenant_id"], date.today()).decode("utf-8")
+    line = next(row for row in text.splitlines() if "TGA-PACK-1" in row)
+    assert "Australia" in line and "Submitted" in line and "report.pdf" in line
+    assert hashlib.sha256(b"%PDF-1.4 our report to the TGA").hexdigest() in line
+    assert pack.file_basis(pack.OTHER_REPORTS_FILE)
