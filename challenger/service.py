@@ -21,7 +21,9 @@ class ChallengerService:
         self.engine = engine or ControlledChallenger()
         self.model_engine = model_engine or ModelChallenger()
 
-    def generate(self, db: Session, request: ChallengeRequest):
+    def generate(self, db: Session, request: ChallengeRequest, run_analysis: bool = True):
+        """``run_analysis=False`` (RCA-D13, AI off): challenge only the saved hypothesis set named in the request; never
+        generate one (it would run the keyword analysis). Without it, ``AI_OFF`` is raised and nothing is written."""
         if request.tenant_id is None:
             raise ChallengerError("TENANT_REQUIRED", "tenant_id is required")
         hs = None
@@ -40,6 +42,7 @@ class ChallengerService:
                         as_of=request.as_of,
                         persist=True,
                     ),
+                    run_analysis=run_analysis,
                 ).hypothesis_set
             except HypothesisEngineError as e:
                 raise ChallengerError(e.code, e.message) from e
