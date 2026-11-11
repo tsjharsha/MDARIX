@@ -50,7 +50,7 @@ def test_b8_personal_data_off_on_off_keeps_values_only_in_the_frozen_snapshot(tr
     # GB rows only the EU help text makes mandatory: a warning when empty, never a block (owner: follow MHRA).
     rows = _rows(detail)
     assert "consultant" in rows["2_4"]["warning"] and "2_4" not in detail["mandatory"]["missing"]
-    assert rows["3_4H"]["missing_class"] == "MUST" and rows["3_4H"]["warning"] is None
+    assert rows["3_4H"]["missing_class"] == "MUST_HAVE" and rows["3_4H"]["warning"] is None
 
     # Off (default): blank, entered in the authority's route; Send refuses typed details; a PUT is refused as before.
     assert _ok(user.get("/api/v1/complaints/reportability-settings"))["report_personal_data"] is False
