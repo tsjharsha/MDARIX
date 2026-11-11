@@ -915,8 +915,9 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     assert [chapter["code"] for chapter in overview.json()["chapters"]][0] == "ROUTINE_COMPLAINTS"
 
 
-def test_opening_a_case_is_not_investigating_but_starting_its_analysis_is():
-    """The case page's automatic first analysis does not tick the investigation chapter; one a person starts does."""
+def test_opening_a_case_is_not_investigating_and_a_run_starts_nothing_while_ai_is_off():
+    """The case page's automatic first analysis does not tick the investigation chapter; in a free trial (AI off) a
+    run a person asks for starts nothing, so it does not tick it either (asking MDARIX a question still does)."""
     from backend.app.db.models.foundation import Investigation
 
     user, approval, _email = _approved_trial_client()
@@ -938,9 +939,10 @@ def test_opening_a_case_is_not_investigating_but_starting_its_analysis_is():
 
     assert user.post(f"/api/v1/investigations/{case_id}/ai-run", json={"trigger": "AUTO"}).status_code in (200, 202)
     assert investigated() is False
+    # AI is off in a free trial: a person's run starts nothing either (RCA-D13), so it does not count as acting.
     started = user.post(f"/api/v1/investigations/{case_id}/ai-run", json={"trigger": "MANUAL"})
-    assert started.status_code in (200, 202), started.text
-    assert investigated() is True
+    assert started.status_code == 200 and started.json()["state"] == "AI_OFF", started.text
+    assert investigated() is False
 
 
 def test_one_trial_user_reviews_the_sample_brief_and_may_sign_its_decision():
