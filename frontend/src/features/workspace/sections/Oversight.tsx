@@ -8,7 +8,7 @@ import { CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, send, useResource, type Column } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
-import { useCan, useOpenTarget, useTabParam, useWorkspace } from "../workspaceContext";
+import { useCan, useDeadlineList, useOpenTarget, useTabParam, useWorkspace } from "../workspaceContext";
 import {
   CHECK_TONES,
   EVENT_TONES,
@@ -263,21 +263,38 @@ function FilterBar({
 
 export function ExportButton({ filters }: { filters: Filters }) {
   const canExport = useCan("data.export");
+  const deadlines = useDeadlineList();
   const [error, setError] = useState("");
   if (!canExport) return null;
+  const get = (path: string, name: string) =>
+    void downloadFile(path, { fallbackName: name }).catch((reason) =>
+      setError(errorText(reason, "The list could not be downloaded.")),
+    );
   return (
     <>
-      <button
-        type="button"
-        className="ac-secondary"
-        onClick={() =>
-          void downloadFile(exportPath(filters), { fallbackName: "mdarix-oversight.csv" }).catch((reason) =>
-            setError(errorText(reason, "The list could not be downloaded.")),
-          )
-        }
-      >
+      <button type="button" className="ac-secondary" onClick={() => get(exportPath(filters), "mdarix-oversight.csv")}>
         <Download size={15} aria-hidden="true" /> CSV
       </button>
+      {deadlines && (
+        <>
+          {/* B6a G18a: the open reporting deadlines, an offline copy to keep for an outage. */}
+          <button
+            type="button"
+            className="ac-secondary"
+            title="Open reporting deadlines: your copy if MDARIX is unavailable"
+            onClick={() => get(`${OVERSIGHT}/deadlines.pdf`, "mdarix-deadlines.pdf")}
+          >
+            <Download size={15} aria-hidden="true" /> Deadlines PDF
+          </button>
+          <button
+            type="button"
+            className="ac-secondary"
+            onClick={() => get(`${OVERSIGHT}/deadlines.csv`, "mdarix-deadlines.csv")}
+          >
+            <Download size={15} aria-hidden="true" /> Deadlines CSV
+          </button>
+        </>
+      )}
       <InlineError text={error} />
     </>
   );

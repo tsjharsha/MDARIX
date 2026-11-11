@@ -1585,6 +1585,39 @@ def send_readiness_digest(recipient: str, *, organization: str, week: str, conte
     )
 
 
+def send_deadline_list(recipient: str, *, organization: str, day: str, zone: str, lines: list[dict]) -> str:
+    """The daily deadline list (backend/app/oversight/deadline_list.py): an offline copy of the open reporting
+    deadlines; sent also when empty, so a missing e-mail means a problem. References, dates and states only."""
+    rows = [line for line in lines if isinstance(line, dict)]
+    overdue = sum(1 for line in rows if line.get("state") == "OVERDUE")
+    count = f"{len(rows)} open reporting deadline{'' if len(rows) == 1 else 's'} today"
+    items = tuple(
+        f"{line.get('state_label')}: {line.get('due_label')}, {line.get('ref') or '-'}, {line.get('market')}, "
+        f"{line.get('owed')}" + (f" (owner: {line['owner']})" if line.get("owner") else "")
+        for line in rows
+    )
+    return _send(
+        recipient,
+        Message(
+            subject=f"{count}" + (f", {overdue} overdue" if overdue else "") + f" ({organization}, {day})",
+            heading=f"Open reporting deadlines, {day}",
+            paragraphs=(
+                f"{count} in {organization}" + (f", {overdue} overdue" if overdue else "") + f". Times in {zone}.",
+                "Keep this e-mail: it is your copy of the deadlines if MDARIX is unavailable. The legal clocks keep "
+                "running during an outage; follow your own procedure and enter what arrived when MDARIX is back.",
+            ),
+            items=items,
+            button=("Open Oversight", _app_link("Readiness", "Oversight")),
+            closing=("Oversight can also download this list as CSV or PDF for a printed copy.",),
+            reason=(
+                f"You receive this daily list because you approve reports, lead quality or administer {organization} "
+                "in MDARIX. To stop it, switch off the daily deadline list under My Account (the last person who "
+                "receives it cannot)."
+            ),
+        ),
+    )
+
+
 def send_ai_budget_notice(
     recipient: str, *, organization: str, percent: int, month: str, tokens_used: int | None, budget: int | None
 ) -> str:

@@ -125,11 +125,14 @@ B9_SWITCHES = {
 B8_SWITCHES = {"MDARIX_B8_EU_MIR": True, "MDARIX_B8_GB_MIR": True}
 # B9b switch and its default: a country outside the five markets (the picker, its routes, OTHER-floor-1).
 B9B_SWITCHES = {"MDARIX_B9B_OTHER": True}
-SWITCHES = {**B9_SWITCHES, **B8_SWITCHES, **B9B_SWITCHES}
+# B6a switches and their defaults (B6a-D13, all on): the daily deadline list and its downloads; the late-entry reason
+# and the duplicate check before saving a back-entered Case.
+B6_SWITCHES = {"MDARIX_B6_DEADLINE_LIST": True, "MDARIX_B6_LATE_ENTRY": True}
+SWITCHES = {**B9_SWITCHES, **B8_SWITCHES, **B9B_SWITCHES, **B6_SWITCHES}
 
 
 def switched_on(name: str | None) -> bool:
-    """A B9, B8 or B9b switch (read on every call); None (no switch) is always on."""
+    """A B9, B8, B9b or B6 switch (read on every call); None (no switch) is always on."""
     if name is None:
         return True
     value = os.getenv(name, "").strip().lower()

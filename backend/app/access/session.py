@@ -33,6 +33,7 @@ from backend.app.access.permissions import normalize_role, permissions_for_roles
 from backend.app.cell_link import licence_state
 from backend.app.deployment_role import deployment_role
 from backend.app.feature_set import (
+    B6_SWITCHES,
     B9_SWITCHES,
     challenge,
     closed_loop,
@@ -313,6 +314,8 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         "rule_register": rule_register(),
         # B9 (markets): each part's screens show only while its switch is on (MDARIX_B9_*, feature_set.B9_SWITCHES).
         "b9": {name.removeprefix("MDARIX_B9_").lower(): switched_on(name) for name in B9_SWITCHES},
+        # B6a: deadline_list (downloads on Oversight) and late_entry (the reason and duplicate check on Log a case).
+        "b6": {name.removeprefix("MDARIX_B6_").lower(): switched_on(name) for name in B6_SWITCHES},
         # classic or new (tenants.navigation, set in Tenant 360): the workspace's navigation; nothing shows it yet.
         "navigation": (tenant.navigation if tenant is not None else None) or "classic",
         # An evaluation on the sample only (tenants.sample_only, 0.10.71): the screens hide every upload and import

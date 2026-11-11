@@ -139,6 +139,8 @@ export type SessionContext = {
   rule_register?: boolean;
   /** B9 (MDARIX_B9_*, feature_set.B9_SWITCHES): each market part's screens show only while its switch is on. */
   b9?: { india?: boolean; canada?: boolean; us_importer?: boolean; us_user_facility?: boolean };
+  /** B6a (MDARIX_B6_*, feature_set.B6_SWITCHES): the deadline list downloads and the late-entry reason. */
+  b6?: { deadline_list?: boolean; late_entry?: boolean };
   /** classic or new (tenants.navigation, 0.10.67): the organization's menu (app/linkTable.ts). */
   navigation?: string;
   /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
@@ -419,6 +421,16 @@ export function useB9India(): boolean {
 /** B9: Canada's chain and official form show only while the server has MDARIX_B9_CANADA on. */
 export function useB9Canada(): boolean {
   return useContext(WorkspaceContext)?.session?.b9?.canada === true;
+}
+
+/** B6a: the deadline list downloads on Oversight show only while the server has MDARIX_B6_DEADLINE_LIST on. */
+export function useDeadlineList(): boolean {
+  return useContext(WorkspaceContext)?.session?.b6?.deadline_list === true;
+}
+
+/** B6a: the late-entry reason and the duplicate check before saving a Case, while MDARIX_B6_LATE_ENTRY is on. */
+export function useLateEntry(): boolean {
+  return useContext(WorkspaceContext)?.session?.b6?.late_entry === true;
 }
 
 /** B7b: "E-mail to check" shows only while the server has e-mail intake switched on. */

@@ -99,19 +99,25 @@ type EmailPreferences = {
   weekly_readiness: boolean;
   weekly_readiness_eligible: boolean;
   weekly_readiness_about: string;
+  /** B6a G18a: the daily deadline list (absent on an older server). */
+  daily_deadlines?: boolean;
+  daily_deadlines_eligible?: boolean;
+  daily_deadlines_locked?: boolean;
+  daily_deadlines_about?: string;
 };
 
-/** The weekly readiness email, on or off for oneself (GET/PUT /api/v1/me/email-preferences). Exported for its test. */
+/** The weekly readiness email and the daily deadline list, on or off for oneself (GET/PUT
+ * /api/v1/me/email-preferences); the last person who receives the daily list cannot switch it off. Exported for its test. */
 export function EmailChoices() {
   const preferences = useResource<EmailPreferences>("/api/v1/me/email-preferences");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const data = preferences.data;
-  const change = async (on: boolean) => {
+  const change = async (choice: { weekly_readiness?: boolean; daily_deadlines?: boolean }) => {
     setBusy(true);
     setError("");
     try {
-      await send("/api/v1/me/email-preferences", "PUT", { weekly_readiness: on });
+      await send("/api/v1/me/email-preferences", "PUT", choice);
       preferences.reload();
     } catch (failure) {
       setError(errorText(failure, "Your email choice was not saved."));
@@ -120,7 +126,7 @@ export function EmailChoices() {
     }
   };
   return (
-    <Panel eyebrow="Email" title="Weekly readiness email" source={preferences}>
+    <Panel eyebrow="Email" title="Emails from MDARIX" source={preferences}>
       {data && (
         <>
           <p>{data.weekly_readiness_about}</p>
@@ -130,9 +136,21 @@ export function EmailChoices() {
                 type="checkbox"
                 checked={data.weekly_readiness}
                 disabled={busy}
-                onChange={(event) => void change(event.target.checked)}
+                onChange={(event) => void change({ weekly_readiness: event.target.checked })}
               />{" "}
               Send me the weekly readiness email
+            </label>
+          )}
+          {data.daily_deadlines_about && <p>{data.daily_deadlines_about}</p>}
+          {data.daily_deadlines_eligible && (
+            <label className="ca-check">
+              <input
+                type="checkbox"
+                checked={data.daily_deadlines ?? true}
+                disabled={busy || data.daily_deadlines_locked}
+                onChange={(event) => void change({ daily_deadlines: event.target.checked })}
+              />{" "}
+              Send me the daily deadline list
             </label>
           )}
           {error && (

@@ -33,6 +33,9 @@ email could not be sent, so the outbox retries (and finally dead-letters and ale
   Administrators when the change concerns an administrator account.
 * ``READINESS_DIGEST`` (scheduler, backend/app/readiness_home/digest.py): the organization's quality leads (Leader and
   Quality Reviewer) who have not switched the weekly readiness email off; once per ISO week.
+* ``DEADLINE_LIST`` (scheduler, backend/app/oversight/deadline_list.py): the organization's open reporting deadlines,
+  once a day from 06:00 organization time, to its regulatory approvers, Leaders and customer administrators who have
+  not switched it off (never to nobody); sent also when empty.
 """
 
 from __future__ import annotations
@@ -1046,6 +1049,11 @@ def _handle_event(db: Session, event_name: str, payload: dict) -> bool:
         from backend.app.readiness_home.digest import deliver
 
         deliver(db, payload)
+        return True
+    if event_name == "DEADLINE_LIST":
+        from backend.app.oversight.deadline_list import deliver as deliver_deadlines
+
+        deliver_deadlines(db, payload)
         return True
     from auth.security_notices import handle_security_notice
 

@@ -1171,11 +1171,11 @@ def test_the_weekly_readiness_email_reaches_the_quality_leads_once_a_week(monkey
 
         # A quality lead may switch it off for themselves; then nobody of this trial gets it.
         shown = user.get("/api/v1/me/email-preferences").json()
-        assert shown == {
+        assert {key: value for key, value in shown.items() if key.startswith("weekly")} == {
             "weekly_readiness": True,
             "weekly_readiness_eligible": True,
             "weekly_readiness_about": shown["weekly_readiness_about"],
-        }
+        }  # B6a added the daily deadline list's keys beside these (tests/test_b6a_deadline_list.py)
         assert (
             user.put("/api/v1/me/email-preferences", json={"weekly_readiness": False}).json()["weekly_readiness"]
             is False

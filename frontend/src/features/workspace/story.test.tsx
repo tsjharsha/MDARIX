@@ -391,7 +391,7 @@ describe("booking a one-to-one demo from the trial", () => {
 
   it("lets a person switch the weekly readiness email off for themselves", async () => {
     const { EmailChoices } = await import("./sections/Account");
-    expect(renderToStaticMarkup(<EmailChoices />)).toContain("Weekly readiness email");
+    expect(renderToStaticMarkup(<EmailChoices />)).toContain("Emails from MDARIX");
   });
 
   it("explains the sample data: its size, the pain each part re-creates, the requirement and where to see it", async () => {

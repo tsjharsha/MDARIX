@@ -5,6 +5,8 @@
   events (ready to close, not ready, decision record not filed, closed in the QMS before readiness); who is away;
   the staffing warning. IDs, owners, dates and states only, never patient or reporter data;
 - ``GET /api/v1/oversight/export.csv``: the same list for the monthly product review (data.export);
+- ``GET /api/v1/oversight/deadlines.csv`` and ``.pdf``: the open reporting deadlines, an offline copy for an outage
+  (B6a G18a, data.export, audited; oversight/deadline_list.py, which also e-mails it daily);
 - ``GET``/``PUT /api/v1/oversight/settings``: the working calendar (time zone, working weekdays, holidays) and the
   simple escalation rule (reminder hours, escalation role); changing them needs quality review or regulatory
   approval;
@@ -697,6 +699,57 @@ def export(
         content=stream.getvalue().encode("utf-8-sig"),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": attachment("mdarix-oversight.csv")},
+    )
+
+
+def _deadlines(db, control_db, ctx, kind: str) -> tuple[dict, list[dict]]:
+    """B6a G18a: the open reporting deadlines for an offline copy; the download is audited (the caller commits)."""
+    from backend.app.oversight import deadline_list
+
+    if not deadline_list.switched_on():
+        raise _error(404, "DEADLINE_LIST_OFF", "The deadline list is switched off")
+    tenant_id = _tenant(ctx)
+    found = deadline_list.lines(db, control_db, tenant_id)
+    rows = deadline_list.with_owners(control_db, tenant_id, found)
+    _audit(db, ctx, "DEADLINE_LIST_DOWNLOADED", "DeadlineList", None, format=kind, day=found["day"], lines=len(rows))
+    return found, rows
+
+
+@router.get("/deadlines.csv", dependencies=[Depends(require_permission(DATA_EXPORT))])
+def deadlines_csv(
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The open reporting deadlines as CSV (references, markets, dates, states and owners only)."""
+    from backend.app.oversight import deadline_list
+
+    found, rows = _deadlines(db, control_db, ctx, "csv")
+    db.commit()
+    return Response(
+        content=deadline_list.as_csv(rows),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": attachment(f"mdarix-deadlines-{found['day']}.csv")},
+    )
+
+
+@router.get("/deadlines.pdf", dependencies=[Depends(require_permission(DATA_EXPORT))])
+def deadlines_pdf(
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The open reporting deadlines as a printable PDF, one page per 40 lines, for an outage."""
+    from backend.app.oversight import deadline_list
+    from backend.app.stage3_workflow_router import _organization_name
+
+    found, rows = _deadlines(db, control_db, ctx, "pdf")
+    body = deadline_list.as_pdf(found, rows, _organization_name(control_db, _tenant(ctx)))
+    db.commit()
+    return Response(
+        content=body,
+        media_type="application/pdf",
+        headers={"Content-Disposition": attachment(f"mdarix-deadlines-{found['day']}.pdf")},
     )
 
 
