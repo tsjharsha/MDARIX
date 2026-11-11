@@ -57,6 +57,9 @@ const SHOWS = [
  * intakes, flagged calls, flagged imported complaints and set-aside rows that suggest harm), with both clocks: the
  * triage target from when it reached MDARIX, and each market's provisional deadline from awareness (T-G19).
  */
+/** B6a run 3: how many triage items one page shows; the rest are counted and one click away. */
+export const TRIAGE_PAGE = 100;
+
 export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const [show, setShow] = useState<"open" | "done">("open");
   // The item whose panel is open is part of the address (Triage?item=<key>): Back closes it, refresh keeps it.
@@ -69,6 +72,8 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
   const [intake] = useTabParam("intake");
   const { reportTab, shownTab } = useWorkspace();
   const list = useResource<TriageList>(`${TRIAGE}?show=${show}`);
+  // B6a run 3: every open item is read and counted; one page shows TRIAGE_PAGE of them, "Show more" the next.
+  const [shownCount, setShownCount] = useState(TRIAGE_PAGE);
   const summary = list.data?.summary;
   // An old flagged import is Imported backlog work (OD-12 + 3a): not listed here, but its form opens from the backlog.
   const every = list.data?.items ?? [];
@@ -148,14 +153,32 @@ export function Triage({ onOpenTab }: { onOpenTab?: (tab: string) => void }) {
         source={list}
       >
         <div className="uw-cr-toolbar">
-          <ChipFilter label="Which events" options={SHOWS} value={show} onChange={setShow} />
+          <ChipFilter
+            label="Which events"
+            options={SHOWS}
+            value={show}
+            onChange={(value) => {
+              setShow(value);
+              setShownCount(TRIAGE_PAGE);
+            }}
+          />
         </div>
         {items.length ? (
-          <ul className="uw-cr-list">
-            {items.map((item) => (
-              <TriageCard key={item.key} item={item} onOpen={() => setOpen(item)} onOpenTab={onOpenTab} />
-            ))}
-          </ul>
+          <>
+            <ul className="uw-cr-list">
+              {items.slice(0, shownCount).map((item) => (
+                <TriageCard key={item.key} item={item} onOpen={() => setOpen(item)} onOpenTab={onOpenTab} />
+              ))}
+            </ul>
+            {items.length > shownCount && (
+              <p className="uw-hint">
+                {countOf(items.length - shownCount, "more event")} on this list.{" "}
+                <button type="button" className="ac-secondary" onClick={() => setShownCount(shownCount + TRIAGE_PAGE)}>
+                  Show the next {Math.min(TRIAGE_PAGE, items.length - shownCount)}
+                </button>
+              </p>
+            )}
+          </>
         ) : (
           <Empty
             title={show === "open" ? "Nothing to triage" : "Nothing triaged yet"}

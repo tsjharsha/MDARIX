@@ -22,7 +22,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from sqlalchemy import event as sa_event, exists, func, or_, select
+from sqlalchemy import event as sa_event, exists, func, or_
 from sqlalchemy.orm import Session
 
 from backend.app.trial.sample_source import is_sample
@@ -369,12 +369,13 @@ def _user_or_none(actor) -> uuid.UUID | None:
 
 
 def links_of(db: Session, tenant_id: uuid.UUID) -> list[RecordLink]:
-    return (
-        db.query(RecordLink)
-        .filter(RecordLink.tenant_id == tenant_id)
-        .order_by(RecordLink.decided_at)
-        .limit(READ_LIMIT)
-        .all()
+    from backend.app.db.request_memo import once
+
+    # B6a run 3: every link (a cut could leave a linked record's earlier awareness out), read once per request.
+    return once(
+        db,
+        ("record_links", str(tenant_id)),
+        lambda: db.query(RecordLink).filter(RecordLink.tenant_id == tenant_id).order_by(RecordLink.decided_at).all(),
     )
 
 
@@ -477,13 +478,9 @@ def _complaint_record(complaint: Complaint) -> dict:
 
 def backlog_settings(db: Session, tenant_id: uuid.UUID) -> tuple[int, int]:
     """The imported-backlog rule (OD-12): ``backlog_days`` and ``backlog_target_days``, 30 and 10 by default."""
-    from backend.app.db.models.oversight import OversightSettings
+    from backend.app.oversight.service import settings_row
 
-    settings = (
-        db.query(OversightSettings.backlog_days, OversightSettings.backlog_target_days)
-        .filter(OversightSettings.tenant_id == tenant_id)
-        .first()
-    )
+    settings = settings_row(db, tenant_id)  # B6a run 3: the settings read once per request
     return (settings.backlog_days, settings.backlog_target_days) if settings else (30, 10)
 
 
@@ -493,32 +490,20 @@ def subjects(
     """Every record the triage list may show, by ``(kind, id)``: intake events, open imported complaints and open
     set-aside rows, each with its flags, availability and awareness (``keys``: only these records, B6a)."""
 
-    def only(column, kind, mine: tuple, order: tuple) -> list:
-        """The asked records of ``kind``, within the same READ_LIMIT cut the whole read makes (so both agree)."""
-        if keys is None:
-            return []
-        cut = select(column).where(*mine).order_by(*order).limit(READ_LIMIT)
-        return [column.in_([key[1] for key in keys if key[0] == kind]), column.in_(cut)]
+    def only(column, kind) -> list:
+        """The asked records of ``kind`` (B6a). B6a run 3: no read cut on either read, so no open record is missed."""
+        return [] if keys is None else [column.in_([key[1] for key in keys if key[0] == kind])]
 
     found: dict[tuple, dict] = {}
     event_rows = (IntakeEvent.tenant_id == tenant_id,)
     event_order = (IntakeEvent.created_at.desc(), IntakeEvent.id)
     backlog_days = backlog_settings(db, tenant_id)[0]
-    products = {
-        row.id: row.name
-        for row in db.query(Product.id, Product.name).filter(Product.tenant_id == tenant_id).limit(READ_LIMIT)
-    }
+    products = {row.id: row.name for row in db.query(Product.id, Product.name).filter(Product.tenant_id == tenant_id)}
     lots = {
         row.id: row.lot_identifier
         for row in db.query(LotBatch.id, LotBatch.lot_identifier).filter(LotBatch.tenant_id == tenant_id)
     }
-    events = (
-        db.query(IntakeEvent)
-        .filter(*event_rows, *only(IntakeEvent.id, INTAKE, event_rows, event_order))
-        .order_by(*event_order)
-        .limit(READ_LIMIT)
-        .all()
-    )
+    events = db.query(IntakeEvent).filter(*event_rows, *only(IntakeEvent.id, INTAKE)).order_by(*event_order).all()
     checks = checks_of(db, tenant_id, [event.id for event in events])
     later = later_words(db, tenant_id, [event.id for event in events])
     for event in events:
@@ -551,15 +536,6 @@ def subjects(
             # imported backlog work: no alert, on the Cases list with its note.
             "backlog": record is None and case_import.is_backlog(event, backlog_days),
         }
-    complaint_rows = (Complaint.tenant_id == tenant_id,)
-    complaint_order = (Complaint.ingestion_timestamp.desc().nullslast(), Complaint.id)
-    complaints = (
-        db.query(Complaint)
-        .filter(*complaint_rows, *only(Complaint.id, COMPLAINT, complaint_rows, complaint_order))
-        .order_by(*complaint_order)
-        .limit(READ_LIMIT)
-        .all()
-    )
     # B7 (RT-26): a complaint MDARIX closed stays on the list (done), so new harm can reopen its triage and it.
     from backend.app.db.models.oversight import EventClosure
 
@@ -569,6 +545,20 @@ def subjects(
             EventClosure.tenant_id == tenant_id, EventClosure.closed_at.isnot(None)
         )
     }
+    # B6a run 3: every open complaint, no read cut. A complaint closed in the QMS is skipped in SQL (the same rule as
+    # review_rules.is_closed, applied again below) so a large closed history costs no Python time.
+    status = func.lower(func.coalesce(Complaint.status, ""))
+    status = func.btrim(func.regexp_replace(func.regexp_replace(status, r"[_/.:;,-]+", " ", "g"), r"\s+", " ", "g"))
+    complaints = (
+        db.query(Complaint)
+        .filter(
+            Complaint.tenant_id == tenant_id,
+            or_(status.notin_(sorted(review_rules.CLOSED_STATUSES)), Complaint.id.in_(closed_here)),
+            *only(Complaint.id, COMPLAINT),
+        )
+        .order_by(Complaint.ingestion_timestamp.desc().nullslast(), Complaint.id)
+        .all()
+    )
     for complaint in complaints:
         if review_rules.is_closed(complaint.status) and complaint.id not in closed_here:
             continue
@@ -619,9 +609,8 @@ def subjects(
     )
     rows = (
         db.query(ImportQuarantineRow)
-        .filter(*open_rows, *only(ImportQuarantineRow.id, QUARANTINE, open_rows, (ImportQuarantineRow.id,)))
+        .filter(*open_rows, *only(ImportQuarantineRow.id, QUARANTINE))
         .order_by(ImportQuarantineRow.id)
-        .limit(READ_LIMIT)
         .all()
     )
     for row in rows:
@@ -812,9 +801,10 @@ def imported_backlog(
 
 
 def triage_records(db: Session, tenant_id: uuid.UUID) -> dict[tuple, TriageRecord]:
+    # B6a run 3: every record, no read cut (a missing record would show a triaged event as untriaged).
     return {
         (row.subject_kind, row.subject_id): row
-        for row in db.query(TriageRecord).filter(TriageRecord.tenant_id == tenant_id).limit(READ_LIMIT * 2)
+        for row in db.query(TriageRecord).filter(TriageRecord.tenant_id == tenant_id)
     }
 
 
@@ -840,29 +830,54 @@ def triage(
 ) -> dict:
     """The triage list: one item per event (linked records together), the open ones most urgent first.
     ``complaint_ids`` (B6a): only the events these complaints belong to, each item exactly as the whole list gives it
-    (tests/test_b6a_scoped_watch.py); the summary then counts only them."""
-    # A moment given is kept to the minute: the watch passes its own "now", microseconds apart within one request.
+    (tests/test_b6a_scoped_watch.py); the summary is not narrowed (no scoped caller reads it)."""
+    # A moment is kept to the minute: the watch passes its own "now", microseconds apart within one request. B6a run 3:
+    # no moment is this minute, so a read without one shares the read of the same request that gave one.
+    now = now or now_utc()
     minute = now.replace(second=0, microsecond=0) if isinstance(now, datetime) else now
     scope = None if complaint_ids is None else frozenset(str(value) for value in complaint_ids)
-    key = (str(tenant_id), show, control_db is not None, minute, scope)
+    # B6a run 3: one read serves "open", "done" and "all" (a page read the list twice, once open and once all).
+    key = (str(tenant_id), control_db is not None, minute, scope)
     memo = db.info.setdefault(_MEMO, {})
+    fresh = time.monotonic() - _MEMO_SECONDS
     # A read with the people's names also serves one that needs none (B6a: a page read the list twice for that).
-    kept = memo.get(key) or (memo.get((*key[:2], True, *key[3:])) if control_db is None else None)
-    if kept and time.monotonic() - kept[0] < _MEMO_SECONDS:
-        return kept[1]
-    found = _triage(db, control_db, tenant_id, show, now, scope)
-    memo[key] = (time.monotonic(), found)
-    return found
+    kept = memo.get(key) or (memo.get((key[0], True, *key[2:])) if control_db is None else None)
+    kept = kept if kept and kept[0] > fresh else None
+    if kept is None and scope is not None:
+        # B6a run 3: a read of more complaints (or of all) in this request serves a read of some of them: their items
+        # are the same item by item (tests/test_b6a_scoped_watch.py), so its items for the asked complaints are kept.
+        wanted = {f"{COMPLAINT}:{value}" for value in scope}
+        for (tenant, names, moment, wider), entry in memo.items():
+            if (
+                (tenant, moment) == (key[0], key[2])
+                and (names or control_db is None)
+                and (wider is None or scope <= wider)
+                and entry[0] > fresh
+            ):
+                pairs = [
+                    (item, closed)
+                    for item, closed in zip(entry[1]["items"], entry[2])
+                    if wanted.intersection(item["members"])
+                ]
+                kept = (entry[0], {**entry[1], "items": [item for item, _ in pairs]}, [closed for _, closed in pairs])
+                break
+    if kept is None:
+        kept = (time.monotonic(), *_triage(db, control_db, tenant_id, now, scope))
+        memo[key] = kept
+    _, found, done = kept
+    if show == "all":
+        return found
+    return {**found, "items": [item for item, closed in zip(found["items"], done) if closed == (show == "done")]}
 
 
 def _triage(
     db: Session,
     control_db: Session | None,
     tenant_id: uuid.UUID,
-    show: str,
     now: datetime | date | None,
     scope: frozenset[str] | None = None,
-) -> dict:
+) -> tuple[dict, list[bool]]:
+    """The whole list ("all") and, item by item, whether it is done (the "open" and "done" lists filter on it)."""
     now = now or now_utc()
     if not isinstance(now, datetime):
         # A day (the readiness checks' watch passes one): read at its noon UTC. It raised AttributeError before, and
@@ -908,16 +923,16 @@ def _triage(
         conflict = [link for link in conflicts if last_done is None or rules.utc(link.decided_at) > last_done]
         if not listed and not conflict:
             continue
+        if keys is not None and not any((COMPLAINT, uuid.UUID(value)) in members for value in scope):
+            continue  # a linked record's event without the asked complaint on it (closed in the QMS): not theirs
         done = not conflict and all(
             records.get(key) is not None and records[key].completed_at is not None for key in listed
         )
-        if (show == "open" and done) or (show == "done" and not done):
-            continue
-        items.append(_item(found, members, listed, records, conflict, enabled, names, now, today, context))
+        items.append((_item(found, members, listed, records, conflict, enabled, names, now, today, context), done))
     order = {rules.THREAT: 0, rules.FLAGGED: 1, rules.UNFLAGGED: 2}
-    items.sort(key=lambda item: (order[item["tier"]], item["earliest_due"] or "9999", item["ref"]))
+    items.sort(key=lambda pair: (order[pair[0]["tier"]], pair[0]["earliest_due"] or "9999", pair[0]["ref"]))
     return {
-        "items": items,
+        "items": [item for item, _ in items],
         "summary": _summary(db, tenant_id, records, found, group, links),
         "people": colleagues(control_db, tenant_id),
         "enabled_markets": enabled,
@@ -925,7 +940,7 @@ def _triage(
         "provisional_version": rules.PROVISIONAL_VERSION,
         "starter_mark": _starter(),
         "now": now.isoformat(),
-    }
+    }, [done for _, done in items]
 
 
 def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datetime) -> dict:
@@ -965,7 +980,7 @@ def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datet
             signed.setdefault(key, {})[market] = clock
     products = {
         row.id: markets.product_is_ivd(row)
-        for row in db.query(Product).filter(Product.tenant_id == tenant_id).limit(READ_LIMIT)
+        for row in db.query(Product).filter(Product.tenant_id == tenant_id)  # every product: IVD sets the law
     }
     return {
         "org_zone": zone,
@@ -979,9 +994,9 @@ def _deadline_context(db: Session, tenant_id: uuid.UUID, found: dict, now: datet
 
 
 def fast_hours(db: Session, tenant_id) -> int:
-    from backend.app.db.models.oversight import OversightSettings
+    from backend.app.oversight.service import settings_row
 
-    row = db.query(OversightSettings.triage_fast_hours).filter(OversightSettings.tenant_id == tenant_id).first()
+    row = settings_row(db, tenant_id)  # B6a run 3: the settings read once per request
     return row.triage_fast_hours if row else 4
 
 

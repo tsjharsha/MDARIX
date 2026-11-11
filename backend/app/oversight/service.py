@@ -65,7 +65,14 @@ def _iso(value) -> str | None:
 
 
 def settings_row(db: Session, tenant_id) -> OversightSettings | None:
-    return db.query(OversightSettings).filter(OversightSettings.tenant_id == tenant_id).one_or_none()
+    from backend.app.db.request_memo import once
+
+    # B6a run 3: read once per request (a complaint page read it a dozen times); any write reads it again.
+    return once(
+        db,
+        ("oversight_settings", str(tenant_id)),
+        lambda: db.query(OversightSettings).filter(OversightSettings.tenant_id == tenant_id).one_or_none(),
+    )
 
 
 def settings_view(row: OversightSettings | None) -> dict:
@@ -206,7 +213,7 @@ def _legal_end(day: date, market: str | None, zone: str) -> datetime:
 
 
 def _task_items(db: Session, tenant_id, complaint_ids: set[str] | None = None) -> list[dict]:
-    from sqlalchemy import or_, select
+    from sqlalchemy import or_
 
     from backend.app.communications.service import TASK_TYPE as REPLY_TASK
     from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
@@ -220,18 +227,17 @@ def _task_items(db: Session, tenant_id, complaint_ids: set[str] | None = None) -
     order = (WorkflowTask.due_at, WorkflowTask.id)
     query = db.query(WorkflowTask).filter(*dated)
     if complaint_ids is not None:
-        # The two ways a task names its complaint (below), within the same READ_LIMIT cut as the whole read (so both
-        # agree); due_items keeps only the asked complaints' items after.
+        # The two ways a task names its complaint (below); due_items keeps only the asked complaints' items after.
         query = query.filter(
             or_(
                 WorkflowTask.details["complaint_id"].astext.in_(list(complaint_ids)),
                 (WorkflowTask.source_entity_type == "Complaint")
                 & WorkflowTask.source_entity_id.in_([uuid.UUID(value) for value in complaint_ids]),
             ),
-            WorkflowTask.id.in_(select(WorkflowTask.id).where(*dated).order_by(*order).limit(READ_LIMIT)),
         )
     found = []
-    for task in query.order_by(*order).limit(READ_LIMIT):
+    # B6a run 3: every open dated task, no read cut (a cut could hide a deadline); only open ones are read.
+    for task in query.order_by(*order):
         details = task.details or {}
         complaint_id = details.get("complaint_id") or (
             task.source_entity_id if task.source_entity_type == "Complaint" else None
@@ -345,18 +351,39 @@ def _triage_items(db: Session, control_db, tenant_id, now: datetime, ids: set[st
     return found
 
 
-def watch_read(db: Session, control_db, tenant_id, now: datetime, complaint_ids: set[str] | None = None) -> list[dict]:
+# B6a run 3: named in a list's "incomplete" when the watch reached its read cut (never silently incomplete).
+WATCH_CUT = "the reportability watch beyond its first 20,000 complaints"
+
+
+def watch_read(
+    db: Session,
+    control_db,
+    tenant_id,
+    now: datetime,
+    complaint_ids: set[str] | None = None,
+    incomplete: list[str] | None = None,
+) -> list[dict]:
     """The reportability watch's open items (``complaint_ids``: these complaints only), read once per page and shared
-    by its due items and its clocks (B6a: a complaint page read the whole organization's watch twice)."""
+    by its due items and its clocks (B6a: a complaint page read the whole organization's watch twice). A read that
+    reached the watch's read cut is named in ``incomplete``."""
     from backend.app.reportability import service as reportability
 
-    return reportability.watch(
+    found = reportability.watch(
         db, control_db, tenant_id, show="open", page_size=10_000, today=now, complaint_ids=complaint_ids
-    )["items"]
+    )
+    if found["truncated"] and incomplete is not None and WATCH_CUT not in incomplete:
+        incomplete.append(WATCH_CUT)
+    return found["items"]
 
 
 def _watch_items(
-    db: Session, control_db, tenant_id, now: datetime, watched: list[dict] | None = None, ids: set[str] | None = None
+    db: Session,
+    control_db,
+    tenant_id,
+    now: datetime,
+    watched: list[dict] | None = None,
+    ids: set[str] | None = None,
+    incomplete: list[str] | None = None,
 ) -> list[dict]:
     """The reportability watch's provisional clock of a market not assessed yet (SAMPLE-RV-06: FDA), so Oversight
     says what Reporting and the complaint page say (stage 8; it listed a market's clock only once its assessment was
@@ -366,7 +393,7 @@ def _watch_items(
     from backend.app.reportability import facts
 
     found = []
-    for item in watched if watched is not None else watch_read(db, control_db, tenant_id, now, ids):
+    for item in watched if watched is not None else watch_read(db, control_db, tenant_id, now, ids, incomplete):
         binding = item.get("binding")
         needs = item.get("needs") or []
         if not binding or not binding.get("due_at"):
@@ -577,7 +604,7 @@ def due_items(
     B6a: ``complaint_ids`` gives only these complaints' items, the same items in the same order as the whole
     organization's list filtered to them (tests/test_b6a_scoped_watch.py): each source reads only them, and the
     sources that never name a complaint (guides, CAPAs, e-mails) are not read. ``watched``: the watch already read
-    for the same complaints (watch_read), so a page reads it once."""
+    for the same complaints (watch_read, which names its own read cut in ``failed``), so a page reads it once."""
     now = now or now_utc()
     calendar = calendar_of(db, tenant_id)
     ids = None if complaint_ids is None else {str(value) for value in complaint_ids}
@@ -585,7 +612,7 @@ def due_items(
         ("tasks", lambda: _task_items(db, tenant_id, ids)),
         ("triage", lambda: _triage_items(db, control_db, tenant_id, now, ids)),
         ("reports", lambda: _report_items(db, tenant_id, calendar.zone, ids)),
-        ("watch", lambda: _watch_items(db, control_db, tenant_id, now, watched, ids)),
+        ("watch", lambda: _watch_items(db, control_db, tenant_id, now, watched, ids, failed)),
         ("guides", lambda: _guide_items(db, tenant_id, calendar)),
         ("capas", lambda: _capa_items(db, tenant_id)),
         ("e-mails", lambda: _mail_items(db, tenant_id, calendar)),

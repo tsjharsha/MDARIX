@@ -266,6 +266,17 @@ describe("the oversight view", () => {
     expect(html).toContain("is away until");
     expect(html).toContain("CSV");
     expect(html).toContain("UTC, Mon Tue Wed Thu Fri");
+    expect(html).not.toContain("This list is incomplete");
+  });
+
+  it("says plainly when a source reached its read cut (B6a run 3: never silently incomplete)", () => {
+    resources.data["/api/v1/oversight"] = {
+      ...oversight,
+      incomplete: ["the reportability watch beyond its first 20,000 complaints"],
+    };
+    const html = render(<OversightView />, ["data.export"]);
+    expect(html).toContain("This list is incomplete: the reportability watch beyond its first 20,000 complaints");
+    resources.data["/api/v1/oversight"] = oversight;
   });
 
   it("shows an event's checklist, its stage and the form to sign ready to close", () => {

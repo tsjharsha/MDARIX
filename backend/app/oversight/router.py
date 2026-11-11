@@ -158,13 +158,21 @@ def _escalations(db, tenant_id) -> dict[str, list[str]]:
 
 
 def _item_views(
-    db, control_db, tenant_id, now: datetime, complaint_ids: set[str] | None = None, watched: list[dict] | None = None
+    db,
+    control_db,
+    tenant_id,
+    now: datetime,
+    complaint_ids: set[str] | None = None,
+    watched: list[dict] | None = None,
+    incomplete: list[str] | None = None,
 ) -> tuple[list[dict], dict]:
+    """``incomplete`` (B6a run 3): the sources that could not be read, or were cut, so the screen says so."""
     view = service.settings_view(service.settings_row(db, tenant_id))
     calendar = service.calendar_from(view)
     today = calendar.local_day(now)
     away = service.absences(db, tenant_id, today)
-    items = service.due_items(db, control_db, tenant_id, now, complaint_ids=complaint_ids, watched=watched)
+    incomplete = [] if incomplete is None else incomplete
+    items = service.due_items(db, control_db, tenant_id, now, incomplete, complaint_ids=complaint_ids, watched=watched)
     escalated = _escalations(db, tenant_id)
     refs = {ref for item in items for ref in (item["owner_id"], item["backup_id"])}
     refs |= {ref for found in escalated.values() for ref in found} | {a["backup_id"] for a in away}
@@ -193,7 +201,7 @@ def _item_views(
                 "opens": item["opens"],
             }
         )
-    return views, {"settings": view, "away": away, "names": names, "calendar": calendar}
+    return views, {"settings": view, "away": away, "names": names, "calendar": calendar, "incomplete": incomplete}
 
 
 def _filtered(items, product, market, category, show) -> list[dict]:
@@ -351,8 +359,9 @@ def _signers(control_db, tenant_id, me: str, has_case: bool) -> dict[str, dict]:
 def dated_reads(db, control_db, tenant_id, now) -> tuple[list[dict], dict, dict[str, list[dict]]]:
     """The dated items, their context and the watch's clocks that the list's views, its order and its work columns all
     read: read once per request (0.10.85, D3.13; each read the whole watch again)."""
-    watched = service.watch_read(db, control_db, tenant_id, now)  # B6a: the watch read once, not twice
-    views, context = _item_views(db, control_db, tenant_id, now, watched=watched)
+    incomplete: list[str] = []
+    watched = service.watch_read(db, control_db, tenant_id, now, None, incomplete)  # B6a: the watch read once
+    views, context = _item_views(db, control_db, tenant_id, now, watched=watched, incomplete=incomplete)
     clocks = _watch_clocks(db, control_db, tenant_id, None, now, context["settings"]["reminder_hours"], watched)
     return views, context, clocks
 
@@ -383,11 +392,12 @@ def urgency(reads) -> dict[str, tuple]:
     return {key: tuple(value) for key, value in found.items()}
 
 
-def complaint_work(db, control_db, tenant_id, complaints: list, reads=None) -> dict[str, dict]:
+def complaint_work(db, control_db, tenant_id, complaints: list, reads=None, facts=None) -> dict[str, dict]:
     """What the new navigation shows for each complaint (0.10.68), from the same reads as Oversight and the event:
     its owner, stage, next action, its dated items (a deadline per market, then its own targets, soonest first) and
     the markets they are for. The complaint page, the complaint list and My work show these values, so they agree
-    with Oversight (tests/test_complaint_page.py)."""
+    with Oversight (tests/test_complaint_page.py). ``facts``: the complaints' ``closure.facts`` already read by the
+    caller, by id (B6a run 3: the complaint page read them twice)."""
     from backend.app.reportability import markets
 
     if not complaints:
@@ -403,8 +413,6 @@ def complaint_work(db, control_db, tenant_id, complaints: list, reads=None) -> d
     else:
         views, context, clocks = reads
     due = [view for view in views if view["complaint_id"] in ids]
-    tasks = closure.open_tasks_by_complaint(db, tenant_id)
-    triage = closure.open_on_triage(db, tenant_id, ids)
     rows = {
         row.complaint_id: row
         for row in db.query(EventClosure).filter(
@@ -413,7 +421,9 @@ def complaint_work(db, control_db, tenant_id, complaints: list, reads=None) -> d
     }
     products = _products(db, tenant_id)
     # Each kind of record is read once for the page (0.10.85, D3.13; it was a dozen queries per complaint).
-    facts = closure.facts_many(db, tenant_id, complaints, tasks, triage)
+    if facts is None:
+        tasks = closure.open_tasks_by_complaint(db, tenant_id)
+        facts = closure.facts_many(db, tenant_id, complaints, tasks, closure.open_on_triage(db, tenant_id, ids))
     found = {str(c.id): _event_summary(c, facts[str(c.id)], rows.get(c.id), products) for c in complaints}
     names = _names(control_db, tenant_id, {item["owner_id"] for item in found.values()})
     out = {}
@@ -656,6 +666,8 @@ def oversight(
         },
         "staffing": _staffing(everyone, context["settings"]["escalation_role"]),
         "never": NEVER,
+        # B6a run 3: a source that could not be read or reached its read cut; the screen says the list is incomplete.
+        "incomplete": context["incomplete"],
     }
 
 
@@ -1185,12 +1197,13 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
     record = closure.decision_record(control_db, found, row, names)
     signed_print = row.content_fingerprint if row is not None else None
     changed = bool(row and row.ready_state and signed_print != closure.fingerprint(complaint.id, items))
-    work = complaint_work(db, control_db, tenant_id, [complaint])[str(complaint.id)]
+    work = complaint_work(db, control_db, tenant_id, [complaint], facts={str(complaint.id): found})[str(complaint.id)]
     nearest = work["due"][0] if work["due"] else None
     state = _event_state(complaint, items, row)
     signers = _signers(control_db, tenant_id, me, bool(found["cases"]))
     product = _products(db, tenant_id).get(complaint.product_id)
     version, lot = _version_and_lot(db, tenant_id, complaint)
+    practice = _practice(control_db, tenant_id)
     return {
         "event": {
             "complaint_id": str(complaint.id),
@@ -1273,14 +1286,14 @@ def event_view(db, control_db, tenant_id, complaint: Complaint, me: str) -> dict
         "people": [{"id": p["id"], "name": p["name"]} for p in service.people(control_db, tenant_id)],
         "reason_min": closure.REASON_MIN,
         "never_closes": closure.NEVER_CLOSES,
-        "practice_label": _practice(control_db, tenant_id),
+        "practice_label": practice,
         # The owner, stage, next action and dated items the lists and My work show for it (0.10.68).
         "work": work,
         # Who may sign each step, before the work starts (7.8).
         "signers": signers,
         # Who prepared, who may approve and who approved the decision record's work (0.10.71, A6); apart from the
         # record so its fingerprint is unchanged.
-        "record_people": _record_people(found, row, names, signers, me, bool(_practice(control_db, tenant_id))),
+        "record_people": _record_people(found, row, names, signers, me, bool(practice)),
         # The page's Related (0.10.74, C2): the records linked to the complaint, in plain lines.
         "related": record_page.related(
             db, found, complaint, names, service_work.view(complaint, names), work["markets"]

@@ -4,7 +4,7 @@ import { DeadlineChip, SampleDates } from "../../../app/chips";
 import { DecideAndSign, shortPrint } from "./common";
 import { marketLabel } from "../../../app/labels";
 import { WhyAssessed, otherMarketLine } from "./MarketAssessment";
-import { CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide-react";
+import { AlertTriangle, CalendarClock, ChevronRight, Download, FileCheck2, Users } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, send, useResource, type Column } from "../../customer-admin/shared";
 import { downloadFile } from "../../reports/download";
@@ -87,6 +87,12 @@ export function OversightView({
           tone={view?.event_counts.CLOSED_BEFORE_READY ? "critical" : "good"}
         />
       </div>
+      {view?.incomplete?.length ? (
+        <p className="uw-ov-warning tone-critical" role="alert">
+          <AlertTriangle size={15} aria-hidden="true" /> This list is incomplete: {view.incomplete.join(", ")} could not
+          be read. Some deadlines may be missing here; check Reporting.
+        </p>
+      ) : null}
       {part === "all" && view?.staffing && (
         <p className="uw-ov-warning tone-warning" role="status">
           <Users size={15} aria-hidden="true" /> {view.staffing}

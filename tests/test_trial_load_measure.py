@@ -97,6 +97,20 @@ def _profile(client: TestClient, path: str, name: str) -> None:
     profiler.runcall(client.get, path)
     with open(os.path.join(folder, f"profile-{name}.txt"), "w", encoding="utf-8") as handle:
         pstats.Stats(profiler, stream=handle).sort_stats("cumulative").print_stats(r"backend[\\/]app", 45)
+    # B6a run 3: the same call's statements, grouped by text (parameters apart), most repeated first.
+    seen: dict[str, int] = {}
+
+    def _keep(_conn, _cursor, statement, *_args):
+        seen[statement] = seen.get(statement, 0) + 1
+
+    event.listen(Engine, "before_cursor_execute", _keep)
+    try:
+        client.get(path)
+    finally:
+        event.remove(Engine, "before_cursor_execute", _keep)
+    with open(os.path.join(folder, f"queries-{name}.txt"), "w", encoding="utf-8") as handle:
+        for statement, times in sorted(seen.items(), key=lambda pair: -pair[1]):
+            handle.write(f"{times}x {' '.join(statement.split())[:400]}\n")
 
 
 def _save(report: dict) -> None:
@@ -152,6 +166,7 @@ def test_measure_a_trial_against_the_targets(monkeypatch):
         pages = ["/api/v1/oversight/events/SAMPLE-RV-11", "/api/v1/trial/one-story"]
         report["reads_sample"] = [_series(user, "GET", path) for path in pages]
         _save(report)
+        _profile(user, pages[0], "complaint-page-sample")
 
         # 1. A 5,000-row import, as one file: check, then import. TestClient would run the work the server does after
         # the answer (finding signals, queueing embeddings) before returning: it is held and timed on its own.
@@ -213,14 +228,15 @@ def test_measure_a_trial_against_the_targets(monkeypatch):
             "/api/v1/intake/duplicates",
             "/api/v1/oversight/events/SAMPLE-RV-11",
         ]
-        # B6a: MDARIX_TRIAL_LOAD_PAGES=1 measures only the complaint page and the story, then stops.
+        # B6a: MDARIX_TRIAL_LOAD_PAGES=1 measures only the complaint page, the story and the triage list, then stops.
         pages_only = bool(os.getenv("MDARIX_TRIAL_LOAD_PAGES"))
         report["reads_5000"] = []
-        for path in pages if pages_only else reads:
+        for path in [*pages, "/api/v1/triage"] if pages_only else reads:
             report["reads_5000"].append(_series(user, "GET", path))
             _save(report)
         _profile(user, pages[0], "complaint-page-5000")
         _profile(user, pages[1], "story-5000")
+        _profile(user, "/api/v1/triage", "triage-5000")
         if pages_only:
             return
 

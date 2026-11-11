@@ -140,6 +140,8 @@ export type Oversight = {
   settings: OversightSettings;
   staffing: string | null;
   never: string;
+  /** B6a run 3: sources that could not be read or reached their read cut: the list is incomplete. */
+  incomplete?: string[];
 };
 
 export type CheckItem = {

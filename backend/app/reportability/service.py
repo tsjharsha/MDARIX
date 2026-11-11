@@ -10,7 +10,7 @@ import uuid
 from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from backend.app.complaint_review import rules as review_rules
@@ -42,7 +42,14 @@ def _day(value) -> date | None:
 
 def settings_of(db: Session, tenant_id: uuid.UUID, control_db: Session | None = None) -> dict:
     """The organization's reporting windows (none until someone enters them), with the templates to start from."""
-    row = db.query(ReportabilitySettings).filter(ReportabilitySettings.tenant_id == tenant_id).first()
+    from backend.app.db.request_memo import once
+
+    # B6a run 3: read once per request (a complaint page read it nine times); any write reads it again.
+    row = once(
+        db,
+        ("reportability_settings", str(tenant_id)),
+        lambda: db.query(ReportabilitySettings).filter(ReportabilitySettings.tenant_id == tenant_id).first(),
+    )
     windows = [rules.clean_window(item) for item in (row.windows if row else None) or []]
     editor = row.updated_by if row else None
     names = people(control_db, tenant_id, [editor]) if editor and control_db is not None else {}
@@ -101,8 +108,7 @@ def personal_data_on(db: Session, tenant_id: uuid.UUID) -> bool:
 
 
 def reporting_roles(db: Session, tenant_id: uuid.UUID) -> dict[str, str]:
-    row = db.query(ReportabilitySettings.reporting_roles).filter(ReportabilitySettings.tenant_id == tenant_id).first()
-    return effective_roles(row[0] if row else None)
+    return settings_of(db, tenant_id)["reporting_roles"]  # B6a run 3: the settings row read once per request
 
 
 def _moment(value) -> datetime | None:
@@ -315,11 +321,9 @@ def _rows(db: Session, tenant_id: uuid.UUID, since: date, product_id: uuid.UUID 
         followed.append(Complaint.product_id == product_id)
     query = query.filter(*followed)
     if complaint_ids is not None:
-        # B6a: the asked complaints, within the same READ_LIMIT cut the whole read makes, so both always agree.
-        cut = select(Complaint.id).where(*followed).order_by(AWARE_AT.asc(), Complaint.id).limit(READ_LIMIT)
-        query = query.filter(
-            Complaint.id.in_([uuid.UUID(str(value)) for value in complaint_ids]), Complaint.id.in_(cut)
-        )
+        # B6a: the asked complaints. B6a run 3: no read cut here, so a complaint page always has its own clock; past
+        # the whole read's cut the whole read says it is incomplete (truncated) instead.
+        query = query.filter(Complaint.id.in_([uuid.UUID(str(value)) for value in complaint_ids]))
     return query.order_by(AWARE_AT.asc(), Complaint.id).limit(READ_LIMIT + 1).all()
 
 

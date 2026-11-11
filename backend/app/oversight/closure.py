@@ -153,19 +153,24 @@ def _cases(db: Session, tenant_id, complaint_id, disposition) -> list:
 
 
 def open_tasks_by_complaint(db: Session, tenant_id) -> dict[str, list]:
-    """Open My Work tasks by the complaint they are about (read once for a list of events)."""
+    """Open My Work tasks by the complaint they are about (read once for a list of events; B6a run 3: once per
+    request, read again after any write)."""
     from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask
+    from backend.app.db.request_memo import once
 
-    found: dict[str, list] = {}
-    for task in db.query(WorkflowTask).filter(
-        WorkflowTask.tenant_id == tenant_id, WorkflowTask.status.in_(list(OPEN_TASK_STATUSES))
-    ):
-        key = (task.details or {}).get("complaint_id") or (
-            task.source_entity_id if task.source_entity_type == "Complaint" else None
-        )
-        if key:
-            found.setdefault(str(key), []).append(task)
-    return found
+    def read() -> dict[str, list]:
+        found: dict[str, list] = {}
+        for task in db.query(WorkflowTask).filter(
+            WorkflowTask.tenant_id == tenant_id, WorkflowTask.status.in_(list(OPEN_TASK_STATUSES))
+        ):
+            key = (task.details or {}).get("complaint_id") or (
+                task.source_entity_id if task.source_entity_type == "Complaint" else None
+            )
+            if key:
+                found.setdefault(str(key), []).append(task)
+        return found
+
+    return once(db, ("open_tasks_by_complaint", str(tenant_id)), read)
 
 
 def open_on_triage(db: Session, tenant_id, complaint_ids=None) -> set[str]:
