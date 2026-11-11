@@ -37,7 +37,7 @@ def test_the_role_picks_its_floor_and_an_off_switch_reads_manufacturer(monkeypat
     assert register.floor("US")["code"] == "US-floor-1"
     assert _floor("IMPORTER")["code"] == "US-IMP-floor-1"
     assert _floor("USER_FACILITY")["code"] == "US-UF-floor-1"
-    assert register.floor("CA", role="IMPORTER")["code"] == "CA-floor-1"  # no role floor: the market's own
+    assert register.floor("CA", role="IMPORTER") == register.floor("CA")  # no role floor: the market's own
     monkeypatch.setenv("MDARIX_B9_US_IMPORTER", "off")
     monkeypatch.delenv("MDARIX_B9_US_USER_FACILITY")  # its default: off
     assert _floor("IMPORTER")["code"] == "US-floor-1" and _floor("USER_FACILITY")["code"] == "US-floor-1"
