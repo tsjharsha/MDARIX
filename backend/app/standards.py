@@ -91,6 +91,9 @@ CATALOG: tuple[Standard, ...] = (
         UNITED_STATES,
         True,
     ),
+    # B9 Part C: user facility and importer reports (starter text).
+    Standard("CFR803_30", "21 CFR 803.30", "Reports by user facilities", UNITED_STATES, True),
+    Standard("CFR803_40", "21 CFR 803.40", "Reports by importers", UNITED_STATES, True),
     Standard("CFR803_50", "21 CFR 803.50", "30-day reports by manufacturers", UNITED_STATES),
     Standard("CFR803_53", "21 CFR 803.53", "5-day reports", UNITED_STATES),
     Standard("CFR11_10E", "21 CFR 11.10(e)", "Audit trails", UNITED_STATES),

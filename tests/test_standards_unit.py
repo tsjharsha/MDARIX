@@ -52,6 +52,8 @@ EXPECTED = [
         "Exemptions, variances and alternative reporting (FDA's VMSR program)",
         "United States",
     ),
+    ("CFR803_30", "21 CFR 803.30", "Reports by user facilities", "United States"),
+    ("CFR803_40", "21 CFR 803.40", "Reports by importers", "United States"),
     ("CFR803_50", "21 CFR 803.50", "30-day reports by manufacturers", "United States"),
     ("CFR803_53", "21 CFR 803.53", "5-day reports", "United States"),
     ("CFR11_10E", "21 CFR 11.10(e)", "Audit trails", "United States"),
@@ -102,6 +104,8 @@ STARTER = {
     "MDCG_2023_3",
     "IN_MDR",
     "IVDR_82",
+    "CFR803_30",
+    "CFR803_40",
 }
 DISCLAIMER = (
     "MDARIX organizes the evidence these ask for; it does not certify compliance. Your quality system and its "

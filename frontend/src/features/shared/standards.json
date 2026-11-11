@@ -97,6 +97,20 @@
       "starter": true
     },
     {
+      "id": "CFR803_30",
+      "short": "21 CFR 803.30",
+      "title": "Reports by user facilities",
+      "jurisdiction": "United States",
+      "starter": true
+    },
+    {
+      "id": "CFR803_40",
+      "short": "21 CFR 803.40",
+      "title": "Reports by importers",
+      "jurisdiction": "United States",
+      "starter": true
+    },
+    {
       "id": "CFR803_50",
       "short": "21 CFR 803.50",
       "title": "30-day reports by manufacturers",
