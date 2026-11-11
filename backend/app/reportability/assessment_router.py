@@ -144,12 +144,13 @@ def _settle_open_reports(db: Session, ctx, tenant_id, complaint_id, market: str,
             ReportObligation.tenant_id == tenant_id,
             ReportObligation.complaint_id == complaint_id,
             ReportObligation.market == market,
-            # The unsubmitted US follow-ups of the chain too, on any signed conclusion (0.10.96, audit fix 4).
+            # The unsubmitted children of the chain too (US follow-ups, India and Canada children: B9), on any signed
+            # conclusion (0.10.96, audit fix 4).
             or_(ReportObligation.kind == "INITIAL", ReportObligation.parent_id.isnot(None)),
         )
         .with_for_update()
     ):
-        if reports.is_follow_up(obligation) or (
+        if reports.keeps_own_clock(obligation) or (
             obligation.kind == "INITIAL" and signed.conclusion == markets.REPORTABLE
         ):
             ended += reports.follow_signed(db, ctx, obligation, signed, now)

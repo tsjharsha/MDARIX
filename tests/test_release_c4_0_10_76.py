@@ -106,7 +106,8 @@ def test_the_mandatory_fields_follow_the_report_type():
     # Canada: a preliminary report fills everything but E2 and E3; an update or final the starred fields (and E2, E3).
     prelim, update = _mandatory(forms.HC_MDPR, "Preliminary"), _mandatory(forms.HC_MDPR, "Update")
     assert {"A1", "B2", "B5", "C9", "D1", "E1", "A5_FINAL_DATE"} <= prelim and not {"E2", "E3", "A4"} & prelim
-    assert update == {"A2", "A3", "A4", "A5", "A5_PREVIOUS", "A6", "B1", "C1"}
+    # A6 (date submitted) is filled at Send for approval (B9 step 11, as FDA's B4): it never blocks sending.
+    assert update == {"A2", "A3", "A4", "A5", "A5_PREVIOUS", "B1", "C1"}
     assert _mandatory(forms.HC_MDPR, "Final") == update | {"E2", "E3"}
     # Patient and reporter fields are never in the meter.
     assert not {"D2", "D3", "D4", "D5"} & _mandatory(forms.HC_MDPR, "Preliminary & Final")

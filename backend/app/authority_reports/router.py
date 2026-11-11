@@ -196,6 +196,8 @@ def _context(db, control_db, obligation: ReportObligation) -> dict:
     # Before approval freezes it, the contact office (G1) is checked as the eMDR file needs it (0.10.92, A5).
     context["check_contact_office"] = obligation.state in rules.EDITABLE
     context["chain_type"] = chain_type(obligation)  # India's P2 (B9 step 14); None: an initial report
+    if is_canada_chain(obligation):
+        context["ca_chain"] = _canada_carried(db, obligation)  # A4 and A5's previous date (B9 step 11)
     if is_follow_up(obligation):
         parent = db.get(ReportObligation, obligation.parent_id)
         chain = _follow_ups(db, obligation.tenant_id, parent.id)
@@ -220,14 +222,21 @@ def is_india_chain(obligation: ReportObligation) -> bool:
     return obligation.parent_id is not None and obligation.form_code == forms.MVPI_MDAE.code
 
 
+def is_canada_chain(obligation: ReportObligation) -> bool:
+    """A Canada update or final (B9 step 11): an HC MDPR child of a preliminary report."""
+    return obligation.parent_id is not None and obligation.form_code == forms.HC_MDPR.code
+
+
 def keeps_own_clock(obligation: ReportObligation) -> bool:
-    """A chain child keeps its own date: a re-signed conclusion never moves it."""
-    return is_follow_up(obligation) or is_india_chain(obligation)
+    """A chain child keeps its own date: a re-signed conclusion never moves it, only supersedes its approval."""
+    return is_follow_up(obligation) or is_india_chain(obligation) or is_canada_chain(obligation)
 
 
 def chain_type(obligation: ReportObligation) -> str | None:
-    """An India child's type in its chain (P2): "Follow up" or "Final"."""
-    return ((obligation.entries or {}).get("CHAIN") or {}).get("type") if is_india_chain(obligation) else None
+    """An India or Canada child's type in its chain (India's P2: "Follow up" or "Final"; Canada's A5: "Update" or
+    "Final")."""
+    child = is_india_chain(obligation) or is_canada_chain(obligation)
+    return ((obligation.entries or {}).get("CHAIN") or {}).get("type") if child else None
 
 
 def _follow_ups(db, tenant_id, parent_id) -> list[ReportObligation]:
@@ -584,6 +593,8 @@ def detail(db, control_db, ctx, obligation: ReportObligation) -> dict:
         "follow_up_due_on": _iso(obligation.follow_up_due_on),
         # B9 step 14: India's chain (on demand, no legal clock: D15).
         "india_chain": india_chain_view(obligation, children) if obligation.form_code == forms.MVPI_MDAE.code else None,
+        # B9 step 11: Canada's chain (the Final made when the preliminary is submitted; updates on demand).
+        "canada_chain": canada_chain_view(obligation, children) if obligation.form_code == forms.HC_MDPR.code else None,
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,
         # A mapped code is a suggestion a person confirms or changes (the new navigation, 0.10.77).
@@ -1191,6 +1202,15 @@ def set_field(
         raise _error(422, "FILLED_AT_SEND", "This date is filled in with the day the report is sent for approval")
     if value and field.source == "in_report_type" and forms.india_derived():  # off: typed over "Initial", as before
         raise _error(422, "FOLLOWS_CHAIN", "The report type follows the chain: create a follow-up or final instead")
+    if field_id == "A5" and obligation.form_code == forms.HC_MDPR.code and forms.switched_on("MDARIX_B9_CANADA"):
+        if is_canada_chain(obligation):
+            raise _error(422, "FOLLOWS_CHAIN", "An update's or final's type follows the chain")
+        if value in (forms.CA_UPDATE, forms.CA_FINAL):
+            raise _error(
+                422,
+                "STARTS_THE_CHAIN",
+                "The first report is a Preliminary, or Preliminary & Final: updates and the final follow it",
+            )
     problem = forms.value_problem(field, value)
     if problem:
         raise _error(422, f"NOT_A_{field.kind}", problem)
@@ -1542,7 +1562,7 @@ def request_snapshot(
     context = _context(db, control_db, obligation)
     if parties is not None:  # the trial sample's own US manufacturer, never stored (0.10.96, A9)
         context["parties"] = parties
-    current = _conclusion(context, obligation.market, any_signed=is_follow_up(obligation))
+    current = _conclusion(context, obligation.market, any_signed=keeps_own_clock(obligation))
     if not is_follow_up(obligation):  # FDA's follow-up leaves B4 out (its "Manufacturer Follow-up" example)
         context["sent_day"] = _org_day(db, obligation.tenant_id, now).isoformat()  # B4 (0.10.96, Q3)
     names = _names(control_db, obligation.tenant_id, _preparers(obligation))
@@ -1567,7 +1587,9 @@ def request_snapshot(
             _emdr_gate(found)
         if found["xml"] and not found["errors"]:
             frozen_file = frozen_emdr(found["xml"], context["parties"], sections, found["left_out"])
-    if is_follow_up(obligation):
+    if strict and is_canada_final(obligation) and forms.switched_on("MDARIX_B9_CANADA"):
+        _canada_final_gate(sections)
+    if keeps_own_clock(obligation):
         obligation.assessment_id = current.id  # a later re-sign supersedes its approval (audit fix 4, the chain)
     if obligation.kind == "INITIAL":
         obligation.assessment_id, obligation.report_type = current.id, current.report_type
@@ -2072,6 +2094,7 @@ def submission(
         now=_now(),
     )
     _audit(db, ctx, "REPORT_SUBMISSION_RECORDED", obligation, attempt=row.attempt, route=route, late=row.late)
+    canada_final_on_submission(db, ctx, obligation, _now())
     db.commit()
     return detail(db, control_db, ctx, obligation)
 
@@ -2447,9 +2470,19 @@ def create_india_report(
         raise _error(409, "CHAIN_ENDED", "A Final report ends the chain: nothing follows it")
     if any(row.state not in rules.VALID_SUBMISSION for row in chain):
         raise _error(409, "CHAIN_OPEN", "Submit (or cancel) the open follow-up first")
+    child = _chain_child(db, ctx, initial, payload.type, text, IN_CHAIN_OWN, next_report_on=payload.next_report_on)
+    db.commit()
+    return detail(db, control_db, ctx, child)
+
+
+def _chain_child(
+    db, ctx, initial: ReportObligation, kind: str, text: str, own, *, due_on=None, next_report_on=None, entries=None
+) -> ReportObligation:
+    """An India or Canada child of ``initial`` (kind RESPONSE, B3's pattern, no migration): it starts from the initial
+    report's entries except its own fields (``own``), holds its type in ``CHAIN``, audited ``REPORT_CHAIN_CREATED``."""
     now, actor = _now(), str(ctx.user_id)
-    entries = {key: value for key, value in (initial.entries or {}).items() if key not in IN_CHAIN_OWN}
-    entries["CHAIN"] = {"type": payload.type, "by": actor, "at": _iso(now)}
+    start = {key: value for key, value in (initial.entries or {}).items() if key not in own}
+    start["CHAIN"] = {"type": kind, "by": actor, "at": _iso(now)}
     child = ReportObligation(
         id=uuid.uuid4(),
         tenant_id=initial.tenant_id,
@@ -2461,11 +2494,11 @@ def create_india_report(
         form_code=initial.form_code,
         form_version=initial.form_version,
         report_type=initial.report_type,
-        due_on=None,
+        due_on=due_on,
         due_provisional=False,
-        follow_up_due_on=payload.next_report_on,
+        follow_up_due_on=next_report_on,
         state=rules.DRAFT,
-        entries=entries,
+        entries={**start, **(entries or {})},
         request_text=text,
         request_received_on=_org_day(db, initial.tenant_id, now),
         created_by=actor,
@@ -2480,8 +2513,172 @@ def create_india_report(
         "REPORT_CHAIN_CREATED",
         initial,
         report=str(child.id),
-        type=payload.type,
-        next_report_on=_iso(payload.next_report_on),
+        type=kind,
+        due_on=_iso(due_on),
+        next_report_on=_iso(next_report_on),
+    )
+    return child
+
+
+# -------------------------------------------------------------------------------------------- Canada chain (B9 step 11)
+# A child's own fields: its type (A5), the preliminary-only final date, the carried A4 and previous date, and A6.
+CA_CHAIN_OWN = frozenset({"A4", "A5", "A5_FINAL_DATE", "A5_PREVIOUS", "A6", "CHAIN"})
+CA_NOTE = "Health Canada's file number (A4) and your file number (A3) carry to every later report."
+CA_FINAL_TEXT = "The final report, created when the preliminary report was recorded as submitted (due on A5's date)."
+
+
+def canada_type(obligation: ReportObligation) -> str:
+    """The report's type (A5): a child's from the chain; the first report's as entered (Preliminary unless
+    Preliminary & Final)."""
+    return chain_type(obligation) or forms.report_kind(forms.HC_MDPR, obligation.entries or {}) or forms.CA_PRELIMINARY
+
+
+def is_canada_final(obligation: ReportObligation) -> bool:
+    """A Canada report that needs E2 and E3: a Final, or a first report sent as Preliminary & Final."""
+    return obligation.form_code == forms.HC_MDPR.code and canada_type(obligation) in (forms.CA_FINAL, forms.CA_BOTH)
+
+
+def _canada_children(db, tenant_id, parent_id) -> list[ReportObligation]:
+    rows = (
+        db.query(ReportObligation)
+        .filter(ReportObligation.tenant_id == tenant_id, ReportObligation.parent_id == parent_id)
+        .order_by(ReportObligation.created_at, ReportObligation.id)
+        .all()
+    )
+    return [row for row in rows if is_canada_chain(row) and row.state != rules.CANCELLED]
+
+
+def canada_chain_view(obligation: ReportObligation, children: list[ReportObligation]) -> dict:
+    """What the Canada report page shows: its type, and on the first report its updates and final, and whether an
+    update can be created now (one open at a time; nothing after a submitted Final or a Preliminary & Final)."""
+    if is_canada_chain(obligation):
+        return {
+            "type": chain_type(obligation),
+            "due_on": _iso(obligation.due_on),
+            "next_report_on": _iso(obligation.follow_up_due_on),
+            "note": CA_NOTE,
+        }
+    first = canada_type(obligation)
+    chain = [row for row in children if is_canada_chain(row) and row.state != rules.CANCELLED]
+    ended = first == forms.CA_BOTH or any(
+        chain_type(row) == forms.CA_FINAL and row.state in rules.SUBMITTED for row in chain
+    )
+    open_update = any(chain_type(row) == forms.CA_UPDATE and row.state not in rules.SUBMITTED for row in chain)
+    return {
+        "type": first,
+        "items": [
+            {"id": str(row.id), "type": chain_type(row), "state": row.state, "due_on": _iso(row.due_on)}
+            for row in chain
+        ],
+        "ended": ended,
+        "can_create": obligation.kind == "INITIAL"
+        and obligation.state in rules.SUBMITTED
+        and not ended
+        and not open_update,
+        "note": CA_NOTE,
+    }
+
+
+def _canada_carried(db, obligation: ReportObligation) -> dict:
+    """A child's carried values: Health Canada's file number (the last authority reference recorded on the chain's
+    submissions) and the day the previous report in the chain was submitted (the organization's day)."""
+    rows = [obligation.parent_id] + [
+        row.id for row in _canada_children(db, obligation.tenant_id, obligation.parent_id) if row.id != obligation.id
+    ]
+    sent = (
+        db.query(ReportSubmission)
+        .filter(ReportSubmission.tenant_id == obligation.tenant_id, ReportSubmission.obligation_id.in_(rows))
+        .order_by(ReportSubmission.submitted_at)
+        .all()
+    )
+    file_no = next((row.authority_reference for row in reversed(sent) if row.authority_reference), None)
+    previous = _org_day(db, obligation.tenant_id, sent[-1].submitted_at).isoformat() if sent else None
+    return {"hc_file": file_no, "previous": previous}
+
+
+def _canada_final_gate(sections: list[dict]) -> None:
+    """A Final (or Preliminary & Final) goes for approval only with its root cause (E2) and corrective actions (E3)."""
+    from backend.app.authority_reports.fda_3500a import values
+
+    held = values(sections)
+    missing = [field for field in ("E2", "E3") if not (held.get(field) or "").strip()]
+    if missing:
+        raise _error(
+            422,
+            "FINAL_NEEDS_E2_E3",
+            "A final report gives the root cause (E2) and the corrective actions (E3) before approval",
+            missing=missing,
+        )
+
+
+def canada_final_on_submission(db, ctx, obligation: ReportObligation, now: datetime) -> ReportObligation | None:
+    """D16: a Preliminary recorded as submitted creates its Final, once, due on the anticipated date the Preliminary
+    gave (A5; no fixed legal clock: s.60(2)(h), s.61). Never while MDARIX_B9_CANADA is off, never after a
+    Preliminary & Final."""
+    if not (
+        obligation.form_code == forms.HC_MDPR.code
+        and obligation.kind == "INITIAL"
+        and canada_type(obligation) == forms.CA_PRELIMINARY
+        and forms.switched_on("MDARIX_B9_CANADA")
+    ):
+        return None
+    if any(chain_type(row) == forms.CA_FINAL for row in _canada_children(db, obligation.tenant_id, obligation.id)):
+        return None
+    promised = ((obligation.entries or {}).get("A5_FINAL_DATE") or {}).get("value") or ""
+    try:
+        due = date.fromisoformat(promised.strip()[:10])
+    except ValueError:
+        due = None  # no date promised: the Final waits without a due date
+    return _chain_child(
+        db,
+        ctx,
+        obligation,
+        forms.CA_FINAL,
+        CA_FINAL_TEXT,
+        CA_CHAIN_OWN,
+        due_on=due,
+        entries={"A5": {"value": forms.CA_FINAL, "by": str(ctx.user_id), "at": _iso(now)}},
+    )
+
+
+class CanadaChainCreate(BaseModel):
+    type: Literal["Update"]
+    what_is_new: str = Field(max_length=rules.NOTE_MAX * 2)
+    next_report_on: date | None = None  # optional, the user's own date: no legal clock for an update
+
+
+@router.post("/{obligation_id}/canada-chain", dependencies=[DECIDERS])
+def create_canada_report(
+    obligation_id: uuid.UUID,
+    payload: CanadaChainCreate,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Create a Canada update of a submitted preliminary report, on demand (B9 step 11): one open at a time; nothing
+    after a submitted Final or a Preliminary & Final. 404 while MDARIX_B9_CANADA is off (feature_set.serves_path)."""
+    initial = _obligation(db, _tenant(ctx), obligation_id, lock=True)
+    text = _text(payload.what_is_new)
+    if not text or len(text) < rules.REASON_MIN:
+        raise _error(422, "REASON_REQUIRED", f"Say what is new, in at least {rules.REASON_MIN} characters")
+    if not (initial.kind == "INITIAL" and initial.form_code == forms.HC_MDPR.code):
+        raise _error(409, "NOT_A_CANADA_PRELIMINARY", "An update is made on a Canada preliminary report")
+    if initial.state not in rules.SUBMITTED:
+        raise _error(409, "NOT_SUBMITTED", "An update follows the preliminary report once it is submitted")
+    view = canada_chain_view(initial, _canada_children(db, initial.tenant_id, initial.id))
+    if view["ended"]:
+        raise _error(409, "CHAIN_ENDED", "The final report is submitted (or the first was Preliminary & Final)")
+    if not view["can_create"]:
+        raise _error(409, "CHAIN_OPEN", "Submit (or cancel) the open update first")
+    child = _chain_child(
+        db,
+        ctx,
+        initial,
+        forms.CA_UPDATE,
+        text,
+        CA_CHAIN_OWN,
+        next_report_on=payload.next_report_on,
+        entries={"A5": {"value": forms.CA_UPDATE, "by": str(ctx.user_id), "at": _iso(_now())}},
     )
     db.commit()
     return detail(db, control_db, ctx, child)
@@ -2671,12 +2868,14 @@ def export(
     us_pdf = kind == "pdf" and obligation.form_code == forms.FDA_3500A.code
     # B9: an India report's official MvPI form (form=official) and ADRMS entry sheet (form=adrms).
     india_pdf = kind == "pdf" and obligation.form_code == forms.MVPI_MDAE.code and _b9_india()
+    # B9 step 10: a Canada report's official HC Pub. 110180 (form=official).
+    ca_pdf = kind == "pdf" and obligation.form_code == forms.HC_MDPR.code and forms.switched_on("MDARIX_B9_CANADA")
     if (
         form is not None
-        and not (form == "official" and (us_pdf or india_pdf))
+        and not (form == "official" and (us_pdf or india_pdf or ca_pdf))
         and not (form in INDIA_FILES and india_pdf)
     ):
-        raise _error(404, "FORMAT_NOT_SUPPORTED", "The official form is a US or India report's PDF")
+        raise _error(404, "FORMAT_NOT_SUPPORTED", "The official form is a US, India or Canada report's PDF")
     view = detail(db, control_db, ctx, obligation)
     frozen = None
     if snapshot is not None:
@@ -2714,6 +2913,15 @@ def export(
         if not view.get("signature"):
             raise _error(409, "APPROVE_FIRST", "The official form is filled once the report is approved")
         body = INDIA_FILES[form](view, organization)
+    elif ca_pdf and form == "official":
+        from backend.app.authority_reports import hc_mdpr
+
+        if not view.get("signature"):
+            raise _error(409, "APPROVE_FIRST", "The official form is filled once the report is approved")
+        try:
+            body = hc_mdpr.render(view, organization)
+        except hc_mdpr.FormFileNeeded as missing:
+            raise _error(409, "FORM_FILE_NEEDED", f"{missing}: the worksheet PDF is ready meanwhile") from None
     elif us_pdf and form == "official":
         if not view.get("signature"):
             raise _error(409, "APPROVE_FIRST", "FDA's official form is filled once the report is approved")

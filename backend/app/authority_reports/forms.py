@@ -356,7 +356,7 @@ MVPI_MDAE = Form(
                     "1",
                     "Date of report",
                     "sent_day",
-                    MUST,
+                    INITIAL,  # filled at Send for approval: as FDA's B4, it never blocks sending
                     note="Filled in with the day you send the report for approval.",
                 ),
                 Field("P2", "2", "Type of report (initial, follow up, final, trend)", "in_report_type", MUST),
@@ -1458,10 +1458,10 @@ HC_MDPR = Form(
                     "A4",
                     "A4",
                     "Health Canada file no. (if applicable)",
-                    None,
+                    "ca_hc_file",
                     INITIAL,
                     must_in=_CA_LATER,
-                    note="From Health Canada's acknowledgement of the preliminary report.",
+                    note="From Health Canada's acknowledgement of the preliminary report, carried to every later report.",
                 ),
                 Field("A5", "A5", "Type of report", "report_type", MUST, options=CA_TYPES),
                 Field(
@@ -1476,11 +1476,18 @@ HC_MDPR = Form(
                     "A5_PREVIOUS",
                     "A5",
                     "Date the previous report was submitted to Health Canada (update or final)",
-                    None,
+                    "ca_previous",
                     INITIAL,
                     must_in=_CA_LATER,
                 ),
-                Field("A6", "A6", "Date submitted", None, MUST, note="The day you submit."),
+                Field(
+                    "A6",
+                    "A6",
+                    "Date submitted",
+                    "sent_day",
+                    INITIAL,  # filled at Send for approval: as FDA's B4, it never blocks sending
+                    note="Filled in with the day you send the report for approval.",
+                ),
                 _ca("A7_MFR", "A7", "Name and address: manufacturer", "manufacturer"),
                 Field("A7_IMP", "A7", "Name and address: importer", "importer"),
                 Field(
@@ -1652,23 +1659,59 @@ EVIDENCE_LABELS = {
 }
 
 
-# India's P1 before B9 (typed, "the day you submit"): in force again while MDARIX_B9_INDIA is off (spec 6.4).
-_INDIA_BEFORE_B9 = {"P1": Field("P1", "1", "Date of report", None, MUST, note="The day you submit.")}
+# Fields as they were before B9 (typed), in force again while their part's switch is off (spec 6.4: "today's
+# worksheet stays"): India's P1; Canada's A4, A5 previous date and A6.
+_BEFORE_B9 = {
+    ("MVPI_MDAE", "P1"): (
+        "MDARIX_B9_INDIA",
+        Field("P1", "1", "Date of report", None, MUST, note="The day you submit."),
+    ),
+    ("HC_MDPR", "A4"): (
+        "MDARIX_B9_CANADA",
+        Field(
+            "A4",
+            "A4",
+            "Health Canada file no. (if applicable)",
+            None,
+            INITIAL,
+            must_in=_CA_LATER,
+            note="From Health Canada's acknowledgement of the preliminary report.",
+        ),
+    ),
+    ("HC_MDPR", "A5_PREVIOUS"): (
+        "MDARIX_B9_CANADA",
+        Field(
+            "A5_PREVIOUS",
+            "A5",
+            "Date the previous report was submitted to Health Canada (update or final)",
+            None,
+            INITIAL,
+            must_in=_CA_LATER,
+        ),
+    ),
+    ("HC_MDPR", "A6"): (
+        "MDARIX_B9_CANADA",
+        Field("A6", "A6", "Date submitted", None, MUST, note="The day you submit."),
+    ),
+}
+
+
+def switched_on(name: str) -> bool:
+    from backend.app import feature_set
+
+    return feature_set.switched_on(name)
 
 
 def india_derived() -> bool:
     """B9 step 14 is in force: India's P1 is the day sent for approval and P2 follows the chain. Off, both are typed
     as before B9 (today's worksheet stays)."""
-    from backend.app.feature_set import switched_on
-
     return switched_on("MDARIX_B9_INDIA")
 
 
 def in_force(form: Form, field: Field) -> Field:
-    """The field as the switches have it now: India's P1 is typed again while MDARIX_B9_INDIA is off."""
-    if form.code == MVPI_MDAE.code and field.id in _INDIA_BEFORE_B9 and not india_derived():
-        return _INDIA_BEFORE_B9[field.id]
-    return field
+    """The field as the switches have it now: a field B9 derives is typed again while its part's switch is off."""
+    before = _BEFORE_B9.get((form.code, field.id))
+    return before[1] if before and not switched_on(before[0]) else field
 
 
 def form_for(market: str, new_navigation: bool) -> Form | None:

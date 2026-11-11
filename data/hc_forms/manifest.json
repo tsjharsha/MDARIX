@@ -1,0 +1,4 @@
+{
+  "note": "FORM FILE NEEDED FROM THE OWNER. The blank Mandatory Medical Device Problem Reporting Form for Industry, HC Pub. 110180 (April 2018), fillable PDF, goes here byte-identical, from canada.ca only (B9 spec section 8; never a copy from another site). The download from canada.ca failed twice (11 Nov 2026, connection reset). When the file is added: list it below with its SHA-256, fill field_map.json from the form's own field names, and check the map once by a person against the printed form (B9-D17). Until then the official Canada form is not offered (409 FORM_FILE_NEEDED) and its tests are skipped.",
+  "files": []
+}

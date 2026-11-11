@@ -92,7 +92,10 @@ _CLOSED_LOOP_API = (re.compile(r"^/api/v1/investigations/[^/]+/did-it-work(/|$)"
 # B4 routes refused while MDARIX_RULE_REGISTER is off.
 _RULE_REGISTER_API = (re.compile(r"^/api/v1/rule-register(/|$)"),)
 # B9 routes refused while their switch is off (the official India form and ADRMS sheet are refused in the route).
-_B9_API = {"MDARIX_B9_INDIA": (re.compile(r"^/api/v1/reports/[^/]+/india-chain/?$"),)}
+_B9_API = {
+    "MDARIX_B9_INDIA": (re.compile(r"^/api/v1/reports/[^/]+/india-chain/?$"),),
+    "MDARIX_B9_CANADA": (re.compile(r"^/api/v1/reports/[^/]+/canada-chain/?$"),),
+}
 
 
 def challenge() -> bool:

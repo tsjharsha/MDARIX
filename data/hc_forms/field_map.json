@@ -1,0 +1,9 @@
+{
+  "note": "Empty until the HC Pub. 110180 form file is added (see manifest.json). text: MDARIX field id -> the form's own text field name; choices: field id -> {the form's words, lower case: its check box name}; dates: the field ids that are dates, written in date_format (a strftime pattern read from the printed form; null keeps the snapshot's yyyy-mm-dd).",
+  "edition": "hc-mdpr-2018-04",
+  "checked_by_a_person": false,
+  "text": {},
+  "choices": {},
+  "dates": [],
+  "date_format": null
+}

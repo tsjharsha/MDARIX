@@ -605,6 +605,11 @@ def _sent_day(context):
     return (day, _source("Worksheet", None, "The day the report was sent for approval")) if day else None
 
 
+def _carried(context, key: str, label: str):
+    value = (context.get("ca_chain") or {}).get(key)
+    return (value, _source("Obligation", None, label)) if value else None
+
+
 def derived_only(source: str | None) -> bool:
     """A source a typed value never overrides: B4/P1 (the day sent for approval) and, while MDARIX_B9_INDIA is on,
     India's P2 (the chain, B9). Off, P2 is typed over "Initial" as before B9."""
@@ -629,6 +634,9 @@ SOURCES = {
         c.get("chain_type") or "Initial",
         _source("Obligation", None, "The report's place in its chain (Initial, Follow up, Final)"),
     ),
+    # B9 step 11: carried along Canada's chain from Health Canada's acknowledgement and the last report sent.
+    "ca_hc_file": lambda c: _carried(c, "hc_file", "Health Canada's file number, from its acknowledgement"),
+    "ca_previous": lambda c: _carried(c, "previous", "The day the previous report in the chain was submitted"),
     "in_serious": _in_serious,
     "in_non_serious": _in_non_serious,
     "follow_up_type": lambda c: None,

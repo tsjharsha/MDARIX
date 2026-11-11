@@ -44,6 +44,29 @@ and user facility. MDARIX prepares; the customer submits: MDARIX never submits. 
 - User guide, Reports: "India: the official MvPI form, the ADRMS sheet, follow-up and final reports".
 - Session flags `b9.india`, `b9.canada`, `b9.us_importer`, `b9.us_user_facility`.
 
+### Added (Canada, Part B)
+- **Canada's chain** (`HC_MDPR`): when a Preliminary is recorded as submitted, its **Final** is created at once, due on
+  the anticipated date the Preliminary gave (A5; no fixed legal clock, s.61). **Updates** on demand
+  (`POST /api/v1/reports/{id}/canada-chain`), one open at a time; nothing follows a submitted Final or a first report
+  sent as Preliminary & Final. The first report is a Preliminary or a Preliminary & Final (`STARTS_THE_CHAIN`); a
+  child's type follows the chain. Health Canada's file number (A4) is carried from the authority reference recorded on
+  the chain's submissions, A3 from the Preliminary, and A5's previous-report date from the last submission. A6 (date
+  submitted) is filled with the day the report is sent for approval. A Final (or Preliminary & Final) goes for approval
+  only with its root cause (E2) and corrective actions (E3) (`FINAL_NEEDS_E2_E3`). An unsent update or final can be
+  cancelled with a reason.
+- **Health Canada's own form** (`worksheet.pdf?form=official` on a Canada report): built, but **the form file
+  HC Pub. 110180 is needed from the owner** (the canada.ca download failed; no other site's copy is used). Until it
+  is in `data/hc_forms` with its SHA-256 and field map, the route answers `409 FORM_FILE_NEEDED` and the read-back
+  tests are skipped.
+- `MDARIX_B9_CANADA` off: no Final is made, the chain route and the official form answer 404, A4, A5's previous date
+  and A6 are typed as before.
+
+### Fixed
+- India's P1 (date of report) and Canada's A6 no longer count as missing on the mandatory meter: they are filled at
+  Send for approval, as FDA's B4 is (P1 had blocked Send for approval on the new navigation since step 14).
+- A re-signed conclusion now also supersedes the approval of an unsent India or Canada follow-up, update or final
+  (audit fix 4 for every chain), never moving its date.
+
 ### Not yet built (Part A)
 - The Final in the India sample (SAMPLE-RV-10) after a CAPA: waits for the owner, because the sample keeps RV-10 back
   for the trial user's correction. No database change in Part A.
