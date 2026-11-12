@@ -503,7 +503,11 @@ def record_origin(
 ):
     """Where a product, lot or complaint came from (R16), by its MDARIX id: the imports behind it, each with its file,
     who imported it and the row it was read from."""
-    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return imports_of(db, data, uuid.UUID(str(ctx.tenant_id)), entity, record_id)
+
+
+def imports_of(db: Session, data: Session, tenant_id: uuid.UUID, entity: str, record_id: uuid.UUID) -> dict:
+    """``record_origin``'s answer; also read by "Trace this value" (B6a G20)."""
     key, source = import_lineage.key_of(data, tenant_id, entity, record_id)
     imported = import_lineage.of_record(data, tenant_id, entity, key)
     refs = sorted({item["import_ref"] for item in imported})

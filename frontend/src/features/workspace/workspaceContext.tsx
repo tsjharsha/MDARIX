@@ -140,7 +140,13 @@ export type SessionContext = {
   /** B9 (MDARIX_B9_*, feature_set.B9_SWITCHES): each market part's screens show only while its switch is on. */
   b9?: { india?: boolean; canada?: boolean; us_importer?: boolean; us_user_facility?: boolean };
   /** B6a (MDARIX_B6_*, feature_set.B6_SWITCHES): the deadline list downloads and the late-entry reason. */
-  b6?: { deadline_list?: boolean; late_entry?: boolean };
+  b6?: {
+    deadline_list?: boolean;
+    late_entry?: boolean;
+    trace?: boolean;
+    similar_wording?: boolean;
+    value_centre?: boolean;
+  };
   /** classic or new (tenants.navigation, 0.10.67): the organization's menu (app/linkTable.ts). */
   navigation?: string;
   /** An evaluation on the sample only (tenants.sample_only, 0.10.71): no upload or import anywhere; "Discuss a pilot". */
@@ -431,6 +437,16 @@ export function useDeadlineList(): boolean {
 /** B6a: the late-entry reason and the duplicate check before saving a Case, while MDARIX_B6_LATE_ENTRY is on. */
 export function useLateEntry(): boolean {
   return useContext(WorkspaceContext)?.session?.b6?.late_entry === true;
+}
+
+/** B6a G20: the "Trace" links on a report, while MDARIX_B6_TRACE is on. */
+export function useTrace(): boolean {
+  return useContext(WorkspaceContext)?.session?.b6?.trace === true;
+}
+
+/** B6a P2: the Value Centre (outcome numbers), while MDARIX_B6_VALUE_CENTRE is on. */
+export function useValueCentre(): boolean {
+  return useContext(WorkspaceContext)?.session?.b6?.value_centre === true;
 }
 
 /** B7b: "E-mail to check" shows only while the server has e-mail intake switched on. */

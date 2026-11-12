@@ -1331,6 +1331,46 @@ def report_detail(
     return detail(db, control_db, ctx, obligation)
 
 
+@router.get("/{obligation_id}/trace/{field_id}")
+def trace_value(
+    obligation_id: uuid.UUID,
+    field_id: str,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """B6a G20 "Trace this value": the value's record and import row, who entered or changed it and when, and the
+    snapshot it is frozen in. Read only; open to every member who reads the report. 404 while ``MDARIX_B6_TRACE``
+    is off, for another organization's report, and for a field the report does not show."""
+    from backend.app.authority_reports import trace
+
+    if not trace.enabled():
+        raise _error(404, "NOT_FOUND", "Not found")
+    tenant_id = _tenant(ctx)
+    obligation = _obligation(db, tenant_id, obligation_id)
+    if obligation.form_code == forms.ATTACHED.code:  # an Other Regulatory Report has no worksheet
+        raise _error(404, "FIELD_UNKNOWN", "No such field on this form")
+    entries = obligation.entries or {}
+    names = _names(control_db, tenant_id, {entry.get("by") for entry in entries.values() if isinstance(entry, dict)})
+    sections = worksheet.build(
+        _form(obligation), _context(db, control_db, obligation), entries, names, obligation.request_text
+    )
+    row = next((item for section in sections for item in section["fields"] if item["id"] == field_id), None)
+    form_field = next((item for item in _form(obligation).fields() if item.id == field_id), None)
+    if row is None or form_field is None:
+        raise _error(404, "FIELD_UNKNOWN", "No such field on this form")
+    return trace.build(
+        db,
+        control_db,
+        tenant_id,
+        obligation,
+        form_field,
+        row,
+        _snapshots(db, obligation),
+        lambda refs: _names(control_db, tenant_id, refs),
+    )
+
+
 # --------------------------------------------------------------------------------------------- the worksheet
 
 

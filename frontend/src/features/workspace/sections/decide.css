@@ -797,3 +797,32 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* B6a G20 "Trace this value": flat (G-2), read only. */
+.tr-link {
+  margin-left: 8px;
+  font-size: 0.85em;
+}
+.tr-body section + section {
+  margin-top: 16px;
+}
+.tr-body h3 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+}
+.tr-list {
+  margin: 0;
+  padding-left: 18px;
+}
+.tr-list li + li {
+  margin-top: 6px;
+}
+.tr-values {
+  display: block;
+  color: var(--ac-muted, #5b6472);
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
+.tr-hash {
+  font-family: ui-monospace, monospace;
+}

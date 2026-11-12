@@ -5,6 +5,7 @@ import { formatDateTime } from "../../../app/dates";
 import { formName } from "./TreeSign";
 import { FieldRow, useAction } from "./Reports";
 import { InlineError } from "./boardParts";
+import { TraceLink } from "./TraceValue";
 import { useWorkspace } from "../workspaceContext";
 import "./decide.css";
 
@@ -268,6 +269,13 @@ export function ApprovingDoc({ detail }: { detail: ReportDetail }) {
                       ) : item.by ? (
                         <small>Entered by {item.by}</small>
                       ) : null}
+                      {item.value && (
+                        <TraceLink
+                          reportId={detail.id}
+                          fieldId={item.id}
+                          title={`${item.number} ${item.label}`.trim()}
+                        />
+                      )}
                     </dd>
                   </div>
                 ))}

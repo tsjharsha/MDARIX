@@ -15,6 +15,7 @@ import { CodePicker } from "./CodePicker";
 import { FollowUps, openFollowUp } from "./FollowUps";
 import { PersonalAtSend, personalBody } from "./PersonalAtSend";
 import { SimilarTableRow } from "./SimilarTable";
+import { TraceLink } from "./TraceValue";
 import { ROLE_LABELS } from "../reportability";
 import {
   OUTCOME_LABELS,
@@ -1151,6 +1152,9 @@ export function FieldRow({
           ? `${item.source ? " · " : ""}${item.status === "CONFIRMED" ? "Confirmed" : "Entered"} by ${item.by} ${formatDate(item.at)}`
           : ""}
         {item.note ? ` ${item.note}` : ""}
+        {item.value && (
+          <TraceLink reportId={detail.id} fieldId={item.id} title={`${item.number} ${item.label}`.trim()} />
+        )}
       </p>
       {item.problem && <InlineError text={`${item.problem}: it counts as missing until it is corrected.`} />}
       {item.warning && (

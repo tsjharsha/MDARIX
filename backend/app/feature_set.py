@@ -133,6 +133,10 @@ B6_SWITCHES = {
     "MDARIX_B6_LATE_ENTRY": True,
     "MDARIX_B6_REVIEWS": True,
     "MDARIX_B6_CHANGE_REASON": True,
+    # Part D: "Trace this value" on a report, similar-wording duplicate suggestions, the Value Centre.
+    "MDARIX_B6_TRACE": True,
+    "MDARIX_B6_SIMILAR_WORDING": True,
+    "MDARIX_B6_VALUE_CENTRE": True,
 }
 SWITCHES = {**B9_SWITCHES, **B8_SWITCHES, **B9B_SWITCHES, **B6_SWITCHES}
 
