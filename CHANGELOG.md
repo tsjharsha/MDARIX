@@ -223,6 +223,13 @@ left rail.
 - Click paths p-u added to the click-path test (a-u). User guide: the new links; the signed-reviews "where" no longer
   writes "Admin console ›" as a screen path (the guide-path test failed on it since run 6).
 
+### Tests (B6a permission sweep)
+- The permission sweep (`tests/test_business_permissions.py`) has reviewed exempt entries for B6a's eight routes
+  without a dependency guard. Each was checked: the seven signed-review routes check the reader and the signer in the
+  route (Leader, Quality Reviewer or customer administrator as owner D4, D5 and 12 Nov say; never MDARIX staff;
+  signing re-authenticates), and "Trace this value" is a read open to every member who reads the report, as the
+  report itself. All eight are also in the list that must refuse anyone without a session. No product change.
+
 ## [0.11.02] - not released yet
 
 B9b: other countries, attach-only reports. For a country outside the five built-in markets (US, EU and Northern
