@@ -144,7 +144,7 @@ checks before signing. None = no record or decision effect.
 | Audit trail, chain verification, reason for change | Direct | A | Scripted; tamper tests | Part 11 audit trail | RSK-016 to -018, -048 |
 | Signed records, snapshots, never rewrite | Direct | A | Scripted | The signed record must stay as signed | RSK-019 to -021, -062 |
 | Tenant isolation, roles, field protection | Direct | A | Negative tests both ways, every surface | Confidentiality of every customer's GxP data | RSK-025, -026, -036 |
-| Import and migration, lineage, quarantine | Direct | A | Scripted; the seven interface checks | Creates regulated records from another system | RSK-027, -028 |
+| Import and migration, lineage, quarantine | Direct | A | Scripted; the seven interface checks (MDX-VAL-001 Annex F) | Creates regulated records from another system | RSK-027, -028 |
 | Signed reviews: audit trail review, access review, configuration snapshot | Direct | A | Scripted | Evidence for the customer's own periodic controls | RSK-049 |
 | Investigation: signed conclusion and challenge loop | Direct | A | Scripted | The conclusion is signed; an open challenge must stop the signature | RSK-051 |
 | Investigation suggestions and display; CAPA effectiveness reminders | Indirect | B | Scenario test | Suggestions and due dates are checked by a person | RSK-061 |
