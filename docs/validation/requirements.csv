@@ -29,7 +29,7 @@ REQ-SIG-004,A,A signature shall be valid only when both the record and the signa
 REQ-SIG-005,A,Only a user with signing authority and recorded signer training shall sign a regulated decision.,A,MDX-VAL-002 RSK-011,RSK-011,,,tests/test_authorization_matrix.py tests/test_business_permissions.py
 REQ-SOD-001,A,"Outside a trial, the maker of a record shall not approve the same record.",A,MDX-B10-005 section 7,RSK-013,CI-17 CI-34 CI-35,CI-17,tests/test_case_reviews.py
 REQ-SOD-002,A,An administrator shall never approve a regulated decision.,A,MDX-B10-005 section 7,RSK-014,DT-13,DT-13,tests/test_authorization_matrix.py
-REQ-SOD-003,A,The rule register shall refuse a rule version approved by the person who built it.,A,"MDX-VAL-000 section 4, O3",RSK-065,,,tests/test_rule_register_unit.py
+REQ-SOD-003,B,"The rule register shall refuse a rule version unless its builder and approver are two different staff accounts, the approver's account may approve rule content; typed names shall not be compared.",A,"MDX-VAL-000 section 4, O3, O10",RSK-065,,,tests/test_rule_register_unit.py
 REQ-AUD-001,A,An audit row shall not be updated or deleted.,A,MDX-B10-005 section 7,RSK-016,,,tests/test_day35_audit_immutability.py
 REQ-AUD-002,A,"The audit hash chain shall be verified daily and on demand, reporting any break.",A,MDX-B10-005 section 7,RSK-017,,,tests/test_audit_hash_chain.py
 REQ-AUD-003,A,"Every change to a regulated value shall be audited with the old value, the new value, the actor and the reason.",A,MDX-VAL-002 RSK-018,RSK-018,CI-33 B6-36,B6-36,tests/test_b6a_change_reason.py

@@ -26,8 +26,10 @@
   },
   "approval": {
     "approved_by": "Owner",
+    "approved_by_account": "staff-quality-1",
     "approved_on": "2026-11-11",
     "built_by": "MDARIX engineering",
+    "built_by_account": "staff-engineering-1",
     "release": "0.10.99",
     "note": "B4 spec approved 11 Nov 2026 (R-D1 to R-D14): version 1 is today's logic, unchanged."
   },

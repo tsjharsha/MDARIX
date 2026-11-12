@@ -30,8 +30,10 @@
   },
   "approval": {
     "approved_by": "Owner",
+    "approved_by_account": "staff-quality-1",
     "approved_on": "2026-11-11",
     "built_by": "MDARIX engineering",
+    "built_by_account": "staff-engineering-1",
     "release": "0.11.01",
     "note": "B8 plan approved 11 Nov 2026 (B8-D8, D16): form editions pinned from the start; files downloaded from the Commission's page with the owner's OK (11 Nov 2026)."
   },

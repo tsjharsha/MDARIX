@@ -88,21 +88,50 @@ def test_the_loader_refuses_an_unknown_catalog_id_a_duplicate_and_a_missing_fiel
         register.load()
 
 
-@pytest.mark.parametrize("approver", ["MDARIX engineering", "  mdarix   ENGINEERING ", "", None])
-def test_a_version_approved_by_its_own_builder_or_by_nobody_is_refused(use, us1, approver):
-    """B6b owner decision O3 (MDX-VAL-002 RSK-065): the register refuses the same person as builder and approver."""
+@pytest.mark.parametrize(
+    ("built", "approver", "approver_name", "message"),
+    [
+        # Different typed names, one account: refused (owner decision O10, accounts, not names).
+        ("staff-engineering-1", "staff-engineering-1", "MDARIX engineering", "an approver account other than"),
+        ("staff-quality-1", "staff-quality-1", "Owner", "an approver account other than"),
+        # An account that may not approve rule content.
+        ("staff-quality-1", "staff-engineering-1", "MDARIX engineering", "an approver account other than"),
+        # A typed name, an unknown account or none at all.
+        ("staff-engineering-1", "Owner", "Owner", "must be staff accounts"),
+        ("staff-engineering-1", "", "Owner", "must be staff accounts"),
+        ("staff-engineering-1", None, "Owner", "must be staff accounts"),
+        # The right accounts, but a name that is not the approver account's.
+        ("staff-engineering-1", "staff-quality-1", "Someone else", "must be the accounts' names"),
+    ],
+)
+def test_a_version_approved_by_its_own_builder_or_by_nobody_is_refused(
+    use, us1, built, approver, approver_name, message
+):
+    """B6b owner decisions O3 and O10 (MDX-VAL-002 RSK-065): builder and approver are two accounts, never one."""
     same = copy.deepcopy(us1)
-    same["approval"].update(built_by="MDARIX engineering", approved_by=approver)
+    same["approval"].update(built_by_account=built, approved_by_account=approver, approved_by=approver_name)
+    same["approval"]["built_by"] = register.STAFF_ACCOUNTS.get(built, ("MDARIX engineering",))[0]
     use([same])
-    with pytest.raises(register.RegisterError, match=r"US-floor-1.json: approval.approved_by must name a person other"):
+    with pytest.raises(register.RegisterError, match=rf"US-floor-1.json: approval.*{message}"):
         register.load()
 
 
 def test_a_version_approved_by_a_second_person_is_allowed(use, us1):
     other = copy.deepcopy(us1)
-    other["approval"].update(built_by="MDARIX engineering", approved_by="Owner")
+    other["approval"].update(
+        built_by="MDARIX engineering",
+        built_by_account="staff-engineering-1",
+        approved_by="Owner",
+        approved_by_account="staff-quality-1",
+    )
     use([other])
-    assert register.load()["US-floor-1"]["approval"]["approved_by"] == "Owner"
+    assert register.load()["US-floor-1"]["approval"]["approved_by_account"] == "staff-quality-1"
+
+
+def test_every_shipped_version_is_built_and_approved_by_two_accounts():
+    """O10: the shipped register itself passes the account check."""
+    for entry in register.load().values():
+        assert entry["approval"]["built_by_account"] != entry["approval"]["approved_by_account"]
 
 
 def test_content_changed_without_a_new_version_fails_naming_the_file(use, us1):
