@@ -20,7 +20,7 @@ Change history
 | 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-003 v0.1 (8 Nov 2026) and the MVP-1.0 CSA package (`docs/compliance/CSA_MVP_VALIDATION_PACKAGE.md`). Revised after a software-assisted review, findings dispositioned by the author: single-statement requirements, supporting controls (section 16), Annexes C and D | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: current status and transition (section 9.4); approval gate on R4 to R7; consultant scope; class C approach; development results are not validation evidence; MIR schema criterion; retention per owner decision O1; qualification of executors and approvers; Annex E (how each rule is checked); requirements split and renumbered in reading order | Sriharsha Telikicherla |
 | 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: a signed release approval record governs every production deploy from the big-bang deploy onward (VMP-R41, OP-8 closed); section 9.4 agreed by the owner (OP-7 now the consultant's review only); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Sriharsha Telikicherla |
-| 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O11 a release is gated on each change's own risk, set in its change-impact assessment, not on the class of the function it touches (VMP-R23, section 9.3); O12 VMP-R49 allows a release with a signed risk acceptance for an Open row | Sriharsha Telikicherla |
+| 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O11 a release is gated on each change's own risk, set in its change-impact assessment, not on the class of the function it touches (VMP-R23, section 9.3); O12 VMP-R49 allows a release with a signed risk acceptance for an Open row; O14 the tagging gap and plan (section 16.1, VMP-R94 to VMP-R96, numbered after the last rule so that no rule is renumbered) | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -401,6 +401,22 @@ AI is off in every release under this plan, and AI helpers are out of scope.
 - **VMP-R79** A third-party test tool (for example pytest) shall be used as supplied.
 - **VMP-R80** A new major version of such a tool shall be qualified by use: a test known to fail shall be seen to
   fail in the qualifying run.
+
+**Known gap: few tests are tagged (owner decision O14).** At the B6b dry run (12 Nov 2026) the `requirement` marker
+was on 22 test files, at file level, so only 11 of the 59 class-A requirements showed as verified in the generated
+RTM; the other tests ran but gave no traceable evidence. The PL-xx scenario group (owner decision O15) gave every
+class-A requirement a scenario and a negative scenario, which are not yet tagged. Plan:
+
+- **VMP-R94** Before the first release pack under this plan, every class-A scenario that an automated test proves
+  shall carry the `requirement` marker on that test, at test-function level where one file proves several scenarios.
+- **VMP-R95** A scenario that no automated test proves (a drill, a by-eye check of a form) shall be executed as a
+  scripted OQ step and recorded as such, not tagged.
+- **VMP-R96** The VSR shall state the number of class-A requirements verified by tagged tests, by scripted steps and
+  not verified, until every class-A requirement is verified.
+
+Order of tagging: the PL-xx negatives first (they protect signatures, audit trail, records, export and access),
+then the remaining class-A groups in the order of MDX-VAL-002 section 6 (rows needing action first). The system owner
+tags; the quality approver samples the tags against the scenario text when reviewing the VSR.
 
 ### 16.2 Training
 
