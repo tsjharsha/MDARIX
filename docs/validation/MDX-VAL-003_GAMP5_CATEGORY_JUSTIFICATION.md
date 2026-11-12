@@ -10,13 +10,13 @@
 | Reviewer | Independent CSV consultant (confirms; not engaged yet) |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
 | Date | 12 Nov 2026 |
-| Code baseline | Branch `feat/b6b-validation-pack` from `628c624a` |
+| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` adds documents only) |
 
 Change history
 
 | Version | Date | Change | By |
 |---|---|---|---|
-| 0.1 | 12 Nov 2026 | First draft (B6b Part A, G11) | Sriharsha Telikicherla |
+| 0.1 | 12 Nov 2026 | First draft (B6b Part A, G11); revised after an independent review (libraries, customer-side rules worded as template instructions) | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -42,7 +42,8 @@ section 9, question 2).
 |---|---|---|
 | The MDARIX application (web application, API, background service, database schema), as released by tag | **4: configured product** | One product, one code base and one version for every customer; each customer configures it through settings and data, never through code |
 | Rule content shipped with MDARIX (rule register versions, starter question sets, reporting windows) | Part of Category 4 (configuration supplied with the product) | Held as versioned data with a content hash, checked when it loads; a change is a new version, never an edit |
-| Platform software: operating system, PostgreSQL, container runtime, web server, file scanner, Python and Node runtimes and their libraries | **1: infrastructure software** | Used as supplied; MDARIX tests only its own use of them (MDX-VAL-001, VMP-R13) |
+| Platform software: operating system, PostgreSQL, container runtime, web server, file scanner, Python and Node runtimes | **1: infrastructure software** | Used as supplied; MDARIX tests only its own use of them (MDX-VAL-001, VMP-R12 and VMP-R13) |
+| Libraries built into the application (for example FastAPI, SQLAlchemy, React) | Part of Category 4 (components of the product) | Tested as part of the product; listed by version in each release's software bill of materials; changed under the change-impact rule (MDX-VAL-001 section 9.3) |
 | Anything MDARIX writes for one customer: a custom connector, a custom mapping, a custom report or a script run for one customer | **5: custom application** | Written for one customer and not part of the shared product; validated as custom software |
 
 ## 4. Why MDARIX is Category 4
@@ -59,8 +60,8 @@ when it is written to a user's requirements. The following facts support Categor
    `backend/app/rule_register/data/`. `backend/app/rule_register/register.py` refuses the register when a version's
    content does not match its content hash, when versions overlap, or when coverage has a gap. A change of rule is a
    new version file; the file records who wrote it and who approved it (the owner or a named regulatory approver).
-   The register does not itself check that the two are different people; the change-control SOP (MDX-SOP-002) shall
-   require it. Signed records name the version they used.
+   The register does not itself check that the two are different people (open point OP-3 and MDX-VAL-002
+   RSK-065). Signed records name the version they used.
 4. **Roles and permissions are fixed data.** Personas and their permissions are defined in
    `access_control/personas.py` and `backend/app/access/permissions.py`; the customer assigns them, it does not
    define new permission logic.
@@ -70,14 +71,14 @@ when it is written to a user's requirements. The following facts support Categor
 
 ### 4.1 What this means for validation
 
-- **GAMP-R01** MDARIX shall validate the product's functions for its own intended use in every release
-  (MDX-VAL-001), including the rule content it ships.
-- **GAMP-R02** The customer shall validate its own configuration for its own intended use, using its signed
-  configuration snapshot as the configuration under test (customer UAT/PQ template, MDX-CUS-001).
-- **GAMP-R03** The customer shall check the starter rule content against its own procedures before relying on it.
-- **GAMP-R04** MDARIX shall never describe its own development as Category 4 in a way that reduces its own testing:
-  MDARIX develops the product under its SDLC (MDX-SOP-001), with risk-based testing per MDX-VAL-002, as a supplier
-  of configurable software.
+- **GAMP-R01** Each release pack shall cover the rule content shipped in that release (rule register versions and
+  their content hashes) as well as the program code.
+- **GAMP-R02** The customer UAT/PQ template (MDX-CUS-001) shall instruct the customer to use its signed configuration
+  snapshot as the configuration under test.
+- **GAMP-R03** The customer UAT/PQ template (MDX-CUS-001) shall instruct the customer to check the starter rule
+  content against its own procedures before relying on it.
+- **GAMP-R04** The Category 4 decision shall not reduce MDARIX's own testing: each MDARIX function is tested at the
+  assurance level of its class in MDX-VAL-002, whatever its GAMP category.
 
 ## 5. Why custom work is Category 5
 
@@ -95,8 +96,9 @@ customer configuration (Category 4), not Category 5.
 
 ## 6. Why platform software is Category 1
 
-- **GAMP-R09** Platform software shall be used as supplied and recorded by version in the IQ record of each release.
-- **GAMP-R10** An upgrade of platform software shall follow the change-impact rule in MDX-VAL-001 section 9.3.
+- **GAMP-R09** Platform software shall be used as supplied.
+- **GAMP-R10** The version of each platform component shall be recorded in the IQ record of each release.
+- **GAMP-R11** An upgrade of platform software shall follow the change-impact rule in MDX-VAL-001 section 9.3.
 
 The cloud provider's infrastructure is assessed as a supplier in the hosting assessment (MDX-SUP-004).
 
@@ -106,6 +108,7 @@ The cloud provider's infrastructure is assessed as a supplier in the hosting ass
 |---|---|---|
 | OP-1 | The consultant to confirm Category 4 for the product and Category 5 for custom work, and say what else they would treat as Category 5 (B6b spec question 2) | Srinivas |
 | OP-2 | Whether customer-written organisation rules (rules that can only raise an outcome) need any extra customer test beyond the UAT/PQ template | Srinivas |
+| OP-3 | The rule register records who wrote and who approved each rule version but does not refuse the same person in both; decide whether `register.py` should refuse it | Sriharsha |
 
 ## Signatures
 
@@ -114,4 +117,5 @@ Unsigned. The signed PDF and its `signatures.csv` row are added after review (MD
 | Role | Name | Meaning of signature | Signature | Date |
 |---|---|---|---|---|
 | Author (R), system owner | Sriharsha Telikicherla, Product & Engineering | I wrote this justification and reviewed every line. | | |
+| Reviewer (C) | Independent CSV consultant | I confirm, or comment on, the categories and their rationale. | | |
 | Approver (A), quality approver | Srinivas Telikicherla, QA/RA | I approve this justification, subject to the consultant's confirmation. | | |

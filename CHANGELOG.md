@@ -26,7 +26,7 @@ no migration, no switch.
   risk-based approach, risk classes A/B/C by severity, lifecycle and per-release validation, change impact, release
   approval before every production deploy, 10-working-day customer change notice, environments, deliverables,
   acceptance criteria, deviations. Replaces the planning draft MDX-B10-003.
-- **Product risk assessment (MDX-VAL-002)**: GxP impact per function, and an FMEA of 64 failure modes with severity,
+- **Product risk assessment (MDX-VAL-002)**: GxP impact per function, and an FMEA of 65 failure modes with severity,
   occurrence and detectability (1-5), RPN and an action rule, each linked to the threat model and to seed
   requirement IDs. Replaces the planning draft MDX-B10-004.
 - **GAMP 5 category justification (MDX-VAL-003)**: Category 4 for MDARIX, Category 5 for anything written for one

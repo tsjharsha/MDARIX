@@ -6,17 +6,17 @@
 | Title | MDARIX product risk assessment: GxP impact per function and FMEA |
 | Version | 0.1 |
 | Status | DRAFT, for review and signature |
-| Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (controls, occurrence, detectability) |
-| Reviewer | Srinivas Telikicherla, QA/RA (severity); independent CSV consultant (not engaged yet) |
+| Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (proposes every rating) |
+| Reviewer | Independent CSV consultant (confirms severities and scales; not engaged yet). The quality approver reviews every severity before approving |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver |
 | Date | 12 Nov 2026 |
-| Code baseline | Branch `feat/b6b-validation-pack` from `628c624a`; every file path below exists at that commit |
+| Code baseline | Product code at `628c624a` (branch `feat/b6b-validation-pack` adds documents only); every file path below exists at that commit |
 
 Change history
 
 | Version | Date | Change | By |
 |---|---|---|---|
-| 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-004 v0.1 (8 Nov 2026): its 43 rows re-scored on 1-5 scales with detectability, plus 21 rows for the functions built in B2 to B9 and B6a | Sriharsha Telikicherla |
+| 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-004 v0.1 (8 Nov 2026): its 43 rows re-scored on 1-5 scales with detectability, plus 22 rows for the functions built in B2 to B9 and B6a. Revised after an independent review: privacy line in the severity scale, re-rated RSK-016, -023, -025, -029, -038, -039, -046, new RSK-065, numbered rules | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -28,8 +28,8 @@ It covers every function of the MDARIX web application, API and background servi
 operating modes and in the free-trial edition. It is a software process risk assessment in the CSA sense. It is not
 the device manufacturer's ISO 14971 risk management file and it does not replace it.
 
-The ratings are the system owner's proposal. Severity is the quality approver's to set. The whole assessment is **to
-confirm with your consultant** (B6b spec section 9, questions 1 and 7).
+The system owner proposes every rating. The quality approver reviews every severity before approving, and the
+consultant confirms the severities and scales. The whole assessment is **to confirm with your consultant** (B6b spec section 9, questions 1 and 7).
 
 ## 2. References
 
@@ -47,13 +47,13 @@ confirm with your consultant** (B6b spec section 9, questions 1 and 7).
 
 | S | Meaning |
 |---|---|
-| 5 | A reportable event is missed or reported late; a wrong regulatory conclusion is signed; wrong data goes to an authority; one customer's data reaches another. Indirect effect on patient safety: a safety signal or report does not reach the authority in time |
-| 4 | The integrity of a regulated record is lost: a signed or submitted record changes without trace; a signature is invalid or not bound to its record; audit history is lost or incomplete; regulated records are lost; an unauthorised person approves |
+| 5 | A reportable event is missed or reported late; a wrong regulatory conclusion is signed; wrong data goes to an authority; one customer's data, or personal data, reaches someone outside that customer. Indirect effect on patient safety: a safety signal or report does not reach the authority in time |
+| 4 | The integrity of a regulated record is lost: a signed or submitted record changes without trace; a signature is invalid or not bound to its record; audit history is lost or incomplete; regulated records are lost; an unauthorised person approves. Or a security or privacy failure inside the customer: erased personal data comes back, or code runs on a user's computer |
 | 3 | Wrong or missing information is shown, but a trained person is expected to catch it before signing; work is delayed or repeated |
 | 2 | Inconvenience; management information wrong; no record or decision effect |
 | 1 | Cosmetic |
 
-### 3.2 Occurrence (O): with today's controls, before formal verification
+### 3.2 Occurrence (O): with today's controls and their automated tests (formal validation runs are not credited)
 
 | O | Meaning |
 |---|---|
@@ -75,20 +75,22 @@ confirm with your consultant** (B6b spec section 9, questions 1 and 7).
 
 ### 3.4 Class and priority
 
-1. The risk class shall be set by severity alone: S4 and S5 give class A, S3 class B, S1 and S2 class C.
-2. RPN = S × O × D (1 to 125). RPN shall only order the work within a class; it shall never lower a class.
+- **RA-R01** The risk class shall be set by severity alone: S4 and S5 give class A, S3 class B, S1 and S2 class C.
+- **RA-R02** RPN = S × O × D (1 to 125) shall be used only to order the work within a class.
+- **RA-R03** RPN shall not lower a class.
 
 ### 3.5 Action rule
 
-3. A row shall need action when RPN is 40 or more, or when S is 5 and D is 3 or more.
-4. For a row that needs action, the action is either the open item named in "Residual risk", or, where none is
-   named, executing its class-A scenarios with pre-approved expected results before the release that relies on it.
+- **RA-R04** A row shall be marked as needing action when RPN is 40 or more, or when S is 5 and D is 3 or more.
+- **RA-R05** A row that needs action shall have its action done before the release that relies on it: the open item
+  named in "Residual risk", or, where none is named, executing its class-A scenarios with pre-approved expected
+  results.
 
 ### 3.6 Conversion from MDX-B10-004
 
 MDX-B10-004 used three levels. Its S3 rows are now S5 (report, conclusion or cross-organisation effect) or S4
-(record-integrity effect); its S2 rows are S3. Its likelihood L1, L2, L3 became O2, O3, O4. Detectability is new.
-The conversion moved no row between classes.
+(record-integrity effect); its S2 rows are S3. Its likelihood L1, L2, L3 became O2, O3, O4. Detectability is new. The conversion itself moved no row between classes. The re-rating after the independent review moved RSK-023,
+-029 and -039 from class B to class A.
 
 ## 4. GxP impact per function
 
@@ -101,7 +103,7 @@ checks before signing. None = no record or decision effect.
 | Awareness, legal clocks, daily deadline list | Direct | A | Scripted, including weekends, daylight saving, time zones | A wrong clock gives a late report | RSK-002, -007, -008, -046 |
 | Triage escalation | Direct | A | Scripted | Decides the fast track for death and serious injury | RSK-031, -032 |
 | Complaint or service classification, routine path | Direct | A | Scripted | "Service only" removes the record from reportability assessment | RSK-033, -034, -052 |
-| Reportability per market, rule register | Direct | A | Scripted; equivalence tests | Suggests the regulatory outcome a person signs | RSK-001, -003 to -006, -050, -054, -055 |
+| Reportability per market, rule register | Direct | A | Scripted; equivalence tests | Suggests the regulatory outcome a person signs | RSK-001, -003 to -006, -050, -054, -055, -065 |
 | Authority report files (eMDR, EU and GB MIR, MvPI, Canada, other countries) | Direct | A | Scripted; schema validation; owner's by-eye check of each form | The customer submits these files to the authority | RSK-022 to -024, -053 to -055 |
 | E-signatures, segregation of duties, signer training | Direct | A | Scripted, negative | Part 11 signature controls | RSK-009 to -015 |
 | Audit trail, chain verification, reason for change | Direct | A | Scripted; tamper tests | Part 11 audit trail | RSK-016 to -018, -048 |
@@ -111,7 +113,7 @@ checks before signing. None = no record or decision effect.
 | Signed reviews: audit trail review, access review, configuration snapshot | Direct | A | Scripted | Evidence for the customer's own periodic controls | RSK-049 |
 | Investigation and challenge loop, CAPA effectiveness | Direct (signed conclusion); Indirect (suggestions, display) | A / B | Scripted for the signature; scenario test for the rest | The conclusion is signed; suggestions are checked by a person | RSK-051, -061 |
 | QMS documents (PMS drafts) | Direct (signed version); Indirect (data tables) | A / B | As above | The signed version is a GxP record | RSK-062 |
-| Export and exit | Direct | A | Scripted; manifest hashes | The customer's inspection pack and exit copy | RSK-035, -036 |
+| Export and exit | Direct | A | Scripted; manifest hashes | The customer's inspection pack and exit copy | RSK-029, -035, -036 |
 | Backup, restore, recovery, time source | Direct | A | Restore drill and recovery record | Loss or wrong time of regulated records | RSK-037 to -040, -047, -056 |
 | Platform administration, support access | Direct (access to GxP data) | A | Negative tests | Third-party access to customer records | RSK-014, -015 |
 | Sample clock (free trial) | Direct if it fails (could move a real record) | A | Scripted | Must never touch a customer's own records | RSK-030 |
@@ -124,13 +126,13 @@ checks before signing. None = no record or decision effect.
 
 ## 5. FMEA
 
-S, O, D, RPN and the action rule as in section 3. "Threats" are MDX-B10-006 identifiers (R4). "REQ (seed)" are the
+S, O, D, RPN and the action rule as in section 3 (column "Action": RA-R04). "Threats" are MDX-B10-006 identifiers (R4). "REQ (seed)" are the
 seed requirements of MDX-B10-005 section 7 (R3); "(B6b B1)" means the requirement ID is assigned when
 `requirements.csv` is built (B6b Part B). The verification column names the scenarios and automated tests that will
 give the evidence. It does not claim they have passed in a validation run: most scenario rows are NOT RUN today
 (scenario register).
 
-| ID | Area | Failure mode | Effect | S | O | D | RPN | Class | Action (rule 3.5) | Controls (code) | Verification | Threats | REQ (seed) | Residual risk |
+| ID | Area | Failure mode | Effect | S | O | D | RPN | Class | Action (RA-R04) | Controls (code) | Verification | Threats | REQ (seed) | Residual risk |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | RSK-001 | Reportability | An Unknown answer is treated as No, giving "not reportable" | Missed report | 5 | 2 | 3 | 30 | A | Yes | Unknown is never No; "not reportable" refused while an Unknown could make it reportable (`backend/app/reportability/markets.py`, `assessments.py`) | RG-05, DT-06 to DT-08; `tests/test_market_assessment_rules.py` | - | REQ-RPT-001 | Acceptable after verification |
 | RSK-002 | Legal clocks | Wrong deadline: wrong time zone, day-0/day-1 counting, weekend, daylight saving | Late report | 5 | 3 | 4 | 60 | A | Yes | One deadline function for every screen; authority time zones; earlier of authority and organisation day (`backend/app/reportability/deadlines.py`) | RG-10, RG-11, DT-16; `tests/test_legal_deadlines.py`, `tests/test_one_deadline_api.py` | - | REQ-CLK-001, REQ-CLK-002 | Acceptable after verification; GB and India day-1 and Canada rules to confirm |
@@ -147,37 +149,37 @@ give the evidence. It does not claim they have passed in a validation run: most 
 | RSK-013 | Segregation of duties | The maker approves their own work outside a trial | No independent check | 4 | 3 | 3 | 36 | A | No | Segregation checks (`backend/app/access/governance.py`, `backend/app/authority_reports/router.py`, `backend/app/case_reviews/rules.py`); same person allowed in a trial only, labelled | CI-17, CI-34, CI-35, TR-05, DT-12, DT-14; `tests/test_case_reviews.py` | PT-05 | REQ-SOD-001 | **Open:** a negative test that the trial allowance never applies to a pilot organisation |
 | RSK-014 | Segregation of duties | An administrator approves a regulated decision | Unauthorised approval | 4 | 2 | 3 | 24 | A | No | Administrators never approve (migration `md03_retire_viewer_approval_authority.py`) | DT-13; `tests/test_authorization_matrix.py` | PT-03, PT-17 | REQ-SOD-002 | Acceptable after verification |
 | RSK-015 | Platform administration | MDARIX staff change customer data | Untraceable third-party change | 4 | 2 | 3 | 24 | A | No | Customer-approved, time-limited support grants; requester, approver and recipient differ (`backend/app/support_access.py`, ADR-015) | `tests/test_support_access_sod.py`, `tests/test_support_access_customer_approval.py` | PT-17 | (B6b B1) | Acceptable after verification |
-| RSK-016 | Audit trail | An audit row is updated or deleted | Lost history | 4 | 2 | 1 | 8 | A | No | Database trigger rejects UPDATE and DELETE (migration `o31audit_immutability.py`) | `tests/test_day35_audit_immutability.py` | PT-14 | REQ-AUD-001 | Acceptable after verification |
+| RSK-016 | Audit trail | An audit row is updated or deleted | Lost history | 4 | 1 | 1 | 4 | A | No | Database trigger rejects UPDATE and DELETE (migration `o31audit_immutability.py`) | `tests/test_day35_audit_immutability.py` | PT-14 | REQ-AUD-001 | Acceptable after verification |
 | RSK-017 | Audit trail | The chain is rewritten by someone with database-owner rights | Undetected alteration | 4 | 3 | 4 | 48 | A | Yes | Hash chain per organisation (`md18_audit_chain.py`, `z45_audit_hash_chain.py`); daily verification with anchors (`backend/app/audit_chain.py`) | `tests/test_audit_hash_chain.py` | PT-14, G-3 | REQ-AUD-002 | **Open:** anchors and logs sit on the same server as the database; copy anchors off the server (threat model G-3) |
 | RSK-018 | Audit trail | A change is not audited (old or new value, or reason, missing) | Incomplete trail | 4 | 3 | 4 | 48 | A | Yes | Audit with actor, time, reason, old and new values (`backend/app/enterprise_audit.py`); reason required on regulated edits (RSK-048) | CI-33, B6-36 | PT-14 | (B6b B1) | **Open:** route-by-route audit completeness check |
 | RSK-019 | Records | A signed conclusion is edited in place | History lost | 4 | 2 | 2 | 16 | A | No | A signed decision is never edited; a correction is a superseding version (`backend/app/human_decision/rules.py`) | IV-16, CI-07, CI-24, TR-02, TR-03 | PT-04 | REQ-REC-001 | Acceptable after verification |
 | RSK-020 | Records | A submitted report is overwritten | Record differs from what was sent | 4 | 2 | 3 | 24 | A | No | Obligation lifecycle states; a follow-up after submission (`backend/app/authority_reports/rules.py`) | RG-15 to RG-17 | PT-04 | REQ-REC-002 | Acceptable after verification |
 | RSK-021 | Records | An upgrade script changes signed records | Silent change | 4 | 3 | 2 | 24 | A | No | Upgrade scripts list, never change, signed conclusions; audited | CI-44; `tests/test_release_0_10_88_resign.py` | PT-04 | (B6b B1) | Acceptable after verification |
 | RSK-022 | Authority reports | A value is placed in the wrong field or code list | Wrong report sent by the customer | 5 | 3 | 3 | 45 | A | Yes | Values only from the approved snapshot; a choice ticked only on FDA's exact wording; unplaced values listed (`backend/app/authority_reports/fda_3500a.py`); eMDR validated against FDA schemas (`emdr.py`) | RG-19; `tests/test_fda_3500a_emdr.py` | - | REQ-ARD-001 | Acceptable after verification for the US; see RSK-053 and RSK-054 for the other markets |
-| RSK-023 | Authority reports | A missing required field is not flagged | Rejected or incomplete report | 3 | 3 | 2 | 18 | B | No | `check` names every block FDA requires (`emdr.py`) | RG-17, RG-18 | - | (B6b B1) | Acceptable after verification |
-| RSK-024 | Authority reports | Responsible-party details changed after approval appear on the report | Report differs from the approval | 5 | 2 | 3 | 30 | A | Yes | The party is used only while it still reads exactly as on the approved report (`emdr.py`) | Scenario to add | PT-04 | REQ-ARD-001 | Acceptable after verification |
-| RSK-025 | Tenant isolation | One organisation reads another's record by ID, search, export, file or report | Data breach | 5 | 3 | 4 | 60 | A | Yes | Tenant from the server session only; forced row-level security with a secret system scope (`backend/app/db/tenant_scope.py`, migrations `md05_rls_system_scope.py`, `md15_rls_system_token.py`, `md34_rls_defence.py`) | P360-11, S360-14, B6-45; `tests/test_rls_coverage.py`, `tests/test_cross_tenant_routes.py`, `tests/test_tenant_security.py` | PT-01, PT-02, PT-16 | REQ-TEN-001 | Acceptable after verification; independent penetration test before the first paid pilot |
+| RSK-023 | Authority reports | A missing required field is not flagged | Rejected, therefore late, report | 5 | 3 | 2 | 30 | A | No | `check` names every block FDA requires (`emdr.py`) | RG-17, RG-18 | - | (B6b B1) | Acceptable after verification |
+| RSK-024 | Authority reports | Responsible-party details changed after approval appear on the report | Report differs from the approval | 5 | 2 | 3 | 30 | A | Yes | The party is used only while it still reads exactly as on the approved report (`emdr.py`) | Scenario to add (no test yet) | PT-04 | REQ-ARD-001 | **Open (verification):** add a scenario and a test |
+| RSK-025 | Tenant isolation | One organisation reads another's record by ID, search, export, file or report | Data breach | 5 | 2 | 4 | 40 | A | Yes | Tenant from the server session only; forced row-level security with a secret system scope (`backend/app/db/tenant_scope.py`, migrations `md05_rls_system_scope.py`, `md15_rls_system_token.py`, `md34_rls_defence.py`) | P360-11, S360-14, B6-45; `tests/test_rls_coverage.py`, `tests/test_cross_tenant_routes.py`, `tests/test_tenant_security.py` | PT-01, PT-02, PT-16 | REQ-TEN-001 | Acceptable after verification; independent penetration test before the first paid pilot |
 | RSK-026 | Tenant isolation | A background job runs with the wrong organisation scope | Cross-organisation write or e-mail | 5 | 3 | 4 | 60 | A | Yes | The worker claims one event at a time, each in its own transaction (`outbox/worker.py`); scope bound per session | `tests/test_outbox_resilience.py` (partial) | PT-15 | REQ-TEN-002 | **Open:** a negative test of organisation scope per job type |
 | RSK-027 | Import | A row is mis-mapped (for example a death column read as No) | Missed triage or report | 5 | 3 | 3 | 45 | A | Yes | Rows set aside in quarantine with reasons; harm rows reach triage while quarantined (`backend/app/import_quarantine.py`); lineage per row with mapping version (`backend/app/import_lineage.py`) | IN-13, IN-14, TR-21, TR-36 to TR-38; `tests/test_import_quarantine_unit.py`, `tests/test_import_lineage_unit.py` | - | REQ-IMP-001 | Acceptable after verification |
 | RSK-028 | Import | A repeated import creates duplicate complaints | Double counting, conflicting conclusions | 3 | 3 | 2 | 18 | B | No | Duplicate external ID goes to reconciliation; a re-run is idempotent | IN-12, IN-14, CI-15, CI-31; `tests/test_import_reupload.py` | - | (B6b B1) | Acceptable after verification |
-| RSK-029 | Export | Formula injection in an exported CSV | Code runs on a user's computer | 3 | 2 | 4 | 24 | B | No | `backend/app/csv_safe.py` on every CSV | `tests/test_csv_safe.py` | - | (B6b B1) | Acceptable |
+| RSK-029 | Export | Formula injection in an exported CSV | Code runs on a user's computer; data can leave the organisation | 4 | 2 | 4 | 32 | A | No | `backend/app/csv_safe.py` on every CSV | `tests/test_csv_safe.py` | - | (B6b B1) | Acceptable |
 | RSK-030 | Sample clock | The hourly sample-clock job moves a customer's own record dates | Real awareness or deadline changed | 5 | 2 | 4 | 40 | A | Yes | Moves only rows whose `source_system` is the sample's own value (`backend/app/trial/sample_source.py`, `sample_clock.py`); whole days only | CI-18, TR-16, P360-13; `tests/test_sample_story_days.py` | - | REQ-SMP-001 | Acceptable after verification; confirm the job cannot run in a pilot organisation |
 | RSK-031 | Triage | Death or serious injury is not fast-tracked | Late 2-, 5- or 10-day report | 5 | 3 | 3 | 45 | A | Yes | Triage flag on death, serious injury, harm words, Unknown on Q4 to Q6, manual escalation (`backend/app/intake/rules.py`) | IN-05, CI-13, TR-01, TR-19, TR-27 to TR-31; `tests/test_intake_triage_api.py`, `tests/test_signals_triage.py` | - | REQ-TRG-001, REQ-TRG-002 | Acceptable after verification |
 | RSK-032 | Triage | Overdue triage is not escalated | Late action | 3 | 3 | 3 | 27 | B | No | Overdue alert, backup person, escalation role | TR-08, TR-09, CI-16 | - | (B6b B1) | Acceptable after verification |
 | RSK-033 | Classification | A complaint is recorded as "service only" | Complaint never assessed for reporting | 5 | 3 | 4 | 60 | A | Yes | Fixed outcomes table; "Service only" only from row 2, no override reaches it (`backend/app/intake/rules.py`); complaint-to-service down-grade refused | IN-02 to IN-04, IN-21, IN-22, CI-19 to CI-25, RT rows; `tests/test_intake_rules.py` | - | REQ-CLS-001, REQ-CLS-002 | Acceptable after verification |
 | RSK-034 | Classification | Classification codes drive a deadline by mistake | Wrong clock | 5 | 2 | 3 | 30 | A | Yes | Classification never sets a deadline or conclusion (`backend/app/complaint_classification/rules.py`) | `tests/test_complaint_disposition_rules.py` | - | REQ-CLS-003 | Acceptable after verification |
 | RSK-035 | Export and exit | The export misses records or versions | Incomplete inspection pack or exit copy | 4 | 3 | 3 | 36 | A | No | Tables discovered from the database; manifest with counts, SHA-256 and verified audit head (`backend/app/tenant_export.py`) | `tests/test_day25_retention_export.py`, `tests/test_export_purge_mfa.py` | - | REQ-EXP-001 | Acceptable after verification; a readable export of record, versions, approvals, audit and rule versions to verify |
-| RSK-036 | Export and exit | An export link is used after expiry or by another person | Data leak | 5 | 3 | 4 | 60 | A | Yes | Exports expire and are deleted; download streamed behind sign-in (`backend/app/tenant_export_api.py`) | Threat-model tests PT-11, PT-13 | PT-11, PT-13 | (B6b B1) | Acceptable after verification |
-| RSK-037 | Backup and restore | A backup fails silently | Data loss at a disaster | 4 | 3 | 2 | 24 | A | No | Daily encrypted dump with SHA-256 manifest; backup-age check (26 h); off-site copy (`infrastructure/docker/backup/backup.sh`, `docs/runbooks/GCP_DEPLOYMENT.md`) | `tests/test_backup_retention.py`, `tests/test_infra_backup_role.py`; restore drill | G-1, G-6 | REQ-BAK-001 | Acceptable after verification |
-| RSK-038 | Backup and restore | Up to 24 hours of records lost (no point-in-time recovery; files on the server disk) | Lost complaints, signatures, awareness times | 4 | 4 | 4 | 64 | A | Yes | Daily dump and daily disk snapshot only; the RPO is stated as 24 hours (owner decision B6b-D8) | Restore drill | G-1, G-2 | (B6b B1) | **Open:** gap to the 15-minute target; closed by point-in-time recovery on pilot hosting. The recovery check (B6b Part D) shows each organisation the window to back-enter |
-| RSK-039 | Backup and restore | A restore brings back erased personal data | Privacy breach | 3 | 3 | 2 | 18 | B | No | Erasure log and `reapply_erasures` (`backend/app/tenant_purge.py`); restore runbook section 4 | Restore drill step (dry run recorded 3 Nov 2026) | - | REQ-BAK-001 | Acceptable after verification |
+| RSK-036 | Export and exit | An export link is used after expiry or by another person | Data leak | 5 | 3 | 4 | 60 | A | Yes | Exports expire and are deleted; download streamed behind sign-in (`backend/app/tenant_export_api.py`) | `tests/test_tenant_data.py` (export expiry); download by another person: threat-model test PT-13 to add | PT-11, PT-13 | (B6b B1) | Acceptable after verification |
+| RSK-037 | Backup and restore | A backup fails silently | Data loss at a disaster | 4 | 3 | 2 | 24 | A | No | Daily encrypted dump with SHA-256 manifest (`infrastructure/docker/backup/backup.sh`); backup-age check, 26 h (`scripts/check_backup_age.sh`); off-site copy (`docs/runbooks/GCP_DEPLOYMENT.md`) | `tests/test_backup_retention.py`, `tests/test_infra_backup_role.py`; restore drill | G-1, G-6 | REQ-BAK-001 | Acceptable after verification |
+| RSK-038 | Backup and restore | Up to 24 hours of records lost (no point-in-time recovery; files on the server disk) | Lost complaints, signatures, awareness times; a report can be missed | 5 | 4 | 4 | 80 | A | Yes | Daily dump and daily disk snapshot only; the RPO is stated as 24 hours (owner decision B6b-D8) | Restore drill | G-1, G-2 | (B6b B1) | **Open:** gap to the 15-minute target; closed by point-in-time recovery on pilot hosting. The recovery check (B6b Part D) shows each organisation the window to back-enter |
+| RSK-039 | Backup and restore | A restore brings back erased personal data | Erased personal data back in use | 4 | 3 | 2 | 24 | A | No | Erasure log and `reapply_erasures` (`backend/app/tenant_purge.py`); restore runbook section 4 | Restore drill step (dry run recorded 3 Nov 2026) | - | REQ-BAK-001 | Acceptable after verification |
 | RSK-040 | Backup and restore | A restore cannot be done (key lost) | Total loss | 4 | 2 | 2 | 16 | A | No | The backup private key is kept off the server by the operator | Quarterly drill | G-7 | (B6b B1) | Acceptable after verification; key custody needs a second holder (threat model G-7) |
 | RSK-041 | AI (off) | An AI suggestion is accepted without review, or overrides a person | Wrong conclusion | 5 | n/a | n/a | n/a | A | n/a | AI release gate enforced in production (`backend/app/ai_release_gate.py`); advisory only | Golden evaluation before switch-on | PT-09 | (at switch-on) | Not applicable while AI is off |
 | RSK-042 | AI (off) | Prompt injection from evidence files | Manipulated suggestion or data leak | 5 | n/a | n/a | n/a | A | n/a | Field allowlist for AI context (`backend/app/ai_boundary.py`); PII masking | Before switch-on | PT-09 | (at switch-on) | Not applicable while AI is off |
 | RSK-043 | AI (off) | Customer data sent to a non-contracted provider | Privacy breach | 5 | n/a | n/a | n/a | A | n/a | Contracted-provider and retention checks (`genai/policy.py`, `genai/provider.py`) | `tests/test_ai_release_gate_unit.py` | PT-10 | (at switch-on) | Not applicable while AI is off |
 | RSK-044 | E-mail intake | An e-mail to the intake address does not become a Case, or its received time is wrong | Missed or late complaint, clock starts late | 5 | 3 | 3 | 45 | A | Yes | Received = the server's own receipt time; unknown addresses refused at SMTP (EM-01); each accepted e-mail listed for a person to check | EM rows; `tests/test_mail_in.py`, `tests/test_email_intake_api.py`, `tests/test_mail_processing.py` | PT-08 | (B6b B1) | Acceptable after verification |
 | RSK-045 | Back-entry after an outage | A Case entered after an outage counts its clock from the entry time, or is entered twice | Late report, or double counting | 5 | 2 | 2 | 20 | A | No | Clock counts from awareness, never from entry; a late-entry reason is required after 24 hours (422 `LATE_ENTRY_REASON_NEEDED`); possible duplicates shown before saving | B6-07 to B6-09; `tests/test_b6a_back_entry.py` | - | (B6b B1) | Acceptable after verification |
-| RSK-046 | Daily deadline list | The daily deadline list is not sent or is incomplete during an outage | Deadlines missed while MDARIX is down | 4 | 2 | 2 | 16 | A | No | An empty list is still sent, so a missing e-mail shows a problem; the last recipient cannot switch it off; CSV and PDF download | B6-01 to B6-06; `tests/test_b6a_deadline_list.py` | - | (B6b B1) | Acceptable after verification |
+| RSK-046 | Daily deadline list | The daily deadline list is not sent or is incomplete during an outage | Deadlines missed while MDARIX is down | 5 | 2 | 2 | 20 | A | No | An empty list is still sent, so a missing e-mail shows a problem; the last recipient cannot switch it off; CSV and PDF download | B6-01 to B6-06; `tests/test_b6a_deadline_list.py` | - | (B6b B1) | Acceptable after verification |
 | RSK-047 | Time source | The server clock drifts, so audit and signature times are wrong | Wrong times on regulated records | 4 | 2 | 2 | 16 | A | No | Clock check with a 1-second limit; degraded state and an operations alert (`scripts/clock_check.py`) | B6-10, B6-11; `tests/test_b6a_clock_unit.py` | - | (B6b B1) | Acceptable after verification |
 | RSK-048 | Reason for change | A regulated value is changed without a reason, or after signing without a flag | Unexplained change in the record | 4 | 2 | 1 | 8 | A | No | A reason is required on reporting-fact edits and on re-uploads behind a signed decision; a flag when facts change after signing; signed bytes unchanged | B6-36 to B6-38; `tests/test_b6a_change_reason.py`, `tests/test_b6a_reupload_reason.py` | PT-04 | (B6b B1) | Acceptable after verification |
 | RSK-049 | Signed reviews (audit trail, access, configuration) | A signed review does not reflect the true state, or changes after signing | Review evidence unreliable | 4 | 2 | 3 | 24 | A | No | Flags computed from the trail; every row marked before signing; own rows marked by another person; content fingerprint fixed at signing; configuration snapshot holds no secret (`backend/app/signed_reviews/`) | B6-28 to B6-35; `tests/test_b6a_signed_reviews.py` | PT-14 | (B6b B1) | Acceptable after verification |
@@ -196,11 +198,13 @@ give the evidence. It does not claim they have passed in a validation run: most 
 | RSK-062 | QMS documents | A signed PMS document version changes after signing | Signed record altered | 4 | 2 | 2 | 16 | A | No | A signed version is never edited; a new version supersedes it | `tests/test_qms_documents_rules.py`, `tests/test_qms_documents_api.py` | PT-04 | (B6b B1) | Acceptable after verification |
 | RSK-063 | Notifications and outbox | A notification is lost or stays dead-lettered unseen | Late action | 3 | 2 | 2 | 12 | B | No | Dead-letter with reason; operations alerts; audited replay of one event (`scripts/replay_outbox.py`) | `tests/test_outbox_resilience.py`, `tests/test_replay_outbox_script.py` | PT-15 | (B6b B1) | Acceptable after verification |
 | RSK-064 | Value Centre and dashboards | A figure on the Value Centre or a dashboard is wrong | Wrong management information; no record or decision effect | 2 | 3 | 4 | 24 | C | No | Medians on known data; sample records excluded; no per-person numbers | B6-43, B6-44; `tests/test_b6a_value_centre.py` | - | (B6b B1) | Acceptable |
+| RSK-065 | Rule register | The same person writes and approves a rule version | No independent check of rule content | 4 | 3 | 3 | 36 | A | No | The rule file records writer and approver; the register does not refuse the same person (`backend/app/rule_register/register.py`) | None yet | - | (B6b B1) | **Open:** decide whether the register refuses the same person (MDX-VAL-003 OP-3); until then the change-control SOP requires two people |
 
 ## 6. Summary
 
-- 64 failure modes: 51 class A, 12 class B, 1 class C. Three AI rows (RSK-041 to -043) are not rated while AI is off.
-- 28 rows need action under rule 3.5: RSK-001 to -008, -017, -018, -022, -024 to -027, -030, -031, -033, -034, -036,
+- 65 failure modes: 55 class A, 9 class B, 1 class C. Three AI rows (RSK-041 to -043) are not rated while AI is off.
+- 32 rows have no seed REQ ID yet ("(B6b B1)"); IDs are assigned when `requirements.csv` is built (OP-3).
+- 28 rows need action under RA-R04: RSK-001 to -008, -017, -018, -022, -024 to -027, -030, -031, -033, -034, -036,
   -038, -044, -050, -052 to -056. For most of them the action is to execute their class-A scenarios.
 - **Open control gaps** (action named in "Residual risk"):
   - RSK-003: question sets to be confirmed by the consultant.
@@ -210,6 +214,9 @@ give the evidence. It does not claim they have passed in a validation run: most 
   - RSK-026: negative test of organisation scope per background job type.
   - RSK-038: RPO 24 hours today; target 15 minutes with point-in-time recovery on pilot hosting.
   - RSK-056: outbox events held after a restore (recovery check, B6b Part D).
+  - RSK-065: the rule register does not refuse the same person as writer and approver.
+- **Verification gaps** (no test yet for a row that needs action): RSK-024 (no scenario or test), RSK-026 (outbox
+  test covers part only), RSK-036 (download by another person: threat-model test PT-13 to add).
 
 ## 7. Open points
 
@@ -227,5 +234,6 @@ Unsigned. The signed PDF and its `signatures.csv` row are added after review (MD
 
 | Role | Name | Meaning of signature | Signature | Date |
 |---|---|---|---|---|
-| Author (R), system owner | Sriharsha Telikicherla, Product & Engineering | I rated controls, occurrence and detectability and reviewed every line. | | |
-| Approver (A), quality approver | Srinivas Telikicherla, QA/RA | I set the severities and approve this assessment for use. | | |
+| Author (R), system owner | Sriharsha Telikicherla, Product & Engineering | I proposed every rating and reviewed every line. | | |
+| Reviewer (C) | Independent CSV consultant | I reviewed the severities, scales and ratings; my comments are recorded. | | |
+| Approver (A), quality approver | Srinivas Telikicherla, QA/RA | I reviewed every severity and approve this assessment for use. | | |
