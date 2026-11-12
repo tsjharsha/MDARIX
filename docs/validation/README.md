@@ -218,10 +218,11 @@ also questions in MDX-VAL-013.
 | O1 | Validation records are kept at least 10 years after a release leaves the last customer, 15 years where a customer makes implantable devices (consultant to confirm) |
 | O2 | MDX-B10-001, -002, -005 and -006 move from the planning folder into `docs/validation/` (done 12 Nov 2026, commit `69248534`) |
 | O3 | The rule register refuses the same person as builder and approver of a rule version (MDX-VAL-002 RSK-065; `backend/app/rule_register/register.py`, added 12 Nov 2026, commit `cb75e8da`) |
-| O4 | RSK-023, RSK-029 and RSK-039 are class A: RSK-023 by the late-report line of severity 5 (confirmed by the owner, 12 Nov 2026); RSK-029 and RSK-039 by the privacy line of severity 4 |
+| O4 | RSK-023, RSK-029 and RSK-039 are class A: RSK-023 by the late-report line of severity 5 (confirmed by the owner, 12 Nov 2026); RSK-039 by the privacy line of severity 4; RSK-029 by the privacy line, now severity 5 (O8) |
 | O5 | No periodic password expiry (NIST SP 800-63B); lockout, breached-password checks and multi-factor authentication instead. Decided by the owner at MVP readiness, before B6b; listed here so that it is controlled (consultant to confirm, MDX-VAL-013 question 6) |
 | O6 | RSK-066 (purge, retention, legal hold) has severity S5; RSK-067 (sign-in and sessions) stays S4 (owner, 12 Nov 2026) |
 | O7 | Severity 5 includes the permanent loss of regulated records; severity 4 the loss of regulated records that can be recovered (owner, 12 Nov 2026; MDX-VAL-002 section 3.7) |
+| O8 | RSK-029 (formula injection in an exported CSV) has severity S5: data can leave the organisation (owner, 12 Nov 2026) |
 
 ## 5. Codes used in these documents
 
