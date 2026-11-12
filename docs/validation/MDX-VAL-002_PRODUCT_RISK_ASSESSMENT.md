@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-002 |
 | Title | Product risk assessment |
-| Version | 0.4 |
+| Version | 0.5 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (proposes every rating) |
 | Reviewer | Independent CSV consultant (confirms severities and scales; not engaged yet). The quality approver reviews every severity before approving |
@@ -21,6 +21,7 @@ Change history
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: rules for an open class-A row and for the residual-risk values (section 3.5); two functions split by sub-function; RSK-002, -025, -030, -035, -040 marked Open and listed; RSK-065 per owner decision O3; RSK-036 and RSK-023 Open (verification); RSK-066 (purge, retention, legal hold) and RSK-067 (sign-in, sessions) added; residual-risk values in a table; RSK-065 closed by the refusal in `register.py` (re-rated O2, D1); re-rating of RSK-023, -029, -039 agreed by the owner (O4) | Sriharsha Telikicherla |
 | 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: RSK-023 is class A by the late-report line of severity 5 (O4 confirmed); RSK-066 re-rated S5 (RPN 30, needs action under RA-R04), RSK-067 stays S4 (O6); 29 rows need action; REQ IDs from `requirements.csv` for the 34 rows without a seed (OP-3); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Sriharsha Telikicherla |
 | 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O7 severity 5 = permanent loss of regulated records, severity 4 = recoverable loss; every row citing either line re-checked (section 3.7): RSK-037 and RSK-040 raised to S5; O8 RSK-029 raised to S5 (RPN 40, needs action); O9 detection only at the quarterly restore drill is D4 (detectability scale), RSK-039 re-scored D4 (RPN 48) and RSK-040 D4 (RPN 40), both now need action; 32 rows need action; O10 RSK-065 control compares staff accounts, not typed names; O15 PL-xx scenarios named in the verification of RSK-023, -026, -036; RA-R05 points to RA-R07 for Open rows | Sriharsha Telikicherla |
+| 0.5 | 12 Nov 2026 | Owner decision O21 of 12 Nov 2026 ("approve all eight"): RSK-037 re-scored D4 under O9 (a backup that cannot be restored is found only at the quarterly drill): RPN 60, needs action; 33 rows need action | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -210,7 +211,7 @@ give the evidence. It does not claim they have passed in a validation run: most 
 | RSK-034 | Classification | Classification codes drive a deadline by mistake | Wrong clock | 5 | 2 | 3 | 30 | A | Yes | Classification never sets a deadline or conclusion (`backend/app/complaint_classification/rules.py`) | `tests/test_complaint_disposition_rules.py` | - | REQ-CLS-003 | Acceptable after verification |
 | RSK-035 | Export and exit | The export misses records or versions | Incomplete inspection pack or exit copy | 4 | 3 | 3 | 36 | A | No | Tables discovered from the database; manifest with counts, SHA-256 and verified audit head (`backend/app/tenant_export.py`) | `tests/test_day25_retention_export.py`, `tests/test_export_purge_mfa.py` | - | REQ-EXP-001 | **Open (verification):** a readable export of record, versions, approvals, audit and rule versions to verify |
 | RSK-036 | Export and exit | An export link is used after expiry or by another person | Data leak | 5 | 3 | 4 | 60 | A | Yes | Exports expire and are deleted; download streamed behind sign-in (`backend/app/tenant_export_api.py`) | `tests/test_tenant_data.py` (export expiry); download by another person: PL-23 (drafted, O15), threat-model test PT-13 to add | PT-11, PT-13 | REQ-EXP-003 | **Open (verification):** test PT-13, download by another person |
-| RSK-037 | Backup and restore | A backup fails silently | Regulated records permanently lost at a disaster (no good backup) | 5 | 3 | 2 | 30 | A | No | Daily encrypted dump with SHA-256 manifest (`infrastructure/docker/backup/backup.sh`); backup-age check, 26 h (`scripts/check_backup_age.sh`); off-site copy (`docs/runbooks/GCP_DEPLOYMENT.md`) | `tests/test_backup_retention.py`, `tests/test_infra_backup_role.py`; restore drill | G-1, G-6 | REQ-BAK-001 | Acceptable after verification |
+| RSK-037 | Backup and restore | A backup fails silently | Regulated records permanently lost at a disaster (no good backup) | 5 | 3 | 4 | 60 | A | Yes | Daily encrypted dump with SHA-256 manifest (`infrastructure/docker/backup/backup.sh`); backup-age check, 26 h (`scripts/check_backup_age.sh`); off-site copy (`docs/runbooks/GCP_DEPLOYMENT.md`) | `tests/test_backup_retention.py`, `tests/test_infra_backup_role.py`; restore drill (a backup that exists but cannot be restored is found only at the quarterly drill: D4, owner decision O21) | G-1, G-6 | REQ-BAK-001 | Acceptable after verification |
 | RSK-038 | Backup and restore | Up to 24 hours of records lost (no point-in-time recovery; files on the server disk) | Lost complaints, signatures, awareness times; a report can be missed | 5 | 4 | 4 | 80 | A | Yes | Daily dump and daily disk snapshot only; the RPO is stated as 24 hours (owner decision B6b-D8) | Restore drill | G-1, G-2 | REQ-BAK-002 | **Open:** gap to the 15-minute target; closed by point-in-time recovery on pilot hosting. The recovery check (B6b Part D) shows each organisation the window to back-enter |
 | RSK-039 | Backup and restore | A restore brings back erased personal data | Erased personal data back in use | 4 | 3 | 4 | 48 | A | Yes | Erasure log and `reapply_erasures` (`backend/app/tenant_purge.py`); restore runbook section 4 | Restore drill step (dry run recorded 3 Nov 2026) | - | REQ-BAK-001 | Acceptable after verification |
 | RSK-040 | Backup and restore | A restore cannot be done (key lost) | Regulated records permanently lost (total loss) | 5 | 2 | 4 | 40 | A | Yes | The backup private key is kept off the server by the operator | Quarterly drill | G-7 | REQ-BAK-003 | **Open:** key custody needs a second holder (threat model G-7) |
@@ -247,8 +248,9 @@ give the evidence. It does not claim they have passed in a validation run: most 
 - 67 failure modes: 57 class A, 9 class B, 1 class C. Three AI rows (RSK-041 to -043) are not rated while AI is off.
 - Every rated row names its REQ IDs in `requirements.csv` (69 requirements: 59 class A, 9 class B, 1 class C); the 34
   rows without a seed got their IDs on 12 Nov 2026 (OP-3 closed). The three AI rows get theirs at switch-on.
-- 32 rows need action under RA-R04: RSK-001 to -008, -017, -018, -022, -024 to -027, -029 to -031, -033, -034, -036,
-  -038 to -040, -044, -050, -052 to -056, -066 (RSK-029, -039 and -040 added on 12 Nov 2026 by owner decisions O7 to O9). For most of them the action is to execute their class-A scenarios.
+- 33 rows need action under RA-R04: RSK-001 to -008, -017, -018, -022, -024 to -027, -029 to -031, -033, -034, -036,
+  -037 to -040, -044, -050, -052 to -056, -066 (RSK-029, -039 and -040 added on 12 Nov 2026 by owner decisions O7 to
+  O9; RSK-037 by O21). For most of them the action is to execute their class-A scenarios.
 - **Open control gaps** (action named in "Residual risk"):
   - RSK-002: GB, India day-1 and Canada counting rules to be confirmed with the consultant.
   - RSK-003: question sets to be confirmed by the consultant.
