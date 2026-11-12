@@ -499,7 +499,9 @@ def test_another_organization_cannot_read_dispositions_and_removal_and_purge_cov
     assert "complaint_dispositions" in TRIAL_DATA_TABLES
 
 
-def test_an_organization_outside_a_trial_signs_without_the_practice_acknowledgement():
+def test_an_organization_outside_a_trial_signs_only_after_its_training_record():
+    """RSK-011 (owner, 12 Nov 2026, replacing decision 6): no training record in the organization at all is refused
+    with the documents to confirm, not skipped; after the record (not a practice one) the signature goes through."""
     from backend.app.trial.retention import purge_trial
     from tests.test_reporting_capa_api import PASSWORD as ORG_PASSWORD
     from tests.test_reporting_capa_api import _client, _complaint, _organization, _product
@@ -512,8 +514,17 @@ def test_an_organization_outside_a_trial_signs_without_the_practice_acknowledgem
             tenant_id, _product(tenant_id), country="US", problem_code=None, patient_involved=False, malfunction=False
         )
         screen = leader.get(_url(complaint)).json()
-        assert screen["training_required"] is False and screen["practice_label"] is None
+        assert screen["training_required"] is True and screen["practice_label"] is None
         assert screen["routine"]["offered"] is True
+        refused = _sign(leader, complaint, "SERVICE_LEVEL", screen, password=ORG_PASSWORD)
+        assert refused.status_code == 409 and refused.json()["detail"]["code"] == "TRAINING_REQUIRED"
+        message = refused.json()["detail"]["message"]
+        assert message.startswith("Training needed before signing") and "Signer training" in message
+        assert len(refused.json()["detail"]["missing"]) == 2
+        _acknowledge(leader)
+        states = leader.get(f"{TRAINING}?documents=DISPOSITION_RULES").json()["documents"]
+        assert states[0]["method"] == "read and acknowledged in MDARIX"
+        screen = leader.get(_url(complaint)).json()
         signed = _sign(leader, complaint, "SERVICE_LEVEL", screen, password=ORG_PASSWORD)
         assert signed.status_code == 200, signed.text
         assert signed.json()["current"]["branch"] == "SERVICE_LEVEL"
