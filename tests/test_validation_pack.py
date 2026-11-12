@@ -202,7 +202,7 @@ def test_interim_template_and_generator_list_the_same_criteria():
     """O13: MDX-VAL-012 template section 4 and the generated record print the same nine criteria."""
     text = (ROOT / "docs" / "validation" / "MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md").read_text(encoding="utf-8")
     section = text.split("## 4. Criteria")[1].split("\n## ")[0]
-    lines = [line for line in section.splitlines() if line[:3] == "| " and line[2].isdigit()]
+    lines = [line for line in section.splitlines() if line[:2] == "| " and line[2].isdigit()]
     rows = [line.split(" | ", 1)[1].rstrip(" |").replace("`", "") for line in lines]
     assert rows == list(pack.INTERIM_CRITERIA)
 
