@@ -324,11 +324,18 @@ them. The owner agreed the approach below on 12 Nov 2026; the consultant reviews
 
 ## 12. Acceptance criteria for a release
 
-- **VMP-R49** Every class-A scenario in scope shall be PASS, with evidence, except a scenario that verifies an
-  MDX-VAL-002 row marked Open: such a scenario may be NOT RUN or FAIL when the row has a risk acceptance signed by the
-  quality approver that names its interim control and due date (MDX-VAL-002 RA-R07) and is listed in the release
-  approval record (RA-R08). A risk acceptance shall never cover a critical failure (VMP-R60) (owner decision O12).
-- **VMP-R50** No open deviation shall affect patient safety or data integrity.
+- **VMP-R49** Every class-A scenario in scope shall be PASS, with evidence, or NOT RUN under VMP-R49a.
+- **VMP-R49a** A class-A scenario that is NOT RUN shall be listed in a risk acceptance signed by the quality approver
+  that names its interim control and due date (MDX-VAL-002 RA-R07).
+- **VMP-R49b** Each such risk acceptance shall be listed in the release approval record (RA-R08).
+- **VMP-R49c** A risk acceptance shall cover only a scenario that is NOT RUN or a risk row marked Open; it shall never
+  cover a FAIL (owner decisions O12 and O18).
+- **VMP-R50** A failed class-A test or scenario shall block the release (owner decision O18).
+- **VMP-R50a** No open deviation shall affect patient safety or data integrity.
+- **VMP-R50b** For the big-bang deploy, the class-A scenarios of the MDX-VAL-002 rows that need action and are marked
+  "Acceptable after verification" shall be executed in the full end-to-end run of 30 Nov 2026 (owner decision O17).
+- **VMP-R50c** Any of those scenarios still NOT RUN after that run shall be listed in a risk acceptance signed before
+  the big-bang deploy and listed in its release approval record (owner decision O17).
 - **VMP-R51** Every other open deviation shall have an acceptance rationale signed by the quality approver.
 - **VMP-R52** The isolation tests shall show zero cross-organisation access, in both directions, on every surface
   tested (API, search, export, files, reports, background jobs).

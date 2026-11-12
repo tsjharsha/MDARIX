@@ -45,10 +45,12 @@ INTERIM_BASIS = (
 INTERIM_CRITERIA = (
     "Release identity: the release equals VERSION, the commit is the tagged commit, one migration head",
     "Release checks: full suite on this commit, every step passed (release-checks JSON and its SHA-256)",
-    "Every class-A scenario named by the change-impact assessment is PASS with evidence, "
-    "or covered by a risk acceptance under criterion 4 (VMP-R49)",
-    "Every Open MDX-VAL-002 row this release relies on has a signed risk acceptance listed in this record (RA-R07, RA-R08)",
-    "No open critical deviation; every other open deviation has its acceptance rationale (VMP-R50, VMP-R51)",
+    "Every class-A scenario named by the change-impact assessment is PASS with evidence, or NOT RUN and listed in a "
+    "risk acceptance under criterion 4; none is FAIL (VMP-R49, VMP-R49a, VMP-R50)",
+    "Every Open MDX-VAL-002 row this release relies on, and every class-A scenario still NOT RUN, has a signed risk "
+    "acceptance listed in this record (RA-R07, RA-R08, VMP-R49b)",
+    "No failed class-A test, no open critical deviation, no open deviation that affects patient safety or data "
+    "integrity; every other open deviation has its acceptance rationale (VMP-R50, VMP-R50a, VMP-R51)",
     "No critical failure of VMP-R60 (a risk acceptance never covers one)",
     "Change-impact assessment reviewed; customer change notice given where VMP-R37 needs one",
     "Restore point taken before the deploy and the rollback plan written",
@@ -180,6 +182,12 @@ def check(sources: Sources, release: str) -> list[str]:
         for sid in sorted(set(req["scenario_ids"]) | set(req["negative_scenarios"])):
             if sid not in sources.scenarios:
                 problems.append(f"{rid}: scenario {sid} is not in the register")
+        if req["class"] == "A":
+            for sid in req["scenario_ids"]:
+                if scenario_outcome(sources, sid) == "FAIL":  # owner decision O18: never covered by an acceptance
+                    problems.append(
+                        f"{rid}: class-A scenario {sid} FAIL; a failed class-A test blocks the release (VMP-R50)"
+                    )
     cited = {s for req in sources.requirements for s in req["scenario_ids"]}
     for sid in sorted(cited & set(sources.scenarios)):
         row = sources.scenarios[sid]

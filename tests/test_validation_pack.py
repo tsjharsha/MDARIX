@@ -198,6 +198,18 @@ def test_golden_figures_and_documents(tmp_path, capsys):
     )
 
 
+def test_a_failed_class_a_test_always_blocks_the_release(tmp_path, capsys):
+    """O18: a failed class-A test is a check failure (no risk acceptance covers it); nothing is written."""
+    junit = JUNIT.replace('time="0.10"><properties>', 'time="0.10"><failure message="x"/><properties>')
+    root = _root(tmp_path, junit=junit)
+    assert _run(root, "--out", str(tmp_path / "out")) == 1
+    assert (
+        "REQ-T-001: class-A scenario AA-02 FAIL; a failed class-A test blocks the release (VMP-R50)"
+        in capsys.readouterr().err
+    )
+    assert not (tmp_path / "out").exists()
+
+
 def test_interim_template_and_generator_list_the_same_criteria():
     """O13: MDX-VAL-012 template section 4 and the generated record print the same nine criteria."""
     text = (ROOT / "docs" / "validation" / "MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md").read_text(encoding="utf-8")

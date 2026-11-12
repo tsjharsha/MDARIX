@@ -4,8 +4,8 @@
 |---|---|
 | Document ID | MDX-VAL-012 (template) |
 | Title | Release approval record: interim template |
-| Version | 0.2 |
-| Status | DRAFT |
+| Version | 0.3 |
+| Status | DRAFT. To be signed by the owner before the big-bang deploy (owner decision O19); PDF for signature: `signing/MDX-VAL-012-template.pdf` (unsigned) |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (prepares each record) |
 | Reviewer | Independent CSV consultant (not engaged yet; MDX-VAL-013 question 24) |
 | Approver (A) | Srinivas Telikicherla, QA/RA, quality approver (signs each record) |
@@ -19,6 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft, owner decision O13: an interim release approval template for the big-bang deploy, before MDX-VAL-001 is approved as 1.0 | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After an independent rating: only criterion 3 may be marked accepted (VMP-R49); signature section number; filing of per-release records; section 5 cites the regression run | Sriharsha Telikicherla |
+| 0.3 | 12 Nov 2026 | Owner decisions O17 to O19 of 12 Nov 2026: big-bang gate for the "Acceptable after verification" action rows (section 5); a risk acceptance covers only NOT RUN scenarios and Open rows, a failed class-A test always blocks (criteria 3 to 5, RA-T04); to be signed by the owner before the big-bang deploy | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -39,8 +40,9 @@ The record approves a deploy. It does not state that the release is validated un
   suite on the same commit, or a release that differs from `VERSION` (owner decision O16).
 - **RA-T03** The system owner shall fill the blank fields of section 3 by hand before the approver signs.
 - **RA-T04** The quality approver shall initial each criterion of section 4 as met or not met, and sign section 6.
-  A criterion marked "not met" stops the deploy. Only criterion 3 may instead be marked "accepted": for a scenario of
-  an Open MDX-VAL-002 row whose signed risk acceptance is listed under criterion 4 (VMP-R49).
+  A criterion marked "not met" stops the deploy. Only criterion 3 may instead be marked "accepted", and only for a
+  class-A scenario that is NOT RUN and listed in a signed risk acceptance under criterion 4 (VMP-R49a). A failed
+  class-A test or scenario is never accepted (VMP-R50, owner decision O18).
 - **RA-T05** For an emergency fix, the approver's written OK (e-mail or chat, quoted with its time) shall be given
   before the deploy and recorded in the field "Emergency fix: written OK"; the signed record follows within 1 working
   day (VMP-R35, VMP-R36).
@@ -73,9 +75,9 @@ The record approves a deploy. It does not state that the release is validated un
 |---|---|
 | 1 | Release identity: the release equals `VERSION`, the commit is the tagged commit, one migration head |
 | 2 | Release checks: full suite on this commit, every step passed (release-checks JSON and its SHA-256) |
-| 3 | Every class-A scenario named by the change-impact assessment is PASS with evidence, or covered by a risk acceptance under criterion 4 (VMP-R49) |
-| 4 | Every Open MDX-VAL-002 row this release relies on has a signed risk acceptance listed in this record (RA-R07, RA-R08) |
-| 5 | No open critical deviation; every other open deviation has its acceptance rationale (VMP-R50, VMP-R51) |
+| 3 | Every class-A scenario named by the change-impact assessment is PASS with evidence, or NOT RUN and listed in a risk acceptance under criterion 4; none is FAIL (VMP-R49, VMP-R49a, VMP-R50) |
+| 4 | Every Open MDX-VAL-002 row this release relies on, and every class-A scenario still NOT RUN, has a signed risk acceptance listed in this record (RA-R07, RA-R08, VMP-R49b) |
+| 5 | No failed class-A test, no open critical deviation, no open deviation that affects patient safety or data integrity; every other open deviation has its acceptance rationale (VMP-R50, VMP-R50a, VMP-R51) |
 | 6 | No critical failure of VMP-R60 (a risk acceptance never covers one) |
 | 7 | Change-impact assessment reviewed; customer change notice given where VMP-R37 needs one |
 | 8 | Restore point taken before the deploy and the rollback plan written |
@@ -89,9 +91,15 @@ is a change to both.
 The first record under this template is for the big-bang deploy. Expected at the date of this draft, so that nobody
 is surprised on the day:
 
-- Criterion 3: most class-A scenarios are NOT RUN in a validation run; each Open row the deploy relies on needs its
-  signed risk acceptance (criterion 4), and the VSR is not yet approved, so MDARIX's statement of validation status
-  stays "Validation in progress; plan MDX-VAL-001 (draft)" (VMP-R44).
+- Criterion 3 (owner decision O17; VMP-R50b, VMP-R50c): the class-A scenarios of the MDX-VAL-002 rows that need
+  action and are marked "Acceptable after verification" (20 rows at 12 Nov 2026: RSK-001, -004 to -008, -022, -027,
+  -029, -031, -033, -034, -039, -044, -050, -052 to -055, -066; RSK-037 also needs action after its re-score, O21)
+  run in the full end-to-end run of 30 Nov 2026. Any still NOT RUN after it goes into one risk acceptance, signed by
+  the quality approver before the deploy and listed under criterion 4. A FAIL in that run blocks the deploy until it
+  is fixed and re-run (O18).
+- Criterion 4: each Open row the deploy relies on needs its signed risk acceptance. The VSR is not yet approved, so
+  MDARIX's statement of validation status stays "Validation in progress; plan MDX-VAL-001 (draft)" (VMP-R44).
+- This template and MDX-VAL-000 section 4 are signed by the owner before the deploy (owner decision O19).
 - Criterion 2: the full suite runs in the E2E test release (about 24 November 2026). The 22 failures seen in the
   first tagged run of 12 Nov 2026 (B6b spec, build status run 3) were stale tests, fixed on the B6a line and merged
   into this branch on 12 Nov 2026; every step must pass, as a logged deviation does not meet criterion 2.
