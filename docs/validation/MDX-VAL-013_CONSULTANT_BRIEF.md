@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-013 |
 | Title | Consultant brief and question pack |
-| Version | 0.1 |
+| Version | 0.2 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA |
 | Reviewer | None: the consultant is the addressee and answers in writing (section 7) |
@@ -18,6 +18,7 @@ Change history
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part A, item A5) | Srinivas Telikicherla |
+| 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: question 21 and the company line disclose that the two founders are related (father and son), with the mitigations | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -43,7 +44,7 @@ compliant for any customer.
   no point-in-time recovery, so the stated recovery point is 24 hours (owner decision B6b-D8). No staging
   environment yet.
 - **Company.** Two founders: Sriharsha Telikicherla (Product & Engineering, system owner) and Srinivas Telikicherla
-  (QA/RA, quality approver). The company is not registered yet. The product runs today in a free-trial phase; no
+  (QA/RA, quality approver), who are father and son. The company is not registered yet. The product runs today in a free-trial phase; no
   release in production has been validated under the new plan (MDX-VAL-001 section 9.4).
 - **Users.** Trained employees of device manufacturers (or their authorised representatives and importers), not
   patients or clinicians.
@@ -123,7 +124,7 @@ number. Questions 1 to 14 keep the numbers used across the MDARIX documents.
 | 18 | The starter question sets and floor rules per market: who should check them against the regulations, and how often? Please also check the GB, India day-1 and Canada counting rules | MDX-VAL-002 RSK-002, RSK-003 |
 | 19 | Customer-written organisation rules can only raise an outcome. Do they need any customer test beyond the UAT/PQ template? | MDX-VAL-003 OP-2 |
 | 20 | Should a customer's ISO 14971 risk management file reference MDARIX's product risk assessment? | MDX-VAL-002 OP-4 |
-| 21 | Two founders cover system owner and quality approver, with each approving the other's documents. Is that segregation of duties enough for the first pilots, and when should a third person be added? | MDX-VAL-001 section 6 |
+| 21 | Two founders, who are related (father and son), cover system owner and quality approver, with each approving the other's documents. Mitigations: the segregation-of-duties rules (MDX-VAL-001 section 6; the approver is never the author, DC-R40) and your review of the first full release pack. Is that segregation of duties enough for the first pilots, and when should a third person be added? | MDX-VAL-001 section 6 |
 | 22 | The recovery point is 24 hours today (no point-in-time recovery). Is that acceptable for the first pilots, and with what interim control, until point-in-time recovery is in place? | MDX-VAL-002 RSK-038 (owner decision B6b-D8) |
 | 23 | Audit events are kept 7 years from each event, with a full export at exit. Is that sufficient against customers' own record-retention periods? | MDX-VAL-001 section 16.4 |
 

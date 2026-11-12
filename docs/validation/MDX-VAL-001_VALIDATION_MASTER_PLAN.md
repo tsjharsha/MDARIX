@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-001 |
 | Title | Validation Master Plan |
-| Version | 0.2 |
+| Version | 0.3 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (first version; not engaged yet) |
@@ -19,6 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-003 v0.1 (8 Nov 2026) and the MVP-1.0 CSA package (`docs/compliance/CSA_MVP_VALIDATION_PACKAGE.md`). Revised after a software-assisted review, findings dispositioned by the author: single-statement requirements, supporting controls (section 16), Annexes C and D | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: current status and transition (section 9.4); approval gate on R4 to R7; consultant scope; class C approach; development results are not validation evidence; MIR schema criterion; retention per owner decision O1; qualification of executors and approvers; Annex E (how each rule is checked); requirements split and renumbered in reading order | Sriharsha Telikicherla |
+| 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: a signed release approval record governs every production deploy from the big-bang deploy onward (VMP-R41, OP-8 closed); section 9.4 agreed by the owner (OP-7 now the consultant's review only) | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -263,10 +264,11 @@ validation at the end (section 9.4 sets when this starts).
 
 No release deployed to production before this plan is approved was released under it. Production runs the
 releases of the free-trial phase (0.10.92 at the date of this draft); no VSR or release approval record exists for
-them. The approach below is proposed in this draft; the owner confirms it and the consultant reviews it (OP-7).
+them. The owner agreed the approach below on 12 Nov 2026; the consultant reviews it (OP-7).
 
 - **VMP-R41** VMP-R24 to VMP-R40 shall apply from the first production release after this plan is approved as
-  version 1.0.
+  version 1.0, except VMP-R34 to VMP-R36 (signed release approval record), which shall apply to every production
+  deploy from the big-bang deploy onward, before this plan is approved (owner decision, 12 Nov 2026; OP-8).
 - **VMP-R42** The first release pack under this plan shall execute every class-A scenario, not only those named by
   its change impact.
 - **VMP-R43** The VSR of that first pack shall state that it is the retrospective validation of the functions
@@ -434,8 +436,8 @@ each audit event, a different start.
 | OP-4 | `VERSION` (0.10.94) and the CHANGELOG section disagree; the release identity must be fixed before the first per-release pack | Sriharsha |
 | OP-5 | MDX-B10-001, -002, -005 and -006 moved into this folder on 12 Nov 2026 (owner decision O2) and are still DRAFT; this plan is not approved before they are approved (VMP-R01) | Srinivas |
 | OP-6 | Each reference R9 to R13 to be confirmed with the consultant | Srinivas |
-| OP-7 | The transition approach for the releases already in production (section 9.4): the owner confirms it; the consultant reviews it (MDX-VAL-013, question 15) | Srinivas |
-| OP-8 | Owner to decide what governs production deploys before this plan is approved as 1.0: a signed release approval record from the next deploy, or the current practice until then (MDX-VAL-000 section 4, B6b-D7) | Srinivas |
+| OP-7 | The transition approach for the releases already in production (section 9.4), agreed by the owner on 12 Nov 2026: the consultant reviews it (MDX-VAL-013, question 15) | Srinivas |
+| OP-8 | Closed 12 Nov 2026: a signed release approval record governs every production deploy from the big-bang deploy onward, before this plan is approved as 1.0 (VMP-R41; MDX-VAL-000 section 4, B6b-D7) | Srinivas |
 
 ## Annex A: writing standard
 

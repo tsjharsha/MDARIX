@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-002 |
 | Title | Product risk assessment |
-| Version | 0.2 |
+| Version | 0.3 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner (proposes every rating) |
 | Reviewer | Independent CSV consultant (confirms severities and scales; not engaged yet). The quality approver reviews every severity before approving |
@@ -19,6 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-004 v0.1 (8 Nov 2026): its 43 rows re-scored on 1-5 scales with detectability, plus 22 rows for the functions built in B2 to B9 and B6a. Revised after a software-assisted review, findings dispositioned by the author: privacy line in the severity scale, re-rated RSK-016, -023, -025, -029, -038, -039, -046, new RSK-065, numbered rules | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: rules for an open class-A row and for the residual-risk values (section 3.5); two functions split by sub-function; RSK-002, -025, -030, -035, -040 marked Open and listed; RSK-065 per owner decision O3; RSK-036 and RSK-023 Open (verification); RSK-066 (purge, retention, legal hold) and RSK-067 (sign-in, sessions) added; residual-risk values in a table; RSK-065 closed by the refusal in `register.py` (re-rated O2, D1); re-rating of RSK-023, -029, -039 agreed by the owner (O4) | Sriharsha Telikicherla |
+| 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: RSK-023 is class A by the late-report line of severity 5 (O4 confirmed); RSK-066 re-rated S5 (RPN 30, needs action under RA-R04), RSK-067 stays S4 (O6); 29 rows need action | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -105,7 +106,9 @@ How these rules are checked: the quality approver checks each row against RA-R01
 
 MDX-B10-004 used three levels. Its S3 rows are now S5 (report, conclusion or cross-organisation effect) or S4
 (record-integrity effect); its S2 rows are S3. Its likelihood L1, L2, L3 became O2, O3, O4. Detectability is new. The conversion itself moved no row between classes. The re-rating after the first review moved RSK-023,
--029 and -039 from class B to class A (owner decision O4).
+-029 and -039 from class B to class A (owner decision O4): RSK-023 because a rejected, therefore late, report is the
+late-report line of severity 5; RSK-029 and RSK-039 by the privacy line of severity 4. RSK-066 is S5 by owner decision O6
+(regulated records lost before their retention date).
 
 ## 4. GxP impact per function
 
@@ -218,15 +221,15 @@ give the evidence. It does not claim they have passed in a validation run: most 
 | RSK-063 | Notifications and outbox | A notification is lost or stays dead-lettered unseen | Late action | 3 | 2 | 2 | 12 | B | No | Dead-letter with reason; operations alerts; audited replay of one event (`scripts/replay_outbox.py`) | `tests/test_outbox_resilience.py`, `tests/test_replay_outbox_script.py` | PT-15 | (B6b B1) | Acceptable after verification |
 | RSK-064 | Value Centre and dashboards | A figure on the Value Centre or a dashboard is wrong | Wrong management information; no record or decision effect | 2 | 3 | 4 | 24 | C | No | Medians on known data; sample records excluded; no per-person numbers | B6-43, B6-44; `tests/test_b6a_value_centre.py` | - | (B6b B1) | Acceptable |
 | RSK-065 | Rule register | The same person builds and approves a rule version | No independent check of rule content | 4 | 2 | 1 | 8 | A | No | The register refuses a version whose `approval.approved_by` is empty or names the same person as `approval.built_by` (`backend/app/rule_register/register.py`; owner decision O3) | `tests/test_rule_register_unit.py` (refused and allowed cases); DT-12 and DT-14 cover the organisation layer | - | (B6b B1) | Acceptable after verification |
-| RSK-066 | Purge and retention | The wrong organisation's records are purged, or records are purged before their retention date or while under legal hold | Regulated records lost | 4 | 2 | 3 | 24 | A | No | Purge needs MFA and a completion job; legal hold blocks erasure (`backend/app/tenant_purge.py`, `backend/app/legal_hold_api.py`); the database refuses early deletion of audit events (trigger `audit_events_retention`, migration `md23_pilot_readiness.py`) | `tests/test_export_purge_mfa.py`, `tests/test_purge_completion_job.py`, `tests/test_customer_admin_erasure_hold.py` | - | (B6b B1) | Acceptable after verification |
+| RSK-066 | Purge and retention | The wrong organisation's records are purged, or records are purged before their retention date or while under legal hold | Regulated records lost | 5 | 2 | 3 | 30 | A | Yes | Purge needs MFA and a completion job; legal hold blocks erasure (`backend/app/tenant_purge.py`, `backend/app/legal_hold_api.py`); the database refuses early deletion of audit events (trigger `audit_events_retention`, migration `md23_pilot_readiness.py`) | `tests/test_export_purge_mfa.py`, `tests/test_purge_completion_job.py`, `tests/test_customer_admin_erasure_hold.py` | - | (B6b B1) | Acceptable after verification |
 | RSK-067 | Sign-in and sessions | A deactivated account, an expired session or a reset second factor still allows an action on a record | Unauthorised change or signature | 4 | 2 | 3 | 24 | A | No | Session lifecycle and permissions checked on each request (`backend/app/access/session.py`, `backend/app/auth_router.py`); lockout after wrong codes | `tests/test_auth_session_lifecycle.py`, `tests/test_session_permissions.py` | PT-05 | (B6b B1) | Acceptable after verification |
 
 ## 6. Summary
 
 - 67 failure modes: 57 class A, 9 class B, 1 class C. Three AI rows (RSK-041 to -043) are not rated while AI is off.
 - 34 rows have no seed REQ ID yet ("(B6b B1)"); IDs are assigned when `requirements.csv` is built (OP-3).
-- 28 rows need action under RA-R04: RSK-001 to -008, -017, -018, -022, -024 to -027, -030, -031, -033, -034, -036,
-  -038, -044, -050, -052 to -056. For most of them the action is to execute their class-A scenarios.
+- 29 rows need action under RA-R04: RSK-001 to -008, -017, -018, -022, -024 to -027, -030, -031, -033, -034, -036,
+  -038, -044, -050, -052 to -056, -066. For most of them the action is to execute their class-A scenarios.
 - **Open control gaps** (action named in "Residual risk"):
   - RSK-002: GB, India day-1 and Canada counting rules to be confirmed with the consultant.
   - RSK-003: question sets to be confirmed by the consultant.

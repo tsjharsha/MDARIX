@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-000 |
 | Title | Validation document control and index |
-| Version | 0.2 |
+| Version | 0.3 |
 | Status | DRAFT |
 | Author (R) | Srinivas Telikicherla, QA/RA |
 | Reviewer | Independent CSV consultant (first issue, VMP-R09; not engaged yet) |
@@ -19,6 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part A); rules numbered DC-Rnn and split into single statements after a software-assisted review, findings dispositioned by the author | Srinivas Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: one signature rule for every document and the header field "Drafting"; signing sequence; registers and legacy files; owner decisions (section 4) and codes (section 5) recorded here; rules renumbered in reading order | Srinivas Telikicherla |
+| 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: B6b-D7 in force from the big-bang deploy (OP-8 closed); O4 reason confirmed; O6 (RSK-066 S5, RSK-067 S4) | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -146,12 +147,12 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 
 | ID | Title | File | Version | Status |
 |---|---|---|---|---|
-| MDX-VAL-000 | Validation document control and index | this file | 0.2 | DRAFT |
-| MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.2 | DRAFT |
-| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.2 | DRAFT |
+| MDX-VAL-000 | Validation document control and index | this file | 0.3 | DRAFT |
+| MDX-VAL-001 | Validation Master Plan | [MDX-VAL-001_VALIDATION_MASTER_PLAN.md](MDX-VAL-001_VALIDATION_MASTER_PLAN.md) | 0.3 | DRAFT |
+| MDX-VAL-002 | Product risk assessment | [MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md](MDX-VAL-002_PRODUCT_RISK_ASSESSMENT.md) | 0.3 | DRAFT |
 | MDX-VAL-003 | GAMP 5 category justification | [MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md](MDX-VAL-003_GAMP5_CATEGORY_JUSTIFICATION.md) | 0.2 | DRAFT |
 | MDX-B10-001, -002, -005, -006 | Validation planning drafts (section 3.1) | MDX-B10-001-Intended-Use-Statement.md, MDX-B10-002-Regulatory-Applicability-Matrix.md, MDX-B10-005-Traceability-Structure.md, MDX-B10-006-Threat-Model.md | 0.1 | DRAFT |
-| MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.1 | DRAFT |
+| MDX-VAL-013 | Consultant brief and question pack | [MDX-VAL-013_CONSULTANT_BRIEF.md](MDX-VAL-013_CONSULTANT_BRIEF.md) | 0.2 | DRAFT |
 | (register) | Scenario register (master copy) | [scenario-register.md](scenario-register.md) | n/a | Controlled by git history |
 | (register) | Signature register | [signatures.csv](signatures.csv) | n/a | Empty: nothing signed yet |
 | MDX-VAL-004 to -012, MDX-SUP, MDX-SOP, MDX-OPS, MDX-CUS | Planned (B6b Parts B to E, section 5) | | | Not written |
@@ -184,7 +185,7 @@ MDX-VAL-002; both carry a banner saying so.
 
 These documents cite "owner decision B6b-Dn" or "owner decision On". Each one is listed here, so that the signed
 copy of this document is the controlled record of it. The owner (Srinivas Telikicherla) approved D1 to D21 on
-12 Nov 2026 ("approve B6b spec") and answered O1 to O4 on 12 Nov 2026. O5 is older (see its row). Items marked "consultant to confirm" are
+12 Nov 2026 ("approve B6b spec") and answered O1 to O4 and O6 on 12 Nov 2026. O5 is older (see its row). Items marked "consultant to confirm" are
 also questions in MDX-VAL-013.
 
 | ID | Decision |
@@ -195,7 +196,7 @@ also questions in MDX-VAL-013.
 | B6b-D4 | FMEA: severity, occurrence and detectability 1 to 5; RPN = S x O x D; class set by severity alone; action at RPN 40 or more, or S5 with D 3 or more (consultant to confirm) |
 | B6b-D5 | GAMP 5: Category 4 for MDARIX, Category 5 for anything written for one customer, Category 1 for infrastructure; not shown to a customer before the consultant confirms |
 | B6b-D6 | MDARIX's own documents are signed as PDFs (by hand and scanned, or a PDF digital signature), with the SHA-256 in `signatures.csv`; MDARIX's own e-signature is not used for them |
-| B6b-D7 | The quality approver signs a release approval record before every production deploy; for an emergency fix, a written OK before the deploy and the signed record within 1 working day. In force from the first production release under MDX-VAL-001 version 1.0 (MDX-VAL-001 section 9.4); the rule for deploys before then is an open owner question (MDX-VAL-001 OP-8) |
+| B6b-D7 | The quality approver signs a release approval record before every production deploy; for an emergency fix, a written OK before the deploy and the signed record within 1 working day. In force for every production deploy from the big-bang deploy onward, before MDX-VAL-001 is approved as 1.0 (owner, 12 Nov 2026; MDX-VAL-001 VMP-R41, OP-8 closed) |
 | B6b-D8 | Recovery point stated to customers: 24 hours today (daily encrypted backup, no point-in-time recovery); target 15 minutes with point-in-time recovery on pilot hosting |
 | B6b-D9 | EU GMP Annex 11 is assessed clause by clause as a benchmark; it binds EU pharmaceutical GMP only; MDARIX is never called "Annex 11 compliant" |
 | B6b-D10 | After a restore, every unsent outbox event older than the restore point is held (dead-lettered, audited); only those the mail provider's log shows as not sent are replayed |
@@ -213,8 +214,9 @@ also questions in MDX-VAL-013.
 | O1 | Validation records are kept at least 10 years after a release leaves the last customer, 15 years where a customer makes implantable devices (consultant to confirm) |
 | O2 | MDX-B10-001, -002, -005 and -006 move from the planning folder into `docs/validation/` (B6b Part B) |
 | O3 | The rule register refuses the same person as builder and approver of a rule version (MDX-VAL-002 RSK-065; `backend/app/rule_register/register.py`, added in B6b Part B) |
-| O4 | RSK-023, RSK-029 and RSK-039 are class A: RSK-023 by the late-report line of severity 5; RSK-029 and RSK-039 by the privacy line of severity 4 |
+| O4 | RSK-023, RSK-029 and RSK-039 are class A: RSK-023 by the late-report line of severity 5 (confirmed by the owner, 12 Nov 2026); RSK-029 and RSK-039 by the privacy line of severity 4 |
 | O5 | No periodic password expiry (NIST SP 800-63B); lockout, breached-password checks and multi-factor authentication instead. Decided by the owner at MVP readiness, before B6b; listed here so that it is controlled (consultant to confirm, MDX-VAL-013 question 6) |
+| O6 | RSK-066 (purge, retention, legal hold) has severity S5; RSK-067 (sign-in and sessions) stays S4 (owner, 12 Nov 2026) |
 
 ## 5. Codes used in these documents
 
@@ -228,7 +230,7 @@ also questions in MDX-VAL-013.
 | RSK-nnn | Failure modes in MDX-VAL-002 |
 | REQ-&lt;AREA&gt;-nnn | Requirements (seed rows in MDX-B10-005 section 7; full list in `requirements.csv`, MDX-VAL-004) |
 | IN, CI, TR, RG, DT, RR, IV, B5, CP, RT, BK, EM, UA, B8, B9, OC, P360, S360, B6 followed by a number | Scenario IDs in the scenario register |
-| O1 to O5, B6b-D1 to -D21 | Owner decisions (section 4) |
+| O1 to O6, B6b-D1 to -D21 | Owner decisions (section 4) |
 
 ## 6. How the rules in section 2 are checked
 
