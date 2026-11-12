@@ -18,7 +18,7 @@ Change history
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part B, item B9) | Srinivas Telikicherla |
-| 0.2 | 12 Nov 2026 | Signature block added after an independent rating | Sriharsha Telikicherla |
+| 0.2 | 12 Nov 2026 | Signature block added after an independent rating; PQ-011 cites PL-18 | Srinivas Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -51,7 +51,7 @@ customer template MDX-CUS-001.
 | PQ-008 | Investigator | Submit an investigation with an open challenge question | Refused until it is answered or marked not applicable | B5-05 |
 | PQ-009 | Quality approver | Sign the audit-trail review for the period | Flags shown; own flagged actions need a second reviewer; the signed review does not change | B6-28, B6-29, B6-31 |
 | PQ-010 | Administrator of another organisation | Open the product, supplier and report addresses of step PQ-006 | 404; nothing of the first organisation is shown | P360-11, S360-14, B8-30 |
-| PQ-011 | Quality approver | Export the organisation's records | Export holds every record and the verified audit head, with a SHA-256 per entry | (REQ-EXP-001; scenario to add) |
+| PQ-011 | Quality approver | Export the organisation's records | Export holds every record and the verified audit head, with a SHA-256 per entry | (REQ-EXP-001; PL-18) |
 
 ## 4. Acceptance
 
@@ -69,6 +69,6 @@ Unsigned. The signed PDF and its `signatures.csv` row are added after review (MD
 
 | Role | Name | Meaning of signature | Signature | Date |
 |---|---|---|---|---|
-| Author (R), system owner | Sriharsha Telikicherla, Product & Engineering | I am responsible for this document and reviewed every line of the draft. | | |
+| Author (R), quality approver | Srinivas Telikicherla, QA/RA | I am responsible for this document and reviewed every line of the draft. | | |
 | Reviewer (C) | Independent CSV consultant | I reviewed this document; my comments are recorded. | | |
-| Approver (A), quality approver | Srinivas Telikicherla, QA/RA | I approve this document for use. | | |
+| Approver (A), system owner (MDX-VAL-000 DC-R42) | Sriharsha Telikicherla, Product & Engineering | I approve this document for use. | | |

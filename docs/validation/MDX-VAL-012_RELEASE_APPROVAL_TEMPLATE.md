@@ -18,7 +18,7 @@ Change history
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft, owner decision O13: an interim release approval template for the big-bang deploy, before MDX-VAL-001 is approved as 1.0 | Sriharsha Telikicherla |
-| 0.2 | 12 Nov 2026 | After an independent rating: only criterion 3 may be marked accepted (VMP-R49); signature section number; filing of per-release records | Sriharsha Telikicherla |
+| 0.2 | 12 Nov 2026 | After an independent rating: only criterion 3 may be marked accepted (VMP-R49); signature section number; filing of per-release records; section 5 cites the regression run | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -92,8 +92,9 @@ is surprised on the day:
 - Criterion 3: most class-A scenarios are NOT RUN in a validation run; each Open row the deploy relies on needs its
   signed risk acceptance (criterion 4), and the VSR is not yet approved, so MDARIX's statement of validation status
   stays "Validation in progress; plan MDX-VAL-001 (draft)" (VMP-R44).
-- Criterion 2: the full suite runs in the E2E test release (about 24 November 2026); the regression failures seen in
-  the B6b dry run must be fixed or logged as deviations before the record can be generated.
+- Criterion 2: the full suite runs in the E2E test release (about 24 November 2026). The 22 failures seen in the
+  first tagged run of 12 Nov 2026 (B6b spec, build status run 3) were stale tests, fixed on the B6a line and merged
+  into this branch on 12 Nov 2026; every step must pass, as a logged deviation does not meet criterion 2.
 
 ## 6. Signatures
 

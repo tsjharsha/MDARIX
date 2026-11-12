@@ -121,7 +121,8 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 
 - **DC-R32** A document shall be signed as a PDF, by hand and scanned or with a PDF digital signature.
 - **DC-R33** MDARIX's own electronic signature shall not be used for MDARIX's own documents.
-- **DC-R34** Each signed PDF shall be stored as `docs/validation/signed/<document ID>_v<version>.pdf`.
+- **DC-R34** Each signed PDF shall be stored as `docs/validation/signed/<document ID>_v<version>.pdf`, except a
+  generated per-release record, which is stored in its release folder `docs/validation/releases/<release>/`.
 - **DC-R35** Each signature shall be one row in [signatures.csv](signatures.csv) with: document ID, version, signer,
   role, meaning, date (UTC), PDF path and the PDF's SHA-256.
 - **DC-R36** A signature row and its PDF shall be committed in the same commit.

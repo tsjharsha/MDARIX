@@ -20,7 +20,7 @@ Change history
 | 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-003 v0.1 (8 Nov 2026) and the MVP-1.0 CSA package (`docs/compliance/CSA_MVP_VALIDATION_PACKAGE.md`). Revised after a software-assisted review, findings dispositioned by the author: single-statement requirements, supporting controls (section 16), Annexes C and D | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: current status and transition (section 9.4); approval gate on R4 to R7; consultant scope; class C approach; development results are not validation evidence; MIR schema criterion; retention per owner decision O1; qualification of executors and approvers; Annex E (how each rule is checked); requirements split and renumbered in reading order | Sriharsha Telikicherla |
 | 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: a signed release approval record governs every production deploy from the big-bang deploy onward (VMP-R41, OP-8 closed); section 9.4 agreed by the owner (OP-7 now the consultant's review only); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Sriharsha Telikicherla |
-| 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O11 a release is gated on each change's own risk, set in its change-impact assessment, not on the class of the function it touches (VMP-R23, section 9.3); O12 VMP-R49 allows a release with a signed risk acceptance for an Open row; O14 the tagging gap and plan (section 16.1, VMP-R94 to VMP-R96, numbered after the last rule so that no rule is renumbered); Annex F, the seven interface checks of import, e-mail intake, authority files and outbox mapped to existing tests, with three gaps | Sriharsha Telikicherla |
+| 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O11 a release is gated on each change's own risk, set in its change-impact assessment, not on the class of the function it touches (VMP-R23, section 9.3); O12 VMP-R49 allows a release with a signed risk acceptance for an Open row; O14 the tagging gap and plan (section 16.1, VMP-R94 to VMP-R96, numbered after the last rule so that no rule is renumbered); RACI: nobody approves their own document (MDX-VAL-013, MDX-B10 drafts); Annex F, the seven interface checks of import, e-mail intake, authority files and outbox mapped to existing tests, with three gaps | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -154,8 +154,8 @@ R = writes or does the work. A = approves and signs (one person). C = reviews an
 | Hosting assessment (-004), SOC 2 / ISO 27001 mapping (-005) | R | A | | I |
 | Trust facts (-006) | R (evidence check) | A (claims owner) | | |
 | SOPs (MDX-SOP-001 to -005) | R | A | C | I |
-| Consultant brief (MDX-VAL-013) | C | R, then A after the system owner's review | (recipient) | |
-| Moved drafts MDX-B10-001, -002, -005, -006 (VMP-R01) | R (-005, -006), C (-001, -002) | R (-001, -002), A (all four) | C | I (-001) |
+| Consultant brief (MDX-VAL-013) | A | R | (recipient) | |
+| Moved drafts MDX-B10-001, -002, -005, -006 (VMP-R01) | R (-005, -006), A (-001, -002) | R (-001, -002), A (-005, -006) | C | I (-001) |
 | Recovery record (MDX-OPS-001) | R (executes) | A | | I (summary) |
 | Monthly health report (MDX-OPS-002) | R (generates) | A (reviews before sending) | | I |
 | Customer templates (MDX-CUS-001 to -006) | C, then A | R | C | |

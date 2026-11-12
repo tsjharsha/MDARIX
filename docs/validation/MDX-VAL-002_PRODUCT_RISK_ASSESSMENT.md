@@ -20,7 +20,7 @@ Change history
 | 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-004 v0.1 (8 Nov 2026): its 43 rows re-scored on 1-5 scales with detectability, plus 22 rows for the functions built in B2 to B9 and B6a. Revised after a software-assisted review, findings dispositioned by the author: privacy line in the severity scale, re-rated RSK-016, -023, -025, -029, -038, -039, -046, new RSK-065, numbered rules | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: rules for an open class-A row and for the residual-risk values (section 3.5); two functions split by sub-function; RSK-002, -025, -030, -035, -040 marked Open and listed; RSK-065 per owner decision O3; RSK-036 and RSK-023 Open (verification); RSK-066 (purge, retention, legal hold) and RSK-067 (sign-in, sessions) added; residual-risk values in a table; RSK-065 closed by the refusal in `register.py` (re-rated O2, D1); re-rating of RSK-023, -029, -039 agreed by the owner (O4) | Sriharsha Telikicherla |
 | 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: RSK-023 is class A by the late-report line of severity 5 (O4 confirmed); RSK-066 re-rated S5 (RPN 30, needs action under RA-R04), RSK-067 stays S4 (O6); 29 rows need action; REQ IDs from `requirements.csv` for the 34 rows without a seed (OP-3); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Sriharsha Telikicherla |
-| 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O7 severity 5 = permanent loss of regulated records, severity 4 = recoverable loss; every row citing either line re-checked (section 3.7): RSK-037 and RSK-040 raised to S5; O8 RSK-029 raised to S5 (RPN 40, needs action); O9 detection only at the quarterly restore drill is D4 (detectability scale), RSK-039 re-scored D4 (RPN 48) and RSK-040 D4 (RPN 40), both now need action; 32 rows need action; O10 RSK-065 control compares staff accounts, not typed names; O15 PL-xx scenarios named in the verification of RSK-023, -026, -036 | Sriharsha Telikicherla |
+| 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O7 severity 5 = permanent loss of regulated records, severity 4 = recoverable loss; every row citing either line re-checked (section 3.7): RSK-037 and RSK-040 raised to S5; O8 RSK-029 raised to S5 (RPN 40, needs action); O9 detection only at the quarterly restore drill is D4 (detectability scale), RSK-039 re-scored D4 (RPN 48) and RSK-040 D4 (RPN 40), both now need action; 32 rows need action; O10 RSK-065 control compares staff accounts, not typed names; O15 PL-xx scenarios named in the verification of RSK-023, -026, -036; RA-R05 points to RA-R07 for Open rows | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -86,7 +86,8 @@ consultant confirms the severities and scales. The whole assessment is **to conf
 ### 3.5 Action rule
 
 - **RA-R04** A row shall be marked as needing action when RPN is 40 or more, or when S is 5 and D is 3 or more.
-- **RA-R05** A row that needs action shall have its action done before the release that relies on it.
+- **RA-R05** A row that needs action shall have its action done before the release that relies on it, or, for a row
+  marked Open, a risk acceptance under RA-R07.
 - **RA-R06** That action shall be the open item named in "Residual risk", or, where none is named, executing the
   row's class-A scenarios with pre-approved expected results.
 - **RA-R07** A row marked Open that is class A or needs action, and that a production release relies on, shall have a risk acceptance signed by the
@@ -134,7 +135,7 @@ checks before signing. None = no record or decision effect.
 
 | Function | GxP impact | Class | Assurance approach (MDX-VAL-001 section 8) | Rationale | FMEA rows |
 |---|---|---|---|---|---|
-| Intake, Case, e-mail intake, back-entry after an outage | Direct | A | Scripted, negative tests, every touched release | Creates the complaint record and its awareness time, which start the legal clocks | RSK-007, -008, -044, -045 |
+| Intake, Case, e-mail intake, back-entry after an outage | Direct | A | Scripted, negative tests, in every release whose change impact names it (MDX-VAL-001 VMP-R23) | Creates the complaint record and its awareness time, which start the legal clocks | RSK-007, -008, -044, -045 |
 | Awareness, legal clocks, daily deadline list | Direct | A | Scripted, including weekends, daylight saving, time zones | A wrong clock gives a late report | RSK-002, -007, -008, -046 |
 | Triage escalation | Direct | A | Scripted | Decides the fast track for death and serious injury | RSK-031, -032 |
 | Complaint or service classification, routine path | Direct | A | Scripted | "Service only" removes the record from reportability assessment | RSK-033, -034, -052 |
