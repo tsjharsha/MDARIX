@@ -316,6 +316,13 @@ left rail.
 - Click paths p-u added to the click-path test (a-u). User guide: the new links; the signed-reviews "where" no longer
   writes "Admin console ›" as a screen path (the guide-path test failed on it since run 6).
 
+### Tests (B6a permission sweep)
+- The permission sweep (`tests/test_business_permissions.py`) has reviewed exempt entries for B6a's eight routes
+  without a dependency guard. Each was checked: the seven signed-review routes check the reader and the signer in the
+  route (Leader, Quality Reviewer or customer administrator as owner D4, D5 and 12 Nov say; never MDARIX staff;
+  signing re-authenticates), and "Trace this value" is a read open to every member who reads the report, as the
+  report itself. All eight are also in the list that must refuse anyone without a session. No product change.
+
 ## [0.11.02] - not released yet
 
 B9b: other countries, attach-only reports. For a country outside the five built-in markets (US, EU and Northern
@@ -836,6 +843,12 @@ not built yet, and the chain is re-ordered at the release join). The API and web
 - Sample: once the sample decision is signed, Did it work? on SAMPLE-CAPA-02 reads "Too early" with no later
   complaints; no after-action complaints are seeded (B5-D10).
 
+### Tests
+
+- The decision brief and human decision tests (`tests/test_decision_brief.py`, `tests/test_human_decision.py`) give
+  their ready case's complaint a lot. Without one, B5's material question C-4 ("complaints with no version or no
+  lot") blocked submit with 409 `BRIEF_NOT_READY`, as B5-D3 intends; the tests predated that rule. No product change.
+
 ## [0.10.97] - not released yet (after the WHIF freeze)
 
 B7a: the routine complaint path. Migration `tr25routinepath` (chained from `tr19casesescalation`; it moves onto
@@ -850,6 +863,12 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   `attachment_quota_mb` (100); Case
   addenda accept the kinds `TRANSLATION` and `EMAIL`; a Case import's key is unique per organization. Legacy
   organization databases get the same from `scripts/add_workflow_tables_to_legacy_planes.py` (step `tr25`).
+
+### Tests
+
+- The authorization matrix (`tests/test_authorization_matrix.py`) switches e-mail intake on for its sweeps, as the
+  permission sweep already does: while intake is off its routes answer 404 before the session check and the guards,
+  so 14 sweeps reported them as "answered past the session check". No product change.
 
 ### Added (B7b e-mail intake, switched off by default)
 
@@ -1254,6 +1273,10 @@ Development cycle 1, item W1: Product 360 and Supplier 360. No migration. The AP
   asks for (`POST .../ai-run`, MANUAL) starts nothing and answers "AI analysis is off for this organization", like the
   automatic one; `POST .../hypotheses` builds only on a saved analysis named in the request and otherwise answers the
   same off state without running an analysis. A person's own hypotheses (Intelligence tab) are unchanged (RCA-D13).
+- And for the last two R1 routes: `POST .../challenges` challenges only a saved set of competing explanations named in
+  the request, and `POST .../unknowns` and `POST .../failure-chains` build only on the saved explanations and challenges
+  for the same point in time; while AI does not answer, neither generates new ones (so no analysis runs) and both answer
+  "AI analysis is off for this organization" without writing anything. The Intelligence tab is unchanged (RCA-D13).
 
 ## [0.10.93] - not released yet (ships with 0.10.94 in the test release, late November)
 

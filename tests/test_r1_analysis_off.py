@@ -154,3 +154,107 @@ def test_with_ai_answering_the_hypotheses_may_run_the_analysis(monkeypatch):
 
     assert result is service.generate.return_value
     assert service.generate.call_args.kwargs == {"run_analysis": True}
+
+
+# ------------------------------------------------- the challenges and the unknowns / failure-chain routes (last two)
+
+OFF = {"persisted": False, "state": "AI_OFF", "message": "AI analysis is off for this organization."}
+
+
+def _ctx():
+    return SimpleNamespace(tenant_id=str(CTX.tenant_id), user_id="person", correlation_id="c")
+
+
+@pytest.fixture
+def no_saved_set(monkeypatch, rules):
+    """No saved hypothesis set or challenges for the case; generating one would run the (watched) keyword analysis."""
+    from hypothesis_engine.service import CompetingHypothesisService
+    from challenger.service import ChallengerService
+    from investigator.service import EvidenceGroundedInvestigatorService
+
+    analyze = MagicMock(side_effect=AssertionError("keyword analysis ran"))
+    monkeypatch.setattr(EvidenceGroundedInvestigatorService, "analyze", analyze)
+    monkeypatch.setattr(CompetingHypothesisService, "latest", lambda self, db, tenant_id, case_id: None)
+    monkeypatch.setattr(ChallengerService, "latest", lambda self, db, tenant_id, case_id: None)
+    return rules[0], analyze
+
+
+def test_challenges_generate_no_hypotheses_while_ai_is_off(monkeypatch, no_saved_set):
+    from backend.app import challenger_router
+    from challenger.schemas import ChallengeRequest
+    from challenger.service import ChallengerService
+
+    provider, analyze = no_saved_set
+    monkeypatch.setattr(challenger_router, "service", ChallengerService())
+    monkeypatch.setattr(challenger_router, "ai_ready", lambda control, tenant_id: False)
+    db = MagicMock()
+
+    response = challenger_router.create_challenges(
+        CASE,
+        None,
+        ChallengeRequest(investigation_id=CASE, hypothesis_set_id=uuid.uuid4()),
+        db=db,
+        control=None,
+        ctx=_ctx(),
+    )
+
+    assert response.status_code == 200
+    assert json.loads(response.body) == {"challenge_set": None, **OFF}
+    analyze.assert_not_called()
+    provider.assert_not_called()
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+@pytest.mark.parametrize(("route", "key"), [("create_unknowns", "unknown_set"), ("create_chains", "failure_chain_set")])
+def test_unknowns_and_failure_chains_generate_nothing_while_ai_is_off(monkeypatch, no_saved_set, route, key):
+    from backend.app import unknowns_failure_chain_router as chain_router
+    from failure_chain.schemas import FailureChainRequest
+    from failure_chain.service import UnknownsFailureChainService
+    from unknowns.schemas import UnknownRequest
+
+    provider, analyze = no_saved_set
+    monkeypatch.setattr(chain_router, "service", UnknownsFailureChainService())
+    monkeypatch.setattr(chain_router, "ai_ready", lambda control, tenant_id: False)
+    data = (UnknownRequest if route == "create_unknowns" else FailureChainRequest)(investigation_id=CASE)
+    db = MagicMock()
+
+    response = getattr(chain_router, route)(CASE, None, data, db=db, control=None, ctx=_ctx())
+
+    assert response.status_code == 200
+    assert json.loads(response.body) == {key: None, **OFF}
+    analyze.assert_not_called()
+    provider.assert_not_called()
+    db.add.assert_not_called()
+    db.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("ready", [True, False])
+@pytest.mark.parametrize("route", ["challenges", "create_unknowns", "create_chains"])
+def test_the_routes_pass_the_organizations_ai_status_to_the_service(monkeypatch, route, ready):
+    """AI answering: the services may generate as before (run_analysis=True); AI off: only saved sets (False)."""
+    from backend.app import challenger_router
+    from backend.app import unknowns_failure_chain_router as chain_router
+    from challenger.schemas import ChallengeRequest
+    from failure_chain.schemas import FailureChainRequest
+    from unknowns.schemas import UnknownRequest
+
+    service = MagicMock()
+    if route == "challenges":
+        module, call, method = challenger_router, challenger_router.create_challenges, service.generate
+        data = ChallengeRequest(investigation_id=CASE)
+        monkeypatch.setattr(module, "with_evidence_business_ids", lambda db, result: result)
+    else:
+        module, call = chain_router, getattr(chain_router, route)
+        method = service.unknowns if route == "create_unknowns" else service.chains
+        data = (UnknownRequest if route == "create_unknowns" else FailureChainRequest)(investigation_id=CASE)
+        monkeypatch.setattr(module, "with_unknown_business_ids", lambda db, tenant_id, result: result)
+        monkeypatch.setattr(module, "with_failure_chain_business_ids", lambda db, tenant_id, result: result)
+    monkeypatch.setattr(module, "service", service)
+    monkeypatch.setattr(module, "make_audit_event", MagicMock(), raising=False)
+    monkeypatch.setattr(module, "ai_ready", lambda control, tenant_id: ready)
+
+    result = call(CASE, None, data, db=MagicMock(), control="control", ctx=_ctx())
+
+    assert result is method.return_value
+    assert method.call_args.kwargs == {"run_analysis": ready}

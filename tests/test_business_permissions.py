@@ -173,6 +173,33 @@ EXEMPT = {
     # B7b: the intake address is set by the Customer Admin only (backend/app/mail_in/router.py `_customer_admin`).
     ("PUT", "/api/v1/email-intake/settings"): "checked in the route: Customer Admin only",
     ("POST", "/api/v1/email-intake/settings/rotate"): "checked in the route: Customer Admin only",
+    # B6a G20: "Trace this value" reads what the report's worksheet already shows to every member who reads the report
+    # (backend/app/authority_reports/router.py `trace_value`), like GET /api/v1/reports/{obligation_id} above.
+    ("GET", "/api/v1/reports/{obligation_id}/trace/{field_id}"): "read-only, as the report it traces",
+    # B6a signed reviews (backend/app/signed_reviews/router.py): who reads and who signs depends on the review (owner
+    # D4, D5, 12 Nov), so each route checks it itself (`_require_read`, then the signer check); never MDARIX staff.
+    ("PUT", "/api/v1/reviews/audit-trail/frequency"): "checked in the route: a Leader only",
+    (
+        "POST",
+        "/api/v1/reviews/audit-trail/sign",
+    ): "checked in the route: a Leader or Quality Reviewer, never an administrator; re-authentication",
+    (
+        "POST",
+        "/api/v1/reviews/audit-trail/{review_id}/confirm",
+    ): "checked in the route: another Leader or Quality Reviewer than the signer; re-authentication",
+    (
+        "POST",
+        "/api/v1/reviews/access/marks",
+    ): "checked in the route: a customer administrator, never their own row; a Leader only the sole admin's row",
+    ("POST", "/api/v1/reviews/access/sign"): "checked in the route: a customer administrator; re-authentication",
+    (
+        "POST",
+        "/api/v1/reviews/configuration/sign",
+    ): "checked in the route: a customer administrator only; re-authentication",
+    (
+        "GET",
+        "/api/v1/reviews/signed/{review_id}/download",
+    ): "checked in the route: whoever may read that kind of review; audited",
 }
 # Exempt routes that must still refuse anyone without a session: the exemption is from the business permission,
 # never from authentication.
@@ -182,6 +209,14 @@ EXEMPT_BUT_SIGNED_IN = {
     ("POST", "/api/v1/signer-training/{document_code}/acknowledge"),
     ("POST", "/api/v1/trial/short-story/marks"),
     ("POST", "/api/v1/trial/one-story/marks"),
+    ("GET", "/api/v1/reports/{obligation_id}/trace/{field_id}"),
+    ("PUT", "/api/v1/reviews/audit-trail/frequency"),
+    ("POST", "/api/v1/reviews/audit-trail/sign"),
+    ("POST", "/api/v1/reviews/audit-trail/{review_id}/confirm"),
+    ("POST", "/api/v1/reviews/access/marks"),
+    ("POST", "/api/v1/reviews/access/sign"),
+    ("POST", "/api/v1/reviews/configuration/sign"),
+    ("GET", "/api/v1/reviews/signed/{review_id}/download"),
 }
 
 
