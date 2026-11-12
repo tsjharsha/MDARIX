@@ -50,6 +50,8 @@ artifacts/automated-release-gate.md
 artifacts/demo/
 # B6a G7: each release check's full output (the summary artifacts/release-checks-<version>.json stays tracked).
 artifacts/release-checks/
+# B6b B12: the dry-run validation pack (development results, not validation evidence; regenerate it).
+artifacts/validation-pack-dryrun/
 
 # Keys, certificates, database dumps and encrypted backups never belong in the repository; the filled production
 # settings (.env.production, .env.migrate) are covered by .env.* above.

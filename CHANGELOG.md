@@ -17,6 +17,9 @@ B6b Part A: validation documents. MDARIX's own validation documents now live in 
 none is to be given to a customer before the independent CSV consultant has reviewed it. One small code change (the
 rule register refuses a version approved by its own builder); no migration, no switch.
 
+B6b Part B: the per-release validation pack generator, the requirements (URS source) and the scenario tags. The
+pack is generated as a dry run only: its statuses are development results, not validation evidence.
+
 ### Added
 - **Document control and index (MDX-VAL-000)**, `docs/validation/README.md`: document numbering (MDX-VAL, -SUP,
   -SOP, -OPS, -CUS), versions and statuses, header template, writing standard, signing as a PDF with its SHA-256 in
@@ -42,8 +45,29 @@ rule register refuses a version approved by its own builder); no migration, no s
   NOT RUN.
 - **Scenario register under version control**: `docs/validation/scenario-register.md` is now the master copy
   (copied byte for byte from the planning folder, which keeps a pointer).
+- **Requirements (URS source)**, `docs/validation/requirements.csv`: 67 requirements (57 class A, 9 B, 1 C), one
+  "shall" statement each, with revision, class, source spec, RSK IDs, scenarios, negative scenarios and named tests.
+  The 34 risk rows without a requirement now name theirs (MDX-VAL-002).
+- **Validation-pack generator**, `scripts/validation_pack.py` (logic in `validation/pack.py`, with a small
+  standard-library XLSX writer `validation/xlsx_write.py` and a DOCX/PDF renderer `validation/docx_render.py`):
+  URS, FS/DS, IQ record, OQ protocol and results, RTM, G13 figures, draft VSR and release approval record, in
+  Markdown, Word, PDF, CSV and Excel, with a SHA-256 manifest, into `docs/validation/releases/<release>/`. The
+  release identity is an argument (a warning when it differs from `VERSION`). It lists every traceability failure
+  (class-A requirement without a negative scenario, requirement without a scenario, unknown scenario, PASS without
+  evidence, marker with an unknown ID) and every deviation-rule failure, and writes nothing unless `--dry-run`. It
+  never overwrites a release folder holding a signed approval, and produces no release approval record while a
+  critical deviation is open. The same inputs give byte-identical files.
+- **Requirement markers in JUnit**: each `requirement(<scenario ID>)` marker is copied into the test's JUnit
+  properties (`validation/pytest_requirements.py`, imported by `tests/conftest.py`); `scripts/release_checks.ps1`
+  writes `artifacts/release-checks/junit.xml` and has a `-Full` switch for the whole suite.
+- **Class-A test tags**: 52 test files carry a file-level `requirement` marker with the scenarios of the class-A
+  requirements that name them.
+- **MDARIX PQ protocol (MDX-VAL-008)** and **deviation log and change-impact template (MDX-VAL-010)**, with
+  `docs/validation/deviation-log.csv` (header only).
 
 ### Changed
+- **Scenario register statuses normalised** to the five values (NOT RUN, PASS, FAIL, BLOCKED, REQUIRES HUMAN
+  DECISION); run notes and partial results moved to a new Notes column.
 - **Rule register: a second person approves.** `backend/app/rule_register/register.py` refuses a rule version
   whose `approval.approved_by` is empty or names the same person as `approval.built_by` (owner decision O3,
   MDX-VAL-002 RSK-065). Every shipped rule file still loads.
