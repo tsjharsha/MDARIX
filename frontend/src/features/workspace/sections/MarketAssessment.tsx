@@ -68,7 +68,7 @@ export function MarketAssessmentDrawer({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { story } = useWorkspace();
+  const { story, open } = useWorkspace();
   const detail = useResource<AssessmentDetail>(assessmentPath(complaint.id));
   const data = detail.data;
   const shown = data?.markets ?? [];
@@ -87,7 +87,10 @@ export function MarketAssessmentDrawer({
       {data && !shown.length && (
         <p className="uw-hint">
           No market is enabled: enter your reporting windows (Complaints › Reporting windows) for the markets you report
-          to.
+          to.{" "}
+          <button type="button" className="ac-link" onClick={() => open("Complaints", "Reporting windows")}>
+            Open Reporting windows
+          </button>
         </p>
       )}
       {data && active && (

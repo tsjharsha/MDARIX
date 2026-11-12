@@ -181,9 +181,25 @@ export const PATHS: Array<{
     proposed: 2,
     steps: [{ go: ["Records", "Effectiveness checks?capa=p1"] }, { press: "Sign", in: "Records" }],
   },
+  // B6a Part D (navigation review, D4): the new screens on the same count.
+  {
+    key: "n",
+    task: "Trace a report value to its record, import row and snapshot",
+    today: 2,
+    proposed: 2,
+    steps: [{ go: ["Complaints", "Reports?complaint=c1"] }, { press: "Trace", in: "TraceValue" }],
+  },
+  {
+    key: "o",
+    task: "See the outcome numbers against the baseline",
+    today: 1,
+    proposed: 1,
+    steps: [{ go: ["My Work", "Team overview"] }],
+    note: "the Value Centre panel is on Team overview (Readiness › Oversight on the classic navigation)",
+  },
 ];
 
-describe("the click paths a–m on the new navigation (stages 7 and 8)", () => {
+describe("the click paths a–o on the new navigation (stages 7 and 8, B6a)", () => {
   it.each(PATHS.map((path) => [path.key, path] as const))("path %s: every step exists, within the count", (_, path) => {
     for (const step of path.steps)
       if ("go" in step) expect(lands(step.go), `${path.key}: ${step.go.join(" › ")}`).toBe(true);

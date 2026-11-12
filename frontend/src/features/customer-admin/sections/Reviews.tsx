@@ -3,6 +3,7 @@ import { Download } from "lucide-react";
 import { Panel } from "../../admin/console/charts";
 import { Table, Tabs, errorText, formatDate, send, useResource } from "../shared";
 import { plural } from "../labels";
+import { useConsole } from "../context";
 
 /**
  * B6a Part C: the reviews the organization signs (flat operational screens, G-2). The server decides who may read and
@@ -325,6 +326,7 @@ export function AccessReview() {
     `${REVIEWS}/access`,
   );
   const [error, setError] = useState("");
+  const { open } = useConsole();
   const mark = async (userId: string, value: string) => {
     setError("");
     try {
@@ -341,7 +343,10 @@ export function AccessReview() {
         <>
           <p className="ac-muted">
             Due {formatDate(data.next_due)} · {plural(data.unmarked, "row")} not marked yet. Change and Remove are done
-            in Users; this review records what was decided.
+            in Users; this review records what was decided.{" "}
+            <button type="button" className="ac-link" onClick={() => open("Users")}>
+              Open Users
+            </button>
           </p>
           {error && <p className="ca-inline-error">{error}</p>}
           <Table
@@ -440,9 +445,14 @@ export function ConfigurationReview() {
           },
         ]}
       />
+      {before && (
+        <button type="button" className="ac-link" onClick={() => setBefore("")}>
+          Hide the comparison
+        </button>
+      )}
       {before && compared.data && (
         <Table
-          caption="Changes since the snapshot"
+          caption={`Changes since the snapshot of ${formatDate(list.find((row) => row.review_id === before)?.signed_at)}`}
           rows={compared.data.changes}
           rowKey={(row) => row.item}
           empty={{ title: "Nothing changed", detail: "The configuration is as signed." }}

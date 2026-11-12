@@ -93,21 +93,24 @@ export function FirstContact({
         title="Cases"
         detail="A service call can hide a complaint. Log the reporter's words, answer the ten questions, and the table gives complaint, complaint and service, service only, inquiry, pending or not a complaint. A harm answer or a harm word goes to triage at once."
       >
-        {canWrite && (
-          <div className="uw-entry-actions">
-            <button type="button" className="ac-primary" onClick={() => setLogging("CONTACT")}>
-              <PhoneCall size={15} aria-hidden="true" /> Log a case
-            </button>
-            <button type="button" className="ac-secondary" onClick={() => setLogging("URGENT")}>
-              <Siren size={15} aria-hidden="true" /> Urgent: death or serious injury
-            </button>
-            {onOpenTab && (
-              <button type="button" className="ac-link" onClick={() => onOpenTab("Triage")}>
-                Open the triage list
+        <div className="uw-entry-actions">
+          {canWrite && (
+            <>
+              <button type="button" className="ac-primary" onClick={() => setLogging("CONTACT")}>
+                <PhoneCall size={15} aria-hidden="true" /> Log a case
               </button>
-            )}
-          </div>
-        )}
+              <button type="button" className="ac-secondary" onClick={() => setLogging("URGENT")}>
+                <Siren size={15} aria-hidden="true" /> Urgent: death or serious injury
+              </button>
+            </>
+          )}
+          {/* B6a navigation review: whoever triages reaches the list, whether or not they may log a case. */}
+          {onOpenTab && (
+            <button type="button" className="ac-link" onClick={() => onOpenTab("Triage")}>
+              Open the triage list
+            </button>
+          )}
+        </div>
       </Hero>
       <EmailToCheck
         reloadKey={reloadKey}
@@ -423,10 +426,7 @@ function LogDrawer({
     onEntry: setEntry(code),
     guide,
   });
-  const backEntry =
-    lateEntry &&
-    !email &&
-    (lateNeeded || looksLate([form.received]));
+  const backEntry = lateEntry && !email && (lateNeeded || looksLate([form.received]));
   const duplicateQuery =
     (!typeProduct && form.product) || form.lot
       ? duplicatesPath({ ...form, product: typeProduct ? "" : form.product })
@@ -1075,6 +1075,7 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
   const canWrite = useCan("case.classify");
   const canLog = useCan("case.log");
   const canReview = useCan("quality.review");
+  const { open } = useWorkspace();
   const [answers, setAnswers] = useState<Answers>({ ...blankAnswers(guide.questions), ...item.answers });
   const [editing, setEditing] = useState(item.draft || item.version === 0);
   const [adding, setAdding] = useState<"addendum" | "correct" | null>(null);
@@ -1196,6 +1197,9 @@ export function CheckBody({ item, guide, onChanged }: { item: IntakeItem; guide:
             ))}
           </ul>
           <p className="uw-hint">Safety never waits for the check or a signature.</p>
+          <button type="button" className="ac-link" onClick={() => open("Complaints", "Triage")}>
+            Open the triage list
+          </button>
         </section>
       )}
       {item.kind !== "URGENT" && (

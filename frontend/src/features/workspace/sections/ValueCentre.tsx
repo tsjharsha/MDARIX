@@ -55,7 +55,7 @@ const COLUMNS: Column<ValueMetric>[] = [
   {
     key: "imported",
     label: "From your QMS export, before MDARIX",
-    render: (row) => (row.imported ? summaryText(row.imported, row.unit) : "—"),
+    render: (row) => (row.imported ? summaryText(row.imported, row.unit) : "â€”"),
   },
 ];
 

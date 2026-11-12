@@ -131,7 +131,9 @@ export function OversightView({
             empty={{
               title: "Nothing overdue or due soon",
               detail:
-                filters.show === "all" ? "No dated item matches these filters." : "Show all items to see later ones.",
+                filters.show === "all"
+                  ? "No dated item matches these filters."
+                  : "Choose Show: Every dated item to see later ones.",
             }}
           />
         )}
@@ -139,7 +141,8 @@ export function OversightView({
       {part === "all" && view && <EventsPanel events={view.events} onOpen={setEvent} />}
       {part === "all" && view && <CalendarPanel settings={view.settings} onSaved={data.reload} />}
       {part === "all" && reviews && <AuditTrailReview />}
-      {part === "all" && outcomes && <ValueCentre />}
+      {/* The new navigation's Team overview (part "items") is where a manager looks: the numbers show there too. */}
+      {outcomes && <ValueCentre />}
       {event && <EventDrawer complaintId={event} onClose={() => setEvent(null)} onChanged={data.reload} />}
     </div>
   );

@@ -24,6 +24,7 @@ import {
   type ReportView,
 } from "../authorityReports";
 import { InlineError } from "./boardParts";
+import { ComplaintNextStep } from "./ComplaintNextStep";
 import { listTitle } from "./common";
 import { StagePath } from "./ComplaintPage";
 import { StoryPill } from "./OneStory";
@@ -490,7 +491,7 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                 </section>
               )}
               {write && detail.stage === "SUBMITTED" && detail.submissions[0] && (
-                <section className="uw-rec-part" aria-label="Record the acknowledgement">
+                <section className="uw-rec-part" id="rp-acknowledgement" aria-label="Record the acknowledgement">
                   <h2>Record the acknowledgement</h2>
                   <RecordEvidence detail={detail} attempt={detail.submissions[0]} onChanged={changed} />
                 </section>
@@ -690,10 +691,23 @@ export function ReportPage({ id, onBack }: { id: string; onBack: () => void }) {
                 )}
               </>
             )}
+            {write && detail.stage === "SUBMITTED" && detail.submissions[0] && (
+              <button
+                type="button"
+                className="ac-secondary"
+                onClick={() => openSubmission(document.getElementById("rp-acknowledgement"))}
+              >
+                Record the acknowledgement
+              </button>
+            )}
             {!canWrite && detail.stage !== "APPROVED" && detail.state !== "CANCELLED" && (
               <p className="ac-muted">You can read this report; a Regulatory Leader or Quality Leader works on it.</p>
             )}
             <InlineError text={action.error || pdfError} />
+            {/* B6a navigation review: once nothing more is owed here, the complaint's own next step (as the drawer). */}
+            {(detail.state === "COMPLETE" || detail.state === "CANCELLED") && (
+              <ComplaintNextStep complaintId={detail.complaint.id} here="Reports" refreshKey={detail.state} />
+            )}
           </section>
           <section className="uw-card uw-card-pad uw-rail-signs" aria-label="Who signs">
             <h2>Who signs</h2>

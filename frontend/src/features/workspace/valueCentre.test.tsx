@@ -64,6 +64,8 @@ describe("Value Centre", () => {
     expect(html).toContain("2026-11: 30 h");
     expect(html).toContain("48 h (90 % within 70 h, 5 records)");
     expect(html).toContain("no one&#x27;s working time is tracked");
+    // No QMS history for a measure: a dash (UTF-8, never a stray byte).
+    expect(html).toMatch(/>—</);
     expect(html).not.toMatch(/(entered|approved|signed|triaged|completed) by/i);
   });
 

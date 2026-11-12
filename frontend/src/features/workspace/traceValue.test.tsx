@@ -67,7 +67,7 @@ describe("Trace this value", () => {
   it("says when a value was typed, never imported, and not frozen yet", () => {
     const html = renderToStaticMarkup(<TraceBody data={{ ...TRACE, origin: null, imports: [], snapshot: null }} />);
     expect(html).toContain("Entered on this report by a person.");
-    expect(html).toContain("Not frozen yet: Send for approval freezes the report.");
+    expect(html).toContain("Not frozen yet: sending it for approval freezes it.");
   });
 
   it("shows the link only while the server has the switch on", () => {

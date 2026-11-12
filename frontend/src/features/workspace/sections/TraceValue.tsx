@@ -118,7 +118,7 @@ export function TraceBody({ data }: { data: ValueTrace }) {
             <span className="tr-values tr-hash">SHA-256 {snapshot.sha256}</span>
           </p>
         ) : (
-          <p className="ac-muted">Not frozen yet: Send for approval freezes the report.</p>
+          <p className="ac-muted">Not frozen yet: sending it for approval freezes it.</p>
         )}
       </section>
     </div>
