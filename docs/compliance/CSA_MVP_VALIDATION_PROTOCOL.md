@@ -1,5 +1,7 @@
 # MDARIX MVP software validation protocol
 
+> **SUPERSEDED (12 Nov 2026, B6b).** This MVP-1.0 protocol was never executed and is retired. Do not give it to a customer or use it as evidence. Its roles, entry criteria and deviation steps are carried into [MDX-VAL-001 Validation Master Plan](../validation/MDX-VAL-001_VALIDATION_MASTER_PLAN.md); the document index is [docs/validation/README.md](../validation/README.md).
+
 Document ID: `MDARIX-CSA-MVP-1.0`  
 Version: `1.0`  
 Status: **Ready for controlled execution**  

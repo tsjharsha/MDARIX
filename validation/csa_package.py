@@ -237,9 +237,19 @@ Customer-specific requirements, infrastructure qualification, access controls, b
 """
 
 
+SUPERSEDED_BANNER = (
+    "> **SUPERSEDED (12 Nov 2026, B6b).** This MVP-1.0 package was never executed and is retired. Do not give it to a "
+    "customer or use it as evidence. The current plan is "
+    "[MDX-VAL-001](../validation/MDX-VAL-001_VALIDATION_MASTER_PLAN.md); the document index is "
+    "[docs/validation/README.md](../validation/README.md)."
+)
+
+
 def render_markdown(package: dict) -> str:
     lines = [
         f"# {package['package_id']}",
+        "",
+        SUPERSEDED_BANNER,
         "",
         f"Release: `{package['release']}`",
         f"Status: **{package['status']}**",
