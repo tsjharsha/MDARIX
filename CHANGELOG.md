@@ -83,6 +83,12 @@ DB-1's `tr24tenantindexes` when DB-1 lands). The API and web images change.
   addenda accept the kinds `TRANSLATION` and `EMAIL`; a Case import's key is unique per organization. Legacy
   organization databases get the same from `scripts/add_workflow_tables_to_legacy_planes.py` (step `tr25`).
 
+### Tests
+
+- The authorization matrix (`tests/test_authorization_matrix.py`) switches e-mail intake on for its sweeps, as the
+  permission sweep already does: while intake is off its routes answer 404 before the session check and the guards,
+  so 14 sweeps reported them as "answered past the session check". No product change.
+
 ### Added (B7b e-mail intake, switched off by default)
 
 - E-mail intake is OFF unless `MDARIX_EMAIL_INTAKE=on` (operations first opens inbound port 25, adds the MX record for
