@@ -223,6 +223,7 @@ also questions in MDX-VAL-013.
 | O6 | RSK-066 (purge, retention, legal hold) has severity S5; RSK-067 (sign-in and sessions) stays S4 (owner, 12 Nov 2026) |
 | O7 | Severity 5 includes the permanent loss of regulated records; severity 4 the loss of regulated records that can be recovered (owner, 12 Nov 2026; MDX-VAL-002 section 3.7) |
 | O8 | RSK-029 (formula injection in an exported CSV) has severity S5: data can leave the organisation (owner, 12 Nov 2026) |
+| O9 | A failure found only at the quarterly restore drill has detectability D4, not D2 (owner, 12 Nov 2026; MDX-VAL-002 section 3.3) |
 
 ## 5. Codes used in these documents
 
