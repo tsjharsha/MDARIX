@@ -14,8 +14,8 @@ operator knows a release migrates the database.
 
 B6b Part A: validation documents. MDARIX's own validation documents now live in the repository under
 `docs/validation/`, versioned with the code. All are drafts for the owner's review and signature; none is signed and
-none is to be given to a customer before the independent CSV consultant has reviewed it. No code change for users,
-no migration, no switch.
+none is to be given to a customer before the independent CSV consultant has reviewed it. One small code change (the
+rule register refuses a version approved by its own builder); no migration, no switch.
 
 ### Added
 - **Document control and index (MDX-VAL-000)**, `docs/validation/README.md`: document numbering (MDX-VAL, -SUP,
@@ -26,15 +26,27 @@ no migration, no switch.
   risk-based approach, risk classes A/B/C by severity, lifecycle and per-release validation, change impact, release
   approval before every production deploy, 10-working-day customer change notice, environments, deliverables,
   acceptance criteria, deviations. Replaces the planning draft MDX-B10-003.
-- **Product risk assessment (MDX-VAL-002)**: GxP impact per function, and an FMEA of 65 failure modes with severity,
+- **Product risk assessment (MDX-VAL-002)**: GxP impact per function, and an FMEA of 67 failure modes with severity,
   occurrence and detectability (1-5), RPN and an action rule, each linked to the threat model and to seed
   requirement IDs. Replaces the planning draft MDX-B10-004.
 - **GAMP 5 category justification (MDX-VAL-003)**: Category 4 for MDARIX, Category 5 for anything written for one
   customer, Category 1 for platform software.
+- **Owner decisions and codes** recorded in MDX-VAL-000 sections 4 and 5, so the signed index is their controlled
+  record; one signature rule for every document (the quality approver approves; the system owner approves what the
+  quality approver writes; a "Drafting" field names who reviewed a software-assisted draft).
+- **Consultant brief and question pack (MDX-VAL-013)**: what MDARIX is, what to confirm, the documents to review and
+  23 questions.
+- **Validation planning drafts MDX-B10-001, -002, -005, -006** moved into `docs/validation/` unchanged (owner
+  decision O2).
+- **Scenario rows B6-47 to B6-58** (validation pack, recovery check, health report, deviation log, release approval),
+  NOT RUN.
 - **Scenario register under version control**: `docs/validation/scenario-register.md` is now the master copy
   (copied byte for byte from the planning folder, which keeps a pointer).
 
 ### Changed
+- **Rule register: a second person approves.** `backend/app/rule_register/register.py` refuses a rule version
+  whose `approval.approved_by` is empty or names the same person as `approval.built_by` (owner decision O3,
+  MDX-VAL-002 RSK-065). Every shipped rule file still loads.
 - **Password expiry claim corrected.** `docs/compliance/COMPLIANCE_VALIDATION_PROTOCOL.md` said passwords expire
   after 90 days; the code has no password expiry (owner decision). It now states that, with the breached-password
   refusal and the sign-in lockout; MFA for signatures is described as on by default and refused off in production.
