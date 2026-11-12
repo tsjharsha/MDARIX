@@ -91,7 +91,8 @@ def _run(root: Path, *extra: str) -> int:
 def test_requirement_marker_reaches_the_junit_xml(tmp_path):
     (tmp_path / "pytest.ini").write_text("[pytest]\nmarkers =\n    requirement(id): scenario\n")
     (tmp_path / "test_tagged.py").write_text(
-        'import pytest\n\n@pytest.mark.requirement("IN-01", "IN-02")\ndef test_one():\n    pass\n'
+        'import pytest\n\npytestmark = pytest.mark.requirement("IN-09")\n\n'
+        '@pytest.mark.requirement("IN-01", "IN-02")\ndef test_one():\n    pass\n'
     )
     junit = tmp_path / "junit.xml"
     done = subprocess.run(
@@ -100,7 +101,8 @@ def test_requirement_marker_reaches_the_junit_xml(tmp_path):
         cwd=ROOT, capture_output=True, text=True, timeout=120,
     )  # fmt: skip
     assert done.returncode == 0, done.stdout + done.stderr
-    assert [t["scenarios"] for t in pack.read_junit(junit)] == [["IN-01", "IN-02"]]
+    read = pack.read_junit(junit)
+    assert [t["scenarios"] for t in read] == [["IN-01", "IN-02"]] and [t["file_scenarios"] for t in read] == [["IN-09"]]
     # The wiring in tests/conftest.py: a test of this file, run through the real conftest, carries its marker.
     real = tmp_path / "real.xml"
     done = subprocess.run(
@@ -256,6 +258,27 @@ def test_no_oq_results_without_an_approved_protocol(tmp_path, capsys):
     expected.write_text(OQ_EXPECTED.splitlines()[0] + "\n")
     assert _run(root, "--dry-run", "--out", str(tmp_path / "dry2")) == 1
     assert "AA-02: class-A scenario without a concrete OQ expected result" in capsys.readouterr().err
+
+
+def test_file_level_markers_never_verify_a_class_a_requirement(tmp_path):
+    """O24: for class A only a test's own marker counts; a file-level marker shows "file-level only, not
+    verification". For class B a file-level marker still counts."""
+    junit = JUNIT.replace('name="requirement" value="AA-02"', 'name="requirement_file" value="AA-02"')
+    junit = junit.replace('<testcase classname="tests.test_b" name="test_untagged" time="0.05"/>',
+                          '<testcase classname="tests.test_b" name="test_counts" time="0.05"><properties>'
+                          '<property name="requirement_file" value="AA-03"/></properties></testcase>')  # fmt: skip
+    root = _root(tmp_path, junit=junit)
+    assert _run(root, "--dry-run", "--out", str(tmp_path / "out")) == 0  # AA-02 now NOT RUN (no check fails)
+    rows = read_rows((tmp_path / "out" / "rtm.xlsx").read_bytes())
+    body = {r[0]: dict(zip(rows[0], r)) for r in rows[1:]}
+    assert body["REQ-T-001"]["status"] == "Not verified" and body["REQ-T-001"]["scenarios_passed"] == "1/2"
+    assert body["REQ-T-002"]["coverage"] == "covered" and body["REQ-T-002"]["status"] == "Verified"
+    only_file = junit.replace('name="requirement" value="AA-01"', 'name="requirement_file" value="AA-01"')
+    (root / "junit.xml").write_text(only_file, encoding="utf-8")
+    assert _run(root, "--dry-run", "--out", str(tmp_path / "out")) == 1
+    rows = read_rows((tmp_path / "out" / "rtm.xlsx").read_bytes())
+    body = {r[0]: dict(zip(rows[0], r)) for r in rows[1:]}
+    assert body["REQ-T-001"]["coverage"] == "file-level only, not verification"
 
 
 def test_interim_template_and_generator_list_the_same_criteria():

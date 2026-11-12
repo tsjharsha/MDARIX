@@ -118,10 +118,12 @@ def read_junit(path: Path) -> list[dict]:
             outcome = "fail"
         elif case.find("skipped") is not None:
             outcome = "skipped"
-        scenarios = sorted({p.get("value", "") for p in case.iter("property") if p.get("name") == "requirement"} - {""})
+        props = [(p.get("name"), p.get("value", "")) for p in case.iter("property")]
+        scenarios = sorted({v for n, v in props if n == "requirement"} - {""})
+        file_scenarios = sorted({v for n, v in props if n == "requirement_file"} - {""} - set(scenarios))
         tests.append({
             "id": f"{case.get('classname', '')}::{case.get('name', '')}", "result": outcome,
-            "seconds": float(case.get("time") or 0), "scenarios": scenarios,
+            "seconds": float(case.get("time") or 0), "scenarios": scenarios, "file_scenarios": file_scenarios,
         })  # fmt: skip
     return sorted(tests, key=lambda t: t["id"])
 
@@ -166,10 +168,18 @@ def _ran(sources: Sources) -> list[dict]:
     return [t for t in sources.tests if t["result"] != "skipped"]
 
 
+def _proves(sources: Sources, test: dict, sid: str) -> bool:
+    """A test proves a scenario by its own (test-level) marker; a file-level marker counts only for a scenario that no
+    class-A requirement cites (owner decision O24)."""
+    if sid in test["scenarios"]:
+        return True
+    return sid in test.get("file_scenarios", ()) and sid not in class_a_scenarios(sources)
+
+
 def scenario_outcome(sources: Sources, sid: str) -> str:
     """This release's outcome of one scenario: FAIL (a tagged test failed, or the register says FAIL), BLOCKED,
     PASS (a tagged test ran and passed), else NOT RUN. A register PASS alone is a development result (VMP-R31)."""
-    results = {t["result"] for t in _ran(sources) if sid in t["scenarios"]}
+    results = {t["result"] for t in _ran(sources) if _proves(sources, t, sid)}
     status = sources.scenarios.get(sid, {}).get("status", "")
     if "fail" in results or status == "FAIL":
         return "FAIL"
@@ -213,7 +223,7 @@ def check(sources: Sources, release: str) -> list[str]:
         if row["status"] == "PASS" and scenario_outcome(sources, sid) != "PASS" and "EVD-" not in row["notes"]:
             problems.append(f"{sid}: PASS without evidence (no passing tagged test in this JUnit, no EVD- record)")
     for test in sources.tests:
-        for sid in test["scenarios"]:
+        for sid in test["scenarios"] + test.get("file_scenarios", []):
             if sid not in sources.scenarios:
                 problems.append(f"{test['id']}: marker names unknown scenario {sid}")
     for dev in release_deviations(sources, release):
@@ -264,7 +274,8 @@ def rtm(sources: Sources) -> list[dict]:
     rows = []
     for req in sources.requirements:
         scenarios = req["scenario_ids"]
-        linked = [t for t in _ran(sources) if set(t["scenarios"]) & set(scenarios)]
+        linked = [t for t in _ran(sources) if any(_proves(sources, t, s) for s in scenarios)]
+        file_only = not linked and any(set(t.get("file_scenarios", ())) & set(scenarios) for t in _ran(sources))
         outcomes = {s: scenario_outcome(sources, s) for s in scenarios}
         statuses = {sources.scenarios.get(s, {}).get("status", "") for s in scenarios}
         if "FAIL" in outcomes.values():
@@ -284,7 +295,7 @@ def rtm(sources: Sources) -> list[dict]:
             "tagged_tests": len(linked), "passed": sum(t["result"] == "pass" for t in linked),
             "failed": sum(t["result"] == "fail" for t in linked),
             "scenarios_passed": f"{sum(o == 'PASS' for o in outcomes.values())}/{len(scenarios)}",
-            "coverage": "covered" if linked else "NOT COVERED",
+            "coverage": "covered" if linked else "file-level only, not verification" if file_only else "NOT COVERED",
             "register_status": "; ".join(f"{s} {sources.scenarios.get(s, {}).get('status', 'NOT IN REGISTER')}" for s in scenarios),
             "named_tests": " ".join(req["tests"]), "status": status,
         })  # fmt: skip
@@ -500,9 +511,10 @@ def oq_tables(s: Sources) -> tuple[list[list], list[list]]:
             req_of.setdefault(sid, []).append(req["req_id"])
     log = [["Test", "Scenarios", "REQs", "Result", "Seconds"]]
     for t in s.tests:
-        if t["scenarios"]:
-            reqs = sorted({r for sid in t["scenarios"] for r in req_of.get(sid, [])})
-            log.append([t["id"], " ".join(t["scenarios"]), " ".join(reqs), t["result"].upper(), t["seconds"]])
+        if t["scenarios"] or t.get("file_scenarios"):
+            tagged = t["scenarios"] + [f"{sid} (file-level)" for sid in t.get("file_scenarios", [])]
+            reqs = sorted({r for sid in t["scenarios"] + t.get("file_scenarios", []) for r in req_of.get(sid, [])})
+            log.append([t["id"], " ".join(tagged), " ".join(reqs), t["result"].upper(), t["seconds"]])
     return scripted, log
 
 
@@ -546,7 +558,7 @@ def oq_protocol(ctx: Context, scripted: list[list], sha256: str) -> str:
 
 
 def oq(ctx: Context, s: Sources, scripted: list[list], log: list[list], sha256: str, approved: bool) -> str:
-    untagged = sum(1 for t in s.tests if not t["scenarios"])
+    untagged = sum(1 for t in s.tests if not t["scenarios"] and not t.get("file_scenarios"))
     state = (
         f"approved (`signatures.csv`, SHA-256 `{sha256}`)"
         if approved
@@ -585,7 +597,8 @@ def rtm_markdown(ctx: Context, rows: list[dict]) -> str:
         _header(ctx, "MDX-VAL-009", "Requirements traceability matrix", SYSTEM_OWNER, QUALITY_APPROVER)
         + _sources_section(ctx)
         + "## 2. Matrix\n\n"
-        'Tests link to a requirement through their `requirement` markers naming one of its scenarios. "NOT COVERED" = '
+        "Tests link to a requirement through their `requirement` markers naming one of its scenarios; for class A only a "
+        'test\'s own marker counts (O24). "NOT COVERED" = '
         "no tagged test in this JUnit; the scripted OQ steps (MDX-VAL-007-R) then carry the evidence. Status: Verified / "
         "Not verified / Failed / Blocked / Requires human decision (MDX-B10-005 section 6). Full columns in `rtm.csv`.\n\n"
         + _table(keys, [[r[k] for k in keys] for r in rows])
@@ -623,8 +636,8 @@ def vsr(ctx: Context, s: Sources, rows: list[dict], figures: dict, devs: list[di
         + "\n\n"
         + "## 8. Known limitations\n\n- Requirements without a scenario or a negative scenario are listed in section 7.\n"
         "- Defect leakage has no source until MDARIX's own complaint and CAPA registers exist (B6b Part D).\n"
-        "- Test tags are at file level: every test in a tagged file carries the file's scenarios. A file is tagged with a "
-        "scenario only where the register row names it, or it is the scenario group's own test file.\n\n"
+        "- Most test tags are at file level. For class-A requirements only a test's own marker counts as verification; "
+        'a file-level marker shows as "file-level only, not verification" in the RTM (owner decision O24).\n\n'
         + "## 9. Independence statement\n\nReviewed by the quality approver, who did not write the code or the tests: "
         "name ________ date ________\n\n" + "## 10. Audit-finding self-check\n\n"
         "- URS not written by engineering alone: ____\n- QA reviewed independently: ____\n- PQ executed by users: ____\n"
