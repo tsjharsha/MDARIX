@@ -15,6 +15,7 @@ from object_storage.service import ObjectStorageService
 from tests.conftest import authenticated_client
 from tests.test_tenant_data import (
     PURGE_BODY,
+    WAIVED,
     BrokenStorage,
     _count,
     _set_status,
@@ -147,7 +148,7 @@ def test_a_hold_set_on_an_unfinished_purge_preserves_what_is_left(organization, 
     _set_status(tenant_id, "SUSPENDED")
     db = SessionLocal()
     try:
-        first = purge_tenant(db, tenant_id, "test", reason="Files step fails", storage=BrokenStorage())
+        first = purge_tenant(db, tenant_id, "test", reason="Files step fails", storage=BrokenStorage(), evidence=WAIVED)
     finally:
         db.close()
     assert first["status"] == "PURGING"

@@ -9,7 +9,7 @@ import { ReportingFacts } from "./ReportingFacts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { deadlineLabel, formatDay } from "../../../app/dates";
 import { SampleDates } from "../../../app/chips";
-import { WorkspaceContext, useCan, useWorkspace } from "../workspaceContext";
+import { WorkspaceContext, useCan, useIsTrial, useWorkspace } from "../workspaceContext";
 import { reportsTab, worksheetMarkets } from "../authorityReports";
 import { communicationsTab } from "../communications";
 import { recordName } from "../complaintReview";
@@ -746,8 +746,8 @@ export function ScalePanel({
   );
 }
 
-/** The training on what a signature relies on: read each document, then "I have read …, MDARIX starter, version 1". Required to sign in a
- * free trial only (owner decision 6); elsewhere the record can be made but signing does not wait for it. */
+/** The training on what a signature relies on: read each document, then "I have read …, MDARIX starter, version 1". Required to sign in
+ * every organization (RSK-011, owner 12 Nov 2026); in a free trial it is a practice record. */
 export function TrainingPanel({
   documents,
   colleagues,
@@ -761,6 +761,7 @@ export function TrainingPanel({
   onDone: () => void;
   note?: string;
 }) {
+  const trial = useIsTrial();
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const acknowledge = async (document: TrainingDocument) => {
@@ -782,14 +783,14 @@ export function TrainingPanel({
     <section className="ca-drawer-section uw-ma-training" role="status">
       <h3>
         <BookOpenCheck size={15} aria-hidden="true" />{" "}
-        {required ? "Before you sign: practice training on" : "Training record on"}{" "}
+        {required ? `Before you sign: ${trial ? "practice " : ""}training on` : "Training record on"}{" "}
         {documents.map((document) => versionWords(document.version)).join(" and ")}
       </h3>
       <p className="ac-muted">
         ISO 13485 clause 6.2: whoever signs is trained on the current version of what the signature relies on. {note}{" "}
-        {required
+        {trial
           ? "In a free trial this is a practice record; MDARIX runs no training."
-          : "Your organization keeps its own training records; signing here does not wait for this one."}
+          : "This records that you read the current version; your organization's QMS keeps its full training records."}
       </p>
       <ul>
         {documents.map((document) => (
