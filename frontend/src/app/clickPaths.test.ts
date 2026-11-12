@@ -242,6 +242,18 @@ export const PATHS: Array<{
     ],
     note: "today the button opened the Summary (Workspace) and the person chose Decisions & actions",
   },
+  {
+    key: "t",
+    task: "After linking duplicates, confirm the awareness conflict on the triage list",
+    today: 3,
+    proposed: 3,
+    steps: [
+      { go: ["My Work", "Queues?view=Possible duplicates"] },
+      { press: "Open the triage list", in: "FirstContact" },
+      { go: ["Complaints", "Triage"] },
+    ],
+    note: "today: the menu, Complaints, To triage; now one link from the hint itself",
+  },
 ];
 
 describe("the click paths a–o on the new navigation (stages 7 and 8, B6a)", () => {

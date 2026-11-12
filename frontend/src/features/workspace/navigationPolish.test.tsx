@@ -6,6 +6,8 @@ import { FollowUpDrawer } from "./sections/AfterDecision";
 import type { FollowUp } from "./afterDecision";
 import { routeFor } from "../../app/linkTable";
 import recordsSource from "./sections/Records.tsx?raw";
+import { DuplicatePair } from "./sections/FirstContact";
+import type { Duplicate, Side } from "./intake";
 
 // B6a navigation polish (D4 backlog items 14, 15, 2 and the audit trail review on the new navigation).
 const inWorkspace = (node: ReactNode, menu: string[] = ["home", "products"]) =>
@@ -62,5 +64,37 @@ describe('"Not effective" opens the investigation\'s decision (D4 #15)', () => {
       section: "Investigations",
       tab: "Decision",
     });
+  });
+});
+
+describe("a possible duplicate (D4 #2, #5)", () => {
+  const side = (id: string, kind: Side["kind"], awareness: string): Side => ({
+    kind,
+    id,
+    ref: `REF-${id}`,
+    source: "Sample",
+    product_name: null,
+    words: "Display froze",
+    event_at: null,
+    awareness_at: awareness,
+    awareness_source: null,
+  });
+  const pair: Duplicate = {
+    left: side("c1", "COMPLAINT", "2026-11-01T09:00:00Z"),
+    right: side("i1", "INTAKE", "2026-11-05T09:00:00Z"),
+    reasons: ["same lot"],
+  };
+
+  it("opens each record in a new tab and the awareness conflict's triage list", () => {
+    const html = inWorkspace(<DuplicatePair pair={pair} onDone={vi.fn()} />);
+    expect(html).toContain('href="/app/readiness?tab=Oversight&amp;event=c1"');
+    expect(html).toContain('href="/app/complaints?tab=First+contact&amp;check=i1"');
+    expect(html).toContain("an awareness conflict on the triage list until it is confirmed.");
+    expect(html).toContain("Open the triage list</button>");
+  });
+
+  it("names no conflict, and offers no triage link, when both were known on the same day", () => {
+    const same = { ...pair, right: { ...pair.right, awareness_at: pair.left.awareness_at } };
+    expect(inWorkspace(<DuplicatePair pair={same} onDone={vi.fn()} />)).not.toContain("Open the triage list");
   });
 });

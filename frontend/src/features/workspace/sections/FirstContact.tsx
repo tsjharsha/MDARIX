@@ -1,12 +1,12 @@
 import { SampleDates } from "../../../app/chips";
-import { useState, type ReactNode } from "react";
+import { useContext, useState, type ReactNode } from "react";
 import { zoneLabel } from "../../../app/labels";
 import { CheckCircle2, Copy, FileWarning, Hourglass, Link2, PhoneCall, Siren, Unlink, Wrench } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { requestJson } from "../../../app/apiClient";
 import { downloadFile } from "../../reports/download";
-import { useCan, useLateEntry, useRoutinePath, useTabParam, useWorkspace } from "../workspaceContext";
+import { WorkspaceContext, useCan, useLateEntry, useRoutinePath, useTabParam, useWorkspace } from "../workspaceContext";
 import { ApiError } from "../../../app/apiClient";
 import { DuplicateHits, LateEntryField, RecordRef, duplicatesPath, looksLate, type DuplicateHit } from "./BackEntry";
 import { DecideAndSign } from "./common";
@@ -2069,7 +2069,7 @@ function Duplicates({ onChanged }: { onChanged: () => void }) {
   );
 }
 
-function DuplicatePair({ pair, onDone }: { pair: Duplicate; onDone: () => void }) {
+export function DuplicatePair({ pair, onDone }: { pair: Duplicate; onDone: () => void }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const decide = async (decision: "LINKED" | "DISMISSED") => {
@@ -2102,7 +2102,7 @@ function DuplicatePair({ pair, onDone }: { pair: Duplicate; onDone: () => void }
       {earlier.awareness_at !== later.awareness_at && (
         <p className="uw-hint">
           Linking moves {later.ref}'s awareness {daysEarlier(later.awareness_at, earlier.awareness_at)} days earlier, to{" "}
-          {earlier.ref}'s: an awareness conflict on the triage list until it is confirmed.
+          {earlier.ref}'s: an awareness conflict on the triage list until it is confirmed. <TriageListLink />
         </p>
       )}
       <label className="ca-field">
@@ -2130,6 +2130,16 @@ function DuplicatePair({ pair, onDone }: { pair: Duplicate; onDone: () => void }
       <InlineError text={error} />
     </div>
   );
+}
+
+/** Navigation polish (B6a D4 #2): the awareness conflict a link makes is confirmed on the triage list. */
+function TriageListLink() {
+  const open = useContext(WorkspaceContext)?.open;
+  return open ? (
+    <button type="button" className="ac-link" onClick={() => open("Complaints", "Triage")}>
+      Open the triage list
+    </button>
+  ) : null;
 }
 
 function LinkRow({ link, onDone }: { link: DuplicateList["links"][number]; onDone: () => void }) {
