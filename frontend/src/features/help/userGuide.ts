@@ -461,8 +461,8 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Link a possible duplicate",
             steps: [
               "Under Complaints › First contact, Possible duplicates lists records from different sources with the same product and lot or serial number, events within 2 days and the same site or country.",
-              "Write why and choose Link into one event, or Not the same: dismiss.",
-              "A link uses the earliest awareness of its sources: the triage list shows Awareness conflict and every deadline counted from awareness is recomputed, the reportability watch's included. Undo a link with a reason; its history stays.",
+              "Choose a record's reference to open it in a new tab and compare (the list stays as it is). Write why and choose Link into one event, or Not the same: dismiss.",
+              "A link uses the earliest awareness of its sources: the triage list shows Awareness conflict and every deadline counted from awareness is recomputed, the reportability watch's included (Open the triage list, beside the warning, goes there). Undo a link with a reason; its history stays.",
             ],
             note: "Uploading a complaints file again updates its records and keeps each field's change, shown in that import's data-quality report. An upload that brings a QMS complaint ID entered on a call closes its QMS-complaint task.",
           },
@@ -1415,7 +1415,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             who: "Quality Reviewer, Authorized Decision Maker, Leader.",
             steps: [
               "On the check, read the criteria and the complaint recurrence Before and Since.",
-              "Choose Effective: the criteria are met, or Not effective: plan a further action.",
+              "Choose Effective: the criteria are met, or Not effective: plan a further action. After a check signed not effective, Go to the investigation's decision opens where the further action is planned as a follow-up; a CAPA follow-up there opens its check again (Open its effectiveness check).",
               "Write What you found, enter Your password and the Authenticator code, and choose Sign the result.",
             ],
             note: "The board's basis is ISO 13485 8.5.2 (corrective action). A signed round keeps the date and time, the meaning of the signature and a link to the exact check signed (21 CFR 11.50 and 11.70).",
@@ -1523,7 +1523,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         id: "signed-reviews",
         title: "Reviews you sign: audit trail, access and configuration",
         where:
-          "Admin console › Reviews (customer administrators and Leaders); the audit trail review also under Readiness › Oversight",
+          "In the Admin console, Reviews (customer administrators and Leaders); the audit trail review also under Readiness › Oversight (Team overview on the new navigation)",
         purpose:
           "The periodic reviews an inspector asks for, signed with your password (and authenticator code) and kept unchanged: what was looked at, what was found, who signed and when. A correction is a new review that names the earlier one.",
         tasks: [
@@ -1591,7 +1591,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             who: "Anyone who reads the report.",
             steps: [
               "On the report, choose Trace beside a value (also under What you are approving).",
-              "1. Where it comes from: the record behind the value and, when a file brought it, the file, its row and the mapping version.",
+              "1. Where it comes from: the record behind the value and, when a file brought it, the file, its row and the mapping version. Choose the record's reference to open it (a complaint or a product); people who may import also see Data-quality report for the file.",
               "2. Who entered or changed it, and when: a value typed on the report, the record's changes by a re-upload, and its audit events with the reason given.",
               "3. Frozen in: the snapshot version, who approved it and when, the value as frozen and its SHA-256.",
             ],

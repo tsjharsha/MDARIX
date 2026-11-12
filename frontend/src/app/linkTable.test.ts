@@ -306,7 +306,7 @@ describe("every link source resolves to an existing screen (6.10)", () => {
     const text = JSON.stringify(GUIDE_PARTS);
     // Not workspace screens: the Help menu's pages and the Admin console's sections ("In the Admin console open
     // Users › Invite").
-    const elsewhere = ["Help", "Users", "Security", "Organization"];
+    const elsewhere = ["Help", "Users", "Security", "Organization", "Reviews"];
     const PANELS: Record<string, string[]> = {
       "Getting started": ["Plan your next steps", "Sample data & trial settings"],
     };

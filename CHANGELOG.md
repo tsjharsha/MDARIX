@@ -205,6 +205,24 @@ No migration. Switches `MDARIX_B6_TRACE`, `MDARIX_B6_SIMILAR_WORDING`, `MDARIX_B
 - **Independent review of Part D (8 findings, 7 fixed).** See the B6a spec, build status run 7.
 - **User guide:** "Trace a value, similar wording and the outcome numbers".
 
+### Navigation polish (B6a, owner 12 Nov "2 polish next")
+No migration; no server change (the follow-up list already sent the CAPA id). Flat, within the hero design and the
+left rail.
+- **Duplicate references are links (D4 items 4, 5).** On the late-entry form and in Possible duplicates, a record's
+  reference opens it in a new tab, so the form or the reason being typed stays: a complaint on its page (Oversight
+  checklist on the classic navigation), a Case on its check.
+- **Trace this value: the origin is a link (item 10).** The record opens its page (a complaint by its reference, a
+  product on Product 360); each import row offers "Data-quality report" to people who may open imports. Every report
+  reader still sees the file name and who imported it (owner decision 12 Nov, now covered by a test: a role without
+  `records.write` gets the same import rows, and the record's origin read still answers 403).
+- **A CAPA follow-up opens its effectiveness check (item 14):** "Open its effectiveness check" in the follow-up.
+- **"Not effective" opens the investigation's decision (item 15):** "Go to the investigation's decision" opens
+  Decisions & actions on the new navigation, the Decision step on the classic one (was the Summary / Workspace).
+- **The duplicate-conflict hint opens the triage list (item 2).**
+- **The audit trail review also on the new navigation:** My work › Team overview, for people who review quality.
+- Click paths p-u added to the click-path test (a-u). User guide: the new links; the signed-reviews "where" no longer
+  writes "Admin console ›" as a screen path (the guide-path test failed on it since run 6).
+
 ## [0.11.02] - not released yet
 
 B9b: other countries, attach-only reports. For a country outside the five built-in markets (US, EU and Northern
