@@ -74,8 +74,30 @@ pack is generated as a dry run only: its statuses are development results, not v
 - **Interface checks mapped** (MDX-VAL-001 Annex F): accuracy, completeness, consistency, transformation, sequence,
   duplicates and failure recovery for import, e-mail intake, authority files and the outbox, each to existing tests;
   three gaps and three partial cells listed as tests to add.
-
+- **Concrete OQ expected results** (`docs/validation/oq-expected-results.csv`, owner decision O20): an input and a
+  concrete expected result (status and error codes, states, dates with zone, labels) for each of the 176 class-A
+  scenarios, with the test that asserts it; 24 rows marked TO CONFIRM for the owner. The OQ protocol
+  (MDX-VAL-007-P, `scripts/validation_pack.py --oq-protocol`) is generated apart from the results (MDX-VAL-007-R)
+  and carries a SHA-256; outside a dry run no OQ results are written without a signed protocol with that SHA-256.
+- **PDFs for the owner's signature** (O19): the release approval template and MDX-VAL-000 section 4, unsigned,
+  in `docs/validation/signing/` (`scripts/validation_signing_pdfs.py`).
+- **Approved build specs under version control** (O22): fifteen specs copied unchanged into `docs/specs/`;
+  `requirements.csv` cites them there.
+- **Deviation DEV-0.11.04-001** (O23): the 12 Nov back-fill of the rule-register account fields.
 ### Changed
+- **Owner decisions O17 to O24 of 12 Nov 2026** recorded in MDX-VAL-000 section 4: big-bang gate for the action
+  rows marked "Acceptable after verification"; a risk acceptance covers only NOT RUN scenarios and Open rows, and a
+  failed class-A test always blocks a release (the generator lists it as a check failure); RSK-037 re-scored D4
+  (RPN 60, needs action); the template and section 4 signed by the owner before the big-bang deploy.
+- **Rule-register staff accounts** are the two persons (labels `sriharsha`, `srinivas`), not role names (O23).
+- **Only test-level `requirement` markers verify a class-A requirement** (O24): the JUnit hook writes a file-level
+  marker as `requirement_file`; the RTM shows "file-level only, not verification".
+- **Generator:** the per-release record is MDX-VAL-012-&lt;release&gt;, apart from the template; the JUnit is copied
+  into the release folder and hashed in the record; the VSR holds the class-A verification counts, the people and
+  the R9-R12 references the plan asks for; every generated document has a Reviewer field and a change history.
+- **Documents:** VMP-R23, VMP-R49 and VMP-R50 split into single statements; PL-07 split (PL-46 added); REQ-RPT-004,
+  -EXP-001, -BAK-001 and -SIG-001 at revision B; PQ steps cite the scenarios they exercise; what a signer re-enters
+  at each signing stated exactly.
 - **Scenario register statuses normalised** to the five values (NOT RUN, PASS, FAIL, BLOCKED, REQUIRES HUMAN
   DECISION); run notes and partial results moved to a new Notes column.
 - **Rule register: a second person approves, by account.** `backend/app/rule_register/register.py` refuses a rule
