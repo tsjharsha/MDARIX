@@ -7,7 +7,12 @@
 The release identity is an argument and must equal VERSION: a mismatch refuses the pack (exit 1, nothing written; owner
 decision O16), except in a dry run, where it is a warning. Every failing traceability or deviation check is listed and the pack is not written (exit 1); with
 --dry-run the pack is written anyway, marked "development results, not validation evidence", and the exit code is
-still 1 when a check fails. A release folder holding a signed approval is never overwritten (exit 2)."""
+still 1 when a check fails. A release folder holding a signed approval is never overwritten (exit 2).
+
+    python scripts/validation_pack.py --release 0.11.04 --oq-protocol
+
+writes only the OQ protocol (MDX-VAL-007-P) and prints its SHA-256: the quality approver signs it before execution
+and its signatures.csv row names that SHA-256. Outside a dry run no OQ results are written without that row (O20)."""
 
 from __future__ import annotations
 
@@ -43,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--date", default="", help="document date YYYY-MM-DD; default: the commit's date")
     parser.add_argument("--out", type=Path, help="default: docs/validation/releases/<release>")
     parser.add_argument("--dry-run", action="store_true", help="write the pack even when checks fail; marked as such")
+    parser.add_argument("--oq-protocol", action="store_true", help="write only the OQ protocol for approval (O20)")
     parser.add_argument("--root", type=Path, default=ROOT, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     root = args.root
@@ -71,15 +77,29 @@ def main(argv: list[str] | None = None) -> int:
         release_checks_raw=args.release_checks.read_bytes() if args.release_checks else None,
         deviations=pack.read_deviations(docs / "deviation-log.csv"),
         clock_check=json.loads(args.clock_check.read_text(encoding="utf-8")) if args.clock_check else None,
+        oq_expected=pack.read_oq_expected(docs / "oq-expected-results.csv"),
     )
     commit = args.commit or _git("rev-parse", "--short=8", "HEAD") or "unknown"
+    scripted, _ = pack.oq_tables(sources)
+    protocol_sha = pack.protocol_sha256(scripted)
+    approved = pack.protocol_approved(docs / "signatures.csv", args.release, protocol_sha)
     ctx = pack.Context(
         release=args.release, version_file=version_file, commit=commit, tag=args.tag,
         date=args.date or _git("show", "-s", "--format=%cs", commit) or "1970-01-01", dry_run=args.dry_run,
         head=pack.migration_head(root / "infrastructure" / "database" / "migrations" / "versions"),
         problems=pack.check(sources, args.release)
-        + pack.release_check_problems(sources.release_checks, commit, bool(sources.tests)),
+        + pack.release_check_problems(sources.release_checks, commit, bool(sources.tests))
+        + ([] if approved or args.oq_protocol else [
+            f"OQ protocol {pack.PROTOCOL_ID} {args.release} is not approved: no signatures.csv row with SHA-256 "
+            f"{protocol_sha}; no OQ results without an approved protocol (owner decision O20)"]),
+        oq_approved=approved,
     )  # fmt: skip
+    if args.oq_protocol:
+        files, sha = pack.build_protocol(ctx, sources)
+        pack.write(out, files)
+        print(f"Written the OQ protocol to {out}; SHA-256 {sha}. Sign it, then add its signatures.csv row "
+              f"({pack.PROTOCOL_ID},{args.release},...,{sha}) before execution.")  # fmt: skip
+        return 0
     for problem in ctx.problems:
         print(f"CHECK FAILED: {problem}", file=sys.stderr)
     if ctx.problems and not args.dry_run:

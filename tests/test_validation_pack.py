@@ -29,6 +29,10 @@ REGISTER = """# register
 | AA-02 | Bad input | Refused | X | NOT RUN | |
 | AA-03 | Counts | Equal | X | NOT RUN | |
 """
+OQ_EXPECTED = """scenario_id,revision,input,expected_result,checked_by,confidence
+AA-01,A,Submit a good input,200; saved,tests/test_a.py::test_saved,code
+AA-02,A,Submit a bad input,422 BAD_INPUT; nothing saved,tests/test_a.py::test_refused,code
+"""
 JUNIT = """<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest">
 <testcase classname="tests.test_a" name="test_refused" time="0.10"><properties>
 <property name="requirement" value="AA-02"/></properties></testcase>
@@ -44,7 +48,20 @@ RELEASE_CHECKS = (
 )
 
 
-def _root(tmp_path: Path, *, requirements=REQUIREMENTS, register=REGISTER, junit=JUNIT, deviations="") -> Path:
+def _approve_protocol(root: Path, release: str = "9.9.9") -> str:
+    """Signs the OQ protocol the way the quality approver does (O20): its signatures.csv row names its SHA-256."""
+    docs = root / "docs" / "validation"
+    sources = pack.Sources(pack.read_requirements(docs / "requirements.csv"), pack.read_register(docs / "scenario-register.md"),
+                           oq_expected=pack.read_oq_expected(docs / "oq-expected-results.csv"))  # fmt: skip
+    sha = pack.protocol_sha256(pack.oq_tables(sources)[0])
+    with open(docs / "signatures.csv", "a", encoding="utf-8") as signatures:
+        signatures.write(f"{pack.PROTOCOL_ID},{release},S. T.,quality approver,approval,2026-11-12,p.pdf,{sha}\n")
+    return sha
+
+
+def _root(
+    tmp_path: Path, *, requirements=REQUIREMENTS, register=REGISTER, junit=JUNIT, deviations="", approve=True
+) -> Path:
     docs = tmp_path / "docs" / "validation"
     docs.mkdir(parents=True)
     (docs / "requirements.csv").write_text(requirements, encoding="utf-8")
@@ -58,6 +75,9 @@ def _root(tmp_path: Path, *, requirements=REQUIREMENTS, register=REGISTER, junit
     (versions / "b.py").write_text('revision = "r2"\ndown_revision = "r1"\n')
     (tmp_path / "junit.xml").write_text(junit, encoding="utf-8")
     (tmp_path / "release-checks.json").write_text(RELEASE_CHECKS, encoding="utf-8")
+    (docs / "oq-expected-results.csv").write_text(OQ_EXPECTED, encoding="utf-8")
+    if approve:
+        _approve_protocol(tmp_path)
     return tmp_path
 
 
@@ -190,7 +210,8 @@ def test_golden_figures_and_documents(tmp_path, capsys):
     vsr = (out / "MDX-VAL-011-VSR.md").read_text(encoding="utf-8")
     assert "fit for MDARIX's intended use as validated" in vsr and "DEVELOPMENT RESULTS" not in vsr
     assert "| IQ-002 | Migration head (one head) | r2 | one head |" in (out / "MDX-VAL-006-IQ.md").read_text("utf-8")
-    assert "OQ-001" in (out / "MDX-VAL-007-OQ.md").read_text("utf-8")
+    assert "OQ-001" in (out / "MDX-VAL-007-R-OQ-results.md").read_text("utf-8")
+    assert "422 BAD_INPUT; nothing saved" in (out / "MDX-VAL-007-P-OQ-protocol.md").read_text("utf-8")
     record = __import__("json").loads((out / "MDX-VAL-012-release-approval.json").read_text())
     assert record["risk_acceptances"] == [] and record["basis"] == pack.INTERIM_BASIS  # O13 interim template
     assert "| 9 | After the deploy: deploy_gate.py passed" in (out / "MDX-VAL-012-release-approval.md").read_text(
@@ -208,6 +229,33 @@ def test_a_failed_class_a_test_always_blocks_the_release(tmp_path, capsys):
         in capsys.readouterr().err
     )
     assert not (tmp_path / "out").exists()
+
+
+def test_no_oq_results_without_an_approved_protocol(tmp_path, capsys):
+    """O20: the protocol is written for approval; without its signatures.csv row (same SHA-256) no OQ results, except a
+    dry run; a changed expected result needs a new approval; a class-A scenario needs a confirmed concrete result."""
+    root = _root(tmp_path, approve=False)
+    assert _run(root, "--oq-protocol", "--out", str(tmp_path / "p")) == 0
+    sha = capsys.readouterr().out.split("SHA-256 ")[1].split(".")[0]
+    assert {p.name for p in (tmp_path / "p").iterdir()} >= {"MDX-VAL-007-P-OQ-protocol.pdf", "oq-protocol.csv"}
+    assert not any("results" in p.name or p.name == "oq-log.xlsx" for p in (tmp_path / "p").iterdir())
+    assert _run(root, "--out", str(tmp_path / "out")) == 1
+    assert f"is not approved: no signatures.csv row with SHA-256 {sha}" in capsys.readouterr().err
+    assert _run(root, "--dry-run", "--out", str(tmp_path / "dry")) == 1
+    assert "NOT APPROVED (dry run only" in (tmp_path / "dry" / "MDX-VAL-007-R-OQ-results.md").read_text("utf-8")
+    assert _approve_protocol(root) == sha
+    assert _run(root, "--out", str(tmp_path / "out")) == 0
+    assert f"approved (`signatures.csv`, SHA-256 `{sha}`)" in (
+        tmp_path / "out" / "MDX-VAL-007-R-OQ-results.md"
+    ).read_text("utf-8")
+    expected = root / "docs" / "validation" / "oq-expected-results.csv"
+    expected.write_text(OQ_EXPECTED.replace("422 BAD_INPUT", "409 BAD_INPUT").replace(",code\n", ",TO CONFIRM\n", 1))
+    assert _run(root, "--out", str(tmp_path / "out2")) == 1
+    said = capsys.readouterr().err
+    assert "is not approved" in said and "AA-01: OQ expected result marked TO CONFIRM" in said
+    expected.write_text(OQ_EXPECTED.splitlines()[0] + "\n")
+    assert _run(root, "--dry-run", "--out", str(tmp_path / "dry2")) == 1
+    assert "AA-02: class-A scenario without a concrete OQ expected result" in capsys.readouterr().err
 
 
 def test_interim_template_and_generator_list_the_same_criteria():
@@ -239,6 +287,7 @@ def test_release_identity_mismatch_is_refused_outside_a_dry_run(tmp_path, capsys
     assert "REFUSED: release 1.0.0 differs from VERSION 9.9.9" in capsys.readouterr().err
     assert not (tmp_path / "out").exists()
     (root / "VERSION").write_text("1.0.0\n")
+    _approve_protocol(root, "1.0.0")
     assert validation_pack.main(args + ["--out", str(tmp_path / "out")]) == 0
     assert "differs from VERSION" not in capsys.readouterr().err
 

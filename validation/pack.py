@@ -71,6 +71,7 @@ class Sources:
     release_checks_raw: bytes | None = None  # hashed as written, never re-serialised
     deviations: list[dict] = field(default_factory=list)
     clock_check: dict | None = None
+    oq_expected: dict[str, dict] = field(default_factory=dict)  # scenario -> concrete OQ expected result (O20)
 
 
 # ---- reading -------------------------------------------------------------------------------------------------------
@@ -100,6 +101,13 @@ def read_register(path: Path) -> dict[str, dict]:
                 "title": cells[1], "expected": cells[2], "status": cells[-2], "notes": cells[-1],
             }  # fmt: skip
     return scenarios
+
+
+def read_oq_expected(path: Path) -> dict[str, dict]:
+    """``oq-expected-results.csv``: per class-A scenario the input and the concrete expected result (owner decision O20)."""
+    if not path.exists():
+        return {}
+    return {row["scenario_id"]: row for row in csv.DictReader(path.read_text(encoding="utf-8-sig").splitlines())}
 
 
 def read_junit(path: Path) -> list[dict]:
@@ -188,6 +196,14 @@ def check(sources: Sources, release: str) -> list[str]:
                     problems.append(
                         f"{rid}: class-A scenario {sid} FAIL; a failed class-A test blocks the release (VMP-R50)"
                     )
+    for sid in class_a_scenarios(sources):
+        expected = sources.oq_expected.get(sid)
+        if not expected or not expected.get("expected_result", "").strip():
+            problems.append(f"{sid}: class-A scenario without a concrete OQ expected result (oq-expected-results.csv)")
+        elif expected.get("confidence", "").strip() != "code":
+            problems.append(
+                f"{sid}: OQ expected result marked {expected.get('confidence') or 'blank'}; confirm it first"
+            )
     cited = {s for req in sources.requirements for s in req["scenario_ids"]}
     for sid in sorted(cited & set(sources.scenarios)):
         row = sources.scenarios[sid]
@@ -220,6 +236,14 @@ def check(sources: Sources, release: str) -> list[str]:
     for dev in open_critical(sources, release):
         problems.append(f"{dev['dev_id']}: critical deviation open; no release approval record can be produced")
     return problems
+
+
+def class_a_scenarios(sources: Sources) -> list[str]:
+    seen: list[str] = []
+    for req in sources.requirements:
+        if req["class"] == "A":
+            seen += [s for s in req["scenario_ids"] if s not in seen and s in sources.scenarios]
+    return seen
 
 
 def release_deviations(sources: Sources, release: str) -> list[dict]:
@@ -328,6 +352,7 @@ class Context:
     dry_run: bool
     head: str
     problems: list[str]
+    oq_approved: bool = False  # signatures.csv holds this release's OQ protocol with the current SHA-256 (O20)
 
 
 def _header(ctx: Context, doc_id: str, title: str, author: str, approver: str) -> str:
@@ -441,20 +466,22 @@ def iq(ctx: Context, s: Sources) -> str:
     )
 
 
+PROTOCOL_HEADER = [
+    "Step",
+    "REQ",
+    "Scenario",
+    "Scenario text",
+    "Input",
+    "Pre-approved expected result",
+    "Checked by (automated)",
+]
+RESULT_HEADER = ["Executed by", "Date", "Result", "Evidence ID"]
+PROTOCOL_ID, RESULTS_ID = "MDX-VAL-007-P", "MDX-VAL-007-R"
+
+
 def oq_tables(s: Sources) -> tuple[list[list], list[list]]:
-    scripted = [
-        [
-            "Step",
-            "REQ",
-            "Scenario",
-            "Scenario text",
-            "Pre-approved expected result",
-            "Executed by",
-            "Date",
-            "Result",
-            "Evidence ID",
-        ]
-    ]
+    """The scripted class-A OQ steps (protocol, without results) and the automated log of tagged tests."""
+    scripted = [PROTOCOL_HEADER]
     n = 0
     for req in s.requirements:
         if req["class"] != "A":
@@ -463,7 +490,10 @@ def oq_tables(s: Sources) -> tuple[list[list], list[list]]:
             row = s.scenarios.get(sid)
             if row:
                 n += 1
-                scripted.append([f"OQ-{n:03d}", req["req_id"], sid, row["title"], row["expected"], "", "", "", ""])
+                concrete = s.oq_expected.get(sid, {})
+                scripted.append([f"OQ-{n:03d}", req["req_id"], sid, row["title"], concrete.get("input", ""),
+                                 concrete.get("expected_result", "") or "(no concrete expected result)",
+                                 concrete.get("checked_by", "")])  # fmt: skip
     req_of: dict[str, list[str]] = {}
     for req in s.requirements:
         for sid in req["scenario_ids"]:
@@ -476,24 +506,63 @@ def oq_tables(s: Sources) -> tuple[list[list], list[list]]:
     return scripted, log
 
 
-def oq(ctx: Context, s: Sources, scripted: list[list], log: list[list]) -> str:
-    untagged = sum(1 for t in s.tests if not t["scenarios"])
+def protocol_sha256(scripted: list[list]) -> str:
+    """The SHA-256 of the OQ protocol's steps as CSV: what the quality approver signs before execution (O20)."""
+    return hashlib.sha256(_csv(scripted)).hexdigest()
+
+
+def protocol_approved(signatures: Path, release: str, sha256: str) -> bool:
+    """``signatures.csv`` holds the signed OQ protocol of this release with exactly this SHA-256."""
+    if not signatures.exists():
+        return False
+    return any(
+        row.get("document_id") == PROTOCOL_ID and row.get("version") == release and row.get("sha256") == sha256
+        for row in csv.DictReader(signatures.read_text(encoding="utf-8-sig").splitlines())
+    )
+
+
+def oq_protocol(ctx: Context, scripted: list[list], sha256: str) -> str:
     return (
         _header(
             ctx,
-            "MDX-VAL-007",
-            "Operational qualification protocol and results",
+            PROTOCOL_ID,
+            "Operational qualification protocol",
             SYSTEM_OWNER,
-            QUALITY_APPROVER + " (pre-approves expected results)",
-        )
+            QUALITY_APPROVER + " (approves the expected results before execution)",
+        )  # fmt: skip
         + _sources_section(ctx)
         + "## 2. Approach\n\n"
-        "Class-A scenarios are executed as scripted steps with the expected results below, pre-approved by the quality "
-        "approver before execution (format of the free-trial test scripts). The automated suite is supporting evidence "
-        "(CSA): tagged tests are listed per scenario; class B and C rows are covered by the automated suite, untagged "
-        f"(B6b-D17): {untagged} untagged test(s) ran in this JUnit.\n\n"
+        "Each class-A scenario is a scripted step with its input and a concrete expected result "
+        "(`docs/validation/oq-expected-results.csv`). The quality approver approves this protocol before any step is "
+        "executed; the approval is the signed PDF and its `signatures.csv` row (document "
+        f"{PROTOCOL_ID}, version {ctx.release}, SHA-256 below). The generator writes no OQ results without that "
+        "approval (owner decision O20). The automated tests named per step are supporting evidence (CSA).\n\n"
+        f"Protocol SHA-256 (of the steps table as CSV): `{sha256}`\n\n"
         f"## 3. Scripted OQ steps (class A): {len(scripted) - 1}\n\n"
         + _table(scripted[0], scripted[1:])
+        + "\n## 4. Approval before execution\n\nName: ____________ Role: quality approver Date (UTC): ____________\n\n"
+        "Meaning: I approve these expected results before execution.\n"
+    )
+
+
+def oq(ctx: Context, s: Sources, scripted: list[list], log: list[list], sha256: str, approved: bool) -> str:
+    untagged = sum(1 for t in s.tests if not t["scenarios"])
+    state = (
+        f"approved (`signatures.csv`, SHA-256 `{sha256}`)"
+        if approved
+        else f"NOT APPROVED (dry run only; SHA-256 `{sha256}`)"
+    )
+    steps = [scripted[0][:3] + scripted[0][5:6] + RESULT_HEADER] + [r[:3] + r[5:6] + [""] * 4 for r in scripted[1:]]
+    return (
+        _header(ctx, RESULTS_ID, "Operational qualification results", SYSTEM_OWNER, QUALITY_APPROVER)
+        + _sources_section(ctx)
+        + "## 2. Approach\n\n"
+        f"Executed against OQ protocol {PROTOCOL_ID} for release {ctx.release}: {state}. Class-A steps are executed as "
+        "scripted; the automated suite is supporting evidence (CSA): tagged tests are listed per scenario; class B "
+        f"and C rows are covered by the automated suite, untagged (B6b-D17): {untagged} untagged test(s) ran in this "
+        "JUnit.\n\n"
+        f"## 3. Scripted OQ results (class A): {len(steps) - 1}\n\n"
+        + _table(steps[0], steps[1:])
         + f"\n## 4. Automated results of tagged tests: {len(log) - 1}\n\n"
         + _table(log[0], log[1:])
     )
@@ -517,7 +586,7 @@ def rtm_markdown(ctx: Context, rows: list[dict]) -> str:
         + _sources_section(ctx)
         + "## 2. Matrix\n\n"
         'Tests link to a requirement through their `requirement` markers naming one of its scenarios. "NOT COVERED" = '
-        "no tagged test in this JUnit; the scripted OQ steps (MDX-VAL-007) then carry the evidence. Status: Verified / "
+        "no tagged test in this JUnit; the scripted OQ steps (MDX-VAL-007-R) then carry the evidence. Status: Verified / "
         "Not verified / Failed / Blocked / Requires human decision (MDX-B10-005 section 6). Full columns in `rtm.csv`.\n\n"
         + _table(keys, [[r[k] for k in keys] for r in rows])
     )
@@ -609,7 +678,7 @@ def approval_markdown(ctx: Context, record: dict) -> str:
 
 def signed(out: Path, release: str, signatures: Path) -> bool:
     """A release folder is signed when it holds a signed PDF or ``signatures.csv`` names its approval record."""
-    if out.exists() and any(out.glob("*-signed.pdf")):
+    if out.exists() and any(out.glob("MDX-VAL-012*-signed.pdf")):  # a signed OQ protocol alone does not lock it
         return True
     if signatures.exists():
         for row in csv.DictReader(signatures.read_text(encoding="utf-8").splitlines()):
@@ -626,17 +695,20 @@ def _csv(rows: list[list]) -> bytes:
 
 def build(ctx: Context, s: Sources) -> dict[str, bytes]:
     """Every file of the pack, by name (deterministic: the same inputs give the same bytes)."""
-    from reports import pdf
-
     files: dict[str, bytes] = {}
     rows = rtm(s)
     figures = g13(s, ctx.release)
     devs = release_deviations(s, ctx.release)
     scripted, log = oq_tables(s)
+    sha = protocol_sha256(scripted)
     rtm_rows = [list(rows[0].keys())] + [list(r.values()) for r in rows] if rows else [["req_id"]]
     files["rtm.csv"] = _csv(rtm_rows)
     files["rtm.xlsx"] = xlsx_write.write({"RTM": rtm_rows})
-    files["oq-log.xlsx"] = xlsx_write.write({"Scripted OQ (class A)": scripted, "Automated (tagged)": log})
+    files["oq-protocol.csv"] = _csv(scripted)
+    with_results = ctx.oq_approved or ctx.dry_run  # O20: no OQ results without an approved protocol
+    if with_results:
+        steps = [scripted[0] + RESULT_HEADER] + [row + [""] * len(RESULT_HEADER) for row in scripted[1:]]
+        files["oq-log.xlsx"] = xlsx_write.write({"Scripted OQ (class A)": steps, "Automated (tagged)": log})
     dev_rows = [DEVIATION_COLUMNS] + [[d.get(c, "") for c in DEVIATION_COLUMNS] for d in devs]
     files["deviations.csv"] = _csv(dev_rows)
     files["deviations.xlsx"] = xlsx_write.write({"Deviations": dev_rows})
@@ -647,13 +719,26 @@ def build(ctx: Context, s: Sources) -> dict[str, bytes]:
     hashes = {name: hashlib.sha256(raw).hexdigest() for name, raw in files.items()}
     documents = {
         "MDX-VAL-004-URS": urs(ctx, s), "MDX-VAL-005-FS-DS": fsds(ctx, s), "MDX-VAL-006-IQ": iq(ctx, s),
-        "MDX-VAL-007-OQ": oq(ctx, s, scripted, log), "MDX-VAL-009-RTM": rtm_markdown(ctx, rows),
+        "MDX-VAL-007-P-OQ-protocol": oq_protocol(ctx, scripted, sha), "MDX-VAL-009-RTM": rtm_markdown(ctx, rows),
         "MDX-VAL-011-VSR": vsr(ctx, s, rows, figures, devs),
     }  # fmt: skip
+    if with_results:
+        documents["MDX-VAL-007-R-OQ-results"] = oq(ctx, s, scripted, log, sha, ctx.oq_approved)
     if not open_critical(s, ctx.release):
         record = approval(ctx, s, figures, hashes, devs)
         files["MDX-VAL-012-release-approval.json"] = (json.dumps(record, indent=2) + "\n").encode("utf-8")
         documents["MDX-VAL-012-release-approval"] = approval_markdown(ctx, record)
+    _render(ctx, documents, files)
+    manifest = {name: hashlib.sha256(raw).hexdigest() for name, raw in sorted(files.items())}
+    files["manifest.json"] = (
+        json.dumps({"release": ctx.release, "commit": ctx.commit, "sha256": manifest}, indent=2) + "\n"
+    ).encode("utf-8")
+    return files
+
+
+def _render(ctx: Context, documents: dict[str, str], files: dict[str, bytes]) -> None:
+    from reports import pdf
+
     watermark = DEV_BANNER if ctx.dry_run else "DRAFT - NOT SIGNED"
     for name, markdown in documents.items():
         title = markdown.splitlines()[0].lstrip("# ")
@@ -662,11 +747,15 @@ def build(ctx: Context, s: Sources) -> dict[str, bytes]:
         files[f"{name}.pdf"] = pdf.render(title, [f"Release {ctx.release} - commit {ctx.commit} - {ctx.date}"],
                                           docx_render.pdf_lines(markdown), watermark=watermark,
                                           footer=f"MDARIX {name} - release {ctx.release}")  # fmt: skip
-    manifest = {name: hashlib.sha256(raw).hexdigest() for name, raw in sorted(files.items())}
-    files["manifest.json"] = (
-        json.dumps({"release": ctx.release, "commit": ctx.commit, "sha256": manifest}, indent=2) + "\n"
-    ).encode("utf-8")
-    return files
+
+
+def build_protocol(ctx: Context, s: Sources) -> tuple[dict[str, bytes], str]:
+    """Only the OQ protocol, for approval before execution (O20): its files and its SHA-256."""
+    scripted, _ = oq_tables(s)
+    sha = protocol_sha256(scripted)
+    files = {"oq-protocol.csv": _csv(scripted)}
+    _render(ctx, {"MDX-VAL-007-P-OQ-protocol": oq_protocol(ctx, scripted, sha)}, files)
+    return files, sha
 
 
 def release_check_problems(checks: dict | None, commit: str, has_junit: bool) -> list[str]:

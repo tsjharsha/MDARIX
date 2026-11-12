@@ -216,7 +216,7 @@ The class of each function comes from MDX-VAL-002. The class is set by severity 
 | 2. Requirements | Each approved build spec lists its requirements as REQ-&lt;AREA&gt;-nnn with acceptance scenarios from the scenario register | URS: `requirements.csv` (MDX-VAL-004) |
 | 3. Risk | Each requirement gets a class from the product risk assessment; new failure modes add rows | MDX-VAL-002, updated per release |
 | 4. Specification | Each requirement is linked to its screen or route and its design | FS/DS (MDX-VAL-005) |
-| 5. Protocols | Class A: scripted protocol per scenario group, expected results approved first. Class B: scenario row. Class C: none | IQ, OQ, PQ protocols (MDX-VAL-006 to -008) |
+| 5. Protocols | Class A: scripted protocol per scenario group, with a concrete expected result per scenario (`oq-expected-results.csv`), approved (signed, SHA-256 in `signatures.csv`) before execution; the generator writes no OQ results without that approval (owner decision O20). Class B: scenario row. Class C: none | IQ, OQ, PQ protocols (MDX-VAL-006, MDX-VAL-007-P, MDX-VAL-008) |
 | 6. Execution | On a controlled environment at a tagged release (section 10) | Execution records, JUnit output, release-checks JSON |
 | 7. Deviations | Every failure, blocked step or protocol error is a deviation | Deviation log (MDX-VAL-010) |
 | 8. Traceability | Generated per release from requirements, scenarios, test markers and results | RTM (MDX-VAL-009) |
@@ -310,7 +310,7 @@ them. The owner agreed the approach below on 12 Nov 2026; the consultant reviews
 | MDX-VAL-004 | URS (`requirements.csv` and its rendering) | Per release | B |
 | MDX-VAL-005 | FS/DS | Per release | B |
 | MDX-VAL-006 | IQ protocol and record | Per release | B |
-| MDX-VAL-007 | OQ protocol and results log | Per release | B |
+| MDX-VAL-007-P, -007-R | OQ protocol (approved before execution) and OQ results log | Per release | B |
 | MDX-VAL-008 | MDARIX PQ protocol and record | Per release | B |
 | MDX-VAL-009 | RTM and validation figures | Per release | B |
 | MDX-VAL-010 | Deviation log | Continuous | B |
