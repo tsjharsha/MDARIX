@@ -160,7 +160,7 @@ Style (guidance, not a requirement): plain English, short sentences, one idea pe
 | (register) | Signature register | [signatures.csv](signatures.csv) | n/a | Empty: nothing signed yet |
 | MDX-VAL-008 | MDARIX PQ protocol | [MDX-VAL-008_PQ_PROTOCOL.md](MDX-VAL-008_PQ_PROTOCOL.md) | 0.3 | DRAFT |
 | MDX-VAL-010 | Deviation log and change-impact template | [MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md](MDX-VAL-010_DEVIATION_LOG_AND_CHANGE_IMPACT.md); log [deviation-log.csv](deviation-log.csv) | 0.2 | DRAFT; log empty |
-| MDX-VAL-012 (template) | Release approval record: interim template | [MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md](MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md) | 0.2 | DRAFT |
+| MDX-VAL-012 (template) | Release approval record: interim template | [MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md](MDX-VAL-012_RELEASE_APPROVAL_TEMPLATE.md) | 0.3 | DRAFT; to be signed by the owner before the big-bang deploy |
 | MDX-VAL-004, -005, -006, -007-P, -007-R, -009, -011, -012-&lt;release&gt; | URS, FS/DS, IQ record, OQ protocol (approved before execution, O20) and OQ results, RTM, VSR, release approval record | Generated per release by `scripts/validation_pack.py` into `releases/<release>/` | per release | None generated yet for a release |
 | (data) | OQ expected results per class-A scenario: input, concrete expected result, asserting test, confidence | [oq-expected-results.csv](oq-expected-results.csv) | per row: revision A | DRAFT for the owner's review; 24 rows marked TO CONFIRM |
 | (register) | Requirements (URS source) | [requirements.csv](requirements.csv) | n/a | Controlled by git history; 69 requirements |

@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Document ID | MDX-VAL-012 (template) |
+| Document ID | MDX-VAL-012 (the template; each per-release record is MDX-VAL-012-&lt;release&gt;) |
 | Title | Release approval record: interim template |
 | Version | 0.3 |
 | Status | DRAFT. To be signed by the owner before the big-bang deploy (owner decision O19); PDF for signature: `signing/MDX-VAL-012-template.pdf` (unsigned) |
@@ -19,7 +19,7 @@ Change history
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft, owner decision O13: an interim release approval template for the big-bang deploy, before MDX-VAL-001 is approved as 1.0 | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After an independent rating: only criterion 3 may be marked accepted (VMP-R49); signature section number; filing of per-release records; section 5 cites the regression run | Sriharsha Telikicherla |
-| 0.3 | 12 Nov 2026 | Owner decisions O17 to O19 of 12 Nov 2026: big-bang gate for the "Acceptable after verification" action rows (section 5); a risk acceptance covers only NOT RUN scenarios and Open rows, a failed class-A test always blocks (criteria 3 to 5, RA-T04); to be signed by the owner before the big-bang deploy | Sriharsha Telikicherla |
+| 0.3 | 12 Nov 2026 | Each per-release record has its own ID, MDX-VAL-012-&lt;release&gt; (RA-T01, RA-T06). Owner decisions O17 to O19 of 12 Nov 2026: big-bang gate for the "Acceptable after verification" action rows (section 5); a risk acceptance covers only NOT RUN scenarios and Open rows, a failed class-A test always blocks (criteria 3 to 5, RA-T04); to be signed by the owner before the big-bang deploy | Sriharsha Telikicherla |
 
 ## 1. Purpose and scope
 
@@ -34,7 +34,8 @@ The record approves a deploy. It does not state that the release is validated un
 
 - **RA-T01** The system owner shall generate the record with `scripts/validation_pack.py` for the release: it writes
   `MDX-VAL-012-release-approval` (JSON, Markdown, DOCX, PDF) into `docs/validation/releases/<release>/`, with the
-  fields of section 3 and the criteria of section 4.
+  fields of section 3 and the criteria of section 4. This template is document MDX-VAL-012; each record made from it
+  is document MDX-VAL-012-&lt;release&gt; (for example MDX-VAL-012-0.11.04).
 - **RA-T02** The generator shall refuse to write the record while a check fails: a requirement without a scenario,
   a class-A requirement without a negative scenario, an open critical deviation, release checks that are not a full
   suite on the same commit, or a release that differs from `VERSION` (owner decision O16).
@@ -47,7 +48,8 @@ The record approves a deploy. It does not state that the release is validated un
   before the deploy and recorded in the field "Emergency fix: written OK"; the signed record follows within 1 working
   day (VMP-R35, VMP-R36).
 - **RA-T06** The signed PDF shall be saved as `MDX-VAL-012-release-approval-signed.pdf` in the release folder and
-  listed in `signatures.csv`; the generator then never overwrites that folder (VMP-R39). A per-release record is filed
+  listed in `signatures.csv` under document MDX-VAL-012-&lt;release&gt;; the generator then never overwrites that
+  folder (VMP-R39). A per-release record is filed
   in its release folder, not under `signed/` (generated records, MDX-VAL-000 section 3).
 
 ## 3. Fields

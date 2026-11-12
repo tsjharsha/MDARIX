@@ -157,7 +157,7 @@ def test_signed_release_folder_is_never_overwritten(tmp_path, capsys):
     assert [p.name for p in folder.iterdir()] == ["MDX-VAL-012-release-approval-signed.pdf"]
     (folder / "MDX-VAL-012-release-approval-signed.pdf").unlink()
     with open(root / "docs" / "validation" / "signatures.csv", "a") as signatures:
-        signatures.write("MDX-VAL-012,9.9.9,S. T.,quality approver,approval,2026-11-12,x.pdf,00\n")
+        signatures.write("MDX-VAL-012-9.9.9,9.9.9,S. T.,quality approver,approval,2026-11-12,x.pdf,00\n")
     assert _run(root) == 2
 
 
@@ -206,7 +206,8 @@ def test_golden_figures_and_documents(tmp_path, capsys):
     assert figures["coverage"] == {"A": "100.0% (1/1)", "B": "0.0% (0/1)", "C": "no data (0/0)"}
     assert figures["negative_coverage_class_a"] == "100.0% (1/1)"
     assert figures["execution_progress"] == "66.7% (2/3)"
-    assert figures["pass_rate"] == "100.0% (2/2)" and figures["pass_rate_all_tests"] == "100.0% (3/3)"
+    assert figures["pass_rate"] == "100.0% (2/2)"
+    assert figures["pass_rate_all_tests"] == "100.0% (3/3), tests in this JUnit (full suite)"
     assert figures["defect_leakage"].startswith("no source yet")
     assert "WARNING: release 9.9.9" not in capsys.readouterr().err  # same as VERSION
     vsr = (out / "MDX-VAL-011-VSR.md").read_text(encoding="utf-8")
@@ -216,6 +217,11 @@ def test_golden_figures_and_documents(tmp_path, capsys):
     assert "422 BAD_INPUT; nothing saved" in (out / "MDX-VAL-007-P-OQ-protocol.md").read_text("utf-8")
     record = __import__("json").loads((out / "MDX-VAL-012-release-approval.json").read_text())
     assert record["risk_acceptances"] == [] and record["basis"] == pack.INTERIM_BASIS  # O13 interim template
+    assert record["document_id"] == "MDX-VAL-012-9.9.9" and record["template"] == "MDX-VAL-012"
+    assert (out / "junit.xml").read_bytes() == (root / "junit.xml").read_bytes()
+    assert record["junit_sha256"] == __import__("hashlib").sha256((root / "junit.xml").read_bytes()).hexdigest()
+    assert "## 8a. Class-A verification (VMP-R96)" in vsr and "| 1 | ____" in vsr and "(VMP-R15)" in vsr
+    assert "| Reviewer | Independent CSV consultant" in vsr and "Change history" in vsr
     assert "| 9 | After the deploy: deploy_gate.py passed" in (out / "MDX-VAL-012-release-approval.md").read_text(
         "utf-8"
     )

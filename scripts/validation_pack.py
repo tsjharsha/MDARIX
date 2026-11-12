@@ -75,6 +75,7 @@ def main(argv: list[str] | None = None) -> int:
         tests=pack.read_junit(args.junit) if args.junit else [],
         release_checks=json.loads(args.release_checks.read_text(encoding="utf-8-sig")) if args.release_checks else None,
         release_checks_raw=args.release_checks.read_bytes() if args.release_checks else None,
+        junit_raw=args.junit.read_bytes() if args.junit else None,
         deviations=pack.read_deviations(docs / "deviation-log.csv"),
         clock_check=json.loads(args.clock_check.read_text(encoding="utf-8")) if args.clock_check else None,
         oq_expected=pack.read_oq_expected(docs / "oq-expected-results.csv"),
