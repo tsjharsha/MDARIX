@@ -67,7 +67,9 @@ ROLE_RULES = {("US", "IMPORTER"): "US-IMP-floor", ("US", "USER_FACILITY"): "US-U
 # person; a change to this list is a code change under change control.
 # shortcut: a controlled list in code, not the platform's database accounts (the register loads without a database);
 # move to the platform accounts when rule versions get an in-app approval path.
-STAFF_ACCOUNTS = {"staff-engineering-1": ("MDARIX engineering", False), "staff-quality-1": ("Owner", True)}
+# Owner decision O23 (12 Nov 2026): the accounts are the two persons, labelled by name (no platform user IDs exist
+# for them in the seed data); the 12 Nov back-fill of these fields is deviation DEV-0.11.04-001.
+STAFF_ACCOUNTS = {"sriharsha": ("Sriharsha", False), "srinivas": ("Srinivas", True)}
 
 
 class RegisterError(ValueError):
