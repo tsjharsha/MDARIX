@@ -11,6 +11,8 @@ Started 7 Nov 2026 (product direction approved by the owner). This is one shared
 
 A blocked or unexecuted scenario is never counted as a pass. Nothing here claims a scenario is implemented today.
 
+A status recorded here before the first release pack under MDX-VAL-001 is a development result, not validation evidence. The validation evidence for a release is the set of results kept in its release folder (`docs/validation/releases/<version>/`).
+
 ## Scenario definition: every scenario, when specified in full, contains
 1. The starting state and the user persona.
 2. The initial information and its source.
@@ -590,3 +592,15 @@ Targeted unit and database tests exist for each (named in the last column); none
 | B6-44 | Value Centre | No per-person numbers | B6a | PASS (tests/test_b6a_value_centre.py, test_b6a_value_centre_unit.py, valueCentre.test.tsx, run 7: no name, account or actor in the answer, the CSV or the screen) |
 | B6-45 | Another organisation | Sees nothing of any new B6a screen or route | B6a | PASS: Part C routes (tests/test_b6a_signed_reviews.py, runs 5-6); Part D run 7: trace 404 REPORT_NOT_FOUND, similar-wording pairs not listed, Value Centre only its own numbers |
 | B6-46 | Each B6 switch off/on | Signed records stay readable | B6a | PASS: MDARIX_B6_REVIEWS and MDARIX_B6_CHANGE_REASON (runs 5-6); MDARIX_B6_TRACE, MDARIX_B6_SIMILAR_WORDING, MDARIX_B6_VALUE_CENTRE off/on in their tests (404 or hidden, then back), and the report, intake, oversight and case regression set with all three off: 64 passed (run 7) |
+| B6-47 | Validation evidence | A test's `requirement` marker appears in the JUnit XML | B6b | NOT RUN |
+| B6-48 | Validation evidence | An XLSX written by the new writer reads back equal through the product's XLSX reader, and a cell starting with "=" stays text | B6b | NOT RUN |
+| B6-49 | Validation evidence | The validation-pack generator fails on each traceability check (class-A REQ without a negative scenario, REQ without a scenario, unknown scenario, PASS without evidence, marker with an unknown ID) and lists all of them | B6b | NOT RUN |
+| B6-50 | Validation evidence | The generator refuses to overwrite a release folder holding a signed approval | B6b | NOT RUN |
+| B6-51 | Validation evidence | The same tag gives byte-identical DOCX and XLSX | B6b | NOT RUN |
+| B6-52 | Validation evidence | Every class-A REQ has at least one tagged test or a scripted OQ step | B6b | NOT RUN |
+| B6-53 | Recovery check | A broken audit chain on the restored copy fails the recovery check | B6b | NOT RUN |
+| B6-54 | Recovery check | A configuration difference with no change event after the signed snapshot is flagged | B6b | NOT RUN |
+| B6-55 | Recovery check | A pending outbox event older than the restore point is held, audited, and sent only after a replay | B6b | NOT RUN |
+| B6-56 | Health report | A health report holds no other organisation's data | B6b | NOT RUN |
+| B6-57 | Deviation log | A deviation cannot be closed without a retest result and an approver | B6b | NOT RUN |
+| B6-58 | Release approval | A release approval record cannot be produced while a critical deviation is open | B6b | NOT RUN |
