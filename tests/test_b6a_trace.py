@@ -17,6 +17,7 @@ from backend.app.db.tenant_scope import bind_system
 from tests.test_authority_reports_api import REPORTS, _fields, _ok, _ready_us, _start_rv06, trial  # noqa: F401
 from tests.test_free_trial import _approved_trial_client
 from tests.test_reporting_capa_api import PASSWORD as COLLEAGUE_PASSWORD
+from tests.test_reporting_capa_api import _client
 
 pytestmark = pytest.mark.db
 
@@ -118,3 +119,16 @@ def test_trace_is_read_only_and_refused_elsewhere(trial, monkeypatch):  # B6-40,
     monkeypatch.setenv("MDARIX_B6_TRACE", "on")
     assert user.get(f"{REPORTS}/{report}/trace/B3").status_code == 200
     assert user.get("/api/v1/session/context").json()["b6"]["trace"] is True
+
+
+def test_every_report_reader_sees_the_import_file_and_who_imported_it(trial):  # owner decision 12 Nov (1)
+    """The trace shows the import file and the importer's name to everyone who may read the report, also to a role
+    without records.write, which the record's own origin read (R16) still refuses."""
+    report = _approved(trial)["id"]
+    reader = _client(trial["tenant_id"], "REGULATORY_REVIEWER", "Rita Reader")
+    own = _ok(trial["user"].get(f"{REPORTS}/{report}/trace/B3"))
+    seen = _ok(reader.get(f"{REPORTS}/{report}/trace/B3"))
+    assert seen["imports"] and seen["imports"] == own["imports"]
+    assert {"file_name", "imported_by", "has_report"} <= set(seen["imports"][0])
+    refused = reader.get(f"/api/v1/data/import/origin/complaints/{seen['origin']['id']}")
+    assert refused.status_code == 403, refused.text
