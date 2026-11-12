@@ -15,6 +15,7 @@ type DataExport = {
   summary: { tables: number; rows: number; files: number } | null;
   created_at: string;
   expires_at: string | null;
+  yours?: boolean; // only the person who asked for it downloads it (RSK-036)
 };
 
 /** A complete copy of everything the organization stored, prepared in the background, downloadable for 7 days. */
@@ -90,7 +91,9 @@ function DataExports() {
             key: "download",
             label: "Download",
             render: (row) =>
-              row.status === "READY" ? (
+              row.status === "READY" && row.yours === false ? (
+                "Only whoever asked for it"
+              ) : row.status === "READY" ? (
                 <a className="ac-link" href={`/api/v1/admin/exports/${row.id}/download`} download>
                   <Download size={14} aria-hidden="true" /> Download zip
                 </a>

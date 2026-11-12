@@ -159,6 +159,8 @@ def _export(platform, tenant_id) -> str:
     return queued.json()["id"]
 
 
+# The hand-back record a direct purge_tenant call needs for a customer organization (RSK-066).
+WAIVED = {"export": "WAIVED", "export_waiver_reason": "Synthetic test organization"}
 PURGE_BODY = {"reason": "Pilot ended; customer asked us to delete everything", "password": PASSWORD}
 
 
@@ -258,6 +260,32 @@ def test_a_purge_needs_an_export_made_after_the_suspension_or_a_recorded_waiver(
     assert log.details["export"] == "WAIVED" and log.details["export_waiver_reason"] == waiver
 
 
+def test_no_caller_deletes_a_customer_organizations_trail_without_the_hand_back(organization):
+    """RSK-066: the hand-back rule is in purge_tenant itself, not only in the API route. Without an export, a waiver
+    or a re-applied purge record, a customer organization's audit trail (inside its retention date) stays."""
+    tenant_id = organization["tenant_id"]
+    _set_status(tenant_id, "SUSPENDED")
+    db = SessionLocal()
+    try:
+        with pytest.raises(PurgeFailed, match="^EXPORT_REQUIRED$"):
+            purge_tenant(db, tenant_id, "test", reason="A direct call without the hand-back")
+        with pytest.raises(PurgeFailed, match="^EXPORT_REQUIRED$"):
+            purge_tenant(db, tenant_id, "test", reason="Other evidence is not the hand-back", evidence={"note": "x"})
+    finally:
+        db.close()
+    assert _count(AuditEvent, tenant_id=tenant_id, action="TEST_EVENT") == 1
+    assert _count(Product, tenant_id=tenant_id) == 1 and _erasure_logs(tenant_id) == []
+    db = SessionLocal()
+    bind_system(db, "test")
+    try:
+        tenant = db.get(Tenant, tenant_id)
+        assert tenant.status == "SUSPENDED"
+        trail = db.query(AuditEvent).filter(AuditEvent.tenant_id == tenant_id).all()
+        assert trail and all(event.retention_until > datetime.now(timezone.utc) for event in trail)
+    finally:
+        db.close()
+
+
 def test_a_purge_whose_rows_cannot_all_be_deleted_changes_nothing(organization, monkeypatch):
     from backend.app import tenant_purge
 
@@ -273,7 +301,7 @@ def test_a_purge_whose_rows_cannot_all_be_deleted_changes_nothing(organization, 
     db = SessionLocal()
     try:
         with pytest.raises(PurgeFailed, match="ROWS_REMAIN:"):
-            purge_tenant(db, tenant_id, "test", reason="Testing an incomplete database stage")
+            purge_tenant(db, tenant_id, "test", reason="Testing an incomplete database stage", evidence=WAIVED)
     finally:
         db.close()
     # Stage one is all-or-nothing: rows, trail, people, status and files are exactly as before.
@@ -302,7 +330,9 @@ def test_a_purge_with_an_unavailable_file_store_stays_purging_alerts_and_is_fini
     storage = BrokenStorage()
     db = SessionLocal()
     try:
-        incomplete = purge_tenant(db, tenant_id, "test", reason="Testing a failed file deletion", storage=storage)
+        incomplete = purge_tenant(
+            db, tenant_id, "test", reason="Testing a failed file deletion", storage=storage, evidence=WAIVED
+        )
     finally:
         db.close()
     # The database rows are committed (stage one) before the file store is touched; the files step is retried.
@@ -458,6 +488,93 @@ def test_exports_are_deleted_after_their_download_period(platform, organization)
         db.close()
     keys = ObjectStorageService().list_tenant_objects(str(tenant_id))
     assert not any("/exports/" in key for key in keys)
+
+
+def _customer_admin(tenant_id):
+    """A signed-in administrator of the customer organization (not the platform administrator who asked)."""
+    import secrets
+
+    from fastapi.testclient import TestClient
+
+    from auth.durable import persist_session
+    from backend.app.main import app
+
+    now = datetime.now(timezone.utc)
+    db = SessionLocal()
+    bind_system(db, "test: a customer administrator")
+    try:
+        user = AuthUser(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            username=f"export-admin-{uuid.uuid4().hex[:8]}@example.invalid",
+            display_name="Customer admin",
+            company="Purge Test",
+            password_hash=_hash("Customer admin 2026!"),
+            role="CUSTOMER_ADMIN",
+            status="ACTIVE",
+            email_verified=True,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(user)
+        db.flush()
+        db.add(
+            TenantMembership(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                user_id=user.id,
+                status="ACTIVE",
+                is_default=True,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        db.commit()
+        token = secrets.token_urlsafe(32)
+        persist_session(db, token, user.id, tenant_id)
+    finally:
+        db.close()
+    client = TestClient(app)
+    client.cookies.set("mdarix_session", token)
+    return client
+
+
+def test_only_the_person_who_asked_downloads_an_export_and_a_refusal_is_audited(platform, organization):
+    """RSK-036 (PT-13): another administrator of the organization sees the export but cannot take it."""
+    tenant_id = organization["tenant_id"]
+    export_id = _export(platform, tenant_id)
+    admin = _customer_admin(tenant_id)
+
+    [listed] = [row for row in admin.get("/api/v1/admin/exports").json()["exports"] if row["id"] == export_id]
+    assert listed["status"] == "READY" and listed["yours"] is False
+    refused = admin.get(f"/api/v1/admin/exports/{export_id}/download")
+    assert refused.status_code == 403 and refused.json()["detail"]["code"] == "EXPORT_NOT_REQUESTER"
+    assert _count(AuditEvent, tenant_id=tenant_id, action="TENANT_EXPORT_DOWNLOAD_REFUSED") == 1
+    assert _count(AuditEvent, tenant_id=tenant_id, action="TENANT_EXPORT_DOWNLOADED") == 0
+
+    base = f"/api/v1/platform-admin/tenants/{tenant_id}/exports"
+    [mine] = [row for row in platform.get(base).json()["exports"] if row["id"] == export_id]
+    assert mine["yours"] is True
+    assert platform.get(f"{base}/{export_id}/download").status_code == 200
+
+
+def test_an_export_past_its_download_period_is_refused_before_the_hourly_job_deletes_it(platform, organization):
+    """RSK-036 (PT-11): the period is enforced at download, not only when export-expiry runs."""
+    tenant_id = organization["tenant_id"]
+    export_id = _export(platform, tenant_id)
+    db = SessionLocal()
+    bind_system(db, "test: the download period ends")
+    try:
+        row = db.get(TenantExport, uuid.UUID(export_id))
+        row.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.commit()
+        assert row.status == "READY"  # the job has not run yet
+    finally:
+        db.close()
+    refused = platform.get(f"/api/v1/platform-admin/tenants/{tenant_id}/exports/{export_id}/download")
+    assert refused.status_code == 410 and refused.json()["detail"]["code"] == "EXPORT_EXPIRED"
+    assert _count(AuditEvent, tenant_id=tenant_id, action="TENANT_EXPORT_DOWNLOAD_REFUSED") == 1
+    assert _count(AuditEvent, tenant_id=tenant_id, action="TENANT_EXPORT_DOWNLOADED") == 0
 
 
 def test_only_administrators_export_or_delete(organization):
