@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-010 |
 | Title | Deviation log and change-impact template |
-| Version | 0.1 |
+| Version | 0.2 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (first pack; not engaged yet) |
@@ -18,6 +18,7 @@ Change history
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 12 Nov 2026 | First draft (B6b Part B, item B10) | Sriharsha Telikicherla |
+| 0.2 | 12 Nov 2026 | Owner decision O11: each change carries its own risk, which sets its re-test rule (MDX-VAL-001 VMP-R23) | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -51,9 +52,10 @@ Kept in the release folder as `change-impact.md`; its ID is quoted in the releas
 | Release and commit range | From the last approved release to this one |
 | Changes | Each merged change, with its spec or fix reference |
 | Functions touched | From the per-function table of MDX-VAL-002 |
+| Risk of each change (VMP-R23) | Per change: can it alter a class-A function's records, decisions, clocks, signatures, reports or data model? Yes: class A. No: its own class, with the reason (for example "label wording only"). The quality approver checks each reason |
 | Risk rows affected | RSK IDs, with any re-rating |
 | Requirements affected | REQ IDs from `requirements.csv` (new, changed, unchanged) |
-| Scenarios to re-run | Every class-A scenario of an affected requirement (VMP-R28); for the first pack, every class-A scenario (VMP-R42) |
+| Scenarios to re-run | Every class-A scenario of a requirement affected by a class-A change (VMP-R23, VMP-R28); for the first pack, every class-A scenario (VMP-R42) |
 | Re-test rule applied | The row of MDX-VAL-001 section 9.3 |
 | Customer impact | Whether a change notice is needed, and its date |
 | Prepared by / reviewed by | System owner / quality approver, with dates (UTC) |

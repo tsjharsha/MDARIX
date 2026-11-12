@@ -4,7 +4,7 @@
 |---|---|
 | Document ID | MDX-VAL-001 |
 | Title | Validation Master Plan |
-| Version | 0.3 |
+| Version | 0.4 |
 | Status | DRAFT |
 | Author (R) | Sriharsha Telikicherla, Product & Engineering, system owner |
 | Reviewer | Independent CSV consultant (first version; not engaged yet) |
@@ -20,6 +20,7 @@ Change history
 | 0.1 | 12 Nov 2026 | First draft. Replaces MDX-B10-003 v0.1 (8 Nov 2026) and the MVP-1.0 CSA package (`docs/compliance/CSA_MVP_VALIDATION_PACKAGE.md`). Revised after a software-assisted review, findings dispositioned by the author: single-statement requirements, supporting controls (section 16), Annexes C and D | Sriharsha Telikicherla |
 | 0.2 | 12 Nov 2026 | After a second software-assisted review, findings dispositioned by the author: current status and transition (section 9.4); approval gate on R4 to R7; consultant scope; class C approach; development results are not validation evidence; MIR schema criterion; retention per owner decision O1; qualification of executors and approvers; Annex E (how each rule is checked); requirements split and renumbered in reading order | Sriharsha Telikicherla |
 | 0.3 | 12 Nov 2026 | Owner answers of 12 Nov 2026: a signed release approval record governs every production deploy from the big-bang deploy onward (VMP-R41, OP-8 closed); section 9.4 agreed by the owner (OP-7 now the consultant's review only); editorial fixes after a third software-assisted review (code baseline names `cb75e8da`; cross-references) | Sriharsha Telikicherla |
+| 0.4 | 12 Nov 2026 | Owner decisions of 12 Nov 2026 ("approve all B6b recommendations"): O11 a release is gated on each change's own risk, set in its change-impact assessment, not on the class of the function it touches (VMP-R23, section 9.3) | Sriharsha Telikicherla |
 
 ## 1. Purpose
 
@@ -191,15 +192,19 @@ The class of each function comes from MDX-VAL-002. The class is set by severity 
 
 | Class | Meaning | Assurance level |
 |---|---|---|
-| **A: High** (severity 4 or 5) | A failure could cause a missed or late authority report, a wrong regulatory conclusion, an undetected change to a signed record, a signature not bound to its record, lost regulated records, or one customer seeing another's data | Scripted testing with expected results approved before execution; negative tests (what must be refused); automated regression on every build; independent review of protocol and results; execution evidence kept; every class-A scenario of a touched function run in that release |
+| **A: High** (severity 4 or 5) | A failure could cause a missed or late authority report, a wrong regulatory conclusion, an undetected change to a signed record, a signature not bound to its record, lost regulated records, or one customer seeing another's data | Scripted testing with expected results approved before execution; negative tests (what must be refused); automated regression on every build; independent review of protocol and results; execution evidence kept; every class-A scenario that the change-impact assessment names run in that release (VMP-R23) |
 | **B: Medium** (severity 3) | A failure shows wrong or missing information that a trained person is expected to catch before signing, or delays work | Scenario testing: the scenario register row is the test, the tester records what was done and seen; automated tests where they exist; peer review |
 | **C: Low** (severity 1 or 2) | Cosmetic or convenience; no record or decision effect | Automated build checks (lint, unit tests, build); the class-C rationale recorded in MDX-VAL-002 section 4; only failures recorded |
 
 - **VMP-R21** A function's class shall be the class of its highest-severity failure mode in MDX-VAL-002.
 - **VMP-R22** A function with no failure mode that can affect a record or a decision shall be class C, with its
   rationale recorded in MDX-VAL-002 section 4.
-- **VMP-R23** A change that touches a class-A function shall be treated as class A for that release, whatever its
-  size.
+- **VMP-R23** The assurance for a change shall be set by the change's own risk, assessed in the release's
+  change-impact assessment (section 9.3), not by the class of the function it touches (owner decision O11). A change
+  that can alter a class-A function's records, decisions, clocks, signatures, reports or data model shall be treated
+  as class A, whatever its size. A change that cannot (for example the wording of a label or help text, a style or a
+  layout) shall be re-validated as its own class, with the reason recorded in the change-impact assessment and checked
+  by the quality approver.
 
 ## 9. Lifecycle and per-release validation
 
@@ -254,7 +259,8 @@ validation at the end (section 9.4 sets when this starts).
 
 | Change type | Minimum re-validation |
 |---|---|
-| Touches a class-A function or its data model | Re-run every class-A scenario of that function; full automated suite; independent review |
+| Can alter a class-A function's records, decisions, clocks, signatures, reports or data model (VMP-R23) | Re-run every class-A scenario of that function; full automated suite; independent review |
+| Touches a class-A function's screen or code but cannot alter its behaviour (text, style, layout), with the reason recorded (VMP-R23) | Automated suite; the scenario rows of the changed screens; the quality approver checks the reason |
 | New rule or question-set version, new floor version | The rule-register test rows of that market, the content-hash test, a signed rule change note |
 | Migration that changes regulated tables | IQ migration check; restore of the previous backup into the new schema; audit-chain verification |
 | Class B or C only | Automated suite; scenario rows of the changed screens |
